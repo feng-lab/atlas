@@ -30,6 +30,9 @@ namespace nim {
 
 namespace {
 
+void parseInfoFromImageIO(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2);
+void parseMetadataFromImageIO(const itk::ImageIOBase* imageIO, ZImgMetadata& meta);
+
 struct NrrdRawSpec
 {
   QString dataFilePath;
@@ -563,7 +566,7 @@ void ZImgITKImage::readInfo(const QString& filename,
     bool isNd2 = filename.endsWith(".nd2", Qt::CaseInsensitive);
 
     infos.resize(1);
-    parseInfo(imageIO.GetPointer(), infos[0], isNd2);
+    parseInfoFromImageIO(imageIO.GetPointer(), infos[0], isNd2);
 
     if (isNrrd) {
       // If this NRRD supports efficient raw region reads, advertise tiled subblocks
@@ -602,7 +605,7 @@ void ZImgITKImage::readMetadata(const QString& filename, ZImgMetadata& meta, siz
     imageIO->SetFileName(QFile::encodeName(filename).constData());
     imageIO->ReadImageInformation();
 
-    parseMetadata(imageIO.GetPointer(), meta);
+    parseMetadataFromImageIO(imageIO.GetPointer(), meta);
   }
   catch (itk::ExceptionObject& err) {
     throw ZException(err.what(), ZException::Option::CheckErrno);
@@ -644,7 +647,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     bool isNd2 = filename.endsWith(".nd2", Qt::CaseInsensitive);
 
     ZImgInfo imgInfo;
-    parseInfo(imageIO.GetPointer(), imgInfo, isNd2);
+    parseInfoFromImageIO(imageIO.GetPointer(), imgInfo, isNd2);
 
     if (region.isEmpty() || !region.isValid(imgInfo)) {
       throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
@@ -800,7 +803,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       }
     }
 
-    parseMetadata(imageIO.GetPointer(), img.metadataRef());
+    parseMetadataFromImageIO(imageIO.GetPointer(), img.metadataRef());
   }
   catch (itk::ExceptionObject& err) {
     throw ZException(err.what(), ZException::Option::CheckErrno);
@@ -841,7 +844,9 @@ bool ZImgITKImage::supportWrite() const
   return false;
 }
 
-void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2)
+namespace {
+
+void parseInfoFromImageIO(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2)
 {
   auto ndims = imageIO->GetNumberOfDimensions();
   if (ndims == 1) {
@@ -1006,7 +1011,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
   }
 }
 
-void ZImgITKImage::parseMetadata(const itk::ImageIOBase* imageIO, ZImgMetadata& meta)
+void parseMetadataFromImageIO(const itk::ImageIOBase* imageIO, ZImgMetadata& meta)
 {
   using DictionaryType = itk::MetaDataDictionary;
   const DictionaryType& dictionary = imageIO->GetMetaDataDictionary();
@@ -1028,6 +1033,8 @@ void ZImgITKImage::parseMetadata(const itk::ImageIOBase* imageIO, ZImgMetadata& 
     ++itr;
   }
 }
+
+} // namespace
 
 bool ZImgITKImage::hasSCIFIOSupport()
 {

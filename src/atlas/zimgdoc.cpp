@@ -184,6 +184,10 @@ size_t ZImgDoc::loadFile(const json::value& jValue, QString& errorMsg)
           "skeleton_source_override_url",
           [&](const QString& s, QString* err) { return pack.setNeuroglancerSkeletonSourceOverride(s, err); },
           [&]() { pack.clearNeuroglancerSkeletonSourceOverride(); });
+        applyOverride(
+          "annotations_source_override_url",
+          [&](const QString& s, QString* err) { return pack.setNeuroglancerAnnotationsSourceOverride(s, err); },
+          [&]() { pack.clearNeuroglancerAnnotationsSourceOverride(); });
       }
 
       return id;
@@ -274,6 +278,9 @@ json::value ZImgDoc::jsonValue(size_t id) const
     }
     if (pack->hasNeuroglancerSkeletonSourceOverride()) {
       jo["skeleton_source_override_url"] = json::value_from(pack->neuroglancerSkeletonSourceOverrideUrl());
+    }
+    if (pack->hasNeuroglancerAnnotationsSourceOverride()) {
+      jo["annotations_source_override_url"] = json::value_from(pack->neuroglancerAnnotationsSourceOverrideUrl());
     }
     return jv;
   }
@@ -429,6 +436,9 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
       applyOverride(historyIt->skeletonSourceOverrideUrl,
                     [&](const QString& s, QString* err) { return pack->setNeuroglancerSkeletonSourceOverride(s, err); },
                     "skeleton");
+      applyOverride(historyIt->annotationsSourceOverrideUrl,
+                    [&](const QString& s, QString* err) { return pack->setNeuroglancerAnnotationsSourceOverride(s, err); },
+                    "annotations");
     }
 
     auto defaultNameFromUrl = [](QString u) -> QString {
@@ -454,12 +464,13 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
     ZNeuroglancerPrecomputedDatasetList::Entry e;
     e.url = pack->neuroglancerRootUrl();
     e.name = !displayName.isEmpty() ? displayName : defaultNameFromUrl(e.url);
-    if (historyIt != entries.end()) {
-      // Preserve per-dataset configuration when recording a new "most recent" entry.
-      e.kind = historyIt->kind;
-      e.meshSourceOverrideUrl = historyIt->meshSourceOverrideUrl;
-      e.skeletonSourceOverrideUrl = historyIt->skeletonSourceOverrideUrl;
-    }
+      if (historyIt != entries.end()) {
+        // Preserve per-dataset configuration when recording a new "most recent" entry.
+        e.kind = historyIt->kind;
+        e.meshSourceOverrideUrl = historyIt->meshSourceOverrideUrl;
+        e.skeletonSourceOverrideUrl = historyIt->skeletonSourceOverrideUrl;
+        e.annotationsSourceOverrideUrl = historyIt->annotationsSourceOverrideUrl;
+      }
     ZNeuroglancerPrecomputedDatasetList::upsertMostRecent(&entries, std::move(e));
 
     QString saveErr;

@@ -1130,7 +1130,7 @@ void ZPunctaDetection::detectSomaMask(const ZImg& dendriteImg,
   thresholdFilter->SetInput(image);
   thresholdFilter->SetLowerThreshold(m_dendriteThreshold);
   thresholdFilter->SetNumberOfWorkUnits(numThreads);
-  registerSubOperation(thresholdFilter.GetPointer(), totalWeight * .2);
+  registerSubOperationExternal(thresholdFilter.GetPointer(), totalWeight * .2);
 
   double tubeRadiusX = std::floor(m_maxDendriteTubeRadius / m_imgInfo.voxelSizeXInUm());
   double tubeRadiusY = std::floor(m_maxDendriteTubeRadius / m_imgInfo.voxelSizeYInUm());
@@ -1164,7 +1164,7 @@ void ZPunctaDetection::detectSomaMask(const ZImg& dendriteImg,
   sliceBySliceImageFilter->SetFilter(openFilter);
   sliceBySliceImageFilter->SetInput(thresholdFilter->GetOutput());
   sliceBySliceImageFilter->SetNumberOfWorkUnits(numThreads);
-  registerSubOperation(sliceBySliceImageFilter.GetPointer(), totalWeight * .5);
+  registerSubOperationExternal(sliceBySliceImageFilter.GetPointer(), totalWeight * .5);
 
   using StructuringElementType = itk::FlatStructuringElement<3>;
   StructuringElementType::RadiusType dlElementRadius;
@@ -1179,7 +1179,7 @@ void ZPunctaDetection::detectSomaMask(const ZImg& dendriteImg,
   dilateFilter->SetInput(sliceBySliceImageFilter->GetOutput());
   dilateFilter->SetKernel(dlStructuringElement);
   dilateFilter->SetNumberOfWorkUnits(numThreads);
-  registerSubOperation(dilateFilter.GetPointer(), totalWeight * .3);
+  registerSubOperationExternal(dilateFilter.GetPointer(), totalWeight * .3);
 
   dilateFilter->Update();
   using ConstIteratorType = itk::ImageRegionConstIterator<BinaryImage3DType>;

@@ -233,7 +233,7 @@ Below is an expanded description of each menu. Items contributed by individual d
 4. **Create Desktop Entry** (Linux) – writes a `.desktop` file under `~/.local/share/applications`.
 5. **Open Log Folder / Open Config Folder** – opens respective directories in the OS file browser.
 6. **Generate Config File** – copies `settings_flagfile.txt` from resources to the config directory.
-7. **Run Custom Command** – invokes `ZCustomCommand` (see section 10.3).
+7. **Run Custom Command** – invokes `ZCustomCommand` (optional; may be disabled in deployed builds — see section 10.3).
 
 ### 3.3 Toolbars and Quick Controls
 
@@ -767,9 +767,13 @@ Tips
 
 ### 10.3 Custom Commands
 
-1. Configure the custom command (see `ZCustomCommand` configuration) to point to scripts or executables.
+This feature is intended for offline/developer scripting and may be omitted from deployed builds.
+
+1. If the menu item is present: configure the custom command (see `ZCustomCommand` configuration) to point to scripts or executables.
 2. Run **Help → Run Custom Command** to execute the script within Atlas. Useful for data preprocessing or invoking external pipelines.
 3. Monitor log output for command status.
+4. If the menu item is not present: your build was compiled without `ZCustomCommand` support.
+   - For local/source builds, enable it by configuring CMake with `-DATLAS_ENABLE_CUSTOM_COMMAND=ON`.
 
 ### 10.4 Updating and Multiple Instances
 

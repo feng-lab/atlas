@@ -8,6 +8,39 @@
 #include <cmath>
 
 namespace nim {
+namespace {
+
+ZROIMaskShapeType toMaskType(ROIType t)
+{
+  switch (t) {
+    case ROIType::Rect:
+      return ZROIMaskShapeType::Rect;
+    case ROIType::Ellipse:
+      return ZROIMaskShapeType::Ellipse;
+    case ROIType::Polygon:
+      return ZROIMaskShapeType::Polygon;
+    case ROIType::Spline:
+      return ZROIMaskShapeType::Spline;
+    case ROIType::Line:
+      return ZROIMaskShapeType::Line;
+  }
+  CHECK(false);
+  return ZROIMaskShapeType::Polygon;
+}
+
+ZROIMaskOperation2D toMaskOp(const ZROIShapeOperation& op)
+{
+  ZROIMaskOperation2D res;
+  res.isAdd = op.isAdd;
+  res.type = toMaskType(op.type);
+  res.poly.reserve(static_cast<size_t>(op.poly.size()));
+  for (const auto& p : op.poly) {
+    res.poly.emplace_back(p.x(), p.y());
+  }
+  return res;
+}
+
+} // namespace
 
 QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showLastSeg)
 {
@@ -57,7 +90,23 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
   return res;
 }
 
-std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToMask(const QPainterPath& path)
+std::tuple<ZImg, index_t, index_t> ZROIUtils::shapeToMask(const std::vector<ZROIShapeOperation>& shapeOps,
+                                                          const ZROIMaskRasterizerSettings& settings)
+{
+  if (shapeOps.empty()) {
+    return std::make_tuple(ZImg(), 0_z, 0_z);
+  }
+
+  std::vector<ZROIMaskOperation2D> ops;
+  ops.reserve(shapeOps.size());
+  for (const auto& op : shapeOps) {
+    ops.push_back(toMaskOp(op));
+  }
+
+  return ZROIMaskRasterizer::shapeToMask(ops, settings);
+}
+
+std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToMaskMR(const QPainterPath& path)
 {
   if (path.isEmpty()) {
     return std::make_tuple(ZImg(), 0_z, 0_z);

@@ -4,7 +4,9 @@
 #include "zdoc.h"
 #include "zview.h"
 
+#if ATLAS_ENABLE_CUSTOM_COMMAND
 #include "zcustomcommand.h"
+#endif
 #include "zviewsettingwidget.h"
 #include "z3drenderingengine.h"
 #include "z3dmainwindow.h"
@@ -443,7 +445,9 @@ void ZMainWindow::generateConfigFile()
 
 void ZMainWindow::runCustomCommand()
 {
+#if ATLAS_ENABLE_CUSTOM_COMMAND
   ZCustomCommand::run();
+#endif
 }
 
 void ZMainWindow::open3DWindow()
@@ -673,10 +677,12 @@ void ZMainWindow::createActions()
   m_generateConfigFileAction->setStatusTip(tr("Generate Config File"));
   connect(m_generateConfigFileAction, &QAction::triggered, this, &ZMainWindow::generateConfigFile);
 
+#if ATLAS_ENABLE_CUSTOM_COMMAND
   m_runCustomCommandAction =
     new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Custom Command"), this);
   m_runCustomCommandAction->setStatusTip(tr("Run Custom Command"));
   connect(m_runCustomCommandAction, &QAction::triggered, this, &ZMainWindow::runCustomCommand);
+#endif
 
   m_openNewInstanceAction = new QAction(tr("Open Additional Instance of Atlas"), this);
   connect(m_openNewInstanceAction, &QAction::triggered, this, &ZMainWindow::openNewInstance);
@@ -765,7 +771,9 @@ void ZMainWindow::createMenus()
   m_helpMenu->addAction(m_openLogFolderAction);
   m_helpMenu->addAction(m_openConfigFolderAction);
   m_helpMenu->addAction(m_generateConfigFileAction);
+#if ATLAS_ENABLE_CUSTOM_COMMAND
   m_helpMenu->addAction(m_runCustomCommandAction);
+#endif
 
   m_dockMenu = new QMenu(this);
   m_dockMenu->addAction(m_openNewInstanceAction);

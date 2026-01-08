@@ -58,8 +58,26 @@ add_gtest_executable(zenumtest)
 add_gtest_executable(zstringutilstest)
 add_gtest_executable(ztupleliketest)
 
+# Atlas-side tests
+
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
+set(_atlas_enable_zroimaskrastertest_default ON)
+if (WIN32 AND (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI}))
+  # `zroimaskrastertest` is particularly slow/heavy on Windows runners. Skip it in
+  # CI by default, but keep it available for local Windows repro via
+  # `-DATLAS_ENABLE_ZROIMASKRASTERTEST=ON`.
+  set(_atlas_enable_zroimaskrastertest_default OFF)
+endif ()
+option(
+  ATLAS_ENABLE_ZROIMASKRASTERTEST
+  "Build and run zroimaskrastertest (slow on Windows CI)."
+  ${_atlas_enable_zroimaskrastertest_default})
+if (ATLAS_ENABLE_ZROIMASKRASTERTEST)
+  add_atlas_gtest_executable(zroimaskrastertest)
+else ()
+  message(STATUS "Skipping zroimaskrastertest (ATLAS_ENABLE_ZROIMASKRASTERTEST=OFF)")
+endif ()
 add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_gtest_executable(zneuroglanceruint64shardingtest)
 add_atlas_gtest_executable(zneuroglancerprecomputedchunkdecodertest)
@@ -67,9 +85,7 @@ add_atlas_gtest_executable(zneuroglancerprecomputedannotationstest)
 add_atlas_gtest_executable(zneuroglancerprecomputedsegmentpropertiestest)
 add_atlas_gtest_executable(zneuroglancerprecomputedskeletontest)
 add_atlas_gtest_executable(zneuroglancerprecomputede2etest)
-add_atlas_gtest_executable(zroimaskrastertest)
 
-# Atlas-side tests
 
 find_package(benchmark REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build NO_DEFAULT_PATH)

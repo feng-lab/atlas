@@ -17,6 +17,7 @@ public:
     QString url;
     QString meshSourceOverrideUrl;
     QString skeletonSourceOverrideUrl;
+    QString annotationsSourceOverrideUrl;
   };
 
   [[nodiscard]] static QString examplesFilename();

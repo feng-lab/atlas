@@ -479,6 +479,7 @@ set(SOURCES
     zimgqtutils.h zimgqtutils.cpp
     zlogqtgui.h zlogqtgui.cpp
     zroi.h zroi.cpp
+    zroitypes.h zroitypes.cpp
     zroiutils.h zroiutils.cpp
     zroidoc.h zroidoc.cpp
     zroiview.h zroiview.cpp
@@ -512,7 +513,6 @@ set(SOURCES
     zstringparameter.h zstringparameter.cpp
     z3dsdfont.h z3dsdfont.cpp
     zspanslider.h zspanslider.cpp
-    zcustomcommand.h zcustomcommand.cpp
     ztakescreenshotwidget.h ztakescreenshotwidget.cpp
     z3dshader.h z3dshader.cpp
     z3dcontext.h z3dcontext.cpp
@@ -662,6 +662,10 @@ set(SOURCES
     zvulkanconepipelinecontext.cpp
 )
 
+if (ATLAS_ENABLE_CUSTOM_COMMAND)
+  list(APPEND SOURCES zcustomcommand.h zcustomcommand.cpp)
+endif ()
+
 # our target
 set(APP_NAME Atlas)
 
@@ -719,7 +723,9 @@ else ()
   # Do not use Vulkan::Headers, which might point to /usr/include
   target_include_directories(atlas_core PUBLIC $ENV{VULKAN_SDK}/include)
 endif ()
-target_compile_definitions(atlas_core PUBLIC ATLAS_USE_CORE_PROFILE)
+target_compile_definitions(atlas_core PUBLIC
+  ATLAS_USE_CORE_PROFILE
+  ATLAS_ENABLE_CUSTOM_COMMAND=$<BOOL:${ATLAS_ENABLE_CUSTOM_COMMAND}>)
 
 target_link_libraries(atlas_core PUBLIC
   img neutu

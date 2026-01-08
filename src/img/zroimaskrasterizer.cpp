@@ -1,6 +1,5 @@
 #include "zroimaskrasterizer.h"
 
-#include "zsaturateoperation.h"
 #include "zlog.h"
 
 #include <NaturalSplineCurve.h>
@@ -58,10 +57,16 @@ public:
   ZBitMask2D(int width, int height)
     : m_width(width)
     , m_height(height)
-    , m_words((static_cast<size_t>(width) * static_cast<size_t>(height) + 63) / 64, 0)
   {
     CHECK(width >= 0);
     CHECK(height >= 0);
+
+    const size_t w = static_cast<size_t>(width);
+    const size_t h = static_cast<size_t>(height);
+    CHECK(w == 0 || (std::numeric_limits<size_t>::max() / w) >= h);
+    const size_t bitCount = w * h;
+    const size_t wordCount = (bitCount + 63) / 64;
+    m_words.assign(wordCount, 0);
   }
 
   [[nodiscard]] int width() const { return m_width; }
@@ -192,71 +197,6 @@ private:
 [[nodiscard]] glm::dvec2 applyScale(const glm::dvec2& p, double scaleX, double scaleY)
 {
   return glm::dvec2(p.x * scaleX, p.y * scaleY);
-}
-
-[[nodiscard]] double evalCubic(double a, double b, double c, double d, double t)
-{
-  // Horner form.
-  return ((a * t + b) * t + c) * t + d;
-}
-
-void expandBoundsForCubic(double p0, double p1, double p2, double p3, double& outMin, double& outMax)
-{
-  outMin = std::min(outMin, std::min(p0, p3));
-  outMax = std::max(outMax, std::max(p0, p3));
-
-  const double a = -p0 + 3.0 * p1 - 3.0 * p2 + p3;
-  const double b = 3.0 * p0 - 6.0 * p1 + 3.0 * p2;
-  const double c = -3.0 * p0 + 3.0 * p1;
-  // d = p0
-
-  // Solve 3a t^2 + 2b t + c = 0 for t in (0, 1)
-  const double qa = 3.0 * a;
-  const double qb = 2.0 * b;
-  const double qc = c;
-
-  if (std::abs(qa) < 1e-12) {
-    if (std::abs(qb) < 1e-12) {
-      return;
-    }
-    const double t = -qc / qb;
-    if (t > 0.0 && t < 1.0) {
-      const double v = evalCubic(a, b, c, p0, t);
-      outMin = std::min(outMin, v);
-      outMax = std::max(outMax, v);
-    }
-    return;
-  }
-
-  const double disc = qb * qb - 4.0 * qa * qc;
-  if (disc < 0.0) {
-    return;
-  }
-  const double sqrtDisc = std::sqrt(disc);
-  const double inv2a = 1.0 / (2.0 * qa);
-  const double t0 = (-qb - sqrtDisc) * inv2a;
-  const double t1 = (-qb + sqrtDisc) * inv2a;
-  for (double t : { t0, t1 }) {
-    if (t > 0.0 && t < 1.0) {
-      const double v = evalCubic(a, b, c, p0, t);
-      outMin = std::min(outMin, v);
-      outMax = std::max(outMax, v);
-    }
-  }
-}
-
-ZROIBounds2D cubicBezierBounds(const glm::dvec2& p0,
-                              const glm::dvec2& p1,
-                              const glm::dvec2& p2,
-                              const glm::dvec2& p3)
-{
-  ZROIBounds2D b;
-  b.expand(p0);
-  b.expand(p3);
-
-  expandBoundsForCubic(p0.x, p1.x, p2.x, p3.x, b.minX, b.maxX);
-  expandBoundsForCubic(p0.y, p1.y, p2.y, p3.y, b.minY, b.maxY);
-  return b;
 }
 
 [[nodiscard]] double distancePointToLine(const glm::dvec2& p, const glm::dvec2& a, const glm::dvec2& b)
@@ -622,9 +562,16 @@ void rasterizeLineStroke(const std::vector<glm::dvec2>& polyline,
       return b;
     }
 
+    // Note: For spline bounds we deliberately avoid the tighter extremum-based Bezier bounds
+    // computation (roots of derivative) because it can be numerically fragile in degenerate
+    // cases (e.g. very small dt segments). Bounding by the Bezier control points is guaranteed
+    // to contain the curve (convex-hull property) and is stable.
     const auto beziers = splineToCubicBeziers(scaled);
     for (const auto& bez : beziers) {
-      b.expand(cubicBezierBounds(bez[0], bez[1], bez[2], bez[3]));
+      b.expand(bez[0]);
+      b.expand(bez[1]);
+      b.expand(bez[2]);
+      b.expand(bez[3]);
     }
     return b;
   }
@@ -747,10 +694,24 @@ std::tuple<ZImg, index_t, index_t> ZROIMaskRasterizer::shapeToMask(const std::ve
       return std::make_tuple(ZImg(), 0_z, 0_z);
     }
 
-    const int outW = static_cast<int>(maxX - minX + 1);
-    const int outH = static_cast<int>(maxY - minY + 1);
-    const int hrW = outW * settings.supersample;
-    const int hrH = outH * settings.supersample;
+    const index_t outSW = maxX - minX + 1;
+    const index_t outSH = maxY - minY + 1;
+    CHECK(outSW > 0_z);
+    CHECK(outSH > 0_z);
+    CHECK(outSW <= static_cast<index_t>(std::numeric_limits<int>::max()));
+    CHECK(outSH <= static_cast<index_t>(std::numeric_limits<int>::max()));
+
+    CHECK(outSW <= std::numeric_limits<index_t>::max() / static_cast<index_t>(settings.supersample));
+    CHECK(outSH <= std::numeric_limits<index_t>::max() / static_cast<index_t>(settings.supersample));
+    const index_t hrSW = outSW * static_cast<index_t>(settings.supersample);
+    const index_t hrSH = outSH * static_cast<index_t>(settings.supersample);
+    CHECK(hrSW <= static_cast<index_t>(std::numeric_limits<int>::max()));
+    CHECK(hrSH <= static_cast<index_t>(std::numeric_limits<int>::max()));
+
+    // const int outW = static_cast<int>(outSW);
+    // const int outH = static_cast<int>(outSH);
+    const int hrW = static_cast<int>(hrSW);
+    const int hrH = static_cast<int>(hrSH);
 
     ZBitMask2D hi(hrW, hrH);
     const glm::dvec2 origin(static_cast<double>(minX), static_cast<double>(minY));
@@ -799,10 +760,24 @@ std::tuple<ZImg, index_t, index_t> ZROIMaskRasterizer::shapeToMask(const std::ve
     return std::make_tuple(ZImg(), 0_z, 0_z);
   }
 
-  const int outW = static_cast<int>(maxX - minX + 1);
-  const int outH = static_cast<int>(maxY - minY + 1);
-  const int hrW = outW * settings.supersample;
-  const int hrH = outH * settings.supersample;
+  const index_t outSW = maxX - minX + 1;
+  const index_t outSH = maxY - minY + 1;
+  CHECK(outSW > 0_z);
+  CHECK(outSH > 0_z);
+  CHECK(outSW <= static_cast<index_t>(std::numeric_limits<int>::max()));
+  CHECK(outSH <= static_cast<index_t>(std::numeric_limits<int>::max()));
+
+  CHECK(outSW <= std::numeric_limits<index_t>::max() / static_cast<index_t>(settings.supersample));
+  CHECK(outSH <= std::numeric_limits<index_t>::max() / static_cast<index_t>(settings.supersample));
+  const index_t hrSW = outSW * static_cast<index_t>(settings.supersample);
+  const index_t hrSH = outSH * static_cast<index_t>(settings.supersample);
+  CHECK(hrSW <= static_cast<index_t>(std::numeric_limits<int>::max()));
+  CHECK(hrSH <= static_cast<index_t>(std::numeric_limits<int>::max()));
+
+  // const int outW = static_cast<int>(outSW);
+  // const int outH = static_cast<int>(outSH);
+  const int hrW = static_cast<int>(hrSW);
+  const int hrH = static_cast<int>(hrSH);
 
   ZBitMask2D hi(hrW, hrH);
   const glm::dvec2 origin(static_cast<double>(minX), static_cast<double>(minY));

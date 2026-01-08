@@ -1,6 +1,8 @@
 #include "zimgprocess.h"
 
 #include "zlog.h"
+#include <itkMacro.h>
+#include <itkProcessObject.h>
 #include <QThread>
 #include <folly/ScopeGuard.h>
 

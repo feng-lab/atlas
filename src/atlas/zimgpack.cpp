@@ -6,6 +6,7 @@
 #include "zimgregioncache.h"
 #include "zcancellation.h"
 #include "zneuroglancerprecomputed.h"
+#include "zneuroglancerprecomputedannotations.h"
 #include "zneuroglancerprecomputedmesh.h"
 #include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancersegmentationcolors.h"
@@ -559,6 +560,18 @@ QString ZImgPack::neuroglancerSkeletonSourceOverrideUrl() const
   return m_ngSkeletonSourceOverrideUrl.trimmed();
 }
 
+bool ZImgPack::hasNeuroglancerAnnotationsSourceOverride() const
+{
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  return !m_ngAnnotationsSourceOverrideUrl.trimmed().isEmpty();
+}
+
+QString ZImgPack::neuroglancerAnnotationsSourceOverrideUrl() const
+{
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  return m_ngAnnotationsSourceOverrideUrl.trimmed();
+}
+
 bool ZImgPack::hasNeuroglancerMeshSourceConfigured() const
 {
   if (!m_ngVolume || !m_ngVolume->isSegmentation()) {
@@ -579,6 +592,14 @@ bool ZImgPack::hasNeuroglancerSkeletonSourceConfigured() const
     return true;
   }
   return hasNeuroglancerSkeletonSourceOverride();
+}
+
+bool ZImgPack::hasNeuroglancerAnnotationsSourceConfigured() const
+{
+  if (!m_ngVolume || !m_ngVolume->isSegmentation()) {
+    return false;
+  }
+  return hasNeuroglancerAnnotationsSourceOverride();
 }
 
 bool ZImgPack::setNeuroglancerMeshSourceOverride(QString userText, QString* errorMsg)
@@ -629,6 +650,30 @@ bool ZImgPack::setNeuroglancerSkeletonSourceOverride(QString userText, QString* 
   return true;
 }
 
+bool ZImgPack::setNeuroglancerAnnotationsSourceOverride(QString userText, QString* errorMsg)
+{
+  if (!m_ngVolume || !m_ngVolume->isSegmentation()) {
+    if (errorMsg) {
+      *errorMsg = QStringLiteral("Not a Neuroglancer segmentation dataset");
+    }
+    return false;
+  }
+
+  QString err;
+  const auto urlOpt = normalizeNeuroglancerExternalSourceDirUrl(*m_ngVolume, std::move(userText), &err);
+  if (!urlOpt) {
+    if (errorMsg) {
+      *errorMsg = err;
+    }
+    return false;
+  }
+
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  m_ngAnnotationsSourceOverrideUrl = *urlOpt;
+  m_ngAnnotationsSourceOverride.reset();
+  return true;
+}
+
 void ZImgPack::clearNeuroglancerMeshSourceOverride()
 {
   const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
@@ -641,6 +686,13 @@ void ZImgPack::clearNeuroglancerSkeletonSourceOverride()
   const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
   m_ngSkeletonSourceOverrideUrl.clear();
   m_ngSkeletonSourceOverride.reset();
+}
+
+void ZImgPack::clearNeuroglancerAnnotationsSourceOverride()
+{
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  m_ngAnnotationsSourceOverrideUrl.clear();
+  m_ngAnnotationsSourceOverride.reset();
 }
 
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZImgPack::loadNeuroglancerMeshSourceBlocking() const
@@ -707,6 +759,38 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZImgPack::loadNeur
   const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
   if (m_ngSkeletonSourceOverrideUrl.trimmed() == overrideUrl) {
     m_ngSkeletonSourceOverride = loaded;
+  }
+  return loaded;
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedAnnotationsSource> ZImgPack::loadNeuroglancerAnnotationsSourceBlocking() const
+{
+  CHECK(m_ngVolume);
+  CHECK(m_ngVolume->isSegmentation());
+
+  QString overrideUrl;
+  {
+    const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+    overrideUrl = m_ngAnnotationsSourceOverrideUrl.trimmed();
+    if (!overrideUrl.isEmpty() && m_ngAnnotationsSourceOverride) {
+      return m_ngAnnotationsSourceOverride;
+    }
+  }
+
+  CHECK(!overrideUrl.isEmpty()) << "Neuroglancer annotations source is not configured";
+
+  const ZImgInfo& info = m_ngVolume->baseImgInfo();
+  const std::array<double, 3> baseResolutionNm{info.voxelSizeX, info.voxelSizeY, info.voxelSizeZ};
+
+  auto loaded = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(overrideUrl),
+                                                                baseResolutionNm,
+                                                                m_ngVolume->baseVoxelOffset(),
+                                                                m_ngVolume->defaultTimeout());
+  CHECK(loaded);
+
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  if (m_ngAnnotationsSourceOverrideUrl.trimmed() == overrideUrl) {
+    m_ngAnnotationsSourceOverride = loaded;
   }
   return loaded;
 }

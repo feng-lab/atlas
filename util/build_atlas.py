@@ -65,6 +65,8 @@ def build_atlas(
 
     cmakecmd.extend(['-DATLAS_SANITIZE_ADDRESS:BOOL=' + ('ON' if use_asan else 'OFF'),
                      '-DATLAS_DEBUG_VERSION:BOOL=' + ('ON' if debug_version else 'OFF'),
+                     # Developer-only tool; keep it out of deployed builds by default.
+                     '-DATLAS_ENABLE_CUSTOM_COMMAND:BOOL=' + ('ON' if debug_version else 'OFF'),
                      ])
     cmakecmd.extend([common_dirs.atlas_repository_dir()])
 

@@ -136,6 +136,7 @@ void ZNeuroglancerPrecomputedDatasetList::normalizeAndDeduplicate(std::vector<En
     clean.kind = trimOrEmpty(e.kind);
     clean.meshSourceOverrideUrl = trimOrEmpty(e.meshSourceOverrideUrl);
     clean.skeletonSourceOverrideUrl = trimOrEmpty(e.skeletonSourceOverrideUrl);
+    clean.annotationsSourceOverrideUrl = trimOrEmpty(e.annotationsSourceOverrideUrl);
 
     // If duplicates exist (e.g. manual edits), merge missing optional metadata into the first occurrence
     // to avoid losing overrides during normalization.
@@ -156,6 +157,9 @@ void ZNeuroglancerPrecomputedDatasetList::normalizeAndDeduplicate(std::vector<En
       if (it->skeletonSourceOverrideUrl.isEmpty() && !clean.skeletonSourceOverrideUrl.isEmpty()) {
         it->skeletonSourceOverrideUrl = std::move(clean.skeletonSourceOverrideUrl);
       }
+      if (it->annotationsSourceOverrideUrl.isEmpty() && !clean.annotationsSourceOverrideUrl.isEmpty()) {
+        it->annotationsSourceOverrideUrl = std::move(clean.annotationsSourceOverrideUrl);
+      }
       continue;
     }
 
@@ -175,6 +179,7 @@ void ZNeuroglancerPrecomputedDatasetList::upsertMostRecent(std::vector<Entry>* e
   entry.kind = entry.kind.trimmed();
   entry.meshSourceOverrideUrl = entry.meshSourceOverrideUrl.trimmed();
   entry.skeletonSourceOverrideUrl = entry.skeletonSourceOverrideUrl.trimmed();
+  entry.annotationsSourceOverrideUrl = entry.annotationsSourceOverrideUrl.trimmed();
   if (entry.url.isEmpty()) {
     return;
   }
@@ -261,6 +266,9 @@ std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> ZNeuroglancerPrecomputed
     if (auto skelIt = o.find("skeleton_source_override_url"); skelIt != o.end() && skelIt->value().is_string()) {
       e.skeletonSourceOverrideUrl = json::value_to<QString>(skelIt->value());
     }
+    if (auto annIt = o.find("annotations_source_override_url"); annIt != o.end() && annIt->value().is_string()) {
+      e.annotationsSourceOverrideUrl = json::value_to<QString>(annIt->value());
+    }
     out.push_back(std::move(e));
   }
 
@@ -288,6 +296,9 @@ json::object ZNeuroglancerPrecomputedDatasetList::toListObject(const std::vector
     }
     if (!e.skeletonSourceOverrideUrl.trimmed().isEmpty()) {
       o["skeleton_source_override_url"] = json::value_from(e.skeletonSourceOverrideUrl.trimmed());
+    }
+    if (!e.annotationsSourceOverrideUrl.trimmed().isEmpty()) {
+      o["annotations_source_override_url"] = json::value_from(e.annotationsSourceOverrideUrl.trimmed());
     }
     datasets.push_back(std::move(o));
   }

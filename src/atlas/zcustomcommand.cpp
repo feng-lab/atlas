@@ -31,7 +31,6 @@
 #include "zconcurrentlrucache.h"
 #include "zthreadsafescalablecache.h"
 #include <qtcsv/reader.h>
-#include <itkMath.h>
 #include <QDir>
 #include <QApplication>
 #include <tbb/global_control.h>

@@ -2,10 +2,6 @@
 
 #include "zimgformat.h"
 
-namespace itk {
-class ImageIOBase;
-} // namespace itk
-
 namespace nim {
 
 class ZImgITKImage : public ZImgFormat
@@ -46,10 +42,6 @@ public:
   [[nodiscard]] bool supportWrite() const override;
 
 protected:
-  static void parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2);
-
-  static void parseMetadata(const itk::ImageIOBase* imageIO, ZImgMetadata& meta);
-
   static bool hasSCIFIOSupport();
 };
 

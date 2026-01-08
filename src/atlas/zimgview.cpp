@@ -271,9 +271,11 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol;
     bool hasMeshDirectory = false;
     bool hasSkeletonDirectory = false;
+    bool hasAnnotationsSource = false;
     bool hasSegmentPropertiesDirectory = false;
     QString meshSourceDirUrl;
     QString skeletonSourceDirUrl;
+    QString annotationsSourceRootUrl;
   };
 
   std::vector<Candidate> candidates;
@@ -311,6 +313,10 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
 
     c.hasMeshDirectory = !c.meshSourceDirUrl.isEmpty();
     c.hasSkeletonDirectory = !c.skeletonSourceDirUrl.isEmpty();
+
+    // Annotations are stored in a separate precomputed dataset, so there is no volume-info fallback.
+    c.annotationsSourceRootUrl = imgPack.neuroglancerAnnotationsSourceOverrideUrl();
+    c.hasAnnotationsSource = !c.annotationsSourceRootUrl.trimmed().isEmpty();
     candidates.push_back(std::move(c));
   }
   if (candidates.empty()) {
@@ -325,39 +331,15 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     return c.hasSkeletonDirectory;
   });
 
-  auto promptAndLoadAnnotationsForSegment =
-    [this](const std::shared_ptr<ZNeuroglancerPrecomputedVolume>& vol, uint64_t segmentId) {
+  const bool hasAnyAnnotations = std::any_of(candidates.begin(), candidates.end(), [](const Candidate& c) {
+    return c.hasAnnotationsSource;
+  });
+
+  auto startAnnotationsLoad =
+    [this](const std::shared_ptr<ZNeuroglancerPrecomputedVolume>& vol, QString annRootUrl, uint64_t segmentId) {
     CHECK(vol);
-
-    QString prefill;
-    const QString clip = QApplication::clipboard()->text().trimmed();
-    if (clip.contains("://") || clip.startsWith("gs://")) {
-      prefill = clip;
-    }
-
-    const QString annUserText = QInputDialog::getText(
-                                  QApplication::activeWindow(),
-                                  QApplication::applicationName(),
-                                  QStringLiteral("Neuroglancer annotations dataset URL (precomputed root):\n"
-                                                 "(e.g. precomputed://gs://.../annotations)\n\n"
-                                                 "The dataset must be '@type': neuroglancer_annotations_v1."),
-                                  QLineEdit::Normal,
-                                  prefill)
-                                .trimmed();
-    if (annUserText.isEmpty()) {
-      return;
-    }
-
-    QString annRootUrl;
-    try {
-      annRootUrl = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(annUserText);
-    }
-    catch (const std::exception& e) {
-      QMessageBox::information(QApplication::activeWindow(),
-                               QApplication::applicationName(),
-                               QString("Invalid annotations URL:\n%1").arg(QString::fromUtf8(e.what())));
-      return;
-    }
+    annRootUrl = annRootUrl.trimmed();
+    CHECK(!annRootUrl.isEmpty());
 
     auto* openWatcher = new QFutureWatcher<NeuroglancerAnnotationsSourceOpenResult>(this);
     connect(openWatcher,
@@ -1256,6 +1238,35 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     });
   }
 
+  if (!hasAnyAnnotations) {
+    auto* explainAnnotationsAct =
+      menu.addAction("Neuroglancer Annotations: configure annotations source in Object View Setting…");
+    connect(explainAnnotationsAct, &QAction::triggered, this, [candidates]() {
+      std::set<QString> roots;
+      for (const auto& c : candidates) {
+        if (c.vol) {
+          roots.insert(c.vol->rootUrl());
+        }
+      }
+
+      QString rootList;
+      for (const auto& r : roots) {
+        rootList += QString("  %1\n").arg(r);
+      }
+
+      QMessageBox::information(
+        QApplication::activeWindow(),
+        QApplication::applicationName(),
+        QStringLiteral("No Neuroglancer annotations source is configured for the currently visible segmentation dataset(s).\n\n"
+                       "To enable annotation loading:\n"
+                       "  1) Select the Neuroglancer segmentation object.\n"
+                       "  2) Open Object View Setting → Neuroglancer Sources.\n"
+                       "  3) Set \"Annotations Source Override\" to an annotations dataset root URL/path (absolute or relative).\n\n"
+                       "Visible segmentation dataset(s):\n%1")
+          .arg(rootList.trimmed()));
+    });
+  }
+
   if (hasAnyMesh) {
     auto* loadMeshAct = menu.addAction("Load Neuroglancer Mesh for Segment Under Cursor");
     connect(loadMeshAct, &QAction::triggered, this, [scenePos, startMeshLoad, candidates]() {
@@ -1326,13 +1337,17 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     });
   }
 
-  {
-    auto* loadAnnUnderCursorAct = menu.addAction("Load Neuroglancer Annotations for Segment Under Cursor…");
-    connect(loadAnnUnderCursorAct, &QAction::triggered, this, [scenePos, candidates, promptAndLoadAnnotationsForSegment]() {
+  if (hasAnyAnnotations) {
+    auto* loadAnnUnderCursorAct = menu.addAction("Load Neuroglancer Annotations for Segment Under Cursor");
+    connect(loadAnnUnderCursorAct, &QAction::triggered, this, [scenePos, candidates, startAnnotationsLoad]() {
       int bestPrecedence = std::numeric_limits<int>::min();
       std::optional<uint64_t> bestSeg;
       std::shared_ptr<ZNeuroglancerPrecomputedVolume> bestVol;
+      QString bestAnnotationsRootUrl;
       for (const auto& c : candidates) {
+        if (!c.hasAnnotationsSource) {
+          continue;
+        }
         CHECK(c.filter);
         const std::optional<uint64_t> segOpt = c.filter->cachedNeuroglancerSegmentationIdAtScenePos(scenePos);
         if (!segOpt) {
@@ -1343,16 +1358,17 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
           bestPrecedence = precedence;
           bestSeg = segOpt;
           bestVol = c.vol;
+          bestAnnotationsRootUrl = c.annotationsSourceRootUrl;
         }
       }
-      if (!bestSeg || !bestVol) {
+      if (!bestSeg || !bestVol || bestAnnotationsRootUrl.trimmed().isEmpty()) {
         QMessageBox::information(QApplication::activeWindow(),
                                  QApplication::applicationName(),
                                  QStringLiteral("No cached Neuroglancer segment ID is available under the cursor yet.\n\n"
                                                 "Wait for the visible tiles to finish loading, then try again."));
         return;
       }
-      promptAndLoadAnnotationsForSegment(bestVol, *bestSeg);
+      startAnnotationsLoad(bestVol, bestAnnotationsRootUrl, *bestSeg);
     });
   }
 
@@ -1374,12 +1390,17 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     return best;
   };
 
-  if (const Candidate* topAny = pickTopmostSegmentationCandidate([](const Candidate&) { return true; })) {
-    if (topAny->vol) {
-      const std::shared_ptr<ZNeuroglancerPrecomputedVolume> topVol = topAny->vol;
+  const Candidate* topAnnotations = hasAnyAnnotations ? pickTopmostSegmentationCandidate([](const Candidate& c) {
+    return c.hasAnnotationsSource;
+  }) : nullptr;
+
+  if (hasAnyAnnotations) {
+    if (topAnnotations && topAnnotations->vol && !topAnnotations->annotationsSourceRootUrl.trimmed().isEmpty()) {
+      const std::shared_ptr<ZNeuroglancerPrecomputedVolume> topVol = topAnnotations->vol;
+      const QString annotationsRootUrl = topAnnotations->annotationsSourceRootUrl;
       auto* loadAnnByIdAct =
         menu.addAction(QString("Load Neuroglancer Annotations for Segment ID… (%1)").arg(topVol->rootUrl()));
-      connect(loadAnnByIdAct, &QAction::triggered, this, [topVol, promptAndLoadAnnotationsForSegment]() {
+      connect(loadAnnByIdAct, &QAction::triggered, this, [topVol, annotationsRootUrl, startAnnotationsLoad]() {
         QString prefill;
         if (const auto clipOpt = parseUint64Base10(QApplication::clipboard()->text())) {
           prefill = QString::number(static_cast<qulonglong>(*clipOpt));
@@ -1400,7 +1421,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                                    QStringLiteral("Invalid object ID. Expected a base-10 uint64 value."));
           return;
         }
-        promptAndLoadAnnotationsForSegment(topVol, *idOpt);
+        startAnnotationsLoad(topVol, annotationsRootUrl, *idOpt);
       });
     }
   }

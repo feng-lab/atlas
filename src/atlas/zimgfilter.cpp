@@ -105,6 +105,7 @@ void persistNeuroglancerSourceOverridesToHistory(const ZImgPack& pack, const QSt
 
   entry.meshSourceOverrideUrl = pack.neuroglancerMeshSourceOverrideUrl();
   entry.skeletonSourceOverrideUrl = pack.neuroglancerSkeletonSourceOverrideUrl();
+  entry.annotationsSourceOverrideUrl = pack.neuroglancerAnnotationsSourceOverrideUrl();
 
   ZNeuroglancerPrecomputedDatasetList::upsertMostRecent(&entries, std::move(entry));
 
@@ -787,6 +788,7 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
 
         const QString meshOverride = m_imgPack->neuroglancerMeshSourceOverrideUrl();
         const QString skeletonOverride = m_imgPack->neuroglancerSkeletonSourceOverrideUrl();
+        const QString annotationsOverride = m_imgPack->neuroglancerAnnotationsSourceOverrideUrl();
 
         QString meshEffective;
         if (!meshOverride.isEmpty()) {
@@ -800,6 +802,11 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
           skeletonEffective = skeletonOverride;
         } else if (vol->hasSkeletonDirectory()) {
           skeletonEffective = vol->skeletonDirUrl().toString(QUrl::StripTrailingSlash) + "/";
+        }
+
+        QString annotationsEffective;
+        if (!annotationsOverride.isEmpty()) {
+          annotationsEffective = annotationsOverride;
         }
 
         addStatus(QStringLiteral("Mesh source: %1").arg(effectiveUrlOrEmpty(meshEffective)));
@@ -895,6 +902,49 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
           updateViewSettingWidgetsGroup();
         });
         ngGroup->addChild(*clearSkel, 1);
+
+        addStatus(QStringLiteral("Annotations source: %1").arg(effectiveUrlOrEmpty(annotationsEffective)));
+        if (!annotationsOverride.isEmpty()) {
+          addStatus(QStringLiteral("  (override; annotations are stored in a separate dataset)"));
+        }
+
+        auto* setAnn = new QPushButton(QStringLiteral("Set Annotations Source Override…"));
+        connect(setAnn, &QPushButton::clicked, this, [this]() {
+          CHECK(m_imgPack);
+          const QString prefill = m_imgPack->neuroglancerAnnotationsSourceOverrideUrl();
+          const QString s = QInputDialog::getText(
+                              QApplication::activeWindow(),
+                              QApplication::applicationName(),
+                              QStringLiteral("Annotations dataset root URL or relative path:\n"
+                                             "(Relative paths are resolved against this dataset's root URL.)\n\n"
+                                             "The target dataset must contain an 'info' with '@type': neuroglancer_annotations_v1."),
+                              QLineEdit::Normal,
+                              prefill)
+                            .trimmed();
+          if (s.isEmpty()) {
+            return;
+          }
+          QString err;
+          if (!m_imgPack->setNeuroglancerAnnotationsSourceOverride(s, &err)) {
+            QMessageBox::information(QApplication::activeWindow(),
+                                     QApplication::applicationName(),
+                                     QStringLiteral("Failed to set annotations source override:\n%1").arg(err));
+            return;
+          }
+          persistNeuroglancerSourceOverridesToHistory(*m_imgPack, QStringLiteral("segmentation"));
+          updateViewSettingWidgetsGroup();
+        });
+        ngGroup->addChild(*setAnn, 1);
+
+        auto* clearAnn = new QPushButton(QStringLiteral("Clear Annotations Source Override"));
+        clearAnn->setEnabled(m_imgPack->hasNeuroglancerAnnotationsSourceOverride());
+        connect(clearAnn, &QPushButton::clicked, this, [this]() {
+          CHECK(m_imgPack);
+          m_imgPack->clearNeuroglancerAnnotationsSourceOverride();
+          persistNeuroglancerSourceOverridesToHistory(*m_imgPack, QStringLiteral("segmentation"));
+          updateViewSettingWidgetsGroup();
+        });
+        ngGroup->addChild(*clearAnn, 1);
 
         m_widgetsGroup->addChild(ngGroup);
       }

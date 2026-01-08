@@ -1,9 +1,13 @@
 #pragma once
 
 #include "zimg.h"
+#include "zroitypes.h"
+#include "zroimaskrasterizer.h"
 #include <QPolygonF>
 #include <QPainterPath>
+#include <string>
 #include <tuple>
+#include <vector>
 
 namespace nim {
 
@@ -12,15 +16,24 @@ class ZROIUtils
 public:
   static QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = true);
 
+  // Rasterize a single ROI shape (add/sub operations) into a tight binary mask using the
+  // scanline-based ZROIMaskRasterizer backend.
+  [[nodiscard]] static std::tuple<ZImg, index_t, index_t>
+  shapeToMask(const std::vector<ZROIShapeOperation>& shapeOps, const ZROIMaskRasterizerSettings& settings);
+
   // Rasterize a filled QPainterPath into a tight binary mask.
   //
   // Note: this uses the fast scanline-based ZROIMaskRasterizer backend (via polygons extracted
   // from the QPainterPath) and may differ slightly from Qt's QPainter/QImage rasterization at edges.
-  static std::tuple<ZImg, index_t, index_t> qPainterPathToMask(const QPainterPath& path);
+  static std::tuple<ZImg, index_t, index_t> qPainterPathToMaskMR(const QPainterPath& path);
 
-  // Legacy/reference implementation that rasterizes via Qt (QPainter -> QImage::Format_Mono).
-  // This is kept for historical behavior parity and for tests/benchmarks.
+  // Reference implementation that rasterizes via Qt (QPainter -> QImage::Format_Mono).
   static std::tuple<ZImg, index_t, index_t> qPainterPathToMaskQt(const QPainterPath& path);
+
+  static std::tuple<ZImg, index_t, index_t> qPainterPathToMask(const QPainterPath& path)
+  {
+    return qPainterPathToMaskQt(path);
+  }
 
   static std::tuple<ZImg, index_t, index_t> qPainterPathToStroke(const QPainterPath& path, double width = 2.);
 

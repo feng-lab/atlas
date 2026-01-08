@@ -26,6 +26,7 @@ namespace nim {
 
 class ZNeuroglancerPrecomputedVolume;
 class ZNeuroglancerPrecomputedMeshSource;
+class ZNeuroglancerPrecomputedAnnotationsSource;
 class ZNeuroglancerPrecomputedSkeletonSource;
 
 class ZImgPackSubBlock : public ZImgSubBlock
@@ -153,25 +154,31 @@ public:
   [[nodiscard]] QString neuroglancerMeshSourceOverrideUrl() const;
   [[nodiscard]] bool hasNeuroglancerSkeletonSourceOverride() const;
   [[nodiscard]] QString neuroglancerSkeletonSourceOverrideUrl() const;
+  [[nodiscard]] bool hasNeuroglancerAnnotationsSourceOverride() const;
+  [[nodiscard]] QString neuroglancerAnnotationsSourceOverrideUrl() const;
 
   // Returns true if either the dataset declares a mesh/skeletons directory in its volume info
   // or the user has registered an override URL.
   [[nodiscard]] bool hasNeuroglancerMeshSourceConfigured() const;
   [[nodiscard]] bool hasNeuroglancerSkeletonSourceConfigured() const;
+  [[nodiscard]] bool hasNeuroglancerAnnotationsSourceConfigured() const;
 
   // Sets an override URL (absolute URL or relative path) for the mesh/skeleton source used by this dataset.
   // If userText is relative, it is resolved against the dataset's root URL. The resulting URL is normalized
   // to a directory form with a trailing slash. Returns false and sets errorMsg on parse/validation failure.
   bool setNeuroglancerMeshSourceOverride(QString userText, QString* errorMsg);
   bool setNeuroglancerSkeletonSourceOverride(QString userText, QString* errorMsg);
+  bool setNeuroglancerAnnotationsSourceOverride(QString userText, QString* errorMsg);
 
   void clearNeuroglancerMeshSourceOverride();
   void clearNeuroglancerSkeletonSourceOverride();
+  void clearNeuroglancerAnnotationsSourceOverride();
 
   // Opens the configured mesh/skeleton source. If a user override is set, it is used; otherwise the dataset's
   // declared 'mesh'/'skeletons' directory is used. This may perform network I/O.
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> loadNeuroglancerMeshSourceBlocking() const;
   std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> loadNeuroglancerSkeletonSourceBlocking() const;
+  std::shared_ptr<const ZNeuroglancerPrecomputedAnnotationsSource> loadNeuroglancerAnnotationsSourceBlocking() const;
 
   void setChannelColor(size_t c, col4 col);
 
@@ -417,8 +424,10 @@ private:
   mutable std::mutex m_ngExternalSourcesMutex;
   QString m_ngMeshSourceOverrideUrl;
   QString m_ngSkeletonSourceOverrideUrl;
+  QString m_ngAnnotationsSourceOverrideUrl;
   mutable std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> m_ngMeshSourceOverride;
   mutable std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> m_ngSkeletonSourceOverride;
+  mutable std::shared_ptr<const ZNeuroglancerPrecomputedAnnotationsSource> m_ngAnnotationsSourceOverride;
 
   bool m_diskCached;
   ZImg m_img;

@@ -81,6 +81,12 @@ if (ATLAS_DEBUG_VERSION)
 endif ()
 message(STATUS "ATLAS_DEBUG_VERSION: ${ATLAS_DEBUG_VERSION}")
 
+option(
+  ATLAS_ENABLE_CUSTOM_COMMAND
+  "Enable the developer-only \"Help → Run Custom Command\" feature (ZCustomCommand)."
+  ${ATLAS_DEBUG_VERSION})
+message(STATUS "ATLAS_ENABLE_CUSTOM_COMMAND: ${ATLAS_ENABLE_CUSTOM_COMMAND}")
+
 option(ATLAS_USE_OPENGLWIDGET "Build Atlas with OPENGLWIDGET, might be slower." OFF)
 if (ATLAS_USE_OPENGLWIDGET)
   add_compile_definitions(ATLAS_USE_OPENGLWIDGET)

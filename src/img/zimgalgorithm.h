@@ -8,10 +8,9 @@
 
 #include "zcpuinfo.h"
 #include "zglobal.h"
-#include <itkCommand.h>
-#include <itkProcessObject.h>
 #include <QObject>
 #include <folly/CancellationToken.h>
+#include <memory>
 #include <map>
 #include <set>
 #include <functional>
@@ -24,6 +23,7 @@ class ZImgAlgorithmBaseWithProgressReporter : public QObject
 
 public:
   ZImgAlgorithmBaseWithProgressReporter();
+  ~ZImgAlgorithmBaseWithProgressReporter() override;
 
   // default report 1 percent change
   // larger value can reduce the number of signals
@@ -40,7 +40,7 @@ public:
     m_weight = 1 - w;
   }
 
-  // if cancelled, current algorithm will abort and throw a ZCancellationException or itk::ProcessAborted
+  // If cancelled, current algorithm will abort and throw a ZCancellationException.
   void setCancellationToken(const folly::CancellationToken& token)
   {
     m_cancellationToken = token;
@@ -62,7 +62,9 @@ protected:
   // will change the progress interval of internal operation
   void registerSubOperation(ZImgAlgorithmBaseWithProgressReporter* sender, double weight);
 
-  void registerSubOperation(itk::ProcessObject* filter, double weight);
+  // Register an external operation that reports progress via callbacks (e.g. a third-party filter).
+  // `sender` must remain alive for the duration of the operation.
+  void registerSubOperationExternal(void* sender, double weight);
 
   void clearRegisteredSubOperations();
 
@@ -71,19 +73,14 @@ protected:
     return m_parent;
   }
 
-private:
+ private:
+  class ExternalProgressCommand;
+  struct ExternalProgressObserverState;
+
   // calculate and send signal
   void sendProgressSignal();
 
-  using CommandType = itk::MemberCommand<ZImgAlgorithmBaseWithProgressReporter>;
-  using CommandPointer = CommandType::Pointer;
-
-  // call back function for ITK
-  void processITKEvent(itk::Object* caller, const itk::EventObject& event);
-
-  void constProcessITKEvent(const itk::Object* caller, const itk::EventObject& event);
-
-  CommandPointer m_CallbackCommand;
+  std::unique_ptr<ExternalProgressObserverState> m_externalProgressObserver;
 
   void setParent(ZImgAlgorithmBaseWithProgressReporter* p)
   {
@@ -103,7 +100,6 @@ protected:
   };
 
   std::map<void*, WeightProgress> m_subOperationsWeightProgress;
-  std::set<itk::ProcessObject*> m_itkOperations;
   double m_weight = 1;
   double m_progress = 0;
   double m_reportInterval = 0.01;
@@ -137,7 +133,7 @@ protected:
   // will change the progress interval of internal operation
   void registerSubOperation(void*, double) {}
 
-  void registerSubOperation(itk::ProcessObject*, double) {}
+  void registerSubOperationExternal(void*, double) {}
 
   void clearRegisteredSubOperations() {}
 

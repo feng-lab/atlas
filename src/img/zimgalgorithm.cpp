@@ -2,13 +2,83 @@
 
 #include "zlog.h"
 
+#include <itkCommand.h>
+#include <itkEventObject.h>
+#include <itkMacro.h>
+#include <itkProcessObject.h>
+
+#include <algorithm>
+
 namespace nim {
+
+class ZImgAlgorithmBaseWithProgressReporter::ExternalProgressCommand final : public itk::Command
+{
+public:
+  using Self = ExternalProgressCommand;
+  using Superclass = itk::Command;
+  using Pointer = itk::SmartPointer<Self>;
+  itkNewMacro(Self);
+
+  void setOwner(ZImgAlgorithmBaseWithProgressReporter* owner)
+  {
+    m_owner = owner;
+  }
+
+  void Execute(itk::Object* caller, const itk::EventObject& event) override
+  {
+    handleEvent(caller, event);
+  }
+
+  void Execute(const itk::Object* caller, const itk::EventObject& event) override
+  {
+    handleEvent(const_cast<itk::Object*>(caller), event);
+  }
+
+private:
+  void handleEvent(itk::Object* caller, const itk::EventObject& event)
+  {
+    if (!m_owner) {
+      return;
+    }
+    if (!itk::ProgressEvent().CheckEvent(&event)) {
+      return;
+    }
+    auto* process = dynamic_cast<itk::ProcessObject*>(caller);
+    if (!process) {
+      return;
+    }
+
+    if (m_owner->m_cancellationToken.isCancellationRequested()) {
+      if (!process->GetAbortGenerateData()) {
+        process->AbortGenerateDataOn();
+        LOG(INFO) << "abort external operation";
+      }
+      return;
+    }
+
+    m_owner->subOperationProgressChanged(std::clamp(process->GetProgress(), 0.f, 1.f), process);
+  }
+
+  ZImgAlgorithmBaseWithProgressReporter* m_owner = nullptr;
+};
+
+struct ZImgAlgorithmBaseWithProgressReporter::ExternalProgressObserverState
+{
+  ExternalProgressCommand::Pointer command;
+};
 
 ZImgAlgorithmBaseWithProgressReporter::ZImgAlgorithmBaseWithProgressReporter()
 {
-  m_CallbackCommand = CommandType::New();
-  m_CallbackCommand->SetCallbackFunction(this, &ZImgAlgorithmBaseWithProgressReporter::processITKEvent);
-  m_CallbackCommand->SetCallbackFunction(this, &ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent);
+  m_externalProgressObserver = std::make_unique<ExternalProgressObserverState>();
+  m_externalProgressObserver->command = ExternalProgressCommand::New();
+  m_externalProgressObserver->command->setOwner(this);
+}
+
+ZImgAlgorithmBaseWithProgressReporter::~ZImgAlgorithmBaseWithProgressReporter()
+{
+  if (m_externalProgressObserver && m_externalProgressObserver->command) {
+    m_externalProgressObserver->command->setOwner(nullptr);
+  }
 }
 
 void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double interval)
@@ -53,17 +123,21 @@ void ZImgAlgorithmBaseWithProgressReporter::registerSubOperation(ZImgAlgorithmBa
   sender->setParent(this);
 }
 
-void ZImgAlgorithmBaseWithProgressReporter::registerSubOperation(itk::ProcessObject* filter, double weight)
+void ZImgAlgorithmBaseWithProgressReporter::registerSubOperationExternal(void* sender, double weight)
 {
-  m_subOperationsWeightProgress[filter].weight = weight;
-  m_subOperationsWeightProgress[filter].progress = 0.0;
-  m_itkOperations.insert(filter);
-  filter->AddObserver(itk::ProgressEvent(), m_CallbackCommand);
+  CHECK(sender);
+  m_subOperationsWeightProgress[sender].weight = weight;
+  m_subOperationsWeightProgress[sender].progress = 0.0;
+
+  auto* process = static_cast<itk::ProcessObject*>(sender);
+  CHECK(process);
+  CHECK(m_externalProgressObserver);
+  CHECK(m_externalProgressObserver->command);
+  process->AddObserver(itk::ProgressEvent(), m_externalProgressObserver->command);
 }
 
 void ZImgAlgorithmBaseWithProgressReporter::clearRegisteredSubOperations()
 {
-  m_itkOperations.clear();
   m_subOperationsWeightProgress.clear();
 }
 
@@ -78,39 +152,6 @@ void ZImgAlgorithmBaseWithProgressReporter::sendProgressSignal()
   } else {
     Q_EMIT progressChanged(currentProgress, this);
     Q_EMIT progressChanged(currentProgress * 100.);
-  }
-}
-
-void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object* caller, const itk::EventObject& event)
-{
-  if (itk::ProgressEvent().CheckEvent(&event)) {
-    if (auto process = dynamic_cast<itk::ProcessObject*>(caller)) {
-      if (m_cancellationToken.isCancellationRequested()) {
-        if (!process->GetAbortGenerateData()) {
-          process->AbortGenerateDataOn();
-          LOG(INFO) << "abort itk 1";
-        }
-      } else {
-        subOperationProgressChanged(std::clamp(process->GetProgress(), 0.f, 1.f), process);
-      }
-    }
-  }
-}
-
-void ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Object* caller,
-                                                                 const itk::EventObject& event)
-{
-  if (itk::ProgressEvent().CheckEvent(&event)) {
-    if (auto process = const_cast<itk::ProcessObject*>(dynamic_cast<const itk::ProcessObject*>(caller))) {
-      if (m_cancellationToken.isCancellationRequested()) {
-        if (!process->GetAbortGenerateData()) {
-          process->AbortGenerateDataOn();
-          LOG(INFO) << "abort itk 2";
-        }
-      } else {
-        subOperationProgressChanged(std::clamp(process->GetProgress(), 0.f, 1.f), process);
-      }
-    }
   }
 }
 
