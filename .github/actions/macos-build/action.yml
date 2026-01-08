@@ -48,6 +48,17 @@ runs:
         PY
 
         KEYCHAIN_PASSWORD="$(python -c 'import secrets; print(secrets.token_hex(16))')"
+        security_quiet() {
+          local subcmd="${1:-<unknown>}"
+          # Treat CI logs as public: suppress all output from `security` on both stdout/stderr
+          # (some subcommands print keychain/cert metadata even on success).
+          if ! security "$@" >/dev/null 2>&1; then
+            echo "Error: security ${subcmd} failed (output suppressed for CI log safety)." >&2
+            return 1
+          fi
+          return 0
+        }
+
         # On some self-hosted runners, the user may not have a default keychain configured.
         # Treat missing defaults/search-lists as soft state and proceed with a temp keychain.
         ORIG_DEFAULT_KEYCHAIN="$(security default-keychain 2>/dev/null | sed -E 's/^"//; s/"$//' || true)"
@@ -61,17 +72,16 @@ runs:
           ORIG_DEFAULT_KEYCHAIN=""
         fi
 
-        security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
-        security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
-        security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
-        # `security import` can print certificate/key metadata (subjects, UUIDs, key labels).
-        # Treat CI logs as public and suppress normal output; errors still surface on stderr.
-        security import "${CERT_P12_PATH}" -k "${KEYCHAIN_PATH}" -P "${MACOS_CODESIGN_P12_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security >/dev/null
-        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+        security_quiet create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+        security_quiet set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
+        security_quiet unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+        security_quiet import "${CERT_P12_PATH}" -k "${KEYCHAIN_PATH}" -P "${MACOS_CODESIGN_P12_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
+        security_quiet set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
 
         # Ensure both login and the temp keychain are searchable (do not drop existing entries).
-        security list-keychains -d user -s "${KEYCHAIN_PATH}" ${ORIG_KEYCHAIN_LIST}
-        security default-keychain -s "${KEYCHAIN_PATH}"
+        # shellcheck disable=SC2086
+        security_quiet list-keychains -d user -s "${KEYCHAIN_PATH}" ${ORIG_KEYCHAIN_LIST}
+        security_quiet default-keychain -s "${KEYCHAIN_PATH}"
         # Public CI logs: do not print certificate subjects / Team IDs. Sanity-check that
         # the configured identity exists without echoing identities into logs.
         identities=""
@@ -309,6 +319,14 @@ runs:
       shell: bash -l {0}
       run: |
         set -euo pipefail
+        security_quiet() {
+          local subcmd="${1:-<unknown>}"
+          if ! security "$@" >/dev/null 2>&1; then
+            echo "Warning: security ${subcmd} failed during cleanup (output suppressed for CI log safety)." >&2
+            return 1
+          fi
+          return 0
+        }
         KEYCHAIN_PATH="${RUNNER_TEMP}/atlas-codesign.keychain-db"
         CERT_P12_PATH="${RUNNER_TEMP}/atlas-codesign-cert.p12"
         NOTARY_P8_PATH="${RUNNER_TEMP}/atlas-notary-key.p8"
@@ -329,18 +347,18 @@ runs:
         fi
 
         if [ -n "${restoreDefault}" ]; then
-          security default-keychain -s "${restoreDefault}" || true
+          security_quiet default-keychain -s "${restoreDefault}" || true
         fi
 
         if [ -n "${ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST:-}" ]; then
           # shellcheck disable=SC2086
-          security list-keychains -d user -s ${ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST} || true
+          security_quiet list-keychains -d user -s ${ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST} || true
         elif [ -n "${restoreDefault}" ]; then
-          security list-keychains -d user -s "${restoreDefault}" || true
+          security_quiet list-keychains -d user -s "${restoreDefault}" || true
         fi
 
         if [ -f "${KEYCHAIN_PATH}" ]; then
-          security delete-keychain "${KEYCHAIN_PATH}" || true
+          security_quiet delete-keychain "${KEYCHAIN_PATH}" || true
         fi
         if [ -n "${ATLAS__SSH_DIR:-}" ] && [ -d "${ATLAS__SSH_DIR}" ]; then
           rm -rf "${ATLAS__SSH_DIR}" || true
