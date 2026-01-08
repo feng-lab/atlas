@@ -50,6 +50,11 @@ struct ZROIBounds2D
   }
 };
 
+[[nodiscard]] bool isFinitePoint(const glm::dvec2& p)
+{
+  return std::isfinite(p.x) && std::isfinite(p.y);
+}
+
 class ZBitMask2D
 {
 public:
@@ -69,8 +74,14 @@ public:
     m_words.assign(wordCount, 0);
   }
 
-  [[nodiscard]] int width() const { return m_width; }
-  [[nodiscard]] int height() const { return m_height; }
+  [[nodiscard]] int width() const
+  {
+    return m_width;
+  }
+  [[nodiscard]] int height() const
+  {
+    return m_height;
+  }
 
   void set(int x, int y)
   {
@@ -199,6 +210,102 @@ private:
   return glm::dvec2(p.x * scaleX, p.y * scaleY);
 }
 
+[[nodiscard]] glm::dvec2 lerp(const glm::dvec2& a, const glm::dvec2& b, double t)
+{
+  return a + (b - a) * t;
+}
+
+[[nodiscard]] glm::dvec2
+evalCubicBezier(const glm::dvec2& p0, const glm::dvec2& p1, const glm::dvec2& p2, const glm::dvec2& p3, double t)
+{
+  // de Casteljau (stable).
+  const glm::dvec2 a = lerp(p0, p1, t);
+  const glm::dvec2 b = lerp(p1, p2, t);
+  const glm::dvec2 c = lerp(p2, p3, t);
+  const glm::dvec2 d = lerp(a, b, t);
+  const glm::dvec2 e = lerp(b, c, t);
+  return lerp(d, e, t);
+}
+
+void addCubicBezierExtremaTs(double p0, double p1, double p2, double p3, std::vector<double>& outTs)
+{
+  // Solve d/dt B(t) = 0 for a 1D cubic Bezier component:
+  //   B(t) = a t^3 + b t^2 + c t + d
+  //   B'(t) = 3 a t^2 + 2 b t + c
+  //
+  // Coefficients in control-point form:
+  //   a = -p0 + 3 p1 - 3 p2 + p3
+  //   b =  3 p0 - 6 p1 + 3 p2
+  //   c = -3 p0 + 3 p1
+  const double a = -p0 + 3.0 * p1 - 3.0 * p2 + p3;
+  const double b = 3.0 * p0 - 6.0 * p1 + 3.0 * p2;
+  const double c = -3.0 * p0 + 3.0 * p1;
+
+  const double scale = std::max(1.0, std::max(std::abs(a), std::max(std::abs(b), std::abs(c))));
+  const double eps = 1e-12 * scale;
+
+  if (std::abs(a) <= eps) {
+    // Linear: 2 b t + c = 0.
+    if (std::abs(b) <= eps) {
+      return;
+    }
+    const double t = -c / (2.0 * b);
+    if (t > 0.0 && t < 1.0 && std::isfinite(t)) {
+      outTs.push_back(t);
+    }
+    return;
+  }
+
+  // Quadratic: 3 a t^2 + 2 b t + c = 0
+  const double disc = b * b - 3.0 * a * c;
+  if (disc < 0.0 || !std::isfinite(disc)) {
+    return;
+  }
+
+  const double sqrtDisc = std::sqrt(std::max(0.0, disc));
+  const double denom = 3.0 * a;
+  if (std::abs(denom) <= eps || !std::isfinite(denom)) {
+    return;
+  }
+
+  const double t0 = (-b - sqrtDisc) / denom;
+  const double t1 = (-b + sqrtDisc) / denom;
+  if (t0 > 0.0 && t0 < 1.0 && std::isfinite(t0)) {
+    outTs.push_back(t0);
+  }
+  if (t1 > 0.0 && t1 < 1.0 && std::isfinite(t1)) {
+    outTs.push_back(t1);
+  }
+}
+
+[[nodiscard]] ZROIBounds2D
+cubicBezierBounds(const glm::dvec2& p0, const glm::dvec2& p1, const glm::dvec2& p2, const glm::dvec2& p3)
+{
+  ZROIBounds2D b;
+  if (!isFinitePoint(p0) || !isFinitePoint(p1) || !isFinitePoint(p2) || !isFinitePoint(p3)) {
+    return b;
+  }
+
+  std::vector<double> ts;
+  ts.reserve(6);
+  ts.push_back(0.0);
+  ts.push_back(1.0);
+  addCubicBezierExtremaTs(p0.x, p1.x, p2.x, p3.x, ts);
+  addCubicBezierExtremaTs(p0.y, p1.y, p2.y, p3.y, ts);
+
+  for (const double t : ts) {
+    if (t < 0.0 || t > 1.0 || !std::isfinite(t)) {
+      continue;
+    }
+    const glm::dvec2 pt = evalCubicBezier(p0, p1, p2, p3, t);
+    if (!isFinitePoint(pt)) {
+      continue;
+    }
+    b.expand(pt);
+  }
+  return b;
+}
+
 [[nodiscard]] double distancePointToLine(const glm::dvec2& p, const glm::dvec2& a, const glm::dvec2& b)
 {
   const glm::dvec2 ab = b - a;
@@ -211,11 +318,8 @@ private:
   return glm::length(p - proj);
 }
 
-[[nodiscard]] bool cubicFlatEnough(const glm::dvec2& p0,
-                                   const glm::dvec2& p1,
-                                   const glm::dvec2& p2,
-                                   const glm::dvec2& p3,
-                                   double tol)
+[[nodiscard]] bool
+cubicFlatEnough(const glm::dvec2& p0, const glm::dvec2& p1, const glm::dvec2& p2, const glm::dvec2& p3, double tol)
 {
   const double d1 = distancePointToLine(p1, p0, p3);
   const double d2 = distancePointToLine(p2, p0, p3);
@@ -235,7 +339,7 @@ void flattenCubicBezier(const glm::dvec2& p0,
   };
 
   std::vector<Segment> stack;
-  stack.push_back(Segment{ p0, p1, p2, p3 });
+  stack.push_back(Segment{p0, p1, p2, p3});
   while (!stack.empty()) {
     Segment s = stack.back();
     stack.pop_back();
@@ -254,8 +358,8 @@ void flattenCubicBezier(const glm::dvec2& p0,
     const glm::dvec2 p0123 = 0.5 * (p012 + p123);
 
     // Push second half first so the first half is processed first.
-    stack.push_back(Segment{ p0123, p123, p23, s.p3 });
-    stack.push_back(Segment{ s.p0, p01, p012, p0123 });
+    stack.push_back(Segment{p0123, p123, p23, s.p3});
+    stack.push_back(Segment{s.p0, p01, p012, p0123});
   }
 }
 
@@ -300,10 +404,9 @@ std::vector<std::array<glm::dvec2, 4>> splineToCubicBeziers(const std::vector<gl
     const glm::dvec2 p0 = points[i];
     const glm::dvec2 p3 = points[i + 1];
     const glm::dvec2 p1 = glm::dvec2(points[i].x + (1.0 / 3.0) * m0[0], points[i].y + (1.0 / 3.0) * m0[1]);
-    const glm::dvec2 p2 =
-      glm::dvec2(points[i + 1].x - (1.0 / 3.0) * m1[0], points[i + 1].y - (1.0 / 3.0) * m1[1]);
+    const glm::dvec2 p2 = glm::dvec2(points[i + 1].x - (1.0 / 3.0) * m1[0], points[i + 1].y - (1.0 / 3.0) * m1[1]);
 
-    beziers.push_back({ p0, p1, p2, p3 });
+    beziers.push_back({p0, p1, p2, p3});
   }
 
   return beziers;
@@ -454,10 +557,7 @@ void rasterizeEllipse(const glm::dvec2& p0, const glm::dvec2& p1, ZBitMask2D& ma
   }
 }
 
-void rasterizeLineStroke(const std::vector<glm::dvec2>& polyline,
-                         double strokeWidth,
-                         ZBitMask2D& mask,
-                         bool setBits)
+void rasterizeLineStroke(const std::vector<glm::dvec2>& polyline, double strokeWidth, ZBitMask2D& mask, bool setBits)
 {
   if (polyline.size() < 2 || strokeWidth <= 0.0) {
     return;
@@ -516,7 +616,9 @@ void rasterizeLineStroke(const std::vector<glm::dvec2>& polyline,
 [[nodiscard]] ZROIBounds2D boundsForOp(const ZROIMaskOperation2D& op, const ZROIMaskRasterizerSettings& settings)
 {
   ZROIBounds2D b;
-  const auto expandScaled = [&](const glm::dvec2& p) { b.expand(applyScale(p, settings.scaleX, settings.scaleY)); };
+  const auto expandScaled = [&](const glm::dvec2& p) {
+    b.expand(applyScale(p, settings.scaleX, settings.scaleY));
+  };
 
   if (op.type == ZROIMaskShapeType::Rect || op.type == ZROIMaskShapeType::Ellipse) {
     if (op.poly.size() < 2) {
@@ -552,7 +654,11 @@ void rasterizeLineStroke(const std::vector<glm::dvec2>& polyline,
     std::vector<glm::dvec2> scaled;
     scaled.reserve(op.poly.size());
     for (const auto& p : op.poly) {
-      scaled.push_back(applyScale(p, settings.scaleX, settings.scaleY));
+      const glm::dvec2 sp = applyScale(p, settings.scaleX, settings.scaleY);
+      if (!isFinitePoint(sp)) {
+        return ZROIBounds2D{};
+      }
+      scaled.push_back(sp);
     }
     const bool isClosed = !scaled.empty() && (scaled.front() == scaled.back());
     if ((isClosed && scaled.size() < 4) || (!isClosed && scaled.size() < 3)) {
@@ -562,21 +668,47 @@ void rasterizeLineStroke(const std::vector<glm::dvec2>& polyline,
       return b;
     }
 
-    // Note: For spline bounds we deliberately avoid the tighter extremum-based Bezier bounds
-    // computation (roots of derivative) because it can be numerically fragile in degenerate
-    // cases (e.g. very small dt segments). Bounding by the Bezier control points is guaranteed
-    // to contain the curve (convex-hull property) and is stable.
+    // Note: Bounding by the Bezier control points is guaranteed to contain the curve (convex-hull
+    // property) but can be catastrophically loose for degenerate splines (large tangents), which
+    // can lead to enormous masks/allocations. Instead compute the actual cubic-Bezier bounds via
+    // derivative roots (interior extrema) per segment.
     const auto beziers = splineToCubicBeziers(scaled);
     for (const auto& bez : beziers) {
-      b.expand(bez[0]);
-      b.expand(bez[1]);
-      b.expand(bez[2]);
-      b.expand(bez[3]);
+      const ZROIBounds2D seg = cubicBezierBounds(bez[0], bez[1], bez[2], bez[3]);
+      if (!seg.isEmpty()) {
+        b.expand(seg);
+      }
     }
     return b;
   }
 
   return b;
+}
+
+[[nodiscard]] bool
+boundsToIntegerRectOrWarn(const ZROIBounds2D& b, index_t& minX, index_t& minY, index_t& maxX, index_t& maxY)
+{
+  // Bounds originate from user-provided ROI files and can be malformed (NaNs/infs/out-of-range).
+  // Avoid UB by validating finiteness/range before casting to integers.
+  if (!std::isfinite(b.minX) || !std::isfinite(b.minY) || !std::isfinite(b.maxX) || !std::isfinite(b.maxY)) {
+    LOG(WARNING) << "ZROIMaskRasterizer: non-finite bounds, skipping rasterization "
+                 << "min=(" << b.minX << "," << b.minY << ") max=(" << b.maxX << "," << b.maxY << ")";
+    return false;
+  }
+
+  const double indexMin = static_cast<double>(std::numeric_limits<index_t>::min());
+  const double indexMax = static_cast<double>(std::numeric_limits<index_t>::max());
+  if (b.minX < indexMin || b.minY < indexMin || b.maxX > indexMax || b.maxY > indexMax) {
+    LOG(WARNING) << "ZROIMaskRasterizer: bounds outside index_t range, skipping rasterization "
+                 << "min=(" << b.minX << "," << b.minY << ") max=(" << b.maxX << "," << b.maxY << ")";
+    return false;
+  }
+
+  minX = std::max(0_z, static_cast<index_t>(std::floor(b.minX)));
+  minY = std::max(0_z, static_cast<index_t>(std::floor(b.minY)));
+  maxX = static_cast<index_t>(std::ceil(b.maxX));
+  maxY = static_cast<index_t>(std::ceil(b.maxY));
+  return true;
 }
 
 [[nodiscard]] std::vector<glm::dvec2> toHiResPoly(const std::vector<glm::dvec2>& poly,
@@ -590,6 +722,17 @@ void rasterizeLineStroke(const std::vector<glm::dvec2>& polyline,
     const glm::dvec2 scaled = applyScale(p, settings.scaleX, settings.scaleY);
     const glm::dvec2 hr = (scaled - origin) * static_cast<double>(supersample);
     res.push_back(hr);
+  }
+  return res;
+}
+
+[[nodiscard]] std::vector<glm::dvec2>
+toHiResPolyAlreadyScaled(const std::vector<glm::dvec2>& scaledPoly, const glm::dvec2& origin, int supersample)
+{
+  std::vector<glm::dvec2> res;
+  res.reserve(scaledPoly.size());
+  for (const auto& p : scaledPoly) {
+    res.push_back((p - origin) * static_cast<double>(supersample));
   }
   return res;
 }
@@ -686,10 +829,13 @@ std::tuple<ZImg, index_t, index_t> ZROIMaskRasterizer::shapeToMask(const std::ve
       return std::make_tuple(ZImg(), 0_z, 0_z);
     }
 
-    const index_t minX = std::max(0_z, static_cast<index_t>(std::floor(b.minX)));
-    const index_t minY = std::max(0_z, static_cast<index_t>(std::floor(b.minY)));
-    const index_t maxX = static_cast<index_t>(std::ceil(b.maxX));
-    const index_t maxY = static_cast<index_t>(std::ceil(b.maxY));
+    index_t minX = 0_z;
+    index_t minY = 0_z;
+    index_t maxX = 0_z;
+    index_t maxY = 0_z;
+    if (!boundsToIntegerRectOrWarn(b, minX, minY, maxX, maxY)) {
+      return std::make_tuple(ZImg(), 0_z, 0_z);
+    }
     if (maxX < minX || maxY < minY) {
       return std::make_tuple(ZImg(), 0_z, 0_z);
     }
@@ -752,10 +898,13 @@ std::tuple<ZImg, index_t, index_t> ZROIMaskRasterizer::shapeToMask(const std::ve
     return std::make_tuple(ZImg(), 0_z, 0_z);
   }
 
-  const index_t minX = std::max(0_z, static_cast<index_t>(std::floor(b.minX)));
-  const index_t minY = std::max(0_z, static_cast<index_t>(std::floor(b.minY)));
-  const index_t maxX = static_cast<index_t>(std::ceil(b.maxX));
-  const index_t maxY = static_cast<index_t>(std::ceil(b.maxY));
+  index_t minX = 0_z;
+  index_t minY = 0_z;
+  index_t maxX = 0_z;
+  index_t maxY = 0_z;
+  if (!boundsToIntegerRectOrWarn(b, minX, minY, maxX, maxY)) {
+    return std::make_tuple(ZImg(), 0_z, 0_z);
+  }
   if (maxX < minX || maxY < minY) {
     return std::make_tuple(ZImg(), 0_z, 0_z);
   }
@@ -826,7 +975,7 @@ std::tuple<ZImg, index_t, index_t> ZROIMaskRasterizer::shapeToMask(const std::ve
         scaled.push_back(applyScale(p, settings.scaleX, settings.scaleY));
       }
       auto polyline = splineToPolyline(scaled, tol / static_cast<double>(settings.supersample));
-      auto hrPolyline = toHiResPoly(polyline, settings, origin, settings.supersample);
+      auto hrPolyline = toHiResPolyAlreadyScaled(polyline, origin, settings.supersample);
       if (hrPolyline.size() >= 2 && hrPolyline.front() == hrPolyline.back()) {
         hrPolyline.pop_back();
       }

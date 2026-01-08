@@ -708,7 +708,7 @@ void ZROI::importMaskImage(const QString& fn, FileFormat format)
   STOP_AND_VLOG(bt)
 }
 
-// #define USE_NEW_RASTERIZER_FOR_ROI_TO_MASK_IMG
+#define USE_NEW_RASTERIZER_FOR_ROI_TO_MASK_IMG
 
 ZImg ZROI::toMaskImg(int outWidth,
                      int outHeight,

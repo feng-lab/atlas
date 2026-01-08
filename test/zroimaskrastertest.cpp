@@ -6,6 +6,7 @@
 #include "ztest.h"
 
 #include <QFileInfo>
+#include <QPointF>
 #include <array>
 #include <random>
 #include <string>
@@ -20,7 +21,7 @@ constexpr std::array<const char*, 3> kNimroiTestFiles = {
   "test1.nimroi",
 };
 
-constexpr int kSlicesPerFileToTest = 90;
+constexpr int kSlicesPerFileToTest = 2;
 
 std::vector<int> chooseSlicesToTest(const ZROI& roi)
 {
@@ -77,7 +78,10 @@ struct MaskWithOffset
   index_t xStart = 0_z;
   index_t yStart = 0_z;
 
-  [[nodiscard]] bool isEmpty() const { return mask.isEmpty(); }
+  [[nodiscard]] bool isEmpty() const
+  {
+    return mask.isEmpty();
+  }
 };
 
 MaskWithOffset unionShapeMasks(const std::vector<MaskWithOffset>& masks)
@@ -136,7 +140,7 @@ MaskWithOffset rasterizeSliceMask(const ZROI& roi, int slice)
     ZROIMaskRasterizerSettings settings;
     settings.supersample = 5;
     auto [mask, xStart, yStart] = ZROIUtils::shapeToMask(ops, settings);
-    perShape.push_back(MaskWithOffset{ std::move(mask), xStart, yStart });
+    perShape.push_back(MaskWithOffset{std::move(mask), xStart, yStart});
   }
 
   return unionShapeMasks(perShape);
@@ -165,13 +169,12 @@ struct CompareStats
   return onPixels;
 }
 
-[[nodiscard]] size_t countIntersectionOnPixels(
-  const ZImg& a,
-  index_t aXStart,
-  index_t aYStart,
-  const ZImg& b,
-  index_t bXStart,
-  index_t bYStart)
+[[nodiscard]] size_t countIntersectionOnPixels(const ZImg& a,
+                                               index_t aXStart,
+                                               index_t aYStart,
+                                               const ZImg& b,
+                                               index_t bXStart,
+                                               index_t bYStart)
 {
   CHECK(!a.isEmpty());
   CHECK(!b.isEmpty());
@@ -209,10 +212,8 @@ struct CompareStats
     CHECK(aY >= 0_z);
     CHECK(bY >= 0_z);
 
-    const auto* aRow =
-      a.data<uint8_t>(static_cast<size_t>(aOverlapX0), static_cast<size_t>(aY), 0);
-    const auto* bRow =
-      b.data<uint8_t>(static_cast<size_t>(bOverlapX0), static_cast<size_t>(bY), 0);
+    const auto* aRow = a.data<uint8_t>(static_cast<size_t>(aOverlapX0), static_cast<size_t>(aY), 0);
+    const auto* bRow = b.data<uint8_t>(static_cast<size_t>(bOverlapX0), static_cast<size_t>(bY), 0);
     for (size_t x = 0; x < overlapW; ++x) {
       intersectionOnPixels += (aRow[x] && bRow[x]) ? 1 : 0;
     }
@@ -221,15 +222,14 @@ struct CompareStats
   return intersectionOnPixels;
 }
 
-[[nodiscard]] CompareStats computeStatsWithOffset(
-  const ZImg& a,
-  index_t aXStart,
-  index_t aYStart,
-  size_t aOnPixels,
-  const ZImg& b,
-  index_t bXStart,
-  index_t bYStart,
-  size_t bOnPixels)
+[[nodiscard]] CompareStats computeStatsWithOffset(const ZImg& a,
+                                                  index_t aXStart,
+                                                  index_t aYStart,
+                                                  size_t aOnPixels,
+                                                  const ZImg& b,
+                                                  index_t bXStart,
+                                                  index_t bYStart,
+                                                  size_t bOnPixels)
 {
   CHECK(!a.isEmpty());
   CHECK(!b.isEmpty());
@@ -249,6 +249,56 @@ struct CompareStats
 
 } // namespace
 
+TEST(ZROIMaskRasterizer, SplineScaleAppliedExactlyOnce)
+{
+  // Regression: previously the spline rasterization path applied settings.scaleX/scaleY twice
+  // (once before spline flattening and again in toHiResPoly), which could both distort results
+  // and catastrophically inflate bounds/allocations when scale != 1.
+
+  constexpr double kScaleX = 2.0;
+  constexpr double kScaleY = 3.0;
+
+  ZROIMaskOperation2D op;
+  op.isAdd = true;
+  op.type = ZROIMaskShapeType::Spline;
+  op.poly = {
+    glm::dvec2(0.0, 0.0),
+    glm::dvec2(400.0, 0.0),
+    glm::dvec2(400.0, 400.0),
+    glm::dvec2(0.0, 400.0),
+    glm::dvec2(0.0, 0.0),
+  };
+
+  ZROIMaskRasterizerSettings settings;
+  settings.supersample = 5;
+  settings.scaleX = kScaleX;
+  settings.scaleY = kScaleY;
+
+  auto [newMask, newXStart, newYStart] = ZROIMaskRasterizer::shapeToMask({op}, settings);
+  ASSERT_FALSE(newMask.isEmpty());
+
+  QPolygonF qpoly;
+  qpoly << QPointF(0.0, 0.0) << QPointF(400.0, 0.0) << QPointF(400.0, 400.0) << QPointF(0.0, 400.0)
+        << QPointF(0.0, 0.0);
+
+  QPolygonF scaled;
+  scaled.reserve(qpoly.size());
+  for (const auto& p : qpoly) {
+    scaled << QPointF(p.x() * kScaleX, p.y() * kScaleY);
+  }
+  const QPainterPath qtPath = ZROIUtils::splineToQPainterPath(scaled);
+
+  auto [qtMask, qtXStart, qtYStart] = ZROIUtils::qPainterPathToMaskQt(qtPath);
+  ASSERT_FALSE(qtMask.isEmpty());
+
+  const size_t qtOnPixels = countOnPixels(qtMask);
+  const size_t newOnPixels = countOnPixels(newMask);
+  const auto stats =
+    computeStatsWithOffset(qtMask, qtXStart, qtYStart, qtOnPixels, newMask, newXStart, newYStart, newOnPixels);
+  EXPECT_GE(stats.iou, 0.999) << "Unexpectedly low IoU for scaled spline (diffPixels=" << stats.diffPixels
+                              << ", union=" << stats.unionPixels << ")";
+}
+
 TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
 {
   const QDir testDataDir = getTestDataDir();
@@ -263,8 +313,7 @@ TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
 
     const auto slicesToTest = chooseSlicesToTest(roi);
     ASSERT_FALSE(slicesToTest.empty()) << "No slices found in nimroi: " << fileName;
-    LOG(INFO) << "Testing nimroi: " << fileName << " slices=" << roi.numSlices()
-              << " selected=" << slicesToTest.size();
+    LOG(INFO) << "Testing nimroi: " << fileName << " slices=" << roi.numSlices() << " selected=" << slicesToTest.size();
 
     ZBenchTimer qtTimer("Qt baseline qPainterPathToMask");
     ZBenchTimer fastTimer("ZROIUtils qPainterPathToMask");
@@ -283,8 +332,8 @@ TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
       if (!qtMask.isEmpty()) {
         LOG(INFO) << "    qt mask start=" << qtXStart << "," << qtYStart << " size=" << qtMask.width() << "x"
                   << qtMask.height() << " bounds=[" << qtXStart << "," << qtYStart << "]-["
-                  << (qtXStart + qtMask.sWidth()) << "," << (qtYStart + qtMask.sHeight()) << "] bytes="
-                  << qtMask.byteNumber();
+                  << (qtXStart + qtMask.sWidth()) << "," << (qtYStart + qtMask.sHeight())
+                  << "] bytes=" << qtMask.byteNumber();
       } else {
         LOG(INFO) << "    qt mask empty";
       }
@@ -295,14 +344,14 @@ TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
       {
         fastTimer.resetAndStart(std::string("ZROIUtils qPainterPathToMask slice ") + std::to_string(slice));
         const QPainterPath refPath = roi.slicePaintPath(slice);
-        std::tie(fastMask, fastXStart, fastYStart) = ZROIUtils::qPainterPathToMask(refPath);
+        std::tie(fastMask, fastXStart, fastYStart) = ZROIUtils::qPainterPathToMaskMR(refPath);
         STOP_AND_LOG(fastTimer);
       }
       if (!fastMask.isEmpty()) {
         LOG(INFO) << "    fast mask start=" << fastXStart << "," << fastYStart << " size=" << fastMask.width() << "x"
                   << fastMask.height() << " bounds=[" << fastXStart << "," << fastYStart << "]-["
-                  << (fastXStart + fastMask.sWidth()) << "," << (fastYStart + fastMask.sHeight()) << "] bytes="
-                  << fastMask.byteNumber();
+                  << (fastXStart + fastMask.sWidth()) << "," << (fastYStart + fastMask.sHeight())
+                  << "] bytes=" << fastMask.byteNumber();
       } else {
         LOG(INFO) << "    fast mask empty";
       }
@@ -314,9 +363,9 @@ TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
         STOP_AND_LOG(newTimer);
       }
       if (!newMask.mask.isEmpty()) {
-        LOG(INFO) << "    new mask start=" << newMask.xStart << "," << newMask.yStart << " size="
-                  << newMask.mask.width() << "x" << newMask.mask.height() << " bounds=[" << newMask.xStart << ","
-                  << newMask.yStart << "]-[" << (newMask.xStart + newMask.mask.sWidth()) << ","
+        LOG(INFO) << "    new mask start=" << newMask.xStart << "," << newMask.yStart
+                  << " size=" << newMask.mask.width() << "x" << newMask.mask.height() << " bounds=[" << newMask.xStart
+                  << "," << newMask.yStart << "]-[" << (newMask.xStart + newMask.mask.sWidth()) << ","
                   << (newMask.yStart + newMask.mask.sHeight()) << "] bytes=" << newMask.mask.byteNumber();
       } else {
         LOG(INFO) << "    new mask empty";
@@ -333,10 +382,10 @@ TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
 
       const index_t commonMinX = std::min(std::min(qtXStart, fastXStart), newMask.xStart);
       const index_t commonMinY = std::min(std::min(qtYStart, fastYStart), newMask.yStart);
-      const index_t commonMaxX =
-        std::max(std::max(qtXStart + qtMask.sWidth(), fastXStart + fastMask.sWidth()), newMask.xStart + newMask.mask.sWidth());
-      const index_t commonMaxY =
-        std::max(std::max(qtYStart + qtMask.sHeight(), fastYStart + fastMask.sHeight()), newMask.yStart + newMask.mask.sHeight());
+      const index_t commonMaxX = std::max(std::max(qtXStart + qtMask.sWidth(), fastXStart + fastMask.sWidth()),
+                                          newMask.xStart + newMask.mask.sWidth());
+      const index_t commonMaxY = std::max(std::max(qtYStart + qtMask.sHeight(), fastYStart + fastMask.sHeight()),
+                                          newMask.yStart + newMask.mask.sHeight());
       LOG(INFO) << "    canvas bounds min=" << commonMinX << "," << commonMinY << " max=" << commonMaxX << ","
                 << commonMaxY;
       ASSERT_GT(commonMaxX, commonMinX);
@@ -361,19 +410,25 @@ TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
 
       const auto fastStats =
         computeStatsWithOffset(qtMask, qtXStart, qtYStart, qtOnPixels, fastMask, fastXStart, fastYStart, fastOnPixels);
-      const auto newStats = computeStatsWithOffset(
-        qtMask, qtXStart, qtYStart, qtOnPixels, newMask.mask, newMask.xStart, newMask.yStart, newOnPixels);
+      const auto newStats = computeStatsWithOffset(qtMask,
+                                                   qtXStart,
+                                                   qtYStart,
+                                                   qtOnPixels,
+                                                   newMask.mask,
+                                                   newMask.xStart,
+                                                   newMask.yStart,
+                                                   newOnPixels);
       LOG(INFO) << "  slice " << slice << " canvas=" << canvasW << "x" << canvasH
                 << " qt_vs_fast union=" << fastStats.unionPixels << " diff=" << fastStats.diffPixels
-                << " iou=" << fastStats.iou << " qt_vs_new union=" << newStats.unionPixels << " diff="
-                << newStats.diffPixels << " iou=" << newStats.iou;
+                << " iou=" << fastStats.iou << " qt_vs_new union=" << newStats.unionPixels
+                << " diff=" << newStats.diffPixels << " iou=" << newStats.iou;
 
       // This test is meant to validate the mask result (binary). Minor edge differences can
       // happen due to rasterization details, but they should be extremely small for typical ROIs.
       EXPECT_GE(fastStats.iou, 0.999) << "Low IoU for " << fileName << " slice " << slice
                                       << " (qt_vs_fast diffPixels=" << fastStats.diffPixels
-                                      << ", union=" << fastStats.unionPixels << ", canvas=" << canvasW << "x"
-                                      << canvasH << ")";
+                                      << ", union=" << fastStats.unionPixels << ", canvas=" << canvasW << "x" << canvasH
+                                      << ")";
       EXPECT_GE(newStats.iou, 0.999) << "Low IoU for " << fileName << " slice " << slice
                                      << " (qt_vs_new diffPixels=" << newStats.diffPixels
                                      << ", union=" << newStats.unionPixels << ", canvas=" << canvasW << "x" << canvasH

@@ -32,7 +32,7 @@ public:
 
   static std::tuple<ZImg, index_t, index_t> qPainterPathToMask(const QPainterPath& path)
   {
-    return qPainterPathToMaskQt(path);
+    return qPainterPathToMaskMR(path);
   }
 
   static std::tuple<ZImg, index_t, index_t> qPainterPathToStroke(const QPainterPath& path, double width = 2.);
