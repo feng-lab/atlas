@@ -38,6 +38,8 @@
 #include <wincrypt.h>
 #endif
 
+constexpr uint64_t kDefaultHttpDiskCacheMaxBytes = 10ULL * 1024ULL * 1024ULL * 1024ULL; // 10 GiB
+
 DEFINE_string(atlas_http_ca_bundle,
               "",
               "Path to a PEM CA bundle for HTTPS requests (overrides auto-detect; also respects env SSL_CERT_FILE).");
@@ -61,8 +63,8 @@ DEFINE_uint32(atlas_http_retry_backoff_max_ms,
               "Maximum backoff delay in milliseconds for transient HTTP error retries (default 2000ms).");
 
 DEFINE_uint64(atlas_http_disk_cache_max_bytes,
-              0,
-              "Maximum size in bytes for the persistent HTTP disk cache (0 disables).");
+              kDefaultHttpDiskCacheMaxBytes,
+              "Maximum size in bytes for the persistent HTTP disk cache (0 disables; default 10 GiB).");
 
 DEFINE_string(atlas_http_disk_cache_dir,
               "",

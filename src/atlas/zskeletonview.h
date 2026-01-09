@@ -17,7 +17,8 @@ private:
   void docSkeletonsAdded(const std::vector<size_t>& objs);
 
   void docSkeletonAdded(size_t id);
+
+  void docSkeletonChanged(size_t id);
 };
 
 } // namespace nim
-

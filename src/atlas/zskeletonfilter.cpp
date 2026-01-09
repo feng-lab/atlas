@@ -35,6 +35,9 @@ QRectF ZSkeletonGraphicsItem::boundingRect() const
 {
   const qreal penWidth = 1 * m_sizeScale;
   const auto bb = m_skeleton.boundBox();
+  if (bb.empty()) {
+    return QRectF();
+  }
   return QRectF(bb.minCorner.x - penWidth / 2,
                 bb.minCorner.y - penWidth / 2,
                 bb.maxCorner.x - bb.minCorner.x + penWidth,
@@ -133,6 +136,15 @@ void ZSkeletonFilter::setData(ZSkeleton& skeleton)
   createSkeletonItem();
 }
 
+void ZSkeletonFilter::reloadSkeletonGeometry()
+{
+  if (!m_skeleton) {
+    return;
+  }
+  createSkeletonItem();
+  Q_EMIT boundBoxChanged();
+}
+
 void ZSkeletonFilter::releaseItemsOwnership()
 {
   static_cast<void>(m_item.release());
@@ -140,6 +152,7 @@ void ZSkeletonFilter::releaseItemsOwnership()
 
 void ZSkeletonFilter::setSelected(bool v)
 {
+  m_selected = v;
   if (m_item) {
     m_item->setSelected_(v);
   }
@@ -164,6 +177,9 @@ ZBBox<glm::ivec4> ZSkeletonFilter::boundBox() const
   ZBBox<glm::ivec4> res;
   if (m_skeleton) {
     const auto bb = m_skeleton->boundBox();
+    if (bb.empty()) {
+      return res;
+    }
     res.expand(glm::ivec4(static_cast<int>(std::floor(bb.minCorner.x)),
                           static_cast<int>(std::floor(bb.minCorner.y)),
                           static_cast<int>(std::floor(bb.minCorner.z)),
@@ -238,7 +254,9 @@ void ZSkeletonFilter::createSkeletonItem()
     QColor(m_skeletonColor.get().x * 255, m_skeletonColor.get().y * 255, m_skeletonColor.get().z * 255));
   m_item->setSizeScale(m_sizeScale.get());
   m_item->setOpacity(m_opacity.get());
+  m_item->setVisible(m_visible.get());
   m_item->setTransform(getQTransform());
+  m_item->setSelected_(m_selected);
   if (m_view.isMaxZProjView()) {
     m_item->setMaxZProjView(realT());
   } else {

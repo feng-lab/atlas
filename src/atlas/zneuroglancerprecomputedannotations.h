@@ -6,9 +6,11 @@
 
 #include <QUrl>
 
+#include <atomic>
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -142,6 +144,38 @@ public:
   // This returns the full set of intersecting annotations (deduplicated by id), not a subsample.
   [[nodiscard]] std::vector<Annotation> loadAnnotationsIntersectingVoxelBoxBlocking(const glm::dvec3& voxelMin,
                                                                                     const glm::dvec3& voxelMax) const;
+
+  struct SpatialLoadProgress
+  {
+    uint64_t totalCells = 0;
+    uint64_t visitedCells = 0;
+    uint64_t uniqueAnnotations = 0;
+    size_t levelsTotal = 0;
+    size_t levelIndex = 0; // [0, levelsTotal)
+  };
+
+  struct SpatialLoadUpdate
+  {
+    SpatialLoadProgress progress;
+    std::vector<Annotation> newAnnotations;
+  };
+
+  using SpatialLoadUpdateCallback = std::function<void(SpatialLoadUpdate update)>;
+
+  // Streams annotations intersecting the given voxel-space box using the multi-level spatial index,
+  // invoking `onUpdate` as new unique annotations become available.
+  //
+  // This method is blocking and performs network I/O; callers should run it off the UI thread.
+  // Updates are rate-limited by `minUpdateInterval` and `maxAnnotationsPerUpdate`.
+  // Cancellation is cooperative: if `cancelFlag` is provided and becomes true, streaming stops as
+  // soon as possible (but any in-flight HTTP request may still take time to return).
+  void streamAnnotationsIntersectingVoxelBoxBlocking(const glm::dvec3& voxelMin,
+                                                     const glm::dvec3& voxelMax,
+                                                     const SpatialLoadUpdateCallback& onUpdate,
+                                                     const std::atomic_bool* cancelFlag = nullptr,
+                                                     std::chrono::milliseconds minUpdateInterval =
+                                                       std::chrono::milliseconds{200},
+                                                     size_t maxAnnotationsPerUpdate = 2048) const;
 
   // Exposed for unit tests: decodes a related-object/spatial index entry (multiple annotation encoding).
   [[nodiscard]] std::vector<Annotation> decodeMultipleAnnotationBytes(std::span<const uint8_t> bytes) const;

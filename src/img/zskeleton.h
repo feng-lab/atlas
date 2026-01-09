@@ -78,6 +78,11 @@ public:
     m_radii = std::move(r);
   }
 
+  // Appends geometry (vertices + edges) to the skeleton.
+  // The `edges` indices are expected to be relative to the provided `v` array (i.e. in [0, v.size()).
+  // Radii are not supported by this API; callers should only use it when the skeleton has no radii.
+  void appendGeometry(std::vector<glm::vec3> v, std::vector<glm::uvec2> e);
+
   [[nodiscard]] ZBBox<glm::dvec3> boundBox() const;
 
 private:

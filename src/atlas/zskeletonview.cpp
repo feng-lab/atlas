@@ -7,6 +7,7 @@ ZSkeletonView::ZSkeletonView(ZSkeletonDoc& doc, ZView& view)
 {
   docSkeletonsAdded(m_doc.objs());
   connect(&m_doc, &ZSkeletonDoc::objAdded, this, &ZSkeletonView::docSkeletonAdded);
+  connect(&m_doc, &ZSkeletonDoc::skeletonChanged, this, &ZSkeletonView::docSkeletonChanged);
 }
 
 void ZSkeletonView::docSkeletonsAdded(const std::vector<size_t>& objs)
@@ -43,5 +44,14 @@ void ZSkeletonView::docSkeletonAdded(size_t id)
   Q_EMIT objViewReady(id);
 }
 
-} // namespace nim
+void ZSkeletonView::docSkeletonChanged(size_t id)
+{
+  auto it = m_idToFilter.find(id);
+  if (it == m_idToFilter.end()) {
+    return;
+  }
 
+  it->second->reloadSkeletonGeometry();
+}
+
+} // namespace nim

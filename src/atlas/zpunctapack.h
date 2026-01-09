@@ -88,6 +88,11 @@ public:
 
   void splitSelectedPunctum();
 
+  // Append puncta without pushing an undo command.
+  // Intended for streaming/network sources (e.g. Neuroglancer annotations spatial index).
+  // Must be called on the UI thread.
+  void appendPunctaNoUndo(std::list<ZPunctum> addedPuncta);
+
   void showPunctaContextMenu(QPoint globalPos);
 
 protected:

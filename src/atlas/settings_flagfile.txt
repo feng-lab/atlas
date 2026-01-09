@@ -16,6 +16,32 @@
 # Proportion of RAM that will be used for Neuroglancer precomputed sharded minishard index cache (per opened volume), default is 0.05
 --atlas_ng_precomputed_minishard_index_cache_memory_proportion=0.05
 
+# HTTP / Network settings for remote datasets (Neuroglancer, etc.)
+
+# Path to a PEM CA bundle for HTTPS requests (empty = auto-detect; also respects env SSL_CERT_FILE).
+--atlas_http_ca_bundle=
+
+# Outbound HTTP proxy strategy using OS system proxy settings only (no proxy URL flags).
+# Values: auto (alternate direct/proxy between retries), no_proxy (always direct),
+#         proxy_if_available (always use system proxy if one exists for the URL).
+--atlas_http_proxy_strategy=auto
+
+# Maximum number of retries for transient network/handshake errors in HTTP GET, default is 2.
+--atlas_http_max_retries=2
+
+# Backoff delay in milliseconds before retrying transient HTTP errors, default is 200ms.
+--atlas_http_retry_backoff_initial_ms=200
+
+# Maximum backoff delay in milliseconds for transient HTTP error retries, default is 2000ms.
+--atlas_http_retry_backoff_max_ms=2000
+
+# Persistent on-disk cache for HTTP GET results (helps avoid re-downloading across sessions).
+# Max size in bytes (default 10 GiB). Set to 0 to disable.
+--atlas_http_disk_cache_max_bytes=10737418240
+
+# Root directory for the HTTP disk cache (empty = auto-chosen Atlas cache/config directory).
+--atlas_http_disk_cache_dir=
+
 # Interval in seconds for logging folly global executor status during waiting, default is 5
 --atlas_log_folly_global_executor_status_interval_in_seconds=5
 

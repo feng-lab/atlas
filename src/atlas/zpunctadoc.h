@@ -3,6 +3,7 @@
 #include "zobjdoc.h"
 #include "zpunctapack.h"
 
+#include <list>
 #include <optional>
 
 namespace nim {
@@ -27,6 +28,10 @@ public:
   [[nodiscard]] std::optional<size_t> findPunctaByExternalSource(const json::value& sourceJson) const;
 
   void updateExternalPunctaMetadata(size_t id, QString displayName, QString tooltip);
+
+  // Append puncta to an external-source pack without pushing an undo command.
+  // Intended for streaming/network sources (e.g. Neuroglancer annotations spatial index).
+  void appendExternalPunctaNoUndo(size_t id, std::list<ZPunctum> addedPuncta);
 
   // ZObjDoc interface
 

@@ -111,6 +111,26 @@ void ZSkeletonDoc::updateExternalSkeletonMetadata(size_t id, QString displayName
   packInfoUpdated(pack.get());
 }
 
+void ZSkeletonDoc::appendExternalSkeletonGeometryNoUndo(size_t id,
+                                                        std::vector<glm::vec3> vertices,
+                                                        std::vector<glm::uvec2> edges)
+{
+  CHECK(m_idToSkeletonPacks.contains(id));
+  auto& pack = m_idToSkeletonPacks.at(id);
+  CHECK(!pack->sourceJson.is_null()) << "appendExternalSkeletonGeometryNoUndo is only valid for external-source skeletons";
+
+  pack->skeleton.appendGeometry(std::move(vertices), std::move(edges));
+  pack->updateDerivedData();
+  packInfoUpdated(pack.get());
+
+  // Update all views, including aliases that share the same pack.
+  for (const auto& [otherId, otherPack] : m_idToSkeletonPacks) {
+    if (otherPack == pack) {
+      Q_EMIT skeletonChanged(otherId);
+    }
+  }
+}
+
 bool ZSkeletonDoc::save([[maybe_unused]] size_t id)
 {
   // Skeletons are currently network-backed/imported objects with no on-disk save format.

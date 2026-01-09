@@ -249,7 +249,9 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
   connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
   rootLayout->addWidget(buttonBox);
 
-  resize(900, 500);
+  // Favor a taller default so the history table shows more entries (the Sources panel is useful
+  // but should not crowd out the list).
+  resize(900, 650);
 }
 
 void ZLoadNeuroglancerPrecomputedDialog::setInitialUrl(const QString& url)

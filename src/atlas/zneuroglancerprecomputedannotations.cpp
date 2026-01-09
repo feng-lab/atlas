@@ -1068,6 +1068,168 @@ ZNeuroglancerPrecomputedAnnotationsSource::loadAnnotationsIntersectingVoxelBoxBl
   return out;
 }
 
+void ZNeuroglancerPrecomputedAnnotationsSource::streamAnnotationsIntersectingVoxelBoxBlocking(
+  const glm::dvec3& voxelMin,
+  const glm::dvec3& voxelMax,
+  const SpatialLoadUpdateCallback& onUpdate,
+  const std::atomic_bool* cancelFlag,
+  std::chrono::milliseconds minUpdateInterval,
+  size_t maxAnnotationsPerUpdate) const
+{
+  CHECK(static_cast<bool>(onUpdate)) << "streamAnnotationsIntersectingVoxelBoxBlocking requires an onUpdate callback";
+  if (m_spatial.empty()) {
+    throw ZException("Neuroglancer annotations dataset has no spatial index ('spatial' missing in info)");
+  }
+
+  const VoxelBox qVoxel = makeVoxelBox(voxelMin, voxelMax);
+  const glm::dvec3 qMinCoord = coordUnitsFromVoxel(qVoxel.min);
+  const glm::dvec3 qMaxCoord = coordUnitsFromVoxel(qVoxel.max);
+
+  auto safeAddU64 = [](uint64_t a, uint64_t b) -> uint64_t {
+    if (a > std::numeric_limits<uint64_t>::max() - b) {
+      return std::numeric_limits<uint64_t>::max();
+    }
+    return a + b;
+  };
+
+  auto safeMulU64 = [](uint64_t a, uint64_t b) -> uint64_t {
+    if (a == 0 || b == 0) {
+      return 0;
+    }
+    if (a > std::numeric_limits<uint64_t>::max() / b) {
+      return std::numeric_limits<uint64_t>::max();
+    }
+    return a * b;
+  };
+
+  struct LevelCellRange
+  {
+    const SpatialLevelSpec* level = nullptr;
+    std::array<int64_t, 3> cellMin{};
+    std::array<int64_t, 3> cellMax{};
+  };
+
+  std::vector<LevelCellRange> ranges;
+  ranges.reserve(m_spatial.size());
+
+  SpatialLoadProgress prog;
+  prog.levelsTotal = m_spatial.size();
+  prog.levelIndex = 0;
+  prog.totalCells = 0;
+  prog.visitedCells = 0;
+  prog.uniqueAnnotations = 0;
+
+  for (const SpatialLevelSpec& level : m_spatial) {
+    LevelCellRange r;
+    r.level = &level;
+
+    for (size_t d = 0; d < 3; ++d) {
+      const double origin = m_lowerBoundCoord[d];
+      const double chunk = level.chunkSize[d];
+      const int64_t maxIdx = static_cast<int64_t>(level.gridShape[d]) - 1;
+      CHECK(maxIdx >= 0);
+
+      const double a = (qMinCoord[d] - origin) / chunk;
+      const double b = (qMaxCoord[d] - origin) / chunk;
+      int64_t lo = static_cast<int64_t>(std::floor(std::min(a, b)));
+      int64_t hi = static_cast<int64_t>(std::floor(std::max(a, b)));
+
+      lo = std::clamp<int64_t>(lo, 0, maxIdx);
+      hi = std::clamp<int64_t>(hi, 0, maxIdx);
+
+      r.cellMin[d] = lo;
+      r.cellMax[d] = hi;
+    }
+
+    const uint64_t nx = static_cast<uint64_t>(r.cellMax[0] - r.cellMin[0] + 1);
+    const uint64_t ny = static_cast<uint64_t>(r.cellMax[1] - r.cellMin[1] + 1);
+    const uint64_t nz = static_cast<uint64_t>(r.cellMax[2] - r.cellMin[2] + 1);
+    const uint64_t levelCells = safeMulU64(safeMulU64(nx, ny), nz);
+    prog.totalCells = safeAddU64(prog.totalCells, levelCells);
+    ranges.push_back(r);
+  }
+
+  std::unordered_set<uint64_t> seen;
+  seen.reserve(1024);
+
+  std::vector<Annotation> batch;
+  batch.reserve(std::min<size_t>(maxAnnotationsPerUpdate, 2048));
+
+  using Clock = std::chrono::steady_clock;
+  auto lastUpdate = Clock::now();
+
+  auto shouldCancel = [&]() -> bool {
+    return cancelFlag && cancelFlag->load(std::memory_order_relaxed);
+  };
+
+  auto flush = [&](bool force) {
+    const auto now = Clock::now();
+    if (!force) {
+      if (batch.empty()) {
+        return;
+      }
+      if (now - lastUpdate < minUpdateInterval) {
+        return;
+      }
+    }
+
+    SpatialLoadUpdate u;
+    u.progress = prog;
+    u.newAnnotations = std::move(batch);
+    batch.clear();
+    batch.reserve(std::min<size_t>(maxAnnotationsPerUpdate, 2048));
+
+    onUpdate(std::move(u));
+    lastUpdate = now;
+  };
+
+  for (size_t levelIdx = 0; levelIdx < ranges.size(); ++levelIdx) {
+    prog.levelIndex = levelIdx;
+    const LevelCellRange& r = ranges[levelIdx];
+    CHECK(r.level);
+
+    for (int64_t z = r.cellMin[2]; z <= r.cellMax[2]; ++z) {
+      for (int64_t y = r.cellMin[1]; y <= r.cellMax[1]; ++y) {
+        for (int64_t x = r.cellMin[0]; x <= r.cellMax[0]; ++x) {
+          if (shouldCancel()) {
+            flush(/*force=*/true);
+            return;
+          }
+
+          const std::array<uint64_t, 3> cell = {static_cast<uint64_t>(x),
+                                                static_cast<uint64_t>(y),
+                                                static_cast<uint64_t>(z)};
+
+          auto bytesOpt = loadSpatialCellEntryBlocking(*r.level, cell);
+          prog.visitedCells = safeAddU64(prog.visitedCells, 1);
+
+          if (bytesOpt) {
+            const auto anns =
+              decodeMultipleAnnotationBytes(std::span<const uint8_t>(bytesOpt->data(), bytesOpt->size()));
+            for (const auto& a : anns) {
+              if (!annotationIntersectsVoxelBox(a, qVoxel)) {
+                continue;
+              }
+              if (!seen.insert(a.id).second) {
+                continue;
+              }
+              prog.uniqueAnnotations = safeAddU64(prog.uniqueAnnotations, 1);
+              batch.push_back(a);
+              if (batch.size() >= maxAnnotationsPerUpdate) {
+                flush(/*force=*/true);
+              }
+            }
+          }
+
+          flush(/*force=*/false);
+        }
+      }
+    }
+  }
+
+  flush(/*force=*/true);
+}
+
 ZNeuroglancerPrecomputedAnnotationsSource::Annotation ZNeuroglancerPrecomputedAnnotationsSource::decodeAnnotationPayload(
   std::span<const uint8_t> bytes,
   size_t& off) const

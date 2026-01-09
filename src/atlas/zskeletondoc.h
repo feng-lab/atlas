@@ -31,6 +31,10 @@ public:
   // segment_properties) becomes available after the skeleton has already been loaded.
   void updateExternalSkeletonMetadata(size_t id, QString displayName, QString tooltip);
 
+  // Append geometry to an external-source skeleton without pushing an undo command.
+  // Intended for streaming/network sources (e.g. Neuroglancer annotations spatial index).
+  void appendExternalSkeletonGeometryNoUndo(size_t id, std::vector<glm::vec3> vertices, std::vector<glm::uvec2> edges);
+
 Q_SIGNALS:
   void skeletonChanged(size_t id);
 

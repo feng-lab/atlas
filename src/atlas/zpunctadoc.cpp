@@ -804,6 +804,16 @@ void ZPunctaDoc::updateExternalPunctaMetadata(size_t id, QString displayName, QS
   packInfoUpdated(pack.get());
 }
 
+void ZPunctaDoc::appendExternalPunctaNoUndo(size_t id, std::list<ZPunctum> addedPuncta)
+{
+  CHECK(m_idToPunctaPacks.contains(id));
+  auto& pack = *m_idToPunctaPacks.at(id);
+  CHECK(!pack.sourceJson.is_null()) << "appendExternalPunctaNoUndo is only valid for external-source puncta";
+
+  pack.appendPunctaNoUndo(std::move(addedPuncta));
+  packInfoUpdated(&pack);
+}
+
 void ZPunctaDoc::setModified(bool)
 {
   if (auto ra = qobject_cast<ZPunctaPack*>(sender())) {

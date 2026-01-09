@@ -12,6 +12,7 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QClipboard>
+#include <QFuture>
 #include <QFutureWatcher>
 #include <QInputDialog>
 #include <QMenu>
@@ -337,6 +338,81 @@ ZImgView::ZImgView(ZImgDoc& doc, ZView& view)
   docImgsAdded(m_doc.objs());
   connect(&m_doc, &ZImgDoc::objAdded, this, &ZImgView::docImgAdded);
   connect(&m_doc, &ZImgDoc::imgChanged, this, &ZImgView::docImgChanged);
+}
+
+ZImgView::~ZImgView()
+{
+  cancelNeuroglancerAnnotationsSpatialLoad(/*markCancelledTooltip=*/false);
+}
+
+void ZImgView::cancelNeuroglancerAnnotationsSpatialLoad(bool markCancelledTooltip)
+{
+  if (!m_ngAnnotationsSpatialCancel) {
+    return;
+  }
+
+  // Mark cancelled first so worker threads stop scheduling any further updates.
+  m_ngAnnotationsSpatialCancel->store(true, std::memory_order_relaxed);
+
+  if (!markCancelledTooltip) {
+    return;
+  }
+  if (m_ngAnnotationsSpatialCompleted) {
+    return;
+  }
+
+  const QString status = QStringLiteral("cancelled (superseded by a newer request)");
+
+  // Best-effort: if the placeholder object exists, update its tooltip to reflect cancellation.
+  if (m_ngAnnotationsSpatialPunctaId && m_doc.doc().punctaDoc().hasObjWithID(*m_ngAnnotationsSpatialPunctaId)) {
+    const size_t id = *m_ngAnnotationsSpatialPunctaId;
+    const uint64_t count = static_cast<uint64_t>(m_doc.doc().punctaDoc().punctaPack(id).puncta().data.size());
+    const auto& qMin = m_ngAnnotationsSpatialQMin;
+    const auto& qMax = m_ngAnnotationsSpatialQMax;
+    const QString tooltip = QString(
+                              "Neuroglancer precomputed annotations (spatial)\n"
+                              "Segmentation: %1\n"
+                              "Annotations: %2\n"
+                              "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                              "Status: %9\n"
+                              "Count: %10")
+                            .arg(m_ngAnnotationsSpatialSegRootUrl)
+                            .arg(m_ngAnnotationsSpatialAnnRootUrl)
+                            .arg(qMin[0], 0, 'g', 8)
+                            .arg(qMin[1], 0, 'g', 8)
+                            .arg(qMin[2], 0, 'g', 8)
+                            .arg(qMax[0], 0, 'g', 8)
+                            .arg(qMax[1], 0, 'g', 8)
+                            .arg(qMax[2], 0, 'g', 8)
+                            .arg(status)
+                            .arg(static_cast<qulonglong>(count));
+    m_doc.doc().punctaDoc().updateExternalPunctaMetadata(id, m_ngAnnotationsSpatialDisplayName, tooltip);
+  }
+
+  if (m_ngAnnotationsSpatialSkeletonId && m_doc.doc().skeletonDoc().hasObjWithID(*m_ngAnnotationsSpatialSkeletonId)) {
+    const size_t id = *m_ngAnnotationsSpatialSkeletonId;
+    const uint64_t segCount = static_cast<uint64_t>(m_doc.doc().skeletonDoc().skeleton(id).numEdges());
+    const auto& qMin = m_ngAnnotationsSpatialQMin;
+    const auto& qMax = m_ngAnnotationsSpatialQMax;
+    const QString tooltip = QString(
+                              "Neuroglancer precomputed annotations (spatial lines)\n"
+                              "Segmentation: %1\n"
+                              "Annotations: %2\n"
+                              "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                              "Status: %9\n"
+                              "Segments: %10")
+                            .arg(m_ngAnnotationsSpatialSegRootUrl)
+                            .arg(m_ngAnnotationsSpatialAnnRootUrl)
+                            .arg(qMin[0], 0, 'g', 8)
+                            .arg(qMin[1], 0, 'g', 8)
+                            .arg(qMin[2], 0, 'g', 8)
+                            .arg(qMax[0], 0, 'g', 8)
+                            .arg(qMax[1], 0, 'g', 8)
+                            .arg(qMax[2], 0, 'g', 8)
+                            .arg(status)
+                            .arg(static_cast<qulonglong>(segCount));
+    m_doc.doc().skeletonDoc().updateExternalSkeletonMetadata(id, m_ngAnnotationsSpatialDisplayName, tooltip);
+  }
 }
 
 void ZImgView::appendContextMenuActions(QMenu& menu,
@@ -718,13 +794,38 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         return;
       }
 
+      // Cancel any in-flight spatial annotation load started from this view. If the prior request already
+      // produced partial results, mark it as cancelled so users understand why it stopped updating.
+      cancelNeuroglancerAnnotationsSpatialLoad(/*markCancelledTooltip=*/true);
+      m_ngAnnotationsSpatialCancel = std::make_shared<std::atomic_bool>(false);
+      const std::shared_ptr<std::atomic_bool> cancelFlag = m_ngAnnotationsSpatialCancel;
+      QPointer<ZImgView> viewPtr(this);
+
+      // Reset per-request UI bookkeeping.
+      m_ngAnnotationsSpatialCompleted = false;
+      m_ngAnnotationsSpatialPunctaId.reset();
+      m_ngAnnotationsSpatialSkeletonId.reset();
+      m_ngAnnotationsSpatialDisplayName.clear();
+      m_ngAnnotationsSpatialSegRootUrl = vol->rootUrl();
+      m_ngAnnotationsSpatialAnnRootUrl = annRootUrl;
+      m_ngAnnotationsSpatialQMin = {qMin.x, qMin.y, qMin.z};
+      m_ngAnnotationsSpatialQMax = {qMax.x, qMax.y, qMax.z};
+
       auto* openWatcher = new QFutureWatcher<NeuroglancerAnnotationsSourceOpenResult>(this);
       connect(openWatcher,
               &QFutureWatcher<NeuroglancerAnnotationsSourceOpenResult>::finished,
               this,
-              [this, openWatcher, vol, annRootUrl, qMin, qMax, sourceJson]() {
+              [viewPtr, cancelFlag, openWatcher, vol, annRootUrl, qMin, qMax, sourceJson]() {
                 const NeuroglancerAnnotationsSourceOpenResult r = openWatcher->result();
                 openWatcher->deleteLater();
+
+                if (!viewPtr || QCoreApplication::closingDown()) {
+                  return;
+                }
+                if (!cancelFlag || cancelFlag != viewPtr->m_ngAnnotationsSpatialCancel ||
+                    cancelFlag->load(std::memory_order_relaxed)) {
+                  return;
+                }
 
                 if (!r.error.isEmpty()) {
                   QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), r.error);
@@ -745,187 +846,344 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                   return;
                 }
 
-                if (QCoreApplication::closingDown()) {
+                using AT = ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType;
+                const AT type = r.source->annotationType();
+                const QString displayName = QString("NG Annotations (View z≈%1)").arg(qMin.z, 0, 'g', 6);
+
+                std::optional<size_t> punctaObjId;
+                std::optional<size_t> skeletonObjId;
+
+                if (type == AT::Point || type == AT::Ellipsoid) {
+                  ZPuncta empty;
+                  const QString tooltip = QString(
+                                            "Neuroglancer precomputed annotations (spatial)\n"
+                                            "Segmentation: %1\n"
+                                            "Annotations: %2\n"
+                                            "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                            "Status: loading…\n"
+                                            "Count: 0")
+                                          .arg(vol->rootUrl())
+                                          .arg(annRootUrl)
+                                          .arg(qMin.x, 0, 'g', 8)
+                                          .arg(qMin.y, 0, 'g', 8)
+                                          .arg(qMin.z, 0, 'g', 8)
+                                          .arg(qMax.x, 0, 'g', 8)
+                                          .arg(qMax.y, 0, 'g', 8)
+                                          .arg(qMax.z, 0, 'g', 8);
+                  punctaObjId = viewPtr->m_doc.doc().punctaDoc().addPunctaFromExternalSource(
+                    std::move(empty), displayName, tooltip, sourceJson);
+                } else if (type == AT::Line || type == AT::Polyline) {
+                  ZSkeleton empty;
+                  const QString tooltip = QString(
+                                            "Neuroglancer precomputed annotations (spatial lines)\n"
+                                            "Segmentation: %1\n"
+                                            "Annotations: %2\n"
+                                            "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                            "Status: loading…\n"
+                                            "Segments: 0")
+                                          .arg(vol->rootUrl())
+                                          .arg(annRootUrl)
+                                          .arg(qMin.x, 0, 'g', 8)
+                                          .arg(qMin.y, 0, 'g', 8)
+                                          .arg(qMin.z, 0, 'g', 8)
+                                          .arg(qMax.x, 0, 'g', 8)
+                                          .arg(qMax.y, 0, 'g', 8)
+                                          .arg(qMax.z, 0, 'g', 8);
+                  skeletonObjId = viewPtr->m_doc.doc().skeletonDoc().addSkeletonFromExternalSource(
+                    empty, displayName, tooltip, sourceJson);
+                } else {
+                  QMessageBox::information(
+                    QApplication::activeWindow(),
+                    QApplication::applicationName(),
+                    QStringLiteral("Unsupported annotation_type for rendering: only POINT/ELLIPSOID or LINE/POLYLINE are supported."));
                   return;
                 }
 
-                auto* loadWatcher = new QFutureWatcher<NeuroglancerAnnotationsLoadResult>(this);
-                connect(loadWatcher,
-                        &QFutureWatcher<NeuroglancerAnnotationsLoadResult>::finished,
-                        this,
-                        [this, loadWatcher]() {
-                          NeuroglancerAnnotationsLoadResult out = loadWatcher->result();
-                          loadWatcher->deleteLater();
+                if (!punctaObjId && !skeletonObjId) {
+                  return;
+                }
 
-                          if (!out.error.isEmpty()) {
-                            QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), out.error);
-                            return;
-                          }
+                viewPtr->m_ngAnnotationsSpatialDisplayName = displayName;
+                viewPtr->m_ngAnnotationsSpatialPunctaId = punctaObjId;
+                viewPtr->m_ngAnnotationsSpatialSkeletonId = skeletonObjId;
 
-                          if (out.puncta) {
-                            if (m_doc.doc().punctaDoc().findPunctaByExternalSource(out.sourceJson)) {
-                              return;
-                            }
-                            m_doc.doc().punctaDoc().addPunctaFromExternalSource(
-                              std::move(*out.puncta), out.displayName, out.tooltip, out.sourceJson);
-                            return;
-                          }
-
-                          if (out.skeleton) {
-                            if (m_doc.doc().skeletonDoc().findSkeletonByExternalSource(out.sourceJson)) {
-                              return;
-                            }
-                            m_doc.doc().skeletonDoc().addSkeletonFromExternalSource(
-                              *out.skeleton, out.displayName, out.tooltip, out.sourceJson);
-                            return;
-                          }
-
-                          QMessageBox::information(
-                            QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            QStringLiteral("No supported annotations were decoded (expected POINT/ELLIPSOID or LINE/POLYLINE)."));
-                        });
-
-                loadWatcher->setFuture(QtConcurrent::run([vol, annRootUrl, qMin, qMax, sourceJson, source = r.source]() {
-                  NeuroglancerAnnotationsLoadResult out;
-                  out.sourceJson = sourceJson;
+                // Stream spatial index results and apply incrementally as each batch becomes available.
+                // This preserves progressive feedback (coarse-first due to spatial level ordering) and
+                // avoids launching new requests after cancellation.
+                [[maybe_unused]] const QFuture<void> bg = QtConcurrent::run([viewPtr,
+                                                                            cancelFlag,
+                                                                            source = r.source,
+                                                                            vol,
+                                                                            annRootUrl,
+                                                                            qMin,
+                                                                            qMax,
+                                                                            displayName,
+                                                                            punctaObjId,
+                                                                            skeletonObjId,
+                                                                            type]() {
                   try {
-                    CHECK(vol);
                     CHECK(source);
+                    CHECK(vol);
 
-                    const auto anns = source->loadAnnotationsIntersectingVoxelBoxBlocking(qMin, qMax);
-                    if (anns.empty()) {
-                      out.error = QString("No annotations found intersecting the current view region.\n\n"
-                                          "Segmentation: %1\nAnnotations: %2\nVoxel box: [%3,%4,%5] - [%6,%7,%8]")
-                                    .arg(vol->rootUrl())
-                                    .arg(annRootUrl)
-                                    .arg(qMin.x, 0, 'g', 8)
-                                    .arg(qMin.y, 0, 'g', 8)
-                                    .arg(qMin.z, 0, 'g', 8)
-                                    .arg(qMax.x, 0, 'g', 8)
-                                    .arg(qMax.y, 0, 'g', 8)
-                                    .arg(qMax.z, 0, 'g', 8);
-                      return out;
-                    }
-
-                    using AT = ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType;
-                    const AT type = source->annotationType();
-
-                    const QString displayName =
-                      QString("NG Annotations (View z≈%1)").arg(qMin.z, 0, 'g', 6);
-                    out.displayName = displayName;
-
-                    if (type == AT::Point || type == AT::Ellipsoid) {
-                      std::list<ZPunctum> pts;
-                      for (const auto& a : anns) {
-                        if (a.points.size() != 1) {
-                          continue;
+                    source->streamAnnotationsIntersectingVoxelBoxBlocking(
+                      qMin,
+                      qMax,
+                      [viewPtr,
+                       cancelFlag,
+                       vol,
+                       annRootUrl,
+                       qMin,
+                       qMax,
+                       displayName,
+                       punctaObjId,
+                       skeletonObjId,
+                       type,
+                       source](ZNeuroglancerPrecomputedAnnotationsSource::SpatialLoadUpdate update) {
+                        if (!viewPtr) {
+                          return;
                         }
-                        const auto& p = a.points[0];
-                        if (type == AT::Ellipsoid && a.ellipsoidRadiiVoxel) {
-                          const glm::vec3 r = *a.ellipsoidRadiiVoxel;
-                          const double rx = static_cast<double>(r.x);
-                          const double ry = static_cast<double>(r.y);
-                          const double rz = static_cast<double>(r.z);
-                          const double rMax = std::max({rx, ry, rz});
-                          ZPunctum punctum(p.x, p.y, p.z, /*r=*/rMax);
-                          punctum.setRadii(rx, ry, rz);
-                          punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
-                          punctum.setMaxIntensity(255.0);
-                          punctum.setMeanIntensity(255.0);
-                          applyAnnotationPropertiesToPunctum(*source, a, punctum);
-                          if (a.rgba8) {
-                            const auto& c = *a.rgba8;
-                            punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+                        if (!cancelFlag || cancelFlag->load(std::memory_order_relaxed)) {
+                          return;
+                        }
+
+                        const auto progress = update.progress;
+
+                        if (punctaObjId) {
+                          auto pts = std::make_shared<std::list<ZPunctum>>();
+                          if (!update.newAnnotations.empty()) {
+                            for (const auto& a : update.newAnnotations) {
+                              if (a.points.size() != 1) {
+                                continue;
+                              }
+                              const auto& p = a.points[0];
+                              if (type == AT::Ellipsoid && a.ellipsoidRadiiVoxel) {
+                                const glm::vec3 r = *a.ellipsoidRadiiVoxel;
+                                const double rx = static_cast<double>(r.x);
+                                const double ry = static_cast<double>(r.y);
+                                const double rz = static_cast<double>(r.z);
+                                const double rMax = std::max({rx, ry, rz});
+                                ZPunctum punctum(p.x, p.y, p.z, /*r=*/rMax);
+                                punctum.setRadii(rx, ry, rz);
+                                punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
+                                punctum.setMaxIntensity(255.0);
+                                punctum.setMeanIntensity(255.0);
+                                applyAnnotationPropertiesToPunctum(*source, a, punctum);
+                                if (a.rgba8) {
+                                  const auto& c = *a.rgba8;
+                                  punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+                                }
+                                pts->push_back(std::move(punctum));
+                              } else {
+                                ZPunctum punctum(p.x, p.y, p.z, /*r=*/2.0);
+                                punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
+                                punctum.setMaxIntensity(255.0);
+                                punctum.setMeanIntensity(255.0);
+                                applyAnnotationPropertiesToPunctum(*source, a, punctum);
+                                if (a.rgba8) {
+                                  const auto& c = *a.rgba8;
+                                  punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+                                }
+                                pts->push_back(std::move(punctum));
+                              }
+                            }
                           }
-                          pts.push_back(std::move(punctum));
-                        } else {
-                          ZPunctum punctum(p.x, p.y, p.z, /*r=*/2.0);
-                          punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
-                          punctum.setMaxIntensity(255.0);
-                          punctum.setMeanIntensity(255.0);
-                          applyAnnotationPropertiesToPunctum(*source, a, punctum);
-                          if (a.rgba8) {
-                            const auto& c = *a.rgba8;
-                            punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+
+                          QMetaObject::invokeMethod(
+                            viewPtr,
+                            [viewPtr, cancelFlag, displayName, vol, annRootUrl, qMin, qMax, progress, punctaObjId, pts]() {
+                              if (!viewPtr || QCoreApplication::closingDown()) {
+                                return;
+                              }
+                              if (!cancelFlag || cancelFlag != viewPtr->m_ngAnnotationsSpatialCancel ||
+                                  cancelFlag->load(std::memory_order_relaxed)) {
+                                return;
+                              }
+                              CHECK(punctaObjId);
+                              const size_t id = *punctaObjId;
+                              auto& doc = viewPtr->m_doc.doc().punctaDoc();
+                              if (!doc.hasObjWithID(id)) {
+                                cancelFlag->store(true, std::memory_order_relaxed);
+                                return;
+                              }
+
+                              if (pts && !pts->empty()) {
+                                doc.appendExternalPunctaNoUndo(id, std::move(*pts));
+                              }
+
+                              const uint64_t count = static_cast<uint64_t>(doc.punctaPack(id).puncta().data.size());
+                              const bool done = (progress.levelsTotal > 0) &&
+                                                (progress.levelIndex + 1 == progress.levelsTotal) &&
+                                                (progress.visitedCells >= progress.totalCells);
+                              viewPtr->m_ngAnnotationsSpatialCompleted = done;
+                              const QString status = done ? QStringLiteral("done")
+                                                          : QString("loading… %1/%2 cells (level %3/%4)")
+                                                              .arg(static_cast<qulonglong>(progress.visitedCells))
+                                                              .arg(static_cast<qulonglong>(progress.totalCells))
+                                                              .arg(static_cast<qulonglong>(progress.levelIndex + 1))
+                                                              .arg(static_cast<qulonglong>(progress.levelsTotal));
+                              const QString tooltip = QString(
+                                                        "Neuroglancer precomputed annotations (spatial)\n"
+                                                        "Segmentation: %1\n"
+                                                        "Annotations: %2\n"
+                                                        "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                                        "Status: %9\n"
+                                                        "Count: %10")
+                                                      .arg(vol->rootUrl())
+                                                      .arg(annRootUrl)
+                                                      .arg(qMin.x, 0, 'g', 8)
+                                                      .arg(qMin.y, 0, 'g', 8)
+                                                      .arg(qMin.z, 0, 'g', 8)
+                                                      .arg(qMax.x, 0, 'g', 8)
+                                                      .arg(qMax.y, 0, 'g', 8)
+                                                      .arg(qMax.z, 0, 'g', 8)
+                                                      .arg(status)
+                                                      .arg(static_cast<qulonglong>(count));
+
+                              doc.updateExternalPunctaMetadata(id, displayName, tooltip);
+
+                              if (done && count == 0) {
+                                doc.removeObj(id);
+                                QMessageBox::information(
+                                  QApplication::activeWindow(),
+                                  QApplication::applicationName(),
+                                  QStringLiteral("No annotations found intersecting the current view region."));
+                              }
+                            },
+                            Qt::QueuedConnection);
+                        } else if (skeletonObjId) {
+                          auto geom = std::make_shared<std::pair<std::vector<glm::vec3>, std::vector<glm::uvec2>>>();
+                          auto& verts = geom->first;
+                          auto& edges = geom->second;
+
+                          if (!update.newAnnotations.empty()) {
+                            size_t base = 0;
+                            for (const auto& a : update.newAnnotations) {
+                              if (a.points.size() < 2) {
+                                continue;
+                              }
+                              base = verts.size();
+                              verts.insert(verts.end(), a.points.begin(), a.points.end());
+                              for (size_t i = 0; i + 1 < a.points.size(); ++i) {
+                                edges.emplace_back(static_cast<uint32_t>(base + i),
+                                                   static_cast<uint32_t>(base + i + 1));
+                              }
+                            }
                           }
-                          pts.push_back(std::move(punctum));
-                        }
-                      }
-                      if (pts.empty()) {
-                        out.error = QString("No POINT/ELLIPSOID annotations decoded for current view region.");
-                        return out;
-                      }
-                      auto p = std::make_shared<ZPuncta>();
-                      p->data = std::move(pts);
-                      out.puncta = std::move(p);
-                      out.tooltip = QString(
-                                      "Neuroglancer precomputed annotations (spatial)\n"
-                                      "Segmentation: %1\n"
-                                      "Annotations: %2\n"
-                                      "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
-                                      "Count: %9")
-                                    .arg(vol->rootUrl())
-                                    .arg(annRootUrl)
-                                    .arg(qMin.x, 0, 'g', 8)
-                                    .arg(qMin.y, 0, 'g', 8)
-                                    .arg(qMin.z, 0, 'g', 8)
-                                    .arg(qMax.x, 0, 'g', 8)
-                                    .arg(qMax.y, 0, 'g', 8)
-                                    .arg(qMax.z, 0, 'g', 8)
-                                    .arg(static_cast<qulonglong>(out.puncta->data.size()));
-                      return out;
-                    }
 
-                    if (type == AT::Line || type == AT::Polyline) {
-                      std::vector<glm::vec3> vertices;
-                      std::vector<glm::uvec2> edges;
-                      size_t numSegments = 0;
-                      for (const auto& a : anns) {
-                        if (a.points.size() < 2) {
-                          continue;
-                        }
-                        const size_t base = vertices.size();
-                        vertices.insert(vertices.end(), a.points.begin(), a.points.end());
-                        for (size_t i = 0; i + 1 < a.points.size(); ++i) {
-                          edges.emplace_back(static_cast<uint32_t>(base + i), static_cast<uint32_t>(base + i + 1));
-                          ++numSegments;
-                        }
-                      }
-                      if (vertices.empty() || edges.empty()) {
-                        out.error = QString("No LINE/POLYLINE annotations decoded for current view region.");
-                        return out;
-                      }
-                      auto skel = std::make_shared<ZSkeleton>();
-                      skel->setVertices(std::move(vertices));
-                      skel->setEdges(std::move(edges));
-                      out.skeleton = std::move(skel);
-                      out.tooltip = QString(
-                                      "Neuroglancer precomputed annotations (spatial lines)\n"
-                                      "Segmentation: %1\n"
-                                      "Annotations: %2\n"
-                                      "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
-                                      "Segments: %9")
-                                    .arg(vol->rootUrl())
-                                    .arg(annRootUrl)
-                                    .arg(qMin.x, 0, 'g', 8)
-                                    .arg(qMin.y, 0, 'g', 8)
-                                    .arg(qMin.z, 0, 'g', 8)
-                                    .arg(qMax.x, 0, 'g', 8)
-                                    .arg(qMax.y, 0, 'g', 8)
-                                    .arg(qMax.z, 0, 'g', 8)
-                                    .arg(static_cast<qulonglong>(numSegments));
-                      return out;
-                    }
+                          QMetaObject::invokeMethod(
+                            viewPtr,
+                            [viewPtr, cancelFlag, displayName, vol, annRootUrl, qMin, qMax, progress, skeletonObjId, geom]() {
+                              if (!viewPtr || QCoreApplication::closingDown()) {
+                                return;
+                              }
+                              if (!cancelFlag || cancelFlag != viewPtr->m_ngAnnotationsSpatialCancel ||
+                                  cancelFlag->load(std::memory_order_relaxed)) {
+                                return;
+                              }
+                              CHECK(skeletonObjId);
+                              const size_t id = *skeletonObjId;
+                              auto& doc = viewPtr->m_doc.doc().skeletonDoc();
+                              if (!doc.hasObjWithID(id)) {
+                                cancelFlag->store(true, std::memory_order_relaxed);
+                                return;
+                              }
 
-                    out.error = QString("Unsupported annotation_type for rendering: only POINT/ELLIPSOID or LINE/POLYLINE are supported.");
-                    return out;
+                              if (geom && !geom->first.empty() && !geom->second.empty()) {
+                                doc.appendExternalSkeletonGeometryNoUndo(id, std::move(geom->first), std::move(geom->second));
+                              }
+
+                              const uint64_t segCount = static_cast<uint64_t>(doc.skeleton(id).numEdges());
+                              const bool done = (progress.levelsTotal > 0) &&
+                                                (progress.levelIndex + 1 == progress.levelsTotal) &&
+                                                (progress.visitedCells >= progress.totalCells);
+                              viewPtr->m_ngAnnotationsSpatialCompleted = done;
+                              const QString status = done ? QStringLiteral("done")
+                                                          : QString("loading… %1/%2 cells (level %3/%4)")
+                                                              .arg(static_cast<qulonglong>(progress.visitedCells))
+                                                              .arg(static_cast<qulonglong>(progress.totalCells))
+                                                              .arg(static_cast<qulonglong>(progress.levelIndex + 1))
+                                                              .arg(static_cast<qulonglong>(progress.levelsTotal));
+                              const QString tooltip = QString(
+                                                        "Neuroglancer precomputed annotations (spatial lines)\n"
+                                                        "Segmentation: %1\n"
+                                                        "Annotations: %2\n"
+                                                        "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                                        "Status: %9\n"
+                                                        "Segments: %10")
+                                                      .arg(vol->rootUrl())
+                                                      .arg(annRootUrl)
+                                                      .arg(qMin.x, 0, 'g', 8)
+                                                      .arg(qMin.y, 0, 'g', 8)
+                                                      .arg(qMin.z, 0, 'g', 8)
+                                                      .arg(qMax.x, 0, 'g', 8)
+                                                      .arg(qMax.y, 0, 'g', 8)
+                                                      .arg(qMax.z, 0, 'g', 8)
+                                                      .arg(status)
+                                                      .arg(static_cast<qulonglong>(segCount));
+
+                              doc.updateExternalSkeletonMetadata(id, displayName, tooltip);
+
+                              if (done && segCount == 0) {
+                                doc.removeObj(id);
+                                QMessageBox::information(
+                                  QApplication::activeWindow(),
+                                  QApplication::applicationName(),
+                                  QStringLiteral("No annotations found intersecting the current view region."));
+                              }
+                            },
+                            Qt::QueuedConnection);
+                        }
+                      },
+                      cancelFlag.get());
                   }
                   catch (const std::exception& e) {
-                    out.error = QString("Failed to load neuroglancer annotations (spatial):\n%1").arg(QString::fromUtf8(e.what()));
-                    return out;
+                    if (!cancelFlag || cancelFlag->load(std::memory_order_relaxed)) {
+                      return;
+                    }
+                    const QString err = QString::fromUtf8(e.what());
+                    QMetaObject::invokeMethod(
+                      viewPtr,
+                      [viewPtr, cancelFlag, displayName, punctaObjId, skeletonObjId, err]() {
+                        if (!viewPtr || QCoreApplication::closingDown()) {
+                          return;
+                        }
+                        if (!cancelFlag || cancelFlag != viewPtr->m_ngAnnotationsSpatialCancel ||
+                            cancelFlag->load(std::memory_order_relaxed)) {
+                          return;
+                        }
+
+                        // Best-effort cleanup of the placeholder object if it is still empty.
+                        if (punctaObjId) {
+                          auto& doc = viewPtr->m_doc.doc().punctaDoc();
+                          if (doc.hasObjWithID(*punctaObjId)) {
+                            if (doc.punctaPack(*punctaObjId).puncta().data.empty()) {
+                              doc.removeObj(*punctaObjId);
+                            } else {
+                              doc.updateExternalPunctaMetadata(
+                                *punctaObjId, displayName, QStringLiteral("Failed to load annotations."));
+                            }
+                          }
+                        }
+                        if (skeletonObjId) {
+                          auto& doc = viewPtr->m_doc.doc().skeletonDoc();
+                          if (doc.hasObjWithID(*skeletonObjId)) {
+                            if (doc.skeleton(*skeletonObjId).empty()) {
+                              doc.removeObj(*skeletonObjId);
+                            } else {
+                              doc.updateExternalSkeletonMetadata(
+                                *skeletonObjId, displayName, QStringLiteral("Failed to load annotations."));
+                            }
+                          }
+                        }
+
+                        QMessageBox::information(
+                          QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          QString("Failed to load neuroglancer annotations (spatial):\n%1").arg(err));
+                      },
+                      Qt::QueuedConnection);
                   }
-                }));
+                });
               });
 
       openWatcher->setFuture(QtConcurrent::run([vol, annRootUrl]() -> NeuroglancerAnnotationsSourceOpenResult {

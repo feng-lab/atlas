@@ -26,7 +26,7 @@ Neuroglancer Precomputed (HTTP)
   - Sharded volumes require HTTP `Range` support; Atlas supports `minishard_index_encoding` and `data_encoding` of `raw` or `gzip` as specified in Neuroglancer’s sharded format. (Sharding `data_encoding` is applied first, then the per-scale chunk `encoding` is decoded.)
 - Networking is implemented with proxygen/folly: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
   - Optional persistent HTTP disk cache (file-based, cross-OS) is implemented in `src/atlas/zhttpdiskcache.h` and `src/atlas/zhttpdiskcache.cpp` and is integrated into `ZProxygenHttpClient::getBytesOnEventBase()` (cache lookup before network; store after successful 200/206).
-    - Enable with `--atlas_http_disk_cache_max_bytes=<N>` (0 disables).
+    - Enable with `--atlas_http_disk_cache_max_bytes=<N>` (default 10 GiB; set to 0 to disable).
     - Optional location override: `--atlas_http_disk_cache_dir=<path>` (otherwise uses the Atlas cache/config directories).
     - The cache is keyed by `(URL + Range)` and stores the already-decoded bytes returned to callers (after HTTP-level `Content-Encoding` handling).
     - Multi-process safety: guarded by a lock file; if the lock cannot be acquired, the cache is disabled for that process.
@@ -70,8 +70,6 @@ Testing (Linking Atlas Code)
 - GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.
 - Neuroglancer precomputed E2E tests:
   - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
-- Windows CI defaults:
-  - `test/zroimaskrastertest.cpp` can be slow/heavy on Windows runners. It is gated by `ATLAS_ENABLE_ZROIMASKRASTERTEST` (default OFF when `GITHUB_ACTIONS`/`CI` is set on Windows; ON otherwise).
 - Developer-only tooling:
   - `ATLAS_ENABLE_CUSTOM_COMMAND` controls whether Atlas includes the **Help → Run Custom Command** menu item (`ZCustomCommand`). Deployed builds should set this OFF.
 

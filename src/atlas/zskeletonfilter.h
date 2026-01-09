@@ -92,6 +92,10 @@ public:
 
   void setData(ZSkeleton& skeleton);
 
+  // Rebuilds the QGraphicsItem from the current skeleton geometry.
+  // This is needed when the underlying ZSkeleton is modified in-place (e.g. streaming loads).
+  void reloadSkeletonGeometry();
+
   void releaseItemsOwnership();
 
   void setSelected(bool v);
@@ -131,6 +135,7 @@ private:
 
   ZSkeleton* m_skeleton = nullptr;
   std::unique_ptr<ZSkeletonGraphicsItem> m_item;
+  bool m_selected = false;
 };
 
 } // namespace nim

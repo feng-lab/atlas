@@ -188,6 +188,18 @@ void ZPunctaPack::splitSelectedPunctum()
   }
 }
 
+void ZPunctaPack::appendPunctaNoUndo(std::list<ZPunctum> addedPuncta)
+{
+  if (addedPuncta.empty()) {
+    return;
+  }
+
+  m_puncta.data.splice(m_puncta.data.end(), addedPuncta);
+  updateDerivedData(); // clears cached "info" and refreshes name/tooltip overrides if any
+  updateViewRelatedData();
+  Q_EMIT punctaChanged();
+}
+
 void ZPunctaPack::showPunctaContextMenu(QPoint globalPos)
 {
   contextMenu().popup(globalPos);

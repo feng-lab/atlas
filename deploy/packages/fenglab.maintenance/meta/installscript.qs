@@ -14,44 +14,9 @@ Component.prototype.onInstallationStarted = function()
             component.installerbaseBinaryPath = "@TargetDir@/MaintenanceTool.app";
         installer.setInstallerBaseBinary(component.installerbaseBinaryPath);
 
-        // update resource file
-        var updateResourceFilePath = "@TargetDir@/update.rcc";
-        var normalizedUpdateResourceFilePath = updateResourceFilePath.replace(/@TargetDir@/, installer.value("TargetDir"));
-        print("Updating resource file: " + normalizedUpdateResourceFilePath);
-        installer.setValue("DefaultResourceReplacement", normalizedUpdateResourceFilePath);
-    }
-}
-
-Component.prototype.createOperationsForArchive = function(archive)
-{
-    //installer.performOperation in older versions of the installer framework don't supports @TargetDir@
-    var normalizedInstallerbaseBinaryPath = component.installerbaseBinaryPath.replace(/@TargetDir@/,
-        installer.value("TargetDir"));
-    var normalizedInstallerbaseBinaryBackupPath = normalizedInstallerbaseBinaryPath + "_backup";
-
-    if (installer.value("os") == "mac") {
-        // When updating the maintenance tool, move the existing bundle out of the way before extracting the new one.
-        // QtIFW leaves this backup in place unless we clean it up.
-        if (installer.fileExists(normalizedInstallerbaseBinaryPath)) {
-            installer.performOperation("Move",
-                new Array(normalizedInstallerbaseBinaryPath, normalizedInstallerbaseBinaryBackupPath));
-        }
-    } else {
-        if (installer.fileExists(normalizedInstallerbaseBinaryPath)) {
-            installer.performOperation("SimpleMoveFile",
-                new Array(normalizedInstallerbaseBinaryPath, normalizedInstallerbaseBinaryBackupPath));
-        }
-    }
-    component.createOperationsForArchive(archive);
-
-    // On macOS the backup is an app bundle directory (MaintenanceTool.app_backup). When running the original
-    // installer (as opposed to running from the MaintenanceTool itself), it's safe to remove the backup after we
-    // have extracted the new bundle; leaving it around confuses users and grows the install dir over time.
-    if (installer.value("os") == "mac" && installer.isInstaller()) {
-        // Queue cleanup *after* Extract by using an operation (rather than performing immediately).
-        // rm -rf with -f makes the cleanup idempotent; allow exit code 1 so a non-critical cleanup failure does not
-        // fail the whole installation.
-        component.addOperation("Execute", "{0,1}", "/bin/rm", "-rf", normalizedInstallerbaseBinaryBackupPath);
+        // Update resource file (branding) used when QtIFW updates the MaintenanceTool base binary.
+        var updateResourceFilePath = installer.value("TargetDir") + "/update.rcc";
+        installer.setValue("DefaultResourceReplacement", updateResourceFilePath);
     }
 }
 
