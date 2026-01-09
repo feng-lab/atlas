@@ -433,13 +433,20 @@ def main() -> int:
         action="store_true",
         help="Build zimg without FreeImage support (passes -DZIMG_DISABLE_FREEIMAGE=ON).",
     )
+    parser.add_argument(
+        "--conda-upload",
+        dest="conda_upload",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help=(
+            "Control whether to build/upload the conda package. "
+            "'auto' (default) uploads conda only for non-tag builds; "
+            "'always' uploads conda whenever ANACONDA_API_TOKEN and conda-build are available; "
+            "'never' skips conda entirely."
+        ),
+    )
 
     args = parser.parse_args()
-
-    allowed_env_keys = {"PYPI_API_TOKEN", "ANACONDA_API_TOKEN"}
-    if common_dirs.is_mac():
-        allowed_env_keys.add("MACOS_CODESIGN_IDENTITY")
-    atlas_env.load_repo_dotenv(allowed_keys=allowed_env_keys)
 
     repo_root = Path(common_dirs.atlas_repository_dir())
     py_project_src = repo_root / "python" / "zimg"
@@ -452,37 +459,35 @@ def main() -> int:
     git_describe = atlas_version.git_describe_from_git_version(raw_git_version)
     version = atlas_pypi.pep440_version_from_git_describe(git_describe)
     logger.info("Detected tag: %s -> zimg version: %s", git_describe, version)
+    is_release_tag = atlas_pypi.is_clean_release_tag(git_describe)
+
+    want_conda_upload = True
+    conda_policy_skip_reason: str | None = None
+    if args.conda_upload == "never":
+        want_conda_upload = False
+        conda_policy_skip_reason = "disabled via --conda-upload=never"
+    elif args.conda_upload == "auto" and is_release_tag:
+        want_conda_upload = False
+        conda_policy_skip_reason = (
+            "disabled for clean release tags (--conda-upload=auto)"
+        )
+
+    allowed_env_keys = {"PYPI_API_TOKEN"}
+    if want_conda_upload:
+        allowed_env_keys.add("ANACONDA_API_TOKEN")
+    if common_dirs.is_mac():
+        allowed_env_keys.add("MACOS_CODESIGN_IDENTITY")
+    atlas_env.load_repo_dotenv(allowed_keys=allowed_env_keys)
 
     out_dir = repo_root / "python" / "zimg" / "dist"
     cmd = [sys.executable, "-m", "build", "--wheel", "--outdir", str(out_dir)]
-
-    conda_token = os.environ.get("ANACONDA_API_TOKEN", "").strip()
-    conda_build_exe = shutil.which("conda-build")
-    conda_source_dir: Path | None = None
-    conda_cmd: list[str] | None = None
-    conda_cmd_display: list[str] | None = None
-    conda_skip_reason: str | None = None
-    if not conda_token:
-        conda_skip_reason = "ANACONDA_API_TOKEN not set"
-    elif conda_build_exe is None:
-        conda_skip_reason = "conda-build not found on PATH"
-    else:
-        conda_source_dir = Path(common_dirs.ext_conda_build_dir())
-        conda_cmd = [
-            "conda-build",
-            "--token",
-            conda_token,
-            "--user",
-            "fenglab",
-            "zimg-recipe",
-        ]
-        conda_cmd_display = ["conda-build", "--token", "$ANACONDA_API_TOKEN", "zimg-recipe"]
 
     if args.dry_run:
         logger.info("Build command: %s", " ".join(cmd))
         logger.info(
             "FreeImage: %s", "disabled" if args.disable_freeimage else "enabled"
         )
+        logger.info("Conda upload policy: %s", args.conda_upload)
         atlas_pypi.maybe_upload_to_pypi(
             out_dir,
             project="zimg",
@@ -493,21 +498,21 @@ def main() -> int:
             allow_non_tag_upload=args.allow_non_tag_upload,
             skip_existing=args.allow_non_tag_upload,
         )
-        if conda_skip_reason is None:
-            assert conda_source_dir is not None
-            assert conda_cmd_display is not None
-            logger.info("Conda stage dir: %s/zimg", conda_source_dir)
+        if want_conda_upload:
+            # Dry-run: print the command we'd run without checking tool/env availability.
+            conda_cmd_display = [
+                "conda-build",
+                "--token",
+                "$ANACONDA_API_TOKEN",
+                "zimg-recipe",
+            ]
             logger.info("Conda build command: %s", " ".join(conda_cmd_display))
-            logger.info("Conda upload: enabled via conda-build")
+            logger.info(
+                "Conda upload: enabled by policy (requires ANACONDA_API_TOKEN and conda-build)"
+            )
         else:
-            if conda_token:
-                logger.warning("Conda: skipped (%s)", conda_skip_reason)
-                logger.warning(
-                    "To enable conda uploads, install `conda-build` and `anaconda-client` "
-                    "(e.g. in a conda env) and ensure `conda-build` is on PATH."
-                )
-            else:
-                logger.info("Conda: skipped (%s)", conda_skip_reason)
+            assert conda_policy_skip_reason is not None
+            logger.info("Conda: skipped (%s)", conda_policy_skip_reason)
         return 0
 
     atlas_pypi.ensure_empty_dir(out_dir)
@@ -611,27 +616,55 @@ def main() -> int:
         skip_existing=args.allow_non_tag_upload,
     )
 
-    if conda_skip_reason is None:
-        assert conda_cmd is not None
-        assert conda_cmd_display is not None
-        assert conda_source_dir is not None
+    if want_conda_upload:
+        conda_token = os.environ.get("ANACONDA_API_TOKEN", "").strip()
+        conda_build_exe = shutil.which("conda-build")
 
-        wheel_path = wheels[0]
-        logger.info("Staging conda zimg package from wheel: %s", wheel_path.name)
-        staged_dir = _stage_conda_zimg_from_wheel(
-            wheel_path=wheel_path, conda_source_dir=conda_source_dir
-        )
-        logger.info("Staged conda package dir: %s", staged_dir)
-        _run_checked(conda_cmd, cwd=repo_root, display_cmd=conda_cmd_display)
-    else:
-        if conda_token:
-            logger.warning("Skipping conda build/upload (%s)", conda_skip_reason)
-            logger.warning(
-                "To enable conda uploads, install `conda-build` and `anaconda-client` "
-                "(e.g. in a conda env) and ensure `conda-build` is on PATH."
-            )
+        conda_source_dir: Path | None = None
+        conda_cmd: list[str] | None = None
+        conda_cmd_display: list[str] | None = None
+        conda_skip_reason: str | None = None
+        if not conda_token:
+            conda_skip_reason = "ANACONDA_API_TOKEN not set"
+        elif conda_build_exe is None:
+            conda_skip_reason = "conda-build not found on PATH"
         else:
-            logger.info("Skipping conda build/upload (%s)", conda_skip_reason)
+            conda_source_dir = Path(common_dirs.ext_conda_build_dir())
+            conda_cmd = [
+                "conda-build",
+                "--token",
+                conda_token,
+                "--user",
+                "fenglab",
+                "zimg-recipe",
+            ]
+            conda_cmd_display = [
+                "conda-build",
+                "--token",
+                "$ANACONDA_API_TOKEN",
+                "zimg-recipe",
+            ]
+
+        if conda_skip_reason is None:
+            assert conda_cmd is not None
+            assert conda_source_dir is not None
+            wheel_path = wheels[0]
+            logger.info("Staging conda zimg package from wheel: %s", wheel_path.name)
+            staged_dir = _stage_conda_zimg_from_wheel(
+                wheel_path=wheel_path, conda_source_dir=conda_source_dir
+            )
+            logger.info("Staged conda package dir: %s", staged_dir)
+            _run_checked(conda_cmd, cwd=repo_root, display_cmd=conda_cmd_display)
+        else:
+            logger.warning("Skipping conda build/upload (%s)", conda_skip_reason)
+            if conda_skip_reason == "conda-build not found on PATH":
+                logger.warning(
+                    "To enable conda uploads, install `conda-build` and `anaconda-client` "
+                    "(e.g. in a conda env) and ensure `conda-build` is on PATH."
+                )
+    else:
+        assert conda_policy_skip_reason is not None
+        logger.info("Skipping conda build/upload (%s)", conda_policy_skip_reason)
 
     return 0
 

@@ -60,33 +60,50 @@ add_gtest_executable(ztupleliketest)
 
 # Atlas-side tests
 
+# Policy for heavy Atlas-linked tests:
+# - Enabled on developer machines.
+# - Disabled on Windows CI runners where link time/memory can be a bottleneck.
+set(_atlas_is_windows_ci OFF)
+if (WIN32 AND (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI}))
+  set(_atlas_is_windows_ci ON)
+endif ()
+
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
-set(_atlas_enable_zroimaskrastertest_default ON)
-if (WIN32 AND (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI}))
-  # `zroimaskrastertest` is particularly slow/heavy on Windows runners. Skip it in
-  # CI by default, but keep it available for local Windows repro via
-  # `-DATLAS_ENABLE_ZROIMASKRASTERTEST=ON`.
-  set(_atlas_enable_zroimaskrastertest_default OFF)
-endif ()
-option(
-  ATLAS_ENABLE_ZROIMASKRASTERTEST
-  "Build and run zroimaskrastertest (slow on Windows CI)."
-  ${_atlas_enable_zroimaskrastertest_default})
-if (ATLAS_ENABLE_ZROIMASKRASTERTEST)
-  add_atlas_gtest_executable(zroimaskrastertest)
+# `zroimaskrastertest` is particularly slow/heavy on Windows runners. Skip it in
+# CI to keep the default test build lightweight.
+if (_atlas_is_windows_ci)
+  message(STATUS "Skipping zroimaskrastertest on Windows CI (heavy link against atlas_lib).")
 else ()
-  message(STATUS "Skipping zroimaskrastertest (ATLAS_ENABLE_ZROIMASKRASTERTEST=OFF)")
+  add_atlas_gtest_executable(zroimaskrastertest)
 endif ()
 add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_gtest_executable(zneuroglanceruint64shardingtest)
 add_atlas_gtest_executable(zneuroglancerprecomputedchunkdecodertest)
 add_atlas_gtest_executable(zneuroglancerstatetest)
-add_atlas_gtest_executable(zneuroglancerprecomputedannotationstest)
 add_atlas_gtest_executable(zhttpdiskcachetest)
-add_atlas_gtest_executable(zneuroglancerprecomputedsegmentpropertiestest)
-add_atlas_gtest_executable(zneuroglancerprecomputedskeletontest)
-add_atlas_gtest_executable(zneuroglancerprecomputede2etest)
+
+# Consolidate the heaviest Atlas-linked Neuroglancer tests into a single executable to
+# avoid paying the large atlas_lib link cost multiple times.
+# `zneuroglancerprecomputedtest` is a large executable that links against atlas_lib
+# and is frequently too slow/heavy to build+link on Windows CI runners. Skip it in
+# CI to keep the default test build lightweight.
+if (_atlas_is_windows_ci)
+  message(STATUS "Skipping zneuroglancerprecomputedtest on Windows CI (heavy link against atlas_lib).")
+else ()
+  add_executable(
+    zneuroglancerprecomputedtest
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedannotationstest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedsegmentpropertiestest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedskeletontest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputede2etest.cpp)
+  target_link_libraries(zneuroglancerprecomputedtest PRIVATE GTest::gtest_main atlas_lib)
+  target_compile_definitions(zneuroglancerprecomputedtest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
+  if (UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_link_options(zneuroglancerprecomputedtest PRIVATE -fuse-ld=lld)
+  endif ()
+  gtest_discover_tests(zneuroglancerprecomputedtest DISCOVERY_TIMEOUT 600)
+endif ()
 
 
 find_package(benchmark REQUIRED
