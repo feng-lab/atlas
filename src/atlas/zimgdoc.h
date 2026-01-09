@@ -82,6 +82,8 @@ protected:
 
   void loadNeuroglancerPrecomputed();
 
+  void loadNeuroglancerState();
+
   void importImgSequence();
 
   void stitchImgs();
@@ -137,6 +139,7 @@ private:
 
   QAction* m_loadImgAction = nullptr;
   QAction* m_loadNeuroglancerPrecomputedAction = nullptr;
+  QAction* m_loadNeuroglancerStateAction = nullptr;
   QAction* m_importImgSequenceAction = nullptr;
 
   QAction* m_stitchImageAction = nullptr;

@@ -178,6 +178,13 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
                       static_cast<col4::value_type>(punctaInfo[11])});
       p.setScore(punctaInfo[12]);
 
+      if (H5Aexists(punctumGrp.getId(), "RadiiXYZ") > 0) {
+        double radii[3]{};
+        H5::Attribute radiiAttr = punctumGrp.openAttribute("RadiiXYZ");
+        radiiAttr.read(doubleType, radii);
+        p.setRadii(radii[0], radii[1], radii[2]);
+      }
+
       if (H5Lexists(punctumGrp.getId(), "VoxelIntensities", H5P_DEFAULT) > 0 &&
           H5Lexists(punctumGrp.getId(), "VoxelLocations", H5P_DEFAULT) > 0) {
         H5::DataSet voxelInten = punctumGrp.openDataSet("VoxelIntensities");
@@ -237,6 +244,8 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename)
     H5::StrType strType(0, H5T_VARIABLE);
 
     H5::DataSpace attrDataSpace(H5S_SCALAR);
+    hsize_t radiiDim = 3;
+    H5::DataSpace radiiDataSpace(1, &radiiDim);
 
     H5::Group allGrp = file.createGroup("Puncta");
 
@@ -286,6 +295,12 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename)
 
       H5::DataSet info = punctumGrp.createDataSet("Summary", doubleType, infoDataspace);
       info.write(punctaInfo, doubleType);
+
+      if (p.hasAnisotropicRadii()) {
+        const double radii[3] = {p.radiusX(), p.radiusY(), p.radiusZ()};
+        H5::Attribute radiiAttr = punctumGrp.createAttribute("RadiiXYZ", doubleType, radiiDataSpace);
+        radiiAttr.write(doubleType, radii);
+      }
 
       if (p.voxelLocations().rows() != 0) {
         voxelIntenDim = p.voxelLocations().rows();

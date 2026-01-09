@@ -7,12 +7,20 @@
 #include "zloadneuroglancerprecomputeddialog.h"
 #include "zneuroglancerprecomputed.h"
 #include "zneuroglancerprecomputeddatasetlist.h"
+#include "zneuroglancerstate.h"
 #include "zlog.h"
+#include "zproxygenhttpclient.h"
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
 #include <QApplication>
+#include <QClipboard>
 #include <QFileDialog>
+#include <QInputDialog>
+#include <QMessageBox>
 #include <QSettings>
+#include <QUrl>
+#include <boost/json.hpp>
+#include <folly/coro/BlockingWait.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -205,6 +213,7 @@ std::vector<QAction*> ZImgDoc::loadFileActions() const
   std::vector<QAction*> res;
   res.push_back(m_loadImgAction);
   res.push_back(m_loadNeuroglancerPrecomputedAction);
+  res.push_back(m_loadNeuroglancerStateAction);
   res.push_back(m_importImgSequenceAction);
   return res;
 }
@@ -480,6 +489,313 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
   }
 }
 
+void ZImgDoc::loadNeuroglancerState()
+{
+  QString prefill;
+  const QString clip = QApplication::clipboard()->text().trimmed();
+  if (!clip.isEmpty()) {
+    prefill = clip;
+  }
+
+  const QString userText =
+    QInputDialog::getText(QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          QStringLiteral("Neuroglancer state URL or JSON:\n"
+                                         "- Paste a Neuroglancer share link (contains '#!{...}'), OR\n"
+                                         "- Paste a URL to a .json state file, OR\n"
+                                         "- Paste raw state JSON text."),
+                          QLineEdit::Normal,
+                          prefill)
+      .trimmed();
+  if (userText.isEmpty()) {
+    return;
+  }
+
+  constexpr std::chrono::milliseconds kDefaultTimeout{30000};
+
+  auto mapGsToHttps = [](QString u) -> QString {
+    QString s = u.trimmed();
+    if (s.startsWith("gs://", Qt::CaseInsensitive)) {
+      const QString rest = s.mid(QStringLiteral("gs://").size());
+      return QStringLiteral("https://storage.googleapis.com/") + rest;
+    }
+    return s;
+  };
+
+  auto tryExtractJsonFromUrlFragment = [](QString u) -> std::optional<QString> {
+    const QUrl url(u.trimmed());
+    if (!url.isValid()) {
+      return std::nullopt;
+    }
+    QString frag = url.fragment(QUrl::FullyDecoded).trimmed();
+    if (frag.isEmpty()) {
+      return std::nullopt;
+    }
+    if (frag.startsWith('!')) {
+      frag = frag.mid(1).trimmed();
+    }
+    if (!frag.startsWith('{') && !frag.startsWith('[') && frag.contains('%')) {
+      frag = QString::fromUtf8(QByteArray::fromPercentEncoding(frag.toUtf8())).trimmed();
+    }
+    if (frag.startsWith('{') || frag.startsWith('[')) {
+      return frag;
+    }
+    return std::nullopt;
+  };
+
+  // Load/parse state JSON.
+  boost::json::value stateJson;
+  try {
+    if (userText.startsWith('{') || userText.startsWith('[')) {
+      stateJson = boost::json::parse(userText.toStdString());
+    } else if (const auto fragOpt = tryExtractJsonFromUrlFragment(userText)) {
+      stateJson = boost::json::parse(fragOpt->toStdString());
+    } else if (userText.contains("://") || userText.startsWith("gs://", Qt::CaseInsensitive)) {
+      const QString urlStr = mapGsToHttps(userText);
+      auto resOpt = folly::coro::blockingWait(
+        ZProxygenHttpClient::instance().getBytes(urlStr.toStdString(), kDefaultTimeout));
+      if (!resOpt) {
+        QMessageBox::information(QApplication::activeWindow(),
+                                 QApplication::applicationName(),
+                                 QStringLiteral("Failed to fetch Neuroglancer state JSON (HTTP 404 or network failure):\n%1")
+                                   .arg(urlStr));
+        return;
+      }
+      if (resOpt->status != 200) {
+        QMessageBox::information(QApplication::activeWindow(),
+                                 QApplication::applicationName(),
+                                 QStringLiteral("Failed to fetch Neuroglancer state JSON:\n%1\n\nHTTP status: %2")
+                                   .arg(urlStr)
+                                   .arg(resOpt->status));
+        return;
+      }
+      const std::string text(reinterpret_cast<const char*>(resOpt->body.data()), resOpt->body.size());
+      stateJson = boost::json::parse(text);
+    } else {
+      QMessageBox::information(QApplication::activeWindow(),
+                               QApplication::applicationName(),
+                               QStringLiteral("Unrecognized input. Paste a Neuroglancer share link, a JSON URL, or raw JSON."));
+      return;
+    }
+  }
+  catch (const std::exception& e) {
+    QMessageBox::information(QApplication::activeWindow(),
+                             QApplication::applicationName(),
+                             QStringLiteral("Failed to parse Neuroglancer state JSON:\n%1").arg(QString::fromUtf8(e.what())));
+    return;
+  }
+
+  const ZNeuroglancerState::ParseResult parsed = ZNeuroglancerState::parse(stateJson);
+  if (parsed.layers.empty()) {
+    QString msg = QStringLiteral("No supported precomputed layers were found in this Neuroglancer state.");
+    if (!parsed.warnings.isEmpty()) {
+      msg += QStringLiteral("\n\nDetails:\n") + parsed.warnings.join("\n");
+    }
+    QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), msg);
+    return;
+  }
+
+  QString historyLoadErr;
+  auto historyEntries = ZNeuroglancerPrecomputedDatasetList::loadUserHistory(&historyLoadErr);
+  if (!historyLoadErr.isEmpty()) {
+    LOG(WARNING) << "Failed to load Neuroglancer history: " << historyLoadErr.toStdString();
+  }
+
+  auto defaultNameFromUrl = [](QString u) -> QString {
+    QString s = u.trimmed();
+    // Strip nested schemes like "precomputed://gs://..."
+    for (int i = 0; i < 2; ++i) {
+      const int idx = s.indexOf("://");
+      if (idx < 0) {
+        break;
+      }
+      s = s.mid(idx + 3);
+    }
+    QStringList parts = s.split('/', Qt::SkipEmptyParts);
+    if (parts.size() >= 2) {
+      return parts[parts.size() - 2] + "/" + parts[parts.size() - 1];
+    }
+    if (!parts.isEmpty()) {
+      return parts.front();
+    }
+    return u.trimmed();
+  };
+
+  auto applyOverridesFromHistoryIfPresent = [&](ZImgPack& pack) {
+    if (!pack.isNeuroglancerPrecomputed() || !pack.neuroglancerVolumeShared()->isSegmentation()) {
+      return;
+    }
+    const QString rootUrl = pack.neuroglancerRootUrl();
+    const QString normalizedRoot = ZNeuroglancerPrecomputedDatasetList::normalizedUrlForMatch(rootUrl);
+    if (normalizedRoot.isEmpty()) {
+      return;
+    }
+
+    auto it = std::find_if(historyEntries.begin(),
+                           historyEntries.end(),
+                           [&](const ZNeuroglancerPrecomputedDatasetList::Entry& e) {
+                             return ZNeuroglancerPrecomputedDatasetList::normalizedUrlForMatch(e.url) == normalizedRoot;
+                           });
+    if (it == historyEntries.end()) {
+      return;
+    }
+
+    auto apply = [&](const QString& overrideText,
+                     auto setter,
+                     const char* kind) {
+      const QString text = overrideText.trimmed();
+      if (text.isEmpty()) {
+        return;
+      }
+      QString err;
+      if (!setter(text, &err)) {
+        LOG(WARNING) << "Failed to apply Neuroglancer " << kind << " source override from history: "
+                     << err.toStdString();
+      }
+    };
+
+    apply(it->meshSourceOverrideUrl,
+          [&](const QString& s, QString* err) { return pack.setNeuroglancerMeshSourceOverride(s, err); },
+          "mesh");
+    apply(it->skeletonSourceOverrideUrl,
+          [&](const QString& s, QString* err) { return pack.setNeuroglancerSkeletonSourceOverride(s, err); },
+          "skeleton");
+    apply(it->annotationsSourceOverrideUrl,
+          [&](const QString& s, QString* err) { return pack.setNeuroglancerAnnotationsSourceOverride(s, err); },
+          "annotations");
+  };
+
+  // We want to update history exactly once at the end, and avoid duplicating entries if multiple layers
+  // refer to the same dataset.
+  std::set<QString> touchedNormalizedRoots;
+  std::map<QString, QString> normalizedRootToNameHint;
+
+  auto upsertHistoryForPack = [&](const ZImgPack& pack, QString displayNameHint, QString kindHint) {
+    const QString rootUrl = pack.neuroglancerRootUrl();
+    const QString normalizedRoot = ZNeuroglancerPrecomputedDatasetList::normalizedUrlForMatch(rootUrl);
+    if (normalizedRoot.isEmpty()) {
+      return;
+    }
+
+    // Only use the first non-empty hint per dataset (so the history name is stable).
+    if (!displayNameHint.trimmed().isEmpty() && !normalizedRootToNameHint.contains(normalizedRoot)) {
+      normalizedRootToNameHint[normalizedRoot] = displayNameHint.trimmed();
+    }
+
+    ZNeuroglancerPrecomputedDatasetList::Entry entry;
+    auto it = std::find_if(historyEntries.begin(),
+                           historyEntries.end(),
+                           [&](const ZNeuroglancerPrecomputedDatasetList::Entry& e) {
+                             return ZNeuroglancerPrecomputedDatasetList::normalizedUrlForMatch(e.url) == normalizedRoot;
+                           });
+    if (it != historyEntries.end()) {
+      entry = *it;
+    }
+
+    entry.url = rootUrl;
+    const QString nameHintFinal = normalizedRootToNameHint.contains(normalizedRoot) ? normalizedRootToNameHint[normalizedRoot] : QString{};
+    if (!nameHintFinal.isEmpty()) {
+      entry.name = nameHintFinal;
+    } else if (entry.name.trimmed().isEmpty()) {
+      entry.name = defaultNameFromUrl(rootUrl);
+    }
+    if (!kindHint.trimmed().isEmpty()) {
+      entry.kind = kindHint.trimmed();
+    }
+
+    entry.meshSourceOverrideUrl = pack.neuroglancerMeshSourceOverrideUrl();
+    entry.skeletonSourceOverrideUrl = pack.neuroglancerSkeletonSourceOverrideUrl();
+    entry.annotationsSourceOverrideUrl = pack.neuroglancerAnnotationsSourceOverrideUrl();
+
+    ZNeuroglancerPrecomputedDatasetList::upsertMostRecent(&historyEntries, std::move(entry));
+    touchedNormalizedRoots.insert(normalizedRoot);
+  };
+
+  // Open supported precomputed volumes from the state.
+  // Note: this is a blocking operation; we keep UI feedback consistent with existing "Load Neuroglancer" behavior.
+  QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
+
+  QStringList warnings = parsed.warnings;
+  std::map<QString, size_t> segmentationLayerNameToObjId;
+
+  for (const auto& layer : parsed.layers) {
+    QString err;
+    const size_t id = loadNeuroglancerPrecomputed(layer.volumeUrl, err);
+    if (!id) {
+      warnings << QStringLiteral("Failed to open precomputed dataset '%1': %2").arg(layer.volumeUrl).arg(err);
+      continue;
+    }
+
+    // Apply doc-level visibility (maps to the standard object visible toggle).
+    m_doc.setObjVisible(id, layer.visible);
+
+    ZImgPack& pack = imgPack(id);
+
+    // Apply any persisted per-dataset overrides before applying state overrides.
+    applyOverridesFromHistoryIfPresent(pack);
+
+    if (layer.type == ZNeuroglancerState::LayerType::Segmentation) {
+      if (!layer.meshSourceOverrideUrl.trimmed().isEmpty()) {
+        QString setErr;
+        (void)pack.setNeuroglancerMeshSourceOverride(layer.meshSourceOverrideUrl, &setErr);
+      }
+      if (!layer.skeletonSourceOverrideUrl.trimmed().isEmpty()) {
+        QString setErr;
+        (void)pack.setNeuroglancerSkeletonSourceOverride(layer.skeletonSourceOverrideUrl, &setErr);
+      }
+      if (!layer.name.trimmed().isEmpty()) {
+        segmentationLayerNameToObjId[layer.name.trimmed()] = id;
+      }
+    }
+
+    QString kindHint = QStringLiteral("image");
+    if (pack.isNeuroglancerPrecomputed() && pack.neuroglancerVolumeShared()->isSegmentation()) {
+      kindHint = QStringLiteral("segmentation");
+    }
+    upsertHistoryForPack(pack, layer.name, kindHint);
+  }
+
+  // Apply annotations bindings to the linked segmentation datasets (configuration only; no objects created).
+  for (const auto& b : parsed.annotationsBindings) {
+    for (const QString& segLayerName : b.linkedSegmentationLayerNames) {
+      auto it = segmentationLayerNameToObjId.find(segLayerName.trimmed());
+      if (it == segmentationLayerNameToObjId.end()) {
+        continue;
+      }
+      const size_t objId = it->second;
+      ZImgPack& pack = imgPack(objId);
+      QString setErr;
+      if (!pack.setNeuroglancerAnnotationsSourceOverride(b.annotationsRootUrl, &setErr)) {
+        warnings << QStringLiteral("Failed to apply annotations source override '%1' to dataset '%2': %3")
+                      .arg(b.annotationsRootUrl)
+                      .arg(pack.neuroglancerRootUrl())
+                      .arg(setErr);
+      }
+      upsertHistoryForPack(pack,
+                           /*displayNameHint=*/segLayerName,
+                           /*kindHint=*/QStringLiteral("segmentation"));
+    }
+  }
+
+  QApplication::restoreOverrideCursor();
+
+  // Persist updated history (including any overrides we applied from state).
+  {
+    QString saveErr;
+    ZNeuroglancerPrecomputedDatasetList::normalizeAndDeduplicate(&historyEntries);
+    if (!ZNeuroglancerPrecomputedDatasetList::saveUserHistory(historyEntries, &saveErr)) {
+      LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr.toStdString();
+    }
+  }
+
+  if (!warnings.isEmpty()) {
+    QMessageBox::information(QApplication::activeWindow(),
+                             QApplication::applicationName(),
+                             QStringLiteral("Neuroglancer state import completed with warnings:\n\n%1")
+                               .arg(warnings.join("\n")));
+  }
+}
+
 void ZImgDoc::importImgSequence()
 {
   ZLoadImageSequenceDialog dlg("Load Sequence Images", QApplication::activeWindow());
@@ -704,6 +1020,11 @@ void ZImgDoc::createActions()
           &QAction::triggered,
           this,
           qOverload<>(&ZImgDoc::loadNeuroglancerPrecomputed));
+
+  m_loadNeuroglancerStateAction =
+    new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("Load Neuroglancer (&State JSON)..."), this);
+  m_loadNeuroglancerStateAction->setStatusTip(tr("Load supported precomputed layers from a Neuroglancer viewer state URL/JSON"));
+  connect(m_loadNeuroglancerStateAction, &QAction::triggered, this, &ZImgDoc::loadNeuroglancerState);
 
   m_importImgSequenceAction = new QAction(tr("&Import Sequence Images..."), this);
   m_importImgSequenceAction->setStatusTip(tr("Load sequence images"));

@@ -5,6 +5,7 @@
 #include "zwidgetsgroup.h"
 #include "zcolormap.h"
 #include "znumericparameter.h"
+#include "z3dellipsoidrenderer.h"
 #include "z3dsphererenderer.h"
 #include "zeventlistenerparameter.h"
 #include "zpunctapack.h"
@@ -74,10 +75,13 @@ protected:
   void addEditingSelectionLines() override;
 
 private:
+  [[nodiscard]] bool usesEllipsoidRendering() const;
+
   void deleteSelectedPuncta();
 
 private:
   Z3DSphereRenderer m_sphereRenderer;
+  Z3DEllipsoidRenderer m_ellipsoidRenderer;
 
   ZStringIntOptionParameter m_colorMode;
   ZVec4Parameter m_singleColorForAllPuncta;
@@ -104,6 +108,11 @@ private:
   std::vector<glm::vec4> m_pointColors;
   std::vector<glm::vec4> m_pointPickingColors;
 
+  std::vector<glm::vec3> m_ellipsoidCenters;
+  std::vector<glm::vec3> m_ellipsoidAxis1;
+  std::vector<glm::vec3> m_ellipsoidAxis2;
+  std::vector<glm::vec3> m_ellipsoidAxis3;
+
   std::vector<glm::vec4> m_pointAndRadiusGlow;
   std::vector<glm::vec4> m_specularAndShininessGlow;
   std::vector<glm::vec4> m_pointColorsGlow;
@@ -113,6 +122,7 @@ private:
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid = false;
+  bool m_useEllipsoidRenderer = false;
 
   ZPunctaPack* m_punctaPack = nullptr;
 };

@@ -9,6 +9,7 @@
 #include "zneuroglancerprecomputedskeleton.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace nim {
 
@@ -26,6 +27,38 @@ namespace {
     return std::nullopt;
   }
   return static_cast<uint64_t>(v);
+}
+
+[[nodiscard]] std::optional<double> jsonNumberAsDouble(const json::value& v)
+{
+  if (v.is_double()) {
+    return v.as_double();
+  }
+  if (v.is_int64()) {
+    return static_cast<double>(v.as_int64());
+  }
+  if (v.is_uint64()) {
+    return static_cast<double>(v.as_uint64());
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] std::optional<glm::dvec3> jsonArray3AsDvec3(const json::value& v)
+{
+  if (!v.is_array()) {
+    return std::nullopt;
+  }
+  const auto& a = v.as_array();
+  if (a.size() != 3) {
+    return std::nullopt;
+  }
+  const auto x = jsonNumberAsDouble(a[0]);
+  const auto y = jsonNumberAsDouble(a[1]);
+  const auto z = jsonNumberAsDouble(a[2]);
+  if (!x || !y || !z) {
+    return std::nullopt;
+  }
+  return glm::dvec3{*x, *y, *z};
 }
 
 } // namespace
@@ -243,6 +276,159 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
             .arg(relationshipId)
             .arg(static_cast<qulonglong>(objectId))
             .arg(static_cast<qulonglong>(numSegments));
+
+        return addSkeletonFromExternalSource(*skel, displayName, tooltip, normalized);
+      }
+
+      if (type == "neuroglancer_precomputed_annotations_spatial") {
+        auto segRootIt = jo.find("segmentation_root_url");
+        if (segRootIt == jo.end() || !segRootIt->value().is_string()) {
+          errorMsg = QString("Invalid neuroglancer annotations spatial JSON: missing string field 'segmentation_root_url'");
+          return 0;
+        }
+        const QString normalizedSegRootUrl =
+          ZNeuroglancerPrecomputedVolume::normalizeRootUrl(json::value_to<QString>(segRootIt->value()));
+
+        auto annRootIt = jo.find("annotation_root_url");
+        if (annRootIt == jo.end() || !annRootIt->value().is_string()) {
+          errorMsg = QString("Invalid neuroglancer annotations spatial JSON: missing string field 'annotation_root_url'");
+          return 0;
+        }
+        const QString normalizedAnnRootUrl =
+          ZNeuroglancerPrecomputedVolume::normalizeRootUrl(json::value_to<QString>(annRootIt->value()));
+
+        auto minIt = jo.find("voxel_box_min");
+        auto maxIt = jo.find("voxel_box_max");
+        if (minIt == jo.end() || maxIt == jo.end()) {
+          errorMsg = QString("Invalid neuroglancer annotations spatial JSON: missing 'voxel_box_min'/'voxel_box_max'");
+          return 0;
+        }
+        const auto minOpt = jsonArray3AsDvec3(minIt->value());
+        const auto maxOpt = jsonArray3AsDvec3(maxIt->value());
+        if (!minOpt || !maxOpt) {
+          errorMsg = QString("Invalid neuroglancer annotations spatial JSON: voxel_box_min/max must be numeric arrays of length 3");
+          return 0;
+        }
+        const glm::dvec3 qMin{std::min(minOpt->x, maxOpt->x),
+                              std::min(minOpt->y, maxOpt->y),
+                              std::min(minOpt->z, maxOpt->z)};
+        const glm::dvec3 qMax{std::max(minOpt->x, maxOpt->x),
+                              std::max(minOpt->y, maxOpt->y),
+                              std::max(minOpt->z, maxOpt->z)};
+        for (int d = 0; d < 3; ++d) {
+          const double lo = (&qMin.x)[d];
+          const double hi = (&qMax.x)[d];
+          if (!std::isfinite(lo) || !std::isfinite(hi) || !(hi >= lo)) {
+            errorMsg = QString("Invalid neuroglancer annotations spatial JSON: voxel_box_min/max must be finite and ordered");
+            return 0;
+          }
+        }
+
+        // Normalize persisted JSON to keep it stable across save/load cycles.
+        json::object normalized;
+        normalized["type"] = "neuroglancer_precomputed_annotations_spatial";
+        normalized["segmentation_root_url"] = json::value_from(normalizedSegRootUrl);
+        normalized["annotation_root_url"] = json::value_from(normalizedAnnRootUrl);
+        {
+          json::array a;
+          a.push_back(qMin.x);
+          a.push_back(qMin.y);
+          a.push_back(qMin.z);
+          normalized["voxel_box_min"] = std::move(a);
+        }
+        {
+          json::array a;
+          a.push_back(qMax.x);
+          a.push_back(qMax.y);
+          a.push_back(qMax.z);
+          normalized["voxel_box_max"] = std::move(a);
+        }
+
+        // Deduplicate before performing any network work.
+        for (const auto& idPack : m_idToSkeletonPacks) {
+          if (isSameObj(normalized, jsonValue(idPack.first))) {
+            return idPack.first;
+          }
+        }
+
+        // Try to reuse an already-opened segmentation volume.
+        std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol;
+        for (const size_t imgId : m_doc.objsOfDoc(&m_doc.imgDoc())) {
+          const ZImgPack& pack = m_doc.imgDoc().imgPack(imgId);
+          if (!pack.isNeuroglancerPrecomputed()) {
+            continue;
+          }
+          if (pack.neuroglancerRootUrl() == normalizedSegRootUrl && pack.neuroglancerVolumeShared()->isSegmentation()) {
+            vol = pack.neuroglancerVolumeShared();
+            break;
+          }
+        }
+        if (!vol) {
+          vol = ZNeuroglancerPrecomputedVolume::open(normalizedSegRootUrl, kDefaultTimeout);
+        }
+        CHECK(vol);
+
+        std::array<double, 3> baseResNm{
+          vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ};
+        auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(
+          QUrl(normalizedAnnRootUrl), baseResNm, vol->baseVoxelOffset(), vol->defaultTimeout());
+        CHECK(source);
+
+        if (source->spatialLevels().empty()) {
+          errorMsg = QString("Neuroglancer annotations dataset has no spatial index ('spatial' missing in info)");
+          return 0;
+        }
+
+        if (source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Line &&
+            source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Polyline) {
+          errorMsg = QString("Unsupported neuroglancer annotations type for skeleton: expected LINE or POLYLINE");
+          return 0;
+        }
+
+        const auto anns = source->loadAnnotationsIntersectingVoxelBoxBlocking(qMin, qMax);
+        if (anns.empty()) {
+          errorMsg = QString("No annotations found intersecting the saved spatial query box.");
+          return 0;
+        }
+
+        std::vector<glm::vec3> vertices;
+        std::vector<glm::uvec2> edges;
+        size_t numSegments = 0;
+        for (const auto& a : anns) {
+          if (a.points.size() < 2) {
+            continue;
+          }
+          const size_t base = vertices.size();
+          vertices.insert(vertices.end(), a.points.begin(), a.points.end());
+          for (size_t i = 0; i + 1 < a.points.size(); ++i) {
+            edges.emplace_back(static_cast<uint32_t>(base + i), static_cast<uint32_t>(base + i + 1));
+            ++numSegments;
+          }
+        }
+        if (vertices.empty() || edges.empty()) {
+          errorMsg = QString("No LINE/POLYLINE segments decoded for the saved spatial query box.");
+          return 0;
+        }
+
+        auto skel = std::make_shared<ZSkeleton>();
+        skel->setVertices(std::move(vertices));
+        skel->setEdges(std::move(edges));
+
+        const QString displayName = QString("NG Annotations (View z≈%1)").arg(qMin.z, 0, 'g', 6);
+        const QString tooltip = QString("Neuroglancer precomputed annotations (spatial lines)\n"
+                                        "Segmentation: %1\n"
+                                        "Annotations: %2\n"
+                                        "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                        "Segments: %9")
+                                  .arg(normalizedSegRootUrl)
+                                  .arg(normalizedAnnRootUrl)
+                                  .arg(qMin.x, 0, 'g', 8)
+                                  .arg(qMin.y, 0, 'g', 8)
+                                  .arg(qMin.z, 0, 'g', 8)
+                                  .arg(qMax.x, 0, 'g', 8)
+                                  .arg(qMax.y, 0, 'g', 8)
+                                  .arg(qMax.z, 0, 'g', 8)
+                                  .arg(static_cast<qulonglong>(numSegments));
 
         return addSkeletonFromExternalSource(*skel, displayName, tooltip, normalized);
       }
@@ -479,6 +665,55 @@ bool ZSkeletonDoc::isSameObj(const json::value& v1, const json::value& v2) const
         const QString rel = json::value_to<QString>(itRel->value()).trimmed();
         const QString obj = json::value_to<QString>(itObj->value()).trimmed();
         return QString("%1|%2|%3|%4|%5").arg(type, segRoot, annRoot, rel, obj);
+      }
+
+      if (type == "neuroglancer_precomputed_annotations_spatial") {
+        auto itSegRoot = o.find("segmentation_root_url");
+        auto itAnnRoot = o.find("annotation_root_url");
+        auto itMin = o.find("voxel_box_min");
+        auto itMax = o.find("voxel_box_max");
+        if (itSegRoot == o.end() || !itSegRoot->value().is_string() ||
+            itAnnRoot == o.end() || !itAnnRoot->value().is_string() ||
+            itMin == o.end() || itMax == o.end()) {
+          return std::nullopt;
+        }
+
+        QString segRoot = json::value_to<QString>(itSegRoot->value());
+        QString annRoot = json::value_to<QString>(itAnnRoot->value());
+        try {
+          segRoot = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(segRoot));
+          annRoot = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(annRoot));
+        }
+        catch (...) {
+          return std::nullopt;
+        }
+
+        const auto minOpt = jsonArray3AsDvec3(itMin->value());
+        const auto maxOpt = jsonArray3AsDvec3(itMax->value());
+        if (!minOpt || !maxOpt) {
+          return std::nullopt;
+        }
+
+        const glm::dvec3 qMin{std::min(minOpt->x, maxOpt->x),
+                              std::min(minOpt->y, maxOpt->y),
+                              std::min(minOpt->z, maxOpt->z)};
+        const glm::dvec3 qMax{std::max(minOpt->x, maxOpt->x),
+                              std::max(minOpt->y, maxOpt->y),
+                              std::max(minOpt->z, maxOpt->z)};
+
+        auto num = [](double v) {
+          return QString::number(v, 'g', 17);
+        };
+        return QString("%1|%2|%3|%4|%5|%6|%7|%8|%9")
+          .arg(type,
+               segRoot,
+               annRoot,
+               num(qMin.x),
+               num(qMin.y),
+               num(qMin.z),
+               num(qMax.x),
+               num(qMax.y),
+               num(qMax.z));
       }
 
       if (type != "neuroglancer_precomputed_skeleton") {

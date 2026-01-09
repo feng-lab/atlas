@@ -25,9 +25,17 @@ Neuroglancer Precomputed (HTTP)
   - `encoding: "compressed_segmentation"` — requires `data_type` ∈ {`"uint32"`, `"uint64"`} and `compressed_segmentation_block_size`.
   - Sharded volumes require HTTP `Range` support; Atlas supports `minishard_index_encoding` and `data_encoding` of `raw` or `gzip` as specified in Neuroglancer’s sharded format. (Sharding `data_encoding` is applied first, then the per-scale chunk `encoding` is decoded.)
 - Networking is implemented with proxygen/folly: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
+  - Optional persistent HTTP disk cache (file-based, cross-OS) is implemented in `src/atlas/zhttpdiskcache.h` and `src/atlas/zhttpdiskcache.cpp` and is integrated into `ZProxygenHttpClient::getBytesOnEventBase()` (cache lookup before network; store after successful 200/206).
+    - Enable with `--atlas_http_disk_cache_max_bytes=<N>` (0 disables).
+    - Optional location override: `--atlas_http_disk_cache_dir=<path>` (otherwise uses the Atlas cache/config directories).
+    - The cache is keyed by `(URL + Range)` and stores the already-decoded bytes returned to callers (after HTTP-level `Content-Encoding` handling).
+    - Multi-process safety: guarded by a lock file; if the lock cannot be acquired, the cache is disabled for that process.
 - Dataset parsing + chunk addressing lives in `src/atlas/zneuroglancerprecomputed.h` and `src/atlas/zneuroglancerprecomputed.cpp` (reads `.../info`, then fetches chunks on demand).
   - Chunk decode helpers live in `src/atlas/zneuroglancerprecomputedchunkdecoder.h` and `src/atlas/zneuroglancerprecomputedchunkdecoder.cpp`.
   - Sharded-format helpers are in `src/atlas/zneuroglanceruint64sharding.h` and `src/atlas/zneuroglanceruint64sharding.cpp`.
+- Neuroglancer “viewer state” import (Option A):
+  - Parser: `src/atlas/zneuroglancerstate.h` and `src/atlas/zneuroglancerstate.cpp` extracts only supported precomputed volume layers (image + segmentation) and records warnings for skipped/unsupported layer types.
+  - UI entry point: `ZImgDoc::loadNeuroglancerState()` opens those layers and can also apply per-dataset source overrides (mesh/skeleton/annotations) discovered from the state (configuration only; unsupported layers are not created as objects in Atlas yet).
 - Caches (per opened Neuroglancer volume; these are budgets, not preallocated):
   - Chunk cache size is controlled by `--atlas_ng_precomputed_chunk_cache_memory_proportion` (default `0.3`, valid range `[0, 1]`).
   - Sharded minishard-index cache size is controlled by `--atlas_ng_precomputed_minishard_index_cache_memory_proportion` (default `0.05`, valid range `[0, 1]`).
@@ -38,6 +46,11 @@ Neuroglancer Precomputed (HTTP)
   - Segment properties (`segment_properties/`) are supported via `ZNeuroglancerPrecomputedSegmentProperties` (`src/atlas/zneuroglancerprecomputedsegmentproperties.*`) and are loaded on demand by mesh/tooling paths (no explicit per-object button required).
   - Precomputed meshes (`mesh/`) are supported via `ZNeuroglancerPrecomputedMeshSource` (`src/atlas/zneuroglancerprecomputedmesh.*`). Mesh import is initiated from the 2D right-click context menu and adds a normal `ZMesh` object to `ZMeshDoc`. Atlas loads a coarse LOD first, then refines to the finest available LOD by replacing mesh geometry in-place (`ZMeshDoc::replaceMeshGeometry` + `meshChanged` signal).
   - Precomputed skeletons (`skeletons/`) are supported via `ZNeuroglancerPrecomputedSkeletonSource` (`src/atlas/zneuroglancerprecomputedskeleton.*`) and are imported into `ZSkeletonDoc` for SWC-like rendering.
+  - Precomputed annotations collections are supported via `ZNeuroglancerPrecomputedAnnotationsSource` (`src/atlas/zneuroglancerprecomputedannotations.*`):
+    - Relationship index loads (segment/object id → annotations) are used for “Load Neuroglancer Annotations for Segment …” actions.
+    - Spatial index loads (voxel AABB → annotations) are used for “Load Neuroglancer Annotations in View (spatial index)…”.
+    - POINT/ELLIPSOID annotations are imported as `ZPuncta` and rendered in 3D via `Z3DPunctaFilter`; ellipsoids preserve anisotropic radii (see `src/img/zpunctum.*` and `src/atlas/z3dpunctafilter.*`).
+    - LINE/POLYLINE annotations are imported as `ZSkeleton`.
   - Mesh/skeleton source resolution:
     - If the segmentation `info` declares `mesh`/`skeletons` keys, Atlas uses those directory URLs.
     - Otherwise, users can configure per-dataset overrides on the `ZImgPack` (UI: Object View Setting → “Neuroglancer Sources”). These overrides are serialized in `.scene` files and used by the right-click import actions (Atlas does not prompt for source URLs in the context menu).

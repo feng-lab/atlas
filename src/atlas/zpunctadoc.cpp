@@ -12,9 +12,131 @@
 #include <QSettings>
 #include <QApplication>
 
+#include <algorithm>
+#include <cmath>
 #include <string>
+#include <type_traits>
 
 namespace nim {
+
+namespace {
+
+[[nodiscard]] std::string toStdStringUtf8(const QString& s)
+{
+  const QByteArray u8 = s.toUtf8();
+  return std::string(u8.constData(), static_cast<size_t>(u8.size()));
+}
+
+[[nodiscard]] QString formatAnnotationPropertyValue(
+  const ZNeuroglancerPrecomputedAnnotationsSource::Annotation::PropertyValue& v)
+{
+  return std::visit(
+    [](auto&& value) -> QString {
+      using T = std::decay_t<decltype(value)>;
+      if constexpr (std::is_same_v<T, std::array<uint8_t, 3>>) {
+        return QString("#%1%2%3")
+          .arg(value[0], 2, 16, QChar('0'))
+          .arg(value[1], 2, 16, QChar('0'))
+          .arg(value[2], 2, 16, QChar('0'))
+          .toUpper();
+      } else if constexpr (std::is_same_v<T, std::array<uint8_t, 4>>) {
+        return QString("rgba(%1,%2,%3,%4)").arg(value[0]).arg(value[1]).arg(value[2]).arg(value[3]);
+      } else if constexpr (std::is_same_v<T, float>) {
+        return QString::number(static_cast<double>(value), 'g', 8);
+      } else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>) {
+        return QString::number(static_cast<qlonglong>(value));
+      } else if constexpr (std::is_integral_v<T> && !std::is_signed_v<T>) {
+        return QString::number(static_cast<qulonglong>(value));
+      } else {
+        static_assert(std::is_same_v<T, void>, "Unhandled annotation property value type");
+        return {};
+      }
+    },
+    v);
+}
+
+[[nodiscard]] std::optional<double> numericPropertyAsDouble(
+  const ZNeuroglancerPrecomputedAnnotationsSource::Annotation::PropertyValue& v)
+{
+  return std::visit(
+    [](auto&& value) -> std::optional<double> {
+      using T = std::decay_t<decltype(value)>;
+      if constexpr (std::is_same_v<T, std::array<uint8_t, 3>> || std::is_same_v<T, std::array<uint8_t, 4>>) {
+        return std::nullopt;
+      } else {
+        return static_cast<double>(value);
+      }
+    },
+    v);
+}
+
+void applyAnnotationPropertiesToPunctum(const ZNeuroglancerPrecomputedAnnotationsSource& source,
+                                       const ZNeuroglancerPrecomputedAnnotationsSource::Annotation& ann,
+                                       ZPunctum& punctum)
+{
+  const auto& specs = source.properties();
+  if (specs.empty()) {
+    return;
+  }
+  if (ann.propertyValues.size() != specs.size()) {
+    return;
+  }
+
+  QStringList props;
+  props.reserve(static_cast<int>(specs.size()));
+  for (size_t i = 0; i < specs.size(); ++i) {
+    const QString k = specs[i].id.trimmed();
+    const QString v = formatAnnotationPropertyValue(ann.propertyValues[i]);
+    props.push_back(QString("%1=%2").arg(k, v));
+
+    if (k.compare(QStringLiteral("score"), Qt::CaseInsensitive) == 0) {
+      if (const auto d = numericPropertyAsDouble(ann.propertyValues[i])) {
+        punctum.setScore(*d);
+      }
+    }
+  }
+
+  if (!props.isEmpty()) {
+    punctum.comment = toStdStringUtf8(props.join("; "));
+    punctum.property1 = toStdStringUtf8(props.value(0));
+    punctum.property2 = toStdStringUtf8(props.value(1));
+    punctum.property3 = toStdStringUtf8(props.value(2));
+  }
+}
+
+[[nodiscard]] std::optional<double> jsonNumberAsDouble(const json::value& v)
+{
+  if (v.is_double()) {
+    return v.as_double();
+  }
+  if (v.is_int64()) {
+    return static_cast<double>(v.as_int64());
+  }
+  if (v.is_uint64()) {
+    return static_cast<double>(v.as_uint64());
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] std::optional<glm::dvec3> jsonArray3AsDvec3(const json::value& v)
+{
+  if (!v.is_array()) {
+    return std::nullopt;
+  }
+  const auto& a = v.as_array();
+  if (a.size() != 3) {
+    return std::nullopt;
+  }
+  const auto x = jsonNumberAsDouble(a[0]);
+  const auto y = jsonNumberAsDouble(a[1]);
+  const auto z = jsonNumberAsDouble(a[2]);
+  if (!x || !y || !z) {
+    return std::nullopt;
+  }
+  return glm::dvec3{*x, *y, *z};
+}
+
+} // namespace
 
 ZPunctaDoc::ZPunctaDoc(ZDoc& doc)
   : ZObjDoc(doc)
@@ -104,7 +226,7 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
         return 0;
       }
       const QString type = json::value_to<QString>(typeIt->value()).trimmed();
-      if (type != "neuroglancer_precomputed_annotations") {
+      if (type != "neuroglancer_precomputed_annotations" && type != "neuroglancer_precomputed_annotations_spatial") {
         errorMsg = QString("Unsupported puncta JSON type '%1'").arg(type);
         return 0;
       }
@@ -125,38 +247,178 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
       const QString normalizedAnnRootUrl =
         ZNeuroglancerPrecomputedVolume::normalizeRootUrl(json::value_to<QString>(annIt->value()));
 
-      auto relIt = jo.find("relationship_id");
-      if (relIt == jo.end() || !relIt->value().is_string()) {
-        errorMsg = QString("Invalid neuroglancer annotations JSON: missing string field 'relationship_id'");
-        return 0;
-      }
-      const QString relationshipId = json::value_to<QString>(relIt->value()).trimmed();
-      if (relationshipId.isEmpty()) {
-        errorMsg = QString("Invalid neuroglancer annotations JSON: relationship_id must be non-empty");
-        return 0;
+      if (type == "neuroglancer_precomputed_annotations") {
+        auto relIt = jo.find("relationship_id");
+        if (relIt == jo.end() || !relIt->value().is_string()) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: missing string field 'relationship_id'");
+          return 0;
+        }
+        const QString relationshipId = json::value_to<QString>(relIt->value()).trimmed();
+        if (relationshipId.isEmpty()) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: relationship_id must be non-empty");
+          return 0;
+        }
+
+        auto objIt = jo.find("object_id");
+        if (objIt == jo.end() || !objIt->value().is_string()) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: missing string field 'object_id'");
+          return 0;
+        }
+        const QString objStr = json::value_to<QString>(objIt->value()).trimmed();
+        bool ok = false;
+        const qulonglong objIdQt = objStr.toULongLong(&ok, 10);
+        if (!ok) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: object_id must be base-10 uint64");
+          return 0;
+        }
+        const uint64_t objectId = static_cast<uint64_t>(objIdQt);
+
+        // Normalize persisted JSON to keep it stable across save/load cycles.
+        json::object normalized;
+        normalized["type"] = "neuroglancer_precomputed_annotations";
+        normalized["segmentation_root_url"] = json::value_from(normalizedSegRootUrl);
+        normalized["annotation_root_url"] = json::value_from(normalizedAnnRootUrl);
+        normalized["relationship_id"] = json::value_from(relationshipId);
+        normalized["object_id"] = json::value_from(QString::number(static_cast<qulonglong>(objectId)));
+        const json::value sourceJson = normalized;
+
+        if (const auto existing = findPunctaByExternalSource(sourceJson)) {
+          return *existing;
+        }
+
+        std::shared_ptr<ZNeuroglancerPrecomputedVolume> segVol =
+          ZNeuroglancerPrecomputedVolume::open(normalizedSegRootUrl, kDefaultTimeout);
+        CHECK(segVol);
+
+        std::array<double, 3> baseResNm{segVol->baseImgInfo().voxelSizeX,
+                                        segVol->baseImgInfo().voxelSizeY,
+                                        segVol->baseImgInfo().voxelSizeZ};
+        auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(
+          QUrl(normalizedAnnRootUrl), baseResNm, segVol->baseVoxelOffset(), kDefaultTimeout);
+        CHECK(source);
+
+        if (source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Point &&
+            source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Ellipsoid) {
+          errorMsg = QString("Unsupported neuroglancer annotations type for puncta: expected POINT or ELLIPSOID");
+          return 0;
+        }
+
+        const auto anns = source->loadAnnotationsForRelatedObjectBlocking(relationshipId, objectId);
+        if (anns.empty()) {
+          errorMsg = QString("No annotations found for object %1 (relationship '%2')")
+                       .arg(static_cast<qulonglong>(objectId))
+                       .arg(relationshipId);
+          return 0;
+        }
+
+        std::list<ZPunctum> pts;
+        for (const auto& a : anns) {
+          if (a.points.size() != 1) {
+            continue;
+          }
+          const auto& p = a.points[0];
+          if (source->annotationType() == ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Ellipsoid &&
+              a.ellipsoidRadiiVoxel) {
+            const glm::vec3 r = *a.ellipsoidRadiiVoxel;
+            const double rx = static_cast<double>(r.x);
+            const double ry = static_cast<double>(r.y);
+            const double rz = static_cast<double>(r.z);
+            const double rMax = std::max({rx, ry, rz});
+            ZPunctum punctum(p.x, p.y, p.z, /*r=*/rMax);
+            punctum.setRadii(rx, ry, rz);
+            punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
+            punctum.setMaxIntensity(255.0);
+            punctum.setMeanIntensity(255.0);
+            applyAnnotationPropertiesToPunctum(*source, a, punctum);
+            if (a.rgba8) {
+              const auto& c = *a.rgba8;
+              punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+            }
+            pts.push_back(std::move(punctum));
+          } else {
+            ZPunctum punctum(p.x, p.y, p.z, /*r=*/2.0);
+            punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
+            punctum.setMaxIntensity(255.0);
+            punctum.setMeanIntensity(255.0);
+            applyAnnotationPropertiesToPunctum(*source, a, punctum);
+            if (a.rgba8) {
+              const auto& c = *a.rgba8;
+              punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+            }
+            pts.push_back(std::move(punctum));
+          }
+        }
+        if (pts.empty()) {
+          errorMsg = QString("No POINT/ELLIPSOID annotations decoded for object %1 (relationship '%2')")
+                       .arg(static_cast<qulonglong>(objectId))
+                       .arg(relationshipId);
+          return 0;
+        }
+
+        const QString displayName =
+          QString("NG Annotations %1 (%2)").arg(static_cast<qulonglong>(objectId)).arg(relationshipId);
+        const QString tooltip =
+          QString(
+            "Neuroglancer precomputed annotations\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nCount: %5")
+            .arg(normalizedSegRootUrl)
+            .arg(normalizedAnnRootUrl)
+            .arg(relationshipId)
+            .arg(static_cast<qulonglong>(objectId))
+            .arg(static_cast<qulonglong>(pts.size()));
+
+        ZPuncta puncta;
+        puncta.data = std::move(pts);
+        return addPunctaFromExternalSource(std::move(puncta), displayName, tooltip, sourceJson);
       }
 
-      auto objIt = jo.find("object_id");
-      if (objIt == jo.end() || !objIt->value().is_string()) {
-        errorMsg = QString("Invalid neuroglancer annotations JSON: missing string field 'object_id'");
+      CHECK(type == QStringLiteral("neuroglancer_precomputed_annotations_spatial"));
+
+      auto minIt = jo.find("voxel_box_min");
+      auto maxIt = jo.find("voxel_box_max");
+      if (minIt == jo.end() || maxIt == jo.end()) {
+        errorMsg = QString("Invalid neuroglancer annotations spatial JSON: missing 'voxel_box_min'/'voxel_box_max'");
         return 0;
       }
-      const QString objStr = json::value_to<QString>(objIt->value()).trimmed();
-      bool ok = false;
-      const qulonglong objIdQt = objStr.toULongLong(&ok, 10);
-      if (!ok) {
-        errorMsg = QString("Invalid neuroglancer annotations JSON: object_id must be base-10 uint64");
+      const auto minOpt = jsonArray3AsDvec3(minIt->value());
+      const auto maxOpt = jsonArray3AsDvec3(maxIt->value());
+      if (!minOpt || !maxOpt) {
+        errorMsg = QString("Invalid neuroglancer annotations spatial JSON: voxel_box_min/max must be numeric arrays of length 3");
         return 0;
       }
-      const uint64_t objectId = static_cast<uint64_t>(objIdQt);
+      const glm::dvec3 qMin{std::min(minOpt->x, maxOpt->x),
+                            std::min(minOpt->y, maxOpt->y),
+                            std::min(minOpt->z, maxOpt->z)};
+      const glm::dvec3 qMax{std::max(minOpt->x, maxOpt->x),
+                            std::max(minOpt->y, maxOpt->y),
+                            std::max(minOpt->z, maxOpt->z)};
+      for (int d = 0; d < 3; ++d) {
+        const double lo = (&qMin.x)[d];
+        const double hi = (&qMax.x)[d];
+        if (!std::isfinite(lo) || !std::isfinite(hi) || !(hi >= lo)) {
+          errorMsg = QString("Invalid neuroglancer annotations spatial JSON: voxel_box_min/max must be finite and ordered");
+          return 0;
+        }
+      }
 
       // Normalize persisted JSON to keep it stable across save/load cycles.
       json::object normalized;
-      normalized["type"] = "neuroglancer_precomputed_annotations";
+      normalized["type"] = "neuroglancer_precomputed_annotations_spatial";
       normalized["segmentation_root_url"] = json::value_from(normalizedSegRootUrl);
       normalized["annotation_root_url"] = json::value_from(normalizedAnnRootUrl);
-      normalized["relationship_id"] = json::value_from(relationshipId);
-      normalized["object_id"] = json::value_from(QString::number(static_cast<qulonglong>(objectId)));
+      {
+        json::array a;
+        a.push_back(qMin.x);
+        a.push_back(qMin.y);
+        a.push_back(qMin.z);
+        normalized["voxel_box_min"] = std::move(a);
+      }
+      {
+        json::array a;
+        a.push_back(qMax.x);
+        a.push_back(qMax.y);
+        a.push_back(qMax.z);
+        normalized["voxel_box_max"] = std::move(a);
+      }
       const json::value sourceJson = normalized;
 
       if (const auto existing = findPunctaByExternalSource(sourceJson)) {
@@ -167,21 +429,22 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
         ZNeuroglancerPrecomputedVolume::open(normalizedSegRootUrl, kDefaultTimeout);
       CHECK(segVol);
 
-      std::array<double, 3> baseResNm{segVol->baseImgInfo().voxelSizeX, segVol->baseImgInfo().voxelSizeY, segVol->baseImgInfo().voxelSizeZ};
-      auto source =
-        ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(normalizedAnnRootUrl), baseResNm, segVol->baseVoxelOffset(), kDefaultTimeout);
+      std::array<double, 3> baseResNm{segVol->baseImgInfo().voxelSizeX,
+                                      segVol->baseImgInfo().voxelSizeY,
+                                      segVol->baseImgInfo().voxelSizeZ};
+      auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(
+        QUrl(normalizedAnnRootUrl), baseResNm, segVol->baseVoxelOffset(), kDefaultTimeout);
       CHECK(source);
 
-      if (source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Point) {
-        errorMsg = QString("Unsupported neuroglancer annotations type for puncta: expected POINT");
+      if (source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Point &&
+          source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Ellipsoid) {
+        errorMsg = QString("Unsupported neuroglancer annotations type for puncta: expected POINT or ELLIPSOID");
         return 0;
       }
 
-      const auto anns = source->loadAnnotationsForRelatedObjectBlocking(relationshipId, objectId);
+      const auto anns = source->loadAnnotationsIntersectingVoxelBoxBlocking(qMin, qMax);
       if (anns.empty()) {
-        errorMsg = QString("No annotations found for object %1 (relationship '%2')")
-                     .arg(static_cast<qulonglong>(objectId))
-                     .arg(relationshipId);
+        errorMsg = QString("No annotations found intersecting the saved spatial query box.");
         return 0;
       }
 
@@ -191,29 +454,55 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
           continue;
         }
         const auto& p = a.points[0];
-        ZPunctum punctum(p.x, p.y, p.z, /*r=*/2.0);
-        punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
-        punctum.setMaxIntensity(255.0);
-        punctum.setMeanIntensity(255.0);
-        if (a.rgba8) {
-          const auto& c = *a.rgba8;
-          punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+        if (source->annotationType() == ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Ellipsoid && a.ellipsoidRadiiVoxel) {
+          const glm::vec3 r = *a.ellipsoidRadiiVoxel;
+          const double rx = static_cast<double>(r.x);
+          const double ry = static_cast<double>(r.y);
+          const double rz = static_cast<double>(r.z);
+          const double rMax = std::max({rx, ry, rz});
+          ZPunctum punctum(p.x, p.y, p.z, /*r=*/rMax);
+          punctum.setRadii(rx, ry, rz);
+          punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
+          punctum.setMaxIntensity(255.0);
+          punctum.setMeanIntensity(255.0);
+          applyAnnotationPropertiesToPunctum(*source, a, punctum);
+          if (a.rgba8) {
+            const auto& c = *a.rgba8;
+            punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+          }
+          pts.push_back(std::move(punctum));
+        } else {
+          ZPunctum punctum(p.x, p.y, p.z, /*r=*/2.0);
+          punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
+          punctum.setMaxIntensity(255.0);
+          punctum.setMeanIntensity(255.0);
+          applyAnnotationPropertiesToPunctum(*source, a, punctum);
+          if (a.rgba8) {
+            const auto& c = *a.rgba8;
+            punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+          }
+          pts.push_back(std::move(punctum));
         }
-        pts.push_back(std::move(punctum));
       }
       if (pts.empty()) {
-        errorMsg = QString("No POINT annotations decoded for object %1 (relationship '%2')")
-                     .arg(static_cast<qulonglong>(objectId))
-                     .arg(relationshipId);
+        errorMsg = QString("No POINT/ELLIPSOID annotations decoded for the saved spatial query box.");
         return 0;
       }
 
-      const QString displayName = QString("NG Annotations %1 (%2)").arg(static_cast<qulonglong>(objectId)).arg(relationshipId);
-      const QString tooltip = QString("Neuroglancer precomputed annotations\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nCount: %5")
+      const QString displayName = QString("NG Annotations (View z≈%1)").arg(qMin.z, 0, 'g', 6);
+      const QString tooltip = QString("Neuroglancer precomputed annotations (spatial)\n"
+                                      "Segmentation: %1\n"
+                                      "Annotations: %2\n"
+                                      "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                      "Count: %9")
                                 .arg(normalizedSegRootUrl)
                                 .arg(normalizedAnnRootUrl)
-                                .arg(relationshipId)
-                                .arg(static_cast<qulonglong>(objectId))
+                                .arg(qMin.x, 0, 'g', 8)
+                                .arg(qMin.y, 0, 'g', 8)
+                                .arg(qMin.z, 0, 'g', 8)
+                                .arg(qMax.x, 0, 'g', 8)
+                                .arg(qMax.y, 0, 'g', 8)
+                                .arg(qMax.z, 0, 'g', 8)
                                 .arg(static_cast<qulonglong>(pts.size()));
 
       ZPuncta puncta;
@@ -318,16 +607,11 @@ bool ZPunctaDoc::isSameObj(const json::value& v1, const json::value& v2) const
         return std::nullopt;
       }
       const QString type = json::value_to<QString>(itType->value()).trimmed();
-      if (type != "neuroglancer_precomputed_annotations") {
-        return std::nullopt;
-      }
 
       auto itSegRoot = o.find("segmentation_root_url");
       auto itAnnRoot = o.find("annotation_root_url");
-      auto itRel = o.find("relationship_id");
-      auto itObj = o.find("object_id");
-      if (itSegRoot == o.end() || !itSegRoot->value().is_string() || itAnnRoot == o.end() || !itAnnRoot->value().is_string() ||
-          itRel == o.end() || !itRel->value().is_string() || itObj == o.end() || !itObj->value().is_string()) {
+      if (itSegRoot == o.end() || !itSegRoot->value().is_string() ||
+          itAnnRoot == o.end() || !itAnnRoot->value().is_string()) {
         return std::nullopt;
       }
 
@@ -341,9 +625,52 @@ bool ZPunctaDoc::isSameObj(const json::value& v1, const json::value& v2) const
         return std::nullopt;
       }
 
-      const QString rel = json::value_to<QString>(itRel->value()).trimmed();
-      const QString obj = json::value_to<QString>(itObj->value()).trimmed();
-      return QString("%1|%2|%3|%4|%5").arg(type, segRoot, annRoot, rel, obj);
+      if (type == "neuroglancer_precomputed_annotations") {
+        auto itRel = o.find("relationship_id");
+        auto itObj = o.find("object_id");
+        if (itRel == o.end() || !itRel->value().is_string() || itObj == o.end() || !itObj->value().is_string()) {
+          return std::nullopt;
+        }
+        const QString rel = json::value_to<QString>(itRel->value()).trimmed();
+        const QString obj = json::value_to<QString>(itObj->value()).trimmed();
+        return QString("%1|%2|%3|%4|%5").arg(type, segRoot, annRoot, rel, obj);
+      }
+
+      if (type == "neuroglancer_precomputed_annotations_spatial") {
+        auto itMin = o.find("voxel_box_min");
+        auto itMax = o.find("voxel_box_max");
+        if (itMin == o.end() || itMax == o.end()) {
+          return std::nullopt;
+        }
+        const auto minOpt = jsonArray3AsDvec3(itMin->value());
+        const auto maxOpt = jsonArray3AsDvec3(itMax->value());
+        if (!minOpt || !maxOpt) {
+          return std::nullopt;
+        }
+
+        const glm::dvec3 qMin{std::min(minOpt->x, maxOpt->x),
+                              std::min(minOpt->y, maxOpt->y),
+                              std::min(minOpt->z, maxOpt->z)};
+        const glm::dvec3 qMax{std::max(minOpt->x, maxOpt->x),
+                              std::max(minOpt->y, maxOpt->y),
+                              std::max(minOpt->z, maxOpt->z)};
+
+        auto num = [](double v) {
+          return QString::number(v, 'g', 17);
+        };
+        return QString("%1|%2|%3|%4|%5|%6|%7|%8|%9")
+          .arg(type,
+               segRoot,
+               annRoot,
+               num(qMin.x),
+               num(qMin.y),
+               num(qMin.z),
+               num(qMax.x),
+               num(qMax.y),
+               num(qMax.z));
+      }
+
+      return std::nullopt;
     };
 
     const auto k1 = keyFor(o1);

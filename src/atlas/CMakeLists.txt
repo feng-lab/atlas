@@ -520,6 +520,7 @@ set(SOURCES
     zimgpack.h zimgpack.cpp
     zimgpackdisplay.h zimgpackdisplay.cpp
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
+    zneuroglancerstate.h zneuroglancerstate.cpp
     zneuroglancerprecomputedannotations.h zneuroglancerprecomputedannotations.cpp
     zneuroglancerprecomputedmesh.h zneuroglancerprecomputedmesh.cpp
     zneuroglancerprecomputedskeleton.h zneuroglancerprecomputedskeleton.cpp
@@ -528,6 +529,7 @@ set(SOURCES
     zneuroglancersegmentpropertiesmodel.h zneuroglancersegmentpropertiesmodel.cpp
     zneuroglancerprecomputedchunkdecoder.h zneuroglancerprecomputedchunkdecoder.cpp
     zneuroglanceruint64sharding.h zneuroglanceruint64sharding.cpp
+    zhttpdiskcache.h zhttpdiskcache.cpp
     zproxygenhttpclient.h zproxygenhttpclient.cpp
     zimgcache.h zimgcache.cpp
     zsysteminfo.h zsysteminfo.cpp

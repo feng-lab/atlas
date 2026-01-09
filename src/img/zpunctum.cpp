@@ -11,6 +11,9 @@ ZPunctum::ZPunctum(double x, double y, double z, double r)
   , m_y(y)
   , m_z(z)
   , m_radius(r)
+  , m_radiusX(r)
+  , m_radiusY(r)
+  , m_radiusZ(r)
 {
   updateVolSize();
   updateMass();
@@ -54,6 +57,10 @@ void ZPunctum::updateFromVoxelsList(double conf)
     double k = std::sqrt(boost::math::quantile(dist, conf));
     m_radius = k * std::sqrt(es.eigenvalues().sum() / 3.);
   }
+  m_radiusX = m_radius;
+  m_radiusY = m_radius;
+  m_radiusZ = m_radius;
+  m_hasAnisotropicRadii = false;
 
   // compute detection score (correlation coeff of image data and gaussian data)
   // This version only uses voxels belong to punctum. It is different from matlab version.

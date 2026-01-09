@@ -8,6 +8,7 @@ namespace nim {
 Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
   , m_sphereRenderer(m_rendererBase)
+  , m_ellipsoidRenderer(m_rendererBase)
   , m_colorMode("Color Mode")
   , m_singleColorForAllPuncta("Puncta Color",
                               glm::vec4(ZRandom::instance().randReal<float>(),
@@ -73,8 +74,10 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
     "When enabled, derive shading properties from intensity (specular/shine)."));
   connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, [this]() {
     m_sphereRenderer.setUseDynamicMaterial(m_useDynamicMaterial.get());
+    m_ellipsoidRenderer.setUseDynamicMaterial(m_useDynamicMaterial.get());
   });
   m_sphereRenderer.setUseDynamicMaterial(m_useDynamicMaterial.get());
+  m_ellipsoidRenderer.setUseDynamicMaterial(m_useDynamicMaterial.get());
 
   //  m_glowSphereRenderer.useDynamicMaterialPara().set(false);
   //  connect(&m_randomGlow, &ZBoolParameter::valueChanged, this, &Z3DPunctaFilter::adjustWidgets);
@@ -201,12 +204,25 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
   return m_widgetsGroup;
 }
 
+bool Z3DPunctaFilter::usesEllipsoidRendering() const
+{
+  return m_useEllipsoidRenderer;
+}
+
 void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
 {
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
-    m_rendererBase.renderVulkan(eye, m_sphereRenderer);
+    if (usesEllipsoidRendering()) {
+      m_rendererBase.renderVulkan(eye, m_ellipsoidRenderer);
+    } else {
+      m_rendererBase.renderVulkan(eye, m_sphereRenderer);
+    }
   } else {
-    m_rendererBase.render(eye, m_sphereRenderer);
+    if (usesEllipsoidRendering()) {
+      m_rendererBase.render(eye, m_ellipsoidRenderer);
+    } else {
+      m_rendererBase.render(eye, m_sphereRenderer);
+    }
   }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
@@ -215,9 +231,17 @@ void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
 void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
 {
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
-    m_rendererBase.renderVulkan(eye, m_sphereRenderer);
+    if (usesEllipsoidRendering()) {
+      m_rendererBase.renderVulkan(eye, m_ellipsoidRenderer);
+    } else {
+      m_rendererBase.renderVulkan(eye, m_sphereRenderer);
+    }
   } else {
-    m_rendererBase.render(eye, m_sphereRenderer);
+    if (usesEllipsoidRendering()) {
+      m_rendererBase.render(eye, m_ellipsoidRenderer);
+    } else {
+      m_rendererBase.render(eye, m_sphereRenderer);
+    }
   }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
@@ -229,9 +253,17 @@ void Z3DPunctaFilter::renderPicking(Z3DEye eye)
     registerPickingObjects();
   }
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
-    m_rendererBase.renderPickingVulkan(eye, m_sphereRenderer);
+    if (usesEllipsoidRendering()) {
+      m_rendererBase.renderPickingVulkan(eye, m_ellipsoidRenderer);
+    } else {
+      m_rendererBase.renderPickingVulkan(eye, m_sphereRenderer);
+    }
   } else {
-    m_rendererBase.renderPicking(eye, m_sphereRenderer);
+    if (usesEllipsoidRendering()) {
+      m_rendererBase.renderPicking(eye, m_ellipsoidRenderer);
+    } else {
+      m_rendererBase.renderPicking(eye, m_sphereRenderer);
+    }
   }
 }
 
@@ -250,7 +282,11 @@ void Z3DPunctaFilter::registerPickingObjects()
                               pickingColor[3] / 255.f);
       m_pointPickingColors.push_back(fPickingColor);
     }
-    m_sphereRenderer.setDataPickingColors(&m_pointPickingColors);
+    if (usesEllipsoidRendering()) {
+      m_ellipsoidRenderer.setDataPickingColors(&m_pointPickingColors);
+    } else {
+      m_sphereRenderer.setDataPickingColors(&m_pointPickingColors);
+    }
   }
 
   m_pickingObjectsRegistered = true;
@@ -276,13 +312,51 @@ void Z3DPunctaFilter::prepareData()
   deregisterPickingObjects();
 
   // convert puncta to format that glsl can use
+  m_useEllipsoidRenderer = false;
+  for (auto punctum : m_punctaPack->punctaPts()) {
+    if (punctum && punctum->hasAnisotropicRadii()) {
+      m_useEllipsoidRenderer = true;
+      break;
+    }
+  }
+
   m_specularAndShininess.clear();
   m_pointAndRadius.clear();
+  m_ellipsoidCenters.clear();
+  m_ellipsoidAxis1.clear();
+  m_ellipsoidAxis2.clear();
+  m_ellipsoidAxis3.clear();
+
+  if (m_useEllipsoidRenderer) {
+    m_ellipsoidCenters.reserve(m_punctaPack->punctaPts().size());
+    m_ellipsoidAxis1.reserve(m_punctaPack->punctaPts().size());
+    m_ellipsoidAxis2.reserve(m_punctaPack->punctaPts().size());
+    m_ellipsoidAxis3.reserve(m_punctaPack->punctaPts().size());
+  } else {
+    m_pointAndRadius.reserve(m_punctaPack->punctaPts().size());
+  }
+  m_specularAndShininess.reserve(m_punctaPack->punctaPts().size());
+
   for (auto punctum : m_punctaPack->punctaPts()) {
-    if (m_useSameSizeForAllPuncta.get()) {
-      m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(), 2.f);
+    if (m_useEllipsoidRenderer) {
+      const float x = static_cast<float>(punctum->x());
+      const float y = static_cast<float>(punctum->y());
+      const float z = static_cast<float>(punctum->z());
+
+      const float rx = m_useSameSizeForAllPuncta.get() ? 2.f : static_cast<float>(punctum->radiusX());
+      const float ry = m_useSameSizeForAllPuncta.get() ? 2.f : static_cast<float>(punctum->radiusY());
+      const float rz = m_useSameSizeForAllPuncta.get() ? 2.f : static_cast<float>(punctum->radiusZ());
+
+      m_ellipsoidCenters.emplace_back(x, y, z);
+      m_ellipsoidAxis1.emplace_back(rx, 0.f, 0.f);
+      m_ellipsoidAxis2.emplace_back(0.f, ry, 0.f);
+      m_ellipsoidAxis3.emplace_back(0.f, 0.f, rz);
     } else {
-      m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(), punctum->radius());
+      if (m_useSameSizeForAllPuncta.get()) {
+        m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(), 2.f);
+      } else {
+        m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(), punctum->radius());
+      }
     }
     m_specularAndShininess.emplace_back(punctum->maxIntensity() / 255.f,
                                         punctum->maxIntensity() / 255.f,
@@ -290,7 +364,15 @@ void Z3DPunctaFilter::prepareData()
                                         punctum->maxIntensity() / 2.f);
   }
 
-  m_sphereRenderer.setData(&m_pointAndRadius, &m_specularAndShininess);
+  if (usesEllipsoidRendering()) {
+    m_ellipsoidRenderer.setData(&m_ellipsoidCenters,
+                                &m_ellipsoidAxis1,
+                                &m_ellipsoidAxis2,
+                                &m_ellipsoidAxis3,
+                                &m_specularAndShininess);
+  } else {
+    m_sphereRenderer.setData(&m_pointAndRadius, &m_specularAndShininess);
+  }
   prepareColor();
   adjustWidgets();
   m_dataIsInvalid = false;
@@ -407,7 +489,11 @@ void Z3DPunctaFilter::prepareColor()
     }
   }
 
-  m_sphereRenderer.setDataColors(&m_pointColors);
+  if (usesEllipsoidRendering()) {
+    m_ellipsoidRenderer.setDataColors(&m_pointColors);
+  } else {
+    m_sphereRenderer.setDataColors(&m_pointColors);
+  }
 }
 
 void Z3DPunctaFilter::adjustWidgets()
@@ -511,14 +597,34 @@ void Z3DPunctaFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
 
 void Z3DPunctaFilter::changePunctaSize()
 {
-  for (size_t i = 0; i < m_pointAndRadius.size(); ++i) {
-    if (m_useSameSizeForAllPuncta.get()) {
-      m_pointAndRadius[i].w = 2.f;
-    } else {
-      m_pointAndRadius[i].w = m_punctaPack->punctaPts()[i]->radius();
+  if (usesEllipsoidRendering()) {
+    for (size_t i = 0; i < m_ellipsoidCenters.size(); ++i) {
+      if (m_useSameSizeForAllPuncta.get()) {
+        m_ellipsoidAxis1[i] = glm::vec3(2.f, 0.f, 0.f);
+        m_ellipsoidAxis2[i] = glm::vec3(0.f, 2.f, 0.f);
+        m_ellipsoidAxis3[i] = glm::vec3(0.f, 0.f, 2.f);
+      } else {
+        const auto* p = m_punctaPack->punctaPts()[i];
+        m_ellipsoidAxis1[i] = glm::vec3(static_cast<float>(p->radiusX()), 0.f, 0.f);
+        m_ellipsoidAxis2[i] = glm::vec3(0.f, static_cast<float>(p->radiusY()), 0.f);
+        m_ellipsoidAxis3[i] = glm::vec3(0.f, 0.f, static_cast<float>(p->radiusZ()));
+      }
     }
+    m_ellipsoidRenderer.setData(&m_ellipsoidCenters,
+                                &m_ellipsoidAxis1,
+                                &m_ellipsoidAxis2,
+                                &m_ellipsoidAxis3,
+                                &m_specularAndShininess);
+  } else {
+    for (size_t i = 0; i < m_pointAndRadius.size(); ++i) {
+      if (m_useSameSizeForAllPuncta.get()) {
+        m_pointAndRadius[i].w = 2.f;
+      } else {
+        m_pointAndRadius[i].w = m_punctaPack->punctaPts()[i]->radius();
+      }
+    }
+    m_sphereRenderer.setData(&m_pointAndRadius, &m_specularAndShininess);
   }
-  m_sphereRenderer.setData(&m_pointAndRadius, &m_specularAndShininess);
   updateBoundBox();
 }
 

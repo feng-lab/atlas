@@ -303,7 +303,7 @@ Steps to load and manage images via `ZImgDoc`:
    3. Confirm. Each image becomes a new object in the manager.
 2. **Load Neuroglancer (Precomputed)**
    1. Choose **File → Load Neuroglancer (Precomputed)...**.
-   2. Enter a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `http://`, `https://`. (Note: Neuroglancer viewer state `.json` URLs are not dataset roots.)
+   2. Enter a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `http://`, `https://`. (Note: Neuroglancer viewer state `.json` URLs are not dataset roots; use **File → Load Neuroglancer (State JSON)...** for share links / state JSON.)
    3. Use the **History** tab to re-open previously loaded datasets; optionally assign friendly names (editable in the dialog).
    4. Use the **Examples** tab for a small built-in list of public datasets.
    5. The history is stored in the user config folder as `neuroglancer_precomputed_history.json` (open via **Help → Open Config Folder**).
@@ -336,12 +336,33 @@ Steps to load and manage images via `ZImgDoc`:
 	        - **Load Neuroglancer Skeletons for All Segments (segment_properties)…**
 	        Mesh import is progressive: Atlas loads a coarse mesh first, then refines to the finest available LOD by replacing mesh geometry in-place.
 	        Note: these actions only pick IDs from already visible/cached tiles and will not trigger additional chunk downloads just to resolve a segment ID. If multiple segmentation layers are visible, Atlas uses the top-most layer (highest view precedence) under the cursor (and for dataset‑scoped actions, the top-most visible segmentation layer).
-	  9. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
-	3. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
-4. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.
-5. **Full resolution rendering** – in 3D, enable Full Resolution in Object View Setting when you require high-quality output. Monitor GPU memory usage and progress logs.
-6. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...**(Ctrl/Cmd+Shift+S) to choose a new format.
-7. **Advanced processing** – Access via the document menu or object context menu:
+	      - **Annotations** (precomputed annotations collections) → either `ZPunctaDoc` (for `POINT` / `ELLIPSOID`) or `ZSkeletonDoc` (for `LINE` / `POLYLINE`):
+	        - Unlike meshes/skeletons, annotation datasets are separate roots and are not discoverable from the segmentation `info` by default.
+	        - Configure the dataset link in **Object View Setting → Neuroglancer Sources** on the segmentation object:
+	          - **Set Annotations Source Override…** (absolute URL or relative path resolved against the segmentation root).
+	        - Once configured, import from the **2D slice view** (right‑click) using:
+	          - **Load Neuroglancer Annotations for Segment Under Cursor** (uses the relationship index; requires a cached segment ID)
+	          - **Load Neuroglancer Annotations for Segment ID…** (manual segment/object ID entry)
+	          - **Load Neuroglancer Annotations in View (spatial index)…** (queries the current viewport region at the current slice; does not require a segment ID)
+	        - Ellipsoid annotations preserve anisotropic radii and render as true ellipsoids in 3D (via `Z3DEllipsoidRenderer`).
+		  9. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
+		  10. Optional: enable the persistent HTTP disk cache to speed up repeated Neuroglancer sessions (and reduce duplicated downloads):
+		      - `--atlas_http_disk_cache_max_bytes=<N>` (0 disables; set e.g. 10–50 GiB depending on disk space)
+		      - `--atlas_http_disk_cache_dir=<path>` (optional override; default is auto-chosen Atlas cache/config directory)
+3. **Load Neuroglancer (State JSON)**
+   1. Choose **File → Load Neuroglancer (State JSON)...**.
+   2. Paste one of:
+      - a Neuroglancer share link (contains `#!{...}`), or
+      - a URL to a state `.json` file, or
+      - raw state JSON text.
+   3. Atlas opens only the supported layer types (**image** and **segmentation**) that reference a `precomputed://...` volume source. Unsupported layer types are ignored (Atlas will show a warning list at the end if anything was skipped).
+   4. If the state contains annotation layers linked to a segmentation layer, Atlas does not create annotation objects yet, but it will use that information to configure the segmentation dataset’s **Annotations Source Override** (so the existing right‑click import actions can work without additional URL prompting).
+   5. Any datasets opened from the state are recorded into the same history list used by **Load Neuroglancer (Precomputed)**.
+4. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
+5. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.
+6. **Full resolution rendering** – in 3D, enable Full Resolution in Object View Setting when you require high-quality output. Monitor GPU memory usage and progress logs.
+7. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...**(Ctrl/Cmd+Shift+S) to choose a new format.
+8. **Advanced processing** – Access via the document menu or object context menu:
    - **Stitch Images...** – run the image stitching dialog for tiled data.
    - **Align Sections...** – align serial sections.
    - **Correct Chromatic Shift...** – adjust channel misalignment.

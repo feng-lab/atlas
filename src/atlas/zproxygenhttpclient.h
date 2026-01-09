@@ -22,6 +22,8 @@ class SSLContext;
 
 namespace nim {
 
+class ZHttpDiskCache;
+
 struct ZHttpGetBytesResult
 {
   uint16_t status = 0;
@@ -51,6 +53,8 @@ private:
   folly::ScopedEventBaseThread m_eventBaseThread;
   std::shared_ptr<const folly::SSLContext> m_sslContext;
   std::string m_caBundlePath;
+
+  std::unique_ptr<ZHttpDiskCache> m_diskCache;
 
   std::unique_ptr<proxygen::coro::HTTPClientConnectionCache> m_directConnCache;
   std::unordered_map<std::string, std::unique_ptr<proxygen::coro::HTTPClientConnectionCache>> m_proxyConnCaches;

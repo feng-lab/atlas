@@ -46,6 +46,7 @@ private:
   QTableView* m_historyView = nullptr;
   QLabel* m_historyMeshSourceLabel = nullptr;
   QLabel* m_historySkeletonSourceLabel = nullptr;
+  QLabel* m_historyAnnotationsSourceLabel = nullptr;
   QPushButton* m_historyEditSourcesBtn = nullptr;
   QPushButton* m_historyClearSourcesBtn = nullptr;
 

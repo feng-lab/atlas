@@ -15,6 +15,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <unordered_set>
 #include <utility>
 
 namespace nim {
@@ -66,6 +67,72 @@ uint64_t requireUint64(const json::object& obj, const char* key)
     return static_cast<uint64_t>(v.as_int64());
   }
   throw ZException(fmt::format("Invalid '{}' in neuroglancer annotations info (expected uint64)", key));
+}
+
+double numberToDouble(const json::value& v, const char* what)
+{
+  if (v.is_double()) {
+    return v.as_double();
+  }
+  if (v.is_int64()) {
+    return static_cast<double>(v.as_int64());
+  }
+  if (v.is_uint64()) {
+    return static_cast<double>(v.as_uint64());
+  }
+  throw ZException(fmt::format("Invalid {} in neuroglancer annotations info (expected number)", what));
+}
+
+uint64_t numberToUint64(const json::value& v, const char* what)
+{
+  if (v.is_uint64()) {
+    return v.as_uint64();
+  }
+  if (v.is_int64()) {
+    const int64_t i = v.as_int64();
+    if (i < 0) {
+      throw ZException(fmt::format("Invalid {} in neuroglancer annotations info (expected >= 0)", what));
+    }
+    return static_cast<uint64_t>(i);
+  }
+  throw ZException(fmt::format("Invalid {} in neuroglancer annotations info (expected integer)", what));
+}
+
+std::array<double, 3> requireNumberArray3(const json::object& obj, const char* key)
+{
+  auto it = obj.find(key);
+  if (it == obj.end() || !it->value().is_array()) {
+    throw ZException(fmt::format("Missing or invalid '{}' in neuroglancer annotations info (expected array)", key));
+  }
+  const auto& arr = it->value().as_array();
+  if (arr.size() != 3) {
+    throw ZException(fmt::format("Invalid '{}' in neuroglancer annotations info (expected length-3 array)", key));
+  }
+  std::array<double, 3> out{};
+  for (size_t d = 0; d < 3; ++d) {
+    out[d] = numberToDouble(arr[d], key);
+  }
+  return out;
+}
+
+std::array<uint64_t, 3> requirePositiveUintArray3(const json::object& obj, const char* key)
+{
+  auto it = obj.find(key);
+  if (it == obj.end() || !it->value().is_array()) {
+    throw ZException(fmt::format("Missing or invalid '{}' in neuroglancer annotations info (expected array)", key));
+  }
+  const auto& arr = it->value().as_array();
+  if (arr.size() != 3) {
+    throw ZException(fmt::format("Invalid '{}' in neuroglancer annotations info (expected length-3 array)", key));
+  }
+  std::array<uint64_t, 3> out{};
+  for (size_t d = 0; d < 3; ++d) {
+    out[d] = numberToUint64(arr[d], key);
+    if (out[d] == 0) {
+      throw ZException(fmt::format("Invalid '{}' in neuroglancer annotations info (expected > 0)", key));
+    }
+  }
+  return out;
 }
 
 double neuroglancerUnitToMeters(QString unit)
@@ -239,10 +306,34 @@ template<typename T>
 T readLE(const uint8_t* p);
 
 template<>
+uint16_t readLE<uint16_t>(const uint8_t* p)
+{
+  return (static_cast<uint16_t>(p[0]) << 0) | (static_cast<uint16_t>(p[1]) << 8);
+}
+
+template<>
+int16_t readLE<int16_t>(const uint8_t* p)
+{
+  const uint16_t u = readLE<uint16_t>(p);
+  int16_t i = 0;
+  std::memcpy(&i, &u, sizeof(int16_t));
+  return i;
+}
+
+template<>
 uint32_t readLE<uint32_t>(const uint8_t* p)
 {
   return (static_cast<uint32_t>(p[0]) << 0) | (static_cast<uint32_t>(p[1]) << 8) | (static_cast<uint32_t>(p[2]) << 16) |
          (static_cast<uint32_t>(p[3]) << 24);
+}
+
+template<>
+int32_t readLE<int32_t>(const uint8_t* p)
+{
+  const uint32_t u = readLE<uint32_t>(p);
+  int32_t i = 0;
+  std::memcpy(&i, &u, sizeof(int32_t));
+  return i;
 }
 
 template<>
@@ -559,6 +650,58 @@ std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> ZNeuroglancerPrecompu
     out->m_byId = std::move(byId);
   }
 
+  out->m_lowerBoundCoord = requireNumberArray3(root, "lower_bound");
+  out->m_upperBoundCoord = requireNumberArray3(root, "upper_bound");
+  for (size_t d = 0; d < 3; ++d) {
+    if (!(out->m_upperBoundCoord[d] > out->m_lowerBoundCoord[d]) || !std::isfinite(out->m_lowerBoundCoord[d]) ||
+        !std::isfinite(out->m_upperBoundCoord[d])) {
+      throw ZException("Invalid neuroglancer annotations bounds (expected finite upper_bound > lower_bound)");
+    }
+  }
+
+  auto spatialIt = root.find("spatial");
+  if (spatialIt != root.end() && !spatialIt->value().is_null()) {
+    if (!spatialIt->value().is_array()) {
+      throw ZException("Invalid neuroglancer annotations info: spatial must be an array");
+    }
+    const auto& arr = spatialIt->value().as_array();
+    out->m_spatial.clear();
+    out->m_spatial.reserve(arr.size());
+    for (const auto& sv : arr) {
+      if (!sv.is_object()) {
+        throw ZException("Invalid neuroglancer annotations spatial level: expected object");
+      }
+      const auto& so = sv.as_object();
+      SpatialLevelSpec level;
+      QString key = requireString(so, "key").trimmed();
+      if (!key.endsWith('/')) {
+        key += '/';
+      }
+      level.indexDirUrl = out->m_rootUrl.resolved(QUrl(key));
+      level.gridShape = requirePositiveUintArray3(so, "grid_shape");
+      {
+        const std::array<double, 3> chunk = requireNumberArray3(so, "chunk_size");
+        for (size_t d = 0; d < 3; ++d) {
+          if (!(chunk[d] > 0.0) || !std::isfinite(chunk[d])) {
+            throw ZException("Invalid neuroglancer annotations chunk_size (expected finite > 0)");
+          }
+          level.chunkSize[d] = chunk[d];
+        }
+      }
+      level.limit = requireUint64(so, "limit");
+      if (level.limit == 0) {
+        throw ZException("Invalid neuroglancer annotations spatial level: limit must be > 0");
+      }
+      if (auto shIt = so.find("sharding"); shIt != so.end() && !shIt->value().is_null()) {
+        if (!shIt->value().is_object()) {
+          throw ZException("Invalid neuroglancer annotations spatial sharding: expected object");
+        }
+        level.sharding = parseShardingSpec(shIt->value().as_object());
+      }
+      out->m_spatial.push_back(std::move(level));
+    }
+  }
+
   // Validate base resolution (external input: volume info).
   for (size_t d = 0; d < 3; ++d) {
     if (!(out->m_baseResolutionNm[d] > 0.0) || !std::isfinite(out->m_baseResolutionNm[d])) {
@@ -676,49 +819,252 @@ glm::vec3 ZNeuroglancerPrecomputedAnnotationsSource::voxelFromCoordUnits(const g
   return glm::vec3(static_cast<float>(vx), static_cast<float>(vy), static_cast<float>(vz));
 }
 
-std::vector<const ZNeuroglancerPrecomputedAnnotationsSource::PropertySpec*>
-ZNeuroglancerPrecomputedAnnotationsSource::props4Byte() const
+glm::dvec3 ZNeuroglancerPrecomputedAnnotationsSource::coordUnitsFromVoxel(const glm::dvec3& voxel) const
 {
-  std::vector<const PropertySpec*> out;
-  out.reserve(m_properties.size());
-  for (const auto& p : m_properties) {
-    if (p.type == PropertyType::Uint32 || p.type == PropertyType::Int32 || p.type == PropertyType::Float32) {
-      out.push_back(&p);
+  const double nmX = (voxel.x + static_cast<double>(m_baseVoxelOffset[0])) * m_baseResolutionNm[0];
+  const double nmY = (voxel.y + static_cast<double>(m_baseVoxelOffset[1])) * m_baseResolutionNm[1];
+  const double nmZ = (voxel.z + static_cast<double>(m_baseVoxelOffset[2])) * m_baseResolutionNm[2];
+
+  const double cx = nmX / m_dimScaleNm[0];
+  const double cy = nmY / m_dimScaleNm[1];
+  const double cz = nmZ / m_dimScaleNm[2];
+
+  return glm::dvec3(cx, cy, cz);
+}
+
+std::optional<std::vector<uint8_t>> ZNeuroglancerPrecomputedAnnotationsSource::loadSpatialCellEntryBlocking(
+  const SpatialLevelSpec& level,
+  const std::array<uint64_t, 3>& cell) const
+{
+  if (!level.sharding) {
+    const QString filename = QString("%1_%2_%3")
+                               .arg(static_cast<qulonglong>(cell[0]))
+                               .arg(static_cast<qulonglong>(cell[1]))
+                               .arg(static_cast<qulonglong>(cell[2]));
+    const QUrl url = level.indexDirUrl.resolved(QUrl(filename));
+    const std::string urlStr = toStdString(url.toString());
+    auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(urlStr, m_timeout));
+    if (!resOpt) {
+      return std::nullopt;
     }
+    if (resOpt->status != 200) {
+      throw ZException(
+        fmt::format("Failed to fetch neuroglancer spatial index entry from '{}' (HTTP {})", urlStr, resOpt->status));
+    }
+    return std::move(resOpt->body);
   }
+
+  const uint64_t key = ZNeuroglancerUint64Sharding::compressedMortonCode(cell, level.gridShape);
+  try {
+    return loadIndexEntryBlocking(level.indexDirUrl, level.sharding, key);
+  }
+  catch (const ZNotFoundException&) {
+    return std::nullopt;
+  }
+}
+
+namespace {
+
+struct VoxelBox
+{
+  glm::dvec3 min;
+  glm::dvec3 max;
+};
+
+[[nodiscard]] VoxelBox makeVoxelBox(glm::dvec3 a, glm::dvec3 b)
+{
+  VoxelBox out;
+  out.min = glm::min(a, b);
+  out.max = glm::max(a, b);
   return out;
 }
 
-std::vector<const ZNeuroglancerPrecomputedAnnotationsSource::PropertySpec*>
-ZNeuroglancerPrecomputedAnnotationsSource::props2Byte() const
+[[nodiscard]] bool intersectsAabb(const VoxelBox& box, const VoxelBox& other)
 {
-  std::vector<const PropertySpec*> out;
-  out.reserve(m_properties.size());
-  for (const auto& p : m_properties) {
-    if (p.type == PropertyType::Uint16 || p.type == PropertyType::Int16) {
-      out.push_back(&p);
-    }
+  if (box.max.x < other.min.x || other.max.x < box.min.x) {
+    return false;
   }
-  return out;
+  if (box.max.y < other.min.y || other.max.y < box.min.y) {
+    return false;
+  }
+  if (box.max.z < other.min.z || other.max.z < box.min.z) {
+    return false;
+  }
+  return true;
 }
 
-std::vector<const ZNeuroglancerPrecomputedAnnotationsSource::PropertySpec*>
-ZNeuroglancerPrecomputedAnnotationsSource::props1Byte() const
+[[nodiscard]] bool segmentIntersectsAabb(const glm::dvec3& p0, const glm::dvec3& p1, const VoxelBox& box)
 {
-  std::vector<const PropertySpec*> out;
-  out.reserve(m_properties.size());
-  for (const auto& p : m_properties) {
-    switch (p.type) {
-    case PropertyType::Rgb:
-    case PropertyType::Rgba:
-    case PropertyType::Uint8:
-    case PropertyType::Int8:
-      out.push_back(&p);
-      break;
-    default:
-      break;
+  // Slab intersection (Liang-Barsky style) for axis-aligned bounding boxes.
+  constexpr double kEps = 1e-12;
+  glm::dvec3 d = p1 - p0;
+  double tMin = 0.0;
+  double tMax = 1.0;
+
+  auto update = [&](double p0d, double dd, double minD, double maxD) {
+    if (std::abs(dd) < kEps) {
+      return (p0d >= minD && p0d <= maxD);
+    }
+    double t1 = (minD - p0d) / dd;
+    double t2 = (maxD - p0d) / dd;
+    if (t1 > t2) {
+      std::swap(t1, t2);
+    }
+    tMin = std::max(tMin, t1);
+    tMax = std::min(tMax, t2);
+    return tMin <= tMax;
+  };
+
+  if (!update(p0.x, d.x, box.min.x, box.max.x)) {
+    return false;
+  }
+  if (!update(p0.y, d.y, box.min.y, box.max.y)) {
+    return false;
+  }
+  if (!update(p0.z, d.z, box.min.z, box.max.z)) {
+    return false;
+  }
+  return true;
+}
+
+[[nodiscard]] bool annotationIntersectsVoxelBox(const ZNeuroglancerPrecomputedAnnotationsSource::Annotation& a,
+                                                const VoxelBox& box)
+{
+  using AnnotationType = ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType;
+
+  if (a.points.empty()) {
+    return false;
+  }
+
+  switch (a.type) {
+  case AnnotationType::Point:
+  {
+    const auto& p = a.points[0];
+    return (static_cast<double>(p.x) >= box.min.x && static_cast<double>(p.x) <= box.max.x &&
+            static_cast<double>(p.y) >= box.min.y && static_cast<double>(p.y) <= box.max.y &&
+            static_cast<double>(p.z) >= box.min.z && static_cast<double>(p.z) <= box.max.z);
+  }
+  case AnnotationType::Ellipsoid: {
+    const auto& c = a.points[0];
+    if (!a.ellipsoidRadiiVoxel) {
+      return (static_cast<double>(c.x) >= box.min.x && static_cast<double>(c.x) <= box.max.x &&
+              static_cast<double>(c.y) >= box.min.y && static_cast<double>(c.y) <= box.max.y &&
+              static_cast<double>(c.z) >= box.min.z && static_cast<double>(c.z) <= box.max.z);
+    }
+
+    const glm::vec3 r = *a.ellipsoidRadiiVoxel;
+    const double rx = static_cast<double>(r.x);
+    const double ry = static_cast<double>(r.y);
+    const double rz = static_cast<double>(r.z);
+    if (!(rx > 0.0) || !(ry > 0.0) || !(rz > 0.0)) {
+      // Degenerate ellipsoid: treat as point.
+      return (static_cast<double>(c.x) >= box.min.x && static_cast<double>(c.x) <= box.max.x &&
+              static_cast<double>(c.y) >= box.min.y && static_cast<double>(c.y) <= box.max.y &&
+              static_cast<double>(c.z) >= box.min.z && static_cast<double>(c.z) <= box.max.z);
+    }
+
+    const double px = std::clamp(static_cast<double>(c.x), box.min.x, box.max.x);
+    const double py = std::clamp(static_cast<double>(c.y), box.min.y, box.max.y);
+    const double pz = std::clamp(static_cast<double>(c.z), box.min.z, box.max.z);
+    const double dx = (px - static_cast<double>(c.x)) / rx;
+    const double dy = (py - static_cast<double>(c.y)) / ry;
+    const double dz = (pz - static_cast<double>(c.z)) / rz;
+    const double dist2 = dx * dx + dy * dy + dz * dz;
+    return dist2 <= 1.0;
+  }
+  case AnnotationType::Line: {
+    if (a.points.size() != 2) {
+      return false;
+    }
+    return segmentIntersectsAabb(glm::dvec3(a.points[0]), glm::dvec3(a.points[1]), box);
+  }
+  case AnnotationType::Polyline: {
+    if (a.points.size() < 2) {
+      return false;
+    }
+    for (size_t i = 1; i < a.points.size(); ++i) {
+      if (segmentIntersectsAabb(glm::dvec3(a.points[i - 1]), glm::dvec3(a.points[i]), box)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  case AnnotationType::AxisAlignedBoundingBox: {
+    if (a.points.size() != 2) {
+      return false;
+    }
+    const VoxelBox ab = makeVoxelBox(glm::dvec3(a.points[0]), glm::dvec3(a.points[1]));
+    return intersectsAabb(box, ab);
+  }
+  }
+
+  return false;
+}
+
+} // namespace
+
+std::vector<ZNeuroglancerPrecomputedAnnotationsSource::Annotation>
+ZNeuroglancerPrecomputedAnnotationsSource::loadAnnotationsIntersectingVoxelBoxBlocking(const glm::dvec3& voxelMin,
+                                                                                       const glm::dvec3& voxelMax) const
+{
+  if (m_spatial.empty()) {
+    throw ZException("Neuroglancer annotations dataset has no spatial index ('spatial' missing in info)");
+  }
+
+  const VoxelBox qVoxel = makeVoxelBox(voxelMin, voxelMax);
+  const glm::dvec3 qMinCoord = coordUnitsFromVoxel(qVoxel.min);
+  const glm::dvec3 qMaxCoord = coordUnitsFromVoxel(qVoxel.max);
+
+  std::vector<Annotation> out;
+  out.reserve(1024);
+  std::unordered_set<uint64_t> seen;
+  seen.reserve(1024);
+
+  for (const SpatialLevelSpec& level : m_spatial) {
+    std::array<int64_t, 3> cellMin{};
+    std::array<int64_t, 3> cellMax{};
+
+    for (size_t d = 0; d < 3; ++d) {
+      const double origin = m_lowerBoundCoord[d];
+      const double chunk = level.chunkSize[d];
+      const int64_t maxIdx = static_cast<int64_t>(level.gridShape[d]) - 1;
+      CHECK(maxIdx >= 0);
+
+      const double a = (qMinCoord[d] - origin) / chunk;
+      const double b = (qMaxCoord[d] - origin) / chunk;
+      int64_t lo = static_cast<int64_t>(std::floor(std::min(a, b)));
+      int64_t hi = static_cast<int64_t>(std::floor(std::max(a, b)));
+
+      lo = std::clamp<int64_t>(lo, 0, maxIdx);
+      hi = std::clamp<int64_t>(hi, 0, maxIdx);
+      cellMin[d] = lo;
+      cellMax[d] = hi;
+    }
+
+    for (int64_t z = cellMin[2]; z <= cellMax[2]; ++z) {
+      for (int64_t y = cellMin[1]; y <= cellMax[1]; ++y) {
+        for (int64_t x = cellMin[0]; x <= cellMax[0]; ++x) {
+          const std::array<uint64_t, 3> cell = {static_cast<uint64_t>(x), static_cast<uint64_t>(y), static_cast<uint64_t>(z)};
+
+          auto bytesOpt = loadSpatialCellEntryBlocking(level, cell);
+          if (!bytesOpt) {
+            continue;
+          }
+          const auto anns = decodeMultipleAnnotationBytes(std::span<const uint8_t>(bytesOpt->data(), bytesOpt->size()));
+          for (const auto& a : anns) {
+            if (!annotationIntersectsVoxelBox(a, qVoxel)) {
+              continue;
+            }
+            if (!seen.insert(a.id).second) {
+              continue;
+            }
+            out.push_back(a);
+          }
+        }
+      }
     }
   }
+
   return out;
 }
 
@@ -764,8 +1110,15 @@ ZNeuroglancerPrecomputedAnnotationsSource::Annotation ZNeuroglancerPrecomputedAn
   }
   case AnnotationType::Ellipsoid: {
     const glm::vec3 center = voxelFromCoordUnits(readVec3());
-    (void)readVec3(); // radii (units of coordinate space; currently ignored)
+    const glm::vec3 radiiCoord = readVec3();
+    const double rxV = std::abs(static_cast<double>(radiiCoord.x)) * m_dimScaleNm[0] / m_baseResolutionNm[0];
+    const double ryV = std::abs(static_cast<double>(radiiCoord.y)) * m_dimScaleNm[1] / m_baseResolutionNm[1];
+    const double rzV = std::abs(static_cast<double>(radiiCoord.z)) * m_dimScaleNm[2] / m_baseResolutionNm[2];
+    if (!std::isfinite(rxV) || !std::isfinite(ryV) || !std::isfinite(rzV)) {
+      throw ZException("Invalid neuroglancer ellipsoid radii (non-finite)");
+    }
     a.points = {center};
+    a.ellipsoidRadiiVoxel = glm::vec3(static_cast<float>(rxV), static_cast<float>(ryV), static_cast<float>(rzV));
     break;
   }
   case AnnotationType::Polyline: {
@@ -787,44 +1140,103 @@ ZNeuroglancerPrecomputedAnnotationsSource::Annotation ZNeuroglancerPrecomputedAn
   }
   }
 
-  // Properties are encoded by size group (see Neuroglancer annotations spec).
-  for (const auto* p : props4Byte()) {
-    CHECK(p);
+  // Properties are encoded by size group (see Neuroglancer annotations spec), and within each
+  // size group they are encoded in the order of the "properties" array from the info JSON.
+  a.propertyValues.clear();
+  if (!m_properties.empty()) {
+    a.propertyValues.resize(m_properties.size());
+  }
+
+  for (size_t i = 0; i < m_properties.size(); ++i) {
+    const auto& p = m_properties[i];
+    if (p.type != PropertyType::Uint32 && p.type != PropertyType::Int32 && p.type != PropertyType::Float32) {
+      continue;
+    }
     ensure(4, "property");
-    off += 4; // value ignored for now
+    switch (p.type) {
+    case PropertyType::Uint32: {
+      const uint32_t v = readLE<uint32_t>(bytes.data() + off);
+      a.propertyValues[i] = v;
+      break;
+    }
+    case PropertyType::Int32: {
+      const int32_t v = readLE<int32_t>(bytes.data() + off);
+      a.propertyValues[i] = v;
+      break;
+    }
+    case PropertyType::Float32: {
+      const float v = readLE<float>(bytes.data() + off);
+      a.propertyValues[i] = v;
+      break;
+    }
+    default:
+      CHECK(false);
+      break;
+    }
+    off += 4;
   }
-  for (const auto* p : props2Byte()) {
-    CHECK(p);
+
+  for (size_t i = 0; i < m_properties.size(); ++i) {
+    const auto& p = m_properties[i];
+    if (p.type != PropertyType::Uint16 && p.type != PropertyType::Int16) {
+      continue;
+    }
     ensure(2, "property");
-    off += 2; // value ignored for now
+    switch (p.type) {
+    case PropertyType::Uint16: {
+      const uint16_t v = readLE<uint16_t>(bytes.data() + off);
+      a.propertyValues[i] = v;
+      break;
+    }
+    case PropertyType::Int16: {
+      const int16_t v = readLE<int16_t>(bytes.data() + off);
+      a.propertyValues[i] = v;
+      break;
+    }
+    default:
+      CHECK(false);
+      break;
+    }
+    off += 2;
   }
-  for (const auto* p : props1Byte()) {
-    CHECK(p);
-    switch (p->type) {
+
+  for (size_t i = 0; i < m_properties.size(); ++i) {
+    const auto& p = m_properties[i];
+    switch (p.type) {
     case PropertyType::Rgb: {
       ensure(3, "rgb property");
+      const std::array<uint8_t, 3> v{bytes[off + 0], bytes[off + 1], bytes[off + 2]};
+      a.propertyValues[i] = v;
       if (!a.rgba8) {
-        a.rgba8 = std::array<uint8_t, 4>{bytes[off + 0], bytes[off + 1], bytes[off + 2], 255};
+        a.rgba8 = std::array<uint8_t, 4>{v[0], v[1], v[2], 255};
       }
       off += 3;
       break;
     }
     case PropertyType::Rgba: {
       ensure(4, "rgba property");
+      const std::array<uint8_t, 4> v{bytes[off + 0], bytes[off + 1], bytes[off + 2], bytes[off + 3]};
+      a.propertyValues[i] = v;
       if (!a.rgba8) {
-        a.rgba8 = std::array<uint8_t, 4>{bytes[off + 0], bytes[off + 1], bytes[off + 2], bytes[off + 3]};
+        a.rgba8 = v;
       }
       off += 4;
       break;
     }
-    case PropertyType::Uint8:
-    case PropertyType::Int8:
-      ensure(1, "uint8/int8 property");
+    case PropertyType::Uint8: {
+      ensure(1, "uint8 property");
+      a.propertyValues[i] = static_cast<uint8_t>(bytes[off]);
       off += 1;
       break;
-    default:
-      CHECK(false) << "Unexpected 1-byte property type";
+    }
+    case PropertyType::Int8: {
+      ensure(1, "int8 property");
+      a.propertyValues[i] = static_cast<int8_t>(bytes[off]);
+      off += 1;
       break;
+    }
+    default:
+      break; // handled in previous passes
     }
   }
 

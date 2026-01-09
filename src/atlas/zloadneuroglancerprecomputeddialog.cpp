@@ -31,6 +31,7 @@ constexpr int kExamplesColUrl = 2;
 constexpr int kRoleHistoryKind = Qt::UserRole + 1;
 constexpr int kRoleHistoryMeshSourceOverrideUrl = Qt::UserRole + 2;
 constexpr int kRoleHistorySkeletonSourceOverrideUrl = Qt::UserRole + 3;
+constexpr int kRoleHistoryAnnotationsSourceOverrideUrl = Qt::UserRole + 4;
 
 [[nodiscard]] QString modelTextOrEmpty(const QStandardItemModel* model, const QModelIndex& index)
 {
@@ -144,6 +145,15 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
       m_historySkeletonSourceLabel->setWordWrap(true);
       skelRow->addWidget(m_historySkeletonSourceLabel, /*stretch=*/1);
       sourcesLayout->addLayout(skelRow);
+    }
+    {
+      auto* annRow = new QHBoxLayout();
+      annRow->addWidget(new QLabel(tr("Annotations source override:")));
+      m_historyAnnotationsSourceLabel = new QLabel(tr("<none>"));
+      m_historyAnnotationsSourceLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+      m_historyAnnotationsSourceLabel->setWordWrap(true);
+      annRow->addWidget(m_historyAnnotationsSourceLabel, /*stretch=*/1);
+      sourcesLayout->addLayout(annRow);
     }
     {
       auto* row = new QHBoxLayout();
@@ -280,6 +290,11 @@ std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> ZLoadNeuroglancerPrecomp
                            m_historyModel->index(r, kHistoryColUrl),
                            kRoleHistorySkeletonSourceOverrideUrl)
         .trimmed();
+    e.annotationsSourceOverrideUrl =
+      modelRoleTextOrEmpty(m_historyModel,
+                           m_historyModel->index(r, kHistoryColUrl),
+                           kRoleHistoryAnnotationsSourceOverrideUrl)
+        .trimmed();
     out.push_back(std::move(e));
   }
   return out;
@@ -295,6 +310,7 @@ void ZLoadNeuroglancerPrecomputedDialog::addHistoryRow(const ZNeuroglancerPrecom
   urlItem->setData(entry.kind, kRoleHistoryKind);
   urlItem->setData(entry.meshSourceOverrideUrl, kRoleHistoryMeshSourceOverrideUrl);
   urlItem->setData(entry.skeletonSourceOverrideUrl, kRoleHistorySkeletonSourceOverrideUrl);
+  urlItem->setData(entry.annotationsSourceOverrideUrl, kRoleHistoryAnnotationsSourceOverrideUrl);
   row << urlItem;
   m_historyModel->appendRow(row);
 }
@@ -350,7 +366,7 @@ void ZLoadNeuroglancerPrecomputedDialog::removeSelectedHistory()
 void ZLoadNeuroglancerPrecomputedDialog::updateHistorySourceUi()
 {
   if (!m_historyView || !m_historyModel || !m_historyMeshSourceLabel || !m_historySkeletonSourceLabel ||
-      !m_historyEditSourcesBtn || !m_historyClearSourcesBtn) {
+      !m_historyAnnotationsSourceLabel || !m_historyEditSourcesBtn || !m_historyClearSourcesBtn) {
     return;
   }
 
@@ -361,15 +377,18 @@ void ZLoadNeuroglancerPrecomputedDialog::updateHistorySourceUi()
 
   QString mesh;
   QString skel;
+  QString ann;
   if (hasSel) {
     const int r = rows.front().row();
     const QModelIndex urlIdx = m_historyModel->index(r, kHistoryColUrl);
     mesh = modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistoryMeshSourceOverrideUrl).trimmed();
     skel = modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistorySkeletonSourceOverrideUrl).trimmed();
+    ann = modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistoryAnnotationsSourceOverrideUrl).trimmed();
   }
 
   m_historyMeshSourceLabel->setText(mesh.isEmpty() ? tr("<none>") : mesh);
   m_historySkeletonSourceLabel->setText(skel.isEmpty() ? tr("<none>") : skel);
+  m_historyAnnotationsSourceLabel->setText(ann.isEmpty() ? tr("<none>") : ann);
 }
 
 void ZLoadNeuroglancerPrecomputedDialog::editSelectedHistorySources()
@@ -388,12 +407,14 @@ void ZLoadNeuroglancerPrecomputedDialog::editSelectedHistorySources()
   const QString currentMesh = modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistoryMeshSourceOverrideUrl).trimmed();
   const QString currentSkel =
     modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistorySkeletonSourceOverrideUrl).trimmed();
+  const QString currentAnn =
+    modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistoryAnnotationsSourceOverrideUrl).trimmed();
 
   QDialog dlg(this);
   dlg.setWindowTitle(tr("Edit Neuroglancer Sources"));
   auto* layout = new QVBoxLayout(&dlg);
 
-  auto* help = new QLabel(tr("Optional per-dataset overrides for Neuroglancer mesh/skeleton sources.\n"
+  auto* help = new QLabel(tr("Optional per-dataset overrides for Neuroglancer mesh/skeleton/annotations sources.\n"
                              "Leave blank to clear. Values may be absolute URLs or dataset-relative paths."));
   help->setWordWrap(true);
   layout->addWidget(help);
@@ -406,6 +427,10 @@ void ZLoadNeuroglancerPrecomputedDialog::editSelectedHistorySources()
   auto* skelEdit = new QLineEdit(currentSkel);
   skelEdit->setPlaceholderText(tr("e.g. precomputed://... or relative path"));
   form->addRow(tr("Skeleton source override:"), skelEdit);
+
+  auto* annEdit = new QLineEdit(currentAnn);
+  annEdit->setPlaceholderText(tr("e.g. precomputed://... or relative path"));
+  form->addRow(tr("Annotations source override:"), annEdit);
   layout->addLayout(form);
 
   auto* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -419,9 +444,11 @@ void ZLoadNeuroglancerPrecomputedDialog::editSelectedHistorySources()
 
   const QString newMesh = meshEdit->text().trimmed();
   const QString newSkel = skelEdit->text().trimmed();
+  const QString newAnn = annEdit->text().trimmed();
 
   m_historyModel->setData(urlIdx, newMesh, kRoleHistoryMeshSourceOverrideUrl);
   m_historyModel->setData(urlIdx, newSkel, kRoleHistorySkeletonSourceOverrideUrl);
+  m_historyModel->setData(urlIdx, newAnn, kRoleHistoryAnnotationsSourceOverrideUrl);
   updateHistorySourceUi();
 }
 
@@ -440,6 +467,7 @@ void ZLoadNeuroglancerPrecomputedDialog::clearSelectedHistorySources()
   const QModelIndex urlIdx = m_historyModel->index(r, kHistoryColUrl);
   m_historyModel->setData(urlIdx, QString(), kRoleHistoryMeshSourceOverrideUrl);
   m_historyModel->setData(urlIdx, QString(), kRoleHistorySkeletonSourceOverrideUrl);
+  m_historyModel->setData(urlIdx, QString(), kRoleHistoryAnnotationsSourceOverrideUrl);
   updateHistorySourceUi();
 }
 

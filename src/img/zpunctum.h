@@ -2,6 +2,7 @@
 
 #include "zeigenutils.h"
 #include "zimginterface.h"
+#include <algorithm>
 #include <cmath>
 #include <list>
 
@@ -37,6 +38,10 @@ public:
     std::swap(m_volSize, rhs.m_volSize);
     std::swap(m_mass, rhs.m_mass);
     std::swap(m_radius, rhs.m_radius);
+    std::swap(m_radiusX, rhs.m_radiusX);
+    std::swap(m_radiusY, rhs.m_radiusY);
+    std::swap(m_radiusZ, rhs.m_radiusZ);
+    std::swap(m_hasAnisotropicRadii, rhs.m_hasAnisotropicRadii);
     property1.swap(rhs.property1);
     property2.swap(rhs.property2);
     property3.swap(rhs.property3);
@@ -52,7 +57,9 @@ public:
     return name == rhs.name && comment == rhs.comment && m_maxIntensity == rhs.m_maxIntensity &&
            m_meanIntensity == rhs.m_meanIntensity && m_x == rhs.m_x && m_y == rhs.m_y && m_z == rhs.m_z &&
            m_sDevOfIntensity == rhs.m_sDevOfIntensity && m_volSize == rhs.m_volSize && m_mass == rhs.m_mass &&
-           m_radius == rhs.m_radius && property1 == rhs.property1 && property2 == rhs.property2 &&
+           m_radius == rhs.m_radius && m_radiusX == rhs.m_radiusX && m_radiusY == rhs.m_radiusY &&
+           m_radiusZ == rhs.m_radiusZ && m_hasAnisotropicRadii == rhs.m_hasAnisotropicRadii &&
+           property1 == rhs.property1 && property2 == rhs.property2 &&
            property3 == rhs.property3 && m_color == rhs.m_color && m_score == rhs.m_score &&
            m_voxelLocations == rhs.m_voxelLocations && m_voxelIntensities == rhs.m_voxelIntensities;
   }
@@ -128,6 +135,26 @@ public:
     return m_radius;
   }
 
+  [[nodiscard]] double radiusX() const
+  {
+    return m_radiusX;
+  }
+
+  [[nodiscard]] double radiusY() const
+  {
+    return m_radiusY;
+  }
+
+  [[nodiscard]] double radiusZ() const
+  {
+    return m_radiusZ;
+  }
+
+  [[nodiscard]] bool hasAnisotropicRadii() const
+  {
+    return m_hasAnisotropicRadii;
+  }
+
   [[nodiscard]] const col4& color() const
   {
     return m_color;
@@ -191,6 +218,19 @@ public:
   void setRadius(double n)
   {
     m_radius = n;
+    m_radiusX = n;
+    m_radiusY = n;
+    m_radiusZ = n;
+    m_hasAnisotropicRadii = false;
+  }
+
+  void setRadii(double rx, double ry, double rz)
+  {
+    m_radiusX = rx;
+    m_radiusY = ry;
+    m_radiusZ = rz;
+    m_hasAnisotropicRadii = true;
+    m_radius = std::max({m_radiusX, m_radiusY, m_radiusZ});
   }
 
   void setColor(const col4& n)
@@ -225,6 +265,10 @@ public:
   {
     using namespace boost::math::double_constants;
     m_radius = std::pow(m_volSize / four_thirds_pi, 1.0 / 3.0);
+    m_radiusX = m_radius;
+    m_radiusY = m_radius;
+    m_radiusZ = m_radius;
+    m_hasAnisotropicRadii = false;
   }
 
   // update volSize from radius
@@ -242,7 +286,10 @@ public:
 
   [[nodiscard]] std::string toString() const
   {
-    return fmt::format("Puncta ({}): ({}, {}, {}, {})", name, m_x, m_y, m_z, m_radius);
+    if (!m_hasAnisotropicRadii || (m_radiusX == m_radiusY && m_radiusX == m_radiusZ)) {
+      return fmt::format("Puncta ({}): ({}, {}, {}, {})", name, m_x, m_y, m_z, m_radius);
+    }
+    return fmt::format("Puncta ({}): ({}, {}, {}, [{}, {}, {}])", name, m_x, m_y, m_z, m_radiusX, m_radiusY, m_radiusZ);
   }
 
   [[nodiscard]] bool isSelected() const
@@ -274,6 +321,10 @@ private:
   size_t m_volSize = 33;
   double m_mass = 8415;
   double m_radius = 2.0; // radius
+  double m_radiusX = 2.0;
+  double m_radiusY = 2.0;
+  double m_radiusZ = 2.0;
+  bool m_hasAnisotropicRadii = false;
   col4 m_color{0, 255, 255};
   double m_score = 1.0; // detection score [-1.0 1.0]
 
