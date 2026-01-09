@@ -28,6 +28,9 @@
 #include "zmessageboxhelpers.h"
 #include "zmarkdownbrowser.h"
 #include "ztheme.h"
+
+#include <gflags/gflags.h>
+
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -54,6 +57,8 @@
 #include <QTimer>
 #include <utility>
 #include <memory>
+
+DECLARE_string(atlas_http_disk_cache_dir);
 
 DEFINE_bool(atlas_block_scene_3d_apply,
             false,
@@ -413,6 +418,32 @@ void ZMainWindow::openConfigFolder()
   QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::configDir().absolutePath()));
 }
 
+void ZMainWindow::openHttpDiskCacheFolder()
+{
+  QString rootDir;
+  if (!FLAGS_atlas_http_disk_cache_dir.empty()) {
+    rootDir = QString::fromStdString(FLAGS_atlas_http_disk_cache_dir).trimmed();
+  }
+  if (rootDir.isEmpty()) {
+    // Prefer the Atlas image cache root (may select a non-system volume with enough space).
+    rootDir = ZSystemInfo::imgCachePath(/*requiredSpaceInBytes=*/0);
+  }
+  if (rootDir.isEmpty()) {
+    rootDir = ZSystemInfo::configDir().absolutePath();
+  }
+
+  // Keep in sync with ZHttpDiskCache (src/atlas/zhttpdiskcache.cpp).
+  const QString cacheDir = QDir(rootDir).filePath(QStringLiteral("atlas_http_disk_cache_v1"));
+
+  // Best-effort: create the directory so users can see where it will live even before the first download.
+  if (!QDir(cacheDir).exists()) {
+    QDir mk;
+    (void)mk.mkpath(QDir(cacheDir).filePath(QStringLiteral("entries")));
+  }
+
+  QDesktopServices::openUrl(QUrl::fromLocalFile(cacheDir));
+}
+
 void ZMainWindow::generateConfigFile()
 {
   QString fn = "user_settings_flagfile.txt";
@@ -672,6 +703,11 @@ void ZMainWindow::createActions()
   m_openConfigFolderAction->setStatusTip(tr("Open Config Folder"));
   connect(m_openConfigFolderAction, &QAction::triggered, this, &ZMainWindow::openConfigFolder);
 
+  m_openHttpDiskCacheFolderAction =
+    new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("Open HTTP Disk Cache Folder"), this);
+  m_openHttpDiskCacheFolderAction->setStatusTip(tr("Open HTTP Disk Cache Folder"));
+  connect(m_openHttpDiskCacheFolderAction, &QAction::triggered, this, &ZMainWindow::openHttpDiskCacheFolder);
+
   m_generateConfigFileAction =
     new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Generate Config File"), this);
   m_generateConfigFileAction->setStatusTip(tr("Generate Config File"));
@@ -770,6 +806,7 @@ void ZMainWindow::createMenus()
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_openLogFolderAction);
   m_helpMenu->addAction(m_openConfigFolderAction);
+  m_helpMenu->addAction(m_openHttpDiskCacheFolderAction);
   m_helpMenu->addAction(m_generateConfigFileAction);
 #if ATLAS_ENABLE_CUSTOM_COMMAND
   m_helpMenu->addAction(m_runCustomCommandAction);

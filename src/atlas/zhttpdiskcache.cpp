@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 
 namespace nim {
 
@@ -269,18 +270,24 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::readEntryFile(const QString& 
 
   uint32_t contentTypeLen = 0;
   uint32_t contentEncLen = 0;
-  uint64_t bodyLen = 0;
+  quint64 bodyLenQ = 0;
   ds >> contentTypeLen;
   ds >> contentEncLen;
-  ds >> bodyLen;
+  ds >> bodyLenQ;
 
   if (contentTypeLen > (1u << 20) || contentEncLen > (1u << 20)) {
+    return std::nullopt;
+  }
+  if (bodyLenQ > static_cast<quint64>(std::numeric_limits<size_t>::max())) {
+    return std::nullopt;
+  }
+  if (bodyLenQ > static_cast<quint64>(std::numeric_limits<qint64>::max())) {
     return std::nullopt;
   }
 
   const qint64 remaining = f.size() - f.pos();
   const qint64 need = static_cast<qint64>(contentTypeLen) + static_cast<qint64>(contentEncLen) +
-                      static_cast<qint64>(bodyLen);
+                      static_cast<qint64>(bodyLenQ);
   if (need < 0 || remaining < need) {
     return std::nullopt;
   }
@@ -302,11 +309,16 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::readEntryFile(const QString& 
   }
 
   std::vector<uint8_t> body;
-  body.resize(static_cast<size_t>(bodyLen));
-  if (bodyLen > 0) {
-    if (ds.readRawData(reinterpret_cast<char*>(body.data()), static_cast<int>(bodyLen)) != static_cast<int>(bodyLen)) {
+  const size_t bodyLen = static_cast<size_t>(bodyLenQ);
+  body.resize(bodyLen);
+  size_t bodyRead = 0;
+  while (bodyRead < bodyLen) {
+    const size_t chunkSize = std::min(bodyLen - bodyRead, static_cast<size_t>(std::numeric_limits<int>::max()));
+    const int n = ds.readRawData(reinterpret_cast<char*>(body.data() + bodyRead), static_cast<int>(chunkSize));
+    if (n != static_cast<int>(chunkSize)) {
       return std::nullopt;
     }
+    bodyRead += chunkSize;
   }
 
   ZHttpGetBytesResult out{};
@@ -335,7 +347,7 @@ void ZHttpDiskCache::writeEntryFile(const QString& path, const ZHttpGetBytesResu
 
   ds << static_cast<uint32_t>(contentType.size());
   ds << static_cast<uint32_t>(contentEnc.size());
-  ds << static_cast<uint64_t>(result.body.size());
+  ds << static_cast<quint64>(result.body.size());
 
   if (!contentType.isEmpty()) {
     ds.writeRawData(contentType.data(), contentType.size());
@@ -344,7 +356,17 @@ void ZHttpDiskCache::writeEntryFile(const QString& path, const ZHttpGetBytesResu
     ds.writeRawData(contentEnc.data(), contentEnc.size());
   }
   if (!result.body.empty()) {
-    ds.writeRawData(reinterpret_cast<const char*>(result.body.data()), static_cast<int>(result.body.size()));
+    size_t bodyWritten = 0;
+    while (bodyWritten < result.body.size()) {
+      const size_t chunkSize =
+        std::min(result.body.size() - bodyWritten, static_cast<size_t>(std::numeric_limits<int>::max()));
+      const int n = ds.writeRawData(reinterpret_cast<const char*>(result.body.data() + bodyWritten),
+                                    static_cast<int>(chunkSize));
+      if (n != static_cast<int>(chunkSize)) {
+        throw ZException("Failed to write cache entry body");
+      }
+      bodyWritten += chunkSize;
+    }
   }
 
   if (!f.commit()) {

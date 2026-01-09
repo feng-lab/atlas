@@ -85,6 +85,11 @@ public:
     return m_openConfigFolderAction;
   }
 
+  QAction* openHttpDiskCacheFolderAction()
+  {
+    return m_openHttpDiskCacheFolderAction;
+  }
+
   QAction* userGuideAction()
   {
     return m_userGuideAction;
@@ -136,6 +141,8 @@ private:
   static void openLogFolder();
 
   static void openConfigFolder();
+
+  static void openHttpDiskCacheFolder();
 
   static void generateConfigFile();
 
@@ -216,6 +223,7 @@ private:
 
   QAction* m_openLogFolderAction = nullptr;
   QAction* m_openConfigFolderAction = nullptr;
+  QAction* m_openHttpDiskCacheFolderAction = nullptr;
   QAction* m_generateConfigFileAction = nullptr;
   QAction* m_runCustomCommandAction = nullptr;
 

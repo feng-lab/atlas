@@ -366,6 +366,7 @@ void Z3DMainWindow::createMenus()
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_2dWindow.openLogFolderAction());
   m_helpMenu->addAction(m_2dWindow.openConfigFolderAction());
+  m_helpMenu->addAction(m_2dWindow.openHttpDiskCacheFolderAction());
 }
 
 void Z3DMainWindow::createToolBars()
