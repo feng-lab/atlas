@@ -70,39 +70,35 @@ endif ()
 
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
-# `zroimaskrastertest` is particularly slow/heavy on Windows runners. Skip it in
-# CI to keep the default test build lightweight.
-if (_atlas_is_windows_ci)
-  message(STATUS "Skipping zroimaskrastertest on Windows CI (heavy link against atlas_lib).")
-else ()
-  add_atlas_gtest_executable(zroimaskrastertest)
-endif ()
 add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_gtest_executable(zneuroglanceruint64shardingtest)
 add_atlas_gtest_executable(zneuroglancerprecomputedchunkdecodertest)
 add_atlas_gtest_executable(zneuroglancerstatetest)
 add_atlas_gtest_executable(zhttpdiskcachetest)
 
-# Consolidate the heaviest Atlas-linked Neuroglancer tests into a single executable to
-# avoid paying the large atlas_lib link cost multiple times.
-# `zneuroglancerprecomputedtest` is a large executable that links against atlas_lib
+# Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
+# the large atlas_lib link cost multiple times. This currently includes:
+# - Neuroglancer precomputed integration tests
+# - ROI mask rasterization integration tests (historically `zroimaskrastertest`)
+# `zatlasheavytest` is a large executable that links against atlas_lib
 # and is frequently too slow/heavy to build+link on Windows CI runners. Skip it in
 # CI to keep the default test build lightweight.
 if (_atlas_is_windows_ci)
-  message(STATUS "Skipping zneuroglancerprecomputedtest on Windows CI (heavy link against atlas_lib).")
+  message(STATUS "Skipping zatlasheavytest on Windows CI (heavy link against atlas_lib).")
 else ()
   add_executable(
-    zneuroglancerprecomputedtest
+    zatlasheavytest
+    ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedannotationstest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedsegmentpropertiestest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedskeletontest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputede2etest.cpp)
-  target_link_libraries(zneuroglancerprecomputedtest PRIVATE GTest::gtest_main atlas_lib)
-  target_compile_definitions(zneuroglancerprecomputedtest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
+  target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_lib)
+  target_compile_definitions(zatlasheavytest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
   if (UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    target_link_options(zneuroglancerprecomputedtest PRIVATE -fuse-ld=lld)
+    target_link_options(zatlasheavytest PRIVATE -fuse-ld=lld)
   endif ()
-  gtest_discover_tests(zneuroglancerprecomputedtest DISCOVERY_TIMEOUT 600)
+  gtest_discover_tests(zatlasheavytest DISCOVERY_TIMEOUT 600)
 endif ()
 
 
