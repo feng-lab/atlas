@@ -26,8 +26,8 @@
 #         proxy_if_available (always use system proxy if one exists for the URL).
 --atlas_http_proxy_strategy=auto
 
-# Maximum number of retries for transient network/handshake errors in HTTP GET, default is 2.
---atlas_http_max_retries=2
+# Maximum number of retries for transient network/handshake errors in HTTP GET, default is 3.
+--atlas_http_max_retries=3
 
 # Backoff delay in milliseconds before retrying transient HTTP errors, default is 200ms.
 --atlas_http_retry_backoff_initial_ms=200

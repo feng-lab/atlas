@@ -51,8 +51,8 @@ DEFINE_string(atlas_http_proxy_strategy,
               "proxy_if_available (always use system proxy if one exists for the URL).");
 
 DEFINE_uint32(atlas_http_max_retries,
-              2,
-              "Maximum number of retries for transient network/handshake errors in HTTP GET (default 2).");
+              3,
+              "Maximum number of retries for transient network/handshake errors in HTTP GET (default 3).");
 
 DEFINE_uint32(atlas_http_retry_backoff_initial_ms,
               200,
@@ -227,14 +227,10 @@ std::optional<ProxyEndpoint> systemHttpProxyForUrl(const std::string& url)
     return std::nullopt;
   }
 
-  // Respect "NoProxy" when that's the system decision for this URL.
-  // Qt returns proxies in the order they should be attempted; if the first entry
-  // is NoProxy, the correct behavior is to connect directly.
-  if (proxies.front().type() == QNetworkProxy::NoProxy) {
-    return std::nullopt;
-  }
-
-  // Otherwise, scan for the first supported HTTP proxy in the ordered list.
+  // Scan for the first supported HTTP proxy in the ordered list.
+  // Note: proxy auto-config (PAC) can legitimately return DIRECT first, followed by
+  //       one or more PROXY fallbacks. We still want to detect that a proxy is
+  //       available so --atlas_http_proxy_strategy=auto can retry via proxy.
   // This handles environments where the OS provides multiple proxy candidates
   // (e.g. PAC) without introducing custom proxy config in Atlas.
   for (const QNetworkProxy& candidate : proxies) {
@@ -387,10 +383,39 @@ bool isRetryableHttpError(const proxygen::coro::HTTPError& e)
 
 bool isRetryableExceptionMessage(std::string_view message)
 {
-  // Heuristic for transient socket/TLS issues surfaced as std::exception.
-  return message.find("handshake") != std::string_view::npos || message.find("Network error") != std::string_view::npos ||
-         message.find("TLS") != std::string_view::npos || message.find("SSL") != std::string_view::npos ||
-         message.find("EOF") != std::string_view::npos;
+  // Heuristic for transient socket/TLS/proxy issues surfaced as std::exception.
+  // Keep this conservative, but include common "direct path is blocked; proxy required" cases.
+  std::string m(message);
+  folly::toLowerAscii(m);
+
+  auto contains = [&](std::string_view needle) -> bool {
+    return m.find(needle) != std::string::npos;
+  };
+
+  // TLS / transport
+  if (contains("handshake") || contains("network error") || contains("tls") || contains("ssl") || contains("eof")) {
+    return true;
+  }
+
+  // Connect / route failures (often fixed by retrying via system proxy in auto mode).
+  if (contains("connect failed") || contains("connect error") || contains("connection refused") ||
+      contains("no route to host") || contains("network is unreachable") || contains("host is down") ||
+      contains("connection reset") || contains("broken pipe")) {
+    return true;
+  }
+
+  // DNS / name resolution
+  if (contains("temporary failure in name resolution") || contains("name or service not known") ||
+      contains("nodename nor servname provided") || contains("unknown host") || contains("host not found")) {
+    return true;
+  }
+
+  // Timeout variants (some surfaces as generic exceptions, not HTTPErrorCode::READ_TIMEOUT/WRITE_TIMEOUT).
+  if (contains("timeout") || contains("timed out")) {
+    return true;
+  }
+
+  return false;
 }
 
 std::chrono::milliseconds retryBackoffForAttempt(uint32_t attempt)
@@ -510,8 +535,8 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
         case ProxyStrategy::ProxyIfAvailable:
           return true;
         case ProxyStrategy::Auto:
-          // Alternate direct/proxy between attempts (attempt 0 is direct).
-          return (attempt % 2u) == 1u;
+          // Alternate proxy/direct between attempts when a proxy exists (attempt 0 is proxy).
+          return (attempt % 2u) == 0u;
         }
         return false;
       }();
@@ -600,7 +625,8 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
 
     // Fall back to message-based retry heuristics for non-proxygen errors.
     std::string msg(error.what().toStdString());
-    const bool retryable = isRetryableExceptionMessage(msg);
+    const bool retryable =
+      error.is_compatible_with<proxygen::coro::HTTPCoroSessionPool::Exception>() || isRetryableExceptionMessage(msg);
     if (attempt < maxRetries && retryable) {
       VLOG(1) << fmt::format("HTTP GET transient exception (attempt {}/{}): '{}' ({})",
                              attempt + 1,
