@@ -137,7 +137,8 @@ TEST(ZHttpDiskCache, PrunesOldestEntries)
   const QString path1 = cacheEntryPathFor(tmp.path(), url1, /*range=*/"");
   ASSERT_TRUE(QFileInfo::exists(path1));
   QFile f1(path1);
-  ASSERT_TRUE(f1.open(QIODevice::ReadOnly));
+  // On Windows, setting the modification time requires a handle with write-attributes access.
+  ASSERT_TRUE(f1.open(QIODevice::ReadWrite));
   ASSERT_TRUE(f1.setFileTime(QDateTime::currentDateTimeUtc().addSecs(-3600), QFileDevice::FileModificationTime));
   f1.close();
 

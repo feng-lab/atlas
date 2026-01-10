@@ -172,7 +172,8 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(
   // Best-effort LRU: touch mtime so prune keeps recently used entries.
   {
     QFile f(path);
-    if (f.open(QIODevice::ReadOnly)) {
+    // On Windows, changing timestamps requires FILE_WRITE_ATTRIBUTES. A ReadOnly handle can fail.
+    if (f.open(QIODevice::ReadWrite)) {
       (void)f.setFileTime(QDateTime::currentDateTimeUtc(), QFileDevice::FileModificationTime);
     }
   }
