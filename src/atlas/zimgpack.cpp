@@ -10,15 +10,18 @@
 #include "zneuroglancerprecomputedmesh.h"
 #include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancersegmentationcolors.h"
+#include <QDateTime>
 #include <QFileInfo>
 #include <QPoint>
-#include <QDir>
 #include <QMenu>
+#include <boost/hash2/sha2.hpp>
+#include <bit>
 #include <folly/coro/Collect.h>
 #include <tbb/parallel_for.h>
 #include <boost/iterator/function_output_iterator.hpp>
-#include <cmath>
 #include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <zbenchtimer.h>
@@ -845,7 +848,15 @@ void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteP
   for (size_t i = 0; i < m_allTiles.size(); ++i) {
     ZImgCache::instance().remove(ImageCacheHashKeyType(this, i));
   }
-  ZImgRegionCache::instance().clear();
+
+  // Invalidate the dataset fingerprint so any future ZImgRegionCache keys use the new
+  // (post-save) dataset identity. ZImgRegionCache is keyed by this fingerprint, so we do
+  // not need to clear the global cache for correctness.
+  {
+    const std::lock_guard<std::mutex> lock(m_datasetFingerprintMutex);
+    m_datasetFingerprintValid.store(false, std::memory_order_release);
+    m_datasetFingerprint.fill(0);
+  }
 
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(m_imgSource.filenames[0], &subBlocks, m_imgSource.format);
@@ -1857,26 +1868,35 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
 
   maybeCancel(cancellationToken);
 
-  if (auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
-                                                                             xyRatio,
-                                                                             zRatio,
-                                                                             sx,
-                                                                             sy,
-                                                                             sz,
-                                                                             sc,
-                                                                             t,
-                                                                             resInfo.width,
-                                                                             resInfo.height,
-                                                                             resInfo.depth,
-                                                                             displayRangeMin,
-                                                                             displayRangeMax));
-      img) {
+  const ZImgRegionCacheSourceKind sourceKind =
+    m_ngVolume ? ZImgRegionCacheSourceKind::Neuroglancer : ZImgRegionCacheSourceKind::File;
+  const ImageRegionCacheHashKeyType memKey = ImageRegionCacheHashKeyType(datasetFingerprintForCache(),
+                                                                         sourceKind,
+                                                                         xyRatio,
+                                                                         zRatio,
+                                                                         sx,
+                                                                         sy,
+                                                                         sz,
+                                                                         sc,
+                                                                         t,
+                                                                         resInfo.width,
+                                                                         resInfo.height,
+                                                                         resInfo.depth,
+                                                                         resInfo.numChannels,
+                                                                         resInfo.numTimes,
+                                                                         static_cast<uint32_t>(resInfo.bytesPerVoxel),
+                                                                         static_cast<uint32_t>(std::to_underlying(resInfo.voxelFormat)),
+                                                                         static_cast<uint32_t>(resInfo.validBitCount),
+                                                                         displayRangeMin,
+                                                                         displayRangeMax);
+  if (auto img = ZImgRegionCache::instance().get(memKey); img) {
     co_return img;
   }
 
   maybeCancel(cancellationToken);
 
   auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
+
   if (m_ngVolume) {
     const std::array<size_t, 3> requestedRatio = {static_cast<size_t>(xyRatio),
                                                   static_cast<size_t>(xyRatio),
@@ -2006,20 +2026,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
 
     maybeCancel(cancellationToken);
 
-    ZImgRegionCache::instance().insert(ImageRegionCacheHashKeyType(this,
-                                                                   xyRatio,
-                                                                   zRatio,
-                                                                   sx,
-                                                                   sy,
-                                                                   sz,
-                                                                   sc,
-                                                                   t,
-                                                                   resInfo.width,
-                                                                   resInfo.height,
-                                                                   resInfo.depth,
-                                                                   displayRangeMin,
-                                                                   displayRangeMax),
-                                       res);
+    ZImgRegionCache::instance().insert(memKey, res);
     co_return res;
   }
 
@@ -2097,20 +2104,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
 
   maybeCancel(cancellationToken);
 
-  ZImgRegionCache::instance().insert(ImageRegionCacheHashKeyType(this,
-                                                                 xyRatio,
-                                                                 zRatio,
-                                                                 sx,
-                                                                 sy,
-                                                                 sz,
-                                                                 sc,
-                                                                 t,
-                                                                 resInfo.width,
-                                                                 resInfo.height,
-                                                                 resInfo.depth,
-                                                                 displayRangeMin,
-                                                                 displayRangeMax),
-                                     res);
+  ZImgRegionCache::instance().insert(memKey, res);
   co_return res;
 }
 
@@ -2868,6 +2862,78 @@ void ZImgPack::updateNameTootip()
     m_name = QFileInfo(m_imgSource.filenames[0]).fileName() + QString(" scene %1").arg(m_imgSource.scene + 1);
     m_tooltip = m_imgSource.filenames[0] + QString(" scene %1").arg(m_imgSource.scene + 1);
   }
+}
+
+std::array<uint8_t, 32> ZImgPack::datasetFingerprintForCache() const
+{
+  if (m_datasetFingerprintValid.load(std::memory_order_acquire)) {
+    return m_datasetFingerprint;
+  }
+
+  const std::lock_guard<std::mutex> lock(m_datasetFingerprintMutex);
+  if (m_datasetFingerprintValid.load(std::memory_order_relaxed)) {
+    return m_datasetFingerprint;
+  }
+
+  CHECK(std::endian::native == std::endian::little);
+
+  boost::hash2::sha2_256 hash;
+  static constexpr char kPrefix[] = "atlas_cache_imgpack_fingerprint_v1\n";
+  hash.update(kPrefix, sizeof(kPrefix) - 1);
+
+  auto updateU64 = [&hash](uint64_t v) { hash.update(&v, sizeof(v)); };
+
+  auto updateI64 = [&updateU64](qint64 v) { updateU64(static_cast<uint64_t>(v)); };
+
+  auto updateBytesWithLen = [&hash, &updateU64](const void* data, size_t bytes) {
+    updateU64(static_cast<uint64_t>(bytes));
+    if (bytes == 0) {
+      return;
+    }
+    CHECK(data != nullptr);
+    hash.update(data, bytes);
+  };
+
+  if (m_ngVolume) {
+    // Neuroglancer sources are identified by their root URL.
+    const QString url = m_ngVolume->rootUrl();
+    const QByteArray urlBytes = url.toUtf8();
+    updateBytesWithLen(urlBytes.constData(), static_cast<size_t>(urlBytes.size()));
+  } else {
+    // Include logical source parameters (region, scene, catDim, etc.).
+    {
+      const std::string sourceJson = jsonToString(m_imgSource);
+      updateBytesWithLen(sourceJson.data(), sourceJson.size());
+    }
+
+    // Include file mtimes/sizes for correctness.
+    updateU64(static_cast<uint64_t>(m_imgSource.filenames.size()));
+    for (int i = 0; i < m_imgSource.filenames.size(); ++i) {
+      const QString fn = m_imgSource.filenames[i];
+      QFileInfo fi(fn);
+
+      QString canonical = fi.canonicalFilePath();
+      if (canonical.isEmpty()) {
+        canonical = fi.absoluteFilePath();
+      }
+
+      const QByteArray pathBytes = canonical.toUtf8();
+      updateBytesWithLen(pathBytes.constData(), static_cast<size_t>(pathBytes.size()));
+
+      const qint64 sizeBytes = fi.size();
+      updateI64(sizeBytes);
+
+      const qint64 mtimeMs = fi.lastModified().toUTC().toMSecsSinceEpoch();
+      updateI64(mtimeMs);
+    }
+  }
+
+  const boost::hash2::sha2_256::result_type digest = hash.result();
+  CHECK(digest.size() == m_datasetFingerprint.size());
+  std::memcpy(m_datasetFingerprint.data(), digest.data(), m_datasetFingerprint.size());
+  m_datasetFingerprintValid.store(true, std::memory_order_release);
+
+  return m_datasetFingerprint;
 }
 
 std::array<size_t, 3> ZImgPack::ratioForScale(double xScale, double yScale, double zScale) const

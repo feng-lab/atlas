@@ -1,10 +1,13 @@
 #pragma once
 
+#include <atomic>
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <memory>
 #include <mutex>
-#include <thread>
-#include <vector>
 #include <optional>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace nim {
 
@@ -70,7 +73,7 @@ class ZConcurrentLRUCache
     ListNode head;
     ListNode tail;
     std::mutex mutex;
-    size_t size = 0;
+    std::atomic<size_t> size{0};
   };
 
 public:
@@ -115,11 +118,158 @@ public:
     MaybeUpdateLRUList
   };
 
+  struct DiskLookupResult
+  {
+    TValue value;
+    size_t objSize = 0;
+  };
+
+  // Optional persistent backing store for the cache.
+  //
+  // - Must be thread-safe: ZConcurrentLRUCache may call it from multiple threads.
+  // - Best-effort: failures should degrade to cache-miss semantics.
+  // - Implementations should not throw; any exception is treated as a cache miss / no-op.
+  class DiskBackend
+  {
+  public:
+    virtual ~DiskBackend() = default;
+
+    [[nodiscard]] virtual std::optional<DiskLookupResult> tryGet(const TKey& key) = 0;
+
+    virtual void put(const TKey& key, const TValue& value, size_t objSize) = 0;
+
+    virtual void erase(const TKey& key) = 0;
+  };
+
+  // Not thread-safe: call during initialization, before the cache is used.
+  void setDiskBackend(std::unique_ptr<DiskBackend> backend)
+  {
+    m_diskBackend = std::move(backend);
+  }
+
   /**
    * Find a value by key and return an optional containing the value if found.
    * Updates the LRU list, making the element the most-recently used, depending on the strategy.
    */
   std::optional<TValue> find(const TKey& key, FindStrategy findStrategy = FindStrategy::UpdateLRUList)
+  {
+    if (auto memHit = findMemoryOnly(key, findStrategy); memHit.has_value()) {
+      return memHit;
+    }
+
+    if (!m_diskBackend) {
+      return {};
+    }
+
+    std::optional<DiskLookupResult> diskHit;
+    try {
+      diskHit = m_diskBackend->tryGet(key);
+    } catch (...) {
+      // Disk cache is best-effort; failures degrade to cache-miss semantics.
+      return {};
+    }
+    if (!diskHit.has_value()) {
+      return {};
+    }
+
+    const bool inserted = insertInternal(key, diskHit->value, diskHit->objSize, /*writeDisk=*/false);
+    if (!inserted) {
+      // Another thread inserted the same key concurrently; prefer the canonical in-memory value.
+      if (auto existing = findMemoryOnly(key, FindStrategy::UpdateLRUList); existing.has_value()) {
+        return existing;
+      }
+    }
+
+    return diskHit->value;
+  }
+
+  /**
+   * Remove a value by key.
+   */
+  void remove(const TKey& key)
+  {
+    m_map.erase_if(key, [&](const auto& mapValue) {
+      auto& segment = *m_segments[getSegmentIndex(key)];
+      std::unique_lock lock(segment.mutex);
+      if (auto node = mapValue.second.listNode.get(); node->inList) {
+        delink(node);
+        segment.size.fetch_sub(node->size, std::memory_order_relaxed);
+        // Node will be deleted when unique_ptr goes out of scope
+      }
+      lock.unlock();
+      return true;
+    });
+
+    if (m_diskBackend) {
+      try {
+        m_diskBackend->erase(key);
+      } catch (...) {
+        // Disk cache is best-effort; failures degrade to no-op semantics.
+      }
+    }
+  }
+
+  /**
+   * Insert a value into the container. Both the key and value will be copied.
+   * The new element will be placed into the LRU list as the most-recently used.
+   *
+   * If there was already an element in the container with the same key, it
+   * will not be updated, and false will be returned. Otherwise, true will be
+   * returned.
+   */
+  bool insert(const TKey& key, const TValue& value, size_t objSize)
+  {
+    return insertInternal(key, value, objSize, /*writeDisk=*/true);
+  }
+
+  /**
+   * Clear the container. NOT THREAD SAFE -- do not use while other threads
+   * are accessing the container.
+   */
+  void clear()
+  {
+    // Clear the map first
+    m_map.clear();
+
+    // Then reset the segments
+    for (auto& segmentPtr : m_segments) {
+      auto& segment = *segmentPtr;
+      // No need to lock since clear() is not thread-safe
+      segment.head.next = &segment.tail;
+      segment.tail.prev = &segment.head;
+      segment.size.store(0, std::memory_order_relaxed);
+    }
+  }
+
+  /**
+   * Get a snapshot of the keys in the container by copying them into the
+   * supplied vector.
+   */
+  void snapshotKeys(std::vector<TKey>& keys)
+  {
+    for (const auto& segmentPtr : m_segments) {
+      auto& segment = *segmentPtr;
+      std::unique_lock lock(segment.mutex);
+      for (auto node = segment.head.next; node != &segment.tail; node = node->next) {
+        keys.push_back(node->key);
+      }
+    }
+  }
+
+  /**
+   * Get the approximate size of the container.
+   */
+  [[nodiscard]] size_t size() const
+  {
+    size_t totalSize = 0;
+    for (const auto& segmentPtr : m_segments) {
+      totalSize += segmentPtr->size.load(std::memory_order_relaxed);
+    }
+    return totalSize;
+  }
+
+private:
+  std::optional<TValue> findMemoryOnly(const TKey& key, FindStrategy findStrategy)
   {
     TValue value;
     if (m_map.cvisit(key, [&](const auto& mapValue) {
@@ -148,108 +298,43 @@ public:
     return {};
   }
 
-  /**
-   * Remove a value by key.
-   */
-  void remove(const TKey& key)
-  {
-    m_map.erase_if(key, [&](const auto& mapValue) {
-      auto& segment = *m_segments[getSegmentIndex(key)];
-      std::unique_lock lock(segment.mutex);
-      if (auto node = mapValue.second.listNode.get(); node->inList) {
-        delink(node);
-        segment.size -= node->size;
-        // Node will be deleted when unique_ptr goes out of scope
-      }
-      lock.unlock();
-      return true;
-    });
-  }
-
-  /**
-   * Insert a value into the container. Both the key and value will be copied.
-   * The new element will be placed into the LRU list as the most-recently used.
-   *
-   * If there was already an element in the container with the same key, it
-   * will not be updated, and false will be returned. Otherwise, true will be
-   * returned.
-   */
-  bool insert(const TKey& key, const TValue& value, size_t objSize)
+  bool insertInternal(const TKey& key, const TValue& value, size_t objSize, bool writeDisk)
   {
     auto& segment = *m_segments[getSegmentIndex(key)];
 
-    // Attempt to insert into the hash map
+    // Attempt to insert into the hash map.
     if (!m_map.try_emplace_and_cvisit(
           key,
           value,
           std::make_unique<ListNode>(key, objSize),
           [&](const auto& mapValue) {
-            // Add the new node to the LRU list
+            // Add the new node to the LRU list.
             std::unique_lock lock(segment.mutex);
             pushFront(segment, mapValue.second.listNode.get());
-            segment.size += objSize;
+            segment.size.fetch_add(objSize, std::memory_order_relaxed);
           },
           [&](const auto&) {})) {
-      // Key already exists, do not insert
-      // node will be deleted automatically when std::unique_ptr goes out of scope
+      // Key already exists, do not insert.
+      // node will be deleted automatically when std::unique_ptr goes out of scope.
       return false;
     }
 
-    // Check if eviction is necessary
-    if (segment.size > m_maxSizePerSegment) {
+    // Check if eviction is necessary.
+    if (segment.size.load(std::memory_order_relaxed) > m_maxSizePerSegment) {
       evict(segment);
+    }
+
+    if (writeDisk && m_diskBackend) {
+      try {
+        m_diskBackend->put(key, value, objSize);
+      } catch (...) {
+        // Disk cache is best-effort; failures degrade to no-op semantics.
+      }
     }
 
     return true;
   }
 
-  /**
-   * Clear the container. NOT THREAD SAFE -- do not use while other threads
-   * are accessing the container.
-   */
-  void clear()
-  {
-    // Clear the map first
-    m_map.clear();
-
-    // Then reset the segments
-    for (auto& segmentPtr : m_segments) {
-      auto& segment = *segmentPtr;
-      // No need to lock since clear() is not thread-safe
-      segment.head.next = &segment.tail;
-      segment.tail.prev = &segment.head;
-      segment.size = 0;
-    }
-  }
-
-  /**
-   * Get a snapshot of the keys in the container by copying them into the
-   * supplied vector.
-   */
-  void snapshotKeys(std::vector<TKey>& keys)
-  {
-    for (const auto& segmentPtr : m_segments) {
-      auto& segment = *segmentPtr;
-      std::unique_lock lock(segment.mutex);
-      for (auto node = segment.head.next; node != &segment.tail; node = node->next) {
-        keys.push_back(node->key);
-      }
-    }
-  }
-
-  /**
-   * Get the approximate size of the container.
-   */
-  [[nodiscard]] size_t size() const
-  {
-    size_t totalSize = 0;
-    for (const auto& segmentPtr : m_segments) {
-      totalSize += segmentPtr->size;
-    }
-    return totalSize;
-  }
-
-private:
   /**
    * Get the segment index for a given key.
    */
@@ -299,7 +384,7 @@ private:
    */
   void evict(Segment& segment)
   {
-    while (segment.size > m_maxSizePerSegment) {
+    while (segment.size.load(std::memory_order_relaxed) > m_maxSizePerSegment) {
       std::unique_lock lock(segment.mutex);
       auto moribund = segment.tail.prev;
       if (moribund == &segment.head) {
@@ -307,7 +392,7 @@ private:
         return;
       }
       delink(moribund);
-      segment.size -= moribund->size;
+      segment.size.fetch_sub(moribund->size, std::memory_order_relaxed);
       lock.unlock();
       // Remove from the hash map
       m_map.erase(moribund->key);
@@ -339,6 +424,8 @@ private:
    * The underlying concurrent hash map.
    */
   HashMap m_map;
+
+  std::unique_ptr<DiskBackend> m_diskBackend;
 
   bool m_canSkipDestructor;
 };

@@ -1,8 +1,8 @@
 #include "zproxygenhttpclient.h"
 
+#include "zdiskcacheutils.h"
 #include "zhttpdiskcache.h"
 #include "zcancellation.h"
-#include "zsysteminfo.h"
 
 #include <folly/String.h>
 #include <folly/compression/Compression.h>
@@ -38,7 +38,7 @@
 #include <wincrypt.h>
 #endif
 
-constexpr uint64_t kDefaultHttpDiskCacheMaxBytes = 10ULL * 1024ULL * 1024ULL * 1024ULL; // 10 GiB
+DECLARE_uint64(atlas_disk_cache_http_max_bytes);
 
 DEFINE_string(atlas_http_ca_bundle,
               "",
@@ -62,32 +62,8 @@ DEFINE_uint32(atlas_http_retry_backoff_max_ms,
               2000,
               "Maximum backoff delay in milliseconds for transient HTTP error retries (default 2000ms).");
 
-DEFINE_uint64(atlas_http_disk_cache_max_bytes,
-              kDefaultHttpDiskCacheMaxBytes,
-              "Maximum size in bytes for the persistent HTTP disk cache (0 disables; default 10 GiB).");
-
-DEFINE_string(atlas_http_disk_cache_dir,
-              "",
-              "Root directory for the persistent HTTP disk cache (default: auto-chosen Atlas cache directory).");
-
 namespace nim {
 namespace {
-
-QString httpDiskCacheRootDirFromFlags()
-{
-  if (!FLAGS_atlas_http_disk_cache_dir.empty()) {
-    return QString::fromStdString(FLAGS_atlas_http_disk_cache_dir).trimmed();
-  }
-
-  // Prefer the Atlas image cache root (may select a non-system volume with enough space).
-  QString root = ZSystemInfo::imgCachePath(/*requiredSpaceInBytes=*/0);
-  if (!root.isEmpty()) {
-    return root;
-  }
-
-  // Fall back to the app-local config/data directory.
-  return ZSystemInfo::configDir().absolutePath();
-}
 
 std::vector<uint8_t> iobufToBytes(/*nullable*/ const folly::IOBuf* buf)
 {
@@ -445,15 +421,14 @@ ZProxygenHttpClient::ZProxygenHttpClient()
   folly::EventBase* evb = m_eventBaseThread.getEventBase();
   CHECK(evb);
 
-  if (FLAGS_atlas_http_disk_cache_max_bytes > 0) {
-    const QString rootDir = httpDiskCacheRootDirFromFlags();
-    m_diskCache = std::make_unique<ZHttpDiskCache>(rootDir, FLAGS_atlas_http_disk_cache_max_bytes);
+  if (FLAGS_atlas_disk_cache_http_max_bytes > 0) {
+    const QString rootDir = atlasDiskCacheRootDirFromFlags();
+    m_diskCache = std::make_unique<ZHttpDiskCache>(rootDir, FLAGS_atlas_disk_cache_http_max_bytes);
     if (!m_diskCache->isEnabled()) {
       m_diskCache.reset();
     } else {
-      LOG(INFO) << fmt::format("HTTP disk cache enabled: root='{}' maxBytes={}",
-                               rootDir.toStdString(),
-                               FLAGS_atlas_http_disk_cache_max_bytes);
+      LOG(INFO) << "HTTP disk cache enabled: root='" << rootDir
+                << "' maxBytes=" << FLAGS_atlas_disk_cache_http_max_bytes;
     }
   }
 

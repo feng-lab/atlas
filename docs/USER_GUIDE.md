@@ -347,8 +347,13 @@ Steps to load and manage images via `ZImgDoc`:
 	        - Ellipsoid annotations preserve anisotropic radii and render as true ellipsoids in 3D (via `Z3DEllipsoidRenderer`).
 		  9. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
 		  10. Optional: enable the persistent HTTP disk cache to speed up repeated Neuroglancer sessions (and reduce duplicated downloads):
-		      - `--atlas_http_disk_cache_max_bytes=<N>` (default 10 GiB; set to 0 to disable; tune e.g. 10–50 GiB depending on disk space)
-		      - `--atlas_http_disk_cache_dir=<path>` (optional override; default is auto-chosen Atlas cache/config directory)
+		      - `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable; tune e.g. 10–50 GiB depending on disk space)
+		      - `--atlas_disk_cache_dir=<path>` (optional override; default is auto-chosen Atlas cache/config directory)
+		      - The cache is stored in a single SQLite DB file at `<dir>/atlas_disk_cache_v1/http.sqlite`.
+		  11. Optional: enable the persistent image-region disk cache to persist computed full-resolution blocks for file-backed datasets:
+		      - `--atlas_disk_cache_imgregion_max_bytes=<N>` (default 20 GiB; set to 0 to disable; tune depending on disk space)
+		      - `--atlas_disk_cache_dir=<path>` (shared root with the HTTP cache; defaults to an auto-chosen Atlas cache/config directory)
+		      - The cache is stored in a single SQLite DB file at `<dir>/atlas_disk_cache_v1/imgregion.sqlite`.
 3. **Load Neuroglancer (State JSON)**
    1. Choose **File → Load Neuroglancer (State JSON)...**.
    2. Paste one of:

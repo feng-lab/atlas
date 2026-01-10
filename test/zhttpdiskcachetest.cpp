@@ -1,21 +1,30 @@
 #include "zhttpdiskcache.h"
 #include "zproxygenhttpclient.h"
+#include "zdiskcacheutils.h"
 
 #include <gtest/gtest.h>
 
-#include <QCryptographicHash>
-#include <QDateTime>
 #include <QDir>
-#include <QDirIterator>
 #include <QFile>
-#include <QFileInfo>
 #include <QTemporaryDir>
+
+#include <boost/hash2/sha2.hpp>
+
+#include <limits>
+
+#include <vtksqlite/sqlite3.h>
 
 namespace nim {
 
 namespace {
 
-QString cacheEntryPathFor(const QString& rootDir, const std::string& url, const std::string& rangeHeaderValue)
+QString cacheDbPathForRoot(const QString& rootDir)
+{
+  const QString cacheDir = atlasDiskCacheDirFromRoot(rootDir);
+  return QDir(cacheDir).filePath(QStringLiteral("http.sqlite"));
+}
+
+QByteArray cacheKeyHashFor(const std::string& url, const std::string& rangeHeaderValue)
 {
   QByteArray keyBytes;
   keyBytes.append("GET\n", 4);
@@ -25,22 +34,139 @@ QString cacheEntryPathFor(const QString& rootDir, const std::string& url, const 
   keyBytes.append(QByteArray(rangeHeaderValue.data(), static_cast<int>(rangeHeaderValue.size())));
   keyBytes.append('\n');
 
-  const QByteArray hexHash = QCryptographicHash::hash(keyBytes, QCryptographicHash::Sha256).toHex();
-  const QString subdir = QString::fromLatin1(hexHash.left(2));
-  const QString filename = QString::fromLatin1(hexHash) + QStringLiteral(".bin");
-  return QDir(rootDir).filePath(QStringLiteral("atlas_http_disk_cache_v1/entries/%1/%2").arg(subdir, filename));
+  boost::hash2::sha2_256 hash;
+  if (!keyBytes.isEmpty()) {
+    hash.update(keyBytes.constData(), static_cast<size_t>(keyBytes.size()));
+  }
+  const boost::hash2::sha2_256::result_type digest = hash.result();
+  CHECK(digest.size() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+  return QByteArray(reinterpret_cast<const char*>(digest.data()), static_cast<int>(digest.size()));
+}
+
+[[nodiscard]] sqlite3* openDb(const QString& dbPath, int flags)
+{
+  sqlite3* db = nullptr;
+  const QByteArray pathBytes = QFile::encodeName(dbPath);
+  if (sqlite3_open_v2(pathBytes.constData(), &db, flags, /*zVfs=*/nullptr) != SQLITE_OK) {
+    if (db) {
+      sqlite3_close(db);
+    }
+    return nullptr;
+  }
+  return db;
 }
 
 size_t countCacheEntries(const QString& rootDir)
 {
-  const QString entriesDir = QDir(rootDir).filePath(QStringLiteral("atlas_http_disk_cache_v1/entries"));
-  size_t count = 0;
-  QDirIterator it(entriesDir, QStringList() << "*.bin", QDir::Files, QDirIterator::Subdirectories);
-  while (it.hasNext()) {
-    it.next();
-    ++count;
+  const QString dbPath = cacheDbPathForRoot(rootDir);
+  sqlite3* db = openDb(dbPath, SQLITE_OPEN_READONLY);
+  if (!db) {
+    return 0;
   }
+
+  sqlite3_stmt* stmt = nullptr;
+  if (sqlite3_prepare_v2(db, "SELECT count(*) FROM entries", -1, &stmt, nullptr) != SQLITE_OK || !stmt) {
+    if (stmt) {
+      sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return 0;
+  }
+
+  size_t count = 0;
+  if (sqlite3_step(stmt) == SQLITE_ROW) {
+    const sqlite3_int64 v = sqlite3_column_int64(stmt, 0);
+    if (v > 0) {
+      count = static_cast<size_t>(v);
+    }
+  }
+  sqlite3_finalize(stmt);
+  sqlite3_close(db);
   return count;
+}
+
+bool hasEntry(const QString& rootDir, const QByteArray& keyHash)
+{
+  const QString dbPath = cacheDbPathForRoot(rootDir);
+  sqlite3* db = openDb(dbPath, SQLITE_OPEN_READONLY);
+  if (!db) {
+    return false;
+  }
+
+  sqlite3_stmt* stmt = nullptr;
+  if (sqlite3_prepare_v2(db, "SELECT 1 FROM entries WHERE key_hash=?1", -1, &stmt, nullptr) != SQLITE_OK || !stmt) {
+    if (stmt) {
+      sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return false;
+  }
+
+  (void)sqlite3_bind_blob(stmt, 1, keyHash.constData(), keyHash.size(), SQLITE_TRANSIENT);
+  const bool ok = (sqlite3_step(stmt) == SQLITE_ROW);
+  sqlite3_finalize(stmt);
+  sqlite3_close(db);
+  return ok;
+}
+
+bool overwriteEntryPrefix(const QString& rootDir, const QByteArray& keyHash, const QByteArray& prefix)
+{
+  const QString dbPath = cacheDbPathForRoot(rootDir);
+  sqlite3* db = openDb(dbPath, SQLITE_OPEN_READWRITE);
+  if (!db) {
+    return false;
+  }
+
+  sqlite3_stmt* stmt = nullptr;
+  if (sqlite3_prepare_v2(db,
+                         "UPDATE entries SET value=?1 || substr(value, ?2) WHERE key_hash=?3",
+                         -1,
+                         &stmt,
+                         nullptr) != SQLITE_OK ||
+      !stmt) {
+    if (stmt) {
+      sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return false;
+  }
+
+  const int startIndex = prefix.size() + 1; // sqlite substr is 1-indexed
+  (void)sqlite3_bind_blob(stmt, 1, prefix.constData(), prefix.size(), SQLITE_TRANSIENT);
+  (void)sqlite3_bind_int(stmt, 2, startIndex);
+  (void)sqlite3_bind_blob(stmt, 3, keyHash.constData(), keyHash.size(), SQLITE_TRANSIENT);
+  const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+
+  sqlite3_finalize(stmt);
+  sqlite3_close(db);
+  return ok;
+}
+
+bool setLastAccessNs(const QString& rootDir, const QByteArray& keyHash, sqlite3_int64 lastAccessNs)
+{
+  const QString dbPath = cacheDbPathForRoot(rootDir);
+  sqlite3* db = openDb(dbPath, SQLITE_OPEN_READWRITE);
+  if (!db) {
+    return false;
+  }
+
+  sqlite3_stmt* stmt = nullptr;
+  if (sqlite3_prepare_v2(db, "UPDATE entries SET last_access_ns=?1 WHERE key_hash=?2", -1, &stmt, nullptr) != SQLITE_OK ||
+      !stmt) {
+    if (stmt) {
+      sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return false;
+  }
+
+  (void)sqlite3_bind_int64(stmt, 1, lastAccessNs);
+  (void)sqlite3_bind_blob(stmt, 2, keyHash.constData(), keyHash.size(), SQLITE_TRANSIENT);
+  const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+
+  sqlite3_finalize(stmt);
+  sqlite3_close(db);
+  return ok;
 }
 
 ZHttpGetBytesResult makeResult(std::vector<uint8_t> body)
@@ -106,19 +232,13 @@ TEST(ZHttpDiskCache, CorruptEntryIsMissAndRemoved)
   const std::string url = "https://example.invalid/data.bin";
   cache.put(url, /*requestHeaders=*/{{"range", "bytes=0-3"}}, makeResult({1, 2, 3, 4}));
 
-  const QString entryPath = cacheEntryPathFor(tmp.path(), url, "bytes=0-3");
-  ASSERT_TRUE(QFileInfo::exists(entryPath));
-
-  QFile f(entryPath);
-  ASSERT_TRUE(f.open(QIODevice::ReadWrite));
-  ASSERT_GE(f.size(), 8);
-  ASSERT_TRUE(f.seek(0));
-  ASSERT_EQ(f.write("BADCACHE", 8), 8);
-  f.close();
+  const QByteArray keyHash = cacheKeyHashFor(url, "bytes=0-3");
+  ASSERT_TRUE(hasEntry(tmp.path(), keyHash));
+  ASSERT_TRUE(overwriteEntryPrefix(tmp.path(), keyHash, QByteArray("BADCACHE")));
 
   auto miss = cache.tryGet(url, /*requestHeaders=*/{{"range", "bytes=0-3"}});
   EXPECT_FALSE(miss.has_value());
-  EXPECT_FALSE(QFileInfo::exists(entryPath));
+  EXPECT_FALSE(hasEntry(tmp.path(), keyHash));
 }
 
 TEST(ZHttpDiskCache, PrunesOldestEntries)
@@ -134,21 +254,17 @@ TEST(ZHttpDiskCache, PrunesOldestEntries)
   const std::string url2 = "https://example.invalid/second.bin";
 
   cache.put(url1, /*requestHeaders=*/{}, makeResult(std::vector<uint8_t>(600, 0x11)));
-  const QString path1 = cacheEntryPathFor(tmp.path(), url1, /*range=*/"");
-  ASSERT_TRUE(QFileInfo::exists(path1));
-  QFile f1(path1);
-  // On Windows, setting the modification time requires a handle with write-attributes access.
-  ASSERT_TRUE(f1.open(QIODevice::ReadWrite));
-  ASSERT_TRUE(f1.setFileTime(QDateTime::currentDateTimeUtc().addSecs(-3600), QFileDevice::FileModificationTime));
-  f1.close();
+  const QByteArray key1 = cacheKeyHashFor(url1, /*range=*/"");
+  ASSERT_TRUE(hasEntry(tmp.path(), key1));
+  ASSERT_TRUE(setLastAccessNs(tmp.path(), key1, /*lastAccessNs=*/1));
 
   cache.put(url2, /*requestHeaders=*/{}, makeResult(std::vector<uint8_t>(600, 0x22)));
-  const QString path2 = cacheEntryPathFor(tmp.path(), url2, /*range=*/"");
-  ASSERT_TRUE(QFileInfo::exists(path2));
+  const QByteArray key2 = cacheKeyHashFor(url2, /*range=*/"");
+  ASSERT_TRUE(hasEntry(tmp.path(), key2));
 
   // After pruning, only the newest entry should remain.
-  EXPECT_FALSE(QFileInfo::exists(path1));
-  EXPECT_TRUE(QFileInfo::exists(path2));
+  EXPECT_FALSE(hasEntry(tmp.path(), key1));
+  EXPECT_TRUE(hasEntry(tmp.path(), key2));
   EXPECT_EQ(countCacheEntries(tmp.path()), 1u);
 }
 

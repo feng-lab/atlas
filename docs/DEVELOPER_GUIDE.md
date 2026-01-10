@@ -24,12 +24,19 @@ Neuroglancer Precomputed (HTTP)
   - `encoding: "compresso"` — requires an unsigned `data_type` with 1/2/4/8 bytes/voxel and `num_channels = 1` (segmentation-style labels).
   - `encoding: "compressed_segmentation"` — requires `data_type` ∈ {`"uint32"`, `"uint64"`} and `compressed_segmentation_block_size`.
   - Sharded volumes require HTTP `Range` support; Atlas supports `minishard_index_encoding` and `data_encoding` of `raw` or `gzip` as specified in Neuroglancer’s sharded format. (Sharding `data_encoding` is applied first, then the per-scale chunk `encoding` is decoded.)
-- Networking is implemented with proxygen/folly: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
-  - Optional persistent HTTP disk cache (file-based, cross-OS) is implemented in `src/atlas/zhttpdiskcache.h` and `src/atlas/zhttpdiskcache.cpp` and is integrated into `ZProxygenHttpClient::getBytesOnEventBase()` (cache lookup before network; store after successful 200/206).
-    - Enable with `--atlas_http_disk_cache_max_bytes=<N>` (default 10 GiB; set to 0 to disable).
-    - Optional location override: `--atlas_http_disk_cache_dir=<path>` (otherwise uses the Atlas cache/config directories).
+  - Networking is implemented with proxygen/folly: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
+  - Optional persistent HTTP disk cache (SQLite-backed, cross-OS) is implemented in `src/atlas/zhttpdiskcache.h`, `src/atlas/zhttpdiskcache.cpp`, and `src/atlas/zsqlitelrucache.h` / `src/atlas/zsqlitelrucache.cpp` and is integrated into `ZProxygenHttpClient::getBytesOnEventBase()` (cache lookup before network; store after successful 200/206).
+    - Enable with `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable).
+    - Optional location override: `--atlas_disk_cache_dir=<path>` (otherwise uses the Atlas cache/config directories).
     - The cache is keyed by `(URL + Range)` and stores the already-decoded bytes returned to callers (after HTTP-level `Content-Encoding` handling).
     - Multi-process safety: guarded by a lock file; if the lock cannot be acquired, the cache is disabled for that process.
+    - On disk, the cache lives at `<root>/atlas_disk_cache_v1/http.sqlite` (WAL mode).
+  - Additional persistent cache buckets can live under the same `<root>/atlas_disk_cache_v1/` directory (each bucket is its own SQLite DB + lock file).
+  - Optional persistent image-region disk cache (SQLite-backed) can be enabled behind `ZImgRegionCache` to persist computed `ZImg` region blocks for file-backed datasets:
+    - Integrated behind the in-memory cache (call sites do not contain disk-cache logic): `src/img/zconcurrentlrucache.h` + `src/atlas/zimgregioncache.h` / `src/atlas/zimgregioncache.cpp`.
+    - Enable with `--atlas_disk_cache_imgregion_max_bytes=<N>` (default 20 GiB; set to 0 to disable).
+    - Stored at `<root>/atlas_disk_cache_v1/imgregion.sqlite` (single bucket DB + lock file).
+    - Current scope: file-backed sources (`ZImgRegionCacheSourceKind::File`); Neuroglancer region caching is still memory-only.
 - Dataset parsing + chunk addressing lives in `src/atlas/zneuroglancerprecomputed.h` and `src/atlas/zneuroglancerprecomputed.cpp` (reads `.../info`, then fetches chunks on demand).
   - Chunk decode helpers live in `src/atlas/zneuroglancerprecomputedchunkdecoder.h` and `src/atlas/zneuroglancerprecomputedchunkdecoder.cpp`.
   - Sharded-format helpers are in `src/atlas/zneuroglanceruint64sharding.h` and `src/atlas/zneuroglanceruint64sharding.cpp`.

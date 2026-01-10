@@ -5,9 +5,21 @@
 // #include "zhashutils.h"
 #include "zconcurrentlrucache.h"
 
+#include <array>
+#include <cstdint>
+
 namespace nim {
 
-using ImageRegionCacheHashKeyType = std::tuple<const void*,
+enum class ZImgRegionCacheSourceKind : uint8_t
+{
+  File = 0,
+  Neuroglancer = 1,
+};
+
+// NOTE: We use a stable dataset fingerprint (not a ZImgPack pointer) so that
+// in-memory and disk cache keys match across Atlas processes and sessions.
+using ImageRegionCacheHashKeyType = std::tuple<std::array<uint8_t, 32>,
+                                               ZImgRegionCacheSourceKind,
                                                index_t,
                                                index_t,
                                                index_t,
@@ -18,6 +30,11 @@ using ImageRegionCacheHashKeyType = std::tuple<const void*,
                                                size_t,
                                                size_t,
                                                size_t,
+                                               size_t,
+                                               size_t,
+                                               uint32_t,
+                                               uint32_t,
+                                               uint32_t,
                                                double,
                                                double>;
 

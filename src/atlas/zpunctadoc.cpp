@@ -21,12 +21,6 @@ namespace nim {
 
 namespace {
 
-[[nodiscard]] std::string toStdStringUtf8(const QString& s)
-{
-  const QByteArray u8 = s.toUtf8();
-  return std::string(u8.constData(), static_cast<size_t>(u8.size()));
-}
-
 [[nodiscard]] QString formatAnnotationPropertyValue(
   const ZNeuroglancerPrecomputedAnnotationsSource::Annotation::PropertyValue& v)
 {
@@ -97,10 +91,10 @@ void applyAnnotationPropertiesToPunctum(const ZNeuroglancerPrecomputedAnnotation
   }
 
   if (!props.isEmpty()) {
-    punctum.comment = toStdStringUtf8(props.join("; "));
-    punctum.property1 = toStdStringUtf8(props.value(0));
-    punctum.property2 = toStdStringUtf8(props.value(1));
-    punctum.property3 = toStdStringUtf8(props.value(2));
+    punctum.comment = props.join("; ").toStdString();
+    punctum.property1 = props.value(0).toStdString();
+    punctum.property2 = props.value(1).toStdString();
+    punctum.property3 = props.value(2).toStdString();
   }
 }
 

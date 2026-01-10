@@ -1,22 +1,25 @@
 #include "zhttpdiskcache.h"
 
+#include "zdiskcacheutils.h"
 #include "zproxygenhttpclient.h"
 #include "zlog.h"
+#include "zsqlitelrucache.h"
+#include "zstructutils.h"
 
-#include <QCryptographicHash>
-#include <QDataStream>
-#include <QDateTime>
 #include <QDir>
-#include <QDirIterator>
 #include <QFile>
-#include <QFileDevice>
-#include <QFileInfo>
 #include <QLockFile>
-#include <QSaveFile>
+
+#include <boost/hash2/sha2.hpp>
 
 #include <algorithm>
+#include <array>
+#include <bit>
+#include <chrono>
 #include <cstring>
 #include <limits>
+#include <string>
+#include <string_view>
 
 namespace nim {
 
@@ -26,18 +29,15 @@ constexpr uint32_t kCacheVersion = 1;
 
 constexpr char kMagic[8] = {'A', 'T', 'L', 'S', 'H', 'D', 'C', '1'};
 
-constexpr std::chrono::seconds kPruneMinInterval{30};
-
-[[nodiscard]] QByteArray toQByteArray(const std::string& s)
+struct HttpCacheEntryHeader
 {
-  return QByteArray(s.data(), static_cast<int>(s.size()));
-}
-
-[[nodiscard]] std::string toStdStringUtf8(const QString& s)
-{
-  const QByteArray u8 = s.toUtf8();
-  return std::string(u8.data(), static_cast<size_t>(u8.size()));
-}
+  std::array<char, 8> magic{};
+  uint32_t version = 0;
+  uint16_t status = 0;
+  uint32_t contentTypeLen = 0;
+  uint32_t contentEncLen = 0;
+  uint64_t bodyLen = 0;
+};
 
 [[nodiscard]] bool isSafeAsciiLower(std::string_view s)
 {
@@ -85,15 +85,15 @@ ZHttpDiskCache::ZHttpDiskCache(QString rootDir, uint64_t maxBytes)
     return;
   }
 
-  m_entriesDir = QDir(m_rootDir).filePath(QStringLiteral("atlas_http_disk_cache_v1/entries"));
-  m_lockPath = QDir(m_rootDir).filePath(QStringLiteral("atlas_http_disk_cache_v1/lock"));
+  m_cacheDir = atlasDiskCacheDirFromRoot(m_rootDir);
+  m_dbPath = QDir(m_cacheDir).filePath(QStringLiteral("http.sqlite"));
+  m_lockPath = QDir(m_cacheDir).filePath(QStringLiteral("http.lock"));
 
   // Ensure base directories exist.
   {
     QDir dir;
-    if (!dir.mkpath(m_entriesDir)) {
-      LOG(WARNING) << "HTTP disk cache disabled: failed to create directory "
-                   << toStdStringUtf8(m_entriesDir);
+    if (!dir.mkpath(m_cacheDir)) {
+      LOG(WARNING) << "HTTP disk cache disabled: failed to create directory " << m_cacheDir;
       return;
     }
   }
@@ -102,13 +102,23 @@ ZHttpDiskCache::ZHttpDiskCache(QString rootDir, uint64_t maxBytes)
   m_lock = std::make_unique<QLockFile>(m_lockPath);
   m_lock->setStaleLockTime(static_cast<int>(std::chrono::milliseconds(std::chrono::seconds(10)).count()));
   if (!m_lock->tryLock(/*timeout=*/0)) {
-    LOG(INFO) << "HTTP disk cache disabled: could not acquire lock at " << toStdStringUtf8(m_lockPath);
+    LOG(INFO) << "HTTP disk cache disabled: could not acquire lock at " << m_lockPath;
+    m_lock.reset();
+    return;
+  }
+
+  m_cache = std::make_unique<ZSqliteLRUCache>(m_dbPath, m_maxBytes);
+  if (!m_cache->isOpen()) {
+    LOG(WARNING) << "HTTP disk cache disabled: failed to open SQLite DB at " << m_dbPath;
+    m_cache.reset();
     m_lock.reset();
     return;
   }
 
   m_enabled = true;
 }
+
+ZHttpDiskCache::~ZHttpDiskCache() = default;
 
 ZHttpDiskCache::KeyParts ZHttpDiskCache::keyPartsFrom(
   const std::string& url,
@@ -122,17 +132,87 @@ ZHttpDiskCache::KeyParts ZHttpDiskCache::keyPartsFrom(
   return out;
 }
 
-QByteArray ZHttpDiskCache::sha256Hex(const QByteArray& bytes)
+ZHttpDiskCache::Blob ZHttpDiskCache::sha256(const void* data, size_t bytes)
 {
-  return QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex();
+  boost::hash2::sha2_256 hash;
+  if (bytes > 0) {
+    CHECK(data != nullptr);
+    hash.update(data, bytes);
+  }
+  const boost::hash2::sha2_256::result_type digest = hash.result();
+  Blob out;
+  out.resize(digest.size());
+  CHECK(out.size() == digest.size());
+  std::memcpy(out.data(), digest.data(), digest.size());
+  return out;
 }
 
-QString ZHttpDiskCache::entryPathForKeyHash(const QByteArray& hexHash) const
+ZHttpDiskCache::Blob ZHttpDiskCache::serializeEntry(const ZHttpGetBytesResult& result)
 {
-  CHECK(hexHash.size() >= 2);
-  const QString subdir = QString::fromLatin1(hexHash.left(2));
-  const QString filename = QString::fromLatin1(hexHash) + QStringLiteral(".bin");
-  return QDir(m_entriesDir).filePath(QDir(subdir).filePath(filename));
+  CHECK(std::endian::native == std::endian::little);
+
+  if (result.status < 0 || result.status > std::numeric_limits<uint16_t>::max()) {
+    return {};
+  }
+  if (result.contentType.size() > std::numeric_limits<uint32_t>::max()) {
+    return {};
+  }
+  if (result.contentEncoding.size() > std::numeric_limits<uint32_t>::max()) {
+    return {};
+  }
+  if (result.body.size() > std::numeric_limits<uint64_t>::max()) {
+    return {};
+  }
+
+  HttpCacheEntryHeader hdr{};
+  std::memcpy(hdr.magic.data(), kMagic, sizeof(kMagic));
+  hdr.version = kCacheVersion;
+  hdr.status = static_cast<uint16_t>(result.status);
+  hdr.contentTypeLen = static_cast<uint32_t>(result.contentType.size());
+  hdr.contentEncLen = static_cast<uint32_t>(result.contentEncoding.size());
+  hdr.bodyLen = static_cast<uint64_t>(result.body.size());
+
+  const size_t headerBytes = compactSize(hdr);
+  if (hdr.bodyLen > std::numeric_limits<size_t>::max()) {
+    return {};
+  }
+  const size_t bodyBytes = static_cast<size_t>(hdr.bodyLen);
+  size_t totalBytes = headerBytes;
+  if (hdr.contentTypeLen > std::numeric_limits<size_t>::max() - totalBytes) {
+    return {};
+  }
+  totalBytes += static_cast<size_t>(hdr.contentTypeLen);
+  if (hdr.contentEncLen > std::numeric_limits<size_t>::max() - totalBytes) {
+    return {};
+  }
+  totalBytes += static_cast<size_t>(hdr.contentEncLen);
+  if (bodyBytes > std::numeric_limits<size_t>::max() - totalBytes) {
+    return {};
+  }
+  totalBytes += bodyBytes;
+
+  Blob out;
+  out.resize(totalBytes);
+  CHECK(compactStructToMemory(out.data(), headerBytes, hdr) == headerBytes);
+
+  size_t offset = headerBytes;
+  if (hdr.contentTypeLen > 0) {
+    const char* p = result.contentType.data();
+    std::memcpy(out.data() + offset, p, hdr.contentTypeLen);
+    offset += hdr.contentTypeLen;
+  }
+  if (hdr.contentEncLen > 0) {
+    const char* p = result.contentEncoding.data();
+    std::memcpy(out.data() + offset, p, hdr.contentEncLen);
+    offset += hdr.contentEncLen;
+  }
+  if (hdr.bodyLen > 0) {
+    std::memcpy(out.data() + offset, result.body.data(), static_cast<size_t>(hdr.bodyLen));
+    offset += static_cast<size_t>(hdr.bodyLen);
+  }
+  CHECK(offset == totalBytes);
+
+  return out;
 }
 
 std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(
@@ -140,42 +220,39 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(
   const std::vector<std::pair<std::string, std::string>>& requestHeaders)
 {
   std::lock_guard<std::mutex> g(m_mu);
-  if (!m_enabled) {
+  if (!m_enabled || !m_cache) {
+    return std::nullopt;
+  }
+  if (!m_cache->isOpen()) {
+    // Best-effort: persistent DB failures should not impact callers.
+    m_cache.reset();
+    m_lock.reset();
+    m_enabled = false;
     return std::nullopt;
   }
 
   const KeyParts parts = keyPartsFrom(url, requestHeaders);
 
-  QByteArray keyBytes;
-  keyBytes.append("GET\n", 4);
-  keyBytes.append(toQByteArray(parts.url));
-  keyBytes.append('\n');
-  keyBytes.append("range=", 6);
-  keyBytes.append(toQByteArray(parts.range));
-  keyBytes.append('\n');
+  std::string keyBytes;
+  keyBytes.reserve(16 + parts.url.size() + parts.range.size());
+  keyBytes.append("GET\n");
+  keyBytes.append(parts.url);
+  keyBytes.push_back('\n');
+  keyBytes.append("range=");
+  keyBytes.append(parts.range);
+  keyBytes.push_back('\n');
 
-  const QByteArray keyHash = sha256Hex(keyBytes);
-  const QString path = entryPathForKeyHash(keyHash);
-
-  QFileInfo fi(path);
-  if (!fi.exists() || !fi.isFile()) {
+  const Blob keyHash = sha256(keyBytes.data(), keyBytes.size());
+  auto valueOpt = m_cache->tryGet(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
+  if (!valueOpt.has_value()) {
     return std::nullopt;
   }
 
-  auto resOpt = readEntryFile(path);
-  if (!resOpt) {
+  auto resOpt = parseEntry(std::span<const std::uint8_t>(valueOpt->data(), valueOpt->size()));
+  if (!resOpt.has_value()) {
     // Corrupt entry; best-effort cleanup.
-    QFile::remove(path);
+    m_cache->erase(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
     return std::nullopt;
-  }
-
-  // Best-effort LRU: touch mtime so prune keeps recently used entries.
-  {
-    QFile f(path);
-    // On Windows, changing timestamps requires FILE_WRITE_ATTRIBUTES. A ReadOnly handle can fail.
-    if (f.open(QIODevice::ReadWrite)) {
-      (void)f.setFileTime(QDateTime::currentDateTimeUtc(), QFileDevice::FileModificationTime);
-    }
   }
 
   return resOpt;
@@ -186,259 +263,98 @@ void ZHttpDiskCache::put(const std::string& url,
                          const ZHttpGetBytesResult& result)
 {
   std::lock_guard<std::mutex> g(m_mu);
-  if (!m_enabled) {
+  if (!m_enabled || !m_cache) {
+    return;
+  }
+  if (!m_cache->isOpen()) {
+    m_cache.reset();
+    m_lock.reset();
+    m_enabled = false;
     return;
   }
   if (result.status != 200 && result.status != 206) {
     return;
   }
-
-  if (!m_sizeKnown) {
-    updateTotalBytesFromDisk();
+  if (static_cast<uint64_t>(result.body.size()) > m_maxBytes) {
+    // An entry larger than the entire budget would cause immediate thrash; skip caching.
+    return;
   }
 
   const KeyParts parts = keyPartsFrom(url, requestHeaders);
-  QByteArray keyBytes;
-  keyBytes.append("GET\n", 4);
-  keyBytes.append(toQByteArray(parts.url));
-  keyBytes.append('\n');
-  keyBytes.append("range=", 6);
-  keyBytes.append(toQByteArray(parts.range));
-  keyBytes.append('\n');
-  const QByteArray keyHash = sha256Hex(keyBytes);
-  const QString path = entryPathForKeyHash(keyHash);
+  std::string keyBytes;
+  keyBytes.reserve(16 + parts.url.size() + parts.range.size());
+  keyBytes.append("GET\n");
+  keyBytes.append(parts.url);
+  keyBytes.push_back('\n');
+  keyBytes.append("range=");
+  keyBytes.append(parts.range);
+  keyBytes.push_back('\n');
 
-  const QFileInfo before(path);
-  const uint64_t beforeSize = (before.exists() && before.isFile()) ? static_cast<uint64_t>(before.size()) : 0;
+  const Blob keyHash = sha256(keyBytes.data(), keyBytes.size());
 
-  // Ensure subdir exists.
-  {
-    const QDir dir = QFileInfo(path).dir();
-    if (!dir.exists()) {
-      QDir mk;
-      if (!mk.mkpath(dir.absolutePath())) {
-        return;
-      }
-    }
-  }
-
-  try {
-    writeEntryFile(path, result);
-  }
-  catch (const std::exception& e) {
-    LOG(WARNING) << "HTTP disk cache write failed: " << e.what();
+  const Blob value = serializeEntry(result);
+  if (value.empty()) {
     return;
   }
-
-  const QFileInfo after(path);
-  if (after.exists() && after.isFile()) {
-    const uint64_t afterSize = static_cast<uint64_t>(after.size());
-    if (afterSize >= beforeSize) {
-      m_totalBytes += (afterSize - beforeSize);
-    } else {
-      m_totalBytes -= (beforeSize - afterSize);
-    }
+  if (static_cast<uint64_t>(value.size()) > m_maxBytes) {
+    // Guard against extreme header sizes; treat as uncacheable.
+    return;
   }
-
-  maybePrune();
+  m_cache->put(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
+               std::span<const std::uint8_t>(value.data(), value.size()));
 }
 
-std::optional<ZHttpGetBytesResult> ZHttpDiskCache::readEntryFile(const QString& path)
+std::optional<ZHttpGetBytesResult> ZHttpDiskCache::parseEntry(std::span<const std::uint8_t> value)
 {
-  QFile f(path);
-  if (!f.open(QIODevice::ReadOnly)) {
-    return std::nullopt;
-  }
-  QDataStream ds(&f);
-  ds.setByteOrder(QDataStream::LittleEndian);
+  CHECK(std::endian::native == std::endian::little);
 
-  char magic[sizeof(kMagic)]{};
-  if (ds.readRawData(magic, static_cast<int>(sizeof(magic))) != static_cast<int>(sizeof(magic))) {
-    return std::nullopt;
-  }
-  if (std::memcmp(magic, kMagic, sizeof(kMagic)) != 0) {
+  static const size_t headerBytes = compactSize(HttpCacheEntryHeader{});
+  if (value.size() < headerBytes) {
     return std::nullopt;
   }
 
-  uint32_t version = 0;
-  ds >> version;
-  if (version != kCacheVersion) {
+  HttpCacheEntryHeader hdr{};
+  readStructFromCompactMemory(hdr, value.data(), headerBytes);
+
+  if (std::memcmp(hdr.magic.data(), kMagic, sizeof(kMagic)) != 0) {
+    return std::nullopt;
+  }
+  if (hdr.version != kCacheVersion) {
     return std::nullopt;
   }
 
-  uint16_t status = 0;
-  ds >> status;
-
-  uint32_t contentTypeLen = 0;
-  uint32_t contentEncLen = 0;
-  quint64 bodyLenQ = 0;
-  ds >> contentTypeLen;
-  ds >> contentEncLen;
-  ds >> bodyLenQ;
-
-  if (contentTypeLen > (1u << 20) || contentEncLen > (1u << 20)) {
+  size_t offset = headerBytes;
+  if (hdr.contentTypeLen > value.size() - offset) {
     return std::nullopt;
   }
-  if (bodyLenQ > static_cast<quint64>(std::numeric_limits<size_t>::max())) {
+  const std::string_view contentTypeView(reinterpret_cast<const char*>(value.data() + offset), hdr.contentTypeLen);
+  offset += hdr.contentTypeLen;
+  if (hdr.contentEncLen > value.size() - offset) {
     return std::nullopt;
   }
-  if (bodyLenQ > static_cast<quint64>(std::numeric_limits<qint64>::max())) {
+  const std::string_view contentEncView(reinterpret_cast<const char*>(value.data() + offset), hdr.contentEncLen);
+  offset += hdr.contentEncLen;
+
+  if (hdr.bodyLen > std::numeric_limits<size_t>::max()) {
     return std::nullopt;
   }
-
-  const qint64 remaining = f.size() - f.pos();
-  const qint64 need = static_cast<qint64>(contentTypeLen) + static_cast<qint64>(contentEncLen) +
-                      static_cast<qint64>(bodyLenQ);
-  if (need < 0 || remaining < need) {
+  const size_t bodyLen = static_cast<size_t>(hdr.bodyLen);
+  if (bodyLen > value.size() - offset) {
     return std::nullopt;
-  }
-
-  QByteArray contentTypeBytes;
-  contentTypeBytes.resize(static_cast<int>(contentTypeLen));
-  if (contentTypeLen > 0) {
-    if (ds.readRawData(contentTypeBytes.data(), static_cast<int>(contentTypeLen)) != static_cast<int>(contentTypeLen)) {
-      return std::nullopt;
-    }
-  }
-
-  QByteArray contentEncBytes;
-  contentEncBytes.resize(static_cast<int>(contentEncLen));
-  if (contentEncLen > 0) {
-    if (ds.readRawData(contentEncBytes.data(), static_cast<int>(contentEncLen)) != static_cast<int>(contentEncLen)) {
-      return std::nullopt;
-    }
   }
 
   std::vector<uint8_t> body;
-  const size_t bodyLen = static_cast<size_t>(bodyLenQ);
   body.resize(bodyLen);
-  size_t bodyRead = 0;
-  while (bodyRead < bodyLen) {
-    const size_t chunkSize = std::min(bodyLen - bodyRead, static_cast<size_t>(std::numeric_limits<int>::max()));
-    const int n = ds.readRawData(reinterpret_cast<char*>(body.data() + bodyRead), static_cast<int>(chunkSize));
-    if (n != static_cast<int>(chunkSize)) {
-      return std::nullopt;
-    }
-    bodyRead += chunkSize;
+  if (!body.empty()) {
+    std::memcpy(body.data(), value.data() + offset, body.size());
   }
 
   ZHttpGetBytesResult out{};
-  out.status = status;
-  out.contentType.assign(contentTypeBytes.data(), static_cast<size_t>(contentTypeBytes.size()));
-  out.contentEncoding.assign(contentEncBytes.data(), static_cast<size_t>(contentEncBytes.size()));
+  out.status = hdr.status;
+  out.contentType.assign(contentTypeView.data(), contentTypeView.size());
+  out.contentEncoding.assign(contentEncView.data(), contentEncView.size());
   out.body = std::move(body);
   return out;
-}
-
-void ZHttpDiskCache::writeEntryFile(const QString& path, const ZHttpGetBytesResult& result)
-{
-  QSaveFile f(path);
-  if (!f.open(QIODevice::WriteOnly)) {
-    throw ZException("Failed to open cache entry for write");
-  }
-  QDataStream ds(&f);
-  ds.setByteOrder(QDataStream::LittleEndian);
-
-  ds.writeRawData(kMagic, static_cast<int>(sizeof(kMagic)));
-  ds << kCacheVersion;
-  ds << static_cast<uint16_t>(result.status);
-
-  const QByteArray contentType = QByteArray(result.contentType.data(), static_cast<int>(result.contentType.size()));
-  const QByteArray contentEnc = QByteArray(result.contentEncoding.data(), static_cast<int>(result.contentEncoding.size()));
-
-  ds << static_cast<uint32_t>(contentType.size());
-  ds << static_cast<uint32_t>(contentEnc.size());
-  ds << static_cast<quint64>(result.body.size());
-
-  if (!contentType.isEmpty()) {
-    ds.writeRawData(contentType.data(), contentType.size());
-  }
-  if (!contentEnc.isEmpty()) {
-    ds.writeRawData(contentEnc.data(), contentEnc.size());
-  }
-  if (!result.body.empty()) {
-    size_t bodyWritten = 0;
-    while (bodyWritten < result.body.size()) {
-      const size_t chunkSize =
-        std::min(result.body.size() - bodyWritten, static_cast<size_t>(std::numeric_limits<int>::max()));
-      const int n = ds.writeRawData(reinterpret_cast<const char*>(result.body.data() + bodyWritten),
-                                    static_cast<int>(chunkSize));
-      if (n != static_cast<int>(chunkSize)) {
-        throw ZException("Failed to write cache entry body");
-      }
-      bodyWritten += chunkSize;
-    }
-  }
-
-  if (!f.commit()) {
-    throw ZException("Failed to commit cache entry");
-  }
-}
-
-void ZHttpDiskCache::updateTotalBytesFromDisk()
-{
-  uint64_t total = 0;
-  QDirIterator it(m_entriesDir, QStringList() << "*.bin", QDir::Files, QDirIterator::Subdirectories);
-  while (it.hasNext()) {
-    it.next();
-    total += static_cast<uint64_t>(it.fileInfo().size());
-  }
-  m_totalBytes = total;
-  m_sizeKnown = true;
-}
-
-void ZHttpDiskCache::maybePrune()
-{
-  if (m_maxBytes == 0 || m_totalBytes <= m_maxBytes) {
-    return;
-  }
-  const auto now = std::chrono::steady_clock::now();
-  if (m_lastPrune.time_since_epoch() != std::chrono::steady_clock::duration::zero() &&
-      (now - m_lastPrune) < kPruneMinInterval) {
-    return;
-  }
-  m_lastPrune = now;
-
-  struct Entry
-  {
-    QString path;
-    uint64_t size = 0;
-    QDateTime mtime;
-  };
-
-  std::vector<Entry> entries;
-  entries.reserve(1024);
-  QDirIterator it(m_entriesDir, QStringList() << "*.bin", QDir::Files, QDirIterator::Subdirectories);
-  while (it.hasNext()) {
-    it.next();
-    const QFileInfo fi = it.fileInfo();
-    Entry e;
-    e.path = fi.absoluteFilePath();
-    e.size = static_cast<uint64_t>(fi.size());
-    e.mtime = fi.lastModified();
-    entries.push_back(std::move(e));
-  }
-
-  std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) {
-    return a.mtime < b.mtime;
-  });
-
-  const uint64_t target = static_cast<uint64_t>(static_cast<double>(m_maxBytes) * 0.9);
-  uint64_t bytes = m_totalBytes;
-  size_t removed = 0;
-  for (const auto& e : entries) {
-    if (bytes <= target) {
-      break;
-    }
-    if (QFile::remove(e.path)) {
-      bytes -= std::min<uint64_t>(bytes, e.size);
-      ++removed;
-    }
-  }
-  m_totalBytes = bytes;
-  if (removed > 0) {
-    VLOG(1) << "HTTP disk cache pruned " << removed << " entries; totalBytes=" << m_totalBytes << " maxBytes=" << m_maxBytes;
-  }
 }
 
 } // namespace nim

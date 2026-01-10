@@ -530,6 +530,8 @@ set(SOURCES
     zneuroglancerprecomputedchunkdecoder.h zneuroglancerprecomputedchunkdecoder.cpp
     zneuroglanceruint64sharding.h zneuroglanceruint64sharding.cpp
     zhttpdiskcache.h zhttpdiskcache.cpp
+    zsqlitelrucache.h zsqlitelrucache.cpp
+    zdiskcacheutils.h zdiskcacheutils.cpp
     zproxygenhttpclient.h zproxygenhttpclient.cpp
     zimgcache.h zimgcache.cpp
     zsysteminfo.h zsysteminfo.cpp
@@ -737,6 +739,7 @@ target_link_libraries(atlas_core PUBLIC
   Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
   Qt6::CorePrivate Qt6::Test
   proxygen::proxygen
+  VTK::sqlite
   assimp::draco
   gRPC::grpc++ protobuf::libprotobuf)
 if (WIN32)

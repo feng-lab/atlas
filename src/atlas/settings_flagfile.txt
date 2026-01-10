@@ -37,10 +37,14 @@
 
 # Persistent on-disk cache for HTTP GET results (helps avoid re-downloading across sessions).
 # Max size in bytes (default 10 GiB). Set to 0 to disable.
---atlas_http_disk_cache_max_bytes=10737418240
+--atlas_disk_cache_http_max_bytes=10737418240
 
-# Root directory for the HTTP disk cache (empty = auto-chosen Atlas cache/config directory).
---atlas_http_disk_cache_dir=
+# Persistent on-disk cache for 3D image-region blocks read via ZImgPack/ZImgRegionCache.
+# Max size in bytes (default 20 GiB). Set to 0 to disable.
+--atlas_disk_cache_imgregion_max_bytes=21474836480
+
+# Root directory for the Atlas persistent disk cache (empty = auto-chosen Atlas cache/config directory).
+--atlas_disk_cache_dir=
 
 # Interval in seconds for logging folly global executor status during waiting, default is 5
 --atlas_log_folly_global_executor_status_interval_in_seconds=5

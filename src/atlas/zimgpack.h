@@ -15,6 +15,7 @@
 #include <tuple>
 #include <array>
 #include <memory>
+#include <atomic>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -117,6 +118,13 @@ public:
   {
     return m_tooltip;
   }
+
+  // Returns a stable fingerprint suitable for persistent cache keys.
+  //
+  // For file-based sources, this includes the ordered file list plus each file's
+  // canonical path, size, and modification time. The result is memoized for the
+  // lifetime of this ZImgPack instance.
+  [[nodiscard]] std::array<uint8_t, 32> datasetFingerprintForCache() const;
 
   [[nodiscard]] bool isNeuroglancerPrecomputed() const
   {
@@ -440,6 +448,10 @@ private:
   using BlockInfoKeyType =
     std::tuple<index_t, index_t, index_t, index_t, index_t, size_t, size_t, size_t, size_t, size_t>;
   mutable boost::concurrent_flat_map<BlockInfoKeyType, std::pair<double, double>> m_blockInfo;
+
+  mutable std::mutex m_datasetFingerprintMutex;
+  mutable std::atomic<bool> m_datasetFingerprintValid{false};
+  mutable std::array<uint8_t, 32> m_datasetFingerprint{};
 };
 
 } // namespace nim

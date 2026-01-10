@@ -74,12 +74,12 @@ add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_gtest_executable(zneuroglanceruint64shardingtest)
 add_atlas_gtest_executable(zneuroglancerprecomputedchunkdecodertest)
 add_atlas_gtest_executable(zneuroglancerstatetest)
-add_atlas_gtest_executable(zhttpdiskcachetest)
 
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
 # the large atlas_lib link cost multiple times. This currently includes:
 # - Neuroglancer precomputed integration tests
 # - ROI mask rasterization integration tests (historically `zroimaskrastertest`)
+# - SQLite-backed HTTP disk cache tests (historically `zhttpdiskcachetest`)
 # `zatlasheavytest` is a large executable that links against atlas_lib
 # and is frequently too slow/heavy to build+link on Windows CI runners. Skip it in
 # CI to keep the default test build lightweight.
@@ -92,7 +92,8 @@ else ()
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedannotationstest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedsegmentpropertiestest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedskeletontest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputede2etest.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputede2etest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
   target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_lib)
   target_compile_definitions(zatlasheavytest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
   if (UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

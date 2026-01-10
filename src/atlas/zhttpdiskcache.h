@@ -1,14 +1,13 @@
 #pragma once
 
-#include <QByteArray>
 #include <QLockFile>
 #include <QString>
 
 #include <cstdint>
-#include <chrono>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -16,18 +15,21 @@
 namespace nim {
 
 struct ZHttpGetBytesResult;
+class ZSqliteLRUCache;
 
-// Simple persistent on-disk cache for HTTP GET results.
+// Simple persistent on-disk cache for HTTP GET results (SQLite-backed).
 //
 // Notes:
 // - This is intentionally a *byte cache* keyed by (URL + Range) and stores the already-decoded
 //   result bytes returned to callers (i.e. after any HTTP-level Content-Encoding has been handled).
-// - Eviction is best-effort LRU-ish based on file timestamps (mtime touched on read).
+// - Eviction is best-effort LRU-ish based on access timestamps (touched on read).
 // - Multi-process safety: the cache directory is guarded by a lock file; if it cannot be acquired,
-//   the cache is disabled for that process.
+//   the cache is disabled for that process. (We keep a single-writer policy so size tracking is consistent.)
 class ZHttpDiskCache
 {
 public:
+  using Blob = std::vector<std::uint8_t>;
+
   struct KeyParts
   {
     std::string url;
@@ -35,6 +37,7 @@ public:
   };
 
   ZHttpDiskCache(QString rootDir, uint64_t maxBytes);
+  ~ZHttpDiskCache();
 
   [[nodiscard]] bool isEnabled() const
   {
@@ -59,32 +62,25 @@ private:
   [[nodiscard]] static KeyParts keyPartsFrom(const std::string& url,
                                             const std::vector<std::pair<std::string, std::string>>& requestHeaders);
 
-  [[nodiscard]] static QByteArray sha256Hex(const QByteArray& bytes);
+  [[nodiscard]] static Blob sha256(const void* data, size_t bytes);
 
-  [[nodiscard]] QString entryPathForKeyHash(const QByteArray& hexHash) const;
+  [[nodiscard]] static Blob serializeEntry(const ZHttpGetBytesResult& result);
 
-  [[nodiscard]] std::optional<ZHttpGetBytesResult> readEntryFile(const QString& path);
-
-  void writeEntryFile(const QString& path, const ZHttpGetBytesResult& result);
-
-  void updateTotalBytesFromDisk();
-
-  void maybePrune();
+  [[nodiscard]] static std::optional<ZHttpGetBytesResult> parseEntry(std::span<const std::uint8_t> value);
 
 private:
   QString m_rootDir;
-  QString m_entriesDir;
+  QString m_cacheDir;
+  QString m_dbPath;
   QString m_lockPath;
 
   uint64_t m_maxBytes = 0;
-  uint64_t m_totalBytes = 0;
 
   bool m_enabled = false;
-  bool m_sizeKnown = false;
 
   std::unique_ptr<QLockFile> m_lock;
+  std::unique_ptr<ZSqliteLRUCache> m_cache;
   std::mutex m_mu;
-  std::chrono::steady_clock::time_point m_lastPrune{};
 };
 
 } // namespace nim
