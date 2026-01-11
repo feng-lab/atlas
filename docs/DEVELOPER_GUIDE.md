@@ -39,6 +39,7 @@ Neuroglancer Precomputed (HTTP)
     - Enable with `--atlas_disk_cache_imgregion_max_bytes=<N>` (default 20 GiB; set to 0 to disable).
     - Async write queue: `--atlas_disk_cache_imgregion_async_max_pending_bytes=<N>` bounds queued SQLite writes (touch/put/erase). Values smaller than 256 MiB are clamped to 256 MiB. When the queue is full, disk writes are dropped (best-effort cache semantics).
     - Read path: synchronous point lookups using per-thread read-only SQLite connections (so concurrent readers do not block each other); LRU touches happen asynchronously.
+    - Payloads are stored compressed (zstd via Folly) to reduce disk usage. Compression runs on the async writer thread; reads transparently decompress on cache hit.
     - Stored at `<root>/atlas_disk_cache_v1/imgregion.sqlite` (single bucket DB).
     - Current scope: file-backed sources (`ZImgRegionCacheSourceKind::File`); Neuroglancer region caching is still memory-only.
 - Dataset parsing + chunk addressing lives in `src/atlas/zneuroglancerprecomputed.h` and `src/atlas/zneuroglancerprecomputed.cpp` (reads `.../info`, then fetches chunks on demand).

@@ -19,6 +19,8 @@
 #include <span>
 #include <vector>
 
+#include <folly/compression/Compression.h>
+
 DEFINE_double(atlas_image_region_cache_memory_proportion,
               0.3,
               "Proportion of RAM that will be used for image region cache, default is 0.3");
@@ -34,6 +36,19 @@ constexpr char kImgRegionDiskCacheDbName[] = "imgregion.sqlite";
 
 constexpr uint32_t kImgRegionDiskCacheEntryVersion = 1;
 constexpr char kImgRegionDiskCacheMagic[8] = {'A', 'T', 'L', 'S', 'I', 'R', 'C', '1'};
+
+struct ImgRegionCompressionConfig
+{
+  folly::compression::CodecType codecType = folly::compression::CodecType::NO_COMPRESSION;
+  int codecLevel = folly::compression::COMPRESSION_LEVEL_DEFAULT;
+};
+
+// Disk-cache entry compression policy for image-region payloads.
+// Change this single constant to experiment with different codecs/levels.
+constexpr ImgRegionCompressionConfig kImgRegionCompression{
+  .codecType = folly::compression::CodecType::ZSTD,
+  .codecLevel = folly::compression::COMPRESSION_LEVEL_DEFAULT,
+};
 
 using Blob = ZSqliteLRUCache::Blob;
 
@@ -67,6 +82,9 @@ struct ImgRegionEntryHeader
 {
   std::array<char, 8> magic{};
   uint32_t version = 0;
+  uint32_t codecType = 0;   // folly::compression::CodecType (0 = none / raw)
+  int32_t codecLevel = 0;   // informational (ignored on decompress)
+  uint32_t reserved0 = 0;
   uint64_t w = 0;
   uint64_t h = 0;
   uint64_t d = 0;
@@ -75,7 +93,8 @@ struct ImgRegionEntryHeader
   uint32_t bytesPerVoxel = 0;
   uint32_t voxelFormat = 0;
   uint32_t validBitCount = 0;
-  uint64_t totalBytes = 0;
+  uint64_t rawBytes = 0;      // uncompressed bytes
+  uint64_t payloadBytes = 0;  // bytes stored after the header (compressed or raw)
 };
 
 [[nodiscard]] Blob sha256(const void* data, size_t bytes)
@@ -186,20 +205,154 @@ struct ImgRegionEntryHeader
   hdr.bytesPerVoxel = static_cast<uint32_t>(info.bytesPerVoxel);
   hdr.voxelFormat = static_cast<uint32_t>(std::to_underlying(info.voxelFormat));
   hdr.validBitCount = static_cast<uint32_t>(info.validBitCount);
-  hdr.totalBytes = static_cast<uint64_t>(img.byteNumber());
+  hdr.rawBytes = static_cast<uint64_t>(img.byteNumber());
 
   const size_t headerBytes = compactSize(hdr);
-  const uint64_t payloadBytes = hdr.totalBytes;
-  if (payloadBytes > std::numeric_limits<size_t>::max()) {
+  const uint64_t rawBytes = hdr.rawBytes;
+  if (rawBytes > std::numeric_limits<size_t>::max()) {
     return {};
   }
-  if (headerBytes > std::numeric_limits<size_t>::max() - static_cast<size_t>(payloadBytes)) {
+
+  const size_t rawBytesSz = static_cast<size_t>(rawBytes);
+  if (rawBytesSz == 0) {
+    return {};
+  }
+
+  const size_t timeBytes = img.timeByteNumber();
+  if (timeBytes == 0) {
+    return {};
+  }
+  if (img.numTimes() == 0 || static_cast<uint64_t>(timeBytes) * static_cast<uint64_t>(img.numTimes()) != rawBytes) {
+    return {};
+  }
+
+  // Always attempt compression (design choice). If compression fails or doesn't
+  // reduce size, fall back to uncompressed storage.
+  {
+    std::unique_ptr<folly::compression::StreamCodec> codec;
+    try {
+      codec = folly::compression::getStreamCodec(kImgRegionCompression.codecType, kImgRegionCompression.codecLevel);
+    } catch (...) {
+      codec.reset();
+    }
+
+    if (codec) {
+      bool ok = true;
+      try {
+        codec->resetStream(rawBytes);
+      } catch (...) {
+        ok = false;
+      }
+
+      uint64_t bound64 = 0;
+      if (ok) {
+        try {
+          bound64 = codec->maxCompressedLength(rawBytes);
+        } catch (...) {
+          ok = false;
+        }
+      }
+
+      Blob compressed;
+      if (ok) {
+        if (bound64 == 0 || bound64 > std::numeric_limits<size_t>::max()) {
+          ok = false;
+        } else {
+          try {
+            compressed.resize(static_cast<size_t>(bound64));
+          } catch (...) {
+            ok = false;
+          }
+        }
+      }
+
+      if (ok && !compressed.empty()) {
+        folly::MutableByteRange outRange(compressed.data(), compressed.size());
+        try {
+          for (size_t ti = 0; ti < img.numTimes(); ++ti) {
+            const uint8_t* src = img.timeData<uint8_t>(ti);
+            if (src == nullptr) {
+              ok = false;
+              break;
+            }
+
+            folly::ByteRange inRange(src, timeBytes);
+            while (!inRange.empty()) {
+              const size_t inBefore = inRange.size();
+              const size_t outBefore = outRange.size();
+              codec->compressStream(inRange, outRange, folly::compression::StreamCodec::FlushOp::NONE);
+              if (inRange.size() == inBefore && outRange.size() == outBefore) {
+                ok = false;
+                break;
+              }
+              if (outRange.empty() && !inRange.empty()) {
+                ok = false;
+                break;
+              }
+            }
+            if (!ok) {
+              break;
+            }
+          }
+
+          if (ok) {
+            folly::ByteRange emptyIn;
+            bool done = false;
+            while (!done) {
+              const size_t outBefore = outRange.size();
+              done = codec->compressStream(emptyIn, outRange, folly::compression::StreamCodec::FlushOp::END);
+              if (!done && outRange.size() == outBefore) {
+                ok = false;
+                break;
+              }
+              if (!done && outRange.empty()) {
+                ok = false;
+                break;
+              }
+            }
+          }
+        } catch (...) {
+          ok = false;
+        }
+
+        if (ok) {
+          const size_t produced = compressed.size() - outRange.size();
+          compressed.resize(produced);
+
+          if (!compressed.empty() && compressed.size() < rawBytesSz) {
+            ImgRegionEntryHeader compressedHdr = hdr;
+            compressedHdr.codecType = static_cast<uint32_t>(kImgRegionCompression.codecType);
+            compressedHdr.codecLevel = static_cast<int32_t>(kImgRegionCompression.codecLevel);
+            compressedHdr.payloadBytes = static_cast<uint64_t>(compressed.size());
+
+            Blob out;
+            try {
+              out.resize(headerBytes + compressed.size());
+            } catch (...) {
+              out.clear();
+            }
+            if (!out.empty() && compactStructToMemory(out.data(), headerBytes, compressedHdr) == headerBytes) {
+              std::memcpy(out.data() + headerBytes, compressed.data(), compressed.size());
+              return out;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Uncompressed fallback.
+  hdr.codecType = 0;
+  hdr.codecLevel = 0;
+  hdr.payloadBytes = hdr.rawBytes;
+
+  if (headerBytes > std::numeric_limits<size_t>::max() - rawBytesSz) {
     return {};
   }
 
   Blob out;
   try {
-    out.resize(headerBytes + static_cast<size_t>(payloadBytes));
+    out.resize(headerBytes + rawBytesSz);
   } catch (...) {
     return {};
   }
@@ -209,28 +362,20 @@ struct ImgRegionEntryHeader
   if (compactStructToMemory(out.data(), headerBytes, hdr) != headerBytes) {
     return {};
   }
-  if (payloadBytes > 0) {
-    const size_t timeBytes = img.timeByteNumber();
-    if (timeBytes == 0) {
-      return {};
-    }
-    if (static_cast<uint64_t>(timeBytes) * static_cast<uint64_t>(img.numTimes()) != payloadBytes) {
-      return {};
-    }
 
-    size_t offset = headerBytes;
-    for (size_t ti = 0; ti < img.numTimes(); ++ti) {
-      const uint8_t* src = img.timeData<uint8_t>(ti);
-      if (src == nullptr) {
-        return {};
-      }
-      std::memcpy(out.data() + offset, src, timeBytes);
-      offset += timeBytes;
-    }
-    if (offset != out.size()) {
+  size_t offset = headerBytes;
+  for (size_t ti = 0; ti < img.numTimes(); ++ti) {
+    const uint8_t* src = img.timeData<uint8_t>(ti);
+    if (src == nullptr) {
       return {};
     }
+    std::memcpy(out.data() + offset, src, timeBytes);
+    offset += timeBytes;
   }
+  if (offset != out.size()) {
+    return {};
+  }
+
   return out;
 }
 
@@ -288,15 +433,27 @@ struct ImgRegionEntryHeader
       !mulNoOverflow(expectedBytes, hdr.bytesPerVoxel, &expectedBytes)) {
     return std::shared_ptr<ZImg>();
   }
-  if (expectedBytes != hdr.totalBytes) {
+  if (expectedBytes != hdr.rawBytes) {
     return std::shared_ptr<ZImg>();
   }
 
-  if (hdr.totalBytes > std::numeric_limits<size_t>::max()) {
+  if (hdr.rawBytes > std::numeric_limits<size_t>::max()) {
     return std::shared_ptr<ZImg>();
   }
-  const size_t totalBytes = static_cast<size_t>(hdr.totalBytes);
-  if (headerBytes > bytes.size() - totalBytes) {
+  const size_t rawBytesSz = static_cast<size_t>(hdr.rawBytes);
+  if (rawBytesSz == 0) {
+    return std::shared_ptr<ZImg>();
+  }
+
+  if (hdr.payloadBytes > std::numeric_limits<size_t>::max()) {
+    return std::shared_ptr<ZImg>();
+  }
+  const size_t payloadBytesSz = static_cast<size_t>(hdr.payloadBytes);
+  if (payloadBytesSz == 0) {
+    return std::shared_ptr<ZImg>();
+  }
+
+  if (headerBytes > bytes.size() - payloadBytesSz) {
     return std::shared_ptr<ZImg>();
   }
 
@@ -317,28 +474,96 @@ struct ImgRegionEntryHeader
   } catch (...) {
     return std::shared_ptr<ZImg>();
   }
-  const uint8_t* src = bytes.data() + headerBytes;
-  if (totalBytes > 0) {
-    const size_t timeBytes = img->timeByteNumber();
-    if (timeBytes == 0) {
-      return std::shared_ptr<ZImg>();
+
+  const size_t timeBytes = img->timeByteNumber();
+  if (timeBytes == 0) {
+    return std::shared_ptr<ZImg>();
+  }
+  if (img->numTimes() == 0 || (timeBytes * img->numTimes()) != rawBytesSz) {
+    return std::shared_ptr<ZImg>();
+  }
+
+  const uint8_t* payload = bytes.data() + headerBytes;
+
+  if (hdr.codecType != 0) {
+    std::unique_ptr<folly::compression::StreamCodec> codec;
+    try {
+      codec = folly::compression::getStreamCodec(static_cast<folly::compression::CodecType>(hdr.codecType));
+    } catch (...) {
+      codec.reset();
     }
-    if (img->numTimes() == 0 || (timeBytes * img->numTimes()) != totalBytes) {
+    if (!codec) {
       return std::shared_ptr<ZImg>();
     }
 
-    size_t offset = 0;
+    try {
+      codec->resetStream(hdr.rawBytes);
+    } catch (...) {
+      return std::shared_ptr<ZImg>();
+    }
+
+    folly::ByteRange inRange(payload, payloadBytesSz);
+    bool done = false;
     for (size_t ti = 0; ti < img->numTimes(); ++ti) {
       uint8_t* dstTime = img->timeData<uint8_t>(ti);
       if (dstTime == nullptr) {
         return std::shared_ptr<ZImg>();
       }
-      std::memcpy(dstTime, src + offset, timeBytes);
-      offset += timeBytes;
+
+      folly::MutableByteRange outRange(dstTime, timeBytes);
+      while (!outRange.empty() && !done) {
+        const size_t inBefore = inRange.size();
+        const size_t outBefore = outRange.size();
+        bool thisDone = false;
+        try {
+          thisDone = codec->uncompressStream(inRange, outRange, folly::compression::StreamCodec::FlushOp::NONE);
+        } catch (...) {
+          return std::shared_ptr<ZImg>();
+        }
+
+        if (inRange.size() == inBefore && outRange.size() == outBefore) {
+          return std::shared_ptr<ZImg>();
+        }
+
+        if (thisDone) {
+          if ((ti + 1) != img->numTimes() || !outRange.empty()) {
+            return std::shared_ptr<ZImg>();
+          }
+          done = true;
+        }
+
+        if (inRange.empty() && !done && !outRange.empty()) {
+          return std::shared_ptr<ZImg>();
+        }
+      }
+      if (!outRange.empty()) {
+        return std::shared_ptr<ZImg>();
+      }
     }
-    if (offset != totalBytes) {
+
+    if (!done || !inRange.empty()) {
       return std::shared_ptr<ZImg>();
     }
+
+    return img;
+  }
+
+  // Uncompressed payload.
+  if (payloadBytesSz != rawBytesSz) {
+    return std::shared_ptr<ZImg>();
+  }
+
+  size_t offset = 0;
+  for (size_t ti = 0; ti < img->numTimes(); ++ti) {
+    uint8_t* dstTime = img->timeData<uint8_t>(ti);
+    if (dstTime == nullptr) {
+      return std::shared_ptr<ZImg>();
+    }
+    std::memcpy(dstTime, payload + offset, timeBytes);
+    offset += timeBytes;
+  }
+  if (offset != rawBytesSz) {
+    return std::shared_ptr<ZImg>();
   }
   return img;
 }
@@ -419,11 +644,6 @@ public:
       return;
     }
 
-    if (static_cast<uint64_t>(objSize) > m_maxBytes) {
-      // An entry larger than the entire budget would cause immediate thrash; skip caching.
-      return;
-    }
-
     // Compute key hash outside the cache mutex to minimize contention with lookups.
     const Blob keyHash = sha256KeyHashFor(key);
     if (keyHash.size() != 32) {
@@ -435,9 +655,6 @@ public:
       return;
     }
     const uint64_t estimatedBytes = headerBytes + static_cast<uint64_t>(objSize);
-    if (estimatedBytes > m_maxBytes) {
-      return;
-    }
 
     m_bucket->tryEnqueuePutValueWithFactory(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
                                             estimatedBytes,

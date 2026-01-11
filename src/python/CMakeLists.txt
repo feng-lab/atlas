@@ -83,6 +83,26 @@ include(LibsForImg)
 
 # subprojects
 if (NOT TARGET img)
+  # When packaging zimg as a standalone wheel (PEP 517 / scikit-build-core), the
+  # build runs in its own CMake project and would normally rebuild `src/img`
+  # from scratch. Reuse the already-built `img` target from the main Atlas build
+  # directory when available.
+  get_filename_component(_ZIMG_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+  set(_ZIMG_ATLAS_BUILD_DIR "${_ZIMG_REPO_ROOT}/cmake-build-release-ninja")
+  if (NOT EXISTS "${_ZIMG_ATLAS_BUILD_DIR}")
+    set(_ZIMG_ATLAS_BUILD_DIR "${_ZIMG_REPO_ROOT}/cmake-build-release")
+  endif ()
+
+  set(_ZIMG_ATLAS_IMG_EXPORT "${_ZIMG_ATLAS_BUILD_DIR}/AtlasImgTargets.cmake")
+  if (EXISTS "${_ZIMG_ATLAS_IMG_EXPORT}")
+    include("${_ZIMG_ATLAS_IMG_EXPORT}")
+    if (TARGET img)
+      message(STATUS "zimg: reusing prebuilt img from ${_ZIMG_ATLAS_BUILD_DIR}")
+    endif ()
+  endif ()
+endif ()
+
+if (NOT TARGET img)
   add_subdirectory(../img zimg_img)
 endif ()
 

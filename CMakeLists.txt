@@ -105,6 +105,11 @@ add_subdirectory(src/neurolabi/c)
 
 include(LibsForImg)
 add_subdirectory(src/img)
+
+# Export the heavy `img` target from the Atlas build tree so other projects
+# (e.g. the standalone zimg Python wheel build) can reuse it without rebuilding.
+export(TARGETS img FILE "${CMAKE_BINARY_DIR}/AtlasImgTargets.cmake")
+
 add_subdirectory(src/neurolabi/gui)
 # add_subdirectory(src/matlab)
 add_subdirectory(src/atlas)
