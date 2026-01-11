@@ -1,12 +1,10 @@
 #pragma once
 
-#include <QLockFile>
 #include <QString>
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
-#include <mutex>
-#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -15,7 +13,7 @@
 namespace nim {
 
 struct ZHttpGetBytesResult;
-class ZSqliteLRUCache;
+class ZSqliteDiskCacheBucket;
 
 // Simple persistent on-disk cache for HTTP GET results (SQLite-backed).
 //
@@ -23,8 +21,8 @@ class ZSqliteLRUCache;
 // - This is intentionally a *byte cache* keyed by (URL + Range) and stores the already-decoded
 //   result bytes returned to callers (i.e. after any HTTP-level Content-Encoding has been handled).
 // - Eviction is best-effort LRU-ish based on access timestamps (touched on read).
-// - Multi-process safety: the cache directory is guarded by a lock file; if it cannot be acquired,
-//   the cache is disabled for that process. (We keep a single-writer policy so size tracking is consistent.)
+// - Multi-process: multiple Atlas processes may concurrently read/write the same cache DB.
+//   Writes are best-effort and may be dropped under SQLite contention.
 class ZHttpDiskCache
 {
 public:
@@ -39,10 +37,7 @@ public:
   ZHttpDiskCache(QString rootDir, uint64_t maxBytes);
   ~ZHttpDiskCache();
 
-  [[nodiscard]] bool isEnabled() const
-  {
-    return m_enabled;
-  }
+  [[nodiscard]] bool isEnabled() const;
 
   [[nodiscard]] uint64_t maxBytes() const
   {
@@ -58,6 +53,9 @@ public:
            const std::vector<std::pair<std::string, std::string>>& requestHeaders,
            const ZHttpGetBytesResult& result);
 
+  // Waits until all queued async writes complete (or timeout). Intended for tests.
+  [[nodiscard]] bool drainWrites(std::chrono::milliseconds timeout = std::chrono::seconds(5));
+
 private:
   [[nodiscard]] static KeyParts keyPartsFrom(const std::string& url,
                                             const std::vector<std::pair<std::string, std::string>>& requestHeaders);
@@ -70,17 +68,10 @@ private:
 
 private:
   QString m_rootDir;
-  QString m_cacheDir;
-  QString m_dbPath;
-  QString m_lockPath;
 
   uint64_t m_maxBytes = 0;
 
-  bool m_enabled = false;
-
-  std::unique_ptr<QLockFile> m_lock;
-  std::unique_ptr<ZSqliteLRUCache> m_cache;
-  std::mutex m_mu;
+  std::unique_ptr<ZSqliteDiskCacheBucket> m_bucket;
 };
 
 } // namespace nim

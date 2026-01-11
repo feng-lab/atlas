@@ -50,9 +50,10 @@ void resetStmt(sqlite3_stmt* stmt)
 
 } // namespace
 
-ZSqliteLRUCache::ZSqliteLRUCache(QString dbPath, uint64_t maxBytes, NowNsFn nowNsFn)
+ZSqliteLRUCache::ZSqliteLRUCache(QString dbPath, uint64_t maxBytes, NowNsFn nowNsFn, bool readOnly)
   : m_dbPath(std::move(dbPath))
   , m_maxBytes(maxBytes)
+  , m_readOnly(readOnly)
   , m_nowNsFn(std::move(nowNsFn))
 {
   if (!m_nowNsFn) {
@@ -72,6 +73,13 @@ ZSqliteLRUCache::~ZSqliteLRUCache()
 void ZSqliteLRUCache::recordSqlErrorLocked(int rc, const char* context)
 {
   if (m_disabled) {
+    return;
+  }
+
+  // Multi-process disk caches expect transient contention on the writer lock.
+  // Treat BUSY/LOCKED as best-effort cache misses / dropped writes, not fatal errors.
+  const int primaryRc = (rc & 0xFF);
+  if (primaryRc == SQLITE_BUSY || primaryRc == SQLITE_LOCKED) {
     return;
   }
 
@@ -124,6 +132,7 @@ void ZSqliteLRUCache::setMaxBytes(uint64_t maxBytes)
 std::optional<ZSqliteLRUCache::Blob> ZSqliteLRUCache::tryGet(std::span<const std::uint8_t> keyHash)
 {
   std::lock_guard<std::mutex> lock(m_mu);
+  CHECK(!m_readOnly);
   if (m_disabled || !m_db || !m_stmtSelectValue || !m_stmtTouch) {
     return std::nullopt;
   }
@@ -199,10 +208,79 @@ std::optional<ZSqliteLRUCache::Blob> ZSqliteLRUCache::tryGet(std::span<const std
   return out;
 }
 
+std::optional<ZSqliteLRUCache::GetNoTouchResult> ZSqliteLRUCache::tryGetNoTouch(std::span<const std::uint8_t> keyHash)
+{
+  std::lock_guard<std::mutex> lock(m_mu);
+  if (m_disabled || !m_db || !m_stmtSelectValue) {
+    return std::nullopt;
+  }
+  if (keyHash.empty()) {
+    return std::nullopt;
+  }
+  if (keyHash.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    return std::nullopt;
+  }
+
+  resetStmt(m_stmtSelectValue);
+  if (sqlite3_bind_blob(m_stmtSelectValue,
+                        /*index=*/1,
+                        keyHash.data(),
+                        static_cast<int>(keyHash.size()),
+                        SQLITE_TRANSIENT) != SQLITE_OK) {
+    recordSqlErrorLocked(sqlite3_errcode(m_db), "bind(select)");
+    return std::nullopt;
+  }
+
+  const int rc = sqlite3_step(m_stmtSelectValue);
+  if (rc == SQLITE_DONE) {
+    recordSqlSuccessLocked();
+    resetStmt(m_stmtSelectValue);
+    return std::nullopt;
+  }
+  if (rc != SQLITE_ROW) {
+    recordSqlErrorLocked(rc, "step(select)");
+    resetStmt(m_stmtSelectValue);
+    return std::nullopt;
+  }
+
+  const void* blobPtr = sqlite3_column_blob(m_stmtSelectValue, 0);
+  const int blobBytes = sqlite3_column_bytes(m_stmtSelectValue, 0);
+  const int64_t lastAccessNs = sqlite3_column_int64(m_stmtSelectValue, 1);
+  if (blobBytes < 0) {
+    recordSqlErrorLocked(sqlite3_errcode(m_db), "column_bytes(select)");
+    resetStmt(m_stmtSelectValue);
+    return std::nullopt;
+  }
+
+  Blob out;
+  try {
+    out.resize(static_cast<size_t>(blobBytes));
+  } catch (...) {
+    // Disk cache is best-effort; treat allocation failures as cache misses.
+    resetStmt(m_stmtSelectValue);
+    return std::nullopt;
+  }
+  if (blobBytes > 0) {
+    if (blobPtr == nullptr) {
+      resetStmt(m_stmtSelectValue);
+      return std::nullopt;
+    }
+    std::memcpy(out.data(), blobPtr, static_cast<size_t>(blobBytes));
+  }
+  resetStmt(m_stmtSelectValue);
+  recordSqlSuccessLocked();
+
+  GetNoTouchResult res;
+  res.value = std::move(out);
+  res.lastAccessNs = lastAccessNs;
+  return res;
+}
+
 void ZSqliteLRUCache::put(std::span<const std::uint8_t> keyHash, std::span<const std::uint8_t> value)
 {
   std::lock_guard<std::mutex> lock(m_mu);
-  if (m_disabled || !m_db || !m_stmtSelectSize || !m_stmtUpsert) {
+  CHECK(!m_readOnly);
+  if (m_disabled || !m_db || !m_stmtUpsert) {
     return;
   }
   if (m_maxBytes == 0) {
@@ -224,26 +302,10 @@ void ZSqliteLRUCache::put(std::span<const std::uint8_t> keyHash, std::span<const
 
   const int64_t nowNs = nowNsLocked();
 
-  // Transaction keeps total_bytes consistent and amortizes fsyncs.
+  // Transaction amortizes fsyncs; size accounting is handled by SQLite triggers.
   if (!execLocked("BEGIN IMMEDIATE")) {
     return;
   }
-
-  uint64_t beforeSize = 0;
-  resetStmt(m_stmtSelectSize);
-  (void)sqlite3_bind_blob(m_stmtSelectSize, 1, keyHash.data(), static_cast<int>(keyHash.size()), SQLITE_TRANSIENT);
-  const int rcBefore = sqlite3_step(m_stmtSelectSize);
-  if (rcBefore == SQLITE_ROW) {
-    const int64_t sizeVal = sqlite3_column_int64(m_stmtSelectSize, 0);
-    if (sizeVal > 0) {
-      beforeSize = static_cast<uint64_t>(sizeVal);
-    }
-  } else if (rcBefore != SQLITE_DONE) {
-    recordSqlErrorLocked(rcBefore, "step(select_size)");
-    (void)execLocked("ROLLBACK");
-    return;
-  }
-  resetStmt(m_stmtSelectSize);
 
   resetStmt(m_stmtUpsert);
   (void)sqlite3_bind_blob(m_stmtUpsert, 1, keyHash.data(), static_cast<int>(keyHash.size()), SQLITE_TRANSIENT);
@@ -260,26 +322,6 @@ void ZSqliteLRUCache::put(std::span<const std::uint8_t> keyHash, std::span<const
     return;
   }
 
-  const uint64_t afterSize = static_cast<uint64_t>(value.size());
-  if (!m_totalBytesKnown) {
-    // Best-effort recovery: if we don't know the starting total, compute it now.
-    // This should be rare (first open) and is not on the hot path.
-    (void)loadOrInitTotalBytesLocked();
-  }
-  if (m_totalBytesKnown) {
-    if (afterSize >= beforeSize) {
-      m_totalBytes += (afterSize - beforeSize);
-    } else {
-      m_totalBytes -= std::min<uint64_t>(m_totalBytes, (beforeSize - afterSize));
-    }
-    // Persist total_bytes.
-    (void)execLocked(
-      fmt::format("INSERT OR REPLACE INTO meta(key,value_int) VALUES('{}',{})",
-                  std::string(kMetaKeyTotalBytes),
-                  m_totalBytes)
-        .c_str());
-  }
-
   if (!execLocked("COMMIT")) {
     (void)execLocked("ROLLBACK");
     return;
@@ -289,10 +331,32 @@ void ZSqliteLRUCache::put(std::span<const std::uint8_t> keyHash, std::span<const
   maybePruneLocked(nowNs);
 }
 
+void ZSqliteLRUCache::touch(std::span<const std::uint8_t> keyHash, int64_t nowNs)
+{
+  std::lock_guard<std::mutex> lock(m_mu);
+  CHECK(!m_readOnly);
+  if (m_disabled || !m_db || !m_stmtTouch) {
+    return;
+  }
+  if (keyHash.empty()) {
+    return;
+  }
+  if (keyHash.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    return;
+  }
+
+  resetStmt(m_stmtTouch);
+  (void)sqlite3_bind_int64(m_stmtTouch, 1, nowNs);
+  (void)sqlite3_bind_blob(m_stmtTouch, 2, keyHash.data(), static_cast<int>(keyHash.size()), SQLITE_TRANSIENT);
+  (void)stepExpectDone(m_stmtTouch);
+  resetStmt(m_stmtTouch);
+}
+
 void ZSqliteLRUCache::erase(std::span<const std::uint8_t> keyHash)
 {
   std::lock_guard<std::mutex> lock(m_mu);
-  if (m_disabled || !m_db || !m_stmtDelete || !m_stmtSelectSize) {
+  CHECK(!m_readOnly);
+  if (m_disabled || !m_db || !m_stmtDelete) {
     return;
   }
   if (keyHash.empty()) {
@@ -306,22 +370,6 @@ void ZSqliteLRUCache::erase(std::span<const std::uint8_t> keyHash)
     return;
   }
 
-  uint64_t beforeSize = 0;
-  resetStmt(m_stmtSelectSize);
-  (void)sqlite3_bind_blob(m_stmtSelectSize, 1, keyHash.data(), static_cast<int>(keyHash.size()), SQLITE_TRANSIENT);
-  const int rcBefore = sqlite3_step(m_stmtSelectSize);
-  if (rcBefore == SQLITE_ROW) {
-    const int64_t sizeVal = sqlite3_column_int64(m_stmtSelectSize, 0);
-    if (sizeVal > 0) {
-      beforeSize = static_cast<uint64_t>(sizeVal);
-    }
-  } else if (rcBefore != SQLITE_DONE) {
-    recordSqlErrorLocked(rcBefore, "step(select_size_for_delete)");
-    (void)execLocked("ROLLBACK");
-    return;
-  }
-  resetStmt(m_stmtSelectSize);
-
   resetStmt(m_stmtDelete);
   (void)sqlite3_bind_blob(m_stmtDelete, 1, keyHash.data(), static_cast<int>(keyHash.size()), SQLITE_TRANSIENT);
   const bool delOk = stepExpectDone(m_stmtDelete);
@@ -330,15 +378,6 @@ void ZSqliteLRUCache::erase(std::span<const std::uint8_t> keyHash)
     recordSqlErrorLocked(sqlite3_errcode(m_db), "step(delete)");
     (void)execLocked("ROLLBACK");
     return;
-  }
-
-  if (m_totalBytesKnown && beforeSize > 0) {
-    m_totalBytes -= std::min<uint64_t>(m_totalBytes, beforeSize);
-    (void)execLocked(
-      fmt::format("INSERT OR REPLACE INTO meta(key,value_int) VALUES('{}',{})",
-                  std::string(kMetaKeyTotalBytes),
-                  m_totalBytes)
-        .c_str());
   }
 
   if (!execLocked("COMMIT")) {
@@ -358,10 +397,6 @@ void ZSqliteLRUCache::closeDbLocked()
     sqlite3_finalize(m_stmtTouch);
     m_stmtTouch = nullptr;
   }
-  if (m_stmtSelectSize) {
-    sqlite3_finalize(m_stmtSelectSize);
-    m_stmtSelectSize = nullptr;
-  }
   if (m_stmtUpsert) {
     sqlite3_finalize(m_stmtUpsert);
     m_stmtUpsert = nullptr;
@@ -374,13 +409,15 @@ void ZSqliteLRUCache::closeDbLocked()
     sqlite3_finalize(m_stmtPruneSelect);
     m_stmtPruneSelect = nullptr;
   }
+  if (m_stmtSelectTotalBytes) {
+    sqlite3_finalize(m_stmtSelectTotalBytes);
+    m_stmtSelectTotalBytes = nullptr;
+  }
 
   if (m_db) {
     sqlite3_close(m_db);
     m_db = nullptr;
   }
-  m_totalBytes = 0;
-  m_totalBytesKnown = false;
 }
 
 bool ZSqliteLRUCache::initDbLocked()
@@ -394,24 +431,46 @@ bool ZSqliteLRUCache::initDbLocked()
 
   const QFileInfo fi(m_dbPath);
   const QString dirPath = fi.dir().absolutePath();
-  if (!QDir().mkpath(dirPath)) {
-    LOG(WARNING) << "SQLite cache disabled: failed to create directory " << dirPath;
-    return false;
+  if (m_readOnly) {
+    // Read-only connections must not create directories. This avoids accidental
+    // directory creation when a user points the cache at a removable volume
+    // and it is missing/unmounted.
+    if (!QDir(dirPath).exists()) {
+      LOG(WARNING) << "SQLite cache disabled: directory does not exist for read-only open: " << dirPath;
+      return false;
+    }
+  } else {
+    if (!QDir().mkpath(dirPath)) {
+      LOG(WARNING) << "SQLite cache disabled: failed to create directory " << dirPath;
+      return false;
+    }
   }
 
   const QByteArray pathBytes = QFile::encodeName(m_dbPath);
-  const int rc =
-    sqlite3_open_v2(pathBytes.constData(),
-                    &m_db,
-                    SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX,
-                    /*zVfs=*/nullptr);
+  const int openFlags = m_readOnly ? (SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX)
+                                   : (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX);
+  const int rc = sqlite3_open_v2(pathBytes.constData(), &m_db, openFlags, /*zVfs=*/nullptr);
   if (rc != SQLITE_OK || !m_db) {
     LOG(WARNING) << "SQLite cache disabled: sqlite3_open_v2 failed for " << m_dbPath << " rc=" << rc;
     closeDbLocked();
     return false;
   }
 
+  // Allow initial schema creation to wait briefly under multi-process startup races.
   sqlite3_busy_timeout(m_db, /*ms=*/250);
+
+  if (m_readOnly) {
+    // Read connections should not modify PRAGMAs or attempt schema creation.
+    if (!prepareLocked("SELECT value,last_access_ns FROM entries WHERE key_hash=?1", &m_stmtSelectValue)) {
+      LOG(WARNING) << "SQLite cache disabled: failed to prepare read-only statements for " << m_dbPath;
+      closeDbLocked();
+      return false;
+    }
+
+    // Operational policy: do not block for contention (best-effort cache semantics).
+    sqlite3_busy_timeout(m_db, /*ms=*/0);
+    return true;
+  }
 
   // Cache-friendly defaults. WAL keeps writes sequential and avoids blocking readers.
   (void)execLocked("PRAGMA journal_mode=WAL");
@@ -423,25 +482,23 @@ bool ZSqliteLRUCache::initDbLocked()
     return false;
   }
 
-  if (!loadOrInitTotalBytesLocked()) {
-    closeDbLocked();
-    return false;
-  }
-
   // Prepare hot statements.
   if (!prepareLocked("SELECT value,last_access_ns FROM entries WHERE key_hash=?1", &m_stmtSelectValue) ||
       !prepareLocked("UPDATE entries SET last_access_ns=?1 WHERE key_hash=?2", &m_stmtTouch) ||
-      !prepareLocked("SELECT size_bytes FROM entries WHERE key_hash=?1", &m_stmtSelectSize) ||
       !prepareLocked("INSERT INTO entries(key_hash,size_bytes,last_access_ns,value) VALUES(?1,?2,?3,?4) "
                      "ON CONFLICT(key_hash) DO UPDATE SET "
                      "size_bytes=excluded.size_bytes,last_access_ns=excluded.last_access_ns,value=excluded.value",
                      &m_stmtUpsert) ||
       !prepareLocked("DELETE FROM entries WHERE key_hash=?1", &m_stmtDelete) ||
-      !prepareLocked("SELECT key_hash,size_bytes FROM entries ORDER BY last_access_ns ASC LIMIT ?1", &m_stmtPruneSelect)) {
+      !prepareLocked("SELECT key_hash,size_bytes FROM entries ORDER BY last_access_ns ASC LIMIT ?1", &m_stmtPruneSelect) ||
+      !prepareLocked("SELECT value_int FROM meta WHERE key=?1", &m_stmtSelectTotalBytes)) {
     LOG(WARNING) << "SQLite cache disabled: failed to prepare statements for " << m_dbPath;
     closeDbLocked();
     return false;
   }
+
+  // Operational policy: do not block for contention (best-effort cache semantics).
+  sqlite3_busy_timeout(m_db, /*ms=*/0);
 
   return true;
 }
@@ -449,6 +506,7 @@ bool ZSqliteLRUCache::initDbLocked()
 bool ZSqliteLRUCache::ensureSchemaLocked()
 {
   CHECK(m_db != nullptr);
+  CHECK(!m_readOnly);
 
   // Read PRAGMA user_version.
   int userVersion = 0;
@@ -470,72 +528,33 @@ bool ZSqliteLRUCache::ensureSchemaLocked()
     userVersion = 0;
   }
 
-  if (userVersion == 0) {
-    if (!execLocked("CREATE TABLE IF NOT EXISTS meta("
-                    "key TEXT PRIMARY KEY,"
-                    "value_int INTEGER NOT NULL)") ||
-        !execLocked("CREATE TABLE IF NOT EXISTS entries("
-                    "key_hash BLOB PRIMARY KEY,"
-                    "size_bytes INTEGER NOT NULL,"
-                    "last_access_ns INTEGER NOT NULL,"
-                    "value BLOB NOT NULL) WITHOUT ROWID") ||
-        !execLocked("CREATE INDEX IF NOT EXISTS entries_last_access ON entries(last_access_ns)") ||
-        !execLocked(fmt::format("PRAGMA user_version={}", kCacheSchemaVersion).c_str())) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool ZSqliteLRUCache::loadOrInitTotalBytesLocked()
-{
-  CHECK(m_db != nullptr);
-
-  m_totalBytes = 0;
-  m_totalBytesKnown = false;
-
-  // Read persisted total_bytes if present.
-  sqlite3_stmt* stmt = nullptr;
-  if (!prepareLocked("SELECT value_int FROM meta WHERE key=?1", &stmt)) {
+  if (!execLocked("CREATE TABLE IF NOT EXISTS meta("
+                  "key TEXT PRIMARY KEY,"
+                  "value_int INTEGER NOT NULL)") ||
+      !execLocked("CREATE TABLE IF NOT EXISTS entries("
+                  "key_hash BLOB PRIMARY KEY,"
+                  "size_bytes INTEGER NOT NULL,"
+                  "last_access_ns INTEGER NOT NULL,"
+                  "value BLOB NOT NULL) WITHOUT ROWID") ||
+      !execLocked("CREATE INDEX IF NOT EXISTS entries_last_access ON entries(last_access_ns)") ||
+      !execLocked(fmt::format("INSERT OR IGNORE INTO meta(key,value_int) VALUES('{}',0)", std::string(kMetaKeyTotalBytes))
+                    .c_str()) ||
+      !execLocked("CREATE TRIGGER IF NOT EXISTS entries_total_bytes_insert "
+                  "AFTER INSERT ON entries BEGIN "
+                  "UPDATE meta SET value_int=value_int+NEW.size_bytes WHERE key='total_bytes'; "
+                  "END") ||
+      !execLocked("CREATE TRIGGER IF NOT EXISTS entries_total_bytes_delete "
+                  "AFTER DELETE ON entries BEGIN "
+                  "UPDATE meta SET value_int=value_int-OLD.size_bytes WHERE key='total_bytes'; "
+                  "END") ||
+      !execLocked("CREATE TRIGGER IF NOT EXISTS entries_total_bytes_update "
+                  "AFTER UPDATE OF size_bytes ON entries BEGIN "
+                  "UPDATE meta SET value_int=value_int+(NEW.size_bytes-OLD.size_bytes) WHERE key='total_bytes'; "
+                  "END") ||
+      !execLocked(fmt::format("PRAGMA user_version={}", kCacheSchemaVersion).c_str())) {
     return false;
   }
-  CHECK(stmt);
-  (void)sqlite3_bind_text(stmt, 1, kMetaKeyTotalBytes.data(), static_cast<int>(kMetaKeyTotalBytes.size()), SQLITE_STATIC);
-  const int rc = sqlite3_step(stmt);
-  if (rc == SQLITE_ROW) {
-    const int64_t v = sqlite3_column_int64(stmt, 0);
-    if (v >= 0) {
-      m_totalBytes = static_cast<uint64_t>(v);
-      m_totalBytesKnown = true;
-    }
-  }
-  sqlite3_finalize(stmt);
 
-  if (m_totalBytesKnown) {
-    return true;
-  }
-
-  // Compute total_bytes (fallback). This is still cheap compared to directory walks.
-  if (!prepareLocked("SELECT IFNULL(sum(size_bytes),0) FROM entries", &stmt)) {
-    return false;
-  }
-  CHECK(stmt);
-  uint64_t total = 0;
-  if (sqlite3_step(stmt) == SQLITE_ROW) {
-    const int64_t v = sqlite3_column_int64(stmt, 0);
-    if (v > 0) {
-      total = static_cast<uint64_t>(v);
-    }
-  }
-  sqlite3_finalize(stmt);
-
-  m_totalBytes = total;
-  m_totalBytesKnown = true;
-
-  (void)execLocked(
-    fmt::format("INSERT OR REPLACE INTO meta(key,value_int) VALUES('{}',{})", std::string(kMetaKeyTotalBytes), total)
-      .c_str());
   return true;
 }
 
@@ -547,7 +566,42 @@ int64_t ZSqliteLRUCache::nowNsLocked() const
 
 void ZSqliteLRUCache::maybePruneLocked(int64_t nowNs)
 {
-  if (m_maxBytes == 0 || !m_totalBytesKnown || m_totalBytes <= m_maxBytes) {
+  if (m_maxBytes == 0 || m_disabled || !m_db || !m_stmtSelectTotalBytes || !m_stmtPruneSelect || !m_stmtDelete) {
+    return;
+  }
+
+  auto readTotalBytes = [&]() -> std::optional<uint64_t> {
+    resetStmt(m_stmtSelectTotalBytes);
+    if (sqlite3_bind_text(m_stmtSelectTotalBytes,
+                          /*index=*/1,
+                          kMetaKeyTotalBytes.data(),
+                          static_cast<int>(kMetaKeyTotalBytes.size()),
+                          SQLITE_STATIC) != SQLITE_OK) {
+      recordSqlErrorLocked(sqlite3_errcode(m_db), "bind(select_total_bytes)");
+      return std::nullopt;
+    }
+    const int rc = sqlite3_step(m_stmtSelectTotalBytes);
+    if (rc == SQLITE_ROW) {
+      const int64_t v = sqlite3_column_int64(m_stmtSelectTotalBytes, 0);
+      resetStmt(m_stmtSelectTotalBytes);
+      recordSqlSuccessLocked();
+      if (v <= 0) {
+        return 0ULL;
+      }
+      return static_cast<uint64_t>(v);
+    }
+    if (rc == SQLITE_DONE) {
+      resetStmt(m_stmtSelectTotalBytes);
+      recordSqlSuccessLocked();
+      return 0ULL;
+    }
+    recordSqlErrorLocked(rc, "step(select_total_bytes)");
+    resetStmt(m_stmtSelectTotalBytes);
+    return std::nullopt;
+  };
+
+  const auto totalBytesOpt = readTotalBytes();
+  if (!totalBytesOpt.has_value() || *totalBytesOpt <= m_maxBytes) {
     return;
   }
 
@@ -559,11 +613,22 @@ void ZSqliteLRUCache::maybePruneLocked(int64_t nowNs)
   m_lastPrune = now;
 
   const uint64_t target = static_cast<uint64_t>(static_cast<double>(m_maxBytes) * kPruneTargetFraction);
-  uint64_t bytes = m_totalBytes;
+  uint64_t bytes = *totalBytesOpt;
   size_t removed = 0;
 
   // Keep the prune transaction short; do batched deletes.
   if (!execLocked("BEGIN IMMEDIATE")) {
+    return;
+  }
+
+  const auto txnTotalOpt = readTotalBytes();
+  if (!txnTotalOpt.has_value()) {
+    (void)execLocked("ROLLBACK");
+    return;
+  }
+  bytes = *txnTotalOpt;
+  if (bytes <= m_maxBytes) {
+    (void)execLocked("ROLLBACK");
     return;
   }
 
@@ -613,17 +678,15 @@ void ZSqliteLRUCache::maybePruneLocked(int64_t nowNs)
   resetStmt(m_stmtPruneSelect);
   resetStmt(m_stmtDelete);
 
-  m_totalBytes = bytes;
-  (void)execLocked(
-    fmt::format("INSERT OR REPLACE INTO meta(key,value_int) VALUES('{}',{})", std::string(kMetaKeyTotalBytes), bytes)
-      .c_str());
-
-  if (!execLocked("COMMIT")) {
+  const bool commitOk = execLocked("COMMIT");
+  if (!commitOk) {
     (void)execLocked("ROLLBACK");
+    return;
   }
+  recordSqlSuccessLocked();
 
   if (removed > 0) {
-    VLOG(1) << "SQLite cache pruned " << removed << " entries; totalBytes=" << m_totalBytes
+    VLOG(1) << "SQLite cache pruned " << removed << " entries; totalBytes=" << bytes
             << " maxBytes=" << m_maxBytes << " nowNs=" << nowNs;
   }
 }

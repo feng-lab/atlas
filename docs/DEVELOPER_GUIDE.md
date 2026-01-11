@@ -27,15 +27,19 @@ Neuroglancer Precomputed (HTTP)
   - Networking is implemented with proxygen/folly: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
   - Optional persistent HTTP disk cache (SQLite-backed, cross-OS) is implemented in `src/atlas/zhttpdiskcache.h`, `src/atlas/zhttpdiskcache.cpp`, and `src/atlas/zsqlitelrucache.h` / `src/atlas/zsqlitelrucache.cpp` and is integrated into `ZProxygenHttpClient::getBytesOnEventBase()` (cache lookup before network; store after successful 200/206).
     - Enable with `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable).
+    - Async write queue: `--atlas_disk_cache_http_async_max_pending_bytes=<N>` bounds queued SQLite writes (touch/put/erase). Values smaller than 256 MiB are clamped to 256 MiB. When the queue is full, disk writes are dropped (best-effort cache semantics).
+    - Read path: synchronous point lookups using per-thread read-only SQLite connections (so concurrent readers do not block each other); LRU touches happen asynchronously.
     - Optional location override: `--atlas_disk_cache_dir=<path>` (otherwise uses the Atlas cache/config directories).
     - The cache is keyed by `(URL + Range)` and stores the already-decoded bytes returned to callers (after HTTP-level `Content-Encoding` handling).
-    - Multi-process safety: guarded by a lock file; if the lock cannot be acquired, the cache is disabled for that process.
+    - Multi-process RW: multiple Atlas processes may concurrently read/write the same cache DB. SQLite contention yields best-effort behavior (writes may be dropped; reads degrade to cache misses).
     - On disk, the cache lives at `<root>/atlas_disk_cache_v1/http.sqlite` (WAL mode).
-  - Additional persistent cache buckets can live under the same `<root>/atlas_disk_cache_v1/` directory (each bucket is its own SQLite DB + lock file).
+  - Additional persistent cache buckets can live under the same `<root>/atlas_disk_cache_v1/` directory (each bucket is its own SQLite DB).
   - Optional persistent image-region disk cache (SQLite-backed) can be enabled behind `ZImgRegionCache` to persist computed `ZImg` region blocks for file-backed datasets:
     - Integrated behind the in-memory cache (call sites do not contain disk-cache logic): `src/img/zconcurrentlrucache.h` + `src/atlas/zimgregioncache.h` / `src/atlas/zimgregioncache.cpp`.
     - Enable with `--atlas_disk_cache_imgregion_max_bytes=<N>` (default 20 GiB; set to 0 to disable).
-    - Stored at `<root>/atlas_disk_cache_v1/imgregion.sqlite` (single bucket DB + lock file).
+    - Async write queue: `--atlas_disk_cache_imgregion_async_max_pending_bytes=<N>` bounds queued SQLite writes (touch/put/erase). Values smaller than 256 MiB are clamped to 256 MiB. When the queue is full, disk writes are dropped (best-effort cache semantics).
+    - Read path: synchronous point lookups using per-thread read-only SQLite connections (so concurrent readers do not block each other); LRU touches happen asynchronously.
+    - Stored at `<root>/atlas_disk_cache_v1/imgregion.sqlite` (single bucket DB).
     - Current scope: file-backed sources (`ZImgRegionCacheSourceKind::File`); Neuroglancer region caching is still memory-only.
 - Dataset parsing + chunk addressing lives in `src/atlas/zneuroglancerprecomputed.h` and `src/atlas/zneuroglancerprecomputed.cpp` (reads `.../info`, then fetches chunks on demand).
   - Chunk decode helpers live in `src/atlas/zneuroglancerprecomputedchunkdecoder.h` and `src/atlas/zneuroglancerprecomputedchunkdecoder.cpp`.

@@ -3,13 +3,10 @@
 #include "zcpuinfo.h"
 #include "zdiskcacheutils.h"
 #include "zlog.h"
-#include "zsqlitelrucache.h"
+#include "zsqlitediskcachebucket.h"
 #include "zstructutils.h"
 
 #include <gflags/gflags.h>
-
-#include <QDir>
-#include <QLockFile>
 
 #include <boost/hash2/sha2.hpp>
 
@@ -27,13 +24,13 @@ DEFINE_double(atlas_image_region_cache_memory_proportion,
               "Proportion of RAM that will be used for image region cache, default is 0.3");
 
 DECLARE_uint64(atlas_disk_cache_imgregion_max_bytes);
+DECLARE_uint64(atlas_disk_cache_imgregion_async_max_pending_bytes);
 
 namespace nim {
 
 namespace {
 
 constexpr char kImgRegionDiskCacheDbName[] = "imgregion.sqlite";
-constexpr char kImgRegionDiskCacheLockName[] = "imgregion.lock";
 
 constexpr uint32_t kImgRegionDiskCacheEntryVersion = 1;
 constexpr char kImgRegionDiskCacheMagic[8] = {'A', 'T', 'L', 'S', 'I', 'R', 'C', '1'};
@@ -98,7 +95,10 @@ struct ImgRegionEntryHeader
 
 [[nodiscard]] Blob sha256KeyHashFor(const ImageRegionCacheHashKeyType& key)
 {
-  CHECK(std::endian::native == std::endian::little);
+  if (std::endian::native != std::endian::little) {
+    // Best-effort: disk cache disabled on unsupported platform endianness.
+    return {};
+  }
 
   const auto& fingerprint = std::get<0>(key);
   const ZImgRegionCacheSourceKind sourceKind = std::get<1>(key);
@@ -147,15 +147,27 @@ struct ImgRegionEntryHeader
   keyBytes.displayRangeMax = displayRangeMax;
 
   Blob compactKeyBytes;
-  compactKeyBytes.resize(compactSize(keyBytes));
-  CHECK(compactStructToMemory(compactKeyBytes.data(), compactKeyBytes.size(), keyBytes) == compactKeyBytes.size());
+  try {
+    compactKeyBytes.resize(compactSize(keyBytes));
+  } catch (...) {
+    // Best-effort: treat allocation failures as "no disk cache".
+    return {};
+  }
+  if (compactKeyBytes.empty()) {
+    return {};
+  }
+  if (compactStructToMemory(compactKeyBytes.data(), compactKeyBytes.size(), keyBytes) != compactKeyBytes.size()) {
+    return {};
+  }
 
   return sha256(compactKeyBytes.data(), compactKeyBytes.size());
 }
 
 [[nodiscard]] Blob serializeImgRegionEntry(const ZImg& img)
 {
-  CHECK(std::endian::native == std::endian::little);
+  if (std::endian::native != std::endian::little) {
+    return {};
+  }
 
   const ZImgInfo& info = img.info();
 
@@ -186,28 +198,47 @@ struct ImgRegionEntryHeader
   }
 
   Blob out;
-  out.resize(headerBytes + static_cast<size_t>(payloadBytes));
-  CHECK(compactStructToMemory(out.data(), headerBytes, hdr) == headerBytes);
+  try {
+    out.resize(headerBytes + static_cast<size_t>(payloadBytes));
+  } catch (...) {
+    return {};
+  }
+  if (out.empty()) {
+    return {};
+  }
+  if (compactStructToMemory(out.data(), headerBytes, hdr) != headerBytes) {
+    return {};
+  }
   if (payloadBytes > 0) {
     const size_t timeBytes = img.timeByteNumber();
-    CHECK(timeBytes > 0);
-    CHECK(static_cast<uint64_t>(timeBytes) * static_cast<uint64_t>(img.numTimes()) == payloadBytes);
+    if (timeBytes == 0) {
+      return {};
+    }
+    if (static_cast<uint64_t>(timeBytes) * static_cast<uint64_t>(img.numTimes()) != payloadBytes) {
+      return {};
+    }
 
     size_t offset = headerBytes;
     for (size_t ti = 0; ti < img.numTimes(); ++ti) {
       const uint8_t* src = img.timeData<uint8_t>(ti);
-      CHECK(src != nullptr);
+      if (src == nullptr) {
+        return {};
+      }
       std::memcpy(out.data() + offset, src, timeBytes);
       offset += timeBytes;
     }
-    CHECK(offset == out.size());
+    if (offset != out.size()) {
+      return {};
+    }
   }
   return out;
 }
 
 [[nodiscard]] std::shared_ptr<ZImg> parseImgRegionEntry(std::span<const std::uint8_t> bytes)
 {
-  CHECK(std::endian::native == std::endian::little);
+  if (std::endian::native != std::endian::little) {
+    return std::shared_ptr<ZImg>();
+  }
 
   const size_t headerBytes = compactSize(ImgRegionEntryHeader{});
   if (bytes.size() < headerBytes) {
@@ -235,7 +266,9 @@ struct ImgRegionEntryHeader
   }
 
   auto mulNoOverflow = [](uint64_t a, uint64_t b, uint64_t* out) -> bool {
-    CHECK(out != nullptr);
+    if (out == nullptr) {
+      return false;
+    }
     if (a == 0 || b == 0) {
       *out = 0;
       return true;
@@ -278,21 +311,34 @@ struct ImgRegionEntryHeader
   info.validBitCount = static_cast<size_t>(hdr.validBitCount);
   info.createDefaultDescriptions();
 
-  auto img = std::make_shared<ZImg>(info);
+  std::shared_ptr<ZImg> img;
+  try {
+    img = std::make_shared<ZImg>(info);
+  } catch (...) {
+    return std::shared_ptr<ZImg>();
+  }
   const uint8_t* src = bytes.data() + headerBytes;
   if (totalBytes > 0) {
     const size_t timeBytes = img->timeByteNumber();
-    CHECK(timeBytes > 0);
-    CHECK(timeBytes * img->numTimes() == totalBytes);
+    if (timeBytes == 0) {
+      return std::shared_ptr<ZImg>();
+    }
+    if (img->numTimes() == 0 || (timeBytes * img->numTimes()) != totalBytes) {
+      return std::shared_ptr<ZImg>();
+    }
 
     size_t offset = 0;
     for (size_t ti = 0; ti < img->numTimes(); ++ti) {
       uint8_t* dstTime = img->timeData<uint8_t>(ti);
-      CHECK(dstTime != nullptr);
+      if (dstTime == nullptr) {
+        return std::shared_ptr<ZImg>();
+      }
       std::memcpy(dstTime, src + offset, timeBytes);
       offset += timeBytes;
     }
-    CHECK(offset == totalBytes);
+    if (offset != totalBytes) {
+      return std::shared_ptr<ZImg>();
+    }
   }
   return img;
 }
@@ -311,68 +357,53 @@ public:
       return;
     }
 
-    m_cacheDir = atlasDiskCacheDirFromRoot(m_rootDir);
-    m_dbPath = QDir(m_cacheDir).filePath(QString::fromLatin1(kImgRegionDiskCacheDbName));
-    m_lockPath = QDir(m_cacheDir).filePath(QString::fromLatin1(kImgRegionDiskCacheLockName));
-
-    {
-      QDir mk;
-      if (!mk.mkpath(m_cacheDir)) {
-        LOG(WARNING) << "Image-region disk cache disabled: failed to create directory " << m_cacheDir;
-        return;
-      }
+    m_bucket = std::make_unique<ZSqliteDiskCacheBucket>(m_rootDir,
+                                                        QString::fromLatin1(kImgRegionDiskCacheDbName),
+                                                        m_maxBytes,
+                                                        FLAGS_atlas_disk_cache_imgregion_async_max_pending_bytes,
+                                                        QStringLiteral("imgregion_disk_cache"));
+    if (isEnabled()) {
+      LOG(INFO) << "Image-region disk cache enabled: root='" << m_rootDir << "' maxBytes=" << m_maxBytes;
     }
+  }
 
-    // Single-writer guard across processes (size accounting/pruning is best-effort but simpler with one writer).
-    m_lock = std::make_unique<QLockFile>(m_lockPath);
-    m_lock->setStaleLockTime(static_cast<int>(std::chrono::milliseconds(std::chrono::seconds(10)).count()));
-    if (!m_lock->tryLock(/*timeout=*/0)) {
-      VLOG(1) << "Image-region disk cache disabled: could not acquire lock at " << m_lockPath;
-      m_lock.reset();
-      return;
-    }
+  ~ImgRegionDiskBackend() override = default;
 
-    m_cache = std::make_unique<ZSqliteLRUCache>(m_dbPath, m_maxBytes);
-    if (!m_cache->isOpen()) {
-      LOG(WARNING) << "Image-region disk cache disabled: failed to open SQLite DB at " << m_dbPath;
-      m_cache.reset();
-      m_lock.reset();
-      return;
-    }
-
-    m_enabled = true;
-    LOG(INFO) << "Image-region disk cache enabled: root='" << m_rootDir << "' maxBytes=" << m_maxBytes;
+  [[nodiscard]] bool isEnabled() const
+  {
+    return m_bucket && m_bucket->isEnabled();
   }
 
   [[nodiscard]] std::optional<DiskLookupResult> tryGet(const ImageRegionCacheHashKeyType& key) override
   {
-    std::lock_guard<std::mutex> g(m_mu);
-    if (!m_enabled || !m_cache) {
-      return std::nullopt;
-    }
-    if (!m_cache->isOpen()) {
-      m_cache.reset();
-      m_lock.reset();
-      m_enabled = false;
+    if (!isEnabled()) {
       return std::nullopt;
     }
 
     const Blob keyHash = sha256KeyHashFor(key);
-    if (keyHash.empty()) {
+    if (keyHash.size() != 32) {
       return std::nullopt;
     }
 
-    auto valueOpt = m_cache->tryGet(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
-    if (!valueOpt.has_value()) {
+    auto getOpt = m_bucket->tryGetNoTouch(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
+    if (!getOpt.has_value()) {
       return std::nullopt;
     }
 
-    auto parsed = parseImgRegionEntry(std::span<const std::uint8_t>(valueOpt->data(), valueOpt->size()));
+    auto parsed = parseImgRegionEntry(std::span<const std::uint8_t>(getOpt->value.data(), getOpt->value.size()));
     if (!parsed) {
       // Corrupt entry; best-effort cleanup.
-      m_cache->erase(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
+      m_bucket->tryEnqueueErase(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
       return std::nullopt;
     }
+
+    const int64_t nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::system_clock::now().time_since_epoch())
+                            .count();
+    m_bucket->tryEnqueueTouchIfStale(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
+                                     getOpt->lastAccessNs,
+                                     nowNs,
+                                     std::chrono::seconds(5));
 
     DiskLookupResult out;
     out.value = std::move(parsed);
@@ -384,66 +415,52 @@ public:
   {
     CHECK(value);
 
-    std::lock_guard<std::mutex> g(m_mu);
-    if (!m_enabled || !m_cache) {
+    if (!isEnabled()) {
       return;
     }
-    if (!m_cache->isOpen()) {
-      m_cache.reset();
-      m_lock.reset();
-      m_enabled = false;
-      return;
-    }
+
     if (static_cast<uint64_t>(objSize) > m_maxBytes) {
       // An entry larger than the entire budget would cause immediate thrash; skip caching.
       return;
     }
 
+    // Compute key hash outside the cache mutex to minimize contention with lookups.
     const Blob keyHash = sha256KeyHashFor(key);
-    if (keyHash.empty()) {
+    if (keyHash.size() != 32) {
       return;
     }
 
-    const Blob entryBytes = serializeImgRegionEntry(*value);
-    if (entryBytes.empty()) {
+    const uint64_t headerBytes = static_cast<uint64_t>(compactSize(ImgRegionEntryHeader{}));
+    if (static_cast<uint64_t>(objSize) > std::numeric_limits<uint64_t>::max() - headerBytes) {
+      return;
+    }
+    const uint64_t estimatedBytes = headerBytes + static_cast<uint64_t>(objSize);
+    if (estimatedBytes > m_maxBytes) {
       return;
     }
 
-    m_cache->put(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
-                 std::span<const std::uint8_t>(entryBytes.data(), entryBytes.size()));
+    m_bucket->tryEnqueuePutValueWithFactory(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
+                                            estimatedBytes,
+                                            [value]() -> Blob { return serializeImgRegionEntry(*value); });
   }
 
   void erase(const ImageRegionCacheHashKeyType& key) override
   {
-    std::lock_guard<std::mutex> g(m_mu);
-    if (!m_enabled || !m_cache) {
-      return;
-    }
-    if (!m_cache->isOpen()) {
-      m_cache.reset();
-      m_lock.reset();
-      m_enabled = false;
-      return;
-    }
     const Blob keyHash = sha256KeyHashFor(key);
-    if (keyHash.empty()) {
+    if (keyHash.size() != 32) {
       return;
     }
-    m_cache->erase(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
+    if (!isEnabled()) {
+      return;
+    }
+    m_bucket->tryEnqueueErase(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
   }
 
 private:
   QString m_rootDir;
-  QString m_cacheDir;
-  QString m_dbPath;
-  QString m_lockPath;
 
   uint64_t m_maxBytes = 0;
-  bool m_enabled = false;
-
-  std::mutex m_mu;
-  std::unique_ptr<QLockFile> m_lock;
-  std::unique_ptr<ZSqliteLRUCache> m_cache;
+  std::unique_ptr<ZSqliteDiskCacheBucket> m_bucket;
 };
 
 } // namespace

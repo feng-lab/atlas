@@ -27,7 +27,13 @@ public:
   using Blob = std::vector<std::uint8_t>;
   using NowNsFn = std::function<int64_t()>;
 
-  ZSqliteLRUCache(QString dbPath, uint64_t maxBytes, NowNsFn nowNsFn = nullptr);
+  struct GetNoTouchResult
+  {
+    Blob value;
+    int64_t lastAccessNs = 0;
+  };
+
+  ZSqliteLRUCache(QString dbPath, uint64_t maxBytes, NowNsFn nowNsFn = nullptr, bool readOnly = false);
   ~ZSqliteLRUCache();
 
   ZSqliteLRUCache(const ZSqliteLRUCache&) = delete;
@@ -45,8 +51,15 @@ public:
   // Returns the cached value if present.
   [[nodiscard]] std::optional<Blob> tryGet(std::span<const std::uint8_t> keyHash);
 
+  // Returns the cached value if present, without mutating the DB (no access-time touch).
+  // Callers that want LRU-ish behavior should schedule touch() out-of-band.
+  [[nodiscard]] std::optional<GetNoTouchResult> tryGetNoTouch(std::span<const std::uint8_t> keyHash);
+
   // Inserts or replaces an entry.
   void put(std::span<const std::uint8_t> keyHash, std::span<const std::uint8_t> value);
+
+  // Best-effort access-time update. No-op on failure.
+  void touch(std::span<const std::uint8_t> keyHash, int64_t nowNs);
 
   // Removes an entry if present.
   void erase(std::span<const std::uint8_t> keyHash);
@@ -56,7 +69,6 @@ private:
 
   [[nodiscard]] bool initDbLocked();
   [[nodiscard]] bool ensureSchemaLocked();
-  [[nodiscard]] bool loadOrInitTotalBytesLocked();
 
   // Tracks persistent SQLite failures and disables the cache (by closing the DB)
   // after repeated errors. This avoids repeatedly paying I/O/SQL overhead when
@@ -75,8 +87,7 @@ private:
 private:
   QString m_dbPath;
   uint64_t m_maxBytes = 0;
-  uint64_t m_totalBytes = 0;
-  bool m_totalBytesKnown = false;
+  bool m_readOnly = false;
 
   NowNsFn m_nowNsFn;
 
@@ -84,10 +95,10 @@ private:
 
   sqlite3_stmt* m_stmtSelectValue = nullptr;
   sqlite3_stmt* m_stmtTouch = nullptr;
-  sqlite3_stmt* m_stmtSelectSize = nullptr;
   sqlite3_stmt* m_stmtUpsert = nullptr;
   sqlite3_stmt* m_stmtDelete = nullptr;
   sqlite3_stmt* m_stmtPruneSelect = nullptr;
+  sqlite3_stmt* m_stmtSelectTotalBytes = nullptr;
 
   std::chrono::steady_clock::time_point m_lastPrune{};
   int m_consecutiveSqlFailures = 0;

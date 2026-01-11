@@ -2,9 +2,17 @@
 
 #include <QString>
 
+#include <cstdint>
+
 namespace nim {
 
 inline constexpr char kAtlasDiskCacheDirName[] = "atlas_disk_cache_v1";
+
+// Disk cache SQLite writes are async (best-effort). To avoid tiny queues that
+// immediately thrash/dropped writes, we clamp per-bucket async budgets to a
+// minimum. This is intentionally conservative: Atlas disk caches are only
+// useful when they can absorb bursts without blocking critical threads.
+inline constexpr uint64_t kAtlasDiskCacheAsyncMinPendingBytes = 256ULL * 1024ULL * 1024ULL; // 256 MiB
 
 // Returns the root directory for Atlas' persistent disk caches based on flags and
 // system defaults. The returned path is NOT the bucket directory; use
@@ -18,4 +26,3 @@ inline constexpr char kAtlasDiskCacheDirName[] = "atlas_disk_cache_v1";
 [[nodiscard]] QString atlasDiskCacheDirFromFlags();
 
 } // namespace nim
-

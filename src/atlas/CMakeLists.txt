@@ -597,6 +597,9 @@ set(SOURCES
     zswccolorparameters.cpp zswccolorparameters.h
     zthreadsafelrucache.h zthreadsafescalablecache.h
     zimgregioncache.cpp zimgregioncache.h
+    zsqlitereadonlypool.cpp zsqlitereadonlypool.h
+    zsqlitediskcachebucket.cpp zsqlitediskcachebucket.h
+    zsqliteasyncwritequeue.cpp zsqliteasyncwritequeue.h
     zcheckbox.cpp zcheckbox.h
     zrunexport3danimation.cpp zrunexport3danimation.h
     zrundumpanimation3dschema.cpp zrundumpanimation3dschema.h

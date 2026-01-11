@@ -1,14 +1,11 @@
 #include "zhttpdiskcache.h"
 
-#include "zdiskcacheutils.h"
 #include "zproxygenhttpclient.h"
 #include "zlog.h"
-#include "zsqlitelrucache.h"
+#include "zsqlitediskcachebucket.h"
 #include "zstructutils.h"
 
-#include <QDir>
-#include <QFile>
-#include <QLockFile>
+#include <gflags/gflags.h>
 
 #include <boost/hash2/sha2.hpp>
 
@@ -20,6 +17,8 @@
 #include <limits>
 #include <string>
 #include <string_view>
+
+DECLARE_uint64(atlas_disk_cache_http_async_max_pending_bytes);
 
 namespace nim {
 
@@ -74,6 +73,34 @@ struct HttpCacheEntryHeader
   return std::nullopt;
 }
 
+[[nodiscard]] int64_t nowNs()
+{
+  using namespace std::chrono;
+  return duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
+}
+
+[[nodiscard]] uint64_t estimatedSerializedEntryBytes(const ZHttpGetBytesResult& result)
+{
+  const size_t headerBytes = compactSize(HttpCacheEntryHeader{});
+  uint64_t total = headerBytes;
+
+  if (result.contentType.size() > std::numeric_limits<uint64_t>::max() - total) {
+    return std::numeric_limits<uint64_t>::max();
+  }
+  total += static_cast<uint64_t>(result.contentType.size());
+
+  if (result.contentEncoding.size() > std::numeric_limits<uint64_t>::max() - total) {
+    return std::numeric_limits<uint64_t>::max();
+  }
+  total += static_cast<uint64_t>(result.contentEncoding.size());
+
+  if (result.body.size() > std::numeric_limits<uint64_t>::max() - total) {
+    return std::numeric_limits<uint64_t>::max();
+  }
+  total += static_cast<uint64_t>(result.body.size());
+  return total;
+}
+
 } // namespace
 
 ZHttpDiskCache::ZHttpDiskCache(QString rootDir, uint64_t maxBytes)
@@ -85,40 +112,19 @@ ZHttpDiskCache::ZHttpDiskCache(QString rootDir, uint64_t maxBytes)
     return;
   }
 
-  m_cacheDir = atlasDiskCacheDirFromRoot(m_rootDir);
-  m_dbPath = QDir(m_cacheDir).filePath(QStringLiteral("http.sqlite"));
-  m_lockPath = QDir(m_cacheDir).filePath(QStringLiteral("http.lock"));
-
-  // Ensure base directories exist.
-  {
-    QDir dir;
-    if (!dir.mkpath(m_cacheDir)) {
-      LOG(WARNING) << "HTTP disk cache disabled: failed to create directory " << m_cacheDir;
-      return;
-    }
-  }
-
-  // Single-writer guard across processes.
-  m_lock = std::make_unique<QLockFile>(m_lockPath);
-  m_lock->setStaleLockTime(static_cast<int>(std::chrono::milliseconds(std::chrono::seconds(10)).count()));
-  if (!m_lock->tryLock(/*timeout=*/0)) {
-    LOG(INFO) << "HTTP disk cache disabled: could not acquire lock at " << m_lockPath;
-    m_lock.reset();
-    return;
-  }
-
-  m_cache = std::make_unique<ZSqliteLRUCache>(m_dbPath, m_maxBytes);
-  if (!m_cache->isOpen()) {
-    LOG(WARNING) << "HTTP disk cache disabled: failed to open SQLite DB at " << m_dbPath;
-    m_cache.reset();
-    m_lock.reset();
-    return;
-  }
-
-  m_enabled = true;
+  m_bucket = std::make_unique<ZSqliteDiskCacheBucket>(m_rootDir,
+                                                      QStringLiteral("http.sqlite"),
+                                                      m_maxBytes,
+                                                      FLAGS_atlas_disk_cache_http_async_max_pending_bytes,
+                                                      QStringLiteral("http_disk_cache"));
 }
 
 ZHttpDiskCache::~ZHttpDiskCache() = default;
+
+bool ZHttpDiskCache::isEnabled() const
+{
+  return m_bucket && m_bucket->isEnabled();
+}
 
 ZHttpDiskCache::KeyParts ZHttpDiskCache::keyPartsFrom(
   const std::string& url,
@@ -149,7 +155,9 @@ ZHttpDiskCache::Blob ZHttpDiskCache::sha256(const void* data, size_t bytes)
 
 ZHttpDiskCache::Blob ZHttpDiskCache::serializeEntry(const ZHttpGetBytesResult& result)
 {
-  CHECK(std::endian::native == std::endian::little);
+  if (std::endian::native != std::endian::little) {
+    return {};
+  }
 
   if (result.status < 0 || result.status > std::numeric_limits<uint16_t>::max()) {
     return {};
@@ -192,8 +200,17 @@ ZHttpDiskCache::Blob ZHttpDiskCache::serializeEntry(const ZHttpGetBytesResult& r
   totalBytes += bodyBytes;
 
   Blob out;
-  out.resize(totalBytes);
-  CHECK(compactStructToMemory(out.data(), headerBytes, hdr) == headerBytes);
+  try {
+    out.resize(totalBytes);
+  } catch (...) {
+    return {};
+  }
+  if (out.empty()) {
+    return {};
+  }
+  if (compactStructToMemory(out.data(), headerBytes, hdr) != headerBytes) {
+    return {};
+  }
 
   size_t offset = headerBytes;
   if (hdr.contentTypeLen > 0) {
@@ -210,7 +227,9 @@ ZHttpDiskCache::Blob ZHttpDiskCache::serializeEntry(const ZHttpGetBytesResult& r
     std::memcpy(out.data() + offset, result.body.data(), static_cast<size_t>(hdr.bodyLen));
     offset += static_cast<size_t>(hdr.bodyLen);
   }
-  CHECK(offset == totalBytes);
+  if (offset != totalBytes) {
+    return {};
+  }
 
   return out;
 }
@@ -219,15 +238,7 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(
   const std::string& url,
   const std::vector<std::pair<std::string, std::string>>& requestHeaders)
 {
-  std::lock_guard<std::mutex> g(m_mu);
-  if (!m_enabled || !m_cache) {
-    return std::nullopt;
-  }
-  if (!m_cache->isOpen()) {
-    // Best-effort: persistent DB failures should not impact callers.
-    m_cache.reset();
-    m_lock.reset();
-    m_enabled = false;
+  if (!isEnabled()) {
     return std::nullopt;
   }
 
@@ -243,17 +254,26 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(
   keyBytes.push_back('\n');
 
   const Blob keyHash = sha256(keyBytes.data(), keyBytes.size());
-  auto valueOpt = m_cache->tryGet(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
-  if (!valueOpt.has_value()) {
+  if (keyHash.size() != 32) {
     return std::nullopt;
   }
 
-  auto resOpt = parseEntry(std::span<const std::uint8_t>(valueOpt->data(), valueOpt->size()));
-  if (!resOpt.has_value()) {
-    // Corrupt entry; best-effort cleanup.
-    m_cache->erase(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
+  auto getOpt = m_bucket->tryGetNoTouch(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
+  if (!getOpt.has_value()) {
     return std::nullopt;
   }
+
+  auto resOpt = parseEntry(std::span<const std::uint8_t>(getOpt->value.data(), getOpt->value.size()));
+  if (!resOpt.has_value()) {
+    // Corrupt entry; best-effort cleanup (async).
+    m_bucket->tryEnqueueErase(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()));
+    return std::nullopt;
+  }
+
+  m_bucket->tryEnqueueTouchIfStale(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
+                                   getOpt->lastAccessNs,
+                                   nowNs(),
+                                   std::chrono::seconds(5));
 
   return resOpt;
 }
@@ -262,14 +282,7 @@ void ZHttpDiskCache::put(const std::string& url,
                          const std::vector<std::pair<std::string, std::string>>& requestHeaders,
                          const ZHttpGetBytesResult& result)
 {
-  std::lock_guard<std::mutex> g(m_mu);
-  if (!m_enabled || !m_cache) {
-    return;
-  }
-  if (!m_cache->isOpen()) {
-    m_cache.reset();
-    m_lock.reset();
-    m_enabled = false;
+  if (!isEnabled()) {
     return;
   }
   if (result.status != 200 && result.status != 206) {
@@ -291,22 +304,50 @@ void ZHttpDiskCache::put(const std::string& url,
   keyBytes.push_back('\n');
 
   const Blob keyHash = sha256(keyBytes.data(), keyBytes.size());
+  if (keyHash.size() != 32) {
+    return;
+  }
 
-  const Blob value = serializeEntry(result);
-  if (value.empty()) {
+  const uint64_t estimatedBytes = estimatedSerializedEntryBytes(result);
+  if (estimatedBytes == std::numeric_limits<uint64_t>::max()) {
     return;
   }
-  if (static_cast<uint64_t>(value.size()) > m_maxBytes) {
-    // Guard against extreme header sizes; treat as uncacheable.
+  if (estimatedBytes > m_maxBytes) {
+    // Entry would always be rejected by the underlying cache (value.size() > maxBytes).
     return;
   }
-  m_cache->put(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
-               std::span<const std::uint8_t>(value.data(), value.size()));
+
+  // Copying the HTTP body can be expensive; avoid copying if the queue is full
+  // by deferring the copy into the factory (executed only if accepted).
+  m_bucket->tryEnqueueTaskWithFactory(
+    std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
+    estimatedBytes,
+    [&result](const ZSqliteDiskCacheBucket::KeyHash32& keyArr) -> ZSqliteDiskCacheBucket::TaskFn {
+      ZHttpGetBytesResult resultCopy = result;
+      return [keyArr, result = std::move(resultCopy)](ZSqliteLRUCache& cache) {
+        const Blob value = serializeEntry(result);
+        if (value.empty()) {
+          return;
+        }
+        cache.put(std::span<const std::uint8_t>(keyArr.data(), keyArr.size()),
+                  std::span<const std::uint8_t>(value.data(), value.size()));
+      };
+    });
+}
+
+bool ZHttpDiskCache::drainWrites(std::chrono::milliseconds timeout)
+{
+  if (!isEnabled()) {
+    return false;
+  }
+  return m_bucket->drainWrites(timeout);
 }
 
 std::optional<ZHttpGetBytesResult> ZHttpDiskCache::parseEntry(std::span<const std::uint8_t> value)
 {
-  CHECK(std::endian::native == std::endian::little);
+  if (std::endian::native != std::endian::little) {
+    return std::nullopt;
+  }
 
   static const size_t headerBytes = compactSize(HttpCacheEntryHeader{});
   if (value.size() < headerBytes) {
@@ -343,18 +384,22 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::parseEntry(std::span<const st
     return std::nullopt;
   }
 
-  std::vector<uint8_t> body;
-  body.resize(bodyLen);
-  if (!body.empty()) {
-    std::memcpy(body.data(), value.data() + offset, body.size());
-  }
+  try {
+    std::vector<uint8_t> body;
+    body.resize(bodyLen);
+    if (!body.empty()) {
+      std::memcpy(body.data(), value.data() + offset, body.size());
+    }
 
-  ZHttpGetBytesResult out{};
-  out.status = hdr.status;
-  out.contentType.assign(contentTypeView.data(), contentTypeView.size());
-  out.contentEncoding.assign(contentEncView.data(), contentEncView.size());
-  out.body = std::move(body);
-  return out;
+    ZHttpGetBytesResult out{};
+    out.status = hdr.status;
+    out.contentType.assign(contentTypeView.data(), contentTypeView.size());
+    out.contentEncoding.assign(contentEncView.data(), contentEncView.size());
+    out.body = std::move(body);
+    return out;
+  } catch (...) {
+    return std::nullopt;
+  }
 }
 
 } // namespace nim
