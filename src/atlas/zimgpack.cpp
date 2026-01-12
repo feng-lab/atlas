@@ -4,6 +4,7 @@
 #include "zlog.h"
 #include "zimgcache.h"
 #include "zimgregioncache.h"
+#include "zimgpreviewdiskcache.h"
 #include "zcancellation.h"
 #include "zneuroglancerprecomputed.h"
 #include "zneuroglancerprecomputedannotations.h"
@@ -1491,6 +1492,28 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
     }
   }
   return res;
+}
+
+std::shared_ptr<const ZImg> ZImgPack::resizedImgCached(size_t width, size_t height, size_t depth, size_t t) const
+{
+  CHECK(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth && width > 0 && height > 0 &&
+        depth > 0);
+
+  // Cache is intended for disk-backed, file-based datasets. For in-memory images (already loaded) and
+  // network-backed sources, fall back to the regular resizedImg path.
+  if (!m_diskCached || m_ngVolume) {
+    auto img = std::make_shared<ZImg>(resizedImg(width, height, depth, t));
+    return std::shared_ptr<const ZImg>(img);
+  }
+
+  const auto fingerprint = datasetFingerprintForCache();
+  if (auto hit = ZImgPreviewDiskCache::instance().tryGetFilePreview(fingerprint, width, height, depth, t); hit) {
+    return std::shared_ptr<const ZImg>(std::move(hit));
+  }
+
+  auto img = std::make_shared<ZImg>(resizedImg(width, height, depth, t));
+  ZImgPreviewDiskCache::instance().tryPutFilePreview(fingerprint, width, height, depth, t, img);
+  return std::shared_ptr<const ZImg>(img);
 }
 
 #if 0

@@ -43,6 +43,12 @@
 # Max size in bytes (default 20 GiB). Set to 0 to disable.
 --atlas_disk_cache_imgregion_max_bytes=21474836480
 
+# Persistent on-disk cache for downsampled 3D preview volumes used by Z3DImg::readVolumes().
+# Max size in bytes (default 5 GiB). Set to 0 to disable.
+--atlas_disk_cache_imgpreview_max_bytes=5368709120
+# Async write queue budget in bytes (default 1024 MiB; min 256 MiB). When full, writes are dropped (best-effort).
+--atlas_disk_cache_imgpreview_async_max_pending_bytes=1073741824
+
 # Root directory for the Atlas persistent disk cache (empty = auto-chosen Atlas cache/config directory).
 --atlas_disk_cache_dir=
 

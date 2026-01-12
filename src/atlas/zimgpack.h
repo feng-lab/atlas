@@ -261,6 +261,12 @@ public:
 
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
+  // Like resizedImg(), but uses the persistent preview-volume disk cache when available.
+  //
+  // This is intended for the fast 3D preview volume built by Z3DImg::readVolumes().
+  // Best-effort: cache failures degrade to the regular resizedImg() path.
+  std::shared_ptr<const ZImg> resizedImgCached(size_t width, size_t height, size_t depth, size_t t) const;
+
 #if 0
   folly::Future<std::shared_ptr<ZImg>> readRegionToImg(index_t xyRatio,
                                                        index_t zRatio,

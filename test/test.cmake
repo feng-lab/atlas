@@ -93,6 +93,7 @@ else ()
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedsegmentpropertiestest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedskeletontest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputede2etest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zimgdiskcacheentrytest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
   target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_lib)
   target_compile_definitions(zatlasheavytest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")

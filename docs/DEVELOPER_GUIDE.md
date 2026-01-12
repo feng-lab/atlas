@@ -42,6 +42,13 @@ Neuroglancer Precomputed (HTTP)
     - Payloads are stored compressed (zstd via Folly) to reduce disk usage. Compression runs on the async writer thread; reads transparently decompress on cache hit.
     - Stored at `<root>/atlas_disk_cache_v1/imgregion.sqlite` (single bucket DB).
     - Current scope: file-backed sources (`ZImgRegionCacheSourceKind::File`); Neuroglancer region caching is still memory-only.
+  - Optional persistent image-preview disk cache (SQLite-backed) can be enabled to persist the downsampled *raw* 3D preview volume built by `Z3DImg::readVolumes()` for file-backed datasets:
+    - Integrated into `ZImgPack::resizedImgCached(...)` and consumed by `Z3DImg::readVolumes()` (fast-path volume construction).
+    - Enable with `--atlas_disk_cache_imgpreview_max_bytes=<N>` (default 5 GiB; set to 0 to disable).
+    - Async write queue: `--atlas_disk_cache_imgpreview_async_max_pending_bytes=<N>` bounds queued SQLite writes (touch/put/erase). Values smaller than 256 MiB are clamped to 256 MiB. When the queue is full, disk writes are dropped (best-effort cache semantics).
+    - Read path: synchronous point lookups using per-thread read-only SQLite connections (so concurrent readers do not block each other); LRU touches happen asynchronously.
+    - Payloads are stored compressed (zstd via Folly) to reduce disk usage.
+    - Stored at `<root>/atlas_disk_cache_v1/imgpreview.sqlite` (single bucket DB).
 - Dataset parsing + chunk addressing lives in `src/atlas/zneuroglancerprecomputed.h` and `src/atlas/zneuroglancerprecomputed.cpp` (reads `.../info`, then fetches chunks on demand).
   - Chunk decode helpers live in `src/atlas/zneuroglancerprecomputedchunkdecoder.h` and `src/atlas/zneuroglancerprecomputedchunkdecoder.cpp`.
   - Sharded-format helpers are in `src/atlas/zneuroglanceruint64sharding.h` and `src/atlas/zneuroglanceruint64sharding.cpp`.

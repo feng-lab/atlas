@@ -15,12 +15,14 @@ constexpr uint64_t kMiB = 1024ULL * 1024ULL;
 
 constexpr uint64_t kDefaultHttpDiskCacheMaxBytes = 10ULL * kGiB;
 constexpr uint64_t kDefaultImgRegionDiskCacheMaxBytes = 20ULL * kGiB;
+constexpr uint64_t kDefaultImgPreviewDiskCacheMaxBytes = 5ULL * kGiB;
 
 // Async write queue limits:
 // - Writes are best-effort and may be dropped if the queue is full.
 // - Keep defaults conservative to avoid unbounded memory growth when disk I/O is slow.
 constexpr uint64_t kDefaultHttpDiskCacheAsyncMaxPendingBytes = 256ULL * kMiB;
 constexpr uint64_t kDefaultImgRegionDiskCacheAsyncMaxPendingBytes = 256ULL * kMiB;
+constexpr uint64_t kDefaultImgPreviewDiskCacheAsyncMaxPendingBytes = 1024ULL * kMiB;
 
 } // namespace
 
@@ -43,6 +45,14 @@ DEFINE_uint64(atlas_disk_cache_imgregion_max_bytes,
 DEFINE_uint64(atlas_disk_cache_imgregion_async_max_pending_bytes,
               kDefaultImgRegionDiskCacheAsyncMaxPendingBytes,
               "Maximum queued bytes for async image-region disk-cache SQLite writes (min 256 MiB; default 256 MiB).");
+
+DEFINE_uint64(atlas_disk_cache_imgpreview_max_bytes,
+              kDefaultImgPreviewDiskCacheMaxBytes,
+              "Maximum size in bytes for the persistent image-preview disk cache (0 disables; default 5 GiB).");
+
+DEFINE_uint64(atlas_disk_cache_imgpreview_async_max_pending_bytes,
+              kDefaultImgPreviewDiskCacheAsyncMaxPendingBytes,
+              "Maximum queued bytes for async image-preview disk-cache SQLite writes (min 256 MiB; default 1024 MiB).");
 
 namespace nim {
 

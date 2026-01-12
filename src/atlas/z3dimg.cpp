@@ -1028,34 +1028,52 @@ void Z3DImg::readVolumes()
     m_volumeGenerations.assign(m_nChannels, 0);
   }
 
-  ZImg img = m_imgPack.resizedImg(m_volumeDimension.x, m_volumeDimension.y, m_volumeDimension.z, 0);
+  const std::shared_ptr<const ZImg> img =
+    m_imgPack.resizedImgCached(m_volumeDimension.x, m_volumeDimension.y, m_volumeDimension.z, 0);
+  CHECK(img);
 
   if (m_nChannels == 1) {
-    if (!img.isType<uint8_t>()) {
-      img = img.convertTo<uint8_t>(m_channelDisplayRanges[0].x, m_channelDisplayRanges[0].y);
-    } else if (img.validBitCount() != 0 && img.validBitCount() != 8 && img.validBitCount() != 16) {
-      img.normalize(m_channelDisplayRanges[0].x, m_channelDisplayRanges[0].y);
+    if (img->isType<uint8_t>() &&
+        (img->validBitCount() == 0 || img->validBitCount() == 8 || img->validBitCount() == 16)) {
+      auto& channel = m_channelResources[0];
+      channel.image = img;
+      channel.dimensions = glm::uvec3(static_cast<uint32_t>(channel.image->width()),
+                                      static_cast<uint32_t>(channel.image->height()),
+                                      static_cast<uint32_t>(channel.image->depth()));
+      ++m_volumeGenerations[0];
+      return;
     }
 
-    auto mutableImage = std::make_shared<ZImg>(std::move(img));
+    ZImg mutableImg = *img;
+    if (!mutableImg.isType<uint8_t>()) {
+      mutableImg = mutableImg.convertTo<uint8_t>(m_channelDisplayRanges[0].x, m_channelDisplayRanges[0].y);
+    } else if (mutableImg.validBitCount() != 0 && mutableImg.validBitCount() != 8 && mutableImg.validBitCount() != 16) {
+      mutableImg.normalize(m_channelDisplayRanges[0].x, m_channelDisplayRanges[0].y);
+    }
+
+    auto mutableImage = std::make_shared<ZImg>(std::move(mutableImg));
     auto& channel = m_channelResources[0];
-    channel.image = std::shared_ptr<const ZImg>(mutableImage);
+    channel.image = std::shared_ptr<const ZImg>(std::move(mutableImage));
     channel.dimensions = glm::uvec3(static_cast<uint32_t>(channel.image->width()),
                                     static_cast<uint32_t>(channel.image->height()),
                                     static_cast<uint32_t>(channel.image->depth()));
     ++m_volumeGenerations[0];
   } else {
     for (size_t i = 0; i < m_nChannels; ++i) {
-      ZImg cImg = img.crop(ZImgRegion(0, -1, 0, -1, 0, -1, i, i + 1));
-      if (!cImg.isType<uint8_t>()) {
-        cImg = cImg.convertTo<uint8_t>(m_channelDisplayRanges[i].x, m_channelDisplayRanges[i].y);
-      } else if (cImg.validBitCount() != 0 && cImg.validBitCount() != 8 && cImg.validBitCount() != 16) {
-        cImg.normalize(m_channelDisplayRanges[i].x, m_channelDisplayRanges[i].y);
+      const ZImg channelView = img->createView(static_cast<index_t>(i), 0);
+      ZImg cImg;
+      if (!channelView.isType<uint8_t>()) {
+        cImg = channelView.convertTo<uint8_t>(m_channelDisplayRanges[i].x, m_channelDisplayRanges[i].y);
+      } else {
+        cImg = channelView;
+        if (cImg.validBitCount() != 0 && cImg.validBitCount() != 8 && cImg.validBitCount() != 16) {
+          cImg.normalize(m_channelDisplayRanges[i].x, m_channelDisplayRanges[i].y);
+        }
       }
 
       auto mutableImage = std::make_shared<ZImg>(std::move(cImg));
       auto& channel = m_channelResources[i];
-      channel.image = std::shared_ptr<const ZImg>(mutableImage);
+      channel.image = std::shared_ptr<const ZImg>(std::move(mutableImage));
       channel.dimensions = glm::uvec3(static_cast<uint32_t>(channel.image->width()),
                                       static_cast<uint32_t>(channel.image->height()),
                                       static_cast<uint32_t>(channel.image->depth()));

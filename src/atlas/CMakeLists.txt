@@ -596,7 +596,9 @@ set(SOURCES
     zregionannotationpack.cpp zregionannotationpack.h
     zswccolorparameters.cpp zswccolorparameters.h
     zthreadsafelrucache.h zthreadsafescalablecache.h
+    zimgdiskcacheentry.cpp zimgdiskcacheentry.h
     zimgregioncache.cpp zimgregioncache.h
+    zimgpreviewdiskcache.cpp zimgpreviewdiskcache.h
     zsqlitereadonlypool.cpp zsqlitereadonlypool.h
     zsqlitediskcachebucket.cpp zsqlitediskcachebucket.h
     zsqliteasyncwritequeue.cpp zsqliteasyncwritequeue.h
