@@ -16,7 +16,7 @@ inputs:
     required: false
     default: "false"
   enable-cache:
-    description: Enable actions/cache restore/save. Set to false for self-hosted runs to avoid caching.
+    description: Enable actions/cache restore/save (GitHub cache service). If false, uses a local on-disk cache for 3rdparty build outputs.
     required: false
     default: "true"
   python-version:
@@ -34,6 +34,41 @@ runs:
         path: |
           src/3rdparty/build
         key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
+
+    - name: Cache 3rdparty build (local on-disk)
+      if: ${{ inputs.enable-cache == 'false' }}
+      shell: bash -l {0}
+      env:
+        CACHE_KEY: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
+        CACHE_PATH_REL: src/3rdparty/build
+      run: |
+        set -euo pipefail
+
+        cacheRoot="$HOME/Library/Caches/atlas/gha-cache"
+        if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+          cacheRoot="${cacheRoot}/${GITHUB_REPOSITORY}"
+        fi
+
+        archive="${cacheRoot}/${CACHE_KEY}.tar.gz"
+
+        mkdir -p "${cacheRoot}"
+
+        if [ -f "${archive}" ]; then
+          echo "Restoring local extlibs cache for '${CACHE_PATH_REL}' from: ${archive}"
+          rm -rf -- "${GITHUB_WORKSPACE%/}/${CACHE_PATH_REL}" 2>/dev/null || true
+          if tar -C "${GITHUB_WORKSPACE%/}" -xzf "${archive}"; then
+            if [ -n "${GITHUB_ENV:-}" ]; then
+              echo "ATLAS_EXTLIBS_LOCAL_CACHE_HIT=true" >> "$GITHUB_ENV"
+            else
+              echo "Warning: GITHUB_ENV is not set; cannot persist local extlibs cache hit flag." >&2
+            fi
+          else
+            echo "Warning: failed to restore local extlibs cache archive; rebuilding and re-packaging." >&2
+            rm -f -- "${archive}" 2>/dev/null || true
+          fi
+        else
+          echo "Local extlibs cache miss for key: ${CACHE_KEY}"
+        fi
 
     - name: Install base packages (Homebrew)
       if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
@@ -205,7 +240,46 @@ runs:
       shell: bash -l {0}
       run: |
         set -euo pipefail
+
+        if [ "${ATLAS_EXTLIBS_LOCAL_CACHE_HIT:-}" = "true" ]; then
+          echo "External deps already restored from local cache; skipping build_ext_libs.py."
+          exit 0
+        fi
+
         eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
         python util/build_ext_libs.py all
+
+    - name: Save 3rdparty build (local on-disk)
+      if: ${{ success() && inputs.enable-cache == 'false' && inputs.build-extlibs == 'true' }}
+      shell: bash -l {0}
+      env:
+        CACHE_KEY: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
+        CACHE_PATH_REL: src/3rdparty/build
+      run: |
+        set -euo pipefail
+
+        if [ "${ATLAS_EXTLIBS_LOCAL_CACHE_HIT:-}" = "true" ]; then
+          echo "External deps restored from local cache; skipping packaging."
+          exit 0
+        fi
+
+        src="${GITHUB_WORKSPACE%/}/${CACHE_PATH_REL}"
+        if [ ! -d "${src}" ]; then
+          echo "Error: expected external deps output directory does not exist: ${src}" >&2
+          exit 1
+        fi
+
+        cacheRoot="$HOME/Library/Caches/atlas/gha-cache"
+        if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+          cacheRoot="${cacheRoot}/${GITHUB_REPOSITORY}"
+        fi
+
+        mkdir -p "${cacheRoot}"
+        archive="${cacheRoot}/${CACHE_KEY}.tar.gz"
+        tmpArchive="${archive}.tmp.$$"
+
+        echo "Saving local extlibs cache archive: ${archive}"
+        tar -C "${GITHUB_WORKSPACE%/}" -czf "${tmpArchive}" "${CACHE_PATH_REL}"
+        mv -f "${tmpArchive}" "${archive}"
