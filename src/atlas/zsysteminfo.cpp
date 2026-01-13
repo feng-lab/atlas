@@ -5,6 +5,7 @@
 #include <QStandardPaths>
 #include <QStorageInfo>
 #include <QSettings>
+#include <QFileInfo>
 #include <QApplication>
 #include <QDateTime>
 #include <QOperatingSystemVersion>
@@ -125,47 +126,81 @@ QDir ZSystemInfo::jsonDir()
 
 QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
 {
-  QString folder = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
-  QDir dir(folder);
-  if (!dir.exists()) {
-    dir.mkpath(".");
-  }
-  QStorageInfo volumeInfo(folder);
-  // VLOG(1) << folder << " " << volumeInfo.bytesAvailable();
-  if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() ||
-      static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes) {
-    folder.clear();
-  }
+  auto tryPath = [&](QString basePath) -> QString {
+    basePath = basePath.trimmed();
+    if (basePath.isEmpty()) {
+      return {};
+    }
 
-  if (folder.isEmpty()) {
-    folder = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-    QDir dir1(folder);
-    if (!dir1.exists()) {
-      dir1.mkpath(".");
+    QDir dir(basePath);
+    if (!dir.exists() && !dir.mkpath(".")) {
+      VLOG(1) << "imgCachePath candidate rejected: cannot create dir '" << basePath << "'";
+      return {};
     }
-    volumeInfo = QStorageInfo(folder);
-    // VLOG(1) << folder << " " << volumeInfo.bytesAvailable();
-    if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() ||
-        static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes) {
-      folder.clear();
+
+    // On macOS, QStorageInfo may report the "/" system volume as read-only even for writable firmlink-backed paths
+    // under /Users. Prefer an explicit directory write check over the storage-level read-only bit.
+    const QFileInfo dirInfo(dir.absolutePath());
+    if (!dirInfo.isDir() || !dirInfo.isReadable() || !dirInfo.isWritable()) {
+      VLOG(1) << "imgCachePath candidate rejected: not writable '" << basePath << "'";
+      return {};
     }
+
+    QStorageInfo volumeInfo(basePath);
+    const qint64 bytesAvailable = volumeInfo.bytesAvailable();
+    VLOG(1) << basePath << " bytesAvailable=" << bytesAvailable << " valid=" << volumeInfo.isValid()
+            << " ready=" << volumeInfo.isReady() << " readOnly=" << volumeInfo.isReadOnly()
+            << " required=" << requiredSpaceInBytes;
+
+    if (!volumeInfo.isValid() || !volumeInfo.isReady()) {
+      return {};
+    }
+    if (bytesAvailable < 0) {
+      // bytesAvailable() is qint64; negative means "unknown" (platform/filesystem-dependent). Avoid casting a negative
+      // value to size_t (wraparound) which could incorrectly pass the required-space check.
+      // Accept only when the caller doesn't require a specific amount.
+      return (requiredSpaceInBytes == 0) ? basePath : QString{};
+    }
+    if (requiredSpaceInBytes > static_cast<size_t>(bytesAvailable)) {
+      return {};
+    }
+
+    return basePath;
+  };
+
+  // Prefer app-local data location (stable across launches; not subject to OS cache eviction).
+  const QString appLocal = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+  QString folder = tryPath(appLocal);
+  if (!folder.isEmpty()) {
+    // For AppLocalDataLocation, return the directory directly. This is a stable, app-owned location where the user
+    // expects Atlas to store persistent data, so an extra ".atlasImgCache" subdir is unnecessary.
+    return folder;
   }
 
   // try other volumes
   if (folder.isEmpty()) {
     auto vols = QStorageInfo::mountedVolumes();
     for (auto& vol : vols) {
-      // VLOG(1) << vols[i].bytesAvailable() << " " << vols[i].rootPath();
-      if (!vol.isRoot() && vol.isValid() && vol.isReady() && !vol.isReadOnly() &&
-          static_cast<size_t>(vol.bytesAvailable()) >= requiredSpaceInBytes) {
-        folder = vol.rootPath();
+      VLOG(1) << "volume bytesAvailable=" << vol.bytesAvailable() << " rootPath=" << vol.rootPath()
+              << " valid=" << vol.isValid() << " ready=" << vol.isReady() << " readOnly=" << vol.isReadOnly()
+              << " isRoot=" << vol.isRoot();
+      if (vol.isRoot() || !vol.isValid() || !vol.isReady()) {
+        continue;
+      }
+
+      const QString candidate = tryPath(vol.rootPath());
+      if (!candidate.isEmpty()) {
+        folder = candidate;
         break;
       }
     }
   }
 
-  if (!folder.isEmpty() && QDir(folder).mkpath(".atlasImgCache")) {
-    return QDir(folder).filePath(".atlasImgCache");
+  if (!folder.isEmpty()) {
+    const QString cacheDirName = QStringLiteral(".atlasImgCache");
+    if (QDir(folder).mkpath(cacheDirName)) {
+      return QDir(folder).filePath(cacheDirName);
+    }
   }
   folder.clear();
   return folder;

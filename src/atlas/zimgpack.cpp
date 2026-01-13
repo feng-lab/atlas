@@ -17,6 +17,7 @@
 #include <QMenu>
 #include <boost/hash2/sha2.hpp>
 #include <bit>
+#include <folly/OperationCancelled.h>
 #include <folly/coro/Collect.h>
 #include <tbb/parallel_for.h>
 #include <boost/iterator/function_output_iterator.hpp>
@@ -48,6 +49,9 @@ DEFINE_uint32(atlas_imgpack_quick_window_sample_step, 8, "Pixel stride inside ti
 DEFINE_uint32(atlas_imgpack_quick_window_max_samples,
               500000,
               "Max total samples across all tiles/channels for quick window");
+
+// Defined in z3dimg.cpp; shared here so 3D preview assembly can reuse the same concurrency limit.
+DECLARE_uint32(atlas_ng_precomputed_3d_max_concurrent_block_reads);
 
 #if 0
 DEFINE_uint32(atlas_readRegionToImg_version,
@@ -1524,6 +1528,160 @@ std::shared_ptr<const ZImg> ZImgPack::resizedImgCached(size_t width, size_t heig
   auto img = std::make_shared<ZImg>(resizedImg(width, height, depth, t));
   ZImgPreviewDiskCache::instance().tryPutFilePreview(fingerprint, width, height, depth, t, img);
   return std::shared_ptr<const ZImg>(img);
+}
+
+folly::coro::Task<std::shared_ptr<const ZImg>> ZImgPack::resizedImgCachedAsync(size_t width,
+                                                                               size_t height,
+                                                                               size_t depth,
+                                                                               size_t t) const
+{
+  auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
+
+  CHECK(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth && width > 0 && height > 0 &&
+        depth > 0);
+
+  // For file-backed sources, reuse the existing synchronous cache behavior.
+  if (!m_ngVolume) {
+    maybeCancel(cancellationToken);
+    co_return resizedImgCached(width, height, depth, t);
+  }
+
+  // Neuroglancer precomputed (network-backed): build the preview volume via coroutines so cancellation
+  // propagates implicitly to HTTP reads (co_withCancellation at the call site).
+  CHECK(m_diskCached);
+  CHECK(t == 0);
+  CHECK(m_ngVolume);
+
+  std::array<size_t, 3> ratio = {1, 1, 1};
+  {
+    // Match resizedImg() ratio selection: choose the least coarse pyramid level that still fits <= target dims,
+    // falling back to the coarsest available level when none fit.
+    auto ceilDiv = [](size_t a, size_t b) -> size_t {
+      CHECK(b > 0);
+      return (a + b - 1) / b;
+    };
+
+    const std::array<size_t, 3> required = {
+      ceilDiv(m_imgInfo.width, width),
+      ceilDiv(m_imgInfo.height, height),
+      ceilDiv(m_imgInfo.depth, depth),
+    };
+
+    bool foundFit = false;
+    size_t bestSum = std::numeric_limits<size_t>::max();
+    for (const auto& r : m_pyramidalRatios) {
+      if (r[0] >= required[0] && r[1] >= required[1] && r[2] >= required[2]) {
+        const size_t sum = r[0] + r[1] + r[2];
+        if (!foundFit || sum < bestSum) {
+          ratio = r;
+          bestSum = sum;
+          foundFit = true;
+        }
+      }
+    }
+
+    if (!foundFit) {
+      size_t maxSum = 0;
+      for (const auto& r : m_pyramidalRatios) {
+        const size_t sum = r[0] + r[1] + r[2];
+        if (sum > maxSum) {
+          ratio = r;
+          maxSum = sum;
+        }
+      }
+    }
+  }
+
+  maybeCancel(cancellationToken);
+
+  auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(ratio);
+  CHECK(scaleIndexOpt);
+
+  ZImgInfo info = m_imgInfo;
+  info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
+  info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
+  info.depth = (m_imgInfo.depth + ratio[2] - 1) / ratio[2];
+  info.numTimes = 1;
+  const auto& scale = m_ngVolume->scales().at(*scaleIndexOpt);
+  info.voxelSizeX = scale.resolutionNm[0];
+  info.voxelSizeY = scale.resolutionNm[1];
+  info.voxelSizeZ = scale.resolutionNm[2];
+
+  ZImg res(info);
+
+  const auto chunks = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt,
+                                                           {0, 0, 0},
+                                                           {static_cast<int64_t>(m_imgInfo.width),
+                                                            static_cast<int64_t>(m_imgInfo.height),
+                                                            static_cast<int64_t>(m_imgInfo.depth)});
+  if (!chunks.empty()) {
+    // Read chunks in batches so we don't keep shared_ptr references to *all* chunks alive at once; this avoids
+    // defeating LRU eviction in the Neuroglancer chunk cache under memory pressure.
+    const size_t maxConcurrent =
+      std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads));
+
+    // Each chunk task both reads and pastes its result. The chunk grid is non-overlapping by construction, so
+    // concurrent writes to disjoint regions of `res` are safe and avoids serializing the CPU-heavy paste step
+    // (notably segmentation ID→RGB conversion).
+    auto readChunkBestEffort = [&](ZNeuroglancerPrecomputedVolume::Chunk chunk) -> folly::coro::Task<void> {
+      std::shared_ptr<ZImg> chunkImg;
+      try {
+        chunkImg = co_await m_ngVolume->readChunkAsync(chunk);
+      } catch (const ZCancellationException&) {
+        throw;
+      } catch (const folly::OperationCancelled&) {
+        throw;
+      } catch (const std::exception&) {
+        co_return;
+      }
+      if (!chunkImg) {
+        co_return;
+      }
+
+      maybeCancel(cancellationToken);
+
+      const ZVoxelCoordinate start(std::round(static_cast<double>(chunk.baseStart[0]) / ratio[0]),
+                                   std::round(static_cast<double>(chunk.baseStart[1]) / ratio[1]),
+                                   std::round(static_cast<double>(chunk.baseStart[2]) / ratio[2]),
+                                   0,
+                                   0);
+      if (m_ngSegmentationRgbFor3D) {
+        CHECK(m_ngVolume->isSegmentation());
+        pasteNeuroglancerSegmentationChunkAsRgb(*chunkImg, res, start);
+      } else {
+        res.pasteImg(*chunkImg, start, false);
+      }
+      co_return;
+    };
+
+    for (size_t batchStart = 0; batchStart < chunks.size(); batchStart += maxConcurrent) {
+      maybeCancel(cancellationToken);
+
+      const size_t batchEnd = std::min(batchStart + maxConcurrent, chunks.size());
+      std::vector<folly::coro::Task<void>> tasks;
+      tasks.reserve(batchEnd - batchStart);
+      for (size_t i = batchStart; i < batchEnd; ++i) {
+        tasks.push_back(readChunkBestEffort(chunks[i]));
+      }
+
+      co_await folly::coro::collectAllRange(std::move(tasks));
+      maybeCancel(cancellationToken);
+    }
+  }
+
+  maybeCancel(cancellationToken);
+
+  if (res.width() != width || res.height() != height || res.depth() != depth) {
+    if (m_ngSegmentationRgbFor3D) {
+      res.resize(width, height, depth, Interpolant::Nearest, false, false, FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+    } else {
+      res.resize(width, height, depth);
+    }
+  }
+
+  auto img = std::make_shared<ZImg>(std::move(res));
+  co_return std::shared_ptr<const ZImg>(std::move(img));
 }
 
 #if 0

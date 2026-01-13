@@ -131,31 +131,40 @@ void Z3DRenderGlobalState::resetScratchPool()
 
 bool Z3DRenderGlobalState::hasCancellationSource() const
 {
+  const std::lock_guard<std::mutex> lock(m_cancellationMutex);
   return static_cast<bool>(m_cancellationSource);
 }
 
-folly::CancellationSource& Z3DRenderGlobalState::ensureCancellationSource()
+std::shared_ptr<folly::CancellationSource> Z3DRenderGlobalState::ensureCancellationSource()
 {
+  const std::lock_guard<std::mutex> lock(m_cancellationMutex);
   if (!m_cancellationSource) {
-    m_cancellationSource = std::make_unique<folly::CancellationSource>();
+    m_cancellationSource = std::make_shared<folly::CancellationSource>();
   }
-  return *m_cancellationSource;
+  return m_cancellationSource;
 }
 
 void Z3DRenderGlobalState::resetCancellationSource()
 {
+  const std::lock_guard<std::mutex> lock(m_cancellationMutex);
   m_cancellationSource.reset();
 }
 
 void Z3DRenderGlobalState::requestCancellation()
 {
-  if (m_cancellationSource) {
-    m_cancellationSource->requestCancellation();
+  std::shared_ptr<folly::CancellationSource> source;
+  {
+    const std::lock_guard<std::mutex> lock(m_cancellationMutex);
+    source = m_cancellationSource;
+  }
+  if (source) {
+    source->requestCancellation();
   }
 }
 
 folly::CancellationToken Z3DRenderGlobalState::currentCancellationToken() const
 {
+  const std::lock_guard<std::mutex> lock(m_cancellationMutex);
   return m_cancellationSource ? m_cancellationSource->getToken() : folly::CancellationToken();
 }
 

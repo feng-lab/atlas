@@ -4,6 +4,7 @@
 
 #include <folly/CancellationToken.h>
 #include <memory>
+#include <mutex>
 
 namespace nim {
 
@@ -24,7 +25,7 @@ public:
   void resetScratchPool();
 
   bool hasCancellationSource() const;
-  folly::CancellationSource& ensureCancellationSource();
+  std::shared_ptr<folly::CancellationSource> ensureCancellationSource();
   void resetCancellationSource();
   void requestCancellation();
   folly::CancellationToken currentCancellationToken() const;
@@ -77,7 +78,10 @@ private:
 
   Z3DScratchResourcePool& accessScratchPool() const;
 
-  std::unique_ptr<folly::CancellationSource> m_cancellationSource;
+  // Cancellation requests may come from other threads (e.g. UI-driven object removal) while the render thread is
+  // mid-frame. Guard access to the source pointer to avoid data races.
+  mutable std::mutex m_cancellationMutex;
+  std::shared_ptr<folly::CancellationSource> m_cancellationSource;
   Z3DScratchResourcePool* m_scratchPool = nullptr;
   RendererSharedState m_rendererState;
 

@@ -2,6 +2,7 @@
 
 #include "z3dshaderprogram.h"
 #include "z3dgpuinfo.h"
+#include "z3drenderglobalstate.h"
 #include "z3dtexture.h"
 #include "zvulkanimageblockuploader.h"
 #include "zkmeans.h"
@@ -1028,8 +1029,20 @@ void Z3DImg::readVolumes()
     m_volumeGenerations.assign(m_nChannels, 0);
   }
 
-  const std::shared_ptr<const ZImg> img =
-    m_imgPack.resizedImgCached(m_volumeDimension.x, m_volumeDimension.y, m_volumeDimension.z, 0);
+  const folly::CancellationToken cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  std::shared_ptr<const ZImg> img;
+  try {
+    auto cpuExecutor = folly::getGlobalCPUExecutor();
+    auto task = folly::coro::co_withCancellation(
+      cancellationToken,
+      m_imgPack.resizedImgCachedAsync(m_volumeDimension.x, m_volumeDimension.y, m_volumeDimension.z, 0));
+    img = folly::coro::blockingWait(folly::coro::co_withExecutor(cpuExecutor, std::move(task)));
+  }
+  catch (const folly::OperationCancelled&) {
+    // co_withCancellation reports cancellation via folly::OperationCancelled.
+    // Translate to Atlas' cancellation type so the renderer can unwind.
+    throw ZCancellationException();
+  }
   CHECK(img);
 
   if (m_nChannels == 1) {

@@ -1552,9 +1552,10 @@ void Z3DRenderingEngine::render(bool stereo)
 
   VLOG(1) << "render";
   try {
-    auto& cancellationSource = Z3DRenderGlobalState::instance().ensureCancellationSource();
+    auto cancellationSource = Z3DRenderGlobalState::instance().ensureCancellationSource();
+    CHECK(cancellationSource);
     while (m_progress < 1.0) {
-      auto token = cancellationSource.getToken();
+      auto token = cancellationSource->getToken();
       m_progress = processFrame(stereo, true, &token);
       Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
     }

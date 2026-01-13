@@ -16,6 +16,7 @@
 #include "zregionannotationdoc.h"
 #include "zmeshdoc.h"
 #include "zskeletondoc.h"
+#include "z3drenderglobalstate.h"
 #include "ztheme.h"
 #include "zchooseobjdialog.h"
 #include "zmessageboxhelpers.h"
@@ -345,6 +346,10 @@ void ZDoc::removeObj(size_t id)
 {
   ZObjDoc* doc = m_objModel->idToDoc(id);
   if (saveOrDiscard(id)) {
+    // Object removal can be triggered while the 3D rendering thread is in the middle of building
+    // preview volumes or paging blocks. Proactively request cancellation so the rendering thread
+    // can unwind quickly and detach filters before object data is destroyed.
+    Z3DRenderGlobalState::instance().requestCancellation();
     m_objModel->removeObj(id);
     doc->removeObj(id);
   }
@@ -354,6 +359,7 @@ void ZDoc::removeAllObjsOfDoc(ZObjDoc* doc)
 {
   auto objs = objsOfDoc(doc);
   if (saveOrDiscard(objs)) {
+    Z3DRenderGlobalState::instance().requestCancellation();
     for (auto obj : objs) {
       m_objModel->removeObj(obj);
       doc->removeObj(obj);

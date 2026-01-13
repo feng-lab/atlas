@@ -267,6 +267,17 @@ public:
   // Best-effort: cache failures degrade to the regular resizedImg() path.
   std::shared_ptr<const ZImg> resizedImgCached(size_t width, size_t height, size_t depth, size_t t) const;
 
+  // Coroutine-based variant of resizedImgCached() for cancellation-aware call sites.
+  //
+  // This is primarily used by the 3D rendering thread when building preview volumes for
+  // network-backed datasets (e.g. Neuroglancer precomputed). Cancellation is provided
+  // implicitly via folly's coroutine cancellation context; callers should run it under
+  // folly::coro::co_withCancellation(...) (or equivalent) to make cancellation effective.
+  folly::coro::Task<std::shared_ptr<const ZImg>> resizedImgCachedAsync(size_t width,
+                                                                       size_t height,
+                                                                       size_t depth,
+                                                                       size_t t) const;
+
 #if 0
   folly::Future<std::shared_ptr<ZImg>> readRegionToImg(index_t xyRatio,
                                                        index_t zRatio,
