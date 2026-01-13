@@ -1,1 +1,1 @@
-"""Agent team (Planner/Inspector/Supervisor) built on the Agents SDK."""
+"""Agent tooling modules (tools + dispatcher + shared utilities)."""

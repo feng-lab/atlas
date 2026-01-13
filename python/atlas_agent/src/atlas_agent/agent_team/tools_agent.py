@@ -1,24 +1,28 @@
 """LLM Agent Tooling: tool specs + dispatcher for function-calling.
 
-This module contains the curated tool list and dispatcher used by the
-multi-agent system. It is the stable entry point for LLM function-calling.
+This module contains the curated tool list and dispatcher used by the chat
+runtime tool loop. It is the stable entry point for LLM function-calling.
 """
 
 import difflib
 import json
-import os
 from typing import Any, Dict, List, Tuple
 
 from google.protobuf.json_format import MessageToDict  # type: ignore
 
-from ..codegen_policy import is_codegen_enabled
 from ..scene_rpc import SceneClient
+from ..session_store import SessionStore
 from .tool_modules import TOOL_TO_MODULE, build_tool_list, general_tools
 from .tool_modules.context import ToolDispatchContext
 
 
 def scene_tools_and_dispatcher(
-    client: SceneClient, *, atlas_dir: str | None = None
+    client: SceneClient,
+    *,
+    atlas_dir: str | None = None,
+    session_store: SessionStore | None = None,
+    runtime_state: dict[str, Any] | None = None,
+    codegen_enabled: bool = False,
 ) -> Tuple[List[Dict[str, Any]], callable]:
     """Return (tool_specs, dispatcher) for OpenAI tool-calling.
 
@@ -29,7 +33,7 @@ def scene_tools_and_dispatcher(
     tools: List[Dict[str, Any]] = build_tool_list()
 
     # Conditionally expose codegen-related tools
-    if is_codegen_enabled():
+    if bool(codegen_enabled):
         tools.append(general_tools.CODEGEN_TOOL_SPEC)
     else:
         # When disabled, ensure any lingering codegen tools are removed (defensive if list changes elsewhere)
@@ -44,10 +48,11 @@ def scene_tools_and_dispatcher(
             )
         ]
 
-    # Per-dispatcher caches (persist during the Implementer run)
+    # Per-dispatcher caches (persist during the tool loop for a single user turn)
     _param_catalog_cache: dict[tuple, list] = {}
     _alias_cache: dict[tuple, dict[str, str]] = {}
     _schema_validator_cache: dict[str, object] = {}
+    _runtime_state: dict[str, Any] = runtime_state if isinstance(runtime_state, dict) else {}
 
     def _list_params_cached(id: int):
         id = int(id)
@@ -172,11 +177,14 @@ def scene_tools_and_dispatcher(
         ctx = ToolDispatchContext(
             client=client,
             atlas_dir=atlas_dir,
+            codegen_enabled=bool(codegen_enabled),
             dispatch=dispatch,
             param_to_dict=_param_to_dict,
             resolve_json_key=_resolve_json_key,
             json_key_exists=_json_key_exists,
             schema_validator_cache=_schema_validator_cache,
+            session_store=session_store,
+            runtime_state=_runtime_state,
         )
 
         module = TOOL_TO_MODULE.get(name)
@@ -190,11 +198,12 @@ def scene_tools_and_dispatcher(
     # Filter out deprecated/disabled tools from the advertised list
     filtered = []
     disabled = {}
-    # Environment-gated tools
+    # Consent-gated tools (privacy): default is "not available" until the user
+    # explicitly decides for the current session.
+    allow_screenshots = False
     try:
-        allow_screenshots = os.environ.get(
-            "ATLAS_AGENT_ALLOW_SCREENSHOTS", ""
-        ).strip().lower() in ("1", "true", "yes")
+        if session_store is not None:
+            allow_screenshots = (session_store.get_consent("screenshots") is True)
     except Exception:
         allow_screenshots = False
     for t in tools:

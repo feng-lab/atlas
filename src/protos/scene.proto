@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package atlas.rpc;
 
+import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 message Empty {}
 message Bool { bool ok = 1; }
 
@@ -76,6 +78,9 @@ message KeysResponse { repeated KeyInfo keys = 1; }
 
 service Scene {
   rpc Ping (PingRequest) returns (PingResponse);
+  // Return the installation root of the running Atlas instance (for locating
+  // bundled schemas/docs/protos). On macOS this is the .app bundle root.
+  rpc GetAppLocation (google.protobuf.Empty) returns (google.protobuf.StringValue);
   // Returns ok=true when the 3D rendering engine is initialized and ready.
   rpc EngineReady (Empty) returns (Bool);
   // Ensure a 3D window/canvas is open so the rendering engine can initialize.

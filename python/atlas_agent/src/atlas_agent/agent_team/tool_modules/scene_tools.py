@@ -1051,17 +1051,17 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": str(e)})
 
     if name == "scene_capabilities_summary":
-        schema_dir = args.get("schema_dir")
-        max_lines = args.get("max_lines") or 140
-        sd, searched = discover_schema_dir(schema_dir, atlas_dir)
+        sd, searched = discover_schema_dir(user_schema_dir=None, atlas_dir=atlas_dir)
+        if not sd:
+            return json.dumps(
+                {"ok": False, "error": "schema not found", "searched": searched}
+            )
         try:
-            text = build_capabilities_prompt(Path(sd), max_lines=max_lines)
+            text = build_capabilities_prompt(Path(sd), codegen_enabled=bool(ctx.codegen_enabled))
             return json.dumps({"ok": True, "summary": text})
         except Exception as e:
-            # Return generic text on failure
-            text = build_capabilities_prompt(
-                Path("/does/not/exist"), max_lines=max_lines
-            )
+            # Return generic text on failure.
+            text = build_capabilities_prompt(Path("/does/not/exist"), codegen_enabled=bool(ctx.codegen_enabled))
             return json.dumps({"ok": False, "summary": text, "error": str(e)})
 
     if name == "scene_facts_summary":

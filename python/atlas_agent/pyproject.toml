@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atlas-agent"
-description = "Multi-agent CLI to operate Atlas via gRPC, with LLM-powered planning and tooling."
+description = "CLI to operate Atlas via gRPC, with LLM-powered planning, tooling, and verification."
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "Apache-2.0"}
@@ -21,11 +21,11 @@ classifiers = [
 ]
 dependencies = [
   "openai>=1.0.0",
-  "openai-agents>=0.4.0",
   "grpcio>=1.56.0",
   "grpcio-tools>=1.56.0",
   "protobuf>=4.24.0",
   "jsonschema>=4.18.0",
+  "rich>=13.7.0",
 ]
 version = "0.0.0"
 
@@ -49,6 +49,7 @@ include = [
 [tool.setuptools.package-data]
 "atlas_agent" = [
   "codegen_allowlist.txt",
+  # gRPC stubs are compiled at runtime against the running Atlas app's proto.
 ]
 
  

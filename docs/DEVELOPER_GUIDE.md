@@ -96,11 +96,10 @@ Agents: Preview Screenshots
 
 - The Python agent tools expose a headless preview renderer for 3D animation verification.
 - Tool: `animation_render_preview` (saves current animation to a temp file and renders one frame via the Atlas binary in offscreen mode).
-- Privacy/consent: Disabled by default. Enable explicitly by setting `ATLAS_AGENT_ALLOW_SCREENSHOTS=1` in the environment when launching the agent CLI.
+- Privacy/consent: The CLI prompts once per session for consent to use preview screenshots for verification (default allow). This decision is stored in the session state; you can toggle at runtime via `:screenshots on` / `:screenshots off`.
 - Binary resolution: The tool uses `--atlas-dir` if provided to the agent CLI, or searches default install locations.
-- Typical usage via CLI environment:
-  - `ATLAS_AGENT_ALLOW_SCREENSHOTS=1 python -m atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app`
-  - or pass the flag: `python -m atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app --allow-screenshots`
+- Typical usage:
+  - `python -m atlas_agent --atlas-dir /Applications/fenglab/Atlas.app` then accept the startup consent prompt.
 
 Agents: Camera Planning & Validation
 

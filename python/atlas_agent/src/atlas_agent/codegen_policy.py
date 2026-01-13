@@ -1,13 +1,13 @@
 """Codegen policy helpers (allowed imports and feature gating).
 
 This module centralizes the allowlist of Python modules that codegen scripts
-may import. The Implementer injects this list into the system prompt so LLMs
+may import. The agent injects this list into the system prompt so LLMs
 know what is safe/available.
 
-Enable/disable the codegen pathway with ATLAS_AGENT_ENABLE_CODEGEN=1.
+Codegen execution is disabled by default and must be explicitly enabled by the
+user via the CLI flag (`--enable-codegen`).
 """
 
-import os
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -55,13 +55,3 @@ def allowed_imports_status() -> Tuple[List[str], List[Dict[str, Any]]]:
             err = str(e)
         status.append({"name": nm, "ok": ok, **({"error": err} if err else {})})
     return names, status
-
-
-def is_codegen_enabled() -> bool:
-    """Return True when the codegen toolpath is enabled.
-
-    Controlled by ATLAS_AGENT_ENABLE_CODEGEN env var. Accepts: 1/true/yes (case‑insensitive).
-    Defaults to False (disabled) when unset.
-    """
-    val = os.environ.get("ATLAS_AGENT_ENABLE_CODEGEN", "").strip().lower()
-    return val in ("1", "true", "yes", "on")

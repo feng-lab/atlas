@@ -1,6 +1,5 @@
 #include "zrpcservice.h"
 
-#include "helloworld.grpc.pb.h"
 #include "scene.grpc.pb.h"
 #include "zservicemanager.h"
 #include "zlog.h"
@@ -21,11 +20,14 @@
 #include <QThread>
 #include <QTimer>
 #include <QApplication>
+#include <QDir>
 #include <QtCore/QDebug>
 #include <algorithm>
 #include <cmath>
 #include <grpcpp/grpcpp.h>
+#include <google/protobuf/empty.pb.h>
 #include <google/protobuf/struct.pb.h>
+#include <google/protobuf/wrappers.pb.h>
 
 namespace nim {
 
@@ -33,9 +35,6 @@ using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::Status;
-using helloworld::HelloRequest;
-using helloworld::HelloReply;
-using helloworld::Greeter;
 
 using atlas::rpc::Scene;
 using atlas::rpc::PingRequest;
@@ -98,19 +97,6 @@ using atlas::rpc::ListKeysRequest;
 using atlas::rpc::KeysResponse;
 using atlas::rpc::KeyInfo;
 using atlas::rpc::TimeStatus;
-
-// Logic and data behind the server's behavior.
-class GreeterServiceImpl final : public Greeter::Service
-{
-  Status SayHello(ServerContext* context, const HelloRequest* request, HelloReply* reply) override
-  {
-    // Overwrite the call's compression algorithm to DEFLATE.
-    context->set_compression_algorithm(GRPC_COMPRESS_DEFLATE);
-    std::string prefix("Hello ");
-    reply->set_message(prefix + request->name());
-    return Status::OK;
-  }
-};
 
 ZRPCService::ZRPCService(QObject* parent)
   : QObject(parent)
@@ -328,6 +314,41 @@ public:
   {
     LOG(INFO) << "RPC Ping";
     reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status GetAppLocation(ServerContext*,
+                        const google::protobuf::Empty*,
+                        google::protobuf::StringValue* reply) override
+  {
+    // This must be UI-thread safe on all platforms, but it does not touch
+    // rendering/engine state. We still compute it on the UI thread so it is
+    // consistent with Qt's application/runtime state.
+    const QString atlasDir = invokeOnUi([&]() -> QString {
+      // applicationDirPath:
+      // - macOS:   .../Atlas.app/Contents/MacOS
+      // - Windows: <install>/ (contains Atlas.exe)
+      // - Linux:   <install>/ (contains Atlas)
+      const QString appDir = QCoreApplication::applicationDirPath();
+      if (appDir.isEmpty()) {
+        return QString{};
+      }
+
+#if defined(Q_OS_MAC)
+      // Convert .../Atlas.app/Contents/MacOS -> .../Atlas.app
+      QDir d(appDir);
+      if (!d.cdUp()) { // Contents
+        return appDir;
+      }
+      if (!d.cdUp()) { // .app
+        return d.absolutePath();
+      }
+      return d.absolutePath();
+#else
+      return QDir(appDir).absolutePath();
+#endif
+    });
+    reply->set_value(atlasDir.toStdString());
     return Status::OK;
   }
 
@@ -2611,7 +2632,6 @@ void ZRPCService::shutdown()
   }
   m_serverOwned.reset();
   // Release services after server is fully stopped
-  m_greeterService.reset();
   m_sceneService.reset();
   m_grpcServer = nullptr;
 }
@@ -2623,7 +2643,6 @@ void ZRPCService::onRPCThreadStarted()
 
   std::string server_address("0.0.0.0:50051");
   // Allocate services on the heap and keep them alive for the server lifetime.
-  m_greeterService = std::unique_ptr<grpc::Service>(new GreeterServiceImpl());
   m_sceneService = std::unique_ptr<grpc::Service>(new SceneServiceImpl(*this));
 
   grpc::ServerBuilder builder;
@@ -2633,7 +2652,6 @@ void ZRPCService::onRPCThreadStarted()
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
   // Register "service" as the instance through which we'll communicate with
   // clients. In this case it corresponds to an *synchronous* service.
-  builder.RegisterService(m_greeterService.get());
   builder.RegisterService(m_sceneService.get());
   // Finally assemble the server.
   m_serverOwned = builder.BuildAndStart();

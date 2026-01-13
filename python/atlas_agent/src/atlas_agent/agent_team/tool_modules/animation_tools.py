@@ -2165,7 +2165,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     break
         if atlas_bin is None:
             return json.dumps(
-                {"ok": False, "error": "Atlas binary not found; set atlas_dir"}
+                {"ok": False, "error": "Atlas binary not found; ensure Atlas is installed"}
             )
         rc = export_video(
             atlas_bin=str(atlas_bin),
@@ -2182,20 +2182,20 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps({"ok": rc == 0, "exit_code": rc})
 
     if name == "animation_render_preview":
-        # Privacy/consent gate: disabled unless explicitly allowed by env
-        allow = os.environ.get("ATLAS_AGENT_ALLOW_SCREENSHOTS", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        # Privacy/consent gate: requires an explicit per-session user decision.
+        allow = False
+        try:
+            if ctx.session_store is not None:
+                allow = (ctx.session_store.get_consent("screenshots") is True)
+        except Exception:
+            allow = False
         if not allow:
             return json.dumps(
                 {
                     "ok": False,
-                    "error": "screenshots disabled; set ATLAS_AGENT_ALLOW_SCREENSHOTS=1 to enable",
+                    "error": "screenshots not permitted for this session",
                 }
             )
-        
 
         fps = int(float(args.get("fps", 30)))
         tsec = float(args.get("time", 0.0))
@@ -2220,7 +2220,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps(
                 {
                     "ok": False,
-                    "error": "Atlas binary not found; set atlas_dir or install Atlas",
+                    "error": "Atlas binary not found; ensure Atlas is installed",
                 }
             )
         # Save animation to a temp file and render a single frame

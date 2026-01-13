@@ -1,8 +1,11 @@
 import json
 import logging
 import os
+import platform
+import subprocess
 import sys
 import tempfile
+import time
 from contextlib import ExitStack
 from dataclasses import dataclass
 from importlib.resources import as_file, files
@@ -10,11 +13,15 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import grpc  # type: ignore[import-untyped]
-from google.protobuf import struct_pb2  # type: ignore[import-untyped]
+from google.protobuf import empty_pb2, struct_pb2, wrappers_pb2  # type: ignore[import-untyped]
 from google.protobuf.json_format import MessageToDict  # type: ignore[import-untyped]
 from grpc_tools import protoc  # type: ignore[import-untyped]
 
-from .repo import find_repo_root
+from .discovery import compute_paths_from_atlas_dir, compute_protos_dir_from_atlas_dir, default_install_dirs
+
+DEFAULT_RPC_LOG_LEVEL = logging.WARNING
+DEFAULT_RPC_BOOTSTRAP_TIMEOUT_SEC = 1.0
+DEFAULT_RPC_BOOTSTRAP_TOTAL_WAIT_SEC = 30.0
 
 
 def _expand_path(s: str) -> str:
@@ -75,22 +82,131 @@ def _compile_proto(proto_path: Path, out_dir: Path) -> None:
             raise RuntimeError(f"Failed to compile {proto_path.name} stubs")
 
 
-def _load_stubs(repo_root: Path):
-    proto = repo_root / "src/protos/scene.proto"
-    if not proto.exists():
-        raise FileNotFoundError(f"scene.proto not found at {proto}")
-    td = tempfile.TemporaryDirectory()
-    out_dir = Path(td.name)
-    _compile_proto(proto, out_dir)
-    sys.path.insert(0, str(out_dir))
-    scene_pb2 = __import__("scene_pb2")
-    scene_pb2_grpc = __import__("scene_pb2_grpc")
-    return td, scene_pb2, scene_pb2_grpc
+def _load_stubs(atlas_dir: Path):
+    """Compile Python gRPC stubs for the Scene service.
+
+    Source of truth:
+      - The running Atlas app bundle/resources (atlas_dir/Resources/protos/scene.proto)
+
+    Rationale: the agent must match the exact running Atlas version; we do not
+    fall back to monorepo protos to avoid drift.
+    """
+    with ExitStack() as stack:
+        proto_path = compute_protos_dir_from_atlas_dir(atlas_dir) / "scene.proto"
+        if not proto_path.exists():
+            raise FileNotFoundError(
+                "scene.proto not found in the running Atlas app bundle.\n"
+                f"- expected: {proto_path}\n"
+                "Rebuild/reinstall Atlas so it ships Resources/protos/scene.proto."
+            )
+        td = tempfile.TemporaryDirectory()
+        out_dir = Path(td.name)
+        _compile_proto(proto_path, out_dir)
+        sys.path.insert(0, str(out_dir))
+        scene_pb2 = __import__("scene_pb2")
+        scene_pb2_grpc = __import__("scene_pb2_grpc")
+        return td, scene_pb2, scene_pb2_grpc
+
+
+def _try_get_atlas_dir_from_rpc(channel: Any, *, timeout_sec: float = 1.0) -> str | None:
+    """Best-effort bootstrap: ask the running Atlas RPC server where it is installed.
+
+    This uses a generic gRPC call with well-known protobuf types, so it does not
+    require compiling scene.proto stubs first.
+    """
+    try:
+        rpc = channel.unary_unary(
+            "/atlas.rpc.Scene/GetAppLocation",
+            request_serializer=empty_pb2.Empty.SerializeToString,
+            response_deserializer=wrappers_pb2.StringValue.FromString,
+        )
+    except Exception:
+        return None
+    try:
+        resp = rpc(empty_pb2.Empty(), timeout=float(timeout_sec))
+    except Exception:
+        return None
+    try:
+        val = str(getattr(resp, "value", "") or "").strip()
+        return val if val else None
+    except Exception:
+        return None
+
+
+def _wait_for_atlas_dir_from_rpc(
+    channel: Any,
+    *,
+    total_wait_sec: float,
+    poll_interval_sec: float = 0.5,
+) -> str | None:
+    """Poll GetAppLocation until the RPC server responds (or a timeout elapses)."""
+    deadline = time.time() + max(0.0, float(total_wait_sec))
+    while True:
+        remaining = deadline - time.time()
+        if remaining <= 0.0:
+            return None
+        timeout = min(DEFAULT_RPC_BOOTSTRAP_TIMEOUT_SEC, max(0.1, remaining))
+        val = _try_get_atlas_dir_from_rpc(channel, timeout_sec=timeout)
+        if val:
+            return val
+        time.sleep(max(0.05, float(poll_interval_sec)))
+
+
+def _resolve_install_dir_for_launch(*, atlas_dir_hint: str | None) -> Path | None:
+    """Return an Atlas install dir to launch, if available on disk."""
+    if isinstance(atlas_dir_hint, str) and atlas_dir_hint.strip():
+        try:
+            p = Path(atlas_dir_hint.strip())
+            if p.exists():
+                return p
+        except Exception:
+            pass
+    for d in default_install_dirs():
+        try:
+            if d.exists():
+                return d
+        except Exception:
+            continue
+    return None
+
+
+def _launch_atlas(*, atlas_dir: Path) -> None:
+    """Launch (or activate) Atlas at the given install dir."""
+    system = platform.system()
+    if system == "Darwin":
+        # LaunchServices is the most reliable way to start a .app bundle.
+        if atlas_dir.suffix.lower() != ".app":
+            # Some dev builds may return the binary dir; fall back to the binary
+            # when the bundle root isn't provided.
+            atlas_bin, _ = compute_paths_from_atlas_dir(atlas_dir)
+            candidate = atlas_bin if atlas_bin.exists() else atlas_dir
+            subprocess.Popen(
+                [str(candidate)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return
+        subprocess.Popen(
+            ["open", "-a", str(atlas_dir)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return
+
+    atlas_bin, _ = compute_paths_from_atlas_dir(atlas_dir)
+    if not atlas_bin.exists():
+        raise FileNotFoundError(f"Atlas binary not found at {atlas_bin}")
+    subprocess.Popen(
+        [str(atlas_bin)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 @dataclass
 class SceneClient:
     address: str = "localhost:50051"
+    atlas_dir: str | None = None
     _tmpdir: Any = None
     _pb2: Any = None
     _pb2_grpc: Any = None
@@ -108,15 +224,67 @@ class SceneClient:
             )
             h.setFormatter(fmt)
             self._logger.addHandler(h)
-            # Default to WARNING to reduce noise; override via ATLAS_AGENT_LOG
-            lvl = os.environ.get("ATLAS_AGENT_LOG", "WARNING").upper()
-            level = getattr(logging, lvl, logging.WARNING)
-            self._logger.setLevel(level)
+            # Default to WARNING to reduce noise (internal policy; not user-configurable).
+            self._logger.setLevel(DEFAULT_RPC_LOG_LEVEL)
             self._logger.propagate = False
-        # Discover repo root by sentinels to avoid path-depth assumptions
-        repo_root = find_repo_root() or Path.cwd()
-        self._tmpdir, self._pb2, self._pb2_grpc = _load_stubs(repo_root)
+
         self._channel = grpc.insecure_channel(self.address)
+
+        # Bootstrap atlas_dir from the running app (authoritative).
+        detected = _try_get_atlas_dir_from_rpc(
+            self._channel, timeout_sec=DEFAULT_RPC_BOOTSTRAP_TIMEOUT_SEC
+        )
+        if not detected:
+            install = _resolve_install_dir_for_launch(atlas_dir_hint=self.atlas_dir)
+            if install is None:
+                raise RuntimeError(
+                    "Atlas RPC server is not reachable and no installed Atlas app was found.\n"
+                    f"- rpc_address: {self.address}\n"
+                    "- expected install locations: "
+                    + ", ".join(str(p) for p in default_install_dirs())
+                    + "\n"
+                    "Please install Atlas to the default location, or launch Atlas manually, then re-run atlas-agent."
+                )
+            self._logger.warning(
+                "Atlas RPC not reachable at %s; launching Atlas from %s",
+                self.address,
+                str(install),
+            )
+            try:
+                _launch_atlas(atlas_dir=install)
+            except Exception as e:
+                raise RuntimeError(
+                    "Failed to launch Atlas from the detected install location.\n"
+                    f"- install: {install}\n"
+                    f"- error: {e}"
+                ) from e
+
+            detected = _wait_for_atlas_dir_from_rpc(
+                self._channel,
+                total_wait_sec=DEFAULT_RPC_BOOTSTRAP_TOTAL_WAIT_SEC,
+            )
+
+        if not detected:
+            raise RuntimeError(
+                "Atlas was launched (or is expected to be running), but the RPC server did not become ready.\n"
+                f"- rpc_address: {self.address}\n"
+                f"- waited_sec: {DEFAULT_RPC_BOOTSTRAP_TOTAL_WAIT_SEC}\n"
+                "Make sure Atlas is running and that the local gRPC scene server is enabled."
+            )
+
+        self.atlas_dir = str(detected).strip()
+
+        atlas_dir_path: Path | None = None
+        if isinstance(self.atlas_dir, str) and self.atlas_dir.strip():
+            try:
+                atlas_dir_path = Path(self.atlas_dir.strip())
+            except Exception:
+                atlas_dir_path = None
+
+        if atlas_dir_path is None:
+            raise RuntimeError("Atlas app location could not be resolved from RPC response.")
+
+        self._tmpdir, self._pb2, self._pb2_grpc = _load_stubs(atlas_dir_path)
         self._stub = self._pb2_grpc.SceneStub(self._channel)
 
     def engine_ready(self) -> bool:
@@ -324,6 +492,112 @@ class SceneClient:
                 facts["scene_values"] = sv
             except Exception:
                 pass
+        return facts
+
+    def scene_facts_compact(
+        self,
+        *,
+        key_targets: dict[int, list[str]] | None = None,
+        include_key_values: bool = False,
+        scene_value_targets: dict[int, list[str]] | None = None,
+        include_objects: bool = True,
+        include_camera_key_times: bool = True,
+    ) -> dict:
+        """Return a compact facts snapshot suitable for LLM grounding.
+
+        Unlike scene_facts(), this does NOT enumerate every parameter of every
+        object. Callers must provide explicit targets.
+
+        Returns:
+          {
+            "objects_list": [{id,type,name,path,visible}, ...]  (optional)
+            "keys": {
+              "camera": [times...],
+              "objects": { "<id>": { "<json_key>": ([times...] | [{time,value}...]) } }
+            },
+            "scene_values": { "<id>": { "<json_key>": value, ... }, ... } (optional)
+          }
+        """
+        facts: dict[str, Any] = {"objects_list": [], "keys": {"camera": [], "objects": {}}}
+
+        if include_objects:
+            try:
+                objs = self.list_objects()
+                for o in getattr(objs, "objects", []):
+                    facts["objects_list"].append(
+                        {
+                            "id": int(getattr(o, "id", 0)),
+                            "type": getattr(o, "type", ""),
+                            "name": getattr(o, "name", ""),
+                            "path": getattr(o, "path", ""),
+                            "visible": bool(getattr(o, "visible", False)),
+                        }
+                    )
+            except Exception:
+                pass
+
+        if include_camera_key_times:
+            try:
+                lr = self.list_keys(id=0, include_values=False)
+                cam_times = [float(getattr(k, "time", 0.0)) for k in getattr(lr, "keys", [])]
+                if cam_times:
+                    facts["keys"]["camera"] = sorted(cam_times)
+            except Exception:
+                pass
+
+        if key_targets:
+            for oid, json_keys in key_targets.items():
+                try:
+                    oid_int = int(oid)
+                except Exception:
+                    continue
+                if oid_int <= 0:
+                    continue
+                for jk in json_keys or []:
+                    if not isinstance(jk, str) or not jk:
+                        continue
+                    try:
+                        lr = self.list_keys(id=oid_int, json_key=jk, include_values=bool(include_key_values))
+                        if include_key_values:
+                            entries = []
+                            for k in getattr(lr, "keys", []) or []:
+                                try:
+                                    vj = getattr(k, "value_json", "") or ""
+                                    val = json.loads(vj) if vj else None
+                                except Exception:
+                                    val = None
+                                ent: dict[str, Any] = {"time": float(getattr(k, "time", 0.0))}
+                                if val is not None:
+                                    ent["value"] = val
+                                entries.append(ent)
+                            if entries:
+                                facts["keys"]["objects"].setdefault(str(oid_int), {})[jk] = sorted(
+                                    entries, key=lambda e: float(e.get("time", 0.0))
+                                )
+                        else:
+                            times = [float(getattr(k, "time", 0.0)) for k in getattr(lr, "keys", [])]
+                            if times:
+                                facts["keys"]["objects"].setdefault(str(oid_int), {})[jk] = sorted(times)
+                    except Exception:
+                        continue
+
+        if scene_value_targets:
+            sv: dict[str, dict[str, Any]] = {}
+            for oid, json_keys in scene_value_targets.items():
+                try:
+                    oid_int = int(oid)
+                except Exception:
+                    continue
+                keys = [k for k in (json_keys or []) if isinstance(k, str) and k]
+                if not keys:
+                    continue
+                try:
+                    sv[str(oid_int)] = self.get_param_values(id=oid_int, json_keys=keys)
+                except Exception:
+                    continue
+            if sv:
+                facts["scene_values"] = sv
+
         return facts
 
     def list_objects(self):

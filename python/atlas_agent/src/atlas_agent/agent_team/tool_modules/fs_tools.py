@@ -13,6 +13,11 @@ from ...repo import find_repo_root  # type: ignore
 from .context import ToolDispatchContext
 from .file_formats import SCENE_LOAD_CATEGORIES, get_supported_extensions
 
+# Internal runtime policy: keep heuristics deterministic and stable.
+#
+# This is used only for a small NUL-byte binary heuristic, not as a read cap.
+BOM_SAMPLE_BYTES_FOR_BINARY_HEURISTIC = 4096
+
 HANDLED_TOOLS = (
     "fs_expand_paths",
     "fs_check_paths",
@@ -477,8 +482,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     except Exception:
                         enc = "utf-8"
             # Binary heuristic
-            BOM_SAMPLE_BYTES = int(os.environ.get("ATLAS_AGENT_BOM_SAMPLE_BYTES", "4096"))
-            sample = data[:BOM_SAMPLE_BYTES]
+            sample = data[:BOM_SAMPLE_BYTES_FOR_BINARY_HEURISTIC]
             is_binary = b"\x00" in sample
             text = data.decode(
                 enc or "utf-8",
@@ -1077,13 +1081,20 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             if s not in seen:
                 seen.add(s)
                 subdirs_u.append(s)
-        # 3) Compose search roots: anchors + anchors/subdir (for known subdir hints)
+        # 3) Compose search roots: anchors + anchors/subdir (for known subdir hints).
+        #
+        # Note: scanning the full anchor is already correctness-first, but adding
+        # anchor/subdir roots can effectively extend search depth within likely
+        # subtrees without scanning unrelated parts of the anchor.
         search_roots = list(anchors)
+        seen_roots = {os.path.normpath(p) for p in search_roots}
         for a in anchors:
-            HINT_SUBDIRS_MAX = int(os.environ.get("ATLAS_AGENT_HINT_SUBDIRS_MAX", "3"))
-            for s in subdirs_u[:HINT_SUBDIRS_MAX]:  # limit depth of hinted stack
-                cand = os.path.join(a, s)
+            for s in subdirs_u:
+                cand = os.path.normpath(os.path.join(a, s))
+                if cand in seen_roots:
+                    continue
                 if os.path.isdir(cand):
+                    seen_roots.add(cand)
                     search_roots.append(cand)
         # 4) Scan within bounded depth and rank candidates
         target = (expected_name or "").lower()

@@ -12,9 +12,13 @@ import logging
 import os
 
 from .chat_rpc_team import run_repl as run_team_repl
+from .console_ui import run_console_repl
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Atlas runs a local gRPC server; by convention we connect to localhost.
+    address = "localhost:50051"
+
     parser = argparse.ArgumentParser(
         prog="atlas-agent",
         description="Atlas animation agent (chat only): control Atlas GUI via RPC",
@@ -22,32 +26,28 @@ def main(argv: list[str] | None = None) -> int:
     # Single entry; accept an optional first positional (e.g., 'chat' or 'chat-rpc')
     parser.add_argument("cmd", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument(
-        "--address", default=os.environ.get("ATLAS_RPC_ADDR", "localhost:50051")
-    )
-    parser.add_argument(
         "--model",
-        default=os.environ.get("ATLAS_LLM_MODEL", "gpt-5.1"),
+        default="gpt-5.2",
     )
     parser.add_argument(
-        "--temperature",
-        type=float,
-        default=float(os.environ.get("ATLAS_LLM_TEMPERATURE", "0.2")),
-    )
-    parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY"))
-    parser.add_argument(
-        "--atlas-dir",
+        "--session",
         default=None,
-        help="Atlas installation root (optional; used to derive exporter path)",
+        help="Session id or path to a session dir. Persists plan/memory across restarts.",
     )
     parser.add_argument(
-        "--allow-screenshots",
-        action="store_true",
-        help="Enable preview screenshots for Inspector (sets ATLAS_AGENT_ALLOW_SCREENSHOTS=1)",
+        "--session-dir",
+        default=None,
+        help="Root directory for sessions (defaults to ~/.atlas_agent/sessions or XDG/APPDATA).",
     )
     parser.add_argument(
         "--enable-codegen",
         action="store_true",
-        help="Enable code generation tools (sets ATLAS_AGENT_ENABLE_CODEGEN=1)",
+        help="Enable code generation tools (python_write_and_run).",
+    )
+    parser.add_argument(
+        "--plain",
+        action="store_true",
+        help="Disable styling and use the plain REPL (debugging/limited terminals).",
     )
     args = parser.parse_args(argv)
     # Ignore deprecated positional subcommands like 'chat' or 'chat-rpc'
@@ -59,26 +59,36 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.cmd and args.cmd not in ("chat", "chat-rpc"):
         logging.error(
-            "Unknown command; this CLI supports chat only. Usage: python -m atlas_agent --address localhost:50051"
+            "Unknown command; this CLI supports chat only. Usage: python -m atlas_agent"
         )
         return 2
 
-    if not args.api_key:
-        logging.error("OPENAI_API_KEY is required (set --api-key).")
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        logging.error("OPENAI_API_KEY is required.")
         return 2
 
-    # Set screenshot env gate from flag if requested
-    if args.allow_screenshots:
-        os.environ["ATLAS_AGENT_ALLOW_SCREENSHOTS"] = "1"
-    if args.enable_codegen:
-        os.environ["ATLAS_AGENT_ENABLE_CODEGEN"] = "1"
+    if args.plain:
+        return int(
+            run_team_repl(
+                address=address,
+                api_key=api_key,
+                model=args.model,
+                temperature=0.2,
+                session=args.session,
+                session_dir=args.session_dir,
+                enable_codegen=bool(args.enable_codegen),
+            )
+        )
 
     return int(
-        run_team_repl(
-            address=args.address,
-            api_key=args.api_key,
+        run_console_repl(
+            address=address,
+            api_key=api_key,
             model=args.model,
-            temperature=args.temperature,
-            atlas_dir=args.atlas_dir,
+            temperature=0.2,
+            session=args.session,
+            session_dir=args.session_dir,
+            enable_codegen=bool(args.enable_codegen),
         )
     )

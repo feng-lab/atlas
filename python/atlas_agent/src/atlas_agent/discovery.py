@@ -1,4 +1,3 @@
-import os
 import platform
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -12,20 +11,13 @@ def discover_schema_dir(user_schema_dir: Optional[str], atlas_dir: Optional[str]
         if _contains_schema(p):
             return p, searched
         searched.append(str(p))
-    # Priority 2: env
-    env_dir = os.environ.get("ATLAS_SCHEMA_DIR")
-    if env_dir:
-        p = Path(env_dir)
-        if _contains_schema(p):
-            return p, searched
-        searched.append(str(p))
-    # Priority 3: from atlas_dir
+    # Priority 2: from atlas_dir
     if atlas_dir:
         atlas_bin, schema_dir = compute_paths_from_atlas_dir(Path(atlas_dir))
         searched.append(str(schema_dir))
         if _contains_schema(schema_dir):
             return schema_dir, searched
-    # Priority 4: default install locations
+    # Priority 3: default install locations
     for default_dir in default_install_dirs():
         atlas_bin, schema_dir = compute_paths_from_atlas_dir(default_dir)
         searched.append(str(schema_dir))
@@ -61,6 +53,33 @@ def compute_paths_from_atlas_dir(atlas_dir: Path) -> Tuple[Path, Path]:
     return atlas_bin, schema_dir
 
 
+def compute_docs_dir_from_atlas_dir(atlas_dir: Path) -> Path:
+    """Return docs_dir derived from an install root."""
+    system = platform.system()
+    if system == "Darwin":
+        return atlas_dir / "Contents/Resources/docs"
+    if system == "Windows":
+        return atlas_dir / "Resources/docs"
+    # Linux
+    return atlas_dir / "Resources/docs"
+
+
+def compute_protos_dir_from_atlas_dir(atlas_dir: Path) -> Path:
+    """Return protos_dir derived from an install root.
+
+    This directory contains RPC `.proto` files shipped with the running Atlas app.
+    External agents can compile client stubs against these protos to avoid drift
+    between the app and the agent package.
+    """
+    system = platform.system()
+    if system == "Darwin":
+        return atlas_dir / "Contents/Resources/protos"
+    if system == "Windows":
+        return atlas_dir / "Resources/protos"
+    # Linux
+    return atlas_dir / "Resources/protos"
+
+
 def default_install_dirs() -> list[Path]:
     system = platform.system()
     candidates: list[Path] = []
@@ -76,4 +95,3 @@ def default_install_dirs() -> list[Path]:
         candidates.append(Path("/opt/fenglab/atlas"))
         candidates.append(Path("/usr/local/fenglab/Atlas"))
     return candidates
-

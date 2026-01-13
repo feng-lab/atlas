@@ -49,7 +49,6 @@ private:
   std::unique_ptr<grpc::Server> m_serverOwned;
   std::thread m_waitThread;
   // Own service instances to guarantee lifetime >= server lifetime
-  std::unique_ptr<grpc::Service> m_greeterService;
   std::unique_ptr<grpc::Service> m_sceneService;
   QPointer<ZDoc> m_doc;
   QPointer<Z3DRenderingEngine> m_engine;

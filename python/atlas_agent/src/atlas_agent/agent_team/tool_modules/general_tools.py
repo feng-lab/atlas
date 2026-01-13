@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
-from ...codegen_policy import allowed_imports_status, is_codegen_enabled
+from ...codegen_policy import allowed_imports_status
 from ...repo import find_repo_root  # type: ignore
 from .context import ToolDispatchContext
 
@@ -32,7 +32,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "report_blocked",
-            "description": "Implementer-only: declare that execution is blocked or not feasible. Use precise reason and details so Supervisor can inform the user.",
+            "description": "Declare that execution is blocked or not feasible. Use precise reason/details so the user can take action.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -124,11 +124,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         }
         return json.dumps(out)
 
-    if name == "python_write_and_run" and not is_codegen_enabled():
+    if name == "python_write_and_run" and not bool(getattr(ctx, "codegen_enabled", False)):
         return json.dumps(
             {
                 "ok": False,
-                "error": "codegen disabled (enable with ATLAS_AGENT_ENABLE_CODEGEN=1)",
+                "error": "codegen disabled (enable with --enable-codegen)",
             }
         )
 

@@ -1,13 +1,27 @@
 import copy
 from typing import Any, Dict, List
 
-from . import animation_tools, camera_tools, fs_tools, general_tools, scene_tools
+from . import (
+    animation_tools,
+    camera_tools,
+    docs_tools,
+    fs_tools,
+    general_tools,
+    plan_tools,
+    scene_tools,
+    session_tools,
+    verification_tools,
+)
 
 ALL_MODULES = [
     general_tools,
+    plan_tools,
+    verification_tools,
+    session_tools,
     scene_tools,
     camera_tools,
     animation_tools,
+    docs_tools,
     fs_tools,
 ]
 

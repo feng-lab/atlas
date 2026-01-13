@@ -8,7 +8,7 @@ This guide includes:
 Atlas Agents System (Scene + Animation)
 
 Overview
-- Multi‑agent system that designs animations live in Atlas via gRPC, with preview in the GUI timeline.
+- Tool-using agent that designs animations live in Atlas via gRPC, with preview in the GUI timeline.
 - Single entry point: a chat interface. The agent saves .animation3d via RPC and, when asked, exports MP4 by invoking Atlas headless in the background (no extra CLI commands for the user).
  - Concepts:
    - Scene (.scene): current objects and their display parameters across 2D/3D. Saving a scene restores the view/state.
@@ -17,25 +17,48 @@ Overview
 
 Quickstart
 - Run chat (only command):
-  - `python -m atlas_agent chat-rpc --address localhost:50051 --model o4`
+  - `atlas-agent --model gpt-5.2` (console UI by default)
+  - Optional plain REPL (no styling): `atlas-agent --plain --model gpt-5.2`
+
+Docs Discovery (runtime)
+- Atlas ships markdown docs inside the app bundle (same content as `docs/` in the repo).
+- The agent can search and read these docs at runtime:
+  - `docs_search` (find relevant sections)
+  - `docs_read` (read a specific excerpt by line range)
+  - `docs_list` (enumerate available docs)
+- Key docs:
+  - `SCENE_SERVER.md` (RPC semantics + contracts)
+  - `AGENTS_GUIDE.md` (tooling contract + best practices)
+  - `USER_GUIDE.md` (user-facing workflows)
+  - `DEVELOPER_GUIDE.md` (engine architecture + threading rules)
 
 Schema Discovery
-- Preferred: pass `--atlas-dir` (installation root). The tool derives both the Atlas binary and the schema under it.
-- If `--atlas-dir` is not provided, it searches common defaults and errors if not found:
+- Preferred (default): the agent asks the running Atlas RPC server for its install location (authoritative).
+- If the RPC server is not reachable (Atlas not open yet), the CLI will:
+  1) detect Atlas in common install locations,
+  2) launch Atlas,
+  3) re-try RPC discovery until it succeeds (or times out).
+- Common install locations (used for launch only):
   - macOS: `/Applications/fenglab/Atlas.app`, `/Applications/Atlas.app`
   - Windows: `C:\\Program Files\\fenglab\\Atlas`, `C:\\Program Files (x86)\\fenglab\\Atlas`
   - Linux: `/opt/fenglab/Atlas`, `/opt/fenglab/atlas`, `/usr/local/fenglab/Atlas`
-- Alternatively, provide `--schema-dir` or set `ATLAS_SCHEMA_DIR`.
+- RPC protos are shipped with the running app at `Resources/protos/scene.proto`; the agent compiles Python stubs from that file so it always matches the running Atlas version (no monorepo fallback).
 
 Headless Rendering
 - When the agent exports video on your behalf, it invokes Atlas with the headless exporter (`--run_export_3d_animation`), adding `-platform offscreen` on Windows/Linux.
 
 Notes
-- Headless export uses the Atlas binary; set `--atlas-dir` or install Atlas to standard locations.
-- Requires the Agents SDK (pip package name `agents`) for multi‑agent chat. Install it to enable session management and future MCP tool support.
+- Headless export uses the Atlas binary. The agent uses the running app's reported install location by default, and falls back to standard install locations when needed.
+- The chat runtime uses the OpenAI Python SDK + the Responses API for streaming reasoning summaries + tool-calling.
+
+Screenshots (optional)
+- Visual verification can use `animation_render_preview` to render a single frame to a temp image.
+- On startup, the CLI asks once per session for consent to use preview screenshots for verification.
+- You can toggle later in the REPL: `:screenshots on` / `:screenshots off`.
+- If a requirement can't be verified from tools or screenshots, the agent will request a human-check step.
 
 Codegen Toggle
-- Code generation helpers are disabled by default and gated behind a flag. Enable with `--enable-codegen` or `ATLAS_AGENT_ENABLE_CODEGEN=1` when invoking the chat agent. When disabled, the `python_write_and_run` tool is hidden and calls are rejected.
+- Code generation helpers are disabled by default and gated behind a flag. Enable with `--enable-codegen` when invoking the chat agent. When disabled, the `python_write_and_run` tool is hidden and calls are rejected.
 
 No Other CLI Commands
 - All actions happen through chat. Ask to load data, set keys, play/pause, save, or export and the agent will call the right tools under the hood.
@@ -53,14 +76,39 @@ Natural Language Examples
   - "Increase the opacity of file fibers.obj from 0 to 1 during time 10-12 seconds"
   - "Color of file soma.ply from red to blue during time 5-8 seconds"
 
-Multi‑Agent (live)
-- Start: `python -m atlas_agent chat-rpc --address localhost:50051 --model o4`
-- The agents (Supervisor, Planner, Inspector) will:
-  - Query scene state (objects, bbox, params) via tools
-  - Propose ≥2 plans, critique, ask clarifying questions if inputs are ambiguous
-  - Execute against a simple TODO list (see below): agents act on the listed tasks; adjust iteratively and explain rationale concisely
+Atlas Agent (live)
+- Start: `atlas-agent --model gpt-5.2` (starts a console UI by default).
+  - If Atlas is not running, the CLI attempts to launch it from a common install location and then waits for the RPC server.
+- Runtime loop (streaming tool loop):
+  - Phases (adaptive by default):
+    - Planner: may run first to create/refresh the plan (read-only tools + `update_plan` only).
+    - Executor: performs changes by calling tools.
+    - Verifier: runs only if Executor made Atlas changes; verifies via read-only tools and updates the plan, then produces the final answer.
+  - Uses the OpenAI Responses API with tool-calling to operate Atlas through the gRPC server.
+  - Streams a first-person “Reasoning summary” as the model thinks, then executes tool calls step-by-step.
+  - Stores deterministic evidence in the session log `session.jsonl` (tool calls + summarized results by default).
+- Session memory (context-window resilience):
+  - The runtime maintains a compact “Session Memory” summary so long conversations remain stable even when raw history exceeds the model context window.
+  - This is built-in (not tuned via environment variables). Use the REPL command `:memory` to inspect what is stored.
+- Sessions (resume across restarts):
+  - The chat runtime stores a single append-only session log (`session.jsonl`) containing domain events (plan/memory/verification/meta/consent), transcript entries, tool calls, and verification evidence. Durable state is reconstructed by replaying the log.
+  - Flags:
+    - `--session <id-or-path>`
+    - `--session-dir <path>`
+  - REPL helpers: `:session`, `:plan`, `:memory`, `:screenshots on|off`
+  - Default session location when `--session-dir` is omitted:
+    - macOS/Linux: `$XDG_STATE_HOME/atlas_agent/sessions` if set, otherwise `~/.atlas_agent/sessions`
+    - Windows: `%APPDATA%\\atlas_agent\\sessions`
+- Auto-retrieval (context-window resilience):
+  - When the user says “resume/continue/last time”, the runtime can inject a small, explicit “Auto-retrieved context” block derived from the session transcript + events log.
+  - This is intentionally a small excerpt. For exact prior messages or more history, use session tools like `session_search_transcript` / `session_search_events`.
+- Reasoning summary (first-person, streamed):
+  - When the model supports reasoning summaries, the runtime streams them (Responses API `reasoning.summary`) so users can see the agent’s intent and verification plan before tool writes.
+  - This is a high-level summary (what it plans to do and how it will verify), not chain-of-thought.
 
-Inspector Behavior (Verification‑only)
+Inspector (legacy / optional)
+- The current default runtime is a single tool-using agent that performs its own verification via tools.
+- The Inspector role described below is legacy / optional design guidance for a verification-only sub-agent if reintroduced.
 - No tools: The Inspector never calls tools or reads files. It judges only from the merged plan, scene context, verified Facts JSON, and an optional preview image.
 - No out‑of‑band requests: It must not ask users to paste/upload logs or run shell commands. Filesystem/network access is out of scope for the Inspector.
 - Facts‑first: Treat Facts as authoritative. If something is not present in Facts, do not assume it is missing in the scene.
@@ -78,7 +126,14 @@ Filesystem Tools (Best Practices)
     - Omitting `length` reads to end; omitting `line_count` reads to end. `line_count` requires `start_line` (use negative `start_line` to tail last N lines).
     - Provide both fields to read exact windows; no other special cases.
     - Avoid mixing byte and line windows in one call. If both are provided, fs_read_text reads the byte window first and then applies the line slice within that window (allowed but discouraged).
-- Prefer these tools over custom file ops. `repo_search` is not exposed to the LLM; `fs_hint_resolve` is the recommended entry.
+- Prefer these tools over custom file ops. Use `fs_hint_resolve` for user file hints; use `repo_search` only for repo-internal lookup (best-effort).
+
+Docs Tools (Best Practices)
+- Prefer docs search over guessing semantics:
+  - Use `docs_search(query, include_paths=["SCENE_SERVER.md"])` for RPC semantics and tool contracts.
+  - Use `docs_search(query, include_paths=["USER_GUIDE.md"])` for user-facing workflows (GUI names/menus, export behavior).
+- Read excerpts narrowly:
+  - Use `docs_read(doc_name="SCENE_SERVER.md", start_line=..., line_count=...)` rather than whole-file reads.
 
 Natural Language Contract (Summary‑first)
 - Before any keys are written, require a concise Plan Summary with two synchronized views:
@@ -110,6 +165,9 @@ Stability rules
 
 Categories and current tools (non-exhaustive)
 - File/FS: `system_info`, `fs_expand_paths`, `fs_check_paths`, `fs_glob`, `fs_resolve_path`, `repo_search`
+- Session: `session_info`, `session_get_plan`, `session_get_memory`, `session_search_transcript`, `session_search_events`
+- Docs: `docs_list`, `docs_search`, `docs_read`
+- Planning: `update_plan`
 - Load: `scene_load_files`, `scene_ensure_loaded`, `scene_smart_load`
 - Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_params`, `scene_apply`, `scene_save_scene`, `scene_set_visibility`, `scene_make_alias`
 - Discovery: `scene_list_objects`, `scene_list_params(id)`, `scene_capabilities`, `scene_schema`, `scene_capabilities_summary`, `scene_facts_summary`
@@ -133,7 +191,7 @@ Agent Tools (Discovery — no duplication)
 
 Source of truth
 - Tools are defined in code and surfaced to LLMs at runtime via the tools parameter. Do not mirror schemas in docs.
-- Location: `tools/atlas_agent/agent_team/tools_agent.py:scene_tools_and_dispatcher`.
+- Location: `python/atlas_agent/src/atlas_agent/agent_team/tools_agent.py:scene_tools_and_dispatcher`.
 
 Discover at runtime
 - Print the live tool list (names + JSONSchemas) from a Python shell:

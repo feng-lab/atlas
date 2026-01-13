@@ -48,7 +48,6 @@ print_target_properties(proxygen::proxygen)
 include(gRPCGenerateCPP)
 
 set(PROTOS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../protos/helloworld.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/../protos/imgprocess.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/../protos/scene.proto
 )
@@ -870,6 +869,15 @@ if (WIN32)
                      COMMAND ${CMAKE_COMMAND} -E copy_directory
                              "${CMAKE_CURRENT_SOURCE_DIR}/../../docs"
                              "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs")
+  # Copy RPC protos into bundle so external agents can compile stubs against the
+  # exact running Atlas version (single source of truth).
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E make_directory
+                             "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/protos"
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                             "${CMAKE_CURRENT_SOURCE_DIR}/../protos/scene.proto"
+                             "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/protos/scene.proto")
 else (WIN32)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
@@ -983,6 +991,15 @@ else (WIN32)
                        COMMAND ${CMAKE_COMMAND} -E copy_directory
                                "${CMAKE_CURRENT_SOURCE_DIR}/../../docs"
                                "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/docs")
+    # Copy RPC protos into bundle so external agents can compile stubs against
+    # the exact running Atlas version (single source of truth).
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E make_directory
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/protos"
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                               "${CMAKE_CURRENT_SOURCE_DIR}/../protos/scene.proto"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/protos/scene.proto")
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
                        COMMAND codesign --force --deep --sign - $<TARGET_BUNDLE_DIR:${APP_NAME}>)
@@ -1057,6 +1074,15 @@ else (WIN32)
                        COMMAND ${CMAKE_COMMAND} -E copy_directory
                                "${CMAKE_CURRENT_SOURCE_DIR}/../../docs"
                                "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs")
+    # Copy RPC protos into bundle so external agents can compile stubs against
+    # the exact running Atlas version (single source of truth).
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E make_directory
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/protos"
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                               "${CMAKE_CURRENT_SOURCE_DIR}/../protos/scene.proto"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/protos/scene.proto")
   endif ()
 endif (WIN32)
 

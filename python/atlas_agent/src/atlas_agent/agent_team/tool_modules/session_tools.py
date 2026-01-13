@@ -1,0 +1,211 @@
+import json
+from typing import Any, Dict, List, Optional
+
+from .context import ToolDispatchContext
+
+HANDLED_TOOLS = (
+    "session_info",
+    "session_get_plan",
+    "session_get_memory",
+    "session_search_transcript",
+    "session_search_events",
+)
+
+TOOL_SPECS: List[Dict[str, Any]] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "session_info",
+            "description": "Return current session identity + storage path (single session.jsonl log) and saved meta (atlas_dir, address, model).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "session_get_plan",
+            "description": "Return the current task plan from the persistent session store (or runtime plan if no session is available).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "include_explanation": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "When true, include plan_source and plan_explanation when available.",
+                    }
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "session_get_memory",
+            "description": "Return the current Session Memory summary string (durable cross-turn context).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "session_search_transcript",
+            "description": "Search the full append-only session transcript (no truncation by default). Returns matching entries with timestamps/roles. For large transcripts, scope the query or set max_results to bound output.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Substring or regex to match."},
+                    "regex": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, treat query as a regex pattern.",
+                    },
+                    "case_sensitive": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Case sensitive match when true.",
+                    },
+                    "role": {
+                        "type": ["string", "null"],
+                        "description": "Optional role filter (e.g., 'user' or 'assistant').",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "0=unlimited (correctness-first). If >0, returns only a window and sets limit_reached=true.",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "session_search_events",
+            "description": "Search the structured events log (tool calls + facts snapshots). Useful for recalling exact previous tool calls beyond the current model context window.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Substring or regex to match (searches serialized event JSON)."},
+                    "regex": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, treat query as a regex pattern.",
+                    },
+                    "case_sensitive": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Case sensitive match when true.",
+                    },
+                    "event_type": {
+                        "type": ["string", "null"],
+                        "description": "Optional event type filter (e.g., 'tool_call', 'facts_snapshot').",
+                    },
+                    "tool": {
+                        "type": ["string", "null"],
+                        "description": "Optional tool filter for tool_call events (exact match).",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "0=unlimited (correctness-first). If >0, returns only a window and sets limit_reached=true.",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+]
+
+
+def _runtime_plan(ctx: ToolDispatchContext) -> list[dict]:
+    try:
+        v = ctx.runtime_state.get("plan")
+        return list(v) if isinstance(v, list) else []
+    except Exception:
+        return []
+
+
+def _runtime_plan_explanation(ctx: ToolDispatchContext) -> str:
+    try:
+        s = ctx.runtime_state.get("plan_explanation")
+        return str(s) if isinstance(s, str) else ""
+    except Exception:
+        return ""
+
+
+def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
+    if name not in HANDLED_TOOLS:
+        return None
+
+    ss = ctx.session_store
+
+    if name == "session_info":
+        if ss is None:
+            return json.dumps({"ok": False, "error": "no session_store available"})
+        try:
+            payload = {
+                "ok": True,
+                "session_id": ss.session_id(),
+                "root": str(ss.root),
+                "log_path": str(ss.log_path),
+                "meta": ss.get_meta(),
+            }
+            return json.dumps(payload, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    if name == "session_get_plan":
+        include_explanation = bool(args.get("include_explanation", True))
+        try:
+            if ss is not None:
+                payload: dict[str, Any] = {"ok": True, "plan": ss.get_plan()}
+                if include_explanation:
+                    payload["plan_source"] = ss.plan_source()
+                    payload["plan_explanation"] = ss.plan_explanation()
+                return json.dumps(payload, ensure_ascii=False)
+            # No session store: fall back to runtime state
+            payload = {"ok": True, "plan": _runtime_plan(ctx)}
+            if include_explanation:
+                payload["plan_source"] = "runtime"
+                payload["plan_explanation"] = _runtime_plan_explanation(ctx)
+            return json.dumps(payload, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    if name == "session_get_memory":
+        try:
+            mem = ss.get_memory_summary() if ss is not None else ""
+            return json.dumps({"ok": True, "memory_summary": mem}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    if name == "session_search_transcript":
+        if ss is None:
+            return json.dumps({"ok": False, "error": "no session_store available"})
+        payload = ss.search_transcript(
+            query=str(args.get("query") or ""),
+            regex=bool(args.get("regex", False)),
+            case_sensitive=bool(args.get("case_sensitive", False)),
+            role=args.get("role"),
+            max_results=int(args.get("max_results", 0) or 0),
+        )
+        return json.dumps(payload, ensure_ascii=False)
+
+    if name == "session_search_events":
+        if ss is None:
+            return json.dumps({"ok": False, "error": "no session_store available"})
+        query = str(args.get("query") or "")
+        if not query:
+            return json.dumps({"ok": False, "error": "query is required"})
+        payload = ss.search_events(
+            query=query,
+            regex=bool(args.get("regex", False)),
+            case_sensitive=bool(args.get("case_sensitive", False)),
+            event_type=args.get("event_type"),
+            tool=args.get("tool"),
+            max_results=int(args.get("max_results", 0) or 0),
+        )
+        return json.dumps(payload, ensure_ascii=False)
+
+    return None
