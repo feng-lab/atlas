@@ -1541,10 +1541,82 @@ folly::coro::Task<std::shared_ptr<const ZImg>> ZImgPack::resizedImgCachedAsync(s
   CHECK(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth && width > 0 && height > 0 &&
         depth > 0);
 
-  // For file-backed sources, reuse the existing synchronous cache behavior.
+  // For file-backed sources, preserve the existing preview-disk-cache behavior while making the
+  // build path cancellation-aware (see below).
   if (!m_ngVolume) {
     maybeCancel(cancellationToken);
-    co_return resizedImgCached(width, height, depth, t);
+
+    // The coroutine wrapper makes Neuroglancer (network-backed) preview builds cancellable because the call-stack
+    // naturally suspends while awaiting HTTP reads. For file-backed (local) sources, however, the old path called
+    // the fully synchronous resizedImgCached() implementation, which does not suspend and therefore could not observe
+    // cancellation once work had started.
+    //
+    // Make the local path cancellation-aware by explicitly polling the coroutine cancellation token while assembling
+    // tiles into the preview volume. This preserves output equivalence with the synchronous path when not cancelled.
+    if (!m_diskCached) {
+      maybeCancel(cancellationToken);
+      auto img = std::make_shared<ZImg>(resizedImg(width, height, depth, t));
+      maybeCancel(cancellationToken);
+      co_return std::shared_ptr<const ZImg>(std::move(img));
+    }
+
+    const auto fingerprint = datasetFingerprintForCache();
+    if (auto hit = ZImgPreviewDiskCache::instance().tryGetFilePreview(fingerprint, width, height, depth, t); hit) {
+      maybeCancel(cancellationToken);
+      co_return std::shared_ptr<const ZImg>(std::move(hit));
+    }
+
+    maybeCancel(cancellationToken);
+
+    const std::array<size_t, 3> ratio =
+      readRatioOf(std::max<size_t>(1, static_cast<size_t>(std::floor(static_cast<double>(m_imgInfo.width) / width))),
+                  std::max<size_t>(1, static_cast<size_t>(std::floor(static_cast<double>(m_imgInfo.height) / height))),
+                  std::max<size_t>(1, static_cast<size_t>(std::floor(static_cast<double>(m_imgInfo.depth) / depth))));
+
+    ZImgInfo info = m_imgInfo;
+    info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
+    info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
+    info.depth = (m_imgInfo.depth + ratio[2] - 1) / ratio[2];
+    info.numTimes = 1;
+
+    ZImg res(info);
+
+    auto tiit = m_rtToTileIndice.find(std::make_tuple(ratio[0], ratio[1], ratio[2], t));
+    if (tiit != m_rtToTileIndice.end()) {
+      const std::vector<size_t>& tileIndice = tiit->second;
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, tileIndice.size()), [&](const tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+          maybeCancel(cancellationToken);
+
+          const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
+          const ZVoxelCoordinate start(std::round(static_cast<double>(tile.x) / ratio[0]),
+                                       std::round(static_cast<double>(tile.y) / ratio[1]),
+                                       std::round(static_cast<double>(tile.z) / ratio[2]),
+                                       0,
+                                       0);
+
+          maybeCancel(cancellationToken);
+
+          std::shared_ptr<ZImg> imgPtr =
+            ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndice[i]), tile);
+
+          maybeCancel(cancellationToken);
+
+          res.pasteImg(*imgPtr, start);
+        }
+      });
+    }
+
+    maybeCancel(cancellationToken);
+
+    if (res.width() != width || res.height() != height || res.depth() != depth) {
+      maybeCancel(cancellationToken);
+      res.resize(width, height, depth);
+    }
+
+    auto img = std::make_shared<ZImg>(std::move(res));
+    ZImgPreviewDiskCache::instance().tryPutFilePreview(fingerprint, width, height, depth, t, img);
+    co_return std::shared_ptr<const ZImg>(std::move(img));
   }
 
   // Neuroglancer precomputed (network-backed): build the preview volume via coroutines so cancellation
