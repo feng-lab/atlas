@@ -303,7 +303,7 @@ Steps to load and manage images via `ZImgDoc`:
    3. Confirm. Each image becomes a new object in the manager.
 2. **Load Neuroglancer (Precomputed)**
    1. Choose **File → Load Neuroglancer (Precomputed)...**.
-   2. Enter a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `http://`, `https://`. (Note: Neuroglancer viewer state `.json` URLs are not dataset roots; use **File → Load Neuroglancer (State JSON)...** for share links / state JSON.)
+   2. Enter a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `s3://`, `http://`, `https://`. (Note: Neuroglancer viewer state `.json` URLs are not dataset roots; use **File → Load Neuroglancer (State JSON)...** for share links / state JSON.)
    3. Use the **History** tab to re-open previously loaded datasets; optionally assign friendly names (editable in the dialog).
    4. Use the **Examples** tab for a small built-in list of public datasets.
    5. The history is stored in the user config folder as `neuroglancer_precomputed_history.json` (open via **Help → Open Config Folder**).
@@ -320,7 +320,7 @@ Steps to load and manage images via `ZImgDoc`:
 	          - If not, configure sources in **Object View Setting → Neuroglancer Sources** for that segmentation object:
 	            - **Set Mesh Source Override…**
 	            - **Set Skeleton Source Override…**
-	            - Values can be an absolute URL (e.g. `precomputed://…`, `gs://…`, `https://…`) or a relative path resolved against the segmentation root.
+	            - Values can be an absolute URL (e.g. `precomputed://…`, `gs://…`, `s3://…`, `https://…`) or a relative path resolved against the segmentation root.
 	          - These overrides are saved in `.scene` files and restored on load.
 	        - Once a source is configured, import from the **2D slice view** (right‑click) using:
 	        - **Copy Neuroglancer Segment ID Under Cursor**

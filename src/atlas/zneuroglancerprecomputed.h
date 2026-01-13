@@ -200,6 +200,7 @@ public:
   // Normalizes a dataset root URL for Neuroglancer precomputed volumes:
   // - Accepts optional "precomputed://" prefix.
   // - Maps "gs://bucket/path" to "https://storage.googleapis.com/bucket/path".
+  // - Maps "s3://bucket/path" to an HTTPS S3 endpoint.
   // - Strips trailing "/info" and ensures the result ends with '/'.
   // This does not perform any network I/O and is safe to call for scene serialization/dedup.
   static QString normalizeRootUrl(QString url);

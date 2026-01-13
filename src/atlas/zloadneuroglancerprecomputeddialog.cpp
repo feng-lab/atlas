@@ -73,7 +73,7 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
     auto* row = new QHBoxLayout();
     row->addWidget(new QLabel(tr("URL:")));
     m_urlEdit = new QLineEdit();
-    m_urlEdit->setPlaceholderText(tr("precomputed://gs://bucket/path or https://host/path"));
+    m_urlEdit->setPlaceholderText(tr("precomputed://gs://bucket/path, precomputed://s3://bucket/path, or https://host/path"));
     row->addWidget(m_urlEdit, /*stretch=*/1);
     formLayout->addLayout(row);
   }

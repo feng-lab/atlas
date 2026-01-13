@@ -1,4 +1,5 @@
 #include "zneuroglancerprecomputedchunkdecoder.h"
+#include "zneuroglancerprecomputed.h"
 
 #include <gtest/gtest.h>
 
@@ -191,5 +192,17 @@ TEST(ZNeuroglancerPrecomputedChunkDecoder, DecodeCompressoMinimalConstantChunk)
   }
 }
 
-} // namespace nim
+TEST(ZNeuroglancerPrecomputedVolume, NormalizeRootUrlSupportsS3)
+{
+  EXPECT_EQ(ZNeuroglancerPrecomputedVolume::normalizeRootUrl(QStringLiteral("s3://my-bucket/dataset")),
+            QStringLiteral("https://my-bucket.s3.amazonaws.com/dataset/"));
 
+  EXPECT_EQ(ZNeuroglancerPrecomputedVolume::normalizeRootUrl(QStringLiteral("precomputed://s3://my-bucket/dataset/info")),
+            QStringLiteral("https://my-bucket.s3.amazonaws.com/dataset/"));
+
+  // Buckets with dots require path-style addressing to avoid TLS wildcard mismatches.
+  EXPECT_EQ(ZNeuroglancerPrecomputedVolume::normalizeRootUrl(QStringLiteral("s3://my.bucket/dataset")),
+            QStringLiteral("https://s3.amazonaws.com/my.bucket/dataset/"));
+}
+
+} // namespace nim

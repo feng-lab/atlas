@@ -429,11 +429,36 @@ QString ZNeuroglancerPrecomputedVolume::normalizeRootUrl(QString url)
 {
   url = url.trimmed();
   if (url.startsWith("precomputed://", Qt::CaseInsensitive)) {
-    url = url.mid(QString("precomputed://").size());
+    url = url.mid(QStringLiteral("precomputed://").size());
   }
   if (url.startsWith("gs://", Qt::CaseInsensitive)) {
-    QString rest = url.mid(QString("gs://").size());
-    url = "https://storage.googleapis.com/" + rest;
+    const QString rest = url.mid(QStringLiteral("gs://").size());
+    url = QStringLiteral("https://storage.googleapis.com/") + rest;
+  } else if (url.startsWith("s3://", Qt::CaseInsensitive)) {
+    const QString rest = url.mid(QStringLiteral("s3://").size());
+    const int slash = rest.indexOf('/');
+    const QString bucket = (slash < 0) ? rest : rest.left(slash);
+    const QString key = (slash < 0) ? QString{} : rest.mid(slash + 1);
+    if (bucket.isEmpty()) {
+      throw ZException(fmt::format("Invalid S3 URL '{}': missing bucket name", toStdString(url)));
+    }
+
+    // Prefer virtual-hosted-style URLs for compatibility with newer AWS regions, but fall back to
+    // path-style when the bucket name contains dots (TLS wildcard mismatch with e.g. "a.b.s3.amazonaws.com").
+    const bool bucketHasDot = bucket.contains('.');
+    if (bucketHasDot) {
+      url = QStringLiteral("https://s3.amazonaws.com/") + bucket;
+      if (!key.isEmpty()) {
+        url += '/';
+        url += key;
+      }
+    } else {
+      url = QStringLiteral("https://") + bucket + QStringLiteral(".s3.amazonaws.com");
+      if (!key.isEmpty()) {
+        url += '/';
+        url += key;
+      }
+    }
   }
 
   QUrl qurl(url);

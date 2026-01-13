@@ -72,7 +72,6 @@ endif ()
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
 add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_gtest_executable(zneuroglanceruint64shardingtest)
-add_atlas_gtest_executable(zneuroglancerprecomputedchunkdecodertest)
 add_atlas_gtest_executable(zneuroglancerstatetest)
 
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
@@ -89,6 +88,7 @@ else ()
   add_executable(
     zatlasheavytest
     ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedchunkdecodertest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedannotationstest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedsegmentpropertiestest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedskeletontest.cpp

@@ -217,8 +217,10 @@ void ZSystemInfo::addFileToRecentFileList(const QString& fileName) const
   QString fn = QFileInfo(fileName).canonicalFilePath();
   if (fn.isEmpty()) {
     const QString trimmed = fileName.trimmed();
-    const bool isNetworkUrl = trimmed.startsWith("precomputed://", Qt::CaseInsensitive) || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
-                              trimmed.startsWith("http://", Qt::CaseInsensitive) || trimmed.startsWith("https://", Qt::CaseInsensitive);
+    const bool isNetworkUrl =
+      trimmed.startsWith("precomputed://", Qt::CaseInsensitive) || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
+      trimmed.startsWith("s3://", Qt::CaseInsensitive) || trimmed.startsWith("http://", Qt::CaseInsensitive) ||
+      trimmed.startsWith("https://", Qt::CaseInsensitive);
     if (!isNetworkUrl) {
       return;
     }

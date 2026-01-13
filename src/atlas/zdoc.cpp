@@ -38,6 +38,7 @@ bool looksLikeNetworkUrl(const QString& s)
 {
   const QString trimmed = s.trimmed();
   return trimmed.startsWith("precomputed://", Qt::CaseInsensitive) || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
+         trimmed.startsWith("s3://", Qt::CaseInsensitive) ||
          trimmed.startsWith("http://", Qt::CaseInsensitive) || trimmed.startsWith("https://", Qt::CaseInsensitive);
 }
 

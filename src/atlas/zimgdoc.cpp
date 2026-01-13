@@ -35,6 +35,7 @@ bool looksLikeNeuroglancerPrecomputedUrl(const QString& s)
 {
   const QString trimmed = s.trimmed();
   return trimmed.startsWith("precomputed://", Qt::CaseInsensitive) || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
+         trimmed.startsWith("s3://", Qt::CaseInsensitive) ||
          trimmed.startsWith("http://", Qt::CaseInsensitive) || trimmed.startsWith("https://", Qt::CaseInsensitive);
 }
 
@@ -513,11 +514,38 @@ void ZImgDoc::loadNeuroglancerState()
 
   constexpr std::chrono::milliseconds kDefaultTimeout{30000};
 
-  auto mapGsToHttps = [](QString u) -> QString {
+  auto mapCloudUrlToHttps = [](QString u) -> QString {
     QString s = u.trimmed();
     if (s.startsWith("gs://", Qt::CaseInsensitive)) {
       const QString rest = s.mid(QStringLiteral("gs://").size());
       return QStringLiteral("https://storage.googleapis.com/") + rest;
+    }
+    if (s.startsWith("s3://", Qt::CaseInsensitive)) {
+      const QString rest = s.mid(QStringLiteral("s3://").size());
+      const int slash = rest.indexOf('/');
+      const QString bucket = (slash < 0) ? rest : rest.left(slash);
+      const QString key = (slash < 0) ? QString{} : rest.mid(slash + 1);
+      if (bucket.isEmpty()) {
+        return s;
+      }
+
+      // Prefer virtual-hosted-style URLs for compatibility with newer AWS regions, but fall back to
+      // path-style when the bucket name contains dots (TLS wildcard mismatch with e.g. "a.b.s3.amazonaws.com").
+      const bool bucketHasDot = bucket.contains('.');
+      if (bucketHasDot) {
+        QString out = QStringLiteral("https://s3.amazonaws.com/") + bucket;
+        if (!key.isEmpty()) {
+          out += '/';
+          out += key;
+        }
+        return out;
+      }
+      QString out = QStringLiteral("https://") + bucket + QStringLiteral(".s3.amazonaws.com");
+      if (!key.isEmpty()) {
+        out += '/';
+        out += key;
+      }
+      return out;
     }
     return s;
   };
@@ -551,7 +579,7 @@ void ZImgDoc::loadNeuroglancerState()
     } else if (const auto fragOpt = tryExtractJsonFromUrlFragment(userText)) {
       stateJson = boost::json::parse(fragOpt->toStdString());
     } else if (userText.contains("://") || userText.startsWith("gs://", Qt::CaseInsensitive)) {
-      const QString urlStr = mapGsToHttps(userText);
+      const QString urlStr = mapCloudUrlToHttps(userText);
       auto resOpt = folly::coro::blockingWait(
         ZProxygenHttpClient::instance().getBytes(urlStr.toStdString(), kDefaultTimeout));
       if (!resOpt) {

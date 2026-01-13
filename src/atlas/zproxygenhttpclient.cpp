@@ -50,6 +50,10 @@ DEFINE_string(atlas_http_proxy_strategy,
               "Values: auto (alternate direct/proxy between retries), no_proxy (always direct), "
               "proxy_if_available (always use system proxy if one exists for the URL).");
 
+DEFINE_uint32(atlas_http_max_redirect_hops,
+              5,
+              "Maximum number of HTTP redirects to follow for a single GET request (default 5).");
+
 DEFINE_uint32(atlas_http_max_retries,
               3,
               "Maximum number of retries for transient network/handshake errors in HTTP GET (default 3).");
@@ -207,6 +211,44 @@ ProxyStrategy proxyStrategyFromFlag()
   throw ZException(fmt::format(
     "Invalid --atlas_http_proxy_strategy='{}' (expected: auto, no_proxy, proxy_if_available)",
     FLAGS_atlas_http_proxy_strategy));
+}
+
+bool isRedirectStatus(uint16_t status)
+{
+  switch (status) {
+  case 301:
+  case 302:
+  case 303:
+  case 307:
+  case 308:
+    return true;
+  default:
+    return false;
+  }
+}
+
+std::string resolveRedirectUrl(const std::string& baseUrl, const std::string& location)
+{
+  const QUrl base(QString::fromStdString(baseUrl));
+  if (!base.isValid()) {
+    throw ZException(fmt::format("Invalid base URL while resolving redirect: '{}'", baseUrl));
+  }
+
+  const QUrl loc(QString::fromStdString(location));
+  const QUrl resolved = base.resolved(loc);
+  if (!resolved.isValid()) {
+    throw ZException(fmt::format("Invalid redirect target '{}' (base '{}')", location, baseUrl));
+  }
+
+  const QString schemeLower = resolved.scheme().trimmed().toLower();
+  if (schemeLower != QStringLiteral("http") && schemeLower != QStringLiteral("https")) {
+    throw ZException(fmt::format("Unsupported redirect scheme '{}' (from '{}' to '{}')",
+                                 schemeLower.toStdString(),
+                                 baseUrl,
+                                 resolved.toString().toStdString()));
+  }
+
+  return resolved.toString(QUrl::FullyEncoded).toStdString();
 }
 
 std::optional<ProxyEndpoint> systemHttpProxyForUrl(const std::string& url)
@@ -478,16 +520,9 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
 
-  proxygen::URL parsedUrl(url);
-  if (!parsedUrl.isValid() || parsedUrl.getHost().empty()) {
+  proxygen::URL initialUrl(url);
+  if (!initialUrl.isValid() || initialUrl.getHost().empty()) {
     throw ZException(fmt::format("Invalid URL '{}'", url));
-  }
-
-  bool isSecure = false;
-  {
-    std::string scheme(parsedUrl.getScheme());
-    folly::toLowerAscii(scheme);
-    isSecure = (scheme == "https");
   }
 
   const ProxyStrategy proxyStrategy = proxyStrategyFromFlag();
@@ -549,37 +584,75 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     auto attemptResult = co_await folly::coro::co_awaitTry([&]() -> folly::coro::Task<ZHttpGetBytesResult> {
       maybeCancel(cancellationToken);
 
-      proxygen::coro::HTTPCoroConnector::ConnectionParams connParams{};
-      const proxygen::coro::HTTPCoroConnector::ConnectionParams* connParamsPtr = nullptr;
-      if (isSecure) {
-        CHECK(m_sslContext);
-        connParams = proxygen::coro::HTTPCoroConnector::defaultConnectionParams();
-        connParams.sslContext = m_sslContext;
-        connParams.serverName = parsedUrl.getHost();
-        connParamsPtr = &connParams;
+      std::string currentUrl = url;
+      const uint32_t maxRedirectHops = FLAGS_atlas_http_max_redirect_hops;
+      for (uint32_t hop = 0; hop <= maxRedirectHops; ++hop) {
+        maybeCancel(cancellationToken);
+
+        proxygen::URL parsedUrl(currentUrl);
+        if (!parsedUrl.isValid() || parsedUrl.getHost().empty()) {
+          throw ZException(fmt::format("Invalid URL '{}'", currentUrl));
+        }
+
+        bool isSecure = false;
+        {
+          std::string scheme(parsedUrl.getScheme());
+          folly::toLowerAscii(scheme);
+          isSecure = (scheme == "https");
+        }
+
+        proxygen::coro::HTTPCoroConnector::ConnectionParams connParams{};
+        const proxygen::coro::HTTPCoroConnector::ConnectionParams* connParamsPtr = nullptr;
+        if (isSecure) {
+          CHECK(m_sslContext);
+          connParams = proxygen::coro::HTTPCoroConnector::defaultConnectionParams();
+          connParams.sslContext = m_sslContext;
+          connParams.serverName = parsedUrl.getHost();
+          connParamsPtr = &connParams;
+        }
+
+        auto sessionRes = co_await connCache->getSessionWithReservation(currentUrl, timeout, connParamsPtr);
+        maybeCancel(cancellationToken);
+
+        auto response = co_await proxygen::coro::HTTPClient::get(
+          sessionRes.session,
+          std::move(sessionRes.reservation),
+          parsedUrl,
+          timeout,
+          headerMap);
+
+        CHECK(response.headers);
+        const uint16_t status = response.headers->getStatusCode();
+        const auto& headers = response.headers->getHeaders();
+
+        if (isRedirectStatus(status)) {
+          const std::string location = headers.getSingleOrEmpty("location");
+          if (location.empty()) {
+            throw ZException(fmt::format("HTTP {} redirect without Location header for '{}'", status, currentUrl));
+          }
+          if (hop == maxRedirectHops) {
+            throw ZException(fmt::format("Too many HTTP redirects (>{}) while fetching '{}' (last Location='{}')",
+                                         maxRedirectHops,
+                                         currentUrl,
+                                         location));
+          }
+          currentUrl = resolveRedirectUrl(currentUrl, location);
+          continue;
+        }
+
+        ZHttpGetBytesResult out{};
+        out.status = status;
+        out.contentType = headers.getSingleOrEmpty("content-type");
+        out.contentEncoding = headers.getSingleOrEmpty("content-encoding");
+
+        auto bodyBuf = response.body.move();
+        out.body = iobufToBytes(bodyBuf.get());
+        out.body = decompressIfNeeded(std::move(out.body), out.contentEncoding);
+        co_return out;
       }
 
-      auto sessionRes = co_await connCache->getSessionWithReservation(url, timeout, connParamsPtr);
-      maybeCancel(cancellationToken);
-
-      auto response = co_await proxygen::coro::HTTPClient::get(
-        sessionRes.session,
-        std::move(sessionRes.reservation),
-        parsedUrl,
-        timeout,
-        headerMap);
-
-      ZHttpGetBytesResult out{};
-      CHECK(response.headers);
-      out.status = response.headers->getStatusCode();
-      const auto& headers = response.headers->getHeaders();
-      out.contentType = headers.getSingleOrEmpty("content-type");
-      out.contentEncoding = headers.getSingleOrEmpty("content-encoding");
-
-      auto bodyBuf = response.body.move();
-      out.body = iobufToBytes(bodyBuf.get());
-      out.body = decompressIfNeeded(std::move(out.body), out.contentEncoding);
-      co_return out;
+      CHECK(false);
+      co_return ZHttpGetBytesResult{};
     }());
 
     if (attemptResult.hasValue()) {
@@ -616,7 +689,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
       }
 
       std::string msg(httpErr->what());
-      if (isSecure && looksLikeTlsTrustStoreError(msg)) {
+      if (looksLikeTlsTrustStoreError(msg)) {
         msg += fmt::format(" (CA bundle: '{}'; override with --atlas_http_ca_bundle=... or env SSL_CERT_FILE)",
                            m_caBundlePath.empty() ? "<auto>" : m_caBundlePath);
       }
@@ -637,7 +710,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
       continue;
     }
 
-    if (isSecure && looksLikeTlsTrustStoreError(msg)) {
+    if (looksLikeTlsTrustStoreError(msg)) {
       msg += fmt::format(" (CA bundle: '{}'; override with --atlas_http_ca_bundle=... or env SSL_CERT_FILE)",
                          m_caBundlePath.empty() ? "<auto>" : m_caBundlePath);
     }
