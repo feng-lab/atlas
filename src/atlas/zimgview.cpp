@@ -1036,7 +1036,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                               doc.updateExternalPunctaMetadata(id, displayName, tooltip);
 
                               if (done && count == 0) {
-                                doc.removeObj(id);
+                                viewPtr->m_doc.doc().removeObj(id);
                                 QMessageBox::information(
                                   QApplication::activeWindow(),
                                   QApplication::applicationName(),
@@ -1118,7 +1118,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                               doc.updateExternalSkeletonMetadata(id, displayName, tooltip);
 
                               if (done && segCount == 0) {
-                                doc.removeObj(id);
+                                viewPtr->m_doc.doc().removeObj(id);
                                 QMessageBox::information(
                                   QApplication::activeWindow(),
                                   QApplication::applicationName(),
@@ -1151,7 +1151,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                           auto& doc = viewPtr->m_doc.doc().punctaDoc();
                           if (doc.hasObjWithID(*punctaObjId)) {
                             if (doc.punctaPack(*punctaObjId).puncta().data.empty()) {
-                              doc.removeObj(*punctaObjId);
+                              viewPtr->m_doc.doc().removeObj(*punctaObjId);
                             } else {
                               doc.updateExternalPunctaMetadata(
                                 *punctaObjId, displayName, QStringLiteral("Failed to load annotations."));
@@ -1162,7 +1162,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                           auto& doc = viewPtr->m_doc.doc().skeletonDoc();
                           if (doc.hasObjWithID(*skeletonObjId)) {
                             if (doc.skeleton(*skeletonObjId).empty()) {
-                              doc.removeObj(*skeletonObjId);
+                              viewPtr->m_doc.doc().removeObj(*skeletonObjId);
                             } else {
                               doc.updateExternalSkeletonMetadata(
                                 *skeletonObjId, displayName, QStringLiteral("Failed to load annotations."));
@@ -2828,6 +2828,18 @@ void ZImgView::docImgsAdded(const std::vector<size_t>& objs)
     connect(viewControl, &ZImgFilter::objDeselected, this, &ZImgView::onObjDeselectedFromView);
     connect(viewControl, &ZImgFilter::objSelected, this, &ZImgView::onObjSelectedFromView);
     connect(viewControl, &ZImgFilter::objVisibleChanged, this, &ZImgView::onObjVisibleChangedFromView);
+    connect(viewControl,
+            &ZImgFilter::neuroglancerDatasetUnsupported,
+            this,
+            [this, id](const QString& /*datasetUrl*/, const QString& /*error*/) {
+              // Remove the object via ZDoc so the object manager stays consistent.
+              // Use a queued connection to avoid deleting the sender while it is still processing callbacks.
+              if (!m_doc.hasObjWithID(id)) {
+                return;
+              }
+              m_doc.doc().removeObj(id);
+            },
+            Qt::QueuedConnection);
     Q_EMIT objViewReady(id);
   }
   if (!objs.empty()) {
@@ -2846,6 +2858,16 @@ void ZImgView::docImgAdded(size_t id)
   connect(viewControl, &ZImgFilter::objDeselected, this, &ZImgView::onObjDeselectedFromView);
   connect(viewControl, &ZImgFilter::objSelected, this, &ZImgView::onObjSelectedFromView);
   connect(viewControl, &ZImgFilter::objVisibleChanged, this, &ZImgView::onObjVisibleChangedFromView);
+  connect(viewControl,
+          &ZImgFilter::neuroglancerDatasetUnsupported,
+          this,
+          [this, id](const QString& /*datasetUrl*/, const QString& /*error*/) {
+            if (!m_doc.hasObjWithID(id)) {
+              return;
+            }
+            m_doc.doc().removeObj(id);
+          },
+          Qt::QueuedConnection);
   Q_EMIT objViewReady(id);
 }
 

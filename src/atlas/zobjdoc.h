@@ -83,9 +83,6 @@ public:
     return nullptr;
   }
 
-  // remove obj with id
-  virtual void removeObj(size_t id) = 0;
-
   //
   [[nodiscard]] virtual QString objName(size_t id) const = 0;
 
@@ -166,6 +163,12 @@ Q_SIGNALS:
   void selectionChangedFromDoc(const std::vector<size_t>& selected, const std::vector<size_t>& deselected);
 
 protected:
+  // Internal hook invoked by ZDoc after it updates the global object model.
+  // Callers should use ZDoc::removeObj(id) instead so the object list and selection stay consistent.
+  virtual void removeObj(size_t id) = 0;
+
+  friend class ZDoc;
+
   static QString strippedName(const QString& fullFileName);
 
 protected:

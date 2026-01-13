@@ -1187,8 +1187,9 @@ void ZImgFilter::updateNeuroglancerLoadingIndicator()
   // If we already finished the final pass for this epoch, the displayed imagery should be sharp and complete.
   // Hide the badge even if earlier background passes (cache/preview) are still winding down.
   const bool finalDone = m_ngFinalCompletedEpoch == m_ngRenderEpoch;
+  const bool finalError = m_ngFinalErrorEpoch == m_ngRenderEpoch;
 
-  const bool shouldShow = ngActive && !finalDone && (cacheBusy || previewBusy || finalBusy);
+  const bool shouldShow = ngActive && (finalError || (!finalDone && (cacheBusy || previewBusy || finalBusy)));
   if (!shouldShow) {
     if (m_ngLoadingBadgeBg) {
       m_ngLoadingBadgeBg->setVisible(false);
@@ -1213,12 +1214,27 @@ void ZImgFilter::updateNeuroglancerLoadingIndicator()
   }
 
   QString text;
-  if (finalBusy) {
+  QColor bgColor(0, 0, 0, 160);
+  QColor borderColor(255, 255, 255, 60);
+  QColor textColor(255, 255, 255, 230);
+  QString tooltip;
+
+  if (finalError) {
+    text = QStringLiteral("Load failed");
+    bgColor = QColor(140, 0, 0, 180);
+    borderColor = QColor(255, 255, 255, 80);
+    tooltip = m_ngFinalError;
+  } else if (finalBusy) {
     // If we already show a coarse preview, this reassures the user that a sharper pass is coming.
     text = m_ngLastAppliedFinalPass ? QStringLiteral("Loading…") : QStringLiteral("Refining…");
   } else {
     text = QStringLiteral("Loading…");
   }
+
+  m_ngLoadingBadgeBg->setPen(QPen(borderColor));
+  m_ngLoadingBadgeBg->setBrush(QBrush(bgColor));
+  m_ngLoadingBadgeText->setBrush(QBrush(textColor));
+  m_ngLoadingBadgeBg->setToolTip(tooltip);
 
   m_ngLoadingBadgeText->setText(text);
 
@@ -1235,6 +1251,69 @@ void ZImgFilter::updateNeuroglancerLoadingIndicator()
   const QPointF anchor = m_view.currentViewport().topLeft() + QPointF(marginScene, marginScene);
   m_ngLoadingBadgeBg->setPos(anchor);
   m_ngLoadingBadgeBg->setVisible(true);
+}
+
+void ZImgFilter::maybeNotifyNeuroglancerFinalError()
+{
+  if (m_ngFinalErrorEpoch != m_ngRenderEpoch) {
+    return;
+  }
+  if (m_ngFinalErrorNotifiedEpoch == m_ngFinalErrorEpoch) {
+    return;
+  }
+
+  const bool ngActive = m_isVisible && m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && !m_view.isMaxZProjView();
+  if (!ngActive) {
+    return;
+  }
+
+  const QString err = m_ngFinalError.trimmed();
+  if (err.isEmpty()) {
+    return;
+  }
+
+  const bool isUnsupportedContentEncoding = err.contains(QStringLiteral("Unsupported Content-Encoding"), Qt::CaseInsensitive);
+  if (!isUnsupportedContentEncoding) {
+    return;
+  }
+
+  m_ngFinalErrorNotifiedEpoch = m_ngFinalErrorEpoch;
+
+  QString encoding = QStringLiteral("<unknown>");
+  {
+    const QString needle = QStringLiteral("Unsupported Content-Encoding '");
+    const int idx = err.indexOf(needle, 0, Qt::CaseInsensitive);
+    if (idx >= 0) {
+      const int start = idx + needle.size();
+      const int end = err.indexOf('\'', start);
+      if (end > start) {
+        encoding = err.mid(start, end - start).trimmed();
+      }
+    }
+  }
+
+  QString datasetUrl;
+  if (m_imgPack && m_imgPack->isNeuroglancerPrecomputed()) {
+    datasetUrl = m_imgPack->neuroglancerRootUrl().trimmed();
+  }
+
+  const QString summary = QStringLiteral("Neuroglancer load failed: unsupported HTTP Content-Encoding '%1'").arg(encoding);
+  QString details =
+    QStringLiteral("Atlas could not load tiles for this Neuroglancer dataset because the server returned an unsupported "
+                   "HTTP Content-Encoding (%1).\n\n"
+                   "Atlas supports: identity, gzip, deflate.\n\n"
+                   "Workaround: configure the server/CDN (or object metadata) to serve Neuroglancer chunk files without "
+                   "Content-Encoding, or using one of the supported encodings.\n")
+      .arg(encoding);
+  if (!datasetUrl.isEmpty()) {
+    details += QStringLiteral("\nDataset: %1\n").arg(datasetUrl);
+  }
+  details += QStringLiteral("\n\nThis dataset will be removed from the object list because it cannot be rendered.");
+  details += QStringLiteral("\nRaw error:\n%1").arg(err);
+
+  showCriticalWithDetails(QApplication::activeWindow(), summary, details, QApplication::applicationName());
+
+  Q_EMIT neuroglancerDatasetUnsupported(datasetUrl, err);
 }
 
 void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack, uint64_t epoch, int passPriority, bool isFinalPass)
@@ -1418,6 +1497,7 @@ void ZImgFilter::requestNeuroglancer2DRender()
   m_ngFinalCompletedEpoch = std::numeric_limits<uint64_t>::max();
   m_ngFinalErrorEpoch = std::numeric_limits<uint64_t>::max();
   m_ngFinalError.clear();
+  m_ngFinalErrorNotifiedEpoch = std::numeric_limits<uint64_t>::max();
 
   const QRectF viewport = mapFromSceneRect(m_view.currentViewport());
   const double viewScale = effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale());
@@ -1556,6 +1636,7 @@ void ZImgFilter::startNeuroglancer2DCacheRender()
       if (treatAsFinal && result.epoch == m_ngRenderEpoch && m_ngFinalErrorEpoch != result.epoch) {
         m_ngFinalErrorEpoch = result.epoch;
         m_ngFinalError = QString("Neuroglancer 2D cached-final render failed: %1").arg(result.error);
+        maybeNotifyNeuroglancerFinalError();
       }
     } else if (m_isVisible && result.epoch == m_ngRenderEpoch) {
       const auto applyPass = treatAsFinal ? Neuroglancer2DRenderParams::Pass::Final : result.pass;
@@ -1631,6 +1712,7 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
     if (pass == Neuroglancer2DRenderParams::Pass::Final) {
       m_ngFinalErrorEpoch = epoch;
       m_ngFinalError = QString("Neuroglancer 2D final render setup failed: %1").arg(QString::fromUtf8(e.what()));
+      maybeNotifyNeuroglancerFinalError();
     }
     if (pass == Neuroglancer2DRenderParams::Pass::Final) {
       if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
@@ -1740,6 +1822,7 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
       if (result.pass == Neuroglancer2DRenderParams::Pass::Final && result.epoch == m_ngRenderEpoch && m_ngFinalErrorEpoch != result.epoch) {
         m_ngFinalErrorEpoch = result.epoch;
         m_ngFinalError = QString("Neuroglancer 2D final tile render failed: %1").arg(result.error);
+        maybeNotifyNeuroglancerFinalError();
       }
       return;
     }
@@ -1759,6 +1842,7 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
             m_ngFinalErrorEpoch != result.epoch) {
           m_ngFinalErrorEpoch = result.epoch;
           m_ngFinalError = QString("Neuroglancer 2D final tile render failed: %1").arg(result.error);
+          maybeNotifyNeuroglancerFinalError();
         }
         continue;
       }

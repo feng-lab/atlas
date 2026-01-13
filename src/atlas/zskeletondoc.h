@@ -63,8 +63,10 @@ public:
 
   [[nodiscard]] std::vector<QAction*> loadFileActions() const override;
 
+protected:
   void removeObj(size_t id) override;
 
+public:
   [[nodiscard]] QString objName(size_t id) const override;
 
   [[nodiscard]] QString objPath(size_t id) const override;

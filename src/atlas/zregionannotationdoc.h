@@ -47,8 +47,6 @@ public:
 
   [[nodiscard]] QMenu* processObjMenu() const override;
 
-  void removeObj(size_t id) override;
-
   [[nodiscard]] QString objName(size_t id) const override;
 
   [[nodiscard]] QString objPath(size_t id) const override;
@@ -72,6 +70,8 @@ public:
   QWidget* createObjEditWidget(size_t id) override;
 
 protected:
+  void removeObj(size_t id) override;
+
   void loadRegionAnnotation();
 
   void importLabelImage();

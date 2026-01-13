@@ -147,6 +147,12 @@ public:
   // represent a visible Neuroglancer segmentation volume at the position, or if the chunk is not cached.
   [[nodiscard]] std::optional<uint64_t> cachedNeuroglancerSegmentationIdAtScenePos(const QPointF& scenePos) const;
 
+Q_SIGNALS:
+  // Emitted when a Neuroglancer precomputed dataset is determined to be unusable due to an external incompatibility
+  // (e.g. unsupported HTTP response encoding). Views may choose to remove the object from the document to avoid
+  // leaving a permanently broken entry in the object list.
+  void neuroglancerDatasetUnsupported(QString datasetUrl, QString error);
+
 protected:
   void viewPrecedenceChanged() override;
 
@@ -190,6 +196,8 @@ private:
   void trimNeuroglancerTilesAfterFinal(uint64_t epoch);
 
   void updateNeuroglancerLoadingIndicator();
+
+  void maybeNotifyNeuroglancerFinalError();
 
   [[nodiscard]] double getLowerChannelRange(size_t c) const;
 
@@ -253,6 +261,7 @@ private:
   uint64_t m_ngFinalCompletedEpoch = std::numeric_limits<uint64_t>::max();
   uint64_t m_ngFinalErrorEpoch = std::numeric_limits<uint64_t>::max();
   QString m_ngFinalError;
+  uint64_t m_ngFinalErrorNotifiedEpoch = std::numeric_limits<uint64_t>::max();
   bool m_ngCacheInFlight = false;
   uint64_t m_ngCacheInFlightEpoch = 0;
   bool m_ngCacheDirty = false;

@@ -12,7 +12,12 @@ public:
     : Z3DObjView(engine)
     , m_doc(doc)
   {
-    connect(&m_doc, &DocType::objAboutToBeRemoved, this, &Z3DFilterView::onObjAboutToBeRemoved);
+    // Object removal is initiated on the UI thread (ZDoc) but must detach 3D filters on the rendering thread before
+    // the underlying object data is destroyed. Use a blocking queued connection across threads to avoid use-after-free
+    // when 3D paging/rendering tasks still reference the object.
+    const Qt::ConnectionType removeConnType =
+      (m_doc.thread() == this->thread()) ? Qt::DirectConnection : Qt::BlockingQueuedConnection;
+    connect(&m_doc, &DocType::objAboutToBeRemoved, this, &Z3DFilterView::onObjAboutToBeRemoved, removeConnType);
     connect(&m_doc, &DocType::objVisibleChanged, this, &Z3DFilterView::onObjVisibleChanged);
     connect(&m_doc, &DocType::selectionChangedFromDoc, this, &Z3DFilterView::onSelectionChanged);
   }

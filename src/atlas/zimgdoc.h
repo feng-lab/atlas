@@ -52,8 +52,6 @@ public:
 
   [[nodiscard]] QMenu* processObjMenu() const override;
 
-  void removeObj(size_t id) override;
-
   [[nodiscard]] QString objName(size_t id) const override;
 
   [[nodiscard]] QString objPath(size_t id) const override;
@@ -78,6 +76,8 @@ Q_SIGNALS:
   void imgChanged(size_t id);
 
 protected:
+  void removeObj(size_t id) override;
+
   void loadImg();
 
   void loadNeuroglancerPrecomputed();

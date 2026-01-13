@@ -1031,7 +1031,12 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
       for (size_t i = r.begin(); i != r.end(); ++i) {
-        auto chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        std::shared_ptr<ZImg> chunkImg;
+        try {
+          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        } catch (const std::exception&) {
+          continue;
+        }
         if (!chunkImg) {
           continue;
         }
@@ -1363,7 +1368,12 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
       for (size_t i = r.begin(); i != r.end(); ++i) {
-        auto chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        std::shared_ptr<ZImg> chunkImg;
+        try {
+          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        } catch (const std::exception&) {
+          continue;
+        }
         if (!chunkImg) {
           continue;
         }
@@ -2689,7 +2699,12 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
       for (size_t i = r.begin(); i != r.end(); ++i) {
-        auto chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        std::shared_ptr<ZImg> chunkImg;
+        try {
+          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        } catch (const std::exception&) {
+          continue;
+        }
         if (!chunkImg) {
           continue;
         }
@@ -2771,7 +2786,12 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
       for (size_t i = r.begin(); i != r.end(); ++i) {
-        auto chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        std::shared_ptr<ZImg> chunkImg;
+        try {
+          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        } catch (const std::exception&) {
+          continue;
+        }
         if (!chunkImg) {
           continue;
         }
