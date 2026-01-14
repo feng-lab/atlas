@@ -1518,14 +1518,14 @@ void Z3DRenderingEngine::getGLFocus()
 
 void Z3DRenderingEngine::renderFast(bool stereo)
 {
-  if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
-    Z3DRenderGlobalState::instance().requestCancellation();
-    LOG(INFO) << "cancel rendering, schedule a update later";
+  if (m_isRendering) {
+    LOG(INFO) << "in fast rendering, schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
     return;
   }
-  if (m_isRendering) {
-    LOG(INFO) << "in fast rendering, schedule a update later";
+  if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
+    Z3DRenderGlobalState::instance().requestCancellation();
+    LOG(INFO) << "cancel rendering, schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
     return;
   }
@@ -1536,7 +1536,28 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   auto renderingGuard = folly::makeGuard([this]() {
     m_isRendering = false;
   });
-  m_progress = processFrame(stereo, true);
+
+  auto& renderState = Z3DRenderGlobalState::instance();
+  auto cancellationSource = renderState.ensureCancellationSource();
+  CHECK(cancellationSource);
+  auto cancellationGuard = folly::makeGuard([&renderState]() {
+    renderState.resetCancellationSource();
+  });
+
+  try {
+    const auto token = cancellationSource->getToken();
+    m_progress = processFrame(stereo, true, &token);
+  }
+  catch (const ZCancellationException&) {
+    LOG(INFO) << "cancelled, schedule a update later";
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    Q_EMIT progressChanged(100);
+    return;
+  }
+  catch (const ZException& e) {
+    LOG(INFO) << e.what();
+  }
+
   Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
   if (m_progress < 1.) {
     QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
