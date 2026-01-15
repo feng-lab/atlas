@@ -21,6 +21,26 @@ namespace nim {
 
 namespace {
 
+// Small utility model: make every cell show its full DisplayRole text as a tooltip by default.
+// This keeps tooltips correct even after in-place edits (history table).
+class ZToolTipStandardItemModel final : public QStandardItemModel
+{
+public:
+  using QStandardItemModel::QStandardItemModel;
+
+  QVariant data(const QModelIndex& index, int role) const override
+  {
+    if (role == Qt::ToolTipRole) {
+      const QVariant explicitTip = QStandardItemModel::data(index, Qt::ToolTipRole);
+      if (explicitTip.isValid() && !explicitTip.toString().isEmpty()) {
+        return explicitTip;
+      }
+      return QStandardItemModel::data(index, Qt::DisplayRole);
+    }
+    return QStandardItemModel::data(index, role);
+  }
+};
+
 constexpr int kHistoryColName = 0;
 constexpr int kHistoryColUrl = 1;
 
@@ -95,7 +115,7 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
     auto* tab = new QWidget();
     auto* layout = new QVBoxLayout(tab);
 
-    m_historyModel = new QStandardItemModel(0, 2, this);
+    m_historyModel = new ZToolTipStandardItemModel(0, 2, this);
     m_historyModel->setHorizontalHeaderLabels({tr("Name"), tr("URL")});
 
     QString historyErr;
@@ -113,7 +133,9 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
     m_historyView->setSelectionMode(QAbstractItemView::SingleSelection);
     m_historyView->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
     m_historyView->horizontalHeader()->setStretchLastSection(true);
-    m_historyView->horizontalHeader()->setSectionResizeMode(kHistoryColName, QHeaderView::ResizeToContents);
+    // Allow the user to reclaim space from long names (URL is last + stretched, so it will take
+    // whatever remains). `ResizeToContents` would lock the column width and can starve the URL.
+    m_historyView->horizontalHeader()->setSectionResizeMode(kHistoryColName, QHeaderView::Interactive);
     m_historyView->horizontalHeader()->setSectionResizeMode(kHistoryColUrl, QHeaderView::Stretch);
     m_historyView->verticalHeader()->setVisible(false);
     m_historyView->setAlternatingRowColors(true);
@@ -196,7 +218,7 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
     label->setWordWrap(true);
     layout->addWidget(label);
 
-    m_examplesModel = new QStandardItemModel(0, 3, this);
+    m_examplesModel = new ZToolTipStandardItemModel(0, 3, this);
     m_examplesModel->setHorizontalHeaderLabels({tr("Name"), tr("Kind"), tr("URL")});
 
     QString examplesErr;
@@ -222,12 +244,17 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
     m_examplesView->setSelectionMode(QAbstractItemView::SingleSelection);
     m_examplesView->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_examplesView->horizontalHeader()->setStretchLastSection(true);
-    m_examplesView->horizontalHeader()->setSectionResizeMode(kExamplesColName, QHeaderView::ResizeToContents);
-    m_examplesView->horizontalHeader()->setSectionResizeMode(kExamplesColKind, QHeaderView::ResizeToContents);
+    // Make columns user-resizable; keep URL as the stretched last column.
+    m_examplesView->horizontalHeader()->setSectionResizeMode(kExamplesColName, QHeaderView::Interactive);
+    m_examplesView->horizontalHeader()->setSectionResizeMode(kExamplesColKind, QHeaderView::Interactive);
     m_examplesView->horizontalHeader()->setSectionResizeMode(kExamplesColUrl, QHeaderView::Stretch);
     m_examplesView->verticalHeader()->setVisible(false);
     m_examplesView->setAlternatingRowColors(true);
     layout->addWidget(m_examplesView);
+
+    // The "Kind" values are short; size the column once to avoid wasting URL space while still
+    // keeping it interactively resizable.
+    m_examplesView->resizeColumnToContents(kExamplesColKind);
 
     wireSelectionToEdits(m_examplesView, m_examplesModel, kExamplesColName, kExamplesColUrl);
 
