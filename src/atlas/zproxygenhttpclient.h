@@ -7,6 +7,7 @@
 #include <proxygen/lib/http/coro/client/HTTPClientConnectionCache.h>
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -50,6 +51,12 @@ private:
     std::vector<std::pair<std::string, std::string>> requestHeaders);
 
 private:
+  struct DirectDnsCacheEntry
+  {
+    std::vector<std::string> addresses;
+    size_t nextIndex = 0;
+  };
+
   folly::ScopedEventBaseThread m_eventBaseThread;
   std::shared_ptr<const folly::SSLContext> m_sslContext;
   std::string m_caBundlePath;
@@ -58,6 +65,7 @@ private:
 
   std::unique_ptr<proxygen::coro::HTTPClientConnectionCache> m_directConnCache;
   std::unordered_map<std::string, std::unique_ptr<proxygen::coro::HTTPClientConnectionCache>> m_proxyConnCaches;
+  std::unordered_map<std::string, DirectDnsCacheEntry> m_directDnsCache;
 };
 
 } // namespace nim

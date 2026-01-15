@@ -15,6 +15,11 @@ files_to_download = [
         "filename": "hdf5-1.14.6.zip"
     },
     {
+        "expected_size": 728187,
+        "expected_sha256": "391cdd24ba8839ca179ddebe860ae0950f72a2e8a38edfc5e8aadbc60b78f2be",
+        "filename": "brotli-1.2.0.zip"
+    },
+    {
         "expected_size": 48627947,
         "expected_sha256": "6f531bd4ba31a7aa0c3511082b544d306df50e7aecfbeef8bdbc1dd770736993",
         "filename": "cmake-4.1.1-windows-x86_64.zip"

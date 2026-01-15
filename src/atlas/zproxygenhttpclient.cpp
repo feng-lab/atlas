@@ -4,6 +4,8 @@
 #include "zhttpdiskcache.h"
 #include "zcancellation.h"
 
+#include <brotli/decode.h>
+#include <folly/Optional.h>
 #include <folly/String.h>
 #include <folly/compression/Compression.h>
 #include <folly/io/Cursor.h>
@@ -21,11 +23,14 @@
 #include <gflags/gflags.h>
 
 #include <QCoreApplication>
+#include <QHostAddress>
+#include <QHostInfo>
 #include <QNetworkProxy>
 #include <QNetworkProxyFactory>
 #include <QNetworkProxyQuery>
 #include <QUrl>
 
+#include <array>
 #include <cstring>
 #include <cstdlib>
 #include <algorithm>
@@ -81,32 +86,160 @@ std::vector<uint8_t> iobufToBytes(/*nullable*/ const folly::IOBuf* buf)
   return out;
 }
 
-std::vector<uint8_t> decompressIfNeeded(std::vector<uint8_t> body, std::string_view contentEncoding)
+[[nodiscard]] std::vector<std::string> parseContentEncodings(std::string_view contentEncoding)
+{
+  std::string lower(contentEncoding);
+  folly::toLowerAscii(lower);
+
+  std::vector<std::string> parts;
+  folly::split(',', lower, parts);
+
+  std::vector<std::string> out;
+  out.reserve(parts.size());
+  for (auto& p : parts) {
+    const folly::StringPiece trimmed = folly::trimWhitespace(folly::StringPiece(p));
+    if (!trimmed.empty()) {
+      out.emplace_back(trimmed.data(), trimmed.size());
+    }
+  }
+  return out;
+}
+
+[[nodiscard]] bool isIdentityContentEncoding(std::string_view contentEncoding)
+{
+  const auto encs = parseContentEncodings(contentEncoding);
+  if (encs.empty()) {
+    // Empty Content-Encoding implies identity.
+    return true;
+  }
+  for (const auto& enc : encs) {
+    if (enc.empty() || enc == "identity") {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+std::vector<uint8_t> brotliDecompress(folly::StringPiece encoded)
+{
+  struct StateDeleter
+  {
+    void operator()(BrotliDecoderState* state) const
+    {
+      BrotliDecoderDestroyInstance(state);
+    }
+  };
+
+  std::unique_ptr<BrotliDecoderState, StateDeleter> state(BrotliDecoderCreateInstance(nullptr, nullptr, nullptr));
+  if (!state) {
+    throw ZException("BrotliDecoderCreateInstance failed");
+  }
+
+  size_t availableIn = encoded.size();
+  const uint8_t* nextIn = reinterpret_cast<const uint8_t*>(encoded.data());
+
+  std::vector<uint8_t> out;
+
+  // Stream into fixed-size chunks, growing the output vector as needed.
+  constexpr size_t kChunkBytes = 64u * 1024u;
+  std::array<uint8_t, kChunkBytes> chunk{};
+  while (true) {
+    size_t availableOut = chunk.size();
+    uint8_t* nextOut = chunk.data();
+
+    BrotliDecoderResult r = BrotliDecoderDecompressStream(
+      state.get(), &availableIn, &nextIn, &availableOut, &nextOut, /*total_out=*/nullptr);
+    const size_t produced = chunk.size() - availableOut;
+    if (produced > 0) {
+      const size_t oldSize = out.size();
+      out.resize(oldSize + produced);
+      std::memcpy(out.data() + oldSize, chunk.data(), produced);
+    }
+
+    switch (r) {
+    case BROTLI_DECODER_RESULT_SUCCESS:
+      return out;
+    case BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT:
+      // Continue; output buffer was full.
+      break;
+    case BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT:
+      // We provided the entire payload up-front; additional input means truncation.
+      if (availableIn == 0) {
+        throw ZException("Brotli decode failed: unexpected end of input");
+      }
+      break;
+    case BROTLI_DECODER_RESULT_ERROR: {
+      const BrotliDecoderErrorCode code = BrotliDecoderGetErrorCode(state.get());
+      const char* msg = BrotliDecoderErrorString(code);
+      throw ZException(fmt::format("Brotli decode failed: {} ({})", msg ? msg : "<unknown>", static_cast<int>(code)));
+    }
+    }
+  }
+}
+
+std::vector<uint8_t> decompressIfNeeded(std::vector<uint8_t> body, std::string& contentEncoding)
 {
   if (body.empty()) {
     return body;
   }
 
-  std::string encLower(contentEncoding);
-  folly::toLowerAscii(encLower);
-  if (encLower.empty() || encLower == "identity") {
+  if (isIdentityContentEncoding(contentEncoding)) {
     return body;
   }
 
-  folly::compression::CodecType codecType{};
-  if (encLower == "gzip" || encLower == "x-gzip") {
-    codecType = folly::compression::CodecType::GZIP;
-  } else if (encLower == "deflate") {
-    codecType = folly::compression::CodecType::ZLIB;
-  } else {
-    throw ZException(fmt::format("Unsupported Content-Encoding '{}'", contentEncoding));
+  const std::string originalEncoding = contentEncoding;
+
+  // Decode in reverse order: Content-Encoding lists encodings in the order applied.
+  const auto encodings = parseContentEncodings(contentEncoding);
+  for (auto it = encodings.rbegin(); it != encodings.rend(); ++it) {
+    const std::string& enc = *it;
+    if (enc.empty() || enc == "identity") {
+      continue;
+    }
+
+    if (enc == "gzip" || enc == "x-gzip") {
+      auto codec = folly::compression::getCodec(folly::compression::CodecType::GZIP);
+      auto uncompressed =
+        codec->uncompress(folly::StringPiece(reinterpret_cast<const char*>(body.data()), body.size()));
+      std::vector<uint8_t> out(uncompressed.size());
+      std::memcpy(out.data(), uncompressed.data(), out.size());
+      body = std::move(out);
+      continue;
+    }
+
+    if (enc == "deflate") {
+      auto codec = folly::compression::getCodec(folly::compression::CodecType::ZLIB);
+      auto uncompressed =
+        codec->uncompress(folly::StringPiece(reinterpret_cast<const char*>(body.data()), body.size()));
+      std::vector<uint8_t> out(uncompressed.size());
+      std::memcpy(out.data(), uncompressed.data(), out.size());
+      body = std::move(out);
+      continue;
+    }
+
+    if (enc == "zstd" || enc == "x-zstd") {
+      auto codec = folly::compression::getCodec(folly::compression::CodecType::ZSTD);
+      auto uncompressed =
+        codec->uncompress(folly::StringPiece(reinterpret_cast<const char*>(body.data()), body.size()));
+      std::vector<uint8_t> out(uncompressed.size());
+      std::memcpy(out.data(), uncompressed.data(), out.size());
+      body = std::move(out);
+      continue;
+    }
+
+    if (enc == "br") {
+      body = brotliDecompress(
+        folly::StringPiece(reinterpret_cast<const char*>(body.data()), body.size()));
+      continue;
+    }
+
+    throw ZException(fmt::format("Unsupported Content-Encoding '{}'", originalEncoding));
   }
 
-  auto codec = folly::compression::getCodec(codecType);
-  auto uncompressed = codec->uncompress(folly::StringPiece(reinterpret_cast<const char*>(body.data()), body.size()));
-  std::vector<uint8_t> out(uncompressed.size());
-  std::memcpy(out.data(), uncompressed.data(), out.size());
-  return out;
+  // The returned payload is now decoded.
+  contentEncoding = "identity";
+  return body;
 }
 
 std::optional<std::string> envVarString(const char* key)
@@ -180,6 +313,45 @@ std::optional<std::string> findCaBundlePath()
     }
   }
   return std::nullopt;
+}
+
+std::vector<std::string> resolveHostToIpAddrsSystem(const std::string& host)
+{
+  CHECK(!host.empty());
+
+  // Fast-path: already an IP literal.
+  if (!QHostAddress(QString::fromStdString(host)).isNull()) {
+    return {host};
+  }
+
+  const QHostInfo info = QHostInfo::fromName(QString::fromStdString(host));
+  if (info.error() != QHostInfo::NoError) {
+    throw ZException(fmt::format("System DNS resolution failed for host '{}': {}",
+                                 host,
+                                 info.errorString().toStdString()));
+  }
+
+  std::vector<std::string> out;
+  out.reserve(static_cast<size_t>(info.addresses().size()));
+  for (const QHostAddress& addr : info.addresses()) {
+    if (addr.isNull()) {
+      continue;
+    }
+    // toString() yields a numeric address literal for resolved addresses.
+    const std::string s = addr.toString().toStdString();
+    if (s.empty()) {
+      continue;
+    }
+    if (std::find(out.begin(), out.end(), s) == out.end()) {
+      out.emplace_back(s);
+    }
+  }
+
+  if (out.empty()) {
+    throw ZException(fmt::format("System DNS resolution returned no usable addresses for host '{}'", host));
+  }
+
+  return out;
 }
 
 struct ProxyEndpoint
@@ -520,6 +692,18 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
 
+  const bool isRangeRequest = [&]() {
+    for (const auto& [k, v] : requestHeaders) {
+      (void)v;
+      std::string keyLower(k);
+      folly::toLowerAscii(keyLower);
+      if (keyLower == "range") {
+        return true;
+      }
+    }
+    return false;
+  }();
+
   proxygen::URL initialUrl(url);
   if (!initialUrl.isValid() || initialUrl.getHost().empty()) {
     throw ZException(fmt::format("Invalid URL '{}'", url));
@@ -544,9 +728,18 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
   };
 
   proxygen::coro::HTTPClient::RequestHeaderMap headerMap;
-  headerMap.emplace("accept-encoding", "identity");
   for (const auto& [k, v] : requestHeaders) {
-    headerMap.emplace(k, v);
+    std::string keyLower(k);
+    folly::toLowerAscii(keyLower);
+    headerMap.emplace(std::move(keyLower), v);
+  }
+
+  if (isRangeRequest) {
+    // Range requests must operate on the identity representation; Content-Encoding makes
+    // the payload length unpredictable relative to the requested byte range.
+    headerMap["accept-encoding"] = "identity";
+  } else if (headerMap.find("accept-encoding") == headerMap.end()) {
+    headerMap.emplace("accept-encoding", "br, gzip, zstd");
   }
 
   if (m_diskCache && m_diskCache->isEnabled()) {
@@ -562,6 +755,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     maybeCancel(cancellationToken);
 
     proxygen::coro::HTTPClientConnectionCache* connCache = m_directConnCache.get();
+    bool usingProxyForAttempt = false;
     if (systemProxy) {
       const bool useProxy = [&]() {
         switch (proxyStrategy) {
@@ -577,6 +771,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
       }();
       if (useProxy) {
         connCache = getOrCreateProxyCache(*systemProxy);
+        usingProxyForAttempt = true;
       }
     }
     CHECK(connCache);
@@ -611,7 +806,45 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
           connParamsPtr = &connParams;
         }
 
-        auto sessionRes = co_await connCache->getSessionWithReservation(currentUrl, timeout, connParamsPtr);
+        folly::Optional<std::string> serverAddress = folly::none;
+        if (!usingProxyForAttempt) {
+          const std::string host(parsedUrl.getHost());
+          CHECK(!host.empty());
+
+          // Cache results per-host and rotate through returned addresses. This keeps
+          // behavior closer to Proxygen's per-request resolution (and supports
+          // multi-A records) while avoiding Proxygen's CoroDNSResolver / c-ares path.
+          //
+          // Rationale:
+          // Under heavy timeout churn with some unstable servers (observed with S3-hosted
+          // BossDB data), Proxygen's direct connect path that performs coroutine DNS
+          // resolution via c-ares has exhibited reproducible SIGSEGV crashes (stacks
+          // include ares_* frames and then crash during static init in
+          // HTTPCommonHeaders::initNames(), consistent with memory corruption elsewhere).
+          //
+          // Do not revert to the "URL overload" below unless the underlying Proxygen/c-ares
+          // issue is fixed:
+          //   auto sessionRes = co_await connCache->getSessionWithReservation(currentUrl, timeout, connParamsPtr);
+          auto it = m_directDnsCache.find(host);
+          if (it == m_directDnsCache.end() || it->second.addresses.empty()) {
+            DirectDnsCacheEntry entry{};
+            entry.addresses = resolveHostToIpAddrsSystem(host);
+            entry.nextIndex = 0;
+            it = m_directDnsCache.emplace(host, std::move(entry)).first;
+          }
+
+          CHECK(!it->second.addresses.empty());
+          const size_t idx = it->second.nextIndex % it->second.addresses.size();
+          serverAddress = it->second.addresses[idx];
+          ++it->second.nextIndex;
+        }
+
+        auto sessionRes = co_await connCache->getSessionWithReservation(parsedUrl.getHost(),
+                                                                        parsedUrl.getPort(),
+                                                                        isSecure,
+                                                                        timeout,
+                                                                        connParamsPtr,
+                                                                        serverAddress);
         maybeCancel(cancellationToken);
 
         auto response = co_await proxygen::coro::HTTPClient::get(
@@ -647,6 +880,15 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
 
         auto bodyBuf = response.body.move();
         out.body = iobufToBytes(bodyBuf.get());
+
+        // We depend on Range requests returning exact bytes; Content-Encoding would make the
+        // payload length unpredictable relative to the requested byte range.
+        if (isRangeRequest && !isIdentityContentEncoding(out.contentEncoding)) {
+          throw ZException(fmt::format("HTTP Range response for '{}' used Content-Encoding='{}' (expected identity)",
+                                       currentUrl,
+                                       out.contentEncoding));
+        }
+
         out.body = decompressIfNeeded(std::move(out.body), out.contentEncoding);
         co_return out;
       }

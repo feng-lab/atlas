@@ -45,6 +45,39 @@ find_package(proxygen CONFIG REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(proxygen::proxygen)
 
+# Brotli does not install a CMake package config; link it via its installed static libraries.
+find_path(BROTLI_INCLUDE_DIR
+          NAMES brotli/decode.h
+          PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include
+          NO_DEFAULT_PATH)
+find_library(BROTLI_DEC_LIBRARY
+             NAMES brotlidec libbrotlidec
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/lib
+             NO_DEFAULT_PATH)
+find_library(BROTLI_COMMON_LIBRARY
+             NAMES brotlicommon libbrotlicommon
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/lib
+             NO_DEFAULT_PATH)
+if (NOT BROTLI_INCLUDE_DIR OR NOT BROTLI_DEC_LIBRARY OR NOT BROTLI_COMMON_LIBRARY)
+  message(FATAL_ERROR "Brotli not found. Build 3rdparty Brotli via `util/build_ext_libs.py brotli`.")
+endif ()
+
+add_library(Brotli::brotlicommon STATIC IMPORTED)
+set_target_properties(Brotli::brotlicommon PROPERTIES
+                      IMPORTED_LOCATION "${BROTLI_COMMON_LIBRARY}"
+                      INTERFACE_INCLUDE_DIRECTORIES "${BROTLI_INCLUDE_DIR}")
+if (UNIX AND NOT APPLE)
+  target_link_libraries(Brotli::brotlicommon INTERFACE m)
+endif ()
+
+add_library(Brotli::brotlidec STATIC IMPORTED)
+set_target_properties(Brotli::brotlidec PROPERTIES
+                      IMPORTED_LOCATION "${BROTLI_DEC_LIBRARY}"
+                      INTERFACE_INCLUDE_DIRECTORIES "${BROTLI_INCLUDE_DIR}")
+target_link_libraries(Brotli::brotlidec INTERFACE Brotli::brotlicommon)
+
+print_target_properties(Brotli::brotlidec)
+
 include(gRPCGenerateCPP)
 
 set(PROTOS
@@ -742,6 +775,7 @@ target_link_libraries(atlas_core PUBLIC
   gflags::gflags
   Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
   Qt6::CorePrivate Qt6::Test
+  Brotli::brotlidec
   proxygen::proxygen
   VTK::sqlite
   assimp::draco

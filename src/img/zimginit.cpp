@@ -134,7 +134,12 @@ ZImgInit::~ZImgInit()
   fftw_cleanup_threads();
 #endif
 
-  folly::SingletonVault::singleton()->destroyInstancesFinal();
+  // Do not manually tear down Folly singletons here.
+  //
+  // Folly already registers an atexit handler to destroy its singleton vault.
+  // Calling destroyInstancesFinal() from this destructor can run before other
+  // subsystems (e.g. the HTTP client/event-base thread) have fully shut down,
+  // which can lead to use-after-destroy crashes in background threads.
 }
 
 } // namespace nim

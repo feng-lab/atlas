@@ -1209,6 +1209,23 @@ def build_zstd(src_dir: str, install_dir: str):
         patch_manager.restore_files()
 
 
+def build_brotli(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend([
+            '-DBUILD_SHARED_LIBS:BOOL=OFF',
+            '-DBROTLI_BUILD_TOOLS:BOOL=OFF',
+            '-DBROTLI_DISABLE_TESTS:BOOL=ON',
+            '-DBROTLI_BUILD_FOR_PACKAGE:BOOL=OFF',
+            src_dir,
+        ])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_fmt(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -3407,6 +3424,19 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             zstd_src_dir = os.path.join(ext_dir(), "zstd")
             build_zstd(zstd_src_dir, ext_build_dir())
 
+        if lib_name == "brotli":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "brotli*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
+            if not os.path.exists(src_dir):
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "brotli*"))
+                unpack_file_to_folder(package_name, ext_dir())
+                assert os.path.exists(src_dir)
+            build_brotli(src_dir, ext_build_dir())
+
         if lib_name == "fmt":
             fmt_src_dir = os.path.join(ext_dir(), "fmt")
             build_fmt(fmt_src_dir, ext_build_dir())
@@ -3712,6 +3742,7 @@ def parse_inputs(argv: list):
         "lz4",
         "xz",
         "zstd",
+        "brotli",
         "fmt",
         "libevent",
         "snappy",

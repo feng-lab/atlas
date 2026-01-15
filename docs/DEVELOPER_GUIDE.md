@@ -25,6 +25,9 @@ Neuroglancer Precomputed (HTTP)
   - `encoding: "compressed_segmentation"` — requires `data_type` ∈ {`"uint32"`, `"uint64"`} and `compressed_segmentation_block_size`.
   - Sharded volumes require HTTP `Range` support; Atlas supports `minishard_index_encoding` and `data_encoding` of `raw` or `gzip` as specified in Neuroglancer’s sharded format. (Sharding `data_encoding` is applied first, then the per-scale chunk `encoding` is decoded.)
   - Networking is implemented with proxygen/folly: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
+    - For non-`Range` requests, Atlas advertises `Accept-Encoding: br, gzip, zstd` and transparently decodes `Content-Encoding` (`br`/`gzip`/`deflate`/`zstd`) before returning bytes to callers.
+    - For `Range` requests, Atlas forces `Accept-Encoding: identity` and rejects encoded responses to preserve byte-exact range semantics (required by sharded Neuroglancer formats).
+    - For direct connections (no proxy), Atlas resolves hostnames via the OS system resolver and passes the resolved IP to Proxygen (bypassing Proxygen’s c-ares coroutine DNS path). This is a stability workaround for reproducible SIGSEGV crashes observed under heavy timeout churn with some unstable servers.
   - Optional persistent HTTP disk cache (SQLite-backed, cross-OS) is implemented in `src/atlas/zhttpdiskcache.h`, `src/atlas/zhttpdiskcache.cpp`, and `src/atlas/zsqlitelrucache.h` / `src/atlas/zsqlitelrucache.cpp` and is integrated into `ZProxygenHttpClient::getBytesOnEventBase()` (cache lookup before network; store after successful 200/206).
     - Enable with `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable).
     - Async write queue: `--atlas_disk_cache_http_async_max_pending_bytes=<N>` bounds queued SQLite writes (touch/put/erase). Values smaller than 256 MiB are clamped to 256 MiB. When the queue is full, disk writes are dropped (best-effort cache semantics).
