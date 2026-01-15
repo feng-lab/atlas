@@ -1356,6 +1356,9 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 
     // Compute progressive progress to mirror GL behaviour
     progress = m_progressiveRendering ? m_imgRaycasterRenderer.progressiveProgress(eye) : 1.0;
+    if (m_progressiveRendering && progress >= 1.0) {
+      m_imgRaycasterRenderer.finalizePagingStatsIfDone(eye);
+    }
 
     // Bound box overlay (no clears), same surface
     m_rendererBase.setActiveSurfaceWithLoadStore(lease, Z3DRendererBase::Preserve);

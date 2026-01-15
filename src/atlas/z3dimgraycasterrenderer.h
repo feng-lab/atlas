@@ -17,6 +17,7 @@ namespace nim {
 
 class Z3DImg;
 class Z3DRendererBase;
+class Z3DImgPagingFrameStats;
 
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions
@@ -68,6 +69,11 @@ public:
   // Report progressive progress for Vulkan/GL-agnostic callers.
   // Returns [0.5,1.0] during progressive accumulation, or 1.0 when complete/not started.
   double progressiveProgress(Z3DEye eye) const;
+
+  // When paging frame stats are enabled, log+clear any active stats once this eye is complete.
+  // This is primarily used by the Vulkan filter path, where completion can be inferred from
+  // progressiveProgress() even if the renderer hasn't observed a "lastRound" sentinel.
+  void finalizePagingStatsIfDone(Z3DEye eye);
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 
@@ -150,18 +156,7 @@ public:
   void prepareEntryExit(const ZMesh& clipped, bool flipped, Z3DEye eye, const glm::uvec2& size);
 
   // Reset progressive accumulation state for an eye
-  void resetProgress(Z3DEye eye)
-  {
-    m_channelIdx[eye] = -1;
-    m_round[eye] = 0;
-    // Also release per-frame resources that can be reacquired on demand
-    if (m_entryExitLease) {
-      m_entryExitLease.release();
-    }
-    if (m_progressiveLayerLease) {
-      m_progressiveLayerLease.release();
-    }
-  }
+  void resetProgress(Z3DEye eye);
 
   // Release entry/exit lease so the scratch pool can reuse it
   void releaseEntryExit()
@@ -285,6 +280,10 @@ private:
   int m_channelIdx[3] = {-1, -1, -1};
   int m_round[3] = {0, 0, 0};
   std::array<uint32_t, 3> m_progressiveGeneration{};
+
+  // Optional per-frame paging read statistics (created only when logging is enabled).
+  std::array<std::shared_ptr<Z3DImgPagingFrameStats>, 3> m_pagingFrameStats;
+  std::array<uint32_t, 3> m_pagingFrameStatsGeneration{};
 
   // Output size provided via ensureInternalTargets()
   glm::uvec2 m_outputSize{32, 32};

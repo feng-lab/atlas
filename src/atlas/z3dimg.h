@@ -278,7 +278,20 @@ public:
   bool updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                           size_t c,
                                           const folly::CancellationToken& cancellationToken,
-                                          ZBenchTimer& bt);
+                                          ZBenchTimer& bt,
+                                          uint32_t roundIndex = 0);
+
+  // Optional per-frame/paging telemetry sink (typically installed by the 3D renderer).
+  // When null, paging read operations are uninstrumented.
+  void setReadStatsSink(/*nullable*/ ZImgReadStatsSink* sink)
+  {
+    m_readStatsSink = sink;
+  }
+
+  [[nodiscard]] ZImgReadStatsSink* readStatsSink() const
+  {
+    return m_readStatsSink;
+  }
 
 protected:
   void readVolumes();
@@ -421,6 +434,10 @@ private:
 
   // Rate-limited logging: when enabled via VLOG, summarize paging demand per LOD.
   std::vector<std::chrono::steady_clock::time_point> m_lastPagingLodStatsLogTimes;
+
+  // Optional paging read stats sink and per-call round tag.
+  ZImgReadStatsSink* m_readStatsSink = nullptr;
+  uint32_t m_activeReadStatsRound = 0;
 };
 
 } // namespace nim

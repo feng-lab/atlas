@@ -36,8 +36,8 @@
 --atlas_http_retry_backoff_max_ms=2000
 
 # Persistent on-disk cache for HTTP GET results (helps avoid re-downloading across sessions).
-# Max size in bytes (default 10 GiB). Set to 0 to disable.
---atlas_disk_cache_http_max_bytes=10737418240
+# Max size in bytes (default 20 GiB). Set to 0 to disable.
+--atlas_disk_cache_http_max_bytes=21474836480
 
 # Persistent on-disk cache for 3D image-region blocks read via ZImgPack/ZImgRegionCache.
 # Max size in bytes (default 20 GiB). Set to 0 to disable.
@@ -78,6 +78,12 @@
 
 # Maximum number of rounds for volume rendering, default is 100
 --atlas_volume_rendering_maximum_round=100
+
+# Log per-frame 3D image paging read stats (bytes/blocks by cache tier: memory, disk, source), default is false
+--atlas_log_3d_paging_frame_stats=false
+
+# Include per-round 3D image paging stats in the per-frame log entry (can be verbose), default is false
+--atlas_log_3d_paging_round_stats=false
 
 # Whether to log openGL context switch event, default is false
 --atlas_log_glbinding_context_switch=false

@@ -1289,6 +1289,10 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     CHECK_GE(rawIdx, 0);
     CHECK_LT(static_cast<size_t>(rawIdx), payload.visibleChannels.size());
   }
+  {
+    const int32_t rawRound = payload.roundIndexRaw;
+    CHECK_GE(rawRound, 0);
+  }
   const size_t resolvedChannelIndex = payload.visibleChannels[static_cast<size_t>(payload.channelIndexRaw)];
 
   // After submission completion: parse compacted buffer and update caches; determine if this round is complete.
@@ -1306,6 +1310,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                                                  attCount = effectiveAttachmentCount,
                                                  channelIndex = resolvedChannelIndex,
                                                  channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
+                                                 roundIndex = static_cast<uint32_t>(payload.roundIndexRaw),
                                                  imagePtr = payload.image]() {
     CHECK(bufPtr != nullptr);
     CHECK(imagePtr != nullptr);
@@ -1345,7 +1350,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     if (!missingBlocks.empty()) {
       auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
       ZBenchTimer timer("vulkan_raycaster_blockid_compaction");
-      imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks, channelIndex, cancellationToken, timer);
+      imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks, channelIndex, cancellationToken, timer, roundIndex);
       VLOG(1) << fmt::format("cache uploads dispatched: blocks={}", missingBlocks.size());
     }
 

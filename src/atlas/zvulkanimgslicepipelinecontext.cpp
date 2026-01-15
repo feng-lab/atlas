@@ -527,7 +527,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       processEventsAndMaybeCancel(cancellationToken);
       if (!missingBlocks.empty()) {
         ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", idx));
-        payload.image->updateAndUploadPageDirectoryCaches(missingBlocks, idx, cancellationToken, timer);
+        payload.image->updateAndUploadPageDirectoryCaches(missingBlocks, idx, cancellationToken, timer, /*roundIndex=*/0);
       }
     }
   }

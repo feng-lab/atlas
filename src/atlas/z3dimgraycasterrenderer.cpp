@@ -3,6 +3,7 @@
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
 #include "z3dimg.h"
+#include "z3dimgpagingstats.h"
 #include "zmesh.h"
 #include "zbenchtimer.h"
 #include "zimgcache.h"
@@ -28,6 +29,9 @@ DEFINE_uint32(atlas_volume_rendering_progressive_blockid_effective_attachments,
               "Caps how many Block-ID attachments are processed per progressive 3D volume rendering round. "
               "Lower values reduce per-round latency (more frequent refinement updates) but may require more rounds "
               "to converge. Set to 0 to disable the cap and use all available attachments.");
+
+DECLARE_bool(atlas_log_3d_paging_frame_stats);
+DECLARE_bool(atlas_log_3d_paging_round_stats);
 
 #if defined(__linux__)
 DEFINE_bool(atlas_debug_texture_output, false, "produce debug intermediate texture to /data/testoutput");
@@ -111,6 +115,30 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   // Also pass raw GL-parity booking for clarity
   payload.channelIndexRaw = m_channelIdx[eye];
   payload.roundIndexRaw = m_round[eye];
+
+  if (FLAGS_atlas_log_3d_paging_frame_stats) {
+    if (!payload.fastPathOnly && m_img) {
+      const uint32_t gen = payload.progressiveGeneration;
+      auto& statsPtr = m_pagingFrameStats[eye];
+      auto& statsGen = m_pagingFrameStatsGeneration[eye];
+      if (!statsPtr || statsGen != gen) {
+        Z3DImgPagingFrameStats::CreateInfo info;
+        info.label = m_img->imgPack().name().toStdString();
+        info.numChannels = m_img->numChannels();
+        info.maxRounds = FLAGS_atlas_volume_rendering_maximum_round;
+        info.streamKey = payload.streamKey;
+        info.progressiveGeneration = gen;
+        statsPtr = std::make_shared<Z3DImgPagingFrameStats>(std::move(info));
+        statsGen = gen;
+      }
+      m_img->setReadStatsSink(statsPtr.get());
+    } else if (m_img) {
+      // Avoid attributing unrelated reads to a stale sink when we are not paging.
+      m_img->setReadStatsSink(nullptr);
+      m_pagingFrameStats[eye].reset();
+      m_pagingFrameStatsGeneration[eye] = 0;
+    }
+  }
 
   auto populateFromEntryExitMesh = [&]() {
     const auto& positions = m_entryExitMesh.vertices();
@@ -334,6 +362,18 @@ void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye, bool lastRoun
       // All channels complete; mark as finished
       m_channelIdx[eye] = -1;
       m_round[eye] = 0;
+
+      if (FLAGS_atlas_log_3d_paging_frame_stats) {
+        auto& stats = m_pagingFrameStats[eye];
+        if (stats && stats->hasActivity()) {
+          LOG(INFO) << stats->formatSummary(FLAGS_atlas_log_3d_paging_round_stats);
+        }
+      }
+      if (m_img) {
+        m_img->setReadStatsSink(nullptr);
+      }
+      m_pagingFrameStats[eye].reset();
+      m_pagingFrameStatsGeneration[eye] = 0;
     }
   } else {
     // Continue rounds on current channel
@@ -359,6 +399,27 @@ void Z3DImgRaycasterRenderer::setChannelCount(size_t count)
 {
   m_channelVisibilities.assign(count, false);
   m_transferFunctions.assign(count, nullptr);
+}
+
+void Z3DImgRaycasterRenderer::resetProgress(Z3DEye eye)
+{
+  m_channelIdx[eye] = -1;
+  m_round[eye] = 0;
+
+  m_pagingFrameStats[eye].reset();
+  m_pagingFrameStatsGeneration[eye] = 0;
+
+  if (m_img) {
+    m_img->setReadStatsSink(nullptr);
+  }
+
+  // Also release per-frame resources that can be reacquired on demand.
+  if (m_entryExitLease) {
+    m_entryExitLease.release();
+  }
+  if (m_progressiveLayerLease) {
+    m_progressiveLayerLease.release();
+  }
 }
 
 void Z3DImgRaycasterRenderer::releaseScratchResources()
@@ -810,6 +871,36 @@ double Z3DImgRaycasterRenderer::progressiveProgress(Z3DEye eye) const
   return static_cast<double>(currentRound) / static_cast<double>(totalRound) * 0.5 + 0.5;
 }
 
+void Z3DImgRaycasterRenderer::finalizePagingStatsIfDone(Z3DEye eye)
+{
+  if (!FLAGS_atlas_log_3d_paging_frame_stats) {
+    return;
+  }
+
+  if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
+    return;
+  }
+
+  auto& stats = m_pagingFrameStats[eye];
+  if (!stats) {
+    return;
+  }
+
+  if (progressiveProgress(eye) < 1.0) {
+    return;
+  }
+
+  if (stats->hasActivity()) {
+    LOG(INFO) << stats->formatSummary(FLAGS_atlas_log_3d_paging_round_stats);
+  }
+
+  if (m_img) {
+    m_img->setReadStatsSink(nullptr);
+  }
+  stats.reset();
+  m_pagingFrameStatsGeneration[eye] = 0;
+}
+
 void Z3DImgRaycasterRenderer::render2DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs)
 {
   auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
@@ -943,7 +1034,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
 
     processEventsAndMaybeCancel(cancellationToken);
 
-    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt);
+    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, /*roundIndex=*/0);
 
     // render channels one by one
     m_image3DSliceWithTransferfunShader->bind();
@@ -1052,6 +1143,8 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
   const auto& viewState = m_rendererBase.viewState();
   const auto& monoEyeState = viewState.eyes[MonoEye];
 
+  std::shared_ptr<Z3DImgPagingFrameStats> localStats;
+
   Z3DScratchResourcePool::RenderTargetLease layerLease;
   if (progressive && m_channelIdx[eye] < 0) {
     // Acquire and clear the persistent layer array lease used across rounds
@@ -1066,6 +1159,18 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     // Initialize progressive accumulation state
     m_channelIdx[eye] = 0;
     ++m_progressiveGeneration[eye];
+
+    if (FLAGS_atlas_log_3d_paging_frame_stats && m_img) {
+      Z3DImgPagingFrameStats::CreateInfo info;
+      info.label = m_img->imgPack().name().toStdString();
+      info.numChannels = m_img->numChannels();
+      info.maxRounds = FLAGS_atlas_volume_rendering_maximum_round;
+      info.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
+      info.progressiveGeneration = m_progressiveGeneration[eye];
+      m_pagingFrameStats[eye] = std::make_shared<Z3DImgPagingFrameStats>(std::move(info));
+      m_pagingFrameStatsGeneration[eye] = m_progressiveGeneration[eye];
+      m_img->setReadStatsSink(m_pagingFrameStats[eye].get());
+    }
 
     m_rendererBase.acquirePersistentLayerArrayRenderTarget(m_progressiveLayerLease,
                                                            m_outputSize,
@@ -1111,6 +1216,26 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     ensureRaycastAccumulators(eye);
     CHECK(m_channelIdx[eye] >= 0 && m_channelIdx[eye] < static_cast<int>(visibleIdxs.size()))
       << m_channelIdx[eye] << " " << visibleIdxs.size();
+
+    if (FLAGS_atlas_log_3d_paging_frame_stats && m_img) {
+      const uint32_t gen = m_progressiveGeneration[eye];
+      auto& statsPtr = m_pagingFrameStats[eye];
+      auto& statsGen = m_pagingFrameStatsGeneration[eye];
+      if (!statsPtr || statsGen != gen) {
+        Z3DImgPagingFrameStats::CreateInfo info;
+        info.label = m_img->imgPack().name().toStdString();
+        info.numChannels = m_img->numChannels();
+        info.maxRounds = FLAGS_atlas_volume_rendering_maximum_round;
+        info.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
+        info.progressiveGeneration = gen;
+        statsPtr = std::make_shared<Z3DImgPagingFrameStats>(std::move(info));
+        statsGen = gen;
+      }
+      m_img->setReadStatsSink(statsPtr.get());
+    } else if (m_img) {
+      m_img->setReadStatsSink(nullptr);
+    }
+
     bool lastRound = render3DImageForOneRound(eye,
                                               visibleIdxs[m_channelIdx[eye]],
                                               m_round[eye],
@@ -1161,6 +1286,25 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
       // final merge step below. It will be released after merging.
     }
   } else {
+    auto clearLocalStatsSinkGuard = folly::makeGuard([this]() {
+      if (m_img) {
+        m_img->setReadStatsSink(nullptr);
+      }
+    });
+
+    if (FLAGS_atlas_log_3d_paging_frame_stats && m_img) {
+      Z3DImgPagingFrameStats::CreateInfo info;
+      info.label = m_img->imgPack().name().toStdString();
+      info.numChannels = m_img->numChannels();
+      info.maxRounds = FLAGS_atlas_volume_rendering_maximum_round;
+      info.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
+      info.progressiveGeneration = 0;
+      localStats = std::make_shared<Z3DImgPagingFrameStats>(std::move(info));
+      m_img->setReadStatsSink(localStats.get());
+    } else if (m_img) {
+      m_img->setReadStatsSink(nullptr);
+    }
+
     ensureRaycastAccumulators(eye);
     layerLease = Z3DRenderGlobalState::instance().scratchPool().acquireLayerArrayRenderTarget(
       m_outputSize,
@@ -1257,6 +1401,22 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
   if (progress == 1.) {
     LOG(INFO) << "image cache size: " << ZImgCache::instance().size();
     LOG(INFO) << "image block cache size: " << ZImgRegionCache::instance().size();
+
+    if (FLAGS_atlas_log_3d_paging_frame_stats) {
+      if (progressive) {
+        auto& stats = m_pagingFrameStats[eye];
+        if (stats && stats->hasActivity()) {
+          LOG(INFO) << stats->formatSummary(FLAGS_atlas_log_3d_paging_round_stats);
+        }
+        if (m_img) {
+          m_img->setReadStatsSink(nullptr);
+        }
+        m_pagingFrameStats[eye].reset();
+        m_pagingFrameStatsGeneration[eye] = 0;
+      } else if (localStats && localStats->hasActivity()) {
+        LOG(INFO) << localStats->formatSummary(FLAGS_atlas_log_3d_paging_round_stats);
+      }
+    }
   }
   return progress;
 }
@@ -1429,7 +1589,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
     processEventsAndMaybeCancel(cancellationToken);
 
-    lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt) && lastRound;
+    lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, round) && lastRound;
 
     processEventsAndMaybeCancel(cancellationToken);
   }

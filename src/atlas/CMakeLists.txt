@@ -549,6 +549,7 @@ set(SOURCES
     z3dshader.h z3dshader.cpp
     z3dcontext.h z3dcontext.cpp
     z3dgl.h z3dgl.cpp
+    zimgreadstats.h
     zimgpack.h zimgpack.cpp
     zimgpackdisplay.h zimgpackdisplay.cpp
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
@@ -586,6 +587,7 @@ set(SOURCES
     z3dtextureandeyecoordinaterenderer.h z3dtextureandeyecoordinaterenderer.cpp
     z3dimgraycasterrenderer.h z3dimgraycasterrenderer.cpp
     z3dimg.h z3dimg.cpp
+    z3dimgpagingstats.h z3dimgpagingstats.cpp
     z3dimgfilter.h z3dimgfilter.cpp
     z3dimgslicerenderer.h z3dimgslicerenderer.cpp
     zregionontology.h zregionontology.cpp

@@ -319,7 +319,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
     processEventsAndMaybeCancel(cancellationToken);
 
-    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, i, cancellationToken, bt);
+    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, i, cancellationToken, bt, /*roundIndex=*/0);
 
     // render channels one by one
     m_image3DSliceWithColorMapShader->bind();

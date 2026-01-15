@@ -2,6 +2,7 @@
 
 #include "zimg.h"
 #include "zimgsliceprovider.h"
+#include "zimgreadstats.h"
 #include "zlog.h"
 #include <QRectF>
 #include <QObject>
@@ -311,7 +312,9 @@ public:
                                                                 size_t t,
                                                                 const ZImgInfo& resInfo,
                                                                 double displayRangeMin,
-                                                                double displayRangeMax) const;
+                                                                double displayRangeMax,
+                                                                ZImgReadStatsSink* statsSink = nullptr,
+                                                                ZImgReadStatsContext statsContext = {}) const;
 
   __forceinline bool isEmptyBlock(index_t xyRatio,
                                   index_t zRatio,

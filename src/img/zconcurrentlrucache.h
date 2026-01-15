@@ -118,6 +118,18 @@ public:
     MaybeUpdateLRUList
   };
 
+  enum class FindSource
+  {
+    Memory,
+    Disk
+  };
+
+  struct FindWithSourceResult
+  {
+    TValue value;
+    FindSource source = FindSource::Memory;
+  };
+
   struct DiskLookupResult
   {
     TValue value;
@@ -181,6 +193,51 @@ public:
     }
 
     return diskHit->value;
+  }
+
+  // Like find(), but reports whether the returned value came from the in-memory cache
+  // or the optional disk backend.
+  //
+  // Note: for disk hits, the value is inserted into memory (best-effort). If another
+  // thread inserts the same key concurrently, we return the canonical in-memory value.
+  std::optional<FindWithSourceResult> findWithSource(const TKey& key,
+                                                     FindStrategy findStrategy = FindStrategy::UpdateLRUList)
+  {
+    if (auto memHit = findMemoryOnly(key, findStrategy); memHit.has_value()) {
+      FindWithSourceResult out;
+      out.value = std::move(memHit).value();
+      out.source = FindSource::Memory;
+      return out;
+    }
+
+    if (!m_diskBackend) {
+      return {};
+    }
+
+    std::optional<DiskLookupResult> diskHit;
+    try {
+      diskHit = m_diskBackend->tryGet(key);
+    } catch (...) {
+      // Disk cache is best-effort; failures degrade to cache-miss semantics.
+      return {};
+    }
+    if (!diskHit.has_value()) {
+      return {};
+    }
+
+    TValue value = std::move(diskHit->value);
+    const bool inserted = insertInternal(key, value, diskHit->objSize, /*writeDisk=*/false);
+    if (!inserted) {
+      // Another thread inserted the same key concurrently; prefer the canonical in-memory value.
+      if (auto existing = findMemoryOnly(key, FindStrategy::UpdateLRUList); existing.has_value()) {
+        value = std::move(existing).value();
+      }
+    }
+
+    FindWithSourceResult out;
+    out.value = std::move(value);
+    out.source = FindSource::Disk;
+    return out;
   }
 
   /**

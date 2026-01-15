@@ -713,9 +713,28 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
 bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                                 size_t c,
                                                 const folly::CancellationToken& cancellationToken,
-                                                ZBenchTimer& bt)
+                                                ZBenchTimer& bt,
+                                                uint32_t roundIndex)
 {
+  const uint32_t prevRound = m_activeReadStatsRound;
+  m_activeReadStatsRound = roundIndex;
+  auto roundGuard = folly::makeGuard([this, prevRound]() { m_activeReadStatsRound = prevRound; });
+
+  const auto statsContext = ZImgReadStatsContext{static_cast<uint32_t>(c), roundIndex};
+
   if (missingBlockIDs.empty()) {
+    if (m_readStatsSink) {
+      ZImgPagingRoundSummary summary;
+      summary.missingBlocks = 0;
+      summary.processedMissingBlocks = 0;
+      summary.skippedMissingBlocks = 0;
+      summary.alreadyMappedBlocks = 0;
+      summary.emptyBlocksMarked = 0;
+      summary.blocksQueuedForRead = 0;
+      summary.emptyBlocksRead = 0;
+      summary.filledAllMissingBlocks = true;
+      m_readStatsSink->on3dPagingRoundSummary(statsContext, summary);
+    }
     LOG(INFO) << "no missing blocks";
     return true;
   }
@@ -879,7 +898,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                      << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
                      << pageTableEntryCoord; // block id shader should not collect mapped empty block
           resetCacheSystem(c);
-          return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt);
+          return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, roundIndex);
 #else
           CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
                        << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
@@ -1014,7 +1033,21 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   // checkPageSystemError();
 
-  return count == missingBlockIDs.size();
+  const bool filledAllMissingBlocks = (count == missingBlockIDs.size());
+  if (m_readStatsSink) {
+    ZImgPagingRoundSummary summary;
+    summary.missingBlocks = missingBlockIDs.size();
+    summary.processedMissingBlocks = count;
+    summary.skippedMissingBlocks = (count < missingBlockIDs.size()) ? (missingBlockIDs.size() - count) : 0;
+    summary.alreadyMappedBlocks = alreadyMapped;
+    summary.emptyBlocksMarked = emptyBlockCount;
+    summary.blocksQueuedForRead = pendingTasks.size();
+    summary.emptyBlocksRead = readEmptyBlockCount;
+    summary.filledAllMissingBlocks = filledAllMissingBlocks;
+    m_readStatsSink->on3dPagingRoundSummary(statsContext, summary);
+  }
+
+  return filledAllMissingBlocks;
 }
 
 // #define ATLAS_uploadImageCache_USE_MPMCQueue
@@ -1276,6 +1309,7 @@ Z3DImg::readImageBlockToBufferAsync(size_t c,
   const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
   auto pageTableEntryPtr = std::get<1>(pendingTasks[taskIdx]);
   glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
+  const auto statsContext = ZImgReadStatsContext{static_cast<uint32_t>(c), m_activeReadStatsRound};
   auto img = co_await m_imgPack.readRegionToImgAsync(m_levelScales[blockImagePos.w].x,
                                                      m_levelScales[blockImagePos.w].z,
                                                      index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
@@ -1285,7 +1319,9 @@ Z3DImg::readImageBlockToBufferAsync(size_t c,
                                                      0,
                                                      resInfo,
                                                      m_channelDisplayRanges[c].x,
-                                                     m_channelDisplayRanges[c].y);
+                                                     m_channelDisplayRanges[c].y,
+                                                     m_readStatsSink,
+                                                     statsContext);
 
   maybeCancel(cancellationToken);
   if (!img) {
@@ -1343,6 +1379,7 @@ Z3DImg::readImageBlockToQueueAsync(size_t c,
 
   const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
   glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
+  const auto statsContext = ZImgReadStatsContext{static_cast<uint32_t>(c), m_activeReadStatsRound};
   auto img = co_await m_imgPack.readRegionToImgAsync(m_levelScales[blockImagePos.w].x,
                                                      m_levelScales[blockImagePos.w].z,
                                                      index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
@@ -1352,7 +1389,9 @@ Z3DImg::readImageBlockToQueueAsync(size_t c,
                                                      0,
                                                      resInfo,
                                                      m_channelDisplayRanges[c].x,
-                                                     m_channelDisplayRanges[c].y);
+                                                     m_channelDisplayRanges[c].y,
+                                                     m_readStatsSink,
+                                                     statsContext);
 
   maybeCancel(cancellationToken);
   queue.enqueue(std::make_tuple(taskIdx, std::move(img)));

@@ -13,7 +13,7 @@ namespace {
 constexpr uint64_t kGiB = 1024ULL * 1024ULL * 1024ULL;
 constexpr uint64_t kMiB = 1024ULL * 1024ULL;
 
-constexpr uint64_t kDefaultHttpDiskCacheMaxBytes = 10ULL * kGiB;
+constexpr uint64_t kDefaultHttpDiskCacheMaxBytes = 20ULL * kGiB;
 constexpr uint64_t kDefaultImgRegionDiskCacheMaxBytes = 20ULL * kGiB;
 constexpr uint64_t kDefaultImgPreviewDiskCacheMaxBytes = 5ULL * kGiB;
 
@@ -32,7 +32,7 @@ DEFINE_string(atlas_disk_cache_dir,
 
 DEFINE_uint64(atlas_disk_cache_http_max_bytes,
               kDefaultHttpDiskCacheMaxBytes,
-              "Maximum size in bytes for the persistent HTTP disk cache (0 disables; default 10 GiB).");
+              "Maximum size in bytes for the persistent HTTP disk cache (0 disables; default 20 GiB).");
 
 DEFINE_uint64(atlas_disk_cache_http_async_max_pending_bytes,
               kDefaultHttpDiskCacheAsyncMaxPendingBytes,

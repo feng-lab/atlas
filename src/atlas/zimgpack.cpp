@@ -2103,7 +2103,9 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
                                                                         size_t t,
                                                                         const ZImgInfo& resInfo,
                                                                         double displayRangeMin,
-                                                                        double displayRangeMax) const
+                                                                        double displayRangeMax,
+                                                                        ZImgReadStatsSink* statsSink,
+                                                                        ZImgReadStatsContext statsContext) const
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
@@ -2123,6 +2125,9 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
           maxIntensity = x.second.second;
         })) {
     if (maxIntensity <= displayRangeMin) {
+      if (statsSink) {
+        statsSink->onImgRegionBlockResolved(statsContext, ZImgRegionBlockSource::SkippedEmpty, 0, /*empty=*/true);
+      }
       co_return std::shared_ptr<ZImg>();
     }
   } else {
@@ -2152,8 +2157,15 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
                                                                          static_cast<uint32_t>(resInfo.validBitCount),
                                                                          displayRangeMin,
                                                                          displayRangeMax);
-  if (auto img = ZImgRegionCache::instance().get(memKey); img) {
-    co_return img;
+  if (auto hit = ZImgRegionCache::instance().findWithSource(memKey); hit.has_value()) {
+    if (statsSink) {
+      const ZImgRegionBlockSource source = (hit->source == ZImgRegionCache::FindSource::Memory)
+                                             ? ZImgRegionBlockSource::MemoryCache
+                                             : ZImgRegionBlockSource::DiskCache;
+      const size_t bytes = hit->value ? hit->value->byteNumber() : 0;
+      statsSink->onImgRegionBlockResolved(statsContext, source, bytes, /*empty=*/false);
+    }
+    co_return hit->value;
   }
 
   maybeCancel(cancellationToken);
@@ -2192,6 +2204,9 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
                                                              {baseStartX, baseStartY, baseStartZ},
                                                              {baseEndX, baseEndY, baseEndZ});
     if (chunks.empty()) {
+      if (statsSink) {
+        statsSink->onImgRegionBlockResolved(statsContext, ZImgRegionBlockSource::SkippedEmpty, 0, /*empty=*/true);
+      }
       co_return std::shared_ptr<ZImg>();
     }
 
@@ -2259,6 +2274,12 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
         std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth),
         std::make_pair(minv, maxv));
       if (maxv <= displayRangeMin) {
+        if (statsSink) {
+          statsSink->onImgRegionBlockResolved(statsContext,
+                                              ZImgRegionBlockSource::SourceRead,
+                                              res ? res->byteNumber() : 0,
+                                              /*empty=*/true);
+        }
         co_return std::shared_ptr<ZImg>();
       }
     }
@@ -2289,6 +2310,12 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
 
     maybeCancel(cancellationToken);
 
+    if (statsSink) {
+      statsSink->onImgRegionBlockResolved(statsContext,
+                                          ZImgRegionBlockSource::SourceRead,
+                                          res ? res->byteNumber() : 0,
+                                          /*empty=*/false);
+    }
     ZImgRegionCache::instance().insert(memKey, res);
     co_return res;
   }
@@ -2307,6 +2334,9 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
   }
 
   if (queryResult.empty()) {
+    if (statsSink) {
+      statsSink->onImgRegionBlockResolved(statsContext, ZImgRegionBlockSource::SkippedEmpty, 0, /*empty=*/true);
+    }
     co_return std::shared_ptr<ZImg>();
   }
 
@@ -2339,6 +2369,12 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
       std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth),
       std::make_pair(minv, maxv));
     if (maxv <= displayRangeMin) {
+      if (statsSink) {
+        statsSink->onImgRegionBlockResolved(statsContext,
+                                            ZImgRegionBlockSource::SourceRead,
+                                            res ? res->byteNumber() : 0,
+                                            /*empty=*/true);
+      }
       co_return std::shared_ptr<ZImg>();
     }
   }
@@ -2367,6 +2403,12 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
 
   maybeCancel(cancellationToken);
 
+  if (statsSink) {
+    statsSink->onImgRegionBlockResolved(statsContext,
+                                        ZImgRegionBlockSource::SourceRead,
+                                        res ? res->byteNumber() : 0,
+                                        /*empty=*/false);
+  }
   ZImgRegionCache::instance().insert(memKey, res);
   co_return res;
 }
