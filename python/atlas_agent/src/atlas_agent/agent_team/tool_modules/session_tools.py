@@ -9,6 +9,7 @@ HANDLED_TOOLS = (
     "session_get_memory",
     "session_search_transcript",
     "session_search_events",
+    "session_tail_events",
 )
 
 TOOL_SPECS: List[Dict[str, Any]] = [
@@ -73,6 +74,16 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                         "default": 0,
                         "description": "0=unlimited (correctness-first). If >0, returns only a window and sets limit_reached=true.",
                     },
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Skip the first N matches (for paging). Use with max_results to page without truncation.",
+                    },
+                    "reverse": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, return newest-first rather than oldest-first.",
+                    },
                 },
                 "required": ["query"],
             },
@@ -110,8 +121,48 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                         "default": 0,
                         "description": "0=unlimited (correctness-first). If >0, returns only a window and sets limit_reached=true.",
                     },
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Skip the first N matches (for paging). Use with max_results to page without truncation.",
+                    },
+                    "reverse": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, return newest-first rather than oldest-first.",
+                    },
                 },
                 "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "session_tail_events",
+            "description": "Return the last N matching events (default excludes transcript). Useful for quick 'what just happened' recall without crafting a search query.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Number of events to return from the end of the log.",
+                    },
+                    "event_type": {
+                        "type": ["string", "null"],
+                        "description": "Optional event type filter (e.g., 'tool_call', 'plan_updated'). Use 'transcript' to include transcript entries explicitly.",
+                    },
+                    "tool": {
+                        "type": ["string", "null"],
+                        "description": "Optional tool filter for tool_call events (exact match).",
+                    },
+                    "reverse": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, return newest-first.",
+                    },
+                },
             },
         },
     },
@@ -189,6 +240,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             case_sensitive=bool(args.get("case_sensitive", False)),
             role=args.get("role"),
             max_results=int(args.get("max_results", 0) or 0),
+            offset=int(args.get("offset", 0) or 0),
+            reverse=bool(args.get("reverse", False)),
         )
         return json.dumps(payload, ensure_ascii=False)
 
@@ -205,7 +258,37 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             event_type=args.get("event_type"),
             tool=args.get("tool"),
             max_results=int(args.get("max_results", 0) or 0),
+            offset=int(args.get("offset", 0) or 0),
+            reverse=bool(args.get("reverse", False)),
         )
         return json.dumps(payload, ensure_ascii=False)
+
+    if name == "session_tail_events":
+        if ss is None:
+            return json.dumps({"ok": False, "error": "no session_store available"})
+        try:
+            limit = int(args.get("limit", 20) or 0)
+        except Exception:
+            limit = 20
+        try:
+            reverse = bool(args.get("reverse", False))
+        except Exception:
+            reverse = False
+        events = ss.tail_events(
+            limit=max(0, limit),
+            event_type=args.get("event_type"),
+            tool=args.get("tool"),
+        )
+        if reverse:
+            events = list(reversed(events))
+        return json.dumps(
+            {
+                "ok": True,
+                "session_id": ss.session_id(),
+                "log_path": str(ss.log_path),
+                "results": events,
+            },
+            ensure_ascii=False,
+        )
 
     return None

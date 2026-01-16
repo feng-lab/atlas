@@ -327,6 +327,42 @@ class SceneClient:
         self._log_rpc("Ping", req, resp)
         return bool(resp.ok)
 
+    def get_app_version(self, *, timeout_sec: float = 1.0) -> str | None:
+        """Best-effort: return the running Atlas build/version string.
+
+        Returns None when the server does not implement GetAppVersion (older installs)
+        or when RPC is unavailable.
+        """
+        try:
+            if self._stub is not None and hasattr(self._stub, "GetAppVersion"):
+                resp = self._stub.GetAppVersion(
+                    empty_pb2.Empty(), timeout=float(timeout_sec)
+                )
+                val = str(getattr(resp, "value", "") or "").strip()
+                return val if val else None
+        except Exception:
+            pass
+
+        # Fallback: generic call (does not require compiled stubs).
+        try:
+            rpc = self._channel.unary_unary(
+                "/atlas.rpc.Scene/GetAppVersion",
+                request_serializer=empty_pb2.Empty.SerializeToString,
+                response_deserializer=wrappers_pb2.StringValue.FromString,
+            )
+            resp = rpc(empty_pb2.Empty(), timeout=float(timeout_sec))
+            val = str(getattr(resp, "value", "") or "").strip()
+            return val if val else None
+        except grpc.RpcError as e:
+            try:
+                if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+                    return None
+            except Exception:
+                pass
+            return None
+        except Exception:
+            return None
+
     def load_files(self, files: Iterable[str]):
         exp: list[str] = []
         missing: list[str] = []
@@ -655,6 +691,17 @@ class SceneClient:
         self._log_rpc("CameraFit", req, resp)
         return [MessageToDict(v) for v in resp.values]
 
+    def camera_get(self) -> dict:
+        """Return the current engine camera as a typed value (no key writes)."""
+        self.ensure_view()
+        if not hasattr(self._stub, "CameraGet"):
+            raise RuntimeError("CameraGet is not supported by this Atlas version")
+        req = empty_pb2.Empty()
+        resp = self._stub.CameraGet(req)
+        self._log_rpc("CameraGet", req, resp)
+        vals = [MessageToDict(v) for v in getattr(resp, "values", [])]
+        return vals[0] if vals else {}
+
     def camera_orbit(self, ids: Optional[list[int]] = None, axis: str = "y", degrees: float = 360.0) -> list[dict]:
         self.ensure_view()
         req = self._pb2.CameraOrbitSuggestRequest(ids=ids or [], axis=axis, degrees=float(degrees))
@@ -702,6 +749,166 @@ class SceneClient:
         self._log_rpc("CameraResetView", req, resp)
         vals = [MessageToDict(v) for v in resp.values]
         return vals[0] if vals else {}
+
+    def camera_move_local(
+        self,
+        *,
+        op: str,
+        distance: float,
+        distance_is_fraction_of_bbox_radius: bool = False,
+        ids: Optional[list[int]] = None,
+        after_clipping: bool = True,
+        move_center: bool = True,
+        base_value: Optional[dict] = None,
+    ) -> dict:
+        """Move camera in its local basis (first-person 'fly' building block)."""
+        self.ensure_view()
+        if not hasattr(self._stub, "CameraMoveLocal"):
+            raise RuntimeError("CameraMoveLocal is not supported by this Atlas version")
+        kwargs: dict[str, Any] = {
+            "op": str(op),
+            "distance": float(distance),
+            "distance_is_fraction_of_bbox_radius": bool(distance_is_fraction_of_bbox_radius),
+            "ids": [int(i) for i in (ids or [])],
+            "after_clipping": bool(after_clipping),
+            "move_center": bool(move_center),
+        }
+        if base_value is not None:
+            kwargs["base_value"] = _to_proto_value(base_value)
+        req = self._pb2.CameraMoveLocalRequest(**kwargs)
+        resp = self._stub.CameraMoveLocal(req)
+        self._log_rpc("CameraMoveLocal", req, resp)
+        vals = [MessageToDict(v) for v in getattr(resp, "values", [])]
+        return vals[0] if vals else {}
+
+    def camera_look_at(
+        self,
+        *,
+        world_point: Optional[tuple[float, float, float]] = None,
+        target_bbox_center: bool = False,
+        bbox_fraction_point: Optional[tuple[float, float, float]] = None,
+        ids: Optional[list[int]] = None,
+        after_clipping: bool = True,
+        base_value: Optional[dict] = None,
+    ) -> dict:
+        """Aim camera at a world point or bbox-derived point (no key writes)."""
+        self.ensure_view()
+        if not hasattr(self._stub, "CameraLookAt"):
+            raise RuntimeError("CameraLookAt is not supported by this Atlas version")
+
+        modes = 0
+        if world_point is not None:
+            modes += 1
+        if bool(target_bbox_center):
+            modes += 1
+        if bbox_fraction_point is not None:
+            modes += 1
+        if modes != 1:
+            raise ValueError("Exactly one of: world_point, target_bbox_center, bbox_fraction_point must be set")
+
+        kwargs: dict[str, Any] = {
+            "ids": [int(i) for i in (ids or [])],
+            "after_clipping": bool(after_clipping),
+        }
+        if base_value is not None:
+            kwargs["base_value"] = _to_proto_value(base_value)
+
+        if world_point is not None:
+            x, y, z = world_point
+            kwargs["world_point"] = self._pb2.Vec3(x=float(x), y=float(y), z=float(z))
+        elif bbox_fraction_point is not None:
+            fx, fy, fz = bbox_fraction_point
+            kwargs["bbox_fraction_point"] = self._pb2.Vec3(x=float(fx), y=float(fy), z=float(fz))
+        else:
+            # Oneof presence matters; set to True explicitly.
+            kwargs["target_bbox_center"] = True
+
+        req = self._pb2.CameraLookAtRequest(**kwargs)
+        resp = self._stub.CameraLookAt(req)
+        self._log_rpc("CameraLookAt", req, resp)
+        vals = [MessageToDict(v) for v in getattr(resp, "values", [])]
+        return vals[0] if vals else {}
+
+    def camera_path_solve(
+        self,
+        *,
+        ids: Optional[list[int]] = None,
+        after_clipping: bool = True,
+        base_value: Optional[dict] = None,
+        waypoints: list[dict],
+    ) -> list[dict]:
+        """Solve typed camera keys from waypoints (does not write keys)."""
+        self.ensure_view()
+        if not hasattr(self._stub, "CameraPathSolve"):
+            raise RuntimeError("CameraPathSolve is not supported by this Atlas version")
+
+        pb_wps = []
+        for w in waypoints or []:
+            if not isinstance(w, dict):
+                raise ValueError("each waypoint must be an object")
+            tm = float(w.get("time", 0.0))
+            kw: dict[str, Any] = {"time": tm}
+
+            eye = w.get("eye")
+            if isinstance(eye, dict):
+                if "world" in eye:
+                    x, y, z = eye["world"]
+                    kw["world_eye"] = self._pb2.Vec3(x=float(x), y=float(y), z=float(z))
+                elif "bbox_fraction" in eye:
+                    x, y, z = eye["bbox_fraction"]
+                    kw["bbox_fraction_eye"] = self._pb2.Vec3(x=float(x), y=float(y), z=float(z))
+
+            look = w.get("look_at")
+            if isinstance(look, dict):
+                if "world" in look:
+                    x, y, z = look["world"]
+                    kw["world_look_at"] = self._pb2.Vec3(x=float(x), y=float(y), z=float(z))
+                elif look.get("bbox_center") is True:
+                    kw["look_at_bbox_center"] = True
+                elif "bbox_fraction" in look:
+                    x, y, z = look["bbox_fraction"]
+                    kw["bbox_fraction_look_at"] = self._pb2.Vec3(x=float(x), y=float(y), z=float(z))
+
+            pb_wps.append(self._pb2.CameraWaypoint(**kw))
+
+        req_kwargs: dict[str, Any] = {
+            "ids": [int(i) for i in (ids or [])],
+            "after_clipping": bool(after_clipping),
+            "waypoints": pb_wps,
+        }
+        if base_value is not None:
+            req_kwargs["base_value"] = _to_proto_value(base_value)
+        req = self._pb2.CameraPathSolveRequest(**req_kwargs)
+        resp = self._stub.CameraPathSolve(req)
+        self._log_rpc("CameraPathSolve", req, resp)
+        out: list[dict] = []
+        for k in getattr(resp, "keys", []):
+            out.append({"time": float(getattr(k, "time", 0.0)), "value": MessageToDict(getattr(k, "value"))})
+        return out
+
+    def set_camera_interpolation_method(self, method: str) -> bool:
+        """Set camera animation interpolation method for the current animation."""
+        self.ensure_view()
+        if not hasattr(self._stub, "SetCameraInterpolationMethod"):
+            raise RuntimeError("SetCameraInterpolationMethod is not supported by this Atlas version")
+        req = self._pb2.SetCameraInterpolationMethodRequest(method=str(method))
+        resp = self._stub.SetCameraInterpolationMethod(req)
+        self._log_rpc("SetCameraInterpolationMethod", req, resp)
+        return bool(getattr(resp, "ok", False))
+
+    def get_camera_interpolation_method(self) -> str | None:
+        """Get camera animation interpolation method for the current animation."""
+        self.ensure_view()
+        if not hasattr(self._stub, "GetCameraInterpolationMethod"):
+            return None
+        req = empty_pb2.Empty()
+        resp = self._stub.GetCameraInterpolationMethod(req)
+        self._log_rpc("GetCameraInterpolationMethod", req, resp)
+        try:
+            v = str(getattr(resp, "value", "") or "").strip()
+            return v if v else None
+        except Exception:
+            return None
 
     # Typed camera planning and validation
     def fit_candidates(self) -> list[int]:

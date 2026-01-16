@@ -74,6 +74,11 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                         "default": 0,
                         "description": "0=unlimited (correctness-first). If >0, returns only a window and sets total_matches to the full count.",
                     },
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Skip the first N matches (for paging). Use with max_results to page through large result sets without truncation.",
+                    },
                 },
                 "required": ["query"],
             },
@@ -214,6 +219,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 include_norm.add(os.path.basename(it.strip()))
         context_lines = max(0, int(args.get("context_lines", 2)))
         max_results = max(0, int(args.get("max_results", 0)))
+        offset = max(0, int(args.get("offset", 0)))
 
         flags = 0 if case_sensitive else re.IGNORECASE
         pattern: Optional[re.Pattern[str]] = None
@@ -254,6 +260,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 if not _match_line(ln):
                     continue
                 total += 1
+                if total <= offset:
+                    continue
                 if max_results and len(matches) >= max_results:
                     continue
                 start = max(0, idx - context_lines)
@@ -277,10 +285,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 "total_matches": total,
                 "results": matches,
                 "result_window": {
+                    "offset": offset,
                     "max_results": max_results,
                     "context_lines": context_lines,
                 },
-                "limit_reached": bool(max_results and total > max_results),
+                "limit_reached": bool(max_results and total > (offset + max_results)),
             }
         )
 

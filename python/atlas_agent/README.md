@@ -68,9 +68,11 @@ Common options:
 ## Docs + Long Sessions
 
 - Atlas ships markdown docs inside the app bundle. The agent can search and read them at runtime via `docs_search` / `docs_read` / `docs_list`.
+- Each user turn starts with a small Supervisor step that produces a short `TASK BRIEF` (stored in the session log). Downstream phases follow this brief to reduce intent drift in long sessions.
 - The chat runtime maintains a compact “Session Memory” summary so long conversations remain stable even when raw history exceeds the model context window.
   - Memory compaction is built-in and not tuned via CLI flags or environment variables.
   - In the REPL: `:memory` shows the current memory summary.
+- If a provider rejects a request due to context length, the runtime trims older within-turn history items and retries automatically (it does not drop your on-disk session log).
 - Sessions are persisted on disk as a single append-only JSONL log (`session.jsonl`) containing:
   - domain events (plan updates, memory updates, verification policy/evidence, consent/meta),
   - transcript entries (user/assistant),
@@ -78,7 +80,7 @@ Common options:
   - reasoning summaries (phase-level).
   - `--session <id-or-path>` to resume a previous session
   - `--session-dir <path>` to choose where sessions live
-  - In the REPL: `:session`, `:plan`, `:memory`
+  - In the REPL: `:session`, `:brief`, `:plan`, `:memory`
 - Default session location when `--session-dir` is omitted:
   - macOS/Linux: `$XDG_STATE_HOME/atlas_agent/sessions` if set, otherwise `~/.atlas_agent/sessions`
   - Windows: `%APPDATA%\\atlas_agent\\sessions`
@@ -87,7 +89,28 @@ Common options:
   - Or copy/paste the on-disk path from the REPL command `:session` (you can pass a session dir or a `session.jsonl` path)
 - Auto-retrieval (context-window resilience): when the user says “resume/continue/last time”, the runtime injects a small “Auto-retrieved context” block derived from the session log (recent tool calls + matching transcript entries).
   - This is intentionally a small excerpt; when more detail is needed, the agent can call `session_search_transcript` or `session_search_events`.
+  - `session_search_transcript` / `session_search_events` support paging via `offset` + `max_results` and can return newest-first with `reverse=true`.
 - The runtime streams a first-person “Reasoning summary” while the model thinks. This is a high-level summary (not chain-of-thought).
+
+## Camera walkthroughs and waypoint splines
+
+Atlas camera animation supports both:
+
+- **First-person walkthroughs** (“fly/drone inside the object”): the agent composes local moves + rotations and writes camera keys.
+- **Guided waypoint splines** (explicit waypoints): the agent solves keys from bbox/world waypoints and evaluates them as a spline.
+
+Prompt patterns that work well:
+
+- First-person walkthrough:
+  - “Create a 12s first-person walkthrough: start outside the volume, fly forward into it, then yaw right while slowly ascending. Keep it smooth; no snap turns.”
+  - “Do an interior fly-through; it’s OK if the object goes out of frame.”
+- Guided waypoint spline:
+  - “Make a 10s guided fly-through with 3 waypoints: outside the front face → inside the center → near the top-right corner. Look at the bbox center throughout. Use bbox fractions for waypoints so it works across datasets.”
+
+Implementation notes:
+
+- For smooth spline paths, the agent sets the camera interpolation method to `Position Rotation Spline`.
+- For interior shots, the agent disables the “keep object fully visible” constraint (`keep_visible=false`) so the camera can move inside.
 
 Help:
 

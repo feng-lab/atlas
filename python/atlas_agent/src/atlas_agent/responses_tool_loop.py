@@ -4,6 +4,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
+CONTEXT_TRIM_MAX_RETRIES = 32
+
 
 class ResponsesStreamingClient(Protocol):
     def responses_stream(
@@ -171,6 +173,97 @@ class ToolLoopResult:
     input_items: list[dict[str, Any]]
 
 
+def _is_context_length_error(exc: BaseException) -> bool:
+    """Best-effort detection for context-window overflow errors.
+
+    Providers and SDK versions format these errors differently. We use a simple
+    string-based heuristic so the tool loop can trim older context and retry
+    rather than hard-failing.
+    """
+
+    msg = str(exc or "").lower()
+    needles = (
+        "context length",
+        "context_length",
+        "context window",
+        "maximum context",
+        "too many tokens",
+        "max tokens",
+        "maximum number of tokens",
+        "reduce the length",
+        "input is too long",
+        "request too large",
+        "token limit",
+    )
+    return any(n in msg for n in needles)
+
+
+def _drop_call_pair(in_items: list[dict[str, Any]], *, call_id: str) -> None:
+    """Remove both sides of a function call/output pair (best-effort)."""
+
+    cid = str(call_id or "")
+    if not cid:
+        return
+
+    def _is_call_item(it: dict[str, Any]) -> bool:
+        return str(it.get("type") or "") == "function_call" and str(it.get("call_id") or "") == cid
+
+    def _is_output_item(it: dict[str, Any]) -> bool:
+        return str(it.get("type") or "") == "function_call_output" and str(it.get("call_id") or "") == cid
+
+    in_items[:] = [it for it in in_items if not (_is_call_item(it) or _is_output_item(it))]
+
+
+def _trim_oldest_item_for_retry(in_items: list[dict[str, Any]]) -> bool:
+    """Trim one oldest non-essential item from in_items.
+
+    Returns true when something was removed, false when we cannot trim further.
+    """
+
+    if not isinstance(in_items, list) or len(in_items) <= 1:
+        return False
+
+    # Try to keep at least one user message (Responses API requirement).
+    last_user_idx: int | None = None
+    for i in range(len(in_items) - 1, -1, -1):
+        it = in_items[i]
+        if not isinstance(it, dict):
+            continue
+        if str(it.get("type") or "") == "message" and str(it.get("role") or "") == "user":
+            last_user_idx = i
+            break
+
+    # Remove from the front while avoiding the last user message when possible.
+    rm_idx = 0
+    if last_user_idx == 0 and len(in_items) > 1:
+        rm_idx = 1
+    if last_user_idx is not None and rm_idx == last_user_idx and len(in_items) > 1:
+        rm_idx = 0 if last_user_idx != 0 else 1
+
+    try:
+        removed = in_items.pop(rm_idx)
+    except Exception:
+        return False
+
+    if isinstance(removed, dict):
+        rtype = str(removed.get("type") or "")
+        if rtype in {"function_call", "function_call_output"}:
+            cid = str(removed.get("call_id") or "")
+            if cid:
+                _drop_call_pair(in_items, call_id=cid)
+
+    # Ensure there is still at least one user message; otherwise add a placeholder.
+    if not any(
+        isinstance(it, dict)
+        and str(it.get("type") or "") == "message"
+        and str(it.get("role") or "") == "user"
+        for it in in_items
+    ):
+        in_items.append(_input_text_message(role="user", text="(context trimmed; continuing)"))
+
+    return True
+
+
 def run_responses_tool_loop(
     *,
     llm: ResponsesStreamingClient,
@@ -240,17 +333,31 @@ def run_responses_tool_loop(
                         cb.on_assistant_text_delta(delta)
                 return
 
-        resp = llm.responses_stream(
-            instructions=instructions,
-            input_items=in_items,
-            tools=normalized_tools,
-            temperature=temperature,
-            parallel_tool_calls=False,
-            reasoning_effort="high",
-            reasoning_summary="detailed",
-            text_verbosity="high",
-            on_event=_on_event,
-        )
+        # Best-effort retry loop for context window overflows: trim older items and retry.
+        resp: dict[str, Any] | None = None
+        for _retry in range(CONTEXT_TRIM_MAX_RETRIES):
+            try:
+                resp = llm.responses_stream(
+                    instructions=instructions,
+                    input_items=in_items,
+                    tools=normalized_tools,
+                    temperature=temperature,
+                    parallel_tool_calls=False,
+                    reasoning_effort="high",
+                    reasoning_summary="detailed",
+                    text_verbosity="high",
+                    on_event=_on_event,
+                )
+                break
+            except Exception as e:
+                if not _is_context_length_error(e):
+                    raise
+                if not _trim_oldest_item_for_retry(in_items):
+                    raise RuntimeError(
+                        "Context window exceeded and could not trim further; start a new session/thread or reduce tool output sizes."
+                    ) from e
+        if resp is None:
+            raise RuntimeError("Responses stream failed without producing a response.")
 
         output_items = _coerce_output_items(resp)
         # Persist output items into the loop input (full local history).

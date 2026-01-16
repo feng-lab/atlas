@@ -81,6 +81,9 @@ service Scene {
   // Return the installation root of the running Atlas instance (for locating
   // bundled schemas/docs/protos). On macOS this is the .app bundle root.
   rpc GetAppLocation (google.protobuf.Empty) returns (google.protobuf.StringValue);
+  // Return a build/version identifier for the running Atlas instance.
+  // Intended for agent compatibility checks and session logs.
+  rpc GetAppVersion (google.protobuf.Empty) returns (google.protobuf.StringValue);
   // Returns ok=true when the 3D rendering engine is initialized and ready.
   rpc EngineReady (Empty) returns (Bool);
   // Ensure a 3D window/canvas is open so the rendering engine can initialize.
@@ -102,6 +105,8 @@ service Scene {
   rpc SetDuration (SetDurationRequest) returns (Bool);
   rpc SetKey (SetKeyRequest) returns (Bool);
   // Camera helpers
+  // Return the current engine camera as a typed value (does not write keys).
+  rpc CameraGet (google.protobuf.Empty) returns (CameraKeysResponse);
   rpc CameraFit (CameraFitRequest) returns (CameraKeysResponse);
   rpc CameraOrbitSuggest (CameraOrbitSuggestRequest) returns (CameraKeysResponse);
   rpc CameraDollySuggest (CameraDollySuggestRequest) returns (CameraKeysResponse);
@@ -110,6 +115,11 @@ service Scene {
   rpc CameraPointTo (CameraPointToRequest) returns (CameraKeysResponse);
   rpc CameraRotate (CameraRotateRequest) returns (CameraKeysResponse);
   rpc CameraResetView (CameraResetViewRequest) returns (CameraKeysResponse);
+  // Camera navigation helpers (freeform walkthrough building blocks)
+  rpc CameraMoveLocal (CameraMoveLocalRequest) returns (CameraKeysResponse);
+  rpc CameraLookAt (CameraLookAtRequest) returns (CameraKeysResponse);
+  // Waypoint-based camera path planning (returns typed keys; does not write keys).
+  rpc CameraPathSolve (CameraPathSolveRequest) returns (CameraSolveResponse);
   // New typed camera planning and validation
   rpc CameraSolve (CameraSolveRequest) returns (CameraSolveResponse);
   rpc CameraValidate (CameraValidateRequest) returns (CameraValidateResponse);
@@ -129,6 +139,9 @@ service Scene {
   rpc RemoveKey (RemoveKeyRequest) returns (Bool);
   rpc Batch (BatchRequest) returns (Bool);
   rpc SetTime (SetTimeRequest) returns (Bool);
+  // Camera animation settings (timeline)
+  rpc SetCameraInterpolationMethod (SetCameraInterpolationMethodRequest) returns (Bool);
+  rpc GetCameraInterpolationMethod (google.protobuf.Empty) returns (google.protobuf.StringValue);
   // Save/export
   // Save current animation to .animation3d
   rpc Save (SaveRequest) returns (Bool);
@@ -217,6 +230,48 @@ message CameraResetViewRequest {
   repeated uint64 ids = 2;      // optional subset to derive bbox (Animation3D filtered). Empty → all visual objects
   bool after_clipping = 3;      // when true, use bbox after clipping
   double min_radius = 4;        // optional minimum radius for RESET/XY
+}
+
+// Camera navigation and path planning
+message CameraMoveLocalRequest {
+  string op = 1;      // "FORWARD"|"BACK"|"RIGHT"|"LEFT"|"UP"|"DOWN"
+  double distance = 2; // world-units, or a fraction when distance_is_fraction_of_bbox_radius=true
+  bool distance_is_fraction_of_bbox_radius = 3; // when true, distance is scaled by bbox enclosing-sphere radius
+  repeated uint64 ids = 4; // optional targets for bbox scale (Animation3D filtered). Empty → all visual objects
+  bool after_clipping = 5; // when true, derive bbox after clipping (only used when scaling distance)
+  bool move_center = 6; // when true, translate eye+center together (fly). When false, translate eye only (dolly/boom)
+  google.protobuf.Value base_value = 7; // optional: move from this camera value instead of current engine camera
+}
+
+message CameraLookAtRequest {
+  google.protobuf.Value base_value = 1; // optional: aim from this camera value instead of current engine camera
+  oneof target {
+    Vec3 world_point = 2;        // camera center will point here
+    bool target_bbox_center = 3; // when set, use bbox center of ids (or all objects)
+    Vec3 bbox_fraction_point = 4; // [0..1] fractions inside the bbox of ids (or all objects)
+  }
+  repeated uint64 ids = 5; // optional targets for bbox computations (Animation3D filtered). Empty → all visual objects
+  bool after_clipping = 6; // when true, derive bbox after clipping
+}
+
+message CameraWaypoint {
+  double time = 1; // key time in seconds
+  oneof eye {
+    Vec3 world_eye = 2;         // absolute world-space eye position
+    Vec3 bbox_fraction_eye = 3; // [0..1] fractions inside bbox of ids
+  }
+  oneof look_at {
+    Vec3 world_look_at = 4;        // absolute world-space look-at point (camera center)
+    bool look_at_bbox_center = 5;  // when set, look at bbox center of ids
+    Vec3 bbox_fraction_look_at = 6; // [0..1] fractions inside bbox of ids
+  }
+}
+
+message CameraPathSolveRequest {
+  repeated uint64 ids = 1; // targets for bbox computations (Animation3D filtered). Empty → all visual objects
+  bool after_clipping = 2; // when true, derive bbox after clipping
+  google.protobuf.Value base_value = 3; // optional: base camera for fov/projection/up defaults
+  repeated CameraWaypoint waypoints = 4; // at least 2 waypoints recommended
 }
 
 // Typed camera planning and validation
@@ -332,6 +387,11 @@ message BatchRequest {
 
 // Playback controls
 message SetTimeRequest { double seconds = 1; bool cancel_rendering = 2; }
+
+// Camera animation settings
+message SetCameraInterpolationMethodRequest {
+  string method = 1; // "Center" | "Position Spline" | "Position Rotation Spline" (case-insensitive)
+}
 
 // Save
 message SaveRequest { string path = 1; }

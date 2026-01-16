@@ -174,11 +174,19 @@ def scene_tools_and_dispatcher(
         except Exception:
             args = {}
 
+        chained_dispatch = dispatch
+        try:
+            maybe = _runtime_state.get("dispatch_proxy")
+            if callable(maybe):
+                chained_dispatch = maybe
+        except Exception:
+            chained_dispatch = dispatch
+
         ctx = ToolDispatchContext(
             client=client,
             atlas_dir=atlas_dir,
             codegen_enabled=bool(codegen_enabled),
-            dispatch=dispatch,
+            dispatch=chained_dispatch,
             param_to_dict=_param_to_dict,
             resolve_json_key=_resolve_json_key,
             json_key_exists=_json_key_exists,

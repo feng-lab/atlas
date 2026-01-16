@@ -1,5 +1,6 @@
 import glob
 import json
+import math
 import os
 import tempfile
 from pathlib import Path
@@ -29,6 +30,9 @@ HANDLED_TOOLS = (
     "animation_replace_key_camera",
     "animation_camera_solve_and_apply",
     "animation_camera_validate",
+    "animation_camera_get_interpolation_method",
+    "animation_camera_set_interpolation_method",
+    "animation_camera_waypoint_spline_apply",
     "animation_get_time",
     "animation_list_keys",
     "animation_clear_keys_range",
@@ -117,6 +121,103 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     },
                 },
                 "required": ["mode", "ids", "t0", "t1"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "animation_camera_get_interpolation_method",
+            "description": "Read the current camera interpolation method for the active animation (e.g., Center | Position Spline | Position Rotation Spline).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "animation_camera_set_interpolation_method",
+            "description": "Set the camera interpolation method for the active animation. Use 'Position Rotation Spline' for first-person walkthroughs and waypoint spline fly-throughs.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "method": {
+                        "type": "string",
+                        "enum": [
+                            "Center",
+                            "Position Spline",
+                            "Position Rotation Spline",
+                        ],
+                        "description": "Interpolation method for camera animation evaluation.",
+                    }
+                },
+                "required": ["method"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "animation_camera_waypoint_spline_apply",
+            "description": "Guided waypoint spline: solve camera keys from bbox/world waypoints, set camera interpolation method (default Position Rotation Spline), optionally clear existing camera keys in [t0,t1], then write validated camera keys. Returns {applied:[times...], total, method}.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects.",
+                    },
+                    "after_clipping": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Use clipped bbox for bbox-fraction waypoints.",
+                    },
+                    "t0": {"type": "number", "description": "Start time (seconds)."},
+                    "t1": {"type": "number", "description": "End time (seconds)."},
+                    "waypoints": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": (
+                            "Waypoints with either absolute time or normalized u in [0,1].\n"
+                            "Each waypoint: {u?:number, time?:number, eye?:{world:[x,y,z]|bbox_fraction:[fx,fy,fz]}, look_at?:{world:[x,y,z]|bbox_center:true|bbox_fraction:[fx,fy,fz]}}.\n"
+                            "If look_at is omitted, the solver preserves the previous view direction and center distance."
+                        ),
+                    },
+                    "method": {
+                        "type": "string",
+                        "default": "Position Rotation Spline",
+                        "enum": [
+                            "Center",
+                            "Position Spline",
+                            "Position Rotation Spline",
+                        ],
+                        "description": "Camera interpolation method to set before writing keys.",
+                    },
+                    "easing": {
+                        "type": "string",
+                        "default": "Linear",
+                        "description": "Easing assigned to written camera keys (note: spline path uses waypoint geometry).",
+                    },
+                    "clear_range": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys.",
+                    },
+                    "tolerance": {
+                        "type": "number",
+                        "default": 1e-3,
+                        "description": "Time tolerance used when clearing/replacing keys.",
+                    },
+                    "constraints": {
+                        "type": "object",
+                        "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
+                    },
+                    "base_value": {
+                        "type": "object",
+                        "description": "Optional base camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted.",
+                    },
+                },
+                "required": ["t0", "t1", "waypoints"],
             },
         },
     },
@@ -1166,6 +1267,304 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 pass
             return json.dumps({"ok": False, "error": msg})
 
+    if name == "animation_camera_get_interpolation_method":
+        try:
+            m = client.get_camera_interpolation_method()
+            if not m:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "camera interpolation method is unavailable (no animation yet or unsupported server)",
+                    }
+                )
+            return json.dumps({"ok": True, "method": m})
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+    if name == "animation_camera_set_interpolation_method":
+        try:
+            method = str(args.get("method") or "").strip()
+            if not method:
+                return json.dumps({"ok": False, "error": "method is required"})
+            ok = client.set_camera_interpolation_method(method)
+            # Read-back (best-effort) so callers can log a deterministic result.
+            cur = None
+            try:
+                cur = client.get_camera_interpolation_method()
+            except Exception:
+                cur = None
+            return json.dumps(
+                {
+                    "ok": bool(ok),
+                    "method": str(method),
+                    **({"current_method": cur} if isinstance(cur, str) and cur.strip() else {}),
+                }
+            )
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+    if name == "animation_camera_waypoint_spline_apply":
+        try:
+            ids = args.get("ids") or []
+            after_clipping = bool(args.get("after_clipping", True))
+            t0 = float(args.get("t0", 0.0))
+            t1 = float(args.get("t1", 0.0))
+            if not (math.isfinite(t0) and math.isfinite(t1)):
+                return json.dumps({"ok": False, "error": "t0 and t1 must be finite"})
+            if t0 < 0.0 or t1 < 0.0:
+                return json.dumps({"ok": False, "error": "t0 and t1 must be >= 0"})
+            if not (t1 > t0):
+                return json.dumps({"ok": False, "error": "t1 must be > t0"})
+            waypoints_in = args.get("waypoints") or []
+            if not isinstance(waypoints_in, list) or not waypoints_in:
+                return json.dumps({"ok": False, "error": "waypoints must be a non-empty list"})
+            if len(waypoints_in) < 2:
+                return json.dumps({"ok": False, "error": "at least 2 waypoints are required"})
+            method = str(args.get("method", "Position Rotation Spline"))
+            easing = str(args.get("easing", "Linear"))
+            tol = float(args.get("tolerance", 1e-3))
+            if not math.isfinite(tol) or tol < 0.0:
+                return json.dumps({"ok": False, "error": "tolerance must be a finite number >= 0"})
+            clear_range = bool(args.get("clear_range", True))
+            constraints = args.get("constraints") or {
+                "keep_visible": True,
+                "min_coverage": 0.95,
+            }
+            base_value = args.get("base_value")
+
+            # Ensure animation exists (creates/binds a default 3D animation with a baseline t=0 frame).
+            if not client.ensure_animation():
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "EnsureAnimation failed (no visual objects loaded yet?)",
+                    }
+                )
+
+            # Set interpolation method so waypoint keys behave as a spline path.
+            if not client.set_camera_interpolation_method(method):
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": f"failed to set camera interpolation method to {method!r}",
+                    }
+                )
+
+            # Normalize waypoint times: allow either absolute time or u in [0,1].
+            span = float(t1 - t0)
+            waypoints: list[dict] = []
+            used_times: set[float] = set()
+            for w in waypoints_in:
+                if not isinstance(w, dict):
+                    return json.dumps(
+                        {"ok": False, "error": "each waypoint must be an object"}
+                    )
+                if "time" in w:
+                    tm = float(w.get("time", 0.0))
+                elif "u" in w:
+                    u = float(w.get("u", 0.0))
+                    if not math.isfinite(u) or u < 0.0 or u > 1.0:
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "when using 'u', it must be a finite number in [0,1]. For out-of-range times, use explicit 'time'.",
+                            }
+                        )
+                    tm = t0 + u * span
+                else:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "each waypoint must include either 'time' (seconds) or 'u' (0..1)",
+                        }
+                    )
+                if not math.isfinite(tm) or tm < 0.0:
+                    return json.dumps({"ok": False, "error": "waypoint time must be finite and >= 0"})
+                if tm < t0 - tol or tm > t1 + tol:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": f"waypoint time {tm} is outside the apply window [{t0},{t1}] (tolerance={tol}). Adjust t0/t1 or use different waypoint times.",
+                        }
+                    )
+                if tm in used_times:
+                    return json.dumps({"ok": False, "error": f"duplicate waypoint time: {tm}"})
+                used_times.add(tm)
+
+                entry: dict[str, Any] = {"time": tm}
+
+                eye = w.get("eye")
+                if eye is not None:
+                    if not isinstance(eye, dict):
+                        return json.dumps({"ok": False, "error": "waypoint.eye must be an object"})
+                    if ("world" in eye) and ("bbox_fraction" in eye):
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "waypoint.eye must have exactly one of: world | bbox_fraction",
+                            }
+                        )
+                    if "world" in eye:
+                        v = eye.get("world")
+                        if not (isinstance(v, list) and len(v) == 3):
+                            return json.dumps({"ok": False, "error": "eye.world must be [x,y,z]"})
+                        if not all(math.isfinite(float(x)) for x in v):
+                            return json.dumps({"ok": False, "error": "eye.world must contain finite numbers"})
+                        entry["eye"] = {"world": [float(v[0]), float(v[1]), float(v[2])]}
+                    elif "bbox_fraction" in eye:
+                        v = eye.get("bbox_fraction")
+                        if not (isinstance(v, list) and len(v) == 3):
+                            return json.dumps({"ok": False, "error": "eye.bbox_fraction must be [fx,fy,fz]"})
+                        vv = [float(v[0]), float(v[1]), float(v[2])]
+                        if not all(math.isfinite(x) for x in vv):
+                            return json.dumps({"ok": False, "error": "eye.bbox_fraction must contain finite numbers"})
+                        if any((x < 0.0 or x > 1.0) for x in vv):
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "eye.bbox_fraction values must be in [0,1]. For out-of-bbox points, use eye.world.",
+                                }
+                            )
+                        entry["eye"] = {"bbox_fraction": vv}
+
+                look = w.get("look_at")
+                if look is not None:
+                    if not isinstance(look, dict):
+                        return json.dumps({"ok": False, "error": "waypoint.look_at must be an object"})
+                    modes = int("world" in look) + int("bbox_fraction" in look) + int(look.get("bbox_center") is True)
+                    if modes != 1:
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "waypoint.look_at must have exactly one of: world | bbox_center:true | bbox_fraction",
+                            }
+                        )
+                    if "world" in look:
+                        v = look.get("world")
+                        if not (isinstance(v, list) and len(v) == 3):
+                            return json.dumps({"ok": False, "error": "look_at.world must be [x,y,z]"})
+                        if not all(math.isfinite(float(x)) for x in v):
+                            return json.dumps({"ok": False, "error": "look_at.world must contain finite numbers"})
+                        entry["look_at"] = {"world": [float(v[0]), float(v[1]), float(v[2])]}
+                    elif look.get("bbox_center") is True:
+                        entry["look_at"] = {"bbox_center": True}
+                    else:
+                        v = look.get("bbox_fraction")
+                        if not (isinstance(v, list) and len(v) == 3):
+                            return json.dumps({"ok": False, "error": "look_at.bbox_fraction must be [fx,fy,fz]"})
+                        vv = [float(v[0]), float(v[1]), float(v[2])]
+                        if not all(math.isfinite(x) for x in vv):
+                            return json.dumps({"ok": False, "error": "look_at.bbox_fraction must contain finite numbers"})
+                        if any((x < 0.0 or x > 1.0) for x in vv):
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "look_at.bbox_fraction values must be in [0,1]. For out-of-bbox points, use look_at.world.",
+                                }
+                            )
+                        entry["look_at"] = {"bbox_fraction": vv}
+
+                waypoints.append(entry)
+
+            # Solve typed camera keys (no writes) from waypoints.
+            keys = client.camera_path_solve(
+                ids=ids,
+                after_clipping=after_clipping,
+                base_value=base_value if isinstance(base_value, dict) else None,
+                waypoints=waypoints,
+            )
+            if not keys:
+                return json.dumps(
+                    {"ok": False, "error": "camera_path_solve returned no keys"}
+                )
+
+            # Optionally clear existing keys in [t0,t1] before applying.
+            if clear_range:
+                clear_res = json.loads(
+                    dispatch(
+                        "animation_clear_keys_range",
+                        json.dumps(
+                            {
+                                "id": 0,
+                                "t0": float(t0),
+                                "t1": float(t1),
+                                "tolerance": float(tol),
+                                "include_times": False,
+                            }
+                        ),
+                    )
+                    or "{}"
+                )
+                if isinstance(clear_res, dict) and clear_res.get("ok") is False:
+                    return json.dumps({"ok": False, "error": f"failed to clear camera keys in range: {clear_res.get('error')}"})
+
+            applied: list[float] = []
+            failed: list[dict[str, Any]] = []
+            for k in keys:
+                try:
+                    tv = float(k.get("time", 0.0))
+                    vv = k.get("value") or {}
+                    payload = {
+                        "time": tv,
+                        "easing": easing,
+                        "value": vv,
+                        "tolerance": tol,
+                        "strict": False,
+                        "ids": ids,
+                        "constraints": constraints,
+                    }
+                    rr = json.loads(
+                        dispatch("animation_replace_key_camera", json.dumps(payload))
+                        or "{}"
+                    )
+                    if rr.get("ok"):
+                        applied.append(tv)
+                    else:
+                        failed.append(
+                            {
+                                "time": tv,
+                                "error": rr.get("error") or rr.get("reason") or "apply_failed",
+                            }
+                        )
+                except Exception as e:
+                    failed.append({"time": float(k.get("time", 0.0) or 0.0), "error": str(e)})
+
+            # Read back the effective method for deterministic logging.
+            cur_method = None
+            try:
+                cur_method = client.get_camera_interpolation_method()
+            except Exception:
+                cur_method = None
+
+            payload: dict[str, Any] = {
+                "ok": not bool(failed),
+                "applied": sorted(applied),
+                "total": len(applied),
+                "method": method,
+            }
+            if failed:
+                payload["failed"] = failed
+            if isinstance(cur_method, str) and cur_method.strip():
+                payload["current_method"] = cur_method
+            return json.dumps(payload)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
     if name == "animation_get_time":
         ts = client.get_time()
         return json.dumps(
@@ -1988,7 +2387,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 easing=easing,
                 value=value_native,
             )
-            return json.dumps({"ok": ok})
+            return json.dumps(
+                {
+                    "ok": ok,
+                    "id": id,
+                    "json_key": json_key,
+                    "time": time_v,
+                    "easing": easing,
+                }
+            )
         except Exception as e:
             msg = str(e)
             try:

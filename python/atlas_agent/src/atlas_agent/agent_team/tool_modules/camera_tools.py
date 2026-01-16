@@ -5,10 +5,14 @@ from .context import ToolDispatchContext
 
 HANDLED_TOOLS = (
     "fit_candidates",
+    "camera_get",
     "camera_focus",
     "camera_point_to",
     "camera_rotate",
     "camera_reset_view",
+    "camera_move_local",
+    "camera_look_at",
+    "camera_path_solve",
 )
 
 TOOL_SPECS: List[Dict[str, Any]] = [
@@ -17,6 +21,14 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "function": {
             "name": "fit_candidates",
             "description": "Return ids of visual objects suitable for camera fit/orbit (excludes Animation3D).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "camera_get",
+            "description": "Return the current engine camera as a typed camera value (no key writes). Useful as a deterministic base_value for camera_move_local/camera_look_at.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -134,6 +146,128 @@ TOOL_SPECS: List[Dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "camera_move_local",
+            "description": "Move the camera in its local basis (first-person fly/dolly building block). Returns a typed camera value. If base_value is omitted, chains from the last produced camera value within the current turn when available; otherwise uses the current engine camera. Use distance_is_fraction_of_bbox_radius=true to avoid guessing world units (distance is scaled by the target bbox enclosing-sphere radius).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "op": {
+                        "type": "string",
+                        "enum": ["FORWARD", "BACK", "RIGHT", "LEFT", "UP", "DOWN"],
+                    },
+                    "distance": {
+                        "type": "number",
+                        "description": "World-units, or a fraction of bbox radius when distance_is_fraction_of_bbox_radius=true.",
+                    },
+                    "distance_is_fraction_of_bbox_radius": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "When true, interpret distance as a fraction of target bbox enclosing-sphere radius.",
+                    },
+                    "ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Optional target ids for bbox scaling. Empty → all visual objects.",
+                    },
+                    "after_clipping": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "When computing bbox for scaling, use clipped bbox (true) or full bbox (false).",
+                    },
+                    "move_center": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "When true, translate eye+center together (fly). When false, translate eye only (dolly/boom).",
+                    },
+                    "base_value": {
+                        "type": "object",
+                        "description": "Optional typed camera value to move from.",
+                    },
+                },
+                "required": ["op", "distance"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "camera_look_at",
+            "description": "Aim the camera at a point (sets camera center; keeps eye). Returns a typed camera value. Exactly one target mode is required: world_point, target_bbox_center, or bbox_fraction_point. If base_value is omitted, chains from the last produced camera value within the current turn when available; otherwise uses the current engine camera.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "world_point": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "description": "World-space target [x,y,z] to aim at (camera center).",
+                    },
+                    "target_bbox_center": {
+                        "type": "boolean",
+                        "description": "When true, aim at the bbox center of ids (or all visual objects).",
+                    },
+                    "bbox_fraction_point": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "description": "Fractions [fx,fy,fz] in [0..1] inside the target bbox of ids (or all visual objects).",
+                    },
+                    "ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Optional target ids for bbox computations. Empty → all visual objects.",
+                    },
+                    "after_clipping": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Use clipped bbox (true) or full bbox (false) for bbox-derived targets.",
+                    },
+                    "base_value": {
+                        "type": "object",
+                        "description": "Optional typed camera value to aim from.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "camera_path_solve",
+            "description": "Solve typed camera keys from waypoints (does NOT write keys). Waypoints may specify eye and/or look_at in world coords or bbox fractions. If look_at is omitted for a waypoint, the solver preserves the previous view direction + center distance. Use animation_camera_set_interpolation_method('Position Rotation Spline') before writing keys for a smooth waypoint spline path.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Optional target ids for bbox computations (fractions/center). Empty → all visual objects.",
+                    },
+                    "after_clipping": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Use clipped bbox (true) or full bbox (false) for bbox-derived points.",
+                    },
+                    "base_value": {
+                        "type": "object",
+                        "description": "Optional typed camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted.",
+                    },
+                    "waypoints": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Waypoints: [{time, eye?:{world:[x,y,z]|bbox_fraction:[fx,fy,fz]}, look_at?:{world:[x,y,z]|bbox_center:true|bbox_fraction:[fx,fy,fz]}}].",
+                    },
+                },
+                "required": ["waypoints"],
+            },
+        },
+    },
 ]
 
 
@@ -167,6 +301,19 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 pass
             return json.dumps({"ok": False, "error": msg})
 
+    if name == "camera_get":
+        try:
+            val = client.camera_get()
+            _set_last_camera_value(val if isinstance(val, dict) else None)
+            return json.dumps({"ok": True, "value": val})
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
     if name == "camera_focus":
         try:
             ids = args.get("ids") or []
@@ -190,6 +337,102 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             val = client.camera_point_to(ids=ids, after_clipping=ac)
             _set_last_camera_value(val if isinstance(val, dict) else None)
             return json.dumps({"ok": True, "value": val})
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+    if name == "camera_move_local":
+        try:
+            op = str(args.get("op"))
+            distance = float(args.get("distance", 0.0))
+            frac = bool(args.get("distance_is_fraction_of_bbox_radius", True))
+            ids = args.get("ids") or []
+            ac = bool(args.get("after_clipping", True))
+            move_center = bool(args.get("move_center", True))
+            base_value = args.get("base_value")
+            if base_value in (None, {}):
+                last = _get_last_camera_value()
+                if last is not None:
+                    base_value = last
+            val = client.camera_move_local(
+                op=op,
+                distance=distance,
+                distance_is_fraction_of_bbox_radius=frac,
+                ids=ids,
+                after_clipping=ac,
+                move_center=move_center,
+                base_value=base_value if isinstance(base_value, dict) else None,
+            )
+            _set_last_camera_value(val if isinstance(val, dict) else None)
+            return json.dumps({"ok": True, "value": val})
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+    if name == "camera_look_at":
+        try:
+            ids = args.get("ids") or []
+            ac = bool(args.get("after_clipping", True))
+            base_value = args.get("base_value")
+            if base_value in (None, {}):
+                last = _get_last_camera_value()
+                if last is not None:
+                    base_value = last
+
+            world_point = args.get("world_point")
+            bbox_fraction_point = args.get("bbox_fraction_point")
+            bbox_center = bool(args.get("target_bbox_center", False))
+
+            wp = None
+            if isinstance(world_point, list) and len(world_point) == 3:
+                wp = (float(world_point[0]), float(world_point[1]), float(world_point[2]))
+            bfp = None
+            if isinstance(bbox_fraction_point, list) and len(bbox_fraction_point) == 3:
+                bfp = (
+                    float(bbox_fraction_point[0]),
+                    float(bbox_fraction_point[1]),
+                    float(bbox_fraction_point[2]),
+                )
+
+            val = client.camera_look_at(
+                world_point=wp,
+                target_bbox_center=bbox_center,
+                bbox_fraction_point=bfp,
+                ids=ids,
+                after_clipping=ac,
+                base_value=base_value if isinstance(base_value, dict) else None,
+            )
+            _set_last_camera_value(val if isinstance(val, dict) else None)
+            return json.dumps({"ok": True, "value": val})
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+    if name == "camera_path_solve":
+        try:
+            ids = args.get("ids") or []
+            ac = bool(args.get("after_clipping", True))
+            base_value = args.get("base_value")
+            waypoints = args.get("waypoints") or []
+            keys = client.camera_path_solve(
+                ids=ids,
+                after_clipping=ac,
+                base_value=base_value if isinstance(base_value, dict) else None,
+                waypoints=waypoints if isinstance(waypoints, list) else [],
+            )
+            return json.dumps({"ok": True, "keys": keys})
         except Exception as e:
             msg = str(e)
             try:

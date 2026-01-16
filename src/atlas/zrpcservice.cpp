@@ -17,6 +17,7 @@
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
 #include "z3dtransformparameter.h"
+#include "../version/version.h"
 #include <QThread>
 #include <QTimer>
 #include <QApplication>
@@ -58,6 +59,10 @@ using atlas::rpc::SetKeyRequest;
 using atlas::rpc::CameraFitRequest;
 using atlas::rpc::CameraOrbitSuggestRequest;
 using atlas::rpc::CameraDollySuggestRequest;
+using atlas::rpc::CameraMoveLocalRequest;
+using atlas::rpc::CameraLookAtRequest;
+using atlas::rpc::CameraPathSolveRequest;
+using atlas::rpc::CameraWaypoint;
 using atlas::rpc::CameraKeysResponse;
 using atlas::rpc::CameraFocusRequest;
 using atlas::rpc::CameraPointToRequest;
@@ -89,6 +94,7 @@ using atlas::rpc::ClearKeysRequest;
 using atlas::rpc::RemoveKeyRequest;
 using atlas::rpc::BatchRequest;
 using atlas::rpc::SetTimeRequest;
+using atlas::rpc::SetCameraInterpolationMethodRequest;
 using atlas::rpc::SaveRequest;
 using atlas::rpc::CutSetRequest;
 using atlas::rpc::CutSuggestRequest;
@@ -349,6 +355,15 @@ public:
 #endif
     });
     reply->set_value(atlasDir.toStdString());
+    return Status::OK;
+  }
+
+  Status GetAppVersion(ServerContext*,
+                       const google::protobuf::Empty*,
+                       google::protobuf::StringValue* reply) override
+  {
+    // Build-time version string (git describe + build timestamp).
+    reply->set_value(std::string(GIT_VERSION));
     return Status::OK;
   }
 
@@ -1253,6 +1268,27 @@ public:
     return Status::OK;
   }
 
+  Status CameraGet(ServerContext*, const google::protobuf::Empty*, CameraKeysResponse* reply) override
+  {
+    if (!m_owner.engine()) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    }
+    auto values = invokeOnUi([&]() -> std::vector<json::value> {
+      std::vector<json::value> out;
+      if (!m_owner.engine()) {
+        return out;
+      }
+      Z3DCameraParameter cam("Camera");
+      cam.setValueSameAs(m_owner.engine()->camera());
+      out.emplace_back(json::value(cam.jsonValue()));
+      return out;
+    });
+    for (const auto& jv : values) {
+      *reply->add_values() = jsonToPb(jv);
+    }
+    return Status::OK;
+  }
+
   Status CameraFit(ServerContext*, const CameraFitRequest* req, CameraKeysResponse* reply) override
   {
     VLOG(1) << "RPC CameraFit all=" << req->all() << " ids=" << req->ids_size();
@@ -1588,6 +1624,382 @@ public:
     return Status::OK;
   }
 
+  Status CameraMoveLocal(ServerContext*, const CameraMoveLocalRequest* req, CameraKeysResponse* reply) override
+  {
+    if (!m_owner.engine()) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    }
+    const QString op = QString::fromStdString(req->op()).toUpper().trimmed();
+    if (op.isEmpty()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "op is required");
+    }
+    if (!(op == "FORWARD" || op == "BACK" || op == "RIGHT" || op == "LEFT" || op == "UP" || op == "DOWN")) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid op (expected FORWARD|BACK|RIGHT|LEFT|UP|DOWN)");
+    }
+    if (!std::isfinite(req->distance())) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "distance must be finite");
+    }
+
+    std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
+    auto values = invokeOnUi([&]() -> std::vector<json::value> {
+      std::vector<json::value> out;
+      if (!m_owner.engine()) {
+        errMsg = "engine not ready";
+        return out;
+      }
+      // Base camera
+      Z3DCameraParameter cam("Camera");
+      cam.setValueSameAs(m_owner.engine()->camera());
+      if (req->has_base_value()) {
+        json::value jv = pbToJson(req->base_value());
+        if (!jv.is_object()) {
+          errCode = grpc::StatusCode::INVALID_ARGUMENT;
+          errMsg = "base_value must be an object";
+          return out;
+        }
+        cam.readValue(jv);
+      }
+
+      double distWorld = req->distance();
+      if (req->distance_is_fraction_of_bbox_radius()) {
+        // Determine bbox from ids (or all visual objects when ids is empty)
+        if (!m_owner.doc()) {
+          errMsg = "doc not ready";
+          return out;
+        }
+        std::vector<size_t> ids;
+        ids.reserve(req->ids_size());
+        for (auto v : req->ids()) {
+          ids.push_back(static_cast<size_t>(v));
+        }
+        if (ids.empty()) {
+          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
+        } else {
+          ids = filterVisualIds(m_owner, ids);
+        }
+        ZBBox<glm::dvec3> bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids)
+                                                     : m_owner.engine()->boundBoxOfObjs(ids);
+        if (bb.empty()) {
+          errMsg = "bbox empty";
+          return out;
+        }
+        const double r = bboxEnclosingSphereRadius(bb);
+        if (!(r > 0.0)) {
+          errMsg = "bbox radius is zero";
+          return out;
+        }
+        distWorld = distWorld * r;
+      }
+
+      glm::vec3 dir(0.f, 0.f, 0.f);
+      if (op == "FORWARD") {
+        dir = cam.get().viewVector();
+      } else if (op == "BACK") {
+        dir = -cam.get().viewVector();
+      } else if (op == "RIGHT") {
+        dir = cam.get().strafeVector();
+      } else if (op == "LEFT") {
+        dir = -cam.get().strafeVector();
+      } else if (op == "UP") {
+        dir = cam.get().upVector();
+      } else if (op == "DOWN") {
+        dir = -cam.get().upVector();
+      }
+
+      const glm::vec3 delta = static_cast<float>(distWorld) * dir;
+      glm::vec3 eye = cam.get().eye();
+      glm::vec3 center = cam.get().center();
+      const glm::vec3 up = cam.get().upVector();
+      // move_center=true implements "fly": translate eye+center together
+      // move_center=false implements "boom/dolly": translate eye only
+      eye += delta;
+      if (req->move_center()) {
+        center += delta;
+      }
+      cam.setCamera(eye, center, up);
+
+      out.emplace_back(json::value(cam.jsonValue()));
+      return out;
+    });
+    if (!errMsg.empty()) {
+      return Status(errCode, errMsg);
+    }
+    for (const auto& jv : values) {
+      *reply->add_values() = jsonToPb(jv);
+    }
+    return Status::OK;
+  }
+
+  Status CameraLookAt(ServerContext*, const CameraLookAtRequest* req, CameraKeysResponse* reply) override
+  {
+    if (!m_owner.engine()) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    }
+    if (req->target_case() == CameraLookAtRequest::TARGET_NOT_SET) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "target is required");
+    }
+
+    std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
+    auto values = invokeOnUi([&]() -> std::vector<json::value> {
+      std::vector<json::value> out;
+      if (!m_owner.engine()) {
+        errMsg = "engine not ready";
+        return out;
+      }
+
+      // Base camera
+      Z3DCameraParameter cam("Camera");
+      cam.setValueSameAs(m_owner.engine()->camera());
+      if (req->has_base_value()) {
+        json::value jv = pbToJson(req->base_value());
+        if (!jv.is_object()) {
+          errCode = grpc::StatusCode::INVALID_ARGUMENT;
+          errMsg = "base_value must be an object";
+          return out;
+        }
+        cam.readValue(jv);
+      }
+
+      auto bboxForReq = [&]() -> ZBBox<glm::dvec3> {
+        ZBBox<glm::dvec3> bb;
+        if (!m_owner.doc() || !m_owner.engine()) {
+          return bb;
+        }
+        std::vector<size_t> ids;
+        ids.reserve(req->ids_size());
+        for (auto v : req->ids()) {
+          ids.push_back(static_cast<size_t>(v));
+        }
+        if (ids.empty()) {
+          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
+        } else {
+          ids = filterVisualIds(m_owner, ids);
+        }
+        bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids) : m_owner.engine()->boundBoxOfObjs(ids);
+        return bb;
+      };
+
+      glm::vec3 target(0.f, 0.f, 0.f);
+      switch (req->target_case()) {
+        case CameraLookAtRequest::kWorldPoint: {
+          const auto& p = req->world_point();
+          target = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+          break;
+        }
+        case CameraLookAtRequest::kTargetBboxCenter: {
+          const auto bb = bboxForReq();
+          if (bb.empty()) {
+            errMsg = "bbox empty";
+            return out;
+          }
+          const glm::dvec3 c = (bb.minCorner + bb.maxCorner) * 0.5;
+          target = glm::vec3(static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z));
+          break;
+        }
+        case CameraLookAtRequest::kBboxFractionPoint: {
+          const auto bb = bboxForReq();
+          if (bb.empty()) {
+            errMsg = "bbox empty";
+            return out;
+          }
+          const auto& f = req->bbox_fraction_point();
+          const auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
+          const double fx = clamp01(f.x());
+          const double fy = clamp01(f.y());
+          const double fz = clamp01(f.z());
+          const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
+          const glm::dvec3 p = bb.minCorner + glm::dvec3(fx * sz.x, fy * sz.y, fz * sz.z);
+          target = glm::vec3(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
+          break;
+        }
+        default: {
+          errCode = grpc::StatusCode::INVALID_ARGUMENT;
+          errMsg = "unsupported target";
+          return out;
+        }
+      }
+
+      // Aim: keep eye and up vector; set center to target.
+      cam.setCamera(cam.get().eye(), target, cam.get().upVector());
+      out.emplace_back(json::value(cam.jsonValue()));
+      return out;
+    });
+    if (!errMsg.empty()) {
+      return Status(errCode, errMsg);
+    }
+    for (const auto& jv : values) {
+      *reply->add_values() = jsonToPb(jv);
+    }
+    return Status::OK;
+  }
+
+  Status CameraPathSolve(ServerContext*, const CameraPathSolveRequest* req, CameraSolveResponse* reply) override
+  {
+    if (!m_owner.engine()) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    }
+    if (req->waypoints_size() == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "waypoints must be non-empty");
+    }
+
+    std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
+    auto keys = invokeOnUi([&]() {
+      std::vector<CameraSolveKey> out;
+      if (!m_owner.engine()) {
+        errMsg = "engine not ready";
+        return out;
+      }
+
+      // Base camera for defaults (projection/fov/up); can be overridden.
+      Z3DCameraParameter base("Camera");
+      base.setValueSameAs(m_owner.engine()->camera());
+      if (req->has_base_value()) {
+        json::value jv = pbToJson(req->base_value());
+        if (!jv.is_object()) {
+          errCode = grpc::StatusCode::INVALID_ARGUMENT;
+          errMsg = "base_value must be an object";
+          return out;
+        }
+        base.readValue(jv);
+      }
+
+      const auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
+      auto fracToWorld = [&](const ZBBox<glm::dvec3>& bb, const Vec3& f) -> glm::vec3 {
+        const double fx = clamp01(f.x());
+        const double fy = clamp01(f.y());
+        const double fz = clamp01(f.z());
+        const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
+        const glm::dvec3 p = bb.minCorner + glm::dvec3(fx * sz.x, fy * sz.y, fz * sz.z);
+        return glm::vec3(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
+      };
+
+      // Determine whether bbox is needed (fractions or bbox-center look-at).
+      bool needBBox = false;
+      for (int i = 0; i < req->waypoints_size(); ++i) {
+        const auto& w = req->waypoints(i);
+        if (w.eye_case() == CameraWaypoint::kBboxFractionEye || w.look_at_case() == CameraWaypoint::kLookAtBboxCenter ||
+            w.look_at_case() == CameraWaypoint::kBboxFractionLookAt) {
+          needBBox = true;
+          break;
+        }
+      }
+      ZBBox<glm::dvec3> bb;
+      if (needBBox) {
+        if (!m_owner.doc()) {
+          errMsg = "doc not ready";
+          return out;
+        }
+        std::vector<size_t> ids;
+        ids.reserve(req->ids_size());
+        for (auto v : req->ids()) {
+          ids.push_back(static_cast<size_t>(v));
+        }
+        if (ids.empty()) {
+          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
+        } else {
+          ids = filterVisualIds(m_owner, ids);
+        }
+        bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids) : m_owner.engine()->boundBoxOfObjs(ids);
+        if (bb.empty()) {
+          errMsg = "bbox empty";
+          return out;
+        }
+      }
+
+      struct WpRef
+      {
+        const CameraWaypoint* wp = nullptr;
+        double time = 0.0;
+        int index = 0;
+      };
+      std::vector<WpRef> wps;
+      wps.reserve(static_cast<size_t>(req->waypoints_size()));
+      for (int i = 0; i < req->waypoints_size(); ++i) {
+        wps.push_back(WpRef{&req->waypoints(i), req->waypoints(i).time(), i});
+      }
+      std::stable_sort(wps.begin(), wps.end(), [](const WpRef& a, const WpRef& b) { return a.time < b.time; });
+
+      Z3DCameraParameter prev("Camera");
+      prev.setValueSameAs(base);
+      bool havePrev = false;
+
+      for (const auto& wr : wps) {
+        const auto* w = wr.wp;
+        if (!w) {
+          continue;
+        }
+        const double t = w->time();
+        if (!(t >= 0.0) || !std::isfinite(t)) {
+          errCode = grpc::StatusCode::INVALID_ARGUMENT;
+          errMsg = "waypoint time must be finite and >= 0";
+          return std::vector<CameraSolveKey>{};
+        }
+
+        glm::vec3 eye = havePrev ? prev.get().eye() : base.get().eye();
+        if (w->eye_case() == CameraWaypoint::kWorldEye) {
+          const auto& p = w->world_eye();
+          eye = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+        } else if (w->eye_case() == CameraWaypoint::kBboxFractionEye) {
+          if (bb.empty()) {
+            errMsg = "bbox required for bbox_fraction_eye";
+            return std::vector<CameraSolveKey>{};
+          }
+          eye = fracToWorld(bb, w->bbox_fraction_eye());
+        }
+
+        glm::vec3 center;
+        if (w->look_at_case() == CameraWaypoint::kWorldLookAt) {
+          const auto& p = w->world_look_at();
+          center = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+        } else if (w->look_at_case() == CameraWaypoint::kLookAtBboxCenter) {
+          if (bb.empty()) {
+            errMsg = "bbox required for look_at_bbox_center";
+            return std::vector<CameraSolveKey>{};
+          }
+          const glm::dvec3 c = (bb.minCorner + bb.maxCorner) * 0.5;
+          center = glm::vec3(static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z));
+        } else if (w->look_at_case() == CameraWaypoint::kBboxFractionLookAt) {
+          if (bb.empty()) {
+            errMsg = "bbox required for bbox_fraction_look_at";
+            return std::vector<CameraSolveKey>{};
+          }
+          center = fracToWorld(bb, w->bbox_fraction_look_at());
+        } else {
+          // Default: keep previous view direction and center distance (first key uses base).
+          const glm::vec3 view = havePrev ? prev.get().viewVector() : base.get().viewVector();
+          const float dist = havePrev ? prev.get().centerDist() : base.get().centerDist();
+          center = eye + view * dist;
+        }
+
+        const glm::vec3 up = havePrev ? prev.get().upVector() : base.get().upVector();
+
+        Z3DCameraParameter cam("Camera");
+        cam.setValueSameAs(base);
+        cam.setCamera(eye, center, up);
+
+        CameraSolveKey k;
+        k.set_time(t);
+        *k.mutable_value() = jsonToPb(cam.jsonValue());
+        out.push_back(std::move(k));
+
+        prev.setValueSameAs(cam);
+        havePrev = true;
+      }
+
+      return out;
+    });
+    if (!errMsg.empty()) {
+      return Status(errCode, errMsg);
+    }
+    for (auto& k : keys) {
+      *reply->add_keys() = std::move(k);
+    }
+    return Status::OK;
+  }
+
   Status FitCandidates(ServerContext*, const Empty*, FitCandidatesResponse* reply) override
   {
     auto ids = invokeOnUi([&]() {
@@ -1765,9 +2177,12 @@ public:
     std::string err;
     const bool allowFov = req->has_policies() ? req->policies().adjust_fov() : false;
     const bool allowDist = req->has_policies() ? req->policies().adjust_distance() : false;
-    const double minCov = req->has_constraints()
-                            ? (req->constraints().min_coverage() > 0.0 ? req->constraints().min_coverage() : 0.95)
-                            : 0.95;
+    const bool keepVisible = req->has_constraints() ? req->constraints().keep_visible() : true;
+    const double minCov = keepVisible
+                            ? (req->has_constraints()
+                                 ? (req->constraints().min_coverage() > 0.0 ? req->constraints().min_coverage() : 0.95)
+                                 : 0.95)
+                            : 0.0;
     const double margin = req->has_constraints() ? req->constraints().margin() : 0.0;
     auto results = invokeOnUi([&]() {
       std::vector<CameraValidateResult> out;
@@ -1922,11 +2337,7 @@ public:
     });
     bool allOk = true;
     for (auto& r : results) {
-      if (!r.within_frame() ||
-          (r.coverage() + 1e-6) <
-            (req->has_constraints()
-               ? (req->constraints().min_coverage() > 0.0 ? req->constraints().min_coverage() : 0.95)
-               : 0.95)) {
+      if (!r.within_frame() || (keepVisible && (r.coverage() + 1e-6) < minCov)) {
         allOk = false;
       }
       *reply->add_results() = std::move(r);
@@ -2242,6 +2653,113 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "set_time failed");
     }
     reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status SetCameraInterpolationMethod(ServerContext*,
+                                      const SetCameraInterpolationMethodRequest* req,
+                                      Bool* reply) override
+  {
+    LOG(INFO) << "RPC SetCameraInterpolationMethod method=" << req->method();
+    std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
+    auto ok = invokeOnUi([&]() -> bool {
+      if (!m_owner.doc() || !m_owner.engine()) {
+        errMsg = "engine/doc not ready";
+        return false;
+      }
+      auto& ad = m_owner.doc()->animation3DDoc();
+      auto ids = ad.animationIds();
+      if (ids.empty()) {
+        if (!hasVisualObjects(m_owner)) {
+          errMsg = "no visual objects loaded";
+          return false;
+        }
+        ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
+      }
+      auto* anim = ad.animationPtr(ids.front());
+      if (!anim) {
+        errMsg = "no animation available";
+        return false;
+      }
+      anim->rebindView();
+      auto* cpa = anim->cameraParameterAnimation();
+      if (!cpa) {
+        errMsg = "cameraParameterAnimation not available";
+        return false;
+      }
+
+      const QString raw = QString::fromStdString(req->method()).trimmed();
+      if (raw.isEmpty()) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "method is required";
+        return false;
+      }
+      const QString m = raw.toLower();
+      QString want;
+      if (m == "center") {
+        want = QStringLiteral("Center");
+      } else if (m == "position spline" || m == "position_spline" || m == "spline") {
+        want = QStringLiteral("Position Spline");
+      } else if (m == "position rotation spline" || m == "position_rotation_spline" || m == "rotation spline" ||
+                 m == "position+rotation spline" || m == "pos rot spline") {
+        want = QStringLiteral("Position Rotation Spline");
+      } else {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "method must be one of: Center | Position Spline | Position Rotation Spline";
+        return false;
+      }
+
+      auto& para = cpa->interpolationMethodPara();
+      if (!para.hasOption(want)) {
+        errCode = grpc::StatusCode::FAILED_PRECONDITION;
+        errMsg = "interpolation method option unavailable";
+        return false;
+      }
+      para.select(want);
+      return true;
+    });
+    if (!ok) {
+      return Status(errCode, errMsg.empty() ? "set_camera_interpolation_method failed" : errMsg);
+    }
+    reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status GetCameraInterpolationMethod(ServerContext*,
+                                      const google::protobuf::Empty*,
+                                      google::protobuf::StringValue* reply) override
+  {
+    std::string errMsg;
+    auto ok = invokeOnUi([&]() -> bool {
+      if (!m_owner.doc()) {
+        errMsg = "doc not ready";
+        return false;
+      }
+      auto& ad = m_owner.doc()->animation3DDoc();
+      auto ids = ad.animationIds();
+      if (ids.empty()) {
+        errMsg = "no animation available";
+        return false;
+      }
+      auto* anim = ad.animationPtr(ids.front());
+      if (!anim) {
+        errMsg = "no animation available";
+        return false;
+      }
+      anim->rebindView();
+      auto* cpa = anim->cameraParameterAnimation();
+      if (!cpa) {
+        errMsg = "cameraParameterAnimation not available";
+        return false;
+      }
+      const QString sel = cpa->interpolationMethodPara().get();
+      reply->set_value(sel.toStdString());
+      return true;
+    });
+    if (!ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, errMsg.empty() ? "get_camera_interpolation_method failed" : errMsg);
+    }
     return Status::OK;
   }
 

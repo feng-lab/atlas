@@ -385,6 +385,8 @@ class SessionStore:
         case_sensitive: bool = False,
         role: str | None = None,
         max_results: int = 0,
+        offset: int = 0,
+        reverse: bool = False,
     ) -> dict[str, Any]:
         """Search transcript entries in the append-only session log.
 
@@ -399,6 +401,10 @@ class SessionStore:
         max_results = int(max_results or 0)
         if max_results < 0:
             max_results = 0
+        offset = int(offset or 0)
+        if offset < 0:
+            offset = 0
+        reverse = bool(reverse)
 
         flags = 0 if case_sensitive else re.IGNORECASE
         pattern: re.Pattern[str] | None = None
@@ -422,14 +428,22 @@ class SessionStore:
                 "regex": bool(regex),
                 "case_sensitive": bool(case_sensitive),
                 "role": role_filter,
+                "reverse": reverse,
                 "total_matches": 0,
                 "results": [],
+                "result_window": {"offset": offset, "max_results": max_results},
                 "limit_reached": False,
             }
 
         total = 0
         limit_reached = False
         results: list[dict[str, Any]] = []
+        window_size = (offset + max_results) if max_results else 0
+        buf = None
+        if reverse and window_size > 0:
+            from collections import deque
+
+            buf = deque(maxlen=window_size)
         try:
             with open(self.log_path, "r", encoding="utf-8", errors="replace") as f:
                 for ln in f:
@@ -450,6 +464,20 @@ class SessionStore:
                     if not _match(content):
                         continue
                     total += 1
+                    entry_out = {
+                        "ts": entry.get("ts"),
+                        "turn_id": entry.get("turn_id"),
+                        "role": erole,
+                        "content": content,
+                    }
+                    if reverse:
+                        if buf is not None:
+                            buf.append(entry_out)
+                        else:
+                            results.append(entry_out)
+                        continue
+                    if total <= offset:
+                        continue
                     if max_results and len(results) >= max_results:
                         limit_reached = True
                         continue
@@ -464,17 +492,28 @@ class SessionStore:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+        if reverse:
+            seq = list(buf) if buf is not None else list(results)
+            seq.reverse()  # newest-first
+            if offset:
+                seq = seq[offset:]
+            if max_results:
+                seq = seq[:max_results]
+            results = seq
+            limit_reached = bool(max_results and total > (offset + max_results))
+
         return {
             "ok": True,
             "query": q,
             "regex": bool(regex),
             "case_sensitive": bool(case_sensitive),
             "role": role_filter,
+            "reverse": reverse,
             "session_id": self.session_id(),
             "log_path": str(self.log_path),
             "total_matches": total,
             "results": results,
-            "result_window": {"max_results": max_results},
+            "result_window": {"offset": offset, "max_results": max_results},
             "limit_reached": limit_reached,
         }
 
@@ -567,6 +606,8 @@ class SessionStore:
         event_type: str | None = None,
         tool: str | None = None,
         max_results: int = 0,
+        offset: int = 0,
+        reverse: bool = False,
     ) -> dict[str, Any]:
         """Search event entries in the session log and return matching event dicts.
 
@@ -580,6 +621,10 @@ class SessionStore:
         max_results = int(max_results or 0)
         if max_results < 0:
             max_results = 0
+        offset = int(offset or 0)
+        if offset < 0:
+            offset = 0
+        reverse = bool(reverse)
         et = str(event_type).strip() if isinstance(event_type, str) and str(event_type).strip() else None
         tool_filter = str(tool).strip() if isinstance(tool, str) and str(tool).strip() else None
 
@@ -606,14 +651,22 @@ class SessionStore:
                 "case_sensitive": bool(case_sensitive),
                 "event_type": et,
                 "tool": tool_filter,
+                "reverse": reverse,
                 "total_matches": 0,
                 "results": [],
+                "result_window": {"offset": offset, "max_results": max_results},
                 "limit_reached": False,
             }
 
         total = 0
         limit_reached = False
         results: list[dict[str, Any]] = []
+        window_size = (offset + max_results) if max_results else 0
+        buf = None
+        if reverse and window_size > 0:
+            from collections import deque
+
+            buf = deque(maxlen=window_size)
         try:
             with open(self.log_path, "r", encoding="utf-8", errors="replace") as f:
                 for ln in f:
@@ -642,12 +695,30 @@ class SessionStore:
                     if not _match(hay):
                         continue
                     total += 1
+                    if reverse:
+                        if buf is not None:
+                            buf.append(ev)
+                        else:
+                            results.append(ev)
+                        continue
+                    if total <= offset:
+                        continue
                     if max_results and len(results) >= max_results:
                         limit_reached = True
                         continue
                     results.append(ev)
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+        if reverse:
+            seq = list(buf) if buf is not None else list(results)
+            seq.reverse()  # newest-first
+            if offset:
+                seq = seq[offset:]
+            if max_results:
+                seq = seq[:max_results]
+            results = seq
+            limit_reached = bool(max_results and total > (offset + max_results))
 
         return {
             "ok": True,
@@ -656,9 +727,10 @@ class SessionStore:
             "case_sensitive": bool(case_sensitive),
             "event_type": et,
             "tool": tool_filter,
+            "reverse": reverse,
             "total_matches": total,
             "results": results,
-            "result_window": {"max_results": max_results},
+            "result_window": {"offset": offset, "max_results": max_results},
             "limit_reached": limit_reached,
         }
 

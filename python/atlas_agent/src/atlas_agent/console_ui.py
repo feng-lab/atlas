@@ -160,6 +160,7 @@ def run_console_repl(
                     "[cyan]:help[/cyan]                This help\n"
                     "[cyan]:session[/cyan]             Show session paths\n"
                     "[cyan]:screenshots on|off[/cyan]  Toggle preview screenshots for this session\n"
+                    "[cyan]:brief[/cyan]               Show the latest Task Brief\n"
                     "[cyan]:plan[/cyan]                Show current plan\n"
                     "[cyan]:memory[/cyan]              Show session memory summary\n"
                     "[cyan]:events [N][/cyan]          Show recent events\n"
@@ -203,6 +204,24 @@ def run_console_repl(
                 except Exception:
                     pass
                 console.print("[green]ok[/green]" if allowed else "[yellow]ok[/yellow]")
+                continue
+            if cmd == "brief":
+                try:
+                    evs = team.session_store.tail_events(limit=1, event_type="task_brief")
+                except Exception as e:
+                    console.print(f"[red]fail:[/red] {e}")
+                    continue
+                if not evs:
+                    console.print("\n[bold]Task Brief[/bold]")
+                    console.print("[dim](no task brief recorded yet)[/dim]")
+                    continue
+                ev = evs[-1]
+                text = str(ev.get("text") or "").strip()
+                console.print("\n[bold]Task Brief[/bold]")
+                if text:
+                    console.print(text, markup=False)
+                else:
+                    console.print("[dim](empty)[/dim]")
                 continue
             if cmd == "plan":
                 _render_plan(console=console, team=team)

@@ -1271,7 +1271,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         except Exception:
             pass
         ok = client.apply_params(norm_params)
-        resp = {"ok": bool(ok)}
+        resp = {
+            "ok": bool(ok),
+            # Canonical targets actually applied (names resolved to json_key).
+            "applied_set_params": [
+                {"id": int(p.get("id", 0)), "json_key": str(p.get("json_key") or "")}
+                for p in norm_params
+                if isinstance(p, dict)
+            ],
+        }
         if overrides:
             resp["warning"] = (
                 "animation keys exist for some params; during playback those keys override scene values"
@@ -1432,14 +1440,48 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     if name == "scene_cut_set_box":
         minv = args.get("min") or [0, 0, 0]
         maxv = args.get("max") or [0, 0, 0]
+        refit = bool(args.get("refit_camera", True))
         ok = client.cut_set_box(
             (minv[0], minv[1], minv[2]),
             (maxv[0], maxv[1], maxv[2]),
-            refit_camera=bool(args.get("refit_camera", True)),
+            refit_camera=refit,
         )
-        return json.dumps({"ok": ok})
+        touched: list[dict[str, Any]] = []
+        # Global cut spans live in the global view-setting scope (id=3).
+        try:
+            for nm in ("Global X Cut", "Global Y Cut", "Global Z Cut"):
+                jk = _resolve_json_key(3, name=nm)
+                if isinstance(jk, str) and jk.strip():
+                    touched.append({"id": 3, "json_key": jk})
+        except Exception:
+            pass
+        # Optionally, refit_camera updates the scene camera (id=0).
+        if refit:
+            touched.append({"id": 0, "json_key": "Camera 3DCamera"})
+        resp: dict[str, Any] = {
+            "ok": bool(ok),
+            "min": list(minv),
+            "max": list(maxv),
+            "refit_camera": bool(refit),
+        }
+        if touched:
+            resp["touched_scene_values"] = touched
+        return json.dumps(resp)
 
     if name == "scene_cut_clear":
-        return json.dumps({"ok": client.cut_clear()})
+        ok = client.cut_clear()
+        touched: list[dict[str, Any]] = []
+        # Global cut spans live in the global view-setting scope (id=3).
+        try:
+            for nm in ("Global X Cut", "Global Y Cut", "Global Z Cut"):
+                jk = _resolve_json_key(3, name=nm)
+                if isinstance(jk, str) and jk.strip():
+                    touched.append({"id": 3, "json_key": jk})
+        except Exception:
+            pass
+        resp: dict[str, Any] = {"ok": bool(ok)}
+        if touched:
+            resp["touched_scene_values"] = touched
+        return json.dumps(resp)
 
     return None

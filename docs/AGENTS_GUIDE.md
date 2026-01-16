@@ -132,6 +132,7 @@ Docs Tools (Best Practices)
 - Prefer docs search over guessing semantics:
   - Use `docs_search(query, include_paths=["SCENE_SERVER.md"])` for RPC semantics and tool contracts.
   - Use `docs_search(query, include_paths=["USER_GUIDE.md"])` for user-facing workflows (GUI names/menus, export behavior).
+  - For large result sets, page with `offset` + `max_results` (no silent truncation).
 - Read excerpts narrowly:
   - Use `docs_read(doc_name="SCENE_SERVER.md", start_line=..., line_count=...)` rather than whole-file reads.
 
@@ -165,14 +166,15 @@ Stability rules
 
 Categories and current tools (non-exhaustive)
 - File/FS: `system_info`, `fs_expand_paths`, `fs_check_paths`, `fs_glob`, `fs_resolve_path`, `repo_search`
-- Session: `session_info`, `session_get_plan`, `session_get_memory`, `session_search_transcript`, `session_search_events`
+- Session: `session_info`, `session_get_plan`, `session_get_memory`, `session_search_transcript` (paging: `offset`/`max_results`, newest-first: `reverse=true`), `session_search_events` (same)
+- Session (extras): `session_tail_events` (quick "recent events" without crafting a search query)
 - Docs: `docs_list`, `docs_search`, `docs_read`
 - Planning: `update_plan`
 - Load: `scene_load_files`, `scene_ensure_loaded`, `scene_smart_load`
 - Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_params`, `scene_apply`, `scene_save_scene`, `scene_set_visibility`, `scene_make_alias`
 - Discovery: `scene_list_objects`, `scene_list_params(id)`, `scene_capabilities`, `scene_schema`, `scene_capabilities_summary`, `scene_facts_summary`
 - Timeline: `animation_list_keys(id,json_key,include_values)`, `animation_batch`, `animation_set_key_param`, `animation_replace_key_param`, `animation_set_duration`, `animation_set_time`, `animation_play`, `animation_pause`, `animation_save_animation`
-- Camera: producers (typed values) — `fit_candidates`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`; scene apply — `scene_camera_fit`, `scene_camera_apply`; animation (timeline) — `animation_camera_solve_and_apply`, `animation_camera_validate`
+- Camera: producers (typed values) — `fit_candidates`, `camera_get`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`, `camera_move_local`, `camera_look_at`, `camera_path_solve`; scene apply — `scene_camera_fit`, `scene_camera_apply`; animation (timeline) — `animation_camera_solve_and_apply`, `animation_replace_key_camera`, `animation_camera_validate`, `animation_camera_get_interpolation_method`, `animation_camera_set_interpolation_method`, `animation_camera_waypoint_spline_apply`
 - Geometry/Cuts: `scene_bbox`, `scene_cut_suggest`, `scene_cut_set`, `scene_cut_clear`
 
 Notes
@@ -213,10 +215,15 @@ Guidance
 ## Camera Usage (Produce → Apply)
 
 Producers (no side effects)
+- `camera_get()` → returns the current engine camera as a typed camera value (useful as a base for chaining).
 - `camera_focus(ids?, after_clipping=true, min_radius=0.0)` → returns a typed camera value.
 - `camera_point_to(ids?, after_clipping=true)` → returns a typed camera value.
 - `camera_reset_view(mode, ids?, after_clipping=true, min_radius=0.0)` → returns a typed camera value.
 - `camera_rotate(op, degrees, base_value?)` → returns a typed camera value.
+- `camera_move_local(op, distance, distance_is_fraction_of_bbox_radius=true, move_center=true, base_value?)` → returns a typed camera value.
+  - Use this for first-person walkthrough building blocks: `FORWARD/BACK/LEFT/RIGHT/UP/DOWN`.
+- `camera_look_at(world_point | target_bbox_center | bbox_fraction_point, base_value?)` → returns a typed camera value (sets camera center; keeps eye).
+- `camera_path_solve(waypoints, ids?, base_value?)` → returns `{time,value}` keys from waypoint geometry (does not write keys).
  - Read current scene camera: `scene_get_values(id=0, json_keys=["Camera 3DCamera"])` (or pass empty `json_keys` to retrieve it among all values).
 
 Scene-only (stateless) apply
@@ -228,8 +235,54 @@ Animation (timeline) authoring
   - Tip: for ORBIT, use `degrees` (default 360). The agent maps this to the backend as needed. Use `params.axis` (default `"y"`).
 - Validate camera key sequences: `animation_camera_validate(ids, times, values?, constraints?, policies?)` (values optional; when omitted, the server samples from the current animation at those times).
 - Single-time explicit write: `animation_replace_key_camera(time, value, easing?)`.
+- Set/read camera interpolation method (important for spline paths):
+  - `animation_camera_set_interpolation_method("Position Rotation Spline")` (recommended for walkthrough/spline fly-through)
+  - `animation_camera_get_interpolation_method()`
+- Guided waypoint spline (one-shot apply):
+  - `animation_camera_waypoint_spline_apply(t0, t1, waypoints=[...], method="Position Rotation Spline", constraints?, clear_range=true, easing="Linear")`
+  - Note: this tool does **not** change the animation duration; call `animation_set_duration(seconds)` separately if needed.
 
 Notes
 - Prefer “produce → apply” for clarity: use `camera_*` producers to compute a typed camera, then choose scene vs. animation by the apply tool.
 - The previous names `camera_solve_and_apply` and `camera_validate` are removed; use `animation_camera_*` for timeline operations. For scene‑only verification, do not call `animation_list_keys`; read the current camera via `scene_get_values(id=0, 'Camera 3DCamera')` or use `scene_camera_fit/scene_camera_apply`.
 - Respect the Scene vs Timeline contract above; do not include time/easing in scene operations.
+
+## Camera Workflows (Walkthrough + Waypoints)
+
+### First-person walkthrough (freeform)
+
+Use this when you want to **enter** a volume/mesh and navigate “like a drone” (not an orbit).
+
+Typical tool pattern:
+1) `animation_ensure_animation` and `animation_set_duration(seconds)`
+2) `animation_camera_set_interpolation_method("Position Rotation Spline")`
+3) Build a sequence of camera values by chaining:
+   - `camera_get()` (optional) → base_value
+   - `camera_move_local(FORWARD/RIGHT/UP, distance_is_fraction_of_bbox_radius=true, ...)`
+   - `camera_rotate(YAW/PITCH, degrees, base_value=...)`
+   - `camera_look_at(...)` (optional, for guided aiming)
+4) For each produced camera value, write a key:
+   - `animation_replace_key_camera(time=..., value=..., constraints={keep_visible:false})` for interior shots
+5) Verify:
+   - `animation_list_keys(id=0)` and optionally `animation_camera_validate(ids, times, values?, constraints={keep_visible:false})`
+
+Prompting guidance (user-facing):
+- “Create a 12s first-person walkthrough: start outside the volume, fly forward into it, then slowly yaw right while ascending; keep it smooth and avoid snap turns.”
+- “Do a slow interior fly-through; it’s OK if the object goes out of frame (keep_visible=false).”
+
+### Guided waypoint spline (bbox/world waypoints)
+
+Use this when you want a **controlled camera path** through specific locations (waypoints) and you want the backend to evaluate it as a spline.
+
+Typical tool pattern:
+1) `animation_ensure_animation` and `animation_set_duration(t1)`
+2) `animation_camera_waypoint_spline_apply(t0, t1, waypoints=[...], method="Position Rotation Spline")`
+   - Waypoints can use bbox fractions to avoid guessing world units:
+     - `eye: {bbox_fraction:[fx,fy,fz]}`
+     - `look_at: {bbox_center:true}` or `look_at: {bbox_fraction:[fx,fy,fz]}`
+3) Verify:
+   - `animation_list_keys(id=0)` and optionally `animation_camera_get_interpolation_method()`
+
+Prompting guidance (user-facing):
+- “Make a 10s guided fly-through: waypoint 1 outside the front face, waypoint 2 inside the center, waypoint 3 near the top-right corner; look at the bbox center throughout.”
+- “Use bbox fractions for waypoints so it works across datasets.”

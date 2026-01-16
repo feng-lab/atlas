@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .agent_team.base import LLMClient
-from .agent_team.intent_resolver import INTENT_RESOLVER_SYSTEM
+from .agent_team.intent_resolver import INTENT_RESOLVER_SYSTEM, IntentResolver
 from .agent_team.tools_agent import scene_tools_and_dispatcher
 from .capabilities_prompt import build_atlas_agent_primer, build_capabilities_prompt
 from .responses_tool_loop import ToolLoopCallbacks, run_responses_tool_loop
@@ -29,11 +29,20 @@ from .session_store import SessionStore
 # implementation (and keep the on-disk session format stable).
 SESSION_MEMORY_COMPACTION_MODE = "llm"  # "llm" | "heuristic" | "off"
 SESSION_MAX_RECENT_MESSAGES = 24
+SESSION_MEMORY_RECENT_WRITE_EVENTS = 12
 
 AUTO_RETRIEVE_MODE = "auto"  # "off" | "auto" | "always"
 AUTO_RETRIEVE_MAX_SNIPPETS = 6
 AUTO_RETRIEVE_MAX_CHARS = 280
 AUTO_RETRIEVE_RECENT_WRITE_EVENTS = 8
+
+# Prompt-budget guardrail for the Supervisor Task Brief step.
+#
+# Rationale: The intent resolver prompt must remain small/stable so it can run
+# reliably even in long sessions. We therefore include only a compact preview of
+# the current object list in the scene snapshot; the full, authoritative list is
+# always available via `scene_list_objects`.
+INTENT_RESOLVER_SCENE_SNAPSHOT_MAX_CHARS = 2400
 
 
 ATLAS_STATE_MUTATION_TOOLS: set[str] = {
@@ -65,6 +74,8 @@ ATLAS_STATE_MUTATION_TOOLS: set[str] = {
     "animation_duplicate_keys_range",
     "animation_batch",
     "animation_camera_solve_and_apply",
+    "animation_camera_set_interpolation_method",
+    "animation_camera_waypoint_spline_apply",
     "animation_set_time",
 }
 
@@ -120,7 +131,8 @@ ATLAS_PLANNER_SYSTEM_PROMPT = (
     "Allowed actions: read-only inspection tools, docs lookup, and update_plan.\n\n"
     "Format:\n"
     "- If genuinely blocked by missing user intent, output exactly: CLARIFY: <one focused question>\n"
-    "- Otherwise: update the plan via update_plan, then include a short TASK BRIEF so execution can proceed without extra history.\n\n"
+    "- You will be given a TASK BRIEF in the shared context. Treat it as authoritative; do not rewrite or reinterpret it.\n"
+    "- Otherwise: update the plan via update_plan (4–7 short steps).\n\n"
     "Verification requirements:\n"
     "- After update_plan, call verification_set_requirements for each plan step_id.\n"
     "- Use policy.all_of groups to express multi-mode verification. Common patterns:\n"
@@ -140,6 +152,7 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
     + "\n".join(
         [
             "- Treat the current plan as the source of truth; execute it step-by-step. If there is no plan yet, create one via update_plan.",
+            "- Derive intent strictly from the Task Brief in the shared context. If the brief conflicts with the latest user message, stop and ask one focused question.",
             "- Prefer live discovery for ids/json_keys/options: scene_list_objects → scene_list_params(id) → scene_get_values(id,json_keys). Do not guess.",
             "- For unclear semantics/workflows, consult docs via docs_search/docs_read (SCENE_SERVER.md, AGENTS_GUIDE.md, USER_GUIDE.md).",
             "- Long sessions: if the user references prior decisions, use session_get_memory/session_get_plan or session_search_transcript for exact quotes.",
@@ -193,6 +206,7 @@ class ChatTeam:
     model: str
     temperature: float = 0.2
     atlas_dir: Optional[str] = None
+    atlas_version: Optional[str] = None
     session: Optional[str] = None
     session_dir: Optional[str] = None
     enable_codegen: bool = False
@@ -223,6 +237,14 @@ class ChatTeam:
                     self.atlas_dir = saved.strip()
             except Exception:
                 pass
+        if not self.atlas_version:
+            try:
+                meta = self.session_store.get_meta()
+                saved = meta.get("atlas_version")
+                if isinstance(saved, str) and saved.strip():
+                    self.atlas_version = saved.strip()
+            except Exception:
+                pass
         # Connect to the running Atlas instance.
         # The RPC server can report its install location, so callers typically
         # do not need to configure an install path.
@@ -238,7 +260,16 @@ class ChatTeam:
                 "Atlas app location is unavailable. Ensure Atlas is running and the local RPC server is enabled."
             )
 
+        # Best-effort: record the running app's build/version for compatibility logs.
+        try:
+            ver = self.scene.get_app_version()
+            if isinstance(ver, str) and ver.strip():
+                self.atlas_version = ver.strip()
+        except Exception:
+            pass
+
         self.llm = LLMClient(api_key=self.api_key, model=self.model)
+        self.intent_resolver = IntentResolver(client=self.llm, temperature=self.temperature)
 
         # Build capabilities context derived from atlas_dir or defaults.
         self._context: str = build_atlas_agent_primer()
@@ -266,6 +297,7 @@ class ChatTeam:
                 address=self.address,
                 model=self.model,
                 atlas_dir=self.atlas_dir,
+                atlas_version=self.atlas_version,
             )
             self.session_store.save()
         except Exception:
@@ -316,11 +348,85 @@ class ChatTeam:
                     )
                 return
 
+            # Include a small deterministic summary of recent state-changing tool calls so the
+            # memory captures facts that may never have been stated in chat text (ids, paths).
+            write_summaries: list[str] = []
+            try:
+                n_recent = max(0, int(SESSION_MEMORY_RECENT_WRITE_EVENTS))
+                if n_recent > 0:
+                    write_tools = set(ATLAS_STATE_MUTATION_TOOLS) | set(ATLAS_OUTPUT_TOOLS)
+                    recent_tool_events = self.session_store.tail_events(
+                        limit=max(1, n_recent * 3), event_type="tool_call"
+                    )
+                    for ev in reversed(recent_tool_events):
+                        try:
+                            tool = str(ev.get("tool") or "")
+                            if tool not in write_tools:
+                                continue
+                            rs = (
+                                ev.get("result_summary")
+                                if isinstance(ev.get("result_summary"), dict)
+                                else {}
+                            )
+                            ok = rs.get("ok") if isinstance(rs, dict) else None
+                            if ok is False:
+                                continue
+                            if isinstance(rs, dict) and rs.get("skipped"):
+                                continue
+                            args = ev.get("args")
+                            short = f"- tool: {tool}"
+                            if isinstance(args, dict):
+                                keys: list[str] = []
+                                for kk in (
+                                    "id",
+                                    "ids",
+                                    "json_key",
+                                    "name",
+                                    "time",
+                                    "t0",
+                                    "t1",
+                                    "path",
+                                    "files",
+                                ):
+                                    if kk in args:
+                                        keys.append(f"{kk}={args.get(kk)!r}")
+                                if keys:
+                                    short += " (" + ", ".join(keys) + ")"
+                            write_summaries.append(short)
+                            if len(write_summaries) >= n_recent:
+                                break
+                        except Exception:
+                            continue
+            except Exception:
+                write_summaries = []
+
+            # Include the current plan (small) so memory retains outstanding work.
+            plan_lines: list[str] = []
+            try:
+                cur_plan = self.session_store.get_plan() or []
+                if cur_plan:
+                    plan_lines.append("Current plan:")
+                    for it in cur_plan:
+                        if not isinstance(it, dict):
+                            continue
+                        step = str(it.get("step") or "").strip()
+                        status = str(it.get("status") or "").strip()
+                        if step:
+                            plan_lines.append(f"- [{status}] {step}")
+            except Exception:
+                plan_lines = []
+
             prompt = "\n".join(
                 [
                     "Existing memory (may be empty):",
                     self._memory_summary or "(none)",
                     "",
+                    *(
+                        ["Recent state changes (most recent first; summarized):", *write_summaries, ""]
+                        if write_summaries
+                        else []
+                    ),
+                    *(plan_lines + [""] if plan_lines else []),
                     "Conversation to fold into memory (chronological):",
                     *[f"{r}: {c}" for (r, c) in overflow],
                     "",
@@ -448,7 +554,11 @@ class ChatTeam:
                 if max_snips and len([s for s in snippets if s.startswith("- ")]) >= max_snips:
                     break
                 try:
-                    hits = self.session_store.search_transcript(query=needle, max_results=2)
+                    hits = self.session_store.search_transcript(
+                        query=needle,
+                        max_results=2,
+                        reverse=True,
+                    )
                 except Exception:
                     continue
                 if not isinstance(hits, dict) or not hits.get("ok"):
@@ -476,12 +586,6 @@ class ChatTeam:
         # Keep history bounded before building the next prompt.
         _compress_history_if_needed()
 
-        # Persist the user input early so intent survives crashes during tool execution.
-        try:
-            self.session_store.append_transcript(role="user", content=user_text, turn_id=turn_id)
-        except Exception:
-            pass
-
         retrieved_context = _auto_retrieve_context(user_text)
 
         env_lines: list[str] = [
@@ -492,7 +596,58 @@ class ChatTeam:
         ]
         if self.atlas_dir:
             env_lines.append(f"  <atlas_dir>{self.atlas_dir}</atlas_dir>")
+        if self.atlas_version:
+            env_lines.append(f"  <atlas_version>{self.atlas_version}</atlas_version>")
         env_lines.append("</environment_context>")
+        env_text = "\n".join(env_lines)
+
+        # Build a compact, factual scene snapshot (read-only) to ground intent resolution.
+        # This is best-effort: if Atlas is busy/unavailable for some reason, we continue
+        # without it rather than breaking the chat turn.
+        scene_lines: list[str] = []
+        try:
+            objs = self.scene.list_objects()
+            ol = list(getattr(objs, "objects", []) or [])
+            scene_lines.append(f"Scene: {len(ol)} objects loaded")
+            for o in ol:
+                try:
+                    oid = int(getattr(o, "id", 0))
+                    typ = str(getattr(o, "type", "") or "")
+                    name = str(getattr(o, "name", "") or "")
+                    vis = bool(getattr(o, "visible", False))
+                    candidate = f"- {oid}:{typ}:{name} visible={vis}"
+                    # Keep this snapshot bounded for prompt stability; avoid silently truncating.
+                    current = "\n".join(scene_lines)
+                    if len(current) + 1 + len(candidate) > INTENT_RESOLVER_SCENE_SNAPSHOT_MAX_CHARS:
+                        remaining = max(0, len(ol) - max(0, len(scene_lines) - 1))
+                        scene_lines.append(
+                            f"... (scene snapshot truncated for prompt budget; {remaining} more objects not shown; use scene_list_objects for full list)"
+                        )
+                        break
+                    scene_lines.append(candidate)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        try:
+            ts = self.scene.get_time()
+            tsec = float(getattr(ts, "seconds", 0.0) or 0.0)
+            dur = float(getattr(ts, "duration", 0.0) or 0.0)
+            scene_lines.append(f"Time: t={tsec:.3f}s / duration={dur:.3f}s")
+        except Exception:
+            pass
+        scene_snapshot_text = "\n".join(scene_lines).strip()
+        try:
+            if scene_snapshot_text:
+                self.session_store.append_event(
+                    {
+                        "type": "scene_snapshot",
+                        "turn_id": turn_id,
+                        "text": scene_snapshot_text,
+                    }
+                )
+        except Exception:
+            pass
 
         context_blocks: list[str] = []
         if ctx:
@@ -516,6 +671,388 @@ class ChatTeam:
                     lines.append(f"- [{status}] {step}")
             if lines:
                 context_blocks.append("Current plan:\n" + "\n".join(lines))
+
+        # Supervisor step: resolve a durable TASK BRIEF that downstream phases must follow.
+        # This improves stability in long sessions and reduces accidental intent drift.
+        brief_ctx_parts: list[str] = []
+        if scene_snapshot_text:
+            brief_ctx_parts.append("Scene snapshot:\n" + scene_snapshot_text)
+        if self._memory_summary:
+            brief_ctx_parts.append("Session memory (summary):\n" + self._memory_summary.strip())
+        if retrieved_context:
+            brief_ctx_parts.append(retrieved_context.strip())
+        if plan:
+            # Reuse the already-rendered plan block from context_blocks (keeps stable formatting).
+            for b in context_blocks:
+                if b.startswith("Current plan:\n"):
+                    brief_ctx_parts.append(b)
+                    break
+        brief_ctx = "\n\n".join([p for p in brief_ctx_parts if p]).strip()
+
+        task_brief = ""
+        try:
+            task_brief = (self.intent_resolver.resolve(user_text, scene_context=brief_ctx) or "").strip()
+        except Exception:
+            task_brief = ""
+
+        # Persist the user input after auto-retrieval (so search doesn't match the current message),
+        # but before any tool execution (so intent survives crashes mid-turn).
+        try:
+            self.session_store.append_transcript(role="user", content=user_text, turn_id=turn_id)
+        except Exception:
+            pass
+        try:
+            if task_brief:
+                self.session_store.append_event(
+                    {
+                        "type": "task_brief",
+                        "turn_id": turn_id,
+                        "text": task_brief,
+                    }
+                )
+        except Exception:
+            pass
+
+        # If the Supervisor needs clarification, stop early (no tool calls).
+        if task_brief.lower().startswith("clarify:"):
+            text = task_brief.strip()
+            if user_text:
+                self._history.append(("user", user_text))
+            if text:
+                self._history.append(("assistant", text))
+            try:
+                if text:
+                    self.session_store.append_transcript(role="assistant", content=text, turn_id=turn_id)
+            except Exception:
+                pass
+            _compress_history_if_needed()
+            try:
+                self.session_store.set_memory_summary(self._memory_summary)
+                self.session_store.set_meta(
+                    atlas_dir=self.atlas_dir,
+                    atlas_version=self.atlas_version,
+                    address=self.address,
+                    model=self.model,
+                    last_turn_id=turn_id,
+                )
+                self.session_store.save()
+            except Exception:
+                pass
+            return text or "(no response)"
+
+        # Make the Task Brief visible to downstream phases.
+        if task_brief:
+            context_blocks.append(task_brief)
+
+        # Track successful Executor mutations so we can write a compact,
+        # deterministic facts snapshot for long-context grounding and resume.
+        #
+        # Policy: This avoids enumerating every parameter. We snapshot only:
+        # - touched scene params (id/json_key) via GetParamValues
+        # - touched timeline keys (id/json_key) via ListKeys
+        # - camera key times (id=0) when camera keys were edited
+        # - object list only when tools likely changed objects/visibility
+        touched_scene_values: dict[int, set[str]] = {}
+        touched_key_targets: dict[int, set[str]] = {}
+        touched_key_times: dict[int, dict[str, set[float]]] = {}
+        touched_camera_key_times: set[float] = set()
+        touched_object_ids: set[int] = set()
+        touched_mutation_tools: set[str] = set()
+        touched_duration_seconds: float | None = None
+        touched_set_time_seconds: float | None = None
+        include_objects_in_snapshot = False
+        include_camera_key_times_in_snapshot = False
+        include_camera_interpolation_method_in_snapshot = False
+        touched_camera_interpolation_method: str | None = None
+
+        def _touch_scene_value(*, id: int, json_key: str) -> None:
+            jk = str(json_key or "").strip()
+            if not jk:
+                return
+            try:
+                touched_scene_values.setdefault(int(id), set()).add(jk)
+            except Exception:
+                return
+
+        def _touch_key(*, id: int, json_key: str, time: float | None = None) -> None:
+            jk = str(json_key or "").strip()
+            if not jk:
+                return
+            try:
+                touched_key_targets.setdefault(int(id), set()).add(jk)
+                if time is not None:
+                    touched_key_times.setdefault(int(id), {}).setdefault(jk, set()).add(float(time))
+            except Exception:
+                return
+
+        def _touch_camera_key_time(*, time: float) -> None:
+            try:
+                touched_camera_key_times.add(float(time))
+            except Exception:
+                return
+
+        def _record_touched_from_tool(*, name: str, args: dict[str, Any], result: Any) -> None:
+            nonlocal include_objects_in_snapshot
+            nonlocal include_camera_key_times_in_snapshot
+            nonlocal include_camera_interpolation_method_in_snapshot
+            nonlocal touched_camera_interpolation_method
+            nonlocal touched_duration_seconds
+            nonlocal touched_set_time_seconds
+
+            tool = str(name or "")
+            if not tool:
+                return
+
+            # Only capture successful writes (ok!=False).
+            ok = True
+            if isinstance(result, dict) and "ok" in result:
+                try:
+                    ok = bool(result.get("ok"))
+                except Exception:
+                    ok = True
+            if ok is False:
+                return
+
+            touched_mutation_tools.add(tool)
+
+            if tool in {"scene_load_files", "scene_ensure_loaded", "scene_smart_load"}:
+                include_objects_in_snapshot = True
+                try:
+                    for o in (result.get("objects") or []):
+                        if isinstance(o, dict):
+                            touched_object_ids.add(int(o.get("id", 0)))
+                except Exception:
+                    pass
+                return
+
+            if tool == "scene_make_alias":
+                include_objects_in_snapshot = True
+                try:
+                    for a in (result.get("aliases") or []):
+                        if not isinstance(a, dict):
+                            continue
+                        touched_object_ids.add(int(a.get("src_id", 0)))
+                        touched_object_ids.add(int(a.get("alias_id", 0)))
+                except Exception:
+                    pass
+                return
+
+            if tool == "scene_set_visibility":
+                include_objects_in_snapshot = True
+                try:
+                    for i in (args.get("ids") or []):
+                        touched_object_ids.add(int(i))
+                except Exception:
+                    pass
+                return
+
+            if tool in {"scene_camera_fit", "scene_camera_apply"}:
+                # Scene camera value (stateless) is always id=0/"Camera 3DCamera".
+                _touch_scene_value(id=0, json_key="Camera 3DCamera")
+                return
+
+            if tool == "scene_apply":
+                # Prefer canonical mapping returned by the tool (name→json_key resolution).
+                applied = result.get("applied_set_params") if isinstance(result, dict) else None
+                if isinstance(applied, list):
+                    for it in applied:
+                        if not isinstance(it, dict):
+                            continue
+                        try:
+                            _touch_scene_value(id=int(it.get("id")), json_key=str(it.get("json_key") or ""))
+                        except Exception:
+                            continue
+                    return
+                # Fallback: only record explicit json_keys (names are not canonical here).
+                try:
+                    for it in (args.get("set_params") or []):
+                        if not isinstance(it, dict):
+                            continue
+                        jk = it.get("json_key")
+                        if isinstance(jk, str) and jk.strip():
+                            _touch_scene_value(id=int(it.get("id")), json_key=jk)
+                except Exception:
+                    pass
+                return
+
+            if tool in {"scene_cut_set_box", "scene_cut_clear"}:
+                # Cuts are global view-setting parameters (typically id=3) and
+                # may also refit the camera (id=0).
+                touched = result.get("touched_scene_values") if isinstance(result, dict) else None
+                if isinstance(touched, list):
+                    for it in touched:
+                        if not isinstance(it, dict):
+                            continue
+                        try:
+                            _touch_scene_value(id=int(it.get("id")), json_key=str(it.get("json_key") or ""))
+                        except Exception:
+                            continue
+                return
+
+            if tool == "animation_ensure_animation":
+                # May create baseline camera keys / default state.
+                include_camera_key_times_in_snapshot = True
+                return
+
+            if tool == "animation_camera_set_interpolation_method":
+                include_camera_interpolation_method_in_snapshot = True
+                try:
+                    touched_camera_interpolation_method = str(args.get("method") or "").strip() or None
+                except Exception:
+                    touched_camera_interpolation_method = None
+                # No camera keys are written by this tool directly.
+                return
+
+            if tool == "animation_set_duration":
+                try:
+                    touched_duration_seconds = float(args.get("seconds", 0.0))
+                except Exception:
+                    touched_duration_seconds = None
+                return
+
+            if tool == "animation_set_time":
+                try:
+                    touched_set_time_seconds = float(args.get("seconds", 0.0))
+                except Exception:
+                    touched_set_time_seconds = None
+                return
+
+            if tool in {"animation_set_key_param", "animation_set_param_by_name"}:
+                try:
+                    kid = int(args.get("id"))
+                except Exception:
+                    return
+                jk = None
+                if isinstance(result, dict):
+                    jk = result.get("json_key")
+                if not jk:
+                    jk = args.get("json_key")
+                if isinstance(jk, str) and jk.strip():
+                    try:
+                        tm = float(args.get("time", 0.0))
+                    except Exception:
+                        tm = None
+                    _touch_key(id=kid, json_key=str(jk), time=tm)
+                return
+
+            if tool in {
+                "animation_replace_key_param",
+                "animation_remove_key_param_at_time",
+                "animation_replace_key_param_at_times",
+                "animation_remove_key",
+            }:
+                try:
+                    kid = int(args.get("id"))
+                except Exception:
+                    return
+                jk = args.get("json_key")
+                if isinstance(jk, str) and jk.strip():
+                    if tool == "animation_replace_key_param_at_times":
+                        try:
+                            times = [float(t) for t in (args.get("times") or [])]
+                        except Exception:
+                            times = []
+                        _touch_key(id=kid, json_key=jk)
+                        for t in times:
+                            _touch_key(id=kid, json_key=jk, time=t)
+                    else:
+                        try:
+                            tm = float(args.get("time", 0.0))
+                        except Exception:
+                            tm = None
+                        _touch_key(id=kid, json_key=jk, time=tm)
+                return
+
+            if tool in {
+                "animation_clear_keys",
+                "animation_clear_keys_range",
+                "animation_shift_keys_range",
+                "animation_scale_keys_range",
+                "animation_duplicate_keys_range",
+            }:
+                try:
+                    kid = int(args.get("id"))
+                except Exception:
+                    return
+                if kid == 0:
+                    include_camera_key_times_in_snapshot = True
+                    # Preserve any explicit times/ranges for resume/debug.
+                    if tool == "animation_clear_keys_range":
+                        try:
+                            _touch_camera_key_time(time=float(args.get("t0", 0.0)))
+                            _touch_camera_key_time(time=float(args.get("t1", 0.0)))
+                        except Exception:
+                            pass
+                    return
+                jk = args.get("json_key")
+                if isinstance(jk, str) and jk.strip():
+                    _touch_key(id=kid, json_key=jk)
+                return
+
+            if tool in {"animation_batch"}:
+                # Batch contains explicit id/json_key/time entries (non-camera only).
+                try:
+                    for sk in (args.get("set_keys") or []):
+                        if not isinstance(sk, dict):
+                            continue
+                        kid = int(sk.get("id"))
+                        jk = sk.get("json_key")
+                        if isinstance(jk, str) and jk.strip():
+                            try:
+                                tm = float(sk.get("time", 0.0))
+                            except Exception:
+                                tm = None
+                            _touch_key(id=kid, json_key=jk, time=tm)
+                    for rk in (args.get("remove_keys") or []):
+                        if not isinstance(rk, dict):
+                            continue
+                        kid = int(rk.get("id"))
+                        jk = rk.get("json_key")
+                        if isinstance(jk, str) and jk.strip():
+                            try:
+                                tm = float(rk.get("time", 0.0))
+                            except Exception:
+                                tm = None
+                            _touch_key(id=kid, json_key=jk, time=tm)
+                except Exception:
+                    pass
+                return
+
+            if tool in {"animation_replace_key_camera", "animation_camera_solve_and_apply"}:
+                include_camera_key_times_in_snapshot = True
+                try:
+                    # animation_replace_key_camera: explicit single-time.
+                    if tool == "animation_replace_key_camera":
+                        _touch_camera_key_time(time=float(args.get("time", 0.0)))
+                    # animation_camera_solve_and_apply: may report applied times.
+                    if isinstance(result, dict) and isinstance(result.get("applied"), list):
+                        for t in result.get("applied") or []:
+                            _touch_camera_key_time(time=float(t))
+                except Exception:
+                    pass
+                return
+
+            if tool == "animation_camera_waypoint_spline_apply":
+                include_camera_key_times_in_snapshot = True
+                include_camera_interpolation_method_in_snapshot = True
+                try:
+                    if isinstance(result, dict):
+                        m = result.get("current_method") or result.get("method")
+                        if isinstance(m, str) and m.strip():
+                            touched_camera_interpolation_method = m.strip()
+                    if touched_camera_interpolation_method is None:
+                        m = args.get("method")
+                        if isinstance(m, str) and m.strip():
+                            touched_camera_interpolation_method = m.strip()
+                except Exception:
+                    pass
+                try:
+                    if isinstance(result, dict) and isinstance(result.get("applied"), list):
+                        for t in result.get("applied") or []:
+                            _touch_camera_key_time(time=float(t))
+                except Exception:
+                    pass
+                return
 
         # Tool list + dispatcher (writes go through this wrapper).
         runtime_state: dict[str, Any] = {
@@ -541,6 +1078,33 @@ class ChatTeam:
         current_phase = "executor"
 
         def _dispatch_logged(name: str, args_json: str) -> str:
+            # Phase safety: nested dispatches must not bypass the phase tool allowlist.
+            ph = str(current_phase or "")
+            if ph in {"Planner", "Verifier"}:
+                if name in ATLAS_STATE_MUTATION_TOOLS:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": f"tool '{name}' is not allowed in phase={ph}",
+                        }
+                    )
+                if name in CODEGEN_TOOLS:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": f"tool '{name}' is not allowed in phase={ph}",
+                        }
+                    )
+                if name in ATLAS_OUTPUT_TOOLS and (
+                    ph != "Verifier" or name not in ATLAS_VERIFICATION_OUTPUT_TOOLS
+                ):
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": f"tool '{name}' is not allowed in phase={ph}",
+                        }
+                    )
+
             result_json = dispatch(name, args_json or "{}")
             try:
                 args_obj = json.loads(args_json or "{}")
@@ -570,15 +1134,142 @@ class ChatTeam:
                 )
             except Exception:
                 pass
+
+            # Track successful Executor-side mutations for a post-write snapshot.
+            try:
+                if str(current_phase or "") == "Executor" and name in ATLAS_STATE_MUTATION_TOOLS:
+                    _record_touched_from_tool(name=name, args=args_obj, result=res_obj)
+            except Exception:
+                pass
             return result_json
+
+        # Ensure tool modules that chain via ctx.dispatch also go through our
+        # logging/touch-tracking wrapper (Codex-style determinism).
+        try:
+            runtime_state["dispatch_proxy"] = _dispatch_logged
+        except Exception:
+            pass
+
+        def _append_executor_facts_snapshot() -> None:
+            """Append a compact post-write scene facts snapshot for this turn.
+
+            This is intended for:
+            - deterministic resume across context windows
+            - grounding future turns without re-enumerating everything
+            """
+            if not touched_mutation_tools:
+                return
+
+            key_targets: dict[int, list[str]] = {}
+            for oid, keys in touched_key_targets.items():
+                if not keys:
+                    continue
+                try:
+                    key_targets[int(oid)] = sorted({str(k) for k in keys if str(k).strip()})
+                except Exception:
+                    continue
+
+            scene_value_targets: dict[int, list[str]] = {}
+            for oid, keys in touched_scene_values.items():
+                if not keys:
+                    continue
+                try:
+                    scene_value_targets[int(oid)] = sorted({str(k) for k in keys if str(k).strip()})
+                except Exception:
+                    continue
+
+            time_status: dict[str, float] | None = None
+            try:
+                ts = self.scene.get_time()
+                time_status = {
+                    "seconds": float(getattr(ts, "seconds", 0.0) or 0.0),
+                    "duration": float(getattr(ts, "duration", 0.0) or 0.0),
+                }
+            except Exception:
+                time_status = None
+
+            snapshot_ok = True
+            snapshot_error = ""
+            facts: dict[str, Any] = {}
+            try:
+                facts = self.scene.scene_facts_compact(
+                    key_targets=key_targets or None,
+                    include_key_values=False,
+                    scene_value_targets=scene_value_targets or None,
+                    include_objects=bool(include_objects_in_snapshot),
+                    include_camera_key_times=bool(include_camera_key_times_in_snapshot),
+                )
+            except Exception as e:
+                snapshot_ok = False
+                snapshot_error = str(e)
+                facts = {}
+
+            if include_camera_interpolation_method_in_snapshot:
+                try:
+                    m = self.scene.get_camera_interpolation_method()
+                    if isinstance(m, str) and m.strip():
+                        facts["camera_interpolation_method"] = m.strip()
+                except Exception:
+                    pass
+
+            touched_payload: dict[str, Any] = {
+                "mutation_tools": sorted(touched_mutation_tools),
+                "scene_value_targets": {
+                    str(oid): sorted(list(keys))
+                    for oid, keys in sorted(touched_scene_values.items(), key=lambda kv: int(kv[0]))
+                    if keys
+                },
+                "key_targets": {
+                    str(oid): sorted(list(keys))
+                    for oid, keys in sorted(touched_key_targets.items(), key=lambda kv: int(kv[0]))
+                    if keys
+                },
+                "key_times": {
+                    str(oid): {
+                        str(jk): sorted([float(t) for t in times])
+                        for jk, times in sorted(per_key.items(), key=lambda kv: str(kv[0]))
+                    }
+                    for oid, per_key in sorted(touched_key_times.items(), key=lambda kv: int(kv[0]))
+                    if isinstance(per_key, dict) and per_key
+                },
+            }
+            if touched_camera_key_times:
+                touched_payload["camera_key_times"] = sorted([float(t) for t in touched_camera_key_times])
+            if touched_camera_interpolation_method is not None:
+                touched_payload["camera_interpolation_method"] = touched_camera_interpolation_method
+            if touched_object_ids:
+                touched_payload["object_ids"] = sorted([int(i) for i in touched_object_ids])
+            if touched_duration_seconds is not None:
+                touched_payload["duration_seconds"] = float(touched_duration_seconds)
+            if touched_set_time_seconds is not None:
+                touched_payload["set_time_seconds"] = float(touched_set_time_seconds)
+
+            ev: dict[str, Any] = {
+                "type": "facts_snapshot",
+                "turn_id": turn_id,
+                "phase": "Executor",
+                "ok": bool(snapshot_ok),
+                "touched": touched_payload,
+                "time_status": time_status,
+                "facts": facts,
+            }
+            if snapshot_error:
+                ev["error"] = snapshot_error
+            try:
+                self.session_store.append_event(ev)
+            except Exception:
+                pass
+
+        # Shared per-phase grounding: keep this in instructions (not input items) so any
+        # context trimming can drop old history/tool items without losing core policy.
+        shared_instructions_parts: list[str] = []
+        shared_instructions_parts.append(env_text)
+        if context_blocks:
+            shared_instructions_parts.append("Shared context:\n" + "\n\n".join(context_blocks))
+        shared_instructions = "\n\n".join([p for p in shared_instructions_parts if p]).strip()
 
         # Build Responses API input items (local history; no server-side state).
         input_items: list[dict[str, Any]] = []
-        input_items.append(_message(role="user", text="\n".join(env_lines)))
-        if context_blocks:
-            input_items.append(
-                _message(role="user", text="Shared context:\n" + "\n\n".join(context_blocks))
-            )
         for role, content in self._history:
             if role in ("user", "assistant") and content:
                 input_items.append(_message(role=role, text=content))
@@ -797,7 +1488,7 @@ class ChatTeam:
                 callbacks.on_phase_start(phase)
             result = run_responses_tool_loop(
                 llm=self.llm,
-                instructions=instructions,
+                instructions=(instructions.rstrip() + "\n\n" + shared_instructions).strip(),
                 input_items=phase_input_items,
                 tools=phase_tools,
                 dispatch=_dispatch_logged,
@@ -862,6 +1553,9 @@ class ChatTeam:
                 phase_input_items=phase_input,
                 max_rounds=24,
             )
+            # Deterministic post-write facts snapshot: store what changed in this turn
+            # so future turns can ground without re-enumerating everything.
+            _append_executor_facts_snapshot()
             phase_input = list(exec_res.input_items)
             did_write_state = any(
                 (call.get("name") in ATLAS_STATE_MUTATION_TOOLS)
@@ -889,12 +1583,6 @@ class ChatTeam:
         # Update local history + transcript.
         if user_text:
             self._history.append(("user", user_text))
-            try:
-                self.session_store.append_transcript(
-                    role="user", content=user_text, turn_id=turn_id
-                )
-            except Exception:
-                pass
         if text:
             self._history.append(("assistant", text))
             try:
@@ -912,6 +1600,7 @@ class ChatTeam:
             self.session_store.set_todo_ledger(self._todo_ledger)
             self.session_store.set_meta(
                 atlas_dir=self.atlas_dir,
+                atlas_version=self.atlas_version,
                 address=self.address,
                 model=self.model,
                 last_turn_id=turn_id,
