@@ -893,18 +893,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         try:
             ids = args.get("ids") or []
             after = bool(args.get("after_clipping", False))
-            req = client._pb2.BBoxRequest(ids=ids, after_clipping=after)
-            resp = client._stub.BBox(req)
-            b = resp.bbox
-            return json.dumps(
-                {
-                    "ok": True,
-                    "min": [b.min.x, b.min.y, b.min.z],
-                    "max": [b.max.x, b.max.y, b.max.z],
-                    "center": [b.center.x, b.center.y, b.center.z],
-                    "size": [b.size.x, b.size.y, b.size.z],
-                }
-            )
+            out = client.bbox(ids=ids, after_clipping=after)
+            return json.dumps(out)
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
@@ -1512,12 +1502,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
     if name == "scene_cut_suggest_box":
         try:
-            req = client._pb2.CutSuggestRequest(
+            resp = client.cut_suggest_box(
                 ids=args.get("ids") or [],
                 margin=float(args.get("margin", 0.0)),
                 after_clipping=bool(args.get("after_clipping", False)),
             )
-            resp = client._stub.CutSuggest(req)
             box = resp.box
             return json.dumps(
                 {

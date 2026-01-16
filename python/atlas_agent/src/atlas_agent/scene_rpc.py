@@ -642,6 +642,48 @@ class SceneClient:
         self._log_rpc("ListObjects", req, resp)
         return resp
 
+    def bbox(self, *, ids: list[int] | None = None, after_clipping: bool = False) -> dict[str, Any]:
+        """Compute a world-space bounding box for the given ids.
+
+        This requires the 3D rendering engine. The client will ensure the 3D view
+        exists before calling the RPC.
+
+        Returns:
+          {
+            "ok": bool,
+            "min": [x,y,z],
+            "max": [x,y,z],
+            "center": [x,y,z],
+            "size": [x,y,z],
+            "error"?: str
+          }
+        """
+
+        # BBox is implemented in the engine; ensure the 3D window/engine exists.
+        if not self.ensure_view():
+            return {"ok": False, "error": "engine not ready"}
+
+        req = self._pb2.BBoxRequest(ids=[int(i) for i in (ids or [])], after_clipping=bool(after_clipping))
+        try:
+            resp = self._stub.BBox(req)
+        except Exception as e:
+            self._log_rpc("BBox", req, None, error=e)
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return {"ok": False, "error": msg}
+        self._log_rpc("BBox", req, resp)
+        b = resp.bbox
+        return {
+            "ok": True,
+            "min": [b.min.x, b.min.y, b.min.z],
+            "max": [b.max.x, b.max.y, b.max.z],
+            "center": [b.center.x, b.center.y, b.center.z],
+            "size": [b.size.x, b.size.y, b.size.z],
+        }
+
     # Animation/timeline
     def ensure_animation(self) -> bool:
         # Ensure the rendering engine exists (open 3D view if necessary)
@@ -1032,6 +1074,8 @@ class SceneClient:
 
     # Non-camera parameter key operations (id-based)
     def set_key_param(self, *, id: int, json_key: str, time: float, easing: str = "Linear", value: Any) -> bool:
+        # Key writes require engine+doc on the server side; ensure the engine exists.
+        self.ensure_view()
         v = _to_proto_value(value)
         req = self._pb2.SetKeyRequest(id=int(id), json_key=json_key, time=float(time), easing=easing, value=v)
         resp = self._stub.SetKey(req)
@@ -1179,6 +1223,10 @@ class SceneClient:
 
     # Scene (stateless) parameter ops
     def get_param_values(self, *, id: int, json_keys: Optional[list[str]] = None) -> dict:
+        # Parameter readback is implemented via the rendering engine parameter list.
+        # Ensure the 3D view/engine exists so GetParamValues does not fail with
+        # FAILED_PRECONDITION ("engine not ready").
+        self.ensure_view()
         req = self._pb2.GetParamValuesRequest(id=int(id), json_keys=json_keys or [])
         resp = self._stub.GetParamValues(req)
         self._log_rpc("GetParamValues", req, resp)
@@ -1195,6 +1243,8 @@ class SceneClient:
         Each item: { id: int, json_key: str, value: any }
         Returns { ok: bool, results: [{json_key, ok, reason?, normalized_value?}] }
         """
+        # Validation runs against the engine parameter schemas; ensure the engine exists.
+        self.ensure_view()
         pb_items = []
         for it in set_params:
             id = int(it.get("id"))
@@ -1222,6 +1272,8 @@ class SceneClient:
 
     def apply_params(self, set_params: list[dict]) -> bool:
         """Apply a batch of scene parameter assignments atomically (no time/easing)."""
+        # ApplySceneParams runs via the engine parameter system; ensure the engine exists.
+        self.ensure_view()
         pb_items = []
         for it in set_params:
             id = int(it.get("id"))
