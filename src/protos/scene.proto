@@ -101,6 +101,9 @@ service Scene {
   rpc GetParamValues (GetParamValuesRequest) returns (GetParamValuesResponse);
   // Save current scene (.scene)
   rpc SaveScene (SaveSceneRequest) returns (Bool);
+  // Render a single-frame screenshot of the current 3D scene (no animation export).
+  // Returns the written image path (typically in the OS temp directory unless a path is provided).
+  rpc TakeScreenshot3D (ScreenshotRequest) returns (ScreenshotResponse);
   rpc EnsureAnimation (EnsureAnimationRequest) returns (Bool);
   rpc SetDuration (SetDurationRequest) returns (Bool);
   rpc SetKey (SetKeyRequest) returns (Bool);
@@ -184,6 +187,22 @@ message GetParamValuesResponse {
 }
 
 message SaveSceneRequest { string path = 1; }
+
+// Screenshot / preview rendering (single frame; current scene state)
+message ScreenshotRequest {
+  uint32 width = 1;
+  uint32 height = 2;
+  // Optional output path. When empty, Atlas chooses a temp file path.
+  string path = 3;
+  // When false and the output file already exists, the call fails.
+  bool overwrite = 4;
+}
+
+message ScreenshotResponse {
+  bool ok = 1;
+  string path = 2;
+  string error = 3;
+}
 
 // Camera helper messages
 message CameraFitRequest {

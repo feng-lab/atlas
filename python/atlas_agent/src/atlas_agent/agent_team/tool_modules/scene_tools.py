@@ -30,6 +30,7 @@ HANDLED_TOOLS = (
     "scene_validate_params",
     "scene_apply",
     "scene_save_scene",
+    "scene_screenshot",
     "scene_camera_fit",
     "scene_camera_apply",
     "scene_load_files",
@@ -62,7 +63,14 @@ SCENE_SET_PARAMS_SCHEMA: Dict[str, Any] = {
                     },
                     "json_key": {"type": "string"},
                     "value": {
-                        "description": 'Typed value. For 3DTransform, use an object with canonical subfields (e.g., {"Translation Vec3":[x,y,z],"Rotation Vec4":[ang,x,y,z],"Scale Vec3":[sx,sy,sz],"Rotation Center Vec3":[cx,cy,cz]}).',
+                        "description": (
+                            "Typed value.\n"
+                            "Composite object values are patch-style in scene_apply: you may provide only the subfields you want to change; "
+                            "omitted subfields are left unchanged.\n"
+                            "For 3DTransform, canonical subfields include: "
+                            "{'Translation Vec3':[x,y,z], 'Rotation Vec4':[ang_deg,ax,ay,az], 'Scale Vec3':[sx,sy,sz], 'Rotation Center Vec3':[cx,cy,cz]}.\n"
+                            "The RPC server also accepts common aliases for 3DTransform and normalizes them: 'Translation', 'Rotation', 'Scale', and 'Center'."
+                        ),
                         "type": [
                             "object",
                             "array",
@@ -238,7 +246,14 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                                     "description": "Display name; dispatcher resolves to json_key if provided",
                                 },
                                 "value": {
-                                    "description": 'Typed value. For 3DTransform, use an object with canonical subfields (e.g., {"Translation Vec3":[x,y,z],"Rotation Vec4":[ang,x,y,z],"Scale Vec3":[sx,sy,sz],"Rotation Center Vec3":[cx,cy,cz]}).',
+                                    "description": (
+                                        "Typed value.\n"
+                                        "Composite object values are patch-style in scene_apply: you may provide only the subfields you want to change; "
+                                        "omitted subfields are left unchanged.\n"
+                                        "For 3DTransform, canonical subfields include: "
+                                        "{'Translation Vec3':[x,y,z], 'Rotation Vec4':[ang_deg,ax,ay,az], 'Scale Vec3':[sx,sy,sz], 'Rotation Center Vec3':[cx,cy,cz]}.\n"
+                                        "The RPC server also accepts common aliases for 3DTransform and normalizes them: 'Translation', 'Rotation', 'Scale', and 'Center'."
+                                    ),
                                     "type": [
                                         "object",
                                         "array",
@@ -274,6 +289,34 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
                 "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "scene_screenshot",
+            "description": (
+                "Render a screenshot of the current 3D scene state (no animation export). "
+                "Writes a single image file and returns its path.\n"
+                "Privacy: requires explicit per-session screenshot consent."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "width": {"type": "integer", "description": "Image width (pixels)"},
+                    "height": {"type": "integer", "description": "Image height (pixels)"},
+                    "path": {
+                        "type": "string",
+                        "description": "Optional output path. When empty, Atlas chooses a temp file path.",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Overwrite the output file when it already exists.",
+                    },
+                },
+                "required": ["width", "height"],
             },
         },
     },
@@ -485,8 +528,14 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "json_key": {"type": "string"},
                     "value": {
                         "description": "Candidate JSON value (native types)",
-                        "type": ["object", "array", "number", "string", "boolean", "null"],
-                        "items": {"type": ["object", "array", "number", "string", "boolean", "null"]},
+                        "anyOf": [
+                            {"type": "object"},
+                            {"type": "array", "items": {}},
+                            {"type": "number"},
+                            {"type": "string"},
+                            {"type": "boolean"},
+                            {"type": "null"},
+                        ],
                     },
                 },
                 "required": ["id", "json_key", "value"],
@@ -1292,6 +1341,49 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     if name == "scene_save_scene":
         ok = client.save_scene(args.get("path"))
         return json.dumps({"ok": bool(ok)})
+
+    if name == "scene_screenshot":
+        # Privacy/consent gate: requires an explicit per-session user decision.
+        allow = False
+        try:
+            if ctx.session_store is not None:
+                allow = (ctx.session_store.get_consent("screenshots") is True)
+        except Exception:
+            allow = False
+        if not allow:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "screenshots not permitted for this session",
+                }
+            )
+
+        try:
+            width = int(args.get("width", 0))
+            height = int(args.get("height", 0))
+        except Exception:
+            return json.dumps({"ok": False, "error": "width and height must be integers"})
+        if width <= 0 or height <= 0:
+            return json.dumps({"ok": False, "error": "width and height must be > 0"})
+
+        path_in = str(args.get("path") or "").strip()
+        overwrite = bool(args.get("overwrite", True))
+        out_path = Path(path_in) if path_in else None
+        try:
+            res = client.screenshot_3d(
+                width=width,
+                height=height,
+                path=out_path,
+                overwrite=overwrite,
+            )
+            return json.dumps(res)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
 
     if name == "scene_camera_fit":
         # Use CameraFit (planning) and apply the first typed value to the scene camera (id=0)

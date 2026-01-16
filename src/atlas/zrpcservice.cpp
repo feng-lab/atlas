@@ -21,7 +21,11 @@
 #include <QThread>
 #include <QTimer>
 #include <QApplication>
+#include <QDateTime>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QUuid>
 #include <QtCore/QDebug>
 #include <algorithm>
 #include <cmath>
@@ -90,6 +94,8 @@ using atlas::rpc::ValidateSceneParamResult;
 using atlas::rpc::GetParamValuesRequest;
 using atlas::rpc::GetParamValuesResponse;
 using atlas::rpc::SaveSceneRequest;
+using atlas::rpc::ScreenshotRequest;
+using atlas::rpc::ScreenshotResponse;
 using atlas::rpc::ClearKeysRequest;
 using atlas::rpc::RemoveKeyRequest;
 using atlas::rpc::BatchRequest;
@@ -131,6 +137,25 @@ auto invokeOnUi(Func&& f)
   R result{};
   QMetaObject::invokeMethod(
     uiObj,
+    [&]() {
+      result = f();
+    },
+    Qt::BlockingQueuedConnection);
+  return result;
+}
+
+template<class Func>
+auto invokeOnObjectThread(QObject* obj, Func&& f)
+{
+  using R = decltype(f());
+  CHECK(obj);
+  // If we're already on the object's thread, invoke directly to avoid deadlock.
+  if (QThread::currentThread() == obj->thread()) {
+    return f();
+  }
+  R result{};
+  QMetaObject::invokeMethod(
+    obj,
     [&]() {
       result = f();
     },
@@ -2969,6 +2994,117 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "save_scene failed");
     }
     reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status TakeScreenshot3D(ServerContext*, const ScreenshotRequest* req, ScreenshotResponse* reply) override
+  {
+    // Note: this intentionally does NOT create an animation or write keyframes.
+    // It renders the current scene state to a single image file.
+
+    const int width = static_cast<int>(req->width());
+    const int height = static_cast<int>(req->height());
+    if (width <= 0 || height <= 0) {
+      reply->set_ok(false);
+      reply->set_error("width and height must be > 0");
+      return Status::OK;
+    }
+
+    struct Result
+    {
+      bool ok = false;
+      QString path;
+      QString error;
+    };
+
+    auto res = invokeOnUi([&]() -> Result {
+      Result r;
+      if (!m_owner.engine()) {
+        r.ok = false;
+        r.error = "engine not ready";
+        return r;
+      }
+
+      auto* eng = m_owner.engine();
+      CHECK(eng);
+
+      QString outPath = QString::fromStdString(req->path()).trimmed();
+      const bool overwrite = req->overwrite();
+      if (outPath.isEmpty()) {
+        const QString ts = QDateTime::currentDateTimeUtc().toString("yyyyMMdd_HHmmss_zzz");
+        const QString uid = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString fn = QString("atlas_scene_screenshot3d_%1_%2.png").arg(ts, uid);
+        outPath = QDir(QDir::tempPath()).filePath(fn);
+      } else {
+        QFileInfo fi(outPath);
+        if (fi.isRelative()) {
+          outPath = QDir::current().filePath(outPath);
+          fi = QFileInfo(outPath);
+        }
+        if (fi.exists() && !overwrite) {
+          r.ok = false;
+          r.path = outPath;
+          r.error = QString("file already exists (overwrite=false): %1").arg(outPath);
+          return r;
+        }
+      }
+
+      // Ensure output directory exists.
+      QDir dir(QFileInfo(outPath).absolutePath());
+      if (!dir.exists()) {
+        if (!dir.mkpath(".")) {
+          r.ok = false;
+          r.path = outPath;
+          r.error = QString("failed to create output folder: %1").arg(dir.absolutePath());
+          return r;
+        }
+      }
+
+      if (QFileInfo(outPath).exists() && overwrite) {
+        // Best-effort: remove first so failures surface earlier.
+        QFile::remove(outPath);
+      }
+
+      r.path = outPath;
+
+      // Run the actual render on the engine's thread (single-GL-context assumption).
+      r = invokeOnObjectThread(eng, [&]() -> Result {
+        Result rr;
+        rr.path = outPath;
+
+        QString err;
+        auto conn = QObject::connect(
+          eng,
+          &Z3DRenderingEngine::renderingError,
+          eng,
+          [&](const QString& e) {
+            if (err.isEmpty()) {
+              err = e;
+            }
+          },
+          Qt::DirectConnection);
+
+        eng->takeFixedSizeScreenShot(outPath, width, height, Z3DScreenShotType::MonoView);
+
+        QObject::disconnect(conn);
+
+        if (QFileInfo(outPath).exists()) {
+          rr.ok = true;
+          return rr;
+        }
+        rr.ok = false;
+        rr.error = err.isEmpty() ? QString("screenshot failed (no output file): %1").arg(outPath) : err;
+        return rr;
+      });
+
+      return r;
+    });
+
+    reply->set_ok(res.ok);
+    reply->set_path(res.path.toStdString());
+    if (!res.error.isEmpty()) {
+      reply->set_error(res.error.toStdString());
+    }
     return Status::OK;
   }
 

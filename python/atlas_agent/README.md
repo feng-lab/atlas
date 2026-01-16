@@ -55,7 +55,9 @@ Phases (adaptive, default):
 
 Screenshots (optional)
 
-- Some steps are best verified visually. The agent can render a preview frame to an image via `animation_render_preview`.
+- Some steps are best verified visually. The agent can render a screenshot image for verification.
+  - For current scene state (preferred): `scene_screenshot`
+  - For animation-at-time verification: `animation_render_preview`
 - On startup, the CLI asks once per session for consent to use preview screenshots for verification.
   - Default is allow (press Enter), but you can deny and the agent will fall back to human-check steps for visual requirements.
   - You can toggle later in the REPL with `:screenshots on` / `:screenshots off`.
@@ -63,7 +65,12 @@ Screenshots (optional)
 Common options:
 
 - `--model` to choose the LLM model
-  - Atlas install location is discovered from the running Atlas RPC server. If Atlas isn't running, the CLI attempts to launch it from common install paths, then re-tries RPC.
+- `--reasoning-effort low|medium|high` to control how much deliberate reasoning the model uses (when supported by your model/provider)
+- `--max-rounds N` to control how many tool-loop rounds the Executor is allowed to run in one turn (`0` = unlimited)
+
+Notes:
+
+- Atlas install location is discovered from the running Atlas RPC server. If Atlas isn't running, the CLI attempts to launch it from common install paths, then re-tries RPC.
 
 ## Docs + Long Sessions
 
@@ -96,7 +103,7 @@ Common options:
 
 Atlas camera animation supports both:
 
-- **First-person walkthroughs** (“fly/drone inside the object”): the agent composes local moves + rotations and writes camera keys.
+- **First-person walkthroughs** (“fly/drone inside the object”): the agent turns natural-language motion into a small set of motion segments (local moves + yaw/pitch/roll) and writes camera keys.
 - **Guided waypoint splines** (explicit waypoints): the agent solves keys from bbox/world waypoints and evaluates them as a spline.
 
 Prompt patterns that work well:
@@ -111,6 +118,7 @@ Implementation notes:
 
 - For smooth spline paths, the agent sets the camera interpolation method to `Position Rotation Spline`.
 - For interior shots, the agent disables the “keep object fully visible” constraint (`keep_visible=false`) so the camera can move inside.
+- When the user provides explicit waypoints, the agent uses waypoint tools; when the user describes motion in words, the agent uses walkthrough segments.
 
 Help:
 

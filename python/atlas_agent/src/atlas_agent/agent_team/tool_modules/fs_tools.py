@@ -249,32 +249,40 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "fs_hint_resolve",
-            "description": "Resolve a user hint (natural language) to likely file/dir paths. Anchors search in common user dirs (Documents/Downloads/Desktop) plus optional base_dirs, scans hinted subfolders (e.g., 'atlas_test'), and ranks candidates by basename similarity.",
+            "description": (
+                "Resolve a likely file/dir path by searching caller-provided directories.\n"
+                "The caller (LLM) must provide structured inputs:\n"
+                "- expected_name: basename to score against (e.g., 'foo.txt')\n"
+                "- possible_dirs: likely directories to search (e.g., ['~/Documents/atlas_test'])\n\n"
+                "Search behavior:\n"
+                "- Only searches within possible_dirs (no implicit hint parsing).\n"
+                "- Returns the best-ranked candidate path and a ranked candidate list.\n"
+                "- expected_name is used for scoring (not an exact-match contract). The result includes match='exact' when the best candidate basename matches expected_name case-insensitively.\n\n"
+                "Return shape:\n"
+                "- Found: {ok:true, path, match:'exact'|'best_candidate', expected_name, candidates, searched_dirs, missing_dirs, total_candidates, limit_reached, hint?}\n"
+                "- Not found: {ok:false, error:'not_found', expected_name, searched_dirs, missing_dirs, hint}"
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "hint_text": {
-                        "type": "string",
-                        "description": "Natural language hint, e.g., 'load file foo.txt from atlas_test in my Documents'",
-                    },
                     "expected_name": {
-                        "type": ["string", "null"],
-                        "description": "Optional exact basename when known (e.g., foo.txt)",
+                        "type": "string",
+                        "description": "Basename to score against (e.g., foo.txt). Not treated as an exact-match contract.",
                     },
                     "kind": {
                         "type": "string",
                         "enum": ["file", "dir", "either"],
                         "default": "file",
                     },
-                    "base_dirs": {
+                    "possible_dirs": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Optional extra search bases (absolute or ~ expanded)",
+                        "description": "Likely search directories (absolute or ~ expanded).",
                     },
                     "max_results": {"type": "integer", "default": 12},
                     "max_depth": {"type": "integer", "default": 6},
                 },
-                "required": ["hint_text"],
+                "required": ["expected_name", "possible_dirs"],
             },
         },
     },
@@ -1032,131 +1040,162 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
     if name == "fs_hint_resolve":
 
-        hint = str(args.get("hint_text") or "")
-        expected_name = str(args.get("expected_name") or "").strip() or None
+        expected_name = str(args.get("expected_name") or "").strip()
+        possible_dirs_raw = args.get("possible_dirs")
         kind = str(args.get("kind") or "file")
         max_results = int(args.get("max_results", 12))
         max_depth = int(args.get("max_depth", 6))
-        base_dirs = [str(p) for p in (args.get("base_dirs") or [])]
-        # 1) Build anchor roots: common user dirs + optional bases
-        home = os.path.expanduser("~")
-        anchors = []
-        # Do NOT scan the home directory root to avoid permission prompts; restrict to common user subdirs
-        for d in (
-            os.path.join(home, "Documents"),
-            os.path.join(home, "Downloads"),
-            os.path.join(home, "Desktop"),
-        ):
-            if os.path.isdir(d):
-                anchors.append(d)
-        for b in base_dirs:
-            b2 = os.path.expanduser(os.path.expandvars(b))
-            if os.path.isdir(b2):
-                anchors.append(os.path.normpath(b2))
-        # 2) Mine hint for subfolder clues and explicit basenames
-        toks = re.split(r"[\s,'\"]+", hint)
-        toks = [t for t in toks if t]
-        # Detect candidate name if not provided (has dot)
+
         if not expected_name:
-            for t in reversed(toks):
-                if "." in t and not any(ch in t for ch in ("/", "\\")):
-                    expected_name = t
-                    break
-        subdirs = []
-        for t in toks:
-            if t.lower() in {"documents", "downloads", "desktop", "home"}:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "expected_name is required",
+                }
+            )
+        if not isinstance(possible_dirs_raw, list) or not possible_dirs_raw:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "possible_dirs is required (non-empty array)",
+                    "expected_name": expected_name,
+                }
+            )
+        possible_dirs = [str(p) for p in possible_dirs_raw if isinstance(p, str) and p.strip()]
+        if not possible_dirs:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "possible_dirs is required (non-empty array of strings)",
+                    "expected_name": expected_name,
+                }
+            )
+
+        # Expand and validate search roots. We keep both searched and missing dirs
+        # for transparency/debugging.
+        searched_dirs: list[str] = []
+        missing_dirs: list[str] = []
+        for d in possible_dirs:
+            d2 = os.path.expanduser(os.path.expandvars(d))
+            d2 = os.path.normpath(d2)
+            if os.path.isdir(d2):
+                searched_dirs.append(d2)
+            else:
+                missing_dirs.append(d2)
+        # De-duplicate searched dirs while preserving order
+        _seen_root: set[str] = set()
+        searched_u: list[str] = []
+        for r in searched_dirs:
+            rn = os.path.normpath(r)
+            if rn in _seen_root:
                 continue
-            # Treat simple tokens as potential subfolders (atlas_test, slice15)
-            if all(ch.isalnum() or ch in ("_", "-", ".") for ch in t) and not (
-                "." in t and t == expected_name
-            ):
-                subdirs.append(t)
-            # Handle path-like tokens
-            if "/" in t or "\\" in t:
-                subdirs.extend([seg for seg in re.split(r"[\\/]+", t) if seg])
-        # De-duplicate but preserve order
-        seen = set()
-        subdirs_u = []
-        for s in subdirs:
-            if s not in seen:
-                seen.add(s)
-                subdirs_u.append(s)
-        # 3) Compose search roots: anchors + anchors/subdir (for known subdir hints).
-        #
-        # Note: scanning the full anchor is already correctness-first, but adding
-        # anchor/subdir roots can effectively extend search depth within likely
-        # subtrees without scanning unrelated parts of the anchor.
-        search_roots = list(anchors)
-        seen_roots = {os.path.normpath(p) for p in search_roots}
-        for a in anchors:
-            for s in subdirs_u:
-                cand = os.path.normpath(os.path.join(a, s))
-                if cand in seen_roots:
-                    continue
-                if os.path.isdir(cand):
-                    seen_roots.add(cand)
-                    search_roots.append(cand)
-        # 4) Scan within bounded depth and rank candidates
-        target = (expected_name or "").lower()
+            _seen_root.add(rn)
+            searched_u.append(rn)
+        searched_dirs = searched_u
+        if not searched_dirs:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "not_found",
+                    "expected_name": expected_name,
+                    "searched_dirs": [],
+                    "missing_dirs": missing_dirs,
+                    "hint": "None of the provided possible_dirs exist on disk.",
+                }
+            )
+
+        target = expected_name.lower()
         candidates: list[tuple[float, str]] = []
 
-        def _walk_with_depth(root: str, max_depth: int):
+        def _walk_with_depth(root: str, max_depth: int) -> None:
             root_p = Path(root)
-            try:
-                for cur, dirs, files in os.walk(root):
-                    rel = Path(cur).relative_to(root_p)
-                    if len(rel.parts) > max_depth:
-                        dirs[:] = []
+            for cur, dirs, files in os.walk(root):
+                rel = Path(cur).relative_to(root_p)
+                if len(rel.parts) > max_depth:
+                    dirs[:] = []
+                    continue
+                names = files if kind != "dir" else dirs
+                for nm in names:
+                    full = os.path.join(cur, nm)
+                    if kind == "file" and not os.path.isfile(full):
                         continue
-                    names = files if kind != "dir" else dirs
-                    for nm in names:
-                        full = os.path.join(cur, nm)
-                        if kind == "file" and not os.path.isfile(full):
-                            continue
-                        if kind == "dir" and not os.path.isdir(full):
-                            continue
-                        score = (
-                            1.0
-                            if (target and nm.lower() == target)
-                            else difflib.SequenceMatcher(
-                                a=nm.lower(), b=(target or nm.lower())
-                            ).ratio()
-                        )
-                        if target and score < 0.5:
-                            continue
-                        candidates.append((score, os.path.abspath(full)))
-            except Exception:
-                return
+                    if kind == "dir" and not os.path.isdir(full):
+                        continue
+                    score = (
+                        1.0
+                        if nm.lower() == target
+                        else difflib.SequenceMatcher(a=nm.lower(), b=target).ratio()
+                    )
+                    if score < 0.5:
+                        continue
+                    candidates.append((float(score), os.path.abspath(full)))
 
-        tried = []
-        # Normalize and filter invalid roots to avoid os.walk errors
-        search_roots = [r for r in search_roots if r and os.path.isdir(r)]
         try:
-            for r in search_roots:
+            for r in searched_dirs:
                 _walk_with_depth(r, max_depth)
-                tried.append(r)
         except Exception as e:
             return json.dumps(
-                {"ok": False, "error": str(e), "candidates": [], "tried": tried}
+                {
+                    "ok": False,
+                    "error": str(e),
+                    "expected_name": expected_name,
+                    "searched_dirs": searched_dirs,
+                    "missing_dirs": missing_dirs,
+                }
             )
-        candidates.sort(key=lambda x: x[0], reverse=True)
-        out = [{"path": p, "score": float(s)} for (s, p) in candidates[:max_results]]
-        # If we found an exact match, return ok=true with first path
-        if out:
-            best = out[0]
-            if (
-                expected_name
-                and os.path.basename(best["path"]).lower() == expected_name.lower()
-            ):
-                return json.dumps(
-                    {
-                        "ok": True,
-                        "path": best["path"],
-                        "candidates": out,
-                        "tried": tried,
-                    }
-                )
-        return json.dumps({"ok": False, "candidates": out, "tried": tried})
+
+        # De-duplicate candidates by absolute path (keep best score).
+        best_by_path: dict[str, float] = {}
+        for score, p in candidates:
+            prev = best_by_path.get(p)
+            if prev is None or score > prev:
+                best_by_path[p] = float(score)
+        candidates_u = [(s, p) for (p, s) in best_by_path.items()]
+        candidates_u.sort(key=lambda x: float(x[0]), reverse=True)
+
+        total_candidates = len(candidates_u)
+        limit_reached = bool(max_results and total_candidates > max_results)
+        out = [{"path": p, "score": float(s)} for (s, p) in candidates_u[:max_results]]
+
+        if not out:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "not_found",
+                    "expected_name": expected_name,
+                    "candidates": [],
+                    "total_candidates": 0,
+                    "limit_reached": False,
+                    "searched_dirs": searched_dirs,
+                    "missing_dirs": missing_dirs,
+                    "hint": "No candidates were found under the searched_dirs. Consider increasing max_depth or providing more specific possible_dirs.",
+                }
+            )
+
+        best = out[0]
+        exact = bool(
+            expected_name
+            and os.path.basename(best["path"]).lower() == str(expected_name).lower()
+        )
+        match = "exact" if exact else "best_candidate"
+
+        payload: dict[str, Any] = {
+            "ok": True,
+            "path": best["path"],
+            "match": match,
+            "expected_name": expected_name,
+            "candidates": out,
+            "total_candidates": total_candidates,
+            "limit_reached": limit_reached,
+            "searched_dirs": searched_dirs,
+            "missing_dirs": missing_dirs,
+        }
+        if expected_name and not exact:
+            payload["hint"] = (
+                "Best candidate basename does not exactly match expected_name. "
+                "Validate by reading/checking the file contents before using it."
+            )
+        return json.dumps(payload)
 
     if name == "repo_search":
 

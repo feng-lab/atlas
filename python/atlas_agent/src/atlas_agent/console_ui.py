@@ -5,6 +5,7 @@ import logging
 from typing import Any, Optional
 
 from .chat_rpc_team import ChatTeam
+from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS
 from .responses_tool_loop import ToolLoopCallbacks
 
 
@@ -99,6 +100,8 @@ def run_console_repl(
     api_key: str,
     model: str,
     temperature: float = 0.2,
+    reasoning_effort: str | None = "high",
+    max_rounds: int = DEFAULT_EXECUTOR_MAX_ROUNDS,
     session: Optional[str] = None,
     session_dir: Optional[str] = None,
     enable_codegen: bool = False,
@@ -130,6 +133,8 @@ def run_console_repl(
         api_key=api_key,
         model=model,
         temperature=temperature,
+        reasoning_effort=reasoning_effort,
+        max_rounds_executor=int(max_rounds),
         session=session,
         session_dir=session_dir,
         enable_codegen=bool(enable_codegen),
@@ -342,6 +347,40 @@ def run_console_repl(
                     msg.append(" ")
                     msg.append(err)
                 console.print(msg)
+
+                # For filesystem resolution tools, failures are often "soft":
+                # they still return ranked candidates and the searched roots.
+                # Show that context so users (and developers) can understand why
+                # a resolve did not return ok=true.
+                if isinstance(parsed, dict) and any(
+                    k in parsed
+                    for k in (
+                        "hint",
+                        "path",
+                        "match",
+                        "expected_name",
+                        "candidates",
+                        "tried",
+                        "searched_dirs",
+                        "missing_dirs",
+                    )
+                ):
+                    extra: dict[str, Any] = {}
+                    for k in (
+                        "hint",
+                        "match",
+                        "expected_name",
+                        "path",
+                        "candidates",
+                        "tried",
+                        "searched_dirs",
+                        "missing_dirs",
+                    ):
+                        if k in parsed:
+                            extra[k] = parsed.get(k)
+                    if extra:
+                        dumped = json.dumps(extra, ensure_ascii=False, indent=2, sort_keys=True)
+                        console.print(Syntax(dumped, "json", word_wrap=True))
             else:
                 console.print(Text(f"← {name}: done", style="green"))
 

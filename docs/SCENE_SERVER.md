@@ -50,6 +50,48 @@ The Atlas GUI hosts the gRPC service `atlas.rpc.Scene` for live control.
 - `ListParams(id) -> ParamList`
   - Enumerate parameters for a specific `id` (`0|1|2|3|>=4`).
 
+### Parameter Types: `3DTransform` (Object Transform)
+
+When a parameter’s `type` is `3DTransform` (for example, `Coord Transform 3DTransform`), its value is an object with canonical subfields:
+
+- `Scale Vec3`: `[sx, sy, sz]`
+- `Rotation Vec4`: `[angle_deg, axis_x, axis_y, axis_z]` (axis-angle; degrees)
+- `Rotation Center Vec3`: `[cx, cy, cz]`
+- `Translation Vec3`: `[tx, ty, tz]`
+
+The engine composes these fields into a 4×4 transform matrix using GLM’s column-vector convention (rightmost term applies first):
+
+`M = T(Translation + RotationCenter*Scale) * R(Rotation) * T(-RotationCenter*Scale) * S(Scale)`
+
+Where `RotationCenter*Scale` is the **component-wise** product: `[cx*sx, cy*sy, cz*sz]`.
+
+Interpretation:
+
+- Scale about the object origin `(0,0,0)`
+- Rotate about pivot `(RotationCenter*Scale)`
+- Translate by `Translation` (applied last)
+
+Equivalent step-by-step application for a local point `p` (homogeneous form implied):
+
+- `p1 = S(Scale) * p`
+- `p2 = T(-RotationCenter*Scale) * p1` (move the scaled rotation center to the origin)
+- `p3 = R(Rotation) * p2`
+- `p4 = T(Translation + RotationCenter*Scale) * p3`
+
+Notes:
+
+- `Rotation Vec4` is axis-angle. The axis is normalized; a zero-length axis produces an identity rotation.
+- `Rotation Center` affects rotation only; scaling is always about the object origin. This is why scaling an object whose geometry is not centered at origin can look like it “moves” relative to world space.
+- `Translation` is applied last and is not multiplied by `Scale`.
+- Keeping the pivot fixed while scaling: because the effective rotation pivot is `(RotationCenter*Scale)`, changing `Scale` can change where the pivot lands in world space unless you also adjust `Translation`. To keep the pivot position constant when scaling from `s0` to `s1` (component-wise), use: `Translation_new = Translation_old + (s0 - s1) * RotationCenter`.
+
+Partial updates and “do I need to provide all fields?”
+
+- **Scene (stateless) apply is patch-style for composite objects**: when setting a `3DTransform` value via `ApplySceneParams`, you may provide **only the subfields you want to change**; omitted subfields are left unchanged.
+  - Example (translation-only update): `{ "Translation Vec3": [tx, ty, tz] }`
+  - The RPC server also accepts common aliases and normalizes them to canonical keys: `Scale`, `Translation`, `Rotation`, and `Center` (maps to `Rotation Center Vec3`).
+- **Timeline (animation) keys are full values**: when writing a keyframe value (e.g., `SetKey`) for a `3DTransform`, the key stores a complete transform value. If you send only `{ "Translation Vec3": [...] }`, the missing subfields will remain at the parameter’s defaults for that key (not “inherit from the current scene”). If you intend to “change only translation but keep existing scale/rotation”, read the current value first (scene or sampled key) and write a full object.
+
 ## Scene (Stateless) Operations
 
 Use these to edit base scene state (no time/easing; **does not** write keyframes):
@@ -63,6 +105,9 @@ Use these to edit base scene state (no time/easing; **does not** write keyframes
   - Applies assignments atomically after validation. Marshalled to UI thread.
 - `SaveScene { path } -> { ok }`
   - Writes a `.scene` file (equivalent to the GUI Save Scene).
+- `TakeScreenshot3D { width, height, path?, overwrite? } -> { ok, path, error? }`
+  - Renders a single image of the current **3D scene** state.
+  - Does **not** create an animation or write keyframes (preferred for verification screenshots).
 - `SetVisibility { ids, on } -> { ok }`
 - `MakeAlias { ids } -> { ok, aliases: [{src_id, alias_id}], error? }`
 

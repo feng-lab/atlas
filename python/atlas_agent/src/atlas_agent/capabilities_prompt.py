@@ -50,6 +50,12 @@ def build_atlas_agent_primer() -> str:
     lines.append(
         "Rule of thumb: any request with time/duration implies animation_* tools; otherwise prefer scene_* tools."
     )
+    lines.append(
+        "Camera motion can be authored as camera keyframes: high-level solve modes (fit/orbit/dolly), first-person walkthroughs (local move + yaw/pitch/roll), or guided waypoint splines."
+    )
+    lines.append(
+        "Routing heuristic: explicit waypoints/points → waypoint spline; motion verbs (fly/turn/pause) → walkthrough segments. Prefer bbox-scaled distances and Position Rotation Spline for smooth motion."
+    )
     return "\n".join(lines)
 
 

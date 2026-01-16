@@ -16,7 +16,13 @@ from .agent_team.base import LLMClient
 from .agent_team.intent_resolver import INTENT_RESOLVER_SYSTEM, IntentResolver
 from .agent_team.tools_agent import scene_tools_and_dispatcher
 from .capabilities_prompt import build_atlas_agent_primer, build_capabilities_prompt
-from .responses_tool_loop import ToolLoopCallbacks, run_responses_tool_loop
+from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS
+from .responses_tool_loop import (
+    ToolLoopCallbacks,
+    ToolLoopNonConverged,
+    ToolLoopResult,
+    run_responses_tool_loop,
+)
 from .discovery import discover_schema_dir
 from .scene_rpc import SceneClient
 from .session_store import SessionStore
@@ -76,11 +82,13 @@ ATLAS_STATE_MUTATION_TOOLS: set[str] = {
     "animation_camera_solve_and_apply",
     "animation_camera_set_interpolation_method",
     "animation_camera_waypoint_spline_apply",
+    "animation_camera_walkthrough_apply",
     "animation_set_time",
 }
 
 ATLAS_OUTPUT_TOOLS: set[str] = {
     "scene_save_scene",
+    "scene_screenshot",
     "animation_save_animation",
     "animation_export_video",
     "animation_render_preview",
@@ -88,6 +96,7 @@ ATLAS_OUTPUT_TOOLS: set[str] = {
 
 # Output tools that are allowed in verification (best-effort; may be disabled by env).
 ATLAS_VERIFICATION_OUTPUT_TOOLS: set[str] = {
+    "scene_screenshot",
     "animation_render_preview",
 }
 
@@ -110,8 +119,11 @@ ATLAS_SHARED_SYSTEM_RULES = (
     "- Minimal mutation policy: change ONLY what is required to fulfill the Task Brief.\n"
     "- Proceed-first: avoid confirmation questions. If defaults are needed, state assumptions and continue.\n"
     "- Keep plans/descriptions semantic; do not assert exact parameter json_keys or option label strings.\n"
-    "- Camera: prefer typed intent (FIT/ORBIT/DOLLY/STATIC) via camera_* tools; do not invent raw coordinates.\n"
-    "- File paths: treat user paths as hints; resolve/verify with fs_* tools before loading.\n"
+    "- Camera: prefer typed operations. For orbits/dollies use animation_camera_solve_and_apply; for first-person walkthroughs use animation_camera_walkthrough_apply; for explicit waypoints use animation_camera_waypoint_spline_apply. Prefer bbox-fraction semantics over raw world coords.\n"
+    "- Camera director rubric (routing): if the user provides explicit waypoints/points/beats, use animation_camera_waypoint_spline_apply; otherwise if the user describes motion verbs (fly/strafe/yaw/pitch/pause), use animation_camera_walkthrough_apply. Mixed prompts: do not drop waypoints/segments; add intermediate points or increase walkthrough step_seconds instead of truncating.\n"
+    "- Camera director rubric (defaults): method='Position Rotation Spline' for walkthrough/waypoints; walkthrough constraints default keep_visible=false unless the user explicitly wants framing; step_seconds defaults: slow≈0.5, medium≈1.0, fast≈1.5–2.0.\n"
+    "- Walkthrough planning: when inventing segments from words, you may use internal segment templates (template+amount/distance/degrees) and let the tool expand them; do not require the user to name templates.\n"
+    "- File paths: classify input. Absolute/~/drive paths are exact (fs_expand_paths→fs_check_paths; if missing try fs_resolve_path). Natural-language hints use fs_hint_resolve with structured args (expected_name + possible_dirs). Always verify before loading.\n"
     "- Maintain an explicit plan via the update_plan tool (4–7 short steps). Exactly one step may be in_progress.\n"
     "- Verify changes after applying: scene_get_values / animation_list_keys / animation_camera_validate, etc.\n"
     "- When blocked on missing user intent/input, call report_blocked and ask a single focused question.\n"
@@ -156,7 +168,8 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
             "- Prefer live discovery for ids/json_keys/options: scene_list_objects → scene_list_params(id) → scene_get_values(id,json_keys). Do not guess.",
             "- For unclear semantics/workflows, consult docs via docs_search/docs_read (SCENE_SERVER.md, AGENTS_GUIDE.md, USER_GUIDE.md).",
             "- Long sessions: if the user references prior decisions, use session_get_memory/session_get_plan or session_search_transcript for exact quotes.",
-            "- File paths: treat user paths as hints. Resolve with fs_hint_resolve/fs_resolve_path, verify with fs_check_paths, then load via scene_load_files/scene_ensure_loaded.",
+            "- File paths (exact): when the user provides an absolute/~/drive path token (e.g. /Users/... , ~/... , C:\\...), treat it as exact. Use fs_expand_paths → fs_check_paths first; only if missing try fs_resolve_path (typo correction). Avoid fs_hint_resolve in this case.",
+            "- File paths (hints): when the user describes location in words (e.g. “in my Documents/atlas_test”), use system_info to resolve common dirs and then call fs_hint_resolve with structured args: expected_name (basename to score) + possible_dirs (likely search roots). If match!='exact', validate by reading/checking the file before loading.",
             "- Scene vs timeline contract: any mention of time/duration implies animation_* tools. Never include time/easing in scene_apply.",
             "- Scene-only intent: do not write animation keys. Use scene_apply/scene_set_visibility/scene_camera_apply and verify with scene_get_values.",
             "- Animation intent: animation_ensure_animation → animation_set_duration → write keys (animation_batch / animation_set_key_param / animation_replace_key_param) and camera keys (animation_camera_solve_and_apply / animation_replace_key_camera).",
@@ -164,7 +177,7 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
             "- Validate before committing where possible (scene_validate_params; animation_camera_validate). Verify after writing (animation_list_keys, animation_camera_validate, scene_get_values).",
             "- Large-file handling: prefer fs_tail_lines/fs_search_text; if you must scan, iterate fs_read_text in windows until EOF (no silent truncation).",
             "- Verification ledger: when a step has specific requirements, use verification_record(mode=tool|visual|human) to attach evidence and update_plan to advance statuses.",
-            "- Visual checks: use animation_render_preview only when screenshots are permitted for this session; otherwise mark as human-check in verification.",
+            "- Visual checks: prefer scene_screenshot for current scene state; use animation_render_preview only when you need a specific animation time. Both require screenshots consent; otherwise mark as human-check in verification.",
             "- If a validation/read-back check fails, diagnose precisely (id/json_key/time/value) and retry within this run before giving up.",
             "- If a requested step is not feasible with the available tools/capabilities, complete all feasible steps first, then call report_blocked once with a precise reason and suggestion.",
             "- When blocked on missing user intent/input, call report_blocked once with one focused question.",
@@ -181,7 +194,7 @@ ATLAS_VERIFIER_SYSTEM_PROMPT = (
     "- Verify the requested changes using read-back tools (scene_get_values, animation_list_keys, animation_camera_validate, etc.).\n"
     "- Record evidence with verification_record (mode=tool|visual|human).\n"
     "- Use verification_eval_plan to decide what can be marked completed, then update plan statuses via update_plan.\n"
-    "- If something cannot be verified from tools alone, try a preview screenshot (animation_render_preview) when enabled.\n"
+    "- If something cannot be verified from tools alone, try a screenshot: prefer scene_screenshot for scene state; use animation_render_preview when verifying a specific animation time.\n"
     "- If the screenshot is unavailable or still ambiguous, keep the step pending and request a human-check.\n"
     "- Absence of evidence is not a failure: only mark a step failed when tool read-backs clearly contradict the plan.\n"
     "- Produce the final user-facing answer for this turn.\n\n"
@@ -192,10 +205,15 @@ MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL = 3_000_000
 
 
 def _message(*, role: str, text: str) -> dict[str, Any]:
+    # The Responses API distinguishes between user input parts (input_text) and
+    # assistant history parts (output_text). Some OpenAI-compatible providers
+    # reject assistant messages that contain input_text parts.
+    role_s = str(role)
+    part_type = "output_text" if role_s == "assistant" else "input_text"
     return {
         "type": "message",
-        "role": str(role),
-        "content": [{"type": "input_text", "text": str(text)}],
+        "role": role_s,
+        "content": [{"type": part_type, "text": str(text)}],
     }
 
 
@@ -205,6 +223,8 @@ class ChatTeam:
     api_key: str
     model: str
     temperature: float = 0.2
+    reasoning_effort: str | None = "high"
+    max_rounds_executor: int = DEFAULT_EXECUTOR_MAX_ROUNDS
     atlas_dir: Optional[str] = None
     atlas_version: Optional[str] = None
     session: Optional[str] = None
@@ -296,6 +316,8 @@ class ChatTeam:
             self.session_store.set_meta(
                 address=self.address,
                 model=self.model,
+                reasoning_effort=self.reasoning_effort,
+                max_rounds_executor=int(self.max_rounds_executor),
                 atlas_dir=self.atlas_dir,
                 atlas_version=self.atlas_version,
             )
@@ -1054,6 +1076,28 @@ class ChatTeam:
                     pass
                 return
 
+            if tool == "animation_camera_walkthrough_apply":
+                include_camera_key_times_in_snapshot = True
+                include_camera_interpolation_method_in_snapshot = True
+                try:
+                    if isinstance(result, dict):
+                        m = result.get("current_method") or result.get("method")
+                        if isinstance(m, str) and m.strip():
+                            touched_camera_interpolation_method = m.strip()
+                    if touched_camera_interpolation_method is None:
+                        m = args.get("method")
+                        if isinstance(m, str) and m.strip():
+                            touched_camera_interpolation_method = m.strip()
+                except Exception:
+                    pass
+                try:
+                    if isinstance(result, dict) and isinstance(result.get("applied"), list):
+                        for t in result.get("applied") or []:
+                            _touch_camera_key_time(time=float(t))
+                except Exception:
+                    pass
+                return
+
         # Tool list + dispatcher (writes go through this wrapper).
         runtime_state: dict[str, Any] = {
             "turn_id": turn_id,
@@ -1385,6 +1429,8 @@ class ChatTeam:
                     clause_hits += 1
             return clause_hits >= 2
 
+        phase_hit_round_budget_phase: str | None = None
+
         def _run_phase(
             *,
             phase: str,
@@ -1393,7 +1439,7 @@ class ChatTeam:
             phase_input_items: list[dict[str, Any]],
             max_rounds: int,
         ):
-            nonlocal current_phase
+            nonlocal current_phase, phase_hit_round_budget_phase
             current_phase = phase
             try:
                 runtime_state["phase"] = phase
@@ -1405,7 +1451,8 @@ class ChatTeam:
                 # rendered image as an input_image in the next model call.
                 if str(runtime_state.get("phase") or "") != "Verifier":
                     return []
-                if str(name or "") != "animation_render_preview":
+                tool_name = str(name or "")
+                if tool_name not in {"animation_render_preview", "scene_screenshot"}:
                     return []
                 if not _screenshots_allowed():
                     return []
@@ -1467,7 +1514,7 @@ class ChatTeam:
                 h = args.get("height") if isinstance(args, dict) else None
                 header = (
                     "Preview image for visual verification.\n"
-                    f"- tool: animation_render_preview\n"
+                    f"- tool: {tool_name}\n"
                     f"- time_sec: {tsec!r}\n"
                     f"- size: {w!r}x{h!r}\n"
                     f"- path: {path}\n"
@@ -1484,34 +1531,241 @@ class ChatTeam:
                     }
                 ]
 
-            if callbacks is not None and callbacks.on_phase_start is not None:
-                callbacks.on_phase_start(phase)
-            result = run_responses_tool_loop(
-                llm=self.llm,
-                instructions=(instructions.rstrip() + "\n\n" + shared_instructions).strip(),
-                input_items=phase_input_items,
-                tools=phase_tools,
-                dispatch=_dispatch_logged,
-                post_tool_output=_post_tool_output,
-                callbacks=callbacks,
-                temperature=self.temperature,
-                max_rounds=max_rounds,
-            )
-            if callbacks is not None and callbacks.on_phase_end is not None:
-                callbacks.on_phase_end(phase)
-            # Persist reasoning summary blocks per phase (append-only) for resume/debug.
-            try:
-                if result.reasoning_summaries:
+            # Capture streamed reasoning deltas so we can persist them even when the
+            # request fails mid-stream (e.g., provider network drops / 400s after some
+            # output). The phase-level summaries returned by run_responses_tool_loop are
+            # still the source of truth when available.
+            streamed_summary_parts: dict[int, list[str]] = {}
+
+            def _capture_reasoning_delta(delta: str, summary_index: int) -> None:
+                if delta:
+                    streamed_summary_parts.setdefault(int(summary_index or 0), []).append(delta)
+                if callbacks is not None and callbacks.on_reasoning_summary_delta is not None:
+                    callbacks.on_reasoning_summary_delta(delta, summary_index)
+
+            def _capture_reasoning_part_added(summary_index: int) -> None:
+                if callbacks is not None and callbacks.on_reasoning_summary_part_added is not None:
+                    callbacks.on_reasoning_summary_part_added(summary_index)
+
+            def _persist_reasoning_summary_complete(summary_text: str, call_index: int) -> None:
+                """Persist reasoning summaries in chronological order.
+
+                This is called by the tool loop after the Responses stream completes
+                (so we have the full assembled reasoning summary), and BEFORE any
+                tool calls from that response are executed. This preserves the same
+                ordering as the terminal output: reasoning summary first, then tools.
+                """
+
+                txt = (summary_text or "").strip()
+                if not txt:
+                    return
+                try:
                     self.session_store.append_event(
                         {
                             "type": "reasoning_summary",
                             "turn_id": turn_id,
                             "phase": phase,
-                            "summaries": list(result.reasoning_summaries),
+                            "call_index": int(call_index),
+                            "summaries": [txt],
                         }
                     )
-            except Exception:
-                pass
+                except Exception:
+                    pass
+
+            phase_callbacks = ToolLoopCallbacks(
+                on_reasoning_summary_delta=_capture_reasoning_delta,
+                on_reasoning_summary_part_added=_capture_reasoning_part_added,
+                on_reasoning_summary_complete=_persist_reasoning_summary_complete,
+                on_assistant_text_delta=(callbacks.on_assistant_text_delta if callbacks else None),
+                on_tool_call=(callbacks.on_tool_call if callbacks else None),
+                on_tool_result=(callbacks.on_tool_result if callbacks else None),
+            )
+
+            if callbacks is not None and callbacks.on_phase_start is not None:
+                callbacks.on_phase_start(phase)
+            try:
+                result = run_responses_tool_loop(
+                    llm=self.llm,
+                    instructions=(instructions.rstrip() + "\n\n" + shared_instructions).strip(),
+                    input_items=phase_input_items,
+                    tools=phase_tools,
+                    dispatch=_dispatch_logged,
+                    post_tool_output=_post_tool_output,
+                    callbacks=phase_callbacks,
+                    temperature=self.temperature,
+                    reasoning_effort=self.reasoning_effort,
+                    max_rounds=max_rounds,
+                )
+            except ToolLoopNonConverged as e:
+                phase_hit_round_budget_phase = str(phase)
+                try:
+                    self.session_store.append_event(
+                        {
+                            "type": "tool_loop_nonconverged",
+                            "turn_id": turn_id,
+                            "phase": phase,
+                            "max_rounds": int(e.max_rounds),
+                            "rounds_completed": int(e.rounds_completed),
+                            "message": str(e),
+                        }
+                    )
+                except Exception:
+                    pass
+
+                # Forced finalization: produce a user-facing progress update without tools.
+                # This avoids surfacing a raw "Agent error" while preserving correctness:
+                # users can say "continue" and the session log contains all prior tool work.
+                try:
+                    plan = self.session_store.get_plan() or []
+                except Exception:
+                    plan = []
+                plan_lines: list[str] = []
+                for it in plan:
+                    if not isinstance(it, dict):
+                        continue
+                    st = str(it.get("status") or "").strip() or "pending"
+                    step = str(it.get("step") or "").strip()
+                    if not step:
+                        continue
+                    plan_lines.append(f"- {st}: {step}")
+                plan_text = "\n".join(plan_lines) if plan_lines else "(no plan recorded)"
+
+                # Keep the finalize prompt short and operational; do not ask for extra info.
+                finalize_instructions = (
+                    "You are Atlas Agent.\n"
+                    "The previous tool-using loop reached its round budget while the model was still returning tool calls.\n"
+                    "You must now STOP calling tools and produce a progress update to the user.\n\n"
+                    "Requirements for your message:\n"
+                    "- Summarize what has already been done (based on the tool outputs in the conversation).\n"
+                    "- State what remains to be done, referencing the current plan.\n"
+                    "- Provide one clear next step: tell the user to reply with 'continue' to resume execution.\n"
+                    "- Do not call tools.\n"
+                    "- Do not invent unknown ids/keys/values.\n\n"
+                    + ATLAS_SHARED_SYSTEM_RULES
+                )
+                finalize_items = list(e.input_items or [])
+                finalize_items.append(
+                    _message(
+                        role="user",
+                        text=(
+                            "INTERNAL: Tool-loop round budget reached; produce a progress update and stop.\n\n"
+                            "Current plan:\n"
+                            f"{plan_text}"
+                        ),
+                    )
+                )
+
+                final_summary_parts: dict[int, list[str]] = {}
+
+                def _on_finalizer_event(ev: dict[str, Any]) -> None:
+                    et = str(ev.get("type") or "")
+                    if et == "response.reasoning_summary_text.delta":
+                        delta = str(ev.get("delta") or "")
+                        try:
+                            summary_index = int(ev.get("summary_index", 0))
+                        except Exception:
+                            summary_index = 0
+                        final_summary_parts.setdefault(summary_index, []).append(delta)
+                        if callbacks is not None and callbacks.on_reasoning_summary_delta is not None:
+                            callbacks.on_reasoning_summary_delta(delta, summary_index)
+                        return
+                    if et == "response.reasoning_summary_part.added":
+                        try:
+                            summary_index = int(ev.get("summary_index", 0))
+                        except Exception:
+                            summary_index = 0
+                        if callbacks is not None and callbacks.on_reasoning_summary_part_added is not None:
+                            callbacks.on_reasoning_summary_part_added(summary_index)
+                        return
+
+                resp = self.llm.responses_stream(
+                    instructions=(finalize_instructions.rstrip() + "\n\n" + shared_instructions).strip(),
+                    input_items=finalize_items,
+                    tools=None,
+                    temperature=self.temperature,
+                    parallel_tool_calls=False,
+                    reasoning_effort=self.reasoning_effort,
+                    reasoning_summary="detailed",
+                    text_verbosity="high",
+                    on_event=_on_finalizer_event,
+                )
+
+                # Persist finalizer reasoning summary (after prior tool events).
+                try:
+                    merged = "\n\n".join(
+                        "".join(final_summary_parts[k]) for k in sorted(final_summary_parts.keys())
+                    ).strip()
+                    if merged:
+                        self.session_store.append_event(
+                            {
+                                "type": "reasoning_summary",
+                                "turn_id": turn_id,
+                                "phase": phase,
+                                "call_index": int(e.rounds_completed),
+                                "summaries": [merged],
+                                "finalizer": True,
+                            }
+                        )
+                except Exception:
+                    pass
+
+                # Extract assistant text from finalizer response.
+                assistant_text_chunks: list[str] = []
+                out_items = resp.get("output")
+                if isinstance(out_items, list):
+                    for it in out_items:
+                        if not isinstance(it, dict):
+                            continue
+                        if str(it.get("type") or "") != "message":
+                            continue
+                        if str(it.get("role") or "") != "assistant":
+                            continue
+                        content = it.get("content") or []
+                        if not isinstance(content, list):
+                            continue
+                        for part in content:
+                            if not isinstance(part, dict):
+                                continue
+                            if str(part.get("type") or "") != "output_text":
+                                continue
+                            t = part.get("text")
+                            if isinstance(t, str) and t:
+                                assistant_text_chunks.append(t)
+                final_text = "".join(assistant_text_chunks).strip() or "(no response)"
+
+                # Return a synthetic ToolLoopResult so the caller can continue the turn.
+                # We append the assistant message into the local input_items history so
+                # subsequent phases (if any) see the finalizer output.
+                final_items = list(e.input_items or [])
+                final_items.append(_message(role="assistant", text=final_text))
+                result = ToolLoopResult(
+                    assistant_text=final_text,
+                    reasoning_summaries=list(e.reasoning_summaries or []),
+                    tool_calls=list(e.tool_calls or []),
+                    input_items=final_items,
+                )
+            except Exception as e:
+                # Persist any streamed reasoning summary we saw before the failure.
+                merged_streamed = "\n\n".join(
+                    "".join(streamed_summary_parts[k]) for k in sorted(streamed_summary_parts.keys())
+                ).strip()
+                if merged_streamed:
+                    try:
+                        self.session_store.append_event(
+                            {
+                                "type": "reasoning_summary",
+                                "turn_id": turn_id,
+                                "phase": phase,
+                                "summaries": [merged_streamed],
+                                "partial": True,
+                                "error": str(e),
+                            }
+                        )
+                    except Exception:
+                        pass
+                raise
+            if callbacks is not None and callbacks.on_phase_end is not None:
+                callbacks.on_phase_end(phase)
             try:
                 if (result.assistant_text or "").strip():
                     self.session_store.append_event(
@@ -1540,6 +1794,8 @@ class ChatTeam:
                 max_rounds=12,
             )
             phase_input = list(planner_res.input_items)
+            if phase_hit_round_budget_phase == "Planner":
+                final_result = planner_res
             # If the Planner asks a clarifying question, stop the turn here.
             pt = (planner_res.assistant_text or "").strip()
             if pt.lower().startswith("clarify:"):
@@ -1551,32 +1807,38 @@ class ChatTeam:
                 instructions=ATLAS_EXECUTOR_SYSTEM_PROMPT,
                 phase_tools=tools,
                 phase_input_items=phase_input,
-                max_rounds=24,
+                max_rounds=int(self.max_rounds_executor),
             )
             # Deterministic post-write facts snapshot: store what changed in this turn
             # so future turns can ground without re-enumerating everything.
             _append_executor_facts_snapshot()
             phase_input = list(exec_res.input_items)
-            did_write_state = any(
-                (call.get("name") in ATLAS_STATE_MUTATION_TOOLS)
-                for call in (exec_res.tool_calls or [])
-            )
-            if did_write_state:
-                verifier_tools = _filter_tools(
-                    read_only_tool_names
-                    | set(SESSION_MUTATION_TOOLS)
-                    | set(ATLAS_VERIFICATION_OUTPUT_TOOLS)
-                )
-                ver_res = _run_phase(
-                    phase="Verifier",
-                    instructions=ATLAS_VERIFIER_SYSTEM_PROMPT,
-                    phase_tools=verifier_tools,
-                    phase_input_items=phase_input,
-                    max_rounds=12,
-                )
-                final_result = ver_res
-            else:
+            if phase_hit_round_budget_phase == "Executor":
+                # If we had to force-finalize due to tool-loop non-convergence, stop this
+                # turn early (do not run Verifier). The session log contains all prior
+                # tool work; the user can reply "continue" to resume with full context.
                 final_result = exec_res
+            else:
+                did_write_state = any(
+                    (call.get("name") in ATLAS_STATE_MUTATION_TOOLS)
+                    for call in (exec_res.tool_calls or [])
+                )
+                if did_write_state:
+                    verifier_tools = _filter_tools(
+                        read_only_tool_names
+                        | set(SESSION_MUTATION_TOOLS)
+                        | set(ATLAS_VERIFICATION_OUTPUT_TOOLS)
+                    )
+                    ver_res = _run_phase(
+                        phase="Verifier",
+                        instructions=ATLAS_VERIFIER_SYSTEM_PROMPT,
+                        phase_tools=verifier_tools,
+                        phase_input_items=phase_input,
+                        max_rounds=12,
+                    )
+                    final_result = ver_res
+                else:
+                    final_result = exec_res
 
         text = (final_result.assistant_text or "").strip() or "(no response)"
 
@@ -1617,6 +1879,8 @@ def run_repl(
     api_key: str,
     model: str,
     temperature: float = 0.2,
+    reasoning_effort: str | None = "high",
+    max_rounds: int = DEFAULT_EXECUTOR_MAX_ROUNDS,
     *,
     session: Optional[str] = None,
     session_dir: Optional[str] = None,
@@ -1638,6 +1902,8 @@ def run_repl(
         api_key=api_key,
         model=model,
         temperature=temperature,
+        reasoning_effort=reasoning_effort,
+        max_rounds_executor=int(max_rounds),
         session=session,
         session_dir=session_dir,
         enable_codegen=bool(enable_codegen),

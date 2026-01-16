@@ -11,6 +11,7 @@ import argparse
 import logging
 import os
 
+from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS
 from .chat_rpc_team import run_repl as run_team_repl
 from .console_ui import run_console_repl
 
@@ -27,7 +28,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("cmd", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument(
         "--model",
-        default="gpt-5.2",
+        default="gpt-5.2-pro",
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        default="high",
+        choices=["low", "medium", "high"],
+        help="Reasoning effort for Responses API calls (when supported by the model/provider).",
+    )
+    parser.add_argument(
+        "--max-rounds",
+        type=int,
+        default=DEFAULT_EXECUTOR_MAX_ROUNDS,
+        help=(
+            "Maximum tool-loop rounds for the Executor phase (0 = unlimited). "
+            "Increase for very complex tasks that require many tool calls."
+        ),
     )
     parser.add_argument(
         "--session",
@@ -75,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
                 api_key=api_key,
                 model=args.model,
                 temperature=0.2,
+                reasoning_effort=args.reasoning_effort,
+                max_rounds=int(args.max_rounds),
                 session=args.session,
                 session_dir=args.session_dir,
                 enable_codegen=bool(args.enable_codegen),
@@ -87,6 +105,8 @@ def main(argv: list[str] | None = None) -> int:
             api_key=api_key,
             model=args.model,
             temperature=0.2,
+            reasoning_effort=args.reasoning_effort,
+            max_rounds=int(args.max_rounds),
             session=args.session,
             session_dir=args.session_dir,
             enable_codegen=bool(args.enable_codegen),

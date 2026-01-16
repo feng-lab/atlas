@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
+from ...camera_director_templates import expand_walkthrough_segments
 from ...describe import load_animation, load_capabilities, summarize_animation
 from ...discovery import (
     compute_paths_from_atlas_dir,
@@ -19,8 +20,17 @@ from .context import ToolDispatchContext
 
 JSON_VALUE_SCHEMA: Dict[str, Any] = {
     "description": "Native JSON value (supports object/array/scalars; nested structures allowed).",
-    "type": ["object", "array", "number", "string", "boolean", "null"],
-    "items": {"type": ["object", "array", "number", "string", "boolean", "null"]},
+    # Use anyOf rather than a "type": [...] union. Some providers validate a more
+    # restrictive subset of JSON Schema and require explicit items for any
+    # schema that can be an array.
+    "anyOf": [
+        {"type": "object"},
+        {"type": "array", "items": {}},
+        {"type": "number"},
+        {"type": "string"},
+        {"type": "boolean"},
+        {"type": "null"},
+    ],
 }
 
 HANDLED_TOOLS = (
@@ -33,6 +43,7 @@ HANDLED_TOOLS = (
     "animation_camera_get_interpolation_method",
     "animation_camera_set_interpolation_method",
     "animation_camera_waypoint_spline_apply",
+    "animation_camera_walkthrough_apply",
     "animation_get_time",
     "animation_list_keys",
     "animation_clear_keys_range",
@@ -218,6 +229,96 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     },
                 },
                 "required": ["t0", "t1", "waypoints"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "animation_camera_walkthrough_apply",
+            "description": (
+                "First-person walkthrough authoring: build a smooth camera path from high-level motion segments (local moves + yaw/pitch/roll), "
+                "set camera interpolation method (default Position Rotation Spline), optionally clear existing camera keys in [t0,t1], then write validated camera keys. "
+                "This is intended for 'fly/drone inside the object' requests where users describe motion in words and the agent invents segments.\n\n"
+                "Segment timing modes (choose ONE):\n"
+                "- Explicit: every segment has u0/u1 in [0,1]\n"
+                "- Duration: every segment has duration (seconds); durations are normalized to fill [t0,t1]\n"
+                "- Equal: no u0/u1/duration provided; segments split [t0,t1] evenly\n\n"
+                "Motion units:\n"
+                "- move distances are fractions of the target bbox enclosing-sphere radius (so no world-unit guessing).\n"
+                "- rotation is in degrees.\n"
+                "Sampling:\n"
+                "- Motion is approximated by sampling each segment at step_seconds; decrease step_seconds for higher-fidelity curved motion."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects.",
+                    },
+                    "after_clipping": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Use clipped bbox for bbox-scaled movement.",
+                    },
+                    "t0": {"type": "number", "description": "Start time (seconds)."},
+                    "t1": {"type": "number", "description": "End time (seconds)."},
+                    "segments": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": (
+                            "Motion segments. Each segment may include:\n"
+                            "- u0/u1 (0..1) OR duration (seconds) OR neither (equal split)\n"
+                            "- move: {forward?, back?, right?, left?, up?, down?} (fractions of bbox radius; signed values allowed)\n"
+                            "- rotate: {yaw?, pitch?, roll?} (degrees)\n"
+                            "- pause: true (equivalent to zero move/rotate)\n"
+                            "- template: optional internal shorthand like 'enter', 'turn_right', 'pause' (expanded before applying)\n"
+                            "- amount/distance/degrees: optional template knobs (amount can be a label like 'small'/'medium' or a number)\n"
+                            "- label: optional string\n"
+                        ),
+                    },
+                    "step_seconds": {
+                        "type": "number",
+                        "default": 1.0,
+                        "description": "Sampling step used to approximate motion inside each segment. Smaller → more keys (smoother curved motion).",
+                    },
+                    "method": {
+                        "type": "string",
+                        "default": "Position Rotation Spline",
+                        "enum": [
+                            "Center",
+                            "Position Spline",
+                            "Position Rotation Spline",
+                        ],
+                        "description": "Camera interpolation method to set before writing keys.",
+                    },
+                    "easing": {
+                        "type": "string",
+                        "default": "Linear",
+                        "description": "Easing assigned to written camera keys (note: spline path uses key geometry).",
+                    },
+                    "clear_range": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys.",
+                    },
+                    "tolerance": {
+                        "type": "number",
+                        "default": 1e-3,
+                        "description": "Time tolerance used when clearing/replacing keys.",
+                    },
+                    "constraints": {
+                        "type": "object",
+                        "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
+                    },
+                    "base_value": {
+                        "type": "object",
+                        "description": "Optional base camera value used as the initial camera pose (projection/fov/up defaults).",
+                    },
+                },
+                "required": ["t0", "t1", "segments"],
             },
         },
     },
@@ -585,7 +686,12 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "animation_set_key_param",
-            "description": "Add a parameter key by id (0=camera unsupported here, ≥4 objects; 1/2/3 groups) with json_key and a native JSON value (bool/number/string/array/object).",
+            "description": (
+                "Add a parameter keyframe by id (0=camera unsupported here, ≥4 objects; 1/2/3 groups) with json_key and a native JSON value.\n"
+                "Note on composite object types (e.g., 3DTransform): animation keys store a full value for that key. If you pass a partial object "
+                "(e.g., {'Translation Vec3':[...]} only), omitted subfields will remain at defaults for that key (they do NOT automatically inherit the current scene).\n"
+                "If you intend to 'change only one subfield but keep the rest', read the current value first (scene_get_values or existing key) and write a full object."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -773,7 +879,11 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "animation_render_preview",
-            "description": "Render a single preview frame by saving the current animation and invoking headless Atlas. Returns a path to the image in the OS temp directory.",
+            "description": (
+                "Render a single preview frame for an animation time by saving the current .animation3d and invoking headless Atlas.\n"
+                "This is primarily for verifying animation-at-time behavior. For static scene screenshots, prefer scene_screenshot (lighter; does not involve animation export).\n"
+                "Returns a path to the image in the OS temp directory."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1557,6 +1667,417 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             if isinstance(cur_method, str) and cur_method.strip():
                 payload["current_method"] = cur_method
             return json.dumps(payload)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+    if name == "animation_camera_walkthrough_apply":
+        try:
+            ids = args.get("ids") or []
+            after_clipping = bool(args.get("after_clipping", True))
+            t0 = float(args.get("t0", 0.0))
+            t1 = float(args.get("t1", 0.0))
+            if not (math.isfinite(t0) and math.isfinite(t1)):
+                return json.dumps({"ok": False, "error": "t0 and t1 must be finite"})
+            if t0 < 0.0 or t1 < 0.0:
+                return json.dumps({"ok": False, "error": "t0 and t1 must be >= 0"})
+            if not (t1 > t0):
+                return json.dumps({"ok": False, "error": "t1 must be > t0"})
+
+            segments_in = args.get("segments") or []
+            if not isinstance(segments_in, list) or not segments_in:
+                return json.dumps({"ok": False, "error": "segments must be a non-empty list"})
+
+            method = str(args.get("method", "Position Rotation Spline"))
+            easing = str(args.get("easing", "Linear"))
+            tol = float(args.get("tolerance", 1e-3))
+            if not math.isfinite(tol) or tol < 0.0:
+                return json.dumps({"ok": False, "error": "tolerance must be a finite number >= 0"})
+            step_seconds = float(args.get("step_seconds", 1.0))
+            if not math.isfinite(step_seconds) or step_seconds <= 0.0:
+                return json.dumps({"ok": False, "error": "step_seconds must be a finite number > 0"})
+            clear_range = bool(args.get("clear_range", True))
+            constraints = args.get("constraints") or {"keep_visible": False}
+            base_value = args.get("base_value")
+
+            # Ensure animation exists (creates/binds a default 3D animation with a baseline t=0 frame).
+            if not client.ensure_animation():
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "EnsureAnimation failed (no visual objects loaded yet?)",
+                    }
+                )
+
+            # Set interpolation method so key sequences behave as a spline path.
+            if not client.set_camera_interpolation_method(method):
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": f"failed to set camera interpolation method to {method!r}",
+                    }
+                )
+
+            # Initial camera pose.
+            cam: dict
+            if isinstance(base_value, dict) and base_value:
+                cam = base_value
+            else:
+                cam = client.camera_get()
+            if not isinstance(cam, dict) or not cam:
+                return json.dumps({"ok": False, "error": "failed to get a base camera value"})
+
+            # Normalize segments to time ranges inside [t0,t1].
+            segs: list[dict[str, Any]] = []
+            for s in segments_in:
+                if not isinstance(s, dict):
+                    return json.dumps({"ok": False, "error": "each segment must be an object"})
+                segs.append(s)
+
+            try:
+                segs = expand_walkthrough_segments(segs)
+            except Exception as e:
+                return json.dumps({"ok": False, "error": f"segment template expansion failed: {e}"})
+
+            span = float(t1 - t0)
+            any_u = any(("u0" in s) or ("u1" in s) for s in segs)
+            any_dur = any("duration" in s for s in segs)
+            if any_u and any_dur:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "segments must use exactly one timing mode: u0/u1 OR duration OR equal split (do not mix)",
+                    }
+                )
+
+            time_ranges: list[tuple[float, float, dict[str, Any]]] = []
+            if any_u:
+                explicit: list[tuple[float, float, dict[str, Any]]] = []
+                for s in segs:
+                    if ("u0" not in s) or ("u1" not in s):
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "when using u0/u1 timing, every segment must include both u0 and u1",
+                            }
+                        )
+                    u0 = float(s.get("u0", 0.0))
+                    u1 = float(s.get("u1", 0.0))
+                    if not (math.isfinite(u0) and math.isfinite(u1)):
+                        return json.dumps({"ok": False, "error": "segment u0/u1 must be finite"})
+                    if u0 < 0.0 or u1 < 0.0 or u0 > 1.0 or u1 > 1.0:
+                        return json.dumps({"ok": False, "error": "segment u0/u1 must be in [0,1]"})
+                    if not (u1 > u0):
+                        return json.dumps({"ok": False, "error": "segment u1 must be > u0"})
+                    explicit.append((u0, u1, s))
+                explicit.sort(key=lambda it: float(it[0]))
+
+                # Fill gaps with pause segments so interpolation doesn't move during gaps.
+                eps = 1e-9
+                ucur = 0.0
+                normalized: list[tuple[float, float, dict[str, Any]]] = []
+                for u0, u1, s in explicit:
+                    if u0 < (ucur - eps):
+                        return json.dumps({"ok": False, "error": "segments overlap in u-space"})
+                    if u0 > (ucur + eps):
+                        normalized.append((ucur, u0, {"pause": True, "label": "pause"}))
+                    normalized.append((u0, u1, s))
+                    ucur = u1
+                if ucur < (1.0 - eps):
+                    normalized.append((ucur, 1.0, {"pause": True, "label": "pause"}))
+
+                for u0, u1, s in normalized:
+                    ta = t0 + u0 * span
+                    tb = t0 + u1 * span
+                    time_ranges.append((float(ta), float(tb), s))
+            elif any_dur:
+                durs: list[float] = []
+                for s in segs:
+                    if "duration" not in s:
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "when using duration timing, every segment must include duration",
+                            }
+                        )
+                    d = float(s.get("duration", 0.0))
+                    if not math.isfinite(d) or d <= 0.0:
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "segment duration must be a finite number > 0",
+                            }
+                        )
+                    durs.append(d)
+                total = float(sum(durs))
+                if not (total > 0.0):
+                    return json.dumps({"ok": False, "error": "total duration must be > 0"})
+                tcur = float(t0)
+                for i, s in enumerate(segs):
+                    dt = span * float(durs[i]) / total
+                    ta = tcur
+                    tb = tcur + dt
+                    tcur = tb
+                    time_ranges.append((ta, tb, s))
+                # Ensure exact end at t1 (avoid drift from floating-point summation).
+                if time_ranges:
+                    ta, _, s = time_ranges[-1]
+                    time_ranges[-1] = (ta, float(t1), s)
+            else:
+                # Equal split
+                n = len(segs)
+                dt = span / float(n)
+                tcur = float(t0)
+                for i, s in enumerate(segs):
+                    ta = tcur
+                    tb = (t0 + (i + 1) * dt) if (i < n - 1) else float(t1)
+                    time_ranges.append((float(ta), float(tb), s))
+                    tcur = float(tb)
+
+            if not time_ranges:
+                return json.dumps({"ok": False, "error": "no valid segments after normalization"})
+
+            def _coerce_float(x: Any, *, field: str) -> float:
+                try:
+                    v = float(x)
+                except Exception:
+                    raise ValueError(f"{field} must be a number")
+                if not math.isfinite(v):
+                    raise ValueError(f"{field} must be finite")
+                return v
+
+            def _parse_move(seg: dict[str, Any]) -> tuple[float, float, float]:
+                if bool(seg.get("pause", False)):
+                    return (0.0, 0.0, 0.0)
+                move = seg.get("move")
+                if move is None:
+                    return (0.0, 0.0, 0.0)
+                if not isinstance(move, dict):
+                    raise ValueError("segment.move must be an object")
+                forward = 0.0
+                right = 0.0
+                up = 0.0
+                for k, v in move.items():
+                    key = str(k or "").strip().lower()
+                    val = _coerce_float(v, field=f"move.{k}")
+                    if key in {"forward", "fwd"}:
+                        forward += val
+                    elif key in {"back", "backward"}:
+                        forward -= val
+                    elif key == "right":
+                        right += val
+                    elif key == "left":
+                        right -= val
+                    elif key == "up":
+                        up += val
+                    elif key == "down":
+                        up -= val
+                    else:
+                        raise ValueError(
+                            "segment.move keys must be one of: forward, back, right, left, up, down"
+                        )
+                return (forward, right, up)
+
+            def _parse_rotate(seg: dict[str, Any]) -> tuple[float, float, float]:
+                if bool(seg.get("pause", False)):
+                    return (0.0, 0.0, 0.0)
+                rot = seg.get("rotate")
+                if rot is None:
+                    return (0.0, 0.0, 0.0)
+                if not isinstance(rot, dict):
+                    raise ValueError("segment.rotate must be an object")
+                yaw = 0.0
+                pitch = 0.0
+                roll = 0.0
+                for k, v in rot.items():
+                    key = str(k or "").strip().lower()
+                    val = _coerce_float(v, field=f"rotate.{k}")
+                    if key == "yaw":
+                        yaw += val
+                    elif key == "pitch":
+                        pitch += val
+                    elif key == "roll":
+                        roll += val
+                    else:
+                        raise ValueError("segment.rotate keys must be one of: yaw, pitch, roll")
+                return (yaw, pitch, roll)
+
+            def _apply_move(cam_value: dict, *, forward: float, right: float, up: float) -> dict:
+                cur = cam_value
+                if abs(forward) > 1e-12:
+                    cur = client.camera_move_local(
+                        op=("FORWARD" if forward >= 0.0 else "BACK"),
+                        distance=abs(float(forward)),
+                        distance_is_fraction_of_bbox_radius=True,
+                        ids=ids,
+                        after_clipping=after_clipping,
+                        move_center=True,
+                        base_value=cur,
+                    )
+                if abs(right) > 1e-12:
+                    cur = client.camera_move_local(
+                        op=("RIGHT" if right >= 0.0 else "LEFT"),
+                        distance=abs(float(right)),
+                        distance_is_fraction_of_bbox_radius=True,
+                        ids=ids,
+                        after_clipping=after_clipping,
+                        move_center=True,
+                        base_value=cur,
+                    )
+                if abs(up) > 1e-12:
+                    cur = client.camera_move_local(
+                        op=("UP" if up >= 0.0 else "DOWN"),
+                        distance=abs(float(up)),
+                        distance_is_fraction_of_bbox_radius=True,
+                        ids=ids,
+                        after_clipping=after_clipping,
+                        move_center=True,
+                        base_value=cur,
+                    )
+                return cur
+
+            def _apply_rotate(cam_value: dict, *, yaw: float, pitch: float, roll: float) -> dict:
+                cur = cam_value
+                if abs(yaw) > 1e-12:
+                    cur = client.camera_rotate(op="YAW", degrees=float(yaw), base_value=cur)
+                if abs(pitch) > 1e-12:
+                    cur = client.camera_rotate(op="PITCH", degrees=float(pitch), base_value=cur)
+                if abs(roll) > 1e-12:
+                    cur = client.camera_rotate(op="ROLL", degrees=float(roll), base_value=cur)
+                return cur
+
+            # Build camera key values by integrating segments sequentially.
+            keys: list[dict[str, Any]] = [{"time": float(t0), "value": cam}]
+            last_time = float(t0)
+            for ta, tb, seg in time_ranges:
+                if not (math.isfinite(ta) and math.isfinite(tb)):
+                    return json.dumps({"ok": False, "error": "segment time range must be finite"})
+                if tb <= ta:
+                    continue
+                try:
+                    total_forward, total_right, total_up = _parse_move(seg)
+                    total_yaw, total_pitch, total_roll = _parse_rotate(seg)
+                except ValueError as e:
+                    return json.dumps({"ok": False, "error": str(e)})
+
+                is_pause = (
+                    abs(total_forward) <= 1e-12
+                    and abs(total_right) <= 1e-12
+                    and abs(total_up) <= 1e-12
+                    and abs(total_yaw) <= 1e-12
+                    and abs(total_pitch) <= 1e-12
+                    and abs(total_roll) <= 1e-12
+                )
+
+                dt = float(tb - ta)
+                n_steps = 1 if is_pause else max(1, int(math.ceil(dt / step_seconds)))
+                for i in range(1, n_steps + 1):
+                    # Integrate small steps to approximate simultaneous movement + rotation.
+                    frac = 1.0 / float(n_steps)
+                    cam = _apply_move(
+                        cam,
+                        forward=total_forward * frac,
+                        right=total_right * frac,
+                        up=total_up * frac,
+                    )
+                    cam = _apply_rotate(
+                        cam,
+                        yaw=total_yaw * frac,
+                        pitch=total_pitch * frac,
+                        roll=total_roll * frac,
+                    )
+                    tm = float(ta + dt * (float(i) / float(n_steps)))
+                    if tm > last_time + 1e-9:
+                        keys.append({"time": tm, "value": cam})
+                        last_time = tm
+
+            # Ensure a final key at t1 (exact).
+            if abs(last_time - float(t1)) > 1e-9:
+                keys.append({"time": float(t1), "value": cam})
+
+            if len(keys) < 2:
+                return json.dumps({"ok": False, "error": "walkthrough produced fewer than 2 keys"})
+
+            # Optionally clear existing keys in [t0,t1] before applying.
+            if clear_range:
+                clear_res = json.loads(
+                    dispatch(
+                        "animation_clear_keys_range",
+                        json.dumps(
+                            {
+                                "id": 0,
+                                "t0": float(t0),
+                                "t1": float(t1),
+                                "tolerance": float(tol),
+                                "include_times": False,
+                            }
+                        ),
+                    )
+                    or "{}"
+                )
+                if isinstance(clear_res, dict) and clear_res.get("ok") is False:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": f"failed to clear camera keys in range: {clear_res.get('error')}",
+                        }
+                    )
+
+            applied: list[float] = []
+            failed: list[dict[str, Any]] = []
+            for k in keys:
+                try:
+                    tv = float(k.get("time", 0.0))
+                    vv = k.get("value") or {}
+                    payload = {
+                        "time": tv,
+                        "easing": easing,
+                        "value": vv,
+                        "tolerance": tol,
+                        "strict": False,
+                        "ids": ids,
+                        "constraints": constraints,
+                    }
+                    rr = json.loads(
+                        dispatch("animation_replace_key_camera", json.dumps(payload))
+                        or "{}"
+                    )
+                    if rr.get("ok"):
+                        applied.append(tv)
+                    else:
+                        failed.append(
+                            {
+                                "time": tv,
+                                "error": rr.get("error") or rr.get("reason") or "apply_failed",
+                            }
+                        )
+                except Exception as e:
+                    failed.append({"time": float(k.get("time", 0.0) or 0.0), "error": str(e)})
+
+            # Read back the effective method for deterministic logging.
+            cur_method = None
+            try:
+                cur_method = client.get_camera_interpolation_method()
+            except Exception:
+                cur_method = None
+
+            out: dict[str, Any] = {
+                "ok": not bool(failed),
+                "applied": sorted(applied),
+                "total": len(applied),
+                "planned_total": len(keys),
+                "method": method,
+                "step_seconds": float(step_seconds),
+            }
+            if failed:
+                out["failed"] = failed
+            if isinstance(cur_method, str) and cur_method.strip():
+                out["current_method"] = cur_method
+            return json.dumps(out)
         except Exception as e:
             msg = str(e)
             try:

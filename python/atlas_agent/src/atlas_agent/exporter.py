@@ -26,6 +26,10 @@ def preview_frames(
     overwrite: bool,
     dummy_output: str,
 ) -> int:
+    # Atlas CLI uses an exclusive end frame (i < endFrame). For agent tools we
+    # treat `end` as inclusive to match the tool descriptions and to support
+    # single-frame preview calls where start==end.
+    end_exclusive = (int(end) + 1) if int(end) >= 0 else int(end)
     args = [
         atlas_bin,
         "--run_export_3d_animation",
@@ -38,7 +42,7 @@ def preview_frames(
         "--output_start_frame",
         str(start),
         "--output_end_frame",
-        str(end),
+        str(end_exclusive),
         "--output_width",
         str(width),
         "--output_height",
@@ -66,6 +70,9 @@ def export_video(
     overwrite: bool,
     use_gpu_devices: str | None,
 ) -> int:
+    # Atlas CLI uses an exclusive end frame (i < endFrame). For agent tools we
+    # treat `end` as inclusive (and preserve -1 as "duration").
+    end_exclusive = (int(end) + 1) if int(end) >= 0 else int(end)
     args = [
         atlas_bin,
         "--run_export_3d_animation",
@@ -78,7 +85,7 @@ def export_video(
         "--output_start_frame",
         str(start),
         "--output_end_frame",
-        str(end),
+        str(end_exclusive),
         "--output_width",
         str(width),
         "--output_height",

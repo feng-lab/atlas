@@ -22,7 +22,15 @@ Z3DBoundedFilter::RendererParameters::RendererParameters()
   , materialShininess("Material Shininess", 100.f, 1.f, 200.f)
 {
   coordTransform.setDescription(QStringLiteral(
-    "Object transform bundle with fields: 'Scale Vec3', 'Rotation Vec4' (axis-angle), 'Rotation Center Vec3', and 'Translation Vec3'."));
+    "Object transform bundle with fields: 'Scale Vec3', 'Rotation Vec4' (axis-angle, degrees), "
+    "'Rotation Center Vec3', and 'Translation Vec3'.\n"
+    "\n"
+    "Matrix composition (GLM column-vector convention; rightmost term applies first):\n"
+    "  M = T(Translation + RotationCenter*Scale) * R(Rotation) * T(-RotationCenter*Scale) * S(Scale)\n"
+    "Meaning: scale about origin → rotate about (RotationCenter*Scale) → translate.\n"
+    "RotationCenter*Scale is component-wise (cx*sx, cy*sy, cz*sz).\n"
+    "RPC/scene_apply: you may provide a partial object (e.g., only 'Translation Vec3'); unspecified fields stay unchanged.\n"
+    "Note: Rotation Center affects rotation only; scaling is always about the object origin (0,0,0)."));
   sizeScale.setSingleStep(0.001);
   sizeScale.setDecimal(3);
   sizeScale.setStyle("SPINBOX");

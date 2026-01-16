@@ -1243,6 +1243,41 @@ class SceneClient:
         self._log_rpc("SaveScene", req, resp)
         return bool(getattr(resp, "ok", False))
 
+    def screenshot_3d(
+        self,
+        *,
+        width: int,
+        height: int,
+        path: Path | None = None,
+        overwrite: bool = True,
+    ) -> dict[str, Any]:
+        """Render a single screenshot of the current 3D scene (no animation export).
+
+        Returns: {"ok": bool, "path": str, "error"?: str}
+        """
+
+        self.ensure_view()
+
+        if self._stub is None or not hasattr(self._stub, "TakeScreenshot3D"):
+            raise RuntimeError("TakeScreenshot3D is not supported by this Atlas version")
+
+        out_path = str(path) if path is not None else ""
+        req = self._pb2.ScreenshotRequest(
+            width=int(width),
+            height=int(height),
+            path=out_path,
+            overwrite=bool(overwrite),
+        )
+        resp = self._stub.TakeScreenshot3D(req)
+        self._log_rpc("TakeScreenshot3D", req, resp)
+
+        ok = bool(getattr(resp, "ok", False))
+        out: dict[str, Any] = {"ok": ok, "path": str(getattr(resp, "path", "") or "")}
+        err = str(getattr(resp, "error", "") or "")
+        if (not ok) and err:
+            out["error"] = err
+        return out
+
     # Cuts
     def cut_set_box(self, min_xyz: tuple[float, float, float], max_xyz: tuple[float, float, float], refit_camera: bool = False) -> bool:
         self.ensure_view()

@@ -52,7 +52,8 @@ Notes
 - The chat runtime uses the OpenAI Python SDK + the Responses API for streaming reasoning summaries + tool-calling.
 
 Screenshots (optional)
-- Visual verification can use `animation_render_preview` to render a single frame to a temp image.
+- Visual verification can use `scene_screenshot` to render a single frame of the **current scene** to a temp image (preferred; does not create animations).
+- When you specifically need to verify an **animation** at a particular time, the agent can use `animation_render_preview` (heavier; runs the animation exporter).
 - On startup, the CLI asks once per session for consent to use preview screenshots for verification.
 - You can toggle later in the REPL: `:screenshots on` / `:screenshots off`.
 - If a requirement can't be verified from tools or screenshots, the agent will request a human-check step.
@@ -79,6 +80,7 @@ Natural Language Examples
 Atlas Agent (live)
 - Start: `atlas-agent --model gpt-5.2` (starts a console UI by default).
   - If Atlas is not running, the CLI attempts to launch it from a common install location and then waits for the RPC server.
+- Long/complex tasks: set `--max-rounds 0` to allow the Executor phase to run an unbounded number of tool-loop rounds (no “did not converge after max_rounds” failures). Otherwise increase `--max-rounds` as needed.
 - Runtime loop (streaming tool loop):
   - Phases (adaptive by default):
     - Planner: may run first to create/refresh the plan (read-only tools + `update_plan` only).
@@ -116,7 +118,16 @@ Inspector (legacy / optional)
 - Feedback is advisory: Use the feedback field for non‑blocking notes (limitations, qualitative comments). Use TODO updates only as checkbox lines when helpful; do not block solely on naming or unverifiable external inputs.
 
 Filesystem Tools (Best Practices)
-- Path resolution: Use `fs_hint_resolve` to turn natural language hints into candidate paths (anchors on ~/Documents, ~/Downloads, ~/Desktop, plus optional bases). Prefer this over guessing full paths.
+- Exact paths: If the user provides an explicit absolute path (e.g., `/Users/...`, `~/...`, `C:\\...`), treat it as exact.
+  - Use `fs_expand_paths` then `fs_check_paths` to verify it exists.
+  - If it does not exist, use `fs_resolve_path` for typo correction (case/pluralization/prefix) rather than fuzzy-searching unrelated folders.
+- Natural-language hints: If the user describes a location in words (“in my Documents/atlas_test folder”), use `fs_hint_resolve` with structured inputs (`expected_name` + `possible_dirs`) to turn the hint into candidate paths. Prefer this over guessing full paths.
+  - Prefer passing structured inputs rather than relying on brittle hint parsing:
+    - `expected_name`: the basename to score against (e.g. `test_st.stitching_log.txt`)
+    - `possible_dirs`: likely search roots (e.g. `["~/Documents/atlas_test"]`)
+    - If the user references a well-known folder name (“Documents”, “Downloads”, “Desktop”), use `system_info` to resolve it to an absolute path and build `possible_dirs` explicitly (e.g. `common_dirs.Documents + "/atlas_test"`).
+  - `expected_name` is a scoring hint (not an exact-match contract). The tool returns `match:"exact"` when the best candidate basename matches `expected_name` case-insensitively; otherwise it returns `match:"best_candidate"` and includes a `hint` explaining that validation is required.
+  - Always validate the selected path by reading/checking it before loading.
 - Logs (simple, robust):
   - `fs_tail_lines`: last N lines (UTF‑8, BOM‑aware). Minimal params: `path`, `n`.
   - `fs_tail_bytes`: last K bytes (UTF‑8, BOM‑aware). Minimal params: `path`, `bytes`.
@@ -171,10 +182,10 @@ Categories and current tools (non-exhaustive)
 - Docs: `docs_list`, `docs_search`, `docs_read`
 - Planning: `update_plan`
 - Load: `scene_load_files`, `scene_ensure_loaded`, `scene_smart_load`
-- Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_params`, `scene_apply`, `scene_save_scene`, `scene_set_visibility`, `scene_make_alias`
+- Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_params`, `scene_apply`, `scene_save_scene`, `scene_screenshot`, `scene_set_visibility`, `scene_make_alias`
 - Discovery: `scene_list_objects`, `scene_list_params(id)`, `scene_capabilities`, `scene_schema`, `scene_capabilities_summary`, `scene_facts_summary`
 - Timeline: `animation_list_keys(id,json_key,include_values)`, `animation_batch`, `animation_set_key_param`, `animation_replace_key_param`, `animation_set_duration`, `animation_set_time`, `animation_play`, `animation_pause`, `animation_save_animation`
-- Camera: producers (typed values) — `fit_candidates`, `camera_get`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`, `camera_move_local`, `camera_look_at`, `camera_path_solve`; scene apply — `scene_camera_fit`, `scene_camera_apply`; animation (timeline) — `animation_camera_solve_and_apply`, `animation_replace_key_camera`, `animation_camera_validate`, `animation_camera_get_interpolation_method`, `animation_camera_set_interpolation_method`, `animation_camera_waypoint_spline_apply`
+- Camera: producers (typed values) — `fit_candidates`, `camera_get`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`, `camera_move_local`, `camera_look_at`, `camera_path_solve`; scene apply — `scene_camera_fit`, `scene_camera_apply`; animation (timeline) — `animation_camera_solve_and_apply`, `animation_replace_key_camera`, `animation_camera_validate`, `animation_camera_get_interpolation_method`, `animation_camera_set_interpolation_method`, `animation_camera_waypoint_spline_apply`, `animation_camera_walkthrough_apply`
 - Geometry/Cuts: `scene_bbox`, `scene_cut_suggest`, `scene_cut_set`, `scene_cut_clear`
 
 Notes
@@ -241,6 +252,9 @@ Animation (timeline) authoring
 - Guided waypoint spline (one-shot apply):
   - `animation_camera_waypoint_spline_apply(t0, t1, waypoints=[...], method="Position Rotation Spline", constraints?, clear_range=true, easing="Linear")`
   - Note: this tool does **not** change the animation duration; call `animation_set_duration(seconds)` separately if needed.
+- First-person walkthrough (one-shot apply):
+  - `animation_camera_walkthrough_apply(t0, t1, segments=[...], method="Position Rotation Spline", step_seconds=1.0, constraints={keep_visible:false})`
+  - Note: this tool does **not** change the animation duration; call `animation_set_duration(seconds)` separately if needed.
 
 Notes
 - Prefer “produce → apply” for clarity: use `camera_*` producers to compute a typed camera, then choose scene vs. animation by the apply tool.
@@ -249,11 +263,72 @@ Notes
 
 ## Camera Workflows (Walkthrough + Waypoints)
 
+## Camera Director Rubric (Default Policy)
+
+Atlas supports multiple camera authoring styles. Users may describe either style (or a mix), so the agent should **route** requests consistently and apply stable defaults.
+
+Routing: pick the representation
+- Prefer **guided waypoint spline** when the user gives explicit spatial beats:
+  - “waypoint 1/2/3…”, “go to A then B then C”, explicit coordinates, or bbox-fraction points like `[0.5,0.5,0.8]`.
+  - Tool: `animation_camera_waypoint_spline_apply(...)`
+- Prefer **first-person walkthrough** when the user describes motion verbs rather than locations:
+  - “fly forward”, “strafe right”, “ascend”, “yaw left”, “look around”, “pause”.
+  - Tool: `animation_camera_walkthrough_apply(...)`
+- Mixed prompts:
+  - If the user provides 3–6 major beats AND describes motion between them, treat the beats as waypoints and add intermediate motion via additional waypoints or by using walkthrough segments for the in-between portion.
+  - Never drop user-provided waypoints/segments. If the plan would generate too many keys, increase `step_seconds` (walkthrough) rather than truncating the path.
+
+Default timing policy
+- If the user gives a total duration only: use `t0=0` and `t1=duration`, and call `animation_set_duration(duration)`.
+- Waypoints:
+  - If waypoint times are omitted, map them evenly across `[t0,t1]` using `u` in `[0,1]`.
+- Walkthrough segments:
+  - If segments have explicit `duration`, normalize durations to fill `[t0,t1]`.
+  - Otherwise, split `[t0,t1]` evenly across segments.
+
+Default smoothing policy
+- For walkthroughs and waypoint fly-throughs, set camera interpolation to `Position Rotation Spline`.
+- Use `Center` only when the intent is specifically “lock camera evaluation around a center” (classic orbit/turntable behavior).
+
+Default “speed” mapping (heuristics)
+- If the user says **slow / cinematic / gentle**:
+  - Use smaller motion per segment and denser sampling (e.g., `step_seconds` around `0.5`–`1.0`).
+- If the user says **fast / quick**:
+  - Use coarser sampling (e.g., `step_seconds` around `1.5`–`2.0`) to avoid generating excessive keys.
+- If no speed is specified:
+  - Use `step_seconds=1.0` and keep segment count modest (but increase when motion needs curvature/precision).
+
+Default motion magnitude mapping (bbox-scaled)
+- Walkthrough move distances are interpreted as **fractions of bbox radius** (so the same script works across datasets).
+- If the user gives no numeric distances:
+  - “slightly / a bit” ≈ `0.05`–`0.15`
+  - “forward into it / enter” ≈ `0.3`–`0.7`
+  - “deep inside” ≈ `0.7`–`1.2` (may require multiple segments)
+- Rotation defaults when no degrees are specified:
+  - “slight turn” ≈ `15°`
+  - “turn” ≈ `45°`
+  - “turn right/left” (strong) ≈ `90°`
+  - “look around” ≈ a sequence of `yaw/pitch` moves rather than a single 180° snap.
+
+Default look/aim policy
+- Walkthrough: default to “look forward” (preserve view direction). Only lock `look_at` when the user explicitly requests it.
+- Waypoints: default to `look_at: {bbox_center:true}` unless the user says “look forward / don’t lock aim”.
+
+Default validation constraints
+- Walkthrough/interior: default `constraints.keep_visible=false` (user intent is exploration, not framing the whole bbox).
+- Exterior presentation/orbit: default `constraints.keep_visible=true` with `min_coverage≈0.95` (framing intent).
+
 ### First-person walkthrough (freeform)
 
 Use this when you want to **enter** a volume/mesh and navigate “like a drone” (not an orbit).
 
-Typical tool pattern:
+Typical tool pattern (preferred: one-shot apply):
+1) `animation_ensure_animation` and `animation_set_duration(seconds)`
+2) `animation_camera_walkthrough_apply(t0, t1, segments=[...], method="Position Rotation Spline", step_seconds=1.0, constraints={keep_visible:false})`
+3) Verify:
+   - `animation_list_keys(id=0)` and optionally `animation_camera_validate(ids, times, values?, constraints={keep_visible:false})`
+
+Low-level pattern (when you need exact control over each pose):
 1) `animation_ensure_animation` and `animation_set_duration(seconds)`
 2) `animation_camera_set_interpolation_method("Position Rotation Spline")`
 3) Build a sequence of camera values by chaining:

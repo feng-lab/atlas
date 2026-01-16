@@ -20,6 +20,7 @@ class LLMClient:
     model: str
     base_url: str | None = None
     _client: Any = field(init=False, default=None, repr=False)
+    _responses_supports_temperature: bool | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self):
         # Normalize base_url once so the rest of atlas_agent can rely on
@@ -54,6 +55,72 @@ class LLMClient:
         return m.startswith("gpt-5")
 
     @staticmethod
+    def _normalize_tool_parameters_schema(params: Any) -> Dict[str, Any]:
+        """Best-effort normalization for provider compatibility.
+
+        Some OpenAI-compatible providers validate tool schemas using a strict
+        subset of JSON Schema (similar to OpenAI Structured Outputs), requiring:
+        - object schemas to set additionalProperties=false
+        - required to be present and include every key in properties
+        - array schemas to include items
+
+        We apply this *only* to schemas that declare properties (i.e., structured
+        objects). We intentionally do not "tighten" generic JSON objects (object
+        schemas without properties), since those often represent arbitrary
+        payloads such as typed scene values.
+        """
+
+        if not isinstance(params, dict):
+            return {"type": "object", "properties": {}}
+
+        out: Dict[str, Any] = dict(params)
+        if "type" not in out:
+            out["type"] = "object"
+        if out.get("type") == "object" and not isinstance(out.get("properties"), dict):
+            out["properties"] = {}
+
+        def _tighten(node: Any) -> Any:
+            if not isinstance(node, dict):
+                return node
+            fixed: Dict[str, Any] = dict(node)
+
+            # Recurse into combinators first.
+            for comb in ("anyOf", "oneOf", "allOf"):
+                v = fixed.get(comb)
+                if isinstance(v, list):
+                    fixed[comb] = [_tighten(x) for x in v]
+
+            t = fixed.get("type")
+            types: set[str] = set()
+            if isinstance(t, str):
+                types.add(t)
+            elif isinstance(t, list):
+                for it in t:
+                    if isinstance(it, str):
+                        types.add(it)
+
+            # Arrays: ensure items exists (empty schema is ok).
+            if "array" in types:
+                items = fixed.get("items")
+                if items is None:
+                    fixed["items"] = {}
+                else:
+                    fixed["items"] = _tighten(items)
+
+            # Structured objects: if properties is a dict (even empty), force strictness.
+            if "object" in types and isinstance(fixed.get("properties"), dict):
+                props = fixed.get("properties") or {}
+                if isinstance(props, dict):
+                    fixed["properties"] = {str(k): _tighten(v) for k, v in props.items()}
+                    fixed["required"] = list(props.keys())
+                    fixed["additionalProperties"] = False
+
+            return fixed
+
+        tightened = _tighten(out)
+        return tightened if isinstance(tightened, dict) else out
+
+    @staticmethod
     def _normalize_tools_for_responses(
         raw_tools: Optional[List[Dict[str, Any]]],
     ) -> Optional[List[Dict[str, Any]]]:
@@ -80,7 +147,13 @@ class LLMClient:
 
             # Standard Responses tool shape: no nested "function" key.
             if "function" not in t:
-                out.append(t)
+                fixed = dict(t)
+                fixed["parameters"] = LLMClient._normalize_tool_parameters_schema(
+                    fixed.get("parameters")
+                )
+                if "strict" not in fixed:
+                    fixed["strict"] = False
+                out.append(fixed)
                 continue
 
             fn = t.get("function")
@@ -91,16 +164,14 @@ class LLMClient:
             name = str(fn.get("name") or "").strip()
             if not name:
                 continue
-            params = fn.get("parameters")
-            if not isinstance(params, dict):
-                params = {"type": "object", "properties": {}}
+            params = LLMClient._normalize_tool_parameters_schema(fn.get("parameters"))
 
             converted: Dict[str, Any] = {
                 "type": "function",
                 "name": name,
                 "parameters": params,
-                # Default to strict JSON tool calling.
-                "strict": bool(fn.get("strict", True)),
+                # Default to non-strict tool calling for broad schema compatibility.
+                "strict": bool(fn.get("strict", False)),
             }
             desc = fn.get("description")
             if isinstance(desc, str) and desc.strip():
@@ -218,20 +289,55 @@ class LLMClient:
             params["text"] = text
 
         # The SDK exposes a context-manager style stream object.
-        with responses.stream(**params) as stream:
-            for ev in stream:
-                if on_event is None:
-                    continue
+        def _is_unsupported_temperature_error(err: Exception) -> bool:
+            msg = str(err or "")
+            if not msg:
+                return False
+            m = msg.lower()
+            return ("unsupported parameter" in m and "temperature" in m) or (
+                "temperature" in m and "not supported" in m
+            )
+
+        # Some models reject optional sampling parameters (notably temperature).
+        # We retry once without temperature and cache the result for this client.
+        if self._responses_supports_temperature is False:
+            params.pop("temperature", None)
+
+        try:
+            with responses.stream(**params) as stream:
+                for ev in stream:
+                    if on_event is None:
+                        continue
+                    try:
+                        on_event(self._to_plain_dict(ev))
+                    except Exception:
+                        # Streaming callbacks must not break model execution.
+                        continue
                 try:
-                    on_event(self._to_plain_dict(ev))
+                    final = stream.get_final_response()
                 except Exception:
-                    # Streaming callbacks must not break model execution.
-                    continue
-            try:
-                final = stream.get_final_response()
-            except Exception:
-                # Some SDK versions may expose .response instead.
-                final = getattr(stream, "response", None)
+                    # Some SDK versions may expose .response instead.
+                    final = getattr(stream, "response", None)
+            if "temperature" in params:
+                self._responses_supports_temperature = True
+        except Exception as e:
+            if "temperature" in params and _is_unsupported_temperature_error(e):
+                self._responses_supports_temperature = False
+                params.pop("temperature", None)
+                with responses.stream(**params) as stream:
+                    for ev in stream:
+                        if on_event is None:
+                            continue
+                        try:
+                            on_event(self._to_plain_dict(ev))
+                        except Exception:
+                            continue
+                    try:
+                        final = stream.get_final_response()
+                    except Exception:
+                        final = getattr(stream, "response", None)
+            else:
+                raise
         return self._to_plain_dict(final) if final is not None else {}
 
     def responses_complete_text(
@@ -274,7 +380,29 @@ class LLMClient:
         if text_verbosity is not None:
             params["text"] = {"verbosity": str(text_verbosity)}
 
-        resp = responses.create(**params)
+        def _is_unsupported_temperature_error(err: Exception) -> bool:
+            msg = str(err or "")
+            if not msg:
+                return False
+            m = msg.lower()
+            return ("unsupported parameter" in m and "temperature" in m) or (
+                "temperature" in m and "not supported" in m
+            )
+
+        if self._responses_supports_temperature is False:
+            params.pop("temperature", None)
+
+        try:
+            resp = responses.create(**params)
+            if "temperature" in params:
+                self._responses_supports_temperature = True
+        except Exception as e:
+            if "temperature" in params and _is_unsupported_temperature_error(e):
+                self._responses_supports_temperature = False
+                params.pop("temperature", None)
+                resp = responses.create(**params)
+            else:
+                raise
         data = self._to_plain_dict(resp)
 
         # Extract assistant output text from Responses API output items.
