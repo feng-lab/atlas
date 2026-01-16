@@ -25,11 +25,21 @@ def preview_frames(
     height: int,
     overwrite: bool,
     dummy_output: str,
+    image_name_prefix: str = "atlas_preview",
+    image_name_field_width: int = 5,
+    tile_size: int = 0,
+    tile_border: int = 0,
 ) -> int:
     # Atlas CLI uses an exclusive end frame (i < endFrame). For agent tools we
     # treat `end` as inclusive to match the tool descriptions and to support
     # single-frame preview calls where start==end.
     end_exclusive = (int(end) + 1) if int(end) >= 0 else int(end)
+    # For preview screenshots we prefer a single deterministic PNG file. Disable
+    # tiled rendering so Atlas does not generate intermediate tile images.
+    tile_size_i = int(tile_size)
+    tile_border_i = int(tile_border)
+    if tile_size_i < 0 or tile_border_i < 0:
+        raise ValueError("tile_size and tile_border must be >= 0")
     args = [
         atlas_bin,
         "--run_export_3d_animation",
@@ -49,7 +59,15 @@ def preview_frames(
         str(height),
         "--output_image_folder_name",
         str(out_dir),
+        "--output_image_name_prefix",
+        str(image_name_prefix),
+        "--output_image_name_field_width",
+        str(int(image_name_field_width)),
         "--skip_video_compression",
+        "--output_tile_size",
+        str(tile_size_i),
+        "--output_tile_border",
+        str(tile_border_i),
     ]
     if overwrite:
         args.append("--overwrite")

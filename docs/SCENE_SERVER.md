@@ -107,6 +107,7 @@ Use these to edit base scene state (no time/easing; **does not** write keyframes
   - Writes a `.scene` file (equivalent to the GUI Save Scene).
 - `TakeScreenshot3D { width, height, path?, overwrite? } -> { ok, path, error? }`
   - Renders a single image of the current **3D scene** state.
+  - Output format is PNG (recommended for LLM visual verification).
   - Does **not** create an animation or write keyframes (preferred for verification screenshots).
 - `SetVisibility { ids, on } -> { ok }`
 - `MakeAlias { ids } -> { ok, aliases: [{src_id, alias_id}], error? }`

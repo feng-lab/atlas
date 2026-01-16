@@ -44,6 +44,11 @@ def test_preview_frames_converts_end_to_exclusive(monkeypatch, tmp_path):
     assert _get_flag_value(args, "--output_start_frame") == "0"
     # CLI uses exclusive end; wrapper must pass 1 for a single-frame export.
     assert _get_flag_value(args, "--output_end_frame") == "1"
+    # Preview should disable tiling to avoid intermediate tile images.
+    assert _get_flag_value(args, "--output_tile_size") == "0"
+    assert _get_flag_value(args, "--output_tile_border") == "0"
+    # Preview should name images deterministically via the prefix.
+    assert _get_flag_value(args, "--output_image_name_prefix") == "atlas_preview"
 
 
 def test_preview_frames_preserves_negative_end(monkeypatch, tmp_path):
@@ -124,4 +129,3 @@ def test_export_video_preserves_negative_end(monkeypatch, tmp_path):
 
     assert captured
     assert _get_flag_value(captured[0], "--output_end_frame") == "-1"
-

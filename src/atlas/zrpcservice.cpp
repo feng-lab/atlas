@@ -3036,6 +3036,14 @@ public:
         const QString fn = QString("atlas_scene_screenshot3d_%1_%2.png").arg(ts, uid);
         outPath = QDir(QDir::tempPath()).filePath(fn);
       } else {
+        // We always write PNG for screenshot RPC calls (LLM-compatible and deterministic).
+        // Do not silently rewrite user paths: fail fast if the extension is unexpected.
+        if (!outPath.endsWith(".png", Qt::CaseInsensitive)) {
+          r.ok = false;
+          r.path = outPath;
+          r.error = QString("TakeScreenshot3D only supports .png output paths: %1").arg(outPath);
+          return r;
+        }
         QFileInfo fi(outPath);
         if (fi.isRelative()) {
           outPath = QDir::current().filePath(outPath);

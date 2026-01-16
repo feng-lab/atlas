@@ -53,7 +53,8 @@ Notes
 
 Screenshots (optional)
 - Visual verification can use `scene_screenshot` to render a single frame of the **current scene** to a temp image (preferred; does not create animations).
-- When you specifically need to verify an **animation** at a particular time, the agent can use `animation_render_preview` (heavier; runs the animation exporter).
+- When you specifically need to verify an **animation** at a particular time, the agent can use `animation_render_preview` (heavier; runs the animation exporter). This tool returns exactly one PNG file path.
+- To maximize model/provider compatibility, the agent only uploads common image formats for visual inspection (prefer PNG; also accepts JPEG/WEBP/GIF when supported).
 - On startup, the CLI asks once per session for consent to use preview screenshots for verification.
 - You can toggle later in the REPL: `:screenshots on` / `:screenshots off`.
 - If a requirement can't be verified from tools or screenshots, the agent will request a human-check step.

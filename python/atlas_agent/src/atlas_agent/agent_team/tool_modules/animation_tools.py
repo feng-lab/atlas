@@ -880,9 +880,9 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "function": {
             "name": "animation_render_preview",
             "description": (
-                "Render a single preview frame for an animation time by saving the current .animation3d and invoking headless Atlas.\n"
+                "Render exactly one PNG preview frame for an animation time by saving the current .animation3d and invoking headless Atlas.\n"
                 "This is primarily for verifying animation-at-time behavior. For static scene screenshots, prefer scene_screenshot (lighter; does not involve animation export).\n"
-                "Returns a path to the image in the OS temp directory."
+                "Returns a path to the PNG in the OS temp directory."
             ),
             "parameters": {
                 "type": "object",
@@ -3172,17 +3172,27 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             height=height,
             overwrite=True,
             dummy_output=str(tdir / "dummy.mp4"),
+            # Prefer a single deterministic PNG output for model inspection.
+            tile_size=0,
+            tile_border=0,
         )
         if rc != 0:
             return json.dumps(
                 {"ok": False, "exit_code": rc, "error": "preview renderer failed"}
             )
-        # Find the produced image (exact naming depends on exporter; pick any image in frames_dir)
-        images = []
-        for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff"):
-            images.extend(sorted(glob.glob(str(frames_dir / ext))))
+        # Find the produced image. The exporter writes PNG; enforce that we return
+        # exactly one PNG so callers can rely on stable behavior.
+        images = sorted(glob.glob(str(frames_dir / "*.png")))
         if not images:
-            return json.dumps({"ok": False, "error": "no image produced"})
+            return json.dumps({"ok": False, "error": "no PNG image produced"})
+        if len(images) != 1:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "expected exactly one PNG image but found multiple",
+                    "paths": images,
+                }
+            )
         return json.dumps({"ok": True, "path": images[0]})
 
     return None

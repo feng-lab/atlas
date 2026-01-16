@@ -298,7 +298,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
             "name": "scene_screenshot",
             "description": (
                 "Render a screenshot of the current 3D scene state (no animation export). "
-                "Writes a single image file and returns its path.\n"
+                "Writes a single PNG image file and returns its path.\n"
                 "Privacy: requires explicit per-session screenshot consent."
             ),
             "parameters": {
@@ -308,7 +308,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "height": {"type": "integer", "description": "Image height (pixels)"},
                     "path": {
                         "type": "string",
-                        "description": "Optional output path. When empty, Atlas chooses a temp file path.",
+                        "description": "Optional output path. When empty, Atlas chooses a temp file path. If provided, must end with .png.",
                     },
                     "overwrite": {
                         "type": "boolean",

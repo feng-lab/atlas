@@ -202,6 +202,18 @@ ATLAS_VERIFIER_SYSTEM_PROMPT = (
 )
 
 MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL = 3_000_000
+MODEL_IMAGE_MIME_BY_SUFFIX: dict[str, str] = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",  # non-animated only (we don't generate animated gifs)
+}
+
+
+def _mime_for_model_image(path: Path) -> str | None:
+    ext = str(path.suffix or "").strip().lower()
+    return MODEL_IMAGE_MIME_BY_SUFFIX.get(ext)
 
 
 def _message(*, role: str, text: str) -> dict[str, Any]:
@@ -1499,8 +1511,20 @@ class ChatTeam:
                         )
                     ]
 
-                mime, _ = mimetypes.guess_type(str(p))
-                mime = mime or "image/png"
+                mime = _mime_for_model_image(p)
+                if not mime:
+                    return [
+                        _message(
+                            role="user",
+                            text=(
+                                "Preview image format is not supported for model upload.\n"
+                                f"- path: {path}\n"
+                                f"- suffix: {p.suffix!r}\n"
+                                "- allowed: .png, .jpg/.jpeg, .webp, .gif\n"
+                                "Please re-render the screenshot as PNG (preferred) at a smaller width/height if needed."
+                            ),
+                        )
+                    ]
                 b64 = base64.b64encode(raw).decode("ascii")
                 data_url = f"data:{mime};base64,{b64}"
 

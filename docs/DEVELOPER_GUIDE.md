@@ -98,7 +98,7 @@ Testing (Linking Atlas Code)
 Agents: Preview Screenshots
 
 - The Python agent tools expose a headless preview renderer for 3D animation verification.
-- Tool: `animation_render_preview` (saves current animation to a temp file and renders one frame via the Atlas binary in offscreen mode).
+- Tool: `animation_render_preview` (saves current animation to a temp file and renders exactly one PNG frame via the Atlas binary in offscreen mode).
 - Privacy/consent: The CLI prompts once per session for consent to use preview screenshots for verification (default allow). This decision is stored in the session state; you can toggle at runtime via `:screenshots on` / `:screenshots off`.
 - Binary resolution: The tool uses `--atlas-dir` if provided to the agent CLI, or searches default install locations.
 - Typical usage:
