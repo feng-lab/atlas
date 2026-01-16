@@ -106,13 +106,20 @@ public:
   // never return nullptr, throw ZException on error
   std::shared_ptr<ZImg> getOrRead(const ImageCacheHashKeyType& key,
                                   const ZImgSubBlock& imgBlock,
-                                  FindStategy findStategy = FindStategy::UpdateLRUList)
+                                  FindStategy findStategy = FindStategy::UpdateLRUList,
+                                  /*optional*/ bool* didRead = nullptr)
   {
     if (auto resOpt = find(key, findStategy); resOpt) {
+      if (didRead) {
+        *didRead = false;
+      }
       return resOpt.value();
     } else {
       auto res = imgBlock.read();
       insert(key, res);
+      if (didRead) {
+        *didRead = true;
+      }
       return res;
     }
   }

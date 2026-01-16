@@ -1,6 +1,7 @@
 #include "zioutils.h"
 
 #include "zglobal.h"
+#include "zioreadstats.h"
 #include "zlog.h"
 #include <QFile>
 #include <QFileInfo>
@@ -54,6 +55,7 @@ void readStream_impl(std::istream& fs, char* buf, size_t count)
       throw ZException(fmt::format("Expect {} bytes, only read {} bytes", count, fs.gcount()),
                        ZException::Option::CheckErrno);
     }
+    reportFileReadBytes(count);
     return;
   }
   while (count > 0) {
@@ -62,6 +64,7 @@ void readStream_impl(std::istream& fs, char* buf, size_t count)
       throw ZException(fmt::format("Expect {} bytes, only read {} bytes", bytesToRead, fs.gcount()),
                        ZException::Option::CheckErrno);
     }
+    reportFileReadBytes(bytesToRead);
     count -= bytesToRead;
     buf += bytesToRead;
   }

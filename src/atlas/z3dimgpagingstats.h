@@ -38,6 +38,12 @@ public:
 
   void on3dPagingRoundSummary(const ZImgReadStatsContext& ctx, const ZImgPagingRoundSummary& summary) override;
 
+  void onSourceLogicalBytes(const ZImgReadStatsContext& ctx, size_t bytes) override;
+
+  void onUnderlyingIoBytes(const ZImgReadStatsContext& ctx, ZImgUnderlyingIoKind kind, size_t bytes) override;
+
+  void onGpuUploadBytes(const ZImgReadStatsContext& ctx, ZImgGpuUploadKind kind, size_t bytes, size_t blocks) override;
+
   [[nodiscard]] bool hasActivity() const;
 
   // Returns a multi-line string suitable for one log entry.
@@ -67,6 +73,21 @@ private:
     std::atomic<size_t> blocksQueuedForRead{0};
     std::atomic<size_t> emptyBlocksRead{0};
     std::atomic<bool> filledAllMissingBlocks{false};
+
+    // Underlying I/O (true bytes read from network/disk cache, independent of decoded block size).
+    std::atomic<uint64_t> underlyingNetworkBytes{0};
+    std::atomic<uint64_t> underlyingHttpDiskCacheBytes{0};
+    std::atomic<uint64_t> underlyingImgRegionDiskCacheBytes{0};
+    std::atomic<uint64_t> underlyingFileBytes{0};
+
+    // Logical source bytes touched (decoded/uncompressed), e.g. source tiles/chunks that were materialized.
+    std::atomic<uint64_t> sourceLogicalBytes{0};
+
+    // GPU uploads (bytes pushed into paging GPU resources).
+    std::atomic<uint64_t> gpuUploadBytesImageBlocks{0};
+    std::atomic<uint64_t> gpuUploadBlocksImageBlocks{0};
+    std::atomic<uint64_t> gpuUploadBytesPageDirectory{0};
+    std::atomic<uint64_t> gpuUploadBytesPageTableCache{0};
   };
 
   struct ChannelStats
@@ -90,7 +111,18 @@ private:
   std::atomic<uint64_t> m_totalBytesDiskCache{0};
   std::atomic<uint64_t> m_totalBytesSourceRead{0};
   std::atomic<uint64_t> m_totalEmptyResults{0};
+
+  std::atomic<uint64_t> m_totalUnderlyingNetworkBytes{0};
+  std::atomic<uint64_t> m_totalUnderlyingHttpDiskCacheBytes{0};
+  std::atomic<uint64_t> m_totalUnderlyingImgRegionDiskCacheBytes{0};
+  std::atomic<uint64_t> m_totalUnderlyingFileBytes{0};
+
+  std::atomic<uint64_t> m_totalSourceLogicalBytes{0};
+
+  std::atomic<uint64_t> m_totalGpuUploadBytesImageBlocks{0};
+  std::atomic<uint64_t> m_totalGpuUploadBlocksImageBlocks{0};
+  std::atomic<uint64_t> m_totalGpuUploadBytesPageDirectory{0};
+  std::atomic<uint64_t> m_totalGpuUploadBytesPageTableCache{0};
 };
 
 } // namespace nim
-

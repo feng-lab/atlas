@@ -6,6 +6,8 @@
 #include "zimgregioncache.h"
 #include "zimgpreviewdiskcache.h"
 #include "zcancellation.h"
+#include "zioreadstats.h"
+#include "zimgreadstatsscope.h"
 #include "zneuroglancerprecomputed.h"
 #include "zneuroglancerprecomputedannotations.h"
 #include "zneuroglancerprecomputedmesh.h"
@@ -75,6 +77,15 @@ struct MaxOp
 namespace nim {
 
 namespace {
+
+void reportFileReadBytesToStatsSink(void* user, const ZIoReadStatsContext& ctx, size_t bytes)
+{
+  auto* statsSink = static_cast<ZImgReadStatsSink*>(user);
+  if (!statsSink) {
+    return;
+  }
+  statsSink->onUnderlyingIoBytes(ZImgReadStatsContext{ctx.channel, ctx.round}, ZImgUnderlyingIoKind::File, bytes);
+}
 
 template<typename TValue>
 std::optional<TValue> tryGetCachedNeuroglancerValueAtBaseVoxel(const ZNeuroglancerPrecomputedVolume& vol,
@@ -2076,13 +2087,31 @@ folly::coro::Task<void> ZImgPack::readTileToImgAsync(size_t tileIndex,
                                                      index_t sy,
                                                      index_t sz,
                                                      size_t sc,
-                                                     std::array<size_t, 3> readRatio) const
+                                                     std::array<size_t, 3> readRatio,
+                                                     ZImgReadStatsSink* statsSink,
+                                                     ZImgReadStatsContext statsContext) const
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
 
   const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
-  auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile);
+  std::optional<ZIoReadStatsScope> ioScope;
+  if (statsSink) {
+    ZIoReadStatsHooks hooks;
+    hooks.user = statsSink;
+    hooks.onFileReadBytes = reportFileReadBytesToStatsSink;
+    const ZIoReadStatsContext ioCtx{statsContext.channel, statsContext.round};
+    ioScope.emplace(hooks, ioCtx);
+  }
+
+  bool didRead = false;
+  auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex),
+                                                *tile,
+                                                ZImgCache::FindStategy::UpdateLRUList,
+                                                &didRead);
+  if (didRead && statsSink) {
+    statsSink->onSourceLogicalBytes(statsContext, imgPtr ? imgPtr->byteNumber() : 0);
+  }
   ZVoxelCoordinate start(std::round((static_cast<double>(tile->x) / xyRatio - sx) * xyRatio / readRatio[0]),
                          std::round((static_cast<double>(tile->y) / xyRatio - sy) * xyRatio / readRatio[1]),
                          std::round((static_cast<double>(tile->z) / zRatio - sz) * zRatio / readRatio[2]),
@@ -2157,7 +2186,15 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
                                                                          static_cast<uint32_t>(resInfo.validBitCount),
                                                                          displayRangeMin,
                                                                          displayRangeMax);
-  if (auto hit = ZImgRegionCache::instance().findWithSource(memKey); hit.has_value()) {
+  const auto hit = [&]() {
+    if (statsSink) {
+      ZImgReadStatsScope statsScope(statsSink, statsContext);
+      return ZImgRegionCache::instance().findWithSource(memKey);
+    }
+    return ZImgRegionCache::instance().findWithSource(memKey);
+  }();
+
+  if (hit.has_value()) {
     if (statsSink) {
       const ZImgRegionBlockSource source = (hit->source == ZImgRegionCache::FindSource::Memory)
                                              ? ZImgRegionBlockSource::MemoryCache
@@ -2232,7 +2269,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
     std::vector<folly::coro::Task<std::shared_ptr<ZImg>>> chunkTasks;
     chunkTasks.reserve(chunks.size());
     for (const auto& chunk : chunks) {
-      chunkTasks.push_back(m_ngVolume->readChunkAsync(chunk));
+      chunkTasks.push_back(m_ngVolume->readChunkAsync(chunk, statsSink, statsContext));
     }
     std::vector<std::shared_ptr<ZImg>> chunkImgs =
       co_await folly::coro::collectAllWindowed(std::move(chunkTasks), maxConcurrentChunkReadsPerBlock);
@@ -2355,7 +2392,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
   for (auto tileIndex : queryResult) {
     tileTasks.push_back(folly::coro::co_withExecutor(
       folly::getGlobalCPUExecutor(),
-      readTileToImgAsync(tileIndex, res.get(), xyRatio, zRatio, sx, sy, sz, sc, readRatio)));
+      readTileToImgAsync(tileIndex, res.get(), xyRatio, zRatio, sx, sy, sz, sc, readRatio, statsSink, statsContext)));
   }
   co_await folly::coro::collectAllRange(std::move(tileTasks));
 

@@ -550,6 +550,7 @@ set(SOURCES
     z3dcontext.h z3dcontext.cpp
     z3dgl.h z3dgl.cpp
     zimgreadstats.h
+    zimgreadstatsscope.h zimgreadstatsscope.cpp
     zimgpack.h zimgpack.cpp
     zimgpackdisplay.h zimgpackdisplay.cpp
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp

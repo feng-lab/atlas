@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zimg.h"
+#include "zimgreadstats.h"
 
 #include <folly/coro/Task.h>
 
@@ -316,7 +317,9 @@ public:
 
   [[nodiscard]] std::shared_ptr<ZImg> tryGetCachedChunk(const Chunk& chunk) const;
 
-  folly::coro::Task<std::shared_ptr<ZImg>> readChunkAsync(const Chunk& chunk) const;
+  folly::coro::Task<std::shared_ptr<ZImg>> readChunkAsync(const Chunk& chunk,
+                                                          /*nullable*/ ZImgReadStatsSink* statsSink = nullptr,
+                                                          ZImgReadStatsContext statsContext = {}) const;
 
   [[nodiscard]] std::shared_ptr<ZImg> readChunkBlocking(const Chunk& chunk) const;
 

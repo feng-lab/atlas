@@ -95,12 +95,13 @@ set(IMG_SOURCES
         # zimgstackinterface.h
         zimgtiff.h zimgtiff.cpp
         zimgv3draw.h zimgv3draw.cpp
-        zimgzeissczi.h zimgzeissczi.cpp
-        zimgzeisslsm.h zimgzeisslsm.cpp
-        zioutils.h zioutils.cpp
-        zrandom.h zrandom.cpp
-        zsaturateoperation.h
-        zstatisticsutils.h
+	        zimgzeissczi.h zimgzeissczi.cpp
+	        zimgzeisslsm.h zimgzeisslsm.cpp
+	        zioutils.h zioutils.cpp
+	        zioreadstats.h zioreadstats.cpp
+	        zrandom.h zrandom.cpp
+	        zsaturateoperation.h
+	        zstatisticsutils.h
         zstringutils.h zstringutils.cpp
         ztiff.h ztiff.cpp
         zvoxelcoordinate.h

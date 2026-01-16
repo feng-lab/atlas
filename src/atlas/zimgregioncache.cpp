@@ -3,6 +3,7 @@
 #include "zcpuinfo.h"
 #include "zdiskcacheutils.h"
 #include "zimgdiskcacheentry.h"
+#include "zimgreadstatsscope.h"
 #include "zlog.h"
 #include "zsqlitediskcachebucket.h"
 #include "zstructutils.h"
@@ -205,6 +206,8 @@ public:
     if (!getOpt.has_value()) {
       return std::nullopt;
     }
+
+    reportUnderlyingIoBytesFromImgReadStatsScope(ZImgUnderlyingIoKind::ImgRegionDiskCache, getOpt->value.size());
 
     auto parsed = parseImgRegionEntry(std::span<const std::uint8_t>(getOpt->value.data(), getOpt->value.size()));
     if (!parsed) {

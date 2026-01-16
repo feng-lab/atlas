@@ -79,7 +79,7 @@
 # Maximum number of rounds for volume rendering, default is 100
 --atlas_volume_rendering_maximum_round=100
 
-# Log per-frame 3D image paging read stats (bytes/blocks by cache tier: memory, disk, source), default is false
+# Log per-frame 3D image paging stats (resolved blocks/bytes by cache tier, underlying I/O bytes, source decoded bytes, GPU upload bytes), default is false
 --atlas_log_3d_paging_frame_stats=false
 
 # Include per-round 3D image paging stats in the per-frame log entry (can be verbose), default is false

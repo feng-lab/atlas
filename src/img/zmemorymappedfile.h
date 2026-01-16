@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zlog.h"
+#include "zioreadstats.h"
 #ifdef ZIMG_USE_LLFIO
 #include <llfio.hpp>
 #endif
@@ -20,6 +21,7 @@ public:
   {
     CHECK(m_mappedFileHandleIsValid);
     std::memcpy(buffer, m_mappedFileHandle.address() + offset, length);
+    reportFileReadBytes(length);
   }
 
   void prefetch(size_t offset, size_t length) const

@@ -12,7 +12,7 @@
 
 DEFINE_bool(atlas_log_3d_paging_frame_stats,
             false,
-            "Log per-frame 3D image paging read stats (bytes/blocks by cache tier: memory, disk, source).");
+            "Log per-frame 3D image paging stats (resolved blocks/bytes by cache tier, underlying I/O bytes, source decoded bytes, GPU upload bytes).");
 
 DEFINE_bool(atlas_log_3d_paging_round_stats,
             false,
@@ -67,6 +67,22 @@ struct AggregatedRoundSummary
   size_t emptyBlocksRead = 0;
   size_t roundsWithAnyMissing = 0;
   size_t roundsFilledAllMissing = 0;
+};
+
+struct AggregatedUnderlyingIoBytes
+{
+  uint64_t networkBytes = 0;
+  uint64_t httpDiskCacheBytes = 0;
+  uint64_t imgRegionDiskCacheBytes = 0;
+  uint64_t fileBytes = 0;
+};
+
+struct AggregatedGpuUploads
+{
+  uint64_t imageBlocksBytes = 0;
+  uint64_t imageBlocks = 0;
+  uint64_t pageDirectoryBytes = 0;
+  uint64_t pageTableCacheBytes = 0;
 };
 
 } // namespace
@@ -150,13 +166,102 @@ void Z3DImgPagingFrameStats::on3dPagingRoundSummary(const ZImgReadStatsContext& 
   rs.filledAllMissingBlocks.store(summary.filledAllMissingBlocks, std::memory_order_relaxed);
 }
 
+void Z3DImgPagingFrameStats::onSourceLogicalBytes(const ZImgReadStatsContext& ctx, size_t bytes)
+{
+  const size_t channel = static_cast<size_t>(ctx.channel);
+  CHECK_LT(channel, m_channels.size()) << "Paging stats channel out of range: channel=" << channel
+                                       << " total=" << m_channels.size();
+  const uint32_t round = ctx.round;
+  CHECK_LT(static_cast<size_t>(round), m_channels[channel].rounds.size())
+    << "Paging stats round out of range: round=" << round << " total=" << m_channels[channel].rounds.size();
+
+  auto& rs = m_channels[channel].rounds[round];
+  const uint64_t ubytes = static_cast<uint64_t>(bytes);
+  rs.sourceLogicalBytes.fetch_add(ubytes, std::memory_order_relaxed);
+  m_totalSourceLogicalBytes.fetch_add(ubytes, std::memory_order_relaxed);
+}
+
+void Z3DImgPagingFrameStats::onUnderlyingIoBytes(const ZImgReadStatsContext& ctx, ZImgUnderlyingIoKind kind, size_t bytes)
+{
+  const size_t channel = static_cast<size_t>(ctx.channel);
+  CHECK_LT(channel, m_channels.size()) << "Paging stats channel out of range: channel=" << channel
+                                       << " total=" << m_channels.size();
+  const uint32_t round = ctx.round;
+  CHECK_LT(static_cast<size_t>(round), m_channels[channel].rounds.size())
+    << "Paging stats round out of range: round=" << round << " total=" << m_channels[channel].rounds.size();
+
+  auto& rs = m_channels[channel].rounds[round];
+  const uint64_t ubytes = static_cast<uint64_t>(bytes);
+
+  switch (kind) {
+    case ZImgUnderlyingIoKind::Network:
+      rs.underlyingNetworkBytes.fetch_add(ubytes, std::memory_order_relaxed);
+      m_totalUnderlyingNetworkBytes.fetch_add(ubytes, std::memory_order_relaxed);
+      break;
+    case ZImgUnderlyingIoKind::HttpDiskCache:
+      rs.underlyingHttpDiskCacheBytes.fetch_add(ubytes, std::memory_order_relaxed);
+      m_totalUnderlyingHttpDiskCacheBytes.fetch_add(ubytes, std::memory_order_relaxed);
+      break;
+    case ZImgUnderlyingIoKind::ImgRegionDiskCache:
+      rs.underlyingImgRegionDiskCacheBytes.fetch_add(ubytes, std::memory_order_relaxed);
+      m_totalUnderlyingImgRegionDiskCacheBytes.fetch_add(ubytes, std::memory_order_relaxed);
+      break;
+    case ZImgUnderlyingIoKind::File:
+      rs.underlyingFileBytes.fetch_add(ubytes, std::memory_order_relaxed);
+      m_totalUnderlyingFileBytes.fetch_add(ubytes, std::memory_order_relaxed);
+      break;
+  }
+}
+
+void Z3DImgPagingFrameStats::onGpuUploadBytes(const ZImgReadStatsContext& ctx,
+                                              ZImgGpuUploadKind kind,
+                                              size_t bytes,
+                                              size_t blocks)
+{
+  const size_t channel = static_cast<size_t>(ctx.channel);
+  CHECK_LT(channel, m_channels.size()) << "Paging stats channel out of range: channel=" << channel
+                                       << " total=" << m_channels.size();
+  const uint32_t round = ctx.round;
+  CHECK_LT(static_cast<size_t>(round), m_channels[channel].rounds.size())
+    << "Paging stats round out of range: round=" << round << " total=" << m_channels[channel].rounds.size();
+
+  auto& rs = m_channels[channel].rounds[round];
+  const uint64_t ubytes = static_cast<uint64_t>(bytes);
+  const uint64_t ublocks = static_cast<uint64_t>(blocks);
+
+  switch (kind) {
+    case ZImgGpuUploadKind::ImageBlocks:
+      rs.gpuUploadBytesImageBlocks.fetch_add(ubytes, std::memory_order_relaxed);
+      rs.gpuUploadBlocksImageBlocks.fetch_add(ublocks, std::memory_order_relaxed);
+      m_totalGpuUploadBytesImageBlocks.fetch_add(ubytes, std::memory_order_relaxed);
+      m_totalGpuUploadBlocksImageBlocks.fetch_add(ublocks, std::memory_order_relaxed);
+      break;
+    case ZImgGpuUploadKind::PageDirectory:
+      rs.gpuUploadBytesPageDirectory.fetch_add(ubytes, std::memory_order_relaxed);
+      m_totalGpuUploadBytesPageDirectory.fetch_add(ubytes, std::memory_order_relaxed);
+      break;
+    case ZImgGpuUploadKind::PageTableCache:
+      rs.gpuUploadBytesPageTableCache.fetch_add(ubytes, std::memory_order_relaxed);
+      m_totalGpuUploadBytesPageTableCache.fetch_add(ubytes, std::memory_order_relaxed);
+      break;
+  }
+}
+
 bool Z3DImgPagingFrameStats::hasActivity() const
 {
   return m_totalBlocksMemoryCache.load(std::memory_order_relaxed) != 0 ||
          m_totalBlocksDiskCache.load(std::memory_order_relaxed) != 0 ||
          m_totalBlocksSourceRead.load(std::memory_order_relaxed) != 0 ||
          m_totalBlocksSkippedEmpty.load(std::memory_order_relaxed) != 0 ||
-         m_totalEmptyResults.load(std::memory_order_relaxed) != 0;
+         m_totalEmptyResults.load(std::memory_order_relaxed) != 0 ||
+         m_totalSourceLogicalBytes.load(std::memory_order_relaxed) != 0 ||
+         m_totalUnderlyingNetworkBytes.load(std::memory_order_relaxed) != 0 ||
+         m_totalUnderlyingHttpDiskCacheBytes.load(std::memory_order_relaxed) != 0 ||
+         m_totalUnderlyingImgRegionDiskCacheBytes.load(std::memory_order_relaxed) != 0 ||
+         m_totalUnderlyingFileBytes.load(std::memory_order_relaxed) != 0 ||
+         m_totalGpuUploadBytesImageBlocks.load(std::memory_order_relaxed) != 0 ||
+         m_totalGpuUploadBytesPageDirectory.load(std::memory_order_relaxed) != 0 ||
+         m_totalGpuUploadBytesPageTableCache.load(std::memory_order_relaxed) != 0;
 }
 
 std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) const
@@ -166,7 +271,16 @@ std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) co
            rs.blocksDiskCache.load(std::memory_order_relaxed) != 0 ||
            rs.blocksSourceRead.load(std::memory_order_relaxed) != 0 ||
            rs.blocksSkippedEmpty.load(std::memory_order_relaxed) != 0 ||
-           rs.missingBlocks.load(std::memory_order_relaxed) != 0 || rs.blocksQueuedForRead.load(std::memory_order_relaxed) != 0;
+           rs.missingBlocks.load(std::memory_order_relaxed) != 0 ||
+           rs.blocksQueuedForRead.load(std::memory_order_relaxed) != 0 ||
+           rs.underlyingNetworkBytes.load(std::memory_order_relaxed) != 0 ||
+           rs.underlyingHttpDiskCacheBytes.load(std::memory_order_relaxed) != 0 ||
+           rs.underlyingImgRegionDiskCacheBytes.load(std::memory_order_relaxed) != 0 ||
+           rs.underlyingFileBytes.load(std::memory_order_relaxed) != 0 ||
+           rs.sourceLogicalBytes.load(std::memory_order_relaxed) != 0 ||
+           rs.gpuUploadBytesImageBlocks.load(std::memory_order_relaxed) != 0 ||
+           rs.gpuUploadBytesPageDirectory.load(std::memory_order_relaxed) != 0 ||
+           rs.gpuUploadBytesPageTableCache.load(std::memory_order_relaxed) != 0;
   };
 
   auto sumBytesForChannel = [](const ChannelStats& ch) {
@@ -187,6 +301,36 @@ std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) co
       out.sourceBlocks += rs.blocksSourceRead.load(std::memory_order_relaxed);
       out.skippedEmptyBlocks += rs.blocksSkippedEmpty.load(std::memory_order_relaxed);
       out.emptyResults += rs.emptyResults.load(std::memory_order_relaxed);
+    }
+    return out;
+  };
+
+  auto sumUnderlyingIoForChannel = [](const ChannelStats& ch) {
+    AggregatedUnderlyingIoBytes out;
+    for (const auto& rs : ch.rounds) {
+      out.networkBytes += rs.underlyingNetworkBytes.load(std::memory_order_relaxed);
+      out.httpDiskCacheBytes += rs.underlyingHttpDiskCacheBytes.load(std::memory_order_relaxed);
+      out.imgRegionDiskCacheBytes += rs.underlyingImgRegionDiskCacheBytes.load(std::memory_order_relaxed);
+      out.fileBytes += rs.underlyingFileBytes.load(std::memory_order_relaxed);
+    }
+    return out;
+  };
+
+  auto sumSourceLogicalForChannel = [](const ChannelStats& ch) -> uint64_t {
+    uint64_t out = 0;
+    for (const auto& rs : ch.rounds) {
+      out += rs.sourceLogicalBytes.load(std::memory_order_relaxed);
+    }
+    return out;
+  };
+
+  auto sumGpuUploadsForChannel = [](const ChannelStats& ch) {
+    AggregatedGpuUploads out;
+    for (const auto& rs : ch.rounds) {
+      out.imageBlocksBytes += rs.gpuUploadBytesImageBlocks.load(std::memory_order_relaxed);
+      out.imageBlocks += rs.gpuUploadBlocksImageBlocks.load(std::memory_order_relaxed);
+      out.pageDirectoryBytes += rs.gpuUploadBytesPageDirectory.load(std::memory_order_relaxed);
+      out.pageTableCacheBytes += rs.gpuUploadBytesPageTableCache.load(std::memory_order_relaxed);
     }
     return out;
   };
@@ -223,6 +367,20 @@ std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) co
 
   const uint64_t emptyResults = m_totalEmptyResults.load(std::memory_order_relaxed);
 
+  const uint64_t underlyingNetworkBytes = m_totalUnderlyingNetworkBytes.load(std::memory_order_relaxed);
+  const uint64_t underlyingHttpDiskCacheBytes = m_totalUnderlyingHttpDiskCacheBytes.load(std::memory_order_relaxed);
+  const uint64_t underlyingImgRegionDiskCacheBytes =
+    m_totalUnderlyingImgRegionDiskCacheBytes.load(std::memory_order_relaxed);
+  const uint64_t underlyingFileBytes = m_totalUnderlyingFileBytes.load(std::memory_order_relaxed);
+
+  const uint64_t gpuUploadBytesImageBlocks = m_totalGpuUploadBytesImageBlocks.load(std::memory_order_relaxed);
+  const uint64_t gpuUploadBlocksImageBlocks = m_totalGpuUploadBlocksImageBlocks.load(std::memory_order_relaxed);
+  const uint64_t gpuUploadBytesPageDirectory = m_totalGpuUploadBytesPageDirectory.load(std::memory_order_relaxed);
+  const uint64_t gpuUploadBytesPageTableCache = m_totalGpuUploadBytesPageTableCache.load(std::memory_order_relaxed);
+  const uint64_t gpuUploadBytesTotal = gpuUploadBytesImageBlocks + gpuUploadBytesPageDirectory + gpuUploadBytesPageTableCache;
+
+  const uint64_t sourceLogicalBytes = m_totalSourceLogicalBytes.load(std::memory_order_relaxed);
+
   const auto now = std::chrono::steady_clock::now();
   const double elapsedMs =
     std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(now - m_start).count();
@@ -252,6 +410,20 @@ std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) co
                      formatBytes(diskBytes),
                      formatBytes(sourceBytes));
   out += fmt::format("  Empty results:   {}\n", emptyResults);
+  out += fmt::format("  Underlying I/O:  {} (network={} http_disk_cache={} imgregion_disk_cache={} file={})\n",
+                     formatBytes(underlyingNetworkBytes + underlyingHttpDiskCacheBytes + underlyingImgRegionDiskCacheBytes +
+                                 underlyingFileBytes),
+                     formatBytes(underlyingNetworkBytes),
+                     formatBytes(underlyingHttpDiskCacheBytes),
+                     formatBytes(underlyingImgRegionDiskCacheBytes),
+                     formatBytes(underlyingFileBytes));
+  out += fmt::format("  Source decoded:  {} (uncompressed; tile/chunk cache misses)\n", formatBytes(sourceLogicalBytes));
+  out += fmt::format("  GPU uploads:     {} (img_blocks={} blocks={} page_directory={} page_table={})\n",
+                     formatBytes(gpuUploadBytesTotal),
+                     formatBytes(gpuUploadBytesImageBlocks),
+                     gpuUploadBlocksImageBlocks,
+                     formatBytes(gpuUploadBytesPageDirectory),
+                     formatBytes(gpuUploadBytesPageTableCache));
 
   AggregatedRoundSummary roundTotals;
   for (const auto& ch : m_channels) {
@@ -286,15 +458,22 @@ std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) co
     const auto& ch = m_channels[c];
     const auto blocks = sumBlocksForChannel(ch);
     const auto bytes = sumBytesForChannel(ch);
+    const auto io = sumUnderlyingIoForChannel(ch);
+    const auto gpu = sumGpuUploadsForChannel(ch);
+    const uint64_t logical = sumSourceLogicalForChannel(ch);
     const auto rounds = sumRoundSummaryForChannel(ch);
-    const bool active = (blocks.memBlocks + blocks.diskBlocks + blocks.sourceBlocks + blocks.skippedEmptyBlocks) != 0 ||
-                        rounds.missingBlocks != 0 || rounds.blocksQueuedForRead != 0;
+    const bool active =
+      (blocks.memBlocks + blocks.diskBlocks + blocks.sourceBlocks + blocks.skippedEmptyBlocks) != 0 ||
+      rounds.missingBlocks != 0 || rounds.blocksQueuedForRead != 0 || io.networkBytes != 0 || io.httpDiskCacheBytes != 0 ||
+      io.imgRegionDiskCacheBytes != 0 || io.fileBytes != 0 ||
+      gpu.imageBlocksBytes != 0 || gpu.pageDirectoryBytes != 0 || gpu.pageTableCacheBytes != 0 || logical != 0;
     if (!active) {
       continue;
     }
 
     out += fmt::format(
-      "  ch{}: blocks={} (mem={} disk={} source={} skipped_empty={} empty={}) bytes={} (mem={} disk={} source={}) rounds_missing={} queued_read={} mapped={}\n",
+      "  ch{}: blocks={} (mem={} disk={} source={} skipped_empty={} empty={}) bytes={} (mem={} disk={} source={}) "
+      "io(net/http/imgregion/file)=({}/{}/{}/{}) src_decoded={} gpu(img/pd/pt)=({}/{}/{}) img_blocks_uploaded={} rounds_missing={} queued_read={} mapped={}\n",
       c,
       (blocks.memBlocks + blocks.diskBlocks + blocks.sourceBlocks),
       blocks.memBlocks,
@@ -306,6 +485,15 @@ std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) co
       formatBytes(bytes.memBytes),
       formatBytes(bytes.diskBytes),
       formatBytes(bytes.sourceBytes),
+      formatBytes(io.networkBytes),
+      formatBytes(io.httpDiskCacheBytes),
+      formatBytes(io.imgRegionDiskCacheBytes),
+      formatBytes(io.fileBytes),
+      formatBytes(logical),
+      formatBytes(gpu.imageBlocksBytes),
+      formatBytes(gpu.pageDirectoryBytes),
+      formatBytes(gpu.pageTableCacheBytes),
+      gpu.imageBlocks,
       rounds.missingBlocks,
       rounds.blocksQueuedForRead,
       rounds.alreadyMappedBlocks);
@@ -317,7 +505,9 @@ std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) co
           continue;
         }
         out += fmt::format(
-          "    r{}: missing={} processed={} skipped={} mapped={} empty_marked={} queued_read={} empty_read={} filled={} | blocks(mem/disk/source)=({}/{}/{}) bytes(mem/disk/source)=({}/{}/{})\n",
+          "    r{}: missing={} processed={} skipped={} mapped={} empty_marked={} queued_read={} empty_read={} filled={} | "
+          "blocks(mem/disk/source)=({}/{}/{}) bytes(mem/disk/source)=({}/{}/{}) io(net/http/imgregion/file)=({}/{}/{}/{}) src_decoded={} "
+          "gpu(img/pd/pt)=({}/{}/{}) img_blocks_uploaded={}\n",
           r,
           rs.missingBlocks.load(std::memory_order_relaxed),
           rs.processedMissingBlocks.load(std::memory_order_relaxed),
@@ -332,7 +522,16 @@ std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) co
           rs.blocksSourceRead.load(std::memory_order_relaxed),
           formatBytes(rs.bytesMemoryCache.load(std::memory_order_relaxed)),
           formatBytes(rs.bytesDiskCache.load(std::memory_order_relaxed)),
-          formatBytes(rs.bytesSourceRead.load(std::memory_order_relaxed)));
+          formatBytes(rs.bytesSourceRead.load(std::memory_order_relaxed)),
+          formatBytes(rs.underlyingNetworkBytes.load(std::memory_order_relaxed)),
+          formatBytes(rs.underlyingHttpDiskCacheBytes.load(std::memory_order_relaxed)),
+          formatBytes(rs.underlyingImgRegionDiskCacheBytes.load(std::memory_order_relaxed)),
+          formatBytes(rs.underlyingFileBytes.load(std::memory_order_relaxed)),
+          formatBytes(rs.sourceLogicalBytes.load(std::memory_order_relaxed)),
+          formatBytes(rs.gpuUploadBytesImageBlocks.load(std::memory_order_relaxed)),
+          formatBytes(rs.gpuUploadBytesPageDirectory.load(std::memory_order_relaxed)),
+          formatBytes(rs.gpuUploadBytesPageTableCache.load(std::memory_order_relaxed)),
+          rs.gpuUploadBlocksImageBlocks.load(std::memory_order_relaxed));
       }
     }
   }

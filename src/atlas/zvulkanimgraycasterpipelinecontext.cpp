@@ -4221,6 +4221,15 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   // Without this, the Vulkan shader may read undefined textures and fail to collect missing blocks.
   {
     ZBenchTimer uploadTimer("vulkan_upload_page_caches");
+    if (auto* statsSink = payload.image->readStatsSink()) {
+      CHECK_GE(payload.roundIndexRaw, 0) << "Negative roundIndexRaw not expected in progressive path.";
+      const auto statsContext =
+        ZImgReadStatsContext{static_cast<uint32_t>(channelIndex), static_cast<uint32_t>(payload.roundIndexRaw)};
+      const uint64_t pageDirectoryBytes = static_cast<uint64_t>(payload.image->pageDirectoryView(channelIndex).size_bytes());
+      const uint64_t pageTableBytes = static_cast<uint64_t>(payload.image->pageTableCacheView(channelIndex).size_bytes());
+      statsSink->onGpuUploadBytes(statsContext, ZImgGpuUploadKind::PageDirectory, pageDirectoryBytes, /*blocks=*/0);
+      statsSink->onGpuUploadBytes(statsContext, ZImgGpuUploadKind::PageTableCache, pageTableBytes, /*blocks=*/0);
+    }
     m_imageBlockUploader->uploadPageCaches(*payload.image, channelIndex, uploadTimer);
   }
 

@@ -301,7 +301,9 @@ public:
                                              index_t sy,
                                              index_t sz,
                                              size_t sc,
-                                             std::array<size_t, 3> readRatio) const;
+                                             std::array<size_t, 3> readRatio,
+                                             ZImgReadStatsSink* statsSink = nullptr,
+                                             ZImgReadStatsContext statsContext = {}) const;
 
   folly::coro::Task<std::shared_ptr<ZImg>> readRegionToImgAsync(index_t xyRatio,
                                                                 index_t zRatio,

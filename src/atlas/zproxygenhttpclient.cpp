@@ -746,6 +746,8 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     maybeCancel(cancellationToken);
     if (auto cached = m_diskCache->tryGet(url, requestHeaders)) {
       VLOG(2) << "HTTP disk cache hit: " << url;
+      cached->source = ZHttpGetBytesSource::DiskCache;
+      cached->encodedBodyBytes = 0;
       co_return std::move(*cached);
     }
   }
@@ -880,6 +882,8 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
 
         auto bodyBuf = response.body.move();
         out.body = iobufToBytes(bodyBuf.get());
+        out.encodedBodyBytes = static_cast<uint64_t>(out.body.size());
+        out.source = ZHttpGetBytesSource::Network;
 
         // We depend on Range requests returning exact bytes; Content-Encoding would make the
         // payload length unpredictable relative to the requested byte range.

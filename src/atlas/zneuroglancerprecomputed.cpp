@@ -266,7 +266,9 @@ std::vector<uint8_t> decodeShardedBytes(std::vector<uint8_t> bytes, ZNeuroglance
 folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpRangeBytes(const std::string& url,
                                                                          std::chrono::milliseconds timeout,
                                                                          uint64_t offset,
-                                                                         uint64_t length)
+                                                                         uint64_t length,
+                                                                         /*nullable*/ ZImgReadStatsSink* statsSink,
+                                                                         ZImgReadStatsContext statsContext)
 {
   if (length == 0) {
     co_return std::vector<uint8_t>{};
@@ -277,6 +279,20 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpRangeBytes(const s
                                                                   {{"range", fmt::format("bytes={}-{}", offset, endInclusive)}});
   if (!resOpt) {
     co_return std::nullopt;
+  }
+  if (statsSink) {
+    switch (resOpt->source) {
+      case ZHttpGetBytesSource::Network:
+        statsSink->onUnderlyingIoBytes(statsContext, ZImgUnderlyingIoKind::Network, resOpt->encodedBodyBytes);
+        break;
+      case ZHttpGetBytesSource::DiskCache:
+        statsSink->onUnderlyingIoBytes(statsContext,
+                                       ZImgUnderlyingIoKind::HttpDiskCache,
+                                       static_cast<uint64_t>(resOpt->body.size()));
+        break;
+      case ZHttpGetBytesSource::Unknown:
+        break;
+    }
   }
   if (resOpt->status != 206 && resOpt->status != 200) {
     throw ZException(fmt::format("HTTP range GET failed for '{}' (status {})", url, resOpt->status));
@@ -311,7 +327,9 @@ folly::coro::Task<std::optional<ShardedShardIndexEntry>> getShardIndexEntry(cons
                                                                            const ZNeuroglancerPrecomputedVolume::Scale::Sharding& sharding,
                                                                            std::chrono::milliseconds timeout,
                                                                            uint64_t shard,
-                                                                           uint64_t minishard)
+                                                                           uint64_t minishard,
+                                                                           /*nullable*/ ZImgReadStatsSink* statsSink,
+                                                                           ZImgReadStatsContext statsContext)
 {
   const QString shardHex = shardHexString(shard, sharding.shardHexDigits);
 
@@ -322,7 +340,12 @@ folly::coro::Task<std::optional<ShardedShardIndexEntry>> getShardIndexEntry(cons
   const uint64_t shardIndexEntryOffset = minishard << 4;
 
   auto readFrom = [&](const QUrl& url) -> folly::coro::Task<std::optional<std::vector<uint8_t>>> {
-    co_return co_await getHttpRangeBytes(toStdString(url.toString()), timeout, shardIndexEntryOffset, 16);
+    co_return co_await getHttpRangeBytes(toStdString(url.toString()),
+                                         timeout,
+                                         shardIndexEntryOffset,
+                                         16,
+                                         statsSink,
+                                         statsContext);
   };
 
   auto parseEntry = [&](std::vector<uint8_t> bytes, bool useSplit) -> ShardedShardIndexEntry {
@@ -1100,7 +1123,9 @@ QUrl ZNeuroglancerPrecomputedVolume::chunkUrl(const Chunk& chunk) const
   return scale.url.resolved(QUrl(name));
 }
 
-folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChunkAsync(const Chunk& chunk) const
+folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChunkAsync(const Chunk& chunk,
+                                                                                        ZImgReadStatsSink* statsSink,
+                                                                                        ZImgReadStatsContext statsContext) const
 {
   CHECK(m_chunkCache);
   CHECK(chunk.scaleIndex < m_scales.size());
@@ -1221,7 +1246,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChu
         };
 
         try {
-          auto entryOpt = co_await getShardIndexEntry(scale, sharding, m_defaultTimeout, shard, minishard);
+          auto entryOpt = co_await getShardIndexEntry(scale, sharding, m_defaultTimeout, shard, minishard, statsSink, statsContext);
           if (!entryOpt) {
             inFlightMinishard->promise.setValue(std::shared_ptr<const DecodedMinishardIndex>());
             eraseMinishardInFlight();
@@ -1237,7 +1262,8 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChu
             if (absEnd < absStart) {
               throw ZException("Invalid shard index entry: end offset < start offset");
             }
-            auto bytesOpt = co_await getHttpRangeBytes(entryOpt->dataUrl, m_defaultTimeout, absStart, absEnd - absStart);
+            auto bytesOpt =
+              co_await getHttpRangeBytes(entryOpt->dataUrl, m_defaultTimeout, absStart, absEnd - absStart, statsSink, statsContext);
             if (!bytesOpt) {
               inFlightMinishard->promise.setValue(std::shared_ptr<const DecodedMinishardIndex>());
               eraseMinishardInFlight();
@@ -1286,7 +1312,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChu
         } else if (mode == 1) {
           dataUrl = toStdString(scale.url.resolved(QUrl(shardHex + ".shard")).toString());
         } else {
-          auto entryOpt = co_await getShardIndexEntry(scale, sharding, m_defaultTimeout, shard, minishard);
+          auto entryOpt = co_await getShardIndexEntry(scale, sharding, m_defaultTimeout, shard, minishard, statsSink, statsContext);
           if (!entryOpt) {
             co_return std::shared_ptr<ZImg>();
           }
@@ -1299,7 +1325,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChu
       if (dataEnd < dataStart) {
         throw ZException("Invalid minishard index: end offset < start offset");
       }
-      auto bytesOpt = co_await getHttpRangeBytes(dataUrl, m_defaultTimeout, dataStart, dataEnd - dataStart);
+      auto bytesOpt = co_await getHttpRangeBytes(dataUrl, m_defaultTimeout, dataStart, dataEnd - dataStart, statsSink, statsContext);
       if (!bytesOpt) {
         co_return std::shared_ptr<ZImg>();
       }
@@ -1311,6 +1337,20 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChu
       auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(urlStr, m_defaultTimeout);
       if (!resOpt) {
         co_return std::shared_ptr<ZImg>();
+      }
+      if (statsSink) {
+        switch (resOpt->source) {
+          case ZHttpGetBytesSource::Network:
+            statsSink->onUnderlyingIoBytes(statsContext, ZImgUnderlyingIoKind::Network, resOpt->encodedBodyBytes);
+            break;
+          case ZHttpGetBytesSource::DiskCache:
+            statsSink->onUnderlyingIoBytes(statsContext,
+                                           ZImgUnderlyingIoKind::HttpDiskCache,
+                                           static_cast<uint64_t>(resOpt->body.size()));
+            break;
+          case ZHttpGetBytesSource::Unknown:
+            break;
+        }
       }
       payload = std::move(resOpt->body);
     }
@@ -1391,6 +1431,10 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChu
 
     auto img = std::make_shared<ZImg>(info);
     std::memcpy(img->timeData<uint8_t>(0), body.data(), body.size());
+
+    if (statsSink) {
+      statsSink->onSourceLogicalBytes(statsContext, img ? img->byteNumber() : 0);
+    }
 
     m_chunkCache->chunkCache.insert(cacheKey, img, img->byteNumber());
     co_return img;

@@ -1003,6 +1003,18 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
     auto uploadGuard = folly::makeGuard([=, this, &bt]() {
       checkPageSystemError(c, false);
+      if (m_readStatsSink) {
+        const uint64_t pageDirectoryBytes = static_cast<uint64_t>(pageDirectoryView(c).size_bytes());
+        const uint64_t pageTableBytes = static_cast<uint64_t>(pageTableCacheView(c).size_bytes());
+        m_readStatsSink->onGpuUploadBytes(statsContext,
+                                          ZImgGpuUploadKind::PageDirectory,
+                                          pageDirectoryBytes,
+                                          /*blocks=*/0);
+        m_readStatsSink->onGpuUploadBytes(statsContext,
+                                          ZImgGpuUploadKind::PageTableCache,
+                                          pageTableBytes,
+                                          /*blocks=*/0);
+      }
       if (m_vulkanImageBlockUploader) {
         m_vulkanImageBlockUploader->uploadPageCaches(*this, c, bt);
       } else {
@@ -1443,9 +1455,25 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                         const folly::CancellationToken& cancellationToken,
                                         ZBenchTimer& bt)
 {
+  const auto statsContext = ZImgReadStatsContext{static_cast<uint32_t>(c), m_activeReadStatsRound};
+
+  auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
+  ZImgInfo resInfo(imageBlockSize.x, imageBlockSize.y, imageBlockSize.z, 1);
+  const size_t blockSizeInByte = resInfo.byteNumber();
+
   if (m_vulkanImageBlockUploader != nullptr) {
     VLOG(3) << "using Vulkan image block uploader";
-    return m_vulkanImageBlockUploader->readAndUploadImageBlocks(*this, c, pendingTasks, cancellationToken, bt);
+    const size_t emptyBlockCount =
+      m_vulkanImageBlockUploader->readAndUploadImageBlocks(*this, c, pendingTasks, cancellationToken, bt);
+    CHECK_LE(emptyBlockCount, pendingTasks.size());
+    if (m_readStatsSink) {
+      const uint64_t uploadedBlocks = static_cast<uint64_t>(pendingTasks.size() - emptyBlockCount);
+      m_readStatsSink->onGpuUploadBytes(statsContext,
+                                        ZImgGpuUploadKind::ImageBlocks,
+                                        uploadedBlocks * static_cast<uint64_t>(blockSizeInByte),
+                                        uploadedBlocks);
+    }
+    return emptyBlockCount;
   }
 
   ensureGLPagingTexturesForChannel(c);
@@ -1518,10 +1546,6 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   //  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {
   //    VLOG(1) << "number of priorities: " << static_cast<int>(p->getNumPriorities());
   //  }
-
-  auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
-  ZImgInfo resInfo(imageBlockSize.x, imageBlockSize.y, imageBlockSize.z, 1);
-  auto blockSizeInByte = resInfo.byteNumber();
 
   uint8_t* pboPtr = nullptr;
   std::vector<uint8_t> pboLocalBuffer;
@@ -1737,6 +1761,15 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                                      (const void*)(i * blockSizeInByte));
     }
     bt.recordEvent("PBO uploading");
+  }
+
+  CHECK_LE(emptyBlockCount, pendingTasks.size());
+  if (m_readStatsSink) {
+    const uint64_t uploadedBlocks = static_cast<uint64_t>(pendingTasks.size() - emptyBlockCount);
+    m_readStatsSink->onGpuUploadBytes(statsContext,
+                                      ZImgGpuUploadKind::ImageBlocks,
+                                      uploadedBlocks * static_cast<uint64_t>(blockSizeInByte),
+                                      uploadedBlocks);
   }
 
   return emptyBlockCount;
