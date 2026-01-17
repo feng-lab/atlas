@@ -261,9 +261,21 @@ class LLMClient:
         def _chat_response_to_responses_dict(chat_resp: Any) -> dict[str, Any]:
             data = self._to_plain_dict(chat_resp)
             out_items: list[dict[str, Any]] = []
+            status = "completed"
+            incomplete_details: dict[str, Any] | None = None
             try:
                 choices = data.get("choices") if isinstance(data, dict) else None
                 choice0 = choices[0] if isinstance(choices, list) and choices else {}
+                if isinstance(choice0, dict):
+                    fr = str(choice0.get("finish_reason") or "").strip().lower()
+                    # Map Chat Completions finish reasons to a Responses-like status
+                    # so the tool loop can handle truncation uniformly.
+                    if fr == "length":
+                        status = "incomplete"
+                        incomplete_details = {"reason": "max_tokens"}
+                    elif fr in {"content_filter"}:
+                        status = "incomplete"
+                        incomplete_details = {"reason": fr}
                 msg = choice0.get("message") if isinstance(choice0, dict) else {}
                 if not isinstance(msg, dict):
                     msg = {}
@@ -307,7 +319,10 @@ class LLMClient:
             except Exception:
                 # Fall back to an empty output; tool loop will treat it as no-op.
                 pass
-            return {"output": out_items}
+            out: dict[str, Any] = {"output": out_items, "status": status}
+            if incomplete_details is not None:
+                out["incomplete_details"] = incomplete_details
+            return out
 
         reasoning: dict[str, Any] | None = None
         if self._model_supports_reasoning_summaries():

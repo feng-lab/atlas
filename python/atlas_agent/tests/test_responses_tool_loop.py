@@ -347,3 +347,118 @@ def test_tool_loop_retries_on_incomplete_chunked_read():
 
     assert out.assistant_text == "Done."
     assert llm.calls == 2
+
+
+def test_tool_loop_prefers_parsed_output_when_stream_truncated():
+    llm = DummyLLM(
+        [
+            {
+                "events": [
+                    {
+                        "type": "response.output_text.delta",
+                        "delta": "Hello",
+                    }
+                ],
+                "response": {
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "Hello world"}],
+                        }
+                    ]
+                },
+            }
+        ]
+    )
+
+    out = run_responses_tool_loop(
+        llm=llm,
+        instructions="system",
+        input_items=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
+        tools=[],
+        dispatch=lambda name, args_json: json.dumps({"ok": True}),
+        callbacks=ToolLoopCallbacks(),
+        max_rounds=3,
+    )
+
+    assert out.assistant_text == "Hello world"
+
+
+def test_tool_loop_auto_continues_when_response_incomplete_and_disables_tools():
+    llm = DummyLLM(
+        [
+            {
+                "response": {
+                    "status": "incomplete",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "Part1"}],
+                        }
+                    ],
+                }
+            },
+            {
+                "response": {
+                    "status": "completed",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "Part2"}],
+                        }
+                    ],
+                }
+            },
+        ]
+    )
+
+    out = run_responses_tool_loop(
+        llm=llm,
+        instructions="system",
+        input_items=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
+        tools=[{"type": "function", "function": {"name": "update_plan", "parameters": {"type": "object"}}}],
+        dispatch=lambda name, args_json: json.dumps({"ok": True}),
+        callbacks=ToolLoopCallbacks(),
+        max_rounds=6,
+    )
+
+    assert out.assistant_text == "Part1\n\nPart2"
+    assert llm.calls == 2
+    assert isinstance(llm.seen_tools[0], list) and llm.seen_tools[0]
+    assert llm.seen_tools[1] == []
+
+
+def test_tool_loop_auto_continues_when_final_message_empty():
+    llm = DummyLLM(
+        [
+            {"response": {"status": "completed", "output": []}},
+            {
+                "response": {
+                    "status": "completed",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "Done."}],
+                        }
+                    ],
+                }
+            },
+        ]
+    )
+
+    out = run_responses_tool_loop(
+        llm=llm,
+        instructions="system",
+        input_items=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
+        tools=[],
+        dispatch=lambda name, args_json: json.dumps({"ok": True}),
+        callbacks=ToolLoopCallbacks(),
+        max_rounds=6,
+    )
+
+    assert out.assistant_text == "Done."
+    assert llm.calls == 2

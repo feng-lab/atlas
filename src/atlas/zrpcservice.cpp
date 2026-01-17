@@ -2985,23 +2985,59 @@ public:
             return true;
           }
         }
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "camera key not found at requested time";
         return false;
       }
       // Non-camera
-      size_t boundId = static_cast<size_t>(req->target_id());
+      const size_t boundId = static_cast<size_t>(req->target_id());
       const QString jsonKey = QString::fromStdString(req->json_key());
+      if (jsonKey.isEmpty()) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "json_key is required for non-camera removal";
+        return false;
+      }
+
+      // Resolve uniqueId for the bound object (same scheme as ListKeys). Do not rely on
+      // UI-expanded ObjectPara display packs, which may be absent in headless/RPC workflows.
+      size_t uniqueId = 0;
       for (const auto& pack : anim->displayPacks()) {
-        if (pack.type == ZAnimationDisplayPack::Type::ObjectPara && pack.boundId == boundId && pack.paraAnimation &&
-            pack.paraAnimation->jsonKey() == jsonKey) {
-          for (const auto& k : pack.paraAnimation->keys()) {
-            if (std::abs(k->time() - req->time()) < 1e-6) {
-              pack.paraAnimation->deleteKey(k.get());
-              pack.paraAnimation->emitKeysChangedSignal();
-              return true;
-            }
-          }
+        if (pack.type == ZAnimationDisplayPack::Type::Object && pack.boundId == boundId) {
+          uniqueId = pack.id;
+          break;
         }
       }
+      if (uniqueId == 0) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "target_id not bound to animation";
+        return false;
+      }
+
+      auto* targetPa = [&]() -> ZParameterAnimation* {
+        const auto& pas = anim->paraAnimationList(uniqueId);
+        for (const auto& paPtr : pas) {
+          if (paPtr && paPtr->jsonKey() == jsonKey) {
+            return paPtr.get();
+          }
+        }
+        return nullptr;
+      }();
+      if (!targetPa) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "json_key not found for target";
+        return false;
+      }
+
+      for (const auto& k : targetPa->keys()) {
+        if (std::abs(k->time() - req->time()) < 1e-6) {
+          targetPa->deleteKey(k.get());
+          targetPa->emitKeysChangedSignal();
+          return true;
+        }
+      }
+
+      errCode = grpc::StatusCode::INVALID_ARGUMENT;
+      errMsg = "key not found at requested time";
       return false;
     });
     if (!ok) {
@@ -3046,7 +3082,14 @@ public:
         Bool okR;
         auto st = RemoveKey(nullptr, &tmp, &okR);
         if (st.error_code() != grpc::StatusCode::OK || !okR.ok()) {
-          LOG(WARNING) << "Batch: RemoveKey failed at index=" << idx << " code=" << st.error_code();
+          errCode = (st.error_code() != grpc::StatusCode::OK) ? st.error_code()
+                                                              : grpc::StatusCode::FAILED_PRECONDITION;
+          if (st.error_code() != grpc::StatusCode::OK && !st.error_message().empty()) {
+            errMsg = "remove_key failed at index=" + std::to_string(idx) + ": " + st.error_message();
+          } else {
+            errMsg = "remove_key failed at index=" + std::to_string(idx);
+          }
+          LOG(WARNING) << "Batch: " << errMsg;
           return false;
         }
         ++idx;
@@ -3064,7 +3107,14 @@ public:
         Bool okS;
         auto st = SetKey(nullptr, &tmp, &okS);
         if (st.error_code() != grpc::StatusCode::OK || !okS.ok()) {
-          LOG(WARNING) << "Batch: SetKey failed at index=" << idx << " code=" << st.error_code();
+          errCode = (st.error_code() != grpc::StatusCode::OK) ? st.error_code()
+                                                              : grpc::StatusCode::FAILED_PRECONDITION;
+          if (st.error_code() != grpc::StatusCode::OK && !st.error_message().empty()) {
+            errMsg = "set_key failed at index=" + std::to_string(idx) + ": " + st.error_message();
+          } else {
+            errMsg = "set_key failed at index=" + std::to_string(idx);
+          }
+          LOG(WARNING) << "Batch: " << errMsg;
           return false;
         }
         ++idx;

@@ -20,6 +20,11 @@ CONTEXT_TRIM_MAX_RETRIES = 32
 TRANSIENT_NETWORK_MAX_RETRIES = 3
 TRANSIENT_NETWORK_BACKOFF_SECONDS = 0.6
 
+# When the model returns a final response with status="incomplete" (max output tokens) or
+# produces an empty final message, we automatically ask it to continue a few times to
+# recover a complete user-facing answer without requiring the user to type "continue".
+FINAL_OUTPUT_CONTINUE_MAX_CALLS = 8
+
 
 class ResponsesStreamingClient(Protocol):
     def responses_stream(
@@ -148,9 +153,61 @@ def _extract_assistant_text_from_output_item(item: dict[str, Any]) -> str:
         for p in parts:
             if not isinstance(p, dict):
                 continue
-            if str(p.get("type") or "") == "output_text":
+            ptype = str(p.get("type") or "")
+            if ptype in {"output_text", "text"}:
                 out.append(str(p.get("text") or ""))
+            elif ptype == "refusal":
+                out.append(str(p.get("refusal") or ""))
     return "".join(out)
+
+
+def _choose_best_final_assistant_text(*, stream_text: str, parsed_text: str) -> str:
+    """Pick the most complete assistant output between streaming deltas and parsed output items.
+
+    Some OpenAI-compatible providers occasionally drop the tail of streamed text deltas
+    while still returning the full output in the final response payload.
+    """
+
+    st = (stream_text or "").strip()
+    pt = (parsed_text or "").strip()
+
+    if not st:
+        return pt
+    if not pt:
+        return st
+
+    # If one contains the other, keep the longer "superset" to avoid truncation.
+    if pt.startswith(st) and len(pt) >= len(st):
+        return pt
+    if st.startswith(pt) and len(st) >= len(pt):
+        return st
+
+    # Otherwise, prefer the longer one.
+    return pt if len(pt) > len(st) else st
+
+
+def _merge_continuation_text(*, prev: str, new: str) -> str:
+    """Merge follow-up 'continue' text with previously collected assistant output."""
+
+    a = (prev or "").rstrip()
+    b = (new or "").lstrip()
+    if not a:
+        return b
+    if not b:
+        return a
+
+    # Avoid common repetition patterns (provider retries may resend full/partial text).
+    if b.startswith(a):
+        return b
+    if a.endswith(b):
+        return a
+    if b in a:
+        return a
+    if a in b:
+        return b
+
+    sep = "\n" if (a and not a.endswith("\n")) else ""
+    return f"{a}{sep}\n{b}".strip()
 
 
 def _extract_function_calls(output_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -281,6 +338,10 @@ class ToolLoopCallbacks:
     # order as tool call events.
     on_reasoning_summary_complete: Callable[[str, int], None] | None = None  # (text, call_index)
     on_assistant_text_delta: Callable[[str], None] | None = None
+    # Called once per Responses API call (per tool-loop round) after the response
+    # payload has been received. Useful for logging provider metadata (e.g. the
+    # actual model routed by an OpenAI-compatible gateway).
+    on_response_meta: Callable[[dict[str, Any], int], None] | None = None  # (resp, call_index)
     on_tool_call: Callable[[str, str, str], None] | None = None  # (name, args_json, call_id)
     on_tool_result: Callable[[str, str, str], None] | None = None  # (name, call_id, result_json)
 
@@ -446,6 +507,7 @@ def run_responses_tool_loop(
     all_tool_calls: list[dict[str, Any]] = []
     reasoning_summaries: list[str] = []
     final_assistant_text = ""
+    final_continue_calls = 0
 
     def _append_message(role: str, text: str) -> None:
         in_items.append(_input_text_message(role=role, text=text))
@@ -503,10 +565,11 @@ def run_responses_tool_loop(
             try:
                 for _retry in range(CONTEXT_TRIM_MAX_RETRIES):
                     try:
+                        round_tools = [] if final_continue_calls > 0 else normalized_tools
                         resp = llm.responses_stream(
                             instructions=instructions,
                             input_items=in_items,
-                            tools=normalized_tools,
+                            tools=round_tools,
                             temperature=temperature,
                             parallel_tool_calls=False,
                             reasoning_effort=reasoning_effort,
@@ -533,6 +596,13 @@ def run_responses_tool_loop(
                 break
         if resp is None:
             raise RuntimeError("Responses stream failed without producing a response.")
+
+        if cb.on_response_meta is not None:
+            try:
+                cb.on_response_meta(resp, int(_round))
+            except Exception:
+                # Meta callbacks must not break tool execution.
+                pass
 
         output_items = _coerce_output_items(resp)
         # Persist output items into the loop input (full local history).
@@ -586,13 +656,42 @@ def run_responses_tool_loop(
             continue
 
         # No tool calls: we consider this a final assistant output.
-        # Prefer streamed deltas (more faithful); fall back to response parsing.
-        if assistant_chunks:
-            final_assistant_text = "".join(assistant_chunks).strip()
-        else:
-            # There may be multiple assistant message items; concatenate.
-            final_assistant_text = "".join(
-                _extract_assistant_text_from_output_item(it) for it in output_items
+        stream_text = "".join(assistant_chunks).strip()
+        # There may be multiple assistant message items; concatenate.
+        parsed_text = "".join(_extract_assistant_text_from_output_item(it) for it in output_items).strip()
+        candidate = _choose_best_final_assistant_text(
+            stream_text=stream_text, parsed_text=parsed_text
+        )
+
+        if candidate:
+            final_assistant_text = _merge_continuation_text(prev=final_assistant_text, new=candidate)
+
+        # Some providers return a final assistant message with status="incomplete" when they hit
+        # max output tokens, even though there are no tool calls. Auto-continue a few times so
+        # the user still gets a complete recap without having to type "continue".
+        status = str(resp.get("status") or "").strip().lower() if isinstance(resp, dict) else ""
+        is_incomplete = status == "incomplete"
+        needs_continue = bool(is_incomplete or not candidate)
+        if needs_continue and final_continue_calls < FINAL_OUTPUT_CONTINUE_MAX_CALLS:
+            final_continue_calls += 1
+            if not candidate:
+                prompt = (
+                    "(internal) Produce a user-facing final answer now. "
+                    "Do not call tools. Do not ask the user for more input unless strictly required."
+                )
+            else:
+                prompt = (
+                    "(internal) Continue from where you left off. "
+                    "Do not call tools. Do not repeat previously produced text. "
+                    "Finish the final user-facing answer."
+                )
+            _append_message("user", prompt)
+            continue
+
+        if is_incomplete and final_assistant_text:
+            final_assistant_text = (
+                final_assistant_text.rstrip()
+                + "\n\n(Note: output was truncated by the model/provider; reply “continue” to request the remaining text.)"
             ).strip()
         break
     else:

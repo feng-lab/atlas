@@ -91,12 +91,9 @@ ATLAS_OUTPUT_TOOLS: set[str] = {
     "animation_save_animation",
     "animation_export_video",
     "animation_render_preview",
-}
-
-# Output tools that are allowed in verification (best-effort; may be disabled by env).
-ATLAS_VERIFICATION_OUTPUT_TOOLS: set[str] = {
-    "scene_screenshot",
-    "animation_render_preview",
+    # Declares the run blocked and short-circuits further execution; treat as output.
+    # (Allowed in Executor, disallowed in Planner.)
+    "report_blocked",
 }
 
 SESSION_MUTATION_TOOLS: set[str] = {
@@ -123,11 +120,12 @@ ATLAS_SHARED_SYSTEM_RULES = (
     "- Camera director rubric (defaults): walkthrough constraints default keep_visible=false unless the user explicitly wants framing; step_seconds defaults: slow≈0.5, medium≈1.0, fast≈1.5–2.0. For sparse waypoints, add intermediate waypoints instead of relying on interpolation modes.\n"
     "- Walkthrough planning: when inventing segments from words, you may use internal segment templates (template+amount/distance/degrees) and let the tool expand them; do not require the user to name templates.\n"
     "- File paths: classify input. Absolute/~/drive paths are exact (fs_expand_paths→fs_check_paths; if missing try fs_resolve_path). Natural-language hints use fs_hint_resolve with structured args (expected_name + possible_dirs). Always verify before loading.\n"
-    "- Maintain an explicit plan via the update_plan tool (4–7 short steps). Exactly one step may be in_progress.\n"
+    "- Maintain an explicit plan via the update_plan tool (aim for 4–7 top-level steps by default; for complex tasks you may use more, or re-plan in phases). Exactly one step may be in_progress.\n"
     "- Verify changes after applying: scene_get_values / animation_list_keys / animation_camera_validate, etc.\n"
-    "- When blocked on missing user intent/input, call report_blocked and ask a single focused question.\n"
+    "- Avoid blocking on missing user intent/input; choose defaults and proceed. Use report_blocked only for technical/capability blocks (RPC down, tool missing, preconditions cannot be satisfied, etc.).\n"
     "- For unclear workflow/semantics, consult docs via docs_search and docs_read (AGENTS_GUIDE.md, SCENE_SERVER.md).\n"
     "- Tool-call arguments must be STRICT JSON (double-quoted keys/strings; lowercase true/false/null; no trailing commas).\n\n"
+    "- Never embed tool calls or raw JSON blobs in assistant text (e.g., {\"tool\": ...} or {\"plan\": ...}). If you need to update the plan or verification, CALL THE TOOL.\n\n"
     "Reasoning summary style:\n"
     "- The UI will show your reasoning summary live. Keep it high-level and safe (no hidden chain-of-thought).\n"
     "- Write in first person and future-looking (\"I will…\"), include risks/trade-offs and a verification strategy.\n\n"
@@ -139,11 +137,13 @@ ATLAS_SHARED_SYSTEM_RULES = (
 ATLAS_PLANNER_SYSTEM_PROMPT = (
     "PHASE: Planner\n"
     "You must NOT change the Atlas scene/timeline in this phase.\n"
-    "Allowed actions: read-only inspection tools, docs lookup, and update_plan.\n\n"
+    "Allowed actions: read-only inspection tools, docs lookup, and update_plan.\n"
+    "Important: The Planner phase tool list is intentionally LIMITED (read-only). It may not include file import or animation-key authoring tools.\n"
+    "Do NOT treat missing write tools in this phase as a blocker; assume the Executor phase has the full write-capable toolset.\n"
+    "Do NOT ask the user clarifying questions in this phase; instead, encode defaults as assumptions in your plan explanation.\n\n"
     "Format:\n"
-    "- If genuinely blocked by missing user intent, output exactly: CLARIFY: <one focused question>\n"
     "- You will be given a TASK BRIEF in the shared context. Treat it as authoritative; do not rewrite or reinterpret it.\n"
-    "- Otherwise: update the plan via update_plan (4–7 short steps).\n\n"
+    "- Otherwise: update the plan via update_plan (aim for 4–7 top-level steps by default; use more or re-plan in phases for very complex tasks).\n\n"
     "Verification requirements:\n"
     "- After update_plan, call verification_set_requirements for each plan step_id.\n"
     "- Use policy.all_of groups to express multi-mode verification. Common patterns:\n"
@@ -163,6 +163,8 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
     + "\n".join(
         [
             "- Treat the current plan as the source of truth; execute it step-by-step. If there is no plan yet, create one via update_plan.",
+            "- If you create a new plan (or materially rewrite it), immediately call verification_set_requirements for each step_id so verification is explicit.",
+            "- At the start of execution (or before verifying a step), call verification_get(include_plan=true) so you know the current verification requirements and statuses.",
             "- Derive intent strictly from the Task Brief in the shared context. If the brief conflicts with the latest user message, stop and ask one focused question.",
             "- Prefer live discovery for ids/json_keys/options: scene_list_objects → scene_list_params(id) → scene_get_values(id,json_keys). Do not guess.",
             "- For unclear semantics/workflows, consult docs via docs_search/docs_read (SCENE_SERVER.md, AGENTS_GUIDE.md, USER_GUIDE.md).",
@@ -175,29 +177,15 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
             "- Camera workflow: use camera_* producers (camera_focus / camera_point_to / camera_rotate / camera_reset_view) to compute typed camera values, then apply via scene_camera_apply(value=...) for scene-only or animation_* camera tools for timeline work.",
             "- Validate before committing where possible (scene_validate_params; animation_camera_validate). Verify after writing (animation_list_keys, animation_camera_validate, scene_get_values).",
             "- Large-file handling: prefer fs_tail_lines/fs_search_text; if you must scan, iterate fs_read_text in windows until EOF (no silent truncation).",
-            "- Verification ledger: when a step has specific requirements, use verification_record(mode=tool|visual|human) to attach evidence and update_plan to advance statuses.",
+            "- Verification ledger: satisfy the current step’s verification policy using read-back tools and/or screenshots; record outcomes via verification_record(mode=tool|visual|human).",
+            "- Plan bookkeeping: after completing a step, update_plan to mark it completed and advance the next step to in_progress. Near the end, call verification_eval_plan and do a final update_plan pass to ensure statuses are consistent.",
             "- Visual checks: prefer scene_screenshot for current scene state; use animation_render_preview only when you need a specific animation time. If screenshots are allowed for this session, do NOT ask the user again—just call the tool and inspect the image. Never ask the user to open temp screenshot files; if a human check is needed, ask them to check in the Atlas UI.",
+            "- If a plan step cannot be verified from tools alone and screenshots are unavailable/ambiguous, keep the step pending and request a human-check (in the Atlas UI). Do not mark fail without concrete contradictory evidence.",
             "- If a validation/read-back check fails, diagnose precisely (id/json_key/time/value) and retry within this run before giving up.",
             "- If a requested step is not feasible with the available tools/capabilities, complete all feasible steps first, then call report_blocked once with a precise reason and suggestion.",
-            "- When blocked on missing user intent/input, call report_blocked once with one focused question.",
+            "- Completion contract: do not stop while there are plan steps that can be executed/verified with available tools. When you do stop, always produce a user-facing recap of what you did, what you verified (tool/screenshot/human), any assumptions/trade-offs, and what remains (if anything).",
         ]
     )
-)
-
-ATLAS_VERIFIER_SYSTEM_PROMPT = (
-    "PHASE: Verifier\n"
-    "You must NOT change the Atlas scene/timeline in this phase.\n"
-    "Allowed actions: read-only inspection tools, docs lookup, session reads, and update_plan.\n\n"
-    "Goals:\n"
-    "- Start by calling verification_get (so you know what needs to be verified).\n"
-    "- Verify the requested changes using read-back tools (scene_get_values, animation_list_keys, animation_camera_validate, etc.).\n"
-    "- Record evidence with verification_record (mode=tool|visual|human).\n"
-    "- Use verification_eval_plan to decide what can be marked completed, then update plan statuses via update_plan.\n"
-    "- If something cannot be verified from tools alone, try a screenshot: prefer scene_screenshot for scene state; use animation_render_preview when verifying a specific animation time.\n"
-    "- If the screenshot is unavailable or still ambiguous, keep the step pending and request a human-check.\n"
-    "- Absence of evidence is not a failure: only mark a step failed when tool read-backs clearly contradict the plan.\n"
-    "- Produce the final user-facing answer for this turn.\n\n"
-    + ATLAS_SHARED_SYSTEM_RULES
 )
 
 MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL = 3_000_000
@@ -342,6 +330,17 @@ class ChatTeam:
             self.session_store.save()
         except Exception:
             pass
+
+        # Track the actual model name returned by the OpenAI-compatible gateway
+        # (some gateways silently reroute requests).
+        self._gateway_model_last: str | None = None
+        try:
+            meta = self.session_store.get_meta()
+            gm = meta.get("gateway_model_last")
+            if isinstance(gm, str) and gm.strip():
+                self._gateway_model_last = gm.strip()
+        except Exception:
+            self._gateway_model_last = None
 
         # Best-effort: restore the session's internal animation autosave.
         #
@@ -770,10 +769,50 @@ class ChatTeam:
         brief_ctx = "\n\n".join([p for p in brief_ctx_parts if p]).strip()
 
         task_brief = ""
+        task_brief_initial = ""
+        suppressed_clarify: str | None = None
         try:
-            task_brief = (self.intent_resolver.resolve(user_text, scene_context=brief_ctx) or "").strip()
+            task_brief_initial = (
+                self.intent_resolver.resolve(user_text, scene_context=brief_ctx) or ""
+            ).strip()
         except Exception:
-            task_brief = ""
+            task_brief_initial = ""
+
+        task_brief = task_brief_initial
+        if task_brief_initial.lower().startswith("clarify:"):
+            # Some providers/models over-use CLARIFY even when the request is
+            # actionable with reasonable defaults. Prefer proceed-first: re-run
+            # the supervisor with a "TASK BRIEF only" constraint and continue.
+            forced = ""
+            try:
+                forced = (
+                    self.intent_resolver.resolve_force_task_brief(user_text, scene_context=brief_ctx)
+                    or ""
+                ).strip()
+            except Exception:
+                forced = ""
+            if forced and not forced.lower().startswith("clarify:"):
+                suppressed_clarify = task_brief_initial.strip()
+                task_brief = forced
+
+        if task_brief.lower().startswith("clarify:"):
+            # Last-resort fallback: the supervisor must not block the run.
+            # Encode the "clarify" as an assumption and proceed with a minimal,
+            # actionable brief that preserves the raw user request.
+            suppressed_clarify = suppressed_clarify or task_brief.strip()
+            tl = (user_text or "").lower()
+            if any(k in tl for k in ("animation", "video", "seconds", "fps", "timeline")):
+                intent = "animation"
+            else:
+                intent = "scene"
+            task_brief = (
+                "TASK BRIEF:\n"
+                f"- Intent: {intent}\n"
+                f"- Targets/Inputs: {user_text.strip()}\n"
+                "- Assumptions: Proceed with reasonable defaults and fill any gaps without asking; resolve file/location hints via fs_* tools; do not modify unrelated settings.\n"
+                "- Signals: Apply the user-requested scene/animation changes.\n"
+                "- Verify: Use tool read-backs (and screenshots if allowed) to confirm the requested outcome.\n"
+            ).strip()
 
         # Persist the user input after auto-retrieval (so search doesn't match the current message),
         # but before any tool execution (so intent survives crashes mid-turn).
@@ -790,35 +829,16 @@ class ChatTeam:
                         "text": task_brief,
                     }
                 )
+            if suppressed_clarify:
+                self.session_store.append_event(
+                    {
+                        "type": "task_brief_clarify_suppressed",
+                        "turn_id": turn_id,
+                        "question": suppressed_clarify,
+                    }
+                )
         except Exception:
             pass
-
-        # If the Supervisor needs clarification, stop early (no tool calls).
-        if task_brief.lower().startswith("clarify:"):
-            text = task_brief.strip()
-            if user_text:
-                self._history.append(("user", user_text))
-            if text:
-                self._history.append(("assistant", text))
-            try:
-                if text:
-                    self.session_store.append_transcript(role="assistant", content=text, turn_id=turn_id)
-            except Exception:
-                pass
-            _compress_history_if_needed()
-            try:
-                self.session_store.set_memory_summary(self._memory_summary)
-                self.session_store.set_meta(
-                    atlas_dir=self.atlas_dir,
-                    atlas_version=self.atlas_version,
-                    address=self.address,
-                    model=self.model,
-                    last_turn_id=turn_id,
-                )
-                self.session_store.save()
-            except Exception:
-                pass
-            return text or "(no response)"
 
         # Make the Task Brief visible to downstream phases.
         if task_brief:
@@ -1162,7 +1182,7 @@ class ChatTeam:
         def _dispatch_logged(name: str, args_json: str) -> str:
             # Phase safety: nested dispatches must not bypass the phase tool allowlist.
             ph = str(current_phase or "")
-            if ph in {"Planner", "Verifier"}:
+            if ph == "Planner":
                 if name in ATLAS_STATE_MUTATION_TOOLS:
                     return json.dumps(
                         {
@@ -1177,9 +1197,7 @@ class ChatTeam:
                             "error": f"tool '{name}' is not allowed in phase={ph}",
                         }
                     )
-                if name in ATLAS_OUTPUT_TOOLS and (
-                    ph != "Verifier" or name not in ATLAS_VERIFICATION_OUTPUT_TOOLS
-                ):
+                if name in ATLAS_OUTPUT_TOOLS:
                     return json.dumps(
                         {
                             "ok": False,
@@ -1207,8 +1225,8 @@ class ChatTeam:
                 policy = "full"
 
             # Circuit breaker: if a tool observes an RPC connection failure, mark this
-            # turn as RPC-unavailable so we can avoid background RPC calls (facts
-            # snapshots, Verifier) that would otherwise spam errors and waste time.
+            # turn as RPC-unavailable so we can avoid background RPC calls (e.g.
+            # post-write facts snapshots) that would otherwise spam errors and waste time.
             try:
                 if isinstance(res_obj, dict) and not ok:
                     err = str(res_obj.get("error") or "").lower()
@@ -1530,10 +1548,10 @@ class ChatTeam:
                 # Allow the model to actually *see* previews by attaching the
                 # rendered image as an input_image in the next model call.
                 #
-                # We do this for Executor and Verifier. The Planner phase is
-                # read-only and should avoid expensive/visual operations unless
-                # strictly necessary.
-                if str(runtime_state.get("phase") or "") not in {"Executor", "Verifier"}:
+                # We do this for Executor. The Planner phase is read-only and
+                # should avoid expensive/visual operations unless strictly
+                # necessary.
+                if str(runtime_state.get("phase") or "") != "Executor":
                     return []
                 tool_name = str(name or "")
                 if tool_name not in {"animation_render_preview", "scene_screenshot"}:
@@ -1669,10 +1687,57 @@ class ChatTeam:
                 except Exception:
                     pass
 
+            last_gateway_model_logged: str | None = None
+
+            def _persist_response_meta(resp: dict[str, Any], call_index: int) -> None:
+                nonlocal last_gateway_model_logged
+                if not isinstance(resp, dict):
+                    return
+                model_name = resp.get("model")
+                if not isinstance(model_name, str) or not model_name.strip():
+                    return
+                model_name = model_name.strip()
+                if model_name == last_gateway_model_logged:
+                    return
+                last_gateway_model_logged = model_name
+                try:
+                    self._gateway_model_last = model_name
+                except Exception:
+                    pass
+                try:
+                    # Persist the most recent routed model into meta immediately so users
+                    # can inspect it mid-session (and not only at turn end).
+                    self.session_store.set_meta(gateway_model_last=model_name)
+                except Exception:
+                    pass
+                if emit_to_stdout:
+                    try:
+                        msg = f"[gateway model: {model_name}]"
+                        if str(self.model) and model_name != str(self.model):
+                            msg = f"[gateway model: {model_name} (requested {self.model})]"
+                        sys.stdout.write(msg + "\n")
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
+                try:
+                    self.session_store.append_event(
+                        {
+                            "type": "llm_response_meta",
+                            "turn_id": turn_id,
+                            "phase": phase,
+                            "call_index": int(call_index),
+                            "requested_model": str(self.model),
+                            "gateway_model": model_name,
+                        }
+                    )
+                except Exception:
+                    pass
+
             phase_callbacks = ToolLoopCallbacks(
                 on_reasoning_summary_delta=_capture_reasoning_delta,
                 on_reasoning_summary_part_added=_capture_reasoning_part_added,
                 on_reasoning_summary_complete=_persist_reasoning_summary_complete,
+                on_response_meta=_persist_response_meta,
                 on_assistant_text_delta=(callbacks.on_assistant_text_delta if callbacks else None),
                 on_tool_call=(callbacks.on_tool_call if callbacks else None),
                 on_tool_result=(callbacks.on_tool_result if callbacks else None),
@@ -1681,18 +1746,140 @@ class ChatTeam:
             if callbacks is not None and callbacks.on_phase_start is not None:
                 callbacks.on_phase_start(phase)
             try:
-                result = run_responses_tool_loop(
-                    llm=self.llm,
-                    instructions=(instructions.rstrip() + "\n\n" + shared_instructions).strip(),
-                    input_items=phase_input_items,
-                    tools=phase_tools,
-                    dispatch=_dispatch_logged,
-                    post_tool_output=_post_tool_output,
-                    callbacks=phase_callbacks,
-                    temperature=self.temperature,
-                    reasoning_effort=self.reasoning_effort,
-                    max_rounds=max_rounds,
-                )
+                def _looks_like_embedded_tool_json(text: str) -> bool:
+                    """Heuristic: model printed tool/plan JSON into assistant text.
+
+                    Some providers/models occasionally fail to emit tool calls and instead
+                    print JSON blobs like {"tool": "..."} or {"plan": [...]} into the message.
+                    That output is not actionable and should be retried with explicit instructions.
+                    """
+
+                    t = (text or "").strip()
+                    if not t:
+                        return False
+                    # Common failure patterns we have seen in session logs.
+                    if '{"tool"' in t or "{'tool'" in t:
+                        return True
+                    if '{"plan"' in t or "{'plan'" in t:
+                        return True
+                    if '"requirements"' in t and '"step_id"' in t:
+                        return True
+                    return False
+
+                def _tool_json_repair_prompt(*, phase_name: str) -> str:
+                    ph = str(phase_name or "")
+                    if ph == "Planner":
+                        return (
+                            "INTERNAL: Your previous reply incorrectly embedded tool/plan JSON into assistant text.\n"
+                            "That is INVALID. You must CALL tools instead of printing JSON.\n\n"
+                            "Do this now:\n"
+                            "1) Call update_plan with a clear, scannable plan (default 4–7 top-level steps; more is ok if needed; exactly one in_progress).\n"
+                            "2) Call verification_set_requirements for each step_id.\n"
+                            "3) Do NOT output any JSON in your assistant text.\n"
+                        )
+                    return (
+                        "INTERNAL: Your previous reply incorrectly embedded tool/plan JSON into assistant text.\n"
+                        "That is INVALID. You must CALL tools instead of printing JSON.\n\n"
+                        "Do this now:\n"
+                        "- If there is no plan yet, call update_plan (default 4–7 top-level steps; more is ok if needed) and then verification_set_requirements.\n"
+                        "- Otherwise, proceed to execute the plan via tools.\n"
+                        "- Do NOT output any JSON in your assistant text.\n"
+                    )
+
+                # Best-effort repair: retry a small number of times when the model
+                # prints tool JSON instead of emitting tool calls.
+                tool_json_repair_attempts = 0
+                executor_no_tool_calls_repair_attempts = 0
+                phase_input_items_local = list(phase_input_items)
+                while True:
+                    result = run_responses_tool_loop(
+                        llm=self.llm,
+                        instructions=(instructions.rstrip() + "\n\n" + shared_instructions).strip(),
+                        input_items=phase_input_items_local,
+                        tools=phase_tools,
+                        dispatch=_dispatch_logged,
+                        post_tool_output=_post_tool_output,
+                        callbacks=phase_callbacks,
+                        temperature=self.temperature,
+                        reasoning_effort=self.reasoning_effort,
+                        max_rounds=max_rounds,
+                    )
+
+                    def _plan_has_remaining_work() -> bool:
+                        try:
+                            plan_now = self.session_store.get_plan() or []
+                        except Exception:
+                            plan_now = []
+                        for it in plan_now:
+                            if not isinstance(it, dict):
+                                continue
+                            st = str(it.get("status") or "").strip()
+                            if st != "completed":
+                                return True
+                        return False
+
+                    if (
+                        not list(result.tool_calls or [])
+                        and _looks_like_embedded_tool_json(result.assistant_text or "")
+                        and tool_json_repair_attempts < 2
+                    ):
+                        tool_json_repair_attempts += 1
+                        try:
+                            self.session_store.append_event(
+                                {
+                                    "type": "phase_retry",
+                                    "turn_id": turn_id,
+                                    "phase": phase,
+                                    "reason": "tool_json_in_text",
+                                    "attempt": int(tool_json_repair_attempts),
+                                }
+                            )
+                        except Exception:
+                            pass
+                        phase_input_items_local = list(result.input_items or [])
+                        phase_input_items_local.append(
+                            _message(role="user", text=_tool_json_repair_prompt(phase_name=phase))
+                        )
+                        continue
+
+                    # Fail-safe: for the Executor phase, we expect tool use whenever the plan
+                    # still has pending work. Some providers/models occasionally produce a
+                    # tool-free response (often GUI/manual instructions) even though tools
+                    # are available. Retry once with an explicit internal nudge.
+                    if (
+                        str(phase) == "Executor"
+                        and not list(result.tool_calls or [])
+                        and _plan_has_remaining_work()
+                        and executor_no_tool_calls_repair_attempts < 1
+                    ):
+                        executor_no_tool_calls_repair_attempts += 1
+                        try:
+                            self.session_store.append_event(
+                                {
+                                    "type": "phase_retry",
+                                    "turn_id": turn_id,
+                                    "phase": phase,
+                                    "reason": "executor_no_tool_calls_plan_incomplete",
+                                    "attempt": int(executor_no_tool_calls_repair_attempts),
+                                }
+                            )
+                        except Exception:
+                            pass
+                        phase_input_items_local = list(result.input_items or [])
+                        phase_input_items_local.append(
+                            _message(
+                                role="user",
+                                text=(
+                                    "INTERNAL: The current plan has pending work.\n"
+                                    "You must execute it by calling tools now.\n"
+                                    "If you cannot proceed due to preconditions or missing capabilities, call report_blocked once with a precise reason and suggestion.\n"
+                                    "Do not provide GUI/manual Atlas instructions as a substitute for tool execution.\n"
+                                    "Only provide a user-facing recap AFTER tool execution.\n"
+                                ),
+                            )
+                        )
+                        continue
+                    break
             except ToolLoopNonConverged as e:
                 phase_hit_round_budget_phase = str(phase)
                 try:
@@ -1877,7 +2064,7 @@ class ChatTeam:
                 pass
             return result
 
-        # Phase runner (adaptive): Planner (optional) → Executor (always) → Verifier (if atlas writes occurred).
+        # Phase runner (adaptive): Planner (optional) → Executor (always).
         phase_input = list(input_items)
         final_result = None
 
@@ -1906,12 +2093,25 @@ class ChatTeam:
             phase_input = list(planner_res.input_items)
             if phase_hit_round_budget_phase == "Planner":
                 final_result = planner_res
-            # If the Planner asks a clarifying question, stop the turn here.
             pt = (planner_res.assistant_text or "").strip()
             if pt.lower().startswith("clarify:"):
-                final_result = planner_res
+                # Planner should not block execution; proceed to Executor with defaults.
+                try:
+                    self.session_store.append_event(
+                        {
+                            "type": "planner_clarify_ignored",
+                            "turn_id": turn_id,
+                            "question": pt,
+                        }
+                    )
+                except Exception:
+                    pass
+                # Drop the Planner assistant text from the within-turn input history
+                # to avoid confusing the Executor. The durable plan/verification
+                # state is already stored in the session store.
+                phase_input = list(input_items)
             # If the Planner explicitly reported a blocked state, do not proceed
-            # into Executor/Verifier (avoid redundant/failed RPC calls).
+            # into the Executor (avoid redundant/failed RPC calls).
             if final_result is None and _turn_is_blocked():
                 final_result = planner_res
 
@@ -1924,7 +2124,7 @@ class ChatTeam:
                 max_rounds=int(self.max_rounds_executor),
             )
             # If the RPC server became unavailable during the Executor, do not attempt
-            # any additional RPC calls (facts snapshot, Verifier) in this turn.
+            # any additional RPC calls (facts snapshot) in this turn.
             if not _turn_rpc_unavailable():
                 # Deterministic post-write facts snapshot: store what changed in this turn
                 # so future turns can ground without re-enumerating everything.
@@ -1932,37 +2132,17 @@ class ChatTeam:
             phase_input = list(exec_res.input_items)
             if phase_hit_round_budget_phase == "Executor":
                 # If we had to force-finalize due to tool-loop non-convergence, stop this
-                # turn early (do not run Verifier). The session log contains all prior
+                # turn early. The session log contains all prior
                 # tool work; the user can reply "continue" to resume with full context.
                 final_result = exec_res
             elif _turn_is_blocked() or _turn_rpc_unavailable():
                 # The model already produced a clear user-facing blocked message.
-                # Skip Verifier and return.
+                # Return without running any additional phases.
                 final_result = exec_res
             else:
-                did_write_state = any(
-                    (call.get("name") in ATLAS_STATE_MUTATION_TOOLS)
-                    for call in (exec_res.tool_calls or [])
-                )
-                if did_write_state:
-                    verifier_tools = _filter_tools(
-                        read_only_tool_names
-                        | set(SESSION_MUTATION_TOOLS)
-                        | set(ATLAS_VERIFICATION_OUTPUT_TOOLS)
-                    )
-                    if _turn_rpc_unavailable():
-                        final_result = exec_res
-                    else:
-                        ver_res = _run_phase(
-                            phase="Verifier",
-                            instructions=ATLAS_VERIFIER_SYSTEM_PROMPT,
-                            phase_tools=verifier_tools,
-                            phase_input_items=phase_input,
-                            max_rounds=12,
-                        )
-                        final_result = ver_res
-                else:
-                    final_result = exec_res
+                # Single-phase execution: the Executor is responsible for both
+                # applying changes and verifying them via read-back tools.
+                final_result = exec_res
 
         text = (final_result.assistant_text or "").strip() or "(no response)"
 
@@ -2026,6 +2206,7 @@ class ChatTeam:
                 atlas_version=self.atlas_version,
                 address=self.address,
                 model=self.model,
+                gateway_model_last=getattr(self, "_gateway_model_last", None),
                 last_turn_id=turn_id,
             )
             self.session_store.save()

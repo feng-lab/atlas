@@ -2804,10 +2804,14 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             )
 
         fps = int(float(args.get("fps", 30)))
-        tsec = float(args.get("time", 0.0))
+        if fps < 1:
+            fps = 1
+        tsec_requested = float(args.get("time", 0.0))
+        if not math.isfinite(tsec_requested):
+            tsec_requested = 0.0
         width = int(args.get("width", 512))
         height = int(args.get("height", 512))
-        frame_idx = int(round(tsec * max(1, fps)))
+        requested_frame_idx = int(math.floor(tsec_requested * fps + 1e-9))
         # Resolve Atlas binary
         atlas_bin = None
         if atlas_dir:
@@ -2840,6 +2844,28 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps(
                 {"ok": False, "error": "failed to save temporary animation"}
             )
+
+        # Headless previews are frame-index based. Map the requested time to a
+        # renderable frame index, clamping when the request is at/after the clip
+        # end time (common case: time == Duration).
+        duration_s: float | None = None
+        try:
+            anim = load_animation(anim_path)
+            d = anim.get("Duration") if isinstance(anim, dict) else None
+            if isinstance(d, (int, float)) and math.isfinite(float(d)) and float(d) >= 0:
+                duration_s = float(d)
+        except Exception:
+            duration_s = None
+
+        frame_idx = requested_frame_idx
+        if duration_s is not None:
+            total_frames = int(math.floor(duration_s * fps + 1e-9))
+            max_frame_idx = max(0, total_frames - 1) if total_frames > 0 else 0
+            frame_idx = min(frame_idx, max_frame_idx)
+        frame_idx = max(0, frame_idx)
+        tsec_resolved = float(frame_idx) / float(fps)
+        time_adjusted = frame_idx != requested_frame_idx
+
         frames_dir = tdir / "frames"
         frames_dir.mkdir(parents=True, exist_ok=True)
         rc = preview_frames(
@@ -2874,6 +2900,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     "paths": images,
                 }
             )
-        return json.dumps({"ok": True, "path": images[0]})
+        out: dict[str, Any] = {"ok": True, "path": images[0]}
+        out["fps"] = int(fps)
+        out["requested_time"] = float(tsec_requested)
+        out["resolved_time"] = float(tsec_resolved)
+        out["frame_idx"] = int(frame_idx)
+        if duration_s is not None:
+            out["duration"] = float(duration_s)
+        if time_adjusted:
+            out["note"] = "preview time was mapped/clamped to a renderable frame index"
+        return json.dumps(out)
 
     return None
