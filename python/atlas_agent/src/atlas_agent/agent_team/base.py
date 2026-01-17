@@ -6,7 +6,11 @@ from typing import Any, Callable, Dict, List, Optional
 
 from openai import OpenAI  # type: ignore
 
-from ..provider_tool_schema import normalize_tools_for_responses_api
+from ..provider_tool_schema import (
+    convert_tools_to_responses_wire,
+    normalize_tools_for_chat_completions_api,
+    tighten_tools_schema_for_provider,
+)
 
 
 @dataclass
@@ -65,7 +69,11 @@ class LLMClient:
     def _normalize_tools_for_responses(
         raw_tools: Optional[List[Dict[str, Any]]],
     ) -> Optional[List[Dict[str, Any]]]:
-        return normalize_tools_for_responses_api(raw_tools)
+        # Two-stage normalization:
+        # 1) Wire adapter to Responses tool shape (so downstream code is uniform).
+        # 2) Provider-border schema tightening for strict validators.
+        tools_wire = convert_tools_to_responses_wire(raw_tools)
+        return tighten_tools_schema_for_provider(tools_wire)
 
     def chat(
         self,
@@ -76,10 +84,11 @@ class LLMClient:
         stream: bool = False,
     ) -> Dict[str, Any]:
         client = self._ensure_client()
+        normalized_tools = normalize_tools_for_chat_completions_api(tools)
         params: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
-            "tools": tools or None,
+            "tools": normalized_tools or None,
         }
         if temperature is not None:
             params["temperature"] = float(temperature)
@@ -249,28 +258,6 @@ class LLMClient:
 
             return messages
 
-        def _responses_tools_to_chat_tools(responses_tools: Optional[List[Dict[str, Any]]]) -> list[dict[str, Any]] | None:
-            if not responses_tools:
-                return None
-            out: list[dict[str, Any]] = []
-            for t in responses_tools:
-                if not isinstance(t, dict):
-                    continue
-                if str(t.get("type") or "") != "function":
-                    continue
-                name = str(t.get("name") or "").strip()
-                if not name:
-                    continue
-                fn: dict[str, Any] = {"name": name}
-                desc = t.get("description")
-                if isinstance(desc, str) and desc.strip():
-                    fn["description"] = desc.strip()
-                params = t.get("parameters")
-                if isinstance(params, dict):
-                    fn["parameters"] = params
-                out.append({"type": "function", "function": fn})
-            return out or None
-
         def _chat_response_to_responses_dict(chat_resp: Any) -> dict[str, Any]:
             data = self._to_plain_dict(chat_resp)
             out_items: list[dict[str, Any]] = []
@@ -358,7 +345,9 @@ class LLMClient:
             chat_messages = _responses_to_chat_messages(
                 instructions_text=instructions, items=input_items
             )
-            chat_tools = _responses_tools_to_chat_tools(normalized_tools)
+            # Normalize to Chat Completions wire shape + apply provider-border
+            # schema tightening for strict validators.
+            chat_tools = normalize_tools_for_chat_completions_api(tools)
 
             def _is_unsupported_temperature_error(err: Exception) -> bool:
                 msg = str(err or "")

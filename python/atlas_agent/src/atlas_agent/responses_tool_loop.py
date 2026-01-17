@@ -5,7 +5,10 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
-from .provider_tool_schema import normalize_tools_for_responses_api
+from .provider_tool_schema import (
+    convert_tools_to_responses_wire,
+    tighten_tools_schema_for_provider,
+)
 
 CONTEXT_TRIM_MAX_RETRIES = 32
 
@@ -434,7 +437,11 @@ def run_responses_tool_loop(
     cb = callbacks or ToolLoopCallbacks()
     # We keep full within-turn input items to avoid relying on server state.
     in_items: list[dict[str, Any]] = list(input_items or [])
-    normalized_tools = normalize_tools_for_responses_api(list(tools or [])) or []
+    # Tool normalization happens in two stages:
+    # 1) Wire adapter: Chat Completions tool shape -> Responses tool shape.
+    # 2) Provider-border schema tightening: satisfy strict JSON schema validators.
+    tools_wire = convert_tools_to_responses_wire(list(tools or [])) or []
+    normalized_tools = tighten_tools_schema_for_provider(tools_wire) or []
 
     all_tool_calls: list[dict[str, Any]] = []
     reasoning_summaries: list[str] = []
