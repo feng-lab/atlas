@@ -27,7 +27,7 @@ INTENT_RESOLVER_SYSTEM = (
 @dataclass
 class IntentResolver:
     client: LLMClient
-    temperature: float = 0.2
+    temperature: float | None = None
 
     def resolve(self, user_text: str, *, scene_context: str) -> str:
         prompt = (
@@ -35,4 +35,8 @@ class IntentResolver:
             "Latest user message:\n" + (user_text or "") + "\n\n" +
             "Produce either a 'CLARIFY:' question or a 'TASK BRIEF:' as specified."
         )
-        return self.client.complete_text(system_prompt=INTENT_RESOLVER_SYSTEM, user_text=prompt, temperature=self.temperature)
+        return self.client.complete_text(
+            system_prompt=INTENT_RESOLVER_SYSTEM,
+            user_text=prompt,
+            temperature=self.temperature,
+        )

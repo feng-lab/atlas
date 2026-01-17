@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 # Required internal helper; fail fast if missing
 from ...repo import find_repo_root  # type: ignore
+from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
 from .file_formats import SCENE_LOAD_CATEGORIES, get_supported_extensions
 
@@ -18,335 +19,266 @@ from .file_formats import SCENE_LOAD_CATEGORIES, get_supported_extensions
 # This is used only for a small NUL-byte binary heuristic, not as a read cap.
 BOM_SAMPLE_BYTES_FOR_BINARY_HEURISTIC = 4096
 
-HANDLED_TOOLS = (
-    "fs_expand_paths",
-    "fs_check_paths",
-    "fs_read_text",
-    "fs_tail_lines",
-    "fs_tail_bytes",
-    "fs_search_text",
-    "fs_read_json",
-    "fs_resolve_path",
-    "fs_hint_resolve",
-    "repo_search",
-    "fs_glob",
-    "fs_find_candidates",
-)
 
-TOOL_SPECS: List[Dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_expand_paths",
-            "description": "Expand ~ and env vars and normalize paths. Returns expanded absolute-like paths per entry (relative kept relative).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "paths": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Input paths (may contain ~ or env vars)",
-                    }
-                },
-                "required": ["paths"],
+def _tool_handler(tool_name: str):
+    def _call(args: dict[str, Any], ctx: ToolDispatchContext):
+        return handle(tool_name, args, ctx)
+
+    return _call
+
+
+TOOLS: List[Tool] = [
+    tool_from_schema(
+        name="fs_expand_paths",
+        description="Expand ~ and env vars and normalize paths. Returns expanded absolute-like paths per entry (relative kept relative).",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Input paths (may contain ~ or env vars)",
+                }
             },
+            "required": ["paths"],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_check_paths",
-            "description": "Check which of the given paths exist on the local filesystem. Returns {exists:[], missing:[]}.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "paths": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Paths to check",
-                    }
-                },
-                "required": ["paths"],
+        handler=_tool_handler("fs_expand_paths"),
+    ),
+    tool_from_schema(
+        name="fs_check_paths",
+        description="Check which of the given paths exist on the local filesystem. Returns {exists:[], missing:[]}.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Paths to check",
+                }
             },
+            "required": ["paths"],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_read_text",
-            "description": "Advanced text read with byte ranges and optional line extraction/filtering. Prefer fs_tail_lines/fs_tail_bytes for simple tails. If both byte and line windows are provided (start/length together with start_line/line_count), the byte window is read first and the line slice is applied within that decoded window. This combination is allowed but discouraged — avoid mixing byte and line windows unless you explicitly want that behavior.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Path to a text file (supports ~ and env var expansion)",
-                    },
-                    "start_line": {
-                        "type": ["integer", "null"],
-                        "description": "Line index (0-based). Negative means offset from end (last line = -1). When combined with start/length, slicing applies within the byte window (discouraged unless intentional).",
-                    },
-                    "line_count": {
-                        "type": ["integer", "null"],
-                        "description": "Number of lines to return from start_line. Omit/null to read to the end. Requires start_line; to tail last N lines use start_line=-N.",
-                    },
-                    "regex": {
-                        "type": ["string", "null"],
-                        "description": "If set, filter returned lines by this regex (applied after slicing). Implies line mode. Discouraged to combine with byte windows unless intentional.",
-                    },
-                    "start": {
-                        "type": ["integer", "null"],
-                        "description": "Start byte offset. Negative values mean offset from end (EOF + start). When combined with start_line/line_count, the line slice is applied to this byte window (discouraged unless intentional).",
-                    },
-                    "length": {
-                        "type": ["integer", "null"],
-                        "description": "Number of bytes to read from start. Omit/null to read to EOF.",
-                    },
-                    "encoding": {
-                        "type": ["string", "null"],
-                        "description": "Force a specific text encoding (default: auto-detect BOM then utf-8).",
-                    },
-                    "errors": {
-                        "type": "string",
-                        "enum": ["strict", "ignore", "replace"],
-                        "default": "replace",
-                        "description": "Decode error policy.",
-                    },
+        handler=_tool_handler("fs_check_paths"),
+    ),
+    tool_from_schema(
+        name="fs_read_text",
+        description="Advanced text read with byte ranges and optional line extraction/filtering. Prefer fs_tail_lines/fs_tail_bytes for simple tails. If both byte and line windows are provided (start/length together with start_line/line_count), the byte window is read first and the line slice is applied within that decoded window. This combination is allowed but discouraged — avoid mixing byte and line windows unless you explicitly want that behavior.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path to a text file (supports ~ and env var expansion)",
                 },
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_tail_lines",
-            "description": "Return exactly the last N lines of a text file. BOM-aware (UTF-8/UTF-16/UTF-32). Minimal, robust, no extra params.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                    "n": {"type": "integer", "default": 200},
+                "start_line": {
+                    "type": ["integer", "null"],
+                    "description": "Line index (0-based). Negative means offset from end (last line = -1). When combined with start/length, slicing applies within the byte window (discouraged unless intentional).",
                 },
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_tail_bytes",
-            "description": "Return the last K bytes of a text file, decoded with BOM-aware detection (UTF-8/UTF-16/UTF-32).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                    "bytes": {"type": "integer", "default": 4096},
+                "line_count": {
+                    "type": ["integer", "null"],
+                    "description": "Number of lines to return from start_line. Omit/null to read to the end. Requires start_line; to tail last N lines use start_line=-N.",
                 },
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_search_text",
-            "description": "Search a text file for a regex and return matches with byte offsets and surrounding line numbers. Correctness-first: searches the requested window (default entire file) without arbitrary caps. For large files, this may be expensive; specify start/length to constrain the window if desired.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Path to file (supports ~ and env var expansion)",
-                    },
-                    "regex": {
-                        "type": "string",
-                        "description": "Regular expression to search. Interpreted on encoded bytes; use case_sensitive=false for ASCII-insensitive search.",
-                    },
-                    "start": {
-                        "type": ["integer", "null"],
-                        "description": "Start byte offset to begin searching (default 0).",
-                    },
-                    "length": {
-                        "type": ["integer", "null"],
-                        "description": "Number of bytes to search from start (default: to EOF).",
-                    },
-                    "case_sensitive": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "ASCII-insensitive match when false (bytes mode).",
-                    },
-                    "encoding": {
-                        "type": ["string", "null"],
-                        "description": "Optional known encoding; otherwise detect BOM then default to utf-8 for pattern encoding only.",
-                    },
-                    "max_matches": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "0=unlimited (correctness-first). If >0, stops after this many matches and sets limit_reached=true.",
-                    },
+                "regex": {
+                    "type": ["string", "null"],
+                    "description": "If set, filter returned lines by this regex (applied after slicing). Implies line mode. Discouraged to combine with byte windows unless intentional.",
                 },
-                "required": ["path", "regex"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_read_json",
-            "description": "Read and parse a JSON file from disk. Returns {ok,data}. Always reads the full file.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Path to a JSON file (supports ~ and env var expansion)",
-                    }
+                "start": {
+                    "type": ["integer", "null"],
+                    "description": "Start byte offset. Negative values mean offset from end (EOF + start). When combined with start_line/line_count, the line slice is applied to this byte window (discouraged unless intentional).",
                 },
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_resolve_path",
-            "description": "Resolve a possibly-typoed file/dir path using heuristics (expand ~, case-insensitive, pluralization, prefix match, repo search). Returns {ok,path?,candidates?,tried?}.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Possibly-typoed path to resolve",
-                    },
-                    "kind": {
-                        "type": "string",
-                        "enum": ["file", "dir", "either"],
-                        "default": "either",
-                        "description": "Expected kind",
-                    },
-                    "base_dirs": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Optional extra search bases",
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Max candidate results",
-                    },
-                    "max_depth": {
-                        "type": "integer",
-                        "default": 6,
-                        "description": "Max recursive depth when searching anchors",
-                    },
+                "length": {
+                    "type": ["integer", "null"],
+                    "description": "Number of bytes to read from start. Omit/null to read to EOF.",
                 },
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_hint_resolve",
-            "description": (
-                "Resolve a likely file/dir path by searching caller-provided directories.\n"
-                "The caller (LLM) must provide structured inputs:\n"
-                "- expected_name: basename to score against (e.g., 'foo.txt')\n"
-                "- possible_dirs: likely directories to search (e.g., ['~/Documents/atlas_test'])\n\n"
-                "Search behavior:\n"
-                "- Only searches within possible_dirs (no implicit hint parsing).\n"
-                "- Returns the best-ranked candidate path and a ranked candidate list.\n"
-                "- expected_name is used for scoring (not an exact-match contract). The result includes match='exact' when the best candidate basename matches expected_name case-insensitively.\n\n"
-                "Return shape:\n"
-                "- Found: {ok:true, path, match:'exact'|'best_candidate', expected_name, candidates, searched_dirs, missing_dirs, total_candidates, limit_reached, hint?}\n"
-                "- Not found: {ok:false, error:'not_found', expected_name, searched_dirs, missing_dirs, hint}"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "expected_name": {
-                        "type": "string",
-                        "description": "Basename to score against (e.g., foo.txt). Not treated as an exact-match contract.",
-                    },
-                    "kind": {
-                        "type": "string",
-                        "enum": ["file", "dir", "either"],
-                        "default": "file",
-                    },
-                    "possible_dirs": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Likely search directories (absolute or ~ expanded).",
-                    },
-                    "max_results": {"type": "integer", "default": 12},
-                    "max_depth": {"type": "integer", "default": 6},
+                "encoding": {
+                    "type": ["string", "null"],
+                    "description": "Force a specific text encoding (default: auto-detect BOM then utf-8).",
                 },
-                "required": ["expected_name", "possible_dirs"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_glob",
-            "description": "List files matching a pattern inside a directory. Expands ~ and env vars. Example: dir='~/Documents/atlas_test/slice15', pattern='*.lsm'",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "dir": {"type": "string", "description": "Directory to glob"},
-                    "pattern": {
-                        "type": "string",
-                        "default": "*",
-                        "description": "Glob pattern",
-                    },
-                    "recursive": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Recurse into subdirs",
-                    },
+                "errors": {
+                    "type": "string",
+                    "enum": ["strict", "ignore", "replace"],
+                    "default": "replace",
+                    "description": "Decode error policy.",
                 },
-                "required": ["dir"],
             },
+            "required": ["path"],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fs_find_candidates",
-            "description": "Resolve candidate file paths by trying directories and extensions; returns existing absolute paths.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "dirs": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Search directories",
-                    },
-                    "names": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Basenames to resolve",
-                    },
-                    "extensions": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Allowed extensions",
-                    },
-                    "schema_dir": {
-                        "type": "string",
-                        "description": "Optional schema directory override for extension catalogs",
-                    },
-                    "case_insensitive": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Case-insensitive matching",
-                    },
+        handler=_tool_handler("fs_read_text"),
+    ),
+    tool_from_schema(
+        name="fs_tail_lines",
+        description="Return exactly the last N lines of a text file. BOM-aware (UTF-8/UTF-16/UTF-32). Minimal, robust, no extra params.",
+        parameters_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}, "n": {"type": "integer", "default": 200}},
+            "required": ["path"],
+        },
+        handler=_tool_handler("fs_tail_lines"),
+    ),
+    tool_from_schema(
+        name="fs_tail_bytes",
+        description="Return the last K bytes of a text file, decoded with BOM-aware detection (UTF-8/UTF-16/UTF-32).",
+        parameters_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}, "bytes": {"type": "integer", "default": 4096}},
+            "required": ["path"],
+        },
+        handler=_tool_handler("fs_tail_bytes"),
+    ),
+    tool_from_schema(
+        name="fs_search_text",
+        description="Search a text file for a regex and return matches with byte offsets and surrounding line numbers. Correctness-first: searches the requested window (default entire file) without arbitrary caps. For large files, this may be expensive; specify start/length to constrain the window if desired.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path to file (supports ~ and env var expansion)",
                 },
-                "required": ["dirs", "names"],
+                "regex": {
+                    "type": "string",
+                    "description": "Regular expression to search. Interpreted on encoded bytes; use case_sensitive=false for ASCII-insensitive search.",
+                },
+                "start": {
+                    "type": ["integer", "null"],
+                    "description": "Start byte offset to begin searching (default 0).",
+                },
+                "length": {
+                    "type": ["integer", "null"],
+                    "description": "Number of bytes to search from start (default: to EOF).",
+                },
+                "case_sensitive": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "ASCII-insensitive match when false (bytes mode).",
+                },
+                "encoding": {
+                    "type": ["string", "null"],
+                    "description": "Optional known encoding; otherwise detect BOM then default to utf-8 for pattern encoding only.",
+                },
+                "max_matches": {
+                    "type": "integer",
+                    "default": 0,
+                    "description": "0=unlimited (correctness-first). If >0, stops after this many matches and sets limit_reached=true.",
+                },
             },
+            "required": ["path", "regex"],
         },
-    },
+        handler=_tool_handler("fs_search_text"),
+    ),
+    tool_from_schema(
+        name="fs_read_json",
+        description="Read and parse a JSON file from disk. Returns {ok,data}. Always reads the full file.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path to a JSON file (supports ~ and env var expansion)",
+                }
+            },
+            "required": ["path"],
+        },
+        handler=_tool_handler("fs_read_json"),
+    ),
+    tool_from_schema(
+        name="fs_resolve_path",
+        description="Resolve a possibly-typoed file/dir path using heuristics (expand ~, case-insensitive, pluralization, prefix match, repo search). Returns {ok,path?,candidates?,tried?}.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Possibly-typoed path to resolve"},
+                "kind": {
+                    "type": "string",
+                    "enum": ["file", "dir", "either"],
+                    "default": "either",
+                    "description": "Expected kind",
+                },
+                "base_dirs": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional extra search bases",
+                },
+                "max_results": {"type": "integer", "default": 10, "description": "Max candidate results"},
+                "max_depth": {
+                    "type": "integer",
+                    "default": 6,
+                    "description": "Max recursive depth when searching anchors",
+                },
+            },
+            "required": ["path"],
+        },
+        handler=_tool_handler("fs_resolve_path"),
+    ),
+    tool_from_schema(
+        name="fs_hint_resolve",
+        description=(
+            "Resolve a likely file/dir path by searching caller-provided directories.\n"
+            "The caller (LLM) must provide structured inputs:\n"
+            "- expected_name: basename to score against (e.g., 'foo.txt')\n"
+            "- possible_dirs: likely directories to search (e.g., ['~/Documents/atlas_test'])\n\n"
+            "Search behavior:\n"
+            "- Only searches within possible_dirs (no implicit hint parsing).\n"
+            "- Returns the best-ranked candidate path and a ranked candidate list.\n"
+            "- expected_name is used for scoring (not an exact-match contract). The result includes match='exact' when the best candidate basename matches expected_name case-insensitively.\n\n"
+            "Return shape:\n"
+            "- Found: {ok:true, path, match:'exact'|'best_candidate', expected_name, candidates, searched_dirs, missing_dirs, total_candidates, limit_reached, hint?}\n"
+            "- Not found: {ok:false, error:'not_found', expected_name, searched_dirs, missing_dirs, hint}"
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "expected_name": {
+                    "type": "string",
+                    "description": "Basename to score against (e.g., foo.txt). Not treated as an exact-match contract.",
+                },
+                "kind": {"type": "string", "enum": ["file", "dir", "either"], "default": "file"},
+                "possible_dirs": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Likely search directories (absolute or ~ expanded).",
+                },
+                "max_results": {"type": "integer", "default": 12},
+                "max_depth": {"type": "integer", "default": 6},
+            },
+            "required": ["expected_name", "possible_dirs"],
+        },
+        handler=_tool_handler("fs_hint_resolve"),
+    ),
+    tool_from_schema(
+        name="fs_glob",
+        description="List files matching a pattern inside a directory. Expands ~ and env vars. Example: dir='~/Documents/atlas_test/slice15', pattern='*.lsm'",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "dir": {"type": "string", "description": "Directory to glob"},
+                "pattern": {"type": "string", "default": "*", "description": "Glob pattern"},
+                "recursive": {"type": "boolean", "default": False, "description": "Recurse into subdirs"},
+            },
+            "required": ["dir"],
+        },
+        handler=_tool_handler("fs_glob"),
+    ),
+    tool_from_schema(
+        name="fs_find_candidates",
+        description="Resolve candidate file paths by trying directories and extensions; returns existing absolute paths.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "dirs": {"type": "array", "items": {"type": "string"}, "description": "Search directories"},
+                "names": {"type": "array", "items": {"type": "string"}, "description": "Basenames to resolve"},
+                "extensions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Allowed extensions",
+                },
+                "schema_dir": {"type": "string", "description": "Optional schema directory override for extension catalogs"},
+                "case_insensitive": {"type": "boolean", "default": True, "description": "Case-insensitive matching"},
+            },
+            "required": ["dirs", "names"],
+        },
+        handler=_tool_handler("fs_find_candidates"),
+    ),
 ]
 
 
@@ -408,7 +340,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         except Exception:
             start_line = None
         line_count = _as_pos_int(args.get("line_count"), None)
-        regex = args.get("regex") or args.get("filter_regex")
+        regex = args.get("regex")
         force_enc = args.get("encoding")
         errors = str(args.get("errors", "replace"))
         # Internal streaming chunk size (not user-configurable)

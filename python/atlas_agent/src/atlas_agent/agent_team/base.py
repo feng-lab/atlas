@@ -1,8 +1,12 @@
 import os
+import json
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from openai import OpenAI  # type: ignore
+
+from ..provider_tool_schema import normalize_tools_for_responses_api
 
 
 @dataclass
@@ -19,8 +23,11 @@ class LLMClient:
     api_key: str
     model: str
     base_url: str | None = None
+    wire_api: str = "auto"  # "auto" | "responses" | "chat"
     _client: Any = field(init=False, default=None, repr=False)
     _responses_supports_temperature: bool | None = field(init=False, default=None, repr=False)
+    _chat_supports_temperature: bool | None = field(init=False, default=None, repr=False)
+    _wire_api_resolved: str | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self):
         # Normalize base_url once so the rest of atlas_agent can rely on
@@ -55,146 +62,30 @@ class LLMClient:
         return m.startswith("gpt-5")
 
     @staticmethod
-    def _normalize_tool_parameters_schema(params: Any) -> Dict[str, Any]:
-        """Best-effort normalization for provider compatibility.
-
-        Some OpenAI-compatible providers validate tool schemas using a strict
-        subset of JSON Schema (similar to OpenAI Structured Outputs), requiring:
-        - object schemas to set additionalProperties=false
-        - required to be present and include every key in properties
-        - array schemas to include items
-
-        We apply this *only* to schemas that declare properties (i.e., structured
-        objects). We intentionally do not "tighten" generic JSON objects (object
-        schemas without properties), since those often represent arbitrary
-        payloads such as typed scene values.
-        """
-
-        if not isinstance(params, dict):
-            return {"type": "object", "properties": {}}
-
-        out: Dict[str, Any] = dict(params)
-        if "type" not in out:
-            out["type"] = "object"
-        if out.get("type") == "object" and not isinstance(out.get("properties"), dict):
-            out["properties"] = {}
-
-        def _tighten(node: Any) -> Any:
-            if not isinstance(node, dict):
-                return node
-            fixed: Dict[str, Any] = dict(node)
-
-            # Recurse into combinators first.
-            for comb in ("anyOf", "oneOf", "allOf"):
-                v = fixed.get(comb)
-                if isinstance(v, list):
-                    fixed[comb] = [_tighten(x) for x in v]
-
-            t = fixed.get("type")
-            types: set[str] = set()
-            if isinstance(t, str):
-                types.add(t)
-            elif isinstance(t, list):
-                for it in t:
-                    if isinstance(it, str):
-                        types.add(it)
-
-            # Arrays: ensure items exists (empty schema is ok).
-            if "array" in types:
-                items = fixed.get("items")
-                if items is None:
-                    fixed["items"] = {}
-                else:
-                    fixed["items"] = _tighten(items)
-
-            # Structured objects: if properties is a dict (even empty), force strictness.
-            if "object" in types and isinstance(fixed.get("properties"), dict):
-                props = fixed.get("properties") or {}
-                if isinstance(props, dict):
-                    fixed["properties"] = {str(k): _tighten(v) for k, v in props.items()}
-                    fixed["required"] = list(props.keys())
-                    fixed["additionalProperties"] = False
-
-            return fixed
-
-        tightened = _tighten(out)
-        return tightened if isinstance(tightened, dict) else out
-
-    @staticmethod
     def _normalize_tools_for_responses(
         raw_tools: Optional[List[Dict[str, Any]]],
     ) -> Optional[List[Dict[str, Any]]]:
-        """Convert Chat Completions-style tool specs to Responses API style.
-
-        The OpenAI Python SDK accepts Responses-style tools like:
-          {"type":"function","name":"...","description":"...","parameters":{...},"strict":true}
-
-        It also *can* accept Chat Completions tools, but only when they were created via
-        openai.pydantic_function_tool(), which we intentionally do not require.
-        """
-
-        if not raw_tools:
-            return None
-
-        out: List[Dict[str, Any]] = []
-        for t in raw_tools:
-            if not isinstance(t, dict):
-                continue
-            if str(t.get("type") or "") != "function":
-                # Non-function tools (if introduced later) pass through.
-                out.append(t)
-                continue
-
-            # Standard Responses tool shape: no nested "function" key.
-            if "function" not in t:
-                fixed = dict(t)
-                fixed["parameters"] = LLMClient._normalize_tool_parameters_schema(
-                    fixed.get("parameters")
-                )
-                if "strict" not in fixed:
-                    fixed["strict"] = False
-                out.append(fixed)
-                continue
-
-            fn = t.get("function")
-            if not isinstance(fn, dict):
-                # SDK would error on this; drop it rather than breaking the whole request.
-                continue
-
-            name = str(fn.get("name") or "").strip()
-            if not name:
-                continue
-            params = LLMClient._normalize_tool_parameters_schema(fn.get("parameters"))
-
-            converted: Dict[str, Any] = {
-                "type": "function",
-                "name": name,
-                "parameters": params,
-                # Default to non-strict tool calling for broad schema compatibility.
-                "strict": bool(fn.get("strict", False)),
-            }
-            desc = fn.get("description")
-            if isinstance(desc, str) and desc.strip():
-                converted["description"] = desc.strip()
-            out.append(converted)
-
-        return out
+        return normalize_tools_for_responses_api(raw_tools)
 
     def chat(
         self,
         *,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.2,
+        temperature: float | None = None,
         stream: bool = False,
     ) -> Dict[str, Any]:
         client = self._ensure_client()
-        return client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=temperature,
-            tools=tools or None,
-        )
+        params: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "tools": tools or None,
+        }
+        if temperature is not None:
+            params["temperature"] = float(temperature)
+        if bool(stream):
+            params["stream"] = True
+        return client.chat.completions.create(**params)
 
     @staticmethod
     def _to_plain_dict(obj: Any) -> Any:
@@ -239,25 +130,197 @@ class LLMClient:
         instructions: str,
         input_items: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.2,
+        temperature: float | None = None,
         parallel_tool_calls: bool = False,
         reasoning_effort: str | None = "high",
         reasoning_summary: str | None = "detailed",
         text_verbosity: str | None = "high",
         on_event: Callable[[Dict[str, Any]], None] | None = None,
     ) -> Dict[str, Any]:
-        """Stream a turn via the OpenAI Responses API.
+        """Stream a turn via an OpenAI-compatible wire API.
 
         - Emits SSE-derived events via on_event (already normalized to dict).
-        - Returns the final response as a plain dict.
+        - Returns the final response as a plain dict in the Responses API shape.
+
+        When wire_api='auto', we prefer the Responses API and fall back to Chat
+        Completions if the provider does not support `/v1/responses`.
         """
 
-        client = self._ensure_client()
-        if not hasattr(client, "responses"):
-            raise RuntimeError("OpenAI client does not support the Responses API")
-        responses = getattr(client, "responses")
-        if not hasattr(responses, "stream"):
-            raise RuntimeError("OpenAI client does not support responses.stream")
+        def _wire_mode() -> str:
+            mode = (self._wire_api_resolved or self.wire_api or "auto").strip().lower()
+            return mode if mode in {"auto", "responses", "chat"} else "auto"
+
+        def _iter_exception_chain(err: BaseException) -> list[BaseException]:
+            out: list[BaseException] = []
+            seen: set[int] = set()
+            cur: BaseException | None = err
+            while cur is not None and id(cur) not in seen:
+                seen.add(id(cur))
+                out.append(cur)
+                nxt = getattr(cur, "__cause__", None) or getattr(cur, "__context__", None)
+                cur = nxt if isinstance(nxt, BaseException) else None
+            return out
+
+        def _is_responses_unsupported(err: Exception) -> bool:
+            # Best-effort: vendors/gateways that don't implement /v1/responses typically
+            # return 404. Only treat these as "wire unsupported" signals; other 4xx
+            # errors are usually real request/validation issues.
+            for e in _iter_exception_chain(err):
+                msg = str(e or "").lower()
+                if "404" in msg and "responses" in msg:
+                    return True
+                if "not found" in msg and "responses" in msg:
+                    return True
+                # OpenAI SDK error objects often carry status_code.
+                try:
+                    sc = int(getattr(e, "status_code", 0) or 0)
+                    if sc == 404:
+                        return True
+                except Exception:
+                    pass
+            return False
+
+        def _responses_to_chat_messages(
+            *, instructions_text: str, items: List[Dict[str, Any]]
+        ) -> list[dict[str, Any]]:
+            messages: list[dict[str, Any]] = []
+            instructions_text = str(instructions_text or "").strip()
+            if instructions_text:
+                messages.append({"role": "system", "content": instructions_text})
+
+            for it in items or []:
+                if not isinstance(it, dict):
+                    continue
+                itype = str(it.get("type") or "")
+                if itype == "message":
+                    role = str(it.get("role") or "").strip() or "user"
+                    content_in = it.get("content")
+                    if isinstance(content_in, list):
+                        parts: list[str] = []
+                        for part in content_in:
+                            if not isinstance(part, dict):
+                                continue
+                            txt = part.get("text")
+                            if isinstance(txt, str) and txt:
+                                parts.append(txt)
+                        content = "".join(parts)
+                    else:
+                        content = str(content_in or "")
+                    if content:
+                        messages.append({"role": role, "content": content})
+                    continue
+
+                if itype == "function_call":
+                    name = str(it.get("name") or "").strip()
+                    call_id = str(it.get("call_id") or "").strip()
+                    arguments = it.get("arguments")
+                    if not isinstance(arguments, str):
+                        try:
+                            arguments = json.dumps(arguments, ensure_ascii=False)
+                        except Exception:
+                            arguments = str(arguments)
+                    if name and call_id:
+                        messages.append(
+                            {
+                                "role": "assistant",
+                                "content": "",
+                                "tool_calls": [
+                                    {
+                                        "id": call_id,
+                                        "type": "function",
+                                        "function": {"name": name, "arguments": arguments},
+                                    }
+                                ],
+                            }
+                        )
+                    continue
+
+                if itype == "function_call_output":
+                    call_id = str(it.get("call_id") or "").strip()
+                    output = it.get("output")
+                    if not isinstance(output, str):
+                        try:
+                            output = json.dumps(output, ensure_ascii=False)
+                        except Exception:
+                            output = str(output)
+                    if call_id:
+                        messages.append({"role": "tool", "tool_call_id": call_id, "content": output})
+                    continue
+
+            return messages
+
+        def _responses_tools_to_chat_tools(responses_tools: Optional[List[Dict[str, Any]]]) -> list[dict[str, Any]] | None:
+            if not responses_tools:
+                return None
+            out: list[dict[str, Any]] = []
+            for t in responses_tools:
+                if not isinstance(t, dict):
+                    continue
+                if str(t.get("type") or "") != "function":
+                    continue
+                name = str(t.get("name") or "").strip()
+                if not name:
+                    continue
+                fn: dict[str, Any] = {"name": name}
+                desc = t.get("description")
+                if isinstance(desc, str) and desc.strip():
+                    fn["description"] = desc.strip()
+                params = t.get("parameters")
+                if isinstance(params, dict):
+                    fn["parameters"] = params
+                out.append({"type": "function", "function": fn})
+            return out or None
+
+        def _chat_response_to_responses_dict(chat_resp: Any) -> dict[str, Any]:
+            data = self._to_plain_dict(chat_resp)
+            out_items: list[dict[str, Any]] = []
+            try:
+                choices = data.get("choices") if isinstance(data, dict) else None
+                choice0 = choices[0] if isinstance(choices, list) and choices else {}
+                msg = choice0.get("message") if isinstance(choice0, dict) else {}
+                if not isinstance(msg, dict):
+                    msg = {}
+                content = msg.get("content")
+                if isinstance(content, str) and content.strip():
+                    out_items.append(
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": content}],
+                        }
+                    )
+                tool_calls = msg.get("tool_calls")
+                if isinstance(tool_calls, list):
+                    for tc in tool_calls:
+                        if not isinstance(tc, dict):
+                            continue
+                        call_id = str(tc.get("id") or "").strip()
+                        fn = tc.get("function")
+                        if not isinstance(fn, dict):
+                            fn = {}
+                        name = str(fn.get("name") or "").strip()
+                        arguments = fn.get("arguments")
+                        if not isinstance(arguments, str):
+                            try:
+                                arguments = json.dumps(arguments, ensure_ascii=False)
+                            except Exception:
+                                arguments = str(arguments)
+                        if not call_id:
+                            # Stable enough for a single tool loop round.
+                            call_id = str(uuid.uuid4())
+                        if name:
+                            out_items.append(
+                                {
+                                    "type": "function_call",
+                                    "call_id": call_id,
+                                    "name": name,
+                                    "arguments": arguments,
+                                }
+                            )
+            except Exception:
+                # Fall back to an empty output; tool loop will treat it as no-op.
+                pass
+            return {"output": out_items}
 
         reasoning: dict[str, Any] | None = None
         if self._model_supports_reasoning_summaries():
@@ -277,9 +340,10 @@ class LLMClient:
             "model": self.model,
             "instructions": instructions,
             "input": input_items,
-            "temperature": temperature,
             "parallel_tool_calls": bool(parallel_tool_calls),
         }
+        if temperature is not None:
+            params["temperature"] = float(temperature)
         normalized_tools = self._normalize_tools_for_responses(tools)
         if normalized_tools:
             params["tools"] = normalized_tools
@@ -287,6 +351,77 @@ class LLMClient:
             params["reasoning"] = reasoning
         if text is not None:
             params["text"] = text
+
+        mode = _wire_mode()
+        if mode == "chat":
+            client = self._ensure_client()
+            chat_messages = _responses_to_chat_messages(
+                instructions_text=instructions, items=input_items
+            )
+            chat_tools = _responses_tools_to_chat_tools(normalized_tools)
+
+            def _is_unsupported_temperature_error(err: Exception) -> bool:
+                msg = str(err or "")
+                if not msg:
+                    return False
+                m = msg.lower()
+                return ("unsupported parameter" in m and "temperature" in m) or (
+                    "temperature" in m and "not supported" in m
+                )
+
+            chat_params: dict[str, Any] = {
+                "model": self.model,
+                "messages": chat_messages,
+                "tools": chat_tools or None,
+            }
+            if temperature is not None and self._chat_supports_temperature is not False:
+                chat_params["temperature"] = float(temperature)
+            try:
+                resp = client.chat.completions.create(**chat_params)
+                if "temperature" in chat_params:
+                    self._chat_supports_temperature = True
+            except Exception as e:
+                if "temperature" in chat_params and _is_unsupported_temperature_error(e):
+                    self._chat_supports_temperature = False
+                    chat_params.pop("temperature", None)
+                    resp = client.chat.completions.create(**chat_params)
+                else:
+                    raise
+            return _chat_response_to_responses_dict(resp)
+
+        client = self._ensure_client()
+        if not hasattr(client, "responses"):
+            if mode == "responses":
+                raise RuntimeError("OpenAI client does not support the Responses API")
+            # auto: fall back to chat
+            self._wire_api_resolved = "chat"
+            return self.responses_stream(
+                instructions=instructions,
+                input_items=input_items,
+                tools=tools,
+                temperature=temperature,
+                parallel_tool_calls=parallel_tool_calls,
+                reasoning_effort=reasoning_effort,
+                reasoning_summary=reasoning_summary,
+                text_verbosity=text_verbosity,
+                on_event=on_event,
+            )
+        responses = getattr(client, "responses")
+        if not hasattr(responses, "stream"):
+            if mode == "responses":
+                raise RuntimeError("OpenAI client does not support responses.stream")
+            self._wire_api_resolved = "chat"
+            return self.responses_stream(
+                instructions=instructions,
+                input_items=input_items,
+                tools=tools,
+                temperature=temperature,
+                parallel_tool_calls=parallel_tool_calls,
+                reasoning_effort=reasoning_effort,
+                reasoning_summary=reasoning_summary,
+                text_verbosity=text_verbosity,
+                on_event=on_event,
+            )
 
         # The SDK exposes a context-manager style stream object.
         def _is_unsupported_temperature_error(err: Exception) -> bool:
@@ -320,7 +455,22 @@ class LLMClient:
                     final = getattr(stream, "response", None)
             if "temperature" in params:
                 self._responses_supports_temperature = True
+            if mode == "auto" and self._wire_api_resolved is None:
+                self._wire_api_resolved = "responses"
         except Exception as e:
+            if mode == "auto" and _is_responses_unsupported(e):
+                self._wire_api_resolved = "chat"
+                return self.responses_stream(
+                    instructions=instructions,
+                    input_items=input_items,
+                    tools=tools,
+                    temperature=temperature,
+                    parallel_tool_calls=parallel_tool_calls,
+                    reasoning_effort=reasoning_effort,
+                    reasoning_summary=reasoning_summary,
+                    text_verbosity=text_verbosity,
+                    on_event=on_event,
+                )
             if "temperature" in params and _is_unsupported_temperature_error(e):
                 self._responses_supports_temperature = False
                 params.pop("temperature", None)
@@ -336,6 +486,8 @@ class LLMClient:
                         final = stream.get_final_response()
                     except Exception:
                         final = getattr(stream, "response", None)
+                if mode == "auto" and self._wire_api_resolved is None:
+                    self._wire_api_resolved = "responses"
             else:
                 raise
         return self._to_plain_dict(final) if final is not None else {}
@@ -345,7 +497,7 @@ class LLMClient:
         *,
         system_prompt: str,
         user_text: str,
-        temperature: float = 0.2,
+        temperature: float | None = None,
         max_output_tokens: int | None = None,
         text_verbosity: str | None = None,
     ) -> str:
@@ -373,8 +525,9 @@ class LLMClient:
             "model": self.model,
             "instructions": str(system_prompt),
             "input": input_items,
-            "temperature": temperature,
         }
+        if temperature is not None:
+            params["temperature"] = float(temperature)
         if max_output_tokens is not None:
             params["max_output_tokens"] = int(max_output_tokens)
         if text_verbosity is not None:
@@ -432,7 +585,7 @@ class LLMClient:
         *,
         system_prompt: str,
         user_text: str,
-        temperature: float = 0.2,
+        temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> str:
         # Prefer Responses API. Fall back to Chat Completions if the provider/model
@@ -452,12 +605,15 @@ class LLMClient:
             {"role": "user", "content": user_text},
         ]
         client = self._ensure_client()
-        resp = client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=temperature,
-            **({"max_tokens": max_tokens} if max_tokens is not None else {}),
-        )
+        params: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+        }
+        if temperature is not None:
+            params["temperature"] = float(temperature)
+        if max_tokens is not None:
+            params["max_tokens"] = int(max_tokens)
+        resp = client.chat.completions.create(**params)
         try:
             return (resp.choices[0].message.content or "").strip()
         except Exception:
@@ -469,7 +625,7 @@ class LLMClient:
         system_prompt: str,
         user_text: str,
         image_data_url: Optional[str] = None,
-        temperature: float = 0.2,
+        temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> str:
         """Multi‑modal completion with an optional inline image data URL (base64).
@@ -491,12 +647,12 @@ class LLMClient:
         ]
         client = self._ensure_client()
         try:
-            resp = client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                **({"max_tokens": max_tokens} if max_tokens is not None else {}),
-            )
+            params: dict[str, Any] = {"model": self.model, "messages": messages}
+            if temperature is not None:
+                params["temperature"] = float(temperature)
+            if max_tokens is not None:
+                params["max_tokens"] = int(max_tokens)
+            resp = client.chat.completions.create(**params)
             return (resp.choices[0].message.content or "").strip()
         except Exception:
             # Fallback to text‑only if multimodal fails

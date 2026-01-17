@@ -80,7 +80,6 @@ ATLAS_STATE_MUTATION_TOOLS: set[str] = {
     "animation_duplicate_keys_range",
     "animation_batch",
     "animation_camera_solve_and_apply",
-    "animation_camera_set_interpolation_method",
     "animation_camera_waypoint_spline_apply",
     "animation_camera_walkthrough_apply",
     "animation_set_time",
@@ -121,7 +120,7 @@ ATLAS_SHARED_SYSTEM_RULES = (
     "- Keep plans/descriptions semantic; do not assert exact parameter json_keys or option label strings.\n"
     "- Camera: prefer typed operations. For orbits/dollies use animation_camera_solve_and_apply; for first-person walkthroughs use animation_camera_walkthrough_apply; for explicit waypoints use animation_camera_waypoint_spline_apply. Prefer bbox-fraction semantics over raw world coords.\n"
     "- Camera director rubric (routing): if the user provides explicit waypoints/points/beats, use animation_camera_waypoint_spline_apply; otherwise if the user describes motion verbs (fly/strafe/yaw/pitch/pause), use animation_camera_walkthrough_apply. Mixed prompts: do not drop waypoints/segments; add intermediate points or increase walkthrough step_seconds instead of truncating.\n"
-    "- Camera director rubric (defaults): method='Position Rotation Spline' for walkthrough/waypoints; walkthrough constraints default keep_visible=false unless the user explicitly wants framing; step_seconds defaults: slow≈0.5, medium≈1.0, fast≈1.5–2.0.\n"
+    "- Camera director rubric (defaults): walkthrough constraints default keep_visible=false unless the user explicitly wants framing; step_seconds defaults: slow≈0.5, medium≈1.0, fast≈1.5–2.0. For sparse waypoints, add intermediate waypoints instead of relying on interpolation modes.\n"
     "- Walkthrough planning: when inventing segments from words, you may use internal segment templates (template+amount/distance/degrees) and let the tool expand them; do not require the user to name templates.\n"
     "- File paths: classify input. Absolute/~/drive paths are exact (fs_expand_paths→fs_check_paths; if missing try fs_resolve_path). Natural-language hints use fs_hint_resolve with structured args (expected_name + possible_dirs). Always verify before loading.\n"
     "- Maintain an explicit plan via the update_plan tool (4–7 short steps). Exactly one step may be in_progress.\n"
@@ -171,13 +170,13 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
             "- File paths (exact): when the user provides an absolute/~/drive path token (e.g. /Users/... , ~/... , C:\\...), treat it as exact. Use fs_expand_paths → fs_check_paths first; only if missing try fs_resolve_path (typo correction). Avoid fs_hint_resolve in this case.",
             "- File paths (hints): when the user describes location in words (e.g. “in my Documents/atlas_test”), use system_info to resolve common dirs and then call fs_hint_resolve with structured args: expected_name (basename to score) + possible_dirs (likely search roots). If match!='exact', validate by reading/checking the file before loading.",
             "- Scene vs timeline contract: any mention of time/duration implies animation_* tools. Never include time/easing in scene_apply.",
-            "- Scene-only intent: do not write animation keys. Use scene_apply/scene_set_visibility/scene_camera_apply and verify with scene_get_values.",
+            "- Scene-only intent: do not write animation keys. Use scene_apply/scene_set_visibility and camera ops: scene_camera_fit (fit+apply) or scene_camera_apply(value=...) (apply a typed camera from camera_*). Verify with scene_get_values.",
             "- Animation intent: animation_ensure_animation → animation_set_duration → write keys (animation_batch / animation_set_key_param / animation_replace_key_param) and camera keys (animation_camera_solve_and_apply / animation_replace_key_camera).",
-            "- Camera workflow: use camera_* producers (camera_focus / camera_point_to / camera_rotate / camera_reset_view) to compute typed camera values, then apply via scene_camera_apply or animation_* camera tools as appropriate.",
+            "- Camera workflow: use camera_* producers (camera_focus / camera_point_to / camera_rotate / camera_reset_view) to compute typed camera values, then apply via scene_camera_apply(value=...) for scene-only or animation_* camera tools for timeline work.",
             "- Validate before committing where possible (scene_validate_params; animation_camera_validate). Verify after writing (animation_list_keys, animation_camera_validate, scene_get_values).",
             "- Large-file handling: prefer fs_tail_lines/fs_search_text; if you must scan, iterate fs_read_text in windows until EOF (no silent truncation).",
             "- Verification ledger: when a step has specific requirements, use verification_record(mode=tool|visual|human) to attach evidence and update_plan to advance statuses.",
-            "- Visual checks: prefer scene_screenshot for current scene state; use animation_render_preview only when you need a specific animation time. Both require screenshots consent; otherwise mark as human-check in verification.",
+            "- Visual checks: prefer scene_screenshot for current scene state; use animation_render_preview only when you need a specific animation time. If screenshots are allowed for this session, do NOT ask the user again—just call the tool and inspect the image. Never ask the user to open temp screenshot files; if a human check is needed, ask them to check in the Atlas UI.",
             "- If a validation/read-back check fails, diagnose precisely (id/json_key/time/value) and retry within this run before giving up.",
             "- If a requested step is not feasible with the available tools/capabilities, complete all feasible steps first, then call report_blocked once with a precise reason and suggestion.",
             "- When blocked on missing user intent/input, call report_blocked once with one focused question.",
@@ -234,7 +233,8 @@ class ChatTeam:
     address: str
     api_key: str
     model: str
-    temperature: float = 0.2
+    wire_api: str = "auto"
+    temperature: float | None = None
     reasoning_effort: str | None = "high"
     max_rounds_executor: int = DEFAULT_EXECUTOR_MAX_ROUNDS
     atlas_dir: Optional[str] = None
@@ -300,7 +300,7 @@ class ChatTeam:
         except Exception:
             pass
 
-        self.llm = LLMClient(api_key=self.api_key, model=self.model)
+        self.llm = LLMClient(api_key=self.api_key, model=self.model, wire_api=self.wire_api)
         self.intent_resolver = IntentResolver(client=self.llm, temperature=self.temperature)
         # Live (in-memory) pointer to the currently edited Animation3D object.
         # Note: ids are not stable across Atlas runs; this is used only within
@@ -332,6 +332,8 @@ class ChatTeam:
             self.session_store.set_meta(
                 address=self.address,
                 model=self.model,
+                wire_api=self.wire_api,
+                temperature=self.temperature,
                 reasoning_effort=self.reasoning_effort,
                 max_rounds_executor=int(self.max_rounds_executor),
                 atlas_dir=self.atlas_dir,
@@ -719,6 +721,17 @@ class ChatTeam:
         context_blocks: list[str] = []
         if ctx:
             context_blocks.append(ctx.strip())
+        # Make session-level capability toggles explicit to the model so it
+        # doesn't waste rounds asking the user for things that are already
+        # allowed (e.g., screenshot consent).
+        try:
+            context_blocks.append(
+                "Session settings:\n"
+                f"- screenshots_allowed: {bool(_screenshots_allowed())}\n"
+                f"- codegen_enabled: {bool(self.enable_codegen)}"
+            )
+        except Exception:
+            pass
         if self._memory_summary:
             context_blocks.append("Session memory (summary):\n" + self._memory_summary.strip())
         if retrieved_context:
@@ -829,8 +842,6 @@ class ChatTeam:
         touched_set_time_seconds: float | None = None
         include_objects_in_snapshot = False
         include_camera_key_times_in_snapshot = False
-        include_camera_interpolation_method_in_snapshot = False
-        touched_camera_interpolation_method: str | None = None
 
         def _touch_scene_value(*, id: int, json_key: str) -> None:
             jk = str(json_key or "").strip()
@@ -861,8 +872,6 @@ class ChatTeam:
         def _record_touched_from_tool(*, name: str, args: dict[str, Any], result: Any) -> None:
             nonlocal include_objects_in_snapshot
             nonlocal include_camera_key_times_in_snapshot
-            nonlocal include_camera_interpolation_method_in_snapshot
-            nonlocal touched_camera_interpolation_method
             nonlocal touched_duration_seconds
             nonlocal touched_set_time_seconds
 
@@ -975,15 +984,6 @@ class ChatTeam:
             if tool == "animation_ensure_animation":
                 # May create baseline camera keys / default state.
                 include_camera_key_times_in_snapshot = True
-                return
-
-            if tool == "animation_camera_set_interpolation_method":
-                include_camera_interpolation_method_in_snapshot = True
-                try:
-                    touched_camera_interpolation_method = str(args.get("method") or "").strip() or None
-                except Exception:
-                    touched_camera_interpolation_method = None
-                # No camera keys are written by this tool directly.
                 return
 
             if tool == "animation_set_duration":
@@ -1117,18 +1117,6 @@ class ChatTeam:
 
             if tool == "animation_camera_waypoint_spline_apply":
                 include_camera_key_times_in_snapshot = True
-                include_camera_interpolation_method_in_snapshot = True
-                try:
-                    if isinstance(result, dict):
-                        m = result.get("current_method") or result.get("method")
-                        if isinstance(m, str) and m.strip():
-                            touched_camera_interpolation_method = m.strip()
-                    if touched_camera_interpolation_method is None:
-                        m = args.get("method")
-                        if isinstance(m, str) and m.strip():
-                            touched_camera_interpolation_method = m.strip()
-                except Exception:
-                    pass
                 try:
                     if isinstance(result, dict) and isinstance(result.get("applied"), list):
                         for t in result.get("applied") or []:
@@ -1139,18 +1127,6 @@ class ChatTeam:
 
             if tool == "animation_camera_walkthrough_apply":
                 include_camera_key_times_in_snapshot = True
-                include_camera_interpolation_method_in_snapshot = True
-                try:
-                    if isinstance(result, dict):
-                        m = result.get("current_method") or result.get("method")
-                        if isinstance(m, str) and m.strip():
-                            touched_camera_interpolation_method = m.strip()
-                    if touched_camera_interpolation_method is None:
-                        m = args.get("method")
-                        if isinstance(m, str) and m.strip():
-                            touched_camera_interpolation_method = m.strip()
-                except Exception:
-                    pass
                 try:
                     if isinstance(result, dict) and isinstance(result.get("applied"), list):
                         for t in result.get("applied") or []:
@@ -1229,6 +1205,25 @@ class ChatTeam:
                 ok = True
             if (name not in full_log_tools) and (not ok):
                 policy = "full"
+
+            # Circuit breaker: if a tool observes an RPC connection failure, mark this
+            # turn as RPC-unavailable so we can avoid background RPC calls (facts
+            # snapshots, Verifier) that would otherwise spam errors and waste time.
+            try:
+                if isinstance(res_obj, dict) and not ok:
+                    err = str(res_obj.get("error") or "").lower()
+                    if (
+                        "statuscode.unavailable" in err
+                        or "connection refused" in err
+                        or "failed to connect to all addresses" in err
+                        or "socket closed" in err
+                    ):
+                        runtime_state["rpc_unavailable"] = {
+                            "tool": str(name),
+                            "error": str(res_obj.get("error") or ""),
+                        }
+            except Exception:
+                pass
             try:
                 self.session_store.append_tool_event(
                     turn_id=turn_id,
@@ -1265,6 +1260,12 @@ class ChatTeam:
             """
             if not touched_mutation_tools:
                 return
+            # If the RPC server is unavailable, do not attempt any snapshotting.
+            try:
+                if isinstance(runtime_state.get("rpc_unavailable"), dict):
+                    return
+            except Exception:
+                pass
 
             key_targets: dict[int, list[str]] = {}
             for oid, keys in touched_key_targets.items():
@@ -1311,15 +1312,6 @@ class ChatTeam:
                 snapshot_ok = False
                 snapshot_error = str(e)
                 facts = {}
-
-            if include_camera_interpolation_method_in_snapshot:
-                try:
-                    if self._current_animation_id is not None and int(self._current_animation_id) > 0:
-                        m = self.scene.get_camera_interpolation_method(animation_id=int(self._current_animation_id))
-                        if isinstance(m, str) and m.strip():
-                            facts["camera_interpolation_method"] = m.strip()
-                except Exception:
-                    pass
 
             # Best-effort: autosave the current animation after successful animation mutations.
             #
@@ -1369,8 +1361,6 @@ class ChatTeam:
             }
             if touched_camera_key_times:
                 touched_payload["camera_key_times"] = sorted([float(t) for t in touched_camera_key_times])
-            if touched_camera_interpolation_method is not None:
-                touched_payload["camera_interpolation_method"] = touched_camera_interpolation_method
             if touched_object_ids:
                 touched_payload["object_ids"] = sorted([int(i) for i in touched_object_ids])
             if touched_duration_seconds is not None:
@@ -1537,9 +1527,13 @@ class ChatTeam:
                 pass
 
             def _post_tool_output(name: str, args_json: str, result_json: str) -> list[dict[str, Any]]:
-                # Allow the Verifier to actually *see* previews by attaching the
+                # Allow the model to actually *see* previews by attaching the
                 # rendered image as an input_image in the next model call.
-                if str(runtime_state.get("phase") or "") != "Verifier":
+                #
+                # We do this for Executor and Verifier. The Planner phase is
+                # read-only and should avoid expensive/visual operations unless
+                # strictly necessary.
+                if str(runtime_state.get("phase") or "") not in {"Executor", "Verifier"}:
                     return []
                 tool_name = str(name or "")
                 if tool_name not in {"animation_render_preview", "scene_screenshot"}:
@@ -1620,7 +1614,8 @@ class ChatTeam:
                     f"- time_sec: {tsec!r}\n"
                     f"- size: {w!r}x{h!r}\n"
                     f"- path: {path}\n"
-                    "Use this image to decide visual requirements (visual/human) for verification."
+                    "This image is for you (the model) to inspect. Do NOT ask the user to open the temp file.\n"
+                    "If you still need a human check, ask the user to look in the Atlas UI (not the file path)."
                 )
                 return [
                     {
@@ -1886,6 +1881,19 @@ class ChatTeam:
         phase_input = list(input_items)
         final_result = None
 
+        def _turn_is_blocked() -> bool:
+            try:
+                b = runtime_state.get("blocked")
+                return isinstance(b, dict) and bool(str(b.get("reason") or "").strip())
+            except Exception:
+                return False
+
+        def _turn_rpc_unavailable() -> bool:
+            try:
+                return isinstance(runtime_state.get("rpc_unavailable"), dict)
+            except Exception:
+                return False
+
         if _should_run_planner():
             planner_tools = _filter_tools(read_only_tool_names | set(SESSION_MUTATION_TOOLS))
             planner_res = _run_phase(
@@ -1902,6 +1910,10 @@ class ChatTeam:
             pt = (planner_res.assistant_text or "").strip()
             if pt.lower().startswith("clarify:"):
                 final_result = planner_res
+            # If the Planner explicitly reported a blocked state, do not proceed
+            # into Executor/Verifier (avoid redundant/failed RPC calls).
+            if final_result is None and _turn_is_blocked():
+                final_result = planner_res
 
         if final_result is None:
             exec_res = _run_phase(
@@ -1911,14 +1923,21 @@ class ChatTeam:
                 phase_input_items=phase_input,
                 max_rounds=int(self.max_rounds_executor),
             )
-            # Deterministic post-write facts snapshot: store what changed in this turn
-            # so future turns can ground without re-enumerating everything.
-            _append_executor_facts_snapshot()
+            # If the RPC server became unavailable during the Executor, do not attempt
+            # any additional RPC calls (facts snapshot, Verifier) in this turn.
+            if not _turn_rpc_unavailable():
+                # Deterministic post-write facts snapshot: store what changed in this turn
+                # so future turns can ground without re-enumerating everything.
+                _append_executor_facts_snapshot()
             phase_input = list(exec_res.input_items)
             if phase_hit_round_budget_phase == "Executor":
                 # If we had to force-finalize due to tool-loop non-convergence, stop this
                 # turn early (do not run Verifier). The session log contains all prior
                 # tool work; the user can reply "continue" to resume with full context.
+                final_result = exec_res
+            elif _turn_is_blocked() or _turn_rpc_unavailable():
+                # The model already produced a clear user-facing blocked message.
+                # Skip Verifier and return.
                 final_result = exec_res
             else:
                 did_write_state = any(
@@ -1931,18 +1950,58 @@ class ChatTeam:
                         | set(SESSION_MUTATION_TOOLS)
                         | set(ATLAS_VERIFICATION_OUTPUT_TOOLS)
                     )
-                    ver_res = _run_phase(
-                        phase="Verifier",
-                        instructions=ATLAS_VERIFIER_SYSTEM_PROMPT,
-                        phase_tools=verifier_tools,
-                        phase_input_items=phase_input,
-                        max_rounds=12,
-                    )
-                    final_result = ver_res
+                    if _turn_rpc_unavailable():
+                        final_result = exec_res
+                    else:
+                        ver_res = _run_phase(
+                            phase="Verifier",
+                            instructions=ATLAS_VERIFIER_SYSTEM_PROMPT,
+                            phase_tools=verifier_tools,
+                            phase_input_items=phase_input,
+                            max_rounds=12,
+                        )
+                        final_result = ver_res
                 else:
                     final_result = exec_res
 
         text = (final_result.assistant_text or "").strip() or "(no response)"
+
+        # If Atlas RPC became unavailable and the model did not explicitly call
+        # report_blocked, ensure the user still receives a clear action item.
+        #
+        # This avoids confusing "half-turns" where tool calls fail but the
+        # assistant ends without a crisp instruction to relaunch Atlas.
+        try:
+            if _turn_rpc_unavailable() and not _turn_is_blocked():
+                info = runtime_state.get("rpc_unavailable") if isinstance(runtime_state, dict) else None
+                tool_name = ""
+                err = ""
+                if isinstance(info, dict):
+                    tool_name = str(info.get("tool") or "").strip()
+                    err = str(info.get("error") or "").strip()
+                extra = "The Atlas gRPC server became unavailable mid-run."
+                if tool_name:
+                    extra += f" (last failing tool: {tool_name})"
+                if err:
+                    # Keep this short; full error is still logged in session tool events.
+                    max_err_chars = 300
+                    err_one_line = err.splitlines()[0].strip() if err else ""
+                    if len(err_one_line) > max_err_chars:
+                        err_one_line = (
+                            err_one_line[:max_err_chars].rstrip()
+                            + "… (truncated; see session tool events for full error)"
+                        )
+                    extra += f"\nError: {err_one_line}"
+                extra += (
+                    "\n\nPlease relaunch Atlas (and ensure the scene server is running), "
+                    "then tell me once it’s back. I can resume from the saved session state."
+                )
+                if text and text != "(no response)":
+                    text = (text.rstrip() + "\n\n" + extra).strip()
+                else:
+                    text = extra
+        except Exception:
+            pass
 
         # Update local history + transcript.
         if user_text:
@@ -1980,7 +2039,8 @@ def run_repl(
     address: str,
     api_key: str,
     model: str,
-    temperature: float = 0.2,
+    wire_api: str = "auto",
+    temperature: float | None = None,
     reasoning_effort: str | None = "high",
     max_rounds: int = DEFAULT_EXECUTOR_MAX_ROUNDS,
     *,
@@ -2003,6 +2063,7 @@ def run_repl(
         address=address,
         api_key=api_key,
         model=model,
+        wire_api=wire_api,
         temperature=temperature,
         reasoning_effort=reasoning_effort,
         max_rounds_executor=int(max_rounds),

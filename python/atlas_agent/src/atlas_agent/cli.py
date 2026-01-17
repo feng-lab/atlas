@@ -11,9 +11,9 @@ import argparse
 import logging
 import os
 
-from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS
 from .chat_rpc_team import run_repl as run_team_repl
 from .console_ui import run_console_repl
+from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,13 +28,31 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("cmd", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument(
         "--model",
-        default="gpt-5.2-pro",
+        default="gpt-5.2",
+    )
+    parser.add_argument(
+        "--wire-api",
+        default="auto",
+        choices=["auto", "responses", "chat"],
+        help=(
+            "Which OpenAI-compatible wire API to use for tool-calling. "
+            "'auto' prefers Responses API and falls back to Chat Completions when unsupported."
+        ),
     )
     parser.add_argument(
         "--reasoning-effort",
         default="high",
-        choices=["low", "medium", "high"],
+        choices=["low", "medium", "high", "xhigh"],
         help="Reasoning effort for Responses API calls (when supported by the model/provider).",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=None,
+        help=(
+            "Sampling temperature. By default it is omitted (provider/model default). "
+            "Some models/providers reject temperature; the agent will retry without it."
+        ),
     )
     parser.add_argument(
         "--max-rounds",
@@ -90,7 +108,8 @@ def main(argv: list[str] | None = None) -> int:
                 address=address,
                 api_key=api_key,
                 model=args.model,
-                temperature=0.2,
+                wire_api=args.wire_api,
+                temperature=args.temperature,
                 reasoning_effort=args.reasoning_effort,
                 max_rounds=int(args.max_rounds),
                 session=args.session,
@@ -104,7 +123,8 @@ def main(argv: list[str] | None = None) -> int:
             address=address,
             api_key=api_key,
             model=args.model,
-            temperature=0.2,
+            wire_api=args.wire_api,
+            temperature=args.temperature,
             reasoning_effort=args.reasoning_effort,
             max_rounds=int(args.max_rounds),
             session=args.session,

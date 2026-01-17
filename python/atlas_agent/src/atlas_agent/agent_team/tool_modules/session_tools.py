@@ -1,171 +1,185 @@
 import json
 from typing import Any, Dict, List, Optional
 
+from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
+from .preconditions import require_session_store
 
-HANDLED_TOOLS = (
-    "session_info",
-    "session_get_plan",
-    "session_get_memory",
-    "session_search_transcript",
-    "session_search_events",
-    "session_tail_events",
-)
+SESSION_INFO_DESCRIPTION = "Return current session identity + storage path (single session.jsonl log) and saved meta (atlas_dir, address, model)."
+SESSION_INFO_PARAMETERS: Dict[str, Any] = {"type": "object", "properties": {}}
 
-TOOL_SPECS: List[Dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "session_info",
-            "description": "Return current session identity + storage path (single session.jsonl log) and saved meta (atlas_dir, address, model).",
-            "parameters": {"type": "object", "properties": {}},
+SESSION_GET_PLAN_DESCRIPTION = "Return the current task plan from the persistent session store (or runtime plan if no session is available)."
+SESSION_GET_PLAN_PARAMETERS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "include_explanation": {
+            "type": "boolean",
+            "default": True,
+            "description": "When true, include plan_source and plan_explanation when available.",
+        }
+    },
+}
+
+SESSION_GET_MEMORY_DESCRIPTION = "Return the current Session Memory summary string (durable cross-turn context)."
+SESSION_GET_MEMORY_PARAMETERS: Dict[str, Any] = {"type": "object", "properties": {}}
+
+SESSION_SEARCH_TRANSCRIPT_DESCRIPTION = "Search the full append-only session transcript (no truncation by default). Returns matching entries with timestamps/roles. For large transcripts, scope the query or set max_results to bound output."
+SESSION_SEARCH_TRANSCRIPT_PARAMETERS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "query": {"type": "string", "description": "Substring or regex to match."},
+        "regex": {
+            "type": "boolean",
+            "default": False,
+            "description": "When true, treat query as a regex pattern.",
+        },
+        "case_sensitive": {
+            "type": "boolean",
+            "default": False,
+            "description": "Case sensitive match when true.",
+        },
+        "role": {
+            "type": ["string", "null"],
+            "description": "Optional role filter (e.g., 'user' or 'assistant').",
+        },
+        "max_results": {
+            "type": "integer",
+            "default": 0,
+            "description": "0=unlimited (correctness-first). If >0, returns only a window and sets limit_reached=true.",
+        },
+        "offset": {
+            "type": "integer",
+            "default": 0,
+            "description": "Skip the first N matches (for paging). Use with max_results to page without truncation.",
+        },
+        "reverse": {
+            "type": "boolean",
+            "default": False,
+            "description": "When true, return newest-first rather than oldest-first.",
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "session_get_plan",
-            "description": "Return the current task plan from the persistent session store (or runtime plan if no session is available).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "include_explanation": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "When true, include plan_source and plan_explanation when available.",
-                    }
-                },
-            },
+    "required": ["query"],
+}
+
+SESSION_SEARCH_EVENTS_DESCRIPTION = "Search the structured events log (tool calls + facts snapshots). Useful for recalling exact previous tool calls beyond the current model context window."
+SESSION_SEARCH_EVENTS_PARAMETERS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "query": {
+            "type": "string",
+            "description": "Substring or regex to match (searches serialized event JSON).",
+        },
+        "regex": {
+            "type": "boolean",
+            "default": False,
+            "description": "When true, treat query as a regex pattern.",
+        },
+        "case_sensitive": {
+            "type": "boolean",
+            "default": False,
+            "description": "Case sensitive match when true.",
+        },
+        "event_type": {
+            "type": ["string", "null"],
+            "description": "Optional event type filter (e.g., 'tool_call', 'facts_snapshot').",
+        },
+        "tool": {
+            "type": ["string", "null"],
+            "description": "Optional tool filter for tool_call events (exact match).",
+        },
+        "max_results": {
+            "type": "integer",
+            "default": 0,
+            "description": "0=unlimited (correctness-first). If >0, returns only a window and sets limit_reached=true.",
+        },
+        "offset": {
+            "type": "integer",
+            "default": 0,
+            "description": "Skip the first N matches (for paging). Use with max_results to page without truncation.",
+        },
+        "reverse": {
+            "type": "boolean",
+            "default": False,
+            "description": "When true, return newest-first rather than oldest-first.",
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "session_get_memory",
-            "description": "Return the current Session Memory summary string (durable cross-turn context).",
-            "parameters": {"type": "object", "properties": {}},
+    "required": ["query"],
+}
+
+SESSION_TAIL_EVENTS_DESCRIPTION = "Return the last N matching events (default excludes transcript). Useful for quick 'what just happened' recall without crafting a search query."
+SESSION_TAIL_EVENTS_PARAMETERS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "limit": {
+            "type": "integer",
+            "default": 20,
+            "description": "Number of events to return from the end of the log.",
+        },
+        "event_type": {
+            "type": ["string", "null"],
+            "description": "Optional event type filter (e.g., 'tool_call', 'plan_updated'). Use 'transcript' to include transcript entries explicitly.",
+        },
+        "tool": {
+            "type": ["string", "null"],
+            "description": "Optional tool filter for tool_call events (exact match).",
+        },
+        "reverse": {
+            "type": "boolean",
+            "default": False,
+            "description": "When true, return newest-first.",
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "session_search_transcript",
-            "description": "Search the full append-only session transcript (no truncation by default). Returns matching entries with timestamps/roles. For large transcripts, scope the query or set max_results to bound output.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Substring or regex to match."},
-                    "regex": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, treat query as a regex pattern.",
-                    },
-                    "case_sensitive": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Case sensitive match when true.",
-                    },
-                    "role": {
-                        "type": ["string", "null"],
-                        "description": "Optional role filter (e.g., 'user' or 'assistant').",
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "0=unlimited (correctness-first). If >0, returns only a window and sets limit_reached=true.",
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Skip the first N matches (for paging). Use with max_results to page without truncation.",
-                    },
-                    "reverse": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, return newest-first rather than oldest-first.",
-                    },
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "session_search_events",
-            "description": "Search the structured events log (tool calls + facts snapshots). Useful for recalling exact previous tool calls beyond the current model context window.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Substring or regex to match (searches serialized event JSON)."},
-                    "regex": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, treat query as a regex pattern.",
-                    },
-                    "case_sensitive": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Case sensitive match when true.",
-                    },
-                    "event_type": {
-                        "type": ["string", "null"],
-                        "description": "Optional event type filter (e.g., 'tool_call', 'facts_snapshot').",
-                    },
-                    "tool": {
-                        "type": ["string", "null"],
-                        "description": "Optional tool filter for tool_call events (exact match).",
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "0=unlimited (correctness-first). If >0, returns only a window and sets limit_reached=true.",
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Skip the first N matches (for paging). Use with max_results to page without truncation.",
-                    },
-                    "reverse": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, return newest-first rather than oldest-first.",
-                    },
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "session_tail_events",
-            "description": "Return the last N matching events (default excludes transcript). Useful for quick 'what just happened' recall without crafting a search query.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "limit": {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Number of events to return from the end of the log.",
-                    },
-                    "event_type": {
-                        "type": ["string", "null"],
-                        "description": "Optional event type filter (e.g., 'tool_call', 'plan_updated'). Use 'transcript' to include transcript entries explicitly.",
-                    },
-                    "tool": {
-                        "type": ["string", "null"],
-                        "description": "Optional tool filter for tool_call events (exact match).",
-                    },
-                    "reverse": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, return newest-first.",
-                    },
-                },
-            },
-        },
-    },
+}
+
+
+def _tool_handler(tool_name: str):
+    def _call(args: dict[str, Any], ctx: ToolDispatchContext):
+        return handle(tool_name, args, ctx)
+
+    return _call
+
+
+TOOLS: List[Tool] = [
+    tool_from_schema(
+        name="session_info",
+        description=SESSION_INFO_DESCRIPTION,
+        parameters_schema=SESSION_INFO_PARAMETERS,
+        handler=_tool_handler("session_info"),
+        preconditions=(require_session_store,),
+    ),
+    tool_from_schema(
+        name="session_get_plan",
+        description=SESSION_GET_PLAN_DESCRIPTION,
+        parameters_schema=SESSION_GET_PLAN_PARAMETERS,
+        handler=_tool_handler("session_get_plan"),
+    ),
+    tool_from_schema(
+        name="session_get_memory",
+        description=SESSION_GET_MEMORY_DESCRIPTION,
+        parameters_schema=SESSION_GET_MEMORY_PARAMETERS,
+        handler=_tool_handler("session_get_memory"),
+    ),
+    tool_from_schema(
+        name="session_search_transcript",
+        description=SESSION_SEARCH_TRANSCRIPT_DESCRIPTION,
+        parameters_schema=SESSION_SEARCH_TRANSCRIPT_PARAMETERS,
+        handler=_tool_handler("session_search_transcript"),
+        preconditions=(require_session_store,),
+    ),
+    tool_from_schema(
+        name="session_search_events",
+        description=SESSION_SEARCH_EVENTS_DESCRIPTION,
+        parameters_schema=SESSION_SEARCH_EVENTS_PARAMETERS,
+        handler=_tool_handler("session_search_events"),
+        preconditions=(require_session_store,),
+    ),
+    tool_from_schema(
+        name="session_tail_events",
+        description=SESSION_TAIL_EVENTS_DESCRIPTION,
+        parameters_schema=SESSION_TAIL_EVENTS_PARAMETERS,
+        handler=_tool_handler("session_tail_events"),
+        preconditions=(require_session_store,),
+    ),
 ]
 
 
@@ -186,9 +200,6 @@ def _runtime_plan_explanation(ctx: ToolDispatchContext) -> str:
 
 
 def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
-    if name not in HANDLED_TOOLS:
-        return None
-
     ss = ctx.session_store
 
     if name == "session_info":

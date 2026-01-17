@@ -116,7 +116,7 @@ Prompt patterns that work well:
 
 Implementation notes:
 
-- For smooth spline paths, the agent sets the camera interpolation method to `Position Rotation Spline`.
+- Camera interpolation method selection is currently disabled for RPC/agent use. Camera path tools rely on the default `Center` mode and achieve smoothness by writing appropriate camera keys.
 - For interior shots, the agent disables the “keep object fully visible” constraint (`keep_visible=false`) so the camera can move inside.
 - When the user provides explicit waypoints, the agent uses waypoint tools; when the user describes motion in words, the agent uses walkthrough segments.
 

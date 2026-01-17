@@ -6,117 +6,111 @@ from typing import Any, Dict, List, Optional
 
 from ...discovery import compute_docs_dir_from_atlas_dir
 from ...repo import find_repo_root
+from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
 
-HANDLED_TOOLS = (
-    "docs_list",
-    "docs_search",
-    "docs_read",
-)
+DOCS_LIST_DESCRIPTION = "List available Atlas markdown docs (from the installed Atlas app bundle when available, and/or from the monorepo docs/ when running in-repo)."
+DOCS_LIST_PARAMETERS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "docs_dir": {
+            "type": ["string", "null"],
+            "description": "Optional explicit docs dir override (otherwise derived from atlas_dir or repo).",
+        },
+        "max_depth": {
+            "type": "integer",
+            "default": -1,
+            "description": "Directory recursion depth for listing markdown docs. Use -1 for unlimited (correctness-first).",
+        },
+    },
+}
 
-TOOL_SPECS: List[Dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "docs_list",
-            "description": "List available Atlas markdown docs (from the installed Atlas app bundle when available, and/or from the monorepo docs/ when running in-repo).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "docs_dir": {
-                        "type": ["string", "null"],
-                        "description": "Optional explicit docs dir override (otherwise derived from atlas_dir or repo).",
-                    },
-                    "max_depth": {
-                        "type": "integer",
-                        "default": -1,
-                        "description": "Directory recursion depth for listing markdown docs. Use -1 for unlimited (correctness-first).",
-                    },
-                },
-            },
+DOCS_SEARCH_DESCRIPTION = "Search Atlas docs for a query. Returns matching excerpts with file paths and line numbers. By default returns all matches (correctness-first); set max_results>0 to bound output."
+DOCS_SEARCH_PARAMETERS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "query": {"type": "string", "description": "Search query (substring or regex)."},
+        "regex": {
+            "type": "boolean",
+            "default": False,
+            "description": "When true, treat query as a regex pattern.",
+        },
+        "case_sensitive": {
+            "type": "boolean",
+            "default": False,
+            "description": "Case sensitive search when true.",
+        },
+        "docs_dir": {"type": ["string", "null"], "description": "Optional explicit docs dir override."},
+        "include_paths": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Optional list of doc basenames or paths to restrict search (e.g., ['SCENE_SERVER.md']).",
+        },
+        "context_lines": {
+            "type": "integer",
+            "default": 2,
+            "description": "Number of surrounding lines to include before/after each match.",
+        },
+        "max_results": {
+            "type": "integer",
+            "default": 0,
+            "description": "0=unlimited (correctness-first). If >0, returns only a window and sets total_matches to the full count.",
+        },
+        "offset": {
+            "type": "integer",
+            "default": 0,
+            "description": "Skip the first N matches (for paging). Use with max_results to page through large result sets without truncation.",
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "docs_search",
-            "description": "Search Atlas docs for a query. Returns matching excerpts with file paths and line numbers. By default returns all matches (correctness-first); set max_results>0 to bound output.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Search query (substring or regex)."},
-                    "regex": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, treat query as a regex pattern.",
-                    },
-                    "case_sensitive": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Case sensitive search when true.",
-                    },
-                    "docs_dir": {
-                        "type": ["string", "null"],
-                        "description": "Optional explicit docs dir override.",
-                    },
-                    "include_paths": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Optional list of doc basenames or paths to restrict search (e.g., ['SCENE_SERVER.md']).",
-                    },
-                    "context_lines": {
-                        "type": "integer",
-                        "default": 2,
-                        "description": "Number of surrounding lines to include before/after each match.",
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "0=unlimited (correctness-first). If >0, returns only a window and sets total_matches to the full count.",
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Skip the first N matches (for paging). Use with max_results to page through large result sets without truncation.",
-                    },
-                },
-                "required": ["query"],
-            },
+    "required": ["query"],
+}
+
+DOCS_READ_DESCRIPTION = "Read a slice of a markdown doc by line range. Prefer targeted slices over whole-file reads."
+DOCS_READ_PARAMETERS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "path": {"type": ["string", "null"], "description": "Absolute path to doc (optional if doc_name is provided)."},
+        "doc_name": {
+            "type": ["string", "null"],
+            "description": "Doc basename (e.g., 'SCENE_SERVER.md') to resolve within discovered docs dirs.",
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "docs_read",
-            "description": "Read a slice of a markdown doc by line range. Prefer targeted slices over whole-file reads.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": ["string", "null"],
-                        "description": "Absolute path to doc (optional if doc_name is provided).",
-                    },
-                    "doc_name": {
-                        "type": ["string", "null"],
-                        "description": "Doc basename (e.g., 'SCENE_SERVER.md') to resolve within discovered docs dirs.",
-                    },
-                    "docs_dir": {
-                        "type": ["string", "null"],
-                        "description": "Optional explicit docs dir override for resolving doc_name.",
-                    },
-                    "start_line": {
-                        "type": "integer",
-                        "description": "0-based start line (use 0 for beginning).",
-                    },
-                    "line_count": {
-                        "type": "integer",
-                        "description": "Number of lines to return.",
-                    },
-                },
-                "required": ["start_line", "line_count"],
-            },
+        "docs_dir": {
+            "type": ["string", "null"],
+            "description": "Optional explicit docs dir override for resolving doc_name.",
         },
+        "start_line": {"type": "integer", "description": "0-based start line (use 0 for beginning)."},
+        "line_count": {"type": "integer", "description": "Number of lines to return."},
     },
+    "required": ["start_line", "line_count"],
+}
+
+
+def _tool_handler(tool_name: str):
+    def _call(args: dict[str, Any], ctx: ToolDispatchContext):
+        return handle(tool_name, args, ctx)
+
+    return _call
+
+
+TOOLS: List[Tool] = [
+    tool_from_schema(
+        name="docs_list",
+        description=DOCS_LIST_DESCRIPTION,
+        parameters_schema=DOCS_LIST_PARAMETERS,
+        handler=_tool_handler("docs_list"),
+    ),
+    tool_from_schema(
+        name="docs_search",
+        description=DOCS_SEARCH_DESCRIPTION,
+        parameters_schema=DOCS_SEARCH_PARAMETERS,
+        handler=_tool_handler("docs_search"),
+    ),
+    tool_from_schema(
+        name="docs_read",
+        description=DOCS_READ_DESCRIPTION,
+        parameters_schema=DOCS_READ_PARAMETERS,
+        handler=_tool_handler("docs_read"),
+    ),
 ]
 
 

@@ -34,6 +34,17 @@ The Atlas GUI hosts the gRPC service `atlas.rpc.Scene` for live control.
   - `ok=true` when the 3D rendering engine is initialized and ready.
 - `Ensure3DWindow() -> { ok }`
   - Opens a 3D window/canvas when needed so the rendering engine can initialize.
+- `GetStatus({ ids?, include_all_objects? }) -> { ok, doc_ready, engine_ready, has_3d_window, objects[] }`
+  - A structured readiness snapshot intended for deterministic agent orchestration.
+  - `doc_ready` indicates the GUI document is registered with the RPC service.
+  - `engine_ready` indicates the 3D rendering engine is registered (a 3D window exists and has initialized enough to accept engine-backed RPCs).
+  - `has_3d_window` indicates a 3D window/canvas exists (does not create one).
+  - Optional `objects[]` entries include an `ObjectLoadState` enum:
+    - `DOC_NOT_READY`, `ENGINE_NOT_READY`, `VIEW_NOT_READY`, `READY`, etc.
+  - Important: `READY` means the object has a bound 3D view/filter and is safe for engine-backed operations (bbox/params/camera). It is **not** a guarantee that all progressive data (e.g. Neuroglancer tiles) is fully loaded.
+- `WaitForObjectsReady({ ids, timeout_ms?, poll_interval_ms? }) -> { ok, doc_ready, engine_ready, has_3d_window, objects[], error? }`
+  - Blocks until all requested ids report `READY` (as defined above), or until `timeout_ms` elapses.
+  - Intended for agent flows like: load → wait_ready → bbox/camera-fit, especially when object view creation is asynchronous.
 
 ### Files / Objects
 
@@ -181,8 +192,9 @@ These return typed camera values/keys that clients can write via `SetKey(animati
 
 Supported `method` strings:
 - `Center`
-- `Position Spline`
-- `Position Rotation Spline` (recommended for waypoint spline fly-throughs and first-person walkthrough paths)
+
+Notes:
+- Spline-based camera interpolation modes are currently disabled for RPC/agent use.
 
 ## Introspection
 

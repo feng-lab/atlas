@@ -16,38 +16,10 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError  # type: ignore
 
 from ...capabilities_prompt import build_capabilities_prompt
 from ...discovery import discover_schema_dir
+from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
 from .file_formats import SCENE_LOAD_CATEGORIES, get_supported_extensions
-
-HANDLED_TOOLS = (
-    "scene_capabilities_summary",
-    "scene_animation_concepts",
-    "scene_params_handbook",
-    "scene_facts_summary",
-    "scene_capabilities",
-    "scene_schema",
-    "scene_get_values",
-    "scene_validate_params",
-    "scene_apply",
-    "scene_save_scene",
-    "scene_screenshot",
-    "scene_camera_fit",
-    "scene_camera_apply",
-    "scene_load_files",
-    "scene_ensure_loaded",
-    "scene_smart_load",
-    "scene_list_objects",
-    "scene_find_objects",
-    "scene_bbox",
-    "scene_list_params",
-    "scene_param_info",
-    "scene_validate_param_value",
-    "scene_set_visibility",
-    "scene_make_alias",
-    "scene_cut_suggest_box",
-    "scene_cut_set_box",
-    "scene_cut_clear",
-)
+from .preconditions import require_engine_ready, require_screenshot_consent
 
 SCENE_SET_PARAMS_SCHEMA: Dict[str, Any] = {
     "type": "object",
@@ -89,567 +61,337 @@ SCENE_SET_PARAMS_SCHEMA: Dict[str, Any] = {
     "required": ["set_params"],
 }
 
-TOOL_SPECS: List[Dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_capabilities_summary",
-            "description": "Condensed capabilities overview. Background: Scene (.scene) is stateless current display state; Animation (.animation2d/.animation3d) adds timeline keys that override scene during playback.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_camera_fit",
-            "description": "Scene-only: fit the scene camera to given ids (or all fit_candidates) without writing animation keys. Applies the typed camera via scene_apply(id=0).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Optional target ids; when omitted uses fit_candidates().",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Use clipped bbox (true) or full bbox (false).",
-                    },
-                    "min_radius": {
-                        "type": "number",
-                        "default": 0.0,
-                        "description": "Minimum radius (world units) for the fit sphere; 0 disables.",
-                    },
-                },
+
+def _tool_handler(tool_name: str):
+    def _call(args: dict[str, Any], ctx: ToolDispatchContext):
+        return handle(tool_name, args, ctx)
+
+    return _call
+
+
+TOOLS: List[Tool] = [
+    tool_from_schema(
+        name="scene_capabilities_summary",
+        description="Condensed capabilities overview. Background: Scene (.scene) is stateless current display state; Animation (.animation2d/.animation3d) adds timeline keys that override scene during playback.",
+        parameters_schema={"type": "object", "properties": {}},
+        preconditions=(),
+        handler=_tool_handler("scene_capabilities_summary"),
+    ),
+    tool_from_schema(
+        name="scene_camera_fit",
+        description=(
+            "Scene-only: fit the scene camera to given ids (or all fit_candidates) without writing animation keys. "
+            "This tool APPLYs the fitted camera immediately (via scene_apply(id=0, json_key='Camera 3DCamera')) and does not return the typed camera value. "
+            "If you already have a typed camera value from a camera_* producer, use scene_camera_apply(value=...) instead."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional target ids; when omitted uses fit_candidates()."},
+                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)."},
+                "min_radius": {"type": "number", "default": 0.0, "description": "Minimum radius (world units) for the fit sphere; 0 disables."},
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_camera_apply",
-            "description": "Scene-only: apply a typed camera value to the scene camera (id=0) without writing timeline keys.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "value": {
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_camera_fit"),
+    ),
+    tool_from_schema(
+        name="scene_camera_apply",
+        description=(
+            "Scene-only: apply a typed camera value to the scene camera (id=0) without writing timeline keys. "
+            "This tool requires an explicit 'value' argument (a typed camera object); it does not use any implicit cached camera state."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "object",
+                    "description": (
+                        "Typed camera value (object with camera fields). "
+                        "Typically obtained from camera_* tools like camera_focus / camera_rotate / camera_reset_view."
+                    ),
+                }
+            },
+            "required": ["value"],
+        },
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_camera_apply"),
+    ),
+    tool_from_schema(
+        name="scene_animation_concepts",
+        description="Explain Atlas Scene vs Animation: Scene (.scene) captures current objects + display params (2D/3D). Animation (.animation2d/.animation3d) extends Scene with per-parameter timeline keys (easing: Switch/Linear/Exp/…). During playback, animation keys override scene values.",
+        parameters_schema={"type": "object", "properties": {}},
+        preconditions=(),
+        handler=_tool_handler("scene_animation_concepts"),
+    ),
+    tool_from_schema(
+        name="scene_params_handbook",
+        description="Generate a Markdown handbook of parameters per object type and groups from capabilities.json (json_key, type, supports_interpolation, ranges).",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "schema_dir": {"type": ["string", "null"], "description": "Optional schema directory override (defaults to discovery via atlas_dir/env)."},
+                "include_groups": {"type": "boolean", "default": True, "description": "When true, include Background/Axis/Global group parameters."},
+                "max_types": {"type": ["integer", "null"], "description": "Optional maximum number of object types to include. When null/omitted, includes all types."},
+                "max_params_per_type": {"type": ["integer", "null"], "description": "Optional maximum number of parameters to include per group/type. When null/omitted, includes all parameters."},
+            },
+        },
+        preconditions=(),
+        handler=_tool_handler("scene_params_handbook"),
+    ),
+    tool_from_schema(
+        name="scene_facts_summary",
+        description="Return a concise natural-language summary of current objects, keyframes, and time; optionally include selected parameter values.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "sample_limit": {"type": "integer", "default": 6, "description": "Maximum number of objects/keys to include in the summary output."},
+                "id": {"type": "integer", "description": "Optional id to include current parameter values for (0=camera, 1=background, 2=axis, 3=global, ≥4=object ids)."},
+                "json_keys": {"type": "array", "items": {"type": "string"}, "description": "Optional json_keys to read for id (only used when id is provided)."},
+            },
+        },
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_facts_summary"),
+    ),
+    tool_from_schema(
+        name="scene_capabilities",
+        description="Return the full capabilities.json (parameter catalogs per object type and groups) from the discovered schema directory.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "schema_dir": {"type": ["string", "null"], "description": "Optional schema directory override (defaults to discovery via atlas_dir/env)."}
+            },
+        },
+        preconditions=(),
+        handler=_tool_handler("scene_capabilities"),
+    ),
+    tool_from_schema(
+        name="scene_schema",
+        description="Return the full Animation3D JSON Schema (animation3d.schema.json).",
+        parameters_schema={
+            "type": "object",
+            "properties": {"schema_dir": {"type": ["string", "null"], "description": "Optional schema directory override (defaults to discovery via atlas_dir/env)."}},
+        },
+        preconditions=(),
+        handler=_tool_handler("scene_schema"),
+    ),
+    tool_from_schema(
+        name="scene_get_values",
+        description="Scene (stateless): return current display values for json_keys by id. Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids. For the scene camera, use json_key 'Camera 3DCamera' (or pass an empty json_keys array to retrieve it).",
+        parameters_schema={"type": "object", "properties": {"id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}, "json_keys": {"type": "array", "items": {"type": "string"}, "description": "Param keys to read (empty = all)"}}, "required": ["id", "json_keys"]},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_get_values"),
+    ),
+    tool_from_schema(
+        name="scene_validate_params",
+        description="Scene (validate-only, no write): preflight display parameter assignments. Returns {ok:bool, results:[{json_key, ok, reason?, normalized_value?}]}. Use before scene_apply; during playback, timeline keys still override scene values.",
+        parameters_schema=SCENE_SET_PARAMS_SCHEMA,
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_validate_params"),
+    ),
+    tool_from_schema(
+        name="scene_apply",
+        description="Scene (stateless): apply display parameter assignments atomically (no time/easing). Accepts either canonical json_key or display name; resolves names via scene_list_params with caching. Targeting is by id (0=camera,1=background,2=axis,3=global,≥4=objects). Note: does not change animation; during playback, animation keys override scene values.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "set_params": {
+                    "type": "array",
+                    "items": {
                         "type": "object",
-                        "description": "Typed camera value (object with camera fields).",
-                    }
-                },
-                "required": ["value"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_animation_concepts",
-            "description": "Explain Atlas Scene vs Animation: Scene (.scene) captures current objects + display params (2D/3D). Animation (.animation2d/.animation3d) extends Scene with per-parameter timeline keys (easing: Switch/Linear/Exp/…). During playback, animation keys override scene values.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_params_handbook",
-            "description": "Generate a Markdown handbook of parameters per object type and groups from capabilities.json (json_key, type, supports_interpolation, ranges).",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_facts_summary",
-            "description": "Return a concise natural-language summary of current objects, keyframes, and time; optionally include selected parameter values.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_capabilities",
-            "description": "Return the full capabilities.json (parameter catalogs per object type and groups) from the discovered schema directory.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "schema_dir": {
-                        "type": ["string", "null"],
-                        "description": "Optional schema directory override (defaults to discovery via atlas_dir/env).",
-                    }
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_schema",
-            "description": "Return the full Animation3D JSON Schema (animation3d.schema.json).",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_get_values",
-            "description": "Scene (stateless): return current display values for json_keys by id. Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids. For the scene camera, use json_key 'Camera 3DCamera' (or pass an empty json_keys array to retrieve it).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_keys": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Param keys to read (empty = all)",
-                    },
-                },
-                "required": ["id", "json_keys"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_validate_params",
-            "description": "Scene (validate-only, no write): preflight display parameter assignments. Returns {ok:bool, results:[{json_key, ok, reason?, normalized_value?}]}. Use before scene_apply; during playback, timeline keys still override scene values.",
-            "parameters": SCENE_SET_PARAMS_SCHEMA,
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_apply",
-            "description": "Scene (stateless): apply display parameter assignments atomically (no time/easing). Accepts either canonical json_key or display name; resolves names via scene_list_params with caching. Targeting is by id (0=camera,1=background,2=axis,3=global,≥4=objects). Note: does not change animation; during playback, animation keys override scene values.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "set_params": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "id": {
-                                    "type": "integer",
-                                    "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                                },
-                                "json_key": {
-                                    "type": "string",
-                                    "description": "Canonical parameter key (preferred)",
-                                },
-                                "name": {
-                                    "type": "string",
-                                    "description": "Display name; dispatcher resolves to json_key if provided",
-                                },
-                                "value": {
-                                    "description": (
-                                        "Typed value.\n"
-                                        "Composite object values are patch-style in scene_apply: you may provide only the subfields you want to change; "
-                                        "omitted subfields are left unchanged.\n"
-                                        "For 3DTransform, canonical subfields include: "
-                                        "{'Translation Vec3':[x,y,z], 'Rotation Vec4':[ang_deg,ax,ay,az], 'Scale Vec3':[sx,sy,sz], 'Rotation Center Vec3':[cx,cy,cz]}.\n"
-                                        "The RPC server also accepts common aliases for 3DTransform and normalizes them: 'Translation', 'Rotation', 'Scale', and 'Center'."
-                                    ),
-                                    "type": [
-                                        "object",
-                                        "array",
-                                        "number",
-                                        "string",
-                                        "boolean",
-                                        "null",
-                                    ],
-                                    "items": {
-                                        "type": [
-                                            "string",
-                                            "number",
-                                            "boolean",
-                                            "null",
-                                        ]
-                                    },
-                                },
+                        "properties": {
+                            "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                            "json_key": {"type": "string", "description": "Canonical parameter key (preferred)"},
+                            "name": {"type": "string", "description": "Display name; dispatcher resolves to json_key if provided"},
+                            "value": {
+                                "description": (
+                                    "Typed value.\n"
+                                    "Composite object values are patch-style in scene_apply: you may provide only the subfields you want to change; "
+                                    "omitted subfields are left unchanged.\n"
+                                    "For 3DTransform, canonical subfields include: "
+                                    "{'Translation Vec3':[x,y,z], 'Rotation Vec4':[ang_deg,ax,ay,az], 'Scale Vec3':[sx,sy,sz], 'Rotation Center Vec3':[cx,cy,cz]}.\n"
+                                    "The RPC server also accepts common aliases for 3DTransform and normalizes them: 'Translation', 'Rotation', 'Scale', and 'Center'."
+                                ),
+                                "type": ["object", "array", "number", "string", "boolean", "null"],
+                                "items": {"type": ["string", "number", "boolean", "null"]},
                             },
-                            "required": ["id", "value"],
                         },
-                    }
-                },
-                "required": ["set_params"],
+                        "required": ["id", "value"],
+                    },
+                }
+            },
+            "required": ["set_params"],
+        },
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_apply"),
+    ),
+    tool_from_schema(
+        name="scene_save_scene",
+        description="Save current scene (.scene) to path.",
+        parameters_schema={"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+        preconditions=(),
+        handler=_tool_handler("scene_save_scene"),
+    ),
+    tool_from_schema(
+        name="scene_screenshot",
+        description=(
+            "Render a screenshot of the current 3D scene state (no animation export). "
+            "Writes a single PNG image file and returns its path.\n"
+            "Intended for model-based visual inspection (the runtime may upload the image to the model when consent is enabled). "
+            "Do NOT ask the user to open the temp file path; if a human check is still needed, ask them to check in the Atlas UI.\n"
+            "Privacy: requires explicit per-session screenshot consent."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "width": {"type": "integer", "description": "Image width (pixels)"},
+                "height": {"type": "integer", "description": "Image height (pixels)"},
+                "path": {"type": "string", "description": "Optional output path. When empty, Atlas chooses a temp file path. If provided, must end with .png."},
+                "overwrite": {"type": "boolean", "default": True, "description": "Overwrite the output file when it already exists."},
+            },
+            "required": ["width", "height"],
+        },
+        preconditions=(require_screenshot_consent, require_engine_ready),
+        handler=_tool_handler("scene_screenshot"),
+    ),
+    tool_from_schema(
+        name="scene_load_files",
+        description="Load one or more files into the GUI scene. Accepts absolute paths; ~ and env vars expanded. Prefer scene_ensure_loaded for idempotent behavior.",
+        parameters_schema={"type": "object", "properties": {"files": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths to load"}}, "required": ["files"]},
+        preconditions=(),
+        handler=_tool_handler("scene_load_files"),
+    ),
+    tool_from_schema(
+        name="scene_ensure_loaded",
+        description="Idempotently ensure files are loaded: skips already loaded paths, validates existence, and loads only missing ones.",
+        parameters_schema={"type": "object", "properties": {"files": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths to load (idempotent)"}}, "required": ["files"]},
+        preconditions=(),
+        handler=_tool_handler("scene_ensure_loaded"),
+    ),
+    tool_from_schema(
+        name="scene_wait_objects_ready",
+        description=(
+            "Wait until the specified object ids are ready for engine-backed operations (bbox/params/camera), or until timeout.\n"
+            "Readiness here means the object has a bound 3D view/filter in the live engine (not that all progressive data is fully loaded).\n"
+            "If ids is empty, waits for all fit_candidates()."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids to wait for (empty = all fit_candidates)."},
+                "timeout_sec": {"type": "number", "default": 30.0, "description": "Max time to wait (seconds). 0 = check once."},
+                "poll_interval_sec": {"type": "number", "default": 0.2, "description": "Polling interval while waiting (seconds)."},
+            },
+            "required": ["ids"],
+        },
+        preconditions=(),
+        handler=_tool_handler("scene_wait_objects_ready"),
+    ),
+    tool_from_schema(
+        name="scene_smart_load",
+        description="Resolve and load one or more files by name, searching typical user directories (Documents/Downloads/Desktop/CWD). Returns loaded object count and the resolved paths.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "names": {"type": "array", "items": {"type": "string"}, "description": "Basenames to search"},
+                "dir_hints": {"type": "array", "items": {"type": "string"}, "description": "Hint directories"},
+                "schema_dir": {"type": "string", "description": "Optional schema directory override for extension catalogs"},
+                "extensions": {"type": "array", "items": {"type": "string"}, "description": "Allowed extensions"},
+                "case_insensitive": {"type": "boolean", "default": True, "description": "Case-insensitive matching"},
+            },
+            "required": ["names"],
+        },
+        preconditions=(),
+        handler=_tool_handler("scene_smart_load"),
+    ),
+    tool_from_schema(
+        name="scene_list_objects",
+        description="List all objects in the current scene (id, type, name, path, visible).",
+        parameters_schema={"type": "object", "properties": {}},
+        preconditions=(),
+        handler=_tool_handler("scene_list_objects"),
+    ),
+    tool_from_schema(
+        name="scene_find_objects",
+        description="Find objects by substring filters over (type, name, path) with optional paging. If limit is omitted, returns all matches (no silent truncation).",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Case-insensitive substring match over type/name/path/id."},
+                "type_contains": {"type": "string", "description": "Case-insensitive substring match over object type."},
+                "name_contains": {"type": "string", "description": "Case-insensitive substring match over object name."},
+                "path_contains": {"type": "string", "description": "Case-insensitive substring match over object path."},
+                "visible": {"type": "boolean", "description": "Optional visibility filter; when omitted, includes both visible and hidden objects."},
+                "limit": {"type": "integer", "minimum": 1, "description": "Optional page size. When omitted, returns all results."},
+                "offset": {"type": "integer", "minimum": 0, "default": 0, "description": "Paging offset (0-based)."},
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_save_scene",
-            "description": "Save current scene (.scene) to path.",
-            "parameters": {
-                "type": "object",
-                "properties": {"path": {"type": "string"}},
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_screenshot",
-            "description": (
-                "Render a screenshot of the current 3D scene state (no animation export). "
-                "Writes a single PNG image file and returns its path.\n"
-                "Privacy: requires explicit per-session screenshot consent."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "width": {"type": "integer", "description": "Image width (pixels)"},
-                    "height": {"type": "integer", "description": "Image height (pixels)"},
-                    "path": {
-                        "type": "string",
-                        "description": "Optional output path. When empty, Atlas chooses a temp file path. If provided, must end with .png.",
-                    },
-                    "overwrite": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Overwrite the output file when it already exists.",
-                    },
-                },
-                "required": ["width", "height"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_load_files",
-            "description": "Load one or more files into the GUI scene. Accepts absolute paths; ~ and env vars expanded. Prefer scene_ensure_loaded for idempotent behavior.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "files": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Absolute paths to load",
-                    },
-                },
-                "required": ["files"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_ensure_loaded",
-            "description": "Idempotently ensure files are loaded: skips already loaded paths, validates existence, and loads only missing ones.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "files": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Absolute paths to load (idempotent)",
-                    },
-                },
-                "required": ["files"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_smart_load",
-            "description": "Resolve and load one or more files by name, searching typical user directories (Documents/Downloads/Desktop/CWD). Returns loaded object count and the resolved paths.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "names": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Basenames to search",
-                    },
-                    "dir_hints": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Hint directories",
-                    },
-                    "schema_dir": {
-                        "type": "string",
-                        "description": "Optional schema directory override for extension catalogs",
-                    },
-                    "extensions": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Allowed extensions",
-                    },
-                    "case_insensitive": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Case-insensitive matching",
-                    },
-                },
-                "required": ["names"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_list_objects",
-            "description": "List all objects in the current scene (id, type, name, path, visible).",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_find_objects",
-            "description": "Find objects by substring filters over (type, name, path) with optional paging. If limit is omitted, returns all matches (no silent truncation).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Case-insensitive substring match over type/name/path/id.",
-                    },
-                    "type_contains": {
-                        "type": "string",
-                        "description": "Case-insensitive substring match over object type.",
-                    },
-                    "name_contains": {
-                        "type": "string",
-                        "description": "Case-insensitive substring match over object name.",
-                    },
-                    "path_contains": {
-                        "type": "string",
-                        "description": "Case-insensitive substring match over object path.",
-                    },
-                    "visible": {
-                        "type": "boolean",
-                        "description": "Optional visibility filter; when omitted, includes both visible and hidden objects.",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "description": "Optional page size. When omitted, returns all results.",
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "default": 0,
-                        "description": "Paging offset (0-based).",
-                    },
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_bbox",
-            "description": "Get bounding box for a set of ids. Pass an empty list for all objects.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Object ids (empty = all)",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Use clipped bbox (true) or full bbox (false)",
-                    },
-                },
-                "required": ["ids", "after_clipping"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_list_params",
-            "description": "List parameters by id (includes value_schema). Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=objects.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    }
-                },
-                "required": ["id"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_param_info",
-            "description": "Get one parameter's metadata by id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects). Resolves json_key from either json_key or display name.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "query": {
-                        "type": "string",
-                        "description": "Either a canonical json_key or a display name (case-insensitive).",
-                    },
-                    "json_key": {
-                        "type": "string",
-                        "description": "Canonical json_key (preferred when known).",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Display name to resolve to json_key (case-insensitive).",
-                    },
-                },
-                "required": ["id"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_validate_param_value",
-            "description": "Validate a candidate value against the live value_schema for a given id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {"type": "string"},
-                    "value": {
-                        "description": "Candidate JSON value (native types)",
-                        "anyOf": [
-                            {"type": "object"},
-                            {"type": "array", "items": {}},
-                            {"type": "number"},
-                            {"type": "string"},
-                            {"type": "boolean"},
-                            {"type": "null"},
-                        ],
-                    },
-                },
-                "required": ["id", "json_key", "value"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_set_visibility",
-            "description": "Toggle visibility of a list of object ids.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Object ids",
-                    },
-                    "on": {
-                        "type": "boolean",
-                        "description": "True to show, false to hide",
-                    },
-                },
-                "required": ["ids", "on"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_make_alias",
-            "description": "Create alias objects for given ids (shared backing data with independent view params).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Object ids to alias; each produces a new alias id.",
-                    }
-                },
-                "required": ["ids"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_cut_suggest_box",
-            "description": "Suggest an axis-aligned cut box for given ids (or all).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Ids to bound (empty = all)",
-                    },
-                    "margin": {
-                        "type": "number",
-                        "default": 0.0,
-                        "description": "Extra normalized margin to expand box",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Use clipped bbox for computation",
-                    },
-                },
-                "required": ["ids", "margin", "after_clipping"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_cut_set_box",
-            "description": "Apply a global cut box and optionally refit camera.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "min": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 3,
-                        "maxItems": 3,
-                        "description": "Box min [x,y,z]",
-                    },
-                    "max": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 3,
-                        "maxItems": 3,
-                        "description": "Box max [x,y,z]",
-                    },
-                    "refit_camera": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Refit camera after applying cut",
-                    },
-                },
-                "required": ["min", "max", "refit_camera"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "scene_cut_clear",
-            "description": "Clear global cuts.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
+        preconditions=(),
+        handler=_tool_handler("scene_find_objects"),
+    ),
+    tool_from_schema(
+        name="scene_bbox",
+        description="Get bounding box for a set of ids. Pass an empty list for all objects.",
+        parameters_schema={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids (empty = all)"}, "after_clipping": {"type": "boolean", "default": False, "description": "Use clipped bbox (true) or full bbox (false)"}}, "required": ["ids"]},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_bbox"),
+    ),
+    tool_from_schema(
+        name="scene_list_params",
+        description="List parameters by id (includes value_schema). Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=objects.",
+        parameters_schema={"type": "object", "properties": {"id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}}, "required": ["id"]},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_list_params"),
+    ),
+    tool_from_schema(
+        name="scene_param_info",
+        description="Get one parameter's metadata by id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects). Resolves json_key from either json_key or display name.",
+        parameters_schema={"type": "object", "properties": {"id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}, "query": {"type": "string", "description": "Either a canonical json_key or a display name (case-insensitive)."}, "json_key": {"type": "string", "description": "Canonical json_key (preferred when known)."}, "name": {"type": "string", "description": "Display name to resolve to json_key (case-insensitive)."}}, "required": ["id"]},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_param_info"),
+    ),
+    tool_from_schema(
+        name="scene_validate_param_value",
+        description="Validate a candidate value against the live value_schema for a given id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects).",
+        parameters_schema={"type": "object", "properties": {"id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}, "json_key": {"type": "string"}, "value": {"description": "Candidate JSON value (native types)", "anyOf": [{"type": "object"}, {"type": "array", "items": {}}, {"type": "number"}, {"type": "string"}, {"type": "boolean"}, {"type": "null"}]}}, "required": ["id", "json_key", "value"]},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_validate_param_value"),
+    ),
+    tool_from_schema(
+        name="scene_set_visibility",
+        description="Toggle visibility of a list of object ids.",
+        parameters_schema={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids"}, "on": {"type": "boolean", "description": "True to show, false to hide"}}, "required": ["ids", "on"]},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_set_visibility"),
+    ),
+    tool_from_schema(
+        name="scene_make_alias",
+        description="Create alias objects for given ids (shared backing data with independent view params).",
+        parameters_schema={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids to alias; each produces a new alias id."}}, "required": ["ids"]},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_make_alias"),
+    ),
+    tool_from_schema(
+        name="scene_cut_suggest_box",
+        description="Suggest an axis-aligned cut box for given ids (or all).",
+        parameters_schema={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}, "description": "Ids to bound (empty = all)"}, "margin": {"type": "number", "default": 0.0, "description": "Extra normalized margin to expand box"}, "after_clipping": {"type": "boolean", "default": False, "description": "Use clipped bbox for computation"}}, "required": ["ids"]},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_cut_suggest_box"),
+    ),
+    tool_from_schema(
+        name="scene_cut_set_box",
+        description="Apply a global cut box and optionally refit camera.",
+        parameters_schema={"type": "object", "properties": {"min": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "Box min [x,y,z]"}, "max": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "Box max [x,y,z]"}, "refit_camera": {"type": "boolean", "default": True, "description": "Refit camera after applying cut"}}, "required": ["min", "max"]},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_cut_set_box"),
+    ),
+    tool_from_schema(
+        name="scene_cut_clear",
+        description="Clear global cuts.",
+        parameters_schema={"type": "object", "properties": {}},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_cut_clear"),
+    ),
 ]
 
 
@@ -697,6 +439,56 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         files = args.get("files") or []
         summary = client.ensure_loaded(files)
         return json.dumps({"ok": True, **summary})
+
+    if name == "scene_wait_objects_ready":
+        ids = args.get("ids") or []
+        timeout_sec = float(args.get("timeout_sec", 30.0) or 0.0)
+        poll_interval_sec = float(args.get("poll_interval_sec", 0.2) or 0.2)
+        try:
+            # Ensure engine exists first so fit_candidates() and readiness checks are meaningful.
+            client.ensure_view(require=True)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": f"3D engine not ready: {e}"})
+
+        ids_list: list[int] = []
+        try:
+            for v in ids:
+                ids_list.append(int(v))
+        except Exception:
+            ids_list = []
+
+        if not ids_list:
+            try:
+                ids_list = [int(x) for x in client.fit_candidates()]
+            except Exception as e:
+                return json.dumps({"ok": False, "error": f"fit_candidates failed: {e}"})
+
+        if not ids_list:
+            return json.dumps({"ok": True, "ids": [], "status": {"ok": True, "objects": []}})
+
+        try:
+            status = client.wait_for_objects_ready(
+                ids_list,
+                timeout_sec=timeout_sec,
+                poll_interval_sec=poll_interval_sec,
+            )
+            # Preserve the full server status blob for debugging determinism.
+            ok = bool(status.get("ok", False))
+            return json.dumps(
+                {
+                    "ok": ok,
+                    "ids": ids_list,
+                    "status": status,
+                },
+                ensure_ascii=False,
+            )
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg}, ensure_ascii=False)
 
     if name == "scene_smart_load":
 
@@ -1022,8 +814,20 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     if name == "scene_params_handbook":
         schema_dir = args.get("schema_dir")
         include_groups = bool(args.get("include_groups", True))
-        max_types = int(args.get("max_types", 50))
-        max_params_per_type = int(args.get("max_params_per_type", 200))
+        max_types_raw = args.get("max_types")
+        max_params_raw = args.get("max_params_per_type")
+        try:
+            max_types = int(max_types_raw) if max_types_raw is not None else None
+        except Exception:
+            max_types = None
+        try:
+            max_params_per_type = int(max_params_raw) if max_params_raw is not None else None
+        except Exception:
+            max_params_per_type = None
+        if isinstance(max_types, int) and max_types <= 0:
+            max_types = None
+        if isinstance(max_params_per_type, int) and max_params_per_type <= 0:
+            max_params_per_type = None
         sd, searched = discover_schema_dir(schema_dir, atlas_dir)
         if not sd:
             return json.dumps(
@@ -1040,6 +844,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             lines: list[str] = []
             lines.append("# Atlas Parameters Handbook (from capabilities.json)")
             lines.append("")
+            lines.append(
+                f"- include_groups={include_groups}, "
+                f"max_types={'all' if max_types is None else max_types}, "
+                f"max_params_per_type={'all' if max_params_per_type is None else max_params_per_type}"
+            )
+            lines.append("")
             if include_groups:
                 globs = caps.get("globals") or {}
                 for gname in ("Background", "Axis", "Global"):
@@ -1048,7 +858,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         continue
                     plist = g.get("parameters") or []
                     lines.append(f"## Group: {gname}")
-                    for p in plist[:max_params_per_type]:
+                    for p in plist if max_params_per_type is None else plist[:max_params_per_type]:
                         lines.append(
                             f"- `{p.get('jsonKey','')}` — {p.get('type','')} (interp={p.get('supportsInterpolation',False)})"
                         )
@@ -1057,13 +867,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             objs = caps.get("objects") or {}
             count_types = 0
             for tname, obj in objs.items() if isinstance(objs, dict) else []:
-                if count_types >= max_types:
+                if max_types is not None and count_types >= max_types:
                     break
                 plist = []
                 if isinstance(obj, dict):
                     plist = obj.get("parameters") or obj.get("params") or []
                 lines.append(f"## Type: {tname}")
-                for p in plist[:max_params_per_type]:
+                for p in plist if max_params_per_type is None else plist[:max_params_per_type]:
                     jk = p.get("jsonKey", "") or p.get("json_key", "")
                     ty = p.get("type", "")
                     interp = p.get("supportsInterpolation", False)
@@ -1119,7 +929,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         lines: list[str] = []
         # Objects summary
         objs = facts.get("objects_list") or []
-        lines.append(f"Objects: {len(objs)} total")
+        shown = min(len(objs), max(0, limit))
+        lines.append(f"Objects: {len(objs)} total (showing {shown}; sample_limit={limit})")
         for o in objs[: max(0, limit)]:
             lines.append(
                 f"  - {o.get('id')}:{o.get('type')}:{o.get('name')} visible={o.get('visible')}"

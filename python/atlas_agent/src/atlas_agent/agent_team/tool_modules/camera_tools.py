@@ -1,273 +1,153 @@
 import json
 from typing import Any, Dict, List
 
+from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
+from .preconditions import require_engine_ready
 
-HANDLED_TOOLS = (
-    "fit_candidates",
-    "camera_get",
-    "camera_focus",
-    "camera_point_to",
-    "camera_rotate",
-    "camera_reset_view",
-    "camera_move_local",
-    "camera_look_at",
-    "camera_path_solve",
-)
+def _tool_handler(tool_name: str):
+    def _call(args: dict[str, Any], ctx: ToolDispatchContext):
+        return handle(tool_name, args, ctx)
 
-TOOL_SPECS: List[Dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "fit_candidates",
-            "description": "Return ids of visual objects suitable for camera fit/orbit (excludes Animation3D).",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "camera_get",
-            "description": "Return the current engine camera as a typed camera value (no key writes). Useful as a deterministic base_value for camera_move_local/camera_look_at.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "camera_focus",
-            "description": "Compute a camera that focuses on the given ids using the current scene bbox. Returns a typed camera value.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "List of target object ids to focus",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Use clipped bbox (true) or full bbox (false)",
-                    },
-                    "min_radius": {
-                        "type": "number",
-                        "default": 0.0,
-                        "description": "Minimum radius to avoid degenerate views",
-                    },
-                },
-                "required": ["ids", "after_clipping", "min_radius"],
+    return _call
+
+
+TOOLS: List[Tool] = [
+    tool_from_schema(
+        name="fit_candidates",
+        description="Return ids of visual objects suitable for camera fit/orbit (excludes Animation3D).",
+        parameters_schema={"type": "object", "properties": {}},
+        handler=_tool_handler("fit_candidates"),
+        preconditions=(require_engine_ready,),
+    ),
+    tool_from_schema(
+        name="camera_get",
+        description="Return the current engine camera as a typed camera value (no key writes). Useful as a deterministic base_value for camera_move_local/camera_look_at.",
+        parameters_schema={"type": "object", "properties": {}},
+        handler=_tool_handler("camera_get"),
+        preconditions=(require_engine_ready,),
+    ),
+    tool_from_schema(
+        name="camera_focus",
+        description="Compute a camera that focuses on the given ids using the current scene bbox. Returns a typed camera value.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "List of target object ids to focus"},
+                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)"},
+                "min_radius": {"type": "number", "default": 0.0, "description": "Minimum radius to avoid degenerate views"},
             },
+            "required": ["ids"],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "camera_point_to",
-            "description": "Compute a camera that points to the targets (center moves, eye unchanged). Returns a typed camera value.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "List of target object ids to point to",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Use clipped bbox (true) or full bbox (false)",
-                    },
-                },
-                "required": ["ids", "after_clipping"],
+        handler=_tool_handler("camera_focus"),
+        preconditions=(require_engine_ready,),
+    ),
+    tool_from_schema(
+        name="camera_point_to",
+        description="Compute a camera that points to the targets (center moves, eye unchanged). Returns a typed camera value.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "List of target object ids to point to"},
+                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)"},
             },
+            "required": ["ids"],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "camera_rotate",
-            "description": "Apply a camera operator to a typed camera value: AZIMUTH/ELEVATION/ROLL/YAW/PITCH/FLIP. Returns a typed camera value. If base_value is omitted, this tool chains from the last produced camera value within the current turn when available; otherwise it uses the current engine camera. Angles >120° are segmented internally into ≤90° steps for stability.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "op": {
-                        "type": "string",
-                        "enum": [
-                            "AZIMUTH",
-                            "ELEVATION",
-                            "ROLL",
-                            "YAW",
-                            "PITCH",
-                            "FLIP",
-                        ],
-                    },
-                    "degrees": {"type": "number", "default": 90.0},
-                    "base_value": {
-                        "type": "object",
-                        "description": "Optional typed camera value to apply the operator to. When omitted, the tool uses the last produced camera value within the current turn when available, otherwise the current engine camera.",
-                    },
+        handler=_tool_handler("camera_point_to"),
+        preconditions=(require_engine_ready,),
+    ),
+    tool_from_schema(
+        name="camera_rotate",
+        description="Apply a camera operator to a typed camera value: AZIMUTH/ELEVATION/ROLL/YAW/PITCH/FLIP. Returns a typed camera value. If base_value is omitted, this tool chains from the last produced camera value within the current turn when available; otherwise it uses the current engine camera. Angles >120° are segmented internally into ≤90° steps for stability.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "op": {"type": "string", "enum": ["AZIMUTH", "ELEVATION", "ROLL", "YAW", "PITCH", "FLIP"]},
+                "degrees": {"type": "number", "default": 90.0},
+                "base_value": {
+                    "type": "object",
+                    "description": "Optional typed camera value to apply the operator to. When omitted, the tool uses the last produced camera value within the current turn when available, otherwise the current engine camera.",
                 },
-                "required": ["op", "degrees"],
             },
+            "required": ["op"],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "camera_reset_view",
-            "description": "Reset camera to XY/XZ/YZ/RESET view using scene bbox (Animation3D excluded). Returns a typed camera value.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "mode": {
-                        "type": "string",
-                        "enum": ["XY", "XZ", "YZ", "RESET"],
-                        "default": "RESET",
-                        "description": "Preset view",
-                    },
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Candidate ids for sizing (optional for RESET)",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Use clipped bbox (true) or full bbox (false)",
-                    },
-                    "min_radius": {
-                        "type": "number",
-                        "default": 0.0,
-                        "description": "Minimum radius to avoid degenerate views",
-                    },
-                },
-                "required": ["mode", "ids", "after_clipping", "min_radius"],
+        handler=_tool_handler("camera_rotate"),
+        preconditions=(require_engine_ready,),
+    ),
+    tool_from_schema(
+        name="camera_reset_view",
+        description="Reset camera to XY/XZ/YZ/RESET view using scene bbox (Animation3D excluded). Returns a typed camera value.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "mode": {"type": "string", "enum": ["XY", "XZ", "YZ", "RESET"], "default": "RESET", "description": "Preset view"},
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Candidate ids for sizing (optional for RESET)"},
+                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)"},
+                "min_radius": {"type": "number", "default": 0.0, "description": "Minimum radius to avoid degenerate views"},
             },
+            "required": [],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "camera_move_local",
-            "description": "Move the camera in its local basis (first-person fly/dolly building block). Returns a typed camera value. If base_value is omitted, chains from the last produced camera value within the current turn when available; otherwise uses the current engine camera. Use distance_is_fraction_of_bbox_radius=true to avoid guessing world units (distance is scaled by the target bbox enclosing-sphere radius).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "op": {
-                        "type": "string",
-                        "enum": ["FORWARD", "BACK", "RIGHT", "LEFT", "UP", "DOWN"],
-                    },
-                    "distance": {
-                        "type": "number",
-                        "description": "World-units, or a fraction of bbox radius when distance_is_fraction_of_bbox_radius=true.",
-                    },
-                    "distance_is_fraction_of_bbox_radius": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "When true, interpret distance as a fraction of target bbox enclosing-sphere radius.",
-                    },
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Optional target ids for bbox scaling. Empty → all visual objects.",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "When computing bbox for scaling, use clipped bbox (true) or full bbox (false).",
-                    },
-                    "move_center": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "When true, translate eye+center together (fly). When false, translate eye only (dolly/boom).",
-                    },
-                    "base_value": {
-                        "type": "object",
-                        "description": "Optional typed camera value to move from.",
-                    },
-                },
-                "required": ["op", "distance"],
+        handler=_tool_handler("camera_reset_view"),
+        preconditions=(require_engine_ready,),
+    ),
+    tool_from_schema(
+        name="camera_move_local",
+        description="Move the camera in its local basis (first-person fly/dolly building block). Returns a typed camera value. If base_value is omitted, chains from the last produced camera value within the current turn when available; otherwise uses the current engine camera. Use distance_is_fraction_of_bbox_radius=true to avoid guessing world units (distance is scaled by the target bbox enclosing-sphere radius).",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "op": {"type": "string", "enum": ["FORWARD", "BACK", "RIGHT", "LEFT", "UP", "DOWN"]},
+                "distance": {"type": "number", "description": "World-units, or a fraction of bbox radius when distance_is_fraction_of_bbox_radius=true."},
+                "distance_is_fraction_of_bbox_radius": {"type": "boolean", "default": True, "description": "When true, interpret distance as a fraction of target bbox enclosing-sphere radius."},
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional target ids for bbox scaling. Empty → all visual objects."},
+                "after_clipping": {"type": "boolean", "default": True, "description": "When computing bbox for scaling, use clipped bbox (true) or full bbox (false)."},
+                "move_center": {"type": "boolean", "default": True, "description": "When true, translate eye+center together (fly). When false, translate eye only (dolly/boom)."},
+                "base_value": {"type": "object", "description": "Optional typed camera value to move from."},
             },
+            "required": ["op", "distance"],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "camera_look_at",
-            "description": "Aim the camera at a point (sets camera center; keeps eye). Returns a typed camera value. Exactly one target mode is required: world_point, target_bbox_center, or bbox_fraction_point. If base_value is omitted, chains from the last produced camera value within the current turn when available; otherwise uses the current engine camera.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "world_point": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 3,
-                        "maxItems": 3,
-                        "description": "World-space target [x,y,z] to aim at (camera center).",
-                    },
-                    "target_bbox_center": {
-                        "type": "boolean",
-                        "description": "When true, aim at the bbox center of ids (or all visual objects).",
-                    },
-                    "bbox_fraction_point": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 3,
-                        "maxItems": 3,
-                        "description": "Fractions [fx,fy,fz] in [0..1] inside the target bbox of ids (or all visual objects).",
-                    },
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Optional target ids for bbox computations. Empty → all visual objects.",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Use clipped bbox (true) or full bbox (false) for bbox-derived targets.",
-                    },
-                    "base_value": {
-                        "type": "object",
-                        "description": "Optional typed camera value to aim from.",
-                    },
-                },
-                "required": [],
+        handler=_tool_handler("camera_move_local"),
+        preconditions=(require_engine_ready,),
+    ),
+    tool_from_schema(
+        name="camera_look_at",
+        description="Aim the camera at a point (sets camera center; keeps eye). Returns a typed camera value. Exactly one target mode is required: world_point, target_bbox_center, or bbox_fraction_point. If base_value is omitted, chains from the last produced camera value within the current turn when available; otherwise uses the current engine camera.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "world_point": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "World-space target [x,y,z] to aim at (camera center)."},
+                "target_bbox_center": {"type": "boolean", "description": "When true, aim at the bbox center of ids (or all visual objects)."},
+                "bbox_fraction_point": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "Fractions [fx,fy,fz] in [0..1] inside the target bbox of ids (or all visual objects)."},
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional target ids for bbox computations. Empty → all visual objects."},
+                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false) for bbox-derived targets."},
+                "base_value": {"type": "object", "description": "Optional typed camera value to aim from."},
             },
+            "required": [],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "camera_path_solve",
-            "description": "Solve typed camera keys from waypoints (does NOT write keys). Waypoints may specify eye and/or look_at in world coords or bbox fractions. If look_at is omitted for a waypoint, the solver preserves the previous view direction + center distance. Use animation_camera_set_interpolation_method('Position Rotation Spline') before writing keys for a smooth waypoint spline path.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Optional target ids for bbox computations (fractions/center). Empty → all visual objects.",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Use clipped bbox (true) or full bbox (false) for bbox-derived points.",
-                    },
-                    "base_value": {
-                        "type": "object",
-                        "description": "Optional typed camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted.",
-                    },
-                    "waypoints": {
-                        "type": "array",
-                        "items": {"type": "object"},
-                        "description": "Waypoints: [{time, eye?:{world:[x,y,z]|bbox_fraction:[fx,fy,fz]}, look_at?:{world:[x,y,z]|bbox_center:true|bbox_fraction:[fx,fy,fz]}}].",
-                    },
-                },
-                "required": ["waypoints"],
+        handler=_tool_handler("camera_look_at"),
+        preconditions=(require_engine_ready,),
+    ),
+    tool_from_schema(
+        name="camera_path_solve",
+        description=(
+            "Solve typed camera keys from waypoints (does NOT write keys). Waypoints may specify eye and/or look_at in world coords or bbox fractions. "
+            "If look_at is omitted for a waypoint, the solver preserves the previous view direction + center distance.\n\n"
+            "Note: camera interpolation modes beyond the default Center are currently disabled. "
+            "For smoother motion from sparse waypoints, provide additional waypoints or sample intermediate keys before writing."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional target ids for bbox computations (fractions/center). Empty → all visual objects."},
+                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false) for bbox-derived points."},
+                "base_value": {"type": "object", "description": "Optional typed camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted."},
+                "waypoints": {"type": "array", "items": {"type": "object"}, "description": "Waypoints: [{time, eye?:{world:[x,y,z]|bbox_fraction:[fx,fy,fz]}, look_at?:{world:[x,y,z]|bbox_center:true|bbox_fraction:[fx,fy,fz]}}]."},
             },
+            "required": ["waypoints"],
         },
-    },
+        handler=_tool_handler("camera_path_solve"),
+        preconditions=(require_engine_ready,),
+    ),
 ]
 
 

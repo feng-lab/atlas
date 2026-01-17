@@ -510,6 +510,9 @@ void ZCameraParameterAnimation::SplineRange::swap(ZCameraParameterAnimation::Spl
   posSplineLengths.swap(rhs.posSplineLengths);
   std::swap(posSplineTotalLength, rhs.posSplineTotalLength);
   rotSpline.swap(rhs.rotSpline);
+  std::swap(m_hasSpline, rhs.m_hasSpline);
+  firstKey.swap(rhs.firstKey);
+  lastKey.swap(rhs.lastKey);
 }
 
 } // namespace nim

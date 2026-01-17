@@ -13,10 +13,16 @@ from ...discovery import (
     default_install_dirs,
     discover_schema_dir,
 )
+from ...tool_registry import Tool, tool_from_schema
 
 # Fail-fast for internal exporter helpers
 from ...exporter import export_video, preview_frames
 from .context import ToolDispatchContext
+from .preconditions import (
+    require_animation_id,
+    require_engine_ready,
+    require_screenshot_consent,
+)
 
 JSON_VALUE_SCHEMA: Dict[str, Any] = {
     "description": "Native JSON value (supports object/array/scalars; nested structures allowed).",
@@ -33,907 +39,507 @@ JSON_VALUE_SCHEMA: Dict[str, Any] = {
     ],
 }
 
-HANDLED_TOOLS = (
-    "animation_set_param_by_name",
-    "animation_remove_key_param_at_time",
-    "animation_replace_key_param",
-    "animation_replace_key_camera",
-    "animation_camera_solve_and_apply",
-    "animation_camera_validate",
-    "animation_camera_get_interpolation_method",
-    "animation_camera_set_interpolation_method",
-    "animation_camera_waypoint_spline_apply",
-    "animation_camera_walkthrough_apply",
-    "animation_get_time",
-    "animation_list_keys",
-    "animation_clear_keys_range",
-    "animation_shift_keys_range",
-    "animation_scale_keys_range",
-    "animation_duplicate_keys_range",
-    "animation_describe_file",
-    "animation_ensure_animation",
-    "animation_set_duration",
-    "animation_set_key_param",
-    "animation_replace_key_param_at_times",
-    "animation_clear_keys",
-    "animation_remove_key",
-    "animation_batch",
-    "animation_set_time",
-    "animation_save_animation",
-    "animation_export_video",
-    "animation_render_preview",
-)
-
-TOOL_SPECS: List[Dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_describe_file",
-            "description": "Parse an .animation3d file and return a concise natural-language summary (uses capabilities.json for names).",
-            "parameters": {
-                "type": "object",
-                "properties": {"path": {"type": "string"}},
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_camera_solve_and_apply",
-            "description": "Animation timeline: solve camera (FIT|ORBIT|DOLLY|STATIC) and write validated keys. Clears existing camera keys in [t0,t1] by default (tolerance-aware). Not for scene-only FIT. Returns {applied:[times...], total}.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "mode": {
-                        "type": "string",
-                        "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"],
-                        "description": "Solve mode for generating camera keys.",
-                    },
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Target ids; empty uses fit_candidates().",
-                    },
-                    "t0": {
-                        "type": "number",
-                        "description": "Start time (seconds) of the write window.",
-                    },
-                    "t1": {
-                        "type": "number",
-                        "description": "End time (seconds) of the write window.",
-                    },
-                    "constraints": {
-                        "type": "object",
-                        "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, fov policy).",
-                    },
-                    "params": {
-                        "type": "object",
-                        "description": "Mode-specific parameters (e.g., axis for ORBIT).",
-                    },
-                    "degrees": {
-                        "type": "number",
-                        "description": "ORBIT: total rotation in degrees (default 360).",
-                    },
-                    "tolerance": {
-                        "type": "number",
-                        "default": 1e-3,
-                        "description": "Time tolerance used when clearing/replacing keys.",
-                    },
-                    "easing": {
-                        "type": "string",
-                        "default": "Linear",
-                        "description": "Easing to assign to written keys.",
-                    },
-                    "clear_range": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys.",
-                    },
-                },
-                "required": ["mode", "ids", "t0", "t1"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_camera_get_interpolation_method",
-            "description": "Read the current camera interpolation method for the active animation (e.g., Center | Position Spline | Position Rotation Spline).",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_camera_set_interpolation_method",
-            "description": "Set the camera interpolation method for the active animation. Use 'Position Rotation Spline' for first-person walkthroughs and waypoint spline fly-throughs.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "method": {
-                        "type": "string",
-                        "enum": [
-                            "Center",
-                            "Position Spline",
-                            "Position Rotation Spline",
-                        ],
-                        "description": "Interpolation method for camera animation evaluation.",
-                    }
-                },
-                "required": ["method"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_camera_waypoint_spline_apply",
-            "description": "Guided waypoint spline: solve camera keys from bbox/world waypoints, set camera interpolation method (default Position Rotation Spline), optionally clear existing camera keys in [t0,t1], then write validated camera keys. Returns {applied:[times...], total, method}.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects.",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Use clipped bbox for bbox-fraction waypoints.",
-                    },
-                    "t0": {"type": "number", "description": "Start time (seconds)."},
-                    "t1": {"type": "number", "description": "End time (seconds)."},
-                    "waypoints": {
-                        "type": "array",
-                        "items": {"type": "object"},
-                        "description": (
-                            "Waypoints with either absolute time or normalized u in [0,1].\n"
-                            "Each waypoint: {u?:number, time?:number, eye?:{world:[x,y,z]|bbox_fraction:[fx,fy,fz]}, look_at?:{world:[x,y,z]|bbox_center:true|bbox_fraction:[fx,fy,fz]}}.\n"
-                            "If look_at is omitted, the solver preserves the previous view direction and center distance."
-                        ),
-                    },
-                    "method": {
-                        "type": "string",
-                        "default": "Position Rotation Spline",
-                        "enum": [
-                            "Center",
-                            "Position Spline",
-                            "Position Rotation Spline",
-                        ],
-                        "description": "Camera interpolation method to set before writing keys.",
-                    },
-                    "easing": {
-                        "type": "string",
-                        "default": "Linear",
-                        "description": "Easing assigned to written camera keys (note: spline path uses waypoint geometry).",
-                    },
-                    "clear_range": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys.",
-                    },
-                    "tolerance": {
-                        "type": "number",
-                        "default": 1e-3,
-                        "description": "Time tolerance used when clearing/replacing keys.",
-                    },
-                    "constraints": {
-                        "type": "object",
-                        "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
-                    },
-                    "base_value": {
-                        "type": "object",
-                        "description": "Optional base camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted.",
-                    },
-                },
-                "required": ["t0", "t1", "waypoints"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_camera_walkthrough_apply",
-            "description": (
-                "First-person walkthrough authoring: build a smooth camera path from high-level motion segments (local moves + yaw/pitch/roll), "
-                "set camera interpolation method (default Position Rotation Spline), optionally clear existing camera keys in [t0,t1], then write validated camera keys. "
-                "This is intended for 'fly/drone inside the object' requests where users describe motion in words and the agent invents segments.\n\n"
-                "Segment timing modes (choose ONE):\n"
-                "- Explicit: every segment has u0/u1 in [0,1]\n"
-                "- Duration: every segment has duration (seconds); durations are normalized to fill [t0,t1]\n"
-                "- Equal: no u0/u1/duration provided; segments split [t0,t1] evenly\n\n"
-                "Motion units:\n"
-                "- move distances are fractions of the target bbox enclosing-sphere radius (so no world-unit guessing).\n"
-                "- rotation is in degrees.\n"
-                "Sampling:\n"
-                "- Motion is approximated by sampling each segment at step_seconds; decrease step_seconds for higher-fidelity curved motion."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects.",
-                    },
-                    "after_clipping": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Use clipped bbox for bbox-scaled movement.",
-                    },
-                    "t0": {"type": "number", "description": "Start time (seconds)."},
-                    "t1": {"type": "number", "description": "End time (seconds)."},
-                    "segments": {
-                        "type": "array",
-                        "items": {"type": "object"},
-                        "description": (
-                            "Motion segments. Each segment may include:\n"
-                            "- u0/u1 (0..1) OR duration (seconds) OR neither (equal split)\n"
-                            "- move: {forward?, back?, right?, left?, up?, down?} (fractions of bbox radius; signed values allowed)\n"
-                            "- rotate: {yaw?, pitch?, roll?} (degrees)\n"
-                            "- pause: true (equivalent to zero move/rotate)\n"
-                            "- template: optional internal shorthand like 'enter', 'turn_right', 'pause' (expanded before applying)\n"
-                            "- amount/distance/degrees: optional template knobs (amount can be a label like 'small'/'medium' or a number)\n"
-                            "- label: optional string\n"
-                        ),
-                    },
-                    "step_seconds": {
-                        "type": "number",
-                        "default": 1.0,
-                        "description": "Sampling step used to approximate motion inside each segment. Smaller → more keys (smoother curved motion).",
-                    },
-                    "method": {
-                        "type": "string",
-                        "default": "Position Rotation Spline",
-                        "enum": [
-                            "Center",
-                            "Position Spline",
-                            "Position Rotation Spline",
-                        ],
-                        "description": "Camera interpolation method to set before writing keys.",
-                    },
-                    "easing": {
-                        "type": "string",
-                        "default": "Linear",
-                        "description": "Easing assigned to written camera keys (note: spline path uses key geometry).",
-                    },
-                    "clear_range": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys.",
-                    },
-                    "tolerance": {
-                        "type": "number",
-                        "default": 1e-3,
-                        "description": "Time tolerance used when clearing/replacing keys.",
-                    },
-                    "constraints": {
-                        "type": "object",
-                        "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
-                    },
-                    "base_value": {
-                        "type": "object",
-                        "description": "Optional base camera value used as the initial camera pose (projection/fov/up defaults).",
-                    },
-                },
-                "required": ["t0", "t1", "segments"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_camera_validate",
-            "description": "Animation timeline: validate camera values against visibility/coverage constraints. Values are optional; when omitted, the server samples the current animation camera at the given times.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Target ids to validate against (typically fit_candidates).",
-                    },
-                    "times": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "description": "Times (seconds) to validate.",
-                    },
-                    "values": {
-                        "type": "array",
-                        "items": {"type": "object"},
-                        "description": "Optional: typed camera values aligned with times. If omitted or shorter than times, the server fills by sampling.",
-                    },
-                    "constraints": {
-                        "type": "object",
-                        "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, etc.).",
-                    },
-                    "policies": {
-                        "type": "object",
-                        "description": "Adjustment policies (adjust_fov, adjust_distance, adjust_clipping).",
-                    },
-                },
-                "required": ["ids", "times"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_set_param_by_name",
-            "description": "Set a parameter by display name (case-insensitive) by id. Resolves json_key via scene_list_params, then calls animation_set_key_param. Id map: 1=background, 2=axis, 3=global, ≥4=objects.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "name": {"type": "string"},
-                    "type_hint": {"type": "string"},
-                    "time": {"type": "number"},
-                    "easing": {"type": "string", "default": "Linear"},
-                    "value": {
-                        "description": 'Native JSON value. For composite params like 3DTransform, pass an object with canonical subfields (e.g., {"Translation Vec3":[x,y,z],"Rotation Vec4":[ang,x,y,z],"Scale Vec3":[sx,sy,sz],"Rotation Center Vec3":[cx,cy,cz]}).',
-                        "type": [
-                            "object",
-                            "array",
-                            "number",
-                            "string",
-                            "boolean",
-                            "null",
-                        ],
-                        "items": {"type": ["string", "number", "boolean", "null"]},
-                    },
-                },
-                "required": ["id", "name", "time", "value"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_remove_key_param_at_time",
-            "description": "Remove one or more keys near a time for a parameter by json_key and id. Uses a tolerance window to match existing keys.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {"type": "string"},
-                    "time": {"type": "number"},
-                    "tolerance": {"type": "number", "default": 1e-3},
-                },
-                "required": ["id", "json_key", "time"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_replace_key_param",
-            "description": "Replace (or set) a parameter key by json_key at time by id: remove any key within tolerance then set a new typed value.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {"type": "string"},
-                    "time": {"type": "number"},
-                    "easing": {"type": "string", "default": "Linear"},
-                    "value": JSON_VALUE_SCHEMA,
-                    "tolerance": {"type": "number", "default": 1e-3},
-                    "strict": {"type": "boolean", "default": False},
-                },
-                "required": ["id", "json_key", "time", "value"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_replace_key_camera",
-            "description": "Replace (or set) a camera key at time: remove any camera key within tolerance then set a new camera value. Use for explicit single-time edits. If you already used animation_camera_solve_and_apply for this segment, do NOT call this afterward to 'finalize' — keys are already written.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "time": {"type": "number"},
-                    "easing": {"type": "string", "default": "Linear"},
-                    "value": {"type": "object"},
-                    "tolerance": {"type": "number", "default": 1e-3},
-                    "strict": {"type": "boolean", "default": False},
-                },
-                "required": ["time", "value"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_list_keys",
-            "description": "Timeline only: list animation keys by id. Requires an existing Animation3D. Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=objects. For camera (id=0) json_key is ignored. Do NOT use for scene-only verification — read current camera via scene_get_values(id=0, 'Camera 3DCamera').",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {
-                        "type": "string",
-                        "description": "Parameter json_key (ignored for camera); use canonical names from scene_list_params(id)",
-                    },
-                    "include_values": {
-                        "type": "boolean",
-                        "description": "True to include value_json samples for each key",
-                    },
-                },
-                "required": ["id", "json_key", "include_values"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_clear_keys_range",
-            "description": "Remove keys within [t0,t1] (inclusive, tolerance-aware) for a specific track. Camera uses id=0 and ignores json_key. Non-camera uses (id,json_key) and requires an existing Animation3D.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {
-                        "type": "string",
-                        "description": "Canonical json_key (ignored for camera).",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
-                    },
-                    "t0": {"type": "number", "description": "Range start time (seconds)."},
-                    "t1": {"type": "number", "description": "Range end time (seconds)."},
-                    "tolerance": {
-                        "type": "number",
-                        "default": 1e-3,
-                        "description": "Time tolerance used for range boundary inclusion and conflict matching.",
-                    },
-                    "include_times": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, include the full list of removed key times (no truncation).",
-                    },
-                },
-                "required": ["id", "t0", "t1"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_shift_keys_range",
-            "description": "Shift keys within [t0,t1] by delta seconds (preserves value and easing). Uses a saved .animation3d snapshot to preserve easing. Conflict policy: error|overwrite|skip.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {
-                        "type": "string",
-                        "description": "Canonical json_key (ignored for camera).",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
-                    },
-                    "t0": {"type": "number", "description": "Range start time (seconds)."},
-                    "t1": {"type": "number", "description": "Range end time (seconds)."},
-                    "delta": {"type": "number", "description": "Time shift in seconds (can be negative)."},
-                    "tolerance": {
-                        "type": "number",
-                        "default": 1e-3,
-                        "description": "Time tolerance used for range boundary inclusion and conflict matching.",
-                    },
-                    "on_conflict": {
-                        "type": "string",
-                        "enum": ["error", "overwrite", "skip"],
-                        "default": "error",
-                        "description": "If shifted keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved).",
-                    },
-                    "include_times": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, include the full list of moved/skipped mappings (no truncation).",
-                    },
-                },
-                "required": ["id", "t0", "t1", "delta"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_scale_keys_range",
-            "description": "Scale key times within [t0,t1] around an anchor (t0|center). Preserves value and easing via a saved .animation3d snapshot. Conflict policy: error|overwrite|skip.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {
-                        "type": "string",
-                        "description": "Canonical json_key (ignored for camera).",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
-                    },
-                    "t0": {"type": "number", "description": "Range start time (seconds)."},
-                    "t1": {"type": "number", "description": "Range end time (seconds)."},
-                    "scale": {"type": "number", "description": "Scale factor (>0)."},
-                    "anchor": {
-                        "type": "string",
-                        "enum": ["t0", "center"],
-                        "default": "t0",
-                        "description": "Anchor mode for scaling: t0 uses the range start; center uses (t0+t1)/2.",
-                    },
-                    "tolerance": {
-                        "type": "number",
-                        "default": 1e-3,
-                        "description": "Time tolerance used for range boundary inclusion and conflict matching.",
-                    },
-                    "on_conflict": {
-                        "type": "string",
-                        "enum": ["error", "overwrite", "skip"],
-                        "default": "error",
-                        "description": "If scaled keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved).",
-                    },
-                    "include_times": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, include the full list of moved/skipped mappings (no truncation).",
-                    },
-                },
-                "required": ["id", "t0", "t1", "scale"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_duplicate_keys_range",
-            "description": "Duplicate/copy keys within [t0,t1] so they reappear starting at dest_t0 (preserves relative offsets, value, and easing). Uses a saved .animation3d snapshot to preserve easing. Conflict policy: error|overwrite|skip.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {
-                        "type": "string",
-                        "description": "Canonical json_key (ignored for camera).",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
-                    },
-                    "t0": {"type": "number", "description": "Source range start time (seconds)."},
-                    "t1": {"type": "number", "description": "Source range end time (seconds)."},
-                    "dest_t0": {
-                        "type": "number",
-                        "description": "Destination start time (seconds). Keys keep their relative offsets from the source range start.",
-                    },
-                    "tolerance": {
-                        "type": "number",
-                        "default": 1e-3,
-                        "description": "Time tolerance used for range boundary inclusion and conflict matching.",
-                    },
-                    "on_conflict": {
-                        "type": "string",
-                        "enum": ["error", "overwrite", "skip"],
-                        "default": "error",
-                        "description": "If duplicated keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (do not create conflicting duplicates).",
-                    },
-                    "include_times": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, include the full list of duplicated/skipped mappings (no truncation).",
-                    },
-                },
-                "required": ["id", "t0", "t1", "dest_t0"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_get_time",
-            "description": (
-                "Animation (timeline): get current playback seconds and duration.\n"
-                "Fails (ok=false) when no Animation3D exists yet; call animation_ensure_animation first."
-            ),
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_ensure_animation",
-            "description": (
-                "Ensure a 3D animation exists and is bound/selected for editing.\n"
-                "Returns {ok, animation_id, created}.\n"
-                "Use the returned animation_id for all subsequent animation_* tool calls."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "create_new": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "When true, create a new Animation3D object (instead of reusing an existing one).",
-                    },
-                    "name": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Optional display name for the created animation (empty means default).",
-                    },
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_set_duration",
-            "description": "Set animation duration in seconds.",
-            "parameters": {
-                "type": "object",
-                "properties": {"seconds": {"type": "number"}},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_set_key_param",
-            "description": (
-                "Add a parameter keyframe by id (0=camera unsupported here, ≥4 objects; 1/2/3 groups) with json_key and a native JSON value.\n"
-                "Note on composite object types (e.g., 3DTransform): animation keys store a full value for that key. If you pass a partial object "
-                "(e.g., {'Translation Vec3':[...]} only), omitted subfields will remain at defaults for that key (they do NOT automatically inherit the current scene).\n"
-                "If you intend to 'change only one subfield but keep the rest', read the current value first (scene_get_values or existing key) and write a full object."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {
-                        "type": "string",
-                        "description": "Canonical json_key; if omitted, 'name' is used to resolve.",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Display name to resolve to json_key when json_key is not provided.",
-                    },
-                    "time": {"type": "number"},
-                    "easing": {"type": "string", "default": "Linear"},
-                    "value": JSON_VALUE_SCHEMA,
-                },
-                "required": ["id", "time", "value"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_replace_key_param_at_times",
-            "description": "Replace keys at the specified times for a parameter by id (1=background,2=axis,3=global,≥4=objects).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {"type": "string"},
-                    "times": {"type": "array", "items": {"type": "number"}},
-                    "value": JSON_VALUE_SCHEMA,
-                    "easing": {"type": "string", "default": "Linear"},
-                    "tolerance": {"type": "number", "default": 1e-3},
-                },
-                "required": ["id", "json_key", "times", "value"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_clear_keys",
-            "description": "Clear all keys for a parameter or camera by id (0=camera).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {"type": "string"},
-                },
-                "required": ["id"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_remove_key",
-            "description": "Remove a key at a specific time for a parameter by id.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
-                    },
-                    "json_key": {"type": "string"},
-                    "time": {"type": "number"},
-                },
-                "required": ["id", "json_key", "time"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_batch",
-            "description": "Batch multiple SetKey and RemoveKey operations atomically. Non-camera only (ids ≥ 1); do not include camera (id=0) keys here. For camera motion, use animation_camera_solve_and_apply.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "set_keys": {
-                        "type": "array",
-                        "items": {"type": "object"},
-                        "description": "List of SetKey operations",
-                    },
-                    "remove_keys": {
-                        "type": "array",
-                        "items": {"type": "object"},
-                        "description": "List of RemoveKey operations",
-                    },
-                    "commit": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Commit immediately if true",
-                    },
-                },
-                "required": ["set_keys", "remove_keys", "commit"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_set_time",
-            "description": "Set current timeline time (seconds).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "seconds": {"type": "number", "description": "Timeline seconds"}
-                },
-                "required": ["seconds"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_save_animation",
-            "description": "Save the current animation to a .animation3d path.",
-            "parameters": {
-                "type": "object",
-                "properties": {"path": {"type": "string"}},
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_export_video",
-            "description": (
-                "Export the current Animation3D to MP4 using the Atlas headless exporter.\n"
-                "This tool saves the live animation (animation_id) to a temporary .animation3d file first.\n"
-                "Note: video export is slower/heavier than previews; prefer scene_screenshot or animation_render_preview for verification."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "out": {"type": "string", "description": "Output .mp4 path"},
-                    "fps": {"type": "number", "default": 30, "description": "Frames per second"},
-                    "start": {"type": "integer", "default": 0, "description": "Start frame (inclusive)"},
-                    "end": {"type": "integer", "default": -1, "description": "End frame (inclusive, -1 = duration)"},
-                    "width": {"type": "integer", "default": 1920, "description": "Output width"},
-                    "height": {"type": "integer", "default": 1080, "description": "Output height"},
-                    "overwrite": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Overwrite output if exists",
-                    },
-                },
-                "required": ["out"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "animation_render_preview",
-            "description": (
-                "Render exactly one PNG preview frame for an animation time by saving the current .animation3d and invoking headless Atlas.\n"
-                "This is primarily for verifying animation-at-time behavior. For static scene screenshots, prefer scene_screenshot (lighter; does not involve animation export).\n"
-                "Returns a path to the PNG in the OS temp directory."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "time": {
-                        "type": "number",
-                        "description": "Preview time in seconds",
-                    },
-                    "fps": {"type": "number", "default": 30, "description": "Frames per second"},
-                    "width": {"type": "integer", "description": "Image width"},
-                    "height": {"type": "integer", "description": "Image height"},
-                },
-                "required": ["time", "width", "height"],
-            },
-        },
-    },
-]
-
-_ANIMATION_ID_PARAM_SCHEMA: Dict[str, Any] = {
+ANIMATION_ID_PARAM_SCHEMA: Dict[str, Any] = {
     "type": "integer",
     "description": "Animation3D object id. Use animation_ensure_animation to create/select an animation and obtain this id.",
 }
 
-# Most animation tools operate on a specific Animation3D object and must be deterministic.
-# We therefore require an explicit `animation_id` for all *live* animation operations.
-_ANIMATION_TOOLS_WITHOUT_ANIMATION_ID: set[str] = {
-    "animation_describe_file",   # file-only
-    "animation_ensure_animation" # returns animation_id
-}
 
-for _spec in TOOL_SPECS:
-    try:
-        fn = _spec.get("function", {})
-        nm = str(fn.get("name") or "")
-        if not nm.startswith("animation_"):
-            continue
-        if nm in _ANIMATION_TOOLS_WITHOUT_ANIMATION_ID:
-            continue
-        params = fn.get("parameters")
-        if not isinstance(params, dict):
-            params = {"type": "object", "properties": {}}
-            fn["parameters"] = params
-        props = params.get("properties")
-        if not isinstance(props, dict):
-            props = {}
-            params["properties"] = props
-        props.setdefault("animation_id", dict(_ANIMATION_ID_PARAM_SCHEMA))
-    except Exception:
-        continue
+def _tool_handler(tool_name: str):
+    def _call(args: dict[str, Any], ctx: ToolDispatchContext):
+        return handle(tool_name, args, ctx)
+
+    return _call
+
+
+TOOLS: List[Tool] = [
+    tool_from_schema(
+        name="animation_describe_file",
+        description="Parse an .animation3d file and return a concise natural-language summary (uses capabilities.json for names).",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Path to a .animation3d file."},
+                "schema_dir": {"type": ["string", "null"], "description": "Optional schema directory override for capabilities.json lookups."},
+                "style": {"type": "string", "enum": ["short", "long"], "default": "short", "description": "Summary style."},
+            },
+            "required": ["path"],
+        },
+        preconditions=(),
+        handler=_tool_handler("animation_describe_file"),
+    ),
+    tool_from_schema(
+        name="animation_camera_solve_and_apply",
+        description="Animation timeline: solve camera (FIT|ORBIT|DOLLY|STATIC) and write validated keys. Clears existing camera keys in [t0,t1] by default (tolerance-aware). Not for scene-only FIT. Returns {applied:[times...], total}.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "mode": {"type": "string", "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"], "description": "Solve mode for generating camera keys."},
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids; empty uses fit_candidates()."},
+                "t0": {"type": "number", "description": "Start time (seconds) of the write window."},
+                "t1": {"type": "number", "description": "End time (seconds) of the write window."},
+                "constraints": {"type": "object", "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, fov policy)."},
+                "params": {"type": "object", "description": "Mode-specific parameters (e.g., axis for ORBIT)."},
+                "degrees": {"type": "number", "description": "ORBIT: total rotation in degrees (default 360)."},
+                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
+                "easing": {"type": "string", "default": "Linear", "description": "Easing to assign to written keys."},
+                "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys."},
+            },
+            "required": ["animation_id", "mode", "ids", "t0", "t1"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_camera_solve_and_apply"),
+    ),
+    # Camera interpolation method tools are intentionally disabled for now.
+    # Only the default "Center" mode is considered stable.
+    tool_from_schema(
+        name="animation_camera_waypoint_spline_apply",
+        description=(
+            "Guided waypoint camera path (timeline): solve typed camera keys from bbox/world waypoints, optionally clear existing camera keys in [t0,t1], "
+            "then write validated camera keys.\n\n"
+            "Note: camera interpolation methods beyond the default Center mode are currently disabled. "
+            "For smoother motion from sparse waypoints, provide additional waypoints or use the walkthrough tool (which samples a denser key sequence)."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects."},
+                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox for bbox-fraction waypoints."},
+                "t0": {"type": "number", "description": "Start time (seconds)."},
+                "t1": {"type": "number", "description": "End time (seconds)."},
+                "waypoints": {"type": "array", "items": {"type": "object"}, "description": "Waypoints with either absolute time or normalized u in [0,1]. Each waypoint: {u?:number, time?:number, eye?:{world:[x,y,z]|bbox_fraction:[fx,fy,fz]}, look_at?:{world:[x,y,z]|bbox_center:true|bbox_fraction:[fx,fy,fz]}}. If look_at is omitted, the solver preserves the previous view direction and center distance."},
+                "easing": {"type": "string", "default": "Linear", "description": "Easing assigned to written camera keys (note: spline path uses waypoint geometry)."},
+                "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys."},
+                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
+                "constraints": {"type": "object", "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement)."},
+                "base_value": {"type": "object", "description": "Optional base camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted."},
+            },
+            "required": ["animation_id", "t0", "t1", "waypoints"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_camera_waypoint_spline_apply"),
+    ),
+    tool_from_schema(
+        name="animation_camera_walkthrough_apply",
+        description=(
+            "First-person walkthrough authoring: build a smooth camera path from high-level motion segments (local moves + yaw/pitch/roll), "
+            "optionally clear existing camera keys in [t0,t1], then write validated camera keys. "
+            "This is intended for 'fly/drone inside the object' requests where users describe motion in words and the agent invents segments.\n\n"
+            "Segment timing modes (choose ONE):\n"
+            "- Explicit: every segment has u0/u1 in [0,1]\n"
+            "- Duration: every segment has duration (seconds); durations are normalized to fill [t0,t1]\n"
+            "- Equal: no u0/u1/duration provided; segments split [t0,t1] evenly\n\n"
+            "Motion units:\n"
+            "- move distances are fractions of the target bbox enclosing-sphere radius (so no world-unit guessing).\n"
+            "- rotation is in degrees.\n"
+            "Sampling:\n"
+            "- Motion is approximated by sampling each segment at step_seconds; decrease step_seconds for higher-fidelity curved motion."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects."},
+                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox for bbox-scaled movement."},
+                "t0": {"type": "number", "description": "Start time (seconds)."},
+                "t1": {"type": "number", "description": "End time (seconds)."},
+                "segments": {"type": "array", "items": {"type": "object"}, "description": "Motion segments. Each segment may include: u0/u1 (0..1) OR duration (seconds) OR neither (equal split); move: {forward?, back?, right?, left?, up?, down?} (fractions of bbox radius; signed values allowed); rotate: {yaw?, pitch?, roll?} (degrees); pause:true; template:'enter'|'turn_right'|'pause'; amount/distance/degrees; label."},
+                "step_seconds": {"type": "number", "default": 1.0, "description": "Sampling step used to approximate motion inside each segment. Smaller → more keys (smoother curved motion)."},
+                "easing": {"type": "string", "default": "Linear", "description": "Easing assigned to written camera keys (note: spline path uses key geometry)."},
+                "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys."},
+                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
+                "constraints": {"type": "object", "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement)."},
+                "base_value": {"type": "object", "description": "Optional base camera value used as the initial camera pose (projection/fov/up defaults)."},
+            },
+            "required": ["animation_id", "t0", "t1", "segments"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_camera_walkthrough_apply"),
+    ),
+    tool_from_schema(
+        name="animation_camera_validate",
+        description="Animation timeline: validate camera values against visibility/coverage constraints. Values are optional; when omitted, the server samples the current animation camera at the given times.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids to validate against (typically fit_candidates)."},
+                "times": {"type": "array", "items": {"type": "number"}, "description": "Times (seconds) to validate."},
+                "values": {"type": "array", "items": {"type": "object"}, "description": "Optional: typed camera values aligned with times. If omitted or shorter than times, the server fills by sampling."},
+                "constraints": {"type": "object", "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, etc.)."},
+                "policies": {"type": "object", "description": "Adjustment policies (adjust_fov, adjust_distance, adjust_clipping)."},
+            },
+            "required": ["animation_id", "ids", "times"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_camera_validate"),
+    ),
+    tool_from_schema(
+        name="animation_set_param_by_name",
+        description="Set a parameter by display name (case-insensitive) by id. Resolves json_key via scene_list_params, then calls animation_set_key_param. Id map: 1=background, 2=axis, 3=global, ≥4=objects.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "name": {"type": "string"},
+                "type_hint": {"type": "string"},
+                "time": {"type": "number"},
+                "easing": {"type": "string", "default": "Linear"},
+                "value": {
+                    "description": 'Native JSON value. For composite params like 3DTransform, pass an object with canonical subfields (e.g., {"Translation Vec3":[x,y,z],"Rotation Vec4":[ang,x,y,z],"Scale Vec3":[sx,sy,sz],"Rotation Center Vec3":[cx,cy,cz]}).',
+                    "type": ["object", "array", "number", "string", "boolean", "null"],
+                    "items": {"type": ["string", "number", "boolean", "null"]},
+                },
+            },
+            "required": ["animation_id", "id", "name", "time", "value"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_set_param_by_name"),
+    ),
+    tool_from_schema(
+        name="animation_remove_key_param_at_time",
+        description="Remove one or more keys near a time for a parameter by json_key and id. Uses a tolerance window to match existing keys.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string"},
+                "time": {"type": "number"},
+                "tolerance": {"type": "number", "default": 1e-3},
+            },
+            "required": ["animation_id", "id", "json_key", "time"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_remove_key_param_at_time"),
+    ),
+    tool_from_schema(
+        name="animation_replace_key_param",
+        description="Replace (or set) a parameter key by json_key at time by id: remove any key within tolerance then set a new typed value.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string"},
+                "time": {"type": "number"},
+                "easing": {"type": "string", "default": "Linear"},
+                "value": JSON_VALUE_SCHEMA,
+                "tolerance": {"type": "number", "default": 1e-3},
+            },
+            "required": ["animation_id", "id", "json_key", "time", "value"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_replace_key_param"),
+    ),
+    tool_from_schema(
+        name="animation_replace_key_camera",
+        description="Replace (or set) a camera key at time: remove any camera key within tolerance then set a new camera value. Use for explicit single-time edits. If you already used animation_camera_solve_and_apply for this segment, do NOT call this afterward to 'finalize' — keys are already written.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "time": {"type": "number"},
+                "easing": {"type": "string", "default": "Linear"},
+                "value": {"type": "object"},
+                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional ids for camera validation. When omitted/empty, uses fit_candidates()."},
+                "constraints": {"type": "object", "description": "Optional camera validation constraints. When omitted, defaults to keep_visible=true and min_coverage=0.95."},
+                "tolerance": {"type": "number", "default": 1e-3},
+            },
+            "required": ["animation_id", "time", "value"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_replace_key_camera"),
+    ),
+    tool_from_schema(
+        name="animation_list_keys",
+        description="Timeline only: list animation keys by id. Requires an existing Animation3D. Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=objects. For camera (id=0) json_key is ignored. Do NOT use for scene-only verification — read current camera via scene_get_values(id=0, 'Camera 3DCamera').",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string", "description": "Parameter json_key (ignored for camera); use canonical names from scene_list_params(id)"},
+                "include_values": {"type": "boolean", "description": "True to include value_json samples for each key"},
+            },
+            "required": ["animation_id", "id", "json_key", "include_values"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_list_keys"),
+    ),
+    tool_from_schema(
+        name="animation_clear_keys_range",
+        description="Remove keys within [t0,t1] (inclusive, tolerance-aware) for a specific track. Camera uses id=0 and ignores json_key. Non-camera uses (id,json_key) and requires an existing Animation3D.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string", "description": "Canonical json_key (ignored for camera)."},
+                "name": {"type": "string", "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera)."},
+                "t0": {"type": "number", "description": "Range start time (seconds)."},
+                "t1": {"type": "number", "description": "Range end time (seconds)."},
+                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used for range boundary inclusion and conflict matching."},
+                "include_times": {"type": "boolean", "default": False, "description": "When true, include the full list of removed key times (no truncation)."},
+            },
+            "required": ["animation_id", "id", "t0", "t1"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_clear_keys_range"),
+    ),
+    tool_from_schema(
+        name="animation_shift_keys_range",
+        description="Shift keys within [t0,t1] by delta seconds (preserves value and easing). Uses a saved .animation3d snapshot to preserve easing. Conflict policy: error|overwrite|skip.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string", "description": "Canonical json_key (ignored for camera)."},
+                "name": {"type": "string", "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera)."},
+                "t0": {"type": "number", "description": "Range start time (seconds)."},
+                "t1": {"type": "number", "description": "Range end time (seconds)."},
+                "delta": {"type": "number", "description": "Time shift in seconds (can be negative)."},
+                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used for range boundary inclusion and conflict matching."},
+                "on_conflict": {"type": "string", "enum": ["error", "overwrite", "skip"], "default": "error", "description": "If shifted keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved)."},
+                "include_times": {"type": "boolean", "default": False, "description": "When true, include the full list of moved/skipped mappings (no truncation)."},
+            },
+            "required": ["animation_id", "id", "t0", "t1", "delta"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_shift_keys_range"),
+    ),
+    tool_from_schema(
+        name="animation_scale_keys_range",
+        description="Scale key times within [t0,t1] around an anchor (t0|center). Preserves value and easing via a saved .animation3d snapshot. Conflict policy: error|overwrite|skip.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string", "description": "Canonical json_key (ignored for camera)."},
+                "name": {"type": "string", "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera)."},
+                "t0": {"type": "number", "description": "Range start time (seconds)."},
+                "t1": {"type": "number", "description": "Range end time (seconds)."},
+                "scale": {"type": "number", "description": "Scale factor (>0)."},
+                "anchor": {"type": "string", "enum": ["t0", "center"], "default": "t0", "description": "Anchor mode for scaling: t0 uses the range start; center uses (t0+t1)/2."},
+                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used for range boundary inclusion and conflict matching."},
+                "on_conflict": {"type": "string", "enum": ["error", "overwrite", "skip"], "default": "error", "description": "If scaled keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved)."},
+                "include_times": {"type": "boolean", "default": False, "description": "When true, include the full list of moved/skipped mappings (no truncation)."},
+            },
+            "required": ["animation_id", "id", "t0", "t1", "scale"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_scale_keys_range"),
+    ),
+    tool_from_schema(
+        name="animation_duplicate_keys_range",
+        description="Duplicate/copy keys within [t0,t1] so they reappear starting at dest_t0 (preserves relative offsets, value, and easing). Uses a saved .animation3d snapshot to preserve easing. Conflict policy: error|overwrite|skip.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string", "description": "Canonical json_key (ignored for camera)."},
+                "name": {"type": "string", "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera)."},
+                "t0": {"type": "number", "description": "Source range start time (seconds)."},
+                "t1": {"type": "number", "description": "Source range end time (seconds)."},
+                "dest_t0": {"type": "number", "description": "Destination start time (seconds). Keys keep their relative offsets from the source range start."},
+                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used for range boundary inclusion and conflict matching."},
+                "on_conflict": {"type": "string", "enum": ["error", "overwrite", "skip"], "default": "error", "description": "If duplicated keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (do not create conflicting duplicates)."},
+                "include_times": {"type": "boolean", "default": False, "description": "When true, include the full list of duplicated/skipped mappings (no truncation)."},
+            },
+            "required": ["animation_id", "id", "t0", "t1", "dest_t0"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_duplicate_keys_range"),
+    ),
+    tool_from_schema(
+        name="animation_get_time",
+        description="Animation (timeline): get current playback seconds and duration. Fails (ok=false) when no Animation3D exists yet; call animation_ensure_animation first.",
+        parameters_schema={
+            "type": "object",
+            "properties": {"animation_id": dict(ANIMATION_ID_PARAM_SCHEMA)},
+            "required": ["animation_id"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_get_time"),
+    ),
+    tool_from_schema(
+        name="animation_ensure_animation",
+        description="Ensure a 3D animation exists and is bound/selected for editing. Returns {ok, animation_id, created}. Use the returned animation_id for all subsequent animation_* tool calls.",
+        parameters_schema={"type": "object", "properties": {"create_new": {"type": "boolean", "default": False, "description": "When true, create a new Animation3D object (instead of reusing an existing one)."}, "name": {"type": "string", "default": "", "description": "Optional display name for the created animation (empty means default)."}}},
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("animation_ensure_animation"),
+    ),
+    tool_from_schema(
+        name="animation_set_duration",
+        description="Set animation duration in seconds.",
+        parameters_schema={
+            "type": "object",
+            "properties": {"animation_id": dict(ANIMATION_ID_PARAM_SCHEMA), "seconds": {"type": "number"}},
+            "required": ["animation_id", "seconds"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_set_duration"),
+    ),
+    tool_from_schema(
+        name="animation_set_key_param",
+        description="Add a parameter keyframe by id (0=camera unsupported here, ≥4 objects; 1/2/3 groups) with json_key and a native JSON value. Note on composite object types (e.g., 3DTransform): animation keys store a full value for that key. If you pass a partial object (e.g., {'Translation Vec3':[...]} only), omitted subfields will remain at defaults for that key (they do NOT automatically inherit the current scene). If you intend to 'change only one subfield but keep the rest', read the current value first (scene_get_values or existing key) and write a full object.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string", "description": "Canonical json_key; if omitted, 'name' is used to resolve."},
+                "name": {"type": "string", "description": "Display name to resolve to json_key when json_key is not provided."},
+                "time": {"type": "number"},
+                "easing": {"type": "string", "default": "Linear"},
+                "value": JSON_VALUE_SCHEMA,
+            },
+            "required": ["animation_id", "id", "time", "value"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_set_key_param"),
+    ),
+    tool_from_schema(
+        name="animation_replace_key_param_at_times",
+        description="Replace keys at the specified times for a parameter by id (1=background,2=axis,3=global,≥4=objects).",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string"},
+                "times": {"type": "array", "items": {"type": "number"}},
+                "value": JSON_VALUE_SCHEMA,
+                "easing": {"type": "string", "default": "Linear"},
+                "tolerance": {"type": "number", "default": 1e-3},
+            },
+            "required": ["animation_id", "id", "json_key", "times", "value"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_replace_key_param_at_times"),
+    ),
+    tool_from_schema(
+        name="animation_clear_keys",
+        description="Clear all keys for a parameter or camera by id (0=camera).",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string"},
+            },
+            "required": ["animation_id", "id"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_clear_keys"),
+    ),
+    tool_from_schema(
+        name="animation_remove_key",
+        description="Remove a key at a specific time for a parameter by id.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "json_key": {"type": "string"},
+                "time": {"type": "number"},
+            },
+            "required": ["animation_id", "id", "json_key", "time"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_remove_key"),
+    ),
+    tool_from_schema(
+        name="animation_batch",
+        description="Batch multiple SetKey and RemoveKey operations atomically. Non-camera only (ids ≥ 1); do not include camera (id=0) keys here. For camera motion, use animation_camera_solve_and_apply.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "set_keys": {"type": "array", "items": {"type": "object"}, "description": "List of SetKey operations"},
+                "remove_keys": {"type": "array", "items": {"type": "object"}, "description": "List of RemoveKey operations"},
+                "commit": {"type": "boolean", "default": True, "description": "Commit immediately if true"},
+            },
+            "required": ["animation_id", "set_keys", "remove_keys"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_batch"),
+    ),
+    tool_from_schema(
+        name="animation_set_time",
+        description="Set current timeline time (seconds).",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "seconds": {"type": "number", "description": "Timeline seconds"},
+                "cancel": {"type": "boolean", "default": False, "description": "When true, cancel any in-progress rendering/export tied to the animation view."},
+            },
+            "required": ["animation_id", "seconds"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_set_time"),
+    ),
+    tool_from_schema(
+        name="animation_save_animation",
+        description="Save the current animation to a .animation3d path.",
+        parameters_schema={
+            "type": "object",
+            "properties": {"animation_id": dict(ANIMATION_ID_PARAM_SCHEMA), "path": {"type": "string"}},
+            "required": ["animation_id", "path"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_save_animation"),
+    ),
+    tool_from_schema(
+        name="animation_export_video",
+        description="Export the current Animation3D to MP4 using the Atlas headless exporter. This tool saves the live animation (animation_id) to a temporary .animation3d file first. Note: video export is slower/heavier than previews; prefer scene_screenshot or animation_render_preview for verification.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "out": {"type": "string", "description": "Output .mp4 path"},
+                "fps": {"type": "number", "default": 30, "description": "Frames per second"},
+                "start": {"type": "integer", "default": 0, "description": "Start frame (inclusive)"},
+                "end": {"type": "integer", "default": -1, "description": "End frame (inclusive, -1 = duration)"},
+                "width": {"type": "integer", "default": 1920, "description": "Output width"},
+                "height": {"type": "integer", "default": 1080, "description": "Output height"},
+                "overwrite": {"type": "boolean", "default": True, "description": "Overwrite output if exists"},
+            },
+            "required": ["animation_id", "out"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_export_video"),
+    ),
+    tool_from_schema(
+        name="animation_render_preview",
+        description=(
+            "Render exactly one PNG preview frame for an animation time by saving the current .animation3d and invoking headless Atlas. "
+            "This is primarily for verifying animation-at-time behavior. For static scene screenshots, prefer scene_screenshot (lighter; does not involve animation export).\n"
+            "Intended for model-based visual inspection (the runtime may upload the image to the model when consent is enabled). "
+            "Do NOT ask the user to open the temp file path; if a human check is still needed, ask them to check in the Atlas UI."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "time": {"type": "number", "description": "Preview time in seconds"},
+                "fps": {"type": "number", "default": 30, "description": "Frames per second"},
+                "width": {"type": "integer", "description": "Image width"},
+                "height": {"type": "integer", "description": "Image height"},
+            },
+            "required": ["animation_id", "time", "width", "height"],
+        },
+        preconditions=(require_screenshot_consent, require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_render_preview"),
+    ),
+]
 
 _GROUP_ID_TO_NAME = {1: "Background", 2: "Axis", 3: "Global"}
 
@@ -1169,7 +775,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         easing = str(args.get("easing", "Linear"))
         value = args.get("value")
         tol = float(args.get("tolerance", 1e-3))
-        strict = bool(args.get("strict", False))
         # Verify parameter exists
         if not _json_key_exists(id, json_key):
             return json.dumps({"ok": False, "error": "json_key not found for id"})
@@ -1214,7 +819,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         easing = str(args.get("easing", "Linear"))
         value = args.get("value") or {}
         tol = float(args.get("tolerance", 1e-3))
-        strict = bool(args.get("strict", False))
         ids = args.get("ids") or []
         if not ids:
             try:
@@ -1440,58 +1044,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 pass
             return json.dumps({"ok": False, "error": msg})
 
-    if name == "animation_camera_get_interpolation_method":
-        try:
-            animation_id = int(args.get("animation_id", 0) or 0)
-            if animation_id <= 0:
-                return json.dumps({"ok": False, "error": "animation_id is required"})
-            m = client.get_camera_interpolation_method(animation_id=animation_id)
-            if not m:
-                return json.dumps(
-                    {
-                        "ok": False,
-                        "error": "camera interpolation method is unavailable (no animation yet or unsupported server)",
-                    }
-                )
-            return json.dumps({"ok": True, "method": m})
-        except Exception as e:
-            msg = str(e)
-            try:
-                msg = e.details()  # type: ignore[attr-defined]
-            except Exception:
-                pass
-            return json.dumps({"ok": False, "error": msg})
-
-    if name == "animation_camera_set_interpolation_method":
-        try:
-            animation_id = int(args.get("animation_id", 0) or 0)
-            if animation_id <= 0:
-                return json.dumps({"ok": False, "error": "animation_id is required"})
-            method = str(args.get("method") or "").strip()
-            if not method:
-                return json.dumps({"ok": False, "error": "method is required"})
-            ok = client.set_camera_interpolation_method(animation_id=animation_id, method=method)
-            # Read-back (best-effort) so callers can log a deterministic result.
-            cur = None
-            try:
-                cur = client.get_camera_interpolation_method(animation_id=animation_id)
-            except Exception:
-                cur = None
-            return json.dumps(
-                {
-                    "ok": bool(ok),
-                    "method": str(method),
-                    **({"current_method": cur} if isinstance(cur, str) and cur.strip() else {}),
-                }
-            )
-        except Exception as e:
-            msg = str(e)
-            try:
-                msg = e.details()  # type: ignore[attr-defined]
-            except Exception:
-                pass
-            return json.dumps({"ok": False, "error": msg})
-
     if name == "animation_camera_waypoint_spline_apply":
         try:
             animation_id = int(args.get("animation_id", 0) or 0)
@@ -1512,7 +1064,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 return json.dumps({"ok": False, "error": "waypoints must be a non-empty list"})
             if len(waypoints_in) < 2:
                 return json.dumps({"ok": False, "error": "at least 2 waypoints are required"})
-            method = str(args.get("method", "Position Rotation Spline"))
             easing = str(args.get("easing", "Linear"))
             tol = float(args.get("tolerance", 1e-3))
             if not math.isfinite(tol) or tol < 0.0:
@@ -1523,15 +1074,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 "min_coverage": 0.95,
             }
             base_value = args.get("base_value")
-
-            # Set interpolation method so waypoint keys behave as a spline path.
-            if not client.set_camera_interpolation_method(animation_id=animation_id, method=method):
-                return json.dumps(
-                    {
-                        "ok": False,
-                        "error": f"failed to set camera interpolation method to {method!r}",
-                    }
-                )
 
             # Normalize waypoint times: allow either absolute time or u in [0,1].
             span = float(t1 - t0)
@@ -1714,23 +1256,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 except Exception as e:
                     failed.append({"time": float(k.get("time", 0.0) or 0.0), "error": str(e)})
 
-            # Read back the effective method for deterministic logging.
-            cur_method = None
-            try:
-                cur_method = client.get_camera_interpolation_method(animation_id=animation_id)
-            except Exception:
-                cur_method = None
-
             payload: dict[str, Any] = {
                 "ok": not bool(failed),
                 "applied": sorted(applied),
                 "total": len(applied),
-                "method": method,
             }
             if failed:
                 payload["failed"] = failed
-            if isinstance(cur_method, str) and cur_method.strip():
-                payload["current_method"] = cur_method
             return json.dumps(payload)
         except Exception as e:
             msg = str(e)
@@ -1760,7 +1292,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             if not isinstance(segments_in, list) or not segments_in:
                 return json.dumps({"ok": False, "error": "segments must be a non-empty list"})
 
-            method = str(args.get("method", "Position Rotation Spline"))
             easing = str(args.get("easing", "Linear"))
             tol = float(args.get("tolerance", 1e-3))
             if not math.isfinite(tol) or tol < 0.0:
@@ -1771,15 +1302,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             clear_range = bool(args.get("clear_range", True))
             constraints = args.get("constraints") or {"keep_visible": False}
             base_value = args.get("base_value")
-
-            # Set interpolation method so key sequences behave as a spline path.
-            if not client.set_camera_interpolation_method(animation_id=animation_id, method=method):
-                return json.dumps(
-                    {
-                        "ok": False,
-                        "error": f"failed to set camera interpolation method to {method!r}",
-                    }
-                )
 
             # Initial camera pose.
             cam: dict
@@ -2119,25 +1641,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 except Exception as e:
                     failed.append({"time": float(k.get("time", 0.0) or 0.0), "error": str(e)})
 
-            # Read back the effective method for deterministic logging.
-            cur_method = None
-            try:
-                cur_method = client.get_camera_interpolation_method(animation_id=animation_id)
-            except Exception:
-                cur_method = None
-
             out: dict[str, Any] = {
                 "ok": not bool(failed),
                 "applied": sorted(applied),
                 "total": len(applied),
                 "planned_total": len(keys),
-                "method": method,
                 "step_seconds": float(step_seconds),
             }
             if failed:
                 out["failed"] = failed
-            if isinstance(cur_method, str) and cur_method.strip():
-                out["current_method"] = cur_method
             return json.dumps(out)
         except Exception as e:
             msg = str(e)

@@ -12,7 +12,8 @@ from google.protobuf.json_format import MessageToDict  # type: ignore
 
 from ..scene_rpc import SceneClient
 from ..session_store import SessionStore
-from .tool_modules import TOOL_TO_MODULE, build_tool_list, general_tools
+from ..tool_registry import ToolRegistry
+from .tool_modules import build_tools
 from .tool_modules.context import ToolDispatchContext
 
 
@@ -30,23 +31,14 @@ def scene_tools_and_dispatcher(
     Returns a compact JSON string result that the model can parse.
     """
 
-    tools: List[Dict[str, Any]] = build_tool_list()
-
-    # Conditionally expose codegen-related tools
-    if bool(codegen_enabled):
-        tools.append(general_tools.CODEGEN_TOOL_SPEC)
-    else:
-        # When disabled, ensure any lingering codegen tools are removed (defensive if list changes elsewhere)
-        tools = [
-            t
-            for t in tools
-            if not (
-                isinstance(t, dict)
-                and isinstance(t.get("function"), dict)
-                and t["function"].get("name")
-                in {"python_write_and_run", "codegen_allowed_imports"}
-            )
-        ]
+    tool_objects = build_tools()
+    # Hide tools that are intentionally disabled for this run. If a tool cannot
+    # be used (feature-gated), it should not be advertised to the model at all
+    # to avoid wasted rounds on blocked tool calls.
+    if not bool(codegen_enabled):
+        codegen_tool_names = {"python_write_and_run", "codegen_allowed_imports"}
+        tool_objects = [t for t in tool_objects if t.name not in codegen_tool_names]
+    tools: List[Dict[str, Any]] = [t.to_chat_tool_spec() for t in tool_objects]
 
     # Per-dispatcher caches (persist during the tool loop for a single user turn)
     _param_catalog_cache: dict[tuple, list] = {}
@@ -169,11 +161,6 @@ def scene_tools_and_dispatcher(
                 return False
             return False
 
-        try:
-            args = json.loads(args_json or "{}")
-        except Exception:
-            args = {}
-
         chained_dispatch = dispatch
         try:
             maybe = _runtime_state.get("dispatch_proxy")
@@ -194,43 +181,9 @@ def scene_tools_and_dispatcher(
             session_store=session_store,
             runtime_state=_runtime_state,
         )
+        return registry.dispatch(name=name, args_json=args_json, ctx=ctx)
 
-        module = TOOL_TO_MODULE.get(name)
-        if module:
-            try:
-                result = module.handle(name, args, ctx)
-            except Exception as e:
-                msg = str(e)
-                try:
-                    # gRPC RpcError and some internal exceptions expose details()
-                    msg = e.details()  # type: ignore[attr-defined]
-                except Exception:
-                    pass
-                return json.dumps({"ok": False, "error": msg})
-            if result is not None:
-                return result
-
-        return json.dumps({"error": f"unknown tool: {name}"})
-
-    # Filter out deprecated/disabled tools from the advertised list
-    filtered = []
-    disabled = {}
-    # Consent-gated tools (privacy): default is "not available" until the user
-    # explicitly decides for the current session.
-    allow_screenshots = False
-    try:
-        if session_store is not None:
-            allow_screenshots = (session_store.get_consent("screenshots") is True)
-    except Exception:
-        allow_screenshots = False
-    for t in tools:
-        try:
-            nm = t.get("function", {}).get("name")
-            # Hide preview tool when screenshots disabled
-            if nm == "animation_render_preview" and not allow_screenshots:
-                continue
-            if nm not in disabled:
-                filtered.append(t)
-        except Exception:
-            filtered.append(t)
-    return filtered, dispatch
+    # Typed tool registry (Option C): validate tool args + run per-tool preconditions
+    # before dispatching into the per-tool handlers.
+    registry = ToolRegistry.from_tools(tool_objects)
+    return tools, dispatch

@@ -10,8 +10,8 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from atlas_agent.agent_team.base import LLMClient  # type: ignore  # noqa: E402
-from atlas_agent.responses_tool_loop import (  # type: ignore  # noqa: E402
-    _normalize_tools_for_responses_api,
+from atlas_agent.provider_tool_schema import (  # type: ignore  # noqa: E402
+    normalize_tools_for_responses_api,
 )
 
 
@@ -55,7 +55,7 @@ def test_responses_tool_loop_normalization_is_responses_compatible():
         }
     ]
 
-    converted = _normalize_tools_for_responses_api(tools)
+    converted = normalize_tools_for_responses_api(tools)
     assert isinstance(converted, list)
     assert converted[0]["type"] == "function"
     assert converted[0]["name"] == "report_blocked"
@@ -94,7 +94,7 @@ def test_tool_loop_normalization_preserves_nested_schemas():
         }
     ]
 
-    converted = _normalize_tools_for_responses_api(tools)
+    converted = normalize_tools_for_responses_api(tools)
     items = converted[0]["parameters"]["properties"]["plan"]["items"]
     assert items["required"] == ["step_id", "step", "status"]
     assert items["additionalProperties"] is False

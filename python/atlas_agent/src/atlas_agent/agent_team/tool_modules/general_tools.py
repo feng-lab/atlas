@@ -9,100 +9,108 @@ from typing import Any, Dict, List
 
 from ...codegen_policy import allowed_imports_status
 from ...repo import find_repo_root  # type: ignore
+from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
+from .preconditions import require_codegen_enabled
 
-HANDLED_TOOLS = (
-    "report_blocked",
-    "python_write_and_run",
-    "system_info",
-    "codegen_allowed_imports",
-)
-
-CODEGEN_TOOL_SPEC: Dict[str, Any] = {
-    "type": "function",
-    "function": {
-        "name": "codegen_allowed_imports",
-        "description": "Return the current codegen allowed import modules and whether each is importable in this environment.",
-        "parameters": {"type": "object", "properties": {}},
+REPORT_BLOCKED_DESCRIPTION = "Declare that execution is blocked or not feasible. Use precise reason/details so the user can take action."
+REPORT_BLOCKED_PARAMETERS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "reason": {
+            "type": "string",
+            "description": "Short reason (e.g., json_key_not_found, option_invalid, tool_missing)",
+        },
+        "details": {
+            "type": "string",
+            "description": "Specifics: id/json_key/value/time or missing option/label names",
+        },
+        "suggestion": {
+            "type": "string",
+            "description": "Optional next step suggestion for the user",
+        },
     },
+    "required": ["reason"],
 }
 
-TOOL_SPECS: List[Dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "report_blocked",
-            "description": "Declare that execution is blocked or not feasible. Use precise reason/details so the user can take action.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "reason": {
-                        "type": "string",
-                        "description": "Short reason (e.g., json_key_not_found, option_invalid, tool_missing)",
-                    },
-                    "details": {
-                        "type": "string",
-                        "description": "Specifics: id/json_key/value/time or missing option/label names",
-                    },
-                    "suggestion": {
-                        "type": "string",
-                        "description": "Optional next step suggestion for the user",
-                    },
-                },
-                "required": ["reason"],
-            },
+SYSTEM_INFO_DESCRIPTION = "Return OS/platform info and common paths so the agent can reason about file locations."
+SYSTEM_INFO_PARAMETERS: Dict[str, Any] = {"type": "object", "properties": {}}
+
+PYTHON_WRITE_AND_RUN_DESCRIPTION = "Write a Python script (string) to a temp file and run it with the repo root on PYTHONPATH. Returns stdout/stderr/exit_code, and optionally echoes the script."
+PYTHON_WRITE_AND_RUN_PARAMETERS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "script": {
+            "type": "string",
+            "description": "Python source code",
+        },
+        "filename": {
+            "type": "string",
+            "description": "Optional filename for the script (for logging)",
+        },
+        "args": {
+            "type": "array",
+            "items": {"type": "string"},
+            "default": [],
+            "description": "argv to pass to the script",
+        },
+        "timeout_sec": {
+            "type": "number",
+            "default": 120.0,
+            "description": "Execution timeout",
+        },
+        "echo_script": {
+            "type": "boolean",
+            "default": True,
+            "description": "Include script echo in response",
+        },
+        "max_echo_chars": {
+            "type": "integer",
+            "default": 4000,
+            "description": "Max script chars to echo",
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "system_info",
-            "description": "Return OS/platform info and common paths so the agent can reason about file locations.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "python_write_and_run",
-            "description": "Write a Python script (string) to a temp file and run it with the repo root on PYTHONPATH. Returns stdout/stderr/exit_code, and optionally echoes the script.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "script": {
-                        "type": "string",
-                        "description": "Python source code",
-                    },
-                    "filename": {
-                        "type": "string",
-                        "description": "Optional filename for the script (for logging)",
-                    },
-                    "args": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "default": [],
-                        "description": "argv to pass to the script",
-                    },
-                    "timeout_sec": {
-                        "type": "number",
-                        "default": 120.0,
-                        "description": "Execution timeout",
-                    },
-                    "echo_script": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Include script echo in response",
-                    },
-                    "max_echo_chars": {
-                        "type": "integer",
-                        "default": 4000,
-                        "description": "Max script chars to echo",
-                    },
-                },
-                "required": ["script"],
-            },
-        },
-    },
+    "required": ["script"],
+}
+
+CODEGEN_ALLOWED_IMPORTS_DESCRIPTION = "Return the current codegen allowed import modules and whether each is importable in this environment."
+CODEGEN_ALLOWED_IMPORTS_PARAMETERS: Dict[str, Any] = {"type": "object", "properties": {}}
+
+
+def _tool_handler(tool_name: str):
+    def _call(args: dict[str, Any], ctx: ToolDispatchContext):
+        return handle(tool_name, args, ctx)
+
+    return _call
+
+
+TOOLS: List[Tool] = [
+    tool_from_schema(
+        name="report_blocked",
+        description=REPORT_BLOCKED_DESCRIPTION,
+        parameters_schema=REPORT_BLOCKED_PARAMETERS,
+        handler=_tool_handler("report_blocked"),
+    ),
+    tool_from_schema(
+        name="system_info",
+        description=SYSTEM_INFO_DESCRIPTION,
+        parameters_schema=SYSTEM_INFO_PARAMETERS,
+        handler=_tool_handler("system_info"),
+    ),
+    tool_from_schema(
+        name="python_write_and_run",
+        description=PYTHON_WRITE_AND_RUN_DESCRIPTION,
+        parameters_schema=PYTHON_WRITE_AND_RUN_PARAMETERS,
+        handler=_tool_handler("python_write_and_run"),
+        preconditions=(require_codegen_enabled,),
+    ),
+    tool_from_schema(
+        name="codegen_allowed_imports",
+        description=CODEGEN_ALLOWED_IMPORTS_DESCRIPTION,
+        parameters_schema=CODEGEN_ALLOWED_IMPORTS_PARAMETERS,
+        handler=_tool_handler("codegen_allowed_imports"),
+        preconditions=(require_codegen_enabled,),
+    ),
 ]
 
 
@@ -116,6 +124,20 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     _schema_validator_cache = ctx.schema_validator_cache
 
     if name == "report_blocked":
+        # Mark this turn as blocked so the phase runner can avoid:
+        # - post-write facts snapshots (which may trigger additional RPC calls)
+        # - Verifier phase (which would likely fail/retry and add noise)
+        #
+        # This is especially important when the block reason is RPC-related (e.g., Atlas crashed).
+        try:
+            if isinstance(getattr(ctx, "runtime_state", None), dict):
+                ctx.runtime_state["blocked"] = {
+                    "reason": str(args.get("reason", "")),
+                    "details": str(args.get("details", "")),
+                    "suggestion": str(args.get("suggestion", "")),
+                }
+        except Exception:
+            pass
         out = {
             "ok": True,
             "reason": str(args.get("reason", "")),

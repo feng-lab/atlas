@@ -14,6 +14,7 @@
 #include "zcameraparameteranimation.h"
 #include "zjson.h"
 #include "z3dcameraparameter.h"
+#include "z3dobjview.h"
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
 #include "z3dtransformparameter.h"
@@ -28,6 +29,7 @@
 #include <QUuid>
 #include <QtCore/QDebug>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <grpcpp/grpcpp.h>
 #include <google/protobuf/empty.pb.h>
@@ -49,6 +51,17 @@ using atlas::rpc::Bool;
 using atlas::rpc::FileList;
 using atlas::rpc::ListObjectsResponse;
 using atlas::rpc::ObjectInfo;
+using atlas::rpc::ObjectLoadState;
+using atlas::rpc::OBJECT_LOAD_STATE_DOC_NOT_READY;
+using atlas::rpc::OBJECT_LOAD_STATE_ENGINE_NOT_READY;
+using atlas::rpc::OBJECT_LOAD_STATE_NOT_FOUND;
+using atlas::rpc::OBJECT_LOAD_STATE_READY;
+using atlas::rpc::OBJECT_LOAD_STATE_VIEW_NOT_READY;
+using atlas::rpc::ObjectStatus;
+using atlas::rpc::GetStatusRequest;
+using atlas::rpc::GetStatusResponse;
+using atlas::rpc::WaitForObjectsReadyRequest;
+using atlas::rpc::WaitForObjectsReadyResponse;
 using atlas::rpc::BBoxRequest;
 using atlas::rpc::BBoxResponse;
 using atlas::rpc::BBox;
@@ -129,6 +142,7 @@ static constexpr uint64_t kScopeCamera = 0;
 [[maybe_unused]] static constexpr uint64_t kScopeBackground = 1;
 [[maybe_unused]] static constexpr uint64_t kScopeAxis = 2;
 [[maybe_unused]] static constexpr uint64_t kScopeGlobal = 3;
+static constexpr uint32_t kWaitForObjectsReadyDefaultPollMs = 50u;
 
 template<class Func>
 auto invokeOnUi(Func&& f)
@@ -336,6 +350,33 @@ static bool hasVisualObjects(ZRPCService& owner)
   }
   return false;
 }
+
+struct EngineCameraAndBBoxSnapshot
+{
+  json::value cameraJson;
+  ZBBox<glm::dvec3> bbox;
+};
+
+[[nodiscard]] EngineCameraAndBBoxSnapshot snapshotEngineCameraAndBBox(Z3DRenderingEngine* engine,
+                                                                      const std::vector<size_t>& ids,
+                                                                      bool afterClipping)
+{
+  CHECK(engine);
+  return invokeOnObjectThread(engine, [&]() {
+    EngineCameraAndBBoxSnapshot out{};
+    out.cameraJson = engine->camera().jsonValue();
+    out.bbox = afterClipping ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
+    return out;
+  });
+}
+
+[[nodiscard]] json::value snapshotEngineCameraJson(Z3DRenderingEngine* engine)
+{
+  CHECK(engine);
+  return invokeOnObjectThread(engine, [&]() -> json::value {
+    return engine->camera().jsonValue();
+  });
+}
 } // namespace
 
 // Scene service bound to app UI context
@@ -397,39 +438,248 @@ public:
     return Status::OK;
   }
 
+  Status GetStatus(ServerContext*, const GetStatusRequest* req, GetStatusResponse* reply) override
+  {
+    // Collect UI-side object info (doc/type/path/visible) and determine whether a 3D window exists.
+    struct UiInfo {
+      uint64_t id = 0;
+      bool docHasObj = false;
+      std::string type;
+      std::string name;
+      std::string path;
+      bool visible = false;
+    };
+
+    const auto ui = invokeOnUi([&]() {
+      struct UiOut {
+        bool docReady = false;
+        bool has3dWindow = false;
+        std::vector<UiInfo> objs;
+      };
+      UiOut out;
+      out.docReady = (m_owner.doc() != nullptr);
+
+      // Detect 3D window presence (without creating one).
+      ZMainWindow* mainWin = nullptr;
+      for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (auto mw = qobject_cast<ZMainWindow*>(w)) {
+          mainWin = mw;
+          break;
+        }
+      }
+      out.has3dWindow = (mainWin && mainWin->get3DWindow() != nullptr);
+
+      // Resolve which ids to report.
+      std::vector<size_t> ids;
+      if (req && req->include_all_objects()) {
+        if (m_owner.doc()) {
+          ids = m_owner.doc()->objs();
+        }
+      } else if (req) {
+        ids.reserve(static_cast<size_t>(req->ids_size()));
+        for (auto v : req->ids()) {
+          ids.push_back(static_cast<size_t>(v));
+        }
+      }
+
+      out.objs.reserve(ids.size());
+      for (auto id : ids) {
+        UiInfo info;
+        info.id = static_cast<uint64_t>(id);
+        if (m_owner.doc()) {
+          if (auto* od = m_owner.doc()->idToDoc(id)) {
+            info.docHasObj = true;
+            info.type = od->typeName().toStdString();
+            info.name = m_owner.doc()->objName(id).toStdString();
+            info.path = od->objPath(id).toStdString();
+            info.visible = m_owner.doc()->isObjVisible(id);
+          }
+        }
+        out.objs.push_back(std::move(info));
+      }
+      return out;
+    });
+
+    reply->set_ok(true);
+    reply->set_doc_ready(ui.docReady);
+    reply->set_has_3d_window(ui.has3dWindow);
+
+    Z3DRenderingEngine* eng = m_owner.engine();
+    const bool engineReady = (eng != nullptr);
+    reply->set_engine_ready(engineReady);
+
+    // Determine per-object view readiness on the engine's thread (single-GL-context assumption).
+    std::vector<bool> viewReady(ui.objs.size(), false);
+    if (engineReady) {
+      viewReady = invokeOnObjectThread(eng, [&]() {
+        std::vector<bool> r;
+        r.reserve(ui.objs.size());
+        for (const auto& info : ui.objs) {
+          const size_t id = static_cast<size_t>(info.id);
+          if (id <= kScopeGlobal) {
+            r.push_back(true);
+            continue;
+          }
+          bool found = false;
+          for (const auto& ov : eng->objViews()) {
+            if (ov && ov->hasObj(id)) {
+              found = true;
+              break;
+            }
+          }
+          r.push_back(found);
+        }
+        return r;
+      });
+    }
+
+    for (size_t i = 0; i < ui.objs.size(); ++i) {
+      const auto& info = ui.objs[i];
+      ObjectStatus* st = reply->add_objects();
+      st->set_id(info.id);
+      st->set_type(info.type);
+      st->set_name(info.name);
+      st->set_path(info.path);
+      st->set_visible(info.visible);
+
+      if (!ui.docReady) {
+        st->set_load_state(OBJECT_LOAD_STATE_DOC_NOT_READY);
+      } else if (!info.docHasObj && static_cast<size_t>(info.id) > kScopeGlobal) {
+        st->set_load_state(OBJECT_LOAD_STATE_NOT_FOUND);
+      } else if (!engineReady) {
+        st->set_load_state(OBJECT_LOAD_STATE_ENGINE_NOT_READY);
+      } else if (i < viewReady.size() && viewReady[i]) {
+        st->set_load_state(OBJECT_LOAD_STATE_READY);
+      } else if (static_cast<size_t>(info.id) <= kScopeGlobal) {
+        st->set_load_state(OBJECT_LOAD_STATE_READY);
+      } else {
+        st->set_load_state(OBJECT_LOAD_STATE_VIEW_NOT_READY);
+      }
+    }
+
+    return Status::OK;
+  }
+
+  Status WaitForObjectsReady(ServerContext* context,
+                             const WaitForObjectsReadyRequest* req,
+                             WaitForObjectsReadyResponse* reply) override
+  {
+    if (!req || req->ids_size() == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "ids is required");
+    }
+
+    const uint32_t timeoutMs = req->timeout_ms();
+    const uint32_t pollMsRaw = req->poll_interval_ms();
+    const uint32_t pollMs = (pollMsRaw > 0u) ? pollMsRaw : kWaitForObjectsReadyDefaultPollMs;
+
+    std::vector<uint64_t> ids;
+    ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      ids.push_back(static_cast<uint64_t>(v));
+    }
+
+    const auto start = std::chrono::steady_clock::now();
+    const auto deadline = start + std::chrono::milliseconds(timeoutMs);
+
+    auto fillReply = [&](bool doneOk, const std::string& err) {
+      // Reuse GetStatus logic for consistent per-id state computation.
+      GetStatusRequest statusReq;
+      for (auto id : ids) {
+        statusReq.add_ids(id);
+      }
+      GetStatusResponse statusResp;
+      GetStatus(nullptr, &statusReq, &statusResp);
+
+      reply->set_ok(doneOk);
+      reply->set_doc_ready(statusResp.doc_ready());
+      reply->set_engine_ready(statusResp.engine_ready());
+      reply->set_has_3d_window(statusResp.has_3d_window());
+      for (const auto& obj : statusResp.objects()) {
+        *reply->add_objects() = obj;
+      }
+      if (!err.empty()) {
+        reply->set_error(err);
+      }
+    };
+
+    while (true) {
+      if (context && context->IsCancelled()) {
+        fillReply(false, "cancelled");
+        return Status(grpc::StatusCode::CANCELLED, "cancelled");
+      }
+
+      // Compute readiness from a fresh status snapshot.
+      GetStatusRequest statusReq;
+      for (auto id : ids) {
+        statusReq.add_ids(id);
+      }
+      GetStatusResponse statusResp;
+      GetStatus(nullptr, &statusReq, &statusResp);
+
+      bool allReady = true;
+      if (!statusResp.doc_ready() || !statusResp.engine_ready()) {
+        allReady = false;
+      } else {
+        for (const auto& obj : statusResp.objects()) {
+          if (obj.load_state() != OBJECT_LOAD_STATE_READY) {
+            allReady = false;
+            break;
+          }
+        }
+      }
+
+      if (allReady) {
+        fillReply(true, "");
+        return Status::OK;
+      }
+
+      if (timeoutMs == 0u || std::chrono::steady_clock::now() >= deadline) {
+        fillReply(false, "timeout waiting for objects to become ready");
+        return Status::OK;
+      }
+
+      QThread::msleep(static_cast<unsigned long>(pollMs));
+    }
+  }
+
   Status GetParamValues(ServerContext*, const GetParamValuesRequest* req, GetParamValuesResponse* reply) override
   {
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.engine()) {
-        return false;
-      }
-      // Use unified parameter access for all scopes, including camera (id=0)
-      const size_t boundId = static_cast<size_t>(req->id());
-      const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
-      json::object j;
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    // Use unified parameter access for all scopes, including camera (id=0).
+    const size_t boundId = static_cast<size_t>(req->id());
+
+    std::vector<std::string> queryKeys;
+    queryKeys.reserve(static_cast<size_t>(req->json_keys_size()));
+    for (const auto& qk : req->json_keys()) {
+      queryKeys.push_back(qk);
+    }
+
+    const json::object j = invokeOnObjectThread(engine, [&]() {
+      const auto params = engine->parametersOfViewSetting(boundId);
+      json::object out;
       for (auto* p : params) {
         if (p) {
-          p->write(j);
+          p->write(out);
         }
       }
-      if (req->json_keys_size() == 0) {
-        for (const auto& [k, v] : j) {
-          (*reply->mutable_values())[std::string(k.data(), k.size())] = jsonToPb(v);
-        }
-      } else {
-        for (const auto& qk : req->json_keys()) {
-          if (auto* pv = j.if_contains(qk)) {
-            (*reply->mutable_values())[qk] = jsonToPb(*pv);
-          }
-        }
-      }
-      return true;
+      return out;
     });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "get_param_values failed");
+
+    if (queryKeys.empty()) {
+      for (const auto& [k, v] : j) {
+        (*reply->mutable_values())[std::string(k.data(), k.size())] = jsonToPb(v);
+      }
+    } else {
+      for (const auto& qk : queryKeys) {
+        if (auto* pv = j.if_contains(qk)) {
+          (*reply->mutable_values())[qk] = jsonToPb(*pv);
+        }
+      }
     }
     return Status::OK;
   }
@@ -441,8 +691,10 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
     bool allOk = true;
-    auto results = invokeOnUi([&]() {
+    auto results = invokeOnObjectThread(engine, [&]() {
       std::vector<ValidateSceneParamResult> out;
       if (!m_owner.engine()) {
         return out;
@@ -451,7 +703,7 @@ public:
         r.set_json_key(sp.json_key());
         // Resolve scope via unified parameter list (id=0 => camera)
         const size_t boundId = static_cast<size_t>(sp.id());
-        const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
+        const auto params = engine->parametersOfViewSetting(boundId);
         // Compatibility: allow empty json_key for camera scope (id=0) and map to the single camera parameter key
         QString jsonKey = QString::fromStdString(sp.json_key());
         if (boundId == kScopeCamera && jsonKey.isEmpty()) {
@@ -700,6 +952,8 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
     // Validate first to avoid partial apply
     ValidateSceneParamsRequest vreq;
     for (const auto& sp : req->set_params()) {
@@ -735,14 +989,14 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, oss.str());
     }
     std::string applyErr;
-    bool ok = invokeOnUi([&]() -> bool {
+    bool ok = invokeOnObjectThread(engine, [&]() -> bool {
       if (!m_owner.engine()) {
         return false;
       }
       for (const auto& sp : req->set_params()) {
         const size_t boundId = static_cast<size_t>(sp.id());
         // Apply using unified parameter list (id=0 => camera)
-        const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
+        const auto params = engine->parametersOfViewSetting(boundId);
         // Compatibility for camera: empty json_key maps to the camera parameter jsonKey
         QString jsonKey = QString::fromStdString(sp.json_key());
         if (boundId == kScopeCamera && jsonKey.isEmpty()) {
@@ -918,17 +1172,20 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto bb = invokeOnUi([&]() {
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    const std::vector<size_t> ids = invokeOnUi([&]() {
       std::vector<size_t> ids;
       ids.reserve(req->ids_size());
       for (auto v : req->ids()) {
         ids.push_back(static_cast<size_t>(v));
       }
-      ids = filterVisualIds(m_owner, ids);
-      if (req->after_clipping()) {
-        return m_owner.engine()->boundBoxOfObjsAfterClipping(ids);
-      }
-      return m_owner.engine()->boundBoxOfObjs(ids);
+      return filterVisualIds(m_owner, ids);
+    });
+
+    const auto bb = invokeOnObjectThread(engine, [&]() {
+      return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
     });
     auto toVec = [](const glm::dvec3& v) {
       Vec3 r;
@@ -952,7 +1209,39 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto res = invokeOnUi([&]() {
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    struct ObjTypeId
+    {
+      QString typeName;
+      size_t id = 0;
+    };
+
+    const std::vector<ObjTypeId> objTypeIds = invokeOnUi([&]() {
+      std::vector<ObjTypeId> out;
+      if (!m_owner.doc()) {
+        return out;
+      }
+      std::vector<size_t> ids;
+      if (req->ids_size() == 0) {
+        ids = m_owner.doc()->objs();
+      } else {
+        ids.reserve(req->ids_size());
+        for (auto v : req->ids()) {
+          ids.push_back(static_cast<size_t>(v));
+        }
+      }
+      out.reserve(ids.size());
+      for (auto id : ids) {
+        if (auto* od = m_owner.doc()->idToDoc(id)) {
+          out.push_back(ObjTypeId{od->typeName(), id});
+        }
+      }
+      return out;
+    });
+
+    auto res = invokeOnObjectThread(engine, [&]() {
       struct CapOut
       {
         std::vector<Parameter> cam, bg, ax, gl;
@@ -960,7 +1249,7 @@ public:
       };
       CapOut out;
       auto collect = [&](size_t id, std::vector<Parameter>& dst) {
-        const auto params = m_owner.engine()->parametersOfViewSetting(id);
+        const auto params = engine->parametersOfViewSetting(id);
         for (auto* p : params) {
           Parameter meta;
           meta.set_json_key(p->jsonKey().toStdString());
@@ -971,10 +1260,10 @@ public:
           }
           meta.set_supports_interpolation(p->supportInterpolation());
           // Enumerated options represented in value_schema via enum; no separate fields.
-          // Attach canonical value schema from parameter
+          // Attach canonical value schema from parameter.
           {
             const json::object schema = p->valueSchema();
-            // Dev guard: ensure schema has a recognizable 'type' for easier diagnostics
+            // Dev guard: ensure schema has a recognizable 'type' for easier diagnostics.
             try {
               auto it = schema.if_contains("type");
               if (!it || !it->is_string()) {
@@ -989,26 +1278,16 @@ public:
           dst.push_back(std::move(meta));
         }
       };
-      // Include camera (id=0) to let clients discover its schema
+      // Include camera (id=0) to let clients discover its schema.
       collect(0, out.cam);
       collect(1, out.bg);
       collect(2, out.ax);
       collect(3, out.gl);
-      std::vector<size_t> ids;
-      if (req->ids_size() == 0) {
-        ids = m_owner.doc() ? m_owner.doc()->objs() : std::vector<size_t>{};
-      } else {
-        ids.reserve(req->ids_size());
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-      }
-      for (auto id : ids) {
-        auto* od = m_owner.doc()->idToDoc(id);
-        auto tn = od->typeName();
+
+      for (const auto& it : objTypeIds) {
         std::vector<Parameter> pv;
-        collect(id, pv);
-        out.objs[tn] = std::move(pv);
+        collect(it.id, pv);
+        out.objs[it.typeName] = std::move(pv);
       }
       return out;
     });
@@ -1156,7 +1435,104 @@ public:
     LOG(INFO) << "RPC SetKey anim=" << animationId << " time=" << req->time() << " easing=" << req->easing()
               << " target_id=" << req->target_id()
               << (req->json_key().empty() ? "" : (" json_key=" + req->json_key()));
+
+    struct ParamMeta
+    {
+      bool found = false;
+      QString type;
+      bool supportsInterpolation = false;
+    };
+
     std::string errMsg;
+    // Camera (id=0) does not require engine parameter lookup.
+    if (req->target_id() == kScopeCamera) {
+      auto ok = invokeOnUi([&]() -> bool {
+        if (!m_owner.doc() || !m_owner.engine()) {
+          errMsg = "engine/doc not ready";
+          return false;
+        }
+        auto& ad = m_owner.doc()->animation3DDoc();
+        auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
+        if (!anim) {
+          errMsg = "animation_id not found";
+          return false;
+        }
+        anim->rebindView();
+        const double tm = req->time();
+        const QString easing = QString::fromStdString(req->easing());
+        json::value jv = pbToJson(req->value());
+        if (!jv.is_object()) {
+          errMsg = "camera value must be an object";
+          return false;
+        }
+        json::object keyObj;
+        keyObj["time"] = tm;
+        keyObj["type"] = easing.toStdString();
+        keyObj["value"] = jv.as_object();
+        auto ckey = std::make_unique<ZCameraParameterKey>();
+        if (!ckey->readValue(keyObj)) {
+          errMsg = "camera value incompatible with parameter";
+          return false;
+        }
+        anim->cameraParameterAnimation()->addKey(std::move(ckey));
+        return true;
+      });
+      if (!ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, errMsg.empty() ? "set_key failed" : errMsg);
+      }
+      reply->set_ok(true);
+      return Status::OK;
+    }
+
+    // Non-camera: validate animation on the UI thread first (preserve existing error precedence).
+    auto preOk = invokeOnUi([&]() -> bool {
+      if (!m_owner.doc() || !m_owner.engine()) {
+        errMsg = "engine/doc not ready";
+        return false;
+      }
+      auto& ad = m_owner.doc()->animation3DDoc();
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
+      if (!anim) {
+        errMsg = "animation_id not found";
+        return false;
+      }
+      return true;
+    });
+    if (!preOk) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, errMsg.empty() ? "set_key failed" : errMsg);
+    }
+
+    // Snapshot parameter metadata on the engine's thread.
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+    const size_t boundId = static_cast<size_t>(req->target_id());
+    const QString jsonKey = QString::fromStdString(req->json_key());
+
+    const ParamMeta meta = invokeOnObjectThread(engine, [&]() {
+      ParamMeta out;
+      const auto params = engine->parametersOfViewSetting(boundId);
+      for (auto* p : params) {
+        if (p && p->jsonKey() == jsonKey) {
+          out.found = true;
+          out.type = p->type();
+          out.supportsInterpolation = p->supportInterpolation();
+          break;
+        }
+      }
+      return out;
+    });
+
+    if (!meta.found) {
+      LOG(WARNING) << "SetKey(param): target parameter not found boundId=" << boundId
+                   << " jsonKey=" << jsonKey.toStdString();
+      return Status(grpc::StatusCode::FAILED_PRECONDITION,
+                    std::string("target parameter not found for json_key=") + jsonKey.toStdString());
+    }
+
+    const double tm = req->time();
+    const QString easing = QString::fromStdString(req->easing());
+    const json::value v = pbToJson(req->value());
+
     auto ok = invokeOnUi([&]() -> bool {
       if (!m_owner.doc() || !m_owner.engine()) {
         errMsg = "engine/doc not ready";
@@ -1169,51 +1545,9 @@ public:
         return false;
       }
       anim->rebindView();
-      const double tm = req->time();
-      const QString easing = QString::fromStdString(req->easing());
-      // Camera (id=0)
-      if (req->target_id() == kScopeCamera) {
-        // Convert typed protobuf Value to boost::json object
-        json::value jv = pbToJson(req->value());
-        if (!jv.is_object()) {
-          errMsg = "camera value must be an object";
-          return false;
-        }
-        json::object val = jv.as_object();
-        json::object keyObj;
-        keyObj["time"] = tm;
-        keyObj["type"] = easing.toStdString();
-        keyObj["value"] = val;
-        auto ckey = std::make_unique<ZCameraParameterKey>();
-        if (!ckey->readValue(keyObj)) {
-          errMsg = "camera value incompatible with parameter";
-          return false;
-        }
-        anim->cameraParameterAnimation()->addKey(std::move(ckey));
-        return true;
-      }
-      // Use id directly (1/2/3 = groups; ≥4 objects)
-      size_t boundId = static_cast<size_t>(req->target_id());
-      // Find target parameter by jsonKey
-      const QString jsonKey = QString::fromStdString(req->json_key());
-      ZParameter* target = nullptr;
-      const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
-      for (auto* p : params) {
-        if (p && p->jsonKey() == jsonKey) {
-          target = p;
-          break;
-        }
-      }
-      if (!target) {
-        LOG(WARNING) << "SetKey(param): target parameter not found boundId=" << boundId
-                     << " jsonKey=" << jsonKey.toStdString();
-        errMsg = std::string("target parameter not found for json_key=") + jsonKey.toStdString();
-        return false;
-      }
-      // Ensure parameter animations exist for this object
+
+      // Ensure parameter animations exist for this object.
       anim->addKeyFrame(0.0);
-      // Build key for that parameter from typed Value
-      json::value v = pbToJson(req->value());
 
       auto jsonTypeName = [](const json::value& j) -> std::string {
         if (j.is_null()) {
@@ -1250,7 +1584,8 @@ public:
         }
         return true;
       };
-      const auto tstr = target->type();
+
+      const QString tstr = meta.type;
       if (tstr == "Bool") {
         if (!v.is_bool()) {
           errMsg = std::string("type mismatch for json_key=") + jsonKey.toStdString() + ": expected Bool got " +
@@ -1278,18 +1613,20 @@ public:
           return false;
         }
       }
-      // For non-interpolatable parameters, force "Switch" to avoid invalid easing selection
-      const QString keyType = target->supportInterpolation() ? easing : QStringLiteral("Switch");
+
+      // For non-interpolatable parameters, force "Switch" to avoid invalid easing selection.
+      const QString keyType = meta.supportsInterpolation ? easing : QStringLiteral("Switch");
       json::object keyObj;
       keyObj["time"] = tm;
       keyObj["type"] = keyType.toStdString();
       keyObj["value"] = v;
-      auto key = std::make_unique<ZParameterKey>(target->type());
+      auto key = std::make_unique<ZParameterKey>(meta.type);
       if (!key->readValue(keyObj)) {
         errMsg = "value incompatible with parameter schema";
         return false;
       }
-      // Locate the object's unique id from display packs, then access its parameter animations
+
+      // Locate the object's unique id from display packs, then access its parameter animations.
       size_t uniqueId = 0;
       for (const auto& pack : anim->displayPacks()) {
         if (pack.type == ZAnimationDisplayPack::Type::Object && pack.boundId == boundId) {
@@ -1302,13 +1639,14 @@ public:
         errMsg = "object pack not found for boundId";
         return false;
       }
+
       const auto& pas = anim->paraAnimationList(uniqueId);
       for (const auto& paPtr : pas) {
         if (!paPtr) {
           continue;
         }
         auto* pa = paPtr.get();
-        if (pa->jsonKey() == jsonKey && pa->type() == target->type()) {
+        if (pa->jsonKey() == jsonKey && pa->type() == meta.type) {
           pa->addKey(std::move(key));
           return true;
         }
@@ -1330,19 +1668,9 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
-      Z3DCameraParameter cam("Camera");
-      cam.setValueSameAs(m_owner.engine()->camera());
-      out.emplace_back(json::value(cam.jsonValue()));
-      return out;
-    });
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
-    }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+    *reply->add_values() = jsonToPb(snapshotEngineCameraJson(engine));
     return Status::OK;
   }
 
@@ -1352,12 +1680,11 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
-      // Gather and filter ids
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    // Gather and filter ids on the UI thread (doc lives there).
+    const std::vector<size_t> ids = invokeOnUi([&]() {
       std::vector<size_t> ids;
       if (req->all() || req->ids_size() == 0) {
         if (m_owner.doc()) {
@@ -1370,30 +1697,29 @@ public:
         }
         ids = filterVisualIds(m_owner, ids);
       }
-      // Compute bbox
-      ZBBox<glm::dvec3> bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids)
-                                                   : m_owner.engine()->boundBoxOfObjs(ids);
-      if (bb.empty()) {
-        return out;
-      }
-      // Create a temporary camera parameter and reset to bbox with optional min radius
-      Z3DCameraParameter camTmp("Camera");
-      camTmp.setValueSameAs(m_owner.engine()->camera());
-      // Apply min radius by expanding bbox if requested
-      if (req->min_radius() > 0.0) {
-        const auto cent = (bb.minCorner + bb.maxCorner) * 0.5;
-        const double r = req->min_radius();
-        ZBBox<glm::dvec3> extra{cent - glm::dvec3(r), cent + glm::dvec3(r)};
-        bb.expand(extra);
-      }
-      camTmp.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
-      const auto j = camTmp.jsonValue();
-      out.emplace_back(json::value(j));
-      return out;
+      return ids;
     });
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
+
+    // Snapshot engine-side data on the rendering thread.
+    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, req->after_clipping());
+    ZBBox<glm::dvec3> bb = snap.bbox;
+    if (bb.empty()) {
+      return Status::OK;
     }
+
+    // Apply min radius by expanding bbox if requested.
+    if (req->min_radius() > 0.0) {
+      const auto cent = (bb.minCorner + bb.maxCorner) * 0.5;
+      const double r = req->min_radius();
+      bb.expand(ZBBox<glm::dvec3>{cent - glm::dvec3(r), cent + glm::dvec3(r)});
+    }
+
+    CHECK(snap.cameraJson.is_object());
+    Z3DCameraParameter camTmp("Camera");
+    camTmp.readValue(snap.cameraJson);
+    camTmp.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
+
+    *reply->add_values() = jsonToPb(camTmp.jsonValue());
     return Status::OK;
   }
 
@@ -1402,12 +1728,10 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
-      // Compute bbox center
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    const std::vector<size_t> ids = invokeOnUi([&]() {
       std::vector<size_t> ids;
       if (req->ids_size() == 0) {
         if (m_owner.doc()) {
@@ -1420,40 +1744,41 @@ public:
         }
         ids = filterVisualIds(m_owner, ids);
       }
-      ZBBox<glm::dvec3> bb = m_owner.engine()->boundBoxOfObjs(ids);
-      if (bb.empty()) {
-        return out;
-      }
-      const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
-      const double angle = (req->degrees() == 0.0 ? 360.0 : req->degrees());
-      // Axis
-      glm::vec3 axis(0.f, 1.f, 0.f);
-      const auto ax = QString::fromStdString(req->axis()).toLower();
-      if (ax == "x") {
-        axis = glm::vec3(1.f, 0.f, 0.f);
-      } else if (ax == "y") {
-        axis = glm::vec3(0.f, 1.f, 0.f);
-      } else if (ax == "z") {
-        axis = glm::vec3(0.f, 0.f, 1.f);
-      }
-
-      // Start: fit to bbox preserving view vector, using a temp camera
-      Z3DCameraParameter startCam("Camera");
-      startCam.setValueSameAs(m_owner.engine()->camera());
-      startCam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
-      // End: rotate around center on the selected axis
-      Z3DCameraParameter endCam("Camera");
-      endCam.setValueSameAs(startCam);
-      // Z3DCamera expects radians for rotation angles
-      endCam.rotate(glm::radians(static_cast<float>(angle)), axis, center);
-
-      out.emplace_back(json::value(startCam.jsonValue()));
-      out.emplace_back(json::value(endCam.jsonValue()));
-      return out;
+      return ids;
     });
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
+
+    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false);
+    const ZBBox<glm::dvec3> bb = snap.bbox;
+    if (bb.empty()) {
+      return Status::OK;
     }
+
+    const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
+    const double angle = (req->degrees() == 0.0 ? 360.0 : req->degrees());
+    // Axis
+    glm::vec3 axis(0.f, 1.f, 0.f);
+    const auto ax = QString::fromStdString(req->axis()).toLower();
+    if (ax == "x") {
+      axis = glm::vec3(1.f, 0.f, 0.f);
+    } else if (ax == "y") {
+      axis = glm::vec3(0.f, 1.f, 0.f);
+    } else if (ax == "z") {
+      axis = glm::vec3(0.f, 0.f, 1.f);
+    }
+
+    CHECK(snap.cameraJson.is_object());
+    // Start: fit to bbox preserving view vector, using a temp camera seeded with the engine camera.
+    Z3DCameraParameter startCam("Camera");
+    startCam.readValue(snap.cameraJson);
+    startCam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
+    // End: rotate around center on the selected axis.
+    Z3DCameraParameter endCam("Camera");
+    endCam.setValueSameAs(startCam);
+    // Z3DCamera expects radians for rotation angles.
+    endCam.rotate(glm::radians(static_cast<float>(angle)), axis, center);
+
+    *reply->add_values() = jsonToPb(startCam.jsonValue());
+    *reply->add_values() = jsonToPb(endCam.jsonValue());
     return Status::OK;
   }
 
@@ -1462,12 +1787,10 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
-      // Determine center from bbox of ids
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    const std::vector<size_t> ids = invokeOnUi([&]() {
       std::vector<size_t> ids;
       if (req->ids_size() == 0) {
         if (m_owner.doc()) {
@@ -1480,32 +1803,32 @@ public:
         }
         ids = filterVisualIds(m_owner, ids);
       }
-      ZBBox<glm::dvec3> bb = m_owner.engine()->boundBoxOfObjs(ids);
-      if (bb.empty()) {
-        return out;
-      }
-      const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
-
-      Z3DCameraParameter startCam("Camera");
-      startCam.setValueSameAs(m_owner.engine()->camera());
-      startCam.setCenter(center);
-      if (req->start_dist() > 0.0) {
-        startCam.dollyToCenterDistance(static_cast<float>(req->start_dist()));
-      }
-
-      Z3DCameraParameter endCam("Camera");
-      endCam.setValueSameAs(startCam);
-      if (req->end_dist() > 0.0) {
-        endCam.dollyToCenterDistance(static_cast<float>(req->end_dist()));
-      }
-
-      out.emplace_back(json::value(startCam.jsonValue()));
-      out.emplace_back(json::value(endCam.jsonValue()));
-      return out;
+      return ids;
     });
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
+
+    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false);
+    const ZBBox<glm::dvec3> bb = snap.bbox;
+    if (bb.empty()) {
+      return Status::OK;
     }
+    const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
+
+    CHECK(snap.cameraJson.is_object());
+    Z3DCameraParameter startCam("Camera");
+    startCam.readValue(snap.cameraJson);
+    startCam.setCenter(center);
+    if (req->start_dist() > 0.0) {
+      startCam.dollyToCenterDistance(static_cast<float>(req->start_dist()));
+    }
+
+    Z3DCameraParameter endCam("Camera");
+    endCam.setValueSameAs(startCam);
+    if (req->end_dist() > 0.0) {
+      endCam.dollyToCenterDistance(static_cast<float>(req->end_dist()));
+    }
+
+    *reply->add_values() = jsonToPb(startCam.jsonValue());
+    *reply->add_values() = jsonToPb(endCam.jsonValue());
     return Status::OK;
   }
 
@@ -1514,39 +1837,35 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
-      // Collect ids and filter Animation3D
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    const std::vector<size_t> ids = invokeOnUi([&]() {
       std::vector<size_t> ids;
       ids.reserve(req->ids_size());
       for (auto v : req->ids()) {
         ids.push_back(static_cast<size_t>(v));
       }
-      ids = filterVisualIds(m_owner, ids);
-      // Compute bbox
-      ZBBox<glm::dvec3> bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids)
-                                                   : m_owner.engine()->boundBoxOfObjs(ids);
-      if (bb.empty()) {
-        return out;
-      }
-      // Apply min_radius if provided
-      if (req->min_radius() > 0.0) {
-        const auto cent = (bb.minCorner + bb.maxCorner) * 0.5;
-        ZBBox<glm::dvec3> extra{cent - glm::dvec3(req->min_radius()), cent + glm::dvec3(req->min_radius())};
-        bb.expand(extra);
-      }
-      Z3DCameraParameter cam("Camera");
-      cam.setValueSameAs(m_owner.engine()->camera());
-      cam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
-      out.emplace_back(json::value(cam.jsonValue()));
-      return out;
+      return filterVisualIds(m_owner, ids);
     });
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
+
+    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, req->after_clipping());
+    ZBBox<glm::dvec3> bb = snap.bbox;
+    if (bb.empty()) {
+      return Status::OK;
     }
+
+    if (req->min_radius() > 0.0) {
+      const auto cent = (bb.minCorner + bb.maxCorner) * 0.5;
+      bb.expand(ZBBox<glm::dvec3>{cent - glm::dvec3(req->min_radius()), cent + glm::dvec3(req->min_radius())});
+    }
+
+    CHECK(snap.cameraJson.is_object());
+    Z3DCameraParameter cam("Camera");
+    cam.readValue(snap.cameraJson);
+    cam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
+
+    *reply->add_values() = jsonToPb(cam.jsonValue());
     return Status::OK;
   }
 
@@ -1555,32 +1874,30 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    const std::vector<size_t> ids = invokeOnUi([&]() {
       std::vector<size_t> ids;
       ids.reserve(req->ids_size());
       for (auto v : req->ids()) {
         ids.push_back(static_cast<size_t>(v));
       }
-      ids = filterVisualIds(m_owner, ids);
-      ZBBox<glm::dvec3> bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids)
-                                                   : m_owner.engine()->boundBoxOfObjs(ids);
-      if (bb.empty()) {
-        return out;
-      }
-      const glm::vec3 cent = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
-      Z3DCameraParameter cam("Camera");
-      cam.setValueSameAs(m_owner.engine()->camera());
-      cam.setCenter(cent);
-      out.emplace_back(json::value(cam.jsonValue()));
-      return out;
+      return filterVisualIds(m_owner, ids);
     });
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
+
+    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, req->after_clipping());
+    const ZBBox<glm::dvec3> bb = snap.bbox;
+    if (bb.empty()) {
+      return Status::OK;
     }
+
+    CHECK(snap.cameraJson.is_object());
+    Z3DCameraParameter cam("Camera");
+    cam.readValue(snap.cameraJson);
+    cam.setCenter(glm::vec3((bb.minCorner + bb.maxCorner) * 0.5));
+
+    *reply->add_values() = jsonToPb(cam.jsonValue());
     return Status::OK;
   }
 
@@ -1589,40 +1906,37 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        return out;
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    const json::value baseJson = snapshotEngineCameraJson(engine);
+    CHECK(baseJson.is_object());
+
+    Z3DCameraParameter cam("Camera");
+    cam.readValue(baseJson);
+    if (req->has_base_value()) {
+      json::value jv = pbToJson(req->base_value());
+      if (jv.is_object()) {
+        cam.readValue(jv);
       }
-      Z3DCameraParameter cam("Camera");
-      cam.setValueSameAs(m_owner.engine()->camera());
-      if (req->has_base_value()) {
-        json::value jv = pbToJson(req->base_value());
-        if (jv.is_object()) {
-          cam.readValue(jv);
-        }
-      }
-      const auto op = QString::fromStdString(req->op()).toUpper();
-      const float angle = glm::radians(static_cast<float>(req->degrees()));
-      if (op == "AZIMUTH") {
-        cam.azimuth(angle);
-      } else if (op == "ELEVATION") {
-        cam.elevation(angle);
-      } else if (op == "ROLL") {
-        cam.roll(angle);
-      } else if (op == "YAW") {
-        cam.yaw(angle);
-      } else if (op == "PITCH") {
-        cam.pitch(angle);
-      } else if (op == "FLIP") {
-        cam.flipViewDirection();
-      }
-      out.emplace_back(json::value(cam.jsonValue()));
-      return out;
-    });
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
     }
+    const auto op = QString::fromStdString(req->op()).toUpper();
+    const float angle = glm::radians(static_cast<float>(req->degrees()));
+    if (op == "AZIMUTH") {
+      cam.azimuth(angle);
+    } else if (op == "ELEVATION") {
+      cam.elevation(angle);
+    } else if (op == "ROLL") {
+      cam.roll(angle);
+    } else if (op == "YAW") {
+      cam.yaw(angle);
+    } else if (op == "PITCH") {
+      cam.pitch(angle);
+    } else if (op == "FLIP") {
+      cam.flipViewDirection();
+    }
+
+    *reply->add_values() = jsonToPb(cam.jsonValue());
     return Status::OK;
   }
 
@@ -1631,12 +1945,11 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
-      // Determine bbox (ids → filtered; empty → all visual)
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    const std::vector<size_t> ids = invokeOnUi([&]() {
+      // Determine bbox (ids → filtered; empty → all visual).
       std::vector<size_t> ids;
       ids.reserve(req->ids_size());
       for (auto v : req->ids()) {
@@ -1649,35 +1962,36 @@ public:
       } else {
         ids = filterVisualIds(m_owner, ids);
       }
-      ZBBox<glm::dvec3> bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids)
-                                                   : m_owner.engine()->boundBoxOfObjs(ids);
-      if (bb.empty()) {
-        return out;
-      }
-      if (req->min_radius() > 0.0 && (req->mode() == std::string("XY") || req->mode() == std::string("RESET"))) {
-        const auto cent = (bb.minCorner + bb.maxCorner) * 0.5;
-        bb.expand(ZBBox<glm::dvec3>(cent - glm::dvec3(req->min_radius()), cent + glm::dvec3(req->min_radius())));
-      }
-      Z3DCameraParameter cam("Camera");
-      cam.setValueSameAs(m_owner.engine()->camera());
-      const auto mode = QString::fromStdString(req->mode()).toUpper();
-      if (mode == "XY" || mode == "RESET" || mode.isEmpty()) {
-        cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
-      } else if (mode == "XZ") {
-        cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
-        cam.rotate90X();
-      } else if (mode == "YZ") {
-        cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
-        cam.rotate90XZ();
-      } else {
-        cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
-      }
-      out.emplace_back(json::value(cam.jsonValue()));
-      return out;
+      return ids;
     });
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
+
+    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, req->after_clipping());
+    ZBBox<glm::dvec3> bb = snap.bbox;
+    if (bb.empty()) {
+      return Status::OK;
     }
+    if (req->min_radius() > 0.0 && (req->mode() == std::string("XY") || req->mode() == std::string("RESET"))) {
+      const auto cent = (bb.minCorner + bb.maxCorner) * 0.5;
+      bb.expand(ZBBox<glm::dvec3>(cent - glm::dvec3(req->min_radius()), cent + glm::dvec3(req->min_radius())));
+    }
+
+    CHECK(snap.cameraJson.is_object());
+    Z3DCameraParameter cam("Camera");
+    cam.readValue(snap.cameraJson);
+    const auto mode = QString::fromStdString(req->mode()).toUpper();
+    if (mode == "XY" || mode == "RESET" || mode.isEmpty()) {
+      cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
+    } else if (mode == "XZ") {
+      cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
+      cam.rotate90X();
+    } else if (mode == "YZ") {
+      cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
+      cam.rotate90XZ();
+    } else {
+      cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
+    }
+
+    *reply->add_values() = jsonToPb(cam.jsonValue());
     return Status::OK;
   }
 
@@ -1697,35 +2011,34 @@ public:
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "distance must be finite");
     }
 
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        errMsg = "engine not ready";
-        return out;
-      }
-      // Base camera
-      Z3DCameraParameter cam("Camera");
-      cam.setValueSameAs(m_owner.engine()->camera());
-      if (req->has_base_value()) {
-        json::value jv = pbToJson(req->base_value());
-        if (!jv.is_object()) {
-          errCode = grpc::StatusCode::INVALID_ARGUMENT;
-          errMsg = "base_value must be an object";
-          return out;
-        }
-        cam.readValue(jv);
-      }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
 
-      double distWorld = req->distance();
-      if (req->distance_is_fraction_of_bbox_radius()) {
-        // Determine bbox from ids (or all visual objects when ids is empty)
-        if (!m_owner.doc()) {
-          errMsg = "doc not ready";
-          return out;
-        }
+    const json::value baseEngineCamera = snapshotEngineCameraJson(engine);
+    CHECK(baseEngineCamera.is_object());
+
+    // Base camera (current engine camera, optionally overridden by base_value).
+    Z3DCameraParameter cam("Camera");
+    cam.readValue(baseEngineCamera);
+    if (req->has_base_value()) {
+      json::value jv = pbToJson(req->base_value());
+      if (!jv.is_object()) {
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "base_value must be an object");
+      }
+      cam.readValue(jv);
+    }
+
+    double distWorld = req->distance();
+    if (req->distance_is_fraction_of_bbox_radius()) {
+      // Determine bbox radius from ids (or all visual objects when ids is empty).
+      bool docReady = false;
+      const std::vector<size_t> ids = invokeOnUi([&]() {
         std::vector<size_t> ids;
+        if (!m_owner.doc()) {
+          docReady = false;
+          return ids;
+        }
+        docReady = true;
         ids.reserve(req->ids_size());
         for (auto v : req->ids()) {
           ids.push_back(static_cast<size_t>(v));
@@ -1735,56 +2048,53 @@ public:
         } else {
           ids = filterVisualIds(m_owner, ids);
         }
-        ZBBox<glm::dvec3> bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids)
-                                                     : m_owner.engine()->boundBoxOfObjs(ids);
-        if (bb.empty()) {
-          errMsg = "bbox empty";
-          return out;
-        }
-        const double r = bboxEnclosingSphereRadius(bb);
-        if (!(r > 0.0)) {
-          errMsg = "bbox radius is zero";
-          return out;
-        }
-        distWorld = distWorld * r;
+        return ids;
+      });
+      if (!docReady) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
       }
 
-      glm::vec3 dir(0.f, 0.f, 0.f);
-      if (op == "FORWARD") {
-        dir = cam.get().viewVector();
-      } else if (op == "BACK") {
-        dir = -cam.get().viewVector();
-      } else if (op == "RIGHT") {
-        dir = cam.get().strafeVector();
-      } else if (op == "LEFT") {
-        dir = -cam.get().strafeVector();
-      } else if (op == "UP") {
-        dir = cam.get().upVector();
-      } else if (op == "DOWN") {
-        dir = -cam.get().upVector();
+      const ZBBox<glm::dvec3> bb = invokeOnObjectThread(engine, [&]() {
+        return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
+      });
+      if (bb.empty()) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
       }
-
-      const glm::vec3 delta = static_cast<float>(distWorld) * dir;
-      glm::vec3 eye = cam.get().eye();
-      glm::vec3 center = cam.get().center();
-      const glm::vec3 up = cam.get().upVector();
-      // move_center=true implements "fly": translate eye+center together
-      // move_center=false implements "boom/dolly": translate eye only
-      eye += delta;
-      if (req->move_center()) {
-        center += delta;
+      const double r = bboxEnclosingSphereRadius(bb);
+      if (!(r > 0.0)) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox radius is zero");
       }
-      cam.setCamera(eye, center, up);
-
-      out.emplace_back(json::value(cam.jsonValue()));
-      return out;
-    });
-    if (!errMsg.empty()) {
-      return Status(errCode, errMsg);
+      distWorld = distWorld * r;
     }
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
+
+    glm::vec3 dir(0.f, 0.f, 0.f);
+    if (op == "FORWARD") {
+      dir = cam.get().viewVector();
+    } else if (op == "BACK") {
+      dir = -cam.get().viewVector();
+    } else if (op == "RIGHT") {
+      dir = cam.get().strafeVector();
+    } else if (op == "LEFT") {
+      dir = -cam.get().strafeVector();
+    } else if (op == "UP") {
+      dir = cam.get().upVector();
+    } else if (op == "DOWN") {
+      dir = -cam.get().upVector();
     }
+
+    const glm::vec3 delta = static_cast<float>(distWorld) * dir;
+    glm::vec3 eye = cam.get().eye();
+    glm::vec3 center = cam.get().center();
+    const glm::vec3 up = cam.get().upVector();
+    // move_center=true implements "fly": translate eye+center together.
+    // move_center=false implements "boom/dolly": translate eye only.
+    eye += delta;
+    if (req->move_center()) {
+      center += delta;
+    }
+    cam.setCamera(eye, center, up);
+
+    *reply->add_values() = jsonToPb(cam.jsonValue());
     return Status::OK;
   }
 
@@ -1797,34 +2107,32 @@ public:
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "target is required");
     }
 
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto values = invokeOnUi([&]() -> std::vector<json::value> {
-      std::vector<json::value> out;
-      if (!m_owner.engine()) {
-        errMsg = "engine not ready";
-        return out;
-      }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
 
-      // Base camera
-      Z3DCameraParameter cam("Camera");
-      cam.setValueSameAs(m_owner.engine()->camera());
-      if (req->has_base_value()) {
-        json::value jv = pbToJson(req->base_value());
-        if (!jv.is_object()) {
-          errCode = grpc::StatusCode::INVALID_ARGUMENT;
-          errMsg = "base_value must be an object";
-          return out;
-        }
-        cam.readValue(jv);
-      }
+    const json::value baseEngineCamera = snapshotEngineCameraJson(engine);
+    CHECK(baseEngineCamera.is_object());
 
-      auto bboxForReq = [&]() -> ZBBox<glm::dvec3> {
-        ZBBox<glm::dvec3> bb;
-        if (!m_owner.doc() || !m_owner.engine()) {
-          return bb;
-        }
+    // Base camera
+    Z3DCameraParameter cam("Camera");
+    cam.readValue(baseEngineCamera);
+    if (req->has_base_value()) {
+      json::value jv = pbToJson(req->base_value());
+      if (!jv.is_object()) {
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "base_value must be an object");
+      }
+      cam.readValue(jv);
+    }
+
+    auto bboxForReq = [&]() -> std::optional<ZBBox<glm::dvec3>> {
+      bool docReady = false;
+      const std::vector<size_t> ids = invokeOnUi([&]() {
         std::vector<size_t> ids;
+        if (!m_owner.doc()) {
+          docReady = false;
+          return ids;
+        }
+        docReady = true;
         ids.reserve(req->ids_size());
         for (auto v : req->ids()) {
           ids.push_back(static_cast<size_t>(v));
@@ -1834,61 +2142,64 @@ public:
         } else {
           ids = filterVisualIds(m_owner, ids);
         }
-        bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids) : m_owner.engine()->boundBoxOfObjs(ids);
-        return bb;
-      };
-
-      glm::vec3 target(0.f, 0.f, 0.f);
-      switch (req->target_case()) {
-        case CameraLookAtRequest::kWorldPoint: {
-          const auto& p = req->world_point();
-          target = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
-          break;
-        }
-        case CameraLookAtRequest::kTargetBboxCenter: {
-          const auto bb = bboxForReq();
-          if (bb.empty()) {
-            errMsg = "bbox empty";
-            return out;
-          }
-          const glm::dvec3 c = (bb.minCorner + bb.maxCorner) * 0.5;
-          target = glm::vec3(static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z));
-          break;
-        }
-        case CameraLookAtRequest::kBboxFractionPoint: {
-          const auto bb = bboxForReq();
-          if (bb.empty()) {
-            errMsg = "bbox empty";
-            return out;
-          }
-          const auto& f = req->bbox_fraction_point();
-          const auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
-          const double fx = clamp01(f.x());
-          const double fy = clamp01(f.y());
-          const double fz = clamp01(f.z());
-          const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
-          const glm::dvec3 p = bb.minCorner + glm::dvec3(fx * sz.x, fy * sz.y, fz * sz.z);
-          target = glm::vec3(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
-          break;
-        }
-        default: {
-          errCode = grpc::StatusCode::INVALID_ARGUMENT;
-          errMsg = "unsupported target";
-          return out;
-        }
+        return ids;
+      });
+      if (!docReady) {
+        return std::nullopt;
       }
+      ZBBox<glm::dvec3> bb = invokeOnObjectThread(engine, [&]() {
+        return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
+      });
+      return bb;
+    };
 
-      // Aim: keep eye and up vector; set center to target.
-      cam.setCamera(cam.get().eye(), target, cam.get().upVector());
-      out.emplace_back(json::value(cam.jsonValue()));
-      return out;
-    });
-    if (!errMsg.empty()) {
-      return Status(errCode, errMsg);
+    glm::vec3 target(0.f, 0.f, 0.f);
+    switch (req->target_case()) {
+      case CameraLookAtRequest::kWorldPoint: {
+        const auto& p = req->world_point();
+        target = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+        break;
+      }
+      case CameraLookAtRequest::kTargetBboxCenter: {
+        auto bbOpt = bboxForReq();
+        if (!bbOpt.has_value()) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
+        }
+        const auto& bb = *bbOpt;
+        if (bb.empty()) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
+        }
+        const glm::dvec3 c = (bb.minCorner + bb.maxCorner) * 0.5;
+        target = glm::vec3(static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z));
+        break;
+      }
+      case CameraLookAtRequest::kBboxFractionPoint: {
+        auto bbOpt = bboxForReq();
+        if (!bbOpt.has_value()) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
+        }
+        const auto& bb = *bbOpt;
+        if (bb.empty()) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
+        }
+        const auto& f = req->bbox_fraction_point();
+        const auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
+        const double fx = clamp01(f.x());
+        const double fy = clamp01(f.y());
+        const double fz = clamp01(f.z());
+        const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
+        const glm::dvec3 p = bb.minCorner + glm::dvec3(fx * sz.x, fy * sz.y, fz * sz.z);
+        target = glm::vec3(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
+        break;
+      }
+      default: {
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "unsupported target");
+      }
     }
-    for (const auto& jv : values) {
-      *reply->add_values() = jsonToPb(jv);
-    }
+
+    // Aim: keep eye and up vector; set center to target.
+    cam.setCamera(cam.get().eye(), target, cam.get().upVector());
+    *reply->add_values() = jsonToPb(cam.jsonValue());
     return Status::OK;
   }
 
@@ -1901,55 +2212,54 @@ public:
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "waypoints must be non-empty");
     }
 
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto keys = invokeOnUi([&]() {
-      std::vector<CameraSolveKey> out;
-      if (!m_owner.engine()) {
-        errMsg = "engine not ready";
-        return out;
-      }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
 
-      // Base camera for defaults (projection/fov/up); can be overridden.
-      Z3DCameraParameter base("Camera");
-      base.setValueSameAs(m_owner.engine()->camera());
-      if (req->has_base_value()) {
-        json::value jv = pbToJson(req->base_value());
-        if (!jv.is_object()) {
-          errCode = grpc::StatusCode::INVALID_ARGUMENT;
-          errMsg = "base_value must be an object";
-          return out;
-        }
-        base.readValue(jv);
-      }
+    const json::value baseEngineCamera = snapshotEngineCameraJson(engine);
+    CHECK(baseEngineCamera.is_object());
 
-      const auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
-      auto fracToWorld = [&](const ZBBox<glm::dvec3>& bb, const Vec3& f) -> glm::vec3 {
-        const double fx = clamp01(f.x());
-        const double fy = clamp01(f.y());
-        const double fz = clamp01(f.z());
-        const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
-        const glm::dvec3 p = bb.minCorner + glm::dvec3(fx * sz.x, fy * sz.y, fz * sz.z);
-        return glm::vec3(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
-      };
-
-      // Determine whether bbox is needed (fractions or bbox-center look-at).
-      bool needBBox = false;
-      for (int i = 0; i < req->waypoints_size(); ++i) {
-        const auto& w = req->waypoints(i);
-        if (w.eye_case() == CameraWaypoint::kBboxFractionEye || w.look_at_case() == CameraWaypoint::kLookAtBboxCenter ||
-            w.look_at_case() == CameraWaypoint::kBboxFractionLookAt) {
-          needBBox = true;
-          break;
-        }
+    // Base camera for defaults (projection/fov/up); can be overridden.
+    Z3DCameraParameter base("Camera");
+    base.readValue(baseEngineCamera);
+    if (req->has_base_value()) {
+      json::value jv = pbToJson(req->base_value());
+      if (!jv.is_object()) {
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "base_value must be an object");
       }
-      ZBBox<glm::dvec3> bb;
-      if (needBBox) {
-        if (!m_owner.doc()) {
-          errMsg = "doc not ready";
-          return out;
-        }
+      base.readValue(jv);
+    }
+
+    const auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
+    auto fracToWorld = [&](const ZBBox<glm::dvec3>& bb, const Vec3& f) -> glm::vec3 {
+      const double fx = clamp01(f.x());
+      const double fy = clamp01(f.y());
+      const double fz = clamp01(f.z());
+      const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
+      const glm::dvec3 p = bb.minCorner + glm::dvec3(fx * sz.x, fy * sz.y, fz * sz.z);
+      return glm::vec3(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
+    };
+
+    // Determine whether bbox is needed (fractions or bbox-center look-at).
+    bool needBBox = false;
+    for (int i = 0; i < req->waypoints_size(); ++i) {
+      const auto& w = req->waypoints(i);
+      if (w.eye_case() == CameraWaypoint::kBboxFractionEye || w.look_at_case() == CameraWaypoint::kLookAtBboxCenter ||
+          w.look_at_case() == CameraWaypoint::kBboxFractionLookAt) {
+        needBBox = true;
+        break;
+      }
+    }
+
+    ZBBox<glm::dvec3> bb;
+    if (needBBox) {
+      bool docReady = false;
+      const std::vector<size_t> ids = invokeOnUi([&]() {
         std::vector<size_t> ids;
+        if (!m_owner.doc()) {
+          docReady = false;
+          return ids;
+        }
+        docReady = true;
         ids.reserve(req->ids_size());
         for (auto v : req->ids()) {
           ids.push_back(static_cast<size_t>(v));
@@ -1959,98 +2269,97 @@ public:
         } else {
           ids = filterVisualIds(m_owner, ids);
         }
-        bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids) : m_owner.engine()->boundBoxOfObjs(ids);
-        if (bb.empty()) {
-          errMsg = "bbox empty";
-          return out;
-        }
+        return ids;
+      });
+      if (!docReady) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
       }
-
-      struct WpRef
-      {
-        const CameraWaypoint* wp = nullptr;
-        double time = 0.0;
-        int index = 0;
-      };
-      std::vector<WpRef> wps;
-      wps.reserve(static_cast<size_t>(req->waypoints_size()));
-      for (int i = 0; i < req->waypoints_size(); ++i) {
-        wps.push_back(WpRef{&req->waypoints(i), req->waypoints(i).time(), i});
+      bb = invokeOnObjectThread(engine, [&]() {
+        return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
+      });
+      if (bb.empty()) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
       }
-      std::stable_sort(wps.begin(), wps.end(), [](const WpRef& a, const WpRef& b) { return a.time < b.time; });
-
-      Z3DCameraParameter prev("Camera");
-      prev.setValueSameAs(base);
-      bool havePrev = false;
-
-      for (const auto& wr : wps) {
-        const auto* w = wr.wp;
-        if (!w) {
-          continue;
-        }
-        const double t = w->time();
-        if (!(t >= 0.0) || !std::isfinite(t)) {
-          errCode = grpc::StatusCode::INVALID_ARGUMENT;
-          errMsg = "waypoint time must be finite and >= 0";
-          return std::vector<CameraSolveKey>{};
-        }
-
-        glm::vec3 eye = havePrev ? prev.get().eye() : base.get().eye();
-        if (w->eye_case() == CameraWaypoint::kWorldEye) {
-          const auto& p = w->world_eye();
-          eye = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
-        } else if (w->eye_case() == CameraWaypoint::kBboxFractionEye) {
-          if (bb.empty()) {
-            errMsg = "bbox required for bbox_fraction_eye";
-            return std::vector<CameraSolveKey>{};
-          }
-          eye = fracToWorld(bb, w->bbox_fraction_eye());
-        }
-
-        glm::vec3 center;
-        if (w->look_at_case() == CameraWaypoint::kWorldLookAt) {
-          const auto& p = w->world_look_at();
-          center = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
-        } else if (w->look_at_case() == CameraWaypoint::kLookAtBboxCenter) {
-          if (bb.empty()) {
-            errMsg = "bbox required for look_at_bbox_center";
-            return std::vector<CameraSolveKey>{};
-          }
-          const glm::dvec3 c = (bb.minCorner + bb.maxCorner) * 0.5;
-          center = glm::vec3(static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z));
-        } else if (w->look_at_case() == CameraWaypoint::kBboxFractionLookAt) {
-          if (bb.empty()) {
-            errMsg = "bbox required for bbox_fraction_look_at";
-            return std::vector<CameraSolveKey>{};
-          }
-          center = fracToWorld(bb, w->bbox_fraction_look_at());
-        } else {
-          // Default: keep previous view direction and center distance (first key uses base).
-          const glm::vec3 view = havePrev ? prev.get().viewVector() : base.get().viewVector();
-          const float dist = havePrev ? prev.get().centerDist() : base.get().centerDist();
-          center = eye + view * dist;
-        }
-
-        const glm::vec3 up = havePrev ? prev.get().upVector() : base.get().upVector();
-
-        Z3DCameraParameter cam("Camera");
-        cam.setValueSameAs(base);
-        cam.setCamera(eye, center, up);
-
-        CameraSolveKey k;
-        k.set_time(t);
-        *k.mutable_value() = jsonToPb(cam.jsonValue());
-        out.push_back(std::move(k));
-
-        prev.setValueSameAs(cam);
-        havePrev = true;
-      }
-
-      return out;
-    });
-    if (!errMsg.empty()) {
-      return Status(errCode, errMsg);
     }
+
+    struct WpRef
+    {
+      const CameraWaypoint* wp = nullptr;
+      double time = 0.0;
+      int index = 0;
+    };
+    std::vector<WpRef> wps;
+    wps.reserve(static_cast<size_t>(req->waypoints_size()));
+    for (int i = 0; i < req->waypoints_size(); ++i) {
+      wps.push_back(WpRef{&req->waypoints(i), req->waypoints(i).time(), i});
+    }
+    std::stable_sort(wps.begin(), wps.end(), [](const WpRef& a, const WpRef& b) { return a.time < b.time; });
+
+    std::vector<CameraSolveKey> keys;
+    keys.reserve(wps.size());
+
+    Z3DCameraParameter prev("Camera");
+    prev.setValueSameAs(base);
+    bool havePrev = false;
+
+    for (const auto& wr : wps) {
+      const auto* w = wr.wp;
+      if (!w) {
+        continue;
+      }
+      const double t = w->time();
+      if (!(t >= 0.0) || !std::isfinite(t)) {
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "waypoint time must be finite and >= 0");
+      }
+
+      glm::vec3 eye = havePrev ? prev.get().eye() : base.get().eye();
+      if (w->eye_case() == CameraWaypoint::kWorldEye) {
+        const auto& p = w->world_eye();
+        eye = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+      } else if (w->eye_case() == CameraWaypoint::kBboxFractionEye) {
+        if (bb.empty()) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox required for bbox_fraction_eye");
+        }
+        eye = fracToWorld(bb, w->bbox_fraction_eye());
+      }
+
+      glm::vec3 center;
+      if (w->look_at_case() == CameraWaypoint::kWorldLookAt) {
+        const auto& p = w->world_look_at();
+        center = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+      } else if (w->look_at_case() == CameraWaypoint::kLookAtBboxCenter) {
+        if (bb.empty()) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox required for look_at_bbox_center");
+        }
+        const glm::dvec3 c = (bb.minCorner + bb.maxCorner) * 0.5;
+        center = glm::vec3(static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z));
+      } else if (w->look_at_case() == CameraWaypoint::kBboxFractionLookAt) {
+        if (bb.empty()) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox required for bbox_fraction_look_at");
+        }
+        center = fracToWorld(bb, w->bbox_fraction_look_at());
+      } else {
+        // Default: keep previous view direction and center distance (first key uses base).
+        const glm::vec3 view = havePrev ? prev.get().viewVector() : base.get().viewVector();
+        const float dist = havePrev ? prev.get().centerDist() : base.get().centerDist();
+        center = eye + view * dist;
+      }
+
+      const glm::vec3 up = havePrev ? prev.get().upVector() : base.get().upVector();
+
+      Z3DCameraParameter cam("Camera");
+      cam.setValueSameAs(base);
+      cam.setCamera(eye, center, up);
+
+      CameraSolveKey k;
+      k.set_time(t);
+      *k.mutable_value() = jsonToPb(cam.jsonValue());
+      keys.push_back(std::move(k));
+
+      prev.setValueSameAs(cam);
+      havePrev = true;
+    }
+
     for (auto& k : keys) {
       *reply->add_keys() = std::move(k);
     }
@@ -2082,49 +2391,57 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto keys = invokeOnUi([&]() {
-      std::vector<CameraSolveKey> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
-      // Collect and filter ids
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    // Collect and filter ids on the UI thread (doc lives there).
+    const std::vector<size_t> ids = invokeOnUi([&]() {
       std::vector<size_t> ids;
       ids.reserve(req->ids_size());
       for (auto v : req->ids()) {
         ids.push_back(static_cast<size_t>(v));
       }
-      ids = filterVisualIds(m_owner, ids);
-      // Compute bbox
-      ZBBox<glm::dvec3> bb = m_owner.engine()->boundBoxOfObjs(ids);
-      const double margin = req->has_constraints() ? req->constraints().margin() : 0.0;
-      if (!bb.empty() && margin > 0.0) {
-        bb = expandedByMarginFraction(bb, margin);
-      }
-      const auto mode = QString::fromStdString(req->mode()).toUpper();
-      const double t0 = req->t0();
-      const double t1 = req->t1();
-      Z3DCameraParameter base("Camera");
-      base.setValueSameAs(m_owner.engine()->camera());
-      if (mode == "FIT") {
-        if (bb.empty()) {
-          return out; // nothing to fit
-        }
+      return filterVisualIds(m_owner, ids);
+    });
+
+    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false);
+    ZBBox<glm::dvec3> bb = snap.bbox;
+    const double margin = req->has_constraints() ? req->constraints().margin() : 0.0;
+    if (!bb.empty() && margin > 0.0) {
+      bb = expandedByMarginFraction(bb, margin);
+    }
+
+    const auto mode = QString::fromStdString(req->mode()).toUpper();
+    const double t0 = req->t0();
+    const double t1 = req->t1();
+
+    CHECK(snap.cameraJson.is_object());
+    Z3DCameraParameter base("Camera");
+    base.readValue(snap.cameraJson);
+
+    std::vector<CameraSolveKey> keys;
+
+    if (mode == "FIT") {
+      if (bb.empty()) {
+        // Nothing to fit; leave keys empty so the RPC reports an empty solve.
+      } else {
         Z3DCameraParameter cam("Camera");
         cam.setValueSameAs(base);
         cam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
         CameraSolveKey k;
         k.set_time(t0);
         *k.mutable_value() = jsonToPb(cam.jsonValue());
-        out.push_back(std::move(k));
-      } else if (mode == "STATIC") {
-        CameraSolveKey k;
-        k.set_time(t0);
-        *k.mutable_value() = jsonToPb(base.jsonValue());
-        out.push_back(std::move(k));
-      } else if (mode == "ORBIT") {
-        if (bb.empty()) {
-          return out;
-        }
+        keys.push_back(std::move(k));
+      }
+    } else if (mode == "STATIC") {
+      CameraSolveKey k;
+      k.set_time(t0);
+      *k.mutable_value() = jsonToPb(base.jsonValue());
+      keys.push_back(std::move(k));
+    } else if (mode == "ORBIT") {
+      if (bb.empty()) {
+        // No bbox; leave keys empty so the RPC reports an empty solve.
+      } else {
         const auto params = req->params();
         std::string axis = "y";
         double angle = 360.0;
@@ -2152,12 +2469,12 @@ public:
         const double sign = (angDeg >= 0.0 ? 1.0 : -1.0);
         double aabs = std::abs(angDeg);
         const double eps = 1e-6;
-        // Treat multiples of 360 as 360 to ensure motion
+        // Treat multiples of 360 as 360 to ensure motion.
         if (std::abs(std::fmod(aabs, 360.0)) < eps) {
           aabs = 360.0;
           angDeg = sign * aabs;
         }
-        // Segment into <=90° steps for stable interpolation
+        // Segment into <=90° steps for stable interpolation.
         int segments = std::max(1, static_cast<int>(std::ceil(aabs / 90.0)));
         const double stepDeg = angDeg / static_cast<double>(segments);
         const double dt = (t1 - t0) / static_cast<double>(segments);
@@ -2165,25 +2482,26 @@ public:
         Z3DCameraParameter cam("Camera");
         cam.setValueSameAs(base);
         cam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
-        // Emit first key (start)
+        // Emit first key (start).
         {
           CameraSolveKey k;
           k.set_time(t0);
           *k.mutable_value() = jsonToPb(cam.jsonValue());
-          out.push_back(std::move(k));
+          keys.push_back(std::move(k));
         }
-        // Apply incremental rotations and emit intermediate keys
+        // Apply incremental rotations and emit intermediate keys.
         for (int i = 1; i <= segments; ++i) {
           cam.rotate(glm::radians(static_cast<float>(stepDeg)), ax, center);
           CameraSolveKey k;
           k.set_time(t0 + dt * static_cast<double>(i));
           *k.mutable_value() = jsonToPb(cam.jsonValue());
-          out.push_back(std::move(k));
+          keys.push_back(std::move(k));
         }
-      } else if (mode == "DOLLY") {
-        if (bb.empty()) {
-          return out;
-        }
+      }
+    } else if (mode == "DOLLY") {
+      if (bb.empty()) {
+        // No bbox; leave keys empty so the RPC reports an empty solve.
+      } else {
         const auto params = req->params();
         double start_dist = 0.0, end_dist = 0.0;
         auto itS = params.fields().find("start_dist");
@@ -2209,14 +2527,14 @@ public:
         CameraSolveKey k0;
         k0.set_time(t0);
         *k0.mutable_value() = jsonToPb(cam0.jsonValue());
-        out.push_back(std::move(k0));
+        keys.push_back(std::move(k0));
         CameraSolveKey k1;
         k1.set_time(t1);
         *k1.mutable_value() = jsonToPb(cam1.jsonValue());
-        out.push_back(std::move(k1));
+        keys.push_back(std::move(k1));
       }
-      return out;
-    });
+    }
+
     for (auto& k : keys) {
       *reply->add_keys() = std::move(k);
     }
@@ -2257,7 +2575,8 @@ public:
         return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id not found");
       }
     }
-    std::string err;
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
     const bool allowFov = req->has_policies() ? req->policies().adjust_fov() : false;
     const bool allowDist = req->has_policies() ? req->policies().adjust_distance() : false;
     const bool keepVisible = req->has_constraints() ? req->constraints().keep_visible() : true;
@@ -2267,12 +2586,9 @@ public:
                                  : 0.95)
                             : 0.0;
     const double margin = req->has_constraints() ? req->constraints().margin() : 0.0;
-    auto results = invokeOnUi([&]() {
-      std::vector<CameraValidateResult> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
-      // Collect targets and bbox (default to all visual objects when ids is empty)
+    // Collect targets on the UI thread (doc lives there).
+    const std::vector<size_t> ids = invokeOnUi([&]() {
+      // Default to all visual objects when ids is empty.
       std::vector<size_t> ids;
       ids.reserve(req->ids_size());
       for (auto v : req->ids()) {
@@ -2280,162 +2596,187 @@ public:
       }
       if (ids.empty()) {
         if (m_owner.doc()) {
-          ids = m_owner.doc()->objs();
-          ids = filterVisualIds(m_owner, ids);
+          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
         }
       } else {
         ids = filterVisualIds(m_owner, ids);
       }
-      ZBBox<glm::dvec3> bb = m_owner.engine()->boundBoxOfObjs(ids);
-      if (!bb.empty() && margin > 0.0) {
-        bb = expandedByMarginFraction(bb, margin);
-      }
-      const double R = bboxEnclosingSphereRadius(bb);
-      // Base camera for aspect
-      Z3DCameraParameter base("Camera");
-      base.setValueSameAs(m_owner.engine()->camera());
-      // Prepare times and values pairs. Be permissive:
-      // - If values are missing (size==0) but times are provided, sample values from the specified animation camera track.
-      // - If counts mismatch, pair up to times.size(); fill missing values by sampling, and ignore extras.
-      std::vector<double> times;
-      times.reserve(req->times_size());
-      for (int i = 0; i < req->times_size(); ++i) {
-        times.push_back(req->times(i));
-      }
-      std::vector<json::value> values;
-      values.reserve(req->values_size());
-      for (int i = 0; i < req->values_size(); ++i) {
-        values.push_back(pbToJson(req->values(i)));
-      }
-      auto sampleCameraAt = [&](double t) -> json::value {
-        // Default to base camera value when no animation is available
+      return ids;
+    });
+
+    // Snapshot engine-side data on the rendering thread.
+    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false);
+    ZBBox<glm::dvec3> bb = snap.bbox;
+    if (!bb.empty() && margin > 0.0) {
+      bb = expandedByMarginFraction(bb, margin);
+    }
+    const double R = bboxEnclosingSphereRadius(bb);
+
+    CHECK(snap.cameraJson.is_object());
+    Z3DCameraParameter base("Camera");
+    base.readValue(snap.cameraJson);
+
+    // Prepare times and values pairs. Be permissive:
+    // - If values are missing (size==0) but times are provided, sample values from the specified animation camera track.
+    // - If counts mismatch, pair up to times.size(); fill missing values by sampling, and ignore extras.
+    std::vector<double> times;
+    times.reserve(req->times_size());
+    for (int i = 0; i < req->times_size(); ++i) {
+      times.push_back(req->times(i));
+    }
+
+    std::vector<json::value> values;
+    values.reserve(static_cast<size_t>(std::max(req->values_size(), req->times_size())));
+    for (int i = 0; i < req->values_size(); ++i) {
+      values.push_back(pbToJson(req->values(i)));
+    }
+
+    const size_t provided = values.size();
+    if (provided < times.size()) {
+      const auto sampled = invokeOnUi([&]() {
+        std::vector<json::value> out;
+        out.reserve(times.size() - provided);
+
+        // Default to the current engine camera when no animation/doc is available.
         if (!m_owner.doc()) {
-          return base.jsonValue();
+          for (size_t i = provided; i < times.size(); ++i) {
+            out.push_back(snap.cameraJson);
+          }
+          return out;
         }
+
         auto& ad = m_owner.doc()->animation3DDoc();
         const size_t animId = static_cast<size_t>(sampleAnimationId);
         auto* anim = ad.animationPtr(animId);
         if (!anim) {
-          LOG(WARNING) << "CameraValidate: animation_id=" << animId << " not found while sampling at t=" << t;
-          return base.jsonValue();
+          LOG(WARNING) << "CameraValidate: animation_id=" << animId << " not found while sampling";
+          for (size_t i = provided; i < times.size(); ++i) {
+            out.push_back(snap.cameraJson);
+          }
+          return out;
         }
+
         ZCameraParameterAnimation* cpa = anim->cameraParameterAnimation();
         if (!cpa) {
-          return base.jsonValue();
+          for (size_t i = provided; i < times.size(); ++i) {
+            out.push_back(snap.cameraJson);
+          }
+          return out;
         }
-        Z3DCameraParameter tmp("Camera");
-        // Seed with base for stable projection/ar fields; updateParaToTime writes necessary fields
-        tmp.setValueSameAs(base);
-        cpa->updateParaToTime(t, &tmp);
-        return tmp.jsonValue();
-      };
-      if (!times.empty()) {
-        // Ensure values.size() >= times.size() by sampling animation for missing entries
-        for (size_t i = values.size(); i < times.size(); ++i) {
-          values.push_back(sampleCameraAt(times[i]));
+
+        for (size_t i = provided; i < times.size(); ++i) {
+          Z3DCameraParameter tmp("Camera");
+          tmp.readValue(snap.cameraJson);
+          cpa->updateParaToTime(times[i], &tmp);
+          out.push_back(tmp.jsonValue());
+        }
+        return out;
+      });
+      values.insert(values.end(), sampled.begin(), sampled.end());
+    }
+
+    std::vector<CameraValidateResult> results;
+    const int n = static_cast<int>(std::min(times.size(), values.size()));
+    results.reserve(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) {
+      const double t = times[i];
+      const json::value& jv = values[i];
+      CameraValidateResult r;
+      r.set_time(t);
+      if (!jv.is_object()) {
+        r.set_within_frame(false);
+        r.set_coverage(0.0);
+        r.set_adjusted(false);
+        r.set_reason("invalid_value");
+        results.push_back(std::move(r));
+        continue;
+      }
+      Z3DCameraParameter cam("Camera");
+      cam.setValueSameAs(base);
+      try {
+        cam.readValue(jv);
+      }
+      catch (const std::exception& e) {
+        LOG(WARNING) << "CameraValidate: exception while parsing camera value at t=" << t << ": " << e.what();
+        r.set_within_frame(false);
+        r.set_coverage(0.0);
+        r.set_adjusted(false);
+        r.set_reason("invalid_value");
+        results.push_back(std::move(r));
+        continue;
+      }
+      catch (...) {
+        LOG(WARNING) << "CameraValidate: unknown exception while parsing camera value at t=" << t;
+        r.set_within_frame(false);
+        r.set_coverage(0.0);
+        r.set_adjusted(false);
+        r.set_reason("invalid_value");
+        results.push_back(std::move(r));
+        continue;
+      }
+      // Compute coverage heuristic.
+      const double required = (R > 0.0) ? requiredCenterDistanceForCoverage(cam.get(), R) : 0.0;
+      const double current = static_cast<double>(cam.get().centerDist());
+      double cov = 1.0;
+      if (required > 1e-9) {
+        cov = std::min(1.0, current / required);
+      }
+      bool ok = (cov + 1e-6) >= minCov;
+      r.set_within_frame(ok);
+      r.set_coverage(cov);
+
+      // Adjustment policy.
+      bool adjusted = false;
+      json::value adj = jv;
+      if (!ok && R > 0.0) {
+        if (allowDist && required > 0.0) {
+          setCameraDistance(cam, required);
+          adjusted = true;
+          adj = cam.jsonValue();
+          // Recompute coverage after adjustment.
+          const double cur2 = static_cast<double>(cam.get().centerDist());
+          const double cov2 = (required > 0.0) ? std::min(1.0, cur2 / required) : 1.0;
+          ok = (cov2 + 1e-6) >= minCov;
+          cov = cov2;
+        } else if (allowFov && current > 1e-9) {
+          // Solve desired FOV to achieve coverage with current distance.
+          double angleUsed = 2.0 * std::asin(std::min(1.0, R / current));
+          double desiredFov = angleUsed;
+          if (cam.get().aspectRatio() < 1.0f) {
+            // angleUsed is horizontal; convert back to vertical FOV.
+            desiredFov = 2.0 * std::atan(std::tan(angleUsed * 0.5) / cam.get().aspectRatio());
+          }
+          Z3DCameraParameter cam2("Camera");
+          cam2.setValueSameAs(cam);
+          cam2.setFrustum(static_cast<float>(desiredFov),
+                          cam.get().aspectRatio(),
+                          cam.get().nearDist(),
+                          cam.get().farDist());
+          adjusted = true;
+          adj = cam2.jsonValue();
+          // Recompute coverage.
+          const double req2 = requiredCenterDistanceForCoverage(cam2.get(), R);
+          const double cur2 = static_cast<double>(cam2.get().centerDist());
+          const double cov2 = (req2 > 1e-9) ? std::min(1.0, cur2 / req2) : 1.0;
+          ok = (cov2 + 1e-6) >= minCov;
+          cov = cov2;
         }
       }
-      const int n = static_cast<int>(std::min(times.size(), values.size()));
-      for (int i = 0; i < n; ++i) {
-        double t = times[i];
-        json::value jv = values[i];
-        CameraValidateResult r;
-        r.set_time(t);
-        if (!jv.is_object()) {
-          r.set_within_frame(false);
-          r.set_coverage(0.0);
-          r.set_adjusted(false);
-          r.set_reason("invalid_value");
-          out.push_back(std::move(r));
-          continue;
-        }
-        Z3DCameraParameter cam("Camera");
-        cam.setValueSameAs(base);
-        try {
-          cam.readValue(jv);
-        }
-        catch (const std::exception& e) {
-          LOG(WARNING) << "CameraValidate: exception while parsing camera value at t=" << t << ": " << e.what();
-          r.set_within_frame(false);
-          r.set_coverage(0.0);
-          r.set_adjusted(false);
-          r.set_reason("invalid_value");
-          out.push_back(std::move(r));
-          continue;
-        }
-        catch (...) {
-          LOG(WARNING) << "CameraValidate: unknown exception while parsing camera value at t=" << t;
-          r.set_within_frame(false);
-          r.set_coverage(0.0);
-          r.set_adjusted(false);
-          r.set_reason("invalid_value");
-          out.push_back(std::move(r));
-          continue;
-        }
-        // Compute coverage heuristic
-        const double required = (R > 0.0) ? requiredCenterDistanceForCoverage(cam.get(), R) : 0.0;
-        const double current = static_cast<double>(cam.get().centerDist());
-        double cov = 1.0;
-        if (required > 1e-9) {
-          cov = std::min(1.0, current / required);
-        }
-        bool ok = (cov + 1e-6) >= minCov;
-        r.set_within_frame(ok);
-        r.set_coverage(cov);
-        // Adjustment policy
-        bool adjusted = false;
-        json::value adj = jv;
-        if (!ok && R > 0.0) {
-          if (allowDist && required > 0.0) {
-            setCameraDistance(cam, required);
-            adjusted = true;
-            adj = cam.jsonValue();
-            // Recompute coverage after adjustment
-            const double cur2 = static_cast<double>(cam.get().centerDist());
-            double cov2 = (required > 0.0) ? std::min(1.0, cur2 / required) : 1.0;
-            ok = (cov2 + 1e-6) >= minCov;
-            cov = cov2;
-          } else if (allowFov && current > 1e-9) {
-            // Solve desired FOV to achieve coverage with current distance
-            double angleUsed = 2.0 * std::asin(std::min(1.0, R / current));
-            double desiredFov = angleUsed;
-            if (cam.get().aspectRatio() < 1.0f) {
-              // angleUsed is horizontal; convert back to vertical FOV
-              desiredFov = 2.0 * std::atan(std::tan(angleUsed * 0.5) / cam.get().aspectRatio());
-            }
-            Z3DCameraParameter cam2("Camera");
-            cam2.setValueSameAs(cam);
-            cam2.setFrustum(static_cast<float>(desiredFov),
-                            cam.get().aspectRatio(),
-                            cam.get().nearDist(),
-                            cam.get().farDist());
-            adjusted = true;
-            adj = cam2.jsonValue();
-            // Recompute coverage
-            const double req2 = requiredCenterDistanceForCoverage(cam2.get(), R);
-            const double cur2 = static_cast<double>(cam2.get().centerDist());
-            double cov2 = (req2 > 1e-9) ? std::min(1.0, cur2 / req2) : 1.0;
-            ok = (cov2 + 1e-6) >= minCov;
-            cov = cov2;
-          }
-        }
-        r.set_adjusted(adjusted);
-        if (adjusted) {
-          *r.mutable_adjusted_value() = jsonToPb(adj);
-        }
-        if (!ok) {
-          if (current < required) {
-            r.set_reason(allowDist ? "too_close" : (allowFov ? "fov_too_small" : "coverage_below_threshold"));
-          } else {
-            r.set_reason("coverage_below_threshold");
-          }
+      r.set_adjusted(adjusted);
+      if (adjusted) {
+        *r.mutable_adjusted_value() = jsonToPb(adj);
+      }
+      if (!ok) {
+        if (current < required) {
+          r.set_reason(allowDist ? "too_close" : (allowFov ? "fov_too_small" : "coverage_below_threshold"));
         } else {
-          r.set_reason("");
+          r.set_reason("coverage_below_threshold");
         }
-        out.push_back(std::move(r));
+      } else {
+        r.set_reason("");
       }
-      return out;
-    });
+      results.push_back(std::move(r));
+    }
     bool allOk = true;
     for (auto& r : results) {
       if (!r.within_frame() || (keepVisible && (r.coverage() + 1e-6) < minCov)) {
@@ -2473,13 +2814,15 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto list = invokeOnUi([&]() {
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+    auto list = invokeOnObjectThread(engine, [&]() {
       std::vector<Parameter> out;
       if (!m_owner.engine()) {
         return out;
       }
       size_t boundId = static_cast<size_t>(req->id());
-      const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
+      const auto params = engine->parametersOfViewSetting(boundId);
       for (auto* p : params) {
         if (!p) {
           continue;
@@ -2826,14 +3169,12 @@ public:
       QString want;
       if (m == "center") {
         want = QStringLiteral("Center");
-      } else if (m == "position spline" || m == "position_spline" || m == "spline") {
-        want = QStringLiteral("Position Spline");
-      } else if (m == "position rotation spline" || m == "position_rotation_spline" || m == "rotation spline" ||
-                 m == "position+rotation spline" || m == "pos rot spline") {
-        want = QStringLiteral("Position Rotation Spline");
       } else {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "method must be one of: Center | Position Spline | Position Rotation Spline";
+        // Temporarily disable spline-based interpolation modes. They are known to
+        // be unstable in some workflows and are not exposed via the agent tool
+        // surface. Fail fast with a clear message rather than silently accepting.
+        errCode = grpc::StatusCode::FAILED_PRECONDITION;
+        errMsg = "camera interpolation methods other than Center are temporarily disabled";
         return false;
       }
 
@@ -3244,11 +3585,19 @@ public:
 
   Status CutSet(ServerContext*, const CutSetRequest* req, Bool* reply) override
   {
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.engine()) {
-        return false;
-      }
-      auto& gp = m_owner.engine()->globalParas();
+    if (!m_owner.engine()) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    const std::vector<size_t> ids = req->refit_camera() ? invokeOnUi([&]() {
+                                   return m_owner.doc() ? m_owner.doc()->objs() : std::vector<size_t>{};
+                                 })
+                                 : std::vector<size_t>{};
+
+    auto ok = invokeOnObjectThread(engine, [&]() -> bool {
+      auto& gp = engine->globalParas();
       bool applied = false;
       if (req->has_box()) {
         const auto& box = req->box();
@@ -3285,7 +3634,7 @@ public:
             uz = d;
             applied = true;
           } else {
-            // Unsupported plane orientation in current implementation
+            // Unsupported plane orientation in current implementation.
             return false;
           }
         }
@@ -3299,16 +3648,11 @@ public:
       if (!applied) {
         return false;
       }
-      if (req->refit_camera()) {
-        // Refit camera to visible objects after clipping
-        std::vector<size_t> ids;
-        if (m_owner.doc()) {
-          ids = m_owner.doc()->objs();
-          // Keep all ids; per-object visibility is honored by bbox-after-clipping
-        }
-        const auto bb = m_owner.engine()->boundBoxOfObjsAfterClipping(ids);
+      if (req->refit_camera() && !ids.empty()) {
+        // Refit camera to visible objects after clipping.
+        const auto bb = engine->boundBoxOfObjsAfterClipping(ids);
         if (!bb.empty()) {
-          m_owner.engine()->camera().resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
+          engine->camera().resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
         }
       }
       return true;
@@ -3322,11 +3666,13 @@ public:
 
   Status CutClear(ServerContext*, const Empty*, Bool* reply) override
   {
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.engine()) {
-        return false;
-      }
-      auto& gp = m_owner.engine()->globalParas();
+    if (!m_owner.engine()) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+    auto ok = invokeOnObjectThread(engine, [&]() -> bool {
+      auto& gp = engine->globalParas();
       gp.globalXCut.setLowerValue(gp.globalXCut.minimum());
       gp.globalXCut.setUpperValue(gp.globalXCut.maximum());
       gp.globalYCut.setLowerValue(gp.globalYCut.minimum());
@@ -3347,11 +3693,10 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
-    auto bbox = invokeOnUi([&]() {
-      ZBBox<glm::dvec3> bb;
-      if (!m_owner.engine()) {
-        return bb;
-      }
+    Z3DRenderingEngine* engine = m_owner.engine();
+    CHECK(engine);
+
+    const std::vector<size_t> ids = invokeOnUi([&]() {
       std::vector<size_t> ids;
       if (req->ids_size() == 0) {
         if (m_owner.doc()) {
@@ -3364,15 +3709,18 @@ public:
         }
         ids = filterVisualIds(m_owner, ids);
       }
-      bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids)
-                                 : m_owner.engine()->boundBoxOfObjs(ids);
-      if (!bb.empty() && req->margin() > 0.0) {
-        const double m = req->margin();
-        bb.expand(bb.minCorner - glm::dvec3(m));
-        bb.expand(bb.maxCorner + glm::dvec3(m));
-      }
-      return bb;
+      return ids;
     });
+
+    auto bbox = invokeOnObjectThread(engine, [&]() {
+      return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
+    });
+
+    if (!bbox.empty() && req->margin() > 0.0) {
+      const double m = req->margin();
+      bbox.expand(bbox.minCorner - glm::dvec3(m));
+      bbox.expand(bbox.maxCorner + glm::dvec3(m));
+    }
     if (bbox.empty()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
     }

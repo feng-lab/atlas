@@ -5,6 +5,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
+from .provider_tool_schema import normalize_tools_for_responses_api
+
 CONTEXT_TRIM_MAX_RETRIES = 32
 
 # Best-effort retry for transient network/proxy issues during streaming.
@@ -23,128 +25,13 @@ class ResponsesStreamingClient(Protocol):
         instructions: str,
         input_items: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.2,
+        temperature: float | None = None,
         parallel_tool_calls: bool = False,
         reasoning_effort: str | None = "high",
         reasoning_summary: str | None = "detailed",
         text_verbosity: str | None = "high",
         on_event: Callable[[Dict[str, Any]], None] | None = None,
     ) -> Dict[str, Any]: ...
-
-
-def _normalize_tool_parameters_schema(params: Any) -> dict[str, Any]:
-    """Best-effort normalization for provider compatibility.
-
-    Some OpenAI-compatible providers validate tool schemas using a strict subset
-    of JSON Schema (similar to OpenAI Structured Outputs), requiring:
-    - object schemas to set additionalProperties=false
-    - required to be present and include every key in properties
-    - array schemas to include items
-
-    We apply this *only* to schemas that declare properties (i.e., structured
-    objects). We intentionally do not "tighten" generic JSON objects (object
-    schemas without properties), since those often represent arbitrary payloads
-    such as typed scene values.
-    """
-
-    if not isinstance(params, dict):
-        return {"type": "object", "properties": {}}
-    out: dict[str, Any] = dict(params)
-    if "type" not in out:
-        out["type"] = "object"
-    if out.get("type") == "object" and not isinstance(out.get("properties"), dict):
-        out["properties"] = {}
-
-    def _tighten(node: Any) -> Any:
-        if not isinstance(node, dict):
-            return node
-        fixed: dict[str, Any] = dict(node)
-
-        for comb in ("anyOf", "oneOf", "allOf"):
-            v = fixed.get(comb)
-            if isinstance(v, list):
-                fixed[comb] = [_tighten(x) for x in v]
-
-        t = fixed.get("type")
-        types: set[str] = set()
-        if isinstance(t, str):
-            types.add(t)
-        elif isinstance(t, list):
-            for it in t:
-                if isinstance(it, str):
-                    types.add(it)
-
-        if "array" in types:
-            items = fixed.get("items")
-            if items is None:
-                fixed["items"] = {}
-            else:
-                fixed["items"] = _tighten(items)
-
-        if "object" in types and isinstance(fixed.get("properties"), dict):
-            props = fixed.get("properties") or {}
-            if isinstance(props, dict):
-                fixed["properties"] = {str(k): _tighten(v) for k, v in props.items()}
-                fixed["required"] = list(props.keys())
-                fixed["additionalProperties"] = False
-
-        return fixed
-
-    tightened = _tighten(out)
-    return tightened if isinstance(tightened, dict) else out
-
-
-def _normalize_tools_for_responses_api(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return a Responses API compatible tool list.
-
-    The OpenAI SDK's `responses.stream(...)` rejects Chat Completions-style
-    function tools when they are plain dicts. In particular, tools shaped like:
-
-      {"type":"function","function":{"name":"...","parameters":{...}}}
-
-    must be converted to the Responses API style:
-
-      {"type":"function","name":"...","parameters":{...},"strict":true}
-
-    Our tool modules intentionally define simple dict specs (not Pydantic tool
-    wrappers), so we normalize here to keep the streaming loop provider-agnostic.
-    """
-
-    out: list[dict[str, Any]] = []
-    for t in tools or []:
-        if not isinstance(t, dict):
-            continue
-        if str(t.get("type") or "") != "function":
-            out.append(t)
-            continue
-
-        # Chat Completions tool shape: {"type":"function","function":{...}}
-        fn = t.get("function")
-        if isinstance(fn, dict):
-            name = str(fn.get("name") or "").strip()
-            if not name:
-                continue
-            params = _normalize_tool_parameters_schema(fn.get("parameters"))
-            converted: dict[str, Any] = {
-                "type": "function",
-                "name": name,
-                "parameters": params,
-                "strict": bool(fn.get("strict", False)),
-            }
-            desc = fn.get("description")
-            if isinstance(desc, str) and desc.strip():
-                converted["description"] = desc.strip()
-            out.append(converted)
-            continue
-
-        # Already Responses-style tool shape.
-        fixed = dict(t)
-        fixed["parameters"] = _normalize_tool_parameters_schema(fixed.get("parameters"))
-        if "strict" not in fixed:
-            fixed["strict"] = False
-        out.append(fixed)
-
-    return out
 
 
 def _input_text_message(*, role: str, text: str) -> dict[str, Any]:
@@ -532,7 +419,7 @@ def run_responses_tool_loop(
     dispatch: Callable[[str, str], str],
     post_tool_output: Callable[[str, str, str], list[dict[str, Any]]] | None = None,
     callbacks: ToolLoopCallbacks | None = None,
-    temperature: float = 0.2,
+    temperature: float | None = None,
     reasoning_effort: str | None = "high",
     max_rounds: int = 24,
 ) -> ToolLoopResult:
@@ -547,7 +434,7 @@ def run_responses_tool_loop(
     cb = callbacks or ToolLoopCallbacks()
     # We keep full within-turn input items to avoid relying on server state.
     in_items: list[dict[str, Any]] = list(input_items or [])
-    normalized_tools = _normalize_tools_for_responses_api(list(tools or []))
+    normalized_tools = normalize_tools_for_responses_api(list(tools or [])) or []
 
     all_tool_calls: list[dict[str, Any]] = []
     reasoning_summaries: list[str] = []

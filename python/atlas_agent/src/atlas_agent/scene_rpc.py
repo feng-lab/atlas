@@ -317,6 +317,89 @@ class SceneClient:
         self._log_rpc("EngineReady", req, resp)
         return bool(resp.ok)
 
+    def get_status(
+        self,
+        *,
+        ids: Iterable[int] | None = None,
+        include_all_objects: bool = False,
+        timeout_sec: float = 5.0,
+    ) -> dict[str, Any]:
+        """Return a readiness snapshot from the GUI RPC server.
+
+        Requires Atlas >= the build that implements Scene.GetStatus.
+        """
+
+        if self._stub is None or not hasattr(self._stub, "GetStatus"):
+            raise RuntimeError("RPC GetStatus is not available in this Atlas build.")
+        if self._pb2 is None or not hasattr(self._pb2, "GetStatusRequest"):
+            raise RuntimeError("RPC GetStatusRequest is not available in this Atlas build.")
+
+        ids_list: list[int] = []
+        if ids is not None:
+            for v in ids:
+                try:
+                    ids_list.append(int(v))
+                except Exception:
+                    continue
+        req = self._pb2.GetStatusRequest(
+            ids=ids_list,
+            include_all_objects=bool(include_all_objects),
+        )
+        resp = self._stub.GetStatus(req, timeout=float(timeout_sec))
+        self._log_rpc("GetStatus", req, resp)
+        try:
+            return MessageToDict(resp)
+        except Exception:
+            return {"ok": bool(getattr(resp, "ok", False))}
+
+    def wait_for_objects_ready(
+        self,
+        ids: Iterable[int],
+        *,
+        timeout_sec: float = 30.0,
+        poll_interval_sec: float = 0.2,
+    ) -> dict[str, Any]:
+        """Block until object ids are ready for engine-backed RPCs (or timeout).
+
+        This waits for the 3D view/filter binding (not full progressive data load).
+        Requires Atlas >= the build that implements Scene.WaitForObjectsReady.
+        """
+
+        if self._stub is None or not hasattr(self._stub, "WaitForObjectsReady"):
+            raise RuntimeError("RPC WaitForObjectsReady is not available in this Atlas build.")
+        if self._pb2 is None or not hasattr(self._pb2, "WaitForObjectsReadyRequest"):
+            raise RuntimeError(
+                "RPC WaitForObjectsReadyRequest is not available in this Atlas build."
+            )
+
+        ids_list: list[int] = []
+        for v in ids:
+            try:
+                ids_list.append(int(v))
+            except Exception:
+                continue
+        if not ids_list:
+            raise ValueError("ids must contain at least one integer id")
+
+        timeout_ms = max(0, int(float(timeout_sec) * 1000.0))
+        poll_ms = max(0, int(float(poll_interval_sec) * 1000.0))
+        req = self._pb2.WaitForObjectsReadyRequest(
+            ids=ids_list,
+            timeout_ms=timeout_ms,
+            poll_interval_ms=poll_ms,
+        )
+        # Client-side RPC timeout must exceed the server-side wait window.
+        # Add a small margin so transport jitter doesn't cause false timeouts.
+        rpc_timeout = None
+        if timeout_sec is not None:
+            rpc_timeout = float(timeout_sec) + 10.0
+        resp = self._stub.WaitForObjectsReady(req, timeout=rpc_timeout)
+        self._log_rpc("WaitForObjectsReady", req, resp)
+        try:
+            return MessageToDict(resp)
+        except Exception:
+            return {"ok": bool(getattr(resp, "ok", False))}
+
     def ensure_view(self, *, require: bool = True) -> bool:
         """Ensure a 3D view (and rendering engine) exists and is ready.
 
@@ -327,10 +410,34 @@ class SceneClient:
             proceed into FAILED_PRECONDITION errors.
         """
 
+        def _is_rpc_unavailable(err: Exception) -> bool:
+            # gRPC server down/crashed typically surfaces as UNAVAILABLE + connection refused.
+            try:
+                if isinstance(err, grpc.RpcError):
+                    return err.code() == grpc.StatusCode.UNAVAILABLE
+            except Exception:
+                pass
+            msg = str(err or "").lower()
+            return "connection refused" in msg or "failed to connect to all addresses" in msg
+
+        def _raise_unavailable(err: Exception) -> None:
+            msg = str(err or "").strip()
+            raise RuntimeError(
+                "Atlas RPC server is unavailable (cannot connect to localhost:50051).\n"
+                "This usually means Atlas was closed or crashed.\n"
+                f"- error: {msg}"
+            )
+
         # Fast-path: already ready (avoid waking UI)
         try:
             if self.engine_ready(timeout_sec=DEFAULT_ENGINE_READY_RPC_TIMEOUT_SEC):
                 return True
+        except grpc.RpcError as e:
+            if _is_rpc_unavailable(e):
+                if require:
+                    _raise_unavailable(e)
+                return False
+            # Fall through to requesting a window + polling readiness.
         except Exception:
             # Fall through to requesting a window + polling readiness.
             pass
@@ -340,6 +447,13 @@ class SceneClient:
         try:
             resp = self._stub.Ensure3DWindow(req, timeout=1.0)
             self._log_rpc("Ensure3DWindow", req, resp)
+        except grpc.RpcError as e:
+            # If the server is down, fail fast rather than waiting for engine readiness.
+            self._log_rpc("Ensure3DWindow", req, None, error=e)
+            if _is_rpc_unavailable(e):
+                if require:
+                    _raise_unavailable(e)
+                return False
         except Exception as e:
             self._log_rpc("Ensure3DWindow", req, None, error=e)
 
@@ -348,6 +462,12 @@ class SceneClient:
             try:
                 if self.engine_ready(timeout_sec=DEFAULT_ENGINE_READY_RPC_TIMEOUT_SEC):
                     return True
+            except grpc.RpcError as e:
+                if _is_rpc_unavailable(e):
+                    if require:
+                        _raise_unavailable(e)
+                    return False
+                # Server may still be initializing, or may be restarting.
             except Exception:
                 # Server may still be initializing, or may be restarting.
                 pass

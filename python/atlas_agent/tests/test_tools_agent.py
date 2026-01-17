@@ -213,3 +213,19 @@ def test_session_tools_with_persistent_store(tmp_path):
 
     ev = _call(dispatch, "session_search_events", query="tool_call", max_results=0)
     assert ev["ok"] is True
+
+
+def test_codegen_and_dev_tools_are_hidden_by_default():
+    tools, _dispatch = scene_tools_and_dispatcher(
+        DummySceneClient(),
+        atlas_dir=None,
+        codegen_enabled=False,
+    )
+    available = {
+        spec.get("function", {}).get("name")
+        for spec in tools
+        if isinstance(spec, dict)
+    }
+    assert "python_write_and_run" not in available
+    assert "codegen_allowed_imports" not in available
+    assert "repo_search" not in available

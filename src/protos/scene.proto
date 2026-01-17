@@ -23,6 +23,68 @@ message ObjectInfo {
 
 message ListObjectsResponse { repeated ObjectInfo objects = 1; }
 
+// Readiness state for a scene object with respect to the live 3D engine/view.
+//
+// Notes:
+// - This is *not* a guarantee that all underlying data has finished progressive
+//   loading (e.g. Neuroglancer volumes). It is intended as a deterministic
+//   readiness signal for engine-backed RPCs (bbox/params/camera ops).
+enum ObjectLoadState {
+  OBJECT_LOAD_STATE_UNSPECIFIED = 0;
+  OBJECT_LOAD_STATE_NOT_FOUND = 1;
+  OBJECT_LOAD_STATE_DOC_NOT_READY = 2;
+  OBJECT_LOAD_STATE_ENGINE_NOT_READY = 3;
+  OBJECT_LOAD_STATE_VIEW_NOT_READY = 4;
+  OBJECT_LOAD_STATE_READY = 5;
+  OBJECT_LOAD_STATE_ERROR = 6;
+}
+
+message ObjectStatus {
+  uint64 id = 1;
+  string type = 2;
+  string name = 3;
+  string path = 4;
+  bool visible = 5;
+  ObjectLoadState load_state = 6;
+  // Optional 0..1 readiness progress (when available). Omitted when unknown.
+  google.protobuf.DoubleValue progress = 7;
+  // Optional error summary when load_state=ERROR.
+  string error = 8;
+}
+
+message GetStatusRequest {
+  // When empty and include_all_objects=false, the response omits objects[].
+  repeated uint64 ids = 1;
+  // When true, include status for all current objects.
+  bool include_all_objects = 2;
+}
+
+message GetStatusResponse {
+  bool ok = 1;
+  bool doc_ready = 2;
+  bool engine_ready = 3;
+  bool has_3d_window = 4;
+  repeated ObjectStatus objects = 5;
+  string error = 6;
+}
+
+message WaitForObjectsReadyRequest {
+  repeated uint64 ids = 1;
+  // Maximum time to wait before returning (0 = do not wait; check once).
+  uint32 timeout_ms = 2;
+  // Poll interval while waiting (0 = server default).
+  uint32 poll_interval_ms = 3;
+}
+
+message WaitForObjectsReadyResponse {
+  bool ok = 1; // true when all requested ids are ready
+  bool doc_ready = 2;
+  bool engine_ready = 3;
+  bool has_3d_window = 4;
+  repeated ObjectStatus objects = 5; // status snapshot at return time
+  string error = 6;
+}
+
 message BBoxRequest { repeated uint64 ids = 1; bool after_clipping = 2; }
 message Vec3 { double x = 1; double y = 2; double z = 3; }
 message BBox { Vec3 min = 1; Vec3 max = 2; Vec3 size = 3; Vec3 center = 4; }
@@ -106,6 +168,12 @@ service Scene {
   rpc EngineReady (Empty) returns (Bool);
   // Ensure a 3D window/canvas is open so the rendering engine can initialize.
   rpc Ensure3DWindow (Empty) returns (Bool);
+  // Return basic readiness state for the RPC server, document, and 3D engine.
+  // Optionally includes per-object readiness (view bound) for deterministic tool use.
+  rpc GetStatus (GetStatusRequest) returns (GetStatusResponse);
+  // Wait until the requested object ids are ready for engine-backed operations
+  // (i.e. the object has a bound 3D view/filter), or until timeout.
+  rpc WaitForObjectsReady (WaitForObjectsReadyRequest) returns (WaitForObjectsReadyResponse);
   rpc LoadFiles (FileList) returns (ListObjectsResponse);
   rpc ListObjects (Empty) returns (ListObjectsResponse);
   rpc BBox (BBoxRequest) returns (BBoxResponse);

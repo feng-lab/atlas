@@ -54,7 +54,7 @@ def build_atlas_agent_primer() -> str:
         "Camera motion can be authored as camera keyframes: high-level solve modes (fit/orbit/dolly), first-person walkthroughs (local move + yaw/pitch/roll), or guided waypoint splines."
     )
     lines.append(
-        "Routing heuristic: explicit waypoints/points → waypoint spline; motion verbs (fly/turn/pause) → walkthrough segments. Prefer bbox-scaled distances and Position Rotation Spline for smooth motion."
+        "Routing heuristic: explicit waypoints/points → waypoint spline; motion verbs (fly/turn/pause) → walkthrough segments. Prefer bbox-scaled distances and dense key sampling for smooth motion."
     )
     return "\n".join(lines)
 
