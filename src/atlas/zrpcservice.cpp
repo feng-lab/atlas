@@ -58,6 +58,7 @@ using atlas::rpc::CapabilitiesResponse;
 using atlas::rpc::Parameter;
 using atlas::rpc::ParamList;
 using atlas::rpc::EnsureAnimationRequest;
+using atlas::rpc::EnsureAnimationResponse;
 using atlas::rpc::SetDurationRequest;
 using atlas::rpc::SetKeyRequest;
 using atlas::rpc::CameraFitRequest;
@@ -98,10 +99,13 @@ using atlas::rpc::ScreenshotRequest;
 using atlas::rpc::ScreenshotResponse;
 using atlas::rpc::ClearKeysRequest;
 using atlas::rpc::RemoveKeyRequest;
+using atlas::rpc::BatchSetKey;
+using atlas::rpc::BatchRemoveKey;
 using atlas::rpc::BatchRequest;
 using atlas::rpc::SetTimeRequest;
 using atlas::rpc::SetCameraInterpolationMethodRequest;
-using atlas::rpc::SaveRequest;
+using atlas::rpc::GetCameraInterpolationMethodRequest;
+using atlas::rpc::SaveAnimationRequest;
 using atlas::rpc::CutSetRequest;
 using atlas::rpc::CutSuggestRequest;
 using atlas::rpc::CutSuggestion;
@@ -109,6 +113,7 @@ using atlas::rpc::ListKeysRequest;
 using atlas::rpc::KeysResponse;
 using atlas::rpc::KeyInfo;
 using atlas::rpc::TimeStatus;
+using atlas::rpc::GetTimeRequest;
 
 ZRPCService::ZRPCService(QObject* parent)
   : QObject(parent)
@@ -729,6 +734,7 @@ public:
       }
       return Status(grpc::StatusCode::FAILED_PRECONDITION, oss.str());
     }
+    std::string applyErr;
     bool ok = invokeOnUi([&]() -> bool {
       if (!m_owner.engine()) {
         return false;
@@ -783,12 +789,26 @@ public:
         } else {
           j[sp.json_key()] = v;
         }
-        target->read(j);
+        try {
+          target->read(j);
+        }
+        catch (const std::exception& e) {
+          applyErr = std::string("apply_scene_params: exception while reading json_key=") + sp.json_key() + " (" +
+                     target->type().toStdString() + "): " + e.what();
+          LOG(WARNING) << applyErr;
+          return false;
+        }
+        catch (...) {
+          applyErr = std::string("apply_scene_params: unknown exception while reading json_key=") + sp.json_key() +
+                     " (" + target->type().toStdString() + ")";
+          LOG(WARNING) << applyErr;
+          return false;
+        }
       }
       return true;
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "apply_scene_params failed");
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, applyErr.empty() ? "apply_scene_params failed" : applyErr);
     }
     reply->set_ok(true);
     return Status::OK;
@@ -824,7 +844,9 @@ public:
         return false;
       }
       if (!mainWin->get3DWindow()) {
-        QMetaObject::invokeMethod(mainWin, &ZMainWindow::ensure3DWindow, Qt::QueuedConnection);
+        // We are already executing on the UI thread (invokeOnUi). Open synchronously
+        // so clients can immediately poll EngineReady() without racing a queued call.
+        mainWin->ensure3DWindow();
       }
       // if (!mainWin->isVisible()) mainWin->show();
       // mainWin->raise();
@@ -851,8 +873,8 @@ public:
       // so subsequent key writes/queries see the latest parameters.
       auto& ad = m_owner.doc()->animation3DDoc();
       auto ids = ad.animationIds();
-      if (!ids.empty()) {
-        if (auto* anim = ad.animationPtr(ids.front())) {
+      for (auto animId : ids) {
+        if (auto* anim = ad.animationPtr(animId)) {
           anim->rebindView();
         }
       }
@@ -1060,53 +1082,66 @@ public:
     return Status::OK;
   }
 
-  Status EnsureAnimation(ServerContext*, const EnsureAnimationRequest*, Bool* reply) override
+  Status EnsureAnimation(ServerContext*, const EnsureAnimationRequest* req, EnsureAnimationResponse* reply) override
   {
-    LOG(INFO) << "RPC EnsureAnimation";
+    LOG(INFO) << "RPC EnsureAnimation create_new=" << req->create_new()
+              << (req->name().empty() ? "" : (" name=" + req->name()));
+    uint64_t animationId = 0;
+    bool created = false;
+    std::string errMsg;
     auto ok = invokeOnUi([&]() -> bool {
       if (!m_owner.doc()) {
+        errMsg = "doc not ready";
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      if (ad.animationIds().empty()) {
-        if (!hasVisualObjects(m_owner)) {
-          LOG(INFO) << "EnsureAnimation: skipped (no visual objects)";
-          return false;
-        }
-        ad.createNewAnimationAndReturnId("LLM Animation");
+      auto ids = ad.animationIds();
+
+      if (!req->create_new() && !ids.empty()) {
+        animationId = static_cast<uint64_t>(ids.front());
+        return true;
       }
-      return true;
+
+      if (!hasVisualObjects(m_owner)) {
+        errMsg = "no visual objects loaded";
+        return false;
+      }
+
+      const QString rawName = QString::fromStdString(req->name()).trimmed();
+      const QString name = rawName.isEmpty() ? QStringLiteral("LLM Animation") : rawName;
+      animationId = static_cast<uint64_t>(ad.createNewAnimationAndReturnId(name));
+      created = true;
+      return animationId != 0;
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready or no visual objects");
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, errMsg.empty() ? "ensure_animation failed" : errMsg);
     }
     reply->set_ok(true);
+    reply->set_animation_id(animationId);
+    reply->set_created(created);
     return Status::OK;
   }
 
   Status SetDuration(ServerContext*, const SetDurationRequest* req, Bool* reply) override
   {
     LOG(INFO) << "RPC SetDuration duration=" << req->duration();
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
     auto ok = invokeOnUi([&]() -> bool {
       if (!m_owner.doc()) {
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        if (!hasVisualObjects(m_owner)) {
-          return false;
-        }
-        ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
-      }
-      if (auto* anim = ad.animationPtr(ids.front())) {
+      if (auto* anim = ad.animationPtr(static_cast<size_t>(animationId))) {
         anim->setDuration(req->duration());
         return true;
       }
       return false;
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "no animation");
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id not found");
     }
     reply->set_ok(true);
     return Status::OK;
@@ -1114,7 +1149,12 @@ public:
 
   Status SetKey(ServerContext*, const SetKeyRequest* req, Bool* reply) override
   {
-    LOG(INFO) << "RPC SetKey time=" << req->time() << " easing=" << req->easing() << " id=" << req->id()
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
+    LOG(INFO) << "RPC SetKey anim=" << animationId << " time=" << req->time() << " easing=" << req->easing()
+              << " target_id=" << req->target_id()
               << (req->json_key().empty() ? "" : (" json_key=" + req->json_key()));
     std::string errMsg;
     auto ok = invokeOnUi([&]() -> bool {
@@ -1123,24 +1163,16 @@ public:
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        if (!hasVisualObjects(m_owner)) {
-          errMsg = "no visual objects loaded";
-          return false;
-        }
-        ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
-      }
-      auto* anim = ad.animationPtr(ids.front());
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
       if (!anim) {
-        errMsg = "no animation available";
+        errMsg = "animation_id not found";
         return false;
       }
       anim->rebindView();
       const double tm = req->time();
       const QString easing = QString::fromStdString(req->easing());
       // Camera (id=0)
-      if (req->id() == kScopeCamera) {
+      if (req->target_id() == kScopeCamera) {
         // Convert typed protobuf Value to boost::json object
         json::value jv = pbToJson(req->value());
         if (!jv.is_object()) {
@@ -1161,7 +1193,7 @@ public:
         return true;
       }
       // Use id directly (1/2/3 = groups; ≥4 objects)
-      size_t boundId = static_cast<size_t>(req->id());
+      size_t boundId = static_cast<size_t>(req->target_id());
       // Find target parameter by jsonKey
       const QString jsonKey = QString::fromStdString(req->json_key());
       ZParameter* target = nullptr;
@@ -2199,6 +2231,32 @@ public:
     if (!m_owner.engine()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
     }
+    if (req->times_size() == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "times must be non-empty");
+    }
+    const uint64_t sampleAnimationId = req->animation_id();
+    if (req->values_size() < req->times_size() && sampleAnimationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT,
+                    "animation_id is required when values are omitted (values_size < times_size)");
+    }
+    if (sampleAnimationId != 0) {
+      bool docReady = false;
+      const bool animExists = invokeOnUi([&]() -> bool {
+        if (!m_owner.doc()) {
+          docReady = false;
+          return false;
+        }
+        docReady = true;
+        auto& ad = m_owner.doc()->animation3DDoc();
+        return ad.animationPtr(static_cast<size_t>(sampleAnimationId)) != nullptr;
+      });
+      if (!docReady) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
+      }
+      if (!animExists) {
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id not found");
+      }
+    }
     std::string err;
     const bool allowFov = req->has_policies() ? req->policies().adjust_fov() : false;
     const bool allowDist = req->has_policies() ? req->policies().adjust_distance() : false;
@@ -2237,7 +2295,7 @@ public:
       Z3DCameraParameter base("Camera");
       base.setValueSameAs(m_owner.engine()->camera());
       // Prepare times and values pairs. Be permissive:
-      // - If values are missing (size==0) but times are provided, sample values from the current animation camera track.
+      // - If values are missing (size==0) but times are provided, sample values from the specified animation camera track.
       // - If counts mismatch, pair up to times.size(); fill missing values by sampling, and ignore extras.
       std::vector<double> times;
       times.reserve(req->times_size());
@@ -2250,17 +2308,15 @@ public:
         values.push_back(pbToJson(req->values(i)));
       }
       auto sampleCameraAt = [&](double t) -> json::value {
-        // Default to base camera value when no animation
+        // Default to base camera value when no animation is available
         if (!m_owner.doc()) {
           return base.jsonValue();
         }
         auto& ad = m_owner.doc()->animation3DDoc();
-        auto aIds = ad.animationIds();
-        if (aIds.empty()) {
-          return base.jsonValue();
-        }
-        auto* anim = ad.animationPtr(aIds.front());
+        const size_t animId = static_cast<size_t>(sampleAnimationId);
+        auto* anim = ad.animationPtr(animId);
         if (!anim) {
+          LOG(WARNING) << "CameraValidate: animation_id=" << animId << " not found while sampling at t=" << t;
           return base.jsonValue();
         }
         ZCameraParameterAnimation* cpa = anim->cameraParameterAnimation();
@@ -2295,7 +2351,27 @@ public:
         }
         Z3DCameraParameter cam("Camera");
         cam.setValueSameAs(base);
-        cam.readValue(jv);
+        try {
+          cam.readValue(jv);
+        }
+        catch (const std::exception& e) {
+          LOG(WARNING) << "CameraValidate: exception while parsing camera value at t=" << t << ": " << e.what();
+          r.set_within_frame(false);
+          r.set_coverage(0.0);
+          r.set_adjusted(false);
+          r.set_reason("invalid_value");
+          out.push_back(std::move(r));
+          continue;
+        }
+        catch (...) {
+          LOG(WARNING) << "CameraValidate: unknown exception while parsing camera value at t=" << t;
+          r.set_within_frame(false);
+          r.set_coverage(0.0);
+          r.set_adjusted(false);
+          r.set_reason("invalid_value");
+          out.push_back(std::move(r));
+          continue;
+        }
         // Compute coverage heuristic
         const double required = (R > 0.0) ? requiredCenterDistanceForCoverage(cam.get(), R) : 0.0;
         const double current = static_cast<double>(cam.get().centerDist());
@@ -2444,23 +2520,29 @@ public:
 
   Status ClearKeys(ServerContext*, const ClearKeysRequest* req, Bool* reply) override
   {
-    LOG(INFO) << "RPC ClearKeys id=" << req->id() << (req->json_key().empty() ? "" : (" json_key=" + req->json_key()));
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
+    LOG(INFO) << "RPC ClearKeys anim=" << animationId << " target_id=" << req->target_id()
+              << (req->json_key().empty() ? "" : (" json_key=" + req->json_key()));
+    std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
     auto ok = invokeOnUi([&]() -> bool {
       if (!m_owner.doc() || !m_owner.engine()) {
+        errMsg = "engine/doc not ready";
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        return false;
-      }
-      auto* anim = ad.animationPtr(ids.front());
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
       if (!anim) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "animation_id not found";
         return false;
       }
       anim->rebindView();
       // Camera (id=0): clear all camera keys
-      if (req->id() == kScopeCamera) {
+      if (req->target_id() == kScopeCamera) {
         ZParameterAnimation* cpa = anim->cameraParameterAnimation();
         // delete keys one by one
         std::vector<ZParameterKey*> keys;
@@ -2475,7 +2557,7 @@ public:
         return true;
       }
       // Non-camera: resolve the object's uniqueId, then operate on its parameter animations
-      size_t boundId = static_cast<size_t>(req->id());
+      size_t boundId = static_cast<size_t>(req->target_id());
       const QString jsonKey = QString::fromStdString(req->json_key());
       size_t uniqueId = 0;
       for (const auto& pack : anim->displayPacks()) {
@@ -2521,7 +2603,7 @@ public:
       return true;
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "clear_keys failed");
+      return Status(errCode, errMsg.empty() ? "clear_keys failed" : errMsg);
     }
     reply->set_ok(true);
     return Status::OK;
@@ -2529,24 +2611,29 @@ public:
 
   Status RemoveKey(ServerContext*, const RemoveKeyRequest* req, Bool* reply) override
   {
-    LOG(INFO) << "RPC RemoveKey time=" << req->time() << " id=" << req->id()
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
+    LOG(INFO) << "RPC RemoveKey anim=" << animationId << " time=" << req->time() << " target_id=" << req->target_id()
               << (req->json_key().empty() ? "" : (" json_key=" + req->json_key()));
+    std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
     auto ok = invokeOnUi([&]() -> bool {
       if (!m_owner.doc() || !m_owner.engine()) {
+        errMsg = "engine/doc not ready";
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        return false;
-      }
-      auto* anim = ad.animationPtr(ids.front());
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
       if (!anim) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "animation_id not found";
         return false;
       }
       anim->rebindView();
       // Camera (id=0)
-      if (req->id() == kScopeCamera) {
+      if (req->target_id() == kScopeCamera) {
         ZParameterAnimation* cpa = anim->cameraParameterAnimation();
         for (const auto& k : cpa->keys()) {
           if (std::abs(k->time() - req->time()) < 1e-6) {
@@ -2558,7 +2645,7 @@ public:
         return false;
       }
       // Non-camera
-      size_t boundId = static_cast<size_t>(req->id());
+      size_t boundId = static_cast<size_t>(req->target_id());
       const QString jsonKey = QString::fromStdString(req->json_key());
       for (const auto& pack : anim->displayPacks()) {
         if (pack.type == ZAnimationDisplayPack::Type::ObjectPara && pack.boundId == boundId && pack.paraAnimation &&
@@ -2575,7 +2662,7 @@ public:
       return false;
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "remove_key failed");
+      return Status(errCode, errMsg.empty() ? "remove_key failed" : errMsg);
     }
     reply->set_ok(true);
     return Status::OK;
@@ -2583,29 +2670,36 @@ public:
 
   Status Batch(ServerContext*, const BatchRequest* req, Bool* reply) override
   {
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
+    std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
     auto ok = invokeOnUi([&]() -> bool {
-      LOG(INFO) << "RPC Batch set_keys=" << req->set_keys_size() << " remove_keys=" << req->remove_keys_size()
+      LOG(INFO) << "RPC Batch anim=" << animationId << " set_keys=" << req->set_keys_size()
+                << " remove_keys=" << req->remove_keys_size()
                 << " commit=" << req->commit();
       if (!m_owner.doc() || !m_owner.engine()) {
+        errMsg = "engine/doc not ready";
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        if (!hasVisualObjects(m_owner)) {
-          return false;
-        }
-        ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
-      }
-      auto* anim = ad.animationPtr(ids.front());
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
       if (!anim) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "animation_id not found";
         return false;
       }
       anim->rebindView();
       // Process removals first
       int idx = 0;
       for (const auto& r : req->remove_keys()) {
-        RemoveKeyRequest tmp = r;
+        RemoveKeyRequest tmp;
+        tmp.set_animation_id(animationId);
+        tmp.set_target_id(r.target_id());
+        tmp.set_json_key(r.json_key());
+        tmp.set_time(r.time());
         Bool okR;
         auto st = RemoveKey(nullptr, &tmp, &okR);
         if (st.error_code() != grpc::StatusCode::OK || !okR.ok()) {
@@ -2617,7 +2711,13 @@ public:
       // Then sets
       idx = 0;
       for (const auto& s : req->set_keys()) {
-        SetKeyRequest tmp = s;
+        SetKeyRequest tmp;
+        tmp.set_animation_id(animationId);
+        tmp.set_target_id(s.target_id());
+        tmp.set_json_key(s.json_key());
+        tmp.set_time(s.time());
+        tmp.set_easing(s.easing());
+        tmp.mutable_value()->CopyFrom(s.value());
         Bool okS;
         auto st = SetKey(nullptr, &tmp, &okS);
         if (st.error_code() != grpc::StatusCode::OK || !okS.ok()) {
@@ -2645,7 +2745,7 @@ public:
       return true;
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "batch failed");
+      return Status(errCode, errMsg.empty() ? "batch failed" : errMsg);
     }
     reply->set_ok(true);
     return Status::OK;
@@ -2653,18 +2753,23 @@ public:
 
   Status SetTime(ServerContext*, const SetTimeRequest* req, Bool* reply) override
   {
-    VLOG(1) << "RPC SetTime seconds=" << req->seconds() << " cancel=" << req->cancel_rendering();
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
+    VLOG(1) << "RPC SetTime anim=" << animationId << " seconds=" << req->seconds() << " cancel=" << req->cancel_rendering();
+    std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
     auto ok = invokeOnUi([&]() -> bool {
       if (!m_owner.doc()) {
+        errMsg = "doc not ready";
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        return false;
-      }
-      auto* anim = ad.animationPtr(ids.front());
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
       if (!anim) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "animation_id not found";
         return false;
       }
       if (req->cancel_rendering()) {
@@ -2675,7 +2780,7 @@ public:
       return true;
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "set_time failed");
+      return Status(errCode, errMsg.empty() ? "set_time failed" : errMsg);
     }
     reply->set_ok(true);
     return Status::OK;
@@ -2685,7 +2790,11 @@ public:
                                       const SetCameraInterpolationMethodRequest* req,
                                       Bool* reply) override
   {
-    LOG(INFO) << "RPC SetCameraInterpolationMethod method=" << req->method();
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
+    LOG(INFO) << "RPC SetCameraInterpolationMethod anim=" << animationId << " method=" << req->method();
     std::string errMsg;
     grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
     auto ok = invokeOnUi([&]() -> bool {
@@ -2694,17 +2803,10 @@ public:
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        if (!hasVisualObjects(m_owner)) {
-          errMsg = "no visual objects loaded";
-          return false;
-        }
-        ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
-      }
-      auto* anim = ad.animationPtr(ids.front());
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
       if (!anim) {
-        errMsg = "no animation available";
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "animation_id not found";
         return false;
       }
       anim->rebindView();
@@ -2752,24 +2854,25 @@ public:
   }
 
   Status GetCameraInterpolationMethod(ServerContext*,
-                                      const google::protobuf::Empty*,
+                                      const GetCameraInterpolationMethodRequest* req,
                                       google::protobuf::StringValue* reply) override
   {
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
     std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
     auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc()) {
-        errMsg = "doc not ready";
+      if (!m_owner.doc() || !m_owner.engine()) {
+        errMsg = "engine/doc not ready";
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        errMsg = "no animation available";
-        return false;
-      }
-      auto* anim = ad.animationPtr(ids.front());
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
       if (!anim) {
-        errMsg = "no animation available";
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "animation_id not found";
         return false;
       }
       anim->rebindView();
@@ -2783,29 +2886,33 @@ public:
       return true;
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, errMsg.empty() ? "get_camera_interpolation_method failed" : errMsg);
+      return Status(errCode, errMsg.empty() ? "get_camera_interpolation_method failed" : errMsg);
     }
     return Status::OK;
   }
 
   Status ListKeys(ServerContext*, const ListKeysRequest* req, KeysResponse* reply) override
   {
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
     if (!m_owner.doc()) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
     }
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
+    std::string errMsg;
     auto ok = invokeOnUi([&]() -> bool {
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        return false;
-      }
-      auto* anim = ad.animationPtr(ids.front());
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
       if (!anim) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "animation_id not found";
         return false;
       }
       anim->rebindView();
       const bool includeValues = req->include_values();
-      if (req->id() == 0) {
+      if (req->target_id() == 0) {
         ZParameterAnimation* cpa = anim->cameraParameterAnimation();
         for (const auto& k : cpa->keys()) {
           KeyInfo* ki = reply->add_keys();
@@ -2819,7 +2926,7 @@ public:
       }
       // Non-camera: resolve uniqueId for the object, then fetch parameter animation by json_key
       const QString jsonKey = QString::fromStdString(req->json_key());
-      const size_t boundId = static_cast<size_t>(req->id());
+      const size_t boundId = static_cast<size_t>(req->target_id());
       size_t uniqueId = 0;
       for (const auto& pack : anim->displayPacks()) {
         if (pack.type == ZAnimationDisplayPack::Type::Object && pack.boundId == boundId) {
@@ -2852,24 +2959,29 @@ public:
       return true; // return empty when no matching param track
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "list_keys failed");
+      return Status(errCode, errMsg.empty() ? "list_keys failed" : errMsg);
     }
     return Status::OK;
   }
 
-  Status GetTime(ServerContext*, const Empty*, TimeStatus* reply) override
+  Status GetTime(ServerContext*, const GetTimeRequest* req, TimeStatus* reply) override
   {
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
+    std::string error;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
     auto ok = invokeOnUi([&]() -> bool {
       if (!m_owner.doc()) {
+        error = "doc not ready";
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        return false;
-      }
-      auto* anim = ad.animationPtr(ids.front());
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
       if (!anim) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        error = "animation_id not found";
         return false;
       }
       // duration is straightforward; current time is stored in animation
@@ -2878,38 +2990,52 @@ public:
       return true;
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "get_time failed");
+      if (error.empty()) {
+        error = "get_time failed";
+      }
+      return Status(errCode, error);
     }
     return Status::OK;
   }
 
-  Status Save(ServerContext*, const SaveRequest* req, Bool* reply) override
+  Status SaveAnimation(ServerContext*, const SaveAnimationRequest* req, Bool* reply) override
   {
-    LOG(INFO) << "RPC Save path=" << req->path();
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
+    if (req->path().empty()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "path is required");
+    }
+    LOG(INFO) << "RPC SaveAnimation anim=" << animationId << " path=" << req->path();
+    std::string errMsg;
+    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
     auto ok = invokeOnUi([&]() -> bool {
       if (!m_owner.doc()) {
+        errMsg = "doc not ready";
         return false;
       }
       auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
+      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
+      if (!anim) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "animation_id not found";
         return false;
       }
       // Mirror UI behavior: use Z3DAnimationDoc save to update name/path state
       const QString qpath = QString::fromStdString(req->path());
-      return ad.saveToPath(ids.front(), qpath);
+      if (qpath.trimmed().isEmpty()) {
+        errCode = grpc::StatusCode::INVALID_ARGUMENT;
+        errMsg = "path is empty";
+        return false;
+      }
+      return ad.saveToPath(static_cast<size_t>(animationId), qpath);
     });
     if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "save failed");
+      return Status(errCode, errMsg.empty() ? "save_animation failed" : errMsg);
     }
     reply->set_ok(true);
     return Status::OK;
-  }
-
-  Status SaveAnimation(ServerContext*, const SaveRequest* req, Bool* reply) override
-  {
-    // Alias of Save for clarity in clients
-    return Save(nullptr, req, reply);
   }
 
   Status SaveScene(ServerContext*, const SaveSceneRequest* req, Bool* reply) override

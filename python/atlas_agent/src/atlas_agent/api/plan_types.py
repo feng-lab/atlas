@@ -37,6 +37,7 @@ class Plan:
     - set_keys/remove_keys: timeline edits (animation lane)
     - commit: when True and any t=0 keys are present, server evaluates t=0 immediately
     """
+    animation_id: Optional[int] = None
     set_params: list[SetParam] = field(default_factory=list)
     set_keys: list[SetKey] = field(default_factory=list)
     remove_keys: list[RemoveKey] = field(default_factory=list)

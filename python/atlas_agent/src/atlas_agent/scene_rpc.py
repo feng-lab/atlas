@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import os
@@ -13,6 +14,12 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import grpc  # type: ignore[import-untyped]
+try:
+    from jsonschema import Draft7Validator as JsonSchemaValidator  # type: ignore
+    from jsonschema.exceptions import SchemaError as JsonSchemaError  # type: ignore
+except Exception:  # pragma: no cover
+    JsonSchemaValidator = None  # type: ignore[assignment]
+    JsonSchemaError = Exception  # type: ignore[assignment]
 from google.protobuf import empty_pb2, struct_pb2, wrappers_pb2  # type: ignore[import-untyped]
 from google.protobuf.json_format import MessageToDict  # type: ignore[import-untyped]
 from grpc_tools import protoc  # type: ignore[import-untyped]
@@ -22,6 +29,11 @@ from .discovery import compute_paths_from_atlas_dir, compute_protos_dir_from_atl
 DEFAULT_RPC_LOG_LEVEL = logging.WARNING
 DEFAULT_RPC_BOOTSTRAP_TIMEOUT_SEC = 1.0
 DEFAULT_RPC_BOOTSTRAP_TOTAL_WAIT_SEC = 30.0
+# How long we will wait for the 3D rendering engine to become ready after
+# requesting a 3D window. This is distinct from "RPC bootstrap" (server up).
+DEFAULT_ENGINE_READY_TOTAL_WAIT_SEC = 30.0
+DEFAULT_ENGINE_READY_POLL_INTERVAL_SEC = 0.2
+DEFAULT_ENGINE_READY_RPC_TIMEOUT_SEC = 10.0
 
 
 def _expand_path(s: str) -> str:
@@ -207,11 +219,17 @@ def _launch_atlas(*, atlas_dir: Path) -> None:
 class SceneClient:
     address: str = "localhost:50051"
     atlas_dir: str | None = None
+    # When true, validate user-supplied parameter values against the server's
+    # JSON Schemas before sending them over RPC.
+    strict_schema_validation: bool = True
     _tmpdir: Any = None
     _pb2: Any = None
     _pb2_grpc: Any = None
     _channel: Any = None
     _stub: Any = None
+    _param_list_cache: dict[int, Any] | None = None
+    _jsonschema_validator_cache: dict[str, Any] | None = None
+    _camera_param_json_key: str | None = None
 
     def __post_init__(self):
         # Configure logger (default INFO to stdout) once
@@ -286,23 +304,62 @@ class SceneClient:
 
         self._tmpdir, self._pb2, self._pb2_grpc = _load_stubs(atlas_dir_path)
         self._stub = self._pb2_grpc.SceneStub(self._channel)
+        self._param_list_cache = {}
+        self._jsonschema_validator_cache = {}
+        self._camera_param_json_key = None
 
-    def engine_ready(self) -> bool:
+    def engine_ready(self, *, timeout_sec: float | None = None) -> bool:
         req = self._pb2.Empty()
-        resp = self._stub.EngineReady(req)
+        kw = {}
+        if timeout_sec is not None:
+            kw["timeout"] = float(timeout_sec)
+        resp = self._stub.EngineReady(req, **kw)
         self._log_rpc("EngineReady", req, resp)
         return bool(resp.ok)
 
-    def ensure_view(self) -> bool:
-        # Ask GUI to ensure a 3D window/canvas exists, then wait for readiness
-        req = self._pb2.Empty()
-        resp = self._stub.Ensure3DWindow(req)
-        self._log_rpc("Ensure3DWindow", req, resp)
-        # Even if ok, give EngineReady a chance to see the engine
+    def ensure_view(self, *, require: bool = True) -> bool:
+        """Ensure a 3D view (and rendering engine) exists and is ready.
+
+        Notes:
+          - Ensure3DWindow is asynchronous on the UI side; EngineReady is the
+            authoritative signal that engine-backed RPCs are safe to call.
+          - When require=True (default), this raises on timeout so callers do not
+            proceed into FAILED_PRECONDITION errors.
+        """
+
+        # Fast-path: already ready (avoid waking UI)
         try:
-            return self.engine_ready()
+            if self.engine_ready(timeout_sec=DEFAULT_ENGINE_READY_RPC_TIMEOUT_SEC):
+                return True
         except Exception:
-            return False
+            # Fall through to requesting a window + polling readiness.
+            pass
+
+        # Ask GUI to ensure a 3D window/canvas exists, then wait for readiness.
+        req = self._pb2.Empty()
+        try:
+            resp = self._stub.Ensure3DWindow(req, timeout=1.0)
+            self._log_rpc("Ensure3DWindow", req, resp)
+        except Exception as e:
+            self._log_rpc("Ensure3DWindow", req, None, error=e)
+
+        deadline = time.time() + float(DEFAULT_ENGINE_READY_TOTAL_WAIT_SEC)
+        while time.time() < deadline:
+            try:
+                if self.engine_ready(timeout_sec=DEFAULT_ENGINE_READY_RPC_TIMEOUT_SEC):
+                    return True
+            except Exception:
+                # Server may still be initializing, or may be restarting.
+                pass
+            time.sleep(DEFAULT_ENGINE_READY_POLL_INTERVAL_SEC)
+
+        if require:
+            raise RuntimeError(
+                "3D engine not ready (timed out waiting after Ensure3DWindow).\n"
+                f"- waited_sec: {DEFAULT_ENGINE_READY_TOTAL_WAIT_SEC}\n"
+                "If Atlas is launching or loading a heavy scene, retry after it becomes responsive."
+            )
+        return False
 
     def _log_rpc(self, name: str, req: Any, resp: Any | None = None, error: Exception | None = None):
         def _safe(obj):
@@ -437,7 +494,13 @@ class SceneClient:
         """Deprecated in favor of scene_facts(). Left for backward compatibility."""
         return self.scene_facts().get("keys", {})
 
-    def scene_facts(self, *, include_values: bool = False, include_scene_values: bool = True) -> dict:
+    def scene_facts(
+        self,
+        *,
+        animation_id: int | None = None,
+        include_values: bool = False,
+        include_scene_values: bool = True,
+    ) -> dict:
         """Return a structured snapshot of the scene for verification/description.
 
         Shape:
@@ -462,11 +525,12 @@ class SceneClient:
                     "path": getattr(o, "path", ""),
                     "visible": bool(getattr(o, "visible", False)),
                 })
-            # Camera keys
-            lr = self.list_keys(id=0)
-            cam_times = [k.time for k in getattr(lr, "keys", [])]
-            if cam_times:
-                facts["keys"]["camera"] = sorted(cam_times)
+            # Camera keys (optional: only when an animation id is provided)
+            if animation_id is not None:
+                lr = self.list_keys(animation_id=int(animation_id), target_id=0, include_values=False)
+                cam_times = [k.time for k in getattr(lr, "keys", [])]
+                if cam_times:
+                    facts["keys"]["camera"] = sorted(cam_times)
         except Exception:
             pass
         # Objects and per-param keys
@@ -482,8 +546,15 @@ class SceneClient:
                     jk = getattr(p, "json_key", "")
                     if not jk:
                         continue
+                    if animation_id is None:
+                        continue
                     try:
-                        lr = self.list_keys(id=oid, json_key=jk, include_values=bool(include_values))
+                        lr = self.list_keys(
+                            animation_id=int(animation_id),
+                            target_id=int(oid),
+                            json_key=str(jk),
+                            include_values=bool(include_values),
+                        )
                         if include_values:
                             entries = []
                             for k in getattr(lr, "keys", []) or []:
@@ -533,6 +604,7 @@ class SceneClient:
     def scene_facts_compact(
         self,
         *,
+        animation_id: int | None = None,
         key_targets: dict[int, list[str]] | None = None,
         include_key_values: bool = False,
         scene_value_targets: dict[int, list[str]] | None = None,
@@ -572,9 +644,9 @@ class SceneClient:
             except Exception:
                 pass
 
-        if include_camera_key_times:
+        if include_camera_key_times and animation_id is not None:
             try:
-                lr = self.list_keys(id=0, include_values=False)
+                lr = self.list_keys(animation_id=int(animation_id), target_id=0, include_values=False)
                 cam_times = [float(getattr(k, "time", 0.0)) for k in getattr(lr, "keys", [])]
                 if cam_times:
                     facts["keys"]["camera"] = sorted(cam_times)
@@ -592,8 +664,15 @@ class SceneClient:
                 for jk in json_keys or []:
                     if not isinstance(jk, str) or not jk:
                         continue
+                    if animation_id is None:
+                        continue
                     try:
-                        lr = self.list_keys(id=oid_int, json_key=jk, include_values=bool(include_key_values))
+                        lr = self.list_keys(
+                            animation_id=int(animation_id),
+                            target_id=int(oid_int),
+                            json_key=str(jk),
+                            include_values=bool(include_key_values),
+                        )
                         if include_key_values:
                             entries = []
                             for k in getattr(lr, "keys", []) or []:
@@ -660,7 +739,7 @@ class SceneClient:
         """
 
         # BBox is implemented in the engine; ensure the 3D window/engine exists.
-        if not self.ensure_view():
+        if not self.ensure_view(require=False):
             return {"ok": False, "error": "engine not ready"}
 
         req = self._pb2.BBoxRequest(ids=[int(i) for i in (ids or [])], after_clipping=bool(after_clipping))
@@ -685,42 +764,36 @@ class SceneClient:
         }
 
     # Animation/timeline
-    def ensure_animation(self) -> bool:
-        # Ensure the rendering engine exists (open 3D view if necessary)
+    def ensure_animation(self, *, create_new: bool = False, name: str | None = None):
+        """Ensure an Animation3D exists and return its id.
+
+        Returns the raw EnsureAnimationResponse proto:
+          - ok (bool)
+          - animation_id (uint64)
+          - created (bool)
+          - error (string)
+        """
+        # Ensure the rendering engine exists (open 3D view if necessary).
         self.ensure_view()
-        # Only create animation when at least one visual object is loaded
-        try:
-            objs = self.list_objects()
-            has_visual = False
-            for o in getattr(objs, "objects", []):
-                t = (getattr(o, "type", "") or "").lower()
-                if t and "animation3d" not in t:
-                    has_visual = True
-                    break
-            if not has_visual:
-                self._logger.info("EnsureAnimation: skipped (no visual objects loaded yet)")
-                return False
-        except Exception:
-            pass
-        req = self._pb2.EnsureAnimationRequest()
+        req = self._pb2.EnsureAnimationRequest(create_new=bool(create_new), name=str(name or ""))
         resp = self._stub.EnsureAnimation(req)
         self._log_rpc("EnsureAnimation", req, resp)
-        return bool(getattr(resp, "ok", False))
+        return resp
 
-    def set_duration(self, seconds: float) -> bool:
-        req = self._pb2.SetDurationRequest(duration=seconds)
+    def set_duration(self, *, animation_id: int, seconds: float) -> bool:
+        req = self._pb2.SetDurationRequest(animation_id=int(animation_id), duration=float(seconds))
         resp = self._stub.SetDuration(req)
         self._log_rpc("SetDuration", req, resp)
         return resp.ok
 
-    def set_time(self, seconds: float, cancel_rendering: bool = False) -> bool:
-        req = self._pb2.SetTimeRequest(seconds=seconds, cancel_rendering=cancel_rendering)
+    def set_time(self, *, animation_id: int, seconds: float, cancel_rendering: bool = False) -> bool:
+        req = self._pb2.SetTimeRequest(animation_id=int(animation_id), seconds=float(seconds), cancel_rendering=cancel_rendering)
         resp = self._stub.SetTime(req)
         self._log_rpc("SetTime", req, resp)
         return resp.ok
 
-    def save_animation(self, path: Path) -> bool:
-        req = self._pb2.SaveRequest(path=str(path))
+    def save_animation(self, *, animation_id: int, path: Path) -> bool:
+        req = self._pb2.SaveAnimationRequest(animation_id=int(animation_id), path=str(path))
         resp = self._stub.SaveAnimation(req)
         self._log_rpc("SaveAnimation", req, resp)
         return resp.ok
@@ -928,22 +1001,22 @@ class SceneClient:
             out.append({"time": float(getattr(k, "time", 0.0)), "value": MessageToDict(getattr(k, "value"))})
         return out
 
-    def set_camera_interpolation_method(self, method: str) -> bool:
-        """Set camera animation interpolation method for the current animation."""
+    def set_camera_interpolation_method(self, *, animation_id: int, method: str) -> bool:
+        """Set camera animation interpolation method for an Animation3D."""
         self.ensure_view()
         if not hasattr(self._stub, "SetCameraInterpolationMethod"):
             raise RuntimeError("SetCameraInterpolationMethod is not supported by this Atlas version")
-        req = self._pb2.SetCameraInterpolationMethodRequest(method=str(method))
+        req = self._pb2.SetCameraInterpolationMethodRequest(animation_id=int(animation_id), method=str(method))
         resp = self._stub.SetCameraInterpolationMethod(req)
         self._log_rpc("SetCameraInterpolationMethod", req, resp)
         return bool(getattr(resp, "ok", False))
 
-    def get_camera_interpolation_method(self) -> str | None:
-        """Get camera animation interpolation method for the current animation."""
+    def get_camera_interpolation_method(self, *, animation_id: int) -> str | None:
+        """Get camera animation interpolation method for an Animation3D."""
         self.ensure_view()
         if not hasattr(self._stub, "GetCameraInterpolationMethod"):
             return None
-        req = empty_pb2.Empty()
+        req = self._pb2.GetCameraInterpolationMethodRequest(animation_id=int(animation_id))
         resp = self._stub.GetCameraInterpolationMethod(req)
         self._log_rpc("GetCameraInterpolationMethod", req, resp)
         try:
@@ -999,13 +1072,21 @@ class SceneClient:
     def camera_validate(
         self,
         *,
+        animation_id: int | None = None,
         ids: Optional[list[int]] = None,
         times: list[float],
-        values: list[dict],
+        values: list[dict] | None = None,
         constraints: Optional[dict] = None,
         policies: Optional[dict] = None,
     ) -> dict:
         self.ensure_view()
+        values = values or []
+        if values:
+            cam_key = self._camera_json_key()
+            values = [
+                self._validate_param_value(id=0, json_key=cam_key, value=v)  # type: ignore[arg-type]
+                for v in values
+            ]
         cons = None
         if constraints:
             cons = self._pb2.CameraConstraints(
@@ -1021,12 +1102,17 @@ class SceneClient:
                 adjust_distance=bool(policies.get("adjust_distance", False)),
                 adjust_clipping=bool(policies.get("adjust_clipping", False)),
             )
+        req_kwargs: dict[str, Any] = {
+            "ids": ids or [],
+            "times": [float(t) for t in times],
+            "values": [_to_proto_value(camera_value) for camera_value in values],
+            "constraints": cons if cons is not None else None,
+            "policies": pol if pol is not None else None,
+        }
+        if animation_id is not None:
+            req_kwargs["animation_id"] = int(animation_id)
         req = self._pb2.CameraValidateRequest(
-            ids=ids or [],
-            times=[float(t) for t in times],
-            values=[_to_proto_value(camera_value) for camera_value in values],
-            constraints=cons if cons is not None else None,
-            policies=pol if pol is not None else None,
+            **req_kwargs,
         )
         resp = self._stub.CameraValidate(req)
         self._log_rpc("CameraValidate", req, resp)
@@ -1048,11 +1134,13 @@ class SceneClient:
         return {"ok": bool(getattr(resp, "ok", False)), "results": results}
 
     # Keys
-    def set_key_camera(self, time: float, easing: str, value: Any) -> bool:
+    def set_key_camera(self, *, animation_id: int, time: float, easing: str, value: Any) -> bool:
         # Ensure engine/view exists before setting camera keys
         self.ensure_view()
+        cam_key = self._camera_json_key()
+        value = self._validate_param_value(id=0, json_key=cam_key, value=value)
         v = _to_proto_value(value)
-        req = self._pb2.SetKeyRequest(id=0, time=time, easing=easing, value=v)
+        req = self._pb2.SetKeyRequest(animation_id=int(animation_id), target_id=0, time=time, easing=easing, value=v)
         resp = self._stub.SetKey(req)
         self._log_rpc("SetKey(camera)", req, resp)
         return resp.ok
@@ -1060,36 +1148,147 @@ class SceneClient:
     def list_params(self, *, id: int):
         # Ensure engine is ready (and open a 3D window if necessary)
         self.ensure_view()
-        req = self._pb2.ListParamsRequest(id=int(id))
+        bound_id = int(id)
+        if self._param_list_cache is not None:
+            cached = self._param_list_cache.get(bound_id)
+            if cached is not None:
+                return cached
+        req = self._pb2.ListParamsRequest(id=bound_id)
         resp = self._stub.ListParams(req)
         self._log_rpc("ListParams", req, resp)
+        if self._param_list_cache is not None:
+            self._param_list_cache[bound_id] = resp
         return resp
 
-    def clear_keys(self, *, id: int, json_key: Optional[str] = None) -> bool:
+    def _camera_json_key(self) -> str:
+        if isinstance(self._camera_param_json_key, str) and self._camera_param_json_key.strip():
+            return self._camera_param_json_key
+        pl = self.list_params(id=0)
+        for p in getattr(pl, "params", []) or []:
+            jk = str(getattr(p, "json_key", "") or "").strip()
+            if jk:
+                self._camera_param_json_key = jk
+                return jk
+        raise RuntimeError("Camera parameter schema is unavailable (ListParams(id=0) returned empty).")
+
+    def _param_meta(self, *, id: int, json_key: str) -> Any | None:
+        pl = self.list_params(id=int(id))
+        for p in getattr(pl, "params", []) or []:
+            if str(getattr(p, "json_key", "") or "") == json_key:
+                return p
+        return None
+
+    def _param_value_schema(self, meta: Any) -> dict[str, Any] | bool:
+        try:
+            if hasattr(meta, "HasField") and meta.HasField("value_schema"):
+                schema = MessageToDict(getattr(meta, "value_schema")) or {}
+                return schema if isinstance(schema, dict) else {}
+        except Exception:
+            pass
+        return {}
+
+    def _normalize_value_for_param(self, *, param_type: str, value: Any) -> Any:
+        """Normalize common user-friendly aliases to canonical schema keys."""
+        if param_type != "3DTransform" or not isinstance(value, dict):
+            return value
+
+        # Patch-style: callers may provide any subset; omit unchanged fields.
+        # Accept common aliases and map them to canonical jsonKey names.
+        mapping = {
+            "Scale": "Scale Vec3",
+            "Scale Vec3": "Scale Vec3",
+            "Translation": "Translation Vec3",
+            "Translation Vec3": "Translation Vec3",
+            "Rotation": "Rotation Vec4",
+            "Rotation Vec4": "Rotation Vec4",
+            "Rotation Center": "Rotation Center Vec3",
+            "Rotation Center Vec3": "Rotation Center Vec3",
+            "Center": "Rotation Center Vec3",
+            "Center Vec3": "Rotation Center Vec3",
+        }
+        out: dict[str, Any] = {}
+        for k, v in value.items():
+            kk = mapping.get(str(k), str(k))
+            out[kk] = v
+        return out
+
+    def _validate_param_value(self, *, id: int, json_key: str, value: Any) -> Any:
+        if not self.strict_schema_validation:
+            return value
+        if JsonSchemaValidator is None:  # pragma: no cover
+            raise RuntimeError("jsonschema is not available (strict_schema_validation requires it).")
+
+        meta = self._param_meta(id=id, json_key=json_key)
+        if meta is None:
+            raise KeyError(f"json_key not found for id={id}: {json_key}")
+
+        param_type = str(getattr(meta, "type", "") or "")
+        normalized = self._normalize_value_for_param(param_type=param_type, value=value)
+        schema = self._param_value_schema(meta)
+        if not schema:
+            return normalized
+        if not isinstance(schema, dict):
+            raise RuntimeError(f"invalid value_schema for id={id} json_key={json_key}: {type(schema).__name__}")
+
+        try:
+            digest = hashlib.sha256(json.dumps(schema, sort_keys=True).encode("utf-8")).hexdigest()
+        except Exception:
+            digest = ""
+        cache_key = f"{id}:{json_key}:{digest}"
+        validator = None
+        if self._jsonschema_validator_cache is not None:
+            validator = self._jsonschema_validator_cache.get(cache_key)
+        if validator is None:
+            try:
+                validator = JsonSchemaValidator(schema)
+            except JsonSchemaError as e:
+                raise RuntimeError(
+                    "invalid value_schema received from server; cannot validate client payload.\n"
+                    f"- id: {id}\n"
+                    f"- json_key: {json_key}\n"
+                    f"- error: {e}"
+                ) from e
+            if self._jsonschema_validator_cache is not None:
+                self._jsonschema_validator_cache[cache_key] = validator
+
+        errors = list(validator.iter_errors(normalized))
+        if errors:
+            e = errors[0]
+            loc = "".join(
+                [f"[{repr(p)}]" if isinstance(p, int) else f".{p}" for p in e.path]
+            )
+            msg = f"{loc}: {e.message}" if loc else e.message
+            raise ValueError(
+                f"value does not match schema for id={id} json_key={json_key}: {msg}"
+            )
+        return normalized
+
+    def clear_keys(self, *, animation_id: int, target_id: int, json_key: Optional[str] = None) -> bool:
         self.ensure_view()
-        req = self._pb2.ClearKeysRequest(id=int(id), json_key=json_key or "")
+        req = self._pb2.ClearKeysRequest(animation_id=int(animation_id), target_id=int(target_id), json_key=json_key or "")
         resp = self._stub.ClearKeys(req)
         self._log_rpc("ClearKeys", req, resp)
         return resp.ok
 
     # Non-camera parameter key operations (id-based)
-    def set_key_param(self, *, id: int, json_key: str, time: float, easing: str = "Linear", value: Any) -> bool:
+    def set_key_param(self, *, animation_id: int, target_id: int, json_key: str, time: float, easing: str = "Linear", value: Any) -> bool:
         # Key writes require engine+doc on the server side; ensure the engine exists.
         self.ensure_view()
+        value = self._validate_param_value(id=int(target_id), json_key=str(json_key), value=value)
         v = _to_proto_value(value)
-        req = self._pb2.SetKeyRequest(id=int(id), json_key=json_key, time=float(time), easing=easing, value=v)
+        req = self._pb2.SetKeyRequest(animation_id=int(animation_id), target_id=int(target_id), json_key=json_key, time=float(time), easing=easing, value=v)
         resp = self._stub.SetKey(req)
         self._log_rpc("SetKey(param)", req, resp)
         return resp.ok
 
-    def remove_key(self, *, id: int, json_key: str, time: float) -> bool:
+    def remove_key(self, *, animation_id: int, target_id: int, json_key: str, time: float) -> bool:
         self.ensure_view()
-        req = self._pb2.RemoveKeyRequest(id=int(id), json_key=json_key, time=float(time))
+        req = self._pb2.RemoveKeyRequest(animation_id=int(animation_id), target_id=int(target_id), json_key=json_key, time=float(time))
         resp = self._stub.RemoveKey(req)
         self._log_rpc("RemoveKey", req, resp)
         return resp.ok
 
-    def batch(self, *, set_keys: list[dict] | None = None, remove_keys: list[dict] | None = None, commit: bool = True) -> bool:
+    def batch(self, *, animation_id: int, set_keys: list[dict] | None = None, remove_keys: list[dict] | None = None, commit: bool = True) -> bool:
         # Ensure engine/view exists before batch operations
         self.ensure_view()
         set_keys = set_keys or []
@@ -1097,25 +1296,31 @@ class SceneClient:
         if not set_keys and not remove_keys:
             self._logger.error("Batch: refusing to execute with empty set/remove")
             return False
-        # Construct protobuf requests (id-only requests)
+        # Construct protobuf requests (Animation3D-scoped ops)
         pb_set = []
         for s in set_keys:
-            id = int(s.get("id", -1))
+            target_id = int(s.get("target_id", s.get("id", -1)))
             val = s.get("value")
-            if id == 0:
+            if target_id == 0:
+                cam_key = self._camera_json_key()
+                val = self._validate_param_value(id=0, json_key=cam_key, value=val)
                 pb_set.append(
-                    self._pb2.SetKeyRequest(
-                        id=id,
+                    self._pb2.BatchSetKey(
+                        target_id=target_id,
                         time=float(s["time"]),
                         easing=str(s.get("easing", "Linear")),
                         value=_to_proto_value(val),
                     )
                 )
             else:
+                jk = str(s.get("json_key") or "")
+                if not jk:
+                    raise ValueError("Batch set_keys requires json_key when target_id != 0")
+                val = self._validate_param_value(id=target_id, json_key=jk, value=val)
                 pb_set.append(
-                    self._pb2.SetKeyRequest(
-                        id=id,
-                        json_key=str(s["json_key"]),
+                    self._pb2.BatchSetKey(
+                        target_id=target_id,
+                        json_key=str(jk),
                         time=float(s["time"]),
                         easing=str(s.get("easing", "Linear")),
                         value=_to_proto_value(val),
@@ -1123,13 +1328,19 @@ class SceneClient:
                 )
         pb_rem = []
         for r in remove_keys:
-            id = int(r.get("id", -1))
-            pb_rem.append(self._pb2.RemoveKeyRequest(id=id, json_key=str(r["json_key"]), time=float(r["time"])) )
+            target_id = int(r.get("target_id", r.get("id", -1)))
+            pb_rem.append(
+                self._pb2.BatchRemoveKey(
+                    target_id=target_id,
+                    json_key=str(r.get("json_key") or ""),
+                    time=float(r["time"]),
+                )
+            )
         # Human-friendly payload log (sanitized)
         def _summarize_keys(keys: list[dict]):
             out: list[dict] = []
             for k in keys:
-                id = int(k.get("id", -1))
+                target_id = int(k.get("target_id", k.get("id", -1)))
                 jk = k.get("json_key")
                 t = float(k.get("time", 0.0))
                 ez = k.get("easing", "")
@@ -1140,14 +1351,15 @@ class SceneClient:
                     except Exception:
                         val = str(val)
                 # Log full payloads for transparency (no truncation)
-                out.append({"id": id, "json_key": jk, "time": t, "easing": ez, "value": val})
+                out.append({"target_id": target_id, "json_key": jk, "time": t, "easing": ez, "value": val})
             return out
         self._logger.info("Batch(payload) %s", json.dumps({
+            "animation_id": int(animation_id),
             "commit": bool(commit),
             "set_keys": _summarize_keys(set_keys),
             "remove_keys": _summarize_keys(remove_keys),
         }))
-        req = self._pb2.BatchRequest(set_keys=pb_set, remove_keys=pb_rem, commit=bool(commit))
+        req = self._pb2.BatchRequest(animation_id=int(animation_id), set_keys=pb_set, remove_keys=pb_rem, commit=bool(commit))
         resp = self._stub.Batch(req)
         self._log_rpc("Batch", req, resp)
 
@@ -1155,12 +1367,12 @@ class SceneClient:
         try:
             missing: list[dict] = []
             for s in set_keys:
-                id = int(s.get("id", -1))
-                lr = self.list_keys(id=int(id), json_key=str(s.get("json_key", "")))
+                target_id = int(s.get("target_id", s.get("id", -1)))
+                lr = self.list_keys(animation_id=int(animation_id), target_id=int(target_id), json_key=str(s.get("json_key", "")))
                 target_times = [k.time for k in getattr(lr, "keys", [])]
                 want_t = float(s.get("time", 0.0))
                 if not any(abs(want_t - t) < 1e-6 for t in target_times):
-                    missing.append({"id": id, "json_key": s.get("json_key"), "time": want_t})
+                    missing.append({"target_id": target_id, "json_key": s.get("json_key"), "time": want_t})
             if missing:
                 self._logger.warning("Batch verify: missing keys at times: %s", json.dumps(missing))
             else:
@@ -1169,17 +1381,22 @@ class SceneClient:
             self._log_rpc("BatchVerify", req, None, error=e)
         return bool(resp.ok)
 
-    def list_keys(self, *, id: int, json_key: Optional[str] = None, include_values: bool = False):
-        # Ensure engine/view exists. Do not force-create animation here to avoid
-        # creating empty animations before objects are loaded.
+    def list_keys(self, *, animation_id: int, target_id: int, json_key: Optional[str] = None, include_values: bool = False):
+        # Ensure engine/view exists. Do not force-create animations here; callers
+        # must supply an explicit Animation3D id for determinism.
         self.ensure_view()
-        req = self._pb2.ListKeysRequest(id=int(id), json_key=json_key or "", include_values=bool(include_values))
+        req = self._pb2.ListKeysRequest(
+            animation_id=int(animation_id),
+            target_id=int(target_id),
+            json_key=json_key or "",
+            include_values=bool(include_values),
+        )
         resp = self._stub.ListKeys(req)
         self._log_rpc("ListKeys", req, resp)
         return resp
 
-    def get_time(self):
-        req = self._pb2.Empty()
+    def get_time(self, *, animation_id: int):
+        req = self._pb2.GetTimeRequest(animation_id=int(animation_id))
         resp = self._stub.GetTime(req)
         self._log_rpc("GetTime", req, resp)
         return resp
@@ -1248,11 +1465,14 @@ class SceneClient:
         pb_items = []
         for it in set_params:
             id = int(it.get("id"))
+            json_key = str(it["json_key"])
+            value = it.get("value")
+            value = self._validate_param_value(id=id, json_key=json_key, value=value)
             pb_items.append(
                 self._pb2.SetParam(
                     id=id,
-                    json_key=str(it["json_key"]),
-                    value=_to_proto_value(it.get("value")),
+                    json_key=json_key,
+                    value=_to_proto_value(value),
                 )
             )
         req = self._pb2.ValidateSceneParamsRequest(set_params=pb_items)
@@ -1277,11 +1497,14 @@ class SceneClient:
         pb_items = []
         for it in set_params:
             id = int(it.get("id"))
+            json_key = str(it["json_key"])
+            value = it.get("value")
+            value = self._validate_param_value(id=id, json_key=json_key, value=value)
             pb_items.append(
                 self._pb2.SetParam(
                     id=id,
-                    json_key=str(it["json_key"]),
-                    value=_to_proto_value(it.get("value")),
+                    json_key=json_key,
+                    value=_to_proto_value(value),
                 )
             )
         req = self._pb2.ApplySceneParamsRequest(set_params=pb_items)

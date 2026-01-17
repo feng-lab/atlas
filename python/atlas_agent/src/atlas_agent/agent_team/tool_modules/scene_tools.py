@@ -9,10 +9,10 @@ from typing import Any, Dict, List
 # Fail-fast required third-party imports
 from google.protobuf.json_format import MessageToDict
 
-try:
-    from jsonschema import Draft202012Validator as JsonSchemaValidator  # type: ignore
-except Exception:
-    from jsonschema import Draft7Validator as JsonSchemaValidator  # type: ignore
+# Server-provided schemas currently follow a Draft-07 style (notably tuple validation via
+# `items: [ ... ]`). Prefer Draft7 for validation so we don't reject valid server schemas.
+from jsonschema import Draft202012Validator, Draft7Validator  # type: ignore
+from jsonschema.exceptions import SchemaError as JsonSchemaError  # type: ignore
 
 from ...capabilities_prompt import build_capabilities_prompt
 from ...discovery import discover_schema_dir
@@ -1107,7 +1107,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         limit = int(args.get("sample_limit", 6))
         sid_opt = args.get("id")
         jks = args.get("json_keys") or []
-        facts = client.scene_facts()
+        cur_anim_id = 0
+        try:
+            cur_anim_id = int(ctx.runtime_state.get("current_animation_id", 0) or 0)
+        except Exception:
+            cur_anim_id = 0
+        if cur_anim_id > 0:
+            facts = client.scene_facts(animation_id=cur_anim_id)
+        else:
+            facts = client.scene_facts()
         lines: list[str] = []
         # Objects summary
         objs = facts.get("objects_list") or []
@@ -1118,7 +1126,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             )
         # Time status
         try:
-            ts = client.get_time()
+            if cur_anim_id <= 0:
+                raise RuntimeError("no current_animation_id")
+            ts = client.get_time(animation_id=cur_anim_id)
             cur = float(getattr(ts, "seconds", 0.0) or 0.0)
             dur = float(getattr(ts, "duration", 0.0) or 0.0)
             lines.append(f"Time: t={cur:.3f}s / duration={dur:.3f}s")
@@ -1296,19 +1306,30 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             )
         # Warn when timeline keys exist for the same id/json_key (scene values overridden during playback)
         overrides: list[dict] = []
+        cur_anim_id = 0
         try:
-            for p in norm_params:
-                id2 = int(p.get("id", -1))
-                jk2 = p.get("json_key")
-                if id2 >= 0 and jk2:
-                    lr = client.list_keys(id=id2, json_key=jk2, include_values=False)
-                    times = [k.time for k in getattr(lr, "keys", [])]
-                    if times:
-                        overrides.append(
-                            {"id": id2, "json_key": jk2, "key_times": times}
-                        )
+            cur_anim_id = int(ctx.runtime_state.get("current_animation_id", 0) or 0)
         except Exception:
-            pass
+            cur_anim_id = 0
+        if cur_anim_id > 0:
+            try:
+                for p in norm_params:
+                    id2 = int(p.get("id", -1))
+                    jk2 = p.get("json_key")
+                    if id2 >= 0 and jk2:
+                        lr = client.list_keys(
+                            animation_id=cur_anim_id,
+                            target_id=id2,
+                            json_key=jk2,
+                            include_values=False,
+                        )
+                        times = [k.time for k in getattr(lr, "keys", [])]
+                        if times:
+                            overrides.append(
+                                {"id": id2, "json_key": jk2, "key_times": times}
+                            )
+            except Exception:
+                pass
         ok = client.apply_params(norm_params)
         resp = {
             "ok": bool(ok),
@@ -1472,7 +1493,21 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         cache_key = f"{id}:{json_key}:{digest}"
         validator = _schema_validator_cache.get(cache_key)
         if validator is None:
-            validator = JsonSchemaValidator(schema or {})
+            # Prefer Draft-07 unless the schema opts into 2020-12 vocabulary.
+            try:
+                if schema is True:
+                    validator = Draft7Validator({})
+                elif schema is False:
+                    validator = Draft7Validator({"not": {}})
+                else:
+                    schema_dict = schema or {}
+                    use_2020 = False
+                    if isinstance(schema_dict, dict):
+                        sch = str(schema_dict.get("$schema") or "")
+                        use_2020 = ("2020-12" in sch) or ("prefixItems" in schema_dict)
+                    validator = Draft202012Validator(schema_dict) if use_2020 else Draft7Validator(schema_dict)
+            except JsonSchemaError as e:
+                return json.dumps({"ok": False, "error": f"invalid_value_schema: {e}"})
             _schema_validator_cache[cache_key] = validator
         errors = list(validator.iter_errors(value))
         if errors:

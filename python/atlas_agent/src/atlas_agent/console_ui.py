@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import Any, Optional
 
 from .chat_rpc_team import ChatTeam
@@ -267,12 +268,23 @@ def run_console_repl(
                         console.print(str(ev), markup=False)
                 continue
             if cmd == "save" and rest:
-                ok = team.scene.save_animation(rest[0])
+                ok = False
+                try:
+                    resp = team.scene.ensure_animation(create_new=False, name=None)
+                    aid = int(getattr(resp, "animation_id", 0) or 0)
+                    if bool(getattr(resp, "ok", False)) and aid > 0:
+                        ok = bool(team.scene.save_animation(animation_id=aid, path=Path(rest[0])))
+                except Exception:
+                    ok = False
                 console.print("[green]ok[/green]" if ok else "[red]fail[/red]")
                 continue
             if cmd == "time" and rest:
                 try:
-                    ok = team.scene.set_time(float(rest[0]))
+                    ok = False
+                    resp = team.scene.ensure_animation(create_new=False, name=None)
+                    aid = int(getattr(resp, "animation_id", 0) or 0)
+                    if bool(getattr(resp, "ok", False)) and aid > 0:
+                        ok = bool(team.scene.set_time(animation_id=aid, seconds=float(rest[0])))
                 except Exception:
                     ok = False
                 console.print("[green]ok[/green]" if ok else "[red]fail[/red]")

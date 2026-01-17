@@ -41,13 +41,29 @@ class CameraAPI:
             raise RuntimeError("camera_solve returned no keys")
         return keys
 
-    def validate(self, *, ids: list[int], times: list[float], values: Optional[list[dict]] = None, constraints: Optional[dict] = None, policies: Optional[dict] = None) -> dict:
-        # values may be omitted; server fills by sampling current animation at times
-        res = self.client.camera_validate(ids=ids, times=times, values=values or [], constraints=constraints or {"keep_visible": True, "min_coverage": 0.95}, policies=policies or {"adjust_fov": False, "adjust_distance": False, "adjust_clipping": False})
+    def validate(
+        self,
+        *,
+        animation_id: int | None = None,
+        ids: list[int],
+        times: list[float],
+        values: Optional[list[dict]] = None,
+        constraints: Optional[dict] = None,
+        policies: Optional[dict] = None,
+    ) -> dict:
+        # values may be omitted; the server can fill by sampling the animation at times when animation_id is provided
+        res = self.client.camera_validate(
+            animation_id=animation_id,
+            ids=ids,
+            times=times,
+            values=values or [],
+            constraints=constraints or {"keep_visible": True, "min_coverage": 0.95},
+            policies=policies or {"adjust_fov": False, "adjust_distance": False, "adjust_clipping": False},
+        )
         return res
 
-    def write_keys(self, *, keys: list[dict], easing: str = "Linear", commit: bool = True) -> None:
+    def write_keys(self, *, animation_id: int, keys: list[dict], easing: str = "Linear", commit: bool = True) -> None:
         set_keys = [{"id": 0, "time": float(k["time"]), "easing": easing, "value": k["value"]} for k in keys]
-        ok = self.client.batch(set_keys=set_keys, remove_keys=[], commit=commit)
+        ok = self.client.batch(animation_id=int(animation_id), set_keys=set_keys, remove_keys=[], commit=commit)
         if not ok:
             raise RuntimeError("Batch failed when writing camera keys")

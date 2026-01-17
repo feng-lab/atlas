@@ -333,26 +333,32 @@ json::value Z3DCameraParameter::jsonValue() const
 
 void Z3DCameraParameter::readValue(const json::value& jsonValue)
 {
-  if (jsonValue.is_object()) {
-    const auto& obj = jsonValue.as_object();
-    m_projectionType.read(obj);
-    m_eye.read(obj);
-    m_center.read(obj);
-    m_upVector.read(obj);
-    m_eyeSeparationAngle.read(obj);
-    m_fieldOfView.read(obj);
-    // m_nearDist.read(obj);
-    // m_farDist.read(obj);
-  }
+  // readValue is used at system boundaries (RPC, serialization). Treat nested parameter reads
+  // as an atomic update: avoid re-entrant update* slots firing mid-parse.
+  {
+    QScopedValueRollback<bool> guard(m_blockSubParameterSignals, true);
 
-  if (m_projectionType.isSelected("Perspective")) {
-    m_value.setProjectionType(Z3DCamera::ProjectionType::Perspective);
-  } else {
-    m_value.setProjectionType(Z3DCamera::ProjectionType::Orthographic);
+    if (jsonValue.is_object()) {
+      const auto& obj = jsonValue.as_object();
+      m_projectionType.read(obj);
+      m_eye.read(obj);
+      m_center.read(obj);
+      m_upVector.read(obj);
+      m_eyeSeparationAngle.read(obj);
+      m_fieldOfView.read(obj);
+      // m_nearDist.read(obj);
+      // m_farDist.read(obj);
+    }
+
+    if (m_projectionType.isSelected("Perspective")) {
+      m_value.setProjectionType(Z3DCamera::ProjectionType::Perspective);
+    } else {
+      m_value.setProjectionType(Z3DCamera::ProjectionType::Orthographic);
+    }
+    m_value.setCamera(m_eye.get(), m_center.get(), m_upVector.get());
+    m_value.setFrustum(glm::radians(m_fieldOfView.get()), m_value.aspectRatio(), m_nearDist.get(), m_farDist.get());
+    m_value.setEyeSeparationAngle(glm::radians(m_eyeSeparationAngle.get()));
   }
-  m_value.setCamera(m_eye.get(), m_center.get(), m_upVector.get());
-  m_value.setFrustum(glm::radians(m_fieldOfView.get()), m_value.aspectRatio(), m_nearDist.get(), m_farDist.get());
-  m_value.setEyeSeparationAngle(glm::radians(m_eyeSeparationAngle.get()));
   Q_EMIT valueChanged();
 }
 

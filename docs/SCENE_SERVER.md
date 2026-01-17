@@ -124,22 +124,23 @@ Note: cuts are global view settings (typically `id=3` in the parameter system), 
 
 Keyframes override base scene values during playback/preview at nonzero times.
 
-- `EnsureAnimation() -> { ok }` (create/bind a default 3D animation with a baseline t=0 frame)
-- `SetDuration(seconds) -> { ok }`
-- `SetTime { seconds, cancel_rendering? } -> { ok }`
-- `SetKey { id, json_key?, time, easing, value } -> { ok }`
-  - `id=0` for camera (json_key ignored), or `>=4` for objects.
+- `EnsureAnimation { create_new?, name? } -> { ok, animation_id, created, error? }`
+  - Creates or selects an `Animation3D` object and binds it for editing in the GUI.
+  - All subsequent timeline operations require the returned `animation_id`.
+- `SetDuration { animation_id, seconds } -> { ok }`
+- `SetTime { animation_id, seconds, cancel_rendering? } -> { ok }`
+- `SetKey { animation_id, target_id, json_key?, time, easing, value } -> { ok }`
+  - `target_id=0` for camera (json_key ignored), or `>=4` for objects.
   - `value` is typed JSON via protobuf `Value` (camera is an object; options are strings; vectors are arrays).
-- `ClearKeys { id, json_key? } -> { ok }`
-  - For `id=0`, clears all camera keys.
-- `RemoveKey { id, json_key, time } -> { ok }`
-- `Batch { set_keys, remove_keys, commit? } -> { ok }`
-- `SaveAnimation { path } -> { ok }` (writes `.animation3d`)
-  - `Save` is an alias of `SaveAnimation`.
+- `ClearKeys { animation_id, target_id, json_key? } -> { ok }`
+  - For `target_id=0`, clears all camera keys.
+- `RemoveKey { animation_id, target_id, json_key, time } -> { ok }`
+- `Batch { animation_id, set_keys, remove_keys, commit? } -> { ok }`
+- `SaveAnimation { animation_id, path } -> { ok }` (writes `.animation3d`)
 
 ## Camera Helpers (Typed Values; No Key Writes)
 
-These return typed camera values/keys that clients can write via `SetKey(id=0, ...)`:
+These return typed camera values/keys that clients can write via `SetKey(animation_id, target_id=0, ...)`:
 
 - `CameraGet() -> { values:[Value] }`
   - Returns the current engine camera as a typed value.
@@ -169,14 +170,14 @@ These return typed camera values/keys that clients can write via `SetKey(id=0, .
 - `FitCandidates {} -> { ids:[uint64] }`
   - Returns visual object ids suitable for camera fit/orbit (excludes Animation3D).
 - `CameraSolve { mode:"FIT|ORBIT|DOLLY|STATIC", ids, t0, t1, constraints?, params? } -> { keys:[{time,value}...] }`
-- `CameraValidate { ids, times, values?, constraints?, policies? } -> { ok, results:[{time, within_frame, coverage, adjusted, adjusted_value?, reason}] }`
-  - If `values` are omitted, the server may sample the current animation camera at those `times`.
+- `CameraValidate { ids, times, values?, constraints?, policies?, animation_id? } -> { ok, results:[{time, within_frame, coverage, adjusted, adjusted_value?, reason}] }`
+  - If `values` are omitted (or shorter than `times`), `animation_id` is required and the server samples the animation camera at those `times`.
   - Interior walkthroughs: set `constraints.keep_visible=false` to disable the coverage threshold (so the camera can go inside / let the bbox leave the frame).
 
 ## Camera Animation Settings (Timeline Evaluation)
 
-- `SetCameraInterpolationMethod { method } -> { ok }`
-- `GetCameraInterpolationMethod {} -> string` (protobuf `StringValue`)
+- `SetCameraInterpolationMethod { animation_id, method } -> { ok }`
+- `GetCameraInterpolationMethod { animation_id } -> string` (protobuf `StringValue`)
 
 Supported `method` strings:
 - `Center`
@@ -185,10 +186,10 @@ Supported `method` strings:
 
 ## Introspection
 
-- `ListKeys { id, json_key?, include_values? } -> { keys:[{time,type,value_json?}] }`
-  - For `id=0` (camera), `json_key` is ignored.
+- `ListKeys { animation_id, target_id, json_key?, include_values? } -> { keys:[{time,type,value_json?}] }`
+  - For `target_id=0` (camera), `json_key` is ignored.
   - For non-camera tracks, provide the parameter `json_key`.
-- `GetTime {} -> { seconds, duration }`
+- `GetTime { animation_id } -> { seconds, duration }`
 
 ## Notes
 

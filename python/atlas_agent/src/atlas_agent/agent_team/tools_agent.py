@@ -197,7 +197,16 @@ def scene_tools_and_dispatcher(
 
         module = TOOL_TO_MODULE.get(name)
         if module:
-            result = module.handle(name, args, ctx)
+            try:
+                result = module.handle(name, args, ctx)
+            except Exception as e:
+                msg = str(e)
+                try:
+                    # gRPC RpcError and some internal exceptions expose details()
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+                return json.dumps({"ok": False, "error": msg})
             if result is not None:
                 return result
 

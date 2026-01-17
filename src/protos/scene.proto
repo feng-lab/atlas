@@ -50,22 +50,40 @@ message CapabilitiesResponse {
   map<string, ParamList> objects = 4;
 }
 
-message EnsureAnimationRequest {}
-message SetDurationRequest { double duration = 1; }
+message EnsureAnimationRequest {
+  // When true, always create a new Animation3D (even if one already exists).
+  bool create_new = 1;
+  // Optional name for a newly created Animation3D.
+  string name = 2;
+}
+
+message EnsureAnimationResponse {
+  bool ok = 1;
+  uint64 animation_id = 2;
+  bool created = 3;
+  string error = 4;
+}
+
+message SetDurationRequest {
+  uint64 animation_id = 1;
+  double duration = 2;
+}
 
 message SetKeyRequest {
-  uint64 id = 1;           // 0=camera, 1=background, 2=axis, 3=global, >=4=object id
-  string json_key = 2;   // non-camera only
-  double time = 3;       // seconds
-  string easing = 4;     // e.g., "Linear", "InOutSine"
-  google.protobuf.Value value = 5; // typed JSON value payload (camera: object; params: number/bool/string/array)
+  uint64 animation_id = 1; // Animation3D object id
+  uint64 target_id = 2;    // 0=camera, 1=background, 2=axis, 3=global, >=4=object id
+  string json_key = 3;     // non-camera only
+  double time = 4;         // seconds
+  string easing = 5;       // e.g., "Linear", "InOutSine"
+  google.protobuf.Value value = 6; // typed JSON value payload (camera: object; params: number/bool/string/array)
 }
 
 // Query keys present in the current animation for a specific target
 message ListKeysRequest {
-  uint64 id = 1;          // 0=camera, >=4 object id
-  string json_key = 2;    // required for non-camera scope; ignored for camera
-  bool include_values = 3; // when true, include value_json for each key
+  uint64 animation_id = 1; // Animation3D object id
+  uint64 target_id = 2;    // 0=camera, >=4 object id
+  string json_key = 3;     // required for non-camera scope; ignored for camera
+  bool include_values = 4; // when true, include value_json for each key
 }
 
 message KeyInfo {
@@ -104,7 +122,7 @@ service Scene {
   // Render a single-frame screenshot of the current 3D scene (no animation export).
   // Returns the written image path (typically in the OS temp directory unless a path is provided).
   rpc TakeScreenshot3D (ScreenshotRequest) returns (ScreenshotResponse);
-  rpc EnsureAnimation (EnsureAnimationRequest) returns (Bool);
+  rpc EnsureAnimation (EnsureAnimationRequest) returns (EnsureAnimationResponse);
   rpc SetDuration (SetDurationRequest) returns (Bool);
   rpc SetKey (SetKeyRequest) returns (Bool);
   // Camera helpers
@@ -144,14 +162,13 @@ service Scene {
   rpc SetTime (SetTimeRequest) returns (Bool);
   // Camera animation settings (timeline)
   rpc SetCameraInterpolationMethod (SetCameraInterpolationMethodRequest) returns (Bool);
-  rpc GetCameraInterpolationMethod (google.protobuf.Empty) returns (google.protobuf.StringValue);
+  rpc GetCameraInterpolationMethod (GetCameraInterpolationMethodRequest) returns (google.protobuf.StringValue);
   // Save/export
   // Save current animation to .animation3d
-  rpc Save (SaveRequest) returns (Bool);
-  rpc SaveAnimation (SaveRequest) returns (Bool);
+  rpc SaveAnimation (SaveAnimationRequest) returns (Bool);
   // Introspection
   rpc ListKeys (ListKeysRequest) returns (KeysResponse);
-  rpc GetTime (Empty) returns (TimeStatus);
+  rpc GetTime (GetTimeRequest) returns (TimeStatus);
 }
 
 // Scene (stateless) parameter messages
@@ -326,6 +343,8 @@ message CameraValidateRequest {
   repeated google.protobuf.Value values = 3; // typed camera values
   CameraConstraints constraints = 4;
   CameraPolicies policies = 5;
+  // Optional: when values are missing, sample the camera from this Animation3D at each time.
+  uint64 animation_id = 6;
 }
 
 message CameraValidateResult {
@@ -395,25 +414,60 @@ message CutSuggestion {
 // Parameter enumeration for a target id (0=camera,1=background,2=axis,3=global,≥4=object id)
 message ListParamsRequest { uint64 id = 1; }
 
-// Keyframe ops
-message ClearKeysRequest { uint64 id = 1; string json_key = 2; }
-message RemoveKeyRequest { uint64 id = 1; string json_key = 2; double time = 3; }
+// Keyframe ops (Animation3D object id + per-track operations)
+message ClearKeysRequest {
+  uint64 animation_id = 1;
+  uint64 target_id = 2;
+  string json_key = 3;
+}
+message RemoveKeyRequest {
+  uint64 animation_id = 1;
+  uint64 target_id = 2;
+  string json_key = 3;
+  double time = 4;
+}
+
+message BatchSetKey {
+  uint64 target_id = 1;
+  string json_key = 2;
+  double time = 3;
+  string easing = 4;
+  google.protobuf.Value value = 5;
+}
+message BatchRemoveKey {
+  uint64 target_id = 1;
+  string json_key = 2;
+  double time = 3;
+}
 message BatchRequest {
-  repeated SetKeyRequest set_keys = 1;
-  repeated RemoveKeyRequest remove_keys = 2;
-  bool commit = 3;
+  uint64 animation_id = 1;
+  repeated BatchSetKey set_keys = 2;
+  repeated BatchRemoveKey remove_keys = 3;
+  bool commit = 4;
 }
 
 // Playback controls
-message SetTimeRequest { double seconds = 1; bool cancel_rendering = 2; }
+message SetTimeRequest {
+  uint64 animation_id = 1;
+  double seconds = 2;
+  bool cancel_rendering = 3;
+}
 
 // Camera animation settings
 message SetCameraInterpolationMethodRequest {
-  string method = 1; // "Center" | "Position Spline" | "Position Rotation Spline" (case-insensitive)
+  uint64 animation_id = 1;
+  string method = 2; // "Center" | "Position Spline" | "Position Rotation Spline" (case-insensitive)
 }
 
-// Save
-message SaveRequest { string path = 1; }
+message GetCameraInterpolationMethodRequest { uint64 animation_id = 1; }
+
+// Save animation
+message SaveAnimationRequest {
+  uint64 animation_id = 1;
+  string path = 2;
+}
+
+message GetTimeRequest { uint64 animation_id = 1; }
 
 // Time status
 message TimeStatus { double seconds = 1; double duration = 2; }

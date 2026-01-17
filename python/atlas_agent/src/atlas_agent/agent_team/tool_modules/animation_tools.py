@@ -659,7 +659,10 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "animation_get_time",
-            "description": "Animation (timeline): get current playback seconds and duration.",
+            "description": (
+                "Animation (timeline): get current playback seconds and duration.\n"
+                "Fails (ok=false) when no Animation3D exists yet; call animation_ensure_animation first."
+            ),
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -667,8 +670,26 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "animation_ensure_animation",
-            "description": "Ensure a 3D animation exists in the GUI.",
-            "parameters": {"type": "object", "properties": {}},
+            "description": (
+                "Ensure a 3D animation exists and is bound/selected for editing.\n"
+                "Returns {ok, animation_id, created}.\n"
+                "Use the returned animation_id for all subsequent animation_* tool calls."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "create_new": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, create a new Animation3D object (instead of reusing an existing one).",
+                    },
+                    "name": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Optional display name for the created animation (empty means default).",
+                    },
+                },
+            },
         },
     },
     {
@@ -832,46 +853,27 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "animation_export_video",
-            "description": "Export an .animation3d to MP4 using the Atlas headless exporter.",
+            "description": (
+                "Export the current Animation3D to MP4 using the Atlas headless exporter.\n"
+                "This tool saves the live animation (animation_id) to a temporary .animation3d file first.\n"
+                "Note: video export is slower/heavier than previews; prefer scene_screenshot or animation_render_preview for verification."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "animation": {
-                        "type": "string",
-                        "description": "Path to .animation3d file",
-                    },
                     "out": {"type": "string", "description": "Output .mp4 path"},
-                    "fps": {"type": "number", "description": "Frames per second"},
-                    "start": {
-                        "type": "integer",
-                        "description": "Start frame (inclusive)",
-                    },
-                    "end": {
-                        "type": "integer",
-                        "description": "End frame (inclusive, -1 = duration)",
-                    },
-                    "width": {"type": "integer", "description": "Output width"},
-                    "height": {"type": "integer", "description": "Output height"},
+                    "fps": {"type": "number", "default": 30, "description": "Frames per second"},
+                    "start": {"type": "integer", "default": 0, "description": "Start frame (inclusive)"},
+                    "end": {"type": "integer", "default": -1, "description": "End frame (inclusive, -1 = duration)"},
+                    "width": {"type": "integer", "default": 1920, "description": "Output width"},
+                    "height": {"type": "integer", "default": 1080, "description": "Output height"},
                     "overwrite": {
                         "type": "boolean",
+                        "default": True,
                         "description": "Overwrite output if exists",
                     },
-                    "use_gpu_devices": {
-                        "type": "string",
-                        "description": "Linux only: comma-separated GPU ids, e.g. '0,1'",
-                    },
                 },
-                "required": [
-                    "animation",
-                    "out",
-                    "fps",
-                    "start",
-                    "end",
-                    "width",
-                    "height",
-                    "overwrite",
-                    "use_gpu_devices",
-                ],
+                "required": ["out"],
             },
         },
     },
@@ -900,6 +902,38 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         },
     },
 ]
+
+_ANIMATION_ID_PARAM_SCHEMA: Dict[str, Any] = {
+    "type": "integer",
+    "description": "Animation3D object id. Use animation_ensure_animation to create/select an animation and obtain this id.",
+}
+
+# Most animation tools operate on a specific Animation3D object and must be deterministic.
+# We therefore require an explicit `animation_id` for all *live* animation operations.
+_ANIMATION_TOOLS_WITHOUT_ANIMATION_ID: set[str] = {
+    "animation_describe_file",   # file-only
+    "animation_ensure_animation" # returns animation_id
+}
+
+for _spec in TOOL_SPECS:
+    try:
+        fn = _spec.get("function", {})
+        nm = str(fn.get("name") or "")
+        if not nm.startswith("animation_"):
+            continue
+        if nm in _ANIMATION_TOOLS_WITHOUT_ANIMATION_ID:
+            continue
+        params = fn.get("parameters")
+        if not isinstance(params, dict):
+            params = {"type": "object", "properties": {}}
+            fn["parameters"] = params
+        props = params.get("properties")
+        if not isinstance(props, dict):
+            props = {}
+            params["properties"] = props
+        props.setdefault("animation_id", dict(_ANIMATION_ID_PARAM_SCHEMA))
+    except Exception:
+        continue
 
 _GROUP_ID_TO_NAME = {1: "Background", 2: "Axis", 3: "Global"}
 
@@ -945,10 +979,10 @@ def _resolve_track_json_key(
     return None
 
 
-def _save_current_animation_to_temp(client) -> dict:
+def _save_animation_to_temp(client, *, animation_id: int) -> dict:
     with tempfile.TemporaryDirectory(prefix="atlas_agent_anim_") as td:
         p = Path(td) / "current.animation3d"
-        ok = client.save_animation(p)
+        ok = client.save_animation(animation_id=int(animation_id), path=p)
         if not ok:
             raise RuntimeError("SaveAnimation failed (no animation available?)")
         return load_animation(p)
@@ -998,6 +1032,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     _schema_validator_cache = ctx.schema_validator_cache
 
     if name == "animation_set_param_by_name":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         name_str = str(args.get("name", ""))
         type_hint = args.get("type_hint")
@@ -1059,7 +1096,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         # Typed SetKey
         try:
             ok = client.set_key_param(
-                id=id,
+                animation_id=animation_id,
+                target_id=id,
                 json_key=target_jk,
                 time=time_v,
                 easing=easing,
@@ -1082,6 +1120,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             )
 
     if name == "animation_remove_key_param_at_time":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         if id == 0:
             return json.dumps(
@@ -1097,12 +1138,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if not _json_key_exists(id, json_key):
             return json.dumps({"ok": False, "error": "json_key not found for id"})
         try:
-            lr = client.list_keys(id=id, json_key=json_key, include_values=False)
+            lr = client.list_keys(animation_id=animation_id, target_id=id, json_key=json_key, include_values=False)
             times = [k.time for k in getattr(lr, "keys", [])]
             to_remove = [t for t in times if abs(t - time_v) <= tol]
             removed = 0
             for t in to_remove:
-                ok = client.remove_key(id=id, json_key=json_key, time=t)
+                ok = client.remove_key(animation_id=animation_id, target_id=id, json_key=json_key, time=t)
                 if ok:
                     removed += 1
             return json.dumps({"ok": True, "removed": removed})
@@ -1115,6 +1156,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_replace_key_param":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         if id == 0:
             return json.dumps(
@@ -1136,6 +1180,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     "animation_remove_key_param_at_time",
                     json.dumps(
                         {
+                            "animation_id": animation_id,
                             "id": id,
                             "json_key": json_key,
                             "time": time_v,
@@ -1145,7 +1190,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 )
             )
             ok = client.set_key_param(
-                id=id, json_key=json_key, time=time_v, easing=easing, value=value
+                animation_id=animation_id,
+                target_id=id,
+                json_key=json_key,
+                time=time_v,
+                easing=easing,
+                value=value,
             )
             return json.dumps({"ok": ok, "removed": rm.get("removed", 0)})
         except Exception as e:
@@ -1157,6 +1207,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_replace_key_camera":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         time_v = float(args.get("time", 0.0))
         easing = str(args.get("easing", "Linear"))
         value = args.get("value") or {}
@@ -1187,18 +1240,19 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         try:
             # Remove camera keys within tolerance
             try:
-                lr = client.list_keys(id=0, include_values=False)
+                lr = client.list_keys(animation_id=animation_id, target_id=0, include_values=False)
                 times = [k.time for k in getattr(lr, "keys", [])]
                 to_remove = [t for t in times if abs(t - time_v) <= tol]
                 removed = 0
                 for t in to_remove:
-                    if client.remove_key(id=0, json_key="", time=t):
+                    if client.remove_key(animation_id=animation_id, target_id=0, json_key="", time=t):
                         removed += 1
             except Exception:
                 removed = 0
             # Validate and accept adjusted value if provided
             try:
                 vr = client.camera_validate(
+                    animation_id=animation_id,
                     ids=ids,
                     times=[time_v],
                     values=[value],
@@ -1210,11 +1264,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     value = vals[0].get("adjusted_value")
             except Exception:
                 pass
-            ok = client.set_key_camera(time=time_v, easing=easing, value=value)
+            ok = client.set_key_camera(animation_id=animation_id, time=time_v, easing=easing, value=value)
             # Re-validate strictly
             final_ok = ok
             try:
                 vr2 = client.camera_validate(
+                    animation_id=animation_id,
                     ids=ids,
                     times=[time_v],
                     values=[value],
@@ -1241,6 +1296,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_camera_solve_and_apply":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         try:
             mode = str(args.get("mode"))
             ids = args.get("ids") or []
@@ -1292,7 +1350,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             # Optionally clear existing keys in [t0, t1] (with tolerance), excluding solver times
             if clear_range:
                 try:
-                    lr = client.list_keys(id=0, include_values=False)
+                    lr = client.list_keys(animation_id=animation_id, target_id=0, include_values=False)
                     existing = [float(k.time) for k in getattr(lr, "keys", [])]
                 except Exception:
                     existing = []
@@ -1312,7 +1370,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     if _near_any(old_t, solved_times, tol):
                         continue
                     try:
-                        client.remove_key(id=0, json_key="", time=old_t)
+                        client.remove_key(animation_id=animation_id, target_id=0, json_key="", time=old_t)
                     except Exception:
                         pass
             applied: list[float] = []
@@ -1322,6 +1380,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     vv = k.get("value") or {}
                     # Use replace to remove near times and validate; pass ids for validation inside the function
                     payload = {
+                        "animation_id": animation_id,
                         "time": tv,
                         "easing": easing,
                         "value": vv,
@@ -1351,6 +1410,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
     if name == "animation_camera_validate":
         try:
+            animation_id = int(args.get("animation_id", 0) or 0)
+            if animation_id <= 0:
+                return json.dumps({"ok": False, "error": "animation_id is required"})
             ids = args.get("ids") or []
             times = args.get("times") or []
             # Values are optional; the server can sample from animation when omitted.
@@ -1360,6 +1422,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             constraints = args.get("constraints") or {}
             policies = args.get("policies") or {}
             res = client.camera_validate(
+                animation_id=animation_id,
                 ids=ids,
                 times=times,
                 values=values,
@@ -1379,7 +1442,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
     if name == "animation_camera_get_interpolation_method":
         try:
-            m = client.get_camera_interpolation_method()
+            animation_id = int(args.get("animation_id", 0) or 0)
+            if animation_id <= 0:
+                return json.dumps({"ok": False, "error": "animation_id is required"})
+            m = client.get_camera_interpolation_method(animation_id=animation_id)
             if not m:
                 return json.dumps(
                     {
@@ -1398,14 +1464,17 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
     if name == "animation_camera_set_interpolation_method":
         try:
+            animation_id = int(args.get("animation_id", 0) or 0)
+            if animation_id <= 0:
+                return json.dumps({"ok": False, "error": "animation_id is required"})
             method = str(args.get("method") or "").strip()
             if not method:
                 return json.dumps({"ok": False, "error": "method is required"})
-            ok = client.set_camera_interpolation_method(method)
+            ok = client.set_camera_interpolation_method(animation_id=animation_id, method=method)
             # Read-back (best-effort) so callers can log a deterministic result.
             cur = None
             try:
-                cur = client.get_camera_interpolation_method()
+                cur = client.get_camera_interpolation_method(animation_id=animation_id)
             except Exception:
                 cur = None
             return json.dumps(
@@ -1425,6 +1494,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
     if name == "animation_camera_waypoint_spline_apply":
         try:
+            animation_id = int(args.get("animation_id", 0) or 0)
+            if animation_id <= 0:
+                return json.dumps({"ok": False, "error": "animation_id is required"})
             ids = args.get("ids") or []
             after_clipping = bool(args.get("after_clipping", True))
             t0 = float(args.get("t0", 0.0))
@@ -1452,17 +1524,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             }
             base_value = args.get("base_value")
 
-            # Ensure animation exists (creates/binds a default 3D animation with a baseline t=0 frame).
-            if not client.ensure_animation():
-                return json.dumps(
-                    {
-                        "ok": False,
-                        "error": "EnsureAnimation failed (no visual objects loaded yet?)",
-                    }
-                )
-
             # Set interpolation method so waypoint keys behave as a spline path.
-            if not client.set_camera_interpolation_method(method):
+            if not client.set_camera_interpolation_method(animation_id=animation_id, method=method):
                 return json.dumps(
                     {
                         "ok": False,
@@ -1605,6 +1668,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         "animation_clear_keys_range",
                         json.dumps(
                             {
+                                "animation_id": animation_id,
                                 "id": 0,
                                 "t0": float(t0),
                                 "t1": float(t1),
@@ -1625,6 +1689,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     tv = float(k.get("time", 0.0))
                     vv = k.get("value") or {}
                     payload = {
+                        "animation_id": animation_id,
                         "time": tv,
                         "easing": easing,
                         "value": vv,
@@ -1652,7 +1717,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             # Read back the effective method for deterministic logging.
             cur_method = None
             try:
-                cur_method = client.get_camera_interpolation_method()
+                cur_method = client.get_camera_interpolation_method(animation_id=animation_id)
             except Exception:
                 cur_method = None
 
@@ -1677,6 +1742,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
     if name == "animation_camera_walkthrough_apply":
         try:
+            animation_id = int(args.get("animation_id", 0) or 0)
+            if animation_id <= 0:
+                return json.dumps({"ok": False, "error": "animation_id is required"})
             ids = args.get("ids") or []
             after_clipping = bool(args.get("after_clipping", True))
             t0 = float(args.get("t0", 0.0))
@@ -1704,17 +1772,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             constraints = args.get("constraints") or {"keep_visible": False}
             base_value = args.get("base_value")
 
-            # Ensure animation exists (creates/binds a default 3D animation with a baseline t=0 frame).
-            if not client.ensure_animation():
-                return json.dumps(
-                    {
-                        "ok": False,
-                        "error": "EnsureAnimation failed (no visual objects loaded yet?)",
-                    }
-                )
-
             # Set interpolation method so key sequences behave as a spline path.
-            if not client.set_camera_interpolation_method(method):
+            if not client.set_camera_interpolation_method(animation_id=animation_id, method=method):
                 return json.dumps(
                     {
                         "ok": False,
@@ -2009,6 +2068,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         "animation_clear_keys_range",
                         json.dumps(
                             {
+                                "animation_id": animation_id,
                                 "id": 0,
                                 "t0": float(t0),
                                 "t1": float(t1),
@@ -2034,6 +2094,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     tv = float(k.get("time", 0.0))
                     vv = k.get("value") or {}
                     payload = {
+                        "animation_id": animation_id,
                         "time": tv,
                         "easing": easing,
                         "value": vv,
@@ -2061,7 +2122,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             # Read back the effective method for deterministic logging.
             cur_method = None
             try:
-                cur_method = client.get_camera_interpolation_method()
+                cur_method = client.get_camera_interpolation_method(animation_id=animation_id)
             except Exception:
                 cur_method = None
 
@@ -2087,22 +2148,36 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_get_time":
-        ts = client.get_time()
-        return json.dumps(
-            {
-                "ok": True,
-                "seconds": getattr(ts, "seconds", 0.0),
-                "duration": getattr(ts, "duration", 0.0),
-            }
-        )
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
+        try:
+            ts = client.get_time(animation_id=animation_id)
+            return json.dumps(
+                {
+                    "ok": True,
+                    "seconds": getattr(ts, "seconds", 0.0),
+                    "duration": getattr(ts, "duration", 0.0),
+                }
+            )
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_list_keys":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         json_key = args.get("json_key") or None
         if isinstance(json_key, str) and json_key.strip() == "":
             json_key = None
         include_values = bool(args.get("include_values", False))
-        lr = client.list_keys(id=id, json_key=json_key, include_values=include_values)
+        lr = client.list_keys(animation_id=animation_id, target_id=id, json_key=json_key, include_values=include_values)
         keys = [
             {"time": k.time, "type": k.type, "value": getattr(k, "value_json", "")}
             for k in lr.keys
@@ -2110,6 +2185,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps({"ok": True, "keys": keys})
 
     if name == "animation_clear_keys_range":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         t0 = float(args.get("t0", 0.0))
         t1 = float(args.get("t1", 0.0))
@@ -2128,7 +2206,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": "json_key or name required"})
         jk = jk or ""
         try:
-            lr = client.list_keys(id=id, json_key=(jk or None), include_values=False)
+            lr = client.list_keys(animation_id=animation_id, target_id=id, json_key=(jk or None), include_values=False)
             times = [float(k.time) for k in getattr(lr, "keys", []) or []]
         except Exception as e:
             msg = str(e)
@@ -2157,7 +2235,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         try:
-            ok = client.batch(set_keys=[], remove_keys=remove_keys, commit=True)
+            ok = client.batch(animation_id=animation_id, set_keys=[], remove_keys=remove_keys, commit=True)
             payload = {
                 "ok": bool(ok),
                 "id": int(id),
@@ -2179,6 +2257,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_shift_keys_range":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         t0 = float(args.get("t0", 0.0))
         t1 = float(args.get("t1", 0.0))
@@ -2199,7 +2280,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": "json_key or name required"})
         jk = jk or ""
         try:
-            anim = _save_current_animation_to_temp(client)
+            anim = _save_animation_to_temp(client, animation_id=animation_id)
             all_keys = _extract_track_keys(anim, id=id, json_key=jk)
         except Exception as e:
             msg = str(e)
@@ -2363,7 +2444,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         try:
-            ok = client.batch(set_keys=set_keys, remove_keys=remove_keys, commit=True)
+            ok = client.batch(animation_id=animation_id, set_keys=set_keys, remove_keys=remove_keys, commit=True)
             out = {
                 "ok": bool(ok),
                 "id": int(id),
@@ -2387,6 +2468,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_scale_keys_range":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         t0 = float(args.get("t0", 0.0))
         t1 = float(args.get("t1", 0.0))
@@ -2426,7 +2510,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": "json_key or name required"})
         jk = jk or ""
         try:
-            anim = _save_current_animation_to_temp(client)
+            anim = _save_animation_to_temp(client, animation_id=animation_id)
             all_keys = _extract_track_keys(anim, id=id, json_key=jk)
         except Exception as e:
             msg = str(e)
@@ -2598,7 +2682,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         try:
-            ok = client.batch(set_keys=set_keys, remove_keys=remove_keys, commit=True)
+            ok = client.batch(animation_id=animation_id, set_keys=set_keys, remove_keys=remove_keys, commit=True)
             out = {
                 "ok": bool(ok),
                 "id": int(id),
@@ -2624,6 +2708,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_duplicate_keys_range":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         t0 = float(args.get("t0", 0.0))
         t1 = float(args.get("t1", 0.0))
@@ -2644,7 +2731,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": "json_key or name required"})
         jk = jk or ""
         try:
-            anim = _save_current_animation_to_temp(client)
+            anim = _save_animation_to_temp(client, animation_id=animation_id)
             all_keys = _extract_track_keys(anim, id=id, json_key=jk)
         except Exception as e:
             msg = str(e)
@@ -2765,7 +2852,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         try:
-            ok = client.batch(set_keys=set_keys, remove_keys=remove_keys, commit=True)
+            ok = client.batch(animation_id=animation_id, set_keys=set_keys, remove_keys=remove_keys, commit=True)
             out = {
                 "ok": bool(ok),
                 "id": int(id),
@@ -2808,13 +2895,36 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": str(e), "searched": searched})
 
     if name == "animation_ensure_animation":
-        return json.dumps({"ok": client.ensure_animation()})
+        create_new = bool(args.get("create_new", False))
+        nm = args.get("name")
+        nm_s = str(nm) if isinstance(nm, str) else ""
+        resp = client.ensure_animation(create_new=create_new, name=nm_s or None)
+        out = {
+            "ok": bool(getattr(resp, "ok", False)),
+            "animation_id": int(getattr(resp, "animation_id", 0) or 0),
+            "created": bool(getattr(resp, "created", False)),
+        }
+        err = str(getattr(resp, "error", "") or "").strip()
+        if err:
+            out["error"] = err
+        if out["ok"] and out["animation_id"] > 0:
+            try:
+                ctx.runtime_state["current_animation_id"] = out["animation_id"]
+            except Exception:
+                pass
+        return json.dumps(out)
 
     if name == "animation_set_duration":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         seconds = float(args.get("seconds", 0.0))
-        return json.dumps({"ok": client.set_duration(seconds)})
+        return json.dumps({"ok": client.set_duration(animation_id=animation_id, seconds=seconds)})
 
     if name == "animation_set_key_param":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         # Expect native JSON value. Resolve json_key by name if needed; coerce common mistakes.
         id = int(args.get("id"))
         if id == 0:
@@ -2902,7 +3012,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 value_native = [float(v) for v in value_native]
         try:
             ok = client.set_key_param(
-                id=id,
+                animation_id=animation_id,
+                target_id=id,
                 json_key=json_key,
                 time=time_v,
                 easing=easing,
@@ -2926,6 +3037,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_replace_key_param_at_times":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         if id == 0:
             return json.dumps(
@@ -2951,6 +3065,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         "animation_remove_key_param_at_time",
                         json.dumps(
                             {
+                                "animation_id": animation_id,
                                 "id": id,
                                 "json_key": json_key,
                                 "time": t,
@@ -2964,6 +3079,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         "animation_set_key_param",
                         json.dumps(
                             {
+                                "animation_id": animation_id,
                                 "id": id,
                                 "json_key": json_key,
                                 "time": t,
@@ -2983,11 +3099,20 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_clear_keys":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
-        ok = client.clear_keys(id=id, json_key=args.get("json_key"))
+        if id == 0:
+            ok = client.clear_keys(animation_id=animation_id, target_id=0, json_key="")
+        else:
+            ok = client.clear_keys(animation_id=animation_id, target_id=id, json_key=str(args.get("json_key") or ""))
         return json.dumps({"ok": ok})
 
     if name == "animation_remove_key":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         id = int(args.get("id"))
         if id == 0:
             return json.dumps(
@@ -3001,10 +3126,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         # Verify parameter exists
         if not _json_key_exists(id, json_key):
             return json.dumps({"ok": False, "error": "json_key not found for id"})
-        ok = client.remove_key(id=id, json_key=json_key, time=time_v)
+        ok = client.remove_key(animation_id=animation_id, target_id=id, json_key=json_key, time=time_v)
         return json.dumps({"ok": ok})
 
     if name == "animation_batch":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         set_keys = args.get("set_keys") or []
         remove_keys = args.get("remove_keys") or []
         if not set_keys and not remove_keys:
@@ -3053,6 +3181,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         ok = client.batch(
+            animation_id=animation_id,
             set_keys=set_keys,
             remove_keys=remove_keys,
             commit=bool(args.get("commit", True)),
@@ -3060,23 +3189,40 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps({"ok": ok})
 
     if name == "animation_set_time":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         ok = client.set_time(
-            float(args.get("seconds", 0.0)),
+            animation_id=animation_id,
+            seconds=float(args.get("seconds", 0.0)),
             cancel_rendering=bool(args.get("cancel", False)),
         )
         return json.dumps({"ok": ok})
 
     if name == "animation_save_animation":
-        return json.dumps({"ok": client.save_animation(Path(args.get("path")))})
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
+        p = Path(str(args.get("path") or ""))
+        ok = bool(client.save_animation(animation_id=animation_id, path=p))
+        if ok:
+            try:
+                if ctx.session_store is not None:
+                    ctx.session_store.set_meta(last_animation_save_path=str(p.expanduser().resolve()))
+            except Exception:
+                pass
+        return json.dumps({"ok": ok})
 
     if name == "animation_export_video":
         # Export .animation3d to MP4 by invoking headless Atlas
         
 
-        anim = args.get("animation")
         out = args.get("out")
-        if not anim or not out:
-            return json.dumps({"ok": False, "error": "animation and out are required"})
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
+        if not out:
+            return json.dumps({"ok": False, "error": "out is required"})
         # Resolve Atlas binary
         atlas_bin = None
         if atlas_dir:
@@ -3095,9 +3241,22 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps(
                 {"ok": False, "error": "Atlas binary not found; ensure Atlas is installed"}
             )
+        # Save the current animation to a stable temp file and export from that file.
+        try:
+            if ctx.session_store is not None:
+                tdir = ctx.session_store.root / "artifacts"
+                tdir.mkdir(parents=True, exist_ok=True)
+            else:
+                tdir = Path(tempfile.mkdtemp(prefix="atlas_export_"))
+        except Exception:
+            tdir = Path(tempfile.mkdtemp(prefix="atlas_export_"))
+        anim_path = tdir / "export.animation3d"
+        ok_save = bool(client.save_animation(animation_id=animation_id, path=anim_path))
+        if not ok_save:
+            return json.dumps({"ok": False, "error": "failed to save animation for export"})
         rc = export_video(
             atlas_bin=str(atlas_bin),
-            animation_path=Path(anim),
+            animation_path=anim_path,
             output_video=Path(out),
             fps=int(args.get("fps", 30)),
             start=int(args.get("start", 0)),
@@ -3105,9 +3264,16 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             width=int(args.get("width", 1920)),
             height=int(args.get("height", 1080)),
             overwrite=bool(args.get("overwrite", True)),
-            use_gpu_devices=args.get("use_gpu_devices"),
+            use_gpu_devices=None,
         )
-        return json.dumps({"ok": rc == 0, "exit_code": rc})
+        return json.dumps(
+            {
+                "ok": rc == 0,
+                "exit_code": rc,
+                "animation_path": str(anim_path),
+                "out": str(out),
+            }
+        )
 
     if name == "animation_render_preview":
         # Privacy/consent gate: requires an explicit per-session user decision.
@@ -3151,10 +3317,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     "error": "Atlas binary not found; ensure Atlas is installed",
                 }
             )
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
         # Save animation to a temp file and render a single frame
         tdir = Path(tempfile.mkdtemp(prefix="atlas_preview_"))
         anim_path = tdir / "preview.animation3d"
-        ok_save = client.save_animation(anim_path)
+        ok_save = client.save_animation(animation_id=animation_id, path=anim_path)
         if not ok_save:
             return json.dumps(
                 {"ok": False, "error": "failed to save temporary animation"}

@@ -60,10 +60,26 @@ class SceneAPI:
         return self._c.make_alias(ids)
 
     # Timeline (selected helpers)
-    def list_keys(self, *, id: int, json_key: str | None = None, include_values: bool = False):
-        return self._c.list_keys(id=int(id), json_key=json_key, include_values=include_values)
+    def list_keys(
+        self,
+        *,
+        animation_id: int,
+        id: int,
+        json_key: str | None = None,
+        include_values: bool = False,
+    ):
+        return self._c.list_keys(
+            animation_id=int(animation_id),
+            target_id=int(id),
+            json_key=json_key,
+            include_values=include_values,
+        )
 
-    def set_time(self, seconds: float, cancel_rendering: bool = False) -> None:
-        ok = self._c.set_time(seconds, cancel_rendering=cancel_rendering)
+    def set_time(self, *, animation_id: int, seconds: float, cancel_rendering: bool = False) -> None:
+        ok = self._c.set_time(
+            animation_id=int(animation_id),
+            seconds=float(seconds),
+            cancel_rendering=cancel_rendering,
+        )
         if not ok:
             raise RuntimeError("SetTime failed")

@@ -36,19 +36,22 @@ def run_plan(client: SceneClient, plan: Plan) -> dict:
 
     # Timeline keys
     if plan.set_keys or plan.remove_keys:
+        if plan.animation_id is None or int(plan.animation_id) <= 0:
+            raise RuntimeError("Plan requires animation_id when set_keys/remove_keys are present")
+        anim_id = int(plan.animation_id)
         set_keys_req = []
         for sk in plan.set_keys:
-            ent = {"id": int(sk.id), "time": float(sk.time), "easing": sk.easing, "value": sk.value}
+            ent = {"target_id": int(sk.id), "time": float(sk.time), "easing": sk.easing, "value": sk.value}
             if int(sk.id) != 0:
                 ent["json_key"] = str(sk.json_key or "")
             set_keys_req.append(ent)
         remove_req = []
         for rk in plan.remove_keys:
-            ent = {"id": int(rk.id), "time": float(rk.time)}
+            ent = {"target_id": int(rk.id), "time": float(rk.time)}
             if int(rk.id) != 0:
                 ent["json_key"] = str(rk.json_key or "")
             remove_req.append(ent)
-        if not client.batch(set_keys=set_keys_req, remove_keys=remove_req, commit=bool(plan.commit)):
+        if not client.batch(animation_id=anim_id, set_keys=set_keys_req, remove_keys=remove_req, commit=bool(plan.commit)):
             raise RuntimeError("Batch failed")
         report["applied"]["keys"] = len(set_keys_req)
         report["applied"]["removed"] = len(remove_req)
@@ -58,9 +61,14 @@ def run_plan(client: SceneClient, plan: Plan) -> dict:
         for sk in plan.set_keys:
             want_t = float(sk.time)
             if int(sk.id) == 0:
-                lr = client.list_keys(id=0)
+                lr = client.list_keys(animation_id=anim_id, target_id=0, include_values=False)
             else:
-                lr = client.list_keys(id=int(sk.id), json_key=str(sk.json_key or ""))
+                lr = client.list_keys(
+                    animation_id=anim_id,
+                    target_id=int(sk.id),
+                    json_key=str(sk.json_key or ""),
+                    include_values=False,
+                )
             times = [k.time for k in getattr(lr, "keys", [])]
             if not any(abs(want_t - t) < 1e-6 for t in times):
                 missing.append({"id": int(sk.id), "json_key": sk.json_key, "time": want_t})

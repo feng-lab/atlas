@@ -185,8 +185,8 @@ Categories and current tools (non-exhaustive)
 - Load: `scene_load_files`, `scene_ensure_loaded`, `scene_smart_load`
 - Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_params`, `scene_apply`, `scene_save_scene`, `scene_screenshot`, `scene_set_visibility`, `scene_make_alias`
 - Discovery: `scene_list_objects`, `scene_list_params(id)`, `scene_capabilities`, `scene_schema`, `scene_capabilities_summary`, `scene_facts_summary`
-- Timeline: `animation_list_keys(id,json_key,include_values)`, `animation_batch`, `animation_set_key_param`, `animation_replace_key_param`, `animation_set_duration`, `animation_set_time`, `animation_play`, `animation_pause`, `animation_save_animation`
-- Camera: producers (typed values) — `fit_candidates`, `camera_get`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`, `camera_move_local`, `camera_look_at`, `camera_path_solve`; scene apply — `scene_camera_fit`, `scene_camera_apply`; animation (timeline) — `animation_camera_solve_and_apply`, `animation_replace_key_camera`, `animation_camera_validate`, `animation_camera_get_interpolation_method`, `animation_camera_set_interpolation_method`, `animation_camera_waypoint_spline_apply`, `animation_camera_walkthrough_apply`
+- Timeline: `animation_ensure_animation(create_new,name)` (returns `animation_id`), then `animation_list_keys(animation_id,id,json_key,include_values)`, `animation_batch(animation_id,...)`, `animation_set_key_param(animation_id,...)`, `animation_replace_key_param(animation_id,...)`, `animation_set_duration(animation_id,seconds)`, `animation_set_time(animation_id,seconds)`, `animation_play`, `animation_pause`, `animation_save_animation(animation_id,path)`
+- Camera: producers (typed values) — `fit_candidates`, `camera_get`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`, `camera_move_local`, `camera_look_at`, `camera_path_solve`; scene apply — `scene_camera_fit`, `scene_camera_apply`; animation (timeline) — `animation_camera_solve_and_apply(animation_id,...)`, `animation_replace_key_camera(animation_id,...)`, `animation_camera_validate(animation_id,...)`, `animation_camera_get_interpolation_method(animation_id)`, `animation_camera_set_interpolation_method(animation_id,method)`, `animation_camera_waypoint_spline_apply(animation_id,...)`, `animation_camera_walkthrough_apply(animation_id,...)`
 - Geometry/Cuts: `scene_bbox`, `scene_cut_suggest`, `scene_cut_set`, `scene_cut_clear`
 
 Notes
@@ -243,19 +243,19 @@ Scene-only (stateless) apply
 - One-shot fit and apply: `scene_camera_fit(ids?, after_clipping=true, min_radius=0.0)` (internally uses CameraFit and applies the result).
 
 Animation (timeline) authoring
-- Solve and write keys: `animation_camera_solve_and_apply(mode, ids, t0, t1, constraints?, params?, degrees?, …)`.
+- Solve and write keys: `animation_camera_solve_and_apply(animation_id, mode, ids, t0, t1, constraints?, params?, degrees?, …)`.
   - Tip: for ORBIT, use `degrees` (default 360). The agent maps this to the backend as needed. Use `params.axis` (default `"y"`).
-- Validate camera key sequences: `animation_camera_validate(ids, times, values?, constraints?, policies?)` (values optional; when omitted, the server samples from the current animation at those times).
-- Single-time explicit write: `animation_replace_key_camera(time, value, easing?)`.
+- Validate camera key sequences: `animation_camera_validate(animation_id, ids, times, values?, constraints?, policies?)` (values optional; when omitted, the server samples from `animation_id` at those times).
+- Single-time explicit write: `animation_replace_key_camera(animation_id, time, value, easing?)`.
 - Set/read camera interpolation method (important for spline paths):
-  - `animation_camera_set_interpolation_method("Position Rotation Spline")` (recommended for walkthrough/spline fly-through)
-  - `animation_camera_get_interpolation_method()`
+  - `animation_camera_set_interpolation_method(animation_id, "Position Rotation Spline")` (recommended for walkthrough/spline fly-through)
+  - `animation_camera_get_interpolation_method(animation_id)`
 - Guided waypoint spline (one-shot apply):
-  - `animation_camera_waypoint_spline_apply(t0, t1, waypoints=[...], method="Position Rotation Spline", constraints?, clear_range=true, easing="Linear")`
-  - Note: this tool does **not** change the animation duration; call `animation_set_duration(seconds)` separately if needed.
+  - `animation_camera_waypoint_spline_apply(animation_id, t0, t1, waypoints=[...], method="Position Rotation Spline", constraints?, clear_range=true, easing="Linear")`
+  - Note: this tool does **not** change the animation duration; call `animation_set_duration(animation_id, seconds)` separately if needed.
 - First-person walkthrough (one-shot apply):
-  - `animation_camera_walkthrough_apply(t0, t1, segments=[...], method="Position Rotation Spline", step_seconds=1.0, constraints={keep_visible:false})`
-  - Note: this tool does **not** change the animation duration; call `animation_set_duration(seconds)` separately if needed.
+  - `animation_camera_walkthrough_apply(animation_id, t0, t1, segments=[...], method="Position Rotation Spline", step_seconds=1.0, constraints={keep_visible:false})`
+  - Note: this tool does **not** change the animation duration; call `animation_set_duration(animation_id, seconds)` separately if needed.
 
 Notes
 - Prefer “produce → apply” for clarity: use `camera_*` producers to compute a typed camera, then choose scene vs. animation by the apply tool.
@@ -280,7 +280,7 @@ Routing: pick the representation
   - Never drop user-provided waypoints/segments. If the plan would generate too many keys, increase `step_seconds` (walkthrough) rather than truncating the path.
 
 Default timing policy
-- If the user gives a total duration only: use `t0=0` and `t1=duration`, and call `animation_set_duration(duration)`.
+- If the user gives a total duration only: use `t0=0` and `t1=duration`, and call `animation_set_duration(animation_id, duration)`.
 - Waypoints:
   - If waypoint times are omitted, map them evenly across `[t0,t1]` using `u` in `[0,1]`.
 - Walkthrough segments:
@@ -324,23 +324,23 @@ Default validation constraints
 Use this when you want to **enter** a volume/mesh and navigate “like a drone” (not an orbit).
 
 Typical tool pattern (preferred: one-shot apply):
-1) `animation_ensure_animation` and `animation_set_duration(seconds)`
-2) `animation_camera_walkthrough_apply(t0, t1, segments=[...], method="Position Rotation Spline", step_seconds=1.0, constraints={keep_visible:false})`
+1) `animation_ensure_animation` → capture `animation_id`, then `animation_set_duration(animation_id, seconds)`
+2) `animation_camera_walkthrough_apply(animation_id, t0, t1, segments=[...], method="Position Rotation Spline", step_seconds=1.0, constraints={keep_visible:false})`
 3) Verify:
-   - `animation_list_keys(id=0)` and optionally `animation_camera_validate(ids, times, values?, constraints={keep_visible:false})`
+   - `animation_list_keys(animation_id, id=0)` and optionally `animation_camera_validate(animation_id, ids, times, values?, constraints={keep_visible:false})`
 
 Low-level pattern (when you need exact control over each pose):
-1) `animation_ensure_animation` and `animation_set_duration(seconds)`
-2) `animation_camera_set_interpolation_method("Position Rotation Spline")`
+1) `animation_ensure_animation` → capture `animation_id`, then `animation_set_duration(animation_id, seconds)`
+2) `animation_camera_set_interpolation_method(animation_id, "Position Rotation Spline")`
 3) Build a sequence of camera values by chaining:
    - `camera_get()` (optional) → base_value
    - `camera_move_local(FORWARD/RIGHT/UP, distance_is_fraction_of_bbox_radius=true, ...)`
    - `camera_rotate(YAW/PITCH, degrees, base_value=...)`
    - `camera_look_at(...)` (optional, for guided aiming)
 4) For each produced camera value, write a key:
-   - `animation_replace_key_camera(time=..., value=..., constraints={keep_visible:false})` for interior shots
+   - `animation_replace_key_camera(animation_id, time=..., value=..., constraints={keep_visible:false})` for interior shots
 5) Verify:
-   - `animation_list_keys(id=0)` and optionally `animation_camera_validate(ids, times, values?, constraints={keep_visible:false})`
+   - `animation_list_keys(animation_id, id=0)` and optionally `animation_camera_validate(animation_id, ids, times, values?, constraints={keep_visible:false})`
 
 Prompting guidance (user-facing):
 - “Create a 12s first-person walkthrough: start outside the volume, fly forward into it, then slowly yaw right while ascending; keep it smooth and avoid snap turns.”
@@ -351,13 +351,13 @@ Prompting guidance (user-facing):
 Use this when you want a **controlled camera path** through specific locations (waypoints) and you want the backend to evaluate it as a spline.
 
 Typical tool pattern:
-1) `animation_ensure_animation` and `animation_set_duration(t1)`
-2) `animation_camera_waypoint_spline_apply(t0, t1, waypoints=[...], method="Position Rotation Spline")`
+1) `animation_ensure_animation` → capture `animation_id`, then `animation_set_duration(animation_id, t1)`
+2) `animation_camera_waypoint_spline_apply(animation_id, t0, t1, waypoints=[...], method="Position Rotation Spline")`
    - Waypoints can use bbox fractions to avoid guessing world units:
      - `eye: {bbox_fraction:[fx,fy,fz]}`
      - `look_at: {bbox_center:true}` or `look_at: {bbox_fraction:[fx,fy,fz]}`
 3) Verify:
-   - `animation_list_keys(id=0)` and optionally `animation_camera_get_interpolation_method()`
+   - `animation_list_keys(animation_id, id=0)` and optionally `animation_camera_get_interpolation_method(animation_id)`
 
 Prompting guidance (user-facing):
 - “Make a 10s guided fly-through: waypoint 1 outside the front face, waypoint 2 inside the center, waypoint 3 near the top-right corner; look at the bbox center throughout.”

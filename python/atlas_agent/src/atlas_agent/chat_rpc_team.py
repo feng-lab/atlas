@@ -302,6 +302,10 @@ class ChatTeam:
 
         self.llm = LLMClient(api_key=self.api_key, model=self.model)
         self.intent_resolver = IntentResolver(client=self.llm, temperature=self.temperature)
+        # Live (in-memory) pointer to the currently edited Animation3D object.
+        # Note: ids are not stable across Atlas runs; this is used only within
+        # a single running app instance for convenience and deterministic tool calls.
+        self._current_animation_id: int | None = None
 
         # Build capabilities context derived from atlas_dir or defaults.
         self._context: str = build_atlas_agent_primer()
@@ -336,6 +340,34 @@ class ChatTeam:
             self.session_store.save()
         except Exception:
             pass
+
+        # Best-effort: restore the session's internal animation autosave.
+        #
+        # The Animation3D object id is not stable across Atlas runs, so we recover
+        # it by loading the autosaved .animation3d file and then mapping it back
+        # to the newly created in-app object id.
+        try:
+            autosave_path = self._animation_autosave_path()
+            if autosave_path.exists():
+                loaded = self.scene.ensure_loaded([str(autosave_path)])
+                for o in (loaded.get("objects") or []):
+                    try:
+                        if str(o.get("type") or "") != "Animation3D":
+                            continue
+                        op = str(o.get("path") or "").strip()
+                        if not op:
+                            continue
+                        if Path(op).expanduser().resolve() == autosave_path.resolve():
+                            self._current_animation_id = int(o.get("id", 0) or 0)
+                            break
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+    def _animation_autosave_path(self) -> Path:
+        """Per-session internal animation autosave location."""
+        return self.session_store.root / "artifacts" / "animation_autosave.animation3d"
 
     def turn(
         self,
@@ -664,10 +696,11 @@ class ChatTeam:
         except Exception:
             pass
         try:
-            ts = self.scene.get_time()
-            tsec = float(getattr(ts, "seconds", 0.0) or 0.0)
-            dur = float(getattr(ts, "duration", 0.0) or 0.0)
-            scene_lines.append(f"Time: t={tsec:.3f}s / duration={dur:.3f}s")
+            if self._current_animation_id is not None and int(self._current_animation_id) > 0:
+                ts = self.scene.get_time(animation_id=int(self._current_animation_id))
+                tsec = float(getattr(ts, "seconds", 0.0) or 0.0)
+                dur = float(getattr(ts, "duration", 0.0) or 0.0)
+                scene_lines.append(f"Time: t={tsec:.3f}s / duration={dur:.3f}s")
         except Exception:
             pass
         scene_snapshot_text = "\n".join(scene_lines).strip()
@@ -848,6 +881,22 @@ class ChatTeam:
                 return
 
             touched_mutation_tools.add(tool)
+
+            # Track the current animation id for future deterministic calls.
+            # This is intentionally in-memory only (ids are not stable across app runs).
+            try:
+                aid_in = args.get("animation_id")
+                if isinstance(aid_in, (int, float)) and int(aid_in) > 0:
+                    self._current_animation_id = int(aid_in)
+            except Exception:
+                pass
+            try:
+                if isinstance(result, dict):
+                    aid_out = result.get("animation_id")
+                    if isinstance(aid_out, (int, float)) and int(aid_out) > 0:
+                        self._current_animation_id = int(aid_out)
+            except Exception:
+                pass
 
             if tool in {"scene_load_files", "scene_ensure_loaded", "scene_smart_load"}:
                 include_objects_in_snapshot = True
@@ -1116,6 +1165,7 @@ class ChatTeam:
             "phase": None,
             # Producer tools (camera_*) may chain using this per-turn cache.
             "last_camera_value": None,
+            "current_animation_id": int(self._current_animation_id or 0),
         }
         tools, dispatch = scene_tools_and_dispatcher(
             self.scene,
@@ -1236,11 +1286,12 @@ class ChatTeam:
 
             time_status: dict[str, float] | None = None
             try:
-                ts = self.scene.get_time()
-                time_status = {
-                    "seconds": float(getattr(ts, "seconds", 0.0) or 0.0),
-                    "duration": float(getattr(ts, "duration", 0.0) or 0.0),
-                }
+                if self._current_animation_id is not None and int(self._current_animation_id) > 0:
+                    ts = self.scene.get_time(animation_id=int(self._current_animation_id))
+                    time_status = {
+                        "seconds": float(getattr(ts, "seconds", 0.0) or 0.0),
+                        "duration": float(getattr(ts, "duration", 0.0) or 0.0),
+                    }
             except Exception:
                 time_status = None
 
@@ -1249,6 +1300,7 @@ class ChatTeam:
             facts: dict[str, Any] = {}
             try:
                 facts = self.scene.scene_facts_compact(
+                    animation_id=(int(self._current_animation_id) if (self._current_animation_id is not None and int(self._current_animation_id) > 0) else None),
                     key_targets=key_targets or None,
                     include_key_values=False,
                     scene_value_targets=scene_value_targets or None,
@@ -1262,11 +1314,37 @@ class ChatTeam:
 
             if include_camera_interpolation_method_in_snapshot:
                 try:
-                    m = self.scene.get_camera_interpolation_method()
-                    if isinstance(m, str) and m.strip():
-                        facts["camera_interpolation_method"] = m.strip()
+                    if self._current_animation_id is not None and int(self._current_animation_id) > 0:
+                        m = self.scene.get_camera_interpolation_method(animation_id=int(self._current_animation_id))
+                        if isinstance(m, str) and m.strip():
+                            facts["camera_interpolation_method"] = m.strip()
                 except Exception:
                     pass
+
+            # Best-effort: autosave the current animation after successful animation mutations.
+            #
+            # This is intentionally separate from user-facing saves/exports so the agent can
+            # resume deterministically across context windows without relying on the user to
+            # remember to "save". The autosave path is per-session under the session store.
+            try:
+                did_animation_mutate = any(
+                    str(t).startswith("animation_") for t in touched_mutation_tools
+                )
+                if (
+                    did_animation_mutate
+                    and self._current_animation_id is not None
+                    and int(self._current_animation_id) > 0
+                ):
+                    p = self._animation_autosave_path()
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    ok = bool(self.scene.save_animation(animation_id=int(self._current_animation_id), path=p))
+                    if ok:
+                        try:
+                            self.session_store.set_meta(animation_autosave_path=str(p))
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
             touched_payload: dict[str, Any] = {
                 "mutation_tools": sorted(touched_mutation_tools),
@@ -2065,11 +2143,26 @@ def run_repl(
                     logger.info("fail: %s", e)
                 continue
             if cmd == "save" and rest:
-                ok = team.scene.save_animation(rest[0])
+                ok = False
+                try:
+                    resp = team.scene.ensure_animation(create_new=False, name=None)
+                    aid = int(getattr(resp, "animation_id", 0) or 0)
+                    if bool(getattr(resp, "ok", False)) and aid > 0:
+                        ok = bool(team.scene.save_animation(animation_id=aid, path=Path(rest[0])))
+                except Exception:
+                    ok = False
                 logger.info("%s", "ok" if ok else "fail")
                 continue
             if cmd == "time" and rest:
-                logger.info("%s", "ok" if team.scene.set_time(float(rest[0])) else "fail")
+                ok = False
+                try:
+                    resp = team.scene.ensure_animation(create_new=False, name=None)
+                    aid = int(getattr(resp, "animation_id", 0) or 0)
+                    if bool(getattr(resp, "ok", False)) and aid > 0:
+                        ok = bool(team.scene.set_time(animation_id=aid, seconds=float(rest[0])))
+                except Exception:
+                    ok = False
+                logger.info("%s", "ok" if ok else "fail")
                 continue
             if cmd == "objects":
                 resp = team.scene.list_objects()
