@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ...codegen_policy import allowed_imports_status
+from ...defaults import (
+    DEFAULT_CODEGEN_MAX_ECHO_CHARS,
+    DEFAULT_CODEGEN_STDIO_PREVIEW_CHARS,
+    DEFAULT_CODEGEN_TIMEOUT_SEC,
+)
 from ...repo import find_repo_root  # type: ignore
 from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
@@ -36,7 +41,11 @@ REPORT_BLOCKED_PARAMETERS: Dict[str, Any] = {
 SYSTEM_INFO_DESCRIPTION = "Return OS/platform info and common paths so the agent can reason about file locations."
 SYSTEM_INFO_PARAMETERS: Dict[str, Any] = {"type": "object", "properties": {}}
 
-PYTHON_WRITE_AND_RUN_DESCRIPTION = "Write a Python script (string) to a temp file and run it with the repo root on PYTHONPATH. Returns stdout/stderr/exit_code, and optionally echoes the script."
+PYTHON_WRITE_AND_RUN_DESCRIPTION = (
+    "Write a Python script to a temp file and run it with the repo root on PYTHONPATH.\n"
+    "Correctness-first: stdout/stderr are NOT truncated or dropped; full outputs are written to files and "
+    "returned as stdout_path/stderr_path, along with small preview strings for convenience."
+)
 PYTHON_WRITE_AND_RUN_PARAMETERS: Dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -56,7 +65,7 @@ PYTHON_WRITE_AND_RUN_PARAMETERS: Dict[str, Any] = {
         },
         "timeout_sec": {
             "type": "number",
-            "default": 120.0,
+            "default": DEFAULT_CODEGEN_TIMEOUT_SEC,
             "description": "Execution timeout",
         },
         "echo_script": {
@@ -66,7 +75,7 @@ PYTHON_WRITE_AND_RUN_PARAMETERS: Dict[str, Any] = {
         },
         "max_echo_chars": {
             "type": "integer",
-            "default": 4000,
+            "default": DEFAULT_CODEGEN_MAX_ECHO_CHARS,
             "description": "Max script chars to echo",
         },
     },
@@ -196,7 +205,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         env["PYTHONPATH"] = repo_root + (os.pathsep + pp if pp else "")
         # Run
         args_list = args.get("args") or []
-        timeout = float(args.get("timeout_sec", 120.0))
+        timeout = float(args.get("timeout_sec", DEFAULT_CODEGEN_TIMEOUT_SEC))
         try:
             cp = subprocess.run(
                 [sys.executable, pth, *args_list],
@@ -205,22 +214,50 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 env=env,
                 timeout=timeout,
             )
-            out = cp.stdout or ""
-            err = cp.stderr or ""
-            # Truncate for transport safety
-            if len(out) > 8000:
-                out = out[:8000] + "\n…[truncated]"
-            if len(err) > 8000:
-                err = err[:8000] + "\n…[truncated]"
+            out_full = cp.stdout or ""
+            err_full = cp.stderr or ""
+
+            # Persist full outputs to files so we never drop information.
+            stdout_path = os.path.join(tdir, "stdout.txt")
+            stderr_path = os.path.join(tdir, "stderr.txt")
+            try:
+                with open(stdout_path, "w", encoding="utf-8", errors="replace") as f:
+                    f.write(out_full)
+            except Exception:
+                stdout_path = ""
+            try:
+                with open(stderr_path, "w", encoding="utf-8", errors="replace") as f:
+                    f.write(err_full)
+            except Exception:
+                stderr_path = ""
+
+            # Small previews for transport/model context; full output is on disk.
+            preview_chars = int(DEFAULT_CODEGEN_STDIO_PREVIEW_CHARS)
+            out_trunc = bool(preview_chars > 0 and len(out_full) > preview_chars)
+            err_trunc = bool(preview_chars > 0 and len(err_full) > preview_chars)
+            out_preview = (
+                out_full
+                if not out_trunc
+                else (out_full[:preview_chars] + "\n…[truncated preview; see stdout_path]")
+            )
+            err_preview = (
+                err_full
+                if not err_trunc
+                else (err_full[:preview_chars] + "\n…[truncated preview; see stderr_path]")
+            )
             resp = {
                 "ok": cp.returncode == 0,
                 "exit_code": cp.returncode,
-                "stdout": out,
-                "stderr": err,
+                "stdout_preview": out_preview,
+                "stderr_preview": err_preview,
+                "stdout_truncated": out_trunc,
+                "stderr_truncated": err_trunc,
+                "stdout_path": stdout_path,
+                "stderr_path": stderr_path,
                 "path": pth,
             }
             if bool(args.get("echo_script", True)):
-                maxc = int(args.get("max_echo_chars", 4000))
+                maxc = int(args.get("max_echo_chars", DEFAULT_CODEGEN_MAX_ECHO_CHARS))
                 scr = (
                     script
                     if len(script) <= maxc
@@ -231,7 +268,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         except Exception as e:
             resp = {"ok": False, "error": str(e), "path": pth}
             if bool(args.get("echo_script", True)):
-                maxc = int(args.get("max_echo_chars", 4000))
+                maxc = int(args.get("max_echo_chars", DEFAULT_CODEGEN_MAX_ECHO_CHARS))
                 scr = (
                     script
                     if len(script) <= maxc

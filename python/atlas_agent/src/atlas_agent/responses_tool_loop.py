@@ -10,20 +10,12 @@ from .provider_tool_schema import (
     tighten_tools_schema_for_provider,
 )
 
-CONTEXT_TRIM_MAX_RETRIES = 32
-
-# Best-effort retry for transient network/proxy issues during streaming.
-#
-# Rationale: some OpenAI-compatible providers occasionally terminate HTTP/1.1 chunked
-# responses early ("incomplete chunked read"). This is not a request error and can
-# usually be resolved by retrying the same request.
-TRANSIENT_NETWORK_MAX_RETRIES = 3
-TRANSIENT_NETWORK_BACKOFF_SECONDS = 0.6
-
-# When the model returns a final response with status="incomplete" (max output tokens) or
-# produces an empty final message, we automatically ask it to continue a few times to
-# recover a complete user-facing answer without requiring the user to type "continue".
-FINAL_OUTPUT_CONTINUE_MAX_CALLS = 8
+from .defaults import (
+    CONTEXT_TRIM_MAX_RETRIES,
+    FINAL_OUTPUT_CONTINUE_MAX_CALLS,
+    TRANSIENT_NETWORK_BACKOFF_SECONDS,
+    TRANSIENT_NETWORK_MAX_RETRIES,
+)
 
 
 class ResponsesStreamingClient(Protocol):
@@ -485,7 +477,7 @@ def run_responses_tool_loop(
     callbacks: ToolLoopCallbacks | None = None,
     temperature: float | None = None,
     reasoning_effort: str | None = "high",
-    max_rounds: int = 24,
+    max_rounds: int,
 ) -> ToolLoopResult:
     """Run a streaming Responses API tool loop.
 

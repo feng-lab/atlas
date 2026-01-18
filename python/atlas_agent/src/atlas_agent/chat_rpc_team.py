@@ -16,7 +16,20 @@ from .agent_team.base import LLMClient
 from .agent_team.intent_resolver import INTENT_RESOLVER_SYSTEM, IntentResolver
 from .agent_team.tools_agent import scene_tools_and_dispatcher
 from .capabilities_prompt import build_atlas_agent_primer, build_capabilities_prompt
-from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS
+from .defaults import (
+    AUTO_RETRIEVE_MAX_CHARS,
+    AUTO_RETRIEVE_MAX_SNIPPETS,
+    AUTO_RETRIEVE_MODE,
+    AUTO_RETRIEVE_NEEDLE_MAX_TOKENS,
+    AUTO_RETRIEVE_RECENT_WRITE_EVENTS,
+    DEFAULT_EXECUTOR_MAX_ROUNDS,
+    DEFAULT_PLANNER_MAX_ROUNDS,
+    INTENT_RESOLVER_SCENE_SNAPSHOT_MAX_CHARS,
+    MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL,
+    SESSION_MAX_RECENT_MESSAGES,
+    SESSION_MEMORY_COMPACTION_MODE,
+    SESSION_MEMORY_RECENT_WRITE_EVENTS,
+)
 from .responses_tool_loop import (
     ToolLoopCallbacks,
     ToolLoopNonConverged,
@@ -31,24 +44,8 @@ from .session_store import SessionStore
 # Internal runtime policy (intentionally not user-configurable).
 #
 # Rationale: The agent needs stable behavior across sessions and machines; we
-# avoid hidden env/flag tuning knobs. When these need changes, we update the
-# implementation (and keep the on-disk session format stable).
-SESSION_MEMORY_COMPACTION_MODE = "llm"  # "llm" | "heuristic" | "off"
-SESSION_MAX_RECENT_MESSAGES = 24
-SESSION_MEMORY_RECENT_WRITE_EVENTS = 12
-
-AUTO_RETRIEVE_MODE = "auto"  # "off" | "auto" | "always"
-AUTO_RETRIEVE_MAX_SNIPPETS = 6
-AUTO_RETRIEVE_MAX_CHARS = 280
-AUTO_RETRIEVE_RECENT_WRITE_EVENTS = 8
-
-# Prompt-budget guardrail for the Supervisor Task Brief step.
-#
-# Rationale: The intent resolver prompt must remain small/stable so it can run
-# reliably even in long sessions. We therefore include only a compact preview of
-# the current object list in the scene snapshot; the full, authoritative list is
-# always available via `scene_list_objects`.
-INTENT_RESOLVER_SCENE_SNAPSHOT_MAX_CHARS = 2400
+# avoid hidden env/flag tuning knobs. When these need changes, update constants
+# in `defaults.py` and keep on-disk session formats stable.
 
 
 ATLAS_STATE_MUTATION_TOOLS: set[str] = {
@@ -119,7 +116,7 @@ ATLAS_SHARED_SYSTEM_RULES = (
     "- Camera director rubric (routing): if the user provides explicit waypoints/points/beats, use animation_camera_waypoint_spline_apply; otherwise if the user describes motion verbs (fly/strafe/yaw/pitch/pause), use animation_camera_walkthrough_apply. Mixed prompts: do not drop waypoints/segments; add intermediate points or increase walkthrough step_seconds instead of truncating.\n"
     "- Camera director rubric (defaults): walkthrough constraints default keep_visible=false unless the user explicitly wants framing; step_seconds defaults: slow≈0.5, medium≈1.0, fast≈1.5–2.0. For sparse waypoints, add intermediate waypoints instead of relying on interpolation modes.\n"
     "- Walkthrough planning: when inventing segments from words, you may use internal segment templates (template+amount/distance/degrees) and let the tool expand them; do not require the user to name templates.\n"
-    "- File paths: classify input. Absolute/~/drive paths are exact (fs_expand_paths→fs_check_paths; if missing try fs_resolve_path). Natural-language hints use fs_hint_resolve with structured args (expected_name + possible_dirs). Always verify before loading.\n"
+    "- File paths: classify input. Absolute/~/drive paths are exact (fs_check_paths expands ~ and env vars; if missing try fs_resolve_path). Natural-language hints use fs_hint_resolve with structured args (expected_name + possible_dirs). Always verify before loading.\n"
     "- Maintain an explicit plan via the update_plan tool (aim for 4–7 top-level steps by default; for complex tasks you may use more, or re-plan in phases). Exactly one step may be in_progress.\n"
     "- Verify changes after applying: scene_get_values / animation_list_keys / animation_camera_validate, etc.\n"
     "- Avoid blocking on missing user intent/input; choose defaults and proceed. Use report_blocked only for technical/capability blocks (RPC down, tool missing, preconditions cannot be satisfied, etc.).\n"
@@ -169,7 +166,7 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
             "- Prefer live discovery for ids/json_keys/options: scene_list_objects → scene_list_params(id) → scene_get_values(id,json_keys). Do not guess.",
             "- For unclear semantics/workflows, consult docs via docs_search/docs_read (SCENE_SERVER.md, AGENTS_GUIDE.md, USER_GUIDE.md).",
             "- Long sessions: if the user references prior decisions, use session_get_memory/session_get_plan or session_search_transcript for exact quotes.",
-            "- File paths (exact): when the user provides an absolute/~/drive path token (e.g. /Users/... , ~/... , C:\\...), treat it as exact. Use fs_expand_paths → fs_check_paths first; only if missing try fs_resolve_path (typo correction). Avoid fs_hint_resolve in this case.",
+            "- File paths (exact): when the user provides an absolute/~/drive path token (e.g. /Users/... , ~/... , C:\\...), treat it as exact. Use fs_check_paths (expands ~ and env vars) first; only if missing try fs_resolve_path (typo correction). Avoid fs_hint_resolve in this case.",
             "- File paths (hints): when the user describes location in words (e.g. “in my Documents/atlas_test”), use system_info to resolve common dirs and then call fs_hint_resolve with structured args: expected_name (basename to score) + possible_dirs (likely search roots). If match!='exact', validate by reading/checking the file before loading.",
             "- Scene vs timeline contract: any mention of time/duration implies animation_* tools. Never include time/easing in scene_apply.",
             "- Scene-only intent: do not write animation keys. Use scene_apply/scene_set_visibility and camera ops: scene_camera_fit (fit+apply) or scene_camera_apply(value=...) (apply a typed camera from camera_*). Verify with scene_get_values.",
@@ -188,7 +185,6 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
     )
 )
 
-MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL = 3_000_000
 MODEL_IMAGE_MIME_BY_SUFFIX: dict[str, str] = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -224,6 +220,7 @@ class ChatTeam:
     wire_api: str = "auto"
     temperature: float | None = None
     reasoning_effort: str | None = "high"
+    max_rounds_planner: int = DEFAULT_PLANNER_MAX_ROUNDS
     max_rounds_executor: int = DEFAULT_EXECUTOR_MAX_ROUNDS
     atlas_dir: Optional[str] = None
     atlas_version: Optional[str] = None
@@ -323,6 +320,7 @@ class ChatTeam:
                 wire_api=self.wire_api,
                 temperature=self.temperature,
                 reasoning_effort=self.reasoning_effort,
+                max_rounds_planner=int(self.max_rounds_planner),
                 max_rounds_executor=int(self.max_rounds_executor),
                 atlas_dir=self.atlas_dir,
                 atlas_version=self.atlas_version,
@@ -560,7 +558,7 @@ class ChatTeam:
                         continue
                     seen.add(wl)
                     needles.append(w)
-                    if len(needles) >= 4:
+                    if len(needles) >= int(AUTO_RETRIEVE_NEEDLE_MAX_TOKENS):
                         break
 
             snippets: list[str] = []
@@ -2038,6 +2036,22 @@ class ChatTeam:
                 except Exception:
                     pass
 
+                # Planner non-convergence is not a user-visible error: it just means the
+                # model kept returning tool calls past the planner round budget. Do not
+                # force-finalize with a "reply 'continue'" prompt here; instead proceed
+                # into the Executor in the same turn (the Executor has repair logic and
+                # can create/repair the plan deterministically).
+                if str(phase) == "Planner":
+                    result = ToolLoopResult(
+                        assistant_text="",
+                        reasoning_summaries=list(e.reasoning_summaries or []),
+                        tool_calls=list(e.tool_calls or []),
+                        input_items=list(e.input_items or []),
+                    )
+                    if callbacks is not None and callbacks.on_phase_end is not None:
+                        callbacks.on_phase_end(phase)
+                    return result
+
                 # Forced finalization: produce a user-facing progress update without tools.
                 # This avoids surfacing a raw "Agent error" while preserving correctness:
                 # users can say "continue" and the session log contains all prior tool work.
@@ -2230,11 +2244,9 @@ class ChatTeam:
                 instructions=ATLAS_PLANNER_SYSTEM_PROMPT,
                 phase_tools=planner_tools,
                 phase_input_items=phase_input,
-                max_rounds=12,
+                max_rounds=int(self.max_rounds_planner),
             )
             phase_input = list(planner_res.input_items)
-            if phase_hit_round_budget_phase == "Planner":
-                final_result = planner_res
             pt = (planner_res.assistant_text or "").strip()
             if pt.lower().startswith("clarify:"):
                 # Planner should not block execution; proceed to Executor with defaults.
@@ -2365,6 +2377,7 @@ def run_repl(
     wire_api: str = "auto",
     temperature: float | None = None,
     reasoning_effort: str | None = "high",
+    max_rounds_planner: int = DEFAULT_PLANNER_MAX_ROUNDS,
     max_rounds: int = DEFAULT_EXECUTOR_MAX_ROUNDS,
     *,
     session: Optional[str] = None,
@@ -2389,6 +2402,7 @@ def run_repl(
         wire_api=wire_api,
         temperature=temperature,
         reasoning_effort=reasoning_effort,
+        max_rounds_planner=int(max_rounds_planner),
         max_rounds_executor=int(max_rounds),
         session=session,
         session_dir=session_dir,

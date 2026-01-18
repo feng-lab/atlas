@@ -10,6 +10,12 @@ from typing import Any, Dict, List, Optional
 
 # Required internal helper; fail fast if missing
 from ...repo import find_repo_root  # type: ignore
+from ...defaults import (
+    DEFAULT_FS_HINT_RESOLVE_MAX_DEPTH,
+    DEFAULT_FS_HINT_RESOLVE_MAX_RESULTS,
+    DEFAULT_FS_RESOLVE_MAX_DEPTH,
+    DEFAULT_FS_RESOLVE_MAX_RESULTS,
+)
 from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
 from .file_formats import SCENE_LOAD_CATEGORIES, get_supported_extensions
@@ -18,6 +24,11 @@ from .file_formats import SCENE_LOAD_CATEGORIES, get_supported_extensions
 #
 # This is used only for a small NUL-byte binary heuristic, not as a read cap.
 BOM_SAMPLE_BYTES_FOR_BINARY_HEURISTIC = 4096
+
+
+def _expand_and_norm_path(p: str) -> str:
+    """Expand ~ and env vars and normalize a filesystem path string."""
+    return os.path.normpath(os.path.expanduser(os.path.expandvars(str(p or ""))))
 
 
 def _tool_handler(tool_name: str):
@@ -29,24 +40,15 @@ def _tool_handler(tool_name: str):
 
 TOOLS: List[Tool] = [
     tool_from_schema(
-        name="fs_expand_paths",
-        description="Expand ~ and env vars and normalize paths. Returns expanded absolute-like paths per entry (relative kept relative).",
-        parameters_schema={
-            "type": "object",
-            "properties": {
-                "paths": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Input paths (may contain ~ or env vars)",
-                }
-            },
-            "required": ["paths"],
-        },
-        handler=_tool_handler("fs_expand_paths"),
-    ),
-    tool_from_schema(
         name="fs_check_paths",
-        description="Check which of the given paths exist on the local filesystem. Returns {exists:[], missing:[]}.",
+        description=(
+            "Check which of the given paths exist on the local filesystem.\n"
+            "Behavior: expands ~ and env vars and normalizes paths before checking.\n"
+            "Returns:\n"
+            "- exists: expanded paths that exist\n"
+            "- missing: expanded paths that do not exist\n"
+            "- checked: per-input mapping [{input, path, exists}] for transparency/debugging"
+        ),
         parameters_schema={
             "type": "object",
             "properties": {
@@ -68,7 +70,7 @@ TOOLS: List[Tool] = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to a text file (supports ~ and env var expansion)",
+                    "description": "Path to a text file (supports ~ and env var expansion; normalized before reading).",
                 },
                 "start_line": {
                     "type": ["integer", "null"],
@@ -107,20 +109,32 @@ TOOLS: List[Tool] = [
     ),
     tool_from_schema(
         name="fs_tail_lines",
-        description="Return exactly the last N lines of a text file. BOM-aware (UTF-8/UTF-16/UTF-32). Minimal, robust, no extra params.",
+        description="Return exactly the last N lines of a text file. Expands ~ and env vars in path. BOM-aware (UTF-8/UTF-16/UTF-32). Minimal, robust, no extra params.",
         parameters_schema={
             "type": "object",
-            "properties": {"path": {"type": "string"}, "n": {"type": "integer", "default": 200}},
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path to a text file (supports ~ and env var expansion; normalized before reading).",
+                },
+                "n": {"type": "integer", "default": 200},
+            },
             "required": ["path"],
         },
         handler=_tool_handler("fs_tail_lines"),
     ),
     tool_from_schema(
         name="fs_tail_bytes",
-        description="Return the last K bytes of a text file, decoded with BOM-aware detection (UTF-8/UTF-16/UTF-32).",
+        description="Return the last K bytes of a text file, decoded with BOM-aware detection (UTF-8/UTF-16/UTF-32). Expands ~ and env vars in path.",
         parameters_schema={
             "type": "object",
-            "properties": {"path": {"type": "string"}, "bytes": {"type": "integer", "default": 4096}},
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path to a text file (supports ~ and env var expansion; normalized before reading).",
+                },
+                "bytes": {"type": "integer", "default": 4096},
+            },
             "required": ["path"],
         },
         handler=_tool_handler("fs_tail_bytes"),
@@ -133,7 +147,7 @@ TOOLS: List[Tool] = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to file (supports ~ and env var expansion)",
+                    "description": "Path to file (supports ~ and env var expansion; normalized before reading).",
                 },
                 "regex": {
                     "type": "string",
@@ -174,7 +188,7 @@ TOOLS: List[Tool] = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to a JSON file (supports ~ and env var expansion)",
+                    "description": "Path to a JSON file (supports ~ and env var expansion; normalized before reading).",
                 }
             },
             "required": ["path"],
@@ -197,13 +211,17 @@ TOOLS: List[Tool] = [
                 "base_dirs": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Optional extra search bases",
+                    "description": "Optional extra search bases (supports ~ and env var expansion; normalized before searching).",
                 },
-                "max_results": {"type": "integer", "default": 10, "description": "Max candidate results"},
+                "max_results": {
+                    "type": "integer",
+                    "default": DEFAULT_FS_RESOLVE_MAX_RESULTS,
+                    "description": "0=unlimited. If >0, return only the first N candidates and set limit_reached=true.",
+                },
                 "max_depth": {
                     "type": "integer",
-                    "default": 6,
-                    "description": "Max recursive depth when searching anchors",
+                    "default": DEFAULT_FS_RESOLVE_MAX_DEPTH,
+                    "description": "Max recursive depth when searching anchors. -1 means unlimited depth.",
                 },
             },
             "required": ["path"],
@@ -236,10 +254,18 @@ TOOLS: List[Tool] = [
                 "possible_dirs": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Likely search directories (absolute or ~ expanded).",
+                    "description": "Likely search directories (supports ~ and env var expansion; normalized before searching).",
                 },
-                "max_results": {"type": "integer", "default": 12},
-                "max_depth": {"type": "integer", "default": 6},
+                "max_results": {
+                    "type": "integer",
+                    "default": DEFAULT_FS_HINT_RESOLVE_MAX_RESULTS,
+                    "description": "0=unlimited. If >0, return only the first N candidates and set limit_reached=true.",
+                },
+                "max_depth": {
+                    "type": "integer",
+                    "default": DEFAULT_FS_HINT_RESOLVE_MAX_DEPTH,
+                    "description": "Max recursive depth within each possible_dir. -1 means unlimited depth.",
+                },
             },
             "required": ["expected_name", "possible_dirs"],
         },
@@ -261,11 +287,15 @@ TOOLS: List[Tool] = [
     ),
     tool_from_schema(
         name="fs_find_candidates",
-        description="Resolve candidate file paths by trying directories and extensions; returns existing absolute paths.",
+        description="Resolve candidate file paths by trying directories and extensions; returns existing absolute paths. Expands ~ and env vars in dirs.",
         parameters_schema={
             "type": "object",
             "properties": {
-                "dirs": {"type": "array", "items": {"type": "string"}, "description": "Search directories"},
+                "dirs": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Search directories (supports ~ and env var expansion; normalized before checking).",
+                },
                 "names": {"type": "array", "items": {"type": "string"}, "description": "Basenames to resolve"},
                 "extensions": {
                     "type": "array",
@@ -291,26 +321,25 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     _json_key_exists = ctx.json_key_exists
     _schema_validator_cache = ctx.schema_validator_cache
 
-    if name == "fs_expand_paths":
-        paths = [str(p) for p in (args.get("paths") or [])]
-        out: list[str] = []
-        for p in paths:
-            t = os.path.expanduser(os.path.expandvars(p))
-            # Normalize separators for current OS
-            t = os.path.normpath(t)
-            out.append(t)
-        return json.dumps({"ok": True, "paths": out})
-
     if name == "fs_check_paths":
         paths = [str(p) for p in (args.get("paths") or [])]
         exists: list[str] = []
         missing: list[str] = []
-        for p in paths:
-            if os.path.exists(p):
-                exists.append(p)
+        checked: list[dict[str, Any]] = []
+        for raw in paths:
+            p = str(raw or "").strip()
+            if not p:
+                checked.append({"input": raw, "path": "", "exists": False})
+                missing.append("")
+                continue
+            expanded = _expand_and_norm_path(p)
+            ok = os.path.exists(expanded)
+            checked.append({"input": raw, "path": expanded, "exists": ok})
+            if ok:
+                exists.append(expanded)
             else:
-                missing.append(p)
-        return json.dumps({"ok": True, "exists": exists, "missing": missing})
+                missing.append(expanded)
+        return json.dumps({"ok": True, "exists": exists, "missing": missing, "checked": checked})
 
     if name == "fs_read_text":
 
@@ -346,7 +375,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         # Internal streaming chunk size (not user-configurable)
         block_size = 65536
         try:
-            q = os.path.expanduser(os.path.expandvars(p))
+            q = _expand_and_norm_path(p)
             # Enforce symmetry: line_count requires start_line (use negative start_line for tail)
             if (line_count is not None) and (start_line is None):
                 return json.dumps(
@@ -507,7 +536,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if n <= 0:
             n = 1
         try:
-            q = os.path.expanduser(os.path.expandvars(p))
+            q = _expand_and_norm_path(p)
             with open(q, "rb") as f:
                 # Detect BOM/encoding from file start (not tail buffer)
                 try:
@@ -578,7 +607,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if k <= 0:
             k = 1
         try:
-            q = os.path.expanduser(os.path.expandvars(p))
+            q = _expand_and_norm_path(p)
             with open(q, "rb") as f:
                 # Detect BOM/encoding from file start
                 try:
@@ -636,7 +665,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if max_matches < 0:
             max_matches = 0
         try:
-            q = os.path.expanduser(os.path.expandvars(p))
+            q = _expand_and_norm_path(p)
             with open(q, "rb") as f:
                 # Determine file size
                 try:
@@ -770,7 +799,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     if name == "fs_read_json":
         p = str(args.get("path") or "")
         try:
-            q = os.path.expanduser(os.path.expandvars(p))
+            q = _expand_and_norm_path(p)
             size = None
             try:
                 size = os.stat(q).st_size
@@ -800,8 +829,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
         path_in = str(args.get("path") or "")
         kind = str(args.get("kind")) if args.get("kind") else "either"
-        max_results = int(args.get("max_results", 10))
-        max_depth = int(args.get("max_depth", 6))
+        max_results = int(args.get("max_results", DEFAULT_FS_RESOLVE_MAX_RESULTS) or 0)
+        if max_results < 0:
+            max_results = 0
+        max_depth = int(args.get("max_depth", DEFAULT_FS_RESOLVE_MAX_DEPTH) or DEFAULT_FS_RESOLVE_MAX_DEPTH)
         base_dirs = [str(p) for p in (args.get("base_dirs") or [])]
         tried: list[str] = []
 
@@ -813,8 +844,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return os.path.exists(p)
 
         # Expand and normalize
-        p0 = os.path.expanduser(os.path.expandvars(path_in))
-        p0 = os.path.normpath(p0)
+        p0 = _expand_and_norm_path(path_in)
         tried.append(p0)
         if _exists(p0):
             return json.dumps({"ok": True, "path": os.path.abspath(p0), "tried": tried})
@@ -927,7 +957,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             if os.path.isdir(cand):
                 anchor_dirs.append(cand)
         # Add optional bases and repo last
-        anchor_dirs.extend(base_dirs)
+        for d in base_dirs:
+            d2 = _expand_and_norm_path(d)
+            if d2:
+                anchor_dirs.append(d2)
         if repo_root:
             anchor_dirs.append(str(repo_root))
         # De-dupe while preserving order
@@ -940,12 +973,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         target = Path(path_in).name
         candidates: list[tuple[float, str]] = []
 
-        def _walk_with_depth(root: str, max_depth: int):
+        def _walk_with_depth(root: str, max_depth: int) -> None:
             root_p = Path(root)
             try:
                 for cur, dirs, files in os.walk(root):
                     rel = Path(cur).relative_to(root_p)
-                    if len(rel.parts) > max_depth:
+                    if max_depth >= 0 and len(rel.parts) > max_depth:
                         dirs[:] = []
                         continue
                     for nm in files if kind != "dir" else dirs:
@@ -967,16 +1000,29 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             _walk_with_depth(r, max_depth)
             tried.append(r)
         candidates.sort(key=lambda x: x[0], reverse=True)
-        out = [{"path": p, "score": float(s)} for (s, p) in candidates[:max_results]]
-        return json.dumps({"ok": False, "candidates": out, "tried": tried})
+        total_candidates = len(candidates)
+        limit_reached = bool(max_results and total_candidates > max_results)
+        window = candidates[:max_results] if max_results else candidates
+        out = [{"path": p, "score": float(s)} for (s, p) in window]
+        return json.dumps(
+            {
+                "ok": False,
+                "candidates": out,
+                "total_candidates": total_candidates,
+                "limit_reached": limit_reached,
+                "tried": tried,
+            }
+        )
 
     if name == "fs_hint_resolve":
 
         expected_name = str(args.get("expected_name") or "").strip()
         possible_dirs_raw = args.get("possible_dirs")
         kind = str(args.get("kind") or "file")
-        max_results = int(args.get("max_results", 12))
-        max_depth = int(args.get("max_depth", 6))
+        max_results = int(args.get("max_results", DEFAULT_FS_HINT_RESOLVE_MAX_RESULTS) or 0)
+        if max_results < 0:
+            max_results = 0
+        max_depth = int(args.get("max_depth", DEFAULT_FS_HINT_RESOLVE_MAX_DEPTH) or DEFAULT_FS_HINT_RESOLVE_MAX_DEPTH)
 
         if not expected_name:
             return json.dumps(
@@ -1008,8 +1054,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         searched_dirs: list[str] = []
         missing_dirs: list[str] = []
         for d in possible_dirs:
-            d2 = os.path.expanduser(os.path.expandvars(d))
-            d2 = os.path.normpath(d2)
+            d2 = _expand_and_norm_path(d)
             if os.path.isdir(d2):
                 searched_dirs.append(d2)
             else:
@@ -1043,7 +1088,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             root_p = Path(root)
             for cur, dirs, files in os.walk(root):
                 rel = Path(cur).relative_to(root_p)
-                if len(rel.parts) > max_depth:
+                if max_depth >= 0 and len(rel.parts) > max_depth:
                     dirs[:] = []
                     continue
                 names = files if kind != "dir" else dirs
@@ -1087,7 +1132,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
         total_candidates = len(candidates_u)
         limit_reached = bool(max_results and total_candidates > max_results)
-        out = [{"path": p, "score": float(s)} for (s, p) in candidates_u[:max_results]]
+        window = candidates_u[:max_results] if max_results else candidates_u
+        out = [{"path": p, "score": float(s)} for (s, p) in window]
 
         if not out:
             return json.dumps(
@@ -1175,7 +1221,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         d = str(args.get("dir") or "")
         pattern = str(args.get("pattern") or "*")
         rec = bool(args.get("recursive", False))
-        base = os.path.expanduser(os.path.expandvars(d))
+        base = _expand_and_norm_path(d)
         if not os.path.isdir(base):
             return json.dumps({"ok": False, "error": f"not a directory: {base}"})
         pat = os.path.join(base, pattern)
@@ -1203,7 +1249,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return cand
 
         for d in dirs:
-            d2 = os.path.expanduser(os.path.expandvars(str(d)))
+            d2 = _expand_and_norm_path(str(d))
             for nm in names:
                 for cand in variants(nm):
                     p = os.path.join(d2, cand)

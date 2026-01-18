@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .chat_rpc_team import ChatTeam
-from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS
+from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS, DEFAULT_PLANNER_MAX_ROUNDS
 from .responses_tool_loop import ToolLoopCallbacks
 
 
@@ -104,6 +104,7 @@ def run_console_repl(
     temperature: float | None = None,
     reasoning_effort: str | None = "high",
     max_rounds: int = DEFAULT_EXECUTOR_MAX_ROUNDS,
+    max_rounds_planner: int = DEFAULT_PLANNER_MAX_ROUNDS,
     session: Optional[str] = None,
     session_dir: Optional[str] = None,
     enable_codegen: bool = False,
@@ -138,6 +139,7 @@ def run_console_repl(
         temperature=temperature,
         reasoning_effort=reasoning_effort,
         max_rounds_executor=int(max_rounds),
+        max_rounds_planner=int(max_rounds_planner),
         session=session,
         session_dir=session_dir,
         enable_codegen=bool(enable_codegen),

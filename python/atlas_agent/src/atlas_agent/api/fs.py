@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Iterable
 
 from ..repo import find_repo_root
+from ..defaults import DEFAULT_FS_RESOLVE_MAX_DEPTH, DEFAULT_FS_RESOLVE_MAX_RESULTS
 
 
 def expand_paths(paths: Iterable[str]) -> list[str]:
@@ -39,7 +40,14 @@ def glob_dir(dir_path: str, pattern: str = "*", recursive: bool = False) -> list
     return [os.path.abspath(m) for m in matches if os.path.isfile(m)]
 
 
-def resolve_path(path: str, *, kind: str = "either", base_dirs: list[str] | None = None, max_candidates: int = 10) -> tuple[bool, str | None, list[dict]]:
+def resolve_path(
+    path: str,
+    *,
+    kind: str = "either",
+    base_dirs: list[str] | None = None,
+    max_candidates: int = DEFAULT_FS_RESOLVE_MAX_RESULTS,
+    max_depth: int = DEFAULT_FS_RESOLVE_MAX_DEPTH,
+) -> tuple[bool, str | None, list[dict]]:
     """Resolve a possibly-typoed file/dir path.
 
     Returns (ok, path, candidates). If ok is False, candidates contains likely
@@ -105,14 +113,14 @@ def resolve_path(path: str, *, kind: str = "either", base_dirs: list[str] | None
     target = Path(path).name.lower()
     candidates: list[tuple[float, str]] = []
 
-    def _walk_with_depth(root: str, max_depth: int = 6):
+    def _walk_with_depth(root: str, max_depth: int) -> None:
         root_p = Path(root)
         for cur, dirs, files in os.walk(root):
             try:
                 rel = Path(cur).relative_to(root_p)
             except Exception:
                 rel = Path("")
-            if len(rel.parts) > max_depth:
+            if max_depth >= 0 and len(rel.parts) > max_depth:
                 dirs[:] = []
                 continue
             for nm in dirs + files:
@@ -127,19 +135,27 @@ def resolve_path(path: str, *, kind: str = "either", base_dirs: list[str] | None
 
     for r in search_roots:
         if os.path.isdir(r):
-            _walk_with_depth(r, 6)
+            _walk_with_depth(r, max_depth)
     candidates.sort(key=lambda x: x[0], reverse=True)
-    out = [{"path": p, "score": float(s)} for (s, p) in candidates[:max_candidates]]
+    limit = max(0, int(max_candidates or 0))
+    window = candidates[:limit] if limit else candidates
+    out = [{"path": p, "score": float(s)} for (s, p) in window]
     return False, None, out
 
 
-def repo_search(name: str, *, type: str = "either", max_depth: int = 6, max_results: int = 20) -> list[dict]:
+def repo_search(
+    name: str,
+    *,
+    type: str = "either",
+    max_depth: int = DEFAULT_FS_RESOLVE_MAX_DEPTH,
+    max_results: int = DEFAULT_FS_RESOLVE_MAX_RESULTS,
+) -> list[dict]:
     repo_root = find_repo_root() or Path.cwd()
     target = name.lower()
     hits: list[tuple[float, str]] = []
     for cur, dirs, files in os.walk(str(repo_root)):
         rel = Path(cur).relative_to(repo_root)
-        if len(rel.parts) > max_depth:
+        if max_depth >= 0 and len(rel.parts) > max_depth:
             dirs[:] = []
             continue
         def _consider(nm: str):
@@ -156,4 +172,6 @@ def repo_search(name: str, *, type: str = "either", max_depth: int = 6, max_resu
         for nm in files:
             _consider(nm)
     hits.sort(key=lambda x: x[0], reverse=True)
-    return [{"path": p, "score": float(s)} for (s, p) in hits[:max_results]]
+    limit = max(0, int(max_results or 0))
+    window = hits[:limit] if limit else hits
+    return [{"path": p, "score": float(s)} for (s, p) in window]

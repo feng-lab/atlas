@@ -13,7 +13,7 @@ import os
 
 from .chat_rpc_team import run_repl as run_team_repl
 from .console_ui import run_console_repl
-from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS
+from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS, DEFAULT_PLANNER_MAX_ROUNDS
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -61,6 +61,16 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "Maximum tool-loop rounds for the Executor phase (0 = unlimited). "
             "Increase for very complex tasks that require many tool calls."
+        ),
+    )
+    parser.add_argument(
+        "--planner-max-rounds",
+        type=int,
+        default=DEFAULT_PLANNER_MAX_ROUNDS,
+        help=(
+            "Maximum tool-loop rounds for the Planner phase (0 = unlimited). "
+            "Increase if the Planner sometimes fails to emit update_plan/verification_set_requirements "
+            "before handing off to the Executor."
         ),
     )
     parser.add_argument(
@@ -112,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
                 temperature=args.temperature,
                 reasoning_effort=args.reasoning_effort,
                 max_rounds=int(args.max_rounds),
+                max_rounds_planner=int(args.planner_max_rounds),
                 session=args.session,
                 session_dir=args.session_dir,
                 enable_codegen=bool(args.enable_codegen),
@@ -127,6 +138,7 @@ def main(argv: list[str] | None = None) -> int:
             temperature=args.temperature,
             reasoning_effort=args.reasoning_effort,
             max_rounds=int(args.max_rounds),
+            max_rounds_planner=int(args.planner_max_rounds),
             session=args.session,
             session_dir=args.session_dir,
             enable_codegen=bool(args.enable_codegen),
