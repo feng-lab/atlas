@@ -34,7 +34,7 @@ env:
 jobs:
   build-env:
     runs-on: ubuntu-22.04
-    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) }}
+    if: ${{ github.event_name != 'create' || github.ref_type == 'tag' }}
     steps:
       - name: Disable Git autocrlf
         shell: bash -l {0}
@@ -238,7 +238,7 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     needs: build-env
-    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) }}
+    if: ${{ github.event_name != 'create' || github.ref_type == 'tag' }}
     permissions:
       contents: write
     steps:
@@ -668,10 +668,3 @@ jobs:
           fi
           python util/publish_zimg.py
           ls -R python/zimg/dist
-
-  skip-ci:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, '[skip ci]') }}
-    steps:
-      - name: CI skipped
-        run: echo "CI skipped because commit message starts with [skip ci]."
