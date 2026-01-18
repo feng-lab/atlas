@@ -508,6 +508,7 @@ def run_responses_tool_loop(
     reasoning_summaries: list[str] = []
     final_assistant_text = ""
     final_continue_calls = 0
+    internal_continue_prompts: list[str] = []
 
     def _append_message(role: str, text: str) -> None:
         in_items.append(_input_text_message(role=role, text=text))
@@ -676,15 +677,17 @@ def run_responses_tool_loop(
             final_continue_calls += 1
             if not candidate:
                 prompt = (
-                    "(internal) Produce a user-facing final answer now. "
-                    "Do not call tools. Do not ask the user for more input unless strictly required."
+                    "INTERNAL TOOLLOOP (not user intent): The previous assistant output was empty or truncated.\n"
+                    "Tools are disabled for this continuation call. Produce a user-facing final answer now.\n"
+                    "Do not ask the user for more input unless strictly required."
                 )
             else:
                 prompt = (
-                    "(internal) Continue from where you left off. "
-                    "Do not call tools. Do not repeat previously produced text. "
+                    "INTERNAL TOOLLOOP (not user intent): Continue writing the final user-facing answer.\n"
+                    "Tools are disabled for this continuation call. Do not repeat previously produced text.\n"
                     "Finish the final user-facing answer."
                 )
+            internal_continue_prompts.append(prompt)
             _append_message("user", prompt)
             continue
 
@@ -707,6 +710,32 @@ def run_responses_tool_loop(
             tool_calls=all_tool_calls,
             input_items=list(in_items),
         )
+
+    # Do not leak internal toolloop control prompts into subsequent phases/turns.
+    # These are orchestration directives, not user messages, and can confuse some
+    # models/providers if left in the conversation history (e.g., the model may
+    # incorrectly claim the user asked it to avoid tools).
+    if internal_continue_prompts:
+        internal_set = set(internal_continue_prompts)
+
+        def _is_internal_continue_message(it: dict[str, Any]) -> bool:
+            if not isinstance(it, dict):
+                return False
+            if str(it.get("type") or "") != "message":
+                return False
+            if str(it.get("role") or "") != "user":
+                return False
+            parts = it.get("content") or []
+            if not isinstance(parts, list):
+                return False
+            text_parts: list[str] = []
+            for p in parts:
+                if isinstance(p, dict) and isinstance(p.get("text"), str):
+                    text_parts.append(p.get("text") or "")
+            msg_text = "".join(text_parts)
+            return msg_text in internal_set
+
+        in_items = [it for it in in_items if not _is_internal_continue_message(it)]
 
     return ToolLoopResult(
         assistant_text=final_assistant_text,

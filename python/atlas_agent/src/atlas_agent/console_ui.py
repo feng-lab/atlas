@@ -306,11 +306,13 @@ def run_console_repl(
         # Natural language turn (stream reasoning summary, show tools, then final answer).
         printed_reasoning = False
         current_phase = "Executor"
+        last_gateway_model: str | None = None
 
         def _on_phase_start(phase: str) -> None:
-            nonlocal printed_reasoning, current_phase
+            nonlocal printed_reasoning, current_phase, last_gateway_model
             current_phase = str(phase or "").strip() or "Phase"
             printed_reasoning = False
+            last_gateway_model = None
             console.print(Text(f"\n# {current_phase}", style="bold magenta"))
 
         def _on_phase_end(_phase: str) -> None:
@@ -401,11 +403,31 @@ def run_console_repl(
             if name == "update_plan" and ok is True:
                 _render_plan(console=console, team=team)
 
+        def _on_response_meta(resp: dict[str, Any], _call_index: int) -> None:
+            nonlocal last_gateway_model, printed_reasoning
+            model_name = None
+            if isinstance(resp, dict):
+                model_name = resp.get("model")
+            if not isinstance(model_name, str) or not model_name.strip():
+                model_name = "can not detect gateway model"
+            model_name = model_name.strip()
+            if last_gateway_model == model_name:
+                return
+            last_gateway_model = model_name
+            # If we were streaming reasoning without a trailing newline, ensure the
+            # meta line doesn't glue onto the previous output.
+            if printed_reasoning:
+                console.print()
+            requested = str(model or "").strip()
+            suffix = f" (requested {requested})" if requested and model_name != requested else ""
+            console.print(Text(f"[gateway model: {model_name}{suffix}]", style="dim"))
+
         callbacks = ToolLoopCallbacks(
             on_phase_start=_on_phase_start,
             on_phase_end=_on_phase_end,
             on_reasoning_summary_delta=_on_reasoning_delta,
             on_reasoning_summary_part_added=_on_reasoning_part_added,
+            on_response_meta=_on_response_meta,
             on_tool_call=_on_tool_call,
             on_tool_result=_on_tool_result,
         )
