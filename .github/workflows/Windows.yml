@@ -4,8 +4,14 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'python/atlas_agent/**'
+      - 'LICENSE'
+      - 'NOTICE'
   create:
-    # Runs when a branch or tag is created; we gate to tags in job steps
+    # Runs when a branch or tag is created; jobs are gated to tags (skip branch creates)
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +37,7 @@ env:
 jobs:
   ext-cache-probe:
     runs-on: windows-2022
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) }}
     outputs:
       p2-hit: ${{ steps.cache-extlibs-probe.outputs.cache-hit }}
     steps:
@@ -51,7 +58,7 @@ jobs:
   build-env-1:
     runs-on: windows-2022
     needs: ext-cache-probe
-    if: needs.ext-cache-probe.outputs.p2-hit != 'true'
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) && needs.ext-cache-probe.outputs.p2-hit != 'true' }}
     steps:
       - name: Disable Git autocrlf
         shell: pwsh
@@ -261,7 +268,7 @@ jobs:
   build-env-2:
     runs-on: windows-2022
     needs: [ext-cache-probe, build-env-1]
-    if: needs.ext-cache-probe.outputs.p2-hit != 'true'
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) && needs.ext-cache-probe.outputs.p2-hit != 'true' }}
     steps:
       - name: Disable Git autocrlf
         shell: pwsh
@@ -377,7 +384,7 @@ jobs:
   build:
     runs-on: windows-2022
     needs: [ext-cache-probe, build-env-2]
-    if: ${{ !cancelled() && (needs.ext-cache-probe.outputs.p2-hit == 'true' || needs.build-env-2.result == 'success') }}
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) && !cancelled() && (needs.ext-cache-probe.outputs.p2-hit == 'true' || needs.build-env-2.result == 'success') }}
     permissions:
       contents: write
     steps:
@@ -803,3 +810,10 @@ jobs:
           python util/publish_zimg.py
           if ($LASTEXITCODE -ne 0) { Write-Error "publish_zimg.py failed"; exit $LASTEXITCODE }
           Get-ChildItem -Recurse python/zimg/dist | Select-Object FullName
+
+  skip-ci:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - name: CI skipped
+        run: echo "CI skipped because commit message starts with [skip ci]."

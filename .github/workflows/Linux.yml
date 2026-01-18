@@ -4,8 +4,14 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'python/atlas_agent/**'
+      - 'LICENSE'
+      - 'NOTICE'
   create:
-    # Runs when a branch or tag is created; we gate to tags in job steps
+    # Runs when a branch or tag is created; jobs are gated to tags (skip branch creates)
   workflow_dispatch:
 
 concurrency:
@@ -28,6 +34,7 @@ env:
 jobs:
   build-env:
     runs-on: ubuntu-22.04
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) }}
     steps:
       - name: Disable Git autocrlf
         shell: bash -l {0}
@@ -231,6 +238,7 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     needs: build-env
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) }}
     permissions:
       contents: write
     steps:
@@ -660,3 +668,10 @@ jobs:
           fi
           python util/publish_zimg.py
           ls -R python/zimg/dist
+
+  skip-ci:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - name: CI skipped
+        run: echo "CI skipped because commit message starts with [skip ci]."

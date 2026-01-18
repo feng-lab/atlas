@@ -4,8 +4,14 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'python/atlas_agent/**'
+      - 'LICENSE'
+      - 'NOTICE'
   create:
-    # Runs when a branch or tag is created; we gate to tags in job steps
+    # Runs when a branch or tag is created; jobs are gated to tags (skip branch creates)
   workflow_dispatch:
 
 concurrency:
@@ -29,6 +35,7 @@ env:
 jobs:
   determine-mode:
     runs-on: ubuntu-latest
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) }}
     outputs:
       mode: ${{ steps.set-mode.outputs.mode }}
     steps:
@@ -42,7 +49,7 @@ jobs:
 
   selfhosted-combined:
     needs: determine-mode
-    if: ${{ needs.determine-mode.outputs.mode == 'self-hosted' }}
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) && needs.determine-mode.outputs.mode == 'self-hosted' }}
     runs-on: self-hosted
     permissions:
       contents: write
@@ -87,7 +94,7 @@ jobs:
 
   build-env:
     needs: determine-mode
-    if: ${{ needs.determine-mode.outputs.mode == 'github' }}
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) && needs.determine-mode.outputs.mode == 'github' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
@@ -115,7 +122,7 @@ jobs:
     needs:
       - determine-mode
       - build-env
-    if: ${{ needs.determine-mode.outputs.mode == 'github' }}
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) && needs.determine-mode.outputs.mode == 'github' }}
     runs-on: macos-15
     permissions:
       contents: write
@@ -144,3 +151,10 @@ jobs:
 
       - name: Build and publish
         uses: ./.github/actions/macos-build
+
+  skip-ci:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - name: CI skipped
+        run: echo "CI skipped because commit message starts with [skip ci]."
