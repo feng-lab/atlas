@@ -2445,6 +2445,7 @@ public:
         const auto params = req->params();
         std::string axis = "y";
         double angle = 360.0;
+        double maxStepDeg = 90.0;
         auto itA = params.fields().find("axis");
         if (itA != params.fields().end() && itA->second.kind_case() == google::protobuf::Value::kStringValue) {
           axis = itA->second.string_value();
@@ -2452,6 +2453,13 @@ public:
         auto itAng = params.fields().find("degrees");
         if (itAng != params.fields().end() && itAng->second.kind_case() == google::protobuf::Value::kNumberValue) {
           angle = itAng->second.number_value();
+        }
+        auto itStep = params.fields().find("max_step_degrees");
+        if (itStep != params.fields().end() && itStep->second.kind_case() == google::protobuf::Value::kNumberValue) {
+          maxStepDeg = itStep->second.number_value();
+        }
+        if (!std::isfinite(maxStepDeg) || maxStepDeg <= 0.0) {
+          return Status(grpc::StatusCode::INVALID_ARGUMENT, "max_step_degrees must be a finite number > 0");
         }
         const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
         glm::vec3 ax(0.f, 1.f, 0.f);
@@ -2463,19 +2471,16 @@ public:
         } else if (axq == "z") {
           ax = glm::vec3(0.f, 0.f, 1.f);
         }
-        // Build a segmented orbit to avoid the 360° wrap producing identical endpoints.
-        // Normalize 0/±360° (or multiples) to a full 360° sweep with segments.
-        double angDeg = angle;
-        const double sign = (angDeg >= 0.0 ? 1.0 : -1.0);
-        double aabs = std::abs(angDeg);
-        const double eps = 1e-6;
-        // Treat multiples of 360 as 360 to ensure motion.
-        if (std::abs(std::fmod(aabs, 360.0)) < eps) {
-          aabs = 360.0;
-          angDeg = sign * aabs;
+        // Segment into <=max_step_degrees steps for stable interpolation and controllable key density.
+        // This also ensures a 360° orbit produces visible motion (because intermediate keys are emitted)
+        // even though the start/end camera poses match.
+        const double angDeg = angle;
+        const double aabs = std::abs(angDeg);
+        const double segD = std::ceil(aabs / maxStepDeg);
+        if (!std::isfinite(segD) || segD < 0.0 || segD > static_cast<double>(std::numeric_limits<int>::max())) {
+          return Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid orbit segmentation (check max_step_degrees/degrees)");
         }
-        // Segment into <=90° steps for stable interpolation.
-        int segments = std::max(1, static_cast<int>(std::ceil(aabs / 90.0)));
+        const int segments = std::max(1, static_cast<int>(segD));
         const double stepDeg = angDeg / static_cast<double>(segments);
         const double dt = (t1 - t0) / static_cast<double>(segments);
 
@@ -3221,8 +3226,8 @@ public:
         want = QStringLiteral("Center");
       } else {
         // Temporarily disable spline-based interpolation modes. They are known to
-        // be unstable in some workflows and are not exposed via the agent tool
-        // surface. Fail fast with a clear message rather than silently accepting.
+        // be unstable in some workflows and are not currently supported via RPC.
+        // Fail fast with a clear message rather than silently accepting.
         errCode = grpc::StatusCode::FAILED_PRECONDITION;
         errMsg = "camera interpolation methods other than Center are temporarily disabled";
         return false;

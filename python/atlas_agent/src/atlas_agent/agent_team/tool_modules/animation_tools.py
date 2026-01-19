@@ -70,7 +70,25 @@ TOOLS: List[Tool] = [
     ),
     tool_from_schema(
         name="animation_camera_solve_and_apply",
-        description="Animation timeline: solve camera (FIT|ORBIT|DOLLY|STATIC) and write validated keys. Clears existing camera keys in [t0,t1] by default (tolerance-aware). Not for scene-only FIT. Returns {applied:[times...], total}.",
+        description=(
+            "Timeline camera solver (writes keys): generate validated camera keys using FIT|ORBIT|DOLLY|STATIC.\n\n"
+            "Use when:\n"
+            "- FIT: establish a good starting frame for ids (presentation framing).\n"
+            "- ORBIT: rotate around the subject (exterior orbit / turntable shots).\n"
+            "- DOLLY: zoom/dolly in or out while keeping the subject framed.\n"
+            "- STATIC: hold the current pose.\n\n"
+            "Avoid when:\n"
+            "- You have explicit spatial beats (A→B→C coordinates) → use animation_camera_waypoint_spline_apply.\n"
+            "- You want first-person motion verbs (fly/turn/pause) → use animation_camera_walkthrough_apply.\n\n"
+            "Primary knobs:\n"
+            "- Smoothness: ORBIT uses max_step_degrees (smaller → more keys → smoother). DOLLY uses more keys/windows.\n"
+            "- Framing vs exploration: constraints.keep_visible=true for exterior presentation; false for interior flythroughs.\n"
+            "- Timing feel: easing changes per-key timing curves only (Linear/EaseInOut/Switch).\n\n"
+            "If the result looks wrong:\n"
+            "- ORBIT: usually wrong ids/target selection, or keys too sparse → lower max_step_degrees.\n"
+            "- DOLLY: if you wanted an arc (move+rotate), use waypoints/walkthrough instead of DOLLY.\n\n"
+            "Camera interpolation is always evaluated using a stable look-at + distance convention; easing is separate."
+        ),
         parameters_schema={
             "type": "object",
             "properties": {
@@ -79,11 +97,12 @@ TOOLS: List[Tool] = [
                 "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids; empty uses fit_candidates()."},
                 "t0": {"type": "number", "description": "Start time (seconds) of the write window."},
                 "t1": {"type": "number", "description": "End time (seconds) of the write window."},
-                "constraints": {"type": "object", "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, fov policy)."},
+                "constraints": {"type": "object", "description": "Visibility/coverage constraints. Typical defaults: keep_visible=true for exterior presentation (with min_coverage≈0.95); keep_visible=false for interior flythroughs."},
                 "params": {"type": "object", "description": "Mode-specific parameters (e.g., axis for ORBIT)."},
                 "degrees": {"type": "number", "description": "ORBIT: total rotation in degrees (default 360)."},
+                "max_step_degrees": {"type": "number", "description": "ORBIT: maximum degrees per solver step (controls key density). Smaller values produce more keys and smoother motion. Default 90."},
                 "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
-                "easing": {"type": "string", "default": "Linear", "description": "Easing to assign to written keys."},
+                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (e.g., Linear/EaseInOut/Switch). This affects per-key timing curves and is separate from camera interpolation."},
                 "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys."},
             },
             "required": ["animation_id", "mode", "ids", "t0", "t1"],
@@ -92,14 +111,26 @@ TOOLS: List[Tool] = [
         handler=_tool_handler("animation_camera_solve_and_apply"),
     ),
     # Camera interpolation method tools are intentionally disabled for now.
-    # Only the default "Center" mode is considered stable.
+    # Camera interpolation is evaluated using a stable look-at + distance convention.
     tool_from_schema(
         name="animation_camera_waypoint_spline_apply",
         description=(
-            "Guided waypoint camera path (timeline): solve typed camera keys from bbox/world waypoints, optionally clear existing camera keys in [t0,t1], "
-            "then write validated camera keys.\n\n"
-            "Note: camera interpolation methods beyond the default Center mode are currently disabled. "
-            "For smoother motion from sparse waypoints, provide additional waypoints or use the walkthrough tool (which samples a denser key sequence)."
+            "Guided waypoint camera path (timeline; writes keys): solve camera keys from explicit bbox/world waypoints.\n\n"
+            "Use when:\n"
+            "- The user provides explicit points/waypoints (world coords or bbox fractions) or clear spatial beats (A→B→C).\n\n"
+            "Avoid when:\n"
+            "- The user describes motion verbs (fly forward, strafe, yaw/pitch, pause) → use animation_camera_walkthrough_apply.\n"
+            "- The goal is a clean exterior orbit around a subject → use animation_camera_solve_and_apply(mode='ORBIT').\n\n"
+            "Primary knobs:\n"
+            "- Aim behavior: look_at_policy controls how missing look_at is filled.\n"
+            "  - preserve_direction (default): keeps the current view direction + distance when look_at is omitted.\n"
+            "  - bbox_center: fills missing look_at to keep tracking the bbox center (third-person track/orbit-like).\n"
+            "- Smoothness: add intermediate waypoints (spatial key density). For continuous \"drone\" motion, use walkthrough (step_seconds).\n"
+            "- Timing feel: easing changes per-key timing curves only.\n\n"
+            "If the result looks wrong:\n"
+            "- Path drifts instead of tracking the subject → set look_at_policy='bbox_center' or provide explicit waypoint look_at.\n"
+            "- Motion is too sharp between points → add intermediate waypoints.\n\n"
+            "Camera interpolation is always evaluated using a stable look-at + distance convention; easing is separate."
         ),
         parameters_schema={
             "type": "object",
@@ -110,7 +141,8 @@ TOOLS: List[Tool] = [
                 "t0": {"type": "number", "description": "Start time (seconds)."},
                 "t1": {"type": "number", "description": "End time (seconds)."},
                 "waypoints": {"type": "array", "items": {"type": "object"}, "description": "Waypoints with either absolute time or normalized u in [0,1]. Each waypoint: {u?:number, time?:number, eye?:{world:[x,y,z]|bbox_fraction:[fx,fy,fz]}, look_at?:{world:[x,y,z]|bbox_center:true|bbox_fraction:[fx,fy,fz]}}. If look_at is omitted, the solver preserves the previous view direction and center distance."},
-                "easing": {"type": "string", "default": "Linear", "description": "Easing assigned to written camera keys (note: spline path uses waypoint geometry)."},
+                "look_at_policy": {"type": "string", "enum": ["preserve_direction", "bbox_center"], "default": "preserve_direction", "description": "How to handle waypoints that omit look_at. preserve_direction keeps the current view direction; bbox_center fills missing look_at with bbox_center:true."},
+                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (e.g., Linear/EaseInOut/Switch). This does not change the waypoint geometry; it only affects per-key transition timing."},
                 "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys."},
                 "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
                 "constraints": {"type": "object", "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement)."},
@@ -124,18 +156,22 @@ TOOLS: List[Tool] = [
     tool_from_schema(
         name="animation_camera_walkthrough_apply",
         description=(
-            "First-person walkthrough authoring: build a smooth camera path from high-level motion segments (local moves + yaw/pitch/roll), "
-            "optionally clear existing camera keys in [t0,t1], then write validated camera keys. "
-            "This is intended for 'fly/drone inside the object' requests where users describe motion in words and the agent invents segments.\n\n"
-            "Segment timing modes (choose ONE):\n"
-            "- Explicit: every segment has u0/u1 in [0,1]\n"
-            "- Duration: every segment has duration (seconds); durations are normalized to fill [t0,t1]\n"
-            "- Equal: no u0/u1/duration provided; segments split [t0,t1] evenly\n\n"
-            "Motion units:\n"
-            "- move distances are fractions of the target bbox enclosing-sphere radius (so no world-unit guessing).\n"
-            "- rotation is in degrees.\n"
-            "Sampling:\n"
-            "- Motion is approximated by sampling each segment at step_seconds; decrease step_seconds for higher-fidelity curved motion."
+            "First-person walkthrough authoring (timeline; writes keys): build a smooth camera path from motion segments "
+            "(local moves + yaw/pitch/roll), optionally clear existing camera keys in [t0,t1], then write validated camera keys.\n\n"
+            "Use when:\n"
+            "- The user describes motion verbs rather than explicit points: fly forward, strafe, turn, look around, pause.\n"
+            "- Interior exploration (moving inside a volume/mesh) where \"keep the whole bbox visible\" is not desired.\n\n"
+            "Avoid when:\n"
+            "- The user gives explicit waypoints/coordinates → use animation_camera_waypoint_spline_apply.\n"
+            "- The goal is a clean exterior turntable orbit → use animation_camera_solve_and_apply(mode='ORBIT').\n\n"
+            "Primary knobs:\n"
+            "- Smoothness: step_seconds (smaller → more sampled keys → smoother curved motion).\n"
+            "- Framing vs exploration: constraints.keep_visible=false for interior flythroughs; true only when explicitly requested.\n"
+            "- Aim behavior: look_at_policy controls first-person vs third-person tracking semantics.\n\n"
+            "If the result looks wrong:\n"
+            "- Interior path keeps \"popping out\" due to framing constraints → set constraints.keep_visible=false.\n"
+            "- You wanted the camera to keep aiming at the subject → set look_at_policy='bbox_center'.\n\n"
+            "Camera interpolation is always evaluated using a stable look-at + distance convention; easing is separate."
         ),
         parameters_schema={
             "type": "object",
@@ -147,7 +183,8 @@ TOOLS: List[Tool] = [
                 "t1": {"type": "number", "description": "End time (seconds)."},
                 "segments": {"type": "array", "items": {"type": "object"}, "description": "Motion segments. Each segment may include: u0/u1 (0..1) OR duration (seconds) OR neither (equal split); move: {forward?, back?, right?, left?, up?, down?} (fractions of bbox radius; signed values allowed); rotate: {yaw?, pitch?, roll?} (degrees); pause:true; template:'enter'|'turn_right'|'pause'; amount/distance/degrees; label."},
                 "step_seconds": {"type": "number", "default": 1.0, "description": "Sampling step used to approximate motion inside each segment. Smaller → more keys (smoother curved motion)."},
-                "easing": {"type": "string", "default": "Linear", "description": "Easing assigned to written camera keys (note: spline path uses key geometry)."},
+                "look_at_policy": {"type": "string", "enum": ["preserve_direction", "bbox_center"], "default": "preserve_direction", "description": "preserve_direction keeps first-person yaw/pitch look control; bbox_center keeps aiming at the target bbox center (third-person track), interpreting yaw/pitch as azimuth/elevation around the center."},
+                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (e.g., Linear/EaseInOut/Switch). This affects per-key timing, not the sampled path geometry."},
                 "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys."},
                 "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
                 "constraints": {"type": "object", "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement)."},
@@ -243,7 +280,7 @@ TOOLS: List[Tool] = [
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
                 "time": {"type": "number"},
-                "easing": {"type": "string", "default": "Linear"},
+                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (e.g., Linear/EaseInOut/Switch). This affects per-key timing curves and is separate from camera interpolation."},
                 "value": {"type": "object"},
                 "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional ids for camera validation. When omitted/empty, uses fit_candidates()."},
                 "constraints": {"type": "object", "description": "Optional camera validation constraints. When omitted, defaults to keep_visible=true and min_coverage=0.95."},
@@ -637,6 +674,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     _json_key_exists = ctx.json_key_exists
     _schema_validator_cache = ctx.schema_validator_cache
 
+    # Camera timeline tools rely on the stable look-at + distance interpolation convention.
+    # Enforce the engine-side setting so authored camera keys always evaluate deterministically
+    # (and stay robust if engine/UI defaults change in the future).
+    def _ensure_camera_center_interpolation(animation_id: int) -> None:
+        try:
+            client.set_camera_interpolation_method(animation_id=animation_id, method="center")
+        except Exception:
+            pass
+
     if name == "animation_set_param_by_name":
         animation_id = int(args.get("animation_id", 0) or 0)
         if animation_id <= 0:
@@ -842,6 +888,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             "adjust_clipping": False,
         }
         try:
+            _ensure_camera_center_interpolation(animation_id)
             # Remove camera keys within tolerance
             try:
                 lr = client.list_keys(animation_id=animation_id, target_id=0, include_values=False)
@@ -926,6 +973,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 return json.dumps(
                     {"ok": False, "error": "t1 must be > t0 for ORBIT/DOLLY"}
                 )
+            _ensure_camera_center_interpolation(animation_id)
             constraints = args.get("constraints") or {
                 "keep_visible": True,
                 "min_coverage": 0.95,
@@ -940,6 +988,25 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 except Exception:
                     deg = 360.0
                 params["degrees"] = deg
+                # Optional: control key density by limiting per-step rotation.
+                if args.get("max_step_degrees") is not None:
+                    try:
+                        msd = float(args.get("max_step_degrees"))
+                    except Exception:
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "max_step_degrees must be a number (degrees per solver step)",
+                            }
+                        )
+                    if (not math.isfinite(msd)) or msd <= 0.0:
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "max_step_degrees must be a finite number > 0",
+                            }
+                        )
+                    params["max_step_degrees"] = msd
             tol = float(args.get("tolerance", 1e-3))
             easing = str(args.get("easing", "Linear"))
             clear_range = bool(args.get("clear_range", True))
@@ -1049,6 +1116,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             animation_id = int(args.get("animation_id", 0) or 0)
             if animation_id <= 0:
                 return json.dumps({"ok": False, "error": "animation_id is required"})
+            _ensure_camera_center_interpolation(animation_id)
             ids = args.get("ids") or []
             after_clipping = bool(args.get("after_clipping", True))
             t0 = float(args.get("t0", 0.0))
@@ -1074,6 +1142,14 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 "min_coverage": 0.95,
             }
             base_value = args.get("base_value")
+            look_at_policy = str(args.get("look_at_policy", "preserve_direction") or "preserve_direction").strip().lower()
+            if look_at_policy not in ("preserve_direction", "bbox_center"):
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "look_at_policy must be one of: preserve_direction | bbox_center",
+                    }
+                )
 
             # Normalize waypoint times: allow either absolute time or u in [0,1].
             span = float(t1 - t0)
@@ -1188,6 +1264,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                                 }
                             )
                         entry["look_at"] = {"bbox_fraction": vv}
+                elif look_at_policy == "bbox_center":
+                    entry["look_at"] = {"bbox_center": True}
 
                 waypoints.append(entry)
 
@@ -1277,6 +1355,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             animation_id = int(args.get("animation_id", 0) or 0)
             if animation_id <= 0:
                 return json.dumps({"ok": False, "error": "animation_id is required"})
+            _ensure_camera_center_interpolation(animation_id)
             ids = args.get("ids") or []
             after_clipping = bool(args.get("after_clipping", True))
             t0 = float(args.get("t0", 0.0))
@@ -1302,6 +1381,14 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             clear_range = bool(args.get("clear_range", True))
             constraints = args.get("constraints") or {"keep_visible": False}
             base_value = args.get("base_value")
+            look_at_policy = str(args.get("look_at_policy", "preserve_direction") or "preserve_direction").strip().lower()
+            if look_at_policy not in ("preserve_direction", "bbox_center"):
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "look_at_policy must be one of: preserve_direction | bbox_center",
+                    }
+                )
 
             # Initial camera pose.
             cam: dict
@@ -1311,6 +1398,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 cam = client.camera_get()
             if not isinstance(cam, dict) or not cam:
                 return json.dumps({"ok": False, "error": "failed to get a base camera value"})
+            if look_at_policy == "bbox_center":
+                cam = client.camera_look_at(
+                    target_bbox_center=True,
+                    ids=ids,
+                    after_clipping=after_clipping,
+                    base_value=cam,
+                )
 
             # Normalize segments to time ranges inside [t0,t1].
             segs: list[dict[str, Any]] = []
@@ -1489,6 +1583,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
             def _apply_move(cam_value: dict, *, forward: float, right: float, up: float) -> dict:
                 cur = cam_value
+                move_center = look_at_policy != "bbox_center"
                 if abs(forward) > 1e-12:
                     cur = client.camera_move_local(
                         op=("FORWARD" if forward >= 0.0 else "BACK"),
@@ -1496,7 +1591,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         distance_is_fraction_of_bbox_radius=True,
                         ids=ids,
                         after_clipping=after_clipping,
-                        move_center=True,
+                        move_center=move_center,
                         base_value=cur,
                     )
                 if abs(right) > 1e-12:
@@ -1506,7 +1601,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         distance_is_fraction_of_bbox_radius=True,
                         ids=ids,
                         after_clipping=after_clipping,
-                        move_center=True,
+                        move_center=move_center,
                         base_value=cur,
                     )
                 if abs(up) > 1e-12:
@@ -1516,7 +1611,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         distance_is_fraction_of_bbox_radius=True,
                         ids=ids,
                         after_clipping=after_clipping,
-                        move_center=True,
+                        move_center=move_center,
                         base_value=cur,
                     )
                 return cur
@@ -1524,9 +1619,17 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             def _apply_rotate(cam_value: dict, *, yaw: float, pitch: float, roll: float) -> dict:
                 cur = cam_value
                 if abs(yaw) > 1e-12:
-                    cur = client.camera_rotate(op="YAW", degrees=float(yaw), base_value=cur)
+                    cur = client.camera_rotate(
+                        op=("AZIMUTH" if look_at_policy == "bbox_center" else "YAW"),
+                        degrees=float(yaw),
+                        base_value=cur,
+                    )
                 if abs(pitch) > 1e-12:
-                    cur = client.camera_rotate(op="PITCH", degrees=float(pitch), base_value=cur)
+                    cur = client.camera_rotate(
+                        op=("ELEVATION" if look_at_policy == "bbox_center" else "PITCH"),
+                        degrees=float(pitch),
+                        base_value=cur,
+                    )
                 if abs(roll) > 1e-12:
                     cur = client.camera_rotate(op="ROLL", degrees=float(roll), base_value=cur)
                 return cur

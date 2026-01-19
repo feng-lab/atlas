@@ -29,6 +29,9 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   , m_cameraDirectionTimeInterval("Camera Direction Time Interval", .5, .1, 100)
 {
   setTransformEnabled(false);
+  // The Animation3D view is primarily a visualization/debug overlay; keep it
+  // hidden by default so normal scenes are not cluttered.
+  setVisible(false);
 
   m_colorMode.addOptions("Single Color", "Colormap Time");
   m_colorMode.select("Colormap Time");
@@ -116,10 +119,9 @@ void Z3DAnimationFilter::setData(Z3DAnimation* animation)
   updateData();
 }
 
-bool Z3DAnimationFilter::isReady(Z3DEye) const
+bool Z3DAnimationFilter::isReady(Z3DEye eye) const
 {
-  return false;
-  // return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_animation;
+  return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_animation;
 }
 
 std::shared_ptr<ZWidgetsGroup> Z3DAnimationFilter::widgetsGroup()
@@ -127,7 +129,6 @@ std::shared_ptr<ZWidgetsGroup> Z3DAnimationFilter::widgetsGroup()
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Animation3D", 1);
     m_widgetsGroup->addChild(m_visible, 1);
-    m_widgetsGroup->addChild(cameraParaAnimation()->interpolationMethodPara(), 1);
     m_widgetsGroup->addChild(m_lineWidth, 1);
     m_widgetsGroup->addChild(m_colorMode, 1);
     m_widgetsGroup->addChild(m_color, 1);

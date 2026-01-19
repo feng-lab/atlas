@@ -395,19 +395,25 @@ void ZCameraParameterAnimation::SplineRange::buildRotSpline()
     rotSpline.emplace_back();
   }
 
-  // Consecutive quaterions should form an acute angle. Changing sign on
-  // a quaternion does not change the rotation it represents.
-  size_t i;
-  for (i = 1; i < keys.size(); ++i) {
-    if (glm::dot(keys[i]->rot(), keys[i - 1]->rot()) < 0.0f) {
-      keys[i]->rot() = -keys[i]->rot();
+  // Consecutive quaternions should form an acute angle. Changing sign on a quaternion does not
+  // change the rotation it represents, but it *does* affect log/exp-based spline construction.
+  // Note: ZCameraParameterKey::rot() returns a value (derived from the view matrix), so we must
+  // not attempt to mutate it in-place. Instead, build a local sign-consistent sequence.
+  std::vector<glm::quat> qs;
+  qs.reserve(keys.size());
+  for (const auto* k : keys) {
+    qs.emplace_back(k->rot());
+  }
+  for (size_t i = 1; i < qs.size(); ++i) {
+    if (glm::dot(qs[i], qs[i - 1]) < 0.0f) {
+      qs[i] = -qs[i];
     }
   }
   for (size_t i0 = 0, i1 = 1, i2 = 2, i3 = 3; i0 < rotSpline.size(); i0++, i1++, i2++, i3++) {
-    glm::quat kQ0 = keys[i0]->rot();
-    glm::quat kQ1 = keys[i1]->rot();
-    glm::quat kQ2 = keys[i2]->rot();
-    glm::quat kQ3 = keys[i3]->rot();
+    glm::quat kQ0 = qs[i0];
+    glm::quat kQ1 = qs[i1];
+    glm::quat kQ2 = qs[i2];
+    glm::quat kQ3 = qs[i3];
     glm::quat kLog10 = glm::log(glm::conjugate(kQ0) * kQ1);
     glm::quat kLog21 = glm::log(glm::conjugate(kQ1) * kQ2);
     glm::quat kLog32 = glm::log(glm::conjugate(kQ2) * kQ3);

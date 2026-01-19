@@ -181,6 +181,9 @@ These return typed camera values/keys that clients can write via `SetKey(animati
 - `FitCandidates {} -> { ids:[uint64] }`
   - Returns visual object ids suitable for camera fit/orbit (excludes Animation3D).
 - `CameraSolve { mode:"FIT|ORBIT|DOLLY|STATIC", ids, t0, t1, constraints?, params? } -> { keys:[{time,value}...] }`
+  - Mode params (selected):
+    - `ORBIT`: `params.axis` (`"x"|"y"|"z"`), `params.degrees` (double), optional `params.max_step_degrees` (double; controls key density; default 90).
+    - `DOLLY`: `params.start_dist` (double), `params.end_dist` (double).
 - `CameraValidate { ids, times, values?, constraints?, policies?, animation_id? } -> { ok, results:[{time, within_frame, coverage, adjusted, adjusted_value?, reason}] }`
   - If `values` are omitted (or shorter than `times`), `animation_id` is required and the server samples the animation camera at those `times`.
   - Interior walkthroughs: set `constraints.keep_visible=false` to disable the coverage threshold (so the camera can go inside / let the bbox leave the frame).
@@ -194,7 +197,7 @@ Supported `method` strings:
 - `Center`
 
 Notes:
-- Spline-based camera interpolation modes are currently disabled for RPC/agent use.
+- Spline-based camera interpolation modes are currently disabled for RPC use.
 
 ## Introspection
 
