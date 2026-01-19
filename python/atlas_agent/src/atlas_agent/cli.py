@@ -28,7 +28,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("cmd", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument(
         "--model",
-        default="gpt-5.2-pro",
+        default="gpt-5.2",
+    )
+    parser.add_argument(
+        "--address",
+        default="localhost:50051",
+        help="Atlas RPC address, e.g. 127.0.0.1:50051",
+    )
+    parser.add_argument(
+        "--atlas-dir",
+        default=None,
+        help="Atlas install dir hint (prefer directory, not .exe). Used when RPC is not reachable.",
     )
     parser.add_argument(
         "--wire-api",
@@ -131,7 +141,8 @@ def main(argv: list[str] | None = None) -> int:
 
     return int(
         run_console_repl(
-            address=address,
+            address=args.address,
+            atlas_dir=args.atlas_dir,
             api_key=api_key,
             model=args.model,
             wire_api=args.wire_api,

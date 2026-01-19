@@ -98,6 +98,7 @@ def _ensure_screenshot_consent(*, console: Any, team: ChatTeam) -> None:
 def run_console_repl(
     *,
     address: str,
+    atlas_dir: str | None = None,
     api_key: str,
     model: str,
     wire_api: str = "auto",
@@ -133,6 +134,7 @@ def run_console_repl(
     console = Console()
     team = ChatTeam(
         address=address,
+        atlas_dir=atlas_dir,
         api_key=api_key,
         model=model,
         wire_api=wire_api,
