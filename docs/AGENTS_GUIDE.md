@@ -246,20 +246,23 @@ Scene-only (stateless) apply
 
 Animation (timeline) authoring
 - Solve and write keys: `animation_camera_solve_and_apply(animation_id, mode, ids, t0, t1, constraints?, params?, degrees?, …)`.
-  - Tip: for ORBIT, use `degrees` (default 360). The agent maps this to the backend as needed. Use `params.axis` (default `"y"`).
+  - Tip: for ORBIT, use `degrees` (default 360) and optionally `max_step_degrees` to control key density (default 90; smaller → more keys/smoother). Use `params.axis` (default `"y"`).
 - Validate camera key sequences: `animation_camera_validate(animation_id, ids, times, values?, constraints?, policies?)` (values optional; when omitted, the server samples from `animation_id` at those times).
 - Single-time explicit write: `animation_replace_key_camera(animation_id, time, value, easing?)`.
 - Guided waypoint spline (one-shot apply):
   - `animation_camera_waypoint_spline_apply(animation_id, t0, t1, waypoints=[...], constraints?, clear_range=true, easing="Linear")`
+  - Optional: `look_at_policy="bbox_center"` fills missing `look_at` so the camera keeps tracking the bbox center; default preserves the previous view direction when `look_at` is omitted.
   - Note: this tool does **not** change the animation duration; call `animation_set_duration(animation_id, seconds)` separately if needed.
 - First-person walkthrough (one-shot apply):
   - `animation_camera_walkthrough_apply(animation_id, t0, t1, segments=[...], step_seconds=1.0, constraints={keep_visible:false})`
+  - Optional: `look_at_policy="bbox_center"` keeps aiming at the bbox center (third-person track) and interprets yaw/pitch as azimuth/elevation around the center; default preserves first-person yaw/pitch look control.
   - Note: this tool does **not** change the animation duration; call `animation_set_duration(animation_id, seconds)` separately if needed.
 
 Notes
 - Prefer “produce → apply” for clarity: use `camera_*` producers to compute a typed camera, then choose scene vs. animation by the apply tool.
 - The previous names `camera_solve_and_apply` and `camera_validate` are removed; use `animation_camera_*` for timeline operations. For scene‑only verification, do not call `animation_list_keys`; read the current camera via `scene_get_values(id=0, 'Camera 3DCamera')` or use `scene_camera_fit/scene_camera_apply`.
 - Respect the Scene vs Timeline contract above; do not include time/easing in scene operations.
+- Camera timeline tools evaluate camera keys using a stable look-at + distance convention so authored keys evaluate deterministically.
 
 ## Camera Workflows (Walkthrough + Waypoints)
 
@@ -287,7 +290,6 @@ Default timing policy
   - Otherwise, split `[t0,t1]` evenly across segments.
 
 Default smoothing policy
-- Camera interpolation modes beyond the default `Center` are currently disabled in the agent tool surface.
 - For walkthroughs and waypoint fly-throughs, prefer **denser sampling** (`step_seconds` smaller) and/or add **intermediate waypoints** to smooth motion.
 
 Default “speed” mapping (heuristics)
@@ -312,7 +314,37 @@ Default motion magnitude mapping (bbox-scaled)
 
 Default look/aim policy
 - Walkthrough: default to “look forward” (preserve view direction). Only lock `look_at` when the user explicitly requests it.
-- Waypoints: default to `look_at: {bbox_center:true}` unless the user says “look forward / don’t lock aim”.
+- Waypoints: default to preserving direction (when `look_at` is omitted, the solver keeps the previous view direction + center distance). Use `look_at_policy="bbox_center"` (or explicit waypoint `look_at`) when the intent is “keep the object centered / orbit around it”.
+
+### Camera Policy Matrix (Safe Combinations)
+
+This is the agent-facing “policy matrix” for camera authoring tools. The goal is to keep the model choosing **intent knobs** (key density, aim behavior, visibility constraints) rather than low-level interpolation representations that can silently change semantics.
+
+Terminology (avoid ambiguity)
+- **Key easing**: per-key transition type (e.g., `Linear`, `EaseInOut`, `Switch`). This is what `easing=` controls in agent tools.
+- **Camera interpolation**: Atlas evaluates camera keys using a stable look-at + distance convention (interpolates look-at target + view distance + orientation).
+
+Hard rule (representation safety)
+- Camera interpolation is fixed to a stable look-at + distance convention so authored keys mean what the tools intend (orbit/dolly/track).
+- For different motion “feel”, use intent knobs (key density, aim policy, visibility constraints) rather than trying to change camera interpolation.
+
+Tool-level matrix (what to use, and what knobs are safe)
+
+| Tool | Best for | Default framing | Default aim behavior | Primary “smoothness” knob | Notes / common pitfalls |
+|---|---|---|---|---|---|
+| `animation_camera_solve_and_apply(mode="ORBIT")` | Exterior orbit / rotate-around-object shots | `constraints.keep_visible=true` (presentation framing) | Implicitly targets bbox center (orbit is around the target bbox center) | `max_step_degrees` (smaller → more keys → smoother) | If the orbit feels “wrong”, it is almost always key density or target selection (ids). Prefer tuning `max_step_degrees` over inventing new representations. |
+| `animation_camera_solve_and_apply(mode="DOLLY")` | Zoom/dolly in/out while keeping the subject framed | `constraints.keep_visible=true` | Implicitly targets bbox center (center distance changes) | Split into multiple DOLLY windows (more keys) and/or use easing | If you want an “arc” (move+rotate), DOLLY alone is not enough—use waypoints or walkthrough. |
+| `animation_camera_waypoint_spline_apply(...)` | Camera path through explicit spatial beats (A→B→C) | `constraints.keep_visible=true` | `look_at_policy="preserve_direction"` by default; optionally lock to bbox center | Add intermediate waypoints (spatial key density) | For “orbit around object”, either use ORBIT solve or set `look_at_policy="bbox_center"` / explicit `look_at`. Leaving `look_at` omitted will preserve direction and can look like a drift rather than a track. |
+| `animation_camera_walkthrough_apply(...)` | First-person “drone” flythroughs and interior exploration | `constraints.keep_visible=false` (exploration framing) | `look_at_policy="preserve_direction"` by default; optionally track bbox center | `step_seconds` (smaller → more keys → smoother curved motion) | For third-person track/orbit behavior, set `look_at_policy="bbox_center"` (switches yaw/pitch to azimuth/elevation and uses `move_center=false`). Don’t try to approximate ORBIT with first-person yaw unless the intent is truly “look around while moving”. |
+
+Aim policy semantics (explicit)
+- `look_at_policy="preserve_direction"`:
+  - Interprets `yaw/pitch` as first-person camera look (YAW/PITCH).
+  - Interprets local moves as “fly” (translate eye + center together; maintains view direction).
+- `look_at_policy="bbox_center"`:
+  - Locks camera center to the target bbox center (third-person tracking).
+  - Interprets `yaw/pitch` as AZIMUTH/ELEVATION around the target (orbit-like).
+  - Interprets local moves as “boom/dolly” (translate eye only; center stays on target).
 
 Default validation constraints
 - Walkthrough/interior: default `constraints.keep_visible=false` (user intent is exploration, not framing the whole bbox).

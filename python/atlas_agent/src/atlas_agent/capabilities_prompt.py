@@ -56,6 +56,24 @@ def build_atlas_agent_primer() -> str:
     lines.append(
         "Routing heuristic: explicit waypoints/points → waypoint spline; motion verbs (fly/turn/pause) → walkthrough segments. Prefer bbox-scaled distances and dense key sampling for smooth motion."
     )
+    lines.append(
+        "Camera interpolation: camera keys are always evaluated using a stable look-at + distance convention (interpolates the look-at target + view distance + orientation)."
+    )
+    lines.append(
+        "Key easing (Linear/EaseInOut/Switch) controls per-key timing curves and is separate from camera interpolation."
+    )
+    lines.append(
+        "To make motion smoother: increase key density (ORBIT: lower max_step_degrees; walkthrough: lower step_seconds; waypoints: add intermediate waypoints)."
+    )
+    lines.append(
+        "For exterior orbit/rotate-around-subject shots: prefer ORBIT solve with max_step_degrees, or walkthrough with look_at_policy='bbox_center' (third-person tracking)."
+    )
+    lines.append(
+        "For first-person interior flythroughs: prefer walkthrough with look_at_policy='preserve_direction' and constraints.keep_visible=false."
+    )
+    lines.append(
+        "For waypoint paths: omit look_at to preserve direction, or set look_at_policy='bbox_center' (or explicit waypoint look_at) to keep the target centered."
+    )
     return "\n".join(lines)
 
 

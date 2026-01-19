@@ -132,7 +132,6 @@ TOOLS: List[Tool] = [
         description=(
             "Solve typed camera keys from waypoints (does NOT write keys). Waypoints may specify eye and/or look_at in world coords or bbox fractions. "
             "If look_at is omitted for a waypoint, the solver preserves the previous view direction + center distance.\n\n"
-            "Note: camera interpolation modes beyond the default Center are currently disabled. "
             "For smoother motion from sparse waypoints, provide additional waypoints or sample intermediate keys before writing."
         ),
         parameters_schema={
