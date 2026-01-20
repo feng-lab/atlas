@@ -133,6 +133,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setKey(size_t animationId,
                                                      const json::value& value)
 {
   KeyOpResult out;
+  const bool recordUndo = (m_undoSuppressionDepth == 0);
 
   if (animationId == 0) {
     out.ok = false;
@@ -194,7 +195,14 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setKey(size_t animationId,
       out.error = "camera key read failed";
       return out;
     }
+    ZAnimation::UndoSnapshot before;
+    if (recordUndo) {
+      before = anim->captureUndoSnapshot();
+    }
     anim->cameraParameterAnimation()->addKey(std::move(ckey));
+    if (recordUndo) {
+      anim->pushUndoSnapshotCommand("Set Camera Key", std::move(before));
+    }
     out.ok = true;
     return out;
   }
@@ -348,6 +356,11 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setKey(size_t animationId,
     }
   }
 
+  ZAnimation::UndoSnapshot before;
+  if (recordUndo) {
+    before = anim->captureUndoSnapshot();
+  }
+
   // Ensure the target track exists without creating a full global keyframe.
   auto ensure = anim->ensureParameterAnimationForBoundId(boundId, jsonKeyTrim);
   if (!ensure.error.isEmpty()) {
@@ -398,6 +411,9 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setKey(size_t animationId,
   }
 
   pa->addKey(std::move(key));
+  if (recordUndo) {
+    anim->pushUndoSnapshotCommand("Set Key", std::move(before));
+  }
   out.ok = true;
   return out;
 }
@@ -408,6 +424,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::removeKey(size_t animationId,
                                                         double timeSec)
 {
   KeyOpResult out;
+  const bool recordUndo = (m_undoSuppressionDepth == 0);
   if (animationId == 0) {
     out.ok = false;
     out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
@@ -433,8 +450,15 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::removeKey(size_t animationId,
     auto* cpa = anim->cameraParameterAnimation();
     for (const auto& k : cpa->keys()) {
       if (std::abs(k->time() - timeSec) < kKeyTimeEpsSec) {
+        ZAnimation::UndoSnapshot before;
+        if (recordUndo) {
+          before = anim->captureUndoSnapshot();
+        }
         cpa->deleteKey(k.get());
         cpa->emitKeysChangedSignal();
+        if (recordUndo) {
+          anim->pushUndoSnapshotCommand("Remove Camera Key", std::move(before));
+        }
         out.ok = true;
         return out;
       }
@@ -463,8 +487,15 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::removeKey(size_t animationId,
 
   for (const auto& k : pa->keys()) {
     if (std::abs(k->time() - timeSec) < kKeyTimeEpsSec) {
+      ZAnimation::UndoSnapshot before;
+      if (recordUndo) {
+        before = anim->captureUndoSnapshot();
+      }
       pa->deleteKey(k.get());
       pa->emitKeysChangedSignal();
+      if (recordUndo) {
+        anim->pushUndoSnapshotCommand("Remove Key", std::move(before));
+      }
       out.ok = true;
       return out;
     }
@@ -478,6 +509,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::removeKey(size_t animationId,
 Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size_t targetId, const QString& jsonKey)
 {
   KeyOpResult out;
+  const bool recordUndo = (m_undoSuppressionDepth == 0);
   if (animationId == 0) {
     out.ok = false;
     out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
@@ -494,6 +526,14 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size
 
   if (targetId == 0) {
     auto* cpa = anim->cameraParameterAnimation();
+    if (cpa->keys().empty()) {
+      out.ok = true;
+      return out;
+    }
+    ZAnimation::UndoSnapshot before;
+    if (recordUndo) {
+      before = anim->captureUndoSnapshot();
+    }
     std::vector<ZParameterKey*> keys;
     keys.reserve(cpa->keys().size());
     for (const auto& k : cpa->keys()) {
@@ -503,12 +543,30 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size
       cpa->deleteKey(k);
     }
     cpa->emitKeysChangedSignal();
+    if (recordUndo) {
+      anim->pushUndoSnapshotCommand("Clear Camera Keys", std::move(before));
+    }
     out.ok = true;
     return out;
   }
 
   const QString jsonKeyTrim = jsonKey.trimmed();
   if (jsonKeyTrim.isEmpty()) {
+    bool hasAnyKeys = false;
+    for (auto* pa : anim->parameterAnimationsForBoundId(targetId)) {
+      if (pa && !pa->keys().empty()) {
+        hasAnyKeys = true;
+        break;
+      }
+    }
+    if (!hasAnyKeys) {
+      out.ok = true;
+      return out;
+    }
+    ZAnimation::UndoSnapshot before;
+    if (recordUndo) {
+      before = anim->captureUndoSnapshot();
+    }
     // Clear all tracks for this target id (benign no-op when no tracks exist).
     for (auto* pa : anim->parameterAnimationsForBoundId(targetId)) {
       std::vector<ZParameterKey*> keys;
@@ -521,6 +579,9 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size
       }
       pa->emitKeysChangedSignal();
     }
+    if (recordUndo) {
+      anim->pushUndoSnapshotCommand("Clear Keys", std::move(before));
+    }
     out.ok = true;
     return out;
   }
@@ -531,6 +592,14 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size
     out.ok = true;
     return out;
   }
+  if (pa->keys().empty()) {
+    out.ok = true;
+    return out;
+  }
+  ZAnimation::UndoSnapshot before;
+  if (recordUndo) {
+    before = anim->captureUndoSnapshot();
+  }
   std::vector<ZParameterKey*> keys;
   keys.reserve(pa->keys().size());
   for (const auto& k : pa->keys()) {
@@ -540,6 +609,9 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size
     pa->deleteKey(k);
   }
   pa->emitKeysChangedSignal();
+  if (recordUndo) {
+    anim->pushUndoSnapshotCommand("Clear Keys", std::move(before));
+  }
   out.ok = true;
   return out;
 }
@@ -608,6 +680,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::batchKeys(size_t animationId,
                                                         bool commit)
 {
   KeyOpResult out;
+  const bool recordUndo = (m_undoSuppressionDepth == 0);
   if (animationId == 0) {
     out.ok = false;
     out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
@@ -631,10 +704,27 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::batchKeys(size_t animationId,
     }
   }
 
+  auto before = anim->captureUndoSnapshot();
+  struct UndoSuppressionGuard
+  {
+    explicit UndoSuppressionGuard(Z3DAnimationDoc& doc)
+      : m_doc(doc)
+    {
+      ++m_doc.m_undoSuppressionDepth;
+    }
+    ~UndoSuppressionGuard()
+    {
+      CHECK(m_doc.m_undoSuppressionDepth > 0);
+      --m_doc.m_undoSuppressionDepth;
+    }
+    Z3DAnimationDoc& m_doc;
+  } guard(*this);
+
   for (size_t idx = 0; idx < removeOps.size(); ++idx) {
     const auto& r = removeOps[idx];
     auto res = removeKey(animationId, r.targetId, r.jsonKey, r.timeSec);
     if (!res.ok) {
+      anim->restoreFromUndoSnapshot(before);
       out.ok = false;
       out.errorKind = res.errorKind;
       const QString detail = res.error.isEmpty() ? "remove_key failed" : res.error;
@@ -648,6 +738,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::batchKeys(size_t animationId,
     const auto& s = setOps[idx];
     auto res = setKey(animationId, s.targetId, s.jsonKey, s.timeSec, s.easing, s.value);
     if (!res.ok) {
+      anim->restoreFromUndoSnapshot(before);
       out.ok = false;
       out.errorKind = res.errorKind;
       const QString detail = res.error.isEmpty() ? "set_key failed" : res.error;
@@ -661,6 +752,10 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::batchKeys(size_t animationId,
 
   if (commit && hasTimeZero) {
     anim->cancelRenderingAndSetCurrentTime(0.0);
+  }
+
+  if (recordUndo && (!removeOps.empty() || !setOps.empty())) {
+    anim->pushUndoSnapshotCommand("Batch Keys", std::move(before));
   }
 
   out.ok = true;
@@ -717,6 +812,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setTime(size_t animationId, double
 Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setCameraInterpolationMethod(size_t animationId, const QString& method)
 {
   KeyOpResult out;
+  const bool recordUndo = (m_undoSuppressionDepth == 0);
   if (animationId == 0) {
     out.ok = false;
     out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
@@ -761,7 +857,19 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setCameraInterpolationMethod(size_
     return out;
   }
 
+  if (cpa->interpolationMethodPara().get() == matched) {
+    out.ok = true;
+    return out;
+  }
+
+  ZAnimation::UndoSnapshot before;
+  if (recordUndo) {
+    before = anim->captureUndoSnapshot();
+  }
   cpa->interpolationMethodPara().select(matched);
+  if (recordUndo) {
+    anim->pushUndoSnapshotCommand("Set Camera Interpolation Method", std::move(before));
+  }
   out.ok = true;
   return out;
 }
@@ -936,7 +1044,8 @@ QString Z3DAnimationDoc::objPath(size_t id) const
 
 bool Z3DAnimationDoc::objHasUnsavedChange(size_t id) const
 {
-  return m_idToAnimationPacks.at(id)->hasUnsavedChange;
+  const auto& pack = m_idToAnimationPacks.at(id);
+  return !(canReadFile(pack->path) && objUndoStack(id)->isClean());
 }
 
 QString Z3DAnimationDoc::objInfo(size_t id) const
@@ -1019,11 +1128,8 @@ void Z3DAnimationDoc::setModified()
   if (auto animation = qobject_cast<Z3DAnimation*>(sender())) {
     for (const auto& idPack : m_idToAnimationPacks) {
       if (idPack.second->animation.get() == animation) {
-        if (!idPack.second->hasUnsavedChange) {
-          idPack.second->updateDerivedData();
-          idPack.second->hasUnsavedChange = true;
-          m_doc.updateObjInfo(idPack.first);
-        }
+        idPack.second->updateDerivedData();
+        m_doc.updateObjInfo(idPack.first);
         return;
       }
     }
@@ -1043,6 +1149,9 @@ size_t Z3DAnimationDoc::addAnimation(Z3DAnimation* animation, const QString& pat
   size_t id = m_doc.getNewObjId();
   m_idToAnimationPacks[id] = std::make_shared<AnimationPack>(animation, path, name);
   m_doc.registerNewObj(id, *this);
+  // Keep Animation3D overlays hidden by default. This aligns the document/model state (object manager checkbox)
+  // with the filter's default visibility, and avoids surprise overlays when loading or creating animations.
+  m_doc.setObjVisible(id, false);
   animation->bindView(m_view);
 
   Q_EMIT objAdded(id, this);
@@ -1060,9 +1169,6 @@ Z3DAnimationDoc::AnimationPack::AnimationPack(Z3DAnimation* animation_, const QS
   , path(QFileInfo(path_).canonicalFilePath())
   , m_tmpName(std::move(name))
 {
-  if (path.isEmpty()) {
-    hasUnsavedChange = true;
-  }
   updateDerivedData();
 }
 
@@ -1094,7 +1200,7 @@ bool Z3DAnimationDoc::saveAnimation(AnimationPack* pack, const QString& fileName
   try {
     pack->animation->save(fileName);
     pack->path = QFileInfo(fileName).canonicalFilePath();
-    pack->hasUnsavedChange = false;
+    pack->animation->undoStack()->setClean();
     pack->updateDerivedData();
 
     ZSystemInfo::instance().addFileToRecentFileList(fileName);

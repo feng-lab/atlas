@@ -9,14 +9,15 @@ namespace nim {
 Z2DAnimation::Z2DAnimation(ZDoc& doc, QObject* parent)
   : ZAnimation(doc, parent)
 {
-  m_sliceAnimation = new ZParameterAnimation("Slice", "Int", QColor(0, 255, 0));
-  m_globalParaAnimations.emplace_back(m_sliceAnimation);
-  m_timeAnimation = new ZParameterAnimation("Time", "Int", QColor(0, 255, 0));
-  m_globalParaAnimations.emplace_back(m_timeAnimation);
-  m_viewStyleAnimation = new ZParameterAnimation("View Style", "StringIntOption", QColor(0, 255, 0));
-  m_globalParaAnimations.emplace_back(m_viewStyleAnimation);
-  m_viewportAnimation = new ZParameterAnimation("Viewport", "DVec4", QColor(0, 255, 0));
+  // Keep the global track ordering stable: load() indexes these by position.
+  m_viewportAnimation = new ZParameterAnimation("Viewport", "DVec4", QColor(0, 255, 0), this);
   m_globalParaAnimations.emplace_back(m_viewportAnimation);
+  m_sliceAnimation = new ZParameterAnimation("Slice", "Int", QColor(0, 255, 0), this);
+  m_globalParaAnimations.emplace_back(m_sliceAnimation);
+  m_timeAnimation = new ZParameterAnimation("Time", "Int", QColor(0, 255, 0), this);
+  m_globalParaAnimations.emplace_back(m_timeAnimation);
+  m_viewStyleAnimation = new ZParameterAnimation("View Style", "StringIntOption", QColor(0, 255, 0), this);
+  m_globalParaAnimations.emplace_back(m_viewStyleAnimation);
 }
 
 void Z2DAnimation::bindView(ZView* v)

@@ -88,6 +88,7 @@ private:
   bool m_updateValueLock = false;
   bool m_itemMoved = false;
   double m_itemOldTime = 0.0;
+  double m_pendingTime = 0.0;
 };
 
 class CurrentTimeLineItem : public QGraphicsLineItem

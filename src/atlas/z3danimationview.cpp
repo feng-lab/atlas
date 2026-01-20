@@ -18,6 +18,9 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
       auto viewControl = new Z3DAnimationFilter(m_engine.globalParas(), this);
       viewControl->setData(&m_doc.animation(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
+      // Sync initial visibility from the document state (object manager checkbox). This is important when
+      // the 3D window is reopened while the document retains object visibility state.
+      viewControl->setVisible(m_doc.isObjVisible(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
@@ -48,6 +51,7 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
     auto viewControl = new Z3DAnimationFilter(m_engine.globalParas(), this);
     viewControl->setData(&m_doc.animation(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
+    viewControl->setVisible(m_doc.isObjVisible(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 

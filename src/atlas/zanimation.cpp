@@ -4,7 +4,10 @@
 #include "zdoc.h"
 #include "zobjdoc.h"
 #include "zparameteranimation.h"
+#include "zcameraparameteranimation.h"
+#include "zcameraparameterkey.h"
 #include "zexception.h"
+#include "zserializationutils.h"
 #include "zview.h"
 #include "z3drenderingengine.h"
 #include "zgraphicsview.h"
@@ -115,6 +118,165 @@ struct ParsedJsonKey
 
 } // namespace
 
+namespace {
+
+static constexpr const char* kUndoDuration = "duration";
+static constexpr const char* kUndoNextUniqueId = "next_unique_id";
+static constexpr const char* kUndoGlobalTracks = "global_tracks";
+static constexpr const char* kUndoObjects = "objects";
+
+static constexpr const char* kUndoObjType = "obj_type";
+static constexpr const char* kUndoObjJsonValue = "obj_json";
+static constexpr const char* kUndoObjExpanded = "expanded";
+static constexpr const char* kUndoObjShowAll = "show_all";
+static constexpr const char* kUndoObjBoundId = "bound_id";
+static constexpr const char* kUndoObjUniqueId = "unique_id";
+static constexpr const char* kUndoObjTracks = "tracks";
+
+static constexpr const char* kUndoTrackColor = "color";
+static constexpr const char* kUndoTrackKeys = "keys";
+static constexpr const char* kUndoCameraInterpolationMethod = "camera_interpolation_method";
+
+[[nodiscard]] json::object snapshotTrackValue(const ZParameterAnimation& pa)
+{
+  json::object obj;
+  obj[kUndoTrackColor] = json::value_from(pa.color());
+
+  json::array keys;
+  keys.reserve(pa.keys().size());
+  for (const auto& k : pa.keys()) {
+    keys.push_back(k->jsonValue());
+  }
+  obj[kUndoTrackKeys] = std::move(keys);
+
+  if (auto* cpa = dynamic_cast<const ZCameraParameterAnimation*>(&pa)) {
+    obj[kUndoCameraInterpolationMethod] = cpa->interpolationMethodPara().get().toStdString();
+  }
+  return obj;
+}
+
+[[nodiscard]] bool restoreTrackFromSnapshot(ZParameterAnimation& pa, const json::value& v, QString* error)
+{
+  if (!v.is_object()) {
+    if (error) {
+      *error = "track snapshot is not an object";
+    }
+    return false;
+  }
+
+  const auto& obj = v.as_object();
+
+  if (auto it = obj.find(kUndoTrackColor); it != obj.end()) {
+    QColor color(0, 0, 0, 255);
+    const json::value& cv = it->value();
+    try {
+      color = json::value_to<QColor>(cv);
+    }
+    catch (...) {
+      if (cv.is_string()) {
+        toVal(cv.get_string(), color);
+      } else {
+        if (error) {
+          *error = "invalid track color";
+        }
+        return false;
+      }
+    }
+    pa.setColor(color);
+  }
+
+  if (auto it = obj.find(kUndoCameraInterpolationMethod); it != obj.end()) {
+    if (!it->value().is_string()) {
+      if (error) {
+        *error = "camera_interpolation_method must be a string";
+      }
+      return false;
+    }
+    const auto& s = it->value().get_string();
+    const QString method = QString::fromUtf8(s.data(), static_cast<int>(s.size()));
+    if (auto* cpa = dynamic_cast<ZCameraParameterAnimation*>(&pa)) {
+      cpa->interpolationMethodPara().select(method);
+    }
+  }
+
+  std::vector<std::unique_ptr<ZParameterKey>> keys;
+  if (auto it = obj.find(kUndoTrackKeys); it != obj.end()) {
+    if (!it->value().is_array()) {
+      if (error) {
+        *error = "track keys must be an array";
+      }
+      return false;
+    }
+    const auto& arr = it->value().as_array();
+    keys.reserve(arr.size());
+    for (const auto& kv : arr) {
+      if (pa.type() == "3DCamera") {
+        auto ck = std::make_unique<ZCameraParameterKey>();
+        if (!ck->readValue(kv)) {
+          if (error) {
+            *error = "failed to read 3DCamera key";
+          }
+          return false;
+        }
+        keys.push_back(std::unique_ptr<ZParameterKey>(std::move(ck)));
+      } else {
+        auto pk = std::make_unique<ZParameterKey>(pa.type());
+        if (!pk->readValue(kv)) {
+          if (error) {
+            *error = QString("failed to read key for type %1").arg(pa.type());
+          }
+          return false;
+        }
+        keys.push_back(std::move(pk));
+      }
+    }
+  }
+
+  pa.replaceKeys(std::move(keys));
+  return true;
+}
+
+class ZAnimationSnapshotCommand final : public QUndoCommand
+{
+public:
+  ZAnimationSnapshotCommand(ZAnimation* animation, QString text, ZAnimation::UndoSnapshot snapshot)
+    : QUndoCommand(std::move(text))
+    , m_animation(animation)
+    , m_snapshot(std::move(snapshot))
+  {
+    CHECK(m_animation);
+  }
+
+  void undo() override
+  {
+    swapSnapshot();
+  }
+
+  void redo() override
+  {
+    if (m_firstRedo) {
+      m_firstRedo = false;
+      return;
+    }
+    swapSnapshot();
+  }
+
+private:
+  void swapSnapshot()
+  {
+    CHECK(m_animation);
+    ZAnimation::UndoSnapshot current = m_animation->captureUndoSnapshot();
+    m_animation->restoreFromUndoSnapshot(m_snapshot);
+    m_snapshot = std::move(current);
+  }
+
+  ZAnimation* m_animation = nullptr; // non-owning
+  ZAnimation::UndoSnapshot m_snapshot;
+  bool m_firstRedo = true;
+};
+
+} // namespace
+
 void ZAnimationChangeDurationCommand::undo()
 {
   m_ani->setDurationImpl(m_oldDuration);
@@ -148,6 +310,8 @@ void ZAnimation::addKeyFrame(double time)
 {
   CHECK(time >= 0.0);
   CHECK(m_engine);
+
+  UndoSnapshot before = captureUndoSnapshot();
 
   bool objChange = false;
   bool sorted = false;
@@ -235,6 +399,7 @@ void ZAnimation::addKeyFrame(double time)
   } else {
     Q_EMIT keysChanged();
   }
+  pushUndoSnapshotCommand("Add Key Frame", std::move(before));
   LOG(INFO) << "Added key frame at time " << time;
 }
 
@@ -308,9 +473,11 @@ void ZAnimation::removeObj(size_t id)
   size_t idx;
   AnimationObj* aniObj = findUniqueId(id, &idx);
   if (aniObj) {
+    UndoSnapshot before = captureUndoSnapshot();
     m_objList.erase(m_objList.begin() + idx);
     buildDisplayPacks();
     Q_EMIT objChanged();
+    pushUndoSnapshotCommand("Remove Object From Animation", std::move(before));
   }
 }
 
@@ -328,6 +495,13 @@ void ZAnimation::removeRedundantKeys()
     }
   }
   Q_EMIT keysChanged();
+}
+
+void ZAnimation::removeRedundantKeysUndoable()
+{
+  UndoSnapshot before = captureUndoSnapshot();
+  removeRedundantKeys();
+  pushUndoSnapshotCommand("Remove Redundant Keys", std::move(before));
 }
 
 ZParameterAnimation* ZAnimation::parameterAnimationForBoundId(size_t boundId, const QString& jsonKey)
@@ -994,7 +1168,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     for (const auto& [key, value] : animationObj) {
       QString qkey = QString::fromUtf8(key.data(), key.size());
       if (key == "Duration") {
-        setDuration(json::value_to<double>(value));
+        setDurationImpl(json::value_to<double>(value));
       } else if (key == "Background" || key == "Axis" || key == "Lighting") {
         auto aniObj = std::make_unique<AnimationObj>(qkey, json::value());
         aniObj->uniqueId = m_nextUniqueId++;
@@ -1008,7 +1182,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
         const auto& jObj = value.as_object();
         for (const auto& [pkey, pvalue] : jObj) {
           QString qpkey = QString::fromUtf8(pkey.data(), pkey.size());
-          std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(qpkey, pvalue));
+          std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(qpkey, pvalue, this));
           if (pa) {
             aniObj->objParaAnimations.push_back(std::move(pa));
           }
@@ -1025,7 +1199,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
               const auto& jObj = value.as_object();
               for (const auto& [pkey, pvalue] : jObj) {
                 QString qpkey = QString::fromUtf8(pkey.data(), pkey.size());
-                std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(qpkey, pvalue));
+                std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(qpkey, pvalue, this));
                 if (pa) {
                   aniObj->objParaAnimations.push_back(std::move(pa));
                 }
@@ -1035,7 +1209,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
             err += QString("Unknown animation object %1\n").arg(qkey);
           }
         } else {
-          std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(qkey, value));
+          std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(qkey, value, this));
           if (pa) {
             globalParaAnimations.push_back(std::move(pa));
           } else {
@@ -1058,7 +1232,11 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     // read files
     std::map<size_t, size_t> idmap = m_doc.read(docObj, err);
     if (idmap.empty()) {
-      err += QString("%1 %2 contains zero valid objects.\n").arg(jsonKey, fn);
+      // An animation file can legitimately contain zero document objects (e.g. camera/global-only timelines).
+      // Only report an error when the file declares document objects but none could be loaded.
+      if (!docObj.empty()) {
+        err += QString("%1 %2 contains zero valid objects.\n").arg(jsonKey, fn);
+      }
     } else {
       for (auto& i : m_objList) {
         if (idmap.contains(i->uniqueId)) {
@@ -1075,6 +1253,10 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     }
 
     updateObjAnimation();
+
+    // Reset undo state after loading: a loaded animation starts clean.
+    m_undoStack.clear();
+    m_undoStack.setClean();
   }
   catch (const ZException& e) {
     throw ZException(QString("Can not load animation %1: %2").arg(fn, e.what()));
@@ -1164,6 +1346,151 @@ void ZAnimation::setDurationImpl(double duration)
     m_duration = duration;
     Q_EMIT durationChanged(m_duration);
   }
+}
+
+ZAnimation::UndoSnapshot ZAnimation::captureUndoSnapshot() const
+{
+  UndoSnapshot out;
+
+  json::object root;
+  root[kUndoDuration] = m_duration;
+  root[kUndoNextUniqueId] = static_cast<uint64_t>(m_nextUniqueId);
+
+  json::object globalTracks;
+  for (const auto& pa : m_globalParaAnimations) {
+    globalTracks[pa->jsonKey().toStdString()] = snapshotTrackValue(*pa);
+  }
+  root[kUndoGlobalTracks] = std::move(globalTracks);
+
+  json::array objects;
+  objects.reserve(m_objList.size());
+  for (const auto& obj : m_objList) {
+    json::object o;
+    o[kUndoObjType] = obj->objType.toStdString();
+    o[kUndoObjJsonValue] = obj->objJsonValue;
+    o[kUndoObjExpanded] = obj->isExpanded;
+    o[kUndoObjShowAll] = obj->isShowAll;
+    o[kUndoObjBoundId] = static_cast<uint64_t>(obj->boundId);
+    o[kUndoObjUniqueId] = static_cast<uint64_t>(obj->uniqueId);
+
+    json::object tracks;
+    for (const auto& pa : obj->objParaAnimations) {
+      tracks[pa->jsonKey().toStdString()] = snapshotTrackValue(*pa);
+    }
+    o[kUndoObjTracks] = std::move(tracks);
+
+    objects.push_back(std::move(o));
+  }
+  root[kUndoObjects] = std::move(objects);
+
+  out.state = std::move(root);
+  return out;
+}
+
+void ZAnimation::restoreFromUndoSnapshot(const UndoSnapshot& snapshot)
+{
+  const auto oldBlocked = signalsBlocked();
+  blockSignals(true);
+
+  QString err;
+
+  if (!snapshot.state.contains(kUndoDuration) || !snapshot.state.at(kUndoDuration).is_number()) {
+    CHECK(false) << "Undo snapshot missing duration";
+  }
+  if (!snapshot.state.contains(kUndoNextUniqueId) || !snapshot.state.at(kUndoNextUniqueId).is_number()) {
+    CHECK(false) << "Undo snapshot missing next_unique_id";
+  }
+  if (!snapshot.state.contains(kUndoGlobalTracks) || !snapshot.state.at(kUndoGlobalTracks).is_object()) {
+    CHECK(false) << "Undo snapshot missing global_tracks";
+  }
+  if (!snapshot.state.contains(kUndoObjects) || !snapshot.state.at(kUndoObjects).is_array()) {
+    CHECK(false) << "Undo snapshot missing objects";
+  }
+
+  const double duration = json::value_to<double>(snapshot.state.at(kUndoDuration));
+  setDurationImpl(duration);
+
+  const auto& nextUniqueV = snapshot.state.at(kUndoNextUniqueId);
+  CHECK(nextUniqueV.is_uint64()) << "Undo snapshot next_unique_id must be uint64";
+  m_nextUniqueId = static_cast<size_t>(nextUniqueV.as_uint64());
+
+  const json::object& globalTracks = snapshot.state.at(kUndoGlobalTracks).as_object();
+  for (const auto& pa : m_globalParaAnimations) {
+    const std::string key = pa->jsonKey().toStdString();
+    auto it = globalTracks.find(key);
+    CHECK(it != globalTracks.end()) << "Undo snapshot missing global track " << key;
+    CHECK(restoreTrackFromSnapshot(*pa, it->value(), &err)) << err.toStdString();
+  }
+
+  m_objList.clear();
+  const auto& objects = snapshot.state.at(kUndoObjects).as_array();
+  m_objList.reserve(objects.size());
+
+  for (const auto& ov : objects) {
+    CHECK(ov.is_object());
+    const auto& o = ov.as_object();
+
+    CHECK(o.contains(kUndoObjType) && o.at(kUndoObjType).is_string());
+    QString objType = QString::fromUtf8(o.at(kUndoObjType).get_string().data(),
+                                        static_cast<int>(o.at(kUndoObjType).get_string().size()));
+
+    json::value objJsonValue;
+    if (o.contains(kUndoObjJsonValue)) {
+      objJsonValue = o.at(kUndoObjJsonValue);
+    }
+
+    auto ao = std::make_unique<AnimationObj>(objType, std::move(objJsonValue));
+
+    if (o.contains(kUndoObjExpanded) && o.at(kUndoObjExpanded).is_bool()) {
+      ao->isExpanded = o.at(kUndoObjExpanded).as_bool();
+    }
+    if (o.contains(kUndoObjShowAll) && o.at(kUndoObjShowAll).is_bool()) {
+      ao->isShowAll = o.at(kUndoObjShowAll).as_bool();
+    }
+    if (o.contains(kUndoObjBoundId) && o.at(kUndoObjBoundId).is_number()) {
+      CHECK(o.at(kUndoObjBoundId).is_uint64()) << "Undo snapshot bound_id must be uint64";
+      ao->boundId = static_cast<size_t>(o.at(kUndoObjBoundId).as_uint64());
+    }
+    if (o.contains(kUndoObjUniqueId) && o.at(kUndoObjUniqueId).is_number()) {
+      CHECK(o.at(kUndoObjUniqueId).is_uint64()) << "Undo snapshot unique_id must be uint64";
+      ao->uniqueId = static_cast<size_t>(o.at(kUndoObjUniqueId).as_uint64());
+    }
+
+    if (o.contains(kUndoObjTracks) && o.at(kUndoObjTracks).is_object()) {
+      const auto& tracks = o.at(kUndoObjTracks).as_object();
+      for (const auto& [k, v] : tracks) {
+        const QString jsonKey = QString::fromUtf8(k.data(), static_cast<int>(k.size()));
+        std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(jsonKey, v, this));
+        if (pa) {
+          ao->objParaAnimations.push_back(std::move(pa));
+        }
+      }
+    }
+
+    m_objList.push_back(std::move(ao));
+  }
+
+  updateObjAnimation();
+
+  if (m_engine) {
+    rebindView();
+  }
+  setCurrentTime(m_currentTime);
+
+  blockSignals(oldBlocked);
+
+  // Emit coarse-grained signals once so listeners see a consistent snapshot.
+  Q_EMIT durationChanged(m_duration);
+  Q_EMIT objChanged();
+  Q_EMIT keysChanged();
+  if (m_engine) {
+    Q_EMIT objViewChanged();
+  }
+}
+
+void ZAnimation::pushUndoSnapshotCommand(const QString& text, UndoSnapshot&& beforeSnapshot)
+{
+  m_undoStack.push(new ZAnimationSnapshotCommand(this, text, std::move(beforeSnapshot)));
 }
 
 ZAnimation::AnimationObj* ZAnimation::findBoundId(size_t id, size_t* idx)

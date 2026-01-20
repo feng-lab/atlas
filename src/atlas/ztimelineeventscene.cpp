@@ -42,7 +42,14 @@ void EventBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
   QAction* selectedAction = menu.exec(event->screenPos());
 
   if (selectedAction == addKeyHereAction) {
+    if (!m_displayPack.paraAnimation->boundParameter()) {
+      LOG(WARNING) << "Add Key Here: parameter not bound";
+      return;
+    }
+    auto& anim = m_timeline.animation();
+    auto before = anim.captureUndoSnapshot();
     m_displayPack.paraAnimation->addKey(m_displayPack.paraAnimation->createKey(time));
+    anim.pushUndoSnapshotCommand("Add Key", std::move(before));
   }
 }
 
@@ -79,9 +86,9 @@ void ParameterKeysItem::updateValue()
 QVariant ParameterKeysItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
   if (change == ItemPositionChange) {
-    m_paraKey.setTime(m_timeline.xToTime(value.toPointF().x()));
+    m_pendingTime = m_timeline.xToTime(value.toPointF().x());
     m_itemMoved = true;
-    return QPointF(m_timeline.timeToX(m_paraKey.time()), 0);
+    return QPointF(m_timeline.timeToX(m_pendingTime), 0);
   }
   return QGraphicsRectItem::itemChange(change, value);
 }
@@ -133,17 +140,24 @@ void ParameterKeysItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
   m_itemMoved = false;
   m_itemOldTime = m_paraKey.time();
+  m_pendingTime = m_itemOldTime;
   QGraphicsRectItem::mousePressEvent(event);
 }
 
 void ParameterKeysItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
   QGraphicsRectItem::mouseReleaseEvent(event);
-  if (m_itemMoved && m_itemOldTime != m_paraKey.time()) {
+  if (m_itemMoved && m_itemOldTime != m_pendingTime) {
+    auto& anim = m_timeline.animation();
+    auto before = anim.captureUndoSnapshot();
+
     m_updateValueLock = true;
+    m_paraKey.setTime(m_pendingTime);
     m_paraAnimation.sortKeys();
     m_paraAnimation.emitKeyChangedSignal(&m_paraKey);
     m_updateValueLock = false;
+
+    anim.pushUndoSnapshotCommand("Move Key", std::move(before));
   }
 }
 
@@ -294,9 +308,17 @@ void ZTimelineEventScene::removeSelectedKeys()
       keyAniMap[&item->paraKey()] = &item->paraAnimation();
     }
   }
+  if (keyAniMap.empty()) {
+    return;
+  }
+
+  auto& anim = m_timeline.animation();
+  auto before = anim.captureUndoSnapshot();
   for (const auto& keyAni : keyAniMap) {
     keyAni.second->deleteKey(keyAni.first);
   }
+
+  anim.pushUndoSnapshotCommand("Delete Keys", std::move(before));
 }
 
 void ZTimelineEventScene::resizeRects()

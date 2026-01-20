@@ -119,7 +119,13 @@ void ParameterAnimationColorItem::mousePressEvent(QGraphicsSceneMouseEvent* /*ev
 {
   QColor newColor = QColorDialog::getColor(m_displayPack.paraAnimation->color(), &m_timeline, "New Color");
   if (newColor.isValid()) {
+    if (newColor == m_displayPack.paraAnimation->color()) {
+      return;
+    }
+    auto& anim = m_timeline.animation();
+    auto before = anim.captureUndoSnapshot();
     m_displayPack.paraAnimation->setColor(newColor);
+    anim.pushUndoSnapshotCommand("Change Track Color", std::move(before));
     setBrush(QBrush(m_displayPack.paraAnimation->color()));
   }
 }

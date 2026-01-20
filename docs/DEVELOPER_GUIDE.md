@@ -84,9 +84,16 @@ Testing (Linking Atlas Code)
   - `atlas_z3d` (STATIC) — shared/OpenGL 3D code (`Z3D*`). Links to `atlas_core` and inherits its usage requirements.
   - `atlas_vulkan` (STATIC) — Vulkan‑only code (`ZVulkan*`). Links to `atlas_core` and inherits its usage requirements.
   - `atlas_lib` (INTERFACE) — umbrella target that links all of the above, preserving a single consumer dependency.
-- Tests and apps should continue to link `atlas_lib`; usage requirements (include dirs/defs and transitive link deps) are propagated via the umbrella target.
+- Prefer linking tests against the smallest Atlas library set that satisfies the test:
+  - Core-only tests should link `atlas_core`.
+  - Z3D/OpenGL tests should link `atlas_z3d` + `atlas_core`.
+  - Vulkan-only tests should link `atlas_vulkan` + `atlas_core`.
+  - Use `atlas_lib` when a single consumer target is preferred or when a test truly needs both render backends.
 - Usage in CMake (already wired in `test/test.cmake`):
-  - `add_atlas_gtest_executable(name)` links `GTest::gtest_main` and `atlas_lib`, inheriting all include dirs/defs (Qt, glbinding, Vulkan, etc.).
+  - `add_atlas_core_gtest_executable(name)` links `GTest::gtest_main` and `atlas_core`.
+  - `add_atlas_z3d_gtest_executable(name)` links `GTest::gtest_main`, `atlas_z3d`, and `atlas_core`.
+  - `add_atlas_vulkan_gtest_executable(name)` links `GTest::gtest_main`, `atlas_vulkan`, and `atlas_core`.
+  - `add_atlas_gtest_executable(name)` links `GTest::gtest_main` and `atlas_lib` (full umbrella).
   - For headless Qt runs, the tests default to `QT_QPA_PLATFORM=minimal`.
 - Runtime resources (shaders/assets) remain app-packaged; unit tests around Vulkan/RAII pipeline contracts do not depend on runtime discovery.
 - GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.

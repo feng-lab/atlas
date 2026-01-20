@@ -42,7 +42,7 @@ ZTimelineWidget::ZTimelineWidget(ZAnimation& ani, ZDoubleParameter* currentTimeP
   m_cleanupButton->setStatusTip(tr("Remove Redundant Keys"));
   m_cleanupButton->setToolTip(tr("Remove Redundant Keys"));
   // m_cleanupButton->setStyleSheet("border-style: none;");
-  connect(m_cleanupButton, &QToolButton::clicked, &m_animation, &ZAnimation::removeRedundantKeys);
+  connect(m_cleanupButton, &QToolButton::clicked, &m_animation, &ZAnimation::removeRedundantKeysUndoable);
 
   m_zoomInButton = new QToolButton(this);
   m_zoomInButton->setIcon(ZTheme::instance().icon(ZTheme::ZoomInIcon));

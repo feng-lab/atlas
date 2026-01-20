@@ -5,6 +5,7 @@
 #include "zparameter.h"
 #include <QObject>
 #include <QColor>
+#include <vector>
 
 namespace nim {
 
@@ -104,6 +105,15 @@ public:
   void setCurrentTime(double secs) const;
 
   void removeRedundantKeys();
+
+  // Replace the entire key list and emit a single keysChanged().
+  // Keys are sorted by time; redundant keys are preserved.
+  void replaceKeys(std::vector<std::unique_ptr<ZParameterKey>> keys);
+
+  void clearKeys()
+  {
+    replaceKeys({});
+  }
 
 Q_SIGNALS:
   void colorChanged(ZParameterAnimation* pa);

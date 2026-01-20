@@ -156,7 +156,8 @@ QString Z2DAnimationDoc::objPath(size_t id) const
 
 bool Z2DAnimationDoc::objHasUnsavedChange(size_t id) const
 {
-  return m_idToAnimationPacks.at(id)->hasUnsavedChange;
+  const auto& pack = m_idToAnimationPacks.at(id);
+  return !(canReadFile(pack->path) && objUndoStack(id)->isClean());
 }
 
 QString Z2DAnimationDoc::objInfo(size_t id) const
@@ -239,11 +240,8 @@ void Z2DAnimationDoc::setModified()
   if (auto animation = qobject_cast<Z2DAnimation*>(sender())) {
     for (const auto& idPack : m_idToAnimationPacks) {
       if (idPack.second->animation.get() == animation) {
-        if (!idPack.second->hasUnsavedChange) {
-          idPack.second->updateDerivedData();
-          idPack.second->hasUnsavedChange = true;
-          m_doc.updateObjInfo(idPack.first);
-        }
+        idPack.second->updateDerivedData();
+        m_doc.updateObjInfo(idPack.first);
         return;
       }
     }
@@ -280,9 +278,6 @@ Z2DAnimationDoc::AnimationPack::AnimationPack(Z2DAnimation* animation_, const QS
   , path(QFileInfo(path_).canonicalFilePath())
   , m_tmpName(std::move(name))
 {
-  if (path.isEmpty()) {
-    hasUnsavedChange = true;
-  }
   updateDerivedData();
 }
 
@@ -314,7 +309,7 @@ bool Z2DAnimationDoc::saveAnimation(AnimationPack* pack, const QString& fileName
   try {
     pack->animation->save(fileName);
     pack->path = QFileInfo(fileName).canonicalFilePath();
-    pack->hasUnsavedChange = false;
+    pack->animation->undoStack()->setClean();
     pack->updateDerivedData();
 
     ZSystemInfo::instance().addFileToRecentFileList(fileName);

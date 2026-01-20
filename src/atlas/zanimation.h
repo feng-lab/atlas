@@ -122,6 +122,17 @@ public:
     return &m_undoStack;
   }
 
+  // Undo/redo support for animation building/editing.
+  // This snapshot format is internal (not the .animation2d/.animation3d file format).
+  struct UndoSnapshot
+  {
+    json::object state;
+  };
+
+  [[nodiscard]] UndoSnapshot captureUndoSnapshot() const;
+  void restoreFromUndoSnapshot(const UndoSnapshot& snapshot);
+  void pushUndoSnapshotCommand(const QString& text, UndoSnapshot&& beforeSnapshot);
+
   [[nodiscard]] virtual bool is2DAnimation() const
   {
     return false;
@@ -136,6 +147,9 @@ public:
   void removeObj(size_t id);
 
   void removeRedundantKeys();
+
+  // UI/agent-facing variant: records the change on the undo stack.
+  void removeRedundantKeysUndoable();
 
   void rebindView();
 

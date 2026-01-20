@@ -237,4 +237,19 @@ void ZParameterAnimation::removeRedundantKeys()
   m_keys.erase(result + 1, m_keys.end());
 }
 
+void ZParameterAnimation::replaceKeys(std::vector<std::unique_ptr<ZParameterKey>> keys)
+{
+  for (const auto& k : keys) {
+    CHECK(k);
+    CHECK(k->time() >= 0.0);
+    CHECK(k->value().type() == m_type);
+  }
+
+  std::ranges::sort(keys, {}, [](const std::unique_ptr<ZParameterKey>& k) {
+    return k->time();
+  });
+  m_keys = std::move(keys);
+  Q_EMIT keysChanged();
+}
+
 } // namespace nim

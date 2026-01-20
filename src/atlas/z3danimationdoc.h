@@ -213,7 +213,6 @@ private:
 
     std::unique_ptr<Z3DAnimation> animation;
     QString path;
-    bool hasUnsavedChange = false;
 
   protected:
     QString m_tmpName;
@@ -236,6 +235,9 @@ private:
   QAction* m_loadAnimationsAction = nullptr;
 
   Z3DRenderingEngine* m_view = nullptr;
+
+  // Used to group multi-step edits (e.g. batch RPC) into a single undo command.
+  int m_undoSuppressionDepth = 0;
 };
 
 } // namespace nim

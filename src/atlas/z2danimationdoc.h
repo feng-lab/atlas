@@ -96,7 +96,6 @@ private:
 
     std::unique_ptr<Z2DAnimation> animation;
     QString path;
-    bool hasUnsavedChange = false;
 
   protected:
     QString m_tmpName;

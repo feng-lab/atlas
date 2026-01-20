@@ -1,10 +1,12 @@
 #include "ztimelinekeyeditdialog.h"
 
+#include "zanimation.h"
 #include "zcameraparameterkey.h"
 #include "zcameraparameteranimation.h"
 #include "zparameterfactory.h"
 #include <QVBoxLayout>
 #include <QDialogButtonBox>
+#include <optional>
 
 namespace nim {
 
@@ -99,6 +101,18 @@ void ZTimelineKeyEditDialog::setInitialValue()
 
 void ZTimelineKeyEditDialog::accept()
 {
+  ZAnimation* owningAnimation = nullptr;
+  for (QObject* p = &m_paraAnimation; p; p = p->parent()) {
+    if (auto* a = qobject_cast<ZAnimation*>(p)) {
+      owningAnimation = a;
+      break;
+    }
+  }
+  std::optional<ZAnimation::UndoSnapshot> before;
+  if (owningAnimation) {
+    before = owningAnimation->captureUndoSnapshot();
+  }
+
   // m_paraAnimation.boundParameter()->disconnect(this);
   m_paraAnimation.blockSignals(true);
   m_paraKey.setTime(m_time.get());
@@ -114,11 +128,13 @@ void ZTimelineKeyEditDialog::accept()
     cpk->setPosTension(m_posTension.get());
     cpk->setPosContinuity(m_posContinuity.get());
     cpk->setPosBias(m_posBias.get());
-    auto* cpa = static_cast<ZCameraParameterAnimation*>(&m_paraAnimation);
-    cpa->buildSpline();
   }
+  m_paraAnimation.sortKeys();
   m_paraAnimation.blockSignals(false);
   m_paraAnimation.emitKeyChangedSignal(&m_paraKey);
+  if (before) {
+    owningAnimation->pushUndoSnapshotCommand("Edit Key", std::move(*before));
+  }
   QDialog::accept();
 }
 
