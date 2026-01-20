@@ -83,6 +83,29 @@ public:
     return findUniqueId(id)->objParaAnimations;
   }
 
+  struct EnsureParameterAnimationResult
+  {
+    ZParameterAnimation* animation = nullptr; // non-owning
+    bool createdObject = false;
+    bool createdParameter = false;
+    QString error;
+  };
+
+  // Lookup a parameter animation track by the runtime-bound object id (same ids
+  // used by the UI and RPC: 1=background,2=axis,3=global/lighting,>=4 object id).
+  // Returns nullptr when the object/track doesn't exist in this animation.
+  [[nodiscard]] ZParameterAnimation* parameterAnimationForBoundId(size_t boundId, const QString& jsonKey);
+  [[nodiscard]] const ZParameterAnimation* parameterAnimationForBoundId(size_t boundId, const QString& jsonKey) const;
+
+  // Return all parameter animation tracks currently present for a bound id.
+  [[nodiscard]] std::vector<ZParameterAnimation*> parameterAnimationsForBoundId(size_t boundId);
+
+  // Ensure the parameter animation track exists for the given bound id + jsonKey.
+  // This is a programmatic equivalent of a user creating a track by adding/editing
+  // keys in the timeline UI: it only creates the requested object/track, not a full
+  // global keyframe for all objects.
+  [[nodiscard]] EnsureParameterAnimationResult ensureParameterAnimationForBoundId(size_t boundId, const QString& jsonKey);
+
   [[nodiscard]] const std::vector<ZAnimationDisplayPack>& displayPacks() const
   {
     return m_displayPacks;

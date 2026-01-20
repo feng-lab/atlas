@@ -223,10 +223,7 @@ int main(int argc, char* argv[])
 
       // ZMainWindow has Qt::WA_DeleteOnClose attribute
       auto mainWin = new ZMainWindow(GIT_VERSION);
-      // Register doc with RPC service (engine will be registered on viewReady)
-      if (g_sm && g_sm->rpcService()) {
-        g_sm->rpcService()->setDoc(mainWin->doc());
-      }
+      sm.setMainWindow(mainWin);
       QObject::connect(&app, &ZApplication::fileOpenRequest, mainWin, &ZMainWindow::loadUrls);
       mainWin->show();
 

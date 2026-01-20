@@ -24,6 +24,7 @@
 #include "zregionannotationview.h"
 #include "zsvgview.h"
 #include "zjson.h"
+#include "zscenejsonio.h"
 #include "zfileutils.h"
 #include "zmessageboxhelpers.h"
 #include "zmarkdownbrowser.h"
@@ -1097,62 +1098,8 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
 
 bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
 {
-  try {
-    json::object sceneObj;
-    sceneObj["Version"] = 1.0;
-
-    json::object docObj;
-    m_doc->write(docObj, true);
-    sceneObj["Doc"] = docObj;
-
-    auto objs = m_doc->objs();
-    for (auto id : objs) {
-      json::object jObj;
-
-      json::object view2DObj;
-      m_view->write(id, view2DObj);
-      jObj["View2D"] = view2DObj;
-
-      if (m_3dWindow) {
-        json::object view3DObj;
-        QMetaObject::invokeMethod(
-          m_3dWindow->engine(),
-          [eng = m_3dWindow->engine(), id, &view3DObj]() {
-            eng->write(id, view3DObj);
-          },
-          Qt::BlockingQueuedConnection);
-        jObj["View3D"] = view3DObj;
-      }
-
-      sceneObj[QString("%1").arg(id).toStdString()] = jObj;
-    }
-
-    json::object view2DGeneralObj;
-    m_view->write(view2DGeneralObj);
-    sceneObj["View2DGeneral"] = view2DGeneralObj;
-
-    if (m_3dWindow) {
-      json::object view3DGeneralObj;
-      QMetaObject::invokeMethod(
-        m_3dWindow->engine(),
-        [eng = m_3dWindow->engine(), &view3DGeneralObj]() {
-          eng->write(view3DGeneralObj);
-        },
-        Qt::BlockingQueuedConnection);
-      sceneObj["View3DGeneral"] = view3DGeneralObj;
-    }
-
-    json::object saveObj;
-    saveObj["Scene"] = sceneObj;
-
-    saveJsonObject(saveObj, fn);
-
-    return true;
-  }
-  catch (const std::exception& e) {
-    err += e.what();
-    return false;
-  }
+  auto* engineOrNull = m_3dWindow ? m_3dWindow->engine() : nullptr;
+  return ZSceneJsonIO::saveToPath(m_doc.get(), m_view.get(), engineOrNull, fn, err);
 }
 
 } // namespace nim

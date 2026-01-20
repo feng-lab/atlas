@@ -2,13 +2,21 @@
 
 #include "zanimationwidget.h"
 #include "z3drenderingengine.h"
+#include "zcameraparameterkey.h"
+#include "zcameraparameteranimation.h"
 #include "zexception.h"
 #include "zlog.h"
 #include "zmessageboxhelpers.h"
+#include "zoptionparameter.h"
+#include "zparameterkey.h"
+#include "zqobjectthreadinvoker.h"
 #include "ztheme.h"
+#include "zjson.h"
 #include <QFileDialog>
 #include <QSettings>
 #include <QApplication>
+#include <algorithm>
+#include <cmath>
 #include <set>
 #include <utility>
 
@@ -64,6 +72,15 @@ Z3DAnimation* Z3DAnimationDoc::animationPtr(size_t id)
   return it->second->animation.get();
 }
 
+const Z3DAnimation* Z3DAnimationDoc::animationPtr(size_t id) const
+{
+  auto it = m_idToAnimationPacks.find(id);
+  if (it == m_idToAnimationPacks.end()) {
+    return nullptr;
+  }
+  return it->second->animation.get();
+}
+
 size_t Z3DAnimationDoc::createNewAnimationAndReturnId(const QString& name)
 {
   auto animation = new Z3DAnimation(m_doc, this);
@@ -74,6 +91,702 @@ size_t Z3DAnimationDoc::createNewAnimationAndReturnId(const QString& name)
     VLOG(1) << "CreateNewAnimationAndReturnId: engine not ready; skipping default keyframe";
   }
   return id;
+}
+
+namespace {
+
+// Timeline editing uses floating seconds; match the existing RPC tolerance.
+static constexpr double kKeyTimeEpsSec = 1e-6;
+
+struct EngineParamSpec
+{
+  bool found = false;
+  QString type;
+  bool supportsInterpolation = false;
+  bool isStringOption = false;
+  bool isIntOption = false;
+  std::vector<QString> stringOptions;
+  std::vector<int> intOptions;
+};
+
+[[nodiscard]] QString normalizeInterpolationMethod(QString s)
+{
+  s = s.toLower().trimmed();
+  QString out;
+  out.reserve(s.size());
+  for (QChar c : s) {
+    if (c.isSpace() || c == QChar('_') || c == QChar('-')) {
+      continue;
+    }
+    out.append(c);
+  }
+  return out;
+}
+
+} // namespace
+
+Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setKey(size_t animationId,
+                                                     size_t targetId,
+                                                     const QString& jsonKey,
+                                                     double timeSec,
+                                                     const QString& easing,
+                                                     const json::value& value)
+{
+  KeyOpResult out;
+
+  if (animationId == 0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+  if (timeSec < 0.0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "time must be >= 0";
+    return out;
+  }
+
+  Z3DAnimation* anim = animationPtr(animationId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+  if (!m_view || !m_view->thread() || !m_view->thread()->isRunning() || m_view->thread()->isFinished()) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::FailedPrecondition;
+    out.error = "engine not ready";
+    return out;
+  }
+
+  // Camera (id=0) is stored as a dedicated track.
+  if (targetId == 0) {
+    if (!value.is_object()) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error = "camera value must be an object";
+      return out;
+    }
+    auto ckey = std::make_unique<ZCameraParameterKey>();
+    json::object keyObj;
+    keyObj["time"] = timeSec;
+    keyObj["type"] = easing.toStdString();
+    keyObj["value"] = value;
+    try {
+      if (!ckey->readValue(keyObj)) {
+        out.ok = false;
+        out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+        out.error = "camera key value incompatible with parameter";
+        return out;
+      }
+    }
+    catch (const std::exception& e) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error = QString("camera key read failed: %1").arg(e.what());
+      return out;
+    }
+    catch (...) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error = "camera key read failed";
+      return out;
+    }
+    anim->cameraParameterAnimation()->addKey(std::move(ckey));
+    out.ok = true;
+    return out;
+  }
+
+  if (jsonKey.trimmed().isEmpty()) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "json_key is required for non-camera";
+    return out;
+  }
+
+  const size_t boundId = targetId;
+  const QString jsonKeyTrim = jsonKey.trimmed();
+
+  Z3DRenderingEngine* view = m_view;
+  auto inv = invokeOnObjectThreadWait(
+    view,
+    [view, boundId, jsonKeyTrim]() {
+      EngineParamSpec spec;
+      const auto params = view->parametersOfViewSetting(boundId);
+      ZParameter* target = nullptr;
+      for (auto* p : params) {
+        if (p && p->jsonKey() == jsonKeyTrim) {
+          target = p;
+          break;
+        }
+      }
+      if (!target) {
+        return spec;
+      }
+      spec.found = true;
+      spec.type = target->type();
+      spec.supportsInterpolation = target->supportInterpolation();
+
+      if (auto optSI = dynamic_cast<const ZStringIntOptionParameter*>(target)) {
+        spec.isStringOption = true;
+        spec.stringOptions = optSI->options();
+      } else if (auto optSS = dynamic_cast<const ZStringStringOptionParameter*>(target)) {
+        spec.isStringOption = true;
+        spec.stringOptions = optSS->options();
+      } else if (auto optII = dynamic_cast<const ZIntIntOptionParameter*>(target)) {
+        spec.isIntOption = true;
+        spec.intOptions = optII->options();
+      }
+
+      return spec;
+    },
+    "animation_set_key:param_spec");
+  if (!inv.ok) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::FailedPrecondition;
+    out.error = QString::fromStdString(inv.error);
+    return out;
+  }
+  const EngineParamSpec spec = inv.value;
+  if (!spec.found) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = QString("target parameter not found for json_key=%1").arg(jsonKeyTrim);
+    return out;
+  }
+
+  // Validate value against parameter type/options (mirror UI constraints).
+  const QString tstr = spec.type;
+  auto expectArrayN = [&](size_t n) -> bool {
+    if (!value.is_array()) {
+      return false;
+    }
+    return value.as_array().size() == n;
+  };
+
+  if (tstr == "Bool") {
+    if (!value.is_bool()) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error =
+        QString("type mismatch for json_key=%1: expected Bool got %2").arg(jsonKeyTrim, QString::fromStdString(jsonTypeName(value)));
+      return out;
+    }
+  } else if (tstr == "Float" || tstr == "Double" || tstr == "Int") {
+    if (!value.is_number()) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error =
+        QString("type mismatch for json_key=%1: expected number got %2").arg(jsonKeyTrim, QString::fromStdString(jsonTypeName(value)));
+      return out;
+    }
+  } else if (tstr.endsWith("Vec4")) {
+    if (!expectArrayN(4)) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error =
+        QString("type mismatch for json_key=%1: expected array[4] got %2").arg(jsonKeyTrim, QString::fromStdString(jsonTypeName(value)));
+      return out;
+    }
+  } else if (tstr.endsWith("Vec3")) {
+    if (!expectArrayN(3)) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error =
+        QString("type mismatch for json_key=%1: expected array[3] got %2").arg(jsonKeyTrim, QString::fromStdString(jsonTypeName(value)));
+      return out;
+    }
+  } else if (spec.isStringOption) {
+    if (!value.is_string()) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error =
+        QString("type mismatch for json_key=%1: expected option string got %2").arg(jsonKeyTrim, QString::fromStdString(jsonTypeName(value)));
+      return out;
+    }
+    const auto& bs = value.as_string();
+    const QString label = QString::fromUtf8(bs.data(), static_cast<int>(bs.size()));
+    const bool allowed = std::ranges::any_of(spec.stringOptions, [&](const QString& o) { return o == label; });
+    if (!allowed) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error = QString("invalid option for json_key=%1: %2").arg(jsonKeyTrim, label);
+      return out;
+    }
+  } else if (spec.isIntOption) {
+    if (!value.is_number()) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error =
+        QString("type mismatch for json_key=%1: expected integer option got %2").arg(jsonKeyTrim, QString::fromStdString(jsonTypeName(value)));
+      return out;
+    }
+    int ival = 0;
+    if (value.is_int64()) {
+      ival = static_cast<int>(value.as_int64());
+    } else if (value.is_uint64()) {
+      ival = static_cast<int>(value.as_uint64());
+    } else {
+      ival = static_cast<int>(std::floor(value.as_double() + 0.5));
+    }
+    const bool allowed = std::ranges::any_of(spec.intOptions, [&](int o) { return o == ival; });
+    if (!allowed) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error = QString("invalid option for json_key=%1: %2").arg(jsonKeyTrim).arg(ival);
+      return out;
+    }
+  } else if (tstr == "3DTransform") {
+    if (!value.is_object()) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error =
+        QString("type mismatch for json_key=%1: expected object got %2").arg(jsonKeyTrim, QString::fromStdString(jsonTypeName(value)));
+      return out;
+    }
+  }
+
+  // Ensure the target track exists without creating a full global keyframe.
+  auto ensure = anim->ensureParameterAnimationForBoundId(boundId, jsonKeyTrim);
+  if (!ensure.error.isEmpty()) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = ensure.error;
+    return out;
+  }
+  if (ensure.createdObject || ensure.createdParameter) {
+    // Bind the newly created track to live parameters so UI playback/editing works immediately.
+    anim->rebindView();
+  }
+
+  auto* pa = anim->parameterAnimationForBoundId(boundId, jsonKeyTrim);
+  if (!pa) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::FailedPrecondition;
+    out.error = "failed to locate parameter animation track";
+    return out;
+  }
+
+  const QString keyType = spec.supportsInterpolation ? easing : QStringLiteral("Switch");
+  json::object keyObj;
+  keyObj["time"] = timeSec;
+  keyObj["type"] = keyType.toStdString();
+  keyObj["value"] = value;
+
+  auto key = std::make_unique<ZParameterKey>(spec.type);
+  try {
+    if (!key->readValue(keyObj)) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+      out.error = "key value incompatible with parameter";
+      return out;
+    }
+  }
+  catch (const std::exception& e) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = QString("key read failed: %1").arg(e.what());
+    return out;
+  }
+  catch (...) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "key read failed";
+    return out;
+  }
+
+  pa->addKey(std::move(key));
+  out.ok = true;
+  return out;
+}
+
+Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::removeKey(size_t animationId,
+                                                        size_t targetId,
+                                                        const QString& jsonKey,
+                                                        double timeSec)
+{
+  KeyOpResult out;
+  if (animationId == 0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+  if (timeSec < 0.0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "time must be >= 0";
+    return out;
+  }
+
+  Z3DAnimation* anim = animationPtr(animationId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+
+  if (targetId == 0) {
+    auto* cpa = anim->cameraParameterAnimation();
+    for (const auto& k : cpa->keys()) {
+      if (std::abs(k->time() - timeSec) < kKeyTimeEpsSec) {
+        cpa->deleteKey(k.get());
+        cpa->emitKeysChangedSignal();
+        out.ok = true;
+        return out;
+      }
+    }
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "camera key not found at requested time";
+    return out;
+  }
+
+  const QString jsonKeyTrim = jsonKey.trimmed();
+  if (jsonKeyTrim.isEmpty()) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "json_key is required for non-camera removal";
+    return out;
+  }
+
+  auto* pa = anim->parameterAnimationForBoundId(targetId, jsonKeyTrim);
+  if (!pa) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "json_key not found for target";
+    return out;
+  }
+
+  for (const auto& k : pa->keys()) {
+    if (std::abs(k->time() - timeSec) < kKeyTimeEpsSec) {
+      pa->deleteKey(k.get());
+      pa->emitKeysChangedSignal();
+      out.ok = true;
+      return out;
+    }
+  }
+  out.ok = false;
+  out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+  out.error = "key not found at requested time";
+  return out;
+}
+
+Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size_t targetId, const QString& jsonKey)
+{
+  KeyOpResult out;
+  if (animationId == 0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+  Z3DAnimation* anim = animationPtr(animationId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+
+  if (targetId == 0) {
+    auto* cpa = anim->cameraParameterAnimation();
+    std::vector<ZParameterKey*> keys;
+    keys.reserve(cpa->keys().size());
+    for (const auto& k : cpa->keys()) {
+      keys.push_back(k.get());
+    }
+    for (auto* k : keys) {
+      cpa->deleteKey(k);
+    }
+    cpa->emitKeysChangedSignal();
+    out.ok = true;
+    return out;
+  }
+
+  const QString jsonKeyTrim = jsonKey.trimmed();
+  if (jsonKeyTrim.isEmpty()) {
+    // Clear all tracks for this target id (benign no-op when no tracks exist).
+    for (auto* pa : anim->parameterAnimationsForBoundId(targetId)) {
+      std::vector<ZParameterKey*> keys;
+      keys.reserve(pa->keys().size());
+      for (const auto& k : pa->keys()) {
+        keys.push_back(k.get());
+      }
+      for (auto* k : keys) {
+        pa->deleteKey(k);
+      }
+      pa->emitKeysChangedSignal();
+    }
+    out.ok = true;
+    return out;
+  }
+
+  auto* pa = anim->parameterAnimationForBoundId(targetId, jsonKeyTrim);
+  if (!pa) {
+    // Preserve existing RPC behavior: clearing a missing track is a benign no-op.
+    out.ok = true;
+    return out;
+  }
+  std::vector<ZParameterKey*> keys;
+  keys.reserve(pa->keys().size());
+  for (const auto& k : pa->keys()) {
+    keys.push_back(k.get());
+  }
+  for (auto* k : keys) {
+    pa->deleteKey(k);
+  }
+  pa->emitKeysChangedSignal();
+  out.ok = true;
+  return out;
+}
+
+Z3DAnimationDoc::ListKeysResult Z3DAnimationDoc::listKeys(size_t animationId,
+                                                          size_t targetId,
+                                                          const QString& jsonKey,
+                                                          bool includeValues)
+{
+  ListKeysResult out;
+  if (animationId == 0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+
+  Z3DAnimation* anim = animationPtr(animationId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+
+  if (targetId == 0) {
+    auto* cpa = anim->cameraParameterAnimation();
+    out.keys.reserve(cpa->keys().size());
+    for (const auto& k : cpa->keys()) {
+      ListedKey ki;
+      ki.timeSec = k->time();
+      ki.parameterType = "3DCamera";
+      if (includeValues) {
+        ki.keyJson = QString::fromStdString(jsonToString(k->jsonValue()));
+      }
+      out.keys.push_back(std::move(ki));
+    }
+    out.ok = true;
+    return out;
+  }
+
+  const QString jsonKeyTrim = jsonKey.trimmed();
+  auto* pa = anim->parameterAnimationForBoundId(targetId, jsonKeyTrim);
+  if (!pa) {
+    // Missing tracks are treated as empty (benign) to simplify client logic.
+    out.ok = true;
+    return out;
+  }
+  out.keys.reserve(pa->keys().size());
+  for (const auto& k : pa->keys()) {
+    ListedKey ki;
+    ki.timeSec = k->time();
+    ki.parameterType = pa->type();
+    if (includeValues) {
+      ki.keyJson = QString::fromStdString(jsonToString(k->jsonValue()));
+    }
+    out.keys.push_back(std::move(ki));
+  }
+  out.ok = true;
+  return out;
+}
+
+Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::batchKeys(size_t animationId,
+                                                        const std::vector<BatchRemoveKeyOp>& removeOps,
+                                                        const std::vector<BatchSetKeyOp>& setOps,
+                                                        bool commit)
+{
+  KeyOpResult out;
+  if (animationId == 0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+
+  Z3DAnimation* anim = animationPtr(animationId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+  if (!setOps.empty()) {
+    if (!m_view || !m_view->thread() || !m_view->thread()->isRunning() || m_view->thread()->isFinished()) {
+      out.ok = false;
+      out.errorKind = KeyOpResult::ErrorKind::FailedPrecondition;
+      out.error = "engine not ready";
+      return out;
+    }
+  }
+
+  for (size_t idx = 0; idx < removeOps.size(); ++idx) {
+    const auto& r = removeOps[idx];
+    auto res = removeKey(animationId, r.targetId, r.jsonKey, r.timeSec);
+    if (!res.ok) {
+      out.ok = false;
+      out.errorKind = res.errorKind;
+      const QString detail = res.error.isEmpty() ? "remove_key failed" : res.error;
+      out.error = QString("remove_key failed at index=%1: %2").arg(idx).arg(detail);
+      return out;
+    }
+  }
+
+  bool hasTimeZero = false;
+  for (size_t idx = 0; idx < setOps.size(); ++idx) {
+    const auto& s = setOps[idx];
+    auto res = setKey(animationId, s.targetId, s.jsonKey, s.timeSec, s.easing, s.value);
+    if (!res.ok) {
+      out.ok = false;
+      out.errorKind = res.errorKind;
+      const QString detail = res.error.isEmpty() ? "set_key failed" : res.error;
+      out.error = QString("set_key failed at index=%1: %2").arg(idx).arg(detail);
+      return out;
+    }
+    if (std::abs(s.timeSec) < kKeyTimeEpsSec) {
+      hasTimeZero = true;
+    }
+  }
+
+  if (commit && hasTimeZero) {
+    anim->cancelRenderingAndSetCurrentTime(0.0);
+  }
+
+  out.ok = true;
+  return out;
+}
+
+Z3DAnimationDoc::TimeStatusResult Z3DAnimationDoc::timeStatus(size_t animationId) const
+{
+  TimeStatusResult out;
+  if (animationId == 0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+  const Z3DAnimation* anim = animationPtr(animationId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+  out.ok = true;
+  out.duration = anim->duration();
+  out.seconds = anim->currentTime();
+  return out;
+}
+
+Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setTime(size_t animationId, double seconds, bool cancelRendering)
+{
+  KeyOpResult out;
+  if (animationId == 0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+  Z3DAnimation* anim = animationPtr(animationId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+  if (cancelRendering) {
+    anim->cancelRenderingAndSetCurrentTime(seconds);
+  } else {
+    anim->setCurrentTime(seconds);
+  }
+  out.ok = true;
+  return out;
+}
+
+Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setCameraInterpolationMethod(size_t animationId, const QString& method)
+{
+  KeyOpResult out;
+  if (animationId == 0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+  Z3DAnimation* anim = animationPtr(animationId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+
+  const QString raw = method.trimmed();
+  if (raw.isEmpty()) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "method is required";
+    return out;
+  }
+
+  auto* cpa = anim->cameraParameterAnimation();
+  CHECK(cpa);
+
+  const QString wantNorm = normalizeInterpolationMethod(raw);
+  QString matched;
+  QString joined;
+  for (const auto& opt : cpa->interpolationMethodPara().options()) {
+    if (!joined.isEmpty()) {
+      joined += ", ";
+    }
+    joined += opt;
+    if (matched.isEmpty() && normalizeInterpolationMethod(opt) == wantNorm) {
+      matched = opt;
+    }
+  }
+  if (matched.isEmpty()) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = QString("unsupported camera interpolation method: %1 (available: %2)").arg(raw, joined);
+    return out;
+  }
+
+  cpa->interpolationMethodPara().select(matched);
+  out.ok = true;
+  return out;
+}
+
+Z3DAnimationDoc::CameraInterpolationMethodResult Z3DAnimationDoc::cameraInterpolationMethod(size_t animationId) const
+{
+  CameraInterpolationMethodResult out;
+  if (animationId == 0) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+  const Z3DAnimation* anim = animationPtr(animationId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+  const auto* cpa = anim->cameraParameterAnimation();
+  CHECK(cpa);
+  out.ok = true;
+  out.method = cpa->interpolationMethodPara().get();
+  return out;
 }
 
 bool Z3DAnimationDoc::save(size_t id)

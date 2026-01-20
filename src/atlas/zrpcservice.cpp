@@ -3,34 +3,16 @@
 #include "scene.grpc.pb.h"
 #include "zservicemanager.h"
 #include "zlog.h"
-#include "zdoc.h"
-#include "zmainwindow.h"
-#include "zview.h"
-#include "z3drenderingengine.h"
-#include "z3danimationdoc.h"
-#include "z3danimation.h"
-#include "zparameteranimation.h"
-#include "zcameraparameterkey.h"
-#include "zcameraparameteranimation.h"
+#include "z3dviewsettingparamops.h"
 #include "zjson.h"
-#include "z3dcameraparameter.h"
-#include "z3dobjview.h"
-#include "zoptionparameter.h"
-#include "znumericparameter.h"
-#include "z3dtransformparameter.h"
+#include "z3dcameraplanner.h"
+#include "zqobjectthreadinvoker.h"
+#include "zrpcuidispatcher.h"
+#include "zrpcsceneids.h"
 #include "../version/version.h"
 #include <QThread>
-#include <QTimer>
-#include <QApplication>
-#include <QDateTime>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QUuid>
-#include <QtCore/QDebug>
-#include <algorithm>
 #include <chrono>
-#include <cmath>
+#include <utility>
 #include <grpcpp/grpcpp.h>
 #include <google/protobuf/empty.pb.h>
 #include <google/protobuf/struct.pb.h>
@@ -57,6 +39,8 @@ using atlas::rpc::OBJECT_LOAD_STATE_ENGINE_NOT_READY;
 using atlas::rpc::OBJECT_LOAD_STATE_NOT_FOUND;
 using atlas::rpc::OBJECT_LOAD_STATE_READY;
 using atlas::rpc::OBJECT_LOAD_STATE_VIEW_NOT_READY;
+using atlas::rpc::OBJECT_LOAD_STATE_ERROR;
+using atlas::rpc::OBJECT_LOAD_STATE_UNSPECIFIED;
 using atlas::rpc::ObjectStatus;
 using atlas::rpc::GetStatusRequest;
 using atlas::rpc::GetStatusResponse;
@@ -134,52 +118,35 @@ ZRPCService::ZRPCService(QObject* parent)
 
 ZRPCService::~ZRPCService() = default;
 
-namespace {
-
-// RPC scope ids for view-setting/parameter operations.
-// 0 = camera; 1 = background; 2 = axis; 3 = global/lighting; >=4 = object id
-static constexpr uint64_t kScopeCamera = 0;
-[[maybe_unused]] static constexpr uint64_t kScopeBackground = 1;
-[[maybe_unused]] static constexpr uint64_t kScopeAxis = 2;
-[[maybe_unused]] static constexpr uint64_t kScopeGlobal = 3;
-static constexpr uint32_t kWaitForObjectsReadyDefaultPollMs = 50u;
-
-template<class Func>
-auto invokeOnUi(Func&& f)
+void ZRPCService::setUiDispatcher(ZRpcUiDispatcher* dispatcher)
 {
-  using R = decltype(f());
-  QObject* uiObj = QCoreApplication::instance();
-  // If we're already on the UI thread, invoke directly to avoid deadlock
-  if (QThread::currentThread() == uiObj->thread()) {
-    return f();
-  }
-  R result{};
-  QMetaObject::invokeMethod(
-    uiObj,
-    [&]() {
-      result = f();
-    },
-    Qt::BlockingQueuedConnection);
-  return result;
+  m_uiDispatcher = dispatcher;
 }
 
+namespace {
+static constexpr uint32_t kWaitForObjectsReadyDefaultPollMs = 50u;
+
+template<class T>
+using ZRpcInvokeResult = ZQObjectThreadInvokeResult<T>;
+
+// gRPC handlers run on gRPC-managed threads. To respect Atlas' thread boundaries,
+// we bounce work to the target QObject thread with a queued call and wait for
+// completion, respecting gRPC cancellation/deadlines where available.
 template<class Func>
-auto invokeOnObjectThread(QObject* obj, Func&& f)
+auto invokeOnObjectThread(grpc::ServerContext* grpcContext, QObject* obj, Func&& f, std::string_view what)
+  -> ZRpcInvokeResult<decltype(f())>
 {
-  using R = decltype(f());
-  CHECK(obj);
-  // If we're already on the object's thread, invoke directly to avoid deadlock.
-  if (QThread::currentThread() == obj->thread()) {
-    return f();
+  std::function<bool()> shouldCancel;
+  if (grpcContext) {
+    const auto deadline = grpcContext->deadline();
+    shouldCancel = [grpcContext, deadline]() -> bool {
+      if (grpcContext->IsCancelled()) {
+        return true;
+      }
+      return std::chrono::system_clock::now() >= deadline;
+    };
   }
-  R result{};
-  QMetaObject::invokeMethod(
-    obj,
-    [&]() {
-      result = f();
-    },
-    Qt::BlockingQueuedConnection);
-  return result;
+  return invokeOnObjectThreadWait(obj, std::forward<Func>(f), what, std::move(shouldCancel));
 }
 
 // Convert google.protobuf.Value to boost::json::value
@@ -269,122 +236,12 @@ static google::protobuf::Value jsonToPb(const json::value& jv)
 
 } // namespace
 
-namespace {
-
-// Helpers used by camera planning/validation
-static std::vector<size_t> filterVisualIds(ZRPCService& owner, const std::vector<size_t>& in)
-{
-  std::vector<size_t> out;
-  out.reserve(in.size());
-  for (auto id : in) {
-    if (owner.doc()) {
-      auto* od = owner.doc()->idToDoc(id);
-      if (od && od->typeName() == QStringLiteral("Animation3D")) {
-        continue;
-      }
-    }
-    out.push_back(id);
-  }
-  return out;
-}
-
-static ZBBox<glm::dvec3> expandedByMarginFraction(const ZBBox<glm::dvec3>& bb, double marginFrac)
-{
-  if (bb.empty() || marginFrac <= 0.0) {
-    return bb;
-  }
-  const glm::dvec3 half = (bb.maxCorner - bb.minCorner) * 0.5;
-  const glm::dvec3 grow = half * marginFrac;
-  ZBBox<glm::dvec3> out = bb;
-  out.expand(bb.minCorner - grow);
-  out.expand(bb.maxCorner + grow);
-  return out;
-}
-
-static double bboxEnclosingSphereRadius(const ZBBox<glm::dvec3>& bb)
-{
-  if (bb.empty()) {
-    return 0.0;
-  }
-  const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
-  return 0.5 * std::sqrt(sz.x * sz.x + sz.y * sz.y + sz.z * sz.z);
-}
-
-static double requiredCenterDistanceForCoverage(const Z3DCamera& cam, double radius)
-{
-  if (radius <= 0.0) {
-    return 0.0;
-  }
-  double angle = cam.fieldOfView();
-  // Match Z3DCamera::resetCamera logic: use horizontal angle when AR < 1
-  if (cam.aspectRatio() < 1.0f) {
-    angle = 2.0 * std::atan(std::tan(angle * 0.5) * cam.aspectRatio());
-  }
-  const double s = std::sin(angle * 0.5);
-  if (s <= 1e-6) {
-    return std::numeric_limits<double>::infinity();
-  }
-  return radius / s;
-}
-
-static void setCameraDistance(Z3DCameraParameter& cam, double centerDist)
-{
-  const glm::vec3 c = cam.get().center();
-  const glm::vec3 v = cam.get().viewVector();
-  const glm::vec3 eye = c - static_cast<float>(centerDist) * v;
-  const glm::vec3 up = cam.get().upVector();
-  cam.setCamera(eye, c, up);
-}
-
-static bool hasVisualObjects(ZRPCService& owner)
-{
-  if (!owner.doc()) {
-    return false;
-  }
-  for (auto id : owner.doc()->objs()) {
-    auto* od = owner.doc()->idToDoc(id);
-    if (od && od->typeName() == QStringLiteral("Animation3D")) {
-      continue;
-    }
-    return true;
-  }
-  return false;
-}
-
-struct EngineCameraAndBBoxSnapshot
-{
-  json::value cameraJson;
-  ZBBox<glm::dvec3> bbox;
-};
-
-[[nodiscard]] EngineCameraAndBBoxSnapshot snapshotEngineCameraAndBBox(Z3DRenderingEngine* engine,
-                                                                      const std::vector<size_t>& ids,
-                                                                      bool afterClipping)
-{
-  CHECK(engine);
-  return invokeOnObjectThread(engine, [&]() {
-    EngineCameraAndBBoxSnapshot out{};
-    out.cameraJson = engine->camera().jsonValue();
-    out.bbox = afterClipping ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
-    return out;
-  });
-}
-
-[[nodiscard]] json::value snapshotEngineCameraJson(Z3DRenderingEngine* engine)
-{
-  CHECK(engine);
-  return invokeOnObjectThread(engine, [&]() -> json::value {
-    return engine->camera().jsonValue();
-  });
-}
-} // namespace
-
 // Scene service bound to app UI context
 class SceneServiceImpl final : public Scene::Service
 {
 public:
-  explicit SceneServiceImpl(ZRPCService& owner)
-    : m_owner(owner)
+  explicit SceneServiceImpl(ZRpcUiDispatcher* uiDispatcher)
+    : m_uiDispatcher(uiDispatcher)
   {}
 
   Status Ping(ServerContext*, const PingRequest*, PingResponse* reply) override
@@ -394,38 +251,36 @@ public:
     return Status::OK;
   }
 
-  Status GetAppLocation(ServerContext*,
+  Status GetAppLocation(ServerContext* grpcContext,
                         const google::protobuf::Empty*,
                         google::protobuf::StringValue* reply) override
   {
-    // This must be UI-thread safe on all platforms, but it does not touch
-    // rendering/engine state. We still compute it on the UI thread so it is
-    // consistent with Qt's application/runtime state.
-    const QString atlasDir = invokeOnUi([&]() -> QString {
-      // applicationDirPath:
-      // - macOS:   .../Atlas.app/Contents/MacOS
-      // - Windows: <install>/ (contains Atlas.exe)
-      // - Linux:   <install>/ (contains Atlas)
-      const QString appDir = QCoreApplication::applicationDirPath();
-      if (appDir.isEmpty()) {
-        return QString{};
-      }
+    CHECK(reply);
 
-#if defined(Q_OS_MAC)
-      // Convert .../Atlas.app/Contents/MacOS -> .../Atlas.app
-      QDir d(appDir);
-      if (!d.cdUp()) { // Contents
-        return appDir;
-      }
-      if (!d.cdUp()) { // .app
-        return d.absolutePath();
-      }
-      return d.absolutePath();
-#else
-      return QDir(appDir).absolutePath();
-#endif
-    });
-    reply->set_value(atlasDir.toStdString());
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "get_app_location: ui dispatcher not ready");
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp]() {
+        return disp->appLocation();
+      },
+      "get_app_location");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "get_app_location failed" : r.error);
+    }
+
+    reply->set_value(r.value.toStdString());
     return Status::OK;
   }
 
@@ -438,122 +293,85 @@ public:
     return Status::OK;
   }
 
-  Status GetStatus(ServerContext*, const GetStatusRequest* req, GetStatusResponse* reply) override
+  Status GetStatus(ServerContext* grpcContext, const GetStatusRequest* req, GetStatusResponse* reply) override
   {
-    // Collect UI-side object info (doc/type/path/visible) and determine whether a 3D window exists.
-    struct UiInfo {
-      uint64_t id = 0;
-      bool docHasObj = false;
-      std::string type;
-      std::string name;
-      std::string path;
-      bool visible = false;
-    };
+    CHECK(reply);
 
-    const auto ui = invokeOnUi([&]() {
-      struct UiOut {
-        bool docReady = false;
-        bool has3dWindow = false;
-        std::vector<UiInfo> objs;
-      };
-      UiOut out;
-      out.docReady = (m_owner.doc() != nullptr);
-
-      // Detect 3D window presence (without creating one).
-      ZMainWindow* mainWin = nullptr;
-      for (QWidget* w : QApplication::topLevelWidgets()) {
-        if (auto mw = qobject_cast<ZMainWindow*>(w)) {
-          mainWin = mw;
-          break;
-        }
+    const bool includeAllObjects = (req != nullptr) ? req->include_all_objects() : false;
+    std::vector<uint64_t> requestedIds;
+    if (req && !includeAllObjects) {
+      requestedIds.reserve(static_cast<size_t>(req->ids_size()));
+      for (auto v : req->ids()) {
+        requestedIds.push_back(static_cast<uint64_t>(v));
       }
-      out.has3dWindow = (mainWin && mainWin->get3DWindow() != nullptr);
-
-      // Resolve which ids to report.
-      std::vector<size_t> ids;
-      if (req && req->include_all_objects()) {
-        if (m_owner.doc()) {
-          ids = m_owner.doc()->objs();
-        }
-      } else if (req) {
-        ids.reserve(static_cast<size_t>(req->ids_size()));
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-      }
-
-      out.objs.reserve(ids.size());
-      for (auto id : ids) {
-        UiInfo info;
-        info.id = static_cast<uint64_t>(id);
-        if (m_owner.doc()) {
-          if (auto* od = m_owner.doc()->idToDoc(id)) {
-            info.docHasObj = true;
-            info.type = od->typeName().toStdString();
-            info.name = m_owner.doc()->objName(id).toStdString();
-            info.path = od->objPath(id).toStdString();
-            info.visible = m_owner.doc()->isObjVisible(id);
-          }
-        }
-        out.objs.push_back(std::move(info));
-      }
-      return out;
-    });
-
-    reply->set_ok(true);
-    reply->set_doc_ready(ui.docReady);
-    reply->set_has_3d_window(ui.has3dWindow);
-
-    Z3DRenderingEngine* eng = m_owner.engine();
-    const bool engineReady = (eng != nullptr);
-    reply->set_engine_ready(engineReady);
-
-    // Determine per-object view readiness on the engine's thread (single-GL-context assumption).
-    std::vector<bool> viewReady(ui.objs.size(), false);
-    if (engineReady) {
-      viewReady = invokeOnObjectThread(eng, [&]() {
-        std::vector<bool> r;
-        r.reserve(ui.objs.size());
-        for (const auto& info : ui.objs) {
-          const size_t id = static_cast<size_t>(info.id);
-          if (id <= kScopeGlobal) {
-            r.push_back(true);
-            continue;
-          }
-          bool found = false;
-          for (const auto& ov : eng->objViews()) {
-            if (ov && ov->hasObj(id)) {
-              found = true;
-              break;
-            }
-          }
-          r.push_back(found);
-        }
-        return r;
-      });
     }
 
-    for (size_t i = 0; i < ui.objs.size(); ++i) {
-      const auto& info = ui.objs[i];
-      ObjectStatus* st = reply->add_objects();
-      st->set_id(info.id);
-      st->set_type(info.type);
-      st->set_name(info.name);
-      st->set_path(info.path);
-      st->set_visible(info.visible);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      reply->set_ok(false);
+      reply->set_doc_ready(false);
+      reply->set_engine_ready(false);
+      reply->set_has_3d_window(false);
+      reply->set_error("get_status: ui dispatcher not ready");
+      return Status::OK;
+    }
 
-      if (!ui.docReady) {
-        st->set_load_state(OBJECT_LOAD_STATE_DOC_NOT_READY);
-      } else if (!info.docHasObj && static_cast<size_t>(info.id) > kScopeGlobal) {
-        st->set_load_state(OBJECT_LOAD_STATE_NOT_FOUND);
-      } else if (!engineReady) {
-        st->set_load_state(OBJECT_LOAD_STATE_ENGINE_NOT_READY);
-      } else if (i < viewReady.size() && viewReady[i]) {
-        st->set_load_state(OBJECT_LOAD_STATE_READY);
-      } else if (static_cast<size_t>(info.id) <= kScopeGlobal) {
-        st->set_load_state(OBJECT_LOAD_STATE_READY);
-      } else {
-        st->set_load_state(OBJECT_LOAD_STATE_VIEW_NOT_READY);
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, ids = std::move(requestedIds), includeAllObjects]() {
+        return disp->statusSnapshot(ids, includeAllObjects);
+      },
+      "get_status");
+    if (!inv.ok) {
+      reply->set_ok(false);
+      reply->set_doc_ready(false);
+      reply->set_engine_ready(false);
+      reply->set_has_3d_window(false);
+      reply->set_error(inv.error);
+      return Status::OK;
+    }
+    const auto& s = inv.value;
+
+    reply->set_ok(s.ok);
+    reply->set_doc_ready(s.docReady);
+    reply->set_engine_ready(s.engineReady);
+    reply->set_has_3d_window(s.has3DWindow);
+    if (!s.error.empty()) {
+      reply->set_error(s.error);
+    }
+
+    auto toProtoState = [](ZRpcUiDispatcher::ObjectLoadState st) -> atlas::rpc::ObjectLoadState {
+      switch (st) {
+        case ZRpcUiDispatcher::ObjectLoadState::NotFound:
+          return OBJECT_LOAD_STATE_NOT_FOUND;
+        case ZRpcUiDispatcher::ObjectLoadState::DocNotReady:
+          return OBJECT_LOAD_STATE_DOC_NOT_READY;
+        case ZRpcUiDispatcher::ObjectLoadState::EngineNotReady:
+          return OBJECT_LOAD_STATE_ENGINE_NOT_READY;
+        case ZRpcUiDispatcher::ObjectLoadState::ViewNotReady:
+          return OBJECT_LOAD_STATE_VIEW_NOT_READY;
+        case ZRpcUiDispatcher::ObjectLoadState::Ready:
+          return OBJECT_LOAD_STATE_READY;
+        case ZRpcUiDispatcher::ObjectLoadState::Error:
+          return OBJECT_LOAD_STATE_ERROR;
+      }
+      return OBJECT_LOAD_STATE_UNSPECIFIED;
+    };
+
+    for (const auto& obj : s.objects) {
+      ObjectStatus* st = reply->add_objects();
+      st->set_id(obj.id);
+      st->set_type(obj.type);
+      st->set_name(obj.name);
+      st->set_path(obj.path);
+      st->set_visible(obj.visible);
+      st->set_load_state(toProtoState(obj.loadState));
+      if (obj.progress.has_value()) {
+        st->mutable_progress()->set_value(*obj.progress);
+      }
+      if (!obj.error.empty()) {
+        st->set_error(obj.error);
       }
     }
 
@@ -642,13 +460,12 @@ public:
     }
   }
 
-  Status GetParamValues(ServerContext*, const GetParamValuesRequest* req, GetParamValuesResponse* reply) override
+  Status GetParamValues(ServerContext* grpcContext,
+                        const GetParamValuesRequest* req,
+                        GetParamValuesResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
+    CHECK(req);
+    CHECK(reply);
 
     // Use unified parameter access for all scopes, including camera (id=0).
     const size_t boundId = static_cast<size_t>(req->id());
@@ -659,534 +476,310 @@ public:
       queryKeys.push_back(qk);
     }
 
-    const json::object j = invokeOnObjectThread(engine, [&]() {
-      const auto params = engine->parametersOfViewSetting(boundId);
-      json::object out;
-      for (auto* p : params) {
-        if (p) {
-          p->write(out);
-        }
-      }
-      return out;
-    });
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "get_param_values: ui dispatcher not ready");
+    }
 
-    if (queryKeys.empty()) {
-      for (const auto& [k, v] : j) {
-        (*reply->mutable_values())[std::string(k.data(), k.size())] = jsonToPb(v);
-      }
-    } else {
-      for (const auto& qk : queryKeys) {
-        if (auto* pv = j.if_contains(qk)) {
-          (*reply->mutable_values())[qk] = jsonToPb(*pv);
-        }
-      }
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, boundId, queryKeys = std::move(queryKeys)]() {
+        return disp->getParamValues(boundId, queryKeys);
+      },
+      "get_param_values");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "get_param_values failed" : r.error);
+    }
+
+    for (const auto& [k, v] : r.values) {
+      (*reply->mutable_values())[std::string(k.data(), k.size())] = jsonToPb(v);
     }
     return Status::OK;
   }
 
-  Status ValidateSceneParams(ServerContext*,
+  Status ValidateSceneParams(ServerContext* grpcContext,
                              const ValidateSceneParamsRequest* req,
                              ValidateSceneParamsResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    CHECK(req);
+    CHECK(reply);
+
+    std::vector<Z3DViewSettingParamOps::SetParamData> setParams;
+    setParams.reserve(static_cast<size_t>(req->set_params_size()));
+    for (const auto& sp : req->set_params()) {
+      Z3DViewSettingParamOps::SetParamData d;
+      d.id = static_cast<size_t>(sp.id());
+      d.jsonKey = QString::fromStdString(sp.json_key());
+      d.value = pbToJson(sp.value());
+      setParams.push_back(std::move(d));
     }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-    bool allOk = true;
-    auto results = invokeOnObjectThread(engine, [&]() {
-      std::vector<ValidateSceneParamResult> out;
-      if (!m_owner.engine()) {
-        return out;
-      }
-      auto validateOne = [&](const SetParam& sp, ValidateSceneParamResult& r) {
-        r.set_json_key(sp.json_key());
-        // Resolve scope via unified parameter list (id=0 => camera)
-        const size_t boundId = static_cast<size_t>(sp.id());
-        const auto params = engine->parametersOfViewSetting(boundId);
-        // Compatibility: allow empty json_key for camera scope (id=0) and map to the single camera parameter key
-        QString jsonKey = QString::fromStdString(sp.json_key());
-        if (boundId == kScopeCamera && jsonKey.isEmpty()) {
-          if (!params.empty() && params.front()) {
-            jsonKey = params.front()->jsonKey();
-          }
-        }
-        ZParameter* target = nullptr;
-        for (auto* p : params) {
-          if (p && p->jsonKey() == jsonKey) {
-            target = p;
-            break;
-          }
-        }
-        if (!target) {
-          r.set_ok(false);
-          r.set_reason("json_key_not_found");
-          return;
-        }
 
-        // Convert to json and perform light type/range checks
-        json::value v = pbToJson(sp.value());
-        auto tstr = target->type();
-
-        // Strict validation for option parameters (system boundary: reject early with a soft error)
-        if (auto optSI = dynamic_cast<const ZStringIntOptionParameter*>(target)) {
-          if (!v.is_string()) {
-            r.set_ok(false);
-            r.set_reason("type_mismatch"); // expected string label
-            return;
-          }
-          const auto& bs = v.as_string();
-          const QString label = QString::fromUtf8(bs.data(), bs.size());
-          if (!optSI->hasOption(label)) {
-            r.set_ok(false);
-            r.set_reason("option_invalid");
-            return;
-          }
-          *r.mutable_normalized_value() = jsonToPb(json::value_from(label));
-          r.set_ok(true);
-          return;
-        }
-        if (auto optSS = dynamic_cast<const ZStringStringOptionParameter*>(target)) {
-          if (!v.is_string()) {
-            r.set_ok(false);
-            r.set_reason("type_mismatch"); // expected string label
-            return;
-          }
-          const auto& bs = v.as_string();
-          const QString label = QString::fromUtf8(bs.data(), bs.size());
-          if (!optSS->hasOption(label)) {
-            r.set_ok(false);
-            r.set_reason("option_invalid");
-            return;
-          }
-          *r.mutable_normalized_value() = jsonToPb(json::value_from(label));
-          r.set_ok(true);
-          return;
-        }
-        if (auto optII = dynamic_cast<const ZIntIntOptionParameter*>(target)) {
-          if (!v.is_number()) {
-            r.set_ok(false);
-            r.set_reason("type_mismatch"); // expected integer option
-            return;
-          }
-          // Treat numeric JSON as integer option (clamp to nearest int)
-          const int ival = static_cast<int>(std::floor(v.as_double() + 0.5));
-          if (!optII->hasOption(ival)) {
-            r.set_ok(false);
-            r.set_reason("option_invalid");
-            return;
-          }
-          *r.mutable_normalized_value() = jsonToPb(json::value_from(ival));
-          r.set_ok(true);
-          return;
-        }
-
-        // Non-option types
-        auto okType = [&]() -> bool {
-          if (tstr == "Bool") {
-            return v.is_bool();
-          }
-          if (tstr == "Int") {
-            return v.is_number();
-          }
-          if (tstr == "Float" || tstr == "Double") {
-            return v.is_number();
-          }
-          if (tstr == "Vec2" || tstr == "DVec2") {
-            return v.is_array() && v.as_array().size() == 2;
-          }
-          if (tstr == "Vec3" || tstr == "DVec3") {
-            return v.is_array() && v.as_array().size() == 3;
-          }
-          if (tstr == "Vec4" || tstr == "DVec4") {
-            return v.is_array() && v.as_array().size() == 4;
-          }
-          // Other custom types: accept and defer to target->read during apply
-          return true;
-        }();
-        if (!okType) {
-          r.set_ok(false);
-          r.set_reason("type_mismatch");
-          return;
-        }
-
-        // Range clamp for numeric/vector when metadata is available
-        auto setNormalized = [&](const json::value& nv) {
-          *r.mutable_normalized_value() = jsonToPb(nv);
-        };
-        bool normalized = false;
-        if (auto dp = dynamic_cast<ZDoubleParameter*>(target)) {
-          if (v.is_number()) {
-            double x = v.as_double();
-            x = std::clamp(x, dp->rangeMin(), dp->rangeMax());
-            setNormalized(x);
-            normalized = true;
-          }
-        } else if (auto fp = dynamic_cast<ZFloatParameter*>(target)) {
-          if (v.is_number()) {
-            double x = v.as_double();
-            x = std::clamp(x, static_cast<double>(fp->rangeMin()), static_cast<double>(fp->rangeMax()));
-            setNormalized(x);
-            normalized = true;
-          }
-        } else if (auto ip = dynamic_cast<ZIntParameter*>(target)) {
-          if (v.is_number()) {
-            double x = v.as_double();
-            x = std::clamp(x, static_cast<double>(ip->rangeMin()), static_cast<double>(ip->rangeMax()));
-            setNormalized(std::floor(x + 0.5));
-            normalized = true;
-          }
-        } else if (auto v2 = dynamic_cast<ZVec2Parameter*>(target)) {
-          if (v.is_array() && v.as_array().size() == 2) {
-            auto mn = v2->rangeMin();
-            auto mx = v2->rangeMax();
-            json::array arr;
-            for (size_t i = 0; i < 2; ++i) {
-              double x = v.as_array()[i].is_number() ? v.as_array()[i].as_double() : 0.0;
-              x = std::clamp(x, static_cast<double>(mn[i]), static_cast<double>(mx[i]));
-              arr.emplace_back(x);
-            }
-            setNormalized(arr);
-            normalized = true;
-          }
-        } else if (auto v3 = dynamic_cast<ZVec3Parameter*>(target)) {
-          if (v.is_array() && v.as_array().size() == 3) {
-            auto mn = v3->rangeMin();
-            auto mx = v3->rangeMax();
-            json::array arr;
-            for (size_t i = 0; i < 3; ++i) {
-              double x = v.as_array()[i].is_number() ? v.as_array()[i].as_double() : 0.0;
-              x = std::clamp(x, static_cast<double>(mn[i]), static_cast<double>(mx[i]));
-              arr.emplace_back(x);
-            }
-            setNormalized(arr);
-            normalized = true;
-          }
-        } else if (auto v4 = dynamic_cast<ZVec4Parameter*>(target)) {
-          if (v.is_array() && v.as_array().size() == 4) {
-            auto mn = v4->rangeMin();
-            auto mx = v4->rangeMax();
-            json::array arr;
-            for (size_t i = 0; i < 4; ++i) {
-              double x = v.as_array()[i].is_number() ? v.as_array()[i].as_double() : 0.0;
-              x = std::clamp(x, static_cast<double>(mn[i]), static_cast<double>(mx[i]));
-              arr.emplace_back(x);
-            }
-            setNormalized(arr);
-            normalized = true;
-          }
-        }
-        // Special handling for 3DTransform: accept plain field names and normalize to child jsonKeys
-        if (!normalized) {
-          if (auto tp = dynamic_cast<const Z3DTransformParameter*>(target)) {
-            if (v.is_object()) {
-              const auto& obj = v.as_object();
-              json::object out;
-              auto getVec = [&](const char* key1, const char* key2, size_t n) -> std::optional<json::array> {
-                const json::value* pv = nullptr;
-                if (auto it = obj.if_contains(key1)) {
-                  pv = &*it;
-                } else if (auto it2 = obj.if_contains(key2)) {
-                  pv = &*it2;
-                } else {
-                  return std::nullopt;
-                }
-                if (!pv->is_array() || pv->as_array().size() != n) {
-                  return std::nullopt;
-                }
-                json::array arr;
-                for (size_t i = 0; i < n; ++i) {
-                  const auto& el = pv->as_array()[i];
-                  if (!el.is_number()) {
-                    return std::nullopt;
-                  }
-                  arr.emplace_back(el.as_double());
-                }
-                return arr;
-              };
-              if (auto a = getVec("Scale", "Scale Vec3", 3)) {
-                out["Scale Vec3"] = *a;
-              }
-              if (auto a = getVec("Translation", "Translation Vec3", 3)) {
-                out["Translation Vec3"] = *a;
-              }
-              if (auto a = getVec("Rotation", "Rotation Vec4", 4)) {
-                out["Rotation Vec4"] = *a;
-              }
-              // Prefer canonical "Rotation Center Vec3"; accept synonyms
-              if (auto a = getVec("Rotation Center", "Rotation Center Vec3", 3)) {
-                out["Rotation Center Vec3"] = *a;
-              } else if (auto a2 = getVec("Center", "Center Vec3", 3)) {
-                out["Rotation Center Vec3"] = *a2;
-              }
-              *r.mutable_normalized_value() = jsonToPb(out);
-            } else {
-              *r.mutable_normalized_value() = jsonToPb(v);
-            }
-          } else {
-            *r.mutable_normalized_value() = jsonToPb(v);
-          }
-        }
-        r.set_ok(true);
-      };
-
-      for (const auto& sp : req->set_params()) {
-        ValidateSceneParamResult r;
-        validateOne(sp, r);
-        if (!r.ok()) {
-          allOk = false;
-        }
-        out.push_back(std::move(r));
-      }
-      return out;
-    });
-    for (auto& r : results) {
-      *reply->add_results() = std::move(r);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "validate_scene_params: ui dispatcher not ready");
     }
-    reply->set_ok(allOk);
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, setParams = std::move(setParams)]() {
+        return disp->validateSceneParams(setParams);
+      },
+      "validate_scene_params");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, r.error.empty() ? "validate_scene_params failed" : r.error);
+    }
+
+    for (const auto& pr : r.results) {
+      ValidateSceneParamResult out;
+      out.set_json_key(pr.jsonKey.toStdString());
+      out.set_ok(pr.ok);
+      if (pr.ok && pr.hasNormalizedValue) {
+        *out.mutable_normalized_value() = jsonToPb(pr.normalizedValue);
+      }
+      if (!pr.ok && !pr.reason.isEmpty()) {
+        out.set_reason(pr.reason.toStdString());
+      }
+      *reply->add_results() = std::move(out);
+    }
+    reply->set_ok(r.allOk);
     return Status::OK;
   }
 
-  Status ApplySceneParams(ServerContext*, const ApplySceneParamsRequest* req, Bool* reply) override
+  Status ApplySceneParams(ServerContext* grpcContext, const ApplySceneParamsRequest* req, Bool* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-    // Validate first to avoid partial apply
-    ValidateSceneParamsRequest vreq;
+    std::vector<Z3DViewSettingParamOps::SetParamData> setParams;
+    setParams.reserve(static_cast<size_t>(req->set_params_size()));
     for (const auto& sp : req->set_params()) {
-      *vreq.add_set_params() = sp;
+      Z3DViewSettingParamOps::SetParamData d;
+      d.id = static_cast<size_t>(sp.id());
+      d.jsonKey = QString::fromStdString(sp.json_key());
+      d.value = pbToJson(sp.value());
+      setParams.push_back(std::move(d));
     }
-    ValidateSceneParamsResponse vresp;
-    auto vst = ValidateSceneParams(nullptr, &vreq, &vresp);
-    if (vst.error_code() != grpc::StatusCode::OK || !vresp.ok()) {
-      // Build a compact reason string to aid diagnostics
-      int bad = 0;
-      std::string firstReason;
-      std::string firstKey;
-      for (const auto& r : vresp.results()) {
-        if (!r.ok()) {
-          ++bad;
-          if (firstReason.empty()) {
-            firstReason = r.reason();
-            firstKey = r.json_key();
-          }
-        }
-      }
-      std::ostringstream oss;
-      oss << "validate failed";
-      if (bad > 0) {
-        oss << ": bad=" << bad;
-        if (!firstReason.empty()) {
-          oss << ", first_reason=" << firstReason;
-        }
-        if (!firstKey.empty()) {
-          oss << ", first_key=" << firstKey;
-        }
-      }
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, oss.str());
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "apply_scene_params: ui dispatcher not ready");
     }
-    std::string applyErr;
-    bool ok = invokeOnObjectThread(engine, [&]() -> bool {
-      if (!m_owner.engine()) {
-        return false;
-      }
-      for (const auto& sp : req->set_params()) {
-        const size_t boundId = static_cast<size_t>(sp.id());
-        // Apply using unified parameter list (id=0 => camera)
-        const auto params = engine->parametersOfViewSetting(boundId);
-        // Compatibility for camera: empty json_key maps to the camera parameter jsonKey
-        QString jsonKey = QString::fromStdString(sp.json_key());
-        if (boundId == kScopeCamera && jsonKey.isEmpty()) {
-          if (!params.empty() && params.front()) {
-            jsonKey = params.front()->jsonKey();
-          }
-        }
-        ZParameter* target = nullptr;
-        for (auto* p : params) {
-          if (p && p->jsonKey() == jsonKey) {
-            target = p;
-            break;
-          }
-        }
-        if (!target) {
-          return false;
-        }
-        // Prefer normalized value from validation when available
-        json::value v = pbToJson(sp.value());
-        // Apply with normalization for composite types
-        json::object j;
-        if (auto tp = dynamic_cast<const Z3DTransformParameter*>(target)) {
-          if (v.is_object()) {
-            const auto& obj = v.as_object();
-            json::object out;
-            auto mapField = [&](const char* key1, const char* key2) {
-              if (auto it = obj.if_contains(key1)) {
-                out[key2] = *it;
-              } else if (auto it2 = obj.if_contains(key2)) {
-                out[key2] = *it2;
-              }
-            };
-            mapField("Scale", "Scale Vec3");
-            mapField("Translation", "Translation Vec3");
-            mapField("Rotation", "Rotation Vec4");
-            // Canonical center key is "Rotation Center Vec3"; accept synonyms
-            mapField("Rotation Center", "Rotation Center Vec3");
-            mapField("Center", "Rotation Center Vec3");
-            mapField("Center Vec3", "Rotation Center Vec3");
-            j[sp.json_key()] = out;
-          } else {
-            j[sp.json_key()] = v;
-          }
-        } else {
-          j[sp.json_key()] = v;
-        }
-        try {
-          target->read(j);
-        }
-        catch (const std::exception& e) {
-          applyErr = std::string("apply_scene_params: exception while reading json_key=") + sp.json_key() + " (" +
-                     target->type().toStdString() + "): " + e.what();
-          LOG(WARNING) << applyErr;
-          return false;
-        }
-        catch (...) {
-          applyErr = std::string("apply_scene_params: unknown exception while reading json_key=") + sp.json_key() +
-                     " (" + target->type().toStdString() + ")";
-          LOG(WARNING) << applyErr;
-          return false;
-        }
-      }
-      return true;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, applyErr.empty() ? "apply_scene_params failed" : applyErr);
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, setParams = std::move(setParams)]() {
+        return disp->applySceneParams(setParams);
+      },
+      "apply_scene_params");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "apply_scene_params failed" : r.error);
     }
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status EngineReady(ServerContext*, const Empty*, Bool* reply) override
+  Status EngineReady(ServerContext* grpcContext, const Empty*, Bool* reply) override
   {
-    // Wait up to ~5 seconds for engine to become ready
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      reply->set_ok(false);
+      return Status::OK;
+    }
+
+    // Wait up to ~5 seconds for engine to become ready.
     for (int i = 0; i < 100; ++i) {
-      if (m_owner.engine()) {
+      auto inv = invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp]() {
+          return disp->engineReady();
+        },
+        "engine_ready");
+
+      if (!inv.ok) {
+        reply->set_ok(false);
+        return Status::OK;
+      }
+      if (inv.value) {
         reply->set_ok(true);
         return Status::OK;
       }
+
       QThread::msleep(50);
     }
+
     reply->set_ok(false);
     return Status::OK;
   }
 
-  Status Ensure3DWindow(ServerContext*, const Empty*, Bool* reply) override
+  Status Ensure3DWindow(ServerContext* grpcContext, const Empty*, Bool* reply) override
   {
-    auto ok = invokeOnUi([&]() -> bool {
-      // Find the main 2D window and ask it to open the 3D window/canvas.
-      ZMainWindow* mainWin = nullptr;
-      for (QWidget* w : QApplication::topLevelWidgets()) {
-        if (auto mw = qobject_cast<ZMainWindow*>(w)) {
-          mainWin = mw;
-          break;
-        }
-      }
-      if (!mainWin) {
-        LOG(WARNING) << "Ensure3DWindow: no ZMainWindow found";
-        return false;
-      }
-      if (!mainWin->get3DWindow()) {
-        // We are already executing on the UI thread (invokeOnUi). Open synchronously
-        // so clients can immediately poll EngineReady() without racing a queued call.
-        mainWin->ensure3DWindow();
-      }
-      // if (!mainWin->isVisible()) mainWin->show();
-      // mainWin->raise();
-      // mainWin->activateWindow();
-      return true;
-    });
-    reply->set_ok(ok);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ensure_3d_window: ui dispatcher not ready");
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp]() {
+        return disp->ensure3DWindow();
+      },
+      "ensure_3d_window");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "ensure_3d_window failed" : r.error);
+    }
+
+    reply->set_ok(true);
     return Status::OK;
   }
 
-  Status LoadFiles(ServerContext*, const FileList* request, ListObjectsResponse* reply) override
+  Status LoadFiles(ServerContext* grpcContext, const FileList* request, ListObjectsResponse* reply) override
   {
+    CHECK(request);
     LOG(INFO) << "RPC LoadFiles count=" << request->files_size();
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc()) {
-        return false;
-      }
-      QStringList qfiles;
-      for (const auto& s : request->files()) {
-        qfiles << QString::fromStdString(s);
-      }
-      m_owner.doc()->loadFileList(qfiles);
-      // If an animation already exists, rebind to include newly loaded objects
-      // so subsequent key writes/queries see the latest parameters.
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      for (auto animId : ids) {
-        if (auto* anim = ad.animationPtr(animId)) {
-          anim->rebindView();
-        }
-      }
-      return true;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
+
+    QStringList qfiles;
+    qfiles.reserve(request->files_size());
+    for (const auto& s : request->files()) {
+      qfiles << QString::fromStdString(s);
+    }
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "load_files: ui dispatcher not ready");
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, files = std::move(qfiles)]() {
+        return disp->loadFilesAndListObjects(files);
+      },
+      "load_files");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "load_files failed" : r.error);
+    }
+
+    for (const auto& obj : r.objects) {
+      ObjectInfo oi;
+      oi.set_id(obj.id);
+      oi.set_type(obj.type);
+      oi.set_name(obj.name);
+      oi.set_path(obj.path);
+      oi.set_visible(obj.visible);
+      *reply->add_objects() = std::move(oi);
     }
     LOG(INFO) << "RPC LoadFiles done";
-    return ListObjects(nullptr, nullptr, reply);
+    return Status::OK;
   }
 
-  Status ListObjects(ServerContext*, const Empty*, ListObjectsResponse* reply) override
+  Status ListObjects(ServerContext* grpcContext, const Empty*, ListObjectsResponse* reply) override
   {
     VLOG(1) << "RPC ListObjects";
-    auto objs = invokeOnUi([&]() {
-      std::vector<ObjectInfo> out;
-      if (!m_owner.doc()) {
-        return out;
-      }
-      for (auto id : m_owner.doc()->objs()) {
-        ObjectInfo oi;
-        oi.set_id(id);
-        auto* od = m_owner.doc()->idToDoc(id);
-        oi.set_type(od->typeName().toStdString());
-        oi.set_name(m_owner.doc()->objName(id).toStdString());
-        oi.set_path(od->objPath(id).toStdString());
-        oi.set_visible(m_owner.doc()->isObjVisible(id));
-        out.push_back(std::move(oi));
-      }
-      return out;
-    });
-    for (auto& oi : objs) {
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "list_objects: ui dispatcher not ready");
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp]() {
+        return disp->listObjects();
+      },
+      "list_objects");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "list_objects failed" : r.error);
+    }
+
+    for (const auto& obj : r.objects) {
+      ObjectInfo oi;
+      oi.set_id(obj.id);
+      oi.set_type(obj.type);
+      oi.set_name(obj.name);
+      oi.set_path(obj.path);
+      oi.set_visible(obj.visible);
       *reply->add_objects() = std::move(oi);
     }
     return Status::OK;
   }
 
-  Status BBox(ServerContext*, const BBoxRequest* req, BBoxResponse* reply) override
+  Status BBox(ServerContext* grpcContext, const BBoxRequest* req, BBoxResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    CHECK(req);
+
+    const bool afterClipping = req->after_clipping();
+    std::vector<size_t> ids;
+    ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      ids.push_back(static_cast<size_t>(v));
     }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
 
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      std::vector<size_t> ids;
-      ids.reserve(req->ids_size());
-      for (auto v : req->ids()) {
-        ids.push_back(static_cast<size_t>(v));
-      }
-      return filterVisualIds(m_owner, ids);
-    });
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox: ui dispatcher not ready");
+    }
 
-    const auto bb = invokeOnObjectThread(engine, [&]() {
-      return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
-    });
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, ids = std::move(ids), afterClipping]() {
+        return disp->bboxOfObjects(ids, afterClipping);
+      },
+      "bbox");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "bbox failed" : r.error);
+    }
+
     auto toVec = [](const glm::dvec3& v) {
       Vec3 r;
       r.set_x(v.x);
@@ -1195,1353 +788,883 @@ public:
       return r;
     };
     ::atlas::rpc::BBox* b = reply->mutable_bbox();
-    const auto& minC = bb.minCorner;
-    const auto& maxC = bb.maxCorner;
-    *b->mutable_min() = toVec(minC);
-    *b->mutable_max() = toVec(maxC);
-    *b->mutable_size() = toVec(maxC - minC);
-    *b->mutable_center() = toVec((maxC + minC) * 0.5);
+    *b->mutable_min() = toVec(r.minCorner);
+    *b->mutable_max() = toVec(r.maxCorner);
+    *b->mutable_size() = toVec(r.size);
+    *b->mutable_center() = toVec(r.center);
     return Status::OK;
   }
 
-  Status Capabilities(ServerContext*, const CapabilitiesRequest* req, CapabilitiesResponse* reply) override
+  Status Capabilities(ServerContext* grpcContext, const CapabilitiesRequest* req, CapabilitiesResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
+    CHECK(req);
+    CHECK(reply);
 
-    struct ObjTypeId
-    {
-      QString typeName;
-      size_t id = 0;
+    std::vector<uint64_t> ids;
+    ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      ids.push_back(static_cast<uint64_t>(v));
+    }
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "capabilities: ui dispatcher not ready");
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, ids = std::move(ids)]() {
+        return disp->capabilities(ids);
+      },
+      "capabilities");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& res = inv.value;
+    if (!res.ok) {
+      const grpc::StatusCode code = (res.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, res.error.empty() ? "capabilities failed" : res.error);
+    }
+
+    auto toProto = [&](const Z3DViewSettingParamOps::ParameterMeta& meta) {
+      Parameter p;
+      p.set_json_key(meta.jsonKey.toStdString());
+      p.set_name(meta.name.toStdString());
+      p.set_type(meta.type.toStdString());
+      if (!meta.description.isEmpty()) {
+        p.set_description(meta.description.toStdString());
+      }
+      p.set_supports_interpolation(meta.supportsInterpolation);
+      p.mutable_value_schema()->CopyFrom(jsonToPb(meta.valueSchema).struct_value());
+      return p;
     };
 
-    const std::vector<ObjTypeId> objTypeIds = invokeOnUi([&]() {
-      std::vector<ObjTypeId> out;
-      if (!m_owner.doc()) {
-        return out;
-      }
-      std::vector<size_t> ids;
-      if (req->ids_size() == 0) {
-        ids = m_owner.doc()->objs();
-      } else {
-        ids.reserve(req->ids_size());
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-      }
-      out.reserve(ids.size());
-      for (auto id : ids) {
-        if (auto* od = m_owner.doc()->idToDoc(id)) {
-          out.push_back(ObjTypeId{od->typeName(), id});
-        }
-      }
-      return out;
-    });
-
-    auto res = invokeOnObjectThread(engine, [&]() {
-      struct CapOut
-      {
-        std::vector<Parameter> cam, bg, ax, gl;
-        std::map<QString, std::vector<Parameter>> objs;
-      };
-      CapOut out;
-      auto collect = [&](size_t id, std::vector<Parameter>& dst) {
-        const auto params = engine->parametersOfViewSetting(id);
-        for (auto* p : params) {
-          Parameter meta;
-          meta.set_json_key(p->jsonKey().toStdString());
-          meta.set_name(p->name().toStdString());
-          meta.set_type(p->type().toStdString());
-          if (!p->description().isEmpty()) {
-            meta.set_description(p->description().toStdString());
-          }
-          meta.set_supports_interpolation(p->supportInterpolation());
-          // Enumerated options represented in value_schema via enum; no separate fields.
-          // Attach canonical value schema from parameter.
-          {
-            const json::object schema = p->valueSchema();
-            // Dev guard: ensure schema has a recognizable 'type' for easier diagnostics.
-            try {
-              auto it = schema.if_contains("type");
-              if (!it || !it->is_string()) {
-                LOG(WARNING) << "valueSchema missing/invalid 'type' for jsonKey=" << p->jsonKey().toStdString()
-                             << ", type=" << p->type().toStdString();
-              }
-            }
-            catch (...) {
-            }
-            meta.mutable_value_schema()->CopyFrom(jsonToPb(schema).struct_value());
-          }
-          dst.push_back(std::move(meta));
-        }
-      };
-      // Include camera (id=0) to let clients discover its schema.
-      collect(0, out.cam);
-      collect(1, out.bg);
-      collect(2, out.ax);
-      collect(3, out.gl);
-
-      for (const auto& it : objTypeIds) {
-        std::vector<Parameter> pv;
-        collect(it.id, pv);
-        out.objs[it.typeName] = std::move(pv);
-      }
-      return out;
-    });
-    for (auto& p : res.cam) {
-      *reply->add_camera() = std::move(p);
+    for (const auto& meta : res.camera) {
+      *reply->add_camera() = toProto(meta);
     }
-    for (auto& p : res.bg) {
-      *reply->add_background() = std::move(p);
+    for (const auto& meta : res.background) {
+      *reply->add_background() = toProto(meta);
     }
-    for (auto& p : res.ax) {
-      *reply->add_axis() = std::move(p);
+    for (const auto& meta : res.axis) {
+      *reply->add_axis() = toProto(meta);
     }
-    for (auto& p : res.gl) {
-      *reply->add_global() = std::move(p);
+    for (const auto& meta : res.global) {
+      *reply->add_global() = toProto(meta);
     }
-    for (auto& [tn, pv] : res.objs) {
+    for (const auto& [tn, metas] : res.objects) {
       ParamList lst;
-      for (auto& p : pv) {
-        *lst.add_params() = std::move(p);
+      for (const auto& meta : metas) {
+        *lst.add_params() = toProto(meta);
       }
       (*reply->mutable_objects())[tn.toStdString()] = std::move(lst);
     }
     return Status::OK;
   }
 
-  Status MakeAlias(ServerContext*, const MakeAliasRequest* req, MakeAliasResponse* reply) override
+  Status MakeAlias(ServerContext* grpcContext, const MakeAliasRequest* req, MakeAliasResponse* reply) override
   {
-    if (!m_owner.doc()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
+    CHECK(req);
+    std::vector<uint64_t> srcIds;
+    srcIds.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      srcIds.push_back(v);
     }
-    bool hadInvalidId = false;
-    bool hadUnsupported = false;
-    auto pairs = invokeOnUi([&]() {
-      std::vector<std::pair<uint64_t, uint64_t>> out;
-      if (!m_owner.doc()) {
-        hadInvalidId = true;
-        return out;
-      }
-      for (auto srcId64 : req->ids()) {
-        const size_t srcId = static_cast<size_t>(srcId64);
-        ZObjDoc* od = m_owner.doc()->idToDoc(srcId);
-        if (!od) {
-          // System boundary: record invalid id and continue.
-          hadInvalidId = true;
-          continue;
-        }
-        const size_t aliasId = od->makeAlias(srcId);
-        if (aliasId == 0) {
-          // Type does not support aliasing or alias creation failed.
-          hadUnsupported = true;
-          continue;
-        }
-        out.emplace_back(srcId64, static_cast<uint64_t>(aliasId));
-      }
-      return out;
-    });
-    for (const auto& p : pairs) {
-      MakeAliasResult* r = reply->add_aliases();
-      r->set_src_id(p.first);
-      r->set_alias_id(p.second);
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      reply->set_ok(false);
+      reply->set_error("make_alias: ui dispatcher not ready");
+      return Status::OK;
     }
-    const bool ok = !pairs.empty() && !hadInvalidId && !hadUnsupported;
-    reply->set_ok(ok);
-    if (!ok) {
-      if (hadInvalidId) {
-        reply->set_error("one or more ids were not found in the current document");
-      } else if (hadUnsupported) {
-        reply->set_error("one or more ids do not support aliasing");
-      }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, srcIds = std::move(srcIds)]() {
+        return disp->makeAliases(srcIds);
+      },
+      "make_alias");
+    if (!inv.ok) {
+      reply->set_ok(false);
+      reply->set_error(inv.error);
+      return Status::OK;
+    }
+    const auto& r = inv.value;
+    for (const auto& p : r.aliases) {
+      MakeAliasResult* out = reply->add_aliases();
+      out->set_src_id(p.srcId);
+      out->set_alias_id(p.aliasId);
+    }
+
+    reply->set_ok(r.ok);
+    if (!r.error.empty()) {
+      reply->set_error(r.error);
     }
     return Status::OK;
   }
 
-  Status EnsureAnimation(ServerContext*, const EnsureAnimationRequest* req, EnsureAnimationResponse* reply) override
+  Status EnsureAnimation(ServerContext* grpcContext,
+                         const EnsureAnimationRequest* req,
+                         EnsureAnimationResponse* reply) override
   {
-    LOG(INFO) << "RPC EnsureAnimation create_new=" << req->create_new()
-              << (req->name().empty() ? "" : (" name=" + req->name()));
-    uint64_t animationId = 0;
-    bool created = false;
-    std::string errMsg;
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc()) {
-        errMsg = "doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
+    const bool createNew = req->create_new();
+    const std::string nameStr = req->name();
+    LOG(INFO) << "RPC EnsureAnimation create_new=" << createNew
+              << (nameStr.empty() ? "" : (" name=" + nameStr));
 
-      if (!req->create_new() && !ids.empty()) {
-        animationId = static_cast<uint64_t>(ids.front());
-        return true;
-      }
-
-      if (!hasVisualObjects(m_owner)) {
-        errMsg = "no visual objects loaded";
-        return false;
-      }
-
-      const QString rawName = QString::fromStdString(req->name()).trimmed();
-      const QString name = rawName.isEmpty() ? QStringLiteral("LLM Animation") : rawName;
-      animationId = static_cast<uint64_t>(ad.createNewAnimationAndReturnId(name));
-      created = true;
-      return animationId != 0;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, errMsg.empty() ? "ensure_animation failed" : errMsg);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
+
+    const QString name = QString::fromStdString(nameStr);
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, createNew, name]() {
+        return disp->ensureAnimation3D(createNew, name);
+      },
+      "ensure_animation");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "ensure_animation failed" : r.error);
+    }
+
     reply->set_ok(true);
-    reply->set_animation_id(animationId);
-    reply->set_created(created);
+    reply->set_animation_id(r.animationId);
+    reply->set_created(r.created);
     return Status::OK;
   }
 
-  Status SetDuration(ServerContext*, const SetDurationRequest* req, Bool* reply) override
+  Status SetDuration(ServerContext* grpcContext, const SetDurationRequest* req, Bool* reply) override
   {
-    LOG(INFO) << "RPC SetDuration duration=" << req->duration();
+    const double duration = req->duration();
+    LOG(INFO) << "RPC SetDuration duration=" << duration;
     const uint64_t animationId = req->animation_id();
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc()) {
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      if (auto* anim = ad.animationPtr(static_cast<size_t>(animationId))) {
-        anim->setDuration(req->duration());
-        return true;
-      }
-      return false;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id not found");
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, animationId, duration]() {
+        return disp->setAnimationDuration(animationId, duration);
+      },
+      "set_duration");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "set_duration failed" : r.error);
+    }
+
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status SetKey(ServerContext*, const SetKeyRequest* req, Bool* reply) override
+  Status SetKey(ServerContext* grpcContext, const SetKeyRequest* req, Bool* reply) override
   {
     const uint64_t animationId = req->animation_id();
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    LOG(INFO) << "RPC SetKey anim=" << animationId << " time=" << req->time() << " easing=" << req->easing()
-              << " target_id=" << req->target_id()
-              << (req->json_key().empty() ? "" : (" json_key=" + req->json_key()));
+    const double timeSec = req->time();
+    const std::string easingStr = req->easing();
+    const uint64_t targetId = req->target_id();
+    const std::string jsonKeyStr = req->json_key();
+    const json::value valueJson = pbToJson(req->value());
 
-    struct ParamMeta
-    {
-      bool found = false;
-      QString type;
-      bool supportsInterpolation = false;
-    };
+    LOG(INFO) << "RPC SetKey anim=" << animationId << " time=" << timeSec << " easing=" << easingStr
+              << " target_id=" << targetId
+              << (jsonKeyStr.empty() ? "" : (" json_key=" + jsonKeyStr));
 
-    std::string errMsg;
-    // Camera (id=0) does not require engine parameter lookup.
-    if (req->target_id() == kScopeCamera) {
-      auto ok = invokeOnUi([&]() -> bool {
-        if (!m_owner.doc() || !m_owner.engine()) {
-          errMsg = "engine/doc not ready";
-          return false;
-        }
-        auto& ad = m_owner.doc()->animation3DDoc();
-        auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-        if (!anim) {
-          errMsg = "animation_id not found";
-          return false;
-        }
-        anim->rebindView();
-        const double tm = req->time();
-        const QString easing = QString::fromStdString(req->easing());
-        json::value jv = pbToJson(req->value());
-        if (!jv.is_object()) {
-          errMsg = "camera value must be an object";
-          return false;
-        }
-        json::object keyObj;
-        keyObj["time"] = tm;
-        keyObj["type"] = easing.toStdString();
-        keyObj["value"] = jv.as_object();
-        auto ckey = std::make_unique<ZCameraParameterKey>();
-        if (!ckey->readValue(keyObj)) {
-          errMsg = "camera value incompatible with parameter";
-          return false;
-        }
-        anim->cameraParameterAnimation()->addKey(std::move(ckey));
-        return true;
-      });
-      if (!ok) {
-        return Status(grpc::StatusCode::FAILED_PRECONDITION, errMsg.empty() ? "set_key failed" : errMsg);
-      }
-      reply->set_ok(true);
-      return Status::OK;
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
 
-    // Non-camera: validate animation on the UI thread first (preserve existing error precedence).
-    auto preOk = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc() || !m_owner.engine()) {
-        errMsg = "engine/doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errMsg = "animation_id not found";
-        return false;
-      }
-      return true;
-    });
-    if (!preOk) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, errMsg.empty() ? "set_key failed" : errMsg);
+    ZRpcUiDispatcher::SetKeyRequest dr;
+    dr.animationId = animationId;
+    dr.targetId = targetId;
+    dr.jsonKey = QString::fromStdString(jsonKeyStr);
+    dr.timeSec = timeSec;
+    dr.easing = QString::fromStdString(easingStr);
+    dr.value = valueJson;
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->setAnimationKey(dr);
+      },
+      "set_key");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "set_key failed" : r.error);
     }
 
-    // Snapshot parameter metadata on the engine's thread.
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-    const size_t boundId = static_cast<size_t>(req->target_id());
-    const QString jsonKey = QString::fromStdString(req->json_key());
-
-    const ParamMeta meta = invokeOnObjectThread(engine, [&]() {
-      ParamMeta out;
-      const auto params = engine->parametersOfViewSetting(boundId);
-      for (auto* p : params) {
-        if (p && p->jsonKey() == jsonKey) {
-          out.found = true;
-          out.type = p->type();
-          out.supportsInterpolation = p->supportInterpolation();
-          break;
-        }
-      }
-      return out;
-    });
-
-    if (!meta.found) {
-      LOG(WARNING) << "SetKey(param): target parameter not found boundId=" << boundId
-                   << " jsonKey=" << jsonKey.toStdString();
-      return Status(grpc::StatusCode::FAILED_PRECONDITION,
-                    std::string("target parameter not found for json_key=") + jsonKey.toStdString());
-    }
-
-    const double tm = req->time();
-    const QString easing = QString::fromStdString(req->easing());
-    const json::value v = pbToJson(req->value());
-
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc() || !m_owner.engine()) {
-        errMsg = "engine/doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errMsg = "animation_id not found";
-        return false;
-      }
-      anim->rebindView();
-
-      // Ensure parameter animations exist for this object.
-      anim->addKeyFrame(0.0);
-
-      auto jsonTypeName = [](const json::value& j) -> std::string {
-        if (j.is_null()) {
-          return "null";
-        }
-        if (j.is_bool()) {
-          return "bool";
-        }
-        if (j.is_string()) {
-          return "string";
-        }
-        if (j.is_number()) {
-          return "number";
-        }
-        if (j.is_array()) {
-          return std::string("array[") + std::to_string(j.as_array().size()) + "]";
-        }
-        if (j.is_object()) {
-          return "object";
-        }
-        return "unknown";
-      };
-      auto expectArrayN = [&](size_t n) -> bool {
-        if (!v.is_array() || v.as_array().size() != n) {
-          errMsg = std::string("type mismatch for json_key=") + jsonKey.toStdString() + ": expected array[" +
-                   std::to_string(n) + "] got " + jsonTypeName(v);
-          return false;
-        }
-        for (const auto& el : v.as_array()) {
-          if (!el.is_number()) {
-            errMsg = std::string("type mismatch for json_key=") + jsonKey.toStdString() + ": expected number elements";
-            return false;
-          }
-        }
-        return true;
-      };
-
-      const QString tstr = meta.type;
-      if (tstr == "Bool") {
-        if (!v.is_bool()) {
-          errMsg = std::string("type mismatch for json_key=") + jsonKey.toStdString() + ": expected Bool got " +
-                   jsonTypeName(v);
-          return false;
-        }
-      } else if (tstr == "Float" || tstr == "Double" || tstr == "Int") {
-        if (!v.is_number()) {
-          errMsg = std::string("type mismatch for json_key=") + jsonKey.toStdString() + ": expected number got " +
-                   jsonTypeName(v);
-          return false;
-        }
-      } else if (tstr.endsWith("Vec4")) {
-        if (!expectArrayN(4)) {
-          return false;
-        }
-      } else if (tstr.endsWith("Vec3")) {
-        if (!expectArrayN(3)) {
-          return false;
-        }
-      } else if (tstr.endsWith("Option")) {
-        if (!v.is_string()) {
-          errMsg = std::string("type mismatch for json_key=") + jsonKey.toStdString() +
-                   ": expected option string got " + jsonTypeName(v);
-          return false;
-        }
-      }
-
-      // For non-interpolatable parameters, force "Switch" to avoid invalid easing selection.
-      const QString keyType = meta.supportsInterpolation ? easing : QStringLiteral("Switch");
-      json::object keyObj;
-      keyObj["time"] = tm;
-      keyObj["type"] = keyType.toStdString();
-      keyObj["value"] = v;
-      auto key = std::make_unique<ZParameterKey>(meta.type);
-      if (!key->readValue(keyObj)) {
-        errMsg = "value incompatible with parameter schema";
-        return false;
-      }
-
-      // Locate the object's unique id from display packs, then access its parameter animations.
-      size_t uniqueId = 0;
-      for (const auto& pack : anim->displayPacks()) {
-        if (pack.type == ZAnimationDisplayPack::Type::Object && pack.boundId == boundId) {
-          uniqueId = pack.id;
-          break;
-        }
-      }
-      if (uniqueId == 0) {
-        LOG(WARNING) << "SetKey(param): object pack not found for boundId=" << boundId;
-        errMsg = "object pack not found for boundId";
-        return false;
-      }
-
-      const auto& pas = anim->paraAnimationList(uniqueId);
-      for (const auto& paPtr : pas) {
-        if (!paPtr) {
-          continue;
-        }
-        auto* pa = paPtr.get();
-        if (pa->jsonKey() == jsonKey && pa->type() == meta.type) {
-          pa->addKey(std::move(key));
-          return true;
-        }
-      }
-      LOG(WARNING) << "SetKey(param): failed to locate paraAnimation for boundId=" << boundId
-                   << " jsonKey=" << jsonKey.toStdString();
-      errMsg = "failed to locate parameter animation for json_key";
-      return false;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, errMsg.empty() ? "set_key failed" : errMsg);
-    }
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status CameraGet(ServerContext*, const google::protobuf::Empty*, CameraKeysResponse* reply) override
+  Status CameraGet(ServerContext* grpcContext, const google::protobuf::Empty*, CameraKeysResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_get: ui dispatcher not ready");
     }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-    *reply->add_values() = jsonToPb(snapshotEngineCameraJson(engine));
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp]() {
+        return disp->cameraGet();
+      },
+      "camera_get");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_get failed" : r.error);
+    }
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
+    }
     return Status::OK;
   }
 
-  Status CameraFit(ServerContext*, const CameraFitRequest* req, CameraKeysResponse* reply) override
+  Status CameraFit(ServerContext* grpcContext, const CameraFitRequest* req, CameraKeysResponse* reply) override
   {
-    VLOG(1) << "RPC CameraFit all=" << req->all() << " ids=" << req->ids_size();
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    // Gather and filter ids on the UI thread (doc lives there).
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      std::vector<size_t> ids;
-      if (req->all() || req->ids_size() == 0) {
-        if (m_owner.doc()) {
-          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
-        }
-      } else {
-        ids.reserve(req->ids_size());
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-        ids = filterVisualIds(m_owner, ids);
-      }
-      return ids;
-    });
-
-    // Snapshot engine-side data on the rendering thread.
-    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, req->after_clipping());
-    ZBBox<glm::dvec3> bb = snap.bbox;
-    if (bb.empty()) {
-      return Status::OK;
+    CHECK(req);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_fit: ui dispatcher not ready");
     }
 
-    // Apply min radius by expanding bbox if requested.
-    if (req->min_radius() > 0.0) {
-      const auto cent = (bb.minCorner + bb.maxCorner) * 0.5;
-      const double r = req->min_radius();
-      bb.expand(ZBBox<glm::dvec3>{cent - glm::dvec3(r), cent + glm::dvec3(r)});
+    ZRpcUiDispatcher::CameraFitRequest dr;
+    dr.all = req->all();
+    dr.afterClipping = req->after_clipping();
+    dr.minRadius = req->min_radius();
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    CHECK(snap.cameraJson.is_object());
-    Z3DCameraParameter camTmp("Camera");
-    camTmp.readValue(snap.cameraJson);
-    camTmp.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cameraFit(dr);
+      },
+      "camera_fit");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_fit failed" : r.error);
+    }
 
-    *reply->add_values() = jsonToPb(camTmp.jsonValue());
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
+    }
     return Status::OK;
   }
 
-  Status CameraOrbitSuggest(ServerContext*, const CameraOrbitSuggestRequest* req, CameraKeysResponse* reply) override
+  Status CameraOrbitSuggest(ServerContext* grpcContext,
+                            const CameraOrbitSuggestRequest* req,
+                            CameraKeysResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      std::vector<size_t> ids;
-      if (req->ids_size() == 0) {
-        if (m_owner.doc()) {
-          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
-        }
-      } else {
-        ids.reserve(req->ids_size());
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-        ids = filterVisualIds(m_owner, ids);
-      }
-      return ids;
-    });
-
-    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false);
-    const ZBBox<glm::dvec3> bb = snap.bbox;
-    if (bb.empty()) {
-      return Status::OK;
+    CHECK(req);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_orbit_suggest: ui dispatcher not ready");
     }
 
-    const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
-    const double angle = (req->degrees() == 0.0 ? 360.0 : req->degrees());
-    // Axis
-    glm::vec3 axis(0.f, 1.f, 0.f);
-    const auto ax = QString::fromStdString(req->axis()).toLower();
-    if (ax == "x") {
-      axis = glm::vec3(1.f, 0.f, 0.f);
-    } else if (ax == "y") {
-      axis = glm::vec3(0.f, 1.f, 0.f);
-    } else if (ax == "z") {
-      axis = glm::vec3(0.f, 0.f, 1.f);
+    ZRpcUiDispatcher::CameraOrbitSuggestRequest dr;
+    dr.axis = req->axis();
+    dr.degrees = req->degrees();
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    CHECK(snap.cameraJson.is_object());
-    // Start: fit to bbox preserving view vector, using a temp camera seeded with the engine camera.
-    Z3DCameraParameter startCam("Camera");
-    startCam.readValue(snap.cameraJson);
-    startCam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
-    // End: rotate around center on the selected axis.
-    Z3DCameraParameter endCam("Camera");
-    endCam.setValueSameAs(startCam);
-    // Z3DCamera expects radians for rotation angles.
-    endCam.rotate(glm::radians(static_cast<float>(angle)), axis, center);
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cameraOrbitSuggest(dr);
+      },
+      "camera_orbit_suggest");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_orbit_suggest failed" : r.error);
+    }
 
-    *reply->add_values() = jsonToPb(startCam.jsonValue());
-    *reply->add_values() = jsonToPb(endCam.jsonValue());
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
+    }
     return Status::OK;
   }
 
-  Status CameraDollySuggest(ServerContext*, const CameraDollySuggestRequest* req, CameraKeysResponse* reply) override
+  Status CameraDollySuggest(ServerContext* grpcContext,
+                            const CameraDollySuggestRequest* req,
+                            CameraKeysResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      std::vector<size_t> ids;
-      if (req->ids_size() == 0) {
-        if (m_owner.doc()) {
-          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
-        }
-      } else {
-        ids.reserve(req->ids_size());
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-        ids = filterVisualIds(m_owner, ids);
-      }
-      return ids;
-    });
-
-    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false);
-    const ZBBox<glm::dvec3> bb = snap.bbox;
-    if (bb.empty()) {
-      return Status::OK;
-    }
-    const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
-
-    CHECK(snap.cameraJson.is_object());
-    Z3DCameraParameter startCam("Camera");
-    startCam.readValue(snap.cameraJson);
-    startCam.setCenter(center);
-    if (req->start_dist() > 0.0) {
-      startCam.dollyToCenterDistance(static_cast<float>(req->start_dist()));
+    CHECK(req);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_dolly_suggest: ui dispatcher not ready");
     }
 
-    Z3DCameraParameter endCam("Camera");
-    endCam.setValueSameAs(startCam);
-    if (req->end_dist() > 0.0) {
-      endCam.dollyToCenterDistance(static_cast<float>(req->end_dist()));
+    ZRpcUiDispatcher::CameraDollySuggestRequest dr;
+    dr.startDist = req->start_dist();
+    dr.endDist = req->end_dist();
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    *reply->add_values() = jsonToPb(startCam.jsonValue());
-    *reply->add_values() = jsonToPb(endCam.jsonValue());
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cameraDollySuggest(dr);
+      },
+      "camera_dolly_suggest");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_dolly_suggest failed" : r.error);
+    }
+
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
+    }
     return Status::OK;
   }
 
-  Status CameraFocus(ServerContext*, const CameraFocusRequest* req, CameraKeysResponse* reply) override
+  Status CameraFocus(ServerContext* grpcContext, const CameraFocusRequest* req, CameraKeysResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      std::vector<size_t> ids;
-      ids.reserve(req->ids_size());
-      for (auto v : req->ids()) {
-        ids.push_back(static_cast<size_t>(v));
-      }
-      return filterVisualIds(m_owner, ids);
-    });
-
-    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, req->after_clipping());
-    ZBBox<glm::dvec3> bb = snap.bbox;
-    if (bb.empty()) {
-      return Status::OK;
+    CHECK(req);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_focus: ui dispatcher not ready");
     }
 
-    if (req->min_radius() > 0.0) {
-      const auto cent = (bb.minCorner + bb.maxCorner) * 0.5;
-      bb.expand(ZBBox<glm::dvec3>{cent - glm::dvec3(req->min_radius()), cent + glm::dvec3(req->min_radius())});
+    ZRpcUiDispatcher::CameraFocusRequest dr;
+    dr.afterClipping = req->after_clipping();
+    dr.minRadius = req->min_radius();
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    CHECK(snap.cameraJson.is_object());
-    Z3DCameraParameter cam("Camera");
-    cam.readValue(snap.cameraJson);
-    cam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cameraFocus(dr);
+      },
+      "camera_focus");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_focus failed" : r.error);
+    }
 
-    *reply->add_values() = jsonToPb(cam.jsonValue());
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
+    }
     return Status::OK;
   }
 
-  Status CameraPointTo(ServerContext*, const CameraPointToRequest* req, CameraKeysResponse* reply) override
+  Status CameraPointTo(ServerContext* grpcContext,
+                       const CameraPointToRequest* req,
+                       CameraKeysResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      std::vector<size_t> ids;
-      ids.reserve(req->ids_size());
-      for (auto v : req->ids()) {
-        ids.push_back(static_cast<size_t>(v));
-      }
-      return filterVisualIds(m_owner, ids);
-    });
-
-    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, req->after_clipping());
-    const ZBBox<glm::dvec3> bb = snap.bbox;
-    if (bb.empty()) {
-      return Status::OK;
+    CHECK(req);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_point_to: ui dispatcher not ready");
     }
 
-    CHECK(snap.cameraJson.is_object());
-    Z3DCameraParameter cam("Camera");
-    cam.readValue(snap.cameraJson);
-    cam.setCenter(glm::vec3((bb.minCorner + bb.maxCorner) * 0.5));
+    ZRpcUiDispatcher::CameraPointToRequest dr;
+    dr.afterClipping = req->after_clipping();
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
+    }
 
-    *reply->add_values() = jsonToPb(cam.jsonValue());
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cameraPointTo(dr);
+      },
+      "camera_point_to");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_point_to failed" : r.error);
+    }
+
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
+    }
     return Status::OK;
   }
 
-  Status CameraRotate(ServerContext*, const CameraRotateRequest* req, CameraKeysResponse* reply) override
+  Status CameraRotate(ServerContext* grpcContext, const CameraRotateRequest* req, CameraKeysResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    const json::value baseJson = snapshotEngineCameraJson(engine);
-    CHECK(baseJson.is_object());
-
-    Z3DCameraParameter cam("Camera");
-    cam.readValue(baseJson);
-    if (req->has_base_value()) {
-      json::value jv = pbToJson(req->base_value());
-      if (jv.is_object()) {
-        cam.readValue(jv);
-      }
-    }
-    const auto op = QString::fromStdString(req->op()).toUpper();
-    const float angle = glm::radians(static_cast<float>(req->degrees()));
-    if (op == "AZIMUTH") {
-      cam.azimuth(angle);
-    } else if (op == "ELEVATION") {
-      cam.elevation(angle);
-    } else if (op == "ROLL") {
-      cam.roll(angle);
-    } else if (op == "YAW") {
-      cam.yaw(angle);
-    } else if (op == "PITCH") {
-      cam.pitch(angle);
-    } else if (op == "FLIP") {
-      cam.flipViewDirection();
+    CHECK(req);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_rotate: ui dispatcher not ready");
     }
 
-    *reply->add_values() = jsonToPb(cam.jsonValue());
-    return Status::OK;
-  }
-
-  Status CameraResetView(ServerContext*, const CameraResetViewRequest* req, CameraKeysResponse* reply) override
-  {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      // Determine bbox (ids → filtered; empty → all visual).
-      std::vector<size_t> ids;
-      ids.reserve(req->ids_size());
-      for (auto v : req->ids()) {
-        ids.push_back(static_cast<size_t>(v));
-      }
-      if (ids.empty()) {
-        if (m_owner.doc()) {
-          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
-        }
-      } else {
-        ids = filterVisualIds(m_owner, ids);
-      }
-      return ids;
-    });
-
-    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, req->after_clipping());
-    ZBBox<glm::dvec3> bb = snap.bbox;
-    if (bb.empty()) {
-      return Status::OK;
-    }
-    if (req->min_radius() > 0.0 && (req->mode() == std::string("XY") || req->mode() == std::string("RESET"))) {
-      const auto cent = (bb.minCorner + bb.maxCorner) * 0.5;
-      bb.expand(ZBBox<glm::dvec3>(cent - glm::dvec3(req->min_radius()), cent + glm::dvec3(req->min_radius())));
-    }
-
-    CHECK(snap.cameraJson.is_object());
-    Z3DCameraParameter cam("Camera");
-    cam.readValue(snap.cameraJson);
-    const auto mode = QString::fromStdString(req->mode()).toUpper();
-    if (mode == "XY" || mode == "RESET" || mode.isEmpty()) {
-      cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
-    } else if (mode == "XZ") {
-      cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
-      cam.rotate90X();
-    } else if (mode == "YZ") {
-      cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
-      cam.rotate90XZ();
-    } else {
-      cam.resetCamera(bb, Z3DCamera::ResetOption::ResetAll);
-    }
-
-    *reply->add_values() = jsonToPb(cam.jsonValue());
-    return Status::OK;
-  }
-
-  Status CameraMoveLocal(ServerContext*, const CameraMoveLocalRequest* req, CameraKeysResponse* reply) override
-  {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    const QString op = QString::fromStdString(req->op()).toUpper().trimmed();
-    if (op.isEmpty()) {
-      return Status(grpc::StatusCode::INVALID_ARGUMENT, "op is required");
-    }
-    if (!(op == "FORWARD" || op == "BACK" || op == "RIGHT" || op == "LEFT" || op == "UP" || op == "DOWN")) {
-      return Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid op (expected FORWARD|BACK|RIGHT|LEFT|UP|DOWN)");
-    }
-    if (!std::isfinite(req->distance())) {
-      return Status(grpc::StatusCode::INVALID_ARGUMENT, "distance must be finite");
-    }
-
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    const json::value baseEngineCamera = snapshotEngineCameraJson(engine);
-    CHECK(baseEngineCamera.is_object());
-
-    // Base camera (current engine camera, optionally overridden by base_value).
-    Z3DCameraParameter cam("Camera");
-    cam.readValue(baseEngineCamera);
+    ZRpcUiDispatcher::CameraRotateRequest dr;
+    dr.op = req->op();
+    dr.degrees = req->degrees();
     if (req->has_base_value()) {
       json::value jv = pbToJson(req->base_value());
       if (!jv.is_object()) {
-        return Status(grpc::StatusCode::INVALID_ARGUMENT, "base_value must be an object");
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_rotate: base_value must be an object");
       }
-      cam.readValue(jv);
+      dr.baseValueOverride = std::move(jv);
     }
 
-    double distWorld = req->distance();
-    if (req->distance_is_fraction_of_bbox_radius()) {
-      // Determine bbox radius from ids (or all visual objects when ids is empty).
-      bool docReady = false;
-      const std::vector<size_t> ids = invokeOnUi([&]() {
-        std::vector<size_t> ids;
-        if (!m_owner.doc()) {
-          docReady = false;
-          return ids;
-        }
-        docReady = true;
-        ids.reserve(req->ids_size());
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-        if (ids.empty()) {
-          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
-        } else {
-          ids = filterVisualIds(m_owner, ids);
-        }
-        return ids;
-      });
-      if (!docReady) {
-        return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
-      }
-
-      const ZBBox<glm::dvec3> bb = invokeOnObjectThread(engine, [&]() {
-        return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
-      });
-      if (bb.empty()) {
-        return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
-      }
-      const double r = bboxEnclosingSphereRadius(bb);
-      if (!(r > 0.0)) {
-        return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox radius is zero");
-      }
-      distWorld = distWorld * r;
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cameraRotate(dr);
+      },
+      "camera_rotate");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_rotate failed" : r.error);
     }
 
-    glm::vec3 dir(0.f, 0.f, 0.f);
-    if (op == "FORWARD") {
-      dir = cam.get().viewVector();
-    } else if (op == "BACK") {
-      dir = -cam.get().viewVector();
-    } else if (op == "RIGHT") {
-      dir = cam.get().strafeVector();
-    } else if (op == "LEFT") {
-      dir = -cam.get().strafeVector();
-    } else if (op == "UP") {
-      dir = cam.get().upVector();
-    } else if (op == "DOWN") {
-      dir = -cam.get().upVector();
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
     }
-
-    const glm::vec3 delta = static_cast<float>(distWorld) * dir;
-    glm::vec3 eye = cam.get().eye();
-    glm::vec3 center = cam.get().center();
-    const glm::vec3 up = cam.get().upVector();
-    // move_center=true implements "fly": translate eye+center together.
-    // move_center=false implements "boom/dolly": translate eye only.
-    eye += delta;
-    if (req->move_center()) {
-      center += delta;
-    }
-    cam.setCamera(eye, center, up);
-
-    *reply->add_values() = jsonToPb(cam.jsonValue());
     return Status::OK;
   }
 
-  Status CameraLookAt(ServerContext*, const CameraLookAtRequest* req, CameraKeysResponse* reply) override
+  Status CameraResetView(ServerContext* grpcContext,
+                         const CameraResetViewRequest* req,
+                         CameraKeysResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    CHECK(req);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_reset_view: ui dispatcher not ready");
     }
-    if (req->target_case() == CameraLookAtRequest::TARGET_NOT_SET) {
-      return Status(grpc::StatusCode::INVALID_ARGUMENT, "target is required");
+
+    ZRpcUiDispatcher::CameraResetViewRequest dr;
+    dr.mode = req->mode();
+    dr.afterClipping = req->after_clipping();
+    dr.minRadius = req->min_radius();
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cameraResetView(dr);
+      },
+      "camera_reset_view");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_reset_view failed" : r.error);
+    }
 
-    const json::value baseEngineCamera = snapshotEngineCameraJson(engine);
-    CHECK(baseEngineCamera.is_object());
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
+    }
+    return Status::OK;
+  }
 
-    // Base camera
-    Z3DCameraParameter cam("Camera");
-    cam.readValue(baseEngineCamera);
+  Status CameraMoveLocal(ServerContext* grpcContext,
+                         const CameraMoveLocalRequest* req,
+                         CameraKeysResponse* reply) override
+  {
+    CHECK(req);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_move_local: ui dispatcher not ready");
+    }
+
+    ZRpcUiDispatcher::CameraMoveLocalRequest dr;
+    dr.op = req->op();
+    dr.distance = req->distance();
+    dr.distanceIsFractionOfBBoxRadius = req->distance_is_fraction_of_bbox_radius();
+    dr.afterClipping = req->after_clipping();
+    dr.moveCenter = req->move_center();
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
+    }
     if (req->has_base_value()) {
       json::value jv = pbToJson(req->base_value());
       if (!jv.is_object()) {
-        return Status(grpc::StatusCode::INVALID_ARGUMENT, "base_value must be an object");
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_move_local: base_value must be an object");
       }
-      cam.readValue(jv);
+      dr.baseValueOverride = std::move(jv);
     }
 
-    auto bboxForReq = [&]() -> std::optional<ZBBox<glm::dvec3>> {
-      bool docReady = false;
-      const std::vector<size_t> ids = invokeOnUi([&]() {
-        std::vector<size_t> ids;
-        if (!m_owner.doc()) {
-          docReady = false;
-          return ids;
-        }
-        docReady = true;
-        ids.reserve(req->ids_size());
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-        if (ids.empty()) {
-          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
-        } else {
-          ids = filterVisualIds(m_owner, ids);
-        }
-        return ids;
-      });
-      if (!docReady) {
-        return std::nullopt;
-      }
-      ZBBox<glm::dvec3> bb = invokeOnObjectThread(engine, [&]() {
-        return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
-      });
-      return bb;
-    };
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cameraMoveLocal(dr);
+      },
+      "camera_move_local");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_move_local failed" : r.error);
+    }
 
-    glm::vec3 target(0.f, 0.f, 0.f);
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
+    }
+    return Status::OK;
+  }
+
+  Status CameraLookAt(ServerContext* grpcContext,
+                      const CameraLookAtRequest* req,
+                      CameraKeysResponse* reply) override
+  {
+    CHECK(req);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_look_at: ui dispatcher not ready");
+    }
+
+    ZRpcUiDispatcher::CameraLookAtRequest dr;
+    dr.afterClipping = req->after_clipping();
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
+    }
+    if (req->has_base_value()) {
+      json::value jv = pbToJson(req->base_value());
+      if (!jv.is_object()) {
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_look_at: base_value must be an object");
+      }
+      dr.baseValueOverride = std::move(jv);
+    }
+
     switch (req->target_case()) {
       case CameraLookAtRequest::kWorldPoint: {
+        dr.target = ZRpcUiDispatcher::CameraLookAtRequest::Target::WorldPoint;
         const auto& p = req->world_point();
-        target = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+        dr.worldPoint =
+          glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
         break;
       }
       case CameraLookAtRequest::kTargetBboxCenter: {
-        auto bbOpt = bboxForReq();
-        if (!bbOpt.has_value()) {
-          return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
-        }
-        const auto& bb = *bbOpt;
-        if (bb.empty()) {
-          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
-        }
-        const glm::dvec3 c = (bb.minCorner + bb.maxCorner) * 0.5;
-        target = glm::vec3(static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z));
+        dr.target = ZRpcUiDispatcher::CameraLookAtRequest::Target::TargetBBoxCenter;
         break;
       }
       case CameraLookAtRequest::kBboxFractionPoint: {
-        auto bbOpt = bboxForReq();
-        if (!bbOpt.has_value()) {
-          return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
-        }
-        const auto& bb = *bbOpt;
-        if (bb.empty()) {
-          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
-        }
+        dr.target = ZRpcUiDispatcher::CameraLookAtRequest::Target::BBoxFractionPoint;
         const auto& f = req->bbox_fraction_point();
-        const auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
-        const double fx = clamp01(f.x());
-        const double fy = clamp01(f.y());
-        const double fz = clamp01(f.z());
-        const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
-        const glm::dvec3 p = bb.minCorner + glm::dvec3(fx * sz.x, fy * sz.y, fz * sz.z);
-        target = glm::vec3(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
+        dr.bboxFractionPoint = glm::dvec3(f.x(), f.y(), f.z());
         break;
       }
       default: {
-        return Status(grpc::StatusCode::INVALID_ARGUMENT, "unsupported target");
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_look_at: target is required");
       }
     }
 
-    // Aim: keep eye and up vector; set center to target.
-    cam.setCamera(cam.get().eye(), target, cam.get().upVector());
-    *reply->add_values() = jsonToPb(cam.jsonValue());
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cameraLookAt(dr);
+      },
+      "camera_look_at");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_look_at failed" : r.error);
+    }
+
+    for (const auto& v : r.values) {
+      *reply->add_values() = jsonToPb(v);
+    }
     return Status::OK;
   }
 
-  Status CameraPathSolve(ServerContext*, const CameraPathSolveRequest* req, CameraSolveResponse* reply) override
+  Status CameraPathSolve(ServerContext* grpcContext,
+                         const CameraPathSolveRequest* req,
+                         CameraSolveResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    if (req->waypoints_size() == 0) {
-      return Status(grpc::StatusCode::INVALID_ARGUMENT, "waypoints must be non-empty");
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
 
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    const json::value baseEngineCamera = snapshotEngineCameraJson(engine);
-    CHECK(baseEngineCamera.is_object());
-
-    // Base camera for defaults (projection/fov/up); can be overridden.
-    Z3DCameraParameter base("Camera");
-    base.readValue(baseEngineCamera);
+    ZRpcUiDispatcher::CameraPathSolveRequest dr;
+    dr.afterClipping = req->after_clipping();
+    dr.ids.reserve(req->ids_size());
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
+    }
     if (req->has_base_value()) {
       json::value jv = pbToJson(req->base_value());
       if (!jv.is_object()) {
         return Status(grpc::StatusCode::INVALID_ARGUMENT, "base_value must be an object");
       }
-      base.readValue(jv);
+      dr.baseValueOverride = std::move(jv);
     }
 
-    const auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
-    auto fracToWorld = [&](const ZBBox<glm::dvec3>& bb, const Vec3& f) -> glm::vec3 {
-      const double fx = clamp01(f.x());
-      const double fy = clamp01(f.y());
-      const double fz = clamp01(f.z());
-      const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
-      const glm::dvec3 p = bb.minCorner + glm::dvec3(fx * sz.x, fy * sz.y, fz * sz.z);
-      return glm::vec3(static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.z));
-    };
-
-    // Determine whether bbox is needed (fractions or bbox-center look-at).
-    bool needBBox = false;
+    dr.waypoints.reserve(static_cast<size_t>(req->waypoints_size()));
     for (int i = 0; i < req->waypoints_size(); ++i) {
       const auto& w = req->waypoints(i);
-      if (w.eye_case() == CameraWaypoint::kBboxFractionEye || w.look_at_case() == CameraWaypoint::kLookAtBboxCenter ||
-          w.look_at_case() == CameraWaypoint::kBboxFractionLookAt) {
-        needBBox = true;
-        break;
+      Z3DCameraPlannerPathWaypoint wp;
+      wp.time = w.time();
+      wp.index = i;
+      switch (w.eye_case()) {
+        case CameraWaypoint::kWorldEye: {
+          wp.eyeMode = Z3DCameraPlannerPathWaypoint::EyeMode::World;
+          const auto& p = w.world_eye();
+          wp.eyeWorld = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+          break;
+        }
+        case CameraWaypoint::kBboxFractionEye: {
+          wp.eyeMode = Z3DCameraPlannerPathWaypoint::EyeMode::BBoxFraction;
+          const auto& f = w.bbox_fraction_eye();
+          wp.eyeBBoxFraction = glm::dvec3(f.x(), f.y(), f.z());
+          break;
+        }
+        default: {
+          wp.eyeMode = Z3DCameraPlannerPathWaypoint::EyeMode::Keep;
+          break;
+        }
       }
+
+      switch (w.look_at_case()) {
+        case CameraWaypoint::kWorldLookAt: {
+          wp.lookAtMode = Z3DCameraPlannerPathWaypoint::LookAtMode::World;
+          const auto& p = w.world_look_at();
+          wp.lookAtWorld =
+            glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+          break;
+        }
+        case CameraWaypoint::kLookAtBboxCenter: {
+          wp.lookAtMode = Z3DCameraPlannerPathWaypoint::LookAtMode::BBoxCenter;
+          break;
+        }
+        case CameraWaypoint::kBboxFractionLookAt: {
+          wp.lookAtMode = Z3DCameraPlannerPathWaypoint::LookAtMode::BBoxFraction;
+          const auto& f = w.bbox_fraction_look_at();
+          wp.lookAtBBoxFraction = glm::dvec3(f.x(), f.y(), f.z());
+          break;
+        }
+        default: {
+          wp.lookAtMode = Z3DCameraPlannerPathWaypoint::LookAtMode::KeepPrevDirection;
+          break;
+        }
+      }
+      dr.waypoints.push_back(std::move(wp));
     }
 
-    ZBBox<glm::dvec3> bb;
-    if (needBBox) {
-      bool docReady = false;
-      const std::vector<size_t> ids = invokeOnUi([&]() {
-        std::vector<size_t> ids;
-        if (!m_owner.doc()) {
-          docReady = false;
-          return ids;
-        }
-        docReady = true;
-        ids.reserve(req->ids_size());
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-        if (ids.empty()) {
-          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
-        } else {
-          ids = filterVisualIds(m_owner, ids);
-        }
-        return ids;
-      });
-      if (!docReady) {
-        return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
-      }
-      bb = invokeOnObjectThread(engine, [&]() {
-        return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
-      });
-      if (bb.empty()) {
-        return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
-      }
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [&]() {
+        return disp->cameraPathSolve(dr);
+      },
+      "camera_path_solve");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_path_solve failed" : r.error);
     }
 
-    struct WpRef
-    {
-      const CameraWaypoint* wp = nullptr;
-      double time = 0.0;
-      int index = 0;
-    };
-    std::vector<WpRef> wps;
-    wps.reserve(static_cast<size_t>(req->waypoints_size()));
-    for (int i = 0; i < req->waypoints_size(); ++i) {
-      wps.push_back(WpRef{&req->waypoints(i), req->waypoints(i).time(), i});
-    }
-    std::stable_sort(wps.begin(), wps.end(), [](const WpRef& a, const WpRef& b) { return a.time < b.time; });
-
-    std::vector<CameraSolveKey> keys;
-    keys.reserve(wps.size());
-
-    Z3DCameraParameter prev("Camera");
-    prev.setValueSameAs(base);
-    bool havePrev = false;
-
-    for (const auto& wr : wps) {
-      const auto* w = wr.wp;
-      if (!w) {
-        continue;
-      }
-      const double t = w->time();
-      if (!(t >= 0.0) || !std::isfinite(t)) {
-        return Status(grpc::StatusCode::INVALID_ARGUMENT, "waypoint time must be finite and >= 0");
-      }
-
-      glm::vec3 eye = havePrev ? prev.get().eye() : base.get().eye();
-      if (w->eye_case() == CameraWaypoint::kWorldEye) {
-        const auto& p = w->world_eye();
-        eye = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
-      } else if (w->eye_case() == CameraWaypoint::kBboxFractionEye) {
-        if (bb.empty()) {
-          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox required for bbox_fraction_eye");
-        }
-        eye = fracToWorld(bb, w->bbox_fraction_eye());
-      }
-
-      glm::vec3 center;
-      if (w->look_at_case() == CameraWaypoint::kWorldLookAt) {
-        const auto& p = w->world_look_at();
-        center = glm::vec3(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
-      } else if (w->look_at_case() == CameraWaypoint::kLookAtBboxCenter) {
-        if (bb.empty()) {
-          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox required for look_at_bbox_center");
-        }
-        const glm::dvec3 c = (bb.minCorner + bb.maxCorner) * 0.5;
-        center = glm::vec3(static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z));
-      } else if (w->look_at_case() == CameraWaypoint::kBboxFractionLookAt) {
-        if (bb.empty()) {
-          return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox required for bbox_fraction_look_at");
-        }
-        center = fracToWorld(bb, w->bbox_fraction_look_at());
-      } else {
-        // Default: keep previous view direction and center distance (first key uses base).
-        const glm::vec3 view = havePrev ? prev.get().viewVector() : base.get().viewVector();
-        const float dist = havePrev ? prev.get().centerDist() : base.get().centerDist();
-        center = eye + view * dist;
-      }
-
-      const glm::vec3 up = havePrev ? prev.get().upVector() : base.get().upVector();
-
-      Z3DCameraParameter cam("Camera");
-      cam.setValueSameAs(base);
-      cam.setCamera(eye, center, up);
-
-      CameraSolveKey k;
-      k.set_time(t);
-      *k.mutable_value() = jsonToPb(cam.jsonValue());
-      keys.push_back(std::move(k));
-
-      prev.setValueSameAs(cam);
-      havePrev = true;
-    }
-
-    for (auto& k : keys) {
-      *reply->add_keys() = std::move(k);
+    for (const auto& k : r.keys) {
+      CameraSolveKey out;
+      out.set_time(k.time);
+      *out.mutable_value() = jsonToPb(k.value);
+      *reply->add_keys() = std::move(out);
     }
     return Status::OK;
   }
 
-  Status FitCandidates(ServerContext*, const Empty*, FitCandidatesResponse* reply) override
+  Status FitCandidates(ServerContext* grpcContext, const Empty*, FitCandidatesResponse* reply) override
   {
-    auto ids = invokeOnUi([&]() {
-      std::vector<uint64_t> out;
-      if (!m_owner.doc()) {
-        return out;
-      }
-      auto filtered = filterVisualIds(m_owner, m_owner.doc()->objs());
-      out.reserve(filtered.size());
-      for (auto id : filtered) {
-        out.push_back(static_cast<uint64_t>(id));
-      }
-      return out;
-    });
-    for (auto id : ids) {
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "fit_candidates: ui dispatcher not ready");
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp]() {
+        return disp->fitCandidates();
+      },
+      "fit_candidates");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    for (auto id : inv.value) {
       reply->add_ids(id);
     }
     return Status::OK;
   }
 
-  Status CameraSolve(ServerContext*, const CameraSolveRequest* req, CameraSolveResponse* reply) override
+  Status CameraSolve(ServerContext* grpcContext, const CameraSolveRequest* req, CameraSolveResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-
-    // Collect and filter ids on the UI thread (doc lives there).
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      std::vector<size_t> ids;
-      ids.reserve(req->ids_size());
-      for (auto v : req->ids()) {
-        ids.push_back(static_cast<size_t>(v));
-      }
-      return filterVisualIds(m_owner, ids);
-    });
-
-    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false);
-    ZBBox<glm::dvec3> bb = snap.bbox;
-    const double margin = req->has_constraints() ? req->constraints().margin() : 0.0;
-    if (!bb.empty() && margin > 0.0) {
-      bb = expandedByMarginFraction(bb, margin);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
 
-    const auto mode = QString::fromStdString(req->mode()).toUpper();
-    const double t0 = req->t0();
-    const double t1 = req->t1();
-
-    CHECK(snap.cameraJson.is_object());
-    Z3DCameraParameter base("Camera");
-    base.readValue(snap.cameraJson);
-
-    std::vector<CameraSolveKey> keys;
-
-    if (mode == "FIT") {
-      if (bb.empty()) {
-        // Nothing to fit; leave keys empty so the RPC reports an empty solve.
-      } else {
-        Z3DCameraParameter cam("Camera");
-        cam.setValueSameAs(base);
-        cam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
-        CameraSolveKey k;
-        k.set_time(t0);
-        *k.mutable_value() = jsonToPb(cam.jsonValue());
-        keys.push_back(std::move(k));
-      }
-    } else if (mode == "STATIC") {
-      CameraSolveKey k;
-      k.set_time(t0);
-      *k.mutable_value() = jsonToPb(base.jsonValue());
-      keys.push_back(std::move(k));
-    } else if (mode == "ORBIT") {
-      if (bb.empty()) {
-        // No bbox; leave keys empty so the RPC reports an empty solve.
-      } else {
-        const auto params = req->params();
-        std::string axis = "y";
-        double angle = 360.0;
-        double maxStepDeg = 90.0;
-        auto itA = params.fields().find("axis");
-        if (itA != params.fields().end() && itA->second.kind_case() == google::protobuf::Value::kStringValue) {
-          axis = itA->second.string_value();
-        }
-        auto itAng = params.fields().find("degrees");
-        if (itAng != params.fields().end() && itAng->second.kind_case() == google::protobuf::Value::kNumberValue) {
-          angle = itAng->second.number_value();
-        }
-        auto itStep = params.fields().find("max_step_degrees");
-        if (itStep != params.fields().end() && itStep->second.kind_case() == google::protobuf::Value::kNumberValue) {
-          maxStepDeg = itStep->second.number_value();
-        }
-        if (!std::isfinite(maxStepDeg) || maxStepDeg <= 0.0) {
-          return Status(grpc::StatusCode::INVALID_ARGUMENT, "max_step_degrees must be a finite number > 0");
-        }
-        const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
-        glm::vec3 ax(0.f, 1.f, 0.f);
-        const auto axq = QString::fromStdString(axis).toLower();
-        if (axq == "x") {
-          ax = glm::vec3(1.f, 0.f, 0.f);
-        } else if (axq == "y") {
-          ax = glm::vec3(0.f, 1.f, 0.f);
-        } else if (axq == "z") {
-          ax = glm::vec3(0.f, 0.f, 1.f);
-        }
-        // Segment into <=max_step_degrees steps for stable interpolation and controllable key density.
-        // This also ensures a 360° orbit produces visible motion (because intermediate keys are emitted)
-        // even though the start/end camera poses match.
-        const double angDeg = angle;
-        const double aabs = std::abs(angDeg);
-        const double segD = std::ceil(aabs / maxStepDeg);
-        if (!std::isfinite(segD) || segD < 0.0 || segD > static_cast<double>(std::numeric_limits<int>::max())) {
-          return Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid orbit segmentation (check max_step_degrees/degrees)");
-        }
-        const int segments = std::max(1, static_cast<int>(segD));
-        const double stepDeg = angDeg / static_cast<double>(segments);
-        const double dt = (t1 - t0) / static_cast<double>(segments);
-
-        Z3DCameraParameter cam("Camera");
-        cam.setValueSameAs(base);
-        cam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
-        // Emit first key (start).
-        {
-          CameraSolveKey k;
-          k.set_time(t0);
-          *k.mutable_value() = jsonToPb(cam.jsonValue());
-          keys.push_back(std::move(k));
-        }
-        // Apply incremental rotations and emit intermediate keys.
-        for (int i = 1; i <= segments; ++i) {
-          cam.rotate(glm::radians(static_cast<float>(stepDeg)), ax, center);
-          CameraSolveKey k;
-          k.set_time(t0 + dt * static_cast<double>(i));
-          *k.mutable_value() = jsonToPb(cam.jsonValue());
-          keys.push_back(std::move(k));
-        }
-      }
-    } else if (mode == "DOLLY") {
-      if (bb.empty()) {
-        // No bbox; leave keys empty so the RPC reports an empty solve.
-      } else {
-        const auto params = req->params();
-        double start_dist = 0.0, end_dist = 0.0;
-        auto itS = params.fields().find("start_dist");
-        if (itS != params.fields().end() && itS->second.kind_case() == google::protobuf::Value::kNumberValue) {
-          start_dist = itS->second.number_value();
-        }
-        auto itE = params.fields().find("end_dist");
-        if (itE != params.fields().end() && itE->second.kind_case() == google::protobuf::Value::kNumberValue) {
-          end_dist = itE->second.number_value();
-        }
-        const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
-        Z3DCameraParameter cam0("Camera");
-        cam0.setValueSameAs(base);
-        cam0.setCenter(center);
-        if (start_dist > 0.0) {
-          cam0.dollyToCenterDistance(static_cast<float>(start_dist));
-        }
-        Z3DCameraParameter cam1("Camera");
-        cam1.setValueSameAs(cam0);
-        if (end_dist > 0.0) {
-          cam1.dollyToCenterDistance(static_cast<float>(end_dist));
-        }
-        CameraSolveKey k0;
-        k0.set_time(t0);
-        *k0.mutable_value() = jsonToPb(cam0.jsonValue());
-        keys.push_back(std::move(k0));
-        CameraSolveKey k1;
-        k1.set_time(t1);
-        *k1.mutable_value() = jsonToPb(cam1.jsonValue());
-        keys.push_back(std::move(k1));
-      }
+    ZRpcUiDispatcher::CameraSolveRequest dr;
+    dr.mode = req->mode();
+    dr.t0 = req->t0();
+    dr.t1 = req->t1();
+    dr.margin = req->has_constraints() ? req->constraints().margin() : 0.0;
+    dr.ids.reserve(req->ids_size());
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    for (auto& k : keys) {
-      *reply->add_keys() = std::move(k);
+    const auto params = req->params();
+    auto itA = params.fields().find("axis");
+    if (itA != params.fields().end() && itA->second.kind_case() == google::protobuf::Value::kStringValue) {
+      dr.orbitAxis = itA->second.string_value();
+    }
+    auto itAng = params.fields().find("degrees");
+    if (itAng != params.fields().end() && itAng->second.kind_case() == google::protobuf::Value::kNumberValue) {
+      dr.orbitDegrees = itAng->second.number_value();
+    }
+    auto itStep = params.fields().find("max_step_degrees");
+    if (itStep != params.fields().end() && itStep->second.kind_case() == google::protobuf::Value::kNumberValue) {
+      dr.orbitMaxStepDegrees = itStep->second.number_value();
+    }
+    auto itS = params.fields().find("start_dist");
+    if (itS != params.fields().end() && itS->second.kind_case() == google::protobuf::Value::kNumberValue) {
+      dr.dollyStartDist = itS->second.number_value();
+    }
+    auto itE = params.fields().find("end_dist");
+    if (itE != params.fields().end() && itE->second.kind_case() == google::protobuf::Value::kNumberValue) {
+      dr.dollyEndDist = itE->second.number_value();
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [&]() {
+        return disp->cameraSolve(dr);
+      },
+      "camera_solve");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_solve failed" : r.error);
+    }
+
+    for (const auto& k : r.keys) {
+      CameraSolveKey out;
+      out.set_time(k.time);
+      *out.mutable_value() = jsonToPb(k.value);
+      *reply->add_keys() = std::move(out);
     }
     if (reply->keys_size() == 0) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_solve failed or empty");
@@ -2549,642 +1672,354 @@ public:
     return Status::OK;
   }
 
-  Status CameraValidate(ServerContext*, const CameraValidateRequest* req, CameraValidateResponse* reply) override
+  Status CameraValidate(ServerContext* grpcContext,
+                        const CameraValidateRequest* req,
+                        CameraValidateResponse* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
-    if (req->times_size() == 0) {
-      return Status(grpc::StatusCode::INVALID_ARGUMENT, "times must be non-empty");
-    }
-    const uint64_t sampleAnimationId = req->animation_id();
-    if (req->values_size() < req->times_size() && sampleAnimationId == 0) {
-      return Status(grpc::StatusCode::INVALID_ARGUMENT,
-                    "animation_id is required when values are omitted (values_size < times_size)");
-    }
-    if (sampleAnimationId != 0) {
-      bool docReady = false;
-      const bool animExists = invokeOnUi([&]() -> bool {
-        if (!m_owner.doc()) {
-          docReady = false;
-          return false;
-        }
-        docReady = true;
-        auto& ad = m_owner.doc()->animation3DDoc();
-        return ad.animationPtr(static_cast<size_t>(sampleAnimationId)) != nullptr;
-      });
-      if (!docReady) {
-        return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
-      }
-      if (!animExists) {
-        return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id not found");
-      }
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-    const bool allowFov = req->has_policies() ? req->policies().adjust_fov() : false;
-    const bool allowDist = req->has_policies() ? req->policies().adjust_distance() : false;
-    const bool keepVisible = req->has_constraints() ? req->constraints().keep_visible() : true;
-    const double minCov = keepVisible
-                            ? (req->has_constraints()
-                                 ? (req->constraints().min_coverage() > 0.0 ? req->constraints().min_coverage() : 0.95)
-                                 : 0.95)
-                            : 0.0;
-    const double margin = req->has_constraints() ? req->constraints().margin() : 0.0;
-    // Collect targets on the UI thread (doc lives there).
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      // Default to all visual objects when ids is empty.
-      std::vector<size_t> ids;
-      ids.reserve(req->ids_size());
-      for (auto v : req->ids()) {
-        ids.push_back(static_cast<size_t>(v));
-      }
-      if (ids.empty()) {
-        if (m_owner.doc()) {
-          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
-        }
-      } else {
-        ids = filterVisualIds(m_owner, ids);
-      }
-      return ids;
-    });
-
-    // Snapshot engine-side data on the rendering thread.
-    EngineCameraAndBBoxSnapshot snap = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false);
-    ZBBox<glm::dvec3> bb = snap.bbox;
-    if (!bb.empty() && margin > 0.0) {
-      bb = expandedByMarginFraction(bb, margin);
-    }
-    const double R = bboxEnclosingSphereRadius(bb);
-
-    CHECK(snap.cameraJson.is_object());
-    Z3DCameraParameter base("Camera");
-    base.readValue(snap.cameraJson);
-
-    // Prepare times and values pairs. Be permissive:
-    // - If values are missing (size==0) but times are provided, sample values from the specified animation camera track.
-    // - If counts mismatch, pair up to times.size(); fill missing values by sampling, and ignore extras.
-    std::vector<double> times;
-    times.reserve(req->times_size());
-    for (int i = 0; i < req->times_size(); ++i) {
-      times.push_back(req->times(i));
+    if (!req) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "request missing");
     }
 
-    std::vector<json::value> values;
-    values.reserve(static_cast<size_t>(std::max(req->values_size(), req->times_size())));
-    for (int i = 0; i < req->values_size(); ++i) {
-      values.push_back(pbToJson(req->values(i)));
+    ZRpcUiDispatcher::CameraValidateRequest dr;
+    dr.afterClipping = false;
+
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    const size_t provided = values.size();
-    if (provided < times.size()) {
-      const auto sampled = invokeOnUi([&]() {
-        std::vector<json::value> out;
-        out.reserve(times.size() - provided);
-
-        // Default to the current engine camera when no animation/doc is available.
-        if (!m_owner.doc()) {
-          for (size_t i = provided; i < times.size(); ++i) {
-            out.push_back(snap.cameraJson);
-          }
-          return out;
-        }
-
-        auto& ad = m_owner.doc()->animation3DDoc();
-        const size_t animId = static_cast<size_t>(sampleAnimationId);
-        auto* anim = ad.animationPtr(animId);
-        if (!anim) {
-          LOG(WARNING) << "CameraValidate: animation_id=" << animId << " not found while sampling";
-          for (size_t i = provided; i < times.size(); ++i) {
-            out.push_back(snap.cameraJson);
-          }
-          return out;
-        }
-
-        ZCameraParameterAnimation* cpa = anim->cameraParameterAnimation();
-        if (!cpa) {
-          for (size_t i = provided; i < times.size(); ++i) {
-            out.push_back(snap.cameraJson);
-          }
-          return out;
-        }
-
-        for (size_t i = provided; i < times.size(); ++i) {
-          Z3DCameraParameter tmp("Camera");
-          tmp.readValue(snap.cameraJson);
-          cpa->updateParaToTime(times[i], &tmp);
-          out.push_back(tmp.jsonValue());
-        }
-        return out;
-      });
-      values.insert(values.end(), sampled.begin(), sampled.end());
+    dr.times.reserve(static_cast<size_t>(req->times_size()));
+    for (auto t : req->times()) {
+      dr.times.push_back(t);
     }
 
-    std::vector<CameraValidateResult> results;
-    const int n = static_cast<int>(std::min(times.size(), values.size()));
-    results.reserve(static_cast<size_t>(n));
-    for (int i = 0; i < n; ++i) {
-      const double t = times[i];
-      const json::value& jv = values[i];
-      CameraValidateResult r;
-      r.set_time(t);
-      if (!jv.is_object()) {
-        r.set_within_frame(false);
-        r.set_coverage(0.0);
-        r.set_adjusted(false);
-        r.set_reason("invalid_value");
-        results.push_back(std::move(r));
-        continue;
-      }
-      Z3DCameraParameter cam("Camera");
-      cam.setValueSameAs(base);
-      try {
-        cam.readValue(jv);
-      }
-      catch (const std::exception& e) {
-        LOG(WARNING) << "CameraValidate: exception while parsing camera value at t=" << t << ": " << e.what();
-        r.set_within_frame(false);
-        r.set_coverage(0.0);
-        r.set_adjusted(false);
-        r.set_reason("invalid_value");
-        results.push_back(std::move(r));
-        continue;
-      }
-      catch (...) {
-        LOG(WARNING) << "CameraValidate: unknown exception while parsing camera value at t=" << t;
-        r.set_within_frame(false);
-        r.set_coverage(0.0);
-        r.set_adjusted(false);
-        r.set_reason("invalid_value");
-        results.push_back(std::move(r));
-        continue;
-      }
-      // Compute coverage heuristic.
-      const double required = (R > 0.0) ? requiredCenterDistanceForCoverage(cam.get(), R) : 0.0;
-      const double current = static_cast<double>(cam.get().centerDist());
-      double cov = 1.0;
-      if (required > 1e-9) {
-        cov = std::min(1.0, current / required);
-      }
-      bool ok = (cov + 1e-6) >= minCov;
-      r.set_within_frame(ok);
-      r.set_coverage(cov);
+    dr.values.reserve(static_cast<size_t>(req->values_size()));
+    for (const auto& v : req->values()) {
+      dr.values.push_back(pbToJson(v));
+    }
 
-      // Adjustment policy.
-      bool adjusted = false;
-      json::value adj = jv;
-      if (!ok && R > 0.0) {
-        if (allowDist && required > 0.0) {
-          setCameraDistance(cam, required);
-          adjusted = true;
-          adj = cam.jsonValue();
-          // Recompute coverage after adjustment.
-          const double cur2 = static_cast<double>(cam.get().centerDist());
-          const double cov2 = (required > 0.0) ? std::min(1.0, cur2 / required) : 1.0;
-          ok = (cov2 + 1e-6) >= minCov;
-          cov = cov2;
-        } else if (allowFov && current > 1e-9) {
-          // Solve desired FOV to achieve coverage with current distance.
-          double angleUsed = 2.0 * std::asin(std::min(1.0, R / current));
-          double desiredFov = angleUsed;
-          if (cam.get().aspectRatio() < 1.0f) {
-            // angleUsed is horizontal; convert back to vertical FOV.
-            desiredFov = 2.0 * std::atan(std::tan(angleUsed * 0.5) / cam.get().aspectRatio());
-          }
-          Z3DCameraParameter cam2("Camera");
-          cam2.setValueSameAs(cam);
-          cam2.setFrustum(static_cast<float>(desiredFov),
-                          cam.get().aspectRatio(),
-                          cam.get().nearDist(),
-                          cam.get().farDist());
-          adjusted = true;
-          adj = cam2.jsonValue();
-          // Recompute coverage.
-          const double req2 = requiredCenterDistanceForCoverage(cam2.get(), R);
-          const double cur2 = static_cast<double>(cam2.get().centerDist());
-          const double cov2 = (req2 > 1e-9) ? std::min(1.0, cur2 / req2) : 1.0;
-          ok = (cov2 + 1e-6) >= minCov;
-          cov = cov2;
-        }
-      }
-      r.set_adjusted(adjusted);
-      if (adjusted) {
-        *r.mutable_adjusted_value() = jsonToPb(adj);
-      }
-      if (!ok) {
-        if (current < required) {
-          r.set_reason(allowDist ? "too_close" : (allowFov ? "fov_too_small" : "coverage_below_threshold"));
-        } else {
-          r.set_reason("coverage_below_threshold");
-        }
-      } else {
-        r.set_reason("");
-      }
-      results.push_back(std::move(r));
+    dr.animationId = req->animation_id();
+
+    dr.adjustFov = req->has_policies() ? req->policies().adjust_fov() : false;
+    dr.adjustDistance = req->has_policies() ? req->policies().adjust_distance() : false;
+
+    dr.keepVisible = req->has_constraints() ? req->constraints().keep_visible() : true;
+    dr.margin = req->has_constraints() ? req->constraints().margin() : 0.0;
+    dr.minCoverage = req->has_constraints() ? req->constraints().min_coverage() : 0.95;
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [&]() {
+        return disp->cameraValidate(dr);
+      },
+      "camera_validate");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    bool allOk = true;
-    for (auto& r : results) {
-      if (!r.within_frame() || (keepVisible && (r.coverage() + 1e-6) < minCov)) {
-        allOk = false;
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_validate failed" : r.error);
+    }
+
+    for (const auto& vr : r.results) {
+      CameraValidateResult out;
+      out.set_time(vr.time);
+      out.set_within_frame(vr.withinFrame);
+      out.set_coverage(vr.coverage);
+      out.set_adjusted(vr.adjusted);
+      out.set_reason(vr.reason);
+      if (vr.adjusted && vr.adjustedValue.has_value()) {
+        *out.mutable_adjusted_value() = jsonToPb(*vr.adjustedValue);
       }
-      *reply->add_results() = std::move(r);
+      *reply->add_results() = std::move(out);
     }
-    reply->set_ok(allOk);
-    if (!allOk) {
-      return Status::OK; // strict acceptance handled client-side via revalidate
-    }
+    reply->set_ok(r.allOk);
     return Status::OK;
   }
 
-  Status SetVisibility(ServerContext*, const VisibilityRequest* req, Bool* reply) override
+  Status SetVisibility(ServerContext* grpcContext, const VisibilityRequest* req, Bool* reply) override
   {
-    bool ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc()) {
-        return false;
-      }
-      for (auto id : req->ids()) {
-        m_owner.doc()->setObjVisible(static_cast<size_t>(id), req->on());
-      }
-      return true;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
+    CHECK(req);
+    const bool on = req->on();
+    std::vector<size_t> ids;
+    ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      ids.push_back(static_cast<size_t>(v));
+    }
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "set_visibility: ui dispatcher not ready");
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, ids = std::move(ids), on]() {
+        return disp->setVisibility(ids, on);
+      },
+      "set_visibility");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "set_visibility failed" : r.error);
     }
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status ListParams(ServerContext*, const ListParamsRequest* req, ParamList* reply) override
+  Status ListParams(ServerContext* grpcContext, const ListParamsRequest* req, ParamList* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    CHECK(req);
+    CHECK(reply);
+
+    const size_t boundId = static_cast<size_t>(req->id());
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "list_params: ui dispatcher not ready");
     }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-    auto list = invokeOnObjectThread(engine, [&]() {
-      std::vector<Parameter> out;
-      if (!m_owner.engine()) {
-        return out;
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, boundId]() {
+        return disp->listParams(boundId);
+      },
+      "list_params");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "list_params failed" : r.error);
+    }
+
+    for (const auto& meta : r.params) {
+      Parameter out;
+      out.set_json_key(meta.jsonKey.toStdString());
+      out.set_name(meta.name.toStdString());
+      out.set_type(meta.type.toStdString());
+      if (!meta.description.isEmpty()) {
+        out.set_description(meta.description.toStdString());
       }
-      size_t boundId = static_cast<size_t>(req->id());
-      const auto params = engine->parametersOfViewSetting(boundId);
-      for (auto* p : params) {
-        if (!p) {
-          continue;
-        }
-        Parameter meta;
-        meta.set_json_key(p->jsonKey().toStdString());
-        meta.set_name(p->name().toStdString());
-        meta.set_type(p->type().toStdString());
-        if (!p->description().isEmpty()) {
-          meta.set_description(p->description().toStdString());
-        }
-        meta.set_supports_interpolation(p->supportInterpolation());
-        // Enumerated options represented in value_schema via enum; no separate fields.
-        // Value schema from parameter (fail-fast if invariant breaks)
-        {
-          const json::object schema = p->valueSchema();
-          // Dev guard: ensure schema has a recognizable 'type'
-          try {
-            auto it = schema.if_contains("type");
-            if (!it || !it->is_string()) {
-              LOG(WARNING) << "valueSchema missing/invalid 'type' for jsonKey=" << p->jsonKey().toStdString()
-                           << ", type=" << p->type().toStdString();
-            }
-          }
-          catch (...) {
-          }
-          meta.mutable_value_schema()->CopyFrom(jsonToPb(schema).struct_value());
-        }
-        out.push_back(std::move(meta));
-      }
-      return out;
-    });
-    for (auto& p : list) {
-      *reply->add_params() = std::move(p);
+      out.set_supports_interpolation(meta.supportsInterpolation);
+      out.mutable_value_schema()->CopyFrom(jsonToPb(meta.valueSchema).struct_value());
+      *reply->add_params() = std::move(out);
     }
     return Status::OK;
   }
 
-  Status ClearKeys(ServerContext*, const ClearKeysRequest* req, Bool* reply) override
+  Status ClearKeys(ServerContext* grpcContext, const ClearKeysRequest* req, Bool* reply) override
   {
     const uint64_t animationId = req->animation_id();
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    LOG(INFO) << "RPC ClearKeys anim=" << animationId << " target_id=" << req->target_id()
-              << (req->json_key().empty() ? "" : (" json_key=" + req->json_key()));
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc() || !m_owner.engine()) {
-        errMsg = "engine/doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "animation_id not found";
-        return false;
-      }
-      anim->rebindView();
-      // Camera (id=0): clear all camera keys
-      if (req->target_id() == kScopeCamera) {
-        ZParameterAnimation* cpa = anim->cameraParameterAnimation();
-        // delete keys one by one
-        std::vector<ZParameterKey*> keys;
-        keys.reserve(cpa->keys().size());
-        for (const auto& k : cpa->keys()) {
-          keys.push_back(k.get());
-        }
-        for (auto* k : keys) {
-          cpa->deleteKey(k);
-        }
-        cpa->emitKeysChangedSignal();
-        return true;
-      }
-      // Non-camera: resolve the object's uniqueId, then operate on its parameter animations
-      size_t boundId = static_cast<size_t>(req->target_id());
-      const QString jsonKey = QString::fromStdString(req->json_key());
-      size_t uniqueId = 0;
-      for (const auto& pack : anim->displayPacks()) {
-        if (pack.type == ZAnimationDisplayPack::Type::Object && pack.boundId == boundId) {
-          uniqueId = pack.id;
-          break;
-        }
-      }
-      bool clearedAny = false;
-      if (uniqueId != 0) {
-        const auto& pas = anim->paraAnimationList(uniqueId);
-        for (const auto& paPtr : pas) {
-          if (!paPtr) {
-            continue;
-          }
-          auto* pa = paPtr.get();
-          if (jsonKey.isEmpty() || pa->jsonKey() == jsonKey) {
-            std::vector<ZParameterKey*> keys;
-            keys.reserve(pa->keys().size());
-            for (const auto& k : pa->keys()) {
-              keys.push_back(k.get());
-            }
-            for (auto* k : keys) {
-              pa->deleteKey(k);
-            }
-            pa->emitKeysChangedSignal();
-            clearedAny = true;
-            if (!jsonKey.isEmpty()) {
-              // When a specific param was requested, stop after clearing its keys
-              break;
-            }
-          }
-        }
-      }
-      // Benign no-op: if no keys existed for the target, report success to simplify client logic
-      if (!clearedAny) {
-        if (jsonKey.isEmpty()) {
-          LOG(INFO) << "RPC ClearKeys: no param tracks for id=" << boundId << "; nothing to clear";
-        } else {
-          LOG(INFO) << "RPC ClearKeys: no matching track for id=" << boundId << " json_key=" << req->json_key();
-        }
-      }
-      return true;
-    });
-    if (!ok) {
-      return Status(errCode, errMsg.empty() ? "clear_keys failed" : errMsg);
+    const uint64_t targetId = req->target_id();
+    const std::string jsonKeyStr = req->json_key();
+    LOG(INFO) << "RPC ClearKeys anim=" << animationId << " target_id=" << targetId
+              << (jsonKeyStr.empty() ? "" : (" json_key=" + jsonKeyStr));
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
+
+    ZRpcUiDispatcher::ClearKeysRequest dr;
+    dr.animationId = animationId;
+    dr.targetId = targetId;
+    dr.jsonKey = QString::fromStdString(jsonKeyStr);
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->clearAnimationKeys(dr);
+      },
+      "clear_keys");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "clear_keys failed" : r.error);
+    }
+
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status RemoveKey(ServerContext*, const RemoveKeyRequest* req, Bool* reply) override
+  Status RemoveKey(ServerContext* grpcContext, const RemoveKeyRequest* req, Bool* reply) override
   {
     const uint64_t animationId = req->animation_id();
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    LOG(INFO) << "RPC RemoveKey anim=" << animationId << " time=" << req->time() << " target_id=" << req->target_id()
-              << (req->json_key().empty() ? "" : (" json_key=" + req->json_key()));
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc() || !m_owner.engine()) {
-        errMsg = "engine/doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "animation_id not found";
-        return false;
-      }
-      anim->rebindView();
-      // Camera (id=0)
-      if (req->target_id() == kScopeCamera) {
-        ZParameterAnimation* cpa = anim->cameraParameterAnimation();
-        for (const auto& k : cpa->keys()) {
-          if (std::abs(k->time() - req->time()) < 1e-6) {
-            cpa->deleteKey(k.get());
-            cpa->emitKeysChangedSignal();
-            return true;
-          }
-        }
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "camera key not found at requested time";
-        return false;
-      }
-      // Non-camera
-      const size_t boundId = static_cast<size_t>(req->target_id());
-      const QString jsonKey = QString::fromStdString(req->json_key());
-      if (jsonKey.isEmpty()) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "json_key is required for non-camera removal";
-        return false;
-      }
+    const double timeSec = req->time();
+    const uint64_t targetId = req->target_id();
+    const std::string jsonKeyStr = req->json_key();
+    LOG(INFO) << "RPC RemoveKey anim=" << animationId << " time=" << timeSec << " target_id=" << targetId
+              << (jsonKeyStr.empty() ? "" : (" json_key=" + jsonKeyStr));
 
-      // Resolve uniqueId for the bound object (same scheme as ListKeys). Do not rely on
-      // UI-expanded ObjectPara display packs, which may be absent in headless/RPC workflows.
-      size_t uniqueId = 0;
-      for (const auto& pack : anim->displayPacks()) {
-        if (pack.type == ZAnimationDisplayPack::Type::Object && pack.boundId == boundId) {
-          uniqueId = pack.id;
-          break;
-        }
-      }
-      if (uniqueId == 0) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "target_id not bound to animation";
-        return false;
-      }
-
-      auto* targetPa = [&]() -> ZParameterAnimation* {
-        const auto& pas = anim->paraAnimationList(uniqueId);
-        for (const auto& paPtr : pas) {
-          if (paPtr && paPtr->jsonKey() == jsonKey) {
-            return paPtr.get();
-          }
-        }
-        return nullptr;
-      }();
-      if (!targetPa) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "json_key not found for target";
-        return false;
-      }
-
-      for (const auto& k : targetPa->keys()) {
-        if (std::abs(k->time() - req->time()) < 1e-6) {
-          targetPa->deleteKey(k.get());
-          targetPa->emitKeysChangedSignal();
-          return true;
-        }
-      }
-
-      errCode = grpc::StatusCode::INVALID_ARGUMENT;
-      errMsg = "key not found at requested time";
-      return false;
-    });
-    if (!ok) {
-      return Status(errCode, errMsg.empty() ? "remove_key failed" : errMsg);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
+
+    ZRpcUiDispatcher::RemoveKeyRequest dr;
+    dr.animationId = animationId;
+    dr.targetId = targetId;
+    dr.jsonKey = QString::fromStdString(jsonKeyStr);
+    dr.timeSec = timeSec;
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->removeAnimationKey(dr);
+      },
+      "remove_key");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "remove_key failed" : r.error);
+    }
+
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status Batch(ServerContext*, const BatchRequest* req, Bool* reply) override
+  Status Batch(ServerContext* grpcContext, const BatchRequest* req, Bool* reply) override
   {
     const uint64_t animationId = req->animation_id();
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto ok = invokeOnUi([&]() -> bool {
-      LOG(INFO) << "RPC Batch anim=" << animationId << " set_keys=" << req->set_keys_size()
-                << " remove_keys=" << req->remove_keys_size()
-                << " commit=" << req->commit();
-      if (!m_owner.doc() || !m_owner.engine()) {
-        errMsg = "engine/doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "animation_id not found";
-        return false;
-      }
-      anim->rebindView();
-      // Process removals first
-      int idx = 0;
-      for (const auto& r : req->remove_keys()) {
-        RemoveKeyRequest tmp;
-        tmp.set_animation_id(animationId);
-        tmp.set_target_id(r.target_id());
-        tmp.set_json_key(r.json_key());
-        tmp.set_time(r.time());
-        Bool okR;
-        auto st = RemoveKey(nullptr, &tmp, &okR);
-        if (st.error_code() != grpc::StatusCode::OK || !okR.ok()) {
-          errCode = (st.error_code() != grpc::StatusCode::OK) ? st.error_code()
-                                                              : grpc::StatusCode::FAILED_PRECONDITION;
-          if (st.error_code() != grpc::StatusCode::OK && !st.error_message().empty()) {
-            errMsg = "remove_key failed at index=" + std::to_string(idx) + ": " + st.error_message();
-          } else {
-            errMsg = "remove_key failed at index=" + std::to_string(idx);
-          }
-          LOG(WARNING) << "Batch: " << errMsg;
-          return false;
-        }
-        ++idx;
-      }
-      // Then sets
-      idx = 0;
-      for (const auto& s : req->set_keys()) {
-        SetKeyRequest tmp;
-        tmp.set_animation_id(animationId);
-        tmp.set_target_id(s.target_id());
-        tmp.set_json_key(s.json_key());
-        tmp.set_time(s.time());
-        tmp.set_easing(s.easing());
-        tmp.mutable_value()->CopyFrom(s.value());
-        Bool okS;
-        auto st = SetKey(nullptr, &tmp, &okS);
-        if (st.error_code() != grpc::StatusCode::OK || !okS.ok()) {
-          errCode = (st.error_code() != grpc::StatusCode::OK) ? st.error_code()
-                                                              : grpc::StatusCode::FAILED_PRECONDITION;
-          if (st.error_code() != grpc::StatusCode::OK && !st.error_message().empty()) {
-            errMsg = "set_key failed at index=" + std::to_string(idx) + ": " + st.error_message();
-          } else {
-            errMsg = "set_key failed at index=" + std::to_string(idx);
-          }
-          LOG(WARNING) << "Batch: " << errMsg;
-          return false;
-        }
-        ++idx;
-      }
+    const bool commit = req->commit();
 
-      // Commit semantics: if requested, immediately apply t=0 keys so UI reflects
-      // initial state without requiring a separate SetTime call. We intentionally
-      // do not jump the timeline for non-zero keys.
-      if (req->commit()) {
-        bool hasTimeZero = false;
-        for (const auto& s : req->set_keys()) {
-          if (std::abs(s.time()) < 1e-9) {
-            hasTimeZero = true;
-            break;
-          }
-        }
-        if (hasTimeZero) {
-          anim->cancelRenderingAndSetCurrentTime(0.0);
-        }
-      }
-      return true;
-    });
-    if (!ok) {
-      return Status(errCode, errMsg.empty() ? "batch failed" : errMsg);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
+
+    ZRpcUiDispatcher::BatchKeysRequest dr;
+    dr.animationId = animationId;
+    dr.commit = commit;
+    dr.removeKeys.reserve(static_cast<size_t>(req->remove_keys_size()));
+    for (const auto& r : req->remove_keys()) {
+      ZRpcUiDispatcher::RemoveKeyRequest op;
+      op.animationId = animationId;
+      op.targetId = r.target_id();
+      op.jsonKey = QString::fromStdString(r.json_key());
+      op.timeSec = r.time();
+      dr.removeKeys.push_back(std::move(op));
+    }
+    dr.setKeys.reserve(static_cast<size_t>(req->set_keys_size()));
+    for (const auto& s : req->set_keys()) {
+      ZRpcUiDispatcher::SetKeyRequest op;
+      op.animationId = animationId;
+      op.targetId = s.target_id();
+      op.jsonKey = QString::fromStdString(s.json_key());
+      op.timeSec = s.time();
+      op.easing = QString::fromStdString(s.easing());
+      op.value = pbToJson(s.value());
+      dr.setKeys.push_back(std::move(op));
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->batchAnimationKeys(dr);
+      },
+      "batch");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "batch failed" : r.error);
+    }
+
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status SetTime(ServerContext*, const SetTimeRequest* req, Bool* reply) override
+  Status SetTime(ServerContext* grpcContext, const SetTimeRequest* req, Bool* reply) override
   {
     const uint64_t animationId = req->animation_id();
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    VLOG(1) << "RPC SetTime anim=" << animationId << " seconds=" << req->seconds() << " cancel=" << req->cancel_rendering();
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc()) {
-        errMsg = "doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "animation_id not found";
-        return false;
-      }
-      if (req->cancel_rendering()) {
-        anim->cancelRenderingAndSetCurrentTime(req->seconds());
-      } else {
-        anim->setCurrentTime(req->seconds());
-      }
-      return true;
-    });
-    if (!ok) {
-      return Status(errCode, errMsg.empty() ? "set_time failed" : errMsg);
+    const double seconds = req->seconds();
+    const bool cancelRendering = req->cancel_rendering();
+    VLOG(1) << "RPC SetTime anim=" << animationId << " seconds=" << seconds << " cancel=" << cancelRendering;
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
+
+    ZRpcUiDispatcher::SetTimeRequest dr;
+    dr.animationId = animationId;
+    dr.seconds = seconds;
+    dr.cancelRendering = cancelRendering;
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->setAnimationTime(dr);
+      },
+      "set_time");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "set_time failed" : r.error);
+    }
+
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status SetCameraInterpolationMethod(ServerContext*,
+  Status SetCameraInterpolationMethod(ServerContext* grpcContext,
                                       const SetCameraInterpolationMethodRequest* req,
                                       Bool* reply) override
   {
@@ -3192,64 +2027,39 @@ public:
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    LOG(INFO) << "RPC SetCameraInterpolationMethod anim=" << animationId << " method=" << req->method();
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc() || !m_owner.engine()) {
-        errMsg = "engine/doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "animation_id not found";
-        return false;
-      }
-      anim->rebindView();
-      auto* cpa = anim->cameraParameterAnimation();
-      if (!cpa) {
-        errMsg = "cameraParameterAnimation not available";
-        return false;
-      }
+    const std::string methodStr = req->method();
+    LOG(INFO) << "RPC SetCameraInterpolationMethod anim=" << animationId << " method=" << methodStr;
 
-      const QString raw = QString::fromStdString(req->method()).trimmed();
-      if (raw.isEmpty()) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "method is required";
-        return false;
-      }
-      const QString m = raw.toLower();
-      QString want;
-      if (m == "center") {
-        want = QStringLiteral("Center");
-      } else {
-        // Temporarily disable spline-based interpolation modes. They are known to
-        // be unstable in some workflows and are not currently supported via RPC.
-        // Fail fast with a clear message rather than silently accepting.
-        errCode = grpc::StatusCode::FAILED_PRECONDITION;
-        errMsg = "camera interpolation methods other than Center are temporarily disabled";
-        return false;
-      }
-
-      auto& para = cpa->interpolationMethodPara();
-      if (!para.hasOption(want)) {
-        errCode = grpc::StatusCode::FAILED_PRECONDITION;
-        errMsg = "interpolation method option unavailable";
-        return false;
-      }
-      para.select(want);
-      return true;
-    });
-    if (!ok) {
-      return Status(errCode, errMsg.empty() ? "set_camera_interpolation_method failed" : errMsg);
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
+
+    const QString method = QString::fromStdString(methodStr);
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, animationId, method]() {
+        return disp->setCameraInterpolationMethod(animationId, method);
+      },
+      "set_camera_interpolation_method");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "set_camera_interpolation_method failed" : r.error);
+    }
+
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status GetCameraInterpolationMethod(ServerContext*,
+  Status GetCameraInterpolationMethod(ServerContext* grpcContext,
                                       const GetCameraInterpolationMethodRequest* req,
                                       google::protobuf::StringValue* reply) override
   {
@@ -3257,549 +2067,378 @@ public:
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc() || !m_owner.engine()) {
-        errMsg = "engine/doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "animation_id not found";
-        return false;
-      }
-      anim->rebindView();
-      auto* cpa = anim->cameraParameterAnimation();
-      if (!cpa) {
-        errMsg = "cameraParameterAnimation not available";
-        return false;
-      }
-      const QString sel = cpa->interpolationMethodPara().get();
-      reply->set_value(sel.toStdString());
-      return true;
-    });
-    if (!ok) {
-      return Status(errCode, errMsg.empty() ? "get_camera_interpolation_method failed" : errMsg);
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, animationId]() {
+        return disp->cameraInterpolationMethod(animationId);
+      },
+      "get_camera_interpolation_method");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "get_camera_interpolation_method failed" : r.error);
+    }
+
+    reply->set_value(r.method);
     return Status::OK;
   }
 
-  Status ListKeys(ServerContext*, const ListKeysRequest* req, KeysResponse* reply) override
+  Status ListKeys(ServerContext* grpcContext, const ListKeysRequest* req, KeysResponse* reply) override
   {
     const uint64_t animationId = req->animation_id();
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    if (!m_owner.doc()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
+    const bool includeValues = req->include_values();
+    const uint64_t targetId = req->target_id();
+    const std::string jsonKeyStr = req->json_key();
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    std::string errMsg;
-    auto ok = invokeOnUi([&]() -> bool {
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "animation_id not found";
-        return false;
+
+    ZRpcUiDispatcher::ListKeysRequest dr;
+    dr.animationId = animationId;
+    dr.targetId = targetId;
+    dr.jsonKey = QString::fromStdString(jsonKeyStr);
+    dr.includeValues = includeValues;
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->listAnimationKeys(dr);
+      },
+      "list_keys");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "list_keys failed" : r.error);
+    }
+
+    for (const auto& k : r.keys) {
+      KeyInfo* ki = reply->add_keys();
+      ki->set_time(k.timeSec);
+      ki->set_type(k.parameterType);
+      if (includeValues && !k.valueJson.empty()) {
+        ki->set_value_json(k.valueJson);
       }
-      anim->rebindView();
-      const bool includeValues = req->include_values();
-      if (req->target_id() == 0) {
-        ZParameterAnimation* cpa = anim->cameraParameterAnimation();
-        for (const auto& k : cpa->keys()) {
-          KeyInfo* ki = reply->add_keys();
-          ki->set_time(k->time());
-          ki->set_type("3DCamera");
-          if (includeValues) {
-            ki->set_value_json(jsonToString(k->jsonValue()));
-          }
-        }
-        return true;
-      }
-      // Non-camera: resolve uniqueId for the object, then fetch parameter animation by json_key
-      const QString jsonKey = QString::fromStdString(req->json_key());
-      const size_t boundId = static_cast<size_t>(req->target_id());
-      size_t uniqueId = 0;
-      for (const auto& pack : anim->displayPacks()) {
-        if (pack.type == ZAnimationDisplayPack::Type::Object && pack.boundId == boundId) {
-          uniqueId = pack.id;
-          break;
-        }
-      }
-      if (uniqueId == 0) {
-        // Object not bound; return empty list
-        return true;
-      }
-      const auto& pas = anim->paraAnimationList(uniqueId);
-      for (const auto& paPtr : pas) {
-        if (!paPtr) {
-          continue;
-        }
-        auto* pa = paPtr.get();
-        if (pa->jsonKey() == jsonKey) {
-          for (const auto& k : pa->keys()) {
-            KeyInfo* ki = reply->add_keys();
-            ki->set_time(k->time());
-            ki->set_type(pa->type().toStdString());
-            if (includeValues) {
-              ki->set_value_json(jsonToString(k->jsonValue()));
-            }
-          }
-          break;
-        }
-      }
-      return true; // return empty when no matching param track
-    });
-    if (!ok) {
-      return Status(errCode, errMsg.empty() ? "list_keys failed" : errMsg);
     }
     return Status::OK;
   }
 
-  Status GetTime(ServerContext*, const GetTimeRequest* req, TimeStatus* reply) override
+  Status GetTime(ServerContext* grpcContext, const GetTimeRequest* req, TimeStatus* reply) override
   {
     const uint64_t animationId = req->animation_id();
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    std::string error;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc()) {
-        error = "doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        error = "animation_id not found";
-        return false;
-      }
-      // duration is straightforward; current time is stored in animation
-      reply->set_duration(anim->duration());
-      reply->set_seconds(anim->currentTime());
-      return true;
-    });
-    if (!ok) {
-      if (error.empty()) {
-        error = "get_time failed";
-      }
-      return Status(errCode, error);
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, animationId]() {
+        return disp->animationTimeStatus(animationId);
+      },
+      "get_time");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "get_time failed" : r.error);
+    }
+
+    reply->set_duration(r.duration);
+    reply->set_seconds(r.seconds);
     return Status::OK;
   }
 
-  Status SaveAnimation(ServerContext*, const SaveAnimationRequest* req, Bool* reply) override
+  Status SaveAnimation(ServerContext* grpcContext, const SaveAnimationRequest* req, Bool* reply) override
   {
     const uint64_t animationId = req->animation_id();
     if (animationId == 0) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
     }
-    if (req->path().empty()) {
+    const std::string pathStr = req->path();
+    if (pathStr.empty()) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "path is required");
     }
-    LOG(INFO) << "RPC SaveAnimation anim=" << animationId << " path=" << req->path();
-    std::string errMsg;
-    grpc::StatusCode errCode = grpc::StatusCode::FAILED_PRECONDITION;
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc()) {
-        errMsg = "doc not ready";
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto* anim = ad.animationPtr(static_cast<size_t>(animationId));
-      if (!anim) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "animation_id not found";
-        return false;
-      }
-      // Mirror UI behavior: use Z3DAnimationDoc save to update name/path state
-      const QString qpath = QString::fromStdString(req->path());
-      if (qpath.trimmed().isEmpty()) {
-        errCode = grpc::StatusCode::INVALID_ARGUMENT;
-        errMsg = "path is empty";
-        return false;
-      }
-      return ad.saveToPath(static_cast<size_t>(animationId), qpath);
-    });
-    if (!ok) {
-      return Status(errCode, errMsg.empty() ? "save_animation failed" : errMsg);
+    LOG(INFO) << "RPC SaveAnimation anim=" << animationId << " path=" << pathStr;
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
+    }
+
+    const QString qpath = QString::fromStdString(pathStr);
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, animationId, qpath]() {
+        return disp->saveAnimationToPath(animationId, qpath);
+      },
+      "save_animation");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "save_animation failed" : r.error);
+    }
+
+    reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status SaveScene(ServerContext* grpcContext, const SaveSceneRequest* req, Bool* reply) override
+  {
+    const std::string pathStr = req->path();
+    LOG(INFO) << "RPC SaveScene path=" << pathStr;
+    if (pathStr.empty()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "path is required");
+    }
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [&]() {
+        return disp->saveSceneToPath(QString::fromStdString(pathStr));
+      },
+      "save_scene");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "save_scene failed" : r.error);
     }
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status SaveScene(ServerContext*, const SaveSceneRequest* req, Bool* reply) override
+  Status TakeScreenshot3D(ServerContext* grpcContext, const ScreenshotRequest* req, ScreenshotResponse* reply) override
   {
-    LOG(INFO) << "RPC SaveScene path=" << req->path();
-    auto ok = invokeOnUi([&]() -> bool {
-      // Find the main window and gather state similar to ZMainWindow::saveJsonSceneImpl
-      ZMainWindow* mainWin = nullptr;
-      for (QWidget* w : QApplication::topLevelWidgets()) {
-        if (auto mw = qobject_cast<ZMainWindow*>(w)) {
-          mainWin = mw;
-          break;
-        }
-      }
-      if (!mainWin) {
-        return false;
-      }
-      if (!m_owner.doc()) {
-        return false;
-      }
-      json::object sceneObj;
-      sceneObj["Version"] = 1.0;
+    CHECK(req);
+    CHECK(reply);
 
-      // Doc
-      json::object docObj;
-      m_owner.doc()->write(docObj, true);
-      sceneObj["Doc"] = docObj;
-
-      // Per-object views
-      auto objs = m_owner.doc()->objs();
-      for (auto id : objs) {
-        json::object jObj;
-        json::object view2DObj;
-        if (auto* v = mainWin->view()) {
-          v->write(id, view2DObj);
-        }
-        jObj["View2D"] = view2DObj;
-
-        if (m_owner.engine()) {
-          json::object view3DObj;
-          auto* eng = m_owner.engine();
-          QMetaObject::invokeMethod(
-            eng,
-            [eng, id, &view3DObj]() {
-              eng->write(id, view3DObj);
-            },
-            Qt::BlockingQueuedConnection);
-          jObj["View3D"] = view3DObj;
-        }
-        sceneObj[QString("%1").arg(id).toStdString()] = jObj;
-      }
-
-      // General views
-      if (auto* v = mainWin->view()) {
-        json::object view2DGeneralObj;
-        v->write(view2DGeneralObj);
-        sceneObj["View2DGeneral"] = view2DGeneralObj;
-      }
-      if (m_owner.engine()) {
-        json::object view3DGeneralObj;
-        auto* eng = m_owner.engine();
-        QMetaObject::invokeMethod(
-          eng,
-          [eng, &view3DGeneralObj]() {
-            eng->write(view3DGeneralObj);
-          },
-          Qt::BlockingQueuedConnection);
-        sceneObj["View3DGeneral"] = view3DGeneralObj;
-      }
-
-      json::object saveObj;
-      saveObj["Scene"] = sceneObj;
-      try {
-        saveJsonObject(saveObj, QString::fromStdString(req->path()));
-      }
-      catch (const std::exception&) {
-        return false;
-      }
-      return true;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "save_scene failed");
-    }
-    reply->set_ok(true);
-    return Status::OK;
-  }
-
-  Status TakeScreenshot3D(ServerContext*, const ScreenshotRequest* req, ScreenshotResponse* reply) override
-  {
-    // Note: this intentionally does NOT create an animation or write keyframes.
-    // It renders the current scene state to a single image file.
-
-    const int width = static_cast<int>(req->width());
-    const int height = static_cast<int>(req->height());
-    if (width <= 0 || height <= 0) {
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
       reply->set_ok(false);
-      reply->set_error("width and height must be > 0");
+      reply->set_error("take_screenshot_3d: ui dispatcher not ready");
       return Status::OK;
     }
 
-    struct Result
-    {
-      bool ok = false;
-      QString path;
-      QString error;
-    };
+    ZRpcUiDispatcher::Screenshot3DRequest dr;
+    dr.width = static_cast<int>(req->width());
+    dr.height = static_cast<int>(req->height());
+    dr.path = QString::fromStdString(req->path());
+    dr.overwrite = req->overwrite();
 
-    auto res = invokeOnUi([&]() -> Result {
-      Result r;
-      if (!m_owner.engine()) {
-        r.ok = false;
-        r.error = "engine not ready";
-        return r;
-      }
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->takeScreenshot3D(dr);
+      },
+      "take_screenshot_3d");
+    if (!inv.ok) {
+      reply->set_ok(false);
+      reply->set_error(inv.error);
+      return Status::OK;
+    }
 
-      auto* eng = m_owner.engine();
-      CHECK(eng);
-
-      QString outPath = QString::fromStdString(req->path()).trimmed();
-      const bool overwrite = req->overwrite();
-      if (outPath.isEmpty()) {
-        const QString ts = QDateTime::currentDateTimeUtc().toString("yyyyMMdd_HHmmss_zzz");
-        const QString uid = QUuid::createUuid().toString(QUuid::WithoutBraces);
-        const QString fn = QString("atlas_scene_screenshot3d_%1_%2.png").arg(ts, uid);
-        outPath = QDir(QDir::tempPath()).filePath(fn);
-      } else {
-        // We always write PNG for screenshot RPC calls (LLM-compatible and deterministic).
-        // Do not silently rewrite user paths: fail fast if the extension is unexpected.
-        if (!outPath.endsWith(".png", Qt::CaseInsensitive)) {
-          r.ok = false;
-          r.path = outPath;
-          r.error = QString("TakeScreenshot3D only supports .png output paths: %1").arg(outPath);
-          return r;
-        }
-        QFileInfo fi(outPath);
-        if (fi.isRelative()) {
-          outPath = QDir::current().filePath(outPath);
-          fi = QFileInfo(outPath);
-        }
-        if (fi.exists() && !overwrite) {
-          r.ok = false;
-          r.path = outPath;
-          r.error = QString("file already exists (overwrite=false): %1").arg(outPath);
-          return r;
-        }
-      }
-
-      // Ensure output directory exists.
-      QDir dir(QFileInfo(outPath).absolutePath());
-      if (!dir.exists()) {
-        if (!dir.mkpath(".")) {
-          r.ok = false;
-          r.path = outPath;
-          r.error = QString("failed to create output folder: %1").arg(dir.absolutePath());
-          return r;
-        }
-      }
-
-      if (QFileInfo(outPath).exists() && overwrite) {
-        // Best-effort: remove first so failures surface earlier.
-        QFile::remove(outPath);
-      }
-
-      r.path = outPath;
-
-      // Run the actual render on the engine's thread (single-GL-context assumption).
-      r = invokeOnObjectThread(eng, [&]() -> Result {
-        Result rr;
-        rr.path = outPath;
-
-        QString err;
-        auto conn = QObject::connect(
-          eng,
-          &Z3DRenderingEngine::renderingError,
-          eng,
-          [&](const QString& e) {
-            if (err.isEmpty()) {
-              err = e;
-            }
-          },
-          Qt::DirectConnection);
-
-        eng->takeFixedSizeScreenShot(outPath, width, height, Z3DScreenShotType::MonoView);
-
-        QObject::disconnect(conn);
-
-        if (QFileInfo(outPath).exists()) {
-          rr.ok = true;
-          return rr;
-        }
-        rr.ok = false;
-        rr.error = err.isEmpty() ? QString("screenshot failed (no output file): %1").arg(outPath) : err;
-        return rr;
-      });
-
-      return r;
-    });
-
-    reply->set_ok(res.ok);
-    reply->set_path(res.path.toStdString());
-    if (!res.error.isEmpty()) {
-      reply->set_error(res.error.toStdString());
+    const auto& r = inv.value;
+    reply->set_ok(r.ok);
+    reply->set_path(r.path.toStdString());
+    if (!r.error.empty()) {
+      reply->set_error(r.error);
     }
     return Status::OK;
   }
 
-  Status CutSet(ServerContext*, const CutSetRequest* req, Bool* reply) override
+  Status CutSet(ServerContext* grpcContext, const CutSetRequest* req, Bool* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
+    CHECK(req);
 
-    const std::vector<size_t> ids = req->refit_camera() ? invokeOnUi([&]() {
-                                   return m_owner.doc() ? m_owner.doc()->objs() : std::vector<size_t>{};
-                                 })
-                                 : std::vector<size_t>{};
-
-    auto ok = invokeOnObjectThread(engine, [&]() -> bool {
-      auto& gp = engine->globalParas();
-      bool applied = false;
-      if (req->has_box()) {
-        const auto& box = req->box();
-        gp.globalXCut.setLowerValue(box.min().x());
-        gp.globalXCut.setUpperValue(box.max().x());
-        gp.globalYCut.setLowerValue(box.min().y());
-        gp.globalYCut.setUpperValue(box.max().y());
-        gp.globalZCut.setLowerValue(box.min().z());
-        gp.globalZCut.setUpperValue(box.max().z());
-        applied = true;
-      } else if (req->has_planes()) {
-        // Support only axis-aligned planes: (1,0,0,-lower), (-1,0,0,upper), etc.
-        double lx = gp.globalXCut.lowerValue(), ux = gp.globalXCut.upperValue();
-        double ly = gp.globalYCut.lowerValue(), uy = gp.globalYCut.upperValue();
-        double lz = gp.globalZCut.lowerValue(), uz = gp.globalZCut.upperValue();
-        for (const auto& p : req->planes().planes()) {
-          const double a = p.a(), b = p.b(), c = p.c(), d = p.d();
-          if (a == 1.0 && b == 0.0 && c == 0.0) {
-            lx = -d;
-            applied = true;
-          } else if (a == -1.0 && b == 0.0 && c == 0.0) {
-            ux = d;
-            applied = true;
-          } else if (a == 0.0 && b == 1.0 && c == 0.0) {
-            ly = -d;
-            applied = true;
-          } else if (a == 0.0 && b == -1.0 && c == 0.0) {
-            uy = d;
-            applied = true;
-          } else if (a == 0.0 && b == 0.0 && c == 1.0) {
-            lz = -d;
-            applied = true;
-          } else if (a == 0.0 && b == 0.0 && c == -1.0) {
-            uz = d;
-            applied = true;
-          } else {
-            // Unsupported plane orientation in current implementation.
-            return false;
-          }
-        }
-        gp.globalXCut.setLowerValue(lx);
-        gp.globalXCut.setUpperValue(ux);
-        gp.globalYCut.setLowerValue(ly);
-        gp.globalYCut.setUpperValue(uy);
-        gp.globalZCut.setLowerValue(lz);
-        gp.globalZCut.setUpperValue(uz);
-      }
-      if (!applied) {
-        return false;
-      }
-      if (req->refit_camera() && !ids.empty()) {
-        // Refit camera to visible objects after clipping.
-        const auto bb = engine->boundBoxOfObjsAfterClipping(ids);
-        if (!bb.empty()) {
-          engine->camera().resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
-        }
-      }
-      return true;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "cut_set failed");
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "cut_set: ui dispatcher not ready");
     }
+
+    ZRpcUiDispatcher::CutSetRequest dr;
+    dr.refitCamera = req->refit_camera();
+    if (req->has_box()) {
+      const auto& b = req->box();
+      ZRpcUiDispatcher::CutBox bd;
+      bd.minCorner = glm::dvec3(b.min().x(), b.min().y(), b.min().z());
+      bd.maxCorner = glm::dvec3(b.max().x(), b.max().y(), b.max().z());
+      dr.box = bd;
+    } else if (req->has_planes()) {
+      const auto& in = req->planes().planes();
+      dr.planes.reserve(static_cast<size_t>(in.size()));
+      for (const auto& p : in) {
+        ZRpcUiDispatcher::CutPlane pd;
+        pd.a = p.a();
+        pd.b = p.b();
+        pd.c = p.c();
+        pd.d = p.d();
+        dr.planes.push_back(pd);
+      }
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cutSet(dr);
+      },
+      "cut_set");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "cut_set failed" : r.error);
+    }
+
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status CutClear(ServerContext*, const Empty*, Bool* reply) override
+  Status CutClear(ServerContext* grpcContext, const Empty*, Bool* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "cut_clear: ui dispatcher not ready");
     }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
-    auto ok = invokeOnObjectThread(engine, [&]() -> bool {
-      auto& gp = engine->globalParas();
-      gp.globalXCut.setLowerValue(gp.globalXCut.minimum());
-      gp.globalXCut.setUpperValue(gp.globalXCut.maximum());
-      gp.globalYCut.setLowerValue(gp.globalYCut.minimum());
-      gp.globalYCut.setUpperValue(gp.globalYCut.maximum());
-      gp.globalZCut.setLowerValue(gp.globalZCut.minimum());
-      gp.globalZCut.setUpperValue(gp.globalZCut.maximum());
-      return true;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "cut_clear failed");
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp]() {
+        return disp->cutClear();
+      },
+      "cut_clear");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "cut_clear failed" : r.error);
+    }
+
     reply->set_ok(true);
     return Status::OK;
   }
 
-  Status CutSuggest(ServerContext*, const CutSuggestRequest* req, CutSuggestion* reply) override
+  Status CutSuggest(ServerContext* grpcContext, const CutSuggestRequest* req, CutSuggestion* reply) override
   {
-    if (!m_owner.engine()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
-    }
-    Z3DRenderingEngine* engine = m_owner.engine();
-    CHECK(engine);
+    CHECK(req);
 
-    const std::vector<size_t> ids = invokeOnUi([&]() {
-      std::vector<size_t> ids;
-      if (req->ids_size() == 0) {
-        if (m_owner.doc()) {
-          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
-        }
-      } else {
-        ids.reserve(req->ids_size());
-        for (auto v : req->ids()) {
-          ids.push_back(static_cast<size_t>(v));
-        }
-        ids = filterVisualIds(m_owner, ids);
-      }
-      return ids;
-    });
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "cut_suggest: ui dispatcher not ready");
+    }
 
-    auto bbox = invokeOnObjectThread(engine, [&]() {
-      return req->after_clipping() ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
-    });
+    ZRpcUiDispatcher::CutSuggestRequest dr;
+    dr.mode = req->mode();
+    dr.margin = req->margin();
+    dr.afterClipping = req->after_clipping();
+    dr.ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      dr.ids.push_back(static_cast<size_t>(v));
+    }
 
-    if (!bbox.empty() && req->margin() > 0.0) {
-      const double m = req->margin();
-      bbox.expand(bbox.minCorner - glm::dvec3(m));
-      bbox.expand(bbox.maxCorner + glm::dvec3(m));
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->cutSuggestBox(dr);
+      },
+      "cut_suggest");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    if (bbox.empty()) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox empty");
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "cut_suggest failed" : r.error);
     }
-    if (req->mode().empty() || req->mode() == std::string("box")) {
-      auto* out = reply->mutable_box();
-      out->mutable_min()->set_x(bbox.minCorner.x);
-      out->mutable_min()->set_y(bbox.minCorner.y);
-      out->mutable_min()->set_z(bbox.minCorner.z);
-      out->mutable_max()->set_x(bbox.maxCorner.x);
-      out->mutable_max()->set_y(bbox.maxCorner.y);
-      out->mutable_max()->set_z(bbox.maxCorner.z);
-      out->mutable_size()->set_x(bbox.maxCorner.x - bbox.minCorner.x);
-      out->mutable_size()->set_y(bbox.maxCorner.y - bbox.minCorner.y);
-      out->mutable_size()->set_z(bbox.maxCorner.z - bbox.minCorner.z);
-      out->mutable_center()->set_x((bbox.maxCorner.x + bbox.minCorner.x) * 0.5);
-      out->mutable_center()->set_y((bbox.maxCorner.y + bbox.minCorner.y) * 0.5);
-      out->mutable_center()->set_z((bbox.maxCorner.z + bbox.minCorner.z) * 0.5);
-      return Status::OK;
-    }
-    return Status(grpc::StatusCode::INVALID_ARGUMENT, "unsupported mode");
+
+    auto* out = reply->mutable_box();
+    out->mutable_min()->set_x(r.minCorner.x);
+    out->mutable_min()->set_y(r.minCorner.y);
+    out->mutable_min()->set_z(r.minCorner.z);
+    out->mutable_max()->set_x(r.maxCorner.x);
+    out->mutable_max()->set_y(r.maxCorner.y);
+    out->mutable_max()->set_z(r.maxCorner.z);
+    out->mutable_size()->set_x(r.size.x);
+    out->mutable_size()->set_y(r.size.y);
+    out->mutable_size()->set_z(r.size.z);
+    out->mutable_center()->set_x(r.center.x);
+    out->mutable_center()->set_y(r.center.y);
+    out->mutable_center()->set_z(r.center.z);
+    return Status::OK;
   }
 
 private:
-  ZRPCService& m_owner;
+  [[nodiscard]] ZRpcUiDispatcher* uiDispatcher() const
+  {
+    return m_uiDispatcher;
+  }
+
+  ZRpcUiDispatcher* m_uiDispatcher = nullptr; // non-owning
 };
 
 void ZRPCService::init()
@@ -3834,7 +2473,7 @@ void ZRPCService::onRPCThreadStarted()
 
   std::string server_address("0.0.0.0:50051");
   // Allocate services on the heap and keep them alive for the server lifetime.
-  m_sceneService = std::unique_ptr<grpc::Service>(new SceneServiceImpl(*this));
+  m_sceneService = std::unique_ptr<grpc::Service>(new SceneServiceImpl(m_uiDispatcher));
 
   grpc::ServerBuilder builder;
   // Set the default compression algorithm for the server.

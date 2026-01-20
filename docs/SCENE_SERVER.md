@@ -54,6 +54,8 @@ The Atlas GUI hosts the gRPC service `atlas.rpc.Scene` for live control.
 ### Geometry / Capabilities
 
 - `BBox(ids, after_clipping) -> bbox {min, max, size, center}`
+  - If `ids` is omitted/empty, the server uses all current **visual** objects (excludes `Animation3D`).
+  - Invalid/unknown ids are rejected with `INVALID_ARGUMENT` (instead of returning an empty bbox).
 - `Capabilities(ids?) -> { camera[], background[], axis[], global[], objects{type: ParamList} }`
   - Each Parameter includes `json_key`, `name`, `type`, `supports_interpolation`, and optionally:
     - `description` (human-readable semantics)
@@ -118,7 +120,8 @@ Use these to edit base scene state (no time/easing; **does not** write keyframes
   - Writes a `.scene` file (equivalent to the GUI Save Scene).
 - `TakeScreenshot3D { width, height, path?, overwrite? } -> { ok, path, error? }`
   - Renders a single image of the current **3D scene** state.
-  - Output format is PNG (recommended for LLM visual verification).
+  - If `path` is omitted/empty, the server writes a `.png` into the OS temp directory.
+  - If `path` is provided, the output format is inferred from the file extension (PNG recommended for LLM visual verification).
   - Does **not** create an animation or write keyframes (preferred for verification screenshots).
 - `SetVisibility { ids, on } -> { ok }`
 - `MakeAlias { ids } -> { ok, aliases: [{src_id, alias_id}], error? }`

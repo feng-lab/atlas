@@ -804,9 +804,9 @@ Agent tooling dependency
   - 3 = Global/Lighting
   - ≥4 = Scene object ids
 - Implementation notes:
-  - These ids are defined in `src/atlas/zrpcservice.cpp` as constants (`kScopeCamera`, `kScopeBackground`, `kScopeAxis`, `kScopeGlobal`). Avoid magic numbers.
+  - These ids are defined in `src/atlas/zrpcsceneids.h` as constants (`kZRpcScopeCamera`, `kZRpcScopeBackground`, `kZRpcScopeAxis`, `kZRpcScopeGlobal`). Avoid magic numbers.
   - Camera is treated as a parameter scope (id=0) for RPC and live introspection. It is NOT represented as an `AnimationObj` entry; camera keys live in the dedicated camera track (`m_globalParaAnimations`).
-  - Compatibility: `ValidateSceneParams` and `ApplySceneParams` accept an empty `json_key` for id=0; the server maps it to the canonical camera parameter key (e.g., `"Camera 3DCamera"`). For all other ids, `json_key` must be specified.
+  - `ValidateSceneParams` and `ApplySceneParams` require a non-empty `json_key` for all scopes, including camera (id=0). Clients should discover the canonical camera parameter key via `Capabilities`/`ListParams` (typically `"Camera 3DCamera"`).
   - In the animation model, `AnimationObj.boundId == 0` remains a sentinel for “unbound/non‑scene” and is unrelated to the camera scope.
   - Do not add an `AnimationObj` for id=0; timeline ops for camera continue to use the camera track APIs.
 

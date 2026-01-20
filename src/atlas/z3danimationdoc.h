@@ -22,9 +22,105 @@ public:
 
   // Return raw pointer to animation by id or nullptr if not found
   [[nodiscard]] Z3DAnimation* animationPtr(size_t id);
+  [[nodiscard]] const Z3DAnimation* animationPtr(size_t id) const;
 
   // Create a new animation and return its id
   size_t createNewAnimationAndReturnId(const QString& name = "");
+
+  struct KeyOpResult
+  {
+    bool ok = false;
+    enum class ErrorKind
+    {
+      FailedPrecondition,
+      InvalidArgument,
+    };
+    ErrorKind errorKind = ErrorKind::FailedPrecondition;
+    QString error;
+  };
+
+  // Set or replace a key for a target parameter track.
+  // targetId follows the same convention as RPC/UI: 0=camera, 1=background,
+  // 2=axis, 3=global/lighting, >=4 object id.
+  [[nodiscard]] KeyOpResult setKey(size_t animationId,
+                                   size_t targetId,
+                                   const QString& jsonKey,
+                                   double timeSec,
+                                   const QString& easing,
+                                   const json::value& value);
+
+  [[nodiscard]] KeyOpResult removeKey(size_t animationId,
+                                      size_t targetId,
+                                      const QString& jsonKey,
+                                      double timeSec);
+
+  [[nodiscard]] KeyOpResult clearKeys(size_t animationId, size_t targetId, const QString& jsonKey);
+
+  struct ListedKey
+  {
+    double timeSec = 0.0;
+    QString parameterType; // e.g. "Vec3", "3DCamera"
+    QString keyJson; // full key json (time/type/value, etc.) serialized as string
+  };
+
+  struct ListKeysResult
+  {
+    bool ok = false;
+    KeyOpResult::ErrorKind errorKind = KeyOpResult::ErrorKind::FailedPrecondition;
+    QString error;
+    std::vector<ListedKey> keys;
+  };
+
+  [[nodiscard]] ListKeysResult listKeys(size_t animationId,
+                                        size_t targetId,
+                                        const QString& jsonKey,
+                                        bool includeValues);
+
+  struct BatchRemoveKeyOp
+  {
+    size_t targetId = 0;
+    QString jsonKey;
+    double timeSec = 0.0;
+  };
+
+  struct BatchSetKeyOp
+  {
+    size_t targetId = 0;
+    QString jsonKey;
+    double timeSec = 0.0;
+    QString easing;
+    json::value value;
+  };
+
+  [[nodiscard]] KeyOpResult batchKeys(size_t animationId,
+                                      const std::vector<BatchRemoveKeyOp>& removeOps,
+                                      const std::vector<BatchSetKeyOp>& setOps,
+                                      bool commit);
+
+  struct TimeStatusResult
+  {
+    bool ok = false;
+    KeyOpResult::ErrorKind errorKind = KeyOpResult::ErrorKind::FailedPrecondition;
+    QString error;
+    double duration = 0.0;
+    double seconds = 0.0;
+  };
+
+  [[nodiscard]] TimeStatusResult timeStatus(size_t animationId) const;
+
+  [[nodiscard]] KeyOpResult setTime(size_t animationId, double seconds, bool cancelRendering);
+
+  [[nodiscard]] KeyOpResult setCameraInterpolationMethod(size_t animationId, const QString& method);
+
+  struct CameraInterpolationMethodResult
+  {
+    bool ok = false;
+    KeyOpResult::ErrorKind errorKind = KeyOpResult::ErrorKind::FailedPrecondition;
+    QString error;
+    QString method;
+  };
+
+  [[nodiscard]] CameraInterpolationMethodResult cameraInterpolationMethod(size_t animationId) const;
 
   // return info of animation with id, animation mesh exist, otherwise crash
   Z3DAnimation& animation(size_t id)

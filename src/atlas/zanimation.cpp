@@ -88,6 +88,33 @@ int numDigits(int32_t x)
 
 namespace nim {
 
+namespace {
+
+struct ParsedJsonKey
+{
+  bool ok = false;
+  QString name;
+  QString type;
+};
+
+[[nodiscard]] ParsedJsonKey parseJsonKey(const QString& jsonKey)
+{
+  ParsedJsonKey out;
+  const int spaceIdx = jsonKey.lastIndexOf(QChar(' '));
+  if (spaceIdx <= 0 || spaceIdx + 1 >= jsonKey.size()) {
+    return out;
+  }
+  out.name = jsonKey.left(spaceIdx);
+  out.type = jsonKey.mid(spaceIdx + 1);
+  if (out.name.trimmed().isEmpty() || out.type.trimmed().isEmpty()) {
+    return out;
+  }
+  out.ok = true;
+  return out;
+}
+
+} // namespace
+
 void ZAnimationChangeDurationCommand::undo()
 {
   m_ani->setDurationImpl(m_oldDuration);
@@ -301,6 +328,113 @@ void ZAnimation::removeRedundantKeys()
     }
   }
   Q_EMIT keysChanged();
+}
+
+ZParameterAnimation* ZAnimation::parameterAnimationForBoundId(size_t boundId, const QString& jsonKey)
+{
+  auto* obj = findBoundId(boundId);
+  if (!obj) {
+    return nullptr;
+  }
+  for (const auto& paPtr : obj->objParaAnimations) {
+    if (paPtr && paPtr->jsonKey() == jsonKey) {
+      return paPtr.get();
+    }
+  }
+  return nullptr;
+}
+
+const ZParameterAnimation* ZAnimation::parameterAnimationForBoundId(size_t boundId, const QString& jsonKey) const
+{
+  auto* obj = findBoundId(boundId);
+  if (!obj) {
+    return nullptr;
+  }
+  for (const auto& paPtr : obj->objParaAnimations) {
+    if (paPtr && paPtr->jsonKey() == jsonKey) {
+      return paPtr.get();
+    }
+  }
+  return nullptr;
+}
+
+std::vector<ZParameterAnimation*> ZAnimation::parameterAnimationsForBoundId(size_t boundId)
+{
+  std::vector<ZParameterAnimation*> out;
+  auto* obj = findBoundId(boundId);
+  if (!obj) {
+    return out;
+  }
+  out.reserve(obj->objParaAnimations.size());
+  for (const auto& paPtr : obj->objParaAnimations) {
+    if (paPtr) {
+      out.push_back(paPtr.get());
+    }
+  }
+  return out;
+}
+
+ZAnimation::EnsureParameterAnimationResult ZAnimation::ensureParameterAnimationForBoundId(size_t boundId,
+                                                                                          const QString& jsonKey)
+{
+  EnsureParameterAnimationResult out;
+
+  const ParsedJsonKey parsed = parseJsonKey(jsonKey);
+  if (!parsed.ok) {
+    out.error = QString("invalid json_key '%1'").arg(jsonKey);
+    return out;
+  }
+
+  AnimationObj* aniObj = findBoundId(boundId);
+  if (!aniObj) {
+    QString objTypeName;
+    json::value objJsonValue;
+    if (boundId == 1) {
+      objTypeName = "Background";
+    } else if (boundId == 2) {
+      objTypeName = "Axis";
+    } else if (boundId == 3) {
+      objTypeName = "Lighting";
+    } else {
+      ZObjDoc* objDoc = m_doc.idToDoc(boundId);
+      if (!objDoc) {
+        out.error = QString("target_id %1 not found in the current document").arg(boundId);
+        return out;
+      }
+      objTypeName = objDoc->typeName();
+      objJsonValue = objDoc->jsonValue(boundId);
+      if (objTypeName.contains("Animation", Qt::CaseInsensitive)) {
+        out.error = QString("target_id %1 is not a visual object").arg(boundId);
+        return out;
+      }
+    }
+
+    auto aO = std::make_unique<AnimationObj>(objTypeName, std::move(objJsonValue));
+    aO->uniqueId = m_nextUniqueId++;
+    aO->boundId = boundId;
+    m_objList.push_back(std::move(aO));
+    aniObj = m_objList.back().get();
+    out.createdObject = true;
+  }
+
+  for (const auto& paPtr : aniObj->objParaAnimations) {
+    if (paPtr && paPtr->jsonKey() == jsonKey) {
+      out.animation = paPtr.get();
+      return out;
+    }
+  }
+
+  auto pa = std::make_unique<ZParameterAnimation>(parsed.name, parsed.type);
+  pa->setParent(this);
+  out.animation = pa.get();
+  aniObj->objParaAnimations.push_back(std::move(pa));
+  out.createdParameter = true;
+
+  // New tracks (and possibly a new animated object) must be reflected in the
+  // display packs so timeline UI and other listeners stay consistent.
+  updateObjAnimation();
+
+  return out;
 }
 
 void ZAnimation::rebindView()

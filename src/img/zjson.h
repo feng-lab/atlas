@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <string>
 
 #ifdef __clang__
 #pragma GCC diagnostic push
@@ -58,6 +59,31 @@ json::object loadJsonObject(const QString& file);
 void saveJsonObject(const json::object& jo, const QString& file);
 
 void saveJsonArray(const json::array& ja, const QString& file);
+
+// Stable type tags for diagnostics (RPC errors, logs, etc.).
+// Examples: "null", "bool", "number", "string", "array[3]", "object".
+[[nodiscard]] inline std::string jsonTypeName(const json::value& j)
+{
+  if (j.is_null()) {
+    return "null";
+  }
+  if (j.is_bool()) {
+    return "bool";
+  }
+  if (j.is_string()) {
+    return "string";
+  }
+  if (j.is_number()) {
+    return "number";
+  }
+  if (j.is_array()) {
+    return std::string("array[") + std::to_string(j.as_array().size()) + "]";
+  }
+  if (j.is_object()) {
+    return "object";
+  }
+  return "unknown";
+}
 
 inline QString asQString(const json::value& jv)
 {

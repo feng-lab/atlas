@@ -7,6 +7,8 @@ class QThread;
 namespace nim {
 
 class ZRPCService;
+class ZRpcUiDispatcher;
+class ZMainWindow;
 
 class ZServiceManager : public QObject
 {
@@ -36,6 +38,14 @@ public:
   void checkCurrentOn(ThreadType p);
 
   ZRPCService* rpcService();
+
+  // UI-thread dispatcher for RPCs. The object is owned by the service manager
+  // and lives on the UI thread for the app lifetime.
+  ZRpcUiDispatcher* rpcUiDispatcher();
+
+  // Register the app's main window so RPC UI dispatch can avoid scanning and
+  // safely coordinate document/view lifecycle.
+  void setMainWindow(ZMainWindow* mainWindow);
 
 private:
   void dbThreadStarted();
@@ -74,6 +84,7 @@ private:
   QThread* m_logicThread = nullptr;
 
   ZRPCService* m_rpcService = nullptr;
+  ZRpcUiDispatcher* m_rpcUiDispatcher = nullptr;
 
   bool m_shutdown = false;
   bool m_init = false;

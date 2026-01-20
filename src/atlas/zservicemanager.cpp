@@ -1,6 +1,8 @@
 #include "zservicemanager.h"
 
 #include "zrpcservice.h"
+#include "zrpcuidispatcher.h"
+#include "zmainwindow.h"
 #include "zdoc.h"
 #include "zlog.h"
 #include <QThread>
@@ -31,6 +33,12 @@ void ZServiceManager::init()
   QThreadPool::globalInstance()->setMaxThreadCount(qMax(4, 2 * threadCount));
 
   m_uiThread = QThread::currentThread();
+
+  // Create the UI dispatcher before starting worker threads so it is available
+  // immediately for RPC calls, and so construction doesn't rely on the UI
+  // event loop being active yet.
+  m_rpcUiDispatcher = new ZRpcUiDispatcher(this);
+
   m_ioThread = new QThread;
   m_dbThread = new QThread;
   m_pushThread = new QThread;
@@ -44,6 +52,7 @@ void ZServiceManager::init()
   m_logicThread->setObjectName("LogicThread");
 
   m_rpcService = new ZRPCService;
+  m_rpcService->setUiDispatcher(m_rpcUiDispatcher);
   m_rpcService->moveToThread(m_rpcThread);
 
   QObject::connect(m_ioThread, &QThread::started, this, &ZServiceManager::ioThreadStarted, Qt::DirectConnection);
@@ -125,6 +134,20 @@ ZRPCService* ZServiceManager::rpcService()
   check();
 
   return this->m_rpcService;
+}
+
+ZRpcUiDispatcher* ZServiceManager::rpcUiDispatcher()
+{
+  check();
+  return m_rpcUiDispatcher;
+}
+
+void ZServiceManager::setMainWindow(ZMainWindow* mainWindow)
+{
+  check();
+  CHECK(isCurrentOn(UI));
+  CHECK(m_rpcUiDispatcher);
+  m_rpcUiDispatcher->setMainWindow(mainWindow);
 }
 
 void ZServiceManager::shutdown()

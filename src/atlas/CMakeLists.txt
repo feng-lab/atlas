@@ -609,6 +609,11 @@ set(SOURCES
     zimgprocessdialog.cpp zimgprocessdialog.h
     zservicemanager.cpp zservicemanager.h
     zrpcservice.cpp zrpcservice.h
+    zrpcuidispatcher.cpp zrpcuidispatcher.h
+    zscenejsonio.cpp zscenejsonio.h
+    z3dcameraplanner.cpp z3dcameraplanner.h
+    z3dviewsettingparamops.cpp z3dviewsettingparamops.h
+    zqobjectthreadinvoker.h
     ztheme.cpp ztheme.h
     zserializationutils.h
     zroiwidget.cpp zroiwidget.h

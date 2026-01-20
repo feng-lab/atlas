@@ -28,6 +28,11 @@ public:
     return m_interpolationMethod;
   }
 
+  [[nodiscard]] const ZStringIntOptionParameter& interpolationMethodPara() const
+  {
+    return m_interpolationMethod;
+  }
+
   // create a new key based on current view
   [[nodiscard]] std::unique_ptr<ZParameterKey> createKey(double secs) const override;
 
