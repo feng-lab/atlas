@@ -73,9 +73,11 @@ runs:
     - name: Install base packages (Homebrew)
       if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
       shell: bash -l {0}
+      env:
+        HOMEBREW_NO_AUTO_UPDATE: "1"
       run: |
         set -euo pipefail
-        brew update
+        # CI stability: avoid Homebrew network updates (and ensure brew install doesn't auto-update).
         # Core tools and build prerequisites for macOS (see readme.md)
         brew install unrar p7zip git golang autoconf || true
 

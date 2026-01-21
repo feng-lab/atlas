@@ -28,6 +28,8 @@ env:
   VULKAN_SDK_VERSION: 1.4.328.1
   # Centralize Qt version to keep parity with Linux/Windows CI
   QT_VERSION: "6.9.2"
+  # CI stability: disable Homebrew auto-update (avoids transient network failures during `brew install`).
+  HOMEBREW_NO_AUTO_UPDATE: "1"
   # Pipeline mode: "github" (split build-env/build) or "self-hosted" (combined).
   # Set this value to switch behavior for all triggers, including manual workflow_dispatch.
   MACOS_PIPELINE_MODE: self-hosted
