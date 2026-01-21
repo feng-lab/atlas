@@ -13,8 +13,22 @@ class SceneAPI:
         self._c = client
 
     # Load
-    def ensure_loaded(self, files: list[str]) -> dict:
-        return self._c.ensure_loaded(files)
+    def load_sources(
+        self,
+        sources: list[str],
+        *,
+        network_timeout_sec: float | None = None,
+        set_visible: bool = True,
+        task_timeout_sec: float = 120.0,
+        wait_ready: bool = True,
+    ) -> dict:
+        return self._c.load_sources(
+            sources,
+            network_timeout_sec=network_timeout_sec,
+            set_visible=set_visible,
+            task_timeout_sec=task_timeout_sec,
+            wait_ready=wait_ready,
+        )
 
     def start_load_task(
         self,
@@ -46,13 +60,15 @@ class SceneAPI:
         resp = self._c.list_objects()
         out = []
         for o in getattr(resp, "objects", []):
-            out.append({
-                "id": int(getattr(o, "id", 0)),
-                "type": getattr(o, "type", ""),
-                "name": getattr(o, "name", ""),
-                "path": getattr(o, "path", ""),
-                "visible": bool(getattr(o, "visible", False)),
-            })
+            out.append(
+                {
+                    "id": int(getattr(o, "id", 0)),
+                    "type": getattr(o, "type", ""),
+                    "name": getattr(o, "name", ""),
+                    "path": getattr(o, "path", ""),
+                    "visible": bool(getattr(o, "visible", False)),
+                }
+            )
         return out
 
     # Scene params (stateless)
@@ -101,7 +117,9 @@ class SceneAPI:
             include_values=include_values,
         )
 
-    def set_time(self, *, animation_id: int, seconds: float, cancel_rendering: bool = False) -> None:
+    def set_time(
+        self, *, animation_id: int, seconds: float, cancel_rendering: bool = False
+    ) -> None:
         ok = self._c.set_time(
             animation_id=int(animation_id),
             seconds=float(seconds),

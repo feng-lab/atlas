@@ -12,8 +12,11 @@
 #include "zrpctaskmanager.h"
 #include "../version/version.h"
 #include <QThread>
+#include <algorithm>
 #include <chrono>
+#include <sstream>
 #include <utility>
+#include <grpc/support/time.h>
 #include <grpcpp/grpcpp.h>
 #include <google/protobuf/empty.pb.h>
 #include <google/protobuf/struct.pb.h>
@@ -31,7 +34,6 @@ using atlas::rpc::PingRequest;
 using atlas::rpc::PingResponse;
 using atlas::rpc::Empty;
 using atlas::rpc::Bool;
-using atlas::rpc::FileList;
 using atlas::rpc::ListObjectsResponse;
 using atlas::rpc::ObjectInfo;
 using atlas::rpc::ObjectLoadState;
@@ -144,6 +146,186 @@ static constexpr uint32_t kWaitTaskDefaultPollMs = 50u;
 template<class T>
 using ZRpcInvokeResult = ZQObjectThreadInvokeResult<T>;
 
+template<class Func>
+auto invokeOnObjectThread(grpc::ServerContext* grpcContext, QObject* obj, Func&& f, std::string_view what)
+  -> ZRpcInvokeResult<decltype(f())>;
+
+[[nodiscard]] bool grpcHasFiniteDeadline(const grpc::ServerContext* grpcContext)
+{
+  if (!grpcContext) {
+    return false;
+  }
+  const gpr_timespec d = grpcContext->raw_deadline();
+  const gpr_timespec inf = gpr_inf_future(d.clock_type);
+  return gpr_time_cmp(d, inf) != 0;
+}
+
+struct ZRpcWaitResult
+{
+  bool ok = false;
+  std::string error;
+};
+
+[[nodiscard]] std::string formatIdList(const std::vector<uint64_t>& ids)
+{
+  std::ostringstream oss;
+  oss << "[";
+  for (size_t i = 0; i < ids.size(); ++i) {
+    if (i) {
+      oss << ", ";
+    }
+    oss << ids[i];
+  }
+  oss << "]";
+  return oss.str();
+}
+
+template<class Predicate>
+[[nodiscard]] ZRpcWaitResult
+waitUntil(grpc::ServerContext* grpcContext, uint32_t pollMs, Predicate&& predicate, std::string_view what)
+{
+  ZRpcWaitResult out;
+
+  if (!grpcContext) {
+    out.ok = false;
+    out.error = std::string(what) + ": grpc context not provided";
+    return out;
+  }
+
+  if (!grpcHasFiniteDeadline(grpcContext)) {
+    // Avoid unbounded waits on server threads: require the caller to set a gRPC deadline
+    // (Python: pass timeout=...).
+    out.ok = false;
+    out.error = std::string(what) + ": no gRPC deadline (set a client timeout to enable auto-wait)";
+    return out;
+  }
+
+  const auto deadline = grpcContext->deadline();
+  while (true) {
+    if (grpcContext->IsCancelled()) {
+      out.ok = false;
+      out.error = std::string(what) + ": cancelled";
+      return out;
+    }
+
+    if (predicate()) {
+      out.ok = true;
+      out.error.clear();
+      return out;
+    }
+
+    if (std::chrono::system_clock::now() >= deadline) {
+      out.ok = false;
+      out.error = std::string(what) + ": timeout waiting for readiness";
+      return out;
+    }
+
+    QThread::msleep(static_cast<unsigned long>(pollMs));
+  }
+}
+
+[[nodiscard]] ZRpcWaitResult waitForObjectViewsReady(grpc::ServerContext* grpcContext,
+                                                     ZRpcUiDispatcher* disp,
+                                                     const std::vector<uint64_t>& ids,
+                                                     uint32_t pollMs,
+                                                     std::string_view what)
+{
+  CHECK(disp);
+
+  if (ids.empty()) {
+    ZRpcWaitResult out;
+    out.ok = true;
+    return out;
+  }
+
+  if (!grpcContext) {
+    ZRpcWaitResult out;
+    out.ok = false;
+    out.error = std::string(what) + ": grpc context not provided";
+    return out;
+  }
+  if (!grpcHasFiniteDeadline(grpcContext)) {
+    ZRpcWaitResult out;
+    out.ok = false;
+    out.error = std::string(what) + ": no gRPC deadline (set a client timeout to enable auto-wait)";
+    return out;
+  }
+
+  const auto deadline = grpcContext->deadline();
+
+  while (true) {
+    if (grpcContext->IsCancelled()) {
+      ZRpcWaitResult out;
+      out.ok = false;
+      out.error = std::string(what) + ": cancelled";
+      return out;
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, ids]() {
+        return disp->statusSnapshot(ids, /*includeAllObjects=*/false);
+      },
+      what);
+    if (!inv.ok) {
+      ZRpcWaitResult out;
+      out.ok = false;
+      out.error = inv.error.empty() ? (std::string(what) + ": failed to query status") : inv.error;
+      return out;
+    }
+
+    const auto& s = inv.value;
+    if (s.ok && s.docReady && s.engineReady) {
+      bool allReady = true;
+      std::vector<uint64_t> notFound;
+      std::vector<uint64_t> errors;
+      for (const auto& obj : s.objects) {
+        if (obj.loadState == ZRpcUiDispatcher::ObjectLoadState::NotFound) {
+          notFound.push_back(obj.id);
+          allReady = false;
+          continue;
+        }
+        if (obj.loadState == ZRpcUiDispatcher::ObjectLoadState::Error) {
+          errors.push_back(obj.id);
+          allReady = false;
+          continue;
+        }
+        if (obj.loadState != ZRpcUiDispatcher::ObjectLoadState::Ready) {
+          allReady = false;
+        }
+      }
+
+      if (!notFound.empty()) {
+        ZRpcWaitResult out;
+        out.ok = false;
+        out.error = std::string(what) + ": object(s) not found: " + formatIdList(notFound);
+        return out;
+      }
+      if (!errors.empty()) {
+        ZRpcWaitResult out;
+        out.ok = false;
+        out.error = std::string(what) + ": object(s) in error state: " + formatIdList(errors);
+        return out;
+      }
+      if (allReady) {
+        ZRpcWaitResult out;
+        out.ok = true;
+        return out;
+      }
+    }
+
+    if (std::chrono::system_clock::now() >= deadline) {
+      ZRpcWaitResult out;
+      out.ok = false;
+      out.error = std::string(what) + ": timeout waiting for objects to become ready";
+      return out;
+    }
+
+    QThread::msleep(static_cast<unsigned long>(pollMs));
+  }
+}
+
 // gRPC handlers run on gRPC-managed threads. To respect Atlas' thread boundaries,
 // we bounce work to the target QObject thread with a queued call and wait for
 // completion, respecting gRPC cancellation/deadlines where available.
@@ -162,6 +344,44 @@ auto invokeOnObjectThread(grpc::ServerContext* grpcContext, QObject* obj, Func&&
     };
   }
   return invokeOnObjectThreadWait(obj, std::forward<Func>(f), what, std::move(shouldCancel));
+}
+
+template<class RepeatedIds>
+[[nodiscard]] ZRpcInvokeResult<std::vector<uint64_t>> resolveWaitIds(grpc::ServerContext* grpcContext,
+                                                                     ZRpcUiDispatcher* disp,
+                                                                     const RepeatedIds& idsField,
+                                                                     bool emptyMeansAll,
+                                                                     std::string_view what)
+{
+  CHECK(disp);
+  ZRpcInvokeResult<std::vector<uint64_t>> out;
+  out.ok = true;
+  if (idsField.size() > 0) {
+    out.value.reserve(static_cast<size_t>(idsField.size()));
+    for (auto v : idsField) {
+      out.value.push_back(static_cast<uint64_t>(v));
+    }
+    return out;
+  }
+  if (!emptyMeansAll) {
+    return out;
+  }
+
+  auto inv = invokeOnObjectThread(
+    grpcContext,
+    disp,
+    [disp]() {
+      return disp->fitCandidates();
+    },
+    what);
+  if (!inv.ok) {
+    out.ok = false;
+    out.error = inv.error.empty() ? (std::string(what) + ": failed to query fit candidates") : inv.error;
+    return out;
+  }
+
+  out.value = std::move(inv.value);
+  return out;
 }
 
 // Convert google.protobuf.Value to boost::json::value
@@ -615,18 +835,58 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "get_param_values: ui dispatcher not ready");
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, boundId, queryKeys = std::move(queryKeys)]() {
-        return disp->getParamValues(boundId, queryKeys);
-      },
-      "get_param_values");
+    auto invokeGet = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, boundId, &queryKeys]() {
+          return disp->getParamValues(boundId, queryKeys);
+        },
+        "get_param_values");
+    };
+
+    auto inv = invokeGet();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
 
-    const auto& r = inv.value;
+    auto r = inv.value;
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("target_not_ready") != std::string::npos) {
+      // Make GetParamValues "UI-parity safe": if the target object isn't yet bound into a 3D view/filter,
+      // wait until it becomes ready (bounded by the caller's gRPC deadline) and retry.
+      if (boundId > kZRpcScopeGlobal) {
+        const std::vector<uint64_t> ids = {static_cast<uint64_t>(boundId)};
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  ids,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "get_param_values:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+      } else {
+        const auto wait = waitUntil(
+          grpcContext,
+          kWaitForObjectsReadyDefaultPollMs,
+          [&]() -> bool {
+            auto inv2 = invokeGet();
+            return inv2.ok && inv2.value.ok;
+          },
+          "get_param_values:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+      }
+
+      // Retry once after readiness.
+      inv = invokeGet();
+      if (!inv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+      }
+      r = inv.value;
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -662,19 +922,87 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "validate_scene_params: ui dispatcher not ready");
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, setParams = std::move(setParams)]() {
-        return disp->validateSceneParams(setParams);
-      },
-      "validate_scene_params");
+    auto invokeValidate = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &setParams]() {
+          return disp->validateSceneParams(setParams);
+        },
+        "validate_scene_params");
+    };
+
+    auto inv = invokeValidate();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = inv.value;
     if (!r.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, r.error.empty() ? "validate_scene_params failed" : r.error);
+    }
+
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+    if (canAutoWait) {
+      bool hasNotReady = false;
+      for (const auto& pr : r.results) {
+        if (!pr.ok && pr.reason.startsWith("target_not_ready")) {
+          hasNotReady = true;
+          break;
+        }
+      }
+
+      if (hasNotReady) {
+        std::vector<uint64_t> idsToWait;
+        idsToWait.reserve(setParams.size());
+        for (const auto& sp : setParams) {
+          if (sp.id > kZRpcScopeGlobal) {
+            idsToWait.push_back(static_cast<uint64_t>(sp.id));
+          }
+        }
+        std::sort(idsToWait.begin(), idsToWait.end());
+        idsToWait.erase(std::unique(idsToWait.begin(), idsToWait.end()), idsToWait.end());
+
+        if (!idsToWait.empty()) {
+          const auto wait = waitForObjectViewsReady(grpcContext,
+                                                    disp,
+                                                    idsToWait,
+                                                    kWaitForObjectsReadyDefaultPollMs,
+                                                    "validate_scene_params:wait_ready");
+          if (!wait.ok) {
+            return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+          }
+        } else {
+          const auto wait = waitUntil(
+            grpcContext,
+            kWaitForObjectsReadyDefaultPollMs,
+            [&]() -> bool {
+              auto inv2 = invokeValidate();
+              if (!inv2.ok || !inv2.value.ok) {
+                return false;
+              }
+              for (const auto& pr2 : inv2.value.results) {
+                if (!pr2.ok && pr2.reason.startsWith("target_not_ready")) {
+                  return false;
+                }
+              }
+              return true;
+            },
+            "validate_scene_params:wait_ready");
+          if (!wait.ok) {
+            return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+          }
+        }
+
+        inv = invokeValidate();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = inv.value;
+        if (!r.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION,
+                        r.error.empty() ? "validate_scene_params failed" : r.error);
+        }
+      }
     }
 
     for (const auto& pr : r.results) {
@@ -710,17 +1038,63 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "apply_scene_params: ui dispatcher not ready");
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, setParams = std::move(setParams)]() {
-        return disp->applySceneParams(setParams);
-      },
-      "apply_scene_params");
+    auto invokeApply = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &setParams]() {
+          return disp->applySceneParams(setParams);
+        },
+        "apply_scene_params");
+    };
+
+    auto inv = invokeApply();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = inv.value;
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("target_not_ready") != std::string::npos) {
+      std::vector<uint64_t> idsToWait;
+      idsToWait.reserve(setParams.size());
+      for (const auto& sp : setParams) {
+        if (sp.id > kZRpcScopeGlobal) {
+          idsToWait.push_back(static_cast<uint64_t>(sp.id));
+        }
+      }
+      std::sort(idsToWait.begin(), idsToWait.end());
+      idsToWait.erase(std::unique(idsToWait.begin(), idsToWait.end()), idsToWait.end());
+
+      if (!idsToWait.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsToWait,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "apply_scene_params:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+      } else {
+        const auto wait = waitUntil(
+          grpcContext,
+          kWaitForObjectsReadyDefaultPollMs,
+          [&]() -> bool {
+            auto inv2 = invokeApply();
+            return inv2.ok && inv2.value.ok;
+          },
+          "apply_scene_params:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+      }
+
+      inv = invokeApply();
+      if (!inv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+      }
+      r = inv.value;
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -794,53 +1168,6 @@ public:
     return Status::OK;
   }
 
-  Status LoadFiles(ServerContext* grpcContext, const FileList* request, ListObjectsResponse* reply) override
-  {
-    CHECK(request);
-    LOG(INFO) << "RPC LoadFiles count=" << request->files_size();
-
-    QStringList qfiles;
-    qfiles.reserve(request->files_size());
-    for (const auto& s : request->files()) {
-      qfiles << QString::fromStdString(s);
-    }
-
-    ZRpcUiDispatcher* disp = uiDispatcher();
-    if (!disp) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "load_files: ui dispatcher not ready");
-    }
-
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, files = std::move(qfiles)]() {
-        return disp->loadFilesAndListObjects(files);
-      },
-      "load_files");
-    if (!inv.ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
-    }
-    const auto& r = inv.value;
-    if (!r.ok) {
-      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
-                                      ? grpc::StatusCode::INVALID_ARGUMENT
-                                      : grpc::StatusCode::FAILED_PRECONDITION;
-      return Status(code, r.error.empty() ? "load_files failed" : r.error);
-    }
-
-    for (const auto& obj : r.objects) {
-      ObjectInfo oi;
-      oi.set_id(obj.id);
-      oi.set_type(obj.type);
-      oi.set_name(obj.name);
-      oi.set_path(obj.path);
-      oi.set_visible(obj.visible);
-      *reply->add_objects() = std::move(oi);
-    }
-    LOG(INFO) << "RPC LoadFiles done";
-    return Status::OK;
-  }
-
   Status ListObjects(ServerContext* grpcContext, const Empty*, ListObjectsResponse* reply) override
   {
     VLOG(1) << "RPC ListObjects";
@@ -896,17 +1223,61 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox: ui dispatcher not ready");
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, ids = std::move(ids), afterClipping]() {
-        return disp->bboxOfObjects(ids, afterClipping);
-      },
-      "bbox");
+    auto invokeBBox = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &ids, afterClipping]() {
+          return disp->bboxOfObjects(ids, afterClipping);
+        },
+        "bbox");
+    };
+
+    auto inv = invokeBBox();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = inv.value;
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("objects may not be ready") != std::string::npos) {
+      std::vector<uint64_t> idsToWait;
+      if (!ids.empty()) {
+        idsToWait.reserve(ids.size());
+        for (auto id : ids) {
+          idsToWait.push_back(static_cast<uint64_t>(id));
+        }
+      } else {
+        // For the "all objects" case, wait for all current fit candidates.
+        auto invFit = invokeOnObjectThread(
+          grpcContext,
+          disp,
+          [disp]() {
+            return disp->fitCandidates();
+          },
+          "bbox:fit_candidates");
+        if (!invFit.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, invFit.error);
+        }
+        idsToWait = std::move(invFit.value);
+      }
+
+      if (idsToWait.empty()) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, "bbox: no visual objects");
+      }
+
+      const auto wait =
+        waitForObjectViewsReady(grpcContext, disp, idsToWait, kWaitForObjectsReadyDefaultPollMs, "bbox:wait_ready");
+      if (!wait.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+      }
+
+      inv = invokeBBox();
+      if (!inv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+      }
+      r = inv.value;
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -945,17 +1316,42 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "capabilities: ui dispatcher not ready");
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, ids = std::move(ids)]() {
-        return disp->capabilities(ids);
-      },
-      "capabilities");
+    auto invokeCaps = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &ids]() {
+          return disp->capabilities(ids);
+        },
+        "capabilities");
+    };
+
+    auto inv = invokeCaps();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& res = inv.value;
+    auto res = inv.value;
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+    if (canAutoWait && !res.ok && res.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        res.error.find("target_not_ready") != std::string::npos) {
+      const auto wait = waitUntil(
+        grpcContext,
+        kWaitForObjectsReadyDefaultPollMs,
+        [&]() -> bool {
+          auto inv2 = invokeCaps();
+          return inv2.ok && inv2.value.ok;
+        },
+        "capabilities:wait_ready");
+      if (!wait.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+      }
+
+      inv = invokeCaps();
+      if (!inv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+      }
+      res = inv.value;
+    }
     if (!res.ok) {
       const grpc::StatusCode code = (res.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1205,6 +1601,40 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_fit: ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+    if (canAutoWait) {
+      std::vector<uint64_t> idsToWait;
+      if (req->all() || req->ids_size() == 0) {
+        auto invFit = invokeOnObjectThread(
+          grpcContext,
+          disp,
+          [disp]() {
+            return disp->fitCandidates();
+          },
+          "camera_fit:fit_candidates");
+        if (!invFit.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, invFit.error);
+        }
+        idsToWait = std::move(invFit.value);
+      } else {
+        idsToWait.reserve(static_cast<size_t>(req->ids_size()));
+        for (auto v : req->ids()) {
+          idsToWait.push_back(static_cast<uint64_t>(v));
+        }
+      }
+
+      if (!idsToWait.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsToWait,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_fit:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+      }
+    }
+
     ZRpcUiDispatcher::CameraFitRequest dr;
     dr.all = req->all();
     dr.afterClipping = req->after_clipping();
@@ -1248,6 +1678,8 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_orbit_suggest: ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+
     ZRpcUiDispatcher::CameraOrbitSuggestRequest dr;
     dr.axis = req->axis();
     dr.degrees = req->degrees();
@@ -1256,17 +1688,44 @@ public:
       dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, dr = std::move(dr)]() {
-        return disp->cameraOrbitSuggest(dr);
-      },
-      "camera_orbit_suggest");
+    auto invokeSuggest = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &dr]() {
+          return disp->cameraOrbitSuggest(dr);
+        },
+        "camera_orbit_suggest");
+    };
+
+    auto inv = invokeSuggest();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("bbox empty") != std::string::npos) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_orbit_suggest:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_orbit_suggest:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeSuggest();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1290,6 +1749,8 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_dolly_suggest: ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+
     ZRpcUiDispatcher::CameraDollySuggestRequest dr;
     dr.startDist = req->start_dist();
     dr.endDist = req->end_dist();
@@ -1298,17 +1759,44 @@ public:
       dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, dr = std::move(dr)]() {
-        return disp->cameraDollySuggest(dr);
-      },
-      "camera_dolly_suggest");
+    auto invokeSuggest = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &dr]() {
+          return disp->cameraDollySuggest(dr);
+        },
+        "camera_dolly_suggest");
+    };
+
+    auto inv = invokeSuggest();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("bbox empty") != std::string::npos) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_dolly_suggest:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_dolly_suggest:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeSuggest();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1330,6 +1818,8 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_focus: ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+
     ZRpcUiDispatcher::CameraFocusRequest dr;
     dr.afterClipping = req->after_clipping();
     dr.minRadius = req->min_radius();
@@ -1338,17 +1828,44 @@ public:
       dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, dr = std::move(dr)]() {
-        return disp->cameraFocus(dr);
-      },
-      "camera_focus");
+    auto invokeFocus = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &dr]() {
+          return disp->cameraFocus(dr);
+        },
+        "camera_focus");
+    };
+
+    auto inv = invokeFocus();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("bbox empty") != std::string::npos) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_focus:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_focus:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeFocus();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1372,6 +1889,8 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_point_to: ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+
     ZRpcUiDispatcher::CameraPointToRequest dr;
     dr.afterClipping = req->after_clipping();
     dr.ids.reserve(static_cast<size_t>(req->ids_size()));
@@ -1379,17 +1898,44 @@ public:
       dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, dr = std::move(dr)]() {
-        return disp->cameraPointTo(dr);
-      },
-      "camera_point_to");
+    auto invokePointTo = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &dr]() {
+          return disp->cameraPointTo(dr);
+        },
+        "camera_point_to");
+    };
+
+    auto inv = invokePointTo();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("bbox empty") != std::string::npos) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_point_to:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_point_to:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokePointTo();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1456,6 +2002,8 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_reset_view: ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+
     ZRpcUiDispatcher::CameraResetViewRequest dr;
     dr.mode = req->mode();
     dr.afterClipping = req->after_clipping();
@@ -1465,17 +2013,44 @@ public:
       dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, dr = std::move(dr)]() {
-        return disp->cameraResetView(dr);
-      },
-      "camera_reset_view");
+    auto invokeReset = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &dr]() {
+          return disp->cameraResetView(dr);
+        },
+        "camera_reset_view");
+    };
+
+    auto inv = invokeReset();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("bbox empty") != std::string::npos) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_reset_view:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_reset_view:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeReset();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1499,6 +2074,9 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_move_local: ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+    const bool wantsBBox = req->distance_is_fraction_of_bbox_radius();
+
     ZRpcUiDispatcher::CameraMoveLocalRequest dr;
     dr.op = req->op();
     dr.distance = req->distance();
@@ -1517,17 +2095,44 @@ public:
       dr.baseValueOverride = std::move(jv);
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, dr = std::move(dr)]() {
-        return disp->cameraMoveLocal(dr);
-      },
-      "camera_move_local");
+    auto invokeMove = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &dr]() {
+          return disp->cameraMoveLocal(dr);
+        },
+        "camera_move_local");
+    };
+
+    auto inv = invokeMove();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && wantsBBox && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("bbox empty") != std::string::npos) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_move_local:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_move_local:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeMove();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1550,6 +2155,10 @@ public:
     if (!disp) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_look_at: ui dispatcher not ready");
     }
+
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+    const bool needsBBox = (req->target_case() == CameraLookAtRequest::kTargetBboxCenter ||
+                            req->target_case() == CameraLookAtRequest::kBboxFractionPoint);
 
     ZRpcUiDispatcher::CameraLookAtRequest dr;
     dr.afterClipping = req->after_clipping();
@@ -1588,17 +2197,44 @@ public:
       }
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, dr = std::move(dr)]() {
-        return disp->cameraLookAt(dr);
-      },
-      "camera_look_at");
+    auto invokeLookAt = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &dr]() {
+          return disp->cameraLookAt(dr);
+        },
+        "camera_look_at");
+    };
+
+    auto inv = invokeLookAt();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && needsBBox && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("bbox empty") != std::string::npos) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_look_at:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_look_at:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeLookAt();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1621,6 +2257,8 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+
     ZRpcUiDispatcher::CameraPathSolveRequest dr;
     dr.afterClipping = req->after_clipping();
     dr.ids.reserve(req->ids_size());
@@ -1635,6 +2273,7 @@ public:
       dr.baseValueOverride = std::move(jv);
     }
 
+    bool needsBBox = false;
     dr.waypoints.reserve(static_cast<size_t>(req->waypoints_size()));
     for (int i = 0; i < req->waypoints_size(); ++i) {
       const auto& w = req->waypoints(i);
@@ -1649,6 +2288,7 @@ public:
           break;
         }
         case CameraWaypoint::kBboxFractionEye: {
+          needsBBox = true;
           wp.eyeMode = Z3DCameraPlannerPathWaypoint::EyeMode::BBoxFraction;
           const auto& f = w.bbox_fraction_eye();
           wp.eyeBBoxFraction = glm::dvec3(f.x(), f.y(), f.z());
@@ -1669,10 +2309,12 @@ public:
           break;
         }
         case CameraWaypoint::kLookAtBboxCenter: {
+          needsBBox = true;
           wp.lookAtMode = Z3DCameraPlannerPathWaypoint::LookAtMode::BBoxCenter;
           break;
         }
         case CameraWaypoint::kBboxFractionLookAt: {
+          needsBBox = true;
           wp.lookAtMode = Z3DCameraPlannerPathWaypoint::LookAtMode::BBoxFraction;
           const auto& f = w.bbox_fraction_look_at();
           wp.lookAtBBoxFraction = glm::dvec3(f.x(), f.y(), f.z());
@@ -1686,17 +2328,44 @@ public:
       dr.waypoints.push_back(std::move(wp));
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [&]() {
-        return disp->cameraPathSolve(dr);
-      },
-      "camera_path_solve");
+    auto invokeSolve = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [&]() {
+          return disp->cameraPathSolve(dr);
+        },
+        "camera_path_solve");
+    };
+
+    auto inv = invokeSolve();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && needsBBox && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        (r.error.find("bbox empty") != std::string::npos || r.error.find("bbox required") != std::string::npos)) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_path_solve:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_path_solve:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeSolve();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1744,6 +2413,8 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+
     ZRpcUiDispatcher::CameraSolveRequest dr;
     dr.mode = req->mode();
     dr.t0 = req->t0();
@@ -1776,17 +2447,48 @@ public:
       dr.dollyEndDist = itE->second.number_value();
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [&]() {
-        return disp->cameraSolve(dr);
-      },
-      "camera_solve");
+    auto invokeSolve = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [&]() {
+          return disp->cameraSolve(dr);
+        },
+        "camera_solve");
+    };
+
+    auto inv = invokeSolve();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+
+    const bool maybeNeedsWait =
+      (r.ok && r.keys.empty()) ||
+      (!r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+       (r.error.find("bbox") != std::string::npos || r.error.find("target_not_ready") != std::string::npos));
+    if (canAutoWait && maybeNeedsWait) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_solve:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_solve:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeSolve();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1801,7 +2503,8 @@ public:
       *reply->add_keys() = std::move(out);
     }
     if (reply->keys_size() == 0) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_solve failed or empty");
+      return Status(grpc::StatusCode::FAILED_PRECONDITION,
+                    "camera_solve: no keys produced (check target ids and scene bbox)");
     }
     return Status::OK;
   }
@@ -1817,6 +2520,8 @@ public:
     if (!req) {
       return Status(grpc::StatusCode::INVALID_ARGUMENT, "request missing");
     }
+
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
 
     ZRpcUiDispatcher::CameraValidateRequest dr;
     dr.afterClipping = false;
@@ -1845,17 +2550,44 @@ public:
     dr.margin = req->has_constraints() ? req->constraints().margin() : 0.0;
     dr.minCoverage = req->has_constraints() ? req->constraints().min_coverage() : 0.95;
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [&]() {
-        return disp->cameraValidate(dr);
-      },
-      "camera_validate");
+    auto invokeValidate = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [&]() {
+          return disp->cameraValidate(dr);
+        },
+        "camera_validate");
+    };
+
+    auto inv = invokeValidate();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        (r.error.find("bbox") != std::string::npos || r.error.find("target_not_ready") != std::string::npos)) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "camera_validate:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "camera_validate:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeValidate();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -1927,17 +2659,52 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "list_params: ui dispatcher not ready");
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, boundId]() {
-        return disp->listParams(boundId);
-      },
-      "list_params");
+    auto invokeList = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, boundId]() {
+          return disp->listParams(boundId);
+        },
+        "list_params");
+    };
+
+    auto inv = invokeList();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = inv.value;
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("target_not_ready") != std::string::npos) {
+      // See GetParamValues: list_params should behave like the GUI and wait for the object view to exist.
+      if (boundId > kZRpcScopeGlobal) {
+        const std::vector<uint64_t> ids = {static_cast<uint64_t>(boundId)};
+        const auto wait =
+          waitForObjectViewsReady(grpcContext, disp, ids, kWaitForObjectsReadyDefaultPollMs, "list_params:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+      } else {
+        const auto wait = waitUntil(
+          grpcContext,
+          kWaitForObjectsReadyDefaultPollMs,
+          [&]() -> bool {
+            auto inv2 = invokeList();
+            return inv2.ok && inv2.value.ok;
+          },
+          "list_params:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+      }
+
+      inv = invokeList();
+      if (!inv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+      }
+      r = inv.value;
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT
@@ -2523,6 +3290,8 @@ public:
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "cut_suggest: ui dispatcher not ready");
     }
 
+    const bool canAutoWait = grpcContext && grpcHasFiniteDeadline(grpcContext);
+
     ZRpcUiDispatcher::CutSuggestRequest dr;
     dr.mode = req->mode();
     dr.margin = req->margin();
@@ -2532,17 +3301,44 @@ public:
       dr.ids.push_back(static_cast<size_t>(v));
     }
 
-    auto inv = invokeOnObjectThread(
-      grpcContext,
-      disp,
-      [disp, dr = std::move(dr)]() {
-        return disp->cutSuggestBox(dr);
-      },
-      "cut_suggest");
+    auto invokeSuggest = [&]() {
+      return invokeOnObjectThread(
+        grpcContext,
+        disp,
+        [disp, &dr]() {
+          return disp->cutSuggestBox(dr);
+        },
+        "cut_suggest");
+    };
+
+    auto inv = invokeSuggest();
     if (!inv.ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
     }
-    const auto& r = inv.value;
+    auto r = std::move(inv.value);
+    if (canAutoWait && !r.ok && r.errorKind == ZRpcUiDispatcher::ErrorKind::FailedPrecondition &&
+        r.error.find("bbox empty") != std::string::npos) {
+      const auto idsInv =
+        resolveWaitIds(grpcContext, disp, req->ids(), /*emptyMeansAll=*/true, "cut_suggest:fit_candidates");
+      if (!idsInv.ok) {
+        return Status(grpc::StatusCode::FAILED_PRECONDITION, idsInv.error);
+      }
+      if (!idsInv.value.empty()) {
+        const auto wait = waitForObjectViewsReady(grpcContext,
+                                                  disp,
+                                                  idsInv.value,
+                                                  kWaitForObjectsReadyDefaultPollMs,
+                                                  "cut_suggest:wait_ready");
+        if (!wait.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, wait.error);
+        }
+        inv = invokeSuggest();
+        if (!inv.ok) {
+          return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+        }
+        r = std::move(inv.value);
+      }
+    }
     if (!r.ok) {
       const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
                                       ? grpc::StatusCode::INVALID_ARGUMENT

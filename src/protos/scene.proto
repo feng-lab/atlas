@@ -11,8 +11,6 @@ message Bool { bool ok = 1; }
 message PingRequest {}
 message PingResponse { bool ok = 1; }
 
-message FileList { repeated string files = 1; }
-
 message ObjectInfo {
   uint64 id = 1;
   string type = 2;
@@ -260,7 +258,6 @@ service Scene {
   rpc CancelTask(TaskId) returns (Bool);
   // Forget a task and release its stored results.
   rpc DeleteTask(TaskId) returns (Bool);
-  rpc LoadFiles (FileList) returns (ListObjectsResponse);
   rpc ListObjects (Empty) returns (ListObjectsResponse);
   rpc BBox (BBoxRequest) returns (BBoxResponse);
   rpc Capabilities (CapabilitiesRequest) returns (CapabilitiesResponse);
@@ -392,20 +389,20 @@ message CameraOrbitSuggestRequest {
 }
 
 message CameraDollySuggestRequest {
-  repeated uint64 ids = 1; // targets to derive center
+  repeated uint64 ids = 1; // targets to derive center (or empty → all)
   double start_dist = 2;   // distance from center at start
   double end_dist = 3;     // distance from center at end
 }
 
 // Camera operator messages
 message CameraFocusRequest {
-  repeated uint64 ids = 1;     // targets to focus on (Animation3D filtered)
+  repeated uint64 ids = 1; // targets to focus on (Animation3D filtered). Empty → all visual objects
   bool after_clipping = 2;     // when true, use bbox after clipping
   double min_radius = 3;       // minimum radius (world units) for focus sphere (optional)
 }
 
 message CameraPointToRequest {
-  repeated uint64 ids = 1;     // targets to point to (Animation3D filtered)
+  repeated uint64 ids = 1; // targets to point to (Animation3D filtered). Empty → all visual objects
   bool after_clipping = 2;     // when true, use bbox after clipping
 }
 
@@ -475,7 +472,7 @@ message CameraConstraints {
 // Solve camera keys for a mode and targets
 message CameraSolveRequest {
   string mode = 1;           // "FIT" | "ORBIT" | "DOLLY" | "STATIC" (case-insensitive)
-  repeated uint64 ids = 2;   // targets; server filters non-visual by default
+  repeated uint64 ids = 2; // targets; server filters non-visual by default. Empty → all visual objects
   double t0 = 3;             // first key time
   double t1 = 4;             // second key time (for ORBIT/DOLLY); ignored for FIT/STATIC
   CameraConstraints constraints = 5;
@@ -492,7 +489,7 @@ message CameraPolicies {
 }
 
 message CameraValidateRequest {
-  repeated uint64 ids = 1;                 // targets; server filters non-visual by default
+  repeated uint64 ids = 1; // targets; server filters non-visual by default. Empty → all visual objects
   repeated double times = 2;               // times corresponding to values
   repeated google.protobuf.Value values = 3; // typed camera values
   CameraConstraints constraints = 4;
@@ -553,7 +550,7 @@ message CutSetRequest {
   bool refit_camera = 3;   // when true, re-fit camera after applying cuts
 }
 message CutSuggestRequest {
-  repeated uint64 ids = 1; // if empty, use all objects
+  repeated uint64 ids = 1; // if empty, use all visual objects
   string mode = 2;         // "box" (current implementation); reserved for future modes
   double margin = 3;       // world-units to expand the suggested box
   bool after_clipping = 4; // suggest using bbox after clipping

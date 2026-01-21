@@ -597,6 +597,12 @@ ZRpcUiDispatcher::BBoxValuesResult ZRpcUiDispatcher::cutSuggestBox(const CutSugg
   std::vector<size_t> ids = req.ids;
   if (ids.empty()) {
     ids = filterVisualIds(doc, doc->objs());
+    if (ids.empty()) {
+      out.ok = false;
+      out.errorKind = ErrorKind::InvalidArgument;
+      out.error = "cut_suggest: no visual objects available";
+      return out;
+    }
   } else {
     invalidIds.reserve(ids.size());
     for (auto id : ids) {
@@ -2276,6 +2282,12 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFit(const CameraFit
   }
 
   ids = filterVisualIds(doc, ids);
+  if (ids.empty()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = useAll ? "camera_fit: no visual objects available" : "camera_fit: ids contain no visual objects";
+    return out;
+  }
 
   auto snapInv = snapshotEngineCameraAndBBox(engine, ids, req.afterClipping, "camera_fit:snapshot_engine");
   if (!snapInv.ok) {
@@ -2294,7 +2306,9 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFit(const CameraFit
 
   ZBBox<glm::dvec3> bb = snap.bbox;
   if (bb.empty()) {
-    out.ok = true;
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera_fit: bbox empty";
     return out;
   }
 
@@ -2320,7 +2334,9 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFit(const CameraFit
     return out;
   }
   if (keys.empty()) {
-    out.ok = true;
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera_fit: no camera key produced";
     return out;
   }
 
@@ -2404,6 +2420,13 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraOrbitSuggest(const 
     }
   }
   ids = filterVisualIds(doc, ids);
+  if (ids.empty()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = req.ids.empty() ? "camera_orbit_suggest: no visual objects available"
+                                : "camera_orbit_suggest: ids contain no visual objects";
+    return out;
+  }
 
   auto snapInv = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false, "camera_orbit_suggest:snapshot_engine");
   if (!snapInv.ok) {
@@ -2420,7 +2443,9 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraOrbitSuggest(const 
     return out;
   }
   if (snap.bbox.empty()) {
-    out.ok = true;
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera_orbit_suggest: bbox empty";
     return out;
   }
 
@@ -2519,6 +2544,13 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraDollySuggest(const 
     }
   }
   ids = filterVisualIds(doc, ids);
+  if (ids.empty()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = req.ids.empty() ? "camera_dolly_suggest: no visual objects available"
+                                : "camera_dolly_suggest: ids contain no visual objects";
+    return out;
+  }
 
   auto snapInv = snapshotEngineCameraAndBBox(engine, ids, /*afterClipping=*/false, "camera_dolly_suggest:snapshot_engine");
   if (!snapInv.ok) {
@@ -2535,7 +2567,9 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraDollySuggest(const 
     return out;
   }
   if (snap.bbox.empty()) {
-    out.ok = true;
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera_dolly_suggest: bbox empty";
     return out;
   }
 
@@ -2571,12 +2605,6 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFocus(const CameraF
 {
   CameraValuesResult out;
 
-  if (req.ids.empty()) {
-    out.ok = false;
-    out.errorKind = ErrorKind::InvalidArgument;
-    out.error = "camera_focus: ids must be non-empty";
-    return out;
-  }
   if (!std::isfinite(req.minRadius) || req.minRadius < 0.0) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
@@ -2614,34 +2642,38 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFocus(const CameraF
     return out;
   }
 
-  // Validate ids and filter non-visual objects (Animation3D).
-  std::vector<size_t> invalidIds;
-  for (auto id : req.ids) {
-    if (!doc->idToDoc(id)) {
-      invalidIds.push_back(id);
-    }
-  }
-  if (!invalidIds.empty()) {
-    out.ok = false;
-    out.errorKind = ErrorKind::InvalidArgument;
-    std::ostringstream oss;
-    oss << "camera_focus: unknown object ids: [";
-    for (size_t i = 0; i < invalidIds.size(); ++i) {
-      if (i) {
-        oss << ", ";
+  std::vector<size_t> ids = req.ids.empty() ? doc->objs() : req.ids;
+  if (!req.ids.empty()) {
+    // Validate ids and filter non-visual objects (Animation3D).
+    std::vector<size_t> invalidIds;
+    for (auto id : ids) {
+      if (!doc->idToDoc(id)) {
+        invalidIds.push_back(id);
       }
-      oss << invalidIds[i];
     }
-    oss << "]";
-    out.error = oss.str();
-    return out;
+    if (!invalidIds.empty()) {
+      out.ok = false;
+      out.errorKind = ErrorKind::InvalidArgument;
+      std::ostringstream oss;
+      oss << "camera_focus: unknown object ids: [";
+      for (size_t i = 0; i < invalidIds.size(); ++i) {
+        if (i) {
+          oss << ", ";
+        }
+        oss << invalidIds[i];
+      }
+      oss << "]";
+      out.error = oss.str();
+      return out;
+    }
   }
 
-  std::vector<size_t> ids = filterVisualIds(doc, req.ids);
+  ids = filterVisualIds(doc, ids);
   if (ids.empty()) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
-    out.error = "camera_focus: ids contain no visual objects";
+    out.error =
+      req.ids.empty() ? "camera_focus: no visual objects available" : "camera_focus: ids contain no visual objects";
     return out;
   }
 
@@ -2662,7 +2694,9 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFocus(const CameraF
 
   ZBBox<glm::dvec3> bb = snap.bbox;
   if (bb.empty()) {
-    out.ok = true;
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera_focus: bbox empty";
     return out;
   }
 
@@ -2688,7 +2722,9 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFocus(const CameraF
     return out;
   }
   if (keys.empty()) {
-    out.ok = true;
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera_focus: no camera key produced";
     return out;
   }
 
@@ -2700,13 +2736,6 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFocus(const CameraF
 ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraPointTo(const CameraPointToRequest& req)
 {
   CameraValuesResult out;
-
-  if (req.ids.empty()) {
-    out.ok = false;
-    out.errorKind = ErrorKind::InvalidArgument;
-    out.error = "camera_point_to: ids must be non-empty";
-    return out;
-  }
 
   ZMainWindow* mainWin = mainWindowUi();
   if (!mainWin) {
@@ -2738,10 +2767,13 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraPointTo(const Camer
     return out;
   }
 
+  std::vector<size_t> ids = req.ids.empty() ? doc->objs() : req.ids;
   std::vector<size_t> invalidIds;
-  for (auto id : req.ids) {
-    if (!doc->idToDoc(id)) {
-      invalidIds.push_back(id);
+  if (!req.ids.empty()) {
+    for (auto id : ids) {
+      if (!doc->idToDoc(id)) {
+        invalidIds.push_back(id);
+      }
     }
   }
   if (!invalidIds.empty()) {
@@ -2760,11 +2792,12 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraPointTo(const Camer
     return out;
   }
 
-  std::vector<size_t> ids = filterVisualIds(doc, req.ids);
+  ids = filterVisualIds(doc, ids);
   if (ids.empty()) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
-    out.error = "camera_point_to: ids contain no visual objects";
+    out.error = req.ids.empty() ? "camera_point_to: no visual objects available"
+                                : "camera_point_to: ids contain no visual objects";
     return out;
   }
 
@@ -2783,7 +2816,9 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraPointTo(const Camer
     return out;
   }
   if (snap.bbox.empty()) {
-    out.ok = true;
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera_point_to: bbox empty";
     return out;
   }
 
@@ -2968,6 +3003,13 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraResetView(const Cam
     }
   }
   ids = filterVisualIds(doc, ids);
+  if (ids.empty()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = req.ids.empty() ? "camera_reset_view: no visual objects available"
+                                : "camera_reset_view: ids contain no visual objects";
+    return out;
+  }
 
   auto snapInv = snapshotEngineCameraAndBBox(engine, ids, req.afterClipping, "camera_reset_view:snapshot_engine");
   if (!snapInv.ok) {
@@ -2986,7 +3028,9 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraResetView(const Cam
 
   ZBBox<glm::dvec3> bb = snap.bbox;
   if (bb.empty()) {
-    out.ok = true;
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera_reset_view: bbox empty";
     return out;
   }
 
@@ -3333,6 +3377,12 @@ ZRpcUiDispatcher::CameraSolveResult ZRpcUiDispatcher::cameraSolve(const CameraSo
     return out;
   }
   ZDoc* doc = mainWin->doc();
+  if (!doc) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "doc not ready";
+    return out;
+  }
 
   auto* w3d = mainWin->get3DWindow();
   if (!w3d) {
@@ -3349,7 +3399,46 @@ ZRpcUiDispatcher::CameraSolveResult ZRpcUiDispatcher::cameraSolve(const CameraSo
     return out;
   }
 
-  const std::vector<size_t> ids = filterVisualIds(doc, req.ids);
+  std::vector<size_t> ids;
+  if (req.ids.empty()) {
+    ids = filterVisualIds(doc, doc->objs());
+    if (ids.empty()) {
+      out.ok = false;
+      out.errorKind = ErrorKind::InvalidArgument;
+      out.error = "camera_solve: no visual objects available (provide ids or load visual objects first)";
+      return out;
+    }
+  } else {
+    std::vector<size_t> invalidIds;
+    invalidIds.reserve(req.ids.size());
+    for (auto id : req.ids) {
+      if (!doc->idToDoc(id)) {
+        invalidIds.push_back(id);
+      }
+    }
+    if (!invalidIds.empty()) {
+      out.ok = false;
+      out.errorKind = ErrorKind::InvalidArgument;
+      std::ostringstream oss;
+      oss << "camera_solve: unknown object ids: [";
+      for (size_t i = 0; i < invalidIds.size(); ++i) {
+        if (i) {
+          oss << ", ";
+        }
+        oss << invalidIds[i];
+      }
+      oss << "]";
+      out.error = oss.str();
+      return out;
+    }
+    ids = filterVisualIds(doc, req.ids);
+    if (ids.empty()) {
+      out.ok = false;
+      out.errorKind = ErrorKind::InvalidArgument;
+      out.error = "camera_solve: ids contain no visual objects";
+      return out;
+    }
+  }
   auto snapInv = invokeOnObjectThreadWait(
     engine,
     [engine, &ids]() {

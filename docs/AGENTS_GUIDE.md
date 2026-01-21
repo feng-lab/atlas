@@ -183,7 +183,7 @@ Categories and current tools (non-exhaustive)
 - Session (extras): `session_tail_events` (quick "recent events" without crafting a search query)
 - Docs: `docs_list`, `docs_search`, `docs_read`
 - Planning: `update_plan`
-- Load: `scene_load_files`, `scene_ensure_loaded`, `scene_smart_load`
+- Load: `scene_load_sources` (canonical; local + network), `scene_smart_load` (resolve-by-name for local files), task API: `scene_start_load_task`, `scene_wait_task`, `scene_cancel_task`, `scene_delete_task`
 - Readiness: `scene_wait_objects_ready` (deterministic wait for 3D view/filter binding; not full progressive data completion)
 - Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_params`, `scene_apply`, `scene_save_scene`, `scene_screenshot`, `scene_set_visibility`, `scene_make_alias`
 - Discovery: `scene_list_objects`, `scene_list_params(id)`, `scene_capabilities`, `scene_schema`, `scene_capabilities_summary`, `scene_facts_summary`

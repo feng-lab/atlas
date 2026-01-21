@@ -342,47 +342,60 @@ TOOLS: List[Tool] = [
         handler=_tool_handler("scene_screenshot"),
     ),
     tool_from_schema(
-        name="scene_load_files",
+        name="scene_load_sources",
         description=(
-            "Load one or more LOCAL files into the GUI scene.\n"
-            "Accepts absolute paths; ~ and env vars expanded.\n"
-            "This tool is local-only: it rejects http(s)/gs/s3/precomputed URLs.\n"
-            "For Neuroglancer precomputed network datasets, use scene_start_load_task + scene_wait_task."
+            "Convenience loader for BOTH local files and network sources.\n"
+            "Supports Neuroglancer precomputed URLs (precomputed://, gs://, s3://, http(s)://) and local paths.\n"
+            "Internally uses StartLoadTask + WaitTask, and (optionally) WaitForObjectsReady so the returned ids are safe for bbox/camera/params."
         ),
         parameters_schema={
             "type": "object",
             "properties": {
-                "files": {
+                "sources": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Absolute paths to load",
-                }
+                    "description": "Dataset URLs/paths to load",
+                },
+                "network_timeout_sec": {
+                    "type": "number",
+                    "default": 30.0,
+                    "description": "Per-dataset network metadata timeout (seconds).",
+                },
+                "set_visible": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "When true, force loaded objects visible.",
+                },
+                "task_timeout_sec": {
+                    "type": "number",
+                    "default": 120.0,
+                    "description": "Max time to wait for load task completion (seconds). 0 = check once.",
+                },
+                "task_poll_interval_sec": {
+                    "type": "number",
+                    "default": 0.2,
+                    "description": "Polling interval while waiting for the task (seconds).",
+                },
+                "wait_ready": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "When true, wait for 3D view/filter readiness for the returned ids.",
+                },
+                "ready_timeout_sec": {
+                    "type": "number",
+                    "default": 30.0,
+                    "description": "Max time to wait for object readiness (seconds). 0 = check once.",
+                },
+                "ready_poll_interval_sec": {
+                    "type": "number",
+                    "default": 0.2,
+                    "description": "Polling interval while waiting for object readiness (seconds).",
+                },
             },
-            "required": ["files"],
+            "required": ["sources"],
         },
         preconditions=(),
-        handler=_tool_handler("scene_load_files"),
-    ),
-    tool_from_schema(
-        name="scene_ensure_loaded",
-        description=(
-            "Idempotently ensure LOCAL files are loaded: skips already loaded paths, validates existence, and loads only missing ones.\n"
-            "This tool is local-only: it rejects http(s)/gs/s3/precomputed URLs.\n"
-            "For Neuroglancer precomputed network datasets, use scene_start_load_task + scene_wait_task."
-        ),
-        parameters_schema={
-            "type": "object",
-            "properties": {
-                "files": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Absolute paths to load (idempotent)",
-                }
-            },
-            "required": ["files"],
-        },
-        preconditions=(),
-        handler=_tool_handler("scene_ensure_loaded"),
+        handler=_tool_handler("scene_load_sources"),
     ),
     tool_from_schema(
         name="scene_start_load_task",
@@ -801,48 +814,36 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         )
         return json.dumps({"ok": True, "text": info})
 
-    if name == "scene_load_files":
-        files = args.get("files") or []
+    if name == "scene_load_sources":
+        sources = args.get("sources") or []
+        network_timeout_sec = args.get("network_timeout_sec", 30.0)
+        set_visible = bool(args.get("set_visible", True))
+        task_timeout_sec = float(args.get("task_timeout_sec", 120.0) or 0.0)
+        task_poll_interval_sec = float(args.get("task_poll_interval_sec", 0.2) or 0.2)
+        wait_ready = bool(args.get("wait_ready", True))
+        ready_timeout_sec = float(args.get("ready_timeout_sec", 30.0) or 0.0)
+        ready_poll_interval_sec = float(args.get("ready_poll_interval_sec", 0.2) or 0.2)
         try:
-            resp = client.load_files(files)
-            objs = [
-                {"id": o.id, "type": o.type, "name": o.name, "visible": o.visible}
-                for o in resp.objects
-            ]
-            return json.dumps({"ok": True, "objects": objs, "paths": files})
-        except FileNotFoundError as e:
-            # Hint the agent to use scene_smart_load next
-            return json.dumps(
-                {
-                    "ok": False,
-                    "error": str(e),
-                    "hint": "Use scene_smart_load to resolve names in common dirs (Documents/Downloads/Desktop/cwd).",
-                }
+            res = client.load_sources(
+                sources,
+                network_timeout_sec=float(network_timeout_sec)
+                if network_timeout_sec is not None
+                else None,
+                set_visible=set_visible,
+                task_timeout_sec=task_timeout_sec,
+                task_poll_interval_sec=task_poll_interval_sec,
+                wait_ready=wait_ready,
+                ready_timeout_sec=ready_timeout_sec,
+                ready_poll_interval_sec=ready_poll_interval_sec,
             )
+            return json.dumps(res, ensure_ascii=False)
         except Exception as e:
-            return json.dumps(
-                {
-                    "ok": False,
-                    "error": str(e),
-                    "hint": "If you are loading a Neuroglancer URL (precomputed://, gs://, s3://, http(s)://), use scene_start_load_task + scene_wait_task.",
-                },
-                ensure_ascii=False,
-            )
-
-    if name == "scene_ensure_loaded":
-        files = args.get("files") or []
-        try:
-            summary = client.ensure_loaded(files)
-            return json.dumps({"ok": True, **summary})
-        except Exception as e:
-            return json.dumps(
-                {
-                    "ok": False,
-                    "error": str(e),
-                    "hint": "If you are loading a Neuroglancer URL (precomputed://, gs://, s3://, http(s)://), use scene_start_load_task + scene_wait_task.",
-                },
-                ensure_ascii=False,
-            )
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg}, ensure_ascii=False)
 
     if name == "scene_start_load_task":
         sources = args.get("sources") or []
@@ -1016,19 +1017,34 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                                     break
                         except Exception:
                             pass
-        loaded = 0
         try:
-            if resolved:
-                resp = client.load_files(resolved)
-                loaded = len(resp.objects)
-            return json.dumps(
-                {
-                    "ok": True,
-                    "loaded_objects": loaded,
-                    "resolved": resolved,
-                    "tried": tried,
-                }
-            )
+            if not resolved:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "No matching files found in searched directories.",
+                        "resolved": resolved,
+                        "tried": tried,
+                    },
+                    ensure_ascii=False,
+                )
+
+            # Reuse the canonical loader so network/local semantics are consistent.
+            # (Here resolved are local paths; scene_load_sources handles any future URL additions.)
+            res = client.load_sources(resolved, wait_ready=True)
+            out = {
+                "ok": bool(res.get("ok", False)),
+                "resolved": resolved,
+                "tried": tried,
+                "loaded_ids": res.get("loaded_ids", []),
+                "task_id": res.get("task_id"),
+                "task_status": res.get("task_status"),
+            }
+            if "ready_status" in res:
+                out["ready_status"] = res.get("ready_status")
+            if "error" in res:
+                out["error"] = res.get("error")
+            return json.dumps(out, ensure_ascii=False)
         except Exception as e:
             return json.dumps(
                 {
@@ -1036,7 +1052,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     "error": str(e),
                     "resolved": resolved,
                     "tried": tried,
-                }
+                },
+                ensure_ascii=False,
             )
 
     if name == "scene_list_objects":

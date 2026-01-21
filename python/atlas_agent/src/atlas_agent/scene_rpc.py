@@ -39,6 +39,12 @@ DEFAULT_RPC_BOOTSTRAP_TOTAL_WAIT_SEC = 30.0
 DEFAULT_ENGINE_READY_TOTAL_WAIT_SEC = 30.0
 DEFAULT_ENGINE_READY_POLL_INTERVAL_SEC = 0.2
 DEFAULT_ENGINE_READY_RPC_TIMEOUT_SEC = 10.0
+# Default deadline for engine-backed operations (params/bbox/camera) that may
+# need to auto-wait for object/view binding. This should be long enough for
+# heavy local scenes and short enough to avoid hanging tool loops indefinitely.
+DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC = 30.0
+# Screenshot rendering can be slower than most single-shot engine ops.
+DEFAULT_SCREENSHOT_RPC_TIMEOUT_SEC = 60.0
 
 
 def _expand_path(s: str) -> str:
@@ -50,20 +56,6 @@ def _expand_path(s: str) -> str:
         if ":" in t:
             t = t.split(":", 1)[1]
     return t
-
-
-def _looks_like_nonlocal_url(s: str) -> bool:
-    """Best-effort URL detection for agent inputs.
-
-    We treat non-file URLs as network-backed sources (e.g. Neuroglancer precomputed).
-    """
-    try:
-        t = str(s or "").strip()
-    except Exception:
-        return False
-    if "://" not in t:
-        return False
-    return not t.lower().startswith("file://")
 
 
 def _to_proto_value(py: Any) -> struct_pb2.Value:
@@ -559,6 +551,107 @@ class SceneClient:
         self._log_rpc("DeleteTask", req, resp)
         return bool(getattr(resp, "ok", False))
 
+    def load_sources(
+        self,
+        sources: Iterable[str],
+        *,
+        network_timeout_sec: float | None = None,
+        set_visible: bool = True,
+        task_timeout_sec: float = 120.0,
+        task_poll_interval_sec: float = 0.2,
+        wait_ready: bool = True,
+        ready_timeout_sec: float = 30.0,
+        ready_poll_interval_sec: float = 0.2,
+    ) -> dict[str, Any]:
+        """Convenience: load local paths and/or network URLs and optionally wait for readiness.
+
+        Intended orchestration for most agent flows:
+          StartLoadTask -> WaitTask -> (optional) WaitForObjectsReady
+        """
+
+        task_id = self.start_load_task(
+            sources,
+            network_timeout_sec=network_timeout_sec,
+            set_visible=set_visible,
+        )
+
+        status = self.wait_task(
+            task_id,
+            timeout_sec=float(task_timeout_sec),
+            poll_interval_sec=float(task_poll_interval_sec),
+        )
+
+        load = {}
+        try:
+            load = status.get("load") or {}
+        except Exception:
+            load = {}
+
+        loaded_ids: list[int] = []
+        try:
+            raw_ids = load.get("loadedIds") or load.get("loaded_ids") or []
+            for v in raw_ids:
+                loaded_ids.append(int(v))
+        except Exception:
+            loaded_ids = []
+
+        state = status.get("state")
+        state_s = str(state or "")
+        state_i: int | None = None
+        try:
+            state_i = int(state)  # type: ignore[arg-type]
+        except Exception:
+            state_i = None
+
+        # Heuristic: treat RUNNING/QUEUED as in-progress when WaitTask returns early (timeout).
+        in_progress = state_s in (
+            "TASK_STATE_QUEUED",
+            "TASK_STATE_RUNNING",
+        ) or state_i in (1, 2)
+
+        # Overall success policy:
+        # - SUCCEEDED => ok
+        # - FAILED => ok only if some ids loaded (partial success)
+        # - CANCELLED => not ok
+        ok = False
+        partial = False
+        if state_s == "TASK_STATE_SUCCEEDED" or state_i == 3:
+            ok = True
+        elif state_s == "TASK_STATE_FAILED" or state_i == 4:
+            ok = bool(loaded_ids)
+            partial = bool(loaded_ids)
+        elif state_s == "TASK_STATE_CANCELLED" or state_i == 5:
+            ok = False
+        elif in_progress:
+            ok = False
+        else:
+            # Unknown/new state: fall back to whether we have any usable ids.
+            ok = bool(loaded_ids)
+            partial = ok and bool(status.get("error"))
+
+        out: dict[str, Any] = {
+            "ok": bool(ok),
+            "partial": bool(partial),
+            "in_progress": bool(in_progress),
+            "task_id": int(task_id),
+            "task_status": status,
+            "loaded_ids": loaded_ids,
+        }
+
+        if wait_ready and loaded_ids and not in_progress:
+            # Ensure a 3D view exists so WaitForObjectsReady is meaningful.
+            self.ensure_view(require=True)
+            ready = self.wait_for_objects_ready(
+                loaded_ids,
+                timeout_sec=float(ready_timeout_sec),
+                poll_interval_sec=float(ready_poll_interval_sec),
+            )
+            out["ready_status"] = ready
+            # If the user asked to wait for readiness, fold that into ok.
+            out["ok"] = bool(out["ok"]) and bool(ready.get("ok", False))
+
+        return out
+
     def ensure_view(self, *, require: bool = True) -> bool:
         """Ensure a 3D view (and rendering engine) exists and is ready.
 
@@ -715,101 +808,6 @@ class SceneClient:
             return None
         except Exception:
             return None
-
-    def load_files(self, files: Iterable[str]):
-        # This is intentionally local-only; URLs must go through the task API so we
-        # don't block on network I/O and we can handle progressive loading cleanly.
-        bad_urls: list[str] = []
-        exp: list[str] = []
-        missing: list[str] = []
-        for s in files:
-            if _looks_like_nonlocal_url(str(s or "")):
-                bad_urls.append(str(s))
-                continue
-            t = _expand_path(s)
-            if not os.path.isabs(t):
-                # leave relative paths as-is; let caller decide base dir
-                pass
-            if not os.path.exists(t):
-                missing.append(t)
-            else:
-                exp.append(t)
-        if bad_urls:
-            raise ValueError(
-                "LoadFiles only supports local file paths.\n"
-                f"- urls: {bad_urls}\n"
-                "Use start_load_task([...]) + wait_task(task_id) for Neuroglancer precomputed URLs."
-            )
-        if missing:
-            self._logger.error("LoadFiles: missing paths: %s", missing)
-            raise FileNotFoundError(f"Not found: {missing}")
-        req = self._pb2.FileList(files=exp)
-        resp = self._stub.LoadFiles(req)
-        self._log_rpc("LoadFiles", req, resp)
-        return resp
-
-    def ensure_loaded(self, files: Iterable[str]):
-        """Idempotently ensure files are loaded: skip any that are already present.
-        Returns a dict: {loaded: [...], skipped: [...], objects: [...]}.
-        """
-        bad_urls: list[str] = []
-        for s in files:
-            if _looks_like_nonlocal_url(str(s or "")):
-                bad_urls.append(str(s))
-        if bad_urls:
-            raise ValueError(
-                "ensure_loaded() only supports local file paths.\n"
-                f"- urls: {bad_urls}\n"
-                "Use start_load_task([...]) + wait_task(task_id) for Neuroglancer precomputed URLs."
-            )
-        # Snapshot current objects and build a set of normalized existing paths
-        objs = self.list_objects()
-        existing_paths = set()
-        for o in getattr(objs, "objects", []):
-            try:
-                p = str(getattr(o, "path", "") or "").strip()
-                if p:
-                    existing_paths.add(os.path.normpath(_expand_path(p)))
-            except Exception:
-                pass
-        to_load: list[str] = []
-        skipped: list[str] = []
-        for s in files:
-            t = _expand_path(s)
-            t_norm = os.path.normpath(t)
-            if t_norm in existing_paths:
-                skipped.append(t_norm)
-            else:
-                to_load.append(t_norm)
-        loaded: list[str] = []
-        if to_load:
-            # Validate existence before sending to Atlas
-            missing = [p for p in to_load if not os.path.exists(p)]
-            if missing:
-                # Do not raise; return missing so the agent can iterate
-                self._logger.warning(
-                    "ensure_loaded: missing paths skipped: %s", missing
-                )
-                to_load = [p for p in to_load if p not in missing]
-            if to_load:
-                req = self._pb2.FileList(files=to_load)
-                resp = self._stub.LoadFiles(req)
-                self._log_rpc("LoadFiles", req, resp)
-                loaded = list(to_load)
-                objs = resp
-        # Return a compact summary structure
-        out_objs = []
-        for o in getattr(objs, "objects", []):
-            out_objs.append(
-                {
-                    "id": int(getattr(o, "id", 0)),
-                    "type": getattr(o, "type", ""),
-                    "name": getattr(o, "name", ""),
-                    "path": getattr(o, "path", ""),
-                    "visible": bool(getattr(o, "visible", False)),
-                }
-            )
-        return {"loaded": loaded, "skipped": skipped, "objects": out_objs}
 
     # Snapshot current timeline keys for facts/verification
     def timeline_snapshot(self) -> dict:
@@ -1100,7 +1098,9 @@ class SceneClient:
             ids=[int(i) for i in (ids or [])], after_clipping=bool(after_clipping)
         )
         try:
-            resp = self._stub.BBox(req)
+            resp = self._stub.BBox(
+                req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+            )
         except Exception as e:
             self._log_rpc("BBox", req, None, error=e)
             msg = str(e)
@@ -1178,7 +1178,9 @@ class SceneClient:
         req = self._pb2.CameraFitRequest(
             ids=ids or [], all=all, after_clipping=after_clipping, min_radius=min_radius
         )
-        resp = self._stub.CameraFit(req)
+        resp = self._stub.CameraFit(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraFit", req, resp)
         return [MessageToDict(v) for v in resp.values]
 
@@ -1188,7 +1190,9 @@ class SceneClient:
         if not hasattr(self._stub, "CameraGet"):
             raise RuntimeError("CameraGet is not supported by this Atlas version")
         req = empty_pb2.Empty()
-        resp = self._stub.CameraGet(req)
+        resp = self._stub.CameraGet(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraGet", req, resp)
         vals = [MessageToDict(v) for v in getattr(resp, "values", [])]
         return vals[0] if vals else {}
@@ -1200,7 +1204,9 @@ class SceneClient:
         req = self._pb2.CameraOrbitSuggestRequest(
             ids=ids or [], axis=axis, degrees=float(degrees)
         )
-        resp = self._stub.CameraOrbitSuggest(req)
+        resp = self._stub.CameraOrbitSuggest(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraOrbitSuggest", req, resp)
         return [MessageToDict(v) for v in resp.values]
 
@@ -1214,7 +1220,9 @@ class SceneClient:
         req = self._pb2.CameraDollySuggestRequest(
             ids=ids or [], start_dist=start_dist, end_dist=end_dist
         )
-        resp = self._stub.CameraDollySuggest(req)
+        resp = self._stub.CameraDollySuggest(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraDollySuggest", req, resp)
         return [MessageToDict(v) for v in resp.values]
 
@@ -1231,7 +1239,9 @@ class SceneClient:
             after_clipping=bool(after_clipping),
             min_radius=float(min_radius),
         )
-        resp = self._stub.CameraFocus(req)
+        resp = self._stub.CameraFocus(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraFocus", req, resp)
         vals = [MessageToDict(v) for v in resp.values]
         return vals[0] if vals else {}
@@ -1243,7 +1253,9 @@ class SceneClient:
         req = self._pb2.CameraPointToRequest(
             ids=ids or [], after_clipping=bool(after_clipping)
         )
-        resp = self._stub.CameraPointTo(req)
+        resp = self._stub.CameraPointTo(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraPointTo", req, resp)
         vals = [MessageToDict(v) for v in resp.values]
         return vals[0] if vals else {}
@@ -1258,7 +1270,9 @@ class SceneClient:
             degrees=float(degrees),
             base_value=bv if bv is not None else None,
         )
-        resp = self._stub.CameraRotate(req)
+        resp = self._stub.CameraRotate(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraRotate", req, resp)
         vals = [MessageToDict(v) for v in resp.values]
         return vals[0] if vals else {}
@@ -1277,7 +1291,9 @@ class SceneClient:
             after_clipping=bool(after_clipping),
             min_radius=float(min_radius),
         )
-        resp = self._stub.CameraResetView(req)
+        resp = self._stub.CameraResetView(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraResetView", req, resp)
         vals = [MessageToDict(v) for v in resp.values]
         return vals[0] if vals else {}
@@ -1310,7 +1326,9 @@ class SceneClient:
         if base_value is not None:
             kwargs["base_value"] = _to_proto_value(base_value)
         req = self._pb2.CameraMoveLocalRequest(**kwargs)
-        resp = self._stub.CameraMoveLocal(req)
+        resp = self._stub.CameraMoveLocal(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraMoveLocal", req, resp)
         vals = [MessageToDict(v) for v in getattr(resp, "values", [])]
         return vals[0] if vals else {}
@@ -1362,7 +1380,9 @@ class SceneClient:
             kwargs["target_bbox_center"] = True
 
         req = self._pb2.CameraLookAtRequest(**kwargs)
-        resp = self._stub.CameraLookAt(req)
+        resp = self._stub.CameraLookAt(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraLookAt", req, resp)
         vals = [MessageToDict(v) for v in getattr(resp, "values", [])]
         return vals[0] if vals else {}
@@ -1423,7 +1443,9 @@ class SceneClient:
         if base_value is not None:
             req_kwargs["base_value"] = _to_proto_value(base_value)
         req = self._pb2.CameraPathSolveRequest(**req_kwargs)
-        resp = self._stub.CameraPathSolve(req)
+        resp = self._stub.CameraPathSolve(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraPathSolve", req, resp)
         out: list[dict] = []
         for k in getattr(resp, "keys", []):
@@ -1507,7 +1529,9 @@ class SceneClient:
             constraints=cons if cons is not None else None,
             params=st if st is not None else None,
         )
-        resp = self._stub.CameraSolve(req)
+        resp = self._stub.CameraSolve(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraSolve", req, resp)
         out: list[dict] = []
         for k in getattr(resp, "keys", []):
@@ -1564,7 +1588,9 @@ class SceneClient:
         req = self._pb2.CameraValidateRequest(
             **req_kwargs,
         )
-        resp = self._stub.CameraValidate(req)
+        resp = self._stub.CameraValidate(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CameraValidate", req, resp)
         results: list[dict] = []
         for r in getattr(resp, "results", []):
@@ -1612,7 +1638,9 @@ class SceneClient:
             if cached is not None:
                 return cached
         req = self._pb2.ListParamsRequest(id=bound_id)
-        resp = self._stub.ListParams(req)
+        resp = self._stub.ListParams(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("ListParams", req, resp)
         if self._param_list_cache is not None:
             self._param_list_cache[bound_id] = resp
@@ -1995,7 +2023,9 @@ class SceneClient:
         # FAILED_PRECONDITION ("engine not ready").
         self.ensure_view()
         req = self._pb2.GetParamValuesRequest(id=int(id), json_keys=json_keys or [])
-        resp = self._stub.GetParamValues(req)
+        resp = self._stub.GetParamValues(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("GetParamValues", req, resp)
         # Convert Struct/Value map to native dict
         out: dict[str, Any] = {}
@@ -2026,7 +2056,9 @@ class SceneClient:
                 )
             )
         req = self._pb2.ValidateSceneParamsRequest(set_params=pb_items)
-        resp = self._stub.ValidateSceneParams(req)
+        resp = self._stub.ValidateSceneParams(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("ValidateSceneParams", req, resp)
         results: list[dict] = []
         for r in getattr(resp, "results", []):
@@ -2061,7 +2093,9 @@ class SceneClient:
                 )
             )
         req = self._pb2.ApplySceneParamsRequest(set_params=pb_items)
-        resp = self._stub.ApplySceneParams(req)
+        resp = self._stub.ApplySceneParams(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("ApplySceneParams", req, resp)
         return bool(getattr(resp, "ok", False))
 
@@ -2098,7 +2132,9 @@ class SceneClient:
             path=out_path,
             overwrite=bool(overwrite),
         )
-        resp = self._stub.TakeScreenshot3D(req)
+        resp = self._stub.TakeScreenshot3D(
+            req, timeout=float(DEFAULT_SCREENSHOT_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("TakeScreenshot3D", req, resp)
 
         ok = bool(getattr(resp, "ok", False))
@@ -2122,11 +2158,15 @@ class SceneClient:
             max=Vec3(x=max_xyz[0], y=max_xyz[1], z=max_xyz[2]),
         )
         req = self._pb2.CutSetRequest(box=box, refit_camera=refit_camera)
-        return self._stub.CutSet(req).ok
+        return self._stub.CutSet(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        ).ok
 
     def cut_clear(self) -> bool:
         self.ensure_view()
-        return self._stub.CutClear(self._pb2.Empty()).ok
+        return self._stub.CutClear(
+            self._pb2.Empty(), timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        ).ok
 
     def cut_suggest_box(
         self,
@@ -2138,6 +2178,8 @@ class SceneClient:
         req = self._pb2.CutSuggestRequest(
             ids=ids or [], mode="box", margin=margin, after_clipping=after_clipping
         )
-        resp = self._stub.CutSuggest(req)
+        resp = self._stub.CutSuggest(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
         self._log_rpc("CutSuggest", req, resp)
         return resp

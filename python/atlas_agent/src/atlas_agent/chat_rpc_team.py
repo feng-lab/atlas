@@ -53,8 +53,8 @@ ATLAS_STATE_MUTATION_TOOLS: set[str] = {
     "scene_apply",
     "scene_camera_fit",
     "scene_camera_apply",
-    "scene_load_files",
-    "scene_ensure_loaded",
+    "scene_load_sources",
+    "scene_start_load_task",
     "scene_smart_load",
     "scene_set_visibility",
     "scene_make_alias",
@@ -122,10 +122,10 @@ ATLAS_SHARED_SYSTEM_RULES = (
     "- Avoid blocking on missing user intent/input; choose defaults and proceed. Use report_blocked only for technical/capability blocks (RPC down, tool missing, preconditions cannot be satisfied, etc.).\n"
     "- For unclear workflow/semantics, consult docs via docs_search and docs_read (AGENTS_GUIDE.md, SCENE_SERVER.md).\n"
     "- Tool-call arguments must be STRICT JSON (double-quoted keys/strings; lowercase true/false/null; no trailing commas).\n\n"
-    "- Never embed tool calls or raw JSON blobs in assistant text (e.g., {\"tool\": ...} or {\"plan\": ...}). If you need to update the plan or verification, CALL THE TOOL.\n\n"
+    '- Never embed tool calls or raw JSON blobs in assistant text (e.g., {"tool": ...} or {"plan": ...}). If you need to update the plan or verification, CALL THE TOOL.\n\n'
     "Reasoning summary style:\n"
     "- The UI will show your reasoning summary live. Keep it high-level and safe (no hidden chain-of-thought).\n"
-    "- Write in first person and future-looking (\"I will…\"), include risks/trade-offs and a verification strategy.\n\n"
+    '- Write in first person and future-looking ("I will…"), include risks/trade-offs and a verification strategy.\n\n'
     "Output expectations:\n"
     "- Final answer: concise, actionable, and evidence-based. State what you changed and how you verified.\n"
     "- If something cannot be verified via tools, say so and record it as a visual/human check (do not speculate).\n"
@@ -144,8 +144,8 @@ ATLAS_PLANNER_SYSTEM_PROMPT = (
     "Verification requirements:\n"
     "- After update_plan, call verification_set_requirements for each plan step_id.\n"
     "- Use policy.all_of groups to express multi-mode verification. Common patterns:\n"
-    "  • Tool-only: all_of=[{any_of:[\"tool\"], description:\"...\"}]\n"
-    "  • Tool AND (Visual OR Human): all_of=[{any_of:[\"tool\"]},{any_of:[\"visual\",\"human\"]}]\n"
+    '  • Tool-only: all_of=[{any_of:["tool"], description:"..."}]\n'
+    '  • Tool AND (Visual OR Human): all_of=[{any_of:["tool"]},{any_of:["visual","human"]}]\n'
     "- Prefer a single plan step with a multi-mode verification policy rather than splitting into multiple steps unless it improves clarity.\n\n"
     + ATLAS_SHARED_SYSTEM_RULES
     + "\n\nTask brief format (reference):\n"
@@ -285,8 +285,12 @@ class ChatTeam:
         except Exception:
             pass
 
-        self.llm = LLMClient(api_key=self.api_key, model=self.model, wire_api=self.wire_api)
-        self.intent_resolver = IntentResolver(client=self.llm, temperature=self.temperature)
+        self.llm = LLMClient(
+            api_key=self.api_key, model=self.model, wire_api=self.wire_api
+        )
+        self.intent_resolver = IntentResolver(
+            client=self.llm, temperature=self.temperature
+        )
         # Live (in-memory) pointer to the currently edited Animation3D object.
         # Note: ids are not stable across Atlas runs; this is used only within
         # a single running app instance for convenience and deterministic tool calls.
@@ -295,7 +299,9 @@ class ChatTeam:
         # Build capabilities context derived from atlas_dir or defaults.
         self._context: str = build_atlas_agent_primer()
         try:
-            schema_dir, _ = discover_schema_dir(user_schema_dir=None, atlas_dir=self.atlas_dir)
+            schema_dir, _ = discover_schema_dir(
+                user_schema_dir=None, atlas_dir=self.atlas_dir
+            )
             if schema_dir:
                 self._context = build_capabilities_prompt(
                     schema_dir,
@@ -305,11 +311,15 @@ class ChatTeam:
             self._context = build_atlas_agent_primer()
 
         # Always include a short docs/tooling hint (docs are shipped inside the Atlas app bundle).
-        self._context = (self._context or "").rstrip() + "\n\n" + "\n".join(
-            [
-                "Docs (runtime): use docs_search/docs_read to look up Atlas behavior and RPC/tool contracts.",
-                "Key docs: AGENTS_GUIDE.md, SCENE_SERVER.md, USER_GUIDE.md, DEVELOPER_GUIDE.md.",
-            ]
+        self._context = (
+            (self._context or "").rstrip()
+            + "\n\n"
+            + "\n".join(
+                [
+                    "Docs (runtime): use docs_search/docs_read to look up Atlas behavior and RPC/tool contracts.",
+                    "Key docs: AGENTS_GUIDE.md, SCENE_SERVER.md, USER_GUIDE.md, DEVELOPER_GUIDE.md.",
+                ]
+            )
         )
 
         # Persist session meta for easy resume.
@@ -348,16 +358,27 @@ class ChatTeam:
         try:
             autosave_path = self._animation_autosave_path()
             if autosave_path.exists():
-                loaded = self.scene.ensure_loaded([str(autosave_path)])
-                for o in (loaded.get("objects") or []):
+                # Load the autosaved animation into the live Atlas doc, then recover
+                # the new in-app object id by matching on the absolute path.
+                #
+                # Notes:
+                # - This uses the unified load_sources path (task API) for both local
+                #   and network sources.
+                # - We do not wait for "object ready" here: Animation3D is not a
+                #   visual object and does not need a bound 3D view/filter.
+                self.scene.load_sources(
+                    [str(autosave_path)], set_visible=False, wait_ready=False
+                )
+                objs = self.scene.list_objects()
+                for o in getattr(objs, "objects", []):
                     try:
-                        if str(o.get("type") or "") != "Animation3D":
+                        if str(getattr(o, "type", "") or "") != "Animation3D":
                             continue
-                        op = str(o.get("path") or "").strip()
+                        op = str(getattr(o, "path", "") or "").strip()
                         if not op:
                             continue
                         if Path(op).expanduser().resolve() == autosave_path.resolve():
-                            self._current_animation_id = int(o.get("id", 0) or 0)
+                            self._current_animation_id = int(getattr(o, "id", 0) or 0)
                             break
                     except Exception:
                         continue
@@ -407,7 +428,9 @@ class ChatTeam:
                         lines.append(f"- {role}: {c}")
                 if lines:
                     self._memory_summary = (
-                        (self._memory_summary.rstrip() + "\n" + "\n".join(lines)).strip()
+                        (
+                            self._memory_summary.rstrip() + "\n" + "\n".join(lines)
+                        ).strip()
                         if self._memory_summary
                         else "\n".join(lines).strip()
                     )
@@ -419,7 +442,9 @@ class ChatTeam:
             try:
                 n_recent = max(0, int(SESSION_MEMORY_RECENT_WRITE_EVENTS))
                 if n_recent > 0:
-                    write_tools = set(ATLAS_STATE_MUTATION_TOOLS) | set(ATLAS_OUTPUT_TOOLS)
+                    write_tools = set(ATLAS_STATE_MUTATION_TOOLS) | set(
+                        ATLAS_OUTPUT_TOOLS
+                    )
                     recent_tool_events = self.session_store.tail_events(
                         limit=max(1, n_recent * 3), event_type="tool_call"
                     )
@@ -487,7 +512,11 @@ class ChatTeam:
                     self._memory_summary or "(none)",
                     "",
                     *(
-                        ["Recent state changes (most recent first; summarized):", *write_summaries, ""]
+                        [
+                            "Recent state changes (most recent first; summarized):",
+                            *write_summaries,
+                            "",
+                        ]
                         if write_summaries
                         else []
                     ),
@@ -611,12 +640,17 @@ class ChatTeam:
                     except Exception:
                         continue
                 if write_summaries:
-                    snippets.append("Recent verified writes (most recent first; summarized):")
+                    snippets.append(
+                        "Recent verified writes (most recent first; summarized):"
+                    )
                     snippets.extend(write_summaries)
 
             # 2) A few matching transcript messages (for qualitative recall).
             for needle in needles:
-                if max_snips and len([s for s in snippets if s.startswith("- ")]) >= max_snips:
+                if (
+                    max_snips
+                    and len([s for s in snippets if s.startswith("- ")]) >= max_snips
+                ):
                     break
                 try:
                     hits = self.session_store.search_transcript(
@@ -683,7 +717,10 @@ class ChatTeam:
                     candidate = f"- {oid}:{typ}:{name} visible={vis}"
                     # Keep this snapshot bounded for prompt stability; avoid silently truncating.
                     current = "\n".join(scene_lines)
-                    if len(current) + 1 + len(candidate) > INTENT_RESOLVER_SCENE_SNAPSHOT_MAX_CHARS:
+                    if (
+                        len(current) + 1 + len(candidate)
+                        > INTENT_RESOLVER_SCENE_SNAPSHOT_MAX_CHARS
+                    ):
                         remaining = max(0, len(ol) - max(0, len(scene_lines) - 1))
                         scene_lines.append(
                             f"... (scene snapshot truncated for prompt budget; {remaining} more objects not shown; use scene_list_objects for full list)"
@@ -695,7 +732,10 @@ class ChatTeam:
         except Exception:
             pass
         try:
-            if self._current_animation_id is not None and int(self._current_animation_id) > 0:
+            if (
+                self._current_animation_id is not None
+                and int(self._current_animation_id) > 0
+            ):
                 ts = self.scene.get_time(animation_id=int(self._current_animation_id))
                 tsec = float(getattr(ts, "seconds", 0.0) or 0.0)
                 dur = float(getattr(ts, "duration", 0.0) or 0.0)
@@ -730,7 +770,9 @@ class ChatTeam:
         except Exception:
             pass
         if self._memory_summary:
-            context_blocks.append("Session memory (summary):\n" + self._memory_summary.strip())
+            context_blocks.append(
+                "Session memory (summary):\n" + self._memory_summary.strip()
+            )
         if retrieved_context:
             context_blocks.append(retrieved_context.strip())
         try:
@@ -755,7 +797,9 @@ class ChatTeam:
         if scene_snapshot_text:
             brief_ctx_parts.append("Scene snapshot:\n" + scene_snapshot_text)
         if self._memory_summary:
-            brief_ctx_parts.append("Session memory (summary):\n" + self._memory_summary.strip())
+            brief_ctx_parts.append(
+                "Session memory (summary):\n" + self._memory_summary.strip()
+            )
         if retrieved_context:
             brief_ctx_parts.append(retrieved_context.strip())
         if plan:
@@ -784,7 +828,9 @@ class ChatTeam:
             forced = ""
             try:
                 forced = (
-                    self.intent_resolver.resolve_force_task_brief(user_text, scene_context=brief_ctx)
+                    self.intent_resolver.resolve_force_task_brief(
+                        user_text, scene_context=brief_ctx
+                    )
                     or ""
                 ).strip()
             except Exception:
@@ -799,7 +845,9 @@ class ChatTeam:
             # actionable brief that preserves the raw user request.
             suppressed_clarify = suppressed_clarify or task_brief.strip()
             tl = (user_text or "").lower()
-            if any(k in tl for k in ("animation", "video", "seconds", "fps", "timeline")):
+            if any(
+                k in tl for k in ("animation", "video", "seconds", "fps", "timeline")
+            ):
                 intent = "animation"
             else:
                 intent = "scene"
@@ -815,7 +863,9 @@ class ChatTeam:
         # Persist the user input after auto-retrieval (so search doesn't match the current message),
         # but before any tool execution (so intent survives crashes mid-turn).
         try:
-            self.session_store.append_transcript(role="user", content=user_text, turn_id=turn_id)
+            self.session_store.append_transcript(
+                role="user", content=user_text, turn_id=turn_id
+            )
         except Exception:
             pass
         try:
@@ -877,7 +927,9 @@ class ChatTeam:
             try:
                 touched_key_targets.setdefault(int(id), set()).add(jk)
                 if time is not None:
-                    touched_key_times.setdefault(int(id), {}).setdefault(jk, set()).add(float(time))
+                    touched_key_times.setdefault(int(id), {}).setdefault(jk, set()).add(
+                        float(time)
+                    )
             except Exception:
                 return
 
@@ -887,7 +939,9 @@ class ChatTeam:
             except Exception:
                 return
 
-        def _record_touched_from_tool(*, name: str, args: dict[str, Any], result: Any) -> None:
+        def _record_touched_from_tool(
+            *, name: str, args: dict[str, Any], result: Any
+        ) -> None:
             nonlocal include_objects_in_snapshot
             nonlocal include_camera_key_times_in_snapshot
             nonlocal touched_duration_seconds
@@ -925,12 +979,12 @@ class ChatTeam:
             except Exception:
                 pass
 
-            if tool in {"scene_load_files", "scene_ensure_loaded", "scene_smart_load"}:
+            if tool in {"scene_load_sources", "scene_smart_load"}:
                 include_objects_in_snapshot = True
                 try:
-                    for o in (result.get("objects") or []):
-                        if isinstance(o, dict):
-                            touched_object_ids.add(int(o.get("id", 0)))
+                    if isinstance(result, dict):
+                        for i in result.get("loaded_ids") or []:
+                            touched_object_ids.add(int(i))
                 except Exception:
                     pass
                 return
@@ -938,7 +992,7 @@ class ChatTeam:
             if tool == "scene_make_alias":
                 include_objects_in_snapshot = True
                 try:
-                    for a in (result.get("aliases") or []):
+                    for a in result.get("aliases") or []:
                         if not isinstance(a, dict):
                             continue
                         touched_object_ids.add(int(a.get("src_id", 0)))
@@ -950,7 +1004,7 @@ class ChatTeam:
             if tool == "scene_set_visibility":
                 include_objects_in_snapshot = True
                 try:
-                    for i in (args.get("ids") or []):
+                    for i in args.get("ids") or []:
                         touched_object_ids.add(int(i))
                 except Exception:
                     pass
@@ -963,19 +1017,26 @@ class ChatTeam:
 
             if tool == "scene_apply":
                 # Prefer canonical mapping returned by the tool (name→json_key resolution).
-                applied = result.get("applied_set_params") if isinstance(result, dict) else None
+                applied = (
+                    result.get("applied_set_params")
+                    if isinstance(result, dict)
+                    else None
+                )
                 if isinstance(applied, list):
                     for it in applied:
                         if not isinstance(it, dict):
                             continue
                         try:
-                            _touch_scene_value(id=int(it.get("id")), json_key=str(it.get("json_key") or ""))
+                            _touch_scene_value(
+                                id=int(it.get("id")),
+                                json_key=str(it.get("json_key") or ""),
+                            )
                         except Exception:
                             continue
                     return
                 # Fallback: only record explicit json_keys (names are not canonical here).
                 try:
-                    for it in (args.get("set_params") or []):
+                    for it in args.get("set_params") or []:
                         if not isinstance(it, dict):
                             continue
                         jk = it.get("json_key")
@@ -988,13 +1049,20 @@ class ChatTeam:
             if tool in {"scene_cut_set_box", "scene_cut_clear"}:
                 # Cuts are global view-setting parameters (typically id=3) and
                 # may also refit the camera (id=0).
-                touched = result.get("touched_scene_values") if isinstance(result, dict) else None
+                touched = (
+                    result.get("touched_scene_values")
+                    if isinstance(result, dict)
+                    else None
+                )
                 if isinstance(touched, list):
                     for it in touched:
                         if not isinstance(it, dict):
                             continue
                         try:
-                            _touch_scene_value(id=int(it.get("id")), json_key=str(it.get("json_key") or ""))
+                            _touch_scene_value(
+                                id=int(it.get("id")),
+                                json_key=str(it.get("json_key") or ""),
+                            )
                         except Exception:
                             continue
                 return
@@ -1093,7 +1161,7 @@ class ChatTeam:
             if tool in {"animation_batch"}:
                 # Batch contains explicit id/json_key/time entries (non-camera only).
                 try:
-                    for sk in (args.get("set_keys") or []):
+                    for sk in args.get("set_keys") or []:
                         if not isinstance(sk, dict):
                             continue
                         kid = int(sk.get("id"))
@@ -1104,7 +1172,7 @@ class ChatTeam:
                             except Exception:
                                 tm = None
                             _touch_key(id=kid, json_key=jk, time=tm)
-                    for rk in (args.get("remove_keys") or []):
+                    for rk in args.get("remove_keys") or []:
                         if not isinstance(rk, dict):
                             continue
                         kid = int(rk.get("id"))
@@ -1119,14 +1187,19 @@ class ChatTeam:
                     pass
                 return
 
-            if tool in {"animation_replace_key_camera", "animation_camera_solve_and_apply"}:
+            if tool in {
+                "animation_replace_key_camera",
+                "animation_camera_solve_and_apply",
+            }:
                 include_camera_key_times_in_snapshot = True
                 try:
                     # animation_replace_key_camera: explicit single-time.
                     if tool == "animation_replace_key_camera":
                         _touch_camera_key_time(time=float(args.get("time", 0.0)))
                     # animation_camera_solve_and_apply: may report applied times.
-                    if isinstance(result, dict) and isinstance(result.get("applied"), list):
+                    if isinstance(result, dict) and isinstance(
+                        result.get("applied"), list
+                    ):
                         for t in result.get("applied") or []:
                             _touch_camera_key_time(time=float(t))
                 except Exception:
@@ -1136,7 +1209,9 @@ class ChatTeam:
             if tool == "animation_camera_waypoint_spline_apply":
                 include_camera_key_times_in_snapshot = True
                 try:
-                    if isinstance(result, dict) and isinstance(result.get("applied"), list):
+                    if isinstance(result, dict) and isinstance(
+                        result.get("applied"), list
+                    ):
                         for t in result.get("applied") or []:
                             _touch_camera_key_time(time=float(t))
                 except Exception:
@@ -1146,7 +1221,9 @@ class ChatTeam:
             if tool == "animation_camera_walkthrough_apply":
                 include_camera_key_times_in_snapshot = True
                 try:
-                    if isinstance(result, dict) and isinstance(result.get("applied"), list):
+                    if isinstance(result, dict) and isinstance(
+                        result.get("applied"), list
+                    ):
                         for t in result.get("applied") or []:
                             _touch_camera_key_time(time=float(t))
                 except Exception:
@@ -1216,7 +1293,9 @@ class ChatTeam:
             policy = "full" if name in full_log_tools else "summary"
             ok = True
             try:
-                ok = bool(res_obj.get("ok", True)) if isinstance(res_obj, dict) else True
+                ok = (
+                    bool(res_obj.get("ok", True)) if isinstance(res_obj, dict) else True
+                )
             except Exception:
                 ok = True
             if (name not in full_log_tools) and (not ok):
@@ -1254,7 +1333,10 @@ class ChatTeam:
 
             # Track successful Executor-side mutations for a post-write snapshot.
             try:
-                if str(current_phase or "") == "Executor" and name in ATLAS_STATE_MUTATION_TOOLS:
+                if (
+                    str(current_phase or "") == "Executor"
+                    and name in ATLAS_STATE_MUTATION_TOOLS
+                ):
                     _record_touched_from_tool(name=name, args=args_obj, result=res_obj)
             except Exception:
                 pass
@@ -1288,7 +1370,9 @@ class ChatTeam:
                 if not keys:
                     continue
                 try:
-                    key_targets[int(oid)] = sorted({str(k) for k in keys if str(k).strip()})
+                    key_targets[int(oid)] = sorted(
+                        {str(k) for k in keys if str(k).strip()}
+                    )
                 except Exception:
                     continue
 
@@ -1297,14 +1381,21 @@ class ChatTeam:
                 if not keys:
                     continue
                 try:
-                    scene_value_targets[int(oid)] = sorted({str(k) for k in keys if str(k).strip()})
+                    scene_value_targets[int(oid)] = sorted(
+                        {str(k) for k in keys if str(k).strip()}
+                    )
                 except Exception:
                     continue
 
             time_status: dict[str, float] | None = None
             try:
-                if self._current_animation_id is not None and int(self._current_animation_id) > 0:
-                    ts = self.scene.get_time(animation_id=int(self._current_animation_id))
+                if (
+                    self._current_animation_id is not None
+                    and int(self._current_animation_id) > 0
+                ):
+                    ts = self.scene.get_time(
+                        animation_id=int(self._current_animation_id)
+                    )
                     time_status = {
                         "seconds": float(getattr(ts, "seconds", 0.0) or 0.0),
                         "duration": float(getattr(ts, "duration", 0.0) or 0.0),
@@ -1317,7 +1408,14 @@ class ChatTeam:
             facts: dict[str, Any] = {}
             try:
                 facts = self.scene.scene_facts_compact(
-                    animation_id=(int(self._current_animation_id) if (self._current_animation_id is not None and int(self._current_animation_id) > 0) else None),
+                    animation_id=(
+                        int(self._current_animation_id)
+                        if (
+                            self._current_animation_id is not None
+                            and int(self._current_animation_id) > 0
+                        )
+                        else None
+                    ),
                     key_targets=key_targets or None,
                     include_key_values=False,
                     scene_value_targets=scene_value_targets or None,
@@ -1345,7 +1443,11 @@ class ChatTeam:
                 ):
                     p = self._animation_autosave_path()
                     p.parent.mkdir(parents=True, exist_ok=True)
-                    ok = bool(self.scene.save_animation(animation_id=int(self._current_animation_id), path=p))
+                    ok = bool(
+                        self.scene.save_animation(
+                            animation_id=int(self._current_animation_id), path=p
+                        )
+                    )
                     if ok:
                         try:
                             self.session_store.set_meta(animation_autosave_path=str(p))
@@ -1358,27 +1460,39 @@ class ChatTeam:
                 "mutation_tools": sorted(touched_mutation_tools),
                 "scene_value_targets": {
                     str(oid): sorted(list(keys))
-                    for oid, keys in sorted(touched_scene_values.items(), key=lambda kv: int(kv[0]))
+                    for oid, keys in sorted(
+                        touched_scene_values.items(), key=lambda kv: int(kv[0])
+                    )
                     if keys
                 },
                 "key_targets": {
                     str(oid): sorted(list(keys))
-                    for oid, keys in sorted(touched_key_targets.items(), key=lambda kv: int(kv[0]))
+                    for oid, keys in sorted(
+                        touched_key_targets.items(), key=lambda kv: int(kv[0])
+                    )
                     if keys
                 },
                 "key_times": {
                     str(oid): {
                         str(jk): sorted([float(t) for t in times])
-                        for jk, times in sorted(per_key.items(), key=lambda kv: str(kv[0]))
+                        for jk, times in sorted(
+                            per_key.items(), key=lambda kv: str(kv[0])
+                        )
                     }
-                    for oid, per_key in sorted(touched_key_times.items(), key=lambda kv: int(kv[0]))
+                    for oid, per_key in sorted(
+                        touched_key_times.items(), key=lambda kv: int(kv[0])
+                    )
                     if isinstance(per_key, dict) and per_key
                 },
             }
             if touched_camera_key_times:
-                touched_payload["camera_key_times"] = sorted([float(t) for t in touched_camera_key_times])
+                touched_payload["camera_key_times"] = sorted(
+                    [float(t) for t in touched_camera_key_times]
+                )
             if touched_object_ids:
-                touched_payload["object_ids"] = sorted([int(i) for i in touched_object_ids])
+                touched_payload["object_ids"] = sorted(
+                    [int(i) for i in touched_object_ids]
+                )
             if touched_duration_seconds is not None:
                 touched_payload["duration_seconds"] = float(touched_duration_seconds)
             if touched_set_time_seconds is not None:
@@ -1405,8 +1519,12 @@ class ChatTeam:
         shared_instructions_parts: list[str] = []
         shared_instructions_parts.append(env_text)
         if context_blocks:
-            shared_instructions_parts.append("Shared context:\n" + "\n\n".join(context_blocks))
-        shared_instructions = "\n\n".join([p for p in shared_instructions_parts if p]).strip()
+            shared_instructions_parts.append(
+                "Shared context:\n" + "\n\n".join(context_blocks)
+            )
+        shared_instructions = "\n\n".join(
+            [p for p in shared_instructions_parts if p]
+        ).strip()
 
         # Build Responses API input items (local history; no server-side state).
         input_items: list[dict[str, Any]] = []
@@ -1542,7 +1660,9 @@ class ChatTeam:
             except Exception:
                 pass
 
-            def _post_tool_output(name: str, args_json: str, result_json: str) -> list[dict[str, Any]]:
+            def _post_tool_output(
+                name: str, args_json: str, result_json: str
+            ) -> list[dict[str, Any]]:
                 # Allow the model to actually *see* previews by attaching the
                 # rendered image as an input_image in the next model call.
                 #
@@ -1652,15 +1772,25 @@ class ChatTeam:
 
             def _capture_reasoning_delta(delta: str, summary_index: int) -> None:
                 if delta:
-                    streamed_summary_parts.setdefault(int(summary_index or 0), []).append(delta)
-                if callbacks is not None and callbacks.on_reasoning_summary_delta is not None:
+                    streamed_summary_parts.setdefault(
+                        int(summary_index or 0), []
+                    ).append(delta)
+                if (
+                    callbacks is not None
+                    and callbacks.on_reasoning_summary_delta is not None
+                ):
                     callbacks.on_reasoning_summary_delta(delta, summary_index)
 
             def _capture_reasoning_part_added(summary_index: int) -> None:
-                if callbacks is not None and callbacks.on_reasoning_summary_part_added is not None:
+                if (
+                    callbacks is not None
+                    and callbacks.on_reasoning_summary_part_added is not None
+                ):
                     callbacks.on_reasoning_summary_part_added(summary_index)
 
-            def _persist_reasoning_summary_complete(summary_text: str, call_index: int) -> None:
+            def _persist_reasoning_summary_complete(
+                summary_text: str, call_index: int
+            ) -> None:
                 """Persist reasoning summaries in chronological order.
 
                 This is called by the tool loop after the Responses stream completes
@@ -1733,7 +1863,9 @@ class ChatTeam:
                 except Exception:
                     pass
 
-            def _persist_response_meta_and_forward(resp: dict[str, Any], call_index: int) -> None:
+            def _persist_response_meta_and_forward(
+                resp: dict[str, Any], call_index: int
+            ) -> None:
                 _persist_response_meta(resp, call_index)
                 if callbacks is not None and callbacks.on_response_meta is not None:
                     try:
@@ -1747,7 +1879,9 @@ class ChatTeam:
                 on_reasoning_summary_part_added=_capture_reasoning_part_added,
                 on_reasoning_summary_complete=_persist_reasoning_summary_complete,
                 on_response_meta=_persist_response_meta_and_forward,
-                on_assistant_text_delta=(callbacks.on_assistant_text_delta if callbacks else None),
+                on_assistant_text_delta=(
+                    callbacks.on_assistant_text_delta if callbacks else None
+                ),
                 on_tool_call=(callbacks.on_tool_call if callbacks else None),
                 on_tool_result=(callbacks.on_tool_result if callbacks else None),
             )
@@ -1755,6 +1889,7 @@ class ChatTeam:
             if callbacks is not None and callbacks.on_phase_start is not None:
                 callbacks.on_phase_start(phase)
             try:
+
                 def _looks_like_embedded_tool_json(text: str) -> bool:
                     """Heuristic: model printed tool/plan JSON into assistant text.
 
@@ -1805,7 +1940,9 @@ class ChatTeam:
                 while True:
                     result = run_responses_tool_loop(
                         llm=self.llm,
-                        instructions=(instructions.rstrip() + "\n\n" + shared_instructions).strip(),
+                        instructions=(
+                            instructions.rstrip() + "\n\n" + shared_instructions
+                        ).strip(),
                         input_items=phase_input_items_local,
                         tools=phase_tools,
                         dispatch=_dispatch_logged,
@@ -1853,7 +1990,10 @@ class ChatTeam:
                             pass
                         phase_input_items_local = list(result.input_items or [])
                         phase_input_items_local.append(
-                            _message(role="user", text=_tool_json_repair_prompt(phase_name=phase))
+                            _message(
+                                role="user",
+                                text=_tool_json_repair_prompt(phase_name=phase),
+                            )
                         )
                         continue
 
@@ -1872,7 +2012,10 @@ class ChatTeam:
                         return False
 
                     # Unexpected refusal recovery: retry once with an explicit internal directive.
-                    if _looks_like_refusal(result.assistant_text or "") and unexpected_refusal_repair_attempts < 2:
+                    if (
+                        _looks_like_refusal(result.assistant_text or "")
+                        and unexpected_refusal_repair_attempts < 2
+                    ):
                         unexpected_refusal_repair_attempts += 1
                         try:
                             self.session_store.append_event(
@@ -1937,15 +2080,23 @@ class ChatTeam:
                     if str(phase) == "Planner" and planner_no_plan_repair_attempts < 2:
                         calls = list(result.tool_calls or [])
                         called_update_plan = any(
-                            isinstance(c, dict) and str(c.get("name") or "") == "update_plan" for c in calls
+                            isinstance(c, dict)
+                            and str(c.get("name") or "") == "update_plan"
+                            for c in calls
                         )
                         called_verification = any(
-                            isinstance(c, dict) and str(c.get("name") or "") == "verification_set_requirements"
+                            isinstance(c, dict)
+                            and str(c.get("name") or "")
+                            == "verification_set_requirements"
                             for c in calls
                         )
                         pt = (result.assistant_text or "").strip().lower()
                         asked_clarify = pt.startswith("clarify:")
-                        if asked_clarify or (not called_update_plan) or (not called_verification):
+                        if (
+                            asked_clarify
+                            or (not called_update_plan)
+                            or (not called_verification)
+                        ):
                             planner_no_plan_repair_attempts += 1
                             try:
                                 self.session_store.append_event(
@@ -1990,7 +2141,9 @@ class ChatTeam:
                                     "turn_id": turn_id,
                                     "phase": phase,
                                     "reason": "executor_no_tool_calls_plan_incomplete",
-                                    "attempt": int(executor_no_tool_calls_repair_attempts),
+                                    "attempt": int(
+                                        executor_no_tool_calls_repair_attempts
+                                    ),
                                 }
                             )
                         except Exception:
@@ -2068,7 +2221,9 @@ class ChatTeam:
                     if not step:
                         continue
                     plan_lines.append(f"- {st}: {step}")
-                plan_text = "\n".join(plan_lines) if plan_lines else "(no plan recorded)"
+                plan_text = (
+                    "\n".join(plan_lines) if plan_lines else "(no plan recorded)"
+                )
 
                 # Keep the finalize prompt short and operational; do not ask for extra info.
                 finalize_instructions = (
@@ -2106,7 +2261,10 @@ class ChatTeam:
                         except Exception:
                             summary_index = 0
                         final_summary_parts.setdefault(summary_index, []).append(delta)
-                        if callbacks is not None and callbacks.on_reasoning_summary_delta is not None:
+                        if (
+                            callbacks is not None
+                            and callbacks.on_reasoning_summary_delta is not None
+                        ):
                             callbacks.on_reasoning_summary_delta(delta, summary_index)
                         return
                     if et == "response.reasoning_summary_part.added":
@@ -2114,12 +2272,17 @@ class ChatTeam:
                             summary_index = int(ev.get("summary_index", 0))
                         except Exception:
                             summary_index = 0
-                        if callbacks is not None and callbacks.on_reasoning_summary_part_added is not None:
+                        if (
+                            callbacks is not None
+                            and callbacks.on_reasoning_summary_part_added is not None
+                        ):
                             callbacks.on_reasoning_summary_part_added(summary_index)
                         return
 
                 resp = self.llm.responses_stream(
-                    instructions=(finalize_instructions.rstrip() + "\n\n" + shared_instructions).strip(),
+                    instructions=(
+                        finalize_instructions.rstrip() + "\n\n" + shared_instructions
+                    ).strip(),
                     input_items=finalize_items,
                     tools=None,
                     temperature=self.temperature,
@@ -2133,7 +2296,8 @@ class ChatTeam:
                 # Persist finalizer reasoning summary (after prior tool events).
                 try:
                     merged = "\n\n".join(
-                        "".join(final_summary_parts[k]) for k in sorted(final_summary_parts.keys())
+                        "".join(final_summary_parts[k])
+                        for k in sorted(final_summary_parts.keys())
                     ).strip()
                     if merged:
                         self.session_store.append_event(
@@ -2187,7 +2351,8 @@ class ChatTeam:
             except Exception as e:
                 # Persist any streamed reasoning summary we saw before the failure.
                 merged_streamed = "\n\n".join(
-                    "".join(streamed_summary_parts[k]) for k in sorted(streamed_summary_parts.keys())
+                    "".join(streamed_summary_parts[k])
+                    for k in sorted(streamed_summary_parts.keys())
                 ).strip()
                 if merged_streamed:
                     try:
@@ -2238,7 +2403,9 @@ class ChatTeam:
                 return False
 
         if _should_run_planner():
-            planner_tools = _filter_tools(read_only_tool_names | set(SESSION_MUTATION_TOOLS))
+            planner_tools = _filter_tools(
+                read_only_tool_names | set(SESSION_MUTATION_TOOLS)
+            )
             planner_res = _run_phase(
                 phase="Planner",
                 instructions=ATLAS_PLANNER_SYSTEM_PROMPT,
@@ -2307,7 +2474,11 @@ class ChatTeam:
         # assistant ends without a crisp instruction to relaunch Atlas.
         try:
             if _turn_rpc_unavailable() and not _turn_is_blocked():
-                info = runtime_state.get("rpc_unavailable") if isinstance(runtime_state, dict) else None
+                info = (
+                    runtime_state.get("rpc_unavailable")
+                    if isinstance(runtime_state, dict)
+                    else None
+                )
                 tool_name = ""
                 err = ""
                 if isinstance(info, dict):
@@ -2426,14 +2597,18 @@ def run_repl(
             "- The image is generated locally (temporary file) and may be sent to the model for inspection.\n"
             "- If you deny, the agent will fall back to human-check steps for visual requirements.\n"
         )
-        ans = input("Allow preview screenshots for this session? [Y/n] ").strip().lower()
+        ans = (
+            input("Allow preview screenshots for this session? [Y/n] ").strip().lower()
+        )
         allow = ans in ("", "y", "yes")
         try:
             team.session_store.set_consent("screenshots", allow)
             team.session_store.save()
         except Exception:
             pass
-        logger.info("Screenshots %s for this session.", "enabled" if allow else "disabled")
+        logger.info(
+            "Screenshots %s for this session.", "enabled" if allow else "disabled"
+        )
 
     while True:
         try:
@@ -2504,8 +2679,16 @@ def run_repl(
                         logger.info("(no plan)")
                         continue
                     for it in plan:
-                        step = (it.get("step") or "").strip() if isinstance(it, dict) else ""
-                        status = (it.get("status") or "").strip() if isinstance(it, dict) else ""
+                        step = (
+                            (it.get("step") or "").strip()
+                            if isinstance(it, dict)
+                            else ""
+                        )
+                        status = (
+                            (it.get("status") or "").strip()
+                            if isinstance(it, dict)
+                            else ""
+                        )
                         if step:
                             logger.info("%s\t%s", status, step)
                 except Exception as e:
@@ -2546,7 +2729,11 @@ def run_repl(
                     resp = team.scene.ensure_animation(create_new=False, name=None)
                     aid = int(getattr(resp, "animation_id", 0) or 0)
                     if bool(getattr(resp, "ok", False)) and aid > 0:
-                        ok = bool(team.scene.save_animation(animation_id=aid, path=Path(rest[0])))
+                        ok = bool(
+                            team.scene.save_animation(
+                                animation_id=aid, path=Path(rest[0])
+                            )
+                        )
                 except Exception:
                     ok = False
                 logger.info("%s", "ok" if ok else "fail")
@@ -2557,7 +2744,11 @@ def run_repl(
                     resp = team.scene.ensure_animation(create_new=False, name=None)
                     aid = int(getattr(resp, "animation_id", 0) or 0)
                     if bool(getattr(resp, "ok", False)) and aid > 0:
-                        ok = bool(team.scene.set_time(animation_id=aid, seconds=float(rest[0])))
+                        ok = bool(
+                            team.scene.set_time(
+                                animation_id=aid, seconds=float(rest[0])
+                            )
+                        )
                 except Exception:
                     ok = False
                 logger.info("%s", "ok" if ok else "fail")
@@ -2565,7 +2756,9 @@ def run_repl(
             if cmd == "objects":
                 resp = team.scene.list_objects()
                 for obj in resp.objects:
-                    logger.info("%s\t%s\t%s\t%s", obj.id, obj.type, obj.name, obj.visible)
+                    logger.info(
+                        "%s\t%s\t%s\t%s", obj.id, obj.type, obj.name, obj.visible
+                    )
                 continue
             logger.info("Unknown command; :help")
             continue

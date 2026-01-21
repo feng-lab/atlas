@@ -62,8 +62,8 @@ The Atlas GUI hosts the gRPC service `atlas.rpc.Scene` for live control.
   - `DeleteTask({ id }) -> { ok }`
     - Forget a task and release stored results (best-effort cancels if still running).
   - Task completion semantics:
-    - `SUCCEEDED` means the dataset(s) are registered in the current document and object ids are available via `result.load.loaded_ids`.
-    - `FAILED` may still include partial `result.load` (some sources loaded/registered, some failed); check `error` and `warnings`.
+    - `SUCCEEDED` means the dataset(s) are registered in the current document and object ids are available via `TaskStatus.load.loaded_ids` (JSON: `load.loadedIds`).
+    - `FAILED` may still include partial `TaskStatus.load` (some sources loaded/registered, some failed); check `error` and `warnings`.
     - For engine-backed operations after loading, use `WaitForObjectsReady` on the returned ids.
 
 - **Agent cookbook: load (network) → wait → operate**
@@ -89,20 +89,34 @@ The Atlas GUI hosts the gRPC service `atlas.rpc.Scene` for live control.
     })
 
     # 3) If any ids loaded, wait for engine/view binding before engine-backed ops
-    ids = status.result.load.loaded_ids
+    ids = status.load.loaded_ids
     ready = Scene.WaitForObjectsReady({ ids: ids, timeout_ms: 30000, poll_interval_ms: 50 })
     ```
   - Handling `FAILED` (partial success):
     - Do not assume `FAILED` means “nothing loaded”. A task can fail for one source but still succeed for others.
-    - If `status.result.load.loaded_ids` is non-empty, you may proceed with those ids (after `WaitForObjectsReady`) and surface `status.error` / `status.result.load.warnings` for debugging.
+    - If `status.load.loaded_ids` is non-empty, you may proceed with those ids (after `WaitForObjectsReady`) and surface `status.error` / `status.load.warnings` for debugging.
     - If `loaded_ids` is empty, treat it as a hard failure and surface `status.error`.
   - Cleanup:
     - Optionally call `DeleteTask({id})` once you’ve consumed the result to release stored task data.
 
-- `LoadFiles(files) -> objects[]`
+- Local paths are supported via the same task API (`StartLoadTask` / `WaitTask`) (recommended).
+  - Task completion means the file(s) are loaded/registered in the document model and object ids are available.
+  - It does **not** wait for:
+    - Qt UI repaint (2D view refresh), or
+    - 3D window creation / engine readiness, or
+    - 3D object view/filter binding, or
+    - progressive rendering completion.
+    If you need deterministic engine-backed operations after loading:
+    - Explicit barrier: call `Ensure3DWindow` (if needed) and then `WaitForObjectsReady` on the returned ids, or
+    - Deadline-based: call engine-backed RPCs with a gRPC deadline/timeout (the server will auto-wait for readiness on `target_not_ready` / bbox-derived transient empties).
 - `ListObjects() -> objects[]` (id, type, name, path, visible)
 
 ### Geometry / Capabilities
+
+- Readiness / auto-wait (UI-parity):
+  - Engine-backed RPCs such as `BBox`, `CutSuggest`, `ListParams`, `GetParamValues`, `ApplySceneParams`, and camera helpers (e.g., `CameraFit`) require objects to be bound into the live 3D engine (view/filter created).
+  - If the client provided a gRPC deadline/timeout, the server will auto-wait and retry on transient readiness issues (e.g., `target_not_ready` or bbox-derived empties during view binding) until the deadline.
+  - If the client did not provide a deadline, the server returns `FAILED_PRECONDITION` immediately (no unbounded waits on server threads).
 
 - `BBox(ids, after_clipping) -> bbox {min, max, size, center}`
   - If `ids` is omitted/empty, the server uses all current **visual** objects (excludes `Animation3D`).
@@ -182,6 +196,8 @@ Use these to edit base scene state (no time/easing; **does not** write keyframes
 - `CutSet { box?:BBox | planes?:CutPlanes, refit_camera?: bool } -> { ok }`
 - `CutClear {} -> { ok }`
 - `CutSuggest { ids?, mode?:"box", margin?, after_clipping? } -> { box | planes }`
+  - `ids` omitted/empty means “all visual objects” (excludes `Animation3D`).
+  - Returns `INVALID_ARGUMENT` when the resolved target set is empty (no visual objects).
 
 Note: cuts are global view settings (typically `id=3` in the parameter system), not per-object.
 
@@ -212,6 +228,9 @@ These return typed camera values/keys that clients can write via `SetKey(animati
 - `CameraFit(ids?, all?, after_clipping?, min_radius?) -> { values:[Value] }`
 - `CameraOrbitSuggest(ids?, axis, degrees?) -> { values:[Value, Value] }`
 - `CameraDollySuggest(ids?, start_dist, end_dist) -> { values:[Value, Value] }`
+  - For camera ops with `ids?`, an omitted/empty `ids` means “all visual objects” (excludes `Animation3D`).
+  - When the resolved target set is empty, these return `INVALID_ARGUMENT` (no-op in the GUI; explicit error for deterministic agent control).
+  - During initial load/view binding, bbox-derived camera ops may transiently fail with `FAILED_PRECONDITION` / “bbox empty”. With a gRPC deadline, the server auto-waits and retries.
 
 ### UI-Parity Camera Operators (Deterministic)
 
