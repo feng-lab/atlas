@@ -117,7 +117,15 @@ class LLMClient:
         md = getattr(obj, "model_dump", None)
         if callable(md):
             try:
-                return LLMClient._to_plain_dict(md())
+                # Pydantic v2 can emit noisy "Pydantic serializer warnings" when
+                # serializing union-heavy SDK models (e.g. OpenAI Responses output
+                # items). For atlas_agent we only need a best-effort dict; silence
+                # those warnings so users don't see a warning per streamed event.
+                try:
+                    return LLMClient._to_plain_dict(md(mode="json", warnings=False))
+                except TypeError:
+                    # Older Pydantic v2 versions may not support these kwargs.
+                    return LLMClient._to_plain_dict(md())
             except Exception:
                 pass
         # Pydantic v1

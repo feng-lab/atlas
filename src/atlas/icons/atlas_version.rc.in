@@ -1,0 +1,35 @@
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION @ATLAS_WIN_FILEVERSION@
+ PRODUCTVERSION @ATLAS_WIN_FILEVERSION@
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "Feng Lab\0"
+      VALUE "FileDescription", "Atlas\0"
+      VALUE "FileVersion", "@ATLAS_VERSION_FULL@\0"
+      VALUE "InternalName", "Atlas\0"
+      VALUE "OriginalFilename", "Atlas.exe\0"
+      VALUE "ProductName", "Atlas\0"
+      VALUE "ProductVersion", "@ATLAS_VERSION_MARKETING@\0"
+      VALUE "LegalCopyright", "Copyright (c) 2011, Linqing Feng\0"
+    END
+  END
+
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1200
+  END
+END

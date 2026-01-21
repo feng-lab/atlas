@@ -1,6 +1,52 @@
 cmake_minimum_required(VERSION 3.17.5)
 project(Atlas)
-set(ATLAS_VERSION ${GIT_VERSION})
+
+# Version stamping: the top-level build generates `GIT_VERSION` and the codebase
+# compiles it into `src/version/version.h`. For OS metadata (Info.plist / Windows
+# VERSIONINFO) we additionally derive:
+#  - a short marketing version (e.g. "1.2.3")
+#  - a numeric 4-tuple (major.minor.patch.build) for platforms that require it
+set(ATLAS_VERSION_FULL "${GIT_VERSION}")
+
+# Keep the raw `git describe` portion (without the appended " build <timestamp>"
+# suffix) for parsing and display.
+set(ATLAS_GIT_DESCRIBE "${ATLAS_VERSION_FULL}")
+string(REGEX REPLACE " build .*" "" ATLAS_GIT_DESCRIBE "${ATLAS_GIT_DESCRIBE}")
+
+set(ATLAS_GIT_TAG_OR_HASH "${ATLAS_GIT_DESCRIBE}")
+string(REPLACE "-" ";" _atlas_git_describe_parts "${ATLAS_GIT_DESCRIBE}")
+list(LENGTH _atlas_git_describe_parts _atlas_git_describe_parts_len)
+if (_atlas_git_describe_parts_len GREATER 0)
+  list(GET _atlas_git_describe_parts 0 ATLAS_GIT_TAG_OR_HASH)
+endif ()
+
+# CFBundleShortVersionString is intended to be a human-readable marketing
+# version. Prefer the leading semver tag from `git describe` and strip the
+# common "v" prefix.
+set(ATLAS_VERSION_MARKETING "0.0.0")
+if (ATLAS_GIT_TAG_OR_HASH MATCHES "^v?[0-9]+\\.[0-9]+(\\.[0-9]+)?$")
+  set(ATLAS_VERSION_MARKETING "${ATLAS_GIT_TAG_OR_HASH}")
+  string(REGEX REPLACE "^v" "" ATLAS_VERSION_MARKETING "${ATLAS_VERSION_MARKETING}")
+endif ()
+
+set(ATLAS_VERSION_MAJOR 0)
+set(ATLAS_VERSION_MINOR 0)
+set(ATLAS_VERSION_PATCH 0)
+if (ATLAS_VERSION_MARKETING MATCHES "^([0-9]+)\\.([0-9]+)(\\.([0-9]+))?$")
+  set(ATLAS_VERSION_MAJOR "${CMAKE_MATCH_1}")
+  set(ATLAS_VERSION_MINOR "${CMAKE_MATCH_2}")
+  if (CMAKE_MATCH_4)
+    set(ATLAS_VERSION_PATCH "${CMAKE_MATCH_4}")
+  endif ()
+endif ()
+
+set(ATLAS_VERSION_BUILD 0)
+if (ATLAS_GIT_DESCRIBE MATCHES "-([0-9]+)-g[0-9a-f]+$")
+  set(ATLAS_VERSION_BUILD "${CMAKE_MATCH_1}")
+endif ()
+
+set(ATLAS_VERSION_NUMERIC "${ATLAS_VERSION_MAJOR}.${ATLAS_VERSION_MINOR}.${ATLAS_VERSION_PATCH}.${ATLAS_VERSION_BUILD}")
+set(ATLAS_WIN_FILEVERSION "${ATLAS_VERSION_MAJOR},${ATLAS_VERSION_MINOR},${ATLAS_VERSION_PATCH},${ATLAS_VERSION_BUILD}")
 
 cmake_policy(SET CMP0074 NEW)
 
@@ -373,8 +419,11 @@ source_group(sys FILES ${SYS_SOURCES})
 # main srcs
 
 if (WIN32)
+  set(ATLAS_WINDOWS_VERSION_RC "${CMAKE_CURRENT_BINARY_DIR}/atlas_version.rc")
+  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/icons/atlas_version.rc.in" "${ATLAS_WINDOWS_VERSION_RC}" @ONLY)
   set(ASSETS
-      ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.rc)
+      ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.rc
+      ${ATLAS_WINDOWS_VERSION_RC})
 elseif (APPLE)
   set(ASSETS
       ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns
@@ -959,11 +1008,11 @@ else (WIN32)
                           INSTALL_RPATH "@executable_path/../Frameworks;@executable_path/../lib"
                           OUTPUT_NAME "${APP_NAME}"
                           MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Info.plist.in"
-                          MACOSX_BUNDLE_INFO_STRING "${APP_NAME}"
-                          MACOSX_BUNDLE_LONG_VERSION_STRING "${ATLAS_VERSION}"
-                          MACOSX_BUNDLE_SHORT_VERSION_STRING "${ATLAS_VERSION}"
+                          MACOSX_BUNDLE_INFO_STRING "${APP_NAME} ${ATLAS_VERSION_FULL}"
+                          MACOSX_BUNDLE_LONG_VERSION_STRING "${ATLAS_VERSION_FULL}"
+                          MACOSX_BUNDLE_SHORT_VERSION_STRING "${ATLAS_VERSION_MARKETING}"
                           MACOSX_BUNDLE_BUNDLE_NAME "${APP_NAME}"
-                          MACOSX_BUNDLE_BUNDLE_VERSION "${ATLAS_VERSION}"
+                          MACOSX_BUNDLE_BUNDLE_VERSION "${ATLAS_VERSION_NUMERIC}"
                           MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
                           MACOSX_BUNDLE_GUI_IDENTIFIER "fenglab.${APP_NAME}"
                           RESOURCE "${ASSETS}"
