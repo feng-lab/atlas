@@ -10,6 +10,7 @@
 #include <QString>
 #include <QStringList>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -17,6 +18,7 @@
 namespace nim {
 
 class ZMainWindow;
+class ZNeuroglancerPrecomputedVolume;
 
 class ZRpcUiDispatcher : public QObject
 {
@@ -194,6 +196,20 @@ public:
 
   // Load local files/dirs (same semantics as the GUI file-open path) and return the updated object list.
   [[nodiscard]] ListObjectsResult loadFilesAndListObjects(const QStringList& filePaths);
+
+  struct AddNeuroglancerPrecomputedResult
+  {
+    bool ok = false;
+    ErrorKind errorKind = ErrorKind::FailedPrecondition;
+    std::string error;
+    uint64_t id = 0;
+    QString rootUrl;
+  };
+
+  // Register an already-open Neuroglancer precomputed volume in the current document (UI thread).
+  // This is used by RPC tasks that open network datasets off the UI thread.
+  [[nodiscard]] AddNeuroglancerPrecomputedResult
+  addNeuroglancerPrecomputedVolume(std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol, bool setVisible);
 
   [[nodiscard]] BoolResult setVisibility(const std::vector<size_t>& ids, bool on);
 

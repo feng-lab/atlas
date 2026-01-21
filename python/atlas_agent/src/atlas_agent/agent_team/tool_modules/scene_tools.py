@@ -87,9 +87,21 @@ TOOLS: List[Tool] = [
         parameters_schema={
             "type": "object",
             "properties": {
-                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional target ids; when omitted uses fit_candidates()."},
-                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)."},
-                "min_radius": {"type": "number", "default": 0.0, "description": "Minimum radius (world units) for the fit sphere; 0 disables."},
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Optional target ids; when omitted uses fit_candidates().",
+                },
+                "after_clipping": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Use clipped bbox (true) or full bbox (false).",
+                },
+                "min_radius": {
+                    "type": "number",
+                    "default": 0.0,
+                    "description": "Minimum radius (world units) for the fit sphere; 0 disables.",
+                },
             },
         },
         preconditions=(require_engine_ready,),
@@ -130,10 +142,23 @@ TOOLS: List[Tool] = [
         parameters_schema={
             "type": "object",
             "properties": {
-                "schema_dir": {"type": ["string", "null"], "description": "Optional schema directory override (defaults to discovery via atlas_dir/env)."},
-                "include_groups": {"type": "boolean", "default": True, "description": "When true, include Background/Axis/Global group parameters."},
-                "max_types": {"type": ["integer", "null"], "description": "Optional maximum number of object types to include. When null/omitted, includes all types."},
-                "max_params_per_type": {"type": ["integer", "null"], "description": "Optional maximum number of parameters to include per group/type. When null/omitted, includes all parameters."},
+                "schema_dir": {
+                    "type": ["string", "null"],
+                    "description": "Optional schema directory override (defaults to discovery via atlas_dir/env).",
+                },
+                "include_groups": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "When true, include Background/Axis/Global group parameters.",
+                },
+                "max_types": {
+                    "type": ["integer", "null"],
+                    "description": "Optional maximum number of object types to include. When null/omitted, includes all types.",
+                },
+                "max_params_per_type": {
+                    "type": ["integer", "null"],
+                    "description": "Optional maximum number of parameters to include per group/type. When null/omitted, includes all parameters.",
+                },
             },
         },
         preconditions=(),
@@ -145,9 +170,20 @@ TOOLS: List[Tool] = [
         parameters_schema={
             "type": "object",
             "properties": {
-                "sample_limit": {"type": "integer", "default": 6, "description": "Maximum number of objects/keys to include in the summary output."},
-                "id": {"type": "integer", "description": "Optional id to include current parameter values for (0=camera, 1=background, 2=axis, 3=global, ≥4=object ids)."},
-                "json_keys": {"type": "array", "items": {"type": "string"}, "description": "Optional json_keys to read for id (only used when id is provided)."},
+                "sample_limit": {
+                    "type": "integer",
+                    "default": 6,
+                    "description": "Maximum number of objects/keys to include in the summary output.",
+                },
+                "id": {
+                    "type": "integer",
+                    "description": "Optional id to include current parameter values for (0=camera, 1=background, 2=axis, 3=global, ≥4=object ids).",
+                },
+                "json_keys": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional json_keys to read for id (only used when id is provided).",
+                },
             },
         },
         preconditions=(require_engine_ready,),
@@ -159,7 +195,10 @@ TOOLS: List[Tool] = [
         parameters_schema={
             "type": "object",
             "properties": {
-                "schema_dir": {"type": ["string", "null"], "description": "Optional schema directory override (defaults to discovery via atlas_dir/env)."}
+                "schema_dir": {
+                    "type": ["string", "null"],
+                    "description": "Optional schema directory override (defaults to discovery via atlas_dir/env).",
+                }
             },
         },
         preconditions=(),
@@ -170,7 +209,12 @@ TOOLS: List[Tool] = [
         description="Return the full Animation3D JSON Schema (animation3d.schema.json).",
         parameters_schema={
             "type": "object",
-            "properties": {"schema_dir": {"type": ["string", "null"], "description": "Optional schema directory override (defaults to discovery via atlas_dir/env)."}},
+            "properties": {
+                "schema_dir": {
+                    "type": ["string", "null"],
+                    "description": "Optional schema directory override (defaults to discovery via atlas_dir/env).",
+                }
+            },
         },
         preconditions=(),
         handler=_tool_handler("scene_schema"),
@@ -178,7 +222,21 @@ TOOLS: List[Tool] = [
     tool_from_schema(
         name="scene_get_values",
         description="Scene (stateless): return current display values for json_keys by id. Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids. For the scene camera, use json_key 'Camera 3DCamera' (or pass an empty json_keys array to retrieve it).",
-        parameters_schema={"type": "object", "properties": {"id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}, "json_keys": {"type": "array", "items": {"type": "string"}, "description": "Param keys to read (empty = all)"}}, "required": ["id", "json_keys"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
+                "json_keys": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Param keys to read (empty = all)",
+                },
+            },
+            "required": ["id", "json_keys"],
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_get_values"),
     ),
@@ -200,9 +258,18 @@ TOOLS: List[Tool] = [
                     "items": {
                         "type": "object",
                         "properties": {
-                            "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
-                            "json_key": {"type": "string", "description": "Canonical parameter key (preferred)"},
-                            "name": {"type": "string", "description": "Display name; dispatcher resolves to json_key if provided"},
+                            "id": {
+                                "type": "integer",
+                                "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                            },
+                            "json_key": {
+                                "type": "string",
+                                "description": "Canonical parameter key (preferred)",
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "Display name; dispatcher resolves to json_key if provided",
+                            },
                             "value": {
                                 "description": (
                                     "Typed value.\n"
@@ -212,8 +279,17 @@ TOOLS: List[Tool] = [
                                     "{'Translation Vec3':[x,y,z], 'Rotation Vec4':[ang_deg,ax,ay,az], 'Scale Vec3':[sx,sy,sz], 'Rotation Center Vec3':[cx,cy,cz]}.\n"
                                     "The RPC server also accepts common aliases for 3DTransform and normalizes them: 'Translation', 'Rotation', 'Scale', and 'Center'."
                                 ),
-                                "type": ["object", "array", "number", "string", "boolean", "null"],
-                                "items": {"type": ["string", "number", "boolean", "null"]},
+                                "type": [
+                                    "object",
+                                    "array",
+                                    "number",
+                                    "string",
+                                    "boolean",
+                                    "null",
+                                ],
+                                "items": {
+                                    "type": ["string", "number", "boolean", "null"]
+                                },
                             },
                         },
                         "required": ["id", "value"],
@@ -228,7 +304,11 @@ TOOLS: List[Tool] = [
     tool_from_schema(
         name="scene_save_scene",
         description="Save current scene (.scene) to path.",
-        parameters_schema={"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+        },
         preconditions=(),
         handler=_tool_handler("scene_save_scene"),
     ),
@@ -246,8 +326,15 @@ TOOLS: List[Tool] = [
             "properties": {
                 "width": {"type": "integer", "description": "Image width (pixels)"},
                 "height": {"type": "integer", "description": "Image height (pixels)"},
-                "path": {"type": "string", "description": "Optional output path. When empty, Atlas chooses a temp file path. If provided, must end with .png."},
-                "overwrite": {"type": "boolean", "default": True, "description": "Overwrite the output file when it already exists."},
+                "path": {
+                    "type": "string",
+                    "description": "Optional output path. When empty, Atlas chooses a temp file path. If provided, must end with .png.",
+                },
+                "overwrite": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Overwrite the output file when it already exists.",
+                },
             },
             "required": ["width", "height"],
         },
@@ -256,17 +343,129 @@ TOOLS: List[Tool] = [
     ),
     tool_from_schema(
         name="scene_load_files",
-        description="Load one or more files into the GUI scene. Accepts absolute paths; ~ and env vars expanded. Prefer scene_ensure_loaded for idempotent behavior.",
-        parameters_schema={"type": "object", "properties": {"files": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths to load"}}, "required": ["files"]},
+        description=(
+            "Load one or more LOCAL files into the GUI scene.\n"
+            "Accepts absolute paths; ~ and env vars expanded.\n"
+            "This tool is local-only: it rejects http(s)/gs/s3/precomputed URLs.\n"
+            "For Neuroglancer precomputed network datasets, use scene_start_load_task + scene_wait_task."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Absolute paths to load",
+                }
+            },
+            "required": ["files"],
+        },
         preconditions=(),
         handler=_tool_handler("scene_load_files"),
     ),
     tool_from_schema(
         name="scene_ensure_loaded",
-        description="Idempotently ensure files are loaded: skips already loaded paths, validates existence, and loads only missing ones.",
-        parameters_schema={"type": "object", "properties": {"files": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths to load (idempotent)"}}, "required": ["files"]},
+        description=(
+            "Idempotently ensure LOCAL files are loaded: skips already loaded paths, validates existence, and loads only missing ones.\n"
+            "This tool is local-only: it rejects http(s)/gs/s3/precomputed URLs.\n"
+            "For Neuroglancer precomputed network datasets, use scene_start_load_task + scene_wait_task."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Absolute paths to load (idempotent)",
+                }
+            },
+            "required": ["files"],
+        },
         preconditions=(),
         handler=_tool_handler("scene_ensure_loaded"),
+    ),
+    tool_from_schema(
+        name="scene_start_load_task",
+        description=(
+            "Start an async load task for one or more sources.\n"
+            "Use this for network-backed datasets like Neuroglancer precomputed (precomputed://, gs://, s3://, http(s)://).\n"
+            "Returns a task_id; use scene_wait_task to await completion and get loaded ids."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "sources": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Dataset URLs/paths to load",
+                },
+                "network_timeout_sec": {
+                    "type": "number",
+                    "default": 30.0,
+                    "description": "Per-dataset network metadata timeout (seconds).",
+                },
+                "set_visible": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "When true, force loaded objects visible.",
+                },
+            },
+            "required": ["sources"],
+        },
+        preconditions=(),
+        handler=_tool_handler("scene_start_load_task"),
+    ),
+    tool_from_schema(
+        name="scene_wait_task",
+        description="Wait for an async task to complete (or until timeout). Returns the current TaskStatus snapshot.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "task_id": {
+                    "type": "integer",
+                    "description": "Task id returned by scene_start_load_task",
+                },
+                "timeout_sec": {
+                    "type": "number",
+                    "default": 30.0,
+                    "description": "Max time to wait (seconds). 0 = check once.",
+                },
+                "poll_interval_sec": {
+                    "type": "number",
+                    "default": 0.2,
+                    "description": "Polling interval while waiting (seconds).",
+                },
+            },
+            "required": ["task_id"],
+        },
+        preconditions=(),
+        handler=_tool_handler("scene_wait_task"),
+    ),
+    tool_from_schema(
+        name="scene_cancel_task",
+        description="Best-effort cancellation of a running task.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "integer", "description": "Task id"},
+            },
+            "required": ["task_id"],
+        },
+        preconditions=(),
+        handler=_tool_handler("scene_cancel_task"),
+    ),
+    tool_from_schema(
+        name="scene_delete_task",
+        description="Delete/forget a task id and release its stored results (best-effort cancels if still running).",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "integer", "description": "Task id"},
+            },
+            "required": ["task_id"],
+        },
+        preconditions=(),
+        handler=_tool_handler("scene_delete_task"),
     ),
     tool_from_schema(
         name="scene_wait_objects_ready",
@@ -278,9 +477,21 @@ TOOLS: List[Tool] = [
         parameters_schema={
             "type": "object",
             "properties": {
-                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids to wait for (empty = all fit_candidates)."},
-                "timeout_sec": {"type": "number", "default": 30.0, "description": "Max time to wait (seconds). 0 = check once."},
-                "poll_interval_sec": {"type": "number", "default": 0.2, "description": "Polling interval while waiting (seconds)."},
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Object ids to wait for (empty = all fit_candidates).",
+                },
+                "timeout_sec": {
+                    "type": "number",
+                    "default": 30.0,
+                    "description": "Max time to wait (seconds). 0 = check once.",
+                },
+                "poll_interval_sec": {
+                    "type": "number",
+                    "default": 0.2,
+                    "description": "Polling interval while waiting (seconds).",
+                },
             },
             "required": ["ids"],
         },
@@ -293,11 +504,30 @@ TOOLS: List[Tool] = [
         parameters_schema={
             "type": "object",
             "properties": {
-                "names": {"type": "array", "items": {"type": "string"}, "description": "Basenames to search"},
-                "dir_hints": {"type": "array", "items": {"type": "string"}, "description": "Hint directories"},
-                "schema_dir": {"type": "string", "description": "Optional schema directory override for extension catalogs"},
-                "extensions": {"type": "array", "items": {"type": "string"}, "description": "Allowed extensions"},
-                "case_insensitive": {"type": "boolean", "default": True, "description": "Case-insensitive matching"},
+                "names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Basenames to search",
+                },
+                "dir_hints": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Hint directories",
+                },
+                "schema_dir": {
+                    "type": "string",
+                    "description": "Optional schema directory override for extension catalogs",
+                },
+                "extensions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Allowed extensions",
+                },
+                "case_insensitive": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Case-insensitive matching",
+                },
             },
             "required": ["names"],
         },
@@ -317,13 +547,37 @@ TOOLS: List[Tool] = [
         parameters_schema={
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Case-insensitive substring match over type/name/path/id."},
-                "type_contains": {"type": "string", "description": "Case-insensitive substring match over object type."},
-                "name_contains": {"type": "string", "description": "Case-insensitive substring match over object name."},
-                "path_contains": {"type": "string", "description": "Case-insensitive substring match over object path."},
-                "visible": {"type": "boolean", "description": "Optional visibility filter; when omitted, includes both visible and hidden objects."},
-                "limit": {"type": "integer", "minimum": 1, "description": "Optional page size. When omitted, returns all results."},
-                "offset": {"type": "integer", "minimum": 0, "default": 0, "description": "Paging offset (0-based)."},
+                "query": {
+                    "type": "string",
+                    "description": "Case-insensitive substring match over type/name/path/id.",
+                },
+                "type_contains": {
+                    "type": "string",
+                    "description": "Case-insensitive substring match over object type.",
+                },
+                "name_contains": {
+                    "type": "string",
+                    "description": "Case-insensitive substring match over object name.",
+                },
+                "path_contains": {
+                    "type": "string",
+                    "description": "Case-insensitive substring match over object path.",
+                },
+                "visible": {
+                    "type": "boolean",
+                    "description": "Optional visibility filter; when omitted, includes both visible and hidden objects.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Optional page size. When omitted, returns all results.",
+                },
+                "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 0,
+                    "description": "Paging offset (0-based).",
+                },
             },
         },
         preconditions=(),
@@ -332,56 +586,187 @@ TOOLS: List[Tool] = [
     tool_from_schema(
         name="scene_bbox",
         description="Get bounding box for a set of ids. Pass an empty list for all objects.",
-        parameters_schema={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids (empty = all)"}, "after_clipping": {"type": "boolean", "default": False, "description": "Use clipped bbox (true) or full bbox (false)"}}, "required": ["ids"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Object ids (empty = all)",
+                },
+                "after_clipping": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Use clipped bbox (true) or full bbox (false)",
+                },
+            },
+            "required": ["ids"],
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_bbox"),
     ),
     tool_from_schema(
         name="scene_list_params",
         description="List parameters by id (includes value_schema). Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=objects.",
-        parameters_schema={"type": "object", "properties": {"id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}}, "required": ["id"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                }
+            },
+            "required": ["id"],
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_list_params"),
     ),
     tool_from_schema(
         name="scene_param_info",
         description="Get one parameter's metadata by id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects). Resolves json_key from either json_key or display name.",
-        parameters_schema={"type": "object", "properties": {"id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}, "query": {"type": "string", "description": "Either a canonical json_key or a display name (case-insensitive)."}, "json_key": {"type": "string", "description": "Canonical json_key (preferred when known)."}, "name": {"type": "string", "description": "Display name to resolve to json_key (case-insensitive)."}}, "required": ["id"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Either a canonical json_key or a display name (case-insensitive).",
+                },
+                "json_key": {
+                    "type": "string",
+                    "description": "Canonical json_key (preferred when known).",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Display name to resolve to json_key (case-insensitive).",
+                },
+            },
+            "required": ["id"],
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_param_info"),
     ),
     tool_from_schema(
         name="scene_validate_param_value",
         description="Validate a candidate value against the live value_schema for a given id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects).",
-        parameters_schema={"type": "object", "properties": {"id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}, "json_key": {"type": "string"}, "value": {"description": "Candidate JSON value (native types)", "anyOf": [{"type": "object"}, {"type": "array", "items": {}}, {"type": "number"}, {"type": "string"}, {"type": "boolean"}, {"type": "null"}]}}, "required": ["id", "json_key", "value"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
+                "json_key": {"type": "string"},
+                "value": {
+                    "description": "Candidate JSON value (native types)",
+                    "anyOf": [
+                        {"type": "object"},
+                        {"type": "array", "items": {}},
+                        {"type": "number"},
+                        {"type": "string"},
+                        {"type": "boolean"},
+                        {"type": "null"},
+                    ],
+                },
+            },
+            "required": ["id", "json_key", "value"],
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_validate_param_value"),
     ),
     tool_from_schema(
         name="scene_set_visibility",
         description="Toggle visibility of a list of object ids.",
-        parameters_schema={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids"}, "on": {"type": "boolean", "description": "True to show, false to hide"}}, "required": ["ids", "on"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Object ids",
+                },
+                "on": {"type": "boolean", "description": "True to show, false to hide"},
+            },
+            "required": ["ids", "on"],
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_set_visibility"),
     ),
     tool_from_schema(
         name="scene_make_alias",
         description="Create alias objects for given ids (shared backing data with independent view params).",
-        parameters_schema={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids to alias; each produces a new alias id."}}, "required": ["ids"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Object ids to alias; each produces a new alias id.",
+                }
+            },
+            "required": ["ids"],
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_make_alias"),
     ),
     tool_from_schema(
         name="scene_cut_suggest_box",
         description="Suggest an axis-aligned cut box for given ids (or all).",
-        parameters_schema={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}, "description": "Ids to bound (empty = all)"}, "margin": {"type": "number", "default": 0.0, "description": "Extra normalized margin to expand box"}, "after_clipping": {"type": "boolean", "default": False, "description": "Use clipped bbox for computation"}}, "required": ["ids"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Ids to bound (empty = all)",
+                },
+                "margin": {
+                    "type": "number",
+                    "default": 0.0,
+                    "description": "Extra normalized margin to expand box",
+                },
+                "after_clipping": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Use clipped bbox for computation",
+                },
+            },
+            "required": ["ids"],
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_cut_suggest_box"),
     ),
     tool_from_schema(
         name="scene_cut_set_box",
         description="Apply a global cut box and optionally refit camera.",
-        parameters_schema={"type": "object", "properties": {"min": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "Box min [x,y,z]"}, "max": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "Box max [x,y,z]"}, "refit_camera": {"type": "boolean", "default": True, "description": "Refit camera after applying cut"}}, "required": ["min", "max"]},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "min": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "description": "Box min [x,y,z]",
+                },
+                "max": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "description": "Box max [x,y,z]",
+                },
+                "refit_camera": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Refit camera after applying cut",
+                },
+            },
+            "required": ["min", "max"],
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_cut_set_box"),
     ),
@@ -434,11 +819,81 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     "hint": "Use scene_smart_load to resolve names in common dirs (Documents/Downloads/Desktop/cwd).",
                 }
             )
+        except Exception as e:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": str(e),
+                    "hint": "If you are loading a Neuroglancer URL (precomputed://, gs://, s3://, http(s)://), use scene_start_load_task + scene_wait_task.",
+                },
+                ensure_ascii=False,
+            )
 
     if name == "scene_ensure_loaded":
         files = args.get("files") or []
-        summary = client.ensure_loaded(files)
-        return json.dumps({"ok": True, **summary})
+        try:
+            summary = client.ensure_loaded(files)
+            return json.dumps({"ok": True, **summary})
+        except Exception as e:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": str(e),
+                    "hint": "If you are loading a Neuroglancer URL (precomputed://, gs://, s3://, http(s)://), use scene_start_load_task + scene_wait_task.",
+                },
+                ensure_ascii=False,
+            )
+
+    if name == "scene_start_load_task":
+        sources = args.get("sources") or []
+        network_timeout_sec = args.get("network_timeout_sec", 30.0)
+        set_visible = bool(args.get("set_visible", True))
+        try:
+            task_id = client.start_load_task(
+                sources,
+                network_timeout_sec=float(network_timeout_sec)
+                if network_timeout_sec is not None
+                else None,
+                set_visible=set_visible,
+            )
+            return json.dumps({"ok": True, "task_id": int(task_id)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False)
+
+    if name == "scene_wait_task":
+        task_id = int(args.get("task_id", 0) or 0)
+        timeout_sec = float(args.get("timeout_sec", 30.0) or 0.0)
+        poll_interval_sec = float(args.get("poll_interval_sec", 0.2) or 0.2)
+        try:
+            status = client.wait_task(
+                task_id,
+                timeout_sec=timeout_sec,
+                poll_interval_sec=poll_interval_sec,
+            )
+            return json.dumps({"ok": True, "status": status}, ensure_ascii=False)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg}, ensure_ascii=False)
+
+    if name == "scene_cancel_task":
+        task_id = int(args.get("task_id", 0) or 0)
+        try:
+            ok = client.cancel_task(task_id)
+            return json.dumps({"ok": bool(ok), "task_id": task_id}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False)
+
+    if name == "scene_delete_task":
+        task_id = int(args.get("task_id", 0) or 0)
+        try:
+            ok = client.delete_task(task_id)
+            return json.dumps({"ok": bool(ok), "task_id": task_id}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False)
 
     if name == "scene_wait_objects_ready":
         ids = args.get("ids") or []
@@ -464,7 +919,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 return json.dumps({"ok": False, "error": f"fit_candidates failed: {e}"})
 
         if not ids_list:
-            return json.dumps({"ok": True, "ids": [], "status": {"ok": True, "objects": []}})
+            return json.dumps(
+                {"ok": True, "ids": [], "status": {"ok": True, "objects": []}}
+            )
 
         try:
             status = client.wait_for_objects_ready(
@@ -491,7 +948,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg}, ensure_ascii=False)
 
     if name == "scene_smart_load":
-
         names = args.get("names") or []
         dir_hints = args.get("dir_hints") or []
         schema_dir_override = args.get("schema_dir")
@@ -587,7 +1043,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         try:
             resp = client.list_objects()
             objs = [
-                {"id": o.id, "type": o.type, "name": o.name, "path": o.path, "visible": o.visible}
+                {
+                    "id": o.id,
+                    "type": o.type,
+                    "name": o.name,
+                    "path": o.path,
+                    "visible": o.visible,
+                }
                 for o in resp.objects
             ]
             return json.dumps({"ok": True, "objects": objs})
@@ -608,7 +1070,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 try:
                     limit = int(limit)
                 except Exception:
-                    return json.dumps({"ok": False, "error": "limit must be an integer"})
+                    return json.dumps(
+                        {"ok": False, "error": "limit must be an integer"}
+                    )
                 if limit < 1:
                     return json.dumps(
                         {"ok": False, "error": "limit must be >= 1 when provided"}
@@ -638,7 +1102,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     "path": str(getattr(o, "path", "")),
                     "visible": bool(getattr(o, "visible", False)),
                 }
-                if isinstance(visible_filter, bool) and entry["visible"] != visible_filter:
+                if (
+                    isinstance(visible_filter, bool)
+                    and entry["visible"] != visible_filter
+                ):
                     continue
                 if tc and tc not in entry["type"].lower():
                     continue
@@ -648,7 +1115,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     continue
                 if q:
                     hay = (
-                        f'{entry["id"]} {entry["type"]} {entry["name"]} {entry["path"]}'
+                        f"{entry['id']} {entry['type']} {entry['name']} {entry['path']}"
                     ).lower()
                     if q not in hay:
                         continue
@@ -717,8 +1184,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             if name_in is not None and str(name_in).strip() != ""
             else (str(query).strip() if query is not None else None)
         )
-        if (candidate is None or candidate == "") and (name_str is None or name_str == ""):
-            return json.dumps({"ok": False, "error": "query, json_key, or name required"})
+        if (candidate is None or candidate == "") and (
+            name_str is None or name_str == ""
+        ):
+            return json.dumps(
+                {"ok": False, "error": "query, json_key, or name required"}
+            )
         try:
             jk = _resolve_json_key(id, candidate=candidate) if candidate else None
             if not jk and name_str:
@@ -734,7 +1205,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     "error": "could not resolve parameter",
                     "id": int(id),
                     **({"query": str(query)} if query is not None else {}),
-                    **({"json_key": str(json_key_in)} if json_key_in is not None else {}),
+                    **(
+                        {"json_key": str(json_key_in)}
+                        if json_key_in is not None
+                        else {}
+                    ),
                     **({"name": str(name_in)} if name_in is not None else {}),
                 }
             )
@@ -749,7 +1224,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 break
         if target is None:
             return json.dumps(
-                {"ok": False, "error": "parameter not found for id", "id": int(id), "json_key": jk}
+                {
+                    "ok": False,
+                    "error": "parameter not found for id",
+                    "id": int(id),
+                    "json_key": jk,
+                }
             )
         info = _param_to_dict(target)
 
@@ -757,7 +1237,19 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             if not isinstance(schema, dict):
                 return {}
             out: dict[str, Any] = {}
-            for k in ("type", "title", "description", "default", "minItems", "maxItems", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"):
+            for k in (
+                "type",
+                "title",
+                "description",
+                "default",
+                "minItems",
+                "maxItems",
+                "minimum",
+                "maximum",
+                "exclusiveMinimum",
+                "exclusiveMaximum",
+                "multipleOf",
+            ):
                 if k in schema:
                     out[k] = schema.get(k)
             if "enum" in schema and isinstance(schema.get("enum"), list):
@@ -765,9 +1257,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             if "const" in schema:
                 out["const"] = schema.get("const")
             if "properties" in schema and isinstance(schema.get("properties"), dict):
-                out["properties"] = sorted([str(k) for k in schema.get("properties", {}).keys()])
+                out["properties"] = sorted(
+                    [str(k) for k in schema.get("properties", {}).keys()]
+                )
             if "required" in schema and isinstance(schema.get("required"), list):
-                out["required"] = [str(x) for x in schema.get("required") if isinstance(x, str)]
+                out["required"] = [
+                    str(x) for x in schema.get("required") if isinstance(x, str)
+                ]
             if "oneOf" in schema and isinstance(schema.get("oneOf"), list):
                 out["oneOf_count"] = len(schema.get("oneOf") or [])
             if "anyOf" in schema and isinstance(schema.get("anyOf"), list):
@@ -821,7 +1317,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         except Exception:
             max_types = None
         try:
-            max_params_per_type = int(max_params_raw) if max_params_raw is not None else None
+            max_params_per_type = (
+                int(max_params_raw) if max_params_raw is not None else None
+            )
         except Exception:
             max_params_per_type = None
         if isinstance(max_types, int) and max_types <= 0:
@@ -858,9 +1356,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         continue
                     plist = g.get("parameters") or []
                     lines.append(f"## Group: {gname}")
-                    for p in plist if max_params_per_type is None else plist[:max_params_per_type]:
+                    for p in (
+                        plist
+                        if max_params_per_type is None
+                        else plist[:max_params_per_type]
+                    ):
                         lines.append(
-                            f"- `{p.get('jsonKey','')}` — {p.get('type','')} (interp={p.get('supportsInterpolation',False)})"
+                            f"- `{p.get('jsonKey', '')}` — {p.get('type', '')} (interp={p.get('supportsInterpolation', False)})"
                         )
                     lines.append("")
             # Object types
@@ -873,7 +1375,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 if isinstance(obj, dict):
                     plist = obj.get("parameters") or obj.get("params") or []
                 lines.append(f"## Type: {tname}")
-                for p in plist if max_params_per_type is None else plist[:max_params_per_type]:
+                for p in (
+                    plist
+                    if max_params_per_type is None
+                    else plist[:max_params_per_type]
+                ):
                     jk = p.get("jsonKey", "") or p.get("json_key", "")
                     ty = p.get("type", "")
                     interp = p.get("supportsInterpolation", False)
@@ -906,11 +1412,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 {"ok": False, "error": "schema not found", "searched": searched}
             )
         try:
-            text = build_capabilities_prompt(Path(sd), codegen_enabled=bool(ctx.codegen_enabled))
+            text = build_capabilities_prompt(
+                Path(sd), codegen_enabled=bool(ctx.codegen_enabled)
+            )
             return json.dumps({"ok": True, "summary": text})
         except Exception as e:
             # Return generic text on failure.
-            text = build_capabilities_prompt(Path("/does/not/exist"), codegen_enabled=bool(ctx.codegen_enabled))
+            text = build_capabilities_prompt(
+                Path("/does/not/exist"), codegen_enabled=bool(ctx.codegen_enabled)
+            )
             return json.dumps({"ok": False, "summary": text, "error": str(e)})
 
     if name == "scene_facts_summary":
@@ -930,7 +1440,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         # Objects summary
         objs = facts.get("objects_list") or []
         shown = min(len(objs), max(0, limit))
-        lines.append(f"Objects: {len(objs)} total (showing {shown}; sample_limit={limit})")
+        lines.append(
+            f"Objects: {len(objs)} total (showing {shown}; sample_limit={limit})"
+        )
         for o in objs[: max(0, limit)]:
             lines.append(
                 f"  - {o.get('id')}:{o.get('type')}:{o.get('name')} visible={o.get('visible')}"
@@ -1169,7 +1681,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         allow = False
         try:
             if ctx.session_store is not None:
-                allow = (ctx.session_store.get_consent("screenshots") is True)
+                allow = ctx.session_store.get_consent("screenshots") is True
         except Exception:
             allow = False
         if not allow:
@@ -1184,7 +1696,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             width = int(args.get("width", 0))
             height = int(args.get("height", 0))
         except Exception:
-            return json.dumps({"ok": False, "error": "width and height must be integers"})
+            return json.dumps(
+                {"ok": False, "error": "width and height must be integers"}
+            )
         if width <= 0 or height <= 0:
             return json.dumps({"ok": False, "error": "width and height must be > 0"})
 
@@ -1316,7 +1830,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     if isinstance(schema_dict, dict):
                         sch = str(schema_dict.get("$schema") or "")
                         use_2020 = ("2020-12" in sch) or ("prefixItems" in schema_dict)
-                    validator = Draft202012Validator(schema_dict) if use_2020 else Draft7Validator(schema_dict)
+                    validator = (
+                        Draft202012Validator(schema_dict)
+                        if use_2020
+                        else Draft7Validator(schema_dict)
+                    )
             except JsonSchemaError as e:
                 return json.dumps({"ok": False, "error": f"invalid_value_schema: {e}"})
             _schema_validator_cache[cache_key] = validator

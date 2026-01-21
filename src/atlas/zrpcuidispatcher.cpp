@@ -8,8 +8,10 @@
 #include "z3drenderingengine.h"
 #include "zcameraparameteranimation.h"
 #include "zdoc.h"
+#include "zimgdoc.h"
 #include "zlog.h"
 #include "zmainwindow.h"
+#include "zneuroglancerprecomputed.h"
 #include "zqobjectthreadinvoker.h"
 #include "zscenejsonio.h"
 #include "zview.h"
@@ -1365,6 +1367,54 @@ ZRpcUiDispatcher::ListObjectsResult ZRpcUiDispatcher::loadFilesAndListObjects(co
 
   mainWin->loadUrls(urls);
   return listObjects();
+}
+
+ZRpcUiDispatcher::AddNeuroglancerPrecomputedResult
+ZRpcUiDispatcher::addNeuroglancerPrecomputedVolume(std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol, bool setVisible)
+{
+  AddNeuroglancerPrecomputedResult out;
+
+  if (!vol) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "add_neuroglancer_precomputed_volume: volume is null";
+    return out;
+  }
+
+  const QString rootUrl = vol->rootUrl();
+
+  ZMainWindow* mainWin = mainWindowUi();
+  if (!mainWin) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "add_neuroglancer_precomputed_volume: main window not ready";
+    return out;
+  }
+  ZDoc* doc = mainWin->doc();
+  if (!doc) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "add_neuroglancer_precomputed_volume: doc not ready";
+    return out;
+  }
+
+  QString err;
+  const size_t id = doc->imgDoc().addNeuroglancerPrecomputedVolume(std::move(vol), err);
+  if (id == 0) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = err.isEmpty() ? "add_neuroglancer_precomputed_volume: failed to add dataset" : err.toStdString();
+    return out;
+  }
+
+  if (setVisible) {
+    doc->setObjVisible(id, true);
+  }
+
+  out.ok = true;
+  out.id = static_cast<uint64_t>(id);
+  out.rootUrl = rootUrl;
+  return out;
 }
 
 ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::setVisibility(const std::vector<size_t>& ids, bool on)

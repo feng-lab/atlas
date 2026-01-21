@@ -9,6 +9,7 @@
 #include "zqobjectthreadinvoker.h"
 #include "zrpcuidispatcher.h"
 #include "zrpcsceneids.h"
+#include "zrpctaskmanager.h"
 #include "../version/version.h"
 #include <QThread>
 #include <chrono>
@@ -46,6 +47,19 @@ using atlas::rpc::GetStatusRequest;
 using atlas::rpc::GetStatusResponse;
 using atlas::rpc::WaitForObjectsReadyRequest;
 using atlas::rpc::WaitForObjectsReadyResponse;
+using atlas::rpc::TaskId;
+using atlas::rpc::TaskStatus;
+using atlas::rpc::TaskState;
+using atlas::rpc::TASK_STATE_UNSPECIFIED;
+using atlas::rpc::TASK_STATE_QUEUED;
+using atlas::rpc::TASK_STATE_RUNNING;
+using atlas::rpc::TASK_STATE_SUCCEEDED;
+using atlas::rpc::TASK_STATE_FAILED;
+using atlas::rpc::TASK_STATE_CANCELLED;
+using atlas::rpc::LoadTaskRequest;
+using atlas::rpc::LoadTaskResult;
+using atlas::rpc::WaitTaskRequest;
+using atlas::rpc::StartTaskResponse;
 using atlas::rpc::BBoxRequest;
 using atlas::rpc::BBoxResponse;
 using atlas::rpc::BBox;
@@ -125,6 +139,7 @@ void ZRPCService::setUiDispatcher(ZRpcUiDispatcher* dispatcher)
 
 namespace {
 static constexpr uint32_t kWaitForObjectsReadyDefaultPollMs = 50u;
+static constexpr uint32_t kWaitTaskDefaultPollMs = 50u;
 
 template<class T>
 using ZRpcInvokeResult = ZQObjectThreadInvokeResult<T>;
@@ -242,6 +257,7 @@ class SceneServiceImpl final : public Scene::Service
 public:
   explicit SceneServiceImpl(ZRpcUiDispatcher* uiDispatcher)
     : m_uiDispatcher(uiDispatcher)
+    , m_taskManager(uiDispatcher)
   {}
 
   Status Ping(ServerContext*, const PingRequest*, PingResponse* reply) override
@@ -458,6 +474,124 @@ public:
 
       QThread::msleep(static_cast<unsigned long>(pollMs));
     }
+  }
+
+  Status StartLoadTask(ServerContext*, const LoadTaskRequest* req, StartTaskResponse* reply) override
+  {
+    CHECK(req);
+    CHECK(reply);
+
+    if (req->sources_size() == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "start_load_task: sources is required");
+    }
+
+    QStringList sources;
+    sources.reserve(req->sources_size());
+    QStringList problems;
+    for (int i = 0; i < req->sources_size(); ++i) {
+      const QString s = QString::fromStdString(req->sources(i)).trimmed();
+      if (s.isEmpty()) {
+        problems.push_back(QString("sources[%1]: empty").arg(i));
+        continue;
+      }
+      sources.push_back(s);
+    }
+    if (!problems.isEmpty()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT,
+                    QString("start_load_task: invalid input: %1").arg(problems.join("; ")).toStdString());
+    }
+
+    ZRpcTaskManager::StartLoadParams params;
+    params.sources = std::move(sources);
+    params.setVisible = req->set_visible();
+    if (req->network_timeout_ms() > 0u) {
+      params.networkTimeout = std::chrono::milliseconds(req->network_timeout_ms());
+    }
+
+    const uint64_t taskId = m_taskManager.startLoadTask(std::move(params));
+    reply->set_ok(true);
+    reply->set_task_id(taskId);
+    return Status::OK;
+  }
+
+  Status GetTaskStatus(ServerContext*, const TaskId* req, TaskStatus* reply) override
+  {
+    CHECK(req);
+    CHECK(reply);
+
+    const auto snapOpt = m_taskManager.taskStatus(req->id());
+    if (!snapOpt.has_value()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "get_task_status: unknown task_id");
+    }
+    fillTaskStatus(*snapOpt, reply);
+    return Status::OK;
+  }
+
+  Status WaitTask(ServerContext* context, const WaitTaskRequest* req, TaskStatus* reply) override
+  {
+    CHECK(req);
+    CHECK(reply);
+
+    if (req->task_id() == 0u) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "wait_task: task_id is required");
+    }
+
+    const uint32_t timeoutMs = req->timeout_ms();
+    const uint32_t pollMsRaw = req->poll_interval_ms();
+    const uint32_t pollMs = (pollMsRaw > 0u) ? pollMsRaw : kWaitTaskDefaultPollMs;
+
+    std::function<bool()> shouldCancel;
+    if (context) {
+      const auto deadline = context->deadline();
+      shouldCancel = [context, deadline]() -> bool {
+        if (context->IsCancelled()) {
+          return true;
+        }
+        return std::chrono::system_clock::now() >= deadline;
+      };
+    }
+
+    const auto snapOpt = m_taskManager.waitForCompletion(req->task_id(),
+                                                         std::chrono::milliseconds(timeoutMs),
+                                                         std::chrono::milliseconds(pollMs),
+                                                         std::move(shouldCancel));
+    if (!snapOpt.has_value()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "wait_task: unknown task_id");
+    }
+
+    fillTaskStatus(*snapOpt, reply);
+
+    if (context && context->IsCancelled()) {
+      return Status(grpc::StatusCode::CANCELLED, "cancelled");
+    }
+
+    return Status::OK;
+  }
+
+  Status CancelTask(ServerContext*, const TaskId* req, Bool* reply) override
+  {
+    CHECK(req);
+    CHECK(reply);
+
+    const bool ok = m_taskManager.cancelTask(req->id());
+    if (!ok) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "cancel_task: unknown task_id");
+    }
+    reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status DeleteTask(ServerContext*, const TaskId* req, Bool* reply) override
+  {
+    CHECK(req);
+    CHECK(reply);
+
+    const bool ok = m_taskManager.deleteTask(req->id());
+    if (!ok) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "delete_task: unknown task_id");
+    }
+    reply->set_ok(true);
+    return Status::OK;
   }
 
   Status GetParamValues(ServerContext* grpcContext,
@@ -2438,7 +2572,62 @@ private:
     return m_uiDispatcher;
   }
 
+  static void fillTaskStatus(const ZRpcTaskSnapshot& snap, TaskStatus* out)
+  {
+    CHECK(out);
+
+    out->set_id(snap.id);
+    out->set_kind(snap.kind);
+
+    auto toProtoState = [](ZRpcTaskState st) -> TaskState {
+      switch (st) {
+        case ZRpcTaskState::Queued:
+          return TASK_STATE_QUEUED;
+        case ZRpcTaskState::Running:
+          return TASK_STATE_RUNNING;
+        case ZRpcTaskState::Succeeded:
+          return TASK_STATE_SUCCEEDED;
+        case ZRpcTaskState::Failed:
+          return TASK_STATE_FAILED;
+        case ZRpcTaskState::Cancelled:
+          return TASK_STATE_CANCELLED;
+      }
+      return TASK_STATE_UNSPECIFIED;
+    };
+
+    out->set_state(toProtoState(snap.state));
+    if (snap.progress.has_value()) {
+      out->mutable_progress()->set_value(*snap.progress);
+    }
+    if (!snap.message.empty()) {
+      out->set_message(snap.message);
+    }
+    if (!snap.error.empty()) {
+      out->set_error(snap.error);
+    }
+
+    if (snap.loadResult.has_value()) {
+      const auto& lr = *snap.loadResult;
+      LoadTaskResult* load = out->mutable_load();
+      for (const auto id : lr.loadedIds) {
+        load->add_loaded_ids(id);
+      }
+      for (const auto& obj : lr.objects) {
+        auto* o = load->add_objects();
+        o->set_id(obj.id);
+        o->set_type(obj.type);
+        o->set_name(obj.name);
+        o->set_path(obj.path);
+        o->set_visible(obj.visible);
+      }
+      for (const auto& w : lr.warnings) {
+        load->add_warnings(w);
+      }
+    }
+  }
+
   ZRpcUiDispatcher* m_uiDispatcher = nullptr; // non-owning
+  ZRpcTaskManager m_taskManager;
 };
 
 void ZRPCService::init()

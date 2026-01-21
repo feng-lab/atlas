@@ -31,14 +31,6 @@ namespace nim {
 
 namespace {
 
-bool looksLikeNeuroglancerPrecomputedUrl(const QString& s)
-{
-  const QString trimmed = s.trimmed();
-  return trimmed.startsWith("precomputed://", Qt::CaseInsensitive) || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
-         trimmed.startsWith("s3://", Qt::CaseInsensitive) ||
-         trimmed.startsWith("http://", Qt::CaseInsensitive) || trimmed.startsWith("https://", Qt::CaseInsensitive);
-}
-
 std::optional<QString> neuroglancerPrecomputedUrlFromJson(const json::value& jValue)
 {
   if (!jValue.is_object()) {
@@ -59,7 +51,7 @@ std::optional<QString> neuroglancerPrecomputedUrlFromJson(const json::value& jVa
   // Backward-compat: previous attempts may have serialized as a ZImgSource with a URL in filenames[0].
   if (auto it = jo.find("filenames"); it != jo.end() && it->value().is_array()) {
     const auto files = json::value_to<QStringList>(it->value());
-    if (!files.isEmpty() && looksLikeNeuroglancerPrecomputedUrl(files[0])) {
+    if (!files.isEmpty() && ZImgDoc::looksLikeNeuroglancerPrecomputedUrl(files[0])) {
       return files[0];
     }
   }
@@ -68,6 +60,14 @@ std::optional<QString> neuroglancerPrecomputedUrlFromJson(const json::value& jVa
 }
 
 } // namespace
+
+bool ZImgDoc::looksLikeNeuroglancerPrecomputedUrl(const QString& s)
+{
+  const QString trimmed = s.trimmed();
+  return trimmed.startsWith("precomputed://", Qt::CaseInsensitive) ||
+         trimmed.startsWith("gs://", Qt::CaseInsensitive) || trimmed.startsWith("s3://", Qt::CaseInsensitive) ||
+         trimmed.startsWith("http://", Qt::CaseInsensitive) || trimmed.startsWith("https://", Qt::CaseInsensitive);
+}
 
 ZImgDoc::ZImgDoc(ZDoc& doc)
   : ZObjDoc(doc)
@@ -1005,6 +1005,19 @@ size_t ZImgDoc::loadNeuroglancerPrecomputed(const QString& url, QString& errorMs
     constexpr std::chrono::milliseconds defaultTimeout{30000};
     auto vol = ZNeuroglancerPrecomputedVolume::open(url, defaultTimeout);
     CHECK(vol);
+    return addNeuroglancerPrecomputedVolume(std::move(vol), errorMsg);
+  }
+  catch (const ZException& e) {
+    errorMsg = e.what();
+    return 0;
+  }
+}
+
+size_t ZImgDoc::addNeuroglancerPrecomputedVolume(std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol, QString& errorMsg)
+{
+  try {
+    errorMsg.clear();
+    CHECK(vol);
 
     const QString rootUrl = vol->rootUrl();
     for (const auto& idPack : m_idToImgPacks) {
@@ -1014,8 +1027,7 @@ size_t ZImgDoc::loadNeuroglancerPrecomputed(const QString& url, QString& errorMs
       }
     }
 
-    size_t id = addImgPack(new ZImgPack(std::move(vol)));
-    return id;
+    return addImgPack(new ZImgPack(std::move(vol)));
   }
   catch (const ZException& e) {
     errorMsg = e.what();

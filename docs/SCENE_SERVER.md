@@ -48,6 +48,57 @@ The Atlas GUI hosts the gRPC service `atlas.rpc.Scene` for live control.
 
 ### Files / Objects
 
+- **Async load tasks (recommended for network datasets)**
+  - `StartLoadTask({ sources, network_timeout_ms?, set_visible? }) -> { ok, task_id, error? }`
+    - Starts a long-running load job and returns immediately.
+    - Use this for Neuroglancer precomputed volumes/segmentations (`precomputed://`, `gs://`, `s3://`, `http(s)://`).
+  - `GetTaskStatus({ id }) -> TaskStatus`
+    - Poll task status (non-blocking).
+  - `WaitTask({ task_id, timeout_ms?, poll_interval_ms? }) -> TaskStatus`
+    - Wait for a task to reach a terminal state (`SUCCEEDED|FAILED|CANCELLED`) or until `timeout_ms` elapses.
+    - If `timeout_ms=0`, returns the current snapshot without waiting.
+  - `CancelTask({ id }) -> { ok }`
+    - Best-effort cancellation (may not interrupt in-flight network I/O, but will try to prevent UI registration).
+  - `DeleteTask({ id }) -> { ok }`
+    - Forget a task and release stored results (best-effort cancels if still running).
+  - Task completion semantics:
+    - `SUCCEEDED` means the dataset(s) are registered in the current document and object ids are available via `result.load.loaded_ids`.
+    - `FAILED` may still include partial `result.load` (some sources loaded/registered, some failed); check `error` and `warnings`.
+    - For engine-backed operations after loading, use `WaitForObjectsReady` on the returned ids.
+
+- **Agent cookbook: load (network) → wait → operate**
+  - Minimal 3-call orchestration (recommended for Neuroglancer precomputed):
+    1) `StartLoadTask(...)` to begin network metadata fetch off the UI thread
+    2) `WaitTask(...)` to wait for completion and get `loaded_ids`
+    3) `WaitForObjectsReady(...)` to ensure the returned ids are bound to a 3D view/filter (safe for bbox/camera/params)
+  - Example:
+    ```text
+    # 1) Start async load
+    start = Scene.StartLoadTask({
+      sources: ["precomputed://..."],
+      network_timeout_ms: 30000,
+      set_visible: true,
+    })
+    task_id = start.task_id
+
+    # 2) Wait for completion (terminal state: SUCCEEDED|FAILED|CANCELLED)
+    status = Scene.WaitTask({
+      task_id: task_id,
+      timeout_ms: 120000,
+      poll_interval_ms: 200,
+    })
+
+    # 3) If any ids loaded, wait for engine/view binding before engine-backed ops
+    ids = status.result.load.loaded_ids
+    ready = Scene.WaitForObjectsReady({ ids: ids, timeout_ms: 30000, poll_interval_ms: 50 })
+    ```
+  - Handling `FAILED` (partial success):
+    - Do not assume `FAILED` means “nothing loaded”. A task can fail for one source but still succeed for others.
+    - If `status.result.load.loaded_ids` is non-empty, you may proceed with those ids (after `WaitForObjectsReady`) and surface `status.error` / `status.result.load.warnings` for debugging.
+    - If `loaded_ids` is empty, treat it as a hard failure and surface `status.error`.
+  - Cleanup:
+    - Optionally call `DeleteTask({id})` once you’ve consumed the result to release stored task data.
+
 - `LoadFiles(files) -> objects[]`
 - `ListObjects() -> objects[]` (id, type, name, path, visible)
 
@@ -211,5 +262,6 @@ Notes:
 
 ## Notes
 
-- All requests are marshalled to the UI/rendering thread via `QMetaObject::invokeMethod` to respect single-GL-context threading rules.
+- Most requests are marshalled to the UI/rendering thread via `QMetaObject::invokeMethod` to respect single-GL-context threading rules.
+- Network-backed dataset loads use the task API so metadata fetch (e.g. Neuroglancer `.../info`) runs off the UI thread, then registration happens on the UI thread.
 - For MP4 export, use the existing headless CLI `--run_export_3d_animation` from Python once a `.animation3d` is authored; keep long-running export tasks out of the GUI RPC.

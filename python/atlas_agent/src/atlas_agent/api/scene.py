@@ -16,6 +16,32 @@ class SceneAPI:
     def ensure_loaded(self, files: list[str]) -> dict:
         return self._c.ensure_loaded(files)
 
+    def start_load_task(
+        self,
+        sources: list[str],
+        *,
+        network_timeout_sec: float | None = None,
+        set_visible: bool = True,
+    ) -> int:
+        return self._c.start_load_task(
+            sources,
+            network_timeout_sec=network_timeout_sec,
+            set_visible=set_visible,
+        )
+
+    def wait_task(
+        self,
+        task_id: int,
+        *,
+        timeout_sec: float = 30.0,
+        poll_interval_sec: float = 0.2,
+    ) -> dict:
+        return self._c.wait_task(
+            task_id,
+            timeout_sec=timeout_sec,
+            poll_interval_sec=poll_interval_sec,
+        )
+
     def list_objects(self) -> list[dict]:
         resp = self._c.list_objects()
         out = []

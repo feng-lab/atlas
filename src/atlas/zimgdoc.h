@@ -13,6 +13,10 @@ class ZImgDoc : public ZObjDoc
 public:
   explicit ZImgDoc(ZDoc& doc);
 
+  // Heuristic: treat strings that look like a Neuroglancer precomputed dataset reference as loadable by this doc.
+  // This is a pure string check (no I/O) and is used by both UI and RPC paths.
+  [[nodiscard]] static bool looksLikeNeuroglancerPrecomputedUrl(const QString& s);
+
   ZImgPack& imgPack(size_t id)
   {
     return *m_idToImgPacks.at(id);
@@ -47,6 +51,10 @@ public:
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
   size_t loadFile(const json::value& jValue, QString& errorMsg) override;
+
+  // Add an already-open Neuroglancer precomputed dataset (e.g. opened off the UI thread for RPC tasks).
+  // Returns the object id (existing id if already loaded) or 0 on failure.
+  size_t addNeuroglancerPrecomputedVolume(std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol, QString& errorMsg);
 
   [[nodiscard]] std::vector<QAction*> loadFileActions() const override;
 

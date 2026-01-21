@@ -85,6 +85,81 @@ message WaitForObjectsReadyResponse {
   string error = 6;
 }
 
+// ---- Task/Job API ----
+//
+// Network-backed operations (e.g. Neuroglancer precomputed) should not block the UI thread.
+// The Scene RPC therefore exposes a task API so clients can start a long-running job,
+// poll status, wait with a timeout, and cancel/delete tasks explicitly.
+
+message TaskId
+{
+  uint64 id = 1;
+}
+
+enum TaskState
+{
+  TASK_STATE_UNSPECIFIED = 0;
+  TASK_STATE_QUEUED = 1;
+  TASK_STATE_RUNNING = 2;
+  TASK_STATE_SUCCEEDED = 3;
+  TASK_STATE_FAILED = 4;
+  TASK_STATE_CANCELLED = 5;
+}
+
+message LoadTaskRequest
+{
+  // Sources to load. Supports:
+  // - local file paths
+  // - Neuroglancer precomputed dataset URLs (precomputed://, gs://, s3://, http(s)://)
+  repeated string sources = 1;
+
+  // Timeout for network metadata fetch (e.g. precomputed .../info) per dataset.
+  // 0 means server default.
+  uint32 network_timeout_ms = 2;
+
+  // When true, ensure loaded objects are visible after loading.
+  // This matches the typical user workflow ("load then see it").
+  bool set_visible = 3;
+}
+
+message LoadTaskResult
+{
+  repeated uint64 loaded_ids = 1;
+  repeated ObjectInfo objects = 2; // snapshot after load completes
+  repeated string warnings = 3;
+}
+
+message TaskStatus
+{
+  uint64 id = 1;
+  string kind = 2; // e.g. "load"
+  TaskState state = 3;
+  google.protobuf.DoubleValue progress = 4; // optional 0..1
+  string message = 5;
+  string error = 6; // populated when state=FAILED
+
+  oneof result
+  {
+    LoadTaskResult load = 10;
+  }
+}
+
+message WaitTaskRequest
+{
+  uint64 task_id = 1;
+  // Maximum time to wait before returning (0 = do not wait; return current status).
+  uint32 timeout_ms = 2;
+  // Poll interval while waiting (0 = server default).
+  uint32 poll_interval_ms = 3;
+}
+
+message StartTaskResponse
+{
+  bool ok = 1;
+  uint64 task_id = 2;
+  string error = 3;
+}
+
 message BBoxRequest { repeated uint64 ids = 1; bool after_clipping = 2; }
 message Vec3 { double x = 1; double y = 2; double z = 3; }
 message BBox { Vec3 min = 1; Vec3 max = 2; Vec3 size = 3; Vec3 center = 4; }
@@ -174,6 +249,17 @@ service Scene {
   // Wait until the requested object ids are ready for engine-backed operations
   // (i.e. the object has a bound 3D view/filter), or until timeout.
   rpc WaitForObjectsReady (WaitForObjectsReadyRequest) returns (WaitForObjectsReadyResponse);
+  // ---- Task/Job API ----
+  // Start an async load task (local paths and/or Neuroglancer precomputed URLs).
+  rpc StartLoadTask(LoadTaskRequest) returns (StartTaskResponse);
+  // Poll task status (non-blocking).
+  rpc GetTaskStatus(TaskId) returns (TaskStatus);
+  // Wait for task completion (with optional timeout).
+  rpc WaitTask(WaitTaskRequest) returns (TaskStatus);
+  // Best-effort cancellation.
+  rpc CancelTask(TaskId) returns (Bool);
+  // Forget a task and release its stored results.
+  rpc DeleteTask(TaskId) returns (Bool);
   rpc LoadFiles (FileList) returns (ListObjectsResponse);
   rpc ListObjects (Empty) returns (ListObjectsResponse);
   rpc BBox (BBoxRequest) returns (BBoxResponse);

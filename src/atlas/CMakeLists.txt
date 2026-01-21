@@ -610,6 +610,7 @@ set(SOURCES
     zservicemanager.cpp zservicemanager.h
     zrpcservice.cpp zrpcservice.h
     zrpcuidispatcher.cpp zrpcuidispatcher.h
+    zrpctaskmanager.cpp zrpctaskmanager.h
     zscenejsonio.cpp zscenejsonio.h
     z3dcameraplanner.cpp z3dcameraplanner.h
     z3dviewsettingparamops.cpp z3dviewsettingparamops.h
