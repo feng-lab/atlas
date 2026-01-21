@@ -960,7 +960,13 @@ if (WIN32)
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy_directory
                              "${CMAKE_CURRENT_SOURCE_DIR}/../../docs"
-                             "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs")
+                             "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs"
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                             "${CMAKE_CURRENT_SOURCE_DIR}/../../LICENSE"
+                             "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs/LICENSE"
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                             "${CMAKE_CURRENT_SOURCE_DIR}/../../NOTICE"
+                             "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs/NOTICE")
   # Copy RPC protos into bundle so external agents can compile stubs against the
   # exact running Atlas version (single source of truth).
   add_custom_command(TARGET ${APP_NAME}
@@ -1002,7 +1008,7 @@ else (WIN32)
     message(STATUS "Qt6Core_INCLUDE_DIRS0: ${Qt6Core_INCLUDE_DIRS0}")
     set_source_files_properties(ztheme.cpp PROPERTIES COMPILE_FLAGS "-isystem ${Qt6Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}/QtCore -isystem ${Qt6Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}")
 
-    set(copyright_line "Copyright (c) 2011, Linqing Feng")
+    set(copyright_line "Copyright (c) 2011 Linqing Feng and contributors")
     set_target_properties(${APP_NAME} PROPERTIES
                           BUILD_RPATH "@executable_path/../Frameworks;@executable_path/../lib"
                           INSTALL_RPATH "@executable_path/../Frameworks;@executable_path/../lib"
@@ -1082,7 +1088,13 @@ else (WIN32)
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_directory
                                "${CMAKE_CURRENT_SOURCE_DIR}/../../docs"
-                               "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/docs")
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/docs"
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                               "${CMAKE_CURRENT_SOURCE_DIR}/../../LICENSE"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/docs/LICENSE"
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                               "${CMAKE_CURRENT_SOURCE_DIR}/../../NOTICE"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/docs/NOTICE")
     # Copy RPC protos into bundle so external agents can compile stubs against
     # the exact running Atlas version (single source of truth).
     add_custom_command(TARGET ${APP_NAME}
@@ -1165,7 +1177,13 @@ else (WIN32)
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_directory
                                "${CMAKE_CURRENT_SOURCE_DIR}/../../docs"
-                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs")
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs"
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                               "${CMAKE_CURRENT_SOURCE_DIR}/../../LICENSE"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs/LICENSE"
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                               "${CMAKE_CURRENT_SOURCE_DIR}/../../NOTICE"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs/NOTICE")
     # Copy RPC protos into bundle so external agents can compile stubs against
     # the exact running Atlas version (single source of truth).
     add_custom_command(TARGET ${APP_NAME}

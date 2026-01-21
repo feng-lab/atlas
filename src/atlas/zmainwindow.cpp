@@ -275,12 +275,23 @@ void ZMainWindow::openRecentFile()
 
 void ZMainWindow::about()
 {
+  const QString apacheLicenseUrl = QStringLiteral("http://www.apache.org/licenses/LICENSE-2.0");
   QMessageBox::about(QApplication::activeWindow(),
-                     QString("About Atlas"),
-                     QString("<p>Atlas version %1</p>"
-                             "<p>Atlas is developed by Linqing Feng (flq@live.com, fenglinqing@gmail.com).</p>"
-                             "<p>All rights reserved.</p>")
-                       .arg(m_versionString));
+                     tr("About Atlas"),
+                     tr("<p>Atlas version %1</p>"
+                        "<p>"
+                        "Atlas<br/>"
+                        "<br/>"
+                        "Copyright (c) 2011 Linqing Feng and contributors &lt;fenglinqing@gmail.com&gt;<br/>"
+                        "<br/>"
+                        "Licensed under the Apache License, Version 2.0 (the \"License\");<br/>"
+                        "you may not use this work except in compliance with the License.<br/>"
+                        "You may obtain a copy of the License in the file LICENSE at the root of this repository<br/>"
+                        "or at <a href=\"%2\">%2</a><br/>"
+                        "<br/>"
+                        "This repository contains third-party components under their respective licenses."
+                        "</p>")
+                       .arg(m_versionString, apacheLicenseUrl));
 }
 
 #ifdef Q_OS_LINUX
