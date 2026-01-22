@@ -77,7 +77,13 @@ def test_tool_loop_returns_assistant_text_when_no_tools_called():
     out = run_responses_tool_loop(
         llm=llm,
         instructions="system",
-        input_items=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
+        input_items=[
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hi"}],
+            }
+        ],
         tools=[],
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
@@ -111,7 +117,7 @@ def test_tool_loop_executes_function_calls_then_continues():
                         {
                             "type": "function_call",
                             "name": "update_plan",
-                            "arguments": "{\"plan\":[]}",
+                            "arguments": '{"plan":[]}',
                             "call_id": "call_1",
                         }
                     ]
@@ -139,8 +145,19 @@ def test_tool_loop_executes_function_calls_then_continues():
     out = run_responses_tool_loop(
         llm=llm,
         instructions="system",
-        input_items=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
-        tools=[{"type": "function", "function": {"name": "update_plan", "parameters": {"type": "object"}}}],
+        input_items=[
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hi"}],
+            }
+        ],
+        tools=[
+            {
+                "type": "function",
+                "function": {"name": "update_plan", "parameters": {"type": "object"}},
+            }
+        ],
         dispatch=dispatch,
         callbacks=ToolLoopCallbacks(on_tool_call=on_tool_call),
         max_rounds=3,
@@ -152,7 +169,7 @@ def test_tool_loop_executes_function_calls_then_continues():
     assert llm.seen_tools[0][0]["type"] == "function"
     assert llm.seen_tools[0][0]["name"] == "update_plan"
     assert "function" not in llm.seen_tools[0][0]
-    assert tool_called == [("update_plan", "{\"plan\":[]}")]
+    assert tool_called == [("update_plan", '{"plan":[]}')]
     assert seen_tool_calls == [("update_plan", "call_1")]
 
 
@@ -184,7 +201,7 @@ def test_reasoning_summary_complete_is_emitted_before_tool_execution():
                         {
                             "type": "function_call",
                             "name": "update_plan",
-                            "arguments": "{\"plan\":[]}",
+                            "arguments": '{"plan":[]}',
                             "call_id": "call_1",
                         }
                     ]
@@ -210,10 +227,23 @@ def test_reasoning_summary_complete_is_emitted_before_tool_execution():
     out = run_responses_tool_loop(
         llm=llm,
         instructions="system",
-        input_items=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
-        tools=[{"type": "function", "function": {"name": "update_plan", "parameters": {"type": "object"}}}],
+        input_items=[
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hi"}],
+            }
+        ],
+        tools=[
+            {
+                "type": "function",
+                "function": {"name": "update_plan", "parameters": {"type": "object"}},
+            }
+        ],
         dispatch=dispatch,
-        callbacks=ToolLoopCallbacks(on_reasoning_summary_complete=on_reasoning_summary_complete),
+        callbacks=ToolLoopCallbacks(
+            on_reasoning_summary_complete=on_reasoning_summary_complete
+        ),
         max_rounds=3,
     )
 
@@ -246,7 +276,7 @@ def test_tool_loop_preserves_assistant_message_as_output_text_in_history():
                         {
                             "type": "function_call",
                             "name": "update_plan",
-                            "arguments": "{\"plan\":[]}",
+                            "arguments": '{"plan":[]}',
                             "call_id": "call_1",
                         },
                     ]
@@ -270,9 +300,18 @@ def test_tool_loop_preserves_assistant_message_as_output_text_in_history():
         llm=llm,
         instructions="system",
         input_items=[
-            {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hi"}],
+            }
         ],
-        tools=[{"type": "function", "function": {"name": "update_plan", "parameters": {"type": "object"}}}],
+        tools=[
+            {
+                "type": "function",
+                "function": {"name": "update_plan", "parameters": {"type": "object"}},
+            }
+        ],
         dispatch=dispatch,
         callbacks=ToolLoopCallbacks(),
         max_rounds=3,
@@ -284,7 +323,11 @@ def test_tool_loop_preserves_assistant_message_as_output_text_in_history():
     # The second call should include assistant history as output_text (not input_text),
     # and should not include provider-specific fields like status.
     second_call_items = llm.seen_input_items[1]
-    assistant_msgs = [it for it in second_call_items if it.get("type") == "message" and it.get("role") == "assistant"]
+    assistant_msgs = [
+        it
+        for it in second_call_items
+        if it.get("type") == "message" and it.get("role") == "assistant"
+    ]
     assert assistant_msgs
     assert assistant_msgs[0]["content"][0]["type"] == "output_text"
     assert assistant_msgs[0]["content"][0]["text"] == "Planning..."
@@ -335,7 +378,11 @@ def test_tool_loop_retries_on_incomplete_chunked_read():
             llm=llm,
             instructions="system",
             input_items=[
-                {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "hi"}],
+                }
             ],
             tools=[],
             dispatch=lambda name, args_json: json.dumps({"ok": True}),
@@ -375,7 +422,13 @@ def test_tool_loop_prefers_parsed_output_when_stream_truncated():
     out = run_responses_tool_loop(
         llm=llm,
         instructions="system",
-        input_items=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
+        input_items=[
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hi"}],
+            }
+        ],
         tools=[],
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
@@ -418,8 +471,19 @@ def test_tool_loop_auto_continues_when_response_incomplete_and_disables_tools():
     out = run_responses_tool_loop(
         llm=llm,
         instructions="system",
-        input_items=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
-        tools=[{"type": "function", "function": {"name": "update_plan", "parameters": {"type": "object"}}}],
+        input_items=[
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hi"}],
+            }
+        ],
+        tools=[
+            {
+                "type": "function",
+                "function": {"name": "update_plan", "parameters": {"type": "object"}},
+            }
+        ],
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
         max_rounds=6,
@@ -453,7 +517,13 @@ def test_tool_loop_auto_continues_when_final_message_empty():
     out = run_responses_tool_loop(
         llm=llm,
         instructions="system",
-        input_items=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
+        input_items=[
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hi"}],
+            }
+        ],
         tools=[],
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
@@ -462,3 +532,172 @@ def test_tool_loop_auto_continues_when_final_message_empty():
 
     assert out.assistant_text == "Done."
     assert llm.calls == 2
+
+
+def test_tool_loop_compacts_on_context_overflow_when_handler_provided():
+    """When the provider rejects the request due to context length, the loop should
+    prefer caller-provided compaction over blind trimming.
+    """
+
+    class OverflowOnceLLM:
+        def __init__(self):
+            self.calls = 0
+            self.seen_input_items = []
+
+        def responses_stream(  # noqa: D401
+            self,
+            *,
+            instructions: str,
+            input_items,
+            tools=None,
+            temperature: float = 0.2,
+            parallel_tool_calls: bool = False,
+            reasoning_effort: str | None = "high",
+            reasoning_summary: str | None = "detailed",
+            text_verbosity: str | None = "high",
+            on_event=None,
+        ):
+            self.calls += 1
+            self.seen_input_items.append(list(input_items or []))
+            if self.calls == 1:
+                raise RuntimeError("maximum context length exceeded")
+            return {
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "Done."}],
+                    }
+                ]
+            }
+
+    llm = OverflowOnceLLM()
+
+    def compact(in_items, _exc: BaseException) -> bool:
+        # Replace older history with a single checkpoint message, preserving the
+        # most recent user message.
+        if not in_items:
+            return False
+        checkpoint = {
+            "type": "message",
+            "role": "user",
+            "content": [{"type": "input_text", "text": "CONTEXT CHECKPOINT"}],
+        }
+        in_items[:] = [checkpoint, in_items[-1]]
+        return True
+
+    out = run_responses_tool_loop(
+        llm=llm,
+        instructions="system",
+        input_items=[
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hi"}],
+            },
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "older"}],
+            },
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "latest"}],
+            },
+        ],
+        tools=[],
+        dispatch=lambda name, args_json: json.dumps({"ok": True}),
+        callbacks=ToolLoopCallbacks(),
+        max_rounds=3,
+        on_context_overflow=compact,
+    )
+
+    assert out.assistant_text == "Done."
+    assert llm.calls == 2
+    second_call_items = llm.seen_input_items[1]
+    assert second_call_items
+    assert second_call_items[0]["type"] == "message"
+    assert second_call_items[0]["role"] == "user"
+    assert second_call_items[0]["content"][0]["text"] == "CONTEXT CHECKPOINT"
+
+
+def test_tool_loop_proactively_compacts_when_estimate_near_context_window():
+    """Proactive compaction should run before the provider rejects the request."""
+
+    class SingleShotLLM:
+        def __init__(self):
+            self.calls = 0
+            self.seen_input_items = []
+
+        def responses_stream(  # noqa: D401
+            self,
+            *,
+            instructions: str,
+            input_items,
+            tools=None,
+            temperature: float = 0.2,
+            parallel_tool_calls: bool = False,
+            reasoning_effort: str | None = "high",
+            reasoning_summary: str | None = "detailed",
+            text_verbosity: str | None = "high",
+            on_event=None,
+        ):
+            self.calls += 1
+            self.seen_input_items.append(list(input_items or []))
+            return {
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "Done."}],
+                    }
+                ]
+            }
+
+    llm = SingleShotLLM()
+    compacted = {"calls": 0}
+
+    def compact(in_items, _exc: BaseException) -> bool:
+        compacted["calls"] += 1
+        # Keep only a small checkpoint + the last user message.
+        if not in_items:
+            return False
+        checkpoint = {
+            "type": "message",
+            "role": "user",
+            "content": [{"type": "input_text", "text": "CONTEXT CHECKPOINT"}],
+        }
+        # Preserve the last user message if present; otherwise keep the last item.
+        last = in_items[-1]
+        for it in reversed(in_items):
+            if it.get("type") == "message" and it.get("role") == "user":
+                last = it
+                break
+        in_items[:] = [checkpoint, last]
+        return True
+
+    out = run_responses_tool_loop(
+        llm=llm,
+        instructions="system",
+        input_items=[
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "x" * 4000}],
+            }
+        ],
+        tools=[],
+        dispatch=lambda name, args_json: json.dumps({"ok": True}),
+        callbacks=ToolLoopCallbacks(),
+        max_rounds=3,
+        on_context_overflow=compact,
+        # Force proactive compaction: tiny context window so our estimate crosses the threshold.
+        effective_input_budget_tokens=200,
+    )
+
+    assert out.assistant_text == "Done."
+    assert compacted["calls"] >= 1
+    assert llm.calls == 1
+    assert llm.seen_input_items
+    assert llm.seen_input_items[0][0]["content"][0]["text"] == "CONTEXT CHECKPOINT"

@@ -22,6 +22,8 @@ from .defaults import (
     AUTO_RETRIEVE_MODE,
     AUTO_RETRIEVE_NEEDLE_MAX_TOKENS,
     AUTO_RETRIEVE_RECENT_WRITE_EVENTS,
+    CONTEXT_COMPACTION_KEEP_TAIL_ITEMS,
+    CONTEXT_COMPACTION_RECENT_TOOL_EVENTS,
     DEFAULT_EXECUTOR_MAX_ROUNDS,
     DEFAULT_PLANNER_MAX_ROUNDS,
     INTENT_RESOLVER_SCENE_SNAPSHOT_MAX_CHARS,
@@ -210,6 +212,34 @@ def _message(*, role: str, text: str) -> dict[str, Any]:
         "role": role_s,
         "content": [{"type": part_type, "text": str(text)}],
     }
+
+
+def _guess_model_effective_input_budget_tokens(model: str) -> int | None:
+    """Best-effort effective *input* token budget guess from model name.
+
+    This is only used for proactive prompt-budget compaction when the provider
+    does not expose model token limits (total context window and/or max output).
+
+    If the provider later returns an explicit "maximum context length is N tokens"
+    error, we persist that value and prefer it over this guess.
+    """
+
+    m = (model or "").strip().lower()
+    if not m:
+        return None
+    # Very old / small-window models
+    if m.startswith("gpt-3.5"):
+        return 16_384
+    # Modern OpenAI-style naming families (best-effort; update as needed)
+    if m.startswith(("gpt-4o", "gpt-4.1", "gpt-4")):
+        return 128_000
+    if m.startswith("gpt-5"):
+        # GPT-5 family defaults to a larger context window than GPT-4o.
+        return 272_000
+    if m.startswith(("o3", "o4")):
+        return 128_000
+    # Unknown provider/model: fall back to a reasonable modern default.
+    return 128_000
 
 
 @dataclass
@@ -1343,7 +1373,7 @@ class ChatTeam:
             return result_json
 
         # Ensure tool modules that chain via ctx.dispatch also go through our
-        # logging/touch-tracking wrapper (Codex-style determinism).
+        # logging/touch-tracking wrapper (deterministic + auditable).
         try:
             runtime_state["dispatch_proxy"] = _dispatch_logged
         except Exception:
@@ -1937,7 +1967,626 @@ class ChatTeam:
                 planner_no_plan_repair_attempts = 0
                 unexpected_refusal_repair_attempts = 0
                 phase_input_items_local = list(phase_input_items)
+
+                CONTEXT_CHECKPOINT_PREFIX = (
+                    "CONTEXT CHECKPOINT (atlas_agent)\n"
+                    "This is an automatically generated summary of earlier within-turn context.\n"
+                    "It exists to keep the conversation within the model context window.\n"
+                    "When you need exact details beyond this summary, use session_search_events/session_search_transcript.\n"
+                    "\n"
+                )
+
+                model_token_limits_validated: set[str] = set()
+
+                def _model_prompt_budgets_for_current_model() -> tuple[
+                    int | None, int | None
+                ]:
+                    requested_model = str(self.model or "").strip()
+                    gateway_model = str(
+                        getattr(self, "_gateway_model_last", None) or ""
+                    ).strip()
+                    gateway_model_l = gateway_model.lower()
+
+                    # Avoid using placeholder strings as model IDs for lookups.
+                    model_name = (
+                        gateway_model
+                        if (
+                            gateway_model
+                            and "detect gateway model" not in gateway_model_l
+                        )
+                        else requested_model
+                    ).strip()
+                    if not model_name:
+                        return (None, None)
+
+                    total_context_window_tokens: int | None = None
+                    max_output_tokens: int | None = None
+                    effective_input_budget_tokens: int | None = None
+                    auto_compact_tokens: int | None = None
+
+                    try:
+                        meta = self.session_store.get_meta()
+                    except Exception:
+                        meta = {}
+                    if isinstance(meta, dict):
+                        # Total context window (provider-reported or error-derived).
+                        total_by_model = meta.get(
+                            "model_total_context_window_tokens_by_model"
+                        )
+                        if isinstance(total_by_model, dict):
+                            try:
+                                v = total_by_model.get(model_name)
+                                if v is not None:
+                                    n = int(v)
+                                    if n > 0:
+                                        total_context_window_tokens = n
+                            except Exception:
+                                pass
+
+                        # Optional provider-reported max output tokens.
+                        max_out_by_model = meta.get("model_max_output_tokens_by_model")
+                        if isinstance(max_out_by_model, dict):
+                            try:
+                                v = max_out_by_model.get(model_name)
+                                if v is not None:
+                                    n = int(v)
+                                    if n > 0:
+                                        max_output_tokens = n
+                            except Exception:
+                                pass
+
+                        # Optional provider-reported effective input budget (prompt tokens).
+                        eff_in_by_model = meta.get(
+                            "model_effective_input_budget_tokens_by_model"
+                        )
+                        if isinstance(eff_in_by_model, dict):
+                            try:
+                                v = eff_in_by_model.get(model_name)
+                                if v is not None:
+                                    n = int(v)
+                                    if n > 0:
+                                        effective_input_budget_tokens = n
+                            except Exception:
+                                pass
+
+                    # Provider-first lookup (best-effort): fetch model token limits once per model.
+                    if model_name not in model_token_limits_validated:
+                        model_token_limits_validated.add(model_name)
+                        try:
+                            budgets = self.llm.get_model_token_budgets(model_name)
+                        except Exception:
+                            budgets = None
+
+                        if budgets is not None:
+                            # Persist provider-reported token limits so resumes have stable budgeting.
+                            if (
+                                budgets.total_context_window_tokens is not None
+                                and int(budgets.total_context_window_tokens) > 0
+                            ):
+                                total_context_window_tokens = int(
+                                    budgets.total_context_window_tokens
+                                )
+                                try:
+                                    meta_now = self.session_store.get_meta() or {}
+                                except Exception:
+                                    meta_now = {}
+                                total_now = (
+                                    meta_now.get(
+                                        "model_total_context_window_tokens_by_model"
+                                    )
+                                    if isinstance(meta_now, dict)
+                                    else None
+                                )
+                                if not isinstance(total_now, dict):
+                                    total_now = {}
+                                total_now[model_name] = int(total_context_window_tokens)
+                                try:
+                                    self.session_store.set_meta(
+                                        model_total_context_window_tokens_by_model=total_now
+                                    )
+                                except Exception:
+                                    pass
+
+                            if (
+                                budgets.max_output_tokens is not None
+                                and int(budgets.max_output_tokens) > 0
+                            ):
+                                max_output_tokens = int(budgets.max_output_tokens)
+                                try:
+                                    meta_now = self.session_store.get_meta() or {}
+                                except Exception:
+                                    meta_now = {}
+                                max_out_now = (
+                                    meta_now.get("model_max_output_tokens_by_model")
+                                    if isinstance(meta_now, dict)
+                                    else None
+                                )
+                                if not isinstance(max_out_now, dict):
+                                    max_out_now = {}
+                                max_out_now[model_name] = int(max_output_tokens)
+                                try:
+                                    self.session_store.set_meta(
+                                        model_max_output_tokens_by_model=max_out_now
+                                    )
+                                except Exception:
+                                    pass
+
+                            if (
+                                budgets.effective_input_budget_tokens is not None
+                                and int(budgets.effective_input_budget_tokens) > 0
+                            ):
+                                effective_input_budget_tokens = int(
+                                    budgets.effective_input_budget_tokens
+                                )
+                                try:
+                                    meta_now = self.session_store.get_meta() or {}
+                                except Exception:
+                                    meta_now = {}
+                                eff_in_now = (
+                                    meta_now.get(
+                                        "model_effective_input_budget_tokens_by_model"
+                                    )
+                                    if isinstance(meta_now, dict)
+                                    else None
+                                )
+                                if not isinstance(eff_in_now, dict):
+                                    eff_in_now = {}
+                                eff_in_now[model_name] = int(
+                                    effective_input_budget_tokens
+                                )
+                                try:
+                                    self.session_store.set_meta(
+                                        model_effective_input_budget_tokens_by_model=eff_in_now
+                                    )
+                                except Exception:
+                                    pass
+
+                            if (
+                                budgets.auto_compact_tokens is not None
+                                and int(budgets.auto_compact_tokens) > 0
+                            ):
+                                auto_compact_tokens = int(budgets.auto_compact_tokens)
+
+                    # Compute effective input budget when total+max_output are known.
+                    if (
+                        effective_input_budget_tokens is None
+                        and total_context_window_tokens is not None
+                        and max_output_tokens is not None
+                    ):
+                        try:
+                            eff = int(total_context_window_tokens) - int(
+                                max_output_tokens
+                            )
+                            effective_input_budget_tokens = eff if eff > 0 else None
+                        except Exception:
+                            effective_input_budget_tokens = None
+
+                    # Fall back to a conservative name-based effective-input guess only when needed.
+                    if effective_input_budget_tokens is None:
+                        guessed_eff = _guess_model_effective_input_budget_tokens(
+                            model_name
+                        )
+                        if (
+                            guessed_eff is not None
+                            and total_context_window_tokens is not None
+                        ):
+                            effective_input_budget_tokens = min(
+                                int(total_context_window_tokens), int(guessed_eff)
+                            )
+                        elif guessed_eff is not None:
+                            effective_input_budget_tokens = int(guessed_eff)
+                        elif total_context_window_tokens is not None:
+                            # Last resort: treat total window as input budget (optimistic).
+                            effective_input_budget_tokens = int(
+                                total_context_window_tokens
+                            )
+
+                    # Default auto-compaction threshold (90%) when not explicitly provided.
+                    if (
+                        auto_compact_tokens is None
+                        and effective_input_budget_tokens is not None
+                    ):
+                        try:
+                            auto_compact_tokens = max(
+                                1, (int(effective_input_budget_tokens) * 9) // 10
+                            )
+                        except Exception:
+                            auto_compact_tokens = None
+
+                    return (effective_input_budget_tokens, auto_compact_tokens)
+
+                def _extract_message_text(item: dict[str, Any]) -> str:
+                    if not isinstance(item, dict):
+                        return ""
+                    if str(item.get("type") or "") != "message":
+                        return ""
+                    content = item.get("content")
+                    if not isinstance(content, list):
+                        return ""
+                    parts: list[str] = []
+                    for p in content:
+                        if not isinstance(p, dict):
+                            continue
+                        txt = p.get("text")
+                        if isinstance(txt, str) and txt:
+                            parts.append(txt)
+                    return "".join(parts).strip()
+
+                def _is_context_checkpoint_message(item: dict[str, Any]) -> bool:
+                    if not isinstance(item, dict):
+                        return False
+                    if str(item.get("type") or "") != "message":
+                        return False
+                    if str(item.get("role") or "") != "user":
+                        return False
+                    txt = _extract_message_text(item)
+                    return txt.startswith("CONTEXT CHECKPOINT (atlas_agent)")
+
+                context_compaction_attempts = 0
+
+                def _context_overflow_compact(
+                    in_items: list[dict[str, Any]], exc: BaseException
+                ) -> bool:
+                    """Checkpoint compaction for long tool loops.
+
+                    When a provider rejects a request due to context overflow, we prefer to
+                    replace older within-turn history with a compact checkpoint summary (so
+                    the model can keep working), rather than blindly dropping old items.
+                    """
+
+                    nonlocal context_compaction_attempts
+                    context_compaction_attempts += 1
+
+                    keep_tail = max(0, int(CONTEXT_COMPACTION_KEEP_TAIL_ITEMS))
+                    if keep_tail <= 0:
+                        return False
+                    if not isinstance(in_items, list) or len(in_items) <= 1:
+                        return False
+                    orig_len = len(in_items)
+
+                    exc_name = type(exc).__name__
+                    exc_msg = str(exc or "")
+                    exc_msg_l = exc_msg.lower()
+                    is_proactive_budget = (
+                        exc_name == "PromptBudgetExceeded"
+                        or "prompt budget exceeded" in exc_msg_l
+                        or "proactive" in exc_msg_l
+                    )
+                    reason_key = (
+                        "prompt_budget"
+                        if is_proactive_budget
+                        else "context_length_error"
+                    )
+                    reason_label = (
+                        "proactive prompt-budget compaction"
+                        if is_proactive_budget
+                        else "context window overflow"
+                    )
+
+                    # Best-effort: if the provider error message includes an explicit maximum
+                    # context window token count, persist it for future proactive estimation.
+                    #
+                    # Common formats:
+                    # - "maximum context length is 128000 tokens"
+                    # - "This model's maximum context length is 8192 tokens"
+                    try:
+                        m = re.search(
+                            r"maximum context length is\s*(\d{4,})\s*tokens", exc_msg_l
+                        )
+                        if not m:
+                            m = re.search(
+                                r"max(?:imum)?\s*context(?:\s*length)?\s*is\s*(\d{4,})\s*tokens",
+                                exc_msg_l,
+                            )
+                        if not m:
+                            m = re.search(r"maximum\s*(\d{4,})\s*tokens", exc_msg_l)
+                        if m:
+                            n = int(m.group(1))
+                            if n > 0:
+                                try:
+                                    meta = self.session_store.get_meta() or {}
+                                except Exception:
+                                    meta = {}
+                                by_model = (
+                                    meta.get(
+                                        "model_total_context_window_tokens_by_model"
+                                    )
+                                    if isinstance(meta, dict)
+                                    else None
+                                )
+                                if not isinstance(by_model, dict):
+                                    by_model = {}
+                                # Prefer the routed model name when available, but avoid
+                                # persisting under placeholder strings when a gateway does not
+                                # report the model (so the value remains useful on resume).
+                                requested_model = str(self.model or "").strip()
+                                gateway_model = str(
+                                    getattr(self, "_gateway_model_last", None) or ""
+                                ).strip()
+                                gateway_model_l = gateway_model.lower()
+                                model_key = (
+                                    gateway_model
+                                    if (
+                                        gateway_model
+                                        and "detect gateway model" not in gateway_model_l
+                                    )
+                                    else requested_model
+                                ).strip()
+                                if model_key:
+                                    by_model[model_key] = int(n)
+                                    self.session_store.set_meta(
+                                        model_total_context_window_tokens_by_model=by_model
+                                    )
+                    except Exception:
+                        pass
+
+                    # Identify the most recent user message; we keep it when compacting so the
+                    # "current ask" is still explicitly present in the prompt.
+                    last_user_idx: int | None = None
+                    for i in range(len(in_items) - 1, -1, -1):
+                        it = in_items[i]
+                        if (
+                            isinstance(it, dict)
+                            and str(it.get("type") or "") == "message"
+                            and str(it.get("role") or "") == "user"
+                        ):
+                            last_user_idx = i
+                            break
+                    if last_user_idx is None:
+                        return False
+
+                    # If we overflow repeatedly in the same phase, fall back to a hard compaction
+                    # (keep only the current user message + an updated checkpoint). This avoids
+                    # getting stuck when a single recent tool output is too large to fit.
+                    force_hard_mode = context_compaction_attempts >= 2
+
+                    suffix_start = max(0, len(in_items) - keep_tail)
+                    suffix_start0 = suffix_start
+                    suffix_start = min(suffix_start, int(last_user_idx))
+
+                    # Avoid splitting function_call/function_call_output pairs across the boundary:
+                    # if the kept suffix references any call_id, keep the matching items too.
+                    call_ids: set[str] = set()
+                    for it in in_items[suffix_start:]:
+                        if not isinstance(it, dict):
+                            continue
+                        cid = it.get("call_id")
+                        if isinstance(cid, str) and cid.strip():
+                            call_ids.add(cid.strip())
+                    if call_ids:
+                        earliest = suffix_start
+                        for i in range(suffix_start):
+                            it = in_items[i]
+                            if not isinstance(it, dict):
+                                continue
+                            if str(it.get("type") or "") not in {
+                                "function_call",
+                                "function_call_output",
+                            }:
+                                continue
+                            cid = it.get("call_id")
+                            if isinstance(cid, str) and cid.strip() in call_ids:
+                                earliest = min(earliest, i)
+                        suffix_start = earliest
+
+                    # If the pair-preserving adjustment would prevent compaction entirely,
+                    # fall back to the original boundary (best-effort; summary is still useful
+                    # even if the kept suffix starts mid-pair).
+                    if suffix_start <= 0:
+                        suffix_start = suffix_start0
+
+                    # Hard fallback: if we still can't compact a prefix while preserving a
+                    # reasonable tail, keep only the last user message and replace everything
+                    # else with a checkpoint summary. This handles cases where a single recent
+                    # tool output is too large to fit in the model context window.
+                    hard_mode = bool(force_hard_mode)
+                    if suffix_start <= 0:
+                        hard_mode = True
+                        suffix_start = int(last_user_idx)
+
+                    # Capture any existing checkpoint summary (we replace it with an updated one).
+                    existing_checkpoint = ""
+                    try:
+                        if in_items and _is_context_checkpoint_message(in_items[0]):
+                            existing_checkpoint = _extract_message_text(in_items[0])
+                            # Strip the boilerplate header so the model updates just the body.
+                            if existing_checkpoint.startswith(
+                                "CONTEXT CHECKPOINT (atlas_agent)"
+                            ):
+                                parts = existing_checkpoint.split("\n\n", 1)
+                                if len(parts) == 2:
+                                    existing_checkpoint = parts[1].strip()
+                    except Exception:
+                        existing_checkpoint = ""
+
+                    # Build a small, deterministic digest of recent tool calls from the session log.
+                    # This avoids feeding huge tool outputs back into a compaction prompt.
+                    tool_digest_lines: list[str] = []
+                    try:
+                        ss = getattr(self, "session_store", None)
+                        if ss is not None:
+                            lim = max(1, int(CONTEXT_COMPACTION_RECENT_TOOL_EVENTS))
+                            # Read a bit more than lim so we can filter by turn/phase without often
+                            # ending up empty.
+                            recent = ss.tail_events(
+                                limit=max(8, lim * 6), event_type="tool_call"
+                            )
+                            for ev in reversed(recent or []):
+                                try:
+                                    if str(ev.get("turn_id") or "") != str(turn_id):
+                                        continue
+                                    if str(ev.get("phase") or "") != str(phase):
+                                        continue
+                                    tool = str(ev.get("tool") or "")
+                                    args = ev.get("args")
+                                    rs = (
+                                        ev.get("result_summary")
+                                        if isinstance(ev.get("result_summary"), dict)
+                                        else {}
+                                    )
+                                    ok = rs.get("ok") if isinstance(rs, dict) else None
+                                    # Keep digest one-line and stable.
+                                    keys: list[str] = []
+                                    if isinstance(args, dict):
+                                        for kk in (
+                                            "id",
+                                            "ids",
+                                            "json_key",
+                                            "name",
+                                            "time",
+                                            "t0",
+                                            "t1",
+                                            "path",
+                                            "files",
+                                            "animation_id",
+                                            "seconds",
+                                            "duration",
+                                        ):
+                                            if kk in args:
+                                                keys.append(f"{kk}={args.get(kk)!r}")
+                                    tail = f" ({', '.join(keys)})" if keys else ""
+                                    extra = ""
+                                    if isinstance(rs, dict):
+                                        if rs.get("error"):
+                                            extra = f" error={rs.get('error')!r}"
+                                        elif ok is False:
+                                            extra = " ok=False"
+                                    tool_digest_lines.append(
+                                        f"- tool: {tool}{tail}{extra}"
+                                    )
+                                    if len(tool_digest_lines) >= lim:
+                                        break
+                                except Exception:
+                                    continue
+                    except Exception:
+                        tool_digest_lines = []
+
+                    # Include plan (small) so the checkpoint retains open work, even if the
+                    # full message history has to be compacted repeatedly.
+                    plan_block = ""
+                    try:
+                        plan_now = self.session_store.get_plan() or []
+                        if plan_now:
+                            lines: list[str] = []
+                            for it in plan_now:
+                                if not isinstance(it, dict):
+                                    continue
+                                step = str(it.get("step") or "").strip()
+                                status = str(it.get("status") or "").strip()
+                                if step:
+                                    lines.append(f"- [{status}] {step}")
+                            if lines:
+                                plan_block = "Current plan:\n" + "\n".join(lines)
+                    except Exception:
+                        plan_block = ""
+
+                    # Ask the model to write an updated checkpoint summary. Keep the
+                    # prompt small and stable; the full raw history remains in session.jsonl.
+                    sys_prompt = (
+                        "You are performing a CONTEXT CHECKPOINT COMPACTION.\n"
+                        "Create a handoff summary for another LLM that will resume this Atlas Agent tool loop.\n"
+                        "Be concise, structured, and focused on enabling continuation.\n"
+                        "Avoid verbose logs and tool schemas."
+                    )
+                    user_parts: list[str] = []
+                    user_parts.append(f"Phase: {phase}")
+                    user_parts.append(f"Reason: {reason_label} ({exc_name})")
+                    if existing_checkpoint:
+                        user_parts.append(
+                            "\nExisting checkpoint summary body:\n"
+                            + existing_checkpoint
+                        )
+                    if plan_block:
+                        user_parts.append("\n" + plan_block)
+                    if tool_digest_lines:
+                        user_parts.append(
+                            "\nRecent tool calls in this turn (most recent first; summarized):\n"
+                            + "\n".join(tool_digest_lines)
+                        )
+                    user_parts.append(
+                        "\nUpdate the checkpoint summary to include:\n"
+                        "- Current progress + key decisions\n"
+                        "- Important context/constraints\n"
+                        "- What remains / clear next steps\n"
+                        "- Any critical ids/paths/values needed to continue\n"
+                        "Output only the summary (no surrounding commentary)."
+                    )
+                    prompt_text = "\n".join([p for p in user_parts if p]).strip()
+
+                    summary_body = ""
+                    try:
+                        summary_body = (
+                            self.llm.complete_text(
+                                system_prompt=sys_prompt,
+                                user_text=prompt_text,
+                                temperature=0.0,
+                                max_tokens=700,
+                            )
+                            or ""
+                        ).strip()
+                    except Exception:
+                        summary_body = ""
+
+                    if not summary_body:
+                        # Fallback: simple heuristic summary (no extra LLM call).
+                        summary_body = "\n".join(
+                            [
+                                f"- Context compacted due to: {reason_label}.",
+                                f"- Phase: {phase}",
+                                *(
+                                    ["- Recent tool calls:", *tool_digest_lines]
+                                    if tool_digest_lines
+                                    else []
+                                ),
+                                *(
+                                    ["- Plan:", *plan_block.splitlines()]
+                                    if plan_block
+                                    else []
+                                ),
+                                "- Next: continue the tool loop from the most recent state; use session_search_events if details are missing.",
+                            ]
+                        ).strip()
+
+                    summary_text = (
+                        CONTEXT_CHECKPOINT_PREFIX + summary_body.strip()
+                    ).strip()
+
+                    # Replace older items with a single checkpoint message.
+                    checkpoint_item: dict[str, Any] = {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": summary_text}],
+                    }
+                    if hard_mode:
+                        in_items[:] = [checkpoint_item, in_items[int(last_user_idx)]]
+                    else:
+                        in_items[:] = [checkpoint_item] + list(in_items[suffix_start:])
+
+                    try:
+                        removed = max(0, int(orig_len) - int(len(in_items)))
+                        self.session_store.append_event(
+                            {
+                                "type": "context_compacted",
+                                "turn_id": turn_id,
+                                "phase": phase,
+                                "reason": reason_key,
+                                "original_items": int(orig_len),
+                                "new_items": int(len(in_items)),
+                                "removed_items": int(removed),
+                                "kept_items": int(len(in_items) - 1),
+                                "mode": ("hard" if hard_mode else "soft"),
+                                "checkpoint_summary": summary_text,
+                            }
+                        )
+                    except Exception:
+                        pass
+
+                    return True
+
                 while True:
+                    effective_input_budget_tokens, auto_compact_tokens = (
+                        _model_prompt_budgets_for_current_model()
+                    )
                     result = run_responses_tool_loop(
                         llm=self.llm,
                         instructions=(
@@ -1951,6 +2600,9 @@ class ChatTeam:
                         temperature=self.temperature,
                         reasoning_effort=self.reasoning_effort,
                         max_rounds=max_rounds,
+                        on_context_overflow=_context_overflow_compact,
+                        effective_input_budget_tokens=effective_input_budget_tokens,
+                        auto_compact_tokens=auto_compact_tokens,
                     )
 
                     def _plan_has_remaining_work() -> bool:

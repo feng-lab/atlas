@@ -79,7 +79,12 @@ Notes:
 - The chat runtime maintains a compact “Session Memory” summary so long conversations remain stable even when raw history exceeds the model context window.
   - Memory compaction is built-in and not tuned via CLI flags or environment variables.
   - In the REPL: `:memory` shows the current memory summary.
-- If a provider rejects a request due to context length, the runtime trims older within-turn history items and retries automatically (it does not drop your on-disk session log).
+- If a provider rejects a request due to context length, the runtime performs **checkpoint compaction**:
+  - It compacts older within-turn tool-loop context into a short “CONTEXT CHECKPOINT” summary and retries.
+  - It may also compact proactively when the estimated prompt budget is approaching the model’s effective input budget.
+  - Model token budgeting prefers provider model metadata when available (total context window and max output tokens) and derives an effective input budget; it falls back to conservative model-name guesses only when the provider does not expose token limits.
+  - If needed, it then falls back to trimming the oldest non-essential items.
+  - The full session log on disk (`session.jsonl`) is never truncated; the checkpoint is only for prompt-budget resilience.
 - Sessions are persisted on disk as a single append-only JSONL log (`session.jsonl`) containing:
   - domain events (plan updates, memory updates, verification policy/evidence, consent/meta),
   - transcript entries (user/assistant),

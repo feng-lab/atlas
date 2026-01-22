@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
@@ -22,6 +23,15 @@ class AgentMessage:
     tool_calls: Optional[List[Dict[str, Any]]] = None
 
 
+@dataclass(frozen=True)
+class ModelTokenBudgets:
+    model: str
+    total_context_window_tokens: int | None = None
+    max_output_tokens: int | None = None
+    effective_input_budget_tokens: int | None = None
+    auto_compact_tokens: int | None = None
+
+
 @dataclass
 class LLMClient:
     api_key: str
@@ -29,9 +39,16 @@ class LLMClient:
     base_url: str | None = None
     wire_api: str = "auto"  # "auto" | "responses" | "chat"
     _client: Any = field(init=False, default=None, repr=False)
-    _responses_supports_temperature: bool | None = field(init=False, default=None, repr=False)
-    _chat_supports_temperature: bool | None = field(init=False, default=None, repr=False)
+    _responses_supports_temperature: bool | None = field(
+        init=False, default=None, repr=False
+    )
+    _chat_supports_temperature: bool | None = field(
+        init=False, default=None, repr=False
+    )
     _wire_api_resolved: str | None = field(init=False, default=None, repr=False)
+    _model_token_budgets_cache: dict[str, ModelTokenBudgets] = field(
+        init=False, default_factory=dict, repr=False
+    )
 
     def __post_init__(self):
         # Normalize base_url once so the rest of atlas_agent can rely on
@@ -48,6 +65,193 @@ class LLMClient:
                 kwargs["base_url"] = base
             self._client = OpenAI(**kwargs)
         return self._client
+
+    @staticmethod
+    def _parse_token_count(value: Any) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return int(value) if int(value) > 0 else None
+        if isinstance(value, float):
+            if value.is_integer():
+                n = int(value)
+                return n if n > 0 else None
+            return None
+        if isinstance(value, str):
+            s = value.strip().lower().replace(",", "").replace("_", "")
+            if not s:
+                return None
+            m = re.fullmatch(r"(\d+(?:\.\d+)?)([km])?", s)
+            if not m:
+                return None
+            try:
+                base = float(m.group(1))
+            except Exception:
+                return None
+            suffix = m.group(2) or ""
+            mult = 1
+            if suffix == "k":
+                mult = 1_000
+            elif suffix == "m":
+                mult = 1_000_000
+            n = int(base * mult)
+            return n if n > 0 else None
+        return None
+
+    @classmethod
+    def _find_first_token_limit_for_keys(
+        cls, obj: Any, keys_lower: set[str]
+    ) -> int | None:
+        visited: set[int] = set()
+
+        def _walk(cur: Any, depth: int) -> int | None:
+            if depth > 10:
+                return None
+            try:
+                oid = id(cur)
+            except Exception:
+                oid = 0
+            if oid and oid in visited:
+                return None
+            if oid:
+                visited.add(oid)
+
+            if isinstance(cur, dict):
+                for k, v in cur.items():
+                    lk = str(k or "").strip().lower()
+                    if lk in keys_lower:
+                        n = cls._parse_token_count(v)
+                        if n is not None:
+                            return n
+                for v in cur.values():
+                    hit = _walk(v, depth + 1)
+                    if hit is not None:
+                        return hit
+                return None
+
+            if isinstance(cur, list):
+                for v in cur:
+                    hit = _walk(v, depth + 1)
+                    if hit is not None:
+                        return hit
+                return None
+
+            return None
+
+        return _walk(obj, 0)
+
+    def get_model_token_budgets(self, model: str | None = None) -> ModelTokenBudgets:
+        """Best-effort fetch of model token budgets from the provider.
+
+        Priority order:
+        - Provider model metadata (when available) via models.retrieve().
+        - Best-effort derivations (effective_input_budget = total - max_output, auto_compact = 90%).
+        - Unknowns are returned as None.
+
+        Important: providers differ in which fields they expose. We keep this tolerant
+        and treat any missing fields as unknown.
+        """
+
+        model_id = str(model or self.model or "").strip()
+        if not model_id:
+            return ModelTokenBudgets(model="")
+        cached = self._model_token_budgets_cache.get(model_id)
+        if cached is not None:
+            return cached
+
+        total_context_window: int | None = None
+        max_output_tokens: int | None = None
+        effective_input_budget: int | None = None
+        auto_compact: int | None = None
+
+        try:
+            client = self._ensure_client()
+            models = getattr(client, "models", None)
+            if models is not None and hasattr(models, "retrieve"):
+                info = models.retrieve(model_id)
+                data = self._to_plain_dict(info)
+                total_context_window = self._find_first_token_limit_for_keys(
+                    data,
+                    {
+                        "context_window",
+                        "context_window_tokens",
+                        "context_length",
+                        "max_context_length",
+                        "max_context_window",
+                        "model_context_window",
+                    },
+                )
+                max_output_tokens = self._find_first_token_limit_for_keys(
+                    data,
+                    {
+                        "max_output_tokens",
+                        "max_completion_tokens",
+                        "max_output",
+                        "max_output_length",
+                        "max_completion_length",
+                        "max_tokens_output",
+                        "completion_tokens",
+                        "output_tokens",
+                    },
+                )
+                effective_input_budget = self._find_first_token_limit_for_keys(
+                    data,
+                    {
+                        "max_input_tokens",
+                        "max_prompt_tokens",
+                        "max_input_length",
+                        "max_prompt_length",
+                        "max_prompt_size",
+                        "max_input_size",
+                        "prompt_tokens",
+                        "input_tokens",
+                    },
+                )
+                auto_compact = self._find_first_token_limit_for_keys(
+                    data,
+                    {
+                        "auto_compact_token_limit",
+                        "auto_compact_tokens",
+                        "auto_compact_token_max",
+                        "auto_compact_limit_tokens",
+                    },
+                )
+        except Exception:
+            # Best-effort: keep unknown and fall back to caller heuristics.
+            total_context_window = None
+            max_output_tokens = None
+            effective_input_budget = None
+            auto_compact = None
+
+        if (
+            effective_input_budget is None
+            and total_context_window is not None
+            and max_output_tokens is not None
+        ):
+            try:
+                effective_input_budget = int(total_context_window) - int(
+                    max_output_tokens
+                )
+                if effective_input_budget <= 0:
+                    effective_input_budget = None
+            except Exception:
+                effective_input_budget = None
+
+        if auto_compact is None and effective_input_budget is not None:
+            try:
+                auto_compact = max(1, (int(effective_input_budget) * 9) // 10)
+            except Exception:
+                auto_compact = None
+
+        out = ModelTokenBudgets(
+            model=model_id,
+            total_context_window_tokens=total_context_window,
+            max_output_tokens=max_output_tokens,
+            effective_input_budget_tokens=effective_input_budget,
+            auto_compact_tokens=auto_compact,
+        )
+        self._model_token_budgets_cache[model_id] = out
+        return out
 
     def _model_supports_reasoning_summaries(self) -> bool:
         """Best-effort capability detection.
@@ -174,7 +378,9 @@ class LLMClient:
             while cur is not None and id(cur) not in seen:
                 seen.add(id(cur))
                 out.append(cur)
-                nxt = getattr(cur, "__cause__", None) or getattr(cur, "__context__", None)
+                nxt = getattr(cur, "__cause__", None) or getattr(
+                    cur, "__context__", None
+                )
                 cur = nxt if isinstance(nxt, BaseException) else None
             return out
 
@@ -245,7 +451,10 @@ class LLMClient:
                                     {
                                         "id": call_id,
                                         "type": "function",
-                                        "function": {"name": name, "arguments": arguments},
+                                        "function": {
+                                            "name": name,
+                                            "arguments": arguments,
+                                        },
                                     }
                                 ],
                             }
@@ -261,7 +470,9 @@ class LLMClient:
                         except Exception:
                             output = str(output)
                     if call_id:
-                        messages.append({"role": "tool", "tool_call_id": call_id, "content": output})
+                        messages.append(
+                            {"role": "tool", "tool_call_id": call_id, "content": output}
+                        )
                     continue
 
             return messages
@@ -338,7 +549,10 @@ class LLMClient:
                 reasoning = {}
                 if reasoning_effort is not None:
                     reasoning["effort"] = reasoning_effort
-                if reasoning_summary is not None and str(reasoning_summary).lower() != "none":
+                if (
+                    reasoning_summary is not None
+                    and str(reasoning_summary).lower() != "none"
+                ):
                     reasoning["summary"] = reasoning_summary
 
         text: dict[str, Any] | None = None
@@ -393,7 +607,9 @@ class LLMClient:
                 if "temperature" in chat_params:
                     self._chat_supports_temperature = True
             except Exception as e:
-                if "temperature" in chat_params and _is_unsupported_temperature_error(e):
+                if "temperature" in chat_params and _is_unsupported_temperature_error(
+                    e
+                ):
                     self._chat_supports_temperature = False
                     chat_params.pop("temperature", None)
                     resp = client.chat.completions.create(**chat_params)
@@ -688,9 +904,13 @@ class BaseAgent:
     def reset(self):
         self.memory.clear()
 
-    def run(self, user_text: str, *, shared_context: Optional[str] = None) -> AgentMessage:
+    def run(
+        self, user_text: str, *, shared_context: Optional[str] = None
+    ) -> AgentMessage:
         msgs: List[Dict[str, Any]] = []
-        sys_content = self.system_prompt + (f"\n\nShared context:\n{shared_context}" if shared_context else "")
+        sys_content = self.system_prompt + (
+            f"\n\nShared context:\n{shared_context}" if shared_context else ""
+        )
         msgs.append({"role": "system", "content": sys_content})
         for m in self.memory:
             d: Dict[str, Any] = {"role": m.role}
@@ -703,16 +923,25 @@ class BaseAgent:
             msgs.append(d)
         msgs.append({"role": "user", "content": user_text})
 
-        resp = self.client.chat(messages=msgs, tools=self.tools, temperature=self.temperature)
+        resp = self.client.chat(
+            messages=msgs, tools=self.tools, temperature=self.temperature
+        )
         choice = resp.choices[0]
         msg = choice.message
         out = AgentMessage(
             role="assistant",
             content=getattr(msg, "content", None),
             tool_calls=[
-                {"id": c.id, "function": {"name": c.function.name, "arguments": c.function.arguments}}
+                {
+                    "id": c.id,
+                    "function": {
+                        "name": c.function.name,
+                        "arguments": c.function.arguments,
+                    },
+                }
                 for c in (getattr(msg, "tool_calls", []) or [])
-            ] or None,
+            ]
+            or None,
         )
         self.memory.append(out)
         return out

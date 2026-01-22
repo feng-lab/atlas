@@ -33,6 +33,25 @@ TRANSIENT_NETWORK_MAX_RETRIES = 3
 TRANSIENT_NETWORK_BACKOFF_SECONDS = 0.6
 FINAL_OUTPUT_CONTINUE_MAX_CALLS = 8
 
+# Context checkpoint compaction (within-turn)
+#
+# When a provider rejects a request due to context window overflow, atlas_agent
+# tries to "compact" older within-turn tool-loop history into a small checkpoint
+# summary and retries, rather than blindly dropping old items. This preserves
+# intent/progress across very long tool loops that span multiple model context
+# windows.
+CONTEXT_COMPACTION_KEEP_TAIL_ITEMS = 24
+CONTEXT_COMPACTION_RECENT_TOOL_EVENTS = 24
+
+# Proactive checkpoint compaction
+#
+# We try to compact BEFORE hitting a provider "context length exceeded" error.
+# This is best-effort and uses an approximate token estimate; when estimates are
+# wrong (or the provider has stricter limits), the reactive overflow path still
+# applies.
+PROACTIVE_CONTEXT_COMPACTION_TRIGGER_RATIO = 0.85
+PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL = 3
+
 
 # Screenshot / preview constraints
 #

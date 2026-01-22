@@ -9,7 +9,7 @@ import pytest
 
 # Add src layout to sys.path for local runs
 ROOT_DIR = Path(__file__).resolve().parents[2]
-SRC_DIR = ROOT_DIR / 'src'
+SRC_DIR = ROOT_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
@@ -60,9 +60,7 @@ def _call(dispatch, name: str, **kwargs):
 def test_expected_tools_advertised(tool_runtime):
     tools = tool_runtime["tools"]
     available = {
-        spec.get("function", {}).get("name")
-        for spec in tools
-        if isinstance(spec, dict)
+        spec.get("function", {}).get("name") for spec in tools if isinstance(spec, dict)
     }
     assert set(TESTABLE_TOOL_NAMES).issubset(available)
 
@@ -118,7 +116,9 @@ def test_python_write_and_run_executes_script(tool_runtime):
     )
     assert result["ok"] is True
     assert result["exit_code"] == 0
-    assert "hello from tool" in result["stdout"]
+    assert "hello from tool" in result["stdout_preview"]
+    # Full stdout is persisted to a file (correctness-first; no silent truncation).
+    assert "hello from tool" in Path(result["stdout_path"]).read_text(encoding="utf-8")
     assert "test_script.py" in result["path"]
     assert "hello from tool" in result["script"]
 
@@ -186,9 +186,7 @@ def test_session_tools_with_persistent_store(tmp_path):
         DummySceneClient(), atlas_dir=None, session_store=store
     )
     available = {
-        spec.get("function", {}).get("name")
-        for spec in tools
-        if isinstance(spec, dict)
+        spec.get("function", {}).get("name") for spec in tools if isinstance(spec, dict)
     }
     assert "session_info" in available
 
@@ -222,9 +220,7 @@ def test_codegen_and_dev_tools_are_hidden_by_default():
         codegen_enabled=False,
     )
     available = {
-        spec.get("function", {}).get("name")
-        for spec in tools
-        if isinstance(spec, dict)
+        spec.get("function", {}).get("name") for spec in tools if isinstance(spec, dict)
     }
     assert "python_write_and_run" not in available
     assert "codegen_allowed_imports" not in available

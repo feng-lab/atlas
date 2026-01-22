@@ -94,6 +94,10 @@ Atlas Agent (live)
 - Session memory (context-window resilience):
   - The runtime maintains a compact “Session Memory” summary so long conversations remain stable even when raw history exceeds the model context window.
   - This is built-in (not tuned via environment variables). Use the REPL command `:memory` to inspect what is stored.
+- Context checkpoint compaction (within-turn resilience):
+  - If a provider rejects a model call due to context window overflow, the runtime compacts older within-turn tool-loop history into a short “CONTEXT CHECKPOINT” summary and retries.
+  - The runtime may also compact proactively when the estimated prompt budget is approaching the model’s effective input budget.
+  - This compaction is only for prompt budgeting; the full append-only session log is still preserved on disk for deterministic resume/debug.
 - Sessions (resume across restarts):
   - The chat runtime stores a single append-only session log (`session.jsonl`) containing domain events (plan/memory/verification/meta/consent), transcript entries, tool calls, and verification evidence. Durable state is reconstructed by replaying the log.
   - Flags:

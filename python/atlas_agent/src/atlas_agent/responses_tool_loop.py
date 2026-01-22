@@ -13,9 +13,55 @@ from .provider_tool_schema import (
 from .defaults import (
     CONTEXT_TRIM_MAX_RETRIES,
     FINAL_OUTPUT_CONTINUE_MAX_CALLS,
+    PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL,
+    PROACTIVE_CONTEXT_COMPACTION_TRIGGER_RATIO,
     TRANSIENT_NETWORK_BACKOFF_SECONDS,
     TRANSIENT_NETWORK_MAX_RETRIES,
 )
+
+ContextOverflowHandler = Callable[[list[dict[str, Any]], BaseException], bool]
+
+
+class PromptBudgetExceeded(RuntimeError):
+    def __init__(self, *, estimated_tokens: int, limit_tokens: int):
+        super().__init__(
+            f"prompt budget exceeded (estimated_tokens={int(estimated_tokens)}, limit_tokens={int(limit_tokens)})"
+        )
+        self.estimated_tokens = int(estimated_tokens)
+        self.limit_tokens = int(limit_tokens)
+
+
+def _approx_token_count_from_bytes(nbytes: int) -> int:
+    # Heuristic (provider-agnostic): token counts are roughly proportional to UTF-8 bytes.
+    # We use 4 bytes/token as a conservative average.
+    b = max(0, int(nbytes))
+    return max(1, (b + 3) // 4)
+
+
+def _estimate_request_tokens(
+    *, instructions: str, input_items: list[dict[str, Any]], tools: list[dict[str, Any]]
+) -> int:
+    """Best-effort prompt token estimate for proactive compaction.
+
+    This does NOT need to be exact; it only needs to detect "we are probably too large"
+    early enough to compact and avoid a provider hard error.
+    """
+
+    payload = {
+        "instructions": str(instructions or ""),
+        "input_items": list(input_items or []),
+        "tools": list(tools or []),
+    }
+    try:
+        # separators reduces overhead; ensure_ascii avoids byte inflation for unicode text.
+        raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    except Exception:
+        raw = str(payload)
+    try:
+        b = len(raw.encode("utf-8", errors="replace"))
+    except Exception:
+        b = len(raw)
+    return _approx_token_count_from_bytes(b)
 
 
 class ResponsesStreamingClient(Protocol):
@@ -74,7 +120,12 @@ def _sanitize_response_item(item: dict[str, Any]) -> dict[str, Any]:
                         # - user input parts: input_text
                         # - assistant history parts: output_text
                         content.append(
-                            {"type": ("output_text" if is_assistant else "input_text"), "text": text}
+                            {
+                                "type": (
+                                    "output_text" if is_assistant else "input_text"
+                                ),
+                                "text": text,
+                            }
                         )
                 elif ptype == "refusal":
                     refusal = part.get("refusal")
@@ -114,7 +165,12 @@ def _sanitize_response_item(item: dict[str, Any]) -> dict[str, Any]:
                 arguments = str(arguments)
         if not name or not call_id:
             return {}
-        return {"type": "function_call", "call_id": call_id, "name": name, "arguments": arguments}
+        return {
+            "type": "function_call",
+            "call_id": call_id,
+            "name": name,
+            "arguments": arguments,
+        }
 
     if itype == "function_call_output":
         call_id = str(item.get("call_id") or "").strip()
@@ -328,14 +384,22 @@ class ToolLoopCallbacks:
     #
     # This lets callers persist reasoning summaries in the same chronological
     # order as tool call events.
-    on_reasoning_summary_complete: Callable[[str, int], None] | None = None  # (text, call_index)
+    on_reasoning_summary_complete: Callable[[str, int], None] | None = (
+        None  # (text, call_index)
+    )
     on_assistant_text_delta: Callable[[str], None] | None = None
     # Called once per Responses API call (per tool-loop round) after the response
     # payload has been received. Useful for logging provider metadata (e.g. the
     # actual model routed by an OpenAI-compatible gateway).
-    on_response_meta: Callable[[dict[str, Any], int], None] | None = None  # (resp, call_index)
-    on_tool_call: Callable[[str, str, str], None] | None = None  # (name, args_json, call_id)
-    on_tool_result: Callable[[str, str, str], None] | None = None  # (name, call_id, result_json)
+    on_response_meta: Callable[[dict[str, Any], int], None] | None = (
+        None  # (resp, call_index)
+    )
+    on_tool_call: Callable[[str, str, str], None] | None = (
+        None  # (name, args_json, call_id)
+    )
+    on_tool_result: Callable[[str, str, str], None] | None = (
+        None  # (name, call_id, result_json)
+    )
 
 
 @dataclass
@@ -408,12 +472,20 @@ def _drop_call_pair(in_items: list[dict[str, Any]], *, call_id: str) -> None:
         return
 
     def _is_call_item(it: dict[str, Any]) -> bool:
-        return str(it.get("type") or "") == "function_call" and str(it.get("call_id") or "") == cid
+        return (
+            str(it.get("type") or "") == "function_call"
+            and str(it.get("call_id") or "") == cid
+        )
 
     def _is_output_item(it: dict[str, Any]) -> bool:
-        return str(it.get("type") or "") == "function_call_output" and str(it.get("call_id") or "") == cid
+        return (
+            str(it.get("type") or "") == "function_call_output"
+            and str(it.get("call_id") or "") == cid
+        )
 
-    in_items[:] = [it for it in in_items if not (_is_call_item(it) or _is_output_item(it))]
+    in_items[:] = [
+        it for it in in_items if not (_is_call_item(it) or _is_output_item(it))
+    ]
 
 
 def _trim_oldest_item_for_retry(in_items: list[dict[str, Any]]) -> bool:
@@ -431,7 +503,10 @@ def _trim_oldest_item_for_retry(in_items: list[dict[str, Any]]) -> bool:
         it = in_items[i]
         if not isinstance(it, dict):
             continue
-        if str(it.get("type") or "") == "message" and str(it.get("role") or "") == "user":
+        if (
+            str(it.get("type") or "") == "message"
+            and str(it.get("role") or "") == "user"
+        ):
             last_user_idx = i
             break
 
@@ -461,7 +536,9 @@ def _trim_oldest_item_for_retry(in_items: list[dict[str, Any]]) -> bool:
         and str(it.get("role") or "") == "user"
         for it in in_items
     ):
-        in_items.append(_input_text_message(role="user", text="(context trimmed; continuing)"))
+        in_items.append(
+            _input_text_message(role="user", text="(context trimmed; continuing)")
+        )
 
     return True
 
@@ -478,6 +555,9 @@ def run_responses_tool_loop(
     temperature: float | None = None,
     reasoning_effort: str | None = "high",
     max_rounds: int,
+    on_context_overflow: ContextOverflowHandler | None = None,
+    effective_input_budget_tokens: int | None = None,
+    auto_compact_tokens: int | None = None,
 ) -> ToolLoopResult:
     """Run a streaming Responses API tool loop.
 
@@ -488,6 +568,10 @@ def run_responses_tool_loop(
     """
 
     cb = callbacks or ToolLoopCallbacks()
+    # effective_input_budget_tokens is the estimated usable token budget for the request payload we
+    # send (instructions + input_items + tools). If a provider exposes only a *total* context window
+    # (input + output), callers should compute an effective input budget by reserving headroom for
+    # model output.
     # We keep full within-turn input items to avoid relying on server state.
     in_items: list[dict[str, Any]] = list(input_items or [])
     # Tool normalization happens in two stages:
@@ -556,9 +640,56 @@ def run_responses_tool_loop(
             # Best-effort retry loop for context window overflows: trim older items and retry.
             resp = None
             try:
+                proactive_attempts = 0
                 for _retry in range(CONTEXT_TRIM_MAX_RETRIES):
+                    round_tools = [] if final_continue_calls > 0 else normalized_tools
+
+                    # Proactive checkpoint compaction: if we can estimate that the next request
+                    # is likely to exceed the model context window, compact BEFORE sending it.
+                    if (
+                        on_context_overflow is not None
+                        and effective_input_budget_tokens is not None
+                        and int(effective_input_budget_tokens) > 0
+                    ):
+                        # Clamp ratio to a sane range; this guards against accidental config edits.
+                        try:
+                            ratio = float(PROACTIVE_CONTEXT_COMPACTION_TRIGGER_RATIO)
+                        except Exception:
+                            ratio = 0.85
+                        ratio = min(0.98, max(0.50, ratio))
+                        limit = (
+                            int(auto_compact_tokens)
+                            if (
+                                auto_compact_tokens is not None
+                                and int(auto_compact_tokens) > 0
+                            )
+                            else int(int(effective_input_budget_tokens) * ratio)
+                        )
+                        if limit > 0 and proactive_attempts < int(
+                            PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL
+                        ):
+                            est = _estimate_request_tokens(
+                                instructions=instructions,
+                                input_items=in_items,
+                                tools=round_tools,
+                            )
+                            if est >= limit:
+                                proactive_attempts += 1
+                                try:
+                                    did_compact = bool(
+                                        on_context_overflow(
+                                            in_items,
+                                            PromptBudgetExceeded(
+                                                estimated_tokens=est, limit_tokens=limit
+                                            ),
+                                        )
+                                    )
+                                except Exception:
+                                    did_compact = False
+                                if did_compact:
+                                    continue
+
                     try:
-                        round_tools = [] if final_continue_calls > 0 else normalized_tools
                         resp = llm.responses_stream(
                             instructions=instructions,
                             input_items=in_items,
@@ -574,12 +705,24 @@ def run_responses_tool_loop(
                     except Exception as e:
                         if not _is_context_length_error(e):
                             raise
+                        # Prefer checkpoint compaction over blind dropping when
+                        # the caller provides a handler.
+                        if on_context_overflow is not None:
+                            try:
+                                if bool(on_context_overflow(in_items, e)):
+                                    continue
+                            except Exception:
+                                # Compaction should never prevent fallback trimming.
+                                pass
                         if not _trim_oldest_item_for_retry(in_items):
                             raise RuntimeError(
                                 "Context window exceeded and could not trim further; start a new session/thread or reduce tool output sizes."
                             ) from e
             except Exception as e:
-                if _is_transient_network_error(e) and net_try < TRANSIENT_NETWORK_MAX_RETRIES - 1:
+                if (
+                    _is_transient_network_error(e)
+                    and net_try < TRANSIENT_NETWORK_MAX_RETRIES - 1
+                ):
                     import time
 
                     time.sleep(TRANSIENT_NETWORK_BACKOFF_SECONDS * (2**net_try))
@@ -651,18 +794,26 @@ def run_responses_tool_loop(
         # No tool calls: we consider this a final assistant output.
         stream_text = "".join(assistant_chunks).strip()
         # There may be multiple assistant message items; concatenate.
-        parsed_text = "".join(_extract_assistant_text_from_output_item(it) for it in output_items).strip()
+        parsed_text = "".join(
+            _extract_assistant_text_from_output_item(it) for it in output_items
+        ).strip()
         candidate = _choose_best_final_assistant_text(
             stream_text=stream_text, parsed_text=parsed_text
         )
 
         if candidate:
-            final_assistant_text = _merge_continuation_text(prev=final_assistant_text, new=candidate)
+            final_assistant_text = _merge_continuation_text(
+                prev=final_assistant_text, new=candidate
+            )
 
         # Some providers return a final assistant message with status="incomplete" when they hit
         # max output tokens, even though there are no tool calls. Auto-continue a few times so
         # the user still gets a complete recap without having to type "continue".
-        status = str(resp.get("status") or "").strip().lower() if isinstance(resp, dict) else ""
+        status = (
+            str(resp.get("status") or "").strip().lower()
+            if isinstance(resp, dict)
+            else ""
+        )
         is_incomplete = status == "incomplete"
         needs_continue = bool(is_incomplete or not candidate)
         if needs_continue and final_continue_calls < FINAL_OUTPUT_CONTINUE_MAX_CALLS:
