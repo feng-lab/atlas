@@ -49,6 +49,187 @@ def _render_plan(*, console: Any, team: ChatTeam) -> None:
         console.print(Text(f"{mark} {step}", style=style))
 
 
+def _render_token_budget(*, console: Any, team: ChatTeam) -> None:
+    """Show best-effort model token budget + recent usage stats."""
+
+    from rich.text import Text  # type: ignore
+
+    def _as_nonneg_int(v: Any) -> int | None:
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, int):
+            return int(v) if int(v) >= 0 else None
+        if isinstance(v, float) and v.is_integer():
+            n = int(v)
+            return n if n >= 0 else None
+        return None
+
+    def _as_pos_int(v: Any) -> int | None:
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, int):
+            return int(v) if int(v) > 0 else None
+        if isinstance(v, float) and v.is_integer():
+            n = int(v)
+            return n if n > 0 else None
+        return None
+
+    def _fmt(n: int | None) -> str:
+        return f"{int(n):,}" if isinstance(n, int) else "?"
+
+    try:
+        meta = team.session_store.get_meta() or {}
+    except Exception:
+        meta = {}
+
+    requested_model = str(getattr(team, "model", "") or "").strip()
+    gateway_model = str(meta.get("gateway_model_last") or "").strip()
+    gateway_model_l = gateway_model.lower()
+    model_key = (
+        gateway_model
+        if (gateway_model and "detect gateway model" not in gateway_model_l)
+        else requested_model
+    ).strip()
+
+    total_by_model = (
+        meta.get("model_total_context_window_tokens_by_model")
+        if isinstance(meta, dict)
+        else None
+    )
+    max_out_by_model = (
+        meta.get("model_max_output_tokens_by_model") if isinstance(meta, dict) else None
+    )
+    eff_in_by_model = (
+        meta.get("model_effective_input_budget_tokens_by_model")
+        if isinstance(meta, dict)
+        else None
+    )
+
+    total = (
+        _as_pos_int(total_by_model.get(model_key))
+        if isinstance(total_by_model, dict) and model_key
+        else None
+    )
+    max_out = (
+        _as_pos_int(max_out_by_model.get(model_key))
+        if isinstance(max_out_by_model, dict) and model_key
+        else None
+    )
+    eff_in = (
+        _as_pos_int(eff_in_by_model.get(model_key))
+        if isinstance(eff_in_by_model, dict) and model_key
+        else None
+    )
+    if eff_in is None and total is not None and max_out is not None:
+        try:
+            v = int(total) - int(max_out)
+            eff_in = v if v > 0 else None
+        except Exception:
+            eff_in = None
+    auto_compact = max(1, (int(eff_in) * 9) // 10) if eff_in is not None else None
+
+    console.print("\n[bold]Token Budget[/bold]")
+    console.print(Text(f"requested_model={requested_model or '?'}", style="dim"))
+    console.print(
+        Text(f"gateway_model={gateway_model or '?'}", style="dim"), markup=False
+    )
+    if model_key:
+        console.print(Text(f"model_key={model_key}", style="dim"), markup=False)
+    if total is not None:
+        console.print(Text(f"total_context_window_tokens={_fmt(total)}", style="dim"))
+    if max_out is not None:
+        console.print(Text(f"max_output_tokens={_fmt(max_out)}", style="dim"))
+    if eff_in is not None:
+        console.print(
+            Text(f"effective_input_budget_tokens={_fmt(eff_in)}", style="dim")
+        )
+    if auto_compact is not None:
+        console.print(
+            Text(f"auto_compact_tokens(90%)={_fmt(auto_compact)}", style="dim")
+        )
+
+    last_turn_usage = (
+        meta.get("llm_last_turn_usage") if isinstance(meta, dict) else None
+    )
+    if isinstance(last_turn_usage, dict):
+        calls = _as_nonneg_int(last_turn_usage.get("calls"))
+        calls_with_usage = _as_nonneg_int(last_turn_usage.get("calls_with_usage"))
+        sum_in = _as_nonneg_int(last_turn_usage.get("input_tokens"))
+        sum_out = _as_nonneg_int(last_turn_usage.get("output_tokens"))
+        sum_total = _as_nonneg_int(last_turn_usage.get("total_tokens"))
+        if any(
+            v is not None for v in (calls, calls_with_usage, sum_in, sum_out, sum_total)
+        ):
+            coverage = ""
+            if calls is not None and calls_with_usage is not None:
+                coverage = f" (usage coverage: {calls_with_usage}/{calls} calls)"
+            console.print("\n[bold]Last Turn Usage[/bold]")
+            console.print(
+                Text(
+                    f"calls={calls if calls is not None else '?'}"
+                    f", input_tokens={_fmt(sum_in)}"
+                    f", output_tokens={_fmt(sum_out)}"
+                    f", total_tokens={_fmt(sum_total)}{coverage}",
+                    style="dim",
+                )
+            )
+
+    try:
+        recent = team.session_store.tail_events(limit=5, event_type="llm_call_stats")
+    except Exception:
+        recent = []
+    if not recent:
+        console.print("[dim](no llm_call_stats recorded yet)[/dim]")
+        return
+
+    console.print("\n[bold]Recent LLM Call Stats[/bold]")
+    for ev in recent:
+        if not isinstance(ev, dict):
+            continue
+        ph = str(ev.get("phase") or "").strip()
+        try:
+            call_index = int(ev.get("call_index", 0) or 0)
+        except Exception:
+            call_index = 0
+        req = ev.get("request") if isinstance(ev.get("request"), dict) else {}
+        usage = ev.get("usage") if isinstance(ev.get("usage"), dict) else {}
+        est_in = (
+            _as_pos_int(req.get("estimated_input_tokens"))
+            if isinstance(req, dict)
+            else None
+        )
+        eff = (
+            _as_pos_int(req.get("effective_input_budget_tokens"))
+            if isinstance(req, dict)
+            else None
+        )
+        inp = (
+            _as_pos_int(usage.get("input_tokens")) if isinstance(usage, dict) else None
+        )
+        out = (
+            _as_pos_int(usage.get("output_tokens")) if isinstance(usage, dict) else None
+        )
+
+        used = inp if inp is not None else est_in
+        used_label = "in" if inp is not None else "in≈"
+        ratio = ""
+        if used is not None and eff is not None and eff > 0:
+            try:
+                pct = (float(used) / float(eff)) * 100.0
+                ratio = f" ({pct:.1f}%)"
+            except Exception:
+                ratio = ""
+        tail = ""
+        if out is not None:
+            tail = f", out={_fmt(out)}"
+        console.print(
+            Text(
+                f"- {ph}#{call_index}: {used_label}{_fmt(used)}/{_fmt(eff)}{ratio}{tail}",
+                style="dim",
+            )
+        )
+
+
 def _ensure_screenshot_consent(*, console: Any, team: ChatTeam) -> None:
     """Prompt once per session for screenshot-based visual verification consent.
 
@@ -73,7 +254,11 @@ def _ensure_screenshot_consent(*, console: Any, team: ChatTeam) -> None:
 
     allowed = True
     for _ in range(3):
-        ans = console.input("Allow preview screenshots for this session? [Y/n] ").strip().lower()
+        ans = (
+            console.input("Allow preview screenshots for this session? [Y/n] ")
+            .strip()
+            .lower()
+        )
         if ans in {"", "y", "yes"}:
             allowed = True
             break
@@ -145,7 +330,9 @@ def run_console_repl(
         enable_codegen=bool(enable_codegen),
     )
 
-    console.print(f"[bold]Atlas Agent[/bold]. Session=[cyan]{team.session_store.session_id()}[/cyan]")
+    console.print(
+        f"[bold]Atlas Agent[/bold]. Session=[cyan]{team.session_store.session_id()}[/cyan]"
+    )
     console.print(f"[dim]Atlas app:[/dim] {team.atlas_dir}", markup=False)
     console.print("[dim]Type :help for commands. Ctrl+C to exit.[/dim]")
     _ensure_screenshot_consent(console=console, team=team)
@@ -173,6 +360,7 @@ def run_console_repl(
                     "[cyan]:brief[/cyan]               Show the latest Task Brief\n"
                     "[cyan]:plan[/cyan]                Show current plan\n"
                     "[cyan]:memory[/cyan]              Show session memory summary\n"
+                    "[cyan]:budget[/cyan]              Show token budget and recent usage\n"
                     "[cyan]:events [N][/cyan]          Show recent events\n"
                     "[cyan]:save <path>[/cyan]         Save current animation\n"
                     "[cyan]:time <seconds>[/cyan]      Set current time\n"
@@ -180,7 +368,9 @@ def run_console_repl(
                 )
                 continue
             if cmd == "session":
-                console.print(f"session_id=[cyan]{team.session_store.session_id()}[/cyan]")
+                console.print(
+                    f"session_id=[cyan]{team.session_store.session_id()}[/cyan]"
+                )
                 console.print(f"log={team.session_store.log_path}", markup=False)
                 try:
                     c = team.session_store.get_consent("screenshots")
@@ -195,8 +385,7 @@ def run_console_repl(
                     except Exception:
                         c = None
                     console.print(
-                        f"\nconsent.screenshots={c!r}\n"
-                        "Usage: :screenshots on | off",
+                        f"\nconsent.screenshots={c!r}\nUsage: :screenshots on | off",
                         markup=False,
                     )
                     continue
@@ -217,7 +406,9 @@ def run_console_repl(
                 continue
             if cmd == "brief":
                 try:
-                    evs = team.session_store.tail_events(limit=1, event_type="task_brief")
+                    evs = team.session_store.tail_events(
+                        limit=1, event_type="task_brief"
+                    )
                 except Exception as e:
                     console.print(f"[red]fail:[/red] {e}")
                     continue
@@ -247,6 +438,9 @@ def run_console_repl(
                 else:
                     console.print("[dim](empty)[/dim]")
                 continue
+            if cmd == "budget":
+                _render_token_budget(console=console, team=team)
+                continue
             if cmd == "events":
                 try:
                     n = int(rest[0]) if rest else 20
@@ -267,7 +461,9 @@ def run_console_repl(
                         et = ev.get("type")
                         tool = ev.get("tool")
                         tid = ev.get("turn_id")
-                        console.print(f"[dim]{ts}[/dim]\t{et}\t{tool}\t[dim]{tid}[/dim]")
+                        console.print(
+                            f"[dim]{ts}[/dim]\t{et}\t{tool}\t[dim]{tid}[/dim]"
+                        )
                     except Exception:
                         console.print(str(ev), markup=False)
                 continue
@@ -277,7 +473,11 @@ def run_console_repl(
                     resp = team.scene.ensure_animation(create_new=False, name=None)
                     aid = int(getattr(resp, "animation_id", 0) or 0)
                     if bool(getattr(resp, "ok", False)) and aid > 0:
-                        ok = bool(team.scene.save_animation(animation_id=aid, path=Path(rest[0])))
+                        ok = bool(
+                            team.scene.save_animation(
+                                animation_id=aid, path=Path(rest[0])
+                            )
+                        )
                 except Exception:
                     ok = False
                 console.print("[green]ok[/green]" if ok else "[red]fail[/red]")
@@ -288,7 +488,11 @@ def run_console_repl(
                     resp = team.scene.ensure_animation(create_new=False, name=None)
                     aid = int(getattr(resp, "animation_id", 0) or 0)
                     if bool(getattr(resp, "ok", False)) and aid > 0:
-                        ok = bool(team.scene.set_time(animation_id=aid, seconds=float(rest[0])))
+                        ok = bool(
+                            team.scene.set_time(
+                                animation_id=aid, seconds=float(rest[0])
+                            )
+                        )
                 except Exception:
                     ok = False
                 console.print("[green]ok[/green]" if ok else "[red]fail[/red]")
@@ -309,6 +513,7 @@ def run_console_repl(
         printed_reasoning = False
         current_phase = "Executor"
         last_gateway_model: str | None = None
+        request_meta_by_call: dict[int, dict[str, Any]] = {}
 
         def _on_phase_start(phase: str) -> None:
             nonlocal printed_reasoning, current_phase, last_gateway_model
@@ -323,6 +528,62 @@ def run_console_repl(
             if printed_reasoning:
                 console.print("\n")
             printed_reasoning = False
+
+        def _on_request_meta(req_meta: dict[str, Any], call_index: int) -> None:
+            nonlocal printed_reasoning, request_meta_by_call
+            if not isinstance(req_meta, dict):
+                return
+
+            def _pos_int(v: Any) -> int | None:
+                if isinstance(v, bool):
+                    return None
+                if isinstance(v, int):
+                    return int(v) if int(v) >= 0 else None
+                if isinstance(v, float) and v.is_integer():
+                    n = int(v)
+                    return n if n >= 0 else None
+                return None
+
+            idx = int(call_index or 0)
+            request_meta_by_call[idx] = dict(req_meta)
+            est = _pos_int(req_meta.get("estimated_input_tokens"))
+            eff = _pos_int(req_meta.get("effective_input_budget_tokens"))
+            auto = _pos_int(req_meta.get("auto_compact_tokens"))
+
+            used = est
+            pct = None
+            if used is not None and eff is not None and eff > 0:
+                try:
+                    pct = (float(used) / float(eff)) * 100.0
+                except Exception:
+                    pct = None
+
+            style = "dim"
+            if pct is not None:
+                if pct >= 90.0:
+                    style = "red"
+                elif pct >= 75.0:
+                    style = "yellow"
+
+            def _fmt(n: int | None) -> str:
+                return f"{int(n):,}" if isinstance(n, int) else "?"
+
+            parts: list[str] = []
+            if used is not None:
+                parts.append(f"in≈{_fmt(used)}/{_fmt(eff)}")
+            else:
+                parts.append(f"in≈?/{_fmt(eff)}")
+            if pct is not None:
+                parts.append(f"({pct:.1f}%)")
+            if auto is not None:
+                parts.append(f"auto={_fmt(auto)}")
+
+            # Avoid gluing onto a streaming reasoning line.
+            if printed_reasoning:
+                console.print()
+            console.print(
+                Text(f"[context {current_phase}#{idx}] " + " ".join(parts), style=style)
+            )
 
         def _on_reasoning_delta(delta: str, _summary_index: int) -> None:
             nonlocal printed_reasoning
@@ -397,7 +658,9 @@ def run_console_repl(
                         if k in parsed:
                             extra[k] = parsed.get(k)
                     if extra:
-                        dumped = json.dumps(extra, ensure_ascii=False, indent=2, sort_keys=True)
+                        dumped = json.dumps(
+                            extra, ensure_ascii=False, indent=2, sort_keys=True
+                        )
                         console.print(Syntax(dumped, "json", word_wrap=True))
             else:
                 console.print(Text(f"← {name}: done", style="green"))
@@ -405,7 +668,7 @@ def run_console_repl(
             if name == "update_plan" and ok is True:
                 _render_plan(console=console, team=team)
 
-        def _on_response_meta(resp: dict[str, Any], _call_index: int) -> None:
+        def _on_response_meta(resp: dict[str, Any], call_index: int) -> None:
             nonlocal last_gateway_model, printed_reasoning
             model_name = None
             if isinstance(resp, dict):
@@ -421,14 +684,71 @@ def run_console_repl(
             if printed_reasoning:
                 console.print()
             requested = str(model or "").strip()
-            suffix = f" (requested {requested})" if requested and model_name != requested else ""
-            console.print(Text(f"[gateway model: {model_name}{suffix}]", style="dim"))
+            suffix = (
+                f" (requested {requested})"
+                if requested and model_name != requested
+                else ""
+            )
+            tok_suffix = ""
+            try:
+                usage = resp.get("usage") if isinstance(resp, dict) else None
+                if isinstance(usage, dict):
+                    inp = usage.get("input_tokens")
+                    if not isinstance(inp, int):
+                        inp = (
+                            usage.get("prompt_tokens")
+                            if isinstance(usage.get("prompt_tokens"), int)
+                            else None
+                        )
+                    out = usage.get("output_tokens")
+                    if not isinstance(out, int):
+                        out = (
+                            usage.get("completion_tokens")
+                            if isinstance(usage.get("completion_tokens"), int)
+                            else None
+                        )
+                else:
+                    inp = None
+                    out = None
+                req_meta = request_meta_by_call.get(int(call_index or 0), {})
+                eff = (
+                    req_meta.get("effective_input_budget_tokens")
+                    if isinstance(req_meta, dict)
+                    else None
+                )
+                if isinstance(eff, bool) or not isinstance(eff, int) or eff <= 0:
+                    eff = None
+                used = inp if isinstance(inp, int) and inp >= 0 else None
+                pct = None
+                if used is not None and eff is not None:
+                    try:
+                        pct = (float(used) / float(eff)) * 100.0
+                    except Exception:
+                        pct = None
+                if used is not None or out is not None:
+                    toks = []
+                    if used is not None:
+                        if eff is not None and pct is not None:
+                            toks.append(f"in={used:,}/{eff:,} ({pct:.1f}%)")
+                        else:
+                            toks.append(f"in={used:,}")
+                    if isinstance(out, int) and out >= 0:
+                        toks.append(f"out={out:,}")
+                    if toks:
+                        tok_suffix = " [" + ", ".join(toks) + "]"
+            except Exception:
+                tok_suffix = ""
+
+            console.print(
+                Text(f"[gateway model: {model_name}{suffix}]{tok_suffix}", style="dim")
+            )
 
         callbacks = ToolLoopCallbacks(
             on_phase_start=_on_phase_start,
             on_phase_end=_on_phase_end,
             on_reasoning_summary_delta=_on_reasoning_delta,
             on_reasoning_summary_part_added=_on_reasoning_part_added,
+            on_request_meta=_on_request_meta,
             on_response_meta=_on_response_meta,
             on_tool_call=_on_tool_call,
             on_tool_result=_on_tool_result,

@@ -125,12 +125,33 @@ ATLAS_SHARED_SYSTEM_RULES = (
     "- For unclear workflow/semantics, consult docs via docs_search and docs_read (AGENTS_GUIDE.md, SCENE_SERVER.md).\n"
     "- Tool-call arguments must be STRICT JSON (double-quoted keys/strings; lowercase true/false/null; no trailing commas).\n\n"
     '- Never embed tool calls or raw JSON blobs in assistant text (e.g., {"tool": ...} or {"plan": ...}). If you need to update the plan or verification, CALL THE TOOL.\n\n'
-    "Reasoning summary style:\n"
-    "- The UI will show your reasoning summary live. Keep it high-level and safe (no hidden chain-of-thought).\n"
-    '- Write in first person and future-looking ("I will…"), include risks/trade-offs and a verification strategy.\n\n'
-    "Output expectations:\n"
-    "- Final answer: concise, actionable, and evidence-based. State what you changed and how you verified.\n"
+    "Personality:\n"
+    "- Be calm, friendly, and direct.\n"
+    "- Be transparent about uncertainty and verification; don’t bluff.\n"
+    "- Optimize for the user’s outcome, not for a verbose report.\n"
+    "- When aesthetics are underspecified (camera feel, pacing, framing), propose 1–2 tasteful options and pick one by default.\n\n"
+    "Ambition vs precision:\n"
+    "- If the user specifies exact constraints (duration, angles, times, filenames, paths), follow them exactly.\n"
+    "- If the user leaves details unspecified, choose sensible defaults that produce a high-quality result.\n"
+    "  - State those choices briefly as assumptions and continue (do not stall on questions).\n"
+    "- For creative visualization/animation tasks, you may add small quality improvements that do not change intent\n"
+    "  (e.g., smoother motion via higher key density, reasonable easing, better framing), and mention them briefly.\n\n"
+    "User-facing responses:\n"
+    "- Write like a helpful teammate: concise, direct, and friendly.\n"
+    "- Scale detail with task complexity and the user’s request.\n"
+    "- Default format: outcome → key details → how to view/next action → optional tweaks.\n"
+    "- Avoid mechanical reports (e.g., “## 1) …”). Use headings only when they improve clarity or the user asked for a log.\n"
+    "- Prefer user-facing descriptions of behavior over internal details (ids/json_keys/option labels).\n"
+    "  - Include internal ids/paths only when they materially help reproduction/debug/tweaks, or when the user asked.\n"
+    "- Verification: summarize evidence (tool read-back and/or preview). Do not paste long tool outputs.\n"
     "- If something cannot be verified via tools, say so and record it as a visual/human check (do not speculate).\n"
+    "- Detailed report mode (only when asked for details/logs, e.g. “what happened”, “show details”, “show your work”, “full report/log”):\n"
+    "  - Summary (brief)\n"
+    "  - What changed (key actions; avoid dumping raw tool calls)\n"
+    "  - How to view / where to find it (scene/animation names, how to play)\n"
+    "  - Verification (what you checked, via tool/visual/human; call out any gaps)\n"
+    "  - Assumptions + knobs (what you assumed, and the easiest tweaks the user can request)\n"
+    "  - Technical details (ids/paths/json_keys) only if the user asked or it helps debugging\n"
 )
 
 ATLAS_PLANNER_SYSTEM_PROMPT = (
@@ -162,6 +183,7 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
     + "\n".join(
         [
             "- Treat the current plan as the source of truth; execute it step-by-step. If there is no plan yet, create one via update_plan.",
+            "- Persistence: keep going until the Task Brief is fulfilled and you have verified what you can within this run. Do not stop at partial progress unless blocked.",
             "- If you create a new plan (or materially rewrite it), immediately call verification_set_requirements for each step_id so verification is explicit.",
             "- At the start of execution (or before verifying a step), call verification_get(include_plan=true) so you know the current verification requirements and statuses.",
             "- Derive intent strictly from the Task Brief in the shared context. If the brief conflicts with the latest user message, stop and ask one focused question.",
@@ -182,7 +204,7 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
             "- If a plan step cannot be verified from tools alone and screenshots are unavailable/ambiguous, keep the step pending and request a human-check (in the Atlas UI). Do not mark fail without concrete contradictory evidence.",
             "- If a validation/read-back check fails, diagnose precisely (id/json_key/time/value) and retry within this run before giving up.",
             "- If a requested step is not feasible with the available tools/capabilities, complete all feasible steps first, then call report_blocked once with a precise reason and suggestion.",
-            "- Completion contract: do not stop while there are plan steps that can be executed/verified with available tools. When you do stop, always produce a user-facing recap of what you did, what you verified (tool/screenshot/human), any assumptions/trade-offs, and what remains (if anything).",
+            "- Completion contract: do not stop while there are plan steps that can be executed/verified with available tools. When you do stop, produce a user-facing recap. Default to a concise recap, but include more explanation when the task is complex or the user asked for details. Include what you did, how to view it, what you verified (tool/screenshot/human), any assumptions/trade-offs, and what remains (if anything).",
         ]
     )
 )
@@ -431,6 +453,19 @@ class ChatTeam:
 
         ctx = shared_context or self._context or ""
         turn_id = uuid.uuid4().hex
+
+        # Best-effort token usage stats (per call + per turn). These are:
+        # - persisted per call as llm_call_stats events (for replay/debug)
+        # - summarized into meta at end-of-turn (for quick CLI display/resume)
+        turn_llm_calls = 0
+        turn_llm_calls_with_usage = 0
+        turn_llm_sum_input_tokens = 0
+        turn_llm_sum_output_tokens = 0
+        turn_llm_sum_total_tokens = 0
+        last_llm_request_meta: dict[str, Any] | None = None
+        last_llm_usage_tokens: dict[str, int] | None = None
+        last_llm_gateway_model: str | None = None
+        last_llm_phase: str | None = None
 
         def _screenshots_allowed() -> bool:
             try:
@@ -1845,7 +1880,146 @@ class ChatTeam:
                 except Exception:
                     pass
 
+            pending_request_meta_by_call: dict[int, dict[str, Any]] = {}
+
+            def _capture_request_meta(
+                req_meta: dict[str, Any], call_index: int
+            ) -> None:
+                if not isinstance(req_meta, dict):
+                    return
+                try:
+                    pending_request_meta_by_call[int(call_index)] = dict(req_meta)
+                except Exception:
+                    return
+
+            def _persist_request_meta_and_forward(
+                req_meta: dict[str, Any], call_index: int
+            ) -> None:
+                _capture_request_meta(req_meta, call_index)
+                if callbacks is not None and callbacks.on_request_meta is not None:
+                    try:
+                        callbacks.on_request_meta(req_meta, call_index)
+                    except Exception:
+                        # UI callbacks must not break tool execution.
+                        pass
+
             last_gateway_model_logged: str | None = None
+
+            def _extract_usage_tokens(resp: dict[str, Any]) -> dict[str, int] | None:
+                usage = resp.get("usage") if isinstance(resp, dict) else None
+                if not isinstance(usage, dict):
+                    return None
+
+                def _pos_int(v: Any) -> int | None:
+                    if isinstance(v, bool):
+                        return None
+                    if isinstance(v, int):
+                        return int(v) if int(v) >= 0 else None
+                    if isinstance(v, float) and v.is_integer():
+                        n = int(v)
+                        return n if n >= 0 else None
+                    return None
+
+                inp = _pos_int(usage.get("input_tokens"))
+                if inp is None:
+                    inp = _pos_int(usage.get("prompt_tokens"))
+                out = _pos_int(usage.get("output_tokens"))
+                if out is None:
+                    out = _pos_int(usage.get("completion_tokens"))
+                total = _pos_int(usage.get("total_tokens"))
+                if total is None and inp is not None and out is not None:
+                    total = int(inp) + int(out)
+
+                if inp is None and out is None and total is None:
+                    return None
+                out_d: dict[str, int] = {}
+                if inp is not None:
+                    out_d["input_tokens"] = int(inp)
+                if out is not None:
+                    out_d["output_tokens"] = int(out)
+                if total is not None:
+                    out_d["total_tokens"] = int(total)
+                return out_d
+
+            def _persist_llm_call_stats(resp: dict[str, Any], call_index: int) -> None:
+                """Persist per-call context usage/budget stats (best-effort)."""
+
+                nonlocal turn_llm_calls, turn_llm_calls_with_usage
+                nonlocal \
+                    turn_llm_sum_input_tokens, \
+                    turn_llm_sum_output_tokens, \
+                    turn_llm_sum_total_tokens
+                nonlocal \
+                    last_llm_request_meta, \
+                    last_llm_usage_tokens, \
+                    last_llm_gateway_model, \
+                    last_llm_phase
+
+                if not isinstance(resp, dict):
+                    return
+                request_meta = pending_request_meta_by_call.pop(int(call_index), {})
+                model_name = resp.get("model")
+                detected = isinstance(model_name, str) and bool(model_name.strip())
+                model_name = str(model_name or "").strip() if detected else ""
+                if not model_name:
+                    model_name = "can not detect gateway model"
+                usage_tokens = _extract_usage_tokens(resp)
+                status = resp.get("status")
+                incomplete = resp.get("incomplete_details")
+
+                # Update turn-level summary counters (best-effort; usage may be absent).
+                try:
+                    turn_llm_calls += 1
+                except Exception:
+                    pass
+                last_llm_phase = str(phase or "") if phase is not None else None
+                last_llm_gateway_model = model_name
+                last_llm_request_meta = request_meta if request_meta else None
+                last_llm_usage_tokens = (
+                    usage_tokens if usage_tokens is not None else None
+                )
+                if usage_tokens is not None:
+                    try:
+                        turn_llm_calls_with_usage += 1
+                    except Exception:
+                        pass
+                    inp = usage_tokens.get("input_tokens")
+                    out = usage_tokens.get("output_tokens")
+                    total = usage_tokens.get("total_tokens")
+                    if isinstance(inp, int) and inp >= 0:
+                        turn_llm_sum_input_tokens += int(inp)
+                    if isinstance(out, int) and out >= 0:
+                        turn_llm_sum_output_tokens += int(out)
+                    if isinstance(total, int) and total >= 0:
+                        turn_llm_sum_total_tokens += int(total)
+                    elif (isinstance(inp, int) and inp >= 0) or (
+                        isinstance(out, int) and out >= 0
+                    ):
+                        turn_llm_sum_total_tokens += int(
+                            (int(inp) if isinstance(inp, int) and inp >= 0 else 0)
+                            + (int(out) if isinstance(out, int) and out >= 0 else 0)
+                        )
+
+                try:
+                    self.session_store.append_event(
+                        {
+                            "type": "llm_call_stats",
+                            "turn_id": turn_id,
+                            "phase": phase,
+                            "call_index": int(call_index),
+                            "requested_model": str(self.model),
+                            "gateway_model": model_name,
+                            "gateway_model_detected": bool(detected),
+                            "status": str(status or "") if status is not None else None,
+                            "incomplete_details": incomplete
+                            if isinstance(incomplete, dict)
+                            else None,
+                            "request": request_meta if request_meta else None,
+                            "usage": usage_tokens if usage_tokens is not None else None,
+                        }
+                    )
+                except Exception:
+                    pass
 
             def _persist_response_meta(resp: dict[str, Any], call_index: int) -> None:
                 nonlocal last_gateway_model_logged
@@ -1896,6 +2070,7 @@ class ChatTeam:
             def _persist_response_meta_and_forward(
                 resp: dict[str, Any], call_index: int
             ) -> None:
+                _persist_llm_call_stats(resp, call_index)
                 _persist_response_meta(resp, call_index)
                 if callbacks is not None and callbacks.on_response_meta is not None:
                     try:
@@ -1908,6 +2083,7 @@ class ChatTeam:
                 on_reasoning_summary_delta=_capture_reasoning_delta,
                 on_reasoning_summary_part_added=_capture_reasoning_part_added,
                 on_reasoning_summary_complete=_persist_reasoning_summary_complete,
+                on_request_meta=_persist_request_meta_and_forward,
                 on_response_meta=_persist_response_meta_and_forward,
                 on_assistant_text_delta=(
                     callbacks.on_assistant_text_delta if callbacks else None
@@ -2308,7 +2484,8 @@ class ChatTeam:
                                     gateway_model
                                     if (
                                         gateway_model
-                                        and "detect gateway model" not in gateway_model_l
+                                        and "detect gateway model"
+                                        not in gateway_model_l
                                     )
                                     else requested_model
                                 ).strip()
@@ -3184,6 +3361,43 @@ class ChatTeam:
                 address=self.address,
                 model=self.model,
                 gateway_model_last=getattr(self, "_gateway_model_last", None),
+                llm_last_call=(
+                    {
+                        "phase": last_llm_phase,
+                        "gateway_model": last_llm_gateway_model,
+                        "request": last_llm_request_meta,
+                        "usage": last_llm_usage_tokens,
+                    }
+                    if (
+                        last_llm_gateway_model is not None
+                        or last_llm_request_meta is not None
+                        or last_llm_usage_tokens is not None
+                    )
+                    else None
+                ),
+                llm_last_turn_usage=(
+                    {
+                        "calls": int(turn_llm_calls),
+                        "calls_with_usage": int(turn_llm_calls_with_usage),
+                        "input_tokens": (
+                            int(turn_llm_sum_input_tokens)
+                            if turn_llm_calls_with_usage > 0
+                            else None
+                        ),
+                        "output_tokens": (
+                            int(turn_llm_sum_output_tokens)
+                            if turn_llm_calls_with_usage > 0
+                            else None
+                        ),
+                        "total_tokens": (
+                            int(turn_llm_sum_total_tokens)
+                            if turn_llm_calls_with_usage > 0
+                            else None
+                        ),
+                    }
+                    if int(turn_llm_calls) > 0
+                    else None
+                ),
                 last_turn_id=turn_id,
             )
             self.session_store.save()

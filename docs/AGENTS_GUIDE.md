@@ -103,7 +103,7 @@ Atlas Agent (live)
   - Flags:
     - `--session <id-or-path>`
     - `--session-dir <path>`
-  - REPL helpers: `:session`, `:plan`, `:memory`, `:screenshots on|off`
+  - REPL helpers: `:session`, `:plan`, `:memory`, `:budget`, `:screenshots on|off`
   - Default session location when `--session-dir` is omitted:
     - macOS/Linux: `$XDG_STATE_HOME/atlas_agent/sessions` if set, otherwise `~/.atlas_agent/sessions`
     - Windows: `%APPDATA%\\atlas_agent\\sessions`

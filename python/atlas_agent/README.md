@@ -89,10 +89,11 @@ Notes:
   - domain events (plan updates, memory updates, verification policy/evidence, consent/meta),
   - transcript entries (user/assistant),
   - tool call events (args + results/summaries),
+  - per-call LLM stats (prompt budget estimates + provider-reported token usage when available),
   - reasoning summaries (phase-level).
   - `--session <id-or-path>` to resume a previous session
   - `--session-dir <path>` to choose where sessions live
-  - In the REPL: `:session`, `:brief`, `:plan`, `:memory`
+  - In the REPL: `:session`, `:brief`, `:plan`, `:memory`, `:budget`
 - Default session location when `--session-dir` is omitted:
   - macOS/Linux: `$XDG_STATE_HOME/atlas_agent/sessions` if set, otherwise `~/.atlas_agent/sessions`
   - Windows: `%APPDATA%\\atlas_agent\\sessions`
