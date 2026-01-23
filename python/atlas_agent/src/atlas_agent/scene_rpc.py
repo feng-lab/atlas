@@ -781,17 +781,54 @@ class SceneClient:
             "source_expansion": expand_info,
         }
 
-        if wait_ready and loaded_ids and not in_progress:
-            # Ensure a 3D view exists so WaitForObjectsReady is meaningful.
+        # Readiness orchestration.
+        #
+        # Normally, server-side loaded_ids includes only the objects created by this load.
+        # However, scene (.scene) loads can legitimately return loaded_ids=[]:
+        # - A .scene may re-use existing objects already in the document (no "new" ids),
+        # - The load task still applies view settings and may open the 3D window.
+        #
+        # In those cases, prefer the post-load objects snapshot (load.objects) as the
+        # readiness target set so downstream bbox/camera/param tools are safe.
+        ready_ids: list[int] = []
+        if loaded_ids:
+            ready_ids = list(loaded_ids)
+        else:
+            try:
+                raw_objs = load.get("objects") or []
+            except Exception:
+                raw_objs = []
+            if isinstance(raw_objs, list):
+                seen: set[int] = set()
+                for o in raw_objs:
+                    if not isinstance(o, dict):
+                        continue
+                    try:
+                        oid = int(o.get("id", 0) or 0)
+                    except Exception:
+                        continue
+                    if oid <= 0 or oid in seen:
+                        continue
+                    ready_ids.append(oid)
+                    seen.add(oid)
+
+        has_scene_source = any(str(s or "").lower().endswith(".scene") for s in expanded_sources)
+
+        if wait_ready and not in_progress and (ready_ids or has_scene_source):
+            # Ensure a 3D view exists so engine-backed readiness checks are meaningful.
             self.ensure_view(require=True)
-            ready = self.wait_for_objects_ready(
-                loaded_ids,
-                timeout_sec=float(ready_timeout_sec),
-                poll_interval_sec=float(ready_poll_interval_sec),
-            )
-            out["ready_status"] = ready
-            # If the user asked to wait for readiness, fold that into ok.
-            out["ok"] = bool(out["ok"]) and bool(ready.get("ok", False))
+            out["engine_ready"] = True
+
+            if ready_ids:
+                ready = self.wait_for_objects_ready(
+                    ready_ids,
+                    timeout_sec=float(ready_timeout_sec),
+                    poll_interval_sec=float(ready_poll_interval_sec),
+                )
+                out["ready_ids"] = ready_ids
+                out["ready_status"] = ready
+                # If the user asked to wait for readiness, fold that into ok.
+                out["ok"] = bool(out["ok"]) and bool(ready.get("ok", False))
 
         return out
 

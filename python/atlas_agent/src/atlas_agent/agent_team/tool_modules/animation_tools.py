@@ -13,6 +13,7 @@ from ...discovery import (
     default_install_dirs,
     discover_schema_dir,
 )
+from ...easing import normalize_easing_name
 from ...tool_registry import Tool, tool_from_schema
 
 # Fail-fast for internal exporter helpers
@@ -236,36 +237,7 @@ def _tool_handler(tool_name: str):
 
 
 def _normalize_easing_name(raw: Any) -> str:
-    """Normalize common easing aliases to Atlas/Qt canonical option strings."""
-
-    s = str(raw or "").strip()
-    if not s:
-        return "Linear"
-
-    key = s.lower().replace("_", "").replace("-", "").replace(" ", "")
-
-    # Canonical case normalization for common Qt/QEasingCurve names.
-    canonical_by_key: dict[str, str] = {
-        "linear": "Linear",
-        "switch": "Switch",
-        "inquad": "InQuad",
-        "outquad": "OutQuad",
-        "inoutquad": "InOutQuad",
-    }
-    if key in canonical_by_key:
-        return canonical_by_key[key]
-
-    # Common agent/UX aliases (not Qt names).
-    alias_by_key: dict[str, str] = {
-        "easein": "InQuad",
-        "easeout": "OutQuad",
-        "easeinout": "InOutQuad",
-    }
-    if key in alias_by_key:
-        return alias_by_key[key]
-
-    # Unknown: pass through (server will validate).
-    return s
+    return normalize_easing_name(raw)
 
 
 TOOLS: List[Tool] = [

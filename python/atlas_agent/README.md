@@ -67,6 +67,10 @@ Common options:
 - `--model` to choose the LLM model
 - `--reasoning-effort low|medium|high` to control how much deliberate reasoning the model uses (when supported by your model/provider)
 - `--max-rounds N` to control how many tool-loop rounds the Executor is allowed to run in one turn (`0` = unlimited)
+- `--web-search off|cached|live` to expose the Responses API built-in `web_search` tool (Codex-style)
+  - `cached`: provider cached content only (no live internet access)
+  - `live`: allow live internet access (provider-controlled)
+  - Requires the Responses API. If you force `--wire-api chat` (or your provider forces a fallback), web search is not available.
 
 Notes:
 

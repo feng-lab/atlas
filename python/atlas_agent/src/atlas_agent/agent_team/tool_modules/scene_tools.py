@@ -346,10 +346,12 @@ TOOLS: List[Tool] = [
         description=(
             "Convenience loader for BOTH local files and network sources.\n"
             "Supports Neuroglancer precomputed URLs (precomputed://, gs://, s3://, http(s)://) and local paths.\n"
+            "Also supports Atlas scene files (*.scene) via the same GUI load path.\n"
             "Folder support (UI parity): if a source is a local directory, it is expanded non-recursively into the regular files directly inside (symlinks skipped). "
             "Unloadable/unsupported files are skipped by the loader while continuing to load the rest (reported via task_status warnings/errors).\n"
             "Note: loading a large folder can take a while and may create many objects.\n"
-            "Internally uses StartLoadTask + WaitTask, and (optionally) WaitForObjectsReady so the returned ids are safe for bbox/camera/params."
+            "Internally uses StartLoadTask + WaitTask, and (optionally) WaitForObjectsReady so the returned ids are safe for bbox/camera/params.\n"
+            "Note: scene loads may legitimately return loaded_ids=[] (no new ids if objects were re-used); in that case consult task_status.load.objects and/or ready_ids."
         ),
         parameters_schema={
             "type": "object",
@@ -821,7 +823,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         info = (
             "Scene (.scene): a static, reproducible Atlas state consisting of a list of renderable objects plus rendering parameters for both the 2D and 3D views; it can be saved/restored.\n"
             "Objects: each object has per-view rendering parameters such as transforms (translate/rotate/scale), appearance (color/style), visibility, and cuts/clipping.\n"
-            "Animation (.animation2d/.animation3d): extends the scene with a keyframed timeline. Each parameter (and camera) is defined by keys like (time,value) with easing/interpolation (Switch/Linear/Ease-in/out).\n"
+            "Animation (.animation2d/.animation3d): extends the scene with a keyframed timeline. Each parameter (and camera) is defined by keys like (time,value) with easing/interpolation (Qt/QEasingCurve names like Switch/Linear/InOutQuad).\n"
             "At any time t, Atlas evaluates keys to compute parameter values for objects/camera, yielding a reproducible animation; animations can be saved/restored.\n"
             "Animation2D affects only the 2D view; Animation3D affects only the 3D view. 2D/3D parameters differ even for the same object type, and some types are view-specific (e.g., meshes render in 3D, not 2D).\n"
             "Playback rule: during playback, animation keys override scene values for affected parameters; to change what plays, write/replace keys.\n"

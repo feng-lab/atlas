@@ -66,6 +66,7 @@ Codegen Toggle
 Web Search (optional)
 - Atlas Agent can optionally expose the OpenAI Responses API built-in `web_search` tool (Codex-style) to let the model look things up.
 - Enable with `--web-search cached` (cached content; no live internet) or `--web-search live` (allows live internet access; provider-controlled).
+- What “cached” means: the model can issue search/browse actions, but the provider will serve cached results (no external browsing from your machine and no live outbound internet fetch). This is usually more deterministic and privacy-friendly than live browsing.
 - Default is `--web-search off`.
 - Requires the Responses API. If you force `--wire-api chat` (or the provider forces a fallback to Chat Completions), web search is not sent.
 
@@ -219,6 +220,12 @@ Folder Loads (UI parity)
   - A directory source is expanded **non-recursively** into the regular files directly inside the folder (symlinks skipped), matching the GUI drag-and-drop behavior.
   - If some files are unsupported/unreadable, the load continues for the rest; failures are surfaced via task warnings/errors (partial success is possible).
 - Performance note: loading a whole folder can take a while and may create many objects. When possible, prefer loading a smaller subset (e.g., pre-filter with `fs_glob`) instead of pointing at a huge directory.
+
+Scene Loads
+- `scene_load_sources` can load Atlas scene files (`*.scene`) because the GUI load path treats `.scene` specially.
+- A `.scene` load may re-use existing objects (no "new ids"), so `loaded_ids` can legitimately be empty even when the scene successfully applies view state.
+  - For the authoritative post-load object list, use `task_status.load.objects`.
+  - When `wait_ready=true`, `scene_load_sources` also returns `ready_ids` and `ready_status` to make subsequent bbox/camera/param calls deterministic.
 
 Scene vs Timeline contract (for LLMs)
 - Scene (stateless): `scene_validate_params` → `scene_apply` edits base scene only. Validation returns `{ok, results:[{json_key, ok, reason?, normalized_value?}]}` and performs no writes. It never writes keys and must not include times/easing.

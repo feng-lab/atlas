@@ -30,7 +30,7 @@ def build_atlas_agent_primer() -> str:
         "Objects: each object has rendering parameters (per-view) such as transforms (translate/rotate/scale), appearance (color/style), visibility, and cuts/clipping."
     )
     lines.append(
-        "Animation (.animation2d/.animation3d): extends the scene concept with a keyframed timeline. Each parameter is defined by keys like (time,value) with easing/interpolation (Switch/Linear/Ease-in/out)."
+        "Animation (.animation2d/.animation3d): extends the scene concept with a keyframed timeline. Each parameter is defined by keys like (time,value) with easing/interpolation (Qt/QEasingCurve names like Switch/Linear/InOutQuad)."
     )
     lines.append(
         "At any time t, Atlas evaluates keys to compute parameter values for objects/camera, yielding a reproducible animation; animations can be saved/restored."
