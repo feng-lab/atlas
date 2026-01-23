@@ -477,7 +477,14 @@ TOOLS: List[Tool] = [
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
                 "time": {"type": "number"},
                 "easing": {"type": "string", "default": "Linear", "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing curves and is separate from camera interpolation."},
-                "value": {"type": "object"},
+                "value": {
+                    "description": (
+                        "Typed camera value.\n"
+                        "Provider compatibility: some tool-call validators cannot represent arbitrary JSON objects; "
+                        "in that case you may pass this as a JSON string and Atlas Agent will parse it."
+                    ),
+                    "type": ["object", "string"],
+                },
                 "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional ids for camera validation. When omitted/empty, uses fit_candidates()."},
                 "constraints": {"type": "object", "description": "Optional camera validation constraints. When omitted, defaults to keep_visible=true and min_coverage=0.95."},
                 "tolerance": {"type": "number", "default": 1e-3},
@@ -1067,7 +1074,19 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": "animation_id is required"})
         time_v = float(args.get("time", 0.0))
         easing = _normalize_easing_name(args.get("easing"))
-        value = args.get("value") or {}
+        value = args.get("value")
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except Exception as e:
+                return json.dumps({"ok": False, "error": f"value JSON parse failed: {e}"})
+        if not isinstance(value, dict):
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "value must be a typed camera object (dict) or a JSON string encoding one",
+                }
+            )
         tol = float(args.get("tolerance", 1e-3))
         ids = args.get("ids") or []
         if not ids:

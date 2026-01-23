@@ -189,6 +189,9 @@ Use these to edit base scene state (no time/easing; **does not** write keyframes
   - If `path` is provided, the output format is inferred from the file extension (PNG recommended for LLM visual verification).
   - Does **not** create an animation or write keyframes (preferred for verification screenshots).
 - `SetVisibility { ids, on } -> { ok }`
+- `RemoveObjects { ids, allow_unsaved? } -> { ok }`
+  - By default, fails if any object has unsaved changes (no modal prompts in RPC).
+  - Set `allow_unsaved=true` to discard unsaved changes without prompting.
 - `MakeAlias { ids } -> { ok, aliases: [{src_id, alias_id}], error? }`
 
 ### Cuts (Global)

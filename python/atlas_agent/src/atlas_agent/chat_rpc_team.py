@@ -66,6 +66,7 @@ ATLAS_STATE_MUTATION_TOOLS: set[str] = {
     "scene_start_load_task",
     "scene_smart_load",
     "scene_set_visibility",
+    "scene_remove_objects",
     "scene_make_alias",
     "scene_cut_set_box",
     "scene_cut_clear",
@@ -1441,7 +1442,7 @@ class ChatTeam:
             runtime_state=runtime_state,
             codegen_enabled=bool(self.enable_codegen),
         )
-        # Optional: Responses API built-in web search tool (Codex-style).
+        # Optional: Responses API built-in web search tool.
         #
         # Note: this is a non-function tool (handled by the provider), so it does not
         # participate in our dispatcher allowlist. We gate it by an explicit CLI flag.

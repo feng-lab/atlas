@@ -298,6 +298,8 @@ service Scene {
   rpc FitCandidates (Empty) returns (FitCandidatesResponse);
   // Scene state helpers
   rpc SetVisibility (VisibilityRequest) returns (Bool);
+  // Remove objects from the document (no save/discard prompts; intended for automation).
+  rpc RemoveObjects (RemoveObjectsRequest) returns (Bool);
   // Create aliases for existing objects (shared backing data, independent view params)
   rpc MakeAlias (MakeAliasRequest) returns (MakeAliasResponse);
   // Scene cuts (global axis-aligned box or plane set)
@@ -518,6 +520,13 @@ message FitCandidatesResponse { repeated uint64 ids = 1; }
 message VisibilityRequest {
   repeated uint64 ids = 1;
   bool on = 2;
+}
+
+message RemoveObjectsRequest {
+  repeated uint64 ids = 1;
+  // When false (default), the request fails if any object has unsaved changes.
+  // When true, removal discards unsaved changes without prompting.
+  bool allow_unsaved = 2;
 }
 
 // Aliases (per-object)

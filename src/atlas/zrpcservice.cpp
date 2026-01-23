@@ -96,6 +96,7 @@ using atlas::rpc::CameraValidateResponse;
 using atlas::rpc::CameraValidateResult;
 using atlas::rpc::FitCandidatesResponse;
 using atlas::rpc::VisibilityRequest;
+using atlas::rpc::RemoveObjectsRequest;
 using atlas::rpc::ListParamsRequest;
 using atlas::rpc::SetParam;
 using atlas::rpc::ApplySceneParamsRequest;
@@ -2643,6 +2644,45 @@ public:
                                       : grpc::StatusCode::FAILED_PRECONDITION;
       return Status(code, r.error.empty() ? "set_visibility failed" : r.error);
     }
+    reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status RemoveObjects(ServerContext* grpcContext, const RemoveObjectsRequest* req, Bool* reply) override
+  {
+    CHECK(req);
+    CHECK(reply);
+
+    std::vector<size_t> ids;
+    ids.reserve(static_cast<size_t>(req->ids_size()));
+    for (auto v : req->ids()) {
+      ids.push_back(static_cast<size_t>(v));
+    }
+    const bool allowUnsaved = req->allow_unsaved();
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "remove_objects: ui dispatcher not ready");
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, ids = std::move(ids), allowUnsaved]() {
+        return disp->removeObjects(ids, allowUnsaved);
+      },
+      "remove_objects");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    const auto& r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "remove_objects failed" : r.error);
+    }
+
     reply->set_ok(true);
     return Status::OK;
   }

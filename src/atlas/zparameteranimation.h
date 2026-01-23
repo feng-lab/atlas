@@ -5,6 +5,7 @@
 #include "zparameter.h"
 #include <QObject>
 #include <QColor>
+#include <mutex>
 #include <vector>
 
 namespace nim {
@@ -138,6 +139,12 @@ protected:
   QColor m_color;
   std::vector<std::unique_ptr<ZParameterKey>> m_keys;
   ZParameter* m_boundPara = nullptr;
+  // Animation key evaluation can run on the bound parameter's owning thread
+  // (e.g., the Z3DRenderingEngine thread), while UI edits happen on the UI thread.
+  // Protect the key list and related derived caches (e.g., camera splines) against
+  // concurrent access. Recursive to allow direct Qt signal handlers (keysChanged →
+  // buildSpline) to re-enter while mutations hold the lock.
+  mutable std::recursive_mutex m_keysMutex;
 };
 
 } // namespace nim

@@ -7,6 +7,7 @@
 #include "zglobal.h"
 #include <algorithm>
 #include <utility>
+#include <mutex>
 #include <QThread>
 
 namespace nim {
@@ -27,23 +28,27 @@ ZParameterAnimation::~ZParameterAnimation()
 
 void ZParameterAnimation::bindParameter(ZParameter& para)
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   CHECK(para.type() == m_type);
   m_boundPara = &para;
 }
 
 void ZParameterAnimation::releaseParameter()
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   m_boundPara = nullptr;
 }
 
 void ZParameterAnimation::deleteKey(ZParameterKey* key)
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   Q_EMIT keyAboutToDelete(key);
   std::erase_if(m_keys, [key](const auto& ckey) { return ckey.get() == key; });
 }
 
 void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRedundant)
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   CHECK(key);
   CHECK(key->time() >= 0.0);
   CHECK(key->value().type() == m_type);
@@ -91,6 +96,7 @@ void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRe
 
 void ZParameterAnimation::sortKeys()
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   std::ranges::sort(m_keys, {}, &ZParameterKey::time);
 }
 
@@ -154,6 +160,7 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const json:
 
 void ZParameterAnimation::write(json::object& json) const
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   json::object obj;
   // obj["color"] = json::value_from(toQString(m_color));
   obj["color"] = json::value_from(m_color);
@@ -177,17 +184,22 @@ std::unique_ptr<ZParameterKey> ZParameterAnimation::createKey(double secs) const
 
 void ZParameterAnimation::setCurrentTime(double secs) const
 {
-  if (!m_boundPara) {
+  ZParameter* bound = nullptr;
+  {
+    std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
+    bound = m_boundPara;
+  }
+  if (!bound) {
     return;
   }
   // Ensure parameter updates run on the parameter's owning thread.
-  if (m_boundPara->thread() == QThread::currentThread()) {
-    updateParaToTime(secs, m_boundPara);
+  if (bound->thread() == QThread::currentThread()) {
+    updateParaToTime(secs, bound);
   } else {
-    ZParameter* para = m_boundPara;
-    QMetaObject::invokeMethod(para, [this, secs, para]() {
-      if (para == m_boundPara) {
-        updateParaToTime(secs, para);
+    QMetaObject::invokeMethod(bound, [this, secs, bound]() {
+      std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
+      if (bound == m_boundPara) {
+        updateParaToTime(secs, bound);
       }
     }, Qt::QueuedConnection);
   }
@@ -195,6 +207,7 @@ void ZParameterAnimation::setCurrentTime(double secs) const
 
 void ZParameterAnimation::updateParaToTime(double secs, ZParameter* para) const
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   CHECK(para->type() == m_type);
   CHECK(secs >= 0);
 
@@ -216,6 +229,7 @@ void ZParameterAnimation::updateParaToTime(double secs, ZParameter* para) const
 
 void ZParameterAnimation::removeRedundantKeys()
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   if (m_keys.size() < 2) {
     return;
   }
@@ -239,6 +253,7 @@ void ZParameterAnimation::removeRedundantKeys()
 
 void ZParameterAnimation::replaceKeys(std::vector<std::unique_ptr<ZParameterKey>> keys)
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   for (const auto& k : keys) {
     CHECK(k);
     CHECK(k->time() >= 0.0);

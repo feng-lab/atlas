@@ -117,11 +117,13 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "value": {
-                    "type": "object",
                     "description": (
                         "Typed camera value (object with camera fields). "
-                        "Typically obtained from camera_* tools like camera_focus / camera_rotate / camera_reset_view."
+                        "Typically obtained from camera_* tools like camera_focus / camera_rotate / camera_reset_view.\n"
+                        "Provider compatibility: some tool-call validators cannot represent arbitrary JSON objects; "
+                        "in that case you may pass this as a JSON string and Atlas Agent will parse it."
                     ),
+                    "type": ["object", "string"],
                 }
             },
             "required": ["value"],
@@ -724,6 +726,32 @@ TOOLS: List[Tool] = [
         },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("scene_set_visibility"),
+    ),
+    tool_from_schema(
+        name="scene_remove_objects",
+        description=(
+            "Remove objects from the current document by id.\n"
+            "Safety: by default refuses to remove objects with unsaved changes (no modal prompts). "
+            "Set allow_unsaved=true to discard unsaved changes without prompting."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Object ids to remove",
+                },
+                "allow_unsaved": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, discard unsaved changes without prompting.",
+                },
+            },
+            "required": ["ids"],
+        },
+        preconditions=(require_engine_ready,),
+        handler=_tool_handler("scene_remove_objects"),
     ),
     tool_from_schema(
         name="scene_make_alias",
@@ -1784,9 +1812,22 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     if name == "scene_camera_apply":
         try:
             cam = args.get("value")
+            if isinstance(cam, str):
+                try:
+                    cam = json.loads(cam)
+                except Exception as e:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": f"value JSON parse failed: {e}",
+                        }
+                    )
             if not cam or not isinstance(cam, dict):
                 return json.dumps(
-                    {"ok": False, "error": "value must be a typed camera object"}
+                    {
+                        "ok": False,
+                        "error": "value must be a typed camera object (dict) or a JSON string encoding one",
+                    }
                 )
             ok = client.apply_params(
                 [{"id": 0, "json_key": "Camera 3DCamera", "value": cam}]
@@ -1887,6 +1928,17 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         on = bool(args.get("on", True))
         ok = client.set_visibility(ids, on)
         return json.dumps({"ok": ok})
+
+    if name == "scene_remove_objects":
+        ids = [int(i) for i in (args.get("ids") or [])]
+        if not ids:
+            return json.dumps({"ok": False, "error": "ids must be a non-empty list"})
+        allow_unsaved = bool(args.get("allow_unsaved", False))
+        try:
+            ok = client.remove_objects(ids, allow_unsaved=allow_unsaved)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+        return json.dumps({"ok": bool(ok), "removed_ids": ids})
 
     if name == "scene_make_alias":
         ids = [int(i) for i in (args.get("ids") or [])]

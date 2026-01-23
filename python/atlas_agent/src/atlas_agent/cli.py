@@ -207,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
             planner_tools = [t for t in tools if _tool_name(t) in planner_allowed]
             executor_tools = list(tools)
 
-            # Optional: Responses API built-in web_search tool (Codex-style).
+            # Optional: Responses API built-in web_search tool.
             web_search_tool = None
             try:
                 wsm = str(args.web_search or DEFAULT_WEB_SEARCH_MODE).strip().lower()

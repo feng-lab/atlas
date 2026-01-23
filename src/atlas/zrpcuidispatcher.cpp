@@ -11,6 +11,7 @@
 #include "zimgdoc.h"
 #include "zlog.h"
 #include "zmainwindow.h"
+#include "zobjdoc.h"
 #include "zneuroglancerprecomputed.h"
 #include "zqobjectthreadinvoker.h"
 #include "zscenejsonio.h"
@@ -1469,6 +1470,84 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::setVisibility(const std::vector<s
     doc->setObjVisible(id, on);
   }
 
+  out.ok = true;
+  return out;
+}
+
+ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::removeObjects(const std::vector<size_t>& ids, bool allowUnsaved)
+{
+  BoolResult out;
+
+  ZMainWindow* mainWin = mainWindowUi();
+  if (!mainWin) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "remove_objects: main window not ready";
+    return out;
+  }
+  ZDoc* doc = mainWin->doc();
+  if (!doc) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "remove_objects: doc not ready";
+    return out;
+  }
+  if (ids.empty()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "remove_objects: ids must be non-empty";
+    return out;
+  }
+
+  std::vector<size_t> invalidIds;
+  invalidIds.reserve(ids.size());
+  std::vector<size_t> unsavedIds;
+  unsavedIds.reserve(ids.size());
+
+  for (auto id : ids) {
+    ZObjDoc* od = doc->idToDoc(id);
+    if (!od) {
+      invalidIds.push_back(id);
+      continue;
+    }
+    if (!allowUnsaved && od->objHasUnsavedChange(id)) {
+      unsavedIds.push_back(id);
+    }
+  }
+
+  if (!invalidIds.empty()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    std::ostringstream oss;
+    oss << "remove_objects: unknown object ids: [";
+    for (size_t i = 0; i < invalidIds.size(); ++i) {
+      if (i) {
+        oss << ", ";
+      }
+      oss << invalidIds[i];
+    }
+    oss << "]";
+    out.error = oss.str();
+    return out;
+  }
+
+  if (!unsavedIds.empty()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    std::ostringstream oss;
+    oss << "remove_objects: refusing to remove objects with unsaved changes: [";
+    for (size_t i = 0; i < unsavedIds.size(); ++i) {
+      if (i) {
+        oss << ", ";
+      }
+      oss << unsavedIds[i];
+    }
+    oss << "]. To discard changes, set allow_unsaved=true.";
+    out.error = oss.str();
+    return out;
+  }
+
+  doc->removeObjsNoPrompt(ids);
   out.ok = true;
   return out;
 }

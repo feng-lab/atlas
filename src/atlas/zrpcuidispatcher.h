@@ -213,6 +213,10 @@ public:
 
   [[nodiscard]] BoolResult setVisibility(const std::vector<size_t>& ids, bool on);
 
+  // Remove objects from the document without prompting to save/discard changes.
+  // When allowUnsaved is false, the operation fails if any object has unsaved changes.
+  [[nodiscard]] BoolResult removeObjects(const std::vector<size_t>& ids, bool allowUnsaved);
+
   struct MakeAliasPair
   {
     uint64_t srcId = 0;

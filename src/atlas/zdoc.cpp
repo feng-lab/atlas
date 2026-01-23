@@ -355,6 +355,23 @@ void ZDoc::removeObj(size_t id)
   }
 }
 
+void ZDoc::removeObjsNoPrompt(const std::vector<size_t>& ids)
+{
+  CHECK(!ids.empty());
+
+  // Match removeObj(): object removal can overlap with 3D preview/paging work on the rendering thread.
+  // Proactively request cancellation so the rendering thread can unwind quickly and detach filters
+  // before object data is destroyed.
+  Z3DRenderGlobalState::instance().requestCancellation();
+
+  for (auto id : ids) {
+    ZObjDoc* doc = m_objModel->idToDoc(id);
+    CHECK(doc);
+    m_objModel->removeObj(id);
+    doc->removeObj(id);
+  }
+}
+
 void ZDoc::removeAllObjsOfDoc(ZObjDoc* doc)
 {
   auto objs = objsOfDoc(doc);

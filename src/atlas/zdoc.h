@@ -160,6 +160,15 @@ public:
 
   void removeObj(size_t id);
 
+  // Remove objects without showing Save/Discard UI dialogs (intended for RPC automation).
+  // Callers must explicitly decide how to handle unsaved changes (e.g., block the operation
+  // unless a "force discard" flag is set) before calling this method.
+  //
+  // Preconditions:
+  // - ids must be non-empty
+  // - ids must all exist in this document
+  void removeObjsNoPrompt(const std::vector<size_t>& ids);
+
   void removeAllObjsOfDoc(ZObjDoc* doc);
 
   // ask user whether or not save change of obj id, if obj id has no change, return true

@@ -2171,6 +2171,31 @@ class SceneClient:
         self._log_rpc("SetVisibility", req, resp)
         return resp.ok
 
+    def remove_objects(self, ids: list[int], *, allow_unsaved: bool = False) -> bool:
+        """Remove objects from the document by id.
+
+        Notes:
+        - This is a destructive operation.
+        - By default it refuses to remove objects with unsaved changes (no modal prompts).
+        - Set allow_unsaved=true to discard unsaved changes without prompting.
+        """
+
+        if self._stub is None or not hasattr(self._stub, "RemoveObjects"):
+            raise RuntimeError("RPC RemoveObjects is not available in this Atlas build.")
+        if self._pb2 is None or not hasattr(self._pb2, "RemoveObjectsRequest"):
+            raise RuntimeError("RPC RemoveObjectsRequest is not available in this Atlas build.")
+
+        self.ensure_view()
+        if not ids:
+            raise ValueError("ids must be non-empty")
+        req = self._pb2.RemoveObjectsRequest(
+            ids=[int(i) for i in ids],
+            allow_unsaved=bool(allow_unsaved),
+        )
+        resp = self._stub.RemoveObjects(req)
+        self._log_rpc("RemoveObjects", req, resp)
+        return bool(getattr(resp, "ok", False))
+
     def make_alias(self, ids: list[int]) -> dict:
         """Create alias objects for the given source ids.
 

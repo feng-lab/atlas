@@ -4,7 +4,6 @@
 #include "zdoc.h"
 #include "zobjdoc.h"
 #include "zparameteranimation.h"
-#include "zcameraparameteranimation.h"
 #include "zcameraparameterkey.h"
 #include "zexception.h"
 #include "zserializationutils.h"
@@ -135,7 +134,6 @@ static constexpr const char* kUndoObjTracks = "tracks";
 
 static constexpr const char* kUndoTrackColor = "color";
 static constexpr const char* kUndoTrackKeys = "keys";
-static constexpr const char* kUndoCameraInterpolationMethod = "camera_interpolation_method";
 
 [[nodiscard]] json::object snapshotTrackValue(const ZParameterAnimation& pa)
 {
@@ -148,10 +146,6 @@ static constexpr const char* kUndoCameraInterpolationMethod = "camera_interpolat
     keys.push_back(k->jsonValue());
   }
   obj[kUndoTrackKeys] = std::move(keys);
-
-  if (auto* cpa = dynamic_cast<const ZCameraParameterAnimation*>(&pa)) {
-    obj[kUndoCameraInterpolationMethod] = cpa->interpolationMethodPara().get().toStdString();
-  }
   return obj;
 }
 
@@ -183,20 +177,6 @@ static constexpr const char* kUndoCameraInterpolationMethod = "camera_interpolat
       }
     }
     pa.setColor(color);
-  }
-
-  if (auto it = obj.find(kUndoCameraInterpolationMethod); it != obj.end()) {
-    if (!it->value().is_string()) {
-      if (error) {
-        *error = "camera_interpolation_method must be a string";
-      }
-      return false;
-    }
-    const auto& s = it->value().get_string();
-    const QString method = QString::fromUtf8(s.data(), static_cast<int>(s.size()));
-    if (auto* cpa = dynamic_cast<ZCameraParameterAnimation*>(&pa)) {
-      cpa->interpolationMethodPara().select(method);
-    }
   }
 
   std::vector<std::unique_ptr<ZParameterKey>> keys;

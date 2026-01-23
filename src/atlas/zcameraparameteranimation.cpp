@@ -46,6 +46,7 @@ std::unique_ptr<ZParameterKey> ZCameraParameterAnimation::createKey(double secs)
 
 void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) const
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   CHECK(para->type() == m_type);
   CHECK(secs >= 0);
 
@@ -89,6 +90,16 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) 
     glm::vec3 upVector = glm::vec3(rotMat[0][1], rotMat[1][1], rotMat[2][1]);
     static_cast<Z3DCameraParameter*>(para)->setCamera(center - viewVector * centerDist, center, upVector);
   } else if (m_interpolationMethod.isSelected("Position Spline")) {
+    if (m_pathSegments.empty()) {
+      // Spline data is derived from keysChanged/keyChanged on the UI thread.
+      // If it is temporarily unavailable (e.g., during rebuild), fall back to
+      // the stable center+distance interpolation to avoid crashes.
+      glm::mat3 rotMat = glm::mat3_cast(rot);
+      glm::vec3 viewVector = glm::vec3(-rotMat[0][2], -rotMat[1][2], -rotMat[2][2]);
+      glm::vec3 upVector = glm::vec3(rotMat[0][1], rotMat[1][1], rotMat[2][1]);
+      static_cast<Z3DCameraParameter*>(para)->setCamera(center - viewVector * centerDist, center, upVector);
+      return;
+    }
     glm::vec3 pos;
     for (size_t i = 1; i < m_pathSegments.size(); ++i) {
       if (secs < m_pathSegments[i].startTime()) { // belongs to prev segment
@@ -107,6 +118,13 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) 
     // send signal
     static_cast<Z3DCameraParameter*>(para)->setCamera(pos, pos + viewVector * centerDist, upVector);
   } else {
+    if (m_pathSegments.empty()) {
+      glm::mat3 rotMat = glm::mat3_cast(rot);
+      glm::vec3 viewVector = glm::vec3(-rotMat[0][2], -rotMat[1][2], -rotMat[2][2]);
+      glm::vec3 upVector = glm::vec3(rotMat[0][1], rotMat[1][1], rotMat[2][1]);
+      static_cast<Z3DCameraParameter*>(para)->setCamera(center - viewVector * centerDist, center, upVector);
+      return;
+    }
     glm::vec3 pos;
     for (size_t i = 1; i < m_pathSegments.size(); ++i) {
       if (secs < m_pathSegments[i].startTime()) { // belongs to prev segment
@@ -131,6 +149,7 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) 
 
 void ZCameraParameterAnimation::buildSpline()
 {
+  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   m_pathSegments.clear();
 
   if (m_keys.size() < 2) {

@@ -205,7 +205,7 @@ Categories and current tools (non-exhaustive)
 - Planning: `update_plan`
 - Load: `scene_load_sources` (canonical; local + network), `scene_smart_load` (resolve-by-name for local files), task API: `scene_start_load_task`, `scene_wait_task`, `scene_cancel_task`, `scene_delete_task`
 - Readiness: `scene_wait_objects_ready` (deterministic wait for 3D view/filter binding; not full progressive data completion)
-- Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_params`, `scene_apply`, `scene_save_scene`, `scene_screenshot`, `scene_set_visibility`, `scene_make_alias`
+- Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_params`, `scene_apply`, `scene_save_scene`, `scene_screenshot`, `scene_set_visibility`, `scene_remove_objects`, `scene_make_alias`
 - Discovery: `scene_list_objects`, `scene_list_params(id)`, `scene_capabilities`, `scene_schema`, `scene_capabilities_summary`, `scene_facts_summary`
 - Timeline: `animation_ensure_animation(create_new,name)` (returns `animation_id`), then `animation_list_keys(animation_id,id,json_key,include_values)`, `animation_batch(animation_id,...)`, `animation_set_key_param(animation_id,...)`, `animation_replace_key_param(animation_id,...)`, `animation_set_duration(animation_id,seconds)`, `animation_set_time(animation_id,seconds)`, `animation_play`, `animation_pause`, `animation_save_animation(animation_id,path)`
 - Camera: producers (typed values) — `fit_candidates`, `camera_get`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`, `camera_move_local`, `camera_look_at`, `camera_path_solve`; scene apply — `scene_camera_fit`, `scene_camera_apply`; animation (timeline) — `animation_camera_solve_and_apply(animation_id,...)`, `animation_replace_key_camera(animation_id,...)`, `animation_camera_validate(animation_id,...)`, `animation_camera_waypoint_spline_apply(animation_id,...)`, `animation_camera_walkthrough_apply(animation_id,...)`
@@ -273,14 +273,17 @@ Producers (no side effects)
  - Read current scene camera: `scene_get_values(id=0, json_keys=["Camera 3DCamera"])` (or pass empty `json_keys` to retrieve it among all values).
 
 Scene-only (stateless) apply
-- Apply a typed camera to the scene camera (no keys): `scene_camera_apply({value})` or `scene_apply([{id:0, json_key:"Camera 3DCamera", value}])`.
+- Apply a typed camera to the scene camera (no keys): `scene_camera_apply(value=<typed_camera>)` or `scene_apply([{id:0, json_key:"Camera 3DCamera", value:<typed_camera>}])`.
+  - Provider compatibility: if your tool-call stack cannot send arbitrary JSON objects, you may pass `value` as a JSON string and Atlas Agent will parse it.
 - One-shot fit and apply: `scene_camera_fit(ids?, after_clipping=true, min_radius=0.0)` (internally uses CameraFit and applies the result).
 
 Animation (timeline) authoring
 - Solve and write keys: `animation_camera_solve_and_apply(animation_id, mode, ids, t0, t1, constraints?, params?, degrees?, …)`.
   - Tip: for ORBIT, use `degrees` (default 360) and optionally `max_step_degrees` to control key density (default 90; smaller → more keys/smoother). Use `params.axis` (default `"y"`).
+  - FIT/STATIC semantics: the RPC server ignores `t1` and produces a single key at `t0` (it does **not** fill keys across the interval). If `clear_range=true` and `t1 > t0`, existing camera keys inside `[t0,t1]` may be removed (except solver key times) — set `t1=t0` (or `clear_range=false`) when you only want a one-shot fit.
 - Validate camera key sequences: `animation_camera_validate(animation_id, ids, times, values?, constraints?, policies?)` (values optional; when omitted, the server samples from `animation_id` at those times).
 - Single-time explicit write: `animation_replace_key_camera(animation_id, time, value, easing?)`.
+  - Provider compatibility: `value` may be passed as a JSON string and Atlas Agent will parse it.
 - Guided waypoint spline (one-shot apply):
   - `animation_camera_waypoint_spline_apply(animation_id, t0, t1, waypoints=[...], constraints?, clear_range=true, easing="Linear")`
   - Optional: `look_at_policy="bbox_center"` fills missing `look_at` so the camera keeps tracking the bbox center; default preserves the previous view direction when `look_at` is omitted.
