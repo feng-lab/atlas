@@ -301,6 +301,10 @@ Steps to load and manage images via `ZImgDoc`:
    1. Choose **File → Load Image...**.
    2. Select one or more image files. Atlas supports multi-selection.
    3. Confirm. Each image becomes a new object in the manager.
+   4. Alternative (fast): **drag and drop** files or a folder onto the 2D window.
+      - Dropping a **folder is non-recursive**: Atlas expands it to the regular files directly inside the folder (subfolders are ignored; symlinks are skipped).
+      - Atlas attempts to load each file. Unsupported or unreadable files are skipped, and Atlas shows a warning/error list at the end (it still loads the files that succeeded).
+      - Performance note: loading a very large folder can take a while and may create many objects. If the folder is huge, consider moving only the relevant files into a smaller folder (or use **File → Import Sequence Images...** for image stacks).
 2. **Load Neuroglancer (Precomputed)**
    1. Choose **File → Load Neuroglancer (Precomputed)...**.
    2. Enter a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `s3://`, `http://`, `https://`. (Note: Neuroglancer viewer state `.json` URLs are not dataset roots; use **File → Load Neuroglancer (State JSON)...** for share links / state JSON.)

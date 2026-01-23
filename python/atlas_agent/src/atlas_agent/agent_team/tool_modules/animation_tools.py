@@ -44,6 +44,54 @@ ANIMATION_ID_PARAM_SCHEMA: Dict[str, Any] = {
     "description": "Animation3D object id. Use animation_ensure_animation to create/select an animation and obtain this id.",
 }
 
+ANIMATION_BATCH_SET_KEY_ENTRY_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": (
+        "SetKey entry. Writes one timeline key for a non-camera parameter.\n"
+        "Fields:\n"
+        "- id: target id (1=background, 2=axis, 3=global, ≥4=object ids)\n"
+        "- json_key: parameter json_key (resolve via scene_list_params)\n"
+        "- time: seconds\n"
+        "- value: typed JSON value for the parameter\n"
+        "- easing: easing curve name (Linear/EaseInOut/Switch)"
+    ),
+    "properties": {
+        "id": {
+            "type": "integer",
+            "description": "Target id (non-camera): 1=background, 2=axis, 3=global, ≥4=object ids",
+        },
+        "json_key": {"type": "string", "description": "Parameter json_key for the target id"},
+        "time": {"type": "number", "description": "Key time (seconds)"},
+        "value": dict(JSON_VALUE_SCHEMA),
+        "easing": {
+            "type": "string",
+            "default": "Linear",
+            "description": "Easing curve (Linear/EaseInOut/Switch).",
+        },
+    },
+    "required": ["id", "json_key", "time", "value"],
+}
+
+ANIMATION_BATCH_REMOVE_KEY_ENTRY_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": (
+        "RemoveKey entry. Removes one timeline key for a non-camera parameter.\n"
+        "Fields:\n"
+        "- id: target id (1=background, 2=axis, 3=global, ≥4=object ids)\n"
+        "- json_key: parameter json_key\n"
+        "- time: seconds"
+    ),
+    "properties": {
+        "id": {
+            "type": "integer",
+            "description": "Target id (non-camera): 1=background, 2=axis, 3=global, ≥4=object ids",
+        },
+        "json_key": {"type": "string", "description": "Parameter json_key for the target id"},
+        "time": {"type": "number", "description": "Key time (seconds)"},
+    },
+    "required": ["id", "json_key", "time"],
+}
+
 
 def _tool_handler(tool_name: str):
     def _call(args: dict[str, Any], ctx: ToolDispatchContext):
@@ -499,8 +547,16 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "set_keys": {"type": "array", "items": {"type": "object"}, "description": "List of SetKey operations"},
-                "remove_keys": {"type": "array", "items": {"type": "object"}, "description": "List of RemoveKey operations"},
+                "set_keys": {
+                    "type": "array",
+                    "items": dict(ANIMATION_BATCH_SET_KEY_ENTRY_SCHEMA),
+                    "description": "List of SetKey operations (non-camera parameters).",
+                },
+                "remove_keys": {
+                    "type": "array",
+                    "items": dict(ANIMATION_BATCH_REMOVE_KEY_ENTRY_SCHEMA),
+                    "description": "List of RemoveKey operations (non-camera parameters).",
+                },
                 "commit": {"type": "boolean", "default": True, "description": "Commit immediately if true"},
             },
             "required": ["animation_id", "set_keys", "remove_keys"],

@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import platform
+import re
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,110 @@ def _expand_path(s: str) -> str:
         if ":" in t:
             t = t.split(":", 1)[1]
     return t
+
+
+def _looks_like_url(s: str) -> bool:
+    # Examples: precomputed://, gs://, s3://, http://, https://
+    try:
+        return bool(re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", str(s or "")))
+    except Exception:
+        return False
+
+
+def _expand_local_dir_non_recursive(dir_path: Path) -> list[str]:
+    """List regular files directly inside dir_path (non-recursive; skips symlinks).
+
+    Matches the GUI drag-and-drop semantics: folder load expands to immediate
+    files only (not subdirectories), and ignores symlinks.
+    """
+
+    files: list[str] = []
+    for entry in dir_path.iterdir():
+        try:
+            if entry.is_symlink():
+                continue
+            if entry.is_file():
+                files.append(str(entry.resolve()))
+        except Exception:
+            continue
+    files.sort()
+    return files
+
+
+def _expand_sources_for_load(sources: Iterable[str]) -> tuple[list[str], dict[str, Any]]:
+    """Expand local directory sources to immediate files (non-recursive).
+
+    Returns:
+      (expanded_sources, info)
+
+    info fields are best-effort and intended for debugging/user-facing summaries:
+      - expanded_dirs: [{dir, file_count}]
+      - skipped_dirs: [{dir, reason}]
+    """
+
+    expanded: list[str] = []
+    expanded_dirs: list[dict[str, Any]] = []
+    skipped_dirs: list[dict[str, Any]] = []
+
+    for s in sources:
+        try:
+            t0 = str(s or "").strip()
+        except Exception:
+            t0 = ""
+        if not t0:
+            continue
+
+        t = _expand_path(t0)
+
+        # Network sources pass through unchanged.
+        if _looks_like_url(t):
+            expanded.append(t)
+            continue
+
+        # Local path: normalize to an absolute path so the GUI process does not
+        # interpret it relative to an unexpected working directory.
+        p = Path(t)
+        try:
+            if not p.is_absolute():
+                p = (Path.cwd() / p)
+        except Exception:
+            pass
+
+        try:
+            if p.exists() and p.is_dir():
+                try:
+                    dir_files = _expand_local_dir_non_recursive(p)
+                except Exception as e:
+                    skipped_dirs.append({"dir": str(p), "reason": str(e)})
+                    continue
+
+                if dir_files:
+                    expanded.extend(dir_files)
+                    try:
+                        expanded_dirs.append(
+                            {"dir": str(p.resolve()), "file_count": len(dir_files)}
+                        )
+                    except Exception:
+                        expanded_dirs.append({"dir": str(p), "file_count": len(dir_files)})
+                else:
+                    skipped_dirs.append(
+                        {
+                            "dir": str(p),
+                            "reason": "directory contains no regular files (folder load is non-recursive)",
+                        }
+                    )
+                continue
+
+            if p.exists():
+                expanded.append(str(p.resolve()))
+            else:
+                # Keep the best-effort absolute path string (even if missing) so
+                # the server can surface a concrete error message.
+                expanded.append(str(p))
+        except Exception:
+            expanded.append(t0)
+
+    return expanded, {"expanded_dirs": expanded_dirs, "skipped_dirs": skipped_dirs}
 
 
 def _to_proto_value(py: Any) -> struct_pb2.Value:
@@ -420,6 +525,44 @@ class SceneClient:
             return {"ok": bool(getattr(resp, "ok", False))}
 
     # ---- Task/Job API (async) ----
+    def _start_load_task_with_sources(
+        self,
+        src_list: list[str],
+        *,
+        network_timeout_sec: float | None = None,
+        set_visible: bool = True,
+        timeout_sec: float = 5.0,
+    ) -> int:
+        if self._stub is None or not hasattr(self._stub, "StartLoadTask"):
+            raise RuntimeError(
+                "RPC StartLoadTask is not available in this Atlas build."
+            )
+        if self._pb2 is None or not hasattr(self._pb2, "LoadTaskRequest"):
+            raise RuntimeError(
+                "RPC LoadTaskRequest is not available in this Atlas build."
+            )
+
+        if not src_list:
+            raise ValueError("src_list must not be empty")
+
+        net_timeout_ms = 0
+        if network_timeout_sec is not None:
+            net_timeout_ms = max(0, int(float(network_timeout_sec) * 1000.0))
+
+        req = self._pb2.LoadTaskRequest(
+            sources=src_list,
+            network_timeout_ms=int(net_timeout_ms),
+            set_visible=bool(set_visible),
+        )
+        resp = self._stub.StartLoadTask(req, timeout=float(timeout_sec))
+        self._log_rpc("StartLoadTask", req, resp)
+
+        task_id = int(getattr(resp, "task_id", 0) or 0)
+        if task_id <= 0:
+            err = str(getattr(resp, "error", "") or "").strip()
+            raise RuntimeError(f"StartLoadTask failed: {err or 'no task id returned'}")
+        return task_id
+
     def start_load_task(
         self,
         sources: Iterable[str],
@@ -442,34 +585,22 @@ class SceneClient:
                 "RPC LoadTaskRequest is not available in this Atlas build."
             )
 
-        src_list: list[str] = []
-        for s in sources:
-            try:
-                t = str(s or "").strip()
-            except Exception:
-                t = ""
-            if t:
-                src_list.append(t)
+        src_list, expand_info = _expand_sources_for_load(sources)
         if not src_list:
+            skipped = expand_info.get("skipped_dirs") if isinstance(expand_info, dict) else None
+            if skipped:
+                raise ValueError(
+                    "sources resolved to an empty set after folder expansion "
+                    "(folder load is non-recursive; only regular files are loaded). "
+                    f"skipped_dirs={skipped}"
+                )
             raise ValueError("sources must contain at least one non-empty string")
-
-        net_timeout_ms = 0
-        if network_timeout_sec is not None:
-            net_timeout_ms = max(0, int(float(network_timeout_sec) * 1000.0))
-
-        req = self._pb2.LoadTaskRequest(
-            sources=src_list,
-            network_timeout_ms=int(net_timeout_ms),
-            set_visible=bool(set_visible),
+        return self._start_load_task_with_sources(
+            src_list,
+            network_timeout_sec=network_timeout_sec,
+            set_visible=set_visible,
+            timeout_sec=timeout_sec,
         )
-        resp = self._stub.StartLoadTask(req, timeout=float(timeout_sec))
-        self._log_rpc("StartLoadTask", req, resp)
-
-        task_id = int(getattr(resp, "task_id", 0) or 0)
-        if task_id <= 0:
-            err = str(getattr(resp, "error", "") or "").strip()
-            raise RuntimeError(f"StartLoadTask failed: {err or 'no task id returned'}")
-        return task_id
 
     def get_task_status(
         self, task_id: int, *, timeout_sec: float = 5.0
@@ -569,8 +700,19 @@ class SceneClient:
           StartLoadTask -> WaitTask -> (optional) WaitForObjectsReady
         """
 
-        task_id = self.start_load_task(
-            sources,
+        expanded_sources, expand_info = _expand_sources_for_load(sources)
+        if not expanded_sources:
+            skipped = expand_info.get("skipped_dirs") if isinstance(expand_info, dict) else None
+            if skipped:
+                raise ValueError(
+                    "sources resolved to an empty set after folder expansion "
+                    "(folder load is non-recursive; only regular files are loaded). "
+                    f"skipped_dirs={skipped}"
+                )
+            raise ValueError("sources must contain at least one non-empty string")
+
+        task_id = self._start_load_task_with_sources(
+            expanded_sources,
             network_timeout_sec=network_timeout_sec,
             set_visible=set_visible,
         )
@@ -636,6 +778,7 @@ class SceneClient:
             "task_id": int(task_id),
             "task_status": status,
             "loaded_ids": loaded_ids,
+            "source_expansion": expand_info,
         }
 
         if wait_ready and loaded_ids and not in_progress:

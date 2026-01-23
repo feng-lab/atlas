@@ -199,6 +199,12 @@ Notes
 - The Script API (`atlas_agent.api.*`) may add helpers (plan builders, layouts) without changing the Agent Tooling.
 - When the Script API adds a capability that belongs in Agent Tooling, introduce it via a new tool function and document it here.
 
+Folder Loads (UI parity)
+- `scene_load_sources` and `scene_start_load_task` accept local directory paths in addition to files/URLs.
+  - A directory source is expanded **non-recursively** into the regular files directly inside the folder (symlinks skipped), matching the GUI drag-and-drop behavior.
+  - If some files are unsupported/unreadable, the load continues for the rest; failures are surfaced via task warnings/errors (partial success is possible).
+- Performance note: loading a whole folder can take a while and may create many objects. When possible, prefer loading a smaller subset (e.g., pre-filter with `fs_glob`) instead of pointing at a huge directory.
+
 Scene vs Timeline contract (for LLMs)
 - Scene (stateless): `scene_validate_params` → `scene_apply` edits base scene only. Validation returns `{ok, results:[{json_key, ok, reason?, normalized_value?}]}` and performs no writes. It never writes keys and must not include times/easing.
 - Timeline (animated): use `animation_set_key_param`/`animation_replace_key_param`/`animation_batch` (and camera equivalents) to write keys at times with easing. Keys override scene values at playback.

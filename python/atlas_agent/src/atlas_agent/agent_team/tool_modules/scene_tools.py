@@ -346,6 +346,9 @@ TOOLS: List[Tool] = [
         description=(
             "Convenience loader for BOTH local files and network sources.\n"
             "Supports Neuroglancer precomputed URLs (precomputed://, gs://, s3://, http(s)://) and local paths.\n"
+            "Folder support (UI parity): if a source is a local directory, it is expanded non-recursively into the regular files directly inside (symlinks skipped). "
+            "Unloadable/unsupported files are skipped by the loader while continuing to load the rest (reported via task_status warnings/errors).\n"
+            "Note: loading a large folder can take a while and may create many objects.\n"
             "Internally uses StartLoadTask + WaitTask, and (optionally) WaitForObjectsReady so the returned ids are safe for bbox/camera/params."
         ),
         parameters_schema={
@@ -402,6 +405,7 @@ TOOLS: List[Tool] = [
         description=(
             "Start an async load task for one or more sources.\n"
             "Use this for network-backed datasets like Neuroglancer precomputed (precomputed://, gs://, s3://, http(s)://).\n"
+            "Folder support (UI parity): if a source is a local directory, it is expanded non-recursively into the regular files directly inside (symlinks skipped).\n"
             "Returns a task_id; use scene_wait_task to await completion and get loaded ids."
         ),
         parameters_schema={
