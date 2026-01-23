@@ -39,6 +39,11 @@ from .responses_tool_loop import (
     run_responses_tool_loop,
 )
 from .discovery import discover_schema_dir
+from .llm_usage import (
+    LlmUsageDelta,
+    LlmUsageTotals,
+    extract_usage_delta_from_response,
+)
 from .scene_rpc import SceneClient
 from .session_store import SessionStore
 
@@ -295,6 +300,24 @@ class ChatTeam:
         except Exception:
             self._todo_ledger = []
 
+        # Rolling (in-memory) token usage totals for this session. We persist a copy
+        # into session meta so the CLI can show totals without scanning session.jsonl.
+        self._llm_session_usage = LlmUsageTotals()
+        # Per-turn/per-call live stats for terminal display (initialized here so the
+        # console can treat these as hard-contract attributes).
+        self._llm_turn_usage_current = LlmUsageTotals()
+        self._llm_last_call_usage: LlmUsageDelta | None = None
+        self._llm_last_call_index: int | None = None
+        self._llm_last_call_phase: str | None = None
+        self._llm_last_call_gateway_model: str | None = None
+        try:
+            meta = self.session_store.get_meta()
+            loaded = LlmUsageTotals.from_dict(meta.get("llm_session_usage"))
+            if loaded is not None:
+                self._llm_session_usage = loaded
+        except Exception:
+            pass
+
         self._history: list[tuple[str, str]] = []
 
         # Use atlas_dir from the saved session meta when the caller did not specify one.
@@ -457,15 +480,91 @@ class ChatTeam:
         # Best-effort token usage stats (per call + per turn). These are:
         # - persisted per call as llm_call_stats events (for replay/debug)
         # - summarized into meta at end-of-turn (for quick CLI display/resume)
-        turn_llm_calls = 0
-        turn_llm_calls_with_usage = 0
-        turn_llm_sum_input_tokens = 0
-        turn_llm_sum_output_tokens = 0
-        turn_llm_sum_total_tokens = 0
-        last_llm_request_meta: dict[str, Any] | None = None
-        last_llm_usage_tokens: dict[str, int] | None = None
+        turn_llm_usage = LlmUsageTotals()
+        # Exposed for the terminal UI to render mid-turn usage progress.
+        self._llm_turn_usage_current = turn_llm_usage
+        self._llm_last_call_usage: LlmUsageDelta | None = None
+        self._llm_last_call_index: int | None = None
+        self._llm_last_call_phase: str | None = None
+        self._llm_last_call_gateway_model: str | None = None
+        last_llm_usage_delta: LlmUsageDelta | None = None
         last_llm_gateway_model: str | None = None
         last_llm_phase: str | None = None
+        internal_llm_call_seq = 0
+
+        def _persist_internal_llm_call_stats(
+            *,
+            resp: dict[str, Any],
+            phase: str | None,
+            kind: str,
+        ) -> None:
+            """Persist LLM call stats for internal helper calls (best-effort)."""
+
+            nonlocal internal_llm_call_seq
+
+            if not isinstance(resp, dict):
+                return
+
+            internal_llm_call_seq += 1
+            call_index = -int(internal_llm_call_seq)
+
+            usage_delta = extract_usage_delta_from_response(resp)
+
+            # Turn-level summary counters: include internal calls so totals align
+            # with session-wide aggregates.
+            try:
+                self._llm_session_usage.apply_call(usage_delta)
+                turn_llm_usage.apply_call(usage_delta)
+            except Exception:
+                pass
+
+            try:
+                model_name = resp.get("model")
+                detected = isinstance(model_name, str) and bool(model_name.strip())
+                model_name = str(model_name or "").strip() if detected else ""
+                if not model_name:
+                    model_name = "can not detect gateway model"
+            except Exception:
+                model_name = "can not detect gateway model"
+                detected = False
+
+            # Persist the rolling totals into meta so they survive crashes mid-turn.
+            try:
+                self.session_store.set_meta(
+                    gateway_model_last=str(model_name),
+                    llm_session_usage=self._llm_session_usage.to_dict(),
+                    llm_last_turn_usage=turn_llm_usage.to_dict(),
+                    llm_last_call={
+                        "phase": str(phase or "") if phase is not None else None,
+                        "call_index": int(call_index),
+                        "gateway_model": str(model_name),
+                        "usage": (
+                            usage_delta.to_dict() if usage_delta is not None else None
+                        ),
+                    },
+                )
+            except Exception:
+                pass
+
+            try:
+                self.session_store.append_event(
+                    {
+                        "type": "llm_call_stats",
+                        "turn_id": turn_id,
+                        "phase": phase,
+                        "call_index": int(call_index),
+                        "requested_model": str(self.model),
+                        "gateway_model": str(model_name),
+                        "gateway_model_detected": bool(detected),
+                        "status": None,
+                        "incomplete_details": None,
+                        "usage": usage_delta.to_dict()
+                        if usage_delta is not None
+                        else None,
+                    }
+                )
+            except Exception:
+                pass
 
         def _screenshots_allowed() -> bool:
             try:
@@ -600,11 +699,18 @@ class ChatTeam:
                 "Keep it short enough to fit into future prompts."
             )
             try:
-                mem = self.llm.complete_text(
-                    system_prompt=sys_prompt, user_text=prompt, temperature=0.0
+                mem, mem_resp = self.llm.complete_text_with_response(
+                    system_prompt=sys_prompt,
+                    user_text=prompt,
+                    temperature=0.0,
                 )
                 if mem:
                     self._memory_summary = mem.strip()
+                _persist_internal_llm_call_stats(
+                    resp=mem_resp,
+                    phase="Internal",
+                    kind="session_memory_compaction",
+                )
             except Exception:
                 pass
 
@@ -879,9 +985,17 @@ class ChatTeam:
         task_brief_initial = ""
         suppressed_clarify: str | None = None
         try:
-            task_brief_initial = (
-                self.intent_resolver.resolve(user_text, scene_context=brief_ctx) or ""
-            ).strip()
+            task_brief_initial, task_brief_resp = (
+                self.intent_resolver.resolve_with_response(
+                    user_text, scene_context=brief_ctx
+                )
+            )
+            task_brief_initial = (task_brief_initial or "").strip()
+            _persist_internal_llm_call_stats(
+                resp=task_brief_resp,
+                phase="Internal",
+                kind="intent_resolver",
+            )
         except Exception:
             task_brief_initial = ""
 
@@ -892,12 +1006,17 @@ class ChatTeam:
             # the supervisor with a "TASK BRIEF only" constraint and continue.
             forced = ""
             try:
-                forced = (
-                    self.intent_resolver.resolve_force_task_brief(
+                forced, forced_resp = (
+                    self.intent_resolver.resolve_force_task_brief_with_response(
                         user_text, scene_context=brief_ctx
                     )
-                    or ""
-                ).strip()
+                )
+                forced = (forced or "").strip()
+                _persist_internal_llm_call_stats(
+                    resp=forced_resp,
+                    phase="Internal",
+                    kind="intent_resolver_force_task_brief",
+                )
             except Exception:
                 forced = ""
             if forced and not forced.lower().startswith("clarify:"):
@@ -1880,125 +1999,42 @@ class ChatTeam:
                 except Exception:
                     pass
 
-            pending_request_meta_by_call: dict[int, dict[str, Any]] = {}
-
-            def _capture_request_meta(
-                req_meta: dict[str, Any], call_index: int
-            ) -> None:
-                if not isinstance(req_meta, dict):
-                    return
-                try:
-                    pending_request_meta_by_call[int(call_index)] = dict(req_meta)
-                except Exception:
-                    return
-
-            def _persist_request_meta_and_forward(
-                req_meta: dict[str, Any], call_index: int
-            ) -> None:
-                _capture_request_meta(req_meta, call_index)
-                if callbacks is not None and callbacks.on_request_meta is not None:
-                    try:
-                        callbacks.on_request_meta(req_meta, call_index)
-                    except Exception:
-                        # UI callbacks must not break tool execution.
-                        pass
-
             last_gateway_model_logged: str | None = None
-
-            def _extract_usage_tokens(resp: dict[str, Any]) -> dict[str, int] | None:
-                usage = resp.get("usage") if isinstance(resp, dict) else None
-                if not isinstance(usage, dict):
-                    return None
-
-                def _pos_int(v: Any) -> int | None:
-                    if isinstance(v, bool):
-                        return None
-                    if isinstance(v, int):
-                        return int(v) if int(v) >= 0 else None
-                    if isinstance(v, float) and v.is_integer():
-                        n = int(v)
-                        return n if n >= 0 else None
-                    return None
-
-                inp = _pos_int(usage.get("input_tokens"))
-                if inp is None:
-                    inp = _pos_int(usage.get("prompt_tokens"))
-                out = _pos_int(usage.get("output_tokens"))
-                if out is None:
-                    out = _pos_int(usage.get("completion_tokens"))
-                total = _pos_int(usage.get("total_tokens"))
-                if total is None and inp is not None and out is not None:
-                    total = int(inp) + int(out)
-
-                if inp is None and out is None and total is None:
-                    return None
-                out_d: dict[str, int] = {}
-                if inp is not None:
-                    out_d["input_tokens"] = int(inp)
-                if out is not None:
-                    out_d["output_tokens"] = int(out)
-                if total is not None:
-                    out_d["total_tokens"] = int(total)
-                return out_d
 
             def _persist_llm_call_stats(resp: dict[str, Any], call_index: int) -> None:
                 """Persist per-call context usage/budget stats (best-effort)."""
 
-                nonlocal turn_llm_calls, turn_llm_calls_with_usage
-                nonlocal \
-                    turn_llm_sum_input_tokens, \
-                    turn_llm_sum_output_tokens, \
-                    turn_llm_sum_total_tokens
-                nonlocal \
-                    last_llm_request_meta, \
-                    last_llm_usage_tokens, \
-                    last_llm_gateway_model, \
-                    last_llm_phase
+                nonlocal last_llm_usage_delta, last_llm_gateway_model, last_llm_phase
 
                 if not isinstance(resp, dict):
                     return
-                request_meta = pending_request_meta_by_call.pop(int(call_index), {})
                 model_name = resp.get("model")
                 detected = isinstance(model_name, str) and bool(model_name.strip())
                 model_name = str(model_name or "").strip() if detected else ""
                 if not model_name:
                     model_name = "can not detect gateway model"
-                usage_tokens = _extract_usage_tokens(resp)
+                usage_delta = extract_usage_delta_from_response(resp)
                 status = resp.get("status")
                 incomplete = resp.get("incomplete_details")
 
-                # Update turn-level summary counters (best-effort; usage may be absent).
-                try:
-                    turn_llm_calls += 1
-                except Exception:
-                    pass
                 last_llm_phase = str(phase or "") if phase is not None else None
                 last_llm_gateway_model = model_name
-                last_llm_request_meta = request_meta if request_meta else None
-                last_llm_usage_tokens = (
-                    usage_tokens if usage_tokens is not None else None
-                )
-                if usage_tokens is not None:
-                    try:
-                        turn_llm_calls_with_usage += 1
-                    except Exception:
-                        pass
-                    inp = usage_tokens.get("input_tokens")
-                    out = usage_tokens.get("output_tokens")
-                    total = usage_tokens.get("total_tokens")
-                    if isinstance(inp, int) and inp >= 0:
-                        turn_llm_sum_input_tokens += int(inp)
-                    if isinstance(out, int) and out >= 0:
-                        turn_llm_sum_output_tokens += int(out)
-                    if isinstance(total, int) and total >= 0:
-                        turn_llm_sum_total_tokens += int(total)
-                    elif (isinstance(inp, int) and inp >= 0) or (
-                        isinstance(out, int) and out >= 0
-                    ):
-                        turn_llm_sum_total_tokens += int(
-                            (int(inp) if isinstance(inp, int) and inp >= 0 else 0)
-                            + (int(out) if isinstance(out, int) and out >= 0 else 0)
-                        )
+                last_llm_usage_delta = usage_delta
+
+                try:
+                    self._llm_session_usage.apply_call(usage_delta)
+                    turn_llm_usage.apply_call(usage_delta)
+                except Exception:
+                    pass
+
+                # Expose last-call details for the terminal UI.
+                try:
+                    self._llm_last_call_usage = usage_delta
+                    self._llm_last_call_index = int(call_index)
+                    self._llm_last_call_phase = last_llm_phase
+                    self._llm_last_call_gateway_model = model_name
+                except Exception:
+                    pass
 
                 try:
                     self.session_store.append_event(
@@ -2014,8 +2050,11 @@ class ChatTeam:
                             "incomplete_details": incomplete
                             if isinstance(incomplete, dict)
                             else None,
-                            "request": request_meta if request_meta else None,
-                            "usage": usage_tokens if usage_tokens is not None else None,
+                            "usage": (
+                                usage_delta.to_dict()
+                                if usage_delta is not None
+                                else None
+                            ),
                         }
                     )
                 except Exception:
@@ -2035,12 +2074,6 @@ class ChatTeam:
                 last_gateway_model_logged = model_name
                 try:
                     self._gateway_model_last = model_name
-                except Exception:
-                    pass
-                try:
-                    # Persist the most recent routed model into meta immediately so users
-                    # can inspect it mid-session (and not only at turn end).
-                    self.session_store.set_meta(gateway_model_last=model_name)
                 except Exception:
                     pass
                 if emit_to_stdout:
@@ -2072,6 +2105,32 @@ class ChatTeam:
             ) -> None:
                 _persist_llm_call_stats(resp, call_index)
                 _persist_response_meta(resp, call_index)
+                # Persist rolling LLM usage into meta so it survives crashes mid-turn and
+                # is visible to the terminal UI without log scanning.
+                try:
+                    model_name = None
+                    if isinstance(resp, dict):
+                        model_name = resp.get("model")
+                    if not isinstance(model_name, str) or not model_name.strip():
+                        model_name = "can not detect gateway model"
+                    model_name = model_name.strip()
+                    self.session_store.set_meta(
+                        gateway_model_last=model_name,
+                        llm_session_usage=self._llm_session_usage.to_dict(),
+                        llm_last_turn_usage=turn_llm_usage.to_dict(),
+                        llm_last_call={
+                            "phase": str(phase or "") if phase is not None else None,
+                            "call_index": int(call_index),
+                            "gateway_model": model_name,
+                            "usage": (
+                                self._llm_last_call_usage.to_dict()
+                                if self._llm_last_call_usage is not None
+                                else None
+                            ),
+                        },
+                    )
+                except Exception:
+                    pass
                 if callbacks is not None and callbacks.on_response_meta is not None:
                     try:
                         callbacks.on_response_meta(resp, call_index)
@@ -2083,7 +2142,6 @@ class ChatTeam:
                 on_reasoning_summary_delta=_capture_reasoning_delta,
                 on_reasoning_summary_part_added=_capture_reasoning_part_added,
                 on_reasoning_summary_complete=_persist_reasoning_summary_complete,
-                on_request_meta=_persist_request_meta_and_forward,
                 on_response_meta=_persist_response_meta_and_forward,
                 on_assistant_text_delta=(
                     callbacks.on_assistant_text_delta if callbacks else None
@@ -2692,15 +2750,20 @@ class ChatTeam:
 
                     summary_body = ""
                     try:
-                        summary_body = (
-                            self.llm.complete_text(
+                        summary_body, summary_resp = (
+                            self.llm.complete_text_with_response(
                                 system_prompt=sys_prompt,
                                 user_text=prompt_text,
                                 temperature=0.0,
                                 max_tokens=700,
                             )
-                            or ""
-                        ).strip()
+                        )
+                        summary_body = (summary_body or "").strip()
+                        _persist_internal_llm_call_stats(
+                            resp=summary_resp,
+                            phase=str(phase or "") if phase is not None else None,
+                            kind="context_checkpoint_compaction",
+                        )
                     except Exception:
                         summary_body = ""
 
@@ -3365,37 +3428,24 @@ class ChatTeam:
                     {
                         "phase": last_llm_phase,
                         "gateway_model": last_llm_gateway_model,
-                        "request": last_llm_request_meta,
-                        "usage": last_llm_usage_tokens,
+                        "usage": (
+                            last_llm_usage_delta.to_dict()
+                            if last_llm_usage_delta is not None
+                            else None
+                        ),
                     }
                     if (
                         last_llm_gateway_model is not None
-                        or last_llm_request_meta is not None
-                        or last_llm_usage_tokens is not None
+                        or last_llm_usage_delta is not None
                     )
                     else None
                 ),
                 llm_last_turn_usage=(
-                    {
-                        "calls": int(turn_llm_calls),
-                        "calls_with_usage": int(turn_llm_calls_with_usage),
-                        "input_tokens": (
-                            int(turn_llm_sum_input_tokens)
-                            if turn_llm_calls_with_usage > 0
-                            else None
-                        ),
-                        "output_tokens": (
-                            int(turn_llm_sum_output_tokens)
-                            if turn_llm_calls_with_usage > 0
-                            else None
-                        ),
-                        "total_tokens": (
-                            int(turn_llm_sum_total_tokens)
-                            if turn_llm_calls_with_usage > 0
-                            else None
-                        ),
-                    }
-                    if int(turn_llm_calls) > 0
+                    turn_llm_usage.to_dict() if turn_llm_usage.calls > 0 else None
+                ),
+                llm_session_usage=(
+                    self._llm_session_usage.to_dict()
+                    if self._llm_session_usage.calls > 0
                     else None
                 ),
                 last_turn_id=turn_id,

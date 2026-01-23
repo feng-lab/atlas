@@ -7,6 +7,10 @@ from typing import Any, Optional
 
 from .chat_rpc_team import ChatTeam
 from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS, DEFAULT_PLANNER_MAX_ROUNDS
+from .llm_usage import (
+    LlmUsageDelta,
+    LlmUsageTotals,
+)
 from .responses_tool_loop import ToolLoopCallbacks
 
 
@@ -49,20 +53,98 @@ def _render_plan(*, console: Any, team: ChatTeam) -> None:
         console.print(Text(f"{mark} {step}", style=style))
 
 
+def _render_llm_usage(*, console: Any, team: ChatTeam) -> None:
+    """Show real token usage (last turn + session totals) when available."""
+
+    from rich.text import Text  # type: ignore
+
+    def _fmt(n: int | None) -> str:
+        return f"{int(n):,}" if isinstance(n, int) else "?"
+
+    try:
+        meta = team.session_store.get_meta() or {}
+    except Exception:
+        meta = {}
+
+    last_turn_usage: LlmUsageTotals | None = None
+    if isinstance(meta, dict):
+        last_turn_usage = LlmUsageTotals.from_dict(meta.get("llm_last_turn_usage"))
+    if isinstance(last_turn_usage, LlmUsageTotals) and last_turn_usage.calls > 0:
+        calls = last_turn_usage.calls
+        calls_with_usage = last_turn_usage.calls_with_usage
+        calls_with_cached = last_turn_usage.calls_with_cached_tokens
+        sum_in: int | None = last_turn_usage.input_tokens
+        sum_out: int | None = last_turn_usage.output_tokens
+        sum_cached: int | None = last_turn_usage.cached_tokens
+        sum_uncached_in: int | None = last_turn_usage.uncached_input_tokens
+
+        coverage = f" (usage coverage: {calls_with_usage}/{calls} calls)"
+        if calls_with_usage == 0 and calls > 0:
+            sum_in = None
+            sum_out = None
+        cached_note = f" (cached coverage: {calls_with_cached}/{calls} calls)"
+        if calls_with_cached == 0 and calls > 0:
+            sum_cached = None
+            sum_uncached_in = None
+
+        console.print("\n[bold]Last Turn Usage[/bold]")
+        console.print(Text(f"calls={calls}{coverage}{cached_note}", style="dim"))
+        console.print(
+            Text(
+                f"input_tokens={_fmt(sum_in)}, output_tokens={_fmt(sum_out)}",
+                style="dim",
+            )
+        )
+        console.print(
+            Text(
+                f"cached_tokens={_fmt(sum_cached)}, uncached_input_tokens={_fmt(sum_uncached_in)}",
+                style="dim",
+            )
+        )
+
+    sess_usage: LlmUsageTotals | None = None
+    if isinstance(meta, dict):
+        sess_usage = LlmUsageTotals.from_dict(meta.get("llm_session_usage"))
+    if isinstance(sess_usage, LlmUsageTotals) and sess_usage.calls > 0:
+        calls = sess_usage.calls
+        calls_with_usage = sess_usage.calls_with_usage
+        calls_with_cached = sess_usage.calls_with_cached_tokens
+        sum_in: int | None = sess_usage.input_tokens
+        sum_out: int | None = sess_usage.output_tokens
+        sum_cached: int | None = sess_usage.cached_tokens
+        sum_uncached_in: int | None = sess_usage.uncached_input_tokens
+
+        coverage = f" (usage coverage: {calls_with_usage}/{calls} calls)"
+        if calls_with_usage == 0 and calls > 0:
+            # Provider did not report usage for any calls yet; avoid printing 0
+            # tokens which can be misread as "free". Show unknown instead.
+            sum_in = None
+            sum_out = None
+        cached_note = f" (cached coverage: {calls_with_cached}/{calls} calls)"
+        if calls_with_cached == 0 and calls > 0:
+            sum_cached = None
+            sum_uncached_in = None
+
+        console.print("\n[bold]Session Usage[/bold]")
+        console.print(Text(f"calls={calls}{coverage}{cached_note}", style="dim"))
+        console.print(
+            Text(
+                f"input_tokens={_fmt(sum_in)}, output_tokens={_fmt(sum_out)}",
+                style="dim",
+            )
+        )
+        console.print(
+            Text(
+                f"cached_tokens={_fmt(sum_cached)}, uncached_input_tokens={_fmt(sum_uncached_in)}",
+                style="dim",
+            )
+        )
+
+
 def _render_token_budget(*, console: Any, team: ChatTeam) -> None:
     """Show best-effort model token budget + recent usage stats."""
 
     from rich.text import Text  # type: ignore
-
-    def _as_nonneg_int(v: Any) -> int | None:
-        if isinstance(v, bool):
-            return None
-        if isinstance(v, int):
-            return int(v) if int(v) >= 0 else None
-        if isinstance(v, float) and v.is_integer():
-            n = int(v)
-            return n if n >= 0 else None
-        return None
 
     def _as_pos_int(v: Any) -> int | None:
         if isinstance(v, bool):
@@ -148,86 +230,7 @@ def _render_token_budget(*, console: Any, team: ChatTeam) -> None:
             Text(f"auto_compact_tokens(90%)={_fmt(auto_compact)}", style="dim")
         )
 
-    last_turn_usage = (
-        meta.get("llm_last_turn_usage") if isinstance(meta, dict) else None
-    )
-    if isinstance(last_turn_usage, dict):
-        calls = _as_nonneg_int(last_turn_usage.get("calls"))
-        calls_with_usage = _as_nonneg_int(last_turn_usage.get("calls_with_usage"))
-        sum_in = _as_nonneg_int(last_turn_usage.get("input_tokens"))
-        sum_out = _as_nonneg_int(last_turn_usage.get("output_tokens"))
-        sum_total = _as_nonneg_int(last_turn_usage.get("total_tokens"))
-        if any(
-            v is not None for v in (calls, calls_with_usage, sum_in, sum_out, sum_total)
-        ):
-            coverage = ""
-            if calls is not None and calls_with_usage is not None:
-                coverage = f" (usage coverage: {calls_with_usage}/{calls} calls)"
-            console.print("\n[bold]Last Turn Usage[/bold]")
-            console.print(
-                Text(
-                    f"calls={calls if calls is not None else '?'}"
-                    f", input_tokens={_fmt(sum_in)}"
-                    f", output_tokens={_fmt(sum_out)}"
-                    f", total_tokens={_fmt(sum_total)}{coverage}",
-                    style="dim",
-                )
-            )
-
-    try:
-        recent = team.session_store.tail_events(limit=5, event_type="llm_call_stats")
-    except Exception:
-        recent = []
-    if not recent:
-        console.print("[dim](no llm_call_stats recorded yet)[/dim]")
-        return
-
-    console.print("\n[bold]Recent LLM Call Stats[/bold]")
-    for ev in recent:
-        if not isinstance(ev, dict):
-            continue
-        ph = str(ev.get("phase") or "").strip()
-        try:
-            call_index = int(ev.get("call_index", 0) or 0)
-        except Exception:
-            call_index = 0
-        req = ev.get("request") if isinstance(ev.get("request"), dict) else {}
-        usage = ev.get("usage") if isinstance(ev.get("usage"), dict) else {}
-        est_in = (
-            _as_pos_int(req.get("estimated_input_tokens"))
-            if isinstance(req, dict)
-            else None
-        )
-        eff = (
-            _as_pos_int(req.get("effective_input_budget_tokens"))
-            if isinstance(req, dict)
-            else None
-        )
-        inp = (
-            _as_pos_int(usage.get("input_tokens")) if isinstance(usage, dict) else None
-        )
-        out = (
-            _as_pos_int(usage.get("output_tokens")) if isinstance(usage, dict) else None
-        )
-
-        used = inp if inp is not None else est_in
-        used_label = "in" if inp is not None else "in≈"
-        ratio = ""
-        if used is not None and eff is not None and eff > 0:
-            try:
-                pct = (float(used) / float(eff)) * 100.0
-                ratio = f" ({pct:.1f}%)"
-            except Exception:
-                ratio = ""
-        tail = ""
-        if out is not None:
-            tail = f", out={_fmt(out)}"
-        console.print(
-            Text(
-                f"- {ph}#{call_index}: {used_label}{_fmt(used)}/{_fmt(eff)}{ratio}{tail}",
-                style="dim",
-            )
-        )
+    _render_llm_usage(console=console, team=team)
 
 
 def _ensure_screenshot_consent(*, console: Any, team: ChatTeam) -> None:
@@ -512,14 +515,11 @@ def run_console_repl(
         # Natural language turn (stream reasoning summary, show tools, then final answer).
         printed_reasoning = False
         current_phase = "Executor"
-        last_gateway_model: str | None = None
-        request_meta_by_call: dict[int, dict[str, Any]] = {}
 
         def _on_phase_start(phase: str) -> None:
-            nonlocal printed_reasoning, current_phase, last_gateway_model
+            nonlocal printed_reasoning, current_phase
             current_phase = str(phase or "").strip() or "Phase"
             printed_reasoning = False
-            last_gateway_model = None
             console.print(Text(f"\n# {current_phase}", style="bold magenta"))
 
         def _on_phase_end(_phase: str) -> None:
@@ -528,62 +528,6 @@ def run_console_repl(
             if printed_reasoning:
                 console.print("\n")
             printed_reasoning = False
-
-        def _on_request_meta(req_meta: dict[str, Any], call_index: int) -> None:
-            nonlocal printed_reasoning, request_meta_by_call
-            if not isinstance(req_meta, dict):
-                return
-
-            def _pos_int(v: Any) -> int | None:
-                if isinstance(v, bool):
-                    return None
-                if isinstance(v, int):
-                    return int(v) if int(v) >= 0 else None
-                if isinstance(v, float) and v.is_integer():
-                    n = int(v)
-                    return n if n >= 0 else None
-                return None
-
-            idx = int(call_index or 0)
-            request_meta_by_call[idx] = dict(req_meta)
-            est = _pos_int(req_meta.get("estimated_input_tokens"))
-            eff = _pos_int(req_meta.get("effective_input_budget_tokens"))
-            auto = _pos_int(req_meta.get("auto_compact_tokens"))
-
-            used = est
-            pct = None
-            if used is not None and eff is not None and eff > 0:
-                try:
-                    pct = (float(used) / float(eff)) * 100.0
-                except Exception:
-                    pct = None
-
-            style = "dim"
-            if pct is not None:
-                if pct >= 90.0:
-                    style = "red"
-                elif pct >= 75.0:
-                    style = "yellow"
-
-            def _fmt(n: int | None) -> str:
-                return f"{int(n):,}" if isinstance(n, int) else "?"
-
-            parts: list[str] = []
-            if used is not None:
-                parts.append(f"in≈{_fmt(used)}/{_fmt(eff)}")
-            else:
-                parts.append(f"in≈?/{_fmt(eff)}")
-            if pct is not None:
-                parts.append(f"({pct:.1f}%)")
-            if auto is not None:
-                parts.append(f"auto={_fmt(auto)}")
-
-            # Avoid gluing onto a streaming reasoning line.
-            if printed_reasoning:
-                console.print()
-            console.print(
-                Text(f"[context {current_phase}#{idx}] " + " ".join(parts), style=style)
-            )
 
         def _on_reasoning_delta(delta: str, _summary_index: int) -> None:
             nonlocal printed_reasoning
@@ -669,78 +613,80 @@ def run_console_repl(
                 _render_plan(console=console, team=team)
 
         def _on_response_meta(resp: dict[str, Any], call_index: int) -> None:
-            nonlocal last_gateway_model, printed_reasoning
+            nonlocal printed_reasoning
+
             model_name = None
             if isinstance(resp, dict):
                 model_name = resp.get("model")
             if not isinstance(model_name, str) or not model_name.strip():
                 model_name = "can not detect gateway model"
             model_name = model_name.strip()
-            if last_gateway_model == model_name:
-                return
-            last_gateway_model = model_name
-            # If we were streaming reasoning without a trailing newline, ensure the
-            # meta line doesn't glue onto the previous output.
-            if printed_reasoning:
-                console.print()
+
             requested = str(model or "").strip()
             suffix = (
                 f" (requested {requested})"
                 if requested and model_name != requested
                 else ""
             )
-            tok_suffix = ""
-            try:
-                usage = resp.get("usage") if isinstance(resp, dict) else None
-                if isinstance(usage, dict):
-                    inp = usage.get("input_tokens")
-                    if not isinstance(inp, int):
-                        inp = (
-                            usage.get("prompt_tokens")
-                            if isinstance(usage.get("prompt_tokens"), int)
-                            else None
-                        )
-                    out = usage.get("output_tokens")
-                    if not isinstance(out, int):
-                        out = (
-                            usage.get("completion_tokens")
-                            if isinstance(usage.get("completion_tokens"), int)
-                            else None
-                        )
-                else:
-                    inp = None
-                    out = None
-                req_meta = request_meta_by_call.get(int(call_index or 0), {})
-                eff = (
-                    req_meta.get("effective_input_budget_tokens")
-                    if isinstance(req_meta, dict)
-                    else None
-                )
-                if isinstance(eff, bool) or not isinstance(eff, int) or eff <= 0:
-                    eff = None
-                used = inp if isinstance(inp, int) and inp >= 0 else None
-                pct = None
-                if used is not None and eff is not None:
-                    try:
-                        pct = (float(used) / float(eff)) * 100.0
-                    except Exception:
-                        pct = None
-                if used is not None or out is not None:
-                    toks = []
-                    if used is not None:
-                        if eff is not None and pct is not None:
-                            toks.append(f"in={used:,}/{eff:,} ({pct:.1f}%)")
-                        else:
-                            toks.append(f"in={used:,}")
-                    if isinstance(out, int) and out >= 0:
-                        toks.append(f"out={out:,}")
-                    if toks:
-                        tok_suffix = " [" + ", ".join(toks) + "]"
-            except Exception:
-                tok_suffix = ""
+
+            # If we were streaming reasoning without a trailing newline, ensure the
+            # meta line doesn't glue onto the previous output.
+            if printed_reasoning:
+                console.print()
+
+            def _fmt(n: int | None) -> str:
+                return f"{int(n):,}" if isinstance(n, int) else "?"
+
+            usage = team._llm_last_call_usage
+            if team._llm_last_call_index != call_index:
+                usage = None
+
+            turn_usage = team._llm_turn_usage_current
+            sess_usage = team._llm_session_usage
+
+            call_in = usage.input_tokens if usage is not None else None
+            call_out = usage.output_tokens if usage is not None else None
+            call_cached = usage.cached_tokens if usage is not None else None
+            call_uncached = usage.uncached_input_tokens if usage is not None else None
+
+            turn_in = turn_usage.input_tokens
+            turn_out = turn_usage.output_tokens
+            turn_cached = turn_usage.cached_tokens
+            turn_uncached = turn_usage.uncached_input_tokens
+
+            sess_in = sess_usage.input_tokens
+            sess_out = sess_usage.output_tokens
+            sess_cached = sess_usage.cached_tokens
+            sess_uncached = sess_usage.uncached_input_tokens
+
+            # Avoid showing misleading zeros when coverage is missing.
+            if turn_usage.calls > 0 and turn_usage.calls_with_usage == 0:
+                turn_in = None
+                turn_out = None
+            if turn_usage.calls > 0 and turn_usage.calls_with_cached_tokens == 0:
+                turn_cached = None
+                turn_uncached = None
+
+            if sess_usage.calls > 0 and sess_usage.calls_with_usage == 0:
+                sess_in = None
+                sess_out = None
+            if sess_usage.calls > 0 and sess_usage.calls_with_cached_tokens == 0:
+                sess_cached = None
+                sess_uncached = None
+
+            prefix = (
+                f"[llm {current_phase}#{int(call_index or 0)}] {model_name}{suffix}"
+            )
+            if usage is None:
+                console.print(Text(prefix + " (usage unavailable)", style="dim"))
+                return
+
+            call_part = f"call(in={_fmt(call_in)} cached={_fmt(call_cached)} uncached={_fmt(call_uncached)} out={_fmt(call_out)})"
+            turn_part = f"turn(in={_fmt(turn_in)} cached={_fmt(turn_cached)} uncached={_fmt(turn_uncached)} out={_fmt(turn_out)})"
+            sess_part = f"session(in={_fmt(sess_in)} cached={_fmt(sess_cached)} uncached={_fmt(sess_uncached)} out={_fmt(sess_out)})"
 
             console.print(
-                Text(f"[gateway model: {model_name}{suffix}]{tok_suffix}", style="dim")
+                Text(" | ".join([prefix, call_part, turn_part, sess_part]), style="dim")
             )
 
         callbacks = ToolLoopCallbacks(
@@ -748,7 +694,6 @@ def run_console_repl(
             on_phase_end=_on_phase_end,
             on_reasoning_summary_delta=_on_reasoning_delta,
             on_reasoning_summary_part_added=_on_reasoning_part_added,
-            on_request_meta=_on_request_meta,
             on_response_meta=_on_response_meta,
             on_tool_call=_on_tool_call,
             on_tool_result=_on_tool_result,

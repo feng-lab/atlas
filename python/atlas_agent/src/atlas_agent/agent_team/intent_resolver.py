@@ -35,14 +35,49 @@ class IntentResolver:
     client: LLMClient
     temperature: float | None = None
 
-    def resolve(self, user_text: str, *, scene_context: str) -> str:
+    def resolve_with_response(
+        self, user_text: str, *, scene_context: str
+    ) -> tuple[str, dict]:
         prompt = (
-            "Scene context + history:\n" + scene_context + "\n\n" +
-            "Latest user message:\n" + (user_text or "") + "\n\n" +
-            "Produce a 'TASK BRIEF:' as specified."
+            "Scene context + history:\n"
+            + scene_context
+            + "\n\n"
+            + "Latest user message:\n"
+            + (user_text or "")
+            + "\n\n"
+            + "Produce a 'TASK BRIEF:' as specified."
         )
-        return self.client.complete_text(
+        return self.client.complete_text_with_response(
             system_prompt=INTENT_RESOLVER_SYSTEM,
+            user_text=prompt,
+            temperature=self.temperature,
+        )
+
+    def resolve(self, user_text: str, *, scene_context: str) -> str:
+        text, _resp = self.resolve_with_response(user_text, scene_context=scene_context)
+        return text
+
+    def resolve_force_task_brief_with_response(
+        self, user_text: str, *, scene_context: str
+    ) -> tuple[str, dict]:
+        """Resolve a TASK BRIEF even when the model would otherwise ask CLARIFY.
+
+        Used as a best-effort recovery path for providers/models that over-use
+        clarifying questions. This keeps the agent "proceed-first" by encoding
+        defaults as explicit assumptions.
+        """
+
+        prompt = (
+            "Scene context + history:\n"
+            + scene_context
+            + "\n\n"
+            + "Latest user message:\n"
+            + (user_text or "")
+            + "\n\n"
+            + "Produce a 'TASK BRIEF:' as specified."
+        )
+        return self.client.complete_text_with_response(
+            system_prompt=INTENT_RESOLVER_SYSTEM_FORCE_TASK_BRIEF,
             user_text=prompt,
             temperature=self.temperature,
         )
@@ -54,14 +89,7 @@ class IntentResolver:
         clarifying questions. This keeps the agent "proceed-first" by encoding
         defaults as explicit assumptions.
         """
-
-        prompt = (
-            "Scene context + history:\n" + scene_context + "\n\n" +
-            "Latest user message:\n" + (user_text or "") + "\n\n" +
-            "Produce a 'TASK BRIEF:' as specified."
+        text, _resp = self.resolve_force_task_brief_with_response(
+            user_text, scene_context=scene_context
         )
-        return self.client.complete_text(
-            system_prompt=INTENT_RESOLVER_SYSTEM_FORCE_TASK_BRIEF,
-            user_text=prompt,
-            temperature=self.temperature,
-        )
+        return text

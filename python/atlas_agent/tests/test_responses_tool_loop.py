@@ -255,63 +255,6 @@ def test_reasoning_summary_complete_is_emitted_before_tool_execution():
     assert trace[1] == "tool:update_plan"
 
 
-def test_request_meta_emitted_once_per_call():
-    llm = DummyLLM(
-        [
-            {
-                "response": {
-                    "output": [
-                        {
-                            "type": "message",
-                            "role": "assistant",
-                            "content": [{"type": "output_text", "text": "Done."}],
-                        }
-                    ]
-                }
-            }
-        ]
-    )
-
-    seen: list[tuple[int, dict]] = []
-
-    def on_request_meta(meta: dict, call_index: int) -> None:
-        seen.append((int(call_index), dict(meta)))
-
-    out = run_responses_tool_loop(
-        llm=llm,
-        instructions="system",
-        input_items=[
-            {
-                "type": "message",
-                "role": "user",
-                "content": [{"type": "input_text", "text": "hi"}],
-            }
-        ],
-        tools=[],
-        dispatch=lambda name, args_json: json.dumps({"ok": True}),
-        callbacks=ToolLoopCallbacks(on_request_meta=on_request_meta),
-        max_rounds=3,
-        effective_input_budget_tokens=1000,
-        auto_compact_tokens=900,
-    )
-
-    assert out.assistant_text == "Done."
-    assert llm.calls == 1
-    assert len(seen) == 1
-    call_index, meta = seen[0]
-    assert call_index == 0
-    assert isinstance(meta.get("estimated_input_tokens"), int)
-    assert meta["estimated_input_tokens"] > 0
-    assert meta["effective_input_budget_tokens"] == 1000
-    assert meta["auto_compact_tokens"] == 900
-    assert meta["input_items_count"] == 1
-    assert meta["tools_enabled"] is False
-    assert meta["tool_count"] == 0
-    assert meta["context_retry_index"] == 0
-    assert meta["network_try_index"] == 0
-    assert meta["final_continue_calls"] == 0
-
-
 def test_tool_loop_preserves_assistant_message_as_output_text_in_history():
     tool_called = []
 

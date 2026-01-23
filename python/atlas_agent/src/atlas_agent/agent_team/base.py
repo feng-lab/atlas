@@ -14,15 +14,6 @@ from ..provider_tool_schema import (
 )
 
 
-@dataclass
-class AgentMessage:
-    role: str
-    content: Optional[str] = None
-    name: Optional[str] = None
-    tool_call_id: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-
-
 @dataclass(frozen=True)
 class ModelTokenBudgets:
     model: str
@@ -253,6 +244,52 @@ class LLMClient:
         self._model_token_budgets_cache[model_id] = out
         return out
 
+    def _wire_mode(self) -> str:
+        mode = (self._wire_api_resolved or self.wire_api or "auto").strip().lower()
+        return mode if mode in {"auto", "responses", "chat"} else "auto"
+
+    @staticmethod
+    def _is_unsupported_temperature_error(err: Exception) -> bool:
+        msg = str(err or "")
+        if not msg:
+            return False
+        m = msg.lower()
+        return ("unsupported parameter" in m and "temperature" in m) or (
+            "temperature" in m and "not supported" in m
+        )
+
+    @staticmethod
+    def _iter_exception_chain(err: BaseException) -> list[BaseException]:
+        out: list[BaseException] = []
+        seen: set[int] = set()
+        cur: BaseException | None = err
+        while cur is not None and id(cur) not in seen:
+            seen.add(id(cur))
+            out.append(cur)
+            nxt = getattr(cur, "__cause__", None) or getattr(cur, "__context__", None)
+            cur = nxt if isinstance(nxt, BaseException) else None
+        return out
+
+    @classmethod
+    def _is_responses_unsupported_error(cls, err: Exception) -> bool:
+        # Best-effort: vendors/gateways that don't implement /v1/responses typically
+        # return 404. Only treat these as "wire unsupported" signals; other 4xx
+        # errors are usually real request/validation issues.
+        for e in cls._iter_exception_chain(err):
+            msg = str(e or "").lower()
+            if "404" in msg and "responses" in msg:
+                return True
+            if "not found" in msg and "responses" in msg:
+                return True
+            # OpenAI SDK error objects often carry status_code.
+            try:
+                sc = int(getattr(e, "status_code", 0) or 0)
+                if sc == 404:
+                    return True
+            except Exception:
+                pass
+        return False
+
     def _model_supports_reasoning_summaries(self) -> bool:
         """Best-effort capability detection.
 
@@ -278,27 +315,6 @@ class LLMClient:
         # 2) Provider-border schema tightening for strict validators.
         tools_wire = convert_tools_to_responses_wire(raw_tools)
         return tighten_tools_schema_for_provider(tools_wire)
-
-    def chat(
-        self,
-        *,
-        messages: List[Dict[str, Any]],
-        tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float | None = None,
-        stream: bool = False,
-    ) -> Dict[str, Any]:
-        client = self._ensure_client()
-        normalized_tools = normalize_tools_for_chat_completions_api(tools)
-        params: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "tools": normalized_tools or None,
-        }
-        if temperature is not None:
-            params["temperature"] = float(temperature)
-        if bool(stream):
-            params["stream"] = True
-        return client.chat.completions.create(**params)
 
     @staticmethod
     def _to_plain_dict(obj: Any) -> Any:
@@ -366,42 +382,6 @@ class LLMClient:
         When wire_api='auto', we prefer the Responses API and fall back to Chat
         Completions if the provider does not support `/v1/responses`.
         """
-
-        def _wire_mode() -> str:
-            mode = (self._wire_api_resolved or self.wire_api or "auto").strip().lower()
-            return mode if mode in {"auto", "responses", "chat"} else "auto"
-
-        def _iter_exception_chain(err: BaseException) -> list[BaseException]:
-            out: list[BaseException] = []
-            seen: set[int] = set()
-            cur: BaseException | None = err
-            while cur is not None and id(cur) not in seen:
-                seen.add(id(cur))
-                out.append(cur)
-                nxt = getattr(cur, "__cause__", None) or getattr(
-                    cur, "__context__", None
-                )
-                cur = nxt if isinstance(nxt, BaseException) else None
-            return out
-
-        def _is_responses_unsupported(err: Exception) -> bool:
-            # Best-effort: vendors/gateways that don't implement /v1/responses typically
-            # return 404. Only treat these as "wire unsupported" signals; other 4xx
-            # errors are usually real request/validation issues.
-            for e in _iter_exception_chain(err):
-                msg = str(e or "").lower()
-                if "404" in msg and "responses" in msg:
-                    return True
-                if "not found" in msg and "responses" in msg:
-                    return True
-                # OpenAI SDK error objects often carry status_code.
-                try:
-                    sc = int(getattr(e, "status_code", 0) or 0)
-                    if sc == 404:
-                        return True
-                except Exception:
-                    pass
-            return False
 
         def _responses_to_chat_messages(
             *, instructions_text: str, items: List[Dict[str, Any]]
@@ -539,6 +519,12 @@ class LLMClient:
                 # Fall back to an empty output; tool loop will treat it as no-op.
                 pass
             out: dict[str, Any] = {"output": out_items, "status": status}
+            model = data.get("model") if isinstance(data, dict) else None
+            if isinstance(model, str) and model.strip():
+                out["model"] = model.strip()
+            usage = data.get("usage") if isinstance(data, dict) else None
+            if isinstance(usage, dict) and usage:
+                out["usage"] = dict(usage)
             if incomplete_details is not None:
                 out["incomplete_details"] = incomplete_details
             return out
@@ -576,7 +562,7 @@ class LLMClient:
         if text is not None:
             params["text"] = text
 
-        mode = _wire_mode()
+        mode = self._wire_mode()
         if mode == "chat":
             client = self._ensure_client()
             chat_messages = _responses_to_chat_messages(
@@ -585,15 +571,6 @@ class LLMClient:
             # Normalize to Chat Completions wire shape + apply provider-border
             # schema tightening for strict validators.
             chat_tools = normalize_tools_for_chat_completions_api(tools)
-
-            def _is_unsupported_temperature_error(err: Exception) -> bool:
-                msg = str(err or "")
-                if not msg:
-                    return False
-                m = msg.lower()
-                return ("unsupported parameter" in m and "temperature" in m) or (
-                    "temperature" in m and "not supported" in m
-                )
 
             chat_params: dict[str, Any] = {
                 "model": self.model,
@@ -607,8 +584,9 @@ class LLMClient:
                 if "temperature" in chat_params:
                     self._chat_supports_temperature = True
             except Exception as e:
-                if "temperature" in chat_params and _is_unsupported_temperature_error(
-                    e
+                if (
+                    "temperature" in chat_params
+                    and self._is_unsupported_temperature_error(e)
                 ):
                     self._chat_supports_temperature = False
                     chat_params.pop("temperature", None)
@@ -651,16 +629,6 @@ class LLMClient:
                 on_event=on_event,
             )
 
-        # The SDK exposes a context-manager style stream object.
-        def _is_unsupported_temperature_error(err: Exception) -> bool:
-            msg = str(err or "")
-            if not msg:
-                return False
-            m = msg.lower()
-            return ("unsupported parameter" in m and "temperature" in m) or (
-                "temperature" in m and "not supported" in m
-            )
-
         # Some models reject optional sampling parameters (notably temperature).
         # We retry once without temperature and cache the result for this client.
         if self._responses_supports_temperature is False:
@@ -686,7 +654,7 @@ class LLMClient:
             if mode == "auto" and self._wire_api_resolved is None:
                 self._wire_api_resolved = "responses"
         except Exception as e:
-            if mode == "auto" and _is_responses_unsupported(e):
+            if mode == "auto" and self._is_responses_unsupported_error(e):
                 self._wire_api_resolved = "chat"
                 return self.responses_stream(
                     instructions=instructions,
@@ -699,7 +667,7 @@ class LLMClient:
                     text_verbosity=text_verbosity,
                     on_event=on_event,
                 )
-            if "temperature" in params and _is_unsupported_temperature_error(e):
+            if "temperature" in params and self._is_unsupported_temperature_error(e):
                 self._responses_supports_temperature = False
                 params.pop("temperature", None)
                 with responses.stream(**params) as stream:
@@ -720,19 +688,19 @@ class LLMClient:
                 raise
         return self._to_plain_dict(final) if final is not None else {}
 
-    def responses_complete_text(
+    def _responses_complete_text_with_response(
         self,
         *,
         system_prompt: str,
         user_text: str,
         temperature: float | None = None,
-        max_output_tokens: int | None = None,
+        max_tokens: int | None = None,
         text_verbosity: str | None = None,
-    ) -> str:
-        """Unary Responses API call that returns assistant text.
+    ) -> tuple[str, dict[str, Any]]:
+        """Unary Responses API call that returns assistant text + full response dict.
 
-        This is useful for small internal sub-tasks (e.g., session memory compaction)
-        while keeping the implementation aligned with a Responses-first approach.
+        This is useful for internal sub-tasks where we still want access to usage
+        statistics for budgeting / reporting.
         """
 
         client = self._ensure_client()
@@ -756,19 +724,10 @@ class LLMClient:
         }
         if temperature is not None:
             params["temperature"] = float(temperature)
-        if max_output_tokens is not None:
-            params["max_output_tokens"] = int(max_output_tokens)
+        if max_tokens is not None:
+            params["max_output_tokens"] = int(max_tokens)
         if text_verbosity is not None:
             params["text"] = {"verbosity": str(text_verbosity)}
-
-        def _is_unsupported_temperature_error(err: Exception) -> bool:
-            msg = str(err or "")
-            if not msg:
-                return False
-            m = msg.lower()
-            return ("unsupported parameter" in m and "temperature" in m) or (
-                "temperature" in m and "not supported" in m
-            )
 
         if self._responses_supports_temperature is False:
             params.pop("temperature", None)
@@ -778,18 +737,19 @@ class LLMClient:
             if "temperature" in params:
                 self._responses_supports_temperature = True
         except Exception as e:
-            if "temperature" in params and _is_unsupported_temperature_error(e):
+            if "temperature" in params and self._is_unsupported_temperature_error(e):
                 self._responses_supports_temperature = False
                 params.pop("temperature", None)
                 resp = responses.create(**params)
             else:
                 raise
+
         data = self._to_plain_dict(resp)
 
         # Extract assistant output text from Responses API output items.
         out = data.get("output") if isinstance(data, dict) else None
         if not isinstance(out, list):
-            return ""
+            return ("", data if isinstance(data, dict) else {})
         chunks: list[str] = []
         for item in out:
             if not isinstance(item, dict):
@@ -806,7 +766,7 @@ class LLMClient:
                     continue
                 if str(part.get("type") or "") == "output_text":
                     chunks.append(str(part.get("text") or ""))
-        return "".join(chunks).strip()
+        return ("".join(chunks).strip(), data if isinstance(data, dict) else {})
 
     def complete_text(
         self,
@@ -816,36 +776,88 @@ class LLMClient:
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> str:
-        # Prefer Responses API. Fall back to Chat Completions if the provider/model
-        # does not support Responses.
-        try:
-            return self.responses_complete_text(
-                system_prompt=system_prompt,
-                user_text=user_text,
-                temperature=temperature,
-                max_output_tokens=max_tokens,
+        text, _resp = self.complete_text_with_response(
+            system_prompt=system_prompt,
+            user_text=user_text,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return text
+
+    def complete_text_with_response(
+        self,
+        *,
+        system_prompt: str,
+        user_text: str,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> tuple[str, dict[str, Any]]:
+        """Text completion + response metadata (best-effort).
+
+        Intended for internal agent sub-tasks where we want access to usage stats.
+        """
+
+        mode = self._wire_mode()
+        if mode != "chat":
+            client = self._ensure_client()
+            supports_responses = bool(
+                hasattr(client, "responses")
+                and hasattr(getattr(client, "responses"), "create")
             )
-        except Exception:
-            pass
+            if supports_responses:
+                try:
+                    out = self._responses_complete_text_with_response(
+                        system_prompt=system_prompt,
+                        user_text=user_text,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                    )
+                    if mode == "auto" and self._wire_api_resolved is None:
+                        self._wire_api_resolved = "responses"
+                    return out
+                except Exception as e:
+                    if mode == "responses":
+                        raise
+                    if mode == "auto" and self._is_responses_unsupported_error(e):
+                        self._wire_api_resolved = "chat"
+            else:
+                if mode == "responses":
+                    raise RuntimeError(
+                        "OpenAI client does not support the Responses API"
+                    )
+                self._wire_api_resolved = "chat"
 
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_text},
         ]
-        client = self._ensure_client()
         params: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
         }
-        if temperature is not None:
+        if temperature is not None and self._chat_supports_temperature is not False:
             params["temperature"] = float(temperature)
         if max_tokens is not None:
             params["max_tokens"] = int(max_tokens)
-        resp = client.chat.completions.create(**params)
+        client = self._ensure_client()
         try:
-            return (resp.choices[0].message.content or "").strip()
+            resp = client.chat.completions.create(**params)
+            if "temperature" in params:
+                self._chat_supports_temperature = True
+        except Exception as e:
+            if "temperature" in params and self._is_unsupported_temperature_error(e):
+                self._chat_supports_temperature = False
+                params.pop("temperature", None)
+                resp = client.chat.completions.create(**params)
+            else:
+                raise
+        data = self._to_plain_dict(resp)
+        text = ""
+        try:
+            text = (resp.choices[0].message.content or "").strip()
         except Exception:
-            return ""
+            text = ""
+        return (text, data if isinstance(data, dict) else {})
 
     def complete_with_image(
         self,
@@ -890,58 +902,3 @@ class LLMClient:
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-
-
-@dataclass
-class BaseAgent:
-    name: str
-    system_prompt: str
-    client: LLMClient
-    tools: List[Dict[str, Any]] = field(default_factory=list)
-    temperature: float = 0.2
-    memory: List[AgentMessage] = field(default_factory=list)
-
-    def reset(self):
-        self.memory.clear()
-
-    def run(
-        self, user_text: str, *, shared_context: Optional[str] = None
-    ) -> AgentMessage:
-        msgs: List[Dict[str, Any]] = []
-        sys_content = self.system_prompt + (
-            f"\n\nShared context:\n{shared_context}" if shared_context else ""
-        )
-        msgs.append({"role": "system", "content": sys_content})
-        for m in self.memory:
-            d: Dict[str, Any] = {"role": m.role}
-            if m.content is not None:
-                d["content"] = m.content
-            if m.name:
-                d["name"] = m.name
-            if m.tool_call_id:
-                d["tool_call_id"] = m.tool_call_id
-            msgs.append(d)
-        msgs.append({"role": "user", "content": user_text})
-
-        resp = self.client.chat(
-            messages=msgs, tools=self.tools, temperature=self.temperature
-        )
-        choice = resp.choices[0]
-        msg = choice.message
-        out = AgentMessage(
-            role="assistant",
-            content=getattr(msg, "content", None),
-            tool_calls=[
-                {
-                    "id": c.id,
-                    "function": {
-                        "name": c.function.name,
-                        "arguments": c.function.arguments,
-                    },
-                }
-                for c in (getattr(msg, "tool_calls", []) or [])
-            ]
-            or None,
-        )
-        self.memory.append(out)
-        return out

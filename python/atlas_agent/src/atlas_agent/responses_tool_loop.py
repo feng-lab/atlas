@@ -378,12 +378,6 @@ class ToolLoopCallbacks:
     on_phase_end: Callable[[str], None] | None = None
     on_reasoning_summary_delta: Callable[[str, int], None] | None = None
     on_reasoning_summary_part_added: Callable[[int], None] | None = None
-    # Called once per Responses API call (per tool-loop round), immediately
-    # before we start streaming response events. Useful for prompt-budget
-    # observability (and user-facing display of context usage/budget).
-    on_request_meta: Callable[[dict[str, Any], int], None] | None = (
-        None  # (request_meta, call_index)
-    )
     # Called once per Responses API call (per tool-loop round), after the stream
     # completes and the final reasoning summary text has been assembled, and
     # BEFORE any tool calls from that response are executed.
@@ -696,47 +690,6 @@ def run_responses_tool_loop(
                                     did_compact = False
                                 if did_compact:
                                     continue
-
-                    # Emit request metadata for observability/UX (best-effort).
-                    if cb.on_request_meta is not None:
-                        if estimated_tokens is None:
-                            estimated_tokens = _estimate_request_tokens(
-                                instructions=instructions,
-                                input_items=in_items,
-                                tools=round_tools,
-                            )
-                        try:
-                            cb.on_request_meta(
-                                {
-                                    "estimated_input_tokens": int(estimated_tokens),
-                                    "effective_input_budget_tokens": (
-                                        int(effective_input_budget_tokens)
-                                        if (
-                                            effective_input_budget_tokens is not None
-                                            and int(effective_input_budget_tokens) > 0
-                                        )
-                                        else None
-                                    ),
-                                    "auto_compact_tokens": (
-                                        int(auto_compact_tokens)
-                                        if (
-                                            auto_compact_tokens is not None
-                                            and int(auto_compact_tokens) > 0
-                                        )
-                                        else None
-                                    ),
-                                    "input_items_count": int(len(in_items)),
-                                    "tools_enabled": bool(round_tools),
-                                    "tool_count": int(len(round_tools or [])),
-                                    "context_retry_index": int(_retry),
-                                    "network_try_index": int(net_try),
-                                    "final_continue_calls": int(final_continue_calls),
-                                },
-                                int(_round),
-                            )
-                        except Exception:
-                            # Callbacks must not break tool execution.
-                            pass
 
                     try:
                         resp = llm.responses_stream(

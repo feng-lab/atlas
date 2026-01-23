@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("cmd", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument(
         "--model",
-        default="gpt-5.2-pro",
+        default="gpt-5.2",
     )
     parser.add_argument(
         "--wire-api",
