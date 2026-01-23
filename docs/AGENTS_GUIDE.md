@@ -63,6 +63,21 @@ Screenshots (optional)
 Codegen Toggle
 - Code generation helpers are disabled by default and gated behind a flag. Enable with `--enable-codegen` when invoking the chat agent. When disabled, the `python_write_and_run` tool is hidden and calls are rejected.
 
+Web Search (optional)
+- Atlas Agent can optionally expose the OpenAI Responses API built-in `web_search` tool (Codex-style) to let the model look things up.
+- Enable with `--web-search cached` (cached content; no live internet) or `--web-search live` (allows live internet access; provider-controlled).
+- Default is `--web-search off`.
+- Requires the Responses API. If you force `--wire-api chat` (or the provider forces a fallback to Chat Completions), web search is not sent.
+
+Session Artifacts (File Writes)
+- The agent can write helper files into a per-session artifacts folder (for intermediate outputs or hand-off files) using:
+  - `artifact_write_text` (UTF-8 text)
+  - `artifact_write_json` (JSON)
+  - `artifact_write_bytes_base64` (binary)
+- Safety: these tools only accept **relative paths** and always write under `<session>/artifacts` (they cannot write outside the session).
+- Privacy: session logs redact file contents; tool-call args store only size + sha256 digests for debugging.
+- Phase rule: artifacts writes are allowed in Executor; the Planner phase remains read-only.
+
 No Other CLI Commands
 - All actions happen through chat. Ask to load data, set keys, play/pause, save, or export and the agent will call the right tools under the hood.
 
@@ -331,7 +346,7 @@ Default look/aim policy
 This is the agent-facing “policy matrix” for camera authoring tools. The goal is to keep the model choosing **intent knobs** (key density, aim behavior, visibility constraints) rather than low-level interpolation representations that can silently change semantics.
 
 Terminology (avoid ambiguity)
-- **Key easing**: per-key transition type (e.g., `Linear`, `EaseInOut`, `Switch`). This is what `easing=` controls in agent tools.
+- **Key easing**: per-key transition type (Qt/QEasingCurve names, e.g., `Linear`, `InOutQuad` (ease-in-out), `Switch`). This is what `easing=` controls in agent tools.
 - **Camera interpolation**: Atlas evaluates camera keys using a stable look-at + distance convention (interpolates look-at target + view distance + orientation).
 
 Hard rule (representation safety)

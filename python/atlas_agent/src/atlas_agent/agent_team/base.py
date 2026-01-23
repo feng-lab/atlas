@@ -570,7 +570,17 @@ class LLMClient:
             )
             # Normalize to Chat Completions wire shape + apply provider-border
             # schema tightening for strict validators.
-            chat_tools = normalize_tools_for_chat_completions_api(tools)
+            #
+            # Important: The Chat Completions API does not reliably accept non-function
+            # tool specs (e.g., Responses built-ins like {"type":"web_search"}). Filter
+            # to function tools only to avoid provider errors when the agent is
+            # configured to use (or falls back to) Chat Completions.
+            chat_tools_in = [
+                t
+                for t in (tools or [])
+                if isinstance(t, dict) and str(t.get("type") or "") == "function"
+            ]
+            chat_tools = normalize_tools_for_chat_completions_api(chat_tools_in)
 
             chat_params: dict[str, Any] = {
                 "model": self.model,

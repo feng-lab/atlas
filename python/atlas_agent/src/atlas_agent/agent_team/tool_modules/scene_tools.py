@@ -681,7 +681,18 @@ TOOLS: List[Tool] = [
                     "description": "Candidate JSON value (native types)",
                     "anyOf": [
                         {"type": "object"},
-                        {"type": "array", "items": {}},
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                    "null",
+                                    "object",
+                                ]
+                            },
+                        },
                         {"type": "number"},
                         {"type": "string"},
                         {"type": "boolean"},

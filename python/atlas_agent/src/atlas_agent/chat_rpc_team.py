@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
 import mimetypes
@@ -26,6 +27,7 @@ from .defaults import (
     CONTEXT_COMPACTION_RECENT_TOOL_EVENTS,
     DEFAULT_EXECUTOR_MAX_ROUNDS,
     DEFAULT_PLANNER_MAX_ROUNDS,
+    DEFAULT_WEB_SEARCH_MODE,
     INTENT_RESOLVER_SCENE_SNAPSHOT_MAX_CHARS,
     MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL,
     SESSION_MAX_RECENT_MESSAGES,
@@ -98,6 +100,12 @@ ATLAS_OUTPUT_TOOLS: set[str] = {
     # Declares the run blocked and short-circuits further execution; treat as output.
     # (Allowed in Executor, disallowed in Planner.)
     "report_blocked",
+}
+
+ARTIFACT_WRITE_TOOLS: set[str] = {
+    "artifact_write_text",
+    "artifact_write_json",
+    "artifact_write_bytes_base64",
 }
 
 SESSION_MUTATION_TOOLS: set[str] = {
@@ -275,6 +283,7 @@ class ChatTeam:
     api_key: str
     model: str
     wire_api: str = "auto"
+    web_search_mode: str = DEFAULT_WEB_SEARCH_MODE
     temperature: float | None = None
     reasoning_effort: str | None = "high"
     max_rounds_planner: int = DEFAULT_PLANNER_MAX_ROUNDS
@@ -403,6 +412,7 @@ class ChatTeam:
                 address=self.address,
                 model=self.model,
                 wire_api=self.wire_api,
+                web_search_mode=str(self.web_search_mode or DEFAULT_WEB_SEARCH_MODE),
                 temperature=self.temperature,
                 reasoning_effort=self.reasoning_effort,
                 max_rounds_planner=int(self.max_rounds_planner),
@@ -606,8 +616,10 @@ class ChatTeam:
             try:
                 n_recent = max(0, int(SESSION_MEMORY_RECENT_WRITE_EVENTS))
                 if n_recent > 0:
-                    write_tools = set(ATLAS_STATE_MUTATION_TOOLS) | set(
-                        ATLAS_OUTPUT_TOOLS
+                    write_tools = (
+                        set(ATLAS_STATE_MUTATION_TOOLS)
+                        | set(ATLAS_OUTPUT_TOOLS)
+                        | set(ARTIFACT_WRITE_TOOLS)
                     )
                     recent_tool_events = self.session_store.tail_events(
                         limit=max(1, n_recent * 3), event_type="tool_call"
@@ -1429,6 +1441,27 @@ class ChatTeam:
             runtime_state=runtime_state,
             codegen_enabled=bool(self.enable_codegen),
         )
+        # Optional: Responses API built-in web search tool (Codex-style).
+        #
+        # Note: this is a non-function tool (handled by the provider), so it does not
+        # participate in our dispatcher allowlist. We gate it by an explicit CLI flag.
+        web_search_tool: dict[str, Any] | None = None
+        try:
+            wsm = str(self.web_search_mode or DEFAULT_WEB_SEARCH_MODE).strip().lower()
+        except Exception:
+            wsm = str(DEFAULT_WEB_SEARCH_MODE).strip().lower()
+        if wsm in {"cached"}:
+            web_search_tool = {"type": "web_search", "external_web_access": False}
+        elif wsm in {"live"}:
+            web_search_tool = {"type": "web_search", "external_web_access": True}
+        elif wsm in {"off", "disabled", "0", "false", "no", ""}:
+            web_search_tool = None
+        else:
+            # Fail safe: unknown mode disables web search.
+            web_search_tool = None
+
+        if web_search_tool is not None:
+            tools = list(tools or []) + [web_search_tool]
 
         full_log_tools = (
             set(ATLAS_STATE_MUTATION_TOOLS)
@@ -1463,6 +1496,13 @@ class ChatTeam:
                             "error": f"tool '{name}' is not allowed in phase={ph}",
                         }
                     )
+                if name in ARTIFACT_WRITE_TOOLS:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": f"tool '{name}' is not allowed in phase={ph}",
+                        }
+                    )
 
             result_json = dispatch(name, args_json or "{}")
             try:
@@ -1473,6 +1513,41 @@ class ChatTeam:
                 res_obj = json.loads(result_json or "{}")
             except Exception:
                 res_obj = {"raw": result_json}
+
+            # Avoid persisting large/sensitive payloads (e.g., file contents) into the
+            # append-only session.jsonl tool args. Keep a stable digest instead.
+            try:
+                if name in ARTIFACT_WRITE_TOOLS and isinstance(args_obj, dict):
+                    redacted = dict(args_obj)
+                    if name == "artifact_write_text":
+                        text = redacted.pop("text", None)
+                        if isinstance(text, str):
+                            data = text.encode("utf-8", errors="replace")
+                            redacted["text_bytes"] = int(len(data))
+                            redacted["text_sha256"] = hashlib.sha256(data).hexdigest()
+                        elif text is not None:
+                            redacted["text_kind"] = type(text).__name__
+                    elif name == "artifact_write_json":
+                        data_obj = redacted.pop("data", None)
+                        try:
+                            stable = json.dumps(
+                                data_obj, ensure_ascii=False, sort_keys=True
+                            ).encode("utf-8", errors="replace")
+                            redacted["data_bytes"] = int(len(stable))
+                            redacted["data_sha256"] = hashlib.sha256(stable).hexdigest()
+                        except Exception:
+                            redacted["data_kind"] = type(data_obj).__name__
+                    elif name == "artifact_write_bytes_base64":
+                        b64 = redacted.pop("data_base64", None)
+                        if isinstance(b64, str):
+                            raw = b64.encode("ascii", errors="ignore")
+                            redacted["data_base64_bytes"] = int(len(raw))
+                            redacted["data_base64_sha256"] = hashlib.sha256(raw).hexdigest()
+                        elif b64 is not None:
+                            redacted["data_base64_kind"] = type(b64).__name__
+                    args_obj = redacted
+            except Exception:
+                pass
 
             policy = "full" if name in full_log_tools else "summary"
             ok = True
@@ -2138,11 +2213,43 @@ class ChatTeam:
                         # UI callbacks must not break tool execution.
                         pass
 
+            def _persist_web_search_call_and_forward(
+                call: dict[str, Any], call_index: int
+            ) -> None:
+                try:
+                    action = call.get("action") if isinstance(call, dict) else None
+                    entry: dict[str, Any] = {
+                        "type": "web_search",
+                        "turn_id": turn_id,
+                        "phase": phase,
+                        "call_index": int(call_index),
+                        "mode": str(self.web_search_mode or DEFAULT_WEB_SEARCH_MODE),
+                        "call": call if isinstance(call, dict) else {"raw": str(call)},
+                    }
+                    if isinstance(action, dict):
+                        at = str(action.get("type") or "").strip()
+                        if at:
+                            entry["action_type"] = at
+                        for k in ("query", "url", "pattern"):
+                            v = action.get(k)
+                            if isinstance(v, str) and v.strip():
+                                entry[k] = v.strip()
+                    self.session_store.append_event(entry)
+                except Exception:
+                    pass
+                if callbacks is not None and callbacks.on_web_search_call is not None:
+                    try:
+                        callbacks.on_web_search_call(call, call_index)
+                    except Exception:
+                        # UI callbacks must not break tool execution.
+                        pass
+
             phase_callbacks = ToolLoopCallbacks(
                 on_reasoning_summary_delta=_capture_reasoning_delta,
                 on_reasoning_summary_part_added=_capture_reasoning_part_added,
                 on_reasoning_summary_complete=_persist_reasoning_summary_complete,
                 on_response_meta=_persist_response_meta_and_forward,
+                on_web_search_call=_persist_web_search_call_and_forward,
                 on_assistant_text_delta=(
                     callbacks.on_assistant_text_delta if callbacks else None
                 ),
@@ -3298,6 +3405,8 @@ class ChatTeam:
             planner_tools = _filter_tools(
                 read_only_tool_names | set(SESSION_MUTATION_TOOLS)
             )
+            if web_search_tool is not None:
+                planner_tools = list(planner_tools) + [web_search_tool]
             planner_res = _run_phase(
                 phase="Planner",
                 instructions=ATLAS_PLANNER_SYSTEM_PROMPT,
@@ -3462,6 +3571,7 @@ def run_repl(
     api_key: str,
     model: str,
     wire_api: str = "auto",
+    web_search_mode: str = DEFAULT_WEB_SEARCH_MODE,
     temperature: float | None = None,
     reasoning_effort: str | None = "high",
     max_rounds_planner: int = DEFAULT_PLANNER_MAX_ROUNDS,
@@ -3487,6 +3597,7 @@ def run_repl(
         api_key=api_key,
         model=model,
         wire_api=wire_api,
+        web_search_mode=str(web_search_mode or DEFAULT_WEB_SEARCH_MODE),
         temperature=temperature,
         reasoning_effort=reasoning_effort,
         max_rounds_planner=int(max_rounds_planner),

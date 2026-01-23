@@ -1547,31 +1547,38 @@ class SceneClient:
         for w in waypoints or []:
             if not isinstance(w, dict):
                 raise ValueError("each waypoint must be an object")
-            tm = float(w.get("time", 0.0))
+            if w.get("time") is None:
+                raise ValueError("waypoint.time is required")
+            tm = float(w.get("time"))
             kw: dict[str, Any] = {"time": tm}
 
             eye = w.get("eye")
             if isinstance(eye, dict):
-                if "world" in eye:
-                    x, y, z = eye["world"]
+                world = eye.get("world")
+                frac = eye.get("bbox_fraction")
+                if world is not None:
+                    x, y, z = world
                     kw["world_eye"] = self._pb2.Vec3(x=float(x), y=float(y), z=float(z))
-                elif "bbox_fraction" in eye:
-                    x, y, z = eye["bbox_fraction"]
+                elif frac is not None:
+                    x, y, z = frac
                     kw["bbox_fraction_eye"] = self._pb2.Vec3(
                         x=float(x), y=float(y), z=float(z)
                     )
 
             look = w.get("look_at")
             if isinstance(look, dict):
-                if "world" in look:
-                    x, y, z = look["world"]
+                world = look.get("world")
+                frac = look.get("bbox_fraction")
+                bbox_center = look.get("bbox_center") is True
+                if world is not None:
+                    x, y, z = world
                     kw["world_look_at"] = self._pb2.Vec3(
                         x=float(x), y=float(y), z=float(z)
                     )
-                elif look.get("bbox_center") is True:
+                elif bbox_center:
                     kw["look_at_bbox_center"] = True
-                elif "bbox_fraction" in look:
-                    x, y, z = look["bbox_fraction"]
+                elif frac is not None:
+                    x, y, z = frac
                     kw["bbox_fraction_look_at"] = self._pb2.Vec3(
                         x=float(x), y=float(y), z=float(z)
                     )

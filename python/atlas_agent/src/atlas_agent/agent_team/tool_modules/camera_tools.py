@@ -5,6 +5,70 @@ from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
 from .preconditions import require_engine_ready
 
+VEC3_NUMBER_SCHEMA: Dict[str, Any] = {
+    "type": "array",
+    "items": {"type": "number"},
+    "minItems": 3,
+    "maxItems": 3,
+}
+
+VEC3_NUMBER_OR_NULL_SCHEMA: Dict[str, Any] = {
+    **VEC3_NUMBER_SCHEMA,
+    "type": ["array", "null"],
+}
+
+CAMERA_PATH_WAYPOINT_EYE_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": "Waypoint eye position. Exactly one of world or bbox_fraction should be non-null.",
+    "properties": {
+        "world": {
+            **VEC3_NUMBER_OR_NULL_SCHEMA,
+            "description": "Absolute world-space eye [x,y,z].",
+        },
+        "bbox_fraction": {
+            **VEC3_NUMBER_OR_NULL_SCHEMA,
+            "description": "Fractions [fx,fy,fz] in [0..1] inside the target bbox of ids (or all visual objects).",
+        },
+    },
+}
+
+CAMERA_PATH_WAYPOINT_LOOK_AT_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": "Waypoint look-at target. Exactly one of world, bbox_center, or bbox_fraction should be set.",
+    "properties": {
+        "world": {
+            **VEC3_NUMBER_OR_NULL_SCHEMA,
+            "description": "Absolute world-space look_at target [x,y,z].",
+        },
+        "bbox_center": {
+            "type": ["boolean", "null"],
+            "description": "When true, aim at the bbox center of ids (or all visual objects).",
+        },
+        "bbox_fraction": {
+            **VEC3_NUMBER_OR_NULL_SCHEMA,
+            "description": "Fractions [fx,fy,fz] in [0..1] inside the target bbox of ids (or all visual objects).",
+        },
+    },
+}
+
+CAMERA_PATH_WAYPOINT_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": "Waypoint: {time, eye?, look_at?}. eye/look_at may be omitted (null).",
+    "properties": {
+        "time": {"type": "number", "description": "Waypoint time in seconds."},
+        "eye": {
+            "type": ["object", "null"],
+            "description": "Optional: eye position (world or bbox_fraction).",
+            "properties": CAMERA_PATH_WAYPOINT_EYE_SCHEMA["properties"],
+        },
+        "look_at": {
+            "type": ["object", "null"],
+            "description": "Optional: look-at target (world / bbox_center / bbox_fraction).",
+            "properties": CAMERA_PATH_WAYPOINT_LOOK_AT_SCHEMA["properties"],
+        },
+    },
+}
+
 def _tool_handler(tool_name: str):
     def _call(args: dict[str, Any], ctx: ToolDispatchContext):
         return handle(tool_name, args, ctx)
@@ -140,7 +204,11 @@ TOOLS: List[Tool] = [
                 "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional target ids for bbox computations (fractions/center). Empty → all visual objects."},
                 "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false) for bbox-derived points."},
                 "base_value": {"type": "object", "description": "Optional typed camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted."},
-                "waypoints": {"type": "array", "items": {"type": "object"}, "description": "Waypoints: [{time, eye?:{world:[x,y,z]|bbox_fraction:[fx,fy,fz]}, look_at?:{world:[x,y,z]|bbox_center:true|bbox_fraction:[fx,fy,fz]}}]."},
+                "waypoints": {
+                    "type": "array",
+                    "items": CAMERA_PATH_WAYPOINT_SCHEMA,
+                    "description": "Waypoints: [{time, eye?, look_at?}]. Prefer bbox_fraction coordinates for dataset-scale invariant paths.",
+                },
             },
             "required": ["waypoints"],
         },

@@ -31,12 +31,147 @@ JSON_VALUE_SCHEMA: Dict[str, Any] = {
     # schema that can be an array.
     "anyOf": [
         {"type": "object"},
-        {"type": "array", "items": {}},
+        {
+            "type": "array",
+            "items": {
+                "type": ["string", "number", "boolean", "null", "object"]
+            },
+        },
         {"type": "number"},
         {"type": "string"},
         {"type": "boolean"},
         {"type": "null"},
     ],
+}
+
+VEC3_NUMBER_SCHEMA: Dict[str, Any] = {
+    "type": "array",
+    "items": {"type": "number"},
+    "minItems": 3,
+    "maxItems": 3,
+}
+
+VEC3_NUMBER_OR_NULL_SCHEMA: Dict[str, Any] = {
+    **VEC3_NUMBER_SCHEMA,
+    "type": ["array", "null"],
+}
+
+CAMERA_WAYPOINT_EYE_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": "Waypoint eye position. Exactly one of world or bbox_fraction should be non-null.",
+    "properties": {
+        "world": {
+            **VEC3_NUMBER_OR_NULL_SCHEMA,
+            "description": "Absolute world-space eye [x,y,z].",
+        },
+        "bbox_fraction": {
+            **VEC3_NUMBER_OR_NULL_SCHEMA,
+            "description": "Fractions [fx,fy,fz] in [0..1] inside the target bbox of ids (or all visual objects).",
+        },
+    },
+}
+
+CAMERA_WAYPOINT_LOOK_AT_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": "Waypoint look-at target. Exactly one of world, bbox_center, or bbox_fraction should be set.",
+    "properties": {
+        "world": {
+            **VEC3_NUMBER_OR_NULL_SCHEMA,
+            "description": "Absolute world-space look_at target [x,y,z].",
+        },
+        "bbox_center": {
+            "type": ["boolean", "null"],
+            "description": "When true, aim at the bbox center of ids (or all visual objects).",
+        },
+        "bbox_fraction": {
+            **VEC3_NUMBER_OR_NULL_SCHEMA,
+            "description": "Fractions [fx,fy,fz] in [0..1] inside the target bbox of ids (or all visual objects).",
+        },
+    },
+}
+
+CAMERA_SPLINE_WAYPOINT_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": (
+        "Spline waypoint for camera solving.\n"
+        "Timing: provide either time (seconds) or u (0..1) and set the other to null.\n"
+        "Position: eye and look_at may be omitted (null). When look_at is omitted, look_at_policy controls filling."
+    ),
+    "properties": {
+        "time": {
+            "type": ["number", "null"],
+            "description": "Absolute time (seconds) for this waypoint. Use null when using u.",
+        },
+        "u": {
+            "type": ["number", "null"],
+            "description": "Normalized time in [0,1] within [t0,t1]. Use null when using time.",
+        },
+        "eye": {
+            "type": ["object", "null"],
+            "description": "Optional: eye position (world or bbox_fraction).",
+            "properties": CAMERA_WAYPOINT_EYE_SCHEMA["properties"],
+        },
+        "look_at": {
+            "type": ["object", "null"],
+            "description": "Optional: look-at target (world / bbox_center / bbox_fraction).",
+            "properties": CAMERA_WAYPOINT_LOOK_AT_SCHEMA["properties"],
+        },
+    },
+}
+
+WALKTHROUGH_MOVE_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": (
+        "Local move directive in bbox-radius fractions. Keys may be omitted or null. "
+        "Supported keys: forward, back, right, left, up, down."
+    ),
+    "properties": {
+        "forward": {"type": ["number", "null"]},
+        "back": {"type": ["number", "null"]},
+        "right": {"type": ["number", "null"]},
+        "left": {"type": ["number", "null"]},
+        "up": {"type": ["number", "null"]},
+        "down": {"type": ["number", "null"]},
+    },
+}
+
+WALKTHROUGH_ROTATE_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": "Local rotation directive in degrees. Keys may be omitted or null. Supported keys: yaw, pitch, roll.",
+    "properties": {
+        "yaw": {"type": ["number", "null"]},
+        "pitch": {"type": ["number", "null"]},
+        "roll": {"type": ["number", "null"]},
+    },
+}
+
+WALKTHROUGH_SEGMENT_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": (
+        "Walkthrough segment.\n"
+        "Timing: use exactly one of (u0/u1) OR (duration) OR neither (equal split).\n"
+        "Motion: use move and/or rotate, or pause=true.\n"
+        "Templates: optional internal templates ('enter', 'turn_right', 'pause') expand into concrete move/rotate."
+    ),
+    "properties": {
+        "u0": {"type": ["number", "null"], "description": "Normalized start time in [0,1] (requires u1)."},
+        "u1": {"type": ["number", "null"], "description": "Normalized end time in [0,1] (requires u0)."},
+        "duration": {"type": ["number", "null"], "description": "Segment duration in seconds (relative; normalized across segments)."},
+        "pause": {"type": ["boolean", "null"], "description": "When true, hold pose for the segment duration."},
+        "move": {"type": ["object", "null"], "properties": WALKTHROUGH_MOVE_SCHEMA["properties"]},
+        "rotate": {"type": ["object", "null"], "properties": WALKTHROUGH_ROTATE_SCHEMA["properties"]},
+        "template": {
+            "type": ["string", "null"],
+            "description": "Optional internal template: enter|turn_right|pause (plus aliases). Null disables templating.",
+        },
+        "amount": {
+            "type": ["string", "number", "null"],
+            "description": "Optional template amount (e.g., 'small'|'medium' or a numeric override).",
+        },
+        "distance": {"type": ["number", "null"], "description": "Optional template distance override (bbox-radius fraction)."},
+        "degrees": {"type": ["number", "null"], "description": "Optional template degrees override."},
+        "label": {"type": ["string", "null"], "description": "Optional label for debugging/inspection."},
+    },
 }
 
 ANIMATION_ID_PARAM_SCHEMA: Dict[str, Any] = {
@@ -53,7 +188,7 @@ ANIMATION_BATCH_SET_KEY_ENTRY_SCHEMA: Dict[str, Any] = {
         "- json_key: parameter json_key (resolve via scene_list_params)\n"
         "- time: seconds\n"
         "- value: typed JSON value for the parameter\n"
-        "- easing: easing curve name (Linear/EaseInOut/Switch)"
+        "- easing: easing type (Qt/QEasingCurve name, e.g. Linear/InOutQuad/Switch)"
     ),
     "properties": {
         "id": {
@@ -66,7 +201,7 @@ ANIMATION_BATCH_SET_KEY_ENTRY_SCHEMA: Dict[str, Any] = {
         "easing": {
             "type": "string",
             "default": "Linear",
-            "description": "Easing curve (Linear/EaseInOut/Switch).",
+            "description": "Easing type (Qt/QEasingCurve name, e.g. Linear/InOutQuad/Switch).",
         },
     },
     "required": ["id", "json_key", "time", "value"],
@@ -100,6 +235,39 @@ def _tool_handler(tool_name: str):
     return _call
 
 
+def _normalize_easing_name(raw: Any) -> str:
+    """Normalize common easing aliases to Atlas/Qt canonical option strings."""
+
+    s = str(raw or "").strip()
+    if not s:
+        return "Linear"
+
+    key = s.lower().replace("_", "").replace("-", "").replace(" ", "")
+
+    # Canonical case normalization for common Qt/QEasingCurve names.
+    canonical_by_key: dict[str, str] = {
+        "linear": "Linear",
+        "switch": "Switch",
+        "inquad": "InQuad",
+        "outquad": "OutQuad",
+        "inoutquad": "InOutQuad",
+    }
+    if key in canonical_by_key:
+        return canonical_by_key[key]
+
+    # Common agent/UX aliases (not Qt names).
+    alias_by_key: dict[str, str] = {
+        "easein": "InQuad",
+        "easeout": "OutQuad",
+        "easeinout": "InOutQuad",
+    }
+    if key in alias_by_key:
+        return alias_by_key[key]
+
+    # Unknown: pass through (server will validate).
+    return s
+
+
 TOOLS: List[Tool] = [
     tool_from_schema(
         name="animation_describe_file",
@@ -131,7 +299,7 @@ TOOLS: List[Tool] = [
             "Primary knobs:\n"
             "- Smoothness: ORBIT uses max_step_degrees (smaller → more keys → smoother). DOLLY uses more keys/windows.\n"
             "- Framing vs exploration: constraints.keep_visible=true for exterior presentation; false for interior flythroughs.\n"
-            "- Timing feel: easing changes per-key timing curves only (Linear/EaseInOut/Switch).\n\n"
+            "- Timing feel: easing changes per-key timing curves only (Qt/QEasingCurve names like Linear/InOutQuad/Switch).\n\n"
             "If the result looks wrong:\n"
             "- ORBIT: usually wrong ids/target selection, or keys too sparse → lower max_step_degrees.\n"
             "- DOLLY: if you wanted an arc (move+rotate), use waypoints/walkthrough instead of DOLLY.\n\n"
@@ -150,7 +318,7 @@ TOOLS: List[Tool] = [
                 "degrees": {"type": "number", "description": "ORBIT: total rotation in degrees (default 360)."},
                 "max_step_degrees": {"type": "number", "description": "ORBIT: maximum degrees per solver step (controls key density). Smaller values produce more keys and smoother motion. Default 90."},
                 "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
-                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (e.g., Linear/EaseInOut/Switch). This affects per-key timing curves and is separate from camera interpolation."},
+                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing curves and is separate from camera interpolation."},
                 "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys."},
             },
             "required": ["animation_id", "mode", "ids", "t0", "t1"],
@@ -188,9 +356,13 @@ TOOLS: List[Tool] = [
                 "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox for bbox-fraction waypoints."},
                 "t0": {"type": "number", "description": "Start time (seconds)."},
                 "t1": {"type": "number", "description": "End time (seconds)."},
-                "waypoints": {"type": "array", "items": {"type": "object"}, "description": "Waypoints with either absolute time or normalized u in [0,1]. Each waypoint: {u?:number, time?:number, eye?:{world:[x,y,z]|bbox_fraction:[fx,fy,fz]}, look_at?:{world:[x,y,z]|bbox_center:true|bbox_fraction:[fx,fy,fz]}}. If look_at is omitted, the solver preserves the previous view direction and center distance."},
+                "waypoints": {
+                    "type": "array",
+                    "items": CAMERA_SPLINE_WAYPOINT_SCHEMA,
+                    "description": "Waypoints (time or u + optional eye/look_at). Prefer bbox_fraction coordinates for dataset-scale invariant paths.",
+                },
                 "look_at_policy": {"type": "string", "enum": ["preserve_direction", "bbox_center"], "default": "preserve_direction", "description": "How to handle waypoints that omit look_at. preserve_direction keeps the current view direction; bbox_center fills missing look_at with bbox_center:true."},
-                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (e.g., Linear/EaseInOut/Switch). This does not change the waypoint geometry; it only affects per-key transition timing."},
+                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This does not change the waypoint geometry; it only affects per-key transition timing."},
                 "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys."},
                 "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
                 "constraints": {"type": "object", "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement)."},
@@ -229,10 +401,14 @@ TOOLS: List[Tool] = [
                 "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox for bbox-scaled movement."},
                 "t0": {"type": "number", "description": "Start time (seconds)."},
                 "t1": {"type": "number", "description": "End time (seconds)."},
-                "segments": {"type": "array", "items": {"type": "object"}, "description": "Motion segments. Each segment may include: u0/u1 (0..1) OR duration (seconds) OR neither (equal split); move: {forward?, back?, right?, left?, up?, down?} (fractions of bbox radius; signed values allowed); rotate: {yaw?, pitch?, roll?} (degrees); pause:true; template:'enter'|'turn_right'|'pause'; amount/distance/degrees; label."},
+                "segments": {
+                    "type": "array",
+                    "items": WALKTHROUGH_SEGMENT_SCHEMA,
+                    "description": "Walkthrough segments (timed by u0/u1, duration, or equal split). Move distances are bbox-radius fractions; rotations are degrees.",
+                },
                 "step_seconds": {"type": "number", "default": 1.0, "description": "Sampling step used to approximate motion inside each segment. Smaller → more keys (smoother curved motion)."},
                 "look_at_policy": {"type": "string", "enum": ["preserve_direction", "bbox_center"], "default": "preserve_direction", "description": "preserve_direction keeps first-person yaw/pitch look control; bbox_center keeps aiming at the target bbox center (third-person track), interpreting yaw/pitch as azimuth/elevation around the center."},
-                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (e.g., Linear/EaseInOut/Switch). This affects per-key timing, not the sampled path geometry."},
+                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing, not the sampled path geometry."},
                 "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys."},
                 "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
                 "constraints": {"type": "object", "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement)."},
@@ -328,7 +504,7 @@ TOOLS: List[Tool] = [
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
                 "time": {"type": "number"},
-                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (e.g., Linear/EaseInOut/Switch). This affects per-key timing curves and is separate from camera interpolation."},
+                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing curves and is separate from camera interpolation."},
                 "value": {"type": "object"},
                 "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional ids for camera validation. When omitted/empty, uses fit_candidates()."},
                 "constraints": {"type": "object", "description": "Optional camera validation constraints. When omitted, defaults to keep_visible=true and min_coverage=0.95."},
@@ -747,7 +923,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         name_str = str(args.get("name", ""))
         type_hint = args.get("type_hint")
         time_v = float(args.get("time", 0.0))
-        easing = str(args.get("easing", "Linear"))
+        easing = _normalize_easing_name(args.get("easing"))
         value_native = args.get("value")
         # Resolve param json_key by name and optional type
         pl = client.list_params(id=id)
@@ -874,7 +1050,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             )
         json_key = str(args.get("json_key"))
         time_v = float(args.get("time", 0.0))
-        easing = str(args.get("easing", "Linear"))
+        easing = _normalize_easing_name(args.get("easing"))
         value = args.get("value")
         tol = float(args.get("tolerance", 1e-3))
         # Verify parameter exists
@@ -918,7 +1094,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if animation_id <= 0:
             return json.dumps({"ok": False, "error": "animation_id is required"})
         time_v = float(args.get("time", 0.0))
-        easing = str(args.get("easing", "Linear"))
+        easing = _normalize_easing_name(args.get("easing"))
         value = args.get("value") or {}
         tol = float(args.get("tolerance", 1e-3))
         ids = args.get("ids") or []
@@ -1064,7 +1240,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         )
                     params["max_step_degrees"] = msd
             tol = float(args.get("tolerance", 1e-3))
-            easing = str(args.get("easing", "Linear"))
+            easing = _normalize_easing_name(args.get("easing"))
             clear_range = bool(args.get("clear_range", True))
             keys = client.camera_solve(
                 mode=mode_up,
@@ -1188,7 +1364,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 return json.dumps({"ok": False, "error": "waypoints must be a non-empty list"})
             if len(waypoints_in) < 2:
                 return json.dumps({"ok": False, "error": "at least 2 waypoints are required"})
-            easing = str(args.get("easing", "Linear"))
+            easing = _normalize_easing_name(args.get("easing"))
             tol = float(args.get("tolerance", 1e-3))
             if not math.isfinite(tol) or tol < 0.0:
                 return json.dumps({"ok": False, "error": "tolerance must be a finite number >= 0"})
@@ -1216,10 +1392,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     return json.dumps(
                         {"ok": False, "error": "each waypoint must be an object"}
                     )
-                if "time" in w:
-                    tm = float(w.get("time", 0.0))
-                elif "u" in w:
-                    u = float(w.get("u", 0.0))
+                time_raw = w.get("time")
+                u_raw = w.get("u")
+                if time_raw is not None:
+                    tm = float(time_raw)
+                elif u_raw is not None:
+                    u = float(u_raw)
                     if not math.isfinite(u) or u < 0.0 or u > 1.0:
                         return json.dumps(
                             {
@@ -1253,23 +1431,31 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 eye = w.get("eye")
                 if eye is not None:
                     if not isinstance(eye, dict):
-                        return json.dumps({"ok": False, "error": "waypoint.eye must be an object"})
-                    if ("world" in eye) and ("bbox_fraction" in eye):
+                        return json.dumps(
+                            {"ok": False, "error": "waypoint.eye must be an object or null"}
+                        )
+                    world_raw = eye.get("world")
+                    frac_raw = eye.get("bbox_fraction")
+                    modes = int(world_raw is not None) + int(frac_raw is not None)
+                    if modes == 0:
+                        # Treat a fully-null eye object as "omitted".
+                        pass
+                    elif modes != 1:
                         return json.dumps(
                             {
                                 "ok": False,
-                                "error": "waypoint.eye must have exactly one of: world | bbox_fraction",
+                                "error": "waypoint.eye must have exactly one non-null of: world | bbox_fraction",
                             }
                         )
-                    if "world" in eye:
-                        v = eye.get("world")
+                    elif world_raw is not None:
+                        v = world_raw
                         if not (isinstance(v, list) and len(v) == 3):
                             return json.dumps({"ok": False, "error": "eye.world must be [x,y,z]"})
                         if not all(math.isfinite(float(x)) for x in v):
                             return json.dumps({"ok": False, "error": "eye.world must contain finite numbers"})
                         entry["eye"] = {"world": [float(v[0]), float(v[1]), float(v[2])]}
-                    elif "bbox_fraction" in eye:
-                        v = eye.get("bbox_fraction")
+                    else:
+                        v = frac_raw
                         if not (isinstance(v, list) and len(v) == 3):
                             return json.dumps({"ok": False, "error": "eye.bbox_fraction must be [fx,fy,fz]"})
                         vv = [float(v[0]), float(v[1]), float(v[2])]
@@ -1287,26 +1473,38 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 look = w.get("look_at")
                 if look is not None:
                     if not isinstance(look, dict):
-                        return json.dumps({"ok": False, "error": "waypoint.look_at must be an object"})
-                    modes = int("world" in look) + int("bbox_fraction" in look) + int(look.get("bbox_center") is True)
-                    if modes != 1:
+                        return json.dumps(
+                            {"ok": False, "error": "waypoint.look_at must be an object or null"}
+                        )
+                    world_raw = look.get("world")
+                    frac_raw = look.get("bbox_fraction")
+                    bbox_center = look.get("bbox_center") is True
+                    modes = (
+                        int(world_raw is not None)
+                        + int(frac_raw is not None)
+                        + int(bbox_center)
+                    )
+                    if modes == 0:
+                        # Treat a fully-null look_at object as "omitted".
+                        look = None
+                    elif modes != 1:
                         return json.dumps(
                             {
                                 "ok": False,
                                 "error": "waypoint.look_at must have exactly one of: world | bbox_center:true | bbox_fraction",
                             }
                         )
-                    if "world" in look:
-                        v = look.get("world")
+                    elif world_raw is not None:
+                        v = world_raw
                         if not (isinstance(v, list) and len(v) == 3):
                             return json.dumps({"ok": False, "error": "look_at.world must be [x,y,z]"})
                         if not all(math.isfinite(float(x)) for x in v):
                             return json.dumps({"ok": False, "error": "look_at.world must contain finite numbers"})
                         entry["look_at"] = {"world": [float(v[0]), float(v[1]), float(v[2])]}
-                    elif look.get("bbox_center") is True:
+                    elif bbox_center:
                         entry["look_at"] = {"bbox_center": True}
                     else:
-                        v = look.get("bbox_fraction")
+                        v = frac_raw
                         if not (isinstance(v, list) and len(v) == 3):
                             return json.dumps({"ok": False, "error": "look_at.bbox_fraction must be [fx,fy,fz]"})
                         vv = [float(v[0]), float(v[1]), float(v[2])]
@@ -1320,7 +1518,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                                 }
                             )
                         entry["look_at"] = {"bbox_fraction": vv}
-                elif look_at_policy == "bbox_center":
+
+                if ("look_at" not in entry) and (look_at_policy == "bbox_center"):
                     entry["look_at"] = {"bbox_center": True}
 
                 waypoints.append(entry)
@@ -1427,7 +1626,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             if not isinstance(segments_in, list) or not segments_in:
                 return json.dumps({"ok": False, "error": "segments must be a non-empty list"})
 
-            easing = str(args.get("easing", "Linear"))
+            easing = _normalize_easing_name(args.get("easing"))
             tol = float(args.get("tolerance", 1e-3))
             if not math.isfinite(tol) or tol < 0.0:
                 return json.dumps({"ok": False, "error": "tolerance must be a finite number >= 0"})
@@ -1475,8 +1674,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 return json.dumps({"ok": False, "error": f"segment template expansion failed: {e}"})
 
             span = float(t1 - t0)
-            any_u = any(("u0" in s) or ("u1" in s) for s in segs)
-            any_dur = any("duration" in s for s in segs)
+            any_u = any((s.get("u0") is not None) or (s.get("u1") is not None) for s in segs)
+            any_dur = any(s.get("duration") is not None for s in segs)
             if any_u and any_dur:
                 return json.dumps(
                     {
@@ -1489,15 +1688,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             if any_u:
                 explicit: list[tuple[float, float, dict[str, Any]]] = []
                 for s in segs:
-                    if ("u0" not in s) or ("u1" not in s):
+                    if (s.get("u0") is None) or (s.get("u1") is None):
                         return json.dumps(
                             {
                                 "ok": False,
                                 "error": "when using u0/u1 timing, every segment must include both u0 and u1",
                             }
                         )
-                    u0 = float(s.get("u0", 0.0))
-                    u1 = float(s.get("u1", 0.0))
+                    u0 = float(s.get("u0"))
+                    u1 = float(s.get("u1"))
                     if not (math.isfinite(u0) and math.isfinite(u1)):
                         return json.dumps({"ok": False, "error": "segment u0/u1 must be finite"})
                     if u0 < 0.0 or u1 < 0.0 or u0 > 1.0 or u1 > 1.0:
@@ -1528,14 +1727,14 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             elif any_dur:
                 durs: list[float] = []
                 for s in segs:
-                    if "duration" not in s:
+                    if s.get("duration") is None:
                         return json.dumps(
                             {
                                 "ok": False,
                                 "error": "when using duration timing, every segment must include duration",
                             }
                         )
-                    d = float(s.get("duration", 0.0))
+                    d = float(s.get("duration"))
                     if not math.isfinite(d) or d <= 0.0:
                         return json.dumps(
                             {
@@ -1593,6 +1792,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 right = 0.0
                 up = 0.0
                 for k, v in move.items():
+                    if v is None:
+                        continue
                     key = str(k or "").strip().lower()
                     val = _coerce_float(v, field=f"move.{k}")
                     if key in {"forward", "fwd"}:
@@ -1625,6 +1826,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 pitch = 0.0
                 roll = 0.0
                 for k, v in rot.items():
+                    if v is None:
+                        continue
                     key = str(k or "").strip().lower()
                     val = _coerce_float(v, field=f"rotate.{k}")
                     if key == "yaw":
@@ -2607,7 +2810,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             )
         json_key = args.get("json_key")
         time_v = float(args.get("time", 0.0))
-        easing = str(args.get("easing", "Linear"))
+        easing = _normalize_easing_name(args.get("easing"))
         value_native = args.get("value")
         # Resolve json_key via list_params by display name
         if not json_key:
@@ -2722,7 +2925,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         json_key = str(args.get("json_key"))
         times = args.get("times") or []
         value = args.get("value")
-        easing = str(args.get("easing", "Linear"))
+        easing = _normalize_easing_name(args.get("easing"))
         tol = float(args.get("tolerance", 1e-3))
         if not times:
             return json.dumps({"ok": False, "error": "times required"})
@@ -2806,6 +3009,17 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": "animation_id is required"})
         set_keys = args.get("set_keys") or []
         remove_keys = args.get("remove_keys") or []
+        # Normalize per-entry easing aliases (common LLM guesses like "ease-in-out").
+        if isinstance(set_keys, list):
+            for sk in set_keys:
+                if not isinstance(sk, dict):
+                    continue
+                if "easing" in sk:
+                    ez = sk.get("easing")
+                    if ez is None:
+                        sk.pop("easing", None)
+                    else:
+                        sk["easing"] = _normalize_easing_name(ez)
         if not set_keys and not remove_keys:
             return json.dumps(
                 {

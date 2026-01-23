@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .chat_rpc_team import ChatTeam
-from .defaults import DEFAULT_EXECUTOR_MAX_ROUNDS, DEFAULT_PLANNER_MAX_ROUNDS
+from .defaults import (
+    DEFAULT_EXECUTOR_MAX_ROUNDS,
+    DEFAULT_PLANNER_MAX_ROUNDS,
+    DEFAULT_WEB_SEARCH_MODE,
+)
 from .llm_usage import (
     LlmUsageDelta,
     LlmUsageTotals,
@@ -289,6 +293,7 @@ def run_console_repl(
     api_key: str,
     model: str,
     wire_api: str = "auto",
+    web_search_mode: str = DEFAULT_WEB_SEARCH_MODE,
     temperature: float | None = None,
     reasoning_effort: str | None = "high",
     max_rounds: int = DEFAULT_EXECUTOR_MAX_ROUNDS,
@@ -324,6 +329,7 @@ def run_console_repl(
         api_key=api_key,
         model=model,
         wire_api=wire_api,
+        web_search_mode=str(web_search_mode or DEFAULT_WEB_SEARCH_MODE),
         temperature=temperature,
         reasoning_effort=reasoning_effort,
         max_rounds_executor=int(max_rounds),
@@ -612,6 +618,22 @@ def run_console_repl(
             if name == "update_plan" and ok is True:
                 _render_plan(console=console, team=team)
 
+        def _on_web_search_call(call: dict[str, Any], _call_index: int) -> None:
+            action = call.get("action") if isinstance(call, dict) else None
+            if not isinstance(action, dict) or not action:
+                console.print(Text("\n→ web_search", style="cyan"))
+                return
+            at = str(action.get("type") or "").strip()
+            parts: list[str] = []
+            if at:
+                parts.append(at)
+            for k in ("query", "url", "pattern"):
+                v = action.get(k)
+                if isinstance(v, str) and v.strip():
+                    parts.append(f"{k}={v.strip()!r}")
+            suffix = (" " + " ".join(parts)) if parts else ""
+            console.print(Text(f"\n→ web_search{suffix}", style="cyan"))
+
         def _on_response_meta(resp: dict[str, Any], call_index: int) -> None:
             nonlocal printed_reasoning
 
@@ -695,6 +717,7 @@ def run_console_repl(
             on_reasoning_summary_delta=_on_reasoning_delta,
             on_reasoning_summary_part_added=_on_reasoning_part_added,
             on_response_meta=_on_response_meta,
+            on_web_search_call=_on_web_search_call,
             on_tool_call=_on_tool_call,
             on_tool_result=_on_tool_result,
         )

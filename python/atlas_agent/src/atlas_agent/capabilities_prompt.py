@@ -60,7 +60,7 @@ def build_atlas_agent_primer() -> str:
         "Camera interpolation: camera keys are always evaluated using a stable look-at + distance convention (interpolates the look-at target + view distance + orientation)."
     )
     lines.append(
-        "Key easing (Linear/EaseInOut/Switch) controls per-key timing curves and is separate from camera interpolation."
+        "Key easing controls per-key timing curves and is separate from camera interpolation. Common easing types include Linear, InOutQuad (ease-in-out), and Switch (hold)."
     )
     lines.append(
         "To make motion smoother: increase key density (ORBIT: lower max_step_degrees; walkthrough: lower step_seconds; waypoints: add intermediate waypoints)."

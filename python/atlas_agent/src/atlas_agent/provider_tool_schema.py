@@ -51,13 +51,27 @@ def normalize_tool_parameters_schema_for_provider(params: Any) -> dict[str, Any]
                 if isinstance(it, str):
                     types.add(it)
 
-        # Arrays: ensure items exists (empty schema is ok).
+        # Arrays: ensure items exists. Some strict validators also require items to
+        # declare a concrete (or union) type; use a safe superset when missing.
         if "array" in types:
             items = fixed.get("items")
             if items is None:
-                fixed["items"] = {}
+                items = {}
             else:
-                fixed["items"] = _tighten(items)
+                items = _tighten(items)
+            if isinstance(items, dict) and ("type" not in items) and not any(
+                comb in items for comb in ("anyOf", "oneOf", "allOf")
+            ):
+                # Keep permissive semantics while satisfying strict schema checkers.
+                items = dict(items)
+                items["type"] = [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null",
+                    "object",
+                ]
+            fixed["items"] = items
 
         # Structured objects: if properties is a dict (even empty), force strictness.
         if "object" in types and isinstance(fixed.get("properties"), dict):

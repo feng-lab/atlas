@@ -281,6 +281,36 @@ def _extract_function_calls(output_items: list[dict[str, Any]]) -> list[dict[str
     return calls
 
 
+def _extract_web_search_calls(output_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Extract web_search_call output items (Responses API built-in tool).
+
+    The exact payload varies by provider and SDK version. We keep this very
+    small and only surface the action + status for logging/telemetry-free UX.
+    """
+
+    calls: list[dict[str, Any]] = []
+    for item in output_items or []:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("type") or "") != "web_search_call":
+            continue
+        status = item.get("status")
+        if not isinstance(status, str) or not status.strip():
+            status = None
+        action_in = item.get("action")
+        action: dict[str, Any] = {}
+        if isinstance(action_in, dict):
+            at = str(action_in.get("type") or "").strip()
+            if at:
+                action["type"] = at
+            for k in ("query", "url", "pattern"):
+                v = action_in.get(k)
+                if isinstance(v, str) and v.strip():
+                    action[k] = v.strip()
+        calls.append({"status": status, "action": action})
+    return calls
+
+
 def _coerce_output_items(resp: dict[str, Any]) -> list[dict[str, Any]]:
     out = resp.get("output")
     if not isinstance(out, list):
@@ -399,6 +429,11 @@ class ToolLoopCallbacks:
     )
     on_tool_result: Callable[[str, str, str], None] | None = (
         None  # (name, call_id, result_json)
+    )
+    # Called once per web search invocation observed in a model call.
+    # Payload is a small dict: {"status":..., "action":{"type":"search|open_page|find_in_page", ...}}.
+    on_web_search_call: Callable[[dict[str, Any], int], None] | None = (
+        None  # (web_search_call, call_index)
     )
 
 
@@ -743,6 +778,18 @@ def run_responses_tool_loop(
                 pass
 
         output_items = _coerce_output_items(resp)
+        # Web search (provider built-in): log calls for UI/session history. This
+        # does not require local dispatch and does not drive the tool loop.
+        if cb.on_web_search_call is not None:
+            try:
+                for ws in _extract_web_search_calls(output_items):
+                    try:
+                        cb.on_web_search_call(ws, int(_round))
+                    except Exception:
+                        # Web-search callbacks must not break tool execution.
+                        pass
+            except Exception:
+                pass
         # Persist output items into the loop input (full local history).
         for item in output_items:
             sanitized = _sanitize_response_item(item)

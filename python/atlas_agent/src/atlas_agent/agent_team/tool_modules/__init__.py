@@ -2,6 +2,7 @@ from typing import Any, Dict, List
 
 from ...tool_registry import Tool
 from . import (
+    artifact_tools,
     animation_tools,
     camera_tools,
     docs_tools,
@@ -17,6 +18,7 @@ ALL_MODULES = [
     general_tools,
     plan_tools,
     verification_tools,
+    artifact_tools,
     session_tools,
     scene_tools,
     camera_tools,

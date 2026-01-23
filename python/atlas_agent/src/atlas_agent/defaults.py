@@ -96,3 +96,12 @@ DEFAULT_FS_HINT_RESOLVE_MAX_DEPTH = -1
 DEFAULT_CODEGEN_TIMEOUT_SEC = 120.0
 DEFAULT_CODEGEN_MAX_ECHO_CHARS = 4000
 DEFAULT_CODEGEN_STDIO_PREVIEW_CHARS = 8000
+
+
+# Web search tool (Responses API built-in)
+#
+# Disabled by default for determinism and privacy. Enable via `--web-search`.
+# When enabled:
+# - "cached": uses provider cached content (no live internet access)
+# - "live": allows live internet access (provider-controlled)
+DEFAULT_WEB_SEARCH_MODE = "off"  # "off" | "cached" | "live"
