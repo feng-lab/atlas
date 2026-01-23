@@ -295,6 +295,9 @@ service Scene {
   // New typed camera planning and validation
   rpc CameraSolve (CameraSolveRequest) returns (CameraSolveResponse);
   rpc CameraValidate (CameraValidateRequest) returns (CameraValidateResponse);
+  // Sample the evaluated camera value(s) from an Animation3D at specific time(s),
+  // without mutating the engine time or writing keys.
+  rpc CameraSample(CameraSampleRequest) returns (CameraSampleResponse);
   rpc FitCandidates (Empty) returns (FitCandidatesResponse);
   // Scene state helpers
   rpc SetVisibility (VisibilityRequest) returns (Bool);
@@ -411,7 +414,8 @@ message CameraPointToRequest {
 message CameraRotateRequest {
   string op = 1;                // "AZIMUTH"|"ELEVATION"|"ROLL"|"YAW"|"PITCH"|"FLIP"
   double degrees = 2;           // used for rotation ops (ignored for FLIP)
-  google.protobuf.Value base_value = 3; // optional: apply op to this camera value instead of current engine camera
+  google.protobuf.Value base_value =
+    3; // required: apply op to this typed camera value (no implicit engine camera fallback)
 }
 
 message CameraResetViewRequest {
@@ -429,11 +433,13 @@ message CameraMoveLocalRequest {
   repeated uint64 ids = 4; // optional targets for bbox scale (Animation3D filtered). Empty → all visual objects
   bool after_clipping = 5; // when true, derive bbox after clipping (only used when scaling distance)
   bool move_center = 6; // when true, translate eye+center together (fly). When false, translate eye only (dolly/boom)
-  google.protobuf.Value base_value = 7; // optional: move from this camera value instead of current engine camera
+  google.protobuf.Value base_value =
+    7; // required: move from this typed camera value (no implicit engine camera fallback)
 }
 
 message CameraLookAtRequest {
-  google.protobuf.Value base_value = 1; // optional: aim from this camera value instead of current engine camera
+  google.protobuf.Value base_value =
+    1; // required: aim from this typed camera value (no implicit engine camera fallback)
   oneof target {
     Vec3 world_point = 2;        // camera center will point here
     bool target_bbox_center = 3; // when set, use bbox center of ids (or all objects)
@@ -459,7 +465,7 @@ message CameraWaypoint {
 message CameraPathSolveRequest {
   repeated uint64 ids = 1; // targets for bbox computations (Animation3D filtered). Empty → all visual objects
   bool after_clipping = 2; // when true, derive bbox after clipping
-  google.protobuf.Value base_value = 3; // optional: base camera for fov/projection/up defaults
+  google.protobuf.Value base_value = 3; // required: base camera for fov/projection/up defaults
   repeated CameraWaypoint waypoints = 4; // at least 2 waypoints recommended
 }
 
@@ -512,6 +518,23 @@ message CameraValidateResult {
 message CameraValidateResponse {
   repeated CameraValidateResult results = 1;
   bool ok = 2; // all results within constraints
+}
+
+message CameraSampleRequest
+{
+  uint64 animation_id = 1; // required: Animation3D id to sample from
+  repeated double times = 2; // required: one or more sample times (seconds)
+}
+
+message CameraSampleKey
+{
+  double time = 1;
+  google.protobuf.Value value = 2; // typed camera value at time
+}
+
+message CameraSampleResponse
+{
+  repeated CameraSampleKey samples = 1;
 }
 
 message FitCandidatesResponse { repeated uint64 ids = 1; }

@@ -83,6 +83,19 @@ struct EngineCameraAndBBoxSnapshot
     what);
 }
 
+[[nodiscard]] ZQObjectThreadInvokeResult<ZBBox<glm::dvec3>> snapshotEngineBBox(Z3DRenderingEngine* engine,
+                                                                               const std::vector<size_t>& ids,
+                                                                               bool afterClipping,
+                                                                               std::string_view what)
+{
+  return invokeOnObjectThreadWait(
+    engine,
+    [engine, &ids, afterClipping]() {
+      return afterClipping ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
+    },
+    what);
+}
+
 [[nodiscard]] ZRpcUiDispatcher::ErrorKind mapAnimErrorKind(Z3DAnimationDoc::KeyOpResult::ErrorKind k)
 {
   switch (k) {
@@ -2914,6 +2927,13 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraRotate(const Camera
 {
   CameraValuesResult out;
 
+  if (!req.baseValueOverride.has_value()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "camera_rotate: base_value is required";
+    return out;
+  }
+
   const QString op = QString::fromStdString(req.op).toUpper().trimmed();
   if (op.isEmpty()) {
     out.ok = false;
@@ -2933,7 +2953,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraRotate(const Camera
     out.error = "camera_rotate: degrees must be finite";
     return out;
   }
-  if (req.baseValueOverride.has_value() && !req.baseValueOverride->is_object()) {
+  if (!req.baseValueOverride->is_object()) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
     out.error = "camera_rotate: base_value must be an object";
@@ -2963,25 +2983,8 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraRotate(const Camera
     return out;
   }
 
-  auto baseInv = snapshotEngineCameraJson(engine, "camera_rotate:snapshot_engine");
-  if (!baseInv.ok) {
-    out.ok = false;
-    out.errorKind = ErrorKind::FailedPrecondition;
-    out.error = baseInv.error;
-    return out;
-  }
-  if (!baseInv.value.is_object()) {
-    out.ok = false;
-    out.errorKind = ErrorKind::FailedPrecondition;
-    out.error = "camera_rotate: engine camera invalid";
-    return out;
-  }
-
   Z3DCameraParameter cam("Camera");
-  cam.readValue(baseInv.value);
-  if (req.baseValueOverride.has_value()) {
-    cam.readValue(*req.baseValueOverride);
-  }
+  cam.readValue(*req.baseValueOverride);
 
   const float angleRad = glm::radians(static_cast<float>(req.degrees));
   if (op == "AZIMUTH") {
@@ -3137,6 +3140,13 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraMoveLocal(const Cam
 {
   CameraValuesResult out;
 
+  if (!req.baseValueOverride.has_value()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "camera_move_local: base_value is required";
+    return out;
+  }
+
   const QString op = QString::fromStdString(req.op).toUpper().trimmed();
   if (op.isEmpty()) {
     out.ok = false;
@@ -3156,7 +3166,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraMoveLocal(const Cam
     out.error = "camera_move_local: distance must be finite";
     return out;
   }
-  if (req.baseValueOverride.has_value() && !req.baseValueOverride->is_object()) {
+  if (!req.baseValueOverride->is_object()) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
     out.error = "camera_move_local: base_value must be an object";
@@ -3193,7 +3203,6 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraMoveLocal(const Cam
     return out;
   }
 
-  json::value baseCameraJson;
   std::optional<ZBBox<glm::dvec3>> bboxOpt;
   if (req.distanceIsFractionOfBBoxRadius) {
     std::vector<size_t> ids = req.ids.empty() ? doc->objs() : req.ids;
@@ -3222,39 +3231,18 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraMoveLocal(const Cam
     }
     ids = filterVisualIds(doc, ids);
 
-    auto snapInv = snapshotEngineCameraAndBBox(engine, ids, req.afterClipping, "camera_move_local:snapshot_engine");
-    if (!snapInv.ok) {
+    auto bboxInv = snapshotEngineBBox(engine, ids, req.afterClipping, "camera_move_local:bbox");
+    if (!bboxInv.ok) {
       out.ok = false;
       out.errorKind = ErrorKind::FailedPrecondition;
-      out.error = snapInv.error;
+      out.error = bboxInv.error;
       return out;
     }
-    EngineCameraAndBBoxSnapshot snap = std::move(snapInv.value);
-    baseCameraJson = std::move(snap.cameraJson);
-    bboxOpt = std::move(snap.bbox);
-  } else {
-    auto baseInv = snapshotEngineCameraJson(engine, "camera_move_local:snapshot_engine");
-    if (!baseInv.ok) {
-      out.ok = false;
-      out.errorKind = ErrorKind::FailedPrecondition;
-      out.error = baseInv.error;
-      return out;
-    }
-    baseCameraJson = std::move(baseInv.value);
-  }
-
-  if (!baseCameraJson.is_object()) {
-    out.ok = false;
-    out.errorKind = ErrorKind::FailedPrecondition;
-    out.error = "camera_move_local: engine camera invalid";
-    return out;
+    bboxOpt = std::move(bboxInv.value);
   }
 
   Z3DCameraParameter cam("Camera");
-  cam.readValue(baseCameraJson);
-  if (req.baseValueOverride.has_value()) {
-    cam.readValue(*req.baseValueOverride);
-  }
+  cam.readValue(*req.baseValueOverride);
 
   double distWorld = req.distance;
   if (req.distanceIsFractionOfBBoxRadius) {
@@ -3308,7 +3296,13 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraLookAt(const Camera
 {
   CameraValuesResult out;
 
-  if (req.baseValueOverride.has_value() && !req.baseValueOverride->is_object()) {
+  if (!req.baseValueOverride.has_value()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "camera_look_at: base_value is required";
+    return out;
+  }
+  if (!req.baseValueOverride->is_object()) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
     out.error = "camera_look_at: base_value must be an object";
@@ -3345,7 +3339,6 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraLookAt(const Camera
     return out;
   }
 
-  json::value baseCameraJson;
   std::optional<ZBBox<glm::dvec3>> bboxOpt;
   const bool needsBBox =
     (req.target == CameraLookAtRequest::Target::TargetBBoxCenter ||
@@ -3377,39 +3370,18 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraLookAt(const Camera
     }
     ids = filterVisualIds(doc, ids);
 
-    auto snapInv = snapshotEngineCameraAndBBox(engine, ids, req.afterClipping, "camera_look_at:snapshot_engine");
-    if (!snapInv.ok) {
+    auto bboxInv = snapshotEngineBBox(engine, ids, req.afterClipping, "camera_look_at:bbox");
+    if (!bboxInv.ok) {
       out.ok = false;
       out.errorKind = ErrorKind::FailedPrecondition;
-      out.error = snapInv.error;
+      out.error = bboxInv.error;
       return out;
     }
-    EngineCameraAndBBoxSnapshot snap = std::move(snapInv.value);
-    baseCameraJson = std::move(snap.cameraJson);
-    bboxOpt = std::move(snap.bbox);
-  } else {
-    auto baseInv = snapshotEngineCameraJson(engine, "camera_look_at:snapshot_engine");
-    if (!baseInv.ok) {
-      out.ok = false;
-      out.errorKind = ErrorKind::FailedPrecondition;
-      out.error = baseInv.error;
-      return out;
-    }
-    baseCameraJson = std::move(baseInv.value);
-  }
-
-  if (!baseCameraJson.is_object()) {
-    out.ok = false;
-    out.errorKind = ErrorKind::FailedPrecondition;
-    out.error = "camera_look_at: engine camera invalid";
-    return out;
+    bboxOpt = std::move(bboxInv.value);
   }
 
   Z3DCameraParameter cam("Camera");
-  cam.readValue(baseCameraJson);
-  if (req.baseValueOverride.has_value()) {
-    cam.readValue(*req.baseValueOverride);
-  }
+  cam.readValue(*req.baseValueOverride);
 
   glm::vec3 target(0.f, 0.f, 0.f);
   if (req.target == CameraLookAtRequest::Target::WorldPoint) {
@@ -3607,6 +3579,18 @@ ZRpcUiDispatcher::CameraPathSolveResult ZRpcUiDispatcher::cameraPathSolve(const 
     out.error = "waypoints must be non-empty";
     return out;
   }
+  if (!req.baseValueOverride.has_value()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "base_value is required";
+    return out;
+  }
+  if (!req.baseValueOverride->is_object()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "base_value must be an object";
+    return out;
+  }
 
   ZMainWindow* mainWin = mainWindowUi();
   if (!mainWin) {
@@ -3632,36 +3616,8 @@ ZRpcUiDispatcher::CameraPathSolveResult ZRpcUiDispatcher::cameraPathSolve(const 
     return out;
   }
 
-  auto baseInv = invokeOnObjectThreadWait(
-    engine,
-    [engine]() -> json::value {
-      return engine->camera().jsonValue();
-    },
-    "camera_path_solve:snapshot_camera");
-  if (!baseInv.ok) {
-    out.ok = false;
-    out.errorKind = ErrorKind::FailedPrecondition;
-    out.error = baseInv.error;
-    return out;
-  }
-  if (!baseInv.value.is_object()) {
-    out.ok = false;
-    out.errorKind = ErrorKind::FailedPrecondition;
-    out.error = "engine camera invalid";
-    return out;
-  }
-
   Z3DCameraParameter base("Camera");
-  base.readValue(baseInv.value);
-  if (req.baseValueOverride.has_value()) {
-    if (!req.baseValueOverride->is_object()) {
-      out.ok = false;
-      out.errorKind = ErrorKind::InvalidArgument;
-      out.error = "base_value must be an object";
-      return out;
-    }
-    base.readValue(*req.baseValueOverride);
-  }
+  base.readValue(*req.baseValueOverride);
 
   bool needBBox = false;
   for (const auto& w : req.waypoints) {
@@ -3684,19 +3640,14 @@ ZRpcUiDispatcher::CameraPathSolveResult ZRpcUiDispatcher::cameraPathSolve(const 
       ids = filterVisualIds(doc, ids);
     }
 
-    auto bbInv = invokeOnObjectThreadWait(
-      engine,
-      [engine, ids = std::move(ids), after = req.afterClipping]() {
-        return after ? engine->boundBoxOfObjsAfterClipping(ids) : engine->boundBoxOfObjs(ids);
-      },
-      "camera_path_solve:bbox");
+    auto bbInv = snapshotEngineBBox(engine, ids, req.afterClipping, "camera_path_solve:bbox");
     if (!bbInv.ok) {
       out.ok = false;
       out.errorKind = ErrorKind::FailedPrecondition;
       out.error = bbInv.error;
       return out;
     }
-    bbox = bbInv.value;
+    bbox = std::move(bbInv.value);
     if (bbox->empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::FailedPrecondition;
@@ -3887,6 +3838,89 @@ ZRpcUiDispatcher::CameraValidateResult ZRpcUiDispatcher::cameraValidate(const Ca
 
   out.ok = true;
   out.allOk = allOk;
+  return out;
+}
+
+ZRpcUiDispatcher::CameraSampleResult ZRpcUiDispatcher::cameraSample(const CameraSampleRequest& req)
+{
+  CameraSampleResult out;
+
+  if (req.times.empty()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "times must be non-empty";
+    return out;
+  }
+  if (req.animationId == 0) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+  for (double t : req.times) {
+    if (!std::isfinite(t) || t < 0.0) {
+      out.ok = false;
+      out.errorKind = ErrorKind::InvalidArgument;
+      out.error = "times must be finite and >= 0";
+      return out;
+    }
+  }
+
+  ZMainWindow* mainWin = mainWindowUi();
+  if (!mainWin) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "main window not ready";
+    return out;
+  }
+  ZDoc* doc = mainWin->doc();
+  if (!doc) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "doc not ready";
+    return out;
+  }
+
+  auto& ad = doc->animation3DDoc();
+  const size_t animId = static_cast<size_t>(req.animationId);
+  auto* anim = ad.animationPtr(animId);
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+
+  ZCameraParameterAnimation* cpa = anim->cameraParameterAnimation();
+  if (!cpa) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera track not ready";
+    return out;
+  }
+  if (cpa->keys().empty()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "camera track has no keys";
+    return out;
+  }
+
+  // Seed the temporary camera from an existing key to ensure the parameter is fully initialized.
+  const json::value seed = cpa->keys().front()->value().jsonValue();
+
+  out.samples.reserve(req.times.size());
+  for (double t : req.times) {
+    Z3DCameraParameter tmp("Camera");
+    tmp.readValue(seed);
+    cpa->updateParaToTime(t, &tmp);
+
+    Z3DCameraPlannerSolveKey k;
+    k.time = t;
+    k.value = tmp.jsonValue();
+    out.samples.push_back(std::move(k));
+  }
+
+  out.ok = true;
   return out;
 }
 

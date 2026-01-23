@@ -94,6 +94,9 @@ using atlas::rpc::CameraPolicies;
 using atlas::rpc::CameraValidateRequest;
 using atlas::rpc::CameraValidateResponse;
 using atlas::rpc::CameraValidateResult;
+using atlas::rpc::CameraSampleRequest;
+using atlas::rpc::CameraSampleResponse;
+using atlas::rpc::CameraSampleKey;
 using atlas::rpc::FitCandidatesResponse;
 using atlas::rpc::VisibilityRequest;
 using atlas::rpc::RemoveObjectsRequest;
@@ -1961,7 +1964,10 @@ public:
     ZRpcUiDispatcher::CameraRotateRequest dr;
     dr.op = req->op();
     dr.degrees = req->degrees();
-    if (req->has_base_value()) {
+    if (!req->has_base_value()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_rotate: base_value is required");
+    }
+    {
       json::value jv = pbToJson(req->base_value());
       if (!jv.is_object()) {
         return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_rotate: base_value must be an object");
@@ -2088,7 +2094,10 @@ public:
     for (auto v : req->ids()) {
       dr.ids.push_back(static_cast<size_t>(v));
     }
-    if (req->has_base_value()) {
+    if (!req->has_base_value()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_move_local: base_value is required");
+    }
+    {
       json::value jv = pbToJson(req->base_value());
       if (!jv.is_object()) {
         return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_move_local: base_value must be an object");
@@ -2167,7 +2176,10 @@ public:
     for (auto v : req->ids()) {
       dr.ids.push_back(static_cast<size_t>(v));
     }
-    if (req->has_base_value()) {
+    if (!req->has_base_value()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_look_at: base_value is required");
+    }
+    {
       json::value jv = pbToJson(req->base_value());
       if (!jv.is_object()) {
         return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_look_at: base_value must be an object");
@@ -2266,10 +2278,13 @@ public:
     for (auto v : req->ids()) {
       dr.ids.push_back(static_cast<size_t>(v));
     }
-    if (req->has_base_value()) {
+    if (!req->has_base_value()) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_path_solve: base_value is required");
+    }
+    {
       json::value jv = pbToJson(req->base_value());
       if (!jv.is_object()) {
-        return Status(grpc::StatusCode::INVALID_ARGUMENT, "base_value must be an object");
+        return Status(grpc::StatusCode::INVALID_ARGUMENT, "camera_path_solve: base_value must be an object");
       }
       dr.baseValueOverride = std::move(jv);
     }
@@ -2609,6 +2624,50 @@ public:
       *reply->add_results() = std::move(out);
     }
     reply->set_ok(r.allOk);
+    return Status::OK;
+  }
+
+  Status CameraSample(ServerContext* grpcContext, const CameraSampleRequest* req, CameraSampleResponse* reply) override
+  {
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
+    }
+    if (!req) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "request missing");
+    }
+
+    ZRpcUiDispatcher::CameraSampleRequest dr;
+    dr.animationId = req->animation_id();
+    dr.times.reserve(static_cast<size_t>(req->times_size()));
+    for (auto t : req->times()) {
+      dr.times.push_back(t);
+    }
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [&]() {
+        return disp->cameraSample(dr);
+      },
+      "camera_sample");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+    auto r = std::move(inv.value);
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "camera_sample failed" : r.error);
+    }
+
+    for (const auto& s : r.samples) {
+      CameraSampleKey out;
+      out.set_time(s.time);
+      *out.mutable_value() = jsonToPb(s.value);
+      *reply->add_samples() = std::move(out);
+    }
     return Status::OK;
   }
 

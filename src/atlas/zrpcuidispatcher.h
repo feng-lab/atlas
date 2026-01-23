@@ -580,6 +580,22 @@ public:
 
   [[nodiscard]] CameraValidateResult cameraValidate(const CameraValidateRequest& req);
 
+  struct CameraSampleRequest
+  {
+    uint64_t animationId = 0;
+    std::vector<double> times;
+  };
+
+  struct CameraSampleResult
+  {
+    bool ok = false;
+    ErrorKind errorKind = ErrorKind::FailedPrecondition;
+    std::string error;
+    std::vector<Z3DCameraPlannerSolveKey> samples;
+  };
+
+  [[nodiscard]] CameraSampleResult cameraSample(const CameraSampleRequest& req);
+
 private:
   [[nodiscard]] ZMainWindow* mainWindowUi() const;
 

@@ -34,9 +34,7 @@ JSON_VALUE_SCHEMA: Dict[str, Any] = {
         {"type": "object"},
         {
             "type": "array",
-            "items": {
-                "type": ["string", "number", "boolean", "null", "object"]
-            },
+            "items": {"type": ["string", "number", "boolean", "null", "object"]},
         },
         {"type": "number"},
         {"type": "string"},
@@ -155,12 +153,30 @@ WALKTHROUGH_SEGMENT_SCHEMA: Dict[str, Any] = {
         "Templates: optional internal templates ('enter', 'turn_right', 'pause') expand into concrete move/rotate."
     ),
     "properties": {
-        "u0": {"type": ["number", "null"], "description": "Normalized start time in [0,1] (requires u1)."},
-        "u1": {"type": ["number", "null"], "description": "Normalized end time in [0,1] (requires u0)."},
-        "duration": {"type": ["number", "null"], "description": "Segment duration in seconds (relative; normalized across segments)."},
-        "pause": {"type": ["boolean", "null"], "description": "When true, hold pose for the segment duration."},
-        "move": {"type": ["object", "null"], "properties": WALKTHROUGH_MOVE_SCHEMA["properties"]},
-        "rotate": {"type": ["object", "null"], "properties": WALKTHROUGH_ROTATE_SCHEMA["properties"]},
+        "u0": {
+            "type": ["number", "null"],
+            "description": "Normalized start time in [0,1] (requires u1).",
+        },
+        "u1": {
+            "type": ["number", "null"],
+            "description": "Normalized end time in [0,1] (requires u0).",
+        },
+        "duration": {
+            "type": ["number", "null"],
+            "description": "Segment duration in seconds (relative; normalized across segments).",
+        },
+        "pause": {
+            "type": ["boolean", "null"],
+            "description": "When true, hold pose for the segment duration.",
+        },
+        "move": {
+            "type": ["object", "null"],
+            "properties": WALKTHROUGH_MOVE_SCHEMA["properties"],
+        },
+        "rotate": {
+            "type": ["object", "null"],
+            "properties": WALKTHROUGH_ROTATE_SCHEMA["properties"],
+        },
         "template": {
             "type": ["string", "null"],
             "description": "Optional internal template: enter|turn_right|pause (plus aliases). Null disables templating.",
@@ -169,9 +185,18 @@ WALKTHROUGH_SEGMENT_SCHEMA: Dict[str, Any] = {
             "type": ["string", "number", "null"],
             "description": "Optional template amount (e.g., 'small'|'medium' or a numeric override).",
         },
-        "distance": {"type": ["number", "null"], "description": "Optional template distance override (bbox-radius fraction)."},
-        "degrees": {"type": ["number", "null"], "description": "Optional template degrees override."},
-        "label": {"type": ["string", "null"], "description": "Optional label for debugging/inspection."},
+        "distance": {
+            "type": ["number", "null"],
+            "description": "Optional template distance override (bbox-radius fraction).",
+        },
+        "degrees": {
+            "type": ["number", "null"],
+            "description": "Optional template degrees override.",
+        },
+        "label": {
+            "type": ["string", "null"],
+            "description": "Optional label for debugging/inspection.",
+        },
     },
 }
 
@@ -196,7 +221,10 @@ ANIMATION_BATCH_SET_KEY_ENTRY_SCHEMA: Dict[str, Any] = {
             "type": "integer",
             "description": "Target id (non-camera): 1=background, 2=axis, 3=global, ≥4=object ids",
         },
-        "json_key": {"type": "string", "description": "Parameter json_key for the target id"},
+        "json_key": {
+            "type": "string",
+            "description": "Parameter json_key for the target id",
+        },
         "time": {"type": "number", "description": "Key time (seconds)"},
         "value": dict(JSON_VALUE_SCHEMA),
         "easing": {
@@ -222,7 +250,10 @@ ANIMATION_BATCH_REMOVE_KEY_ENTRY_SCHEMA: Dict[str, Any] = {
             "type": "integer",
             "description": "Target id (non-camera): 1=background, 2=axis, 3=global, ≥4=object ids",
         },
-        "json_key": {"type": "string", "description": "Parameter json_key for the target id"},
+        "json_key": {
+            "type": "string",
+            "description": "Parameter json_key for the target id",
+        },
         "time": {"type": "number", "description": "Key time (seconds)"},
     },
     "required": ["id", "json_key", "time"],
@@ -247,9 +278,20 @@ TOOLS: List[Tool] = [
         parameters_schema={
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Path to a .animation3d file."},
-                "schema_dir": {"type": ["string", "null"], "description": "Optional schema directory override for capabilities.json lookups."},
-                "style": {"type": "string", "enum": ["short", "long"], "default": "short", "description": "Summary style."},
+                "path": {
+                    "type": "string",
+                    "description": "Path to a .animation3d file.",
+                },
+                "schema_dir": {
+                    "type": ["string", "null"],
+                    "description": "Optional schema directory override for capabilities.json lookups.",
+                },
+                "style": {
+                    "type": "string",
+                    "enum": ["short", "long"],
+                    "default": "short",
+                    "description": "Summary style.",
+                },
             },
             "required": ["path"],
         },
@@ -281,17 +323,55 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "mode": {"type": "string", "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"], "description": "Solve mode for generating camera keys."},
-                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids; empty uses fit_candidates()."},
-                "t0": {"type": "number", "description": "Start time (seconds) of the write window."},
-                "t1": {"type": "number", "description": "End time (seconds) of the write window."},
-                "constraints": {"type": "object", "description": "Visibility/coverage constraints. Typical defaults: keep_visible=true for exterior presentation (with min_coverage≈0.95); keep_visible=false for interior flythroughs."},
-                "params": {"type": "object", "description": "Mode-specific parameters (e.g., axis for ORBIT)."},
-                "degrees": {"type": "number", "description": "ORBIT: total rotation in degrees (default 360)."},
-                "max_step_degrees": {"type": "number", "description": "ORBIT: maximum degrees per solver step (controls key density). Smaller values produce more keys and smoother motion. Default 90."},
-                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
-                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing curves and is separate from camera interpolation."},
-                "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys."},
+                "mode": {
+                    "type": "string",
+                    "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"],
+                    "description": "Solve mode for generating camera keys.",
+                },
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Target ids; empty uses fit_candidates().",
+                },
+                "t0": {
+                    "type": "number",
+                    "description": "Start time (seconds) of the write window.",
+                },
+                "t1": {
+                    "type": "number",
+                    "description": "End time (seconds) of the write window.",
+                },
+                "constraints": {
+                    "type": "object",
+                    "description": "Visibility/coverage constraints. Typical defaults: keep_visible=true for exterior presentation (with min_coverage≈0.95); keep_visible=false for interior flythroughs.",
+                },
+                "params": {
+                    "type": "object",
+                    "description": "Mode-specific parameters (e.g., axis for ORBIT).",
+                },
+                "degrees": {
+                    "type": "number",
+                    "description": "ORBIT: total rotation in degrees (default 360).",
+                },
+                "max_step_degrees": {
+                    "type": "number",
+                    "description": "ORBIT: maximum degrees per solver step (controls key density). Smaller values produce more keys and smoother motion. Default 90.",
+                },
+                "tolerance": {
+                    "type": "number",
+                    "default": 1e-3,
+                    "description": "Time tolerance used when clearing/replacing keys.",
+                },
+                "easing": {
+                    "type": "string",
+                    "default": "Linear",
+                    "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing curves and is separate from camera interpolation.",
+                },
+                "clear_range": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys.",
+                },
             },
             "required": ["animation_id", "mode", "ids", "t0", "t1"],
         },
@@ -313,7 +393,7 @@ TOOLS: List[Tool] = [
             "- Aim behavior: look_at_policy controls how missing look_at is filled.\n"
             "  - preserve_direction (default): keeps the current view direction + distance when look_at is omitted.\n"
             "  - bbox_center: fills missing look_at to keep tracking the bbox center (third-person track/orbit-like).\n"
-            "- Smoothness: add intermediate waypoints (spatial key density). For continuous \"drone\" motion, use walkthrough (step_seconds).\n"
+            '- Smoothness: add intermediate waypoints (spatial key density). For continuous "drone" motion, use walkthrough (step_seconds).\n'
             "- Timing feel: easing changes per-key timing curves only.\n\n"
             "If the result looks wrong:\n"
             "- Path drifts instead of tracking the subject → set look_at_policy='bbox_center' or provide explicit waypoint look_at.\n"
@@ -324,8 +404,16 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects."},
-                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox for bbox-fraction waypoints."},
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects.",
+                },
+                "after_clipping": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Use clipped bbox for bbox-fraction waypoints.",
+                },
                 "t0": {"type": "number", "description": "Start time (seconds)."},
                 "t1": {"type": "number", "description": "End time (seconds)."},
                 "waypoints": {
@@ -333,14 +421,37 @@ TOOLS: List[Tool] = [
                     "items": CAMERA_SPLINE_WAYPOINT_SCHEMA,
                     "description": "Waypoints (time or u + optional eye/look_at). Prefer bbox_fraction coordinates for dataset-scale invariant paths.",
                 },
-                "look_at_policy": {"type": "string", "enum": ["preserve_direction", "bbox_center"], "default": "preserve_direction", "description": "How to handle waypoints that omit look_at. preserve_direction keeps the current view direction; bbox_center fills missing look_at with bbox_center:true."},
-                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This does not change the waypoint geometry; it only affects per-key transition timing."},
-                "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys."},
-                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
-                "constraints": {"type": "object", "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement)."},
-                "base_value": {"type": "object", "description": "Optional base camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted."},
+                "look_at_policy": {
+                    "type": "string",
+                    "enum": ["preserve_direction", "bbox_center"],
+                    "default": "preserve_direction",
+                    "description": "How to handle waypoints that omit look_at. preserve_direction keeps the current view direction; bbox_center fills missing look_at with bbox_center:true.",
+                },
+                "easing": {
+                    "type": "string",
+                    "default": "Linear",
+                    "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This does not change the waypoint geometry; it only affects per-key transition timing.",
+                },
+                "clear_range": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys.",
+                },
+                "tolerance": {
+                    "type": "number",
+                    "default": 1e-3,
+                    "description": "Time tolerance used when clearing/replacing keys.",
+                },
+                "constraints": {
+                    "type": "object",
+                    "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
+                },
+                "base_value": {
+                    "type": "object",
+                    "description": "Required base camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted. Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.",
+                },
             },
-            "required": ["animation_id", "t0", "t1", "waypoints"],
+            "required": ["animation_id", "t0", "t1", "waypoints", "base_value"],
         },
         preconditions=(require_animation_id, require_engine_ready),
         handler=_tool_handler("animation_camera_waypoint_spline_apply"),
@@ -352,7 +463,7 @@ TOOLS: List[Tool] = [
             "(local moves + yaw/pitch/roll), optionally clear existing camera keys in [t0,t1], then write validated camera keys.\n\n"
             "Use when:\n"
             "- The user describes motion verbs rather than explicit points: fly forward, strafe, turn, look around, pause.\n"
-            "- Interior exploration (moving inside a volume/mesh) where \"keep the whole bbox visible\" is not desired.\n\n"
+            '- Interior exploration (moving inside a volume/mesh) where "keep the whole bbox visible" is not desired.\n\n'
             "Avoid when:\n"
             "- The user gives explicit waypoints/coordinates → use animation_camera_waypoint_spline_apply.\n"
             "- The goal is a clean exterior turntable orbit → use animation_camera_solve_and_apply(mode='ORBIT').\n\n"
@@ -361,7 +472,7 @@ TOOLS: List[Tool] = [
             "- Framing vs exploration: constraints.keep_visible=false for interior flythroughs; true only when explicitly requested.\n"
             "- Aim behavior: look_at_policy controls first-person vs third-person tracking semantics.\n\n"
             "If the result looks wrong:\n"
-            "- Interior path keeps \"popping out\" due to framing constraints → set constraints.keep_visible=false.\n"
+            '- Interior path keeps "popping out" due to framing constraints → set constraints.keep_visible=false.\n'
             "- You wanted the camera to keep aiming at the subject → set look_at_policy='bbox_center'.\n\n"
             "Camera interpolation is always evaluated using a stable look-at + distance convention; easing is separate."
         ),
@@ -369,8 +480,16 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects."},
-                "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox for bbox-scaled movement."},
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Target ids for bbox computations and validation. Empty → fit_candidates() for validation; bbox computations use all visual objects.",
+                },
+                "after_clipping": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Use clipped bbox for bbox-scaled movement.",
+                },
                 "t0": {"type": "number", "description": "Start time (seconds)."},
                 "t1": {"type": "number", "description": "End time (seconds)."},
                 "segments": {
@@ -378,15 +497,42 @@ TOOLS: List[Tool] = [
                     "items": WALKTHROUGH_SEGMENT_SCHEMA,
                     "description": "Walkthrough segments (timed by u0/u1, duration, or equal split). Move distances are bbox-radius fractions; rotations are degrees.",
                 },
-                "step_seconds": {"type": "number", "default": 1.0, "description": "Sampling step used to approximate motion inside each segment. Smaller → more keys (smoother curved motion)."},
-                "look_at_policy": {"type": "string", "enum": ["preserve_direction", "bbox_center"], "default": "preserve_direction", "description": "preserve_direction keeps first-person yaw/pitch look control; bbox_center keeps aiming at the target bbox center (third-person track), interpreting yaw/pitch as azimuth/elevation around the center."},
-                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing, not the sampled path geometry."},
-                "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys."},
-                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
-                "constraints": {"type": "object", "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement)."},
-                "base_value": {"type": "object", "description": "Optional base camera value used as the initial camera pose (projection/fov/up defaults)."},
+                "step_seconds": {
+                    "type": "number",
+                    "default": 1.0,
+                    "description": "Sampling step used to approximate motion inside each segment. Smaller → more keys (smoother curved motion).",
+                },
+                "look_at_policy": {
+                    "type": "string",
+                    "enum": ["preserve_direction", "bbox_center"],
+                    "default": "preserve_direction",
+                    "description": "preserve_direction keeps first-person yaw/pitch look control; bbox_center keeps aiming at the target bbox center (third-person track), interpreting yaw/pitch as azimuth/elevation around the center.",
+                },
+                "easing": {
+                    "type": "string",
+                    "default": "Linear",
+                    "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing, not the sampled path geometry.",
+                },
+                "clear_range": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Remove existing camera keys inside [t0,t1] (tolerance-aware) before applying new keys.",
+                },
+                "tolerance": {
+                    "type": "number",
+                    "default": 1e-3,
+                    "description": "Time tolerance used when clearing/replacing keys.",
+                },
+                "constraints": {
+                    "type": "object",
+                    "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
+                },
+                "base_value": {
+                    "type": "object",
+                    "description": "Required base camera value used as the initial camera pose (projection/fov/up defaults). Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.",
+                },
             },
-            "required": ["animation_id", "t0", "t1", "segments"],
+            "required": ["animation_id", "t0", "t1", "segments", "base_value"],
         },
         preconditions=(require_animation_id, require_engine_ready),
         handler=_tool_handler("animation_camera_walkthrough_apply"),
@@ -398,16 +544,56 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids to validate against (typically fit_candidates)."},
-                "times": {"type": "array", "items": {"type": "number"}, "description": "Times (seconds) to validate."},
-                "values": {"type": "array", "items": {"type": "object"}, "description": "Optional: typed camera values aligned with times. If omitted or shorter than times, the server fills by sampling."},
-                "constraints": {"type": "object", "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, etc.)."},
-                "policies": {"type": "object", "description": "Adjustment policies (adjust_fov, adjust_distance, adjust_clipping)."},
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Target ids to validate against (typically fit_candidates).",
+                },
+                "times": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "Times (seconds) to validate.",
+                },
+                "values": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Optional: typed camera values aligned with times. If omitted or shorter than times, the server fills by sampling.",
+                },
+                "constraints": {
+                    "type": "object",
+                    "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, etc.).",
+                },
+                "policies": {
+                    "type": "object",
+                    "description": "Adjustment policies (adjust_fov, adjust_distance, adjust_clipping).",
+                },
             },
             "required": ["animation_id", "ids", "times"],
         },
         preconditions=(require_animation_id, require_engine_ready),
         handler=_tool_handler("animation_camera_validate"),
+    ),
+    tool_from_schema(
+        name="animation_camera_sample",
+        description=(
+            "Animation timeline: sample the evaluated camera value from the animation at specific time(s). "
+            "Returns typed camera values (no key writes, no validation, does not change engine time). "
+            "Use this to get a deterministic base_value for camera_rotate/camera_move_local/camera_look_at while authoring."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "times": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "One or more times (seconds) to sample.",
+                },
+            },
+            "required": ["animation_id", "times"],
+        },
+        preconditions=(require_animation_id,),
+        handler=_tool_handler("animation_camera_sample"),
     ),
     tool_from_schema(
         name="animation_set_param_by_name",
@@ -416,7 +602,10 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
                 "name": {"type": "string"},
                 "type_hint": {"type": "string"},
                 "time": {"type": "number"},
@@ -439,7 +628,10 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
                 "json_key": {"type": "string"},
                 "time": {"type": "number"},
                 "tolerance": {"type": "number", "default": 1e-3},
@@ -456,7 +648,10 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
                 "json_key": {"type": "string"},
                 "time": {"type": "number"},
                 "easing": {"type": "string", "default": "Linear"},
@@ -476,7 +671,11 @@ TOOLS: List[Tool] = [
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
                 "time": {"type": "number"},
-                "easing": {"type": "string", "default": "Linear", "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing curves and is separate from camera interpolation."},
+                "easing": {
+                    "type": "string",
+                    "default": "Linear",
+                    "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing curves and is separate from camera interpolation.",
+                },
                 "value": {
                     "description": (
                         "Typed camera value.\n"
@@ -485,8 +684,15 @@ TOOLS: List[Tool] = [
                     ),
                     "type": ["object", "string"],
                 },
-                "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional ids for camera validation. When omitted/empty, uses fit_candidates()."},
-                "constraints": {"type": "object", "description": "Optional camera validation constraints. When omitted, defaults to keep_visible=true and min_coverage=0.95."},
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Optional ids for camera validation. When omitted/empty, uses fit_candidates().",
+                },
+                "constraints": {
+                    "type": "object",
+                    "description": "Optional camera validation constraints. When omitted, defaults to keep_visible=true and min_coverage=0.95.",
+                },
                 "tolerance": {"type": "number", "default": 1e-3},
             },
             "required": ["animation_id", "time", "value"],
@@ -501,9 +707,18 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
-                "json_key": {"type": "string", "description": "Parameter json_key (ignored for camera); use canonical names from scene_list_params(id)"},
-                "include_values": {"type": "boolean", "description": "True to include value_json samples for each key"},
+                "id": {
+                    "type": "integer",
+                    "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
+                "json_key": {
+                    "type": "string",
+                    "description": "Parameter json_key (ignored for camera); use canonical names from scene_list_params(id)",
+                },
+                "include_values": {
+                    "type": "boolean",
+                    "description": "True to include value_json samples for each key",
+                },
             },
             "required": ["animation_id", "id", "json_key", "include_values"],
         },
@@ -517,13 +732,30 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
-                "json_key": {"type": "string", "description": "Canonical json_key (ignored for camera)."},
-                "name": {"type": "string", "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera)."},
+                "id": {
+                    "type": "integer",
+                    "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
+                "json_key": {
+                    "type": "string",
+                    "description": "Canonical json_key (ignored for camera).",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
+                },
                 "t0": {"type": "number", "description": "Range start time (seconds)."},
                 "t1": {"type": "number", "description": "Range end time (seconds)."},
-                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used for range boundary inclusion and conflict matching."},
-                "include_times": {"type": "boolean", "default": False, "description": "When true, include the full list of removed key times (no truncation)."},
+                "tolerance": {
+                    "type": "number",
+                    "default": 1e-3,
+                    "description": "Time tolerance used for range boundary inclusion and conflict matching.",
+                },
+                "include_times": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, include the full list of removed key times (no truncation).",
+                },
             },
             "required": ["animation_id", "id", "t0", "t1"],
         },
@@ -537,15 +769,40 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
-                "json_key": {"type": "string", "description": "Canonical json_key (ignored for camera)."},
-                "name": {"type": "string", "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera)."},
+                "id": {
+                    "type": "integer",
+                    "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
+                "json_key": {
+                    "type": "string",
+                    "description": "Canonical json_key (ignored for camera).",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
+                },
                 "t0": {"type": "number", "description": "Range start time (seconds)."},
                 "t1": {"type": "number", "description": "Range end time (seconds)."},
-                "delta": {"type": "number", "description": "Time shift in seconds (can be negative)."},
-                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used for range boundary inclusion and conflict matching."},
-                "on_conflict": {"type": "string", "enum": ["error", "overwrite", "skip"], "default": "error", "description": "If shifted keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved)."},
-                "include_times": {"type": "boolean", "default": False, "description": "When true, include the full list of moved/skipped mappings (no truncation)."},
+                "delta": {
+                    "type": "number",
+                    "description": "Time shift in seconds (can be negative).",
+                },
+                "tolerance": {
+                    "type": "number",
+                    "default": 1e-3,
+                    "description": "Time tolerance used for range boundary inclusion and conflict matching.",
+                },
+                "on_conflict": {
+                    "type": "string",
+                    "enum": ["error", "overwrite", "skip"],
+                    "default": "error",
+                    "description": "If shifted keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved).",
+                },
+                "include_times": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, include the full list of moved/skipped mappings (no truncation).",
+                },
             },
             "required": ["animation_id", "id", "t0", "t1", "delta"],
         },
@@ -559,16 +816,43 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
-                "json_key": {"type": "string", "description": "Canonical json_key (ignored for camera)."},
-                "name": {"type": "string", "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera)."},
+                "id": {
+                    "type": "integer",
+                    "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
+                "json_key": {
+                    "type": "string",
+                    "description": "Canonical json_key (ignored for camera).",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
+                },
                 "t0": {"type": "number", "description": "Range start time (seconds)."},
                 "t1": {"type": "number", "description": "Range end time (seconds)."},
                 "scale": {"type": "number", "description": "Scale factor (>0)."},
-                "anchor": {"type": "string", "enum": ["t0", "center"], "default": "t0", "description": "Anchor mode for scaling: t0 uses the range start; center uses (t0+t1)/2."},
-                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used for range boundary inclusion and conflict matching."},
-                "on_conflict": {"type": "string", "enum": ["error", "overwrite", "skip"], "default": "error", "description": "If scaled keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved)."},
-                "include_times": {"type": "boolean", "default": False, "description": "When true, include the full list of moved/skipped mappings (no truncation)."},
+                "anchor": {
+                    "type": "string",
+                    "enum": ["t0", "center"],
+                    "default": "t0",
+                    "description": "Anchor mode for scaling: t0 uses the range start; center uses (t0+t1)/2.",
+                },
+                "tolerance": {
+                    "type": "number",
+                    "default": 1e-3,
+                    "description": "Time tolerance used for range boundary inclusion and conflict matching.",
+                },
+                "on_conflict": {
+                    "type": "string",
+                    "enum": ["error", "overwrite", "skip"],
+                    "default": "error",
+                    "description": "If scaled keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved).",
+                },
+                "include_times": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, include the full list of moved/skipped mappings (no truncation).",
+                },
             },
             "required": ["animation_id", "id", "t0", "t1", "scale"],
         },
@@ -582,15 +866,46 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
-                "json_key": {"type": "string", "description": "Canonical json_key (ignored for camera)."},
-                "name": {"type": "string", "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera)."},
-                "t0": {"type": "number", "description": "Source range start time (seconds)."},
-                "t1": {"type": "number", "description": "Source range end time (seconds)."},
-                "dest_t0": {"type": "number", "description": "Destination start time (seconds). Keys keep their relative offsets from the source range start."},
-                "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used for range boundary inclusion and conflict matching."},
-                "on_conflict": {"type": "string", "enum": ["error", "overwrite", "skip"], "default": "error", "description": "If duplicated keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (do not create conflicting duplicates)."},
-                "include_times": {"type": "boolean", "default": False, "description": "When true, include the full list of duplicated/skipped mappings (no truncation)."},
+                "id": {
+                    "type": "integer",
+                    "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
+                "json_key": {
+                    "type": "string",
+                    "description": "Canonical json_key (ignored for camera).",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
+                },
+                "t0": {
+                    "type": "number",
+                    "description": "Source range start time (seconds).",
+                },
+                "t1": {
+                    "type": "number",
+                    "description": "Source range end time (seconds).",
+                },
+                "dest_t0": {
+                    "type": "number",
+                    "description": "Destination start time (seconds). Keys keep their relative offsets from the source range start.",
+                },
+                "tolerance": {
+                    "type": "number",
+                    "default": 1e-3,
+                    "description": "Time tolerance used for range boundary inclusion and conflict matching.",
+                },
+                "on_conflict": {
+                    "type": "string",
+                    "enum": ["error", "overwrite", "skip"],
+                    "default": "error",
+                    "description": "If duplicated keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (do not create conflicting duplicates).",
+                },
+                "include_times": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, include the full list of duplicated/skipped mappings (no truncation).",
+                },
             },
             "required": ["animation_id", "id", "t0", "t1", "dest_t0"],
         },
@@ -611,7 +926,21 @@ TOOLS: List[Tool] = [
     tool_from_schema(
         name="animation_ensure_animation",
         description="Ensure a 3D animation exists and is bound/selected for editing. Returns {ok, animation_id, created}. Use the returned animation_id for all subsequent animation_* tool calls.",
-        parameters_schema={"type": "object", "properties": {"create_new": {"type": "boolean", "default": False, "description": "When true, create a new Animation3D object (instead of reusing an existing one)."}, "name": {"type": "string", "default": "", "description": "Optional display name for the created animation (empty means default)."}}},
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "create_new": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, create a new Animation3D object (instead of reusing an existing one).",
+                },
+                "name": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Optional display name for the created animation (empty means default).",
+                },
+            },
+        },
         preconditions=(require_engine_ready,),
         handler=_tool_handler("animation_ensure_animation"),
     ),
@@ -620,7 +949,10 @@ TOOLS: List[Tool] = [
         description="Set animation duration in seconds.",
         parameters_schema={
             "type": "object",
-            "properties": {"animation_id": dict(ANIMATION_ID_PARAM_SCHEMA), "seconds": {"type": "number"}},
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "seconds": {"type": "number"},
+            },
             "required": ["animation_id", "seconds"],
         },
         preconditions=(require_animation_id, require_engine_ready),
@@ -633,9 +965,18 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
-                "json_key": {"type": "string", "description": "Canonical json_key; if omitted, 'name' is used to resolve."},
-                "name": {"type": "string", "description": "Display name to resolve to json_key when json_key is not provided."},
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
+                "json_key": {
+                    "type": "string",
+                    "description": "Canonical json_key; if omitted, 'name' is used to resolve.",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Display name to resolve to json_key when json_key is not provided.",
+                },
                 "time": {"type": "number"},
                 "easing": {"type": "string", "default": "Linear"},
                 "value": JSON_VALUE_SCHEMA,
@@ -652,7 +993,10 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
                 "json_key": {"type": "string"},
                 "times": {"type": "array", "items": {"type": "number"}},
                 "value": JSON_VALUE_SCHEMA,
@@ -671,7 +1015,10 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
                 "json_key": {"type": "string"},
             },
             "required": ["animation_id", "id"],
@@ -686,7 +1033,10 @@ TOOLS: List[Tool] = [
             "type": "object",
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
-                "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                "id": {
+                    "type": "integer",
+                    "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                },
                 "json_key": {"type": "string"},
                 "time": {"type": "number"},
             },
@@ -712,7 +1062,11 @@ TOOLS: List[Tool] = [
                     "items": dict(ANIMATION_BATCH_REMOVE_KEY_ENTRY_SCHEMA),
                     "description": "List of RemoveKey operations (non-camera parameters).",
                 },
-                "commit": {"type": "boolean", "default": True, "description": "Commit immediately if true"},
+                "commit": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Commit immediately if true",
+                },
             },
             "required": ["animation_id", "set_keys", "remove_keys"],
         },
@@ -727,7 +1081,11 @@ TOOLS: List[Tool] = [
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
                 "seconds": {"type": "number", "description": "Timeline seconds"},
-                "cancel": {"type": "boolean", "default": False, "description": "When true, cancel any in-progress rendering/export tied to the animation view."},
+                "cancel": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, cancel any in-progress rendering/export tied to the animation view.",
+                },
             },
             "required": ["animation_id", "seconds"],
         },
@@ -739,7 +1097,10 @@ TOOLS: List[Tool] = [
         description="Save the current animation to a .animation3d path.",
         parameters_schema={
             "type": "object",
-            "properties": {"animation_id": dict(ANIMATION_ID_PARAM_SCHEMA), "path": {"type": "string"}},
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "path": {"type": "string"},
+            },
             "required": ["animation_id", "path"],
         },
         preconditions=(require_animation_id, require_engine_ready),
@@ -753,12 +1114,36 @@ TOOLS: List[Tool] = [
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
                 "out": {"type": "string", "description": "Output .mp4 path"},
-                "fps": {"type": "number", "default": 30, "description": "Frames per second"},
-                "start": {"type": "integer", "default": 0, "description": "Start frame (inclusive)"},
-                "end": {"type": "integer", "default": -1, "description": "End frame (inclusive, -1 = duration)"},
-                "width": {"type": "integer", "default": 1920, "description": "Output width"},
-                "height": {"type": "integer", "default": 1080, "description": "Output height"},
-                "overwrite": {"type": "boolean", "default": True, "description": "Overwrite output if exists"},
+                "fps": {
+                    "type": "number",
+                    "default": 30,
+                    "description": "Frames per second",
+                },
+                "start": {
+                    "type": "integer",
+                    "default": 0,
+                    "description": "Start frame (inclusive)",
+                },
+                "end": {
+                    "type": "integer",
+                    "default": -1,
+                    "description": "End frame (inclusive, -1 = duration)",
+                },
+                "width": {
+                    "type": "integer",
+                    "default": 1920,
+                    "description": "Output width",
+                },
+                "height": {
+                    "type": "integer",
+                    "default": 1080,
+                    "description": "Output height",
+                },
+                "overwrite": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Overwrite output if exists",
+                },
             },
             "required": ["animation_id", "out"],
         },
@@ -778,13 +1163,21 @@ TOOLS: List[Tool] = [
             "properties": {
                 "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
                 "time": {"type": "number", "description": "Preview time in seconds"},
-                "fps": {"type": "number", "default": 30, "description": "Frames per second"},
+                "fps": {
+                    "type": "number",
+                    "default": 30,
+                    "description": "Frames per second",
+                },
                 "width": {"type": "integer", "description": "Image width"},
                 "height": {"type": "integer", "description": "Image height"},
             },
             "required": ["animation_id", "time", "width", "height"],
         },
-        preconditions=(require_screenshot_consent, require_animation_id, require_engine_ready),
+        preconditions=(
+            require_screenshot_consent,
+            require_animation_id,
+            require_engine_ready,
+        ),
         handler=_tool_handler("animation_render_preview"),
     ),
 ]
@@ -872,7 +1265,14 @@ def _extract_track_keys(anim: dict, *, id: int, json_key: str) -> list[dict[str,
         except Exception:
             tm = 0.0
         easing = str(k.get("type", "Linear"))
-        out.append({"idx": int(idx), "time": float(tm), "easing": easing, "value": k.get("value")})
+        out.append(
+            {
+                "idx": int(idx),
+                "time": float(tm),
+                "easing": easing,
+                "value": k.get("value"),
+            }
+        )
     return out
 
 
@@ -890,7 +1290,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     # (and stay robust if engine/UI defaults change in the future).
     def _ensure_camera_center_interpolation(animation_id: int) -> None:
         try:
-            client.set_camera_interpolation_method(animation_id=animation_id, method="center")
+            client.set_camera_interpolation_method(
+                animation_id=animation_id, method="center"
+            )
         except Exception:
             pass
 
@@ -1001,12 +1403,19 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if not _json_key_exists(id, json_key):
             return json.dumps({"ok": False, "error": "json_key not found for id"})
         try:
-            lr = client.list_keys(animation_id=animation_id, target_id=id, json_key=json_key, include_values=False)
+            lr = client.list_keys(
+                animation_id=animation_id,
+                target_id=id,
+                json_key=json_key,
+                include_values=False,
+            )
             times = [k.time for k in getattr(lr, "keys", [])]
             to_remove = [t for t in times if abs(t - time_v) <= tol]
             removed = 0
             for t in to_remove:
-                ok = client.remove_key(animation_id=animation_id, target_id=id, json_key=json_key, time=t)
+                ok = client.remove_key(
+                    animation_id=animation_id, target_id=id, json_key=json_key, time=t
+                )
                 if ok:
                     removed += 1
             return json.dumps({"ok": True, "removed": removed})
@@ -1079,7 +1488,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             try:
                 value = json.loads(value)
             except Exception as e:
-                return json.dumps({"ok": False, "error": f"value JSON parse failed: {e}"})
+                return json.dumps(
+                    {"ok": False, "error": f"value JSON parse failed: {e}"}
+                )
         if not isinstance(value, dict):
             return json.dumps(
                 {
@@ -1114,12 +1525,16 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             _ensure_camera_center_interpolation(animation_id)
             # Remove camera keys within tolerance
             try:
-                lr = client.list_keys(animation_id=animation_id, target_id=0, include_values=False)
+                lr = client.list_keys(
+                    animation_id=animation_id, target_id=0, include_values=False
+                )
                 times = [k.time for k in getattr(lr, "keys", [])]
                 to_remove = [t for t in times if abs(t - time_v) <= tol]
                 removed = 0
                 for t in to_remove:
-                    if client.remove_key(animation_id=animation_id, target_id=0, json_key="", time=t):
+                    if client.remove_key(
+                        animation_id=animation_id, target_id=0, json_key="", time=t
+                    ):
                         removed += 1
             except Exception:
                 removed = 0
@@ -1138,7 +1553,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     value = vals[0].get("adjusted_value")
             except Exception:
                 pass
-            ok = client.set_key_camera(animation_id=animation_id, time=time_v, easing=easing, value=value)
+            ok = client.set_key_camera(
+                animation_id=animation_id, time=time_v, easing=easing, value=value
+            )
             # Re-validate strictly
             final_ok = ok
             try:
@@ -1244,7 +1661,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             # Optionally clear existing keys in [t0, t1] (with tolerance), excluding solver times
             if clear_range:
                 try:
-                    lr = client.list_keys(animation_id=animation_id, target_id=0, include_values=False)
+                    lr = client.list_keys(
+                        animation_id=animation_id, target_id=0, include_values=False
+                    )
                     existing = [float(k.time) for k in getattr(lr, "keys", [])]
                 except Exception:
                     existing = []
@@ -1264,7 +1683,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     if _near_any(old_t, solved_times, tol):
                         continue
                     try:
-                        client.remove_key(animation_id=animation_id, target_id=0, json_key="", time=old_t)
+                        client.remove_key(
+                            animation_id=animation_id,
+                            target_id=0,
+                            json_key="",
+                            time=old_t,
+                        )
                     except Exception:
                         pass
             applied: list[float] = []
@@ -1334,6 +1758,27 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 pass
             return json.dumps({"ok": False, "error": msg})
 
+    if name == "animation_camera_sample":
+        try:
+            animation_id = int(args.get("animation_id", 0) or 0)
+            if animation_id <= 0:
+                return json.dumps({"ok": False, "error": "animation_id is required"})
+            times_in = args.get("times") or []
+            if not isinstance(times_in, list) or not times_in:
+                return json.dumps(
+                    {"ok": False, "error": "times must be a non-empty list"}
+                )
+            times = [float(t) for t in times_in]
+            samples = client.camera_sample(animation_id=animation_id, times=times)
+            return json.dumps({"ok": True, "samples": samples})
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
     if name == "animation_camera_waypoint_spline_apply":
         try:
             animation_id = int(args.get("animation_id", 0) or 0)
@@ -1352,20 +1797,40 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 return json.dumps({"ok": False, "error": "t1 must be > t0"})
             waypoints_in = args.get("waypoints") or []
             if not isinstance(waypoints_in, list) or not waypoints_in:
-                return json.dumps({"ok": False, "error": "waypoints must be a non-empty list"})
+                return json.dumps(
+                    {"ok": False, "error": "waypoints must be a non-empty list"}
+                )
             if len(waypoints_in) < 2:
-                return json.dumps({"ok": False, "error": "at least 2 waypoints are required"})
+                return json.dumps(
+                    {"ok": False, "error": "at least 2 waypoints are required"}
+                )
             easing = _normalize_easing_name(args.get("easing"))
             tol = float(args.get("tolerance", 1e-3))
             if not math.isfinite(tol) or tol < 0.0:
-                return json.dumps({"ok": False, "error": "tolerance must be a finite number >= 0"})
+                return json.dumps(
+                    {"ok": False, "error": "tolerance must be a finite number >= 0"}
+                )
             clear_range = bool(args.get("clear_range", True))
             constraints = args.get("constraints") or {
                 "keep_visible": True,
                 "min_coverage": 0.95,
             }
             base_value = args.get("base_value")
-            look_at_policy = str(args.get("look_at_policy", "preserve_direction") or "preserve_direction").strip().lower()
+            if not isinstance(base_value, dict) or not base_value:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "base_value is required (typed camera object). Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.",
+                    }
+                )
+            look_at_policy = (
+                str(
+                    args.get("look_at_policy", "preserve_direction")
+                    or "preserve_direction"
+                )
+                .strip()
+                .lower()
+            )
             if look_at_policy not in ("preserve_direction", "bbox_center"):
                 return json.dumps(
                     {
@@ -1405,7 +1870,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         }
                     )
                 if not math.isfinite(tm) or tm < 0.0:
-                    return json.dumps({"ok": False, "error": "waypoint time must be finite and >= 0"})
+                    return json.dumps(
+                        {"ok": False, "error": "waypoint time must be finite and >= 0"}
+                    )
                 if tm < t0 - tol or tm > t1 + tol:
                     return json.dumps(
                         {
@@ -1414,7 +1881,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         }
                     )
                 if tm in used_times:
-                    return json.dumps({"ok": False, "error": f"duplicate waypoint time: {tm}"})
+                    return json.dumps(
+                        {"ok": False, "error": f"duplicate waypoint time: {tm}"}
+                    )
                 used_times.add(tm)
 
                 entry: dict[str, Any] = {"time": tm}
@@ -1423,7 +1892,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 if eye is not None:
                     if not isinstance(eye, dict):
                         return json.dumps(
-                            {"ok": False, "error": "waypoint.eye must be an object or null"}
+                            {
+                                "ok": False,
+                                "error": "waypoint.eye must be an object or null",
+                            }
                         )
                     world_raw = eye.get("world")
                     frac_raw = eye.get("bbox_fraction")
@@ -1441,17 +1913,36 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     elif world_raw is not None:
                         v = world_raw
                         if not (isinstance(v, list) and len(v) == 3):
-                            return json.dumps({"ok": False, "error": "eye.world must be [x,y,z]"})
+                            return json.dumps(
+                                {"ok": False, "error": "eye.world must be [x,y,z]"}
+                            )
                         if not all(math.isfinite(float(x)) for x in v):
-                            return json.dumps({"ok": False, "error": "eye.world must contain finite numbers"})
-                        entry["eye"] = {"world": [float(v[0]), float(v[1]), float(v[2])]}
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "eye.world must contain finite numbers",
+                                }
+                            )
+                        entry["eye"] = {
+                            "world": [float(v[0]), float(v[1]), float(v[2])]
+                        }
                     else:
                         v = frac_raw
                         if not (isinstance(v, list) and len(v) == 3):
-                            return json.dumps({"ok": False, "error": "eye.bbox_fraction must be [fx,fy,fz]"})
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "eye.bbox_fraction must be [fx,fy,fz]",
+                                }
+                            )
                         vv = [float(v[0]), float(v[1]), float(v[2])]
                         if not all(math.isfinite(x) for x in vv):
-                            return json.dumps({"ok": False, "error": "eye.bbox_fraction must contain finite numbers"})
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "eye.bbox_fraction must contain finite numbers",
+                                }
+                            )
                         if any((x < 0.0 or x > 1.0) for x in vv):
                             return json.dumps(
                                 {
@@ -1465,7 +1956,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 if look is not None:
                     if not isinstance(look, dict):
                         return json.dumps(
-                            {"ok": False, "error": "waypoint.look_at must be an object or null"}
+                            {
+                                "ok": False,
+                                "error": "waypoint.look_at must be an object or null",
+                            }
                         )
                     world_raw = look.get("world")
                     frac_raw = look.get("bbox_fraction")
@@ -1488,19 +1982,38 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     elif world_raw is not None:
                         v = world_raw
                         if not (isinstance(v, list) and len(v) == 3):
-                            return json.dumps({"ok": False, "error": "look_at.world must be [x,y,z]"})
+                            return json.dumps(
+                                {"ok": False, "error": "look_at.world must be [x,y,z]"}
+                            )
                         if not all(math.isfinite(float(x)) for x in v):
-                            return json.dumps({"ok": False, "error": "look_at.world must contain finite numbers"})
-                        entry["look_at"] = {"world": [float(v[0]), float(v[1]), float(v[2])]}
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "look_at.world must contain finite numbers",
+                                }
+                            )
+                        entry["look_at"] = {
+                            "world": [float(v[0]), float(v[1]), float(v[2])]
+                        }
                     elif bbox_center:
                         entry["look_at"] = {"bbox_center": True}
                     else:
                         v = frac_raw
                         if not (isinstance(v, list) and len(v) == 3):
-                            return json.dumps({"ok": False, "error": "look_at.bbox_fraction must be [fx,fy,fz]"})
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "look_at.bbox_fraction must be [fx,fy,fz]",
+                                }
+                            )
                         vv = [float(v[0]), float(v[1]), float(v[2])]
                         if not all(math.isfinite(x) for x in vv):
-                            return json.dumps({"ok": False, "error": "look_at.bbox_fraction must contain finite numbers"})
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "look_at.bbox_fraction must contain finite numbers",
+                                }
+                            )
                         if any((x < 0.0 or x > 1.0) for x in vv):
                             return json.dumps(
                                 {
@@ -1516,10 +2029,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 waypoints.append(entry)
 
             # Solve typed camera keys (no writes) from waypoints.
+            base_cam = base_value
             keys = client.camera_path_solve(
                 ids=ids,
                 after_clipping=after_clipping,
-                base_value=base_value if isinstance(base_value, dict) else None,
+                base_value=base_cam,
                 waypoints=waypoints,
             )
             if not keys:
@@ -1546,7 +2060,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     or "{}"
                 )
                 if isinstance(clear_res, dict) and clear_res.get("ok") is False:
-                    return json.dumps({"ok": False, "error": f"failed to clear camera keys in range: {clear_res.get('error')}"})
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": f"failed to clear camera keys in range: {clear_res.get('error')}",
+                        }
+                    )
 
             applied: list[float] = []
             failed: list[dict[str, Any]] = []
@@ -1574,11 +2093,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         failed.append(
                             {
                                 "time": tv,
-                                "error": rr.get("error") or rr.get("reason") or "apply_failed",
+                                "error": rr.get("error")
+                                or rr.get("reason")
+                                or "apply_failed",
                             }
                         )
                 except Exception as e:
-                    failed.append({"time": float(k.get("time", 0.0) or 0.0), "error": str(e)})
+                    failed.append(
+                        {"time": float(k.get("time", 0.0) or 0.0), "error": str(e)}
+                    )
 
             payload: dict[str, Any] = {
                 "ok": not bool(failed),
@@ -1615,19 +2138,39 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
             segments_in = args.get("segments") or []
             if not isinstance(segments_in, list) or not segments_in:
-                return json.dumps({"ok": False, "error": "segments must be a non-empty list"})
+                return json.dumps(
+                    {"ok": False, "error": "segments must be a non-empty list"}
+                )
 
             easing = _normalize_easing_name(args.get("easing"))
             tol = float(args.get("tolerance", 1e-3))
             if not math.isfinite(tol) or tol < 0.0:
-                return json.dumps({"ok": False, "error": "tolerance must be a finite number >= 0"})
+                return json.dumps(
+                    {"ok": False, "error": "tolerance must be a finite number >= 0"}
+                )
             step_seconds = float(args.get("step_seconds", 1.0))
             if not math.isfinite(step_seconds) or step_seconds <= 0.0:
-                return json.dumps({"ok": False, "error": "step_seconds must be a finite number > 0"})
+                return json.dumps(
+                    {"ok": False, "error": "step_seconds must be a finite number > 0"}
+                )
             clear_range = bool(args.get("clear_range", True))
             constraints = args.get("constraints") or {"keep_visible": False}
             base_value = args.get("base_value")
-            look_at_policy = str(args.get("look_at_policy", "preserve_direction") or "preserve_direction").strip().lower()
+            if not isinstance(base_value, dict) or not base_value:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "base_value is required (typed camera object). Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.",
+                    }
+                )
+            look_at_policy = (
+                str(
+                    args.get("look_at_policy", "preserve_direction")
+                    or "preserve_direction"
+                )
+                .strip()
+                .lower()
+            )
             if look_at_policy not in ("preserve_direction", "bbox_center"):
                 return json.dumps(
                     {
@@ -1637,13 +2180,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 )
 
             # Initial camera pose.
-            cam: dict
-            if isinstance(base_value, dict) and base_value:
-                cam = base_value
-            else:
-                cam = client.camera_get()
-            if not isinstance(cam, dict) or not cam:
-                return json.dumps({"ok": False, "error": "failed to get a base camera value"})
+            cam: dict = base_value
             if look_at_policy == "bbox_center":
                 cam = client.camera_look_at(
                     target_bbox_center=True,
@@ -1656,16 +2193,22 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             segs: list[dict[str, Any]] = []
             for s in segments_in:
                 if not isinstance(s, dict):
-                    return json.dumps({"ok": False, "error": "each segment must be an object"})
+                    return json.dumps(
+                        {"ok": False, "error": "each segment must be an object"}
+                    )
                 segs.append(s)
 
             try:
                 segs = expand_walkthrough_segments(segs)
             except Exception as e:
-                return json.dumps({"ok": False, "error": f"segment template expansion failed: {e}"})
+                return json.dumps(
+                    {"ok": False, "error": f"segment template expansion failed: {e}"}
+                )
 
             span = float(t1 - t0)
-            any_u = any((s.get("u0") is not None) or (s.get("u1") is not None) for s in segs)
+            any_u = any(
+                (s.get("u0") is not None) or (s.get("u1") is not None) for s in segs
+            )
             any_dur = any(s.get("duration") is not None for s in segs)
             if any_u and any_dur:
                 return json.dumps(
@@ -1689,11 +2232,17 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     u0 = float(s.get("u0"))
                     u1 = float(s.get("u1"))
                     if not (math.isfinite(u0) and math.isfinite(u1)):
-                        return json.dumps({"ok": False, "error": "segment u0/u1 must be finite"})
+                        return json.dumps(
+                            {"ok": False, "error": "segment u0/u1 must be finite"}
+                        )
                     if u0 < 0.0 or u1 < 0.0 or u0 > 1.0 or u1 > 1.0:
-                        return json.dumps({"ok": False, "error": "segment u0/u1 must be in [0,1]"})
+                        return json.dumps(
+                            {"ok": False, "error": "segment u0/u1 must be in [0,1]"}
+                        )
                     if not (u1 > u0):
-                        return json.dumps({"ok": False, "error": "segment u1 must be > u0"})
+                        return json.dumps(
+                            {"ok": False, "error": "segment u1 must be > u0"}
+                        )
                     explicit.append((u0, u1, s))
                 explicit.sort(key=lambda it: float(it[0]))
 
@@ -1703,7 +2252,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 normalized: list[tuple[float, float, dict[str, Any]]] = []
                 for u0, u1, s in explicit:
                     if u0 < (ucur - eps):
-                        return json.dumps({"ok": False, "error": "segments overlap in u-space"})
+                        return json.dumps(
+                            {"ok": False, "error": "segments overlap in u-space"}
+                        )
                     if u0 > (ucur + eps):
                         normalized.append((ucur, u0, {"pause": True, "label": "pause"}))
                     normalized.append((u0, u1, s))
@@ -1736,7 +2287,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     durs.append(d)
                 total = float(sum(durs))
                 if not (total > 0.0):
-                    return json.dumps({"ok": False, "error": "total duration must be > 0"})
+                    return json.dumps(
+                        {"ok": False, "error": "total duration must be > 0"}
+                    )
                 tcur = float(t0)
                 for i, s in enumerate(segs):
                     dt = span * float(durs[i]) / total
@@ -1760,7 +2313,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     tcur = float(tb)
 
             if not time_ranges:
-                return json.dumps({"ok": False, "error": "no valid segments after normalization"})
+                return json.dumps(
+                    {"ok": False, "error": "no valid segments after normalization"}
+                )
 
             def _coerce_float(x: Any, *, field: str) -> float:
                 try:
@@ -1828,10 +2383,14 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     elif key == "roll":
                         roll += val
                     else:
-                        raise ValueError("segment.rotate keys must be one of: yaw, pitch, roll")
+                        raise ValueError(
+                            "segment.rotate keys must be one of: yaw, pitch, roll"
+                        )
                 return (yaw, pitch, roll)
 
-            def _apply_move(cam_value: dict, *, forward: float, right: float, up: float) -> dict:
+            def _apply_move(
+                cam_value: dict, *, forward: float, right: float, up: float
+            ) -> dict:
                 cur = cam_value
                 move_center = look_at_policy != "bbox_center"
                 if abs(forward) > 1e-12:
@@ -1866,7 +2425,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     )
                 return cur
 
-            def _apply_rotate(cam_value: dict, *, yaw: float, pitch: float, roll: float) -> dict:
+            def _apply_rotate(
+                cam_value: dict, *, yaw: float, pitch: float, roll: float
+            ) -> dict:
                 cur = cam_value
                 if abs(yaw) > 1e-12:
                     cur = client.camera_rotate(
@@ -1876,12 +2437,16 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     )
                 if abs(pitch) > 1e-12:
                     cur = client.camera_rotate(
-                        op=("ELEVATION" if look_at_policy == "bbox_center" else "PITCH"),
+                        op=(
+                            "ELEVATION" if look_at_policy == "bbox_center" else "PITCH"
+                        ),
                         degrees=float(pitch),
                         base_value=cur,
                     )
                 if abs(roll) > 1e-12:
-                    cur = client.camera_rotate(op="ROLL", degrees=float(roll), base_value=cur)
+                    cur = client.camera_rotate(
+                        op="ROLL", degrees=float(roll), base_value=cur
+                    )
                 return cur
 
             # Build camera key values by integrating segments sequentially.
@@ -1889,7 +2454,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             last_time = float(t0)
             for ta, tb, seg in time_ranges:
                 if not (math.isfinite(ta) and math.isfinite(tb)):
-                    return json.dumps({"ok": False, "error": "segment time range must be finite"})
+                    return json.dumps(
+                        {"ok": False, "error": "segment time range must be finite"}
+                    )
                 if tb <= ta:
                     continue
                 try:
@@ -1934,7 +2501,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 keys.append({"time": float(t1), "value": cam})
 
             if len(keys) < 2:
-                return json.dumps({"ok": False, "error": "walkthrough produced fewer than 2 keys"})
+                return json.dumps(
+                    {"ok": False, "error": "walkthrough produced fewer than 2 keys"}
+                )
 
             # Optionally clear existing keys in [t0,t1] before applying.
             if clear_range:
@@ -1988,11 +2557,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         failed.append(
                             {
                                 "time": tv,
-                                "error": rr.get("error") or rr.get("reason") or "apply_failed",
+                                "error": rr.get("error")
+                                or rr.get("reason")
+                                or "apply_failed",
                             }
                         )
                 except Exception as e:
-                    failed.append({"time": float(k.get("time", 0.0) or 0.0), "error": str(e)})
+                    failed.append(
+                        {"time": float(k.get("time", 0.0) or 0.0), "error": str(e)}
+                    )
 
             out: dict[str, Any] = {
                 "ok": not bool(failed),
@@ -2042,7 +2615,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if isinstance(json_key, str) and json_key.strip() == "":
             json_key = None
         include_values = bool(args.get("include_values", False))
-        lr = client.list_keys(animation_id=animation_id, target_id=id, json_key=json_key, include_values=include_values)
+        lr = client.list_keys(
+            animation_id=animation_id,
+            target_id=id,
+            json_key=json_key,
+            include_values=include_values,
+        )
         keys = [
             {"time": k.time, "type": k.type, "value": getattr(k, "value_json", "")}
             for k in lr.keys
@@ -2071,7 +2649,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": "json_key or name required"})
         jk = jk or ""
         try:
-            lr = client.list_keys(animation_id=animation_id, target_id=id, json_key=(jk or None), include_values=False)
+            lr = client.list_keys(
+                animation_id=animation_id,
+                target_id=id,
+                json_key=(jk or None),
+                include_values=False,
+            )
             times = [float(k.time) for k in getattr(lr, "keys", []) or []]
         except Exception as e:
             msg = str(e)
@@ -2083,7 +2666,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
         to_remove = [t for t in times if (t >= (tmin - tol) and t <= (tmax + tol))]
         remove_keys = [
-            {"id": int(id), "json_key": ("" if int(id) == 0 else str(jk)), "time": float(t)}
+            {
+                "id": int(id),
+                "json_key": ("" if int(id) == 0 else str(jk)),
+                "time": float(t),
+            }
             for t in to_remove
         ]
         if not remove_keys:
@@ -2100,7 +2687,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         try:
-            ok = client.batch(animation_id=animation_id, set_keys=[], remove_keys=remove_keys, commit=True)
+            ok = client.batch(
+                animation_id=animation_id,
+                set_keys=[],
+                remove_keys=remove_keys,
+                commit=True,
+            )
             payload = {
                 "ok": bool(ok),
                 "id": int(id),
@@ -2200,7 +2792,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
         if on_conflict == "skip":
             # Direction-aware processing prevents collisions with skipped keys.
-            proc = sorted(in_range, key=lambda kk: float(kk["time"]), reverse=delta >= 0)
+            proc = sorted(
+                in_range, key=lambda kk: float(kk["time"]), reverse=delta >= 0
+            )
             occupied = [float(k["time"]) for k in outside]
             for k in proc:
                 nt = new_time_for(k)
@@ -2248,7 +2842,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             for nt, _k in moved:
                 for okk in outside:
                     if abs(float(okk["time"]) - nt) <= tol:
-                        conflicts.append({"new_time": float(nt), "existing_time": float(okk["time"])})
+                        conflicts.append(
+                            {"new_time": float(nt), "existing_time": float(okk["time"])}
+                        )
             if conflicts and on_conflict == "error":
                 return json.dumps(
                     {
@@ -2309,7 +2905,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         try:
-            ok = client.batch(animation_id=animation_id, set_keys=set_keys, remove_keys=remove_keys, commit=True)
+            ok = client.batch(
+                animation_id=animation_id,
+                set_keys=set_keys,
+                remove_keys=remove_keys,
+                commit=True,
+            )
             out = {
                 "ok": bool(ok),
                 "id": int(id),
@@ -2357,7 +2958,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 {
                     "ok": True,
                     "id": int(id),
-                    "json_key": ("" if int(id) == 0 else str(args.get("json_key") or "")),
+                    "json_key": (
+                        "" if int(id) == 0 else str(args.get("json_key") or "")
+                    ),
                     "moved": 0,
                     "skipped": 0,
                     "overwritten": 0,
@@ -2433,8 +3036,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if on_conflict == "skip":
             above = [k for k in in_range if float(k["time"]) >= anchor_time]
             below = [k for k in in_range if float(k["time"]) < anchor_time]
-            above_proc = sorted(above, key=lambda kk: float(kk["time"]), reverse=scale > 1.0)
-            below_proc = sorted(below, key=lambda kk: float(kk["time"]), reverse=scale < 1.0)
+            above_proc = sorted(
+                above, key=lambda kk: float(kk["time"]), reverse=scale > 1.0
+            )
+            below_proc = sorted(
+                below, key=lambda kk: float(kk["time"]), reverse=scale < 1.0
+            )
             occupied = [float(k["time"]) for k in outside]
 
             def proc_key(k: dict[str, Any]):
@@ -2486,7 +3093,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             for nt, _k in moved:
                 for okk in outside:
                     if abs(float(okk["time"]) - nt) <= tol:
-                        conflicts.append({"new_time": float(nt), "existing_time": float(okk["time"])})
+                        conflicts.append(
+                            {"new_time": float(nt), "existing_time": float(okk["time"])}
+                        )
             if conflicts and on_conflict == "error":
                 return json.dumps(
                     {
@@ -2547,7 +3156,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         try:
-            ok = client.batch(animation_id=animation_id, set_keys=set_keys, remove_keys=remove_keys, commit=True)
+            ok = client.batch(
+                animation_id=animation_id,
+                set_keys=set_keys,
+                remove_keys=remove_keys,
+                commit=True,
+            )
             out = {
                 "ok": bool(ok),
                 "id": int(id),
@@ -2663,7 +3277,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     "error": "duplicate conflicts with existing keys (use on_conflict=overwrite or skip)",
                     "tolerance": float(tol),
                     "conflicts": [
-                        {"new_time": float(nt), "existing_times": [t for t in existing_times if abs(t - nt) <= tol]}
+                        {
+                            "new_time": float(nt),
+                            "existing_times": [
+                                t for t in existing_times if abs(t - nt) <= tol
+                            ],
+                        }
                         for nt, _k in conflicts
                     ],
                 }
@@ -2689,7 +3308,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
         for k in in_range:
             nt = new_time_for(k)
-            if on_conflict == "skip" and any(abs(nt - t) <= tol for t in existing_times):
+            if on_conflict == "skip" and any(
+                abs(nt - t) <= tol for t in existing_times
+            ):
                 skipped_mappings.append({"from": float(k["time"]), "to": float(nt)})
                 continue
             set_keys.append(
@@ -2717,7 +3338,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         try:
-            ok = client.batch(animation_id=animation_id, set_keys=set_keys, remove_keys=remove_keys, commit=True)
+            ok = client.batch(
+                animation_id=animation_id,
+                set_keys=set_keys,
+                remove_keys=remove_keys,
+                commit=True,
+            )
             out = {
                 "ok": bool(ok),
                 "id": int(id),
@@ -2784,7 +3410,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if animation_id <= 0:
             return json.dumps({"ok": False, "error": "animation_id is required"})
         seconds = float(args.get("seconds", 0.0))
-        return json.dumps({"ok": client.set_duration(animation_id=animation_id, seconds=seconds)})
+        return json.dumps(
+            {"ok": client.set_duration(animation_id=animation_id, seconds=seconds)}
+        )
 
     if name == "animation_set_key_param":
         animation_id = int(args.get("animation_id", 0) or 0)
@@ -2971,7 +3599,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if id == 0:
             ok = client.clear_keys(animation_id=animation_id, target_id=0, json_key="")
         else:
-            ok = client.clear_keys(animation_id=animation_id, target_id=id, json_key=str(args.get("json_key") or ""))
+            ok = client.clear_keys(
+                animation_id=animation_id,
+                target_id=id,
+                json_key=str(args.get("json_key") or ""),
+            )
         return json.dumps({"ok": ok})
 
     if name == "animation_remove_key":
@@ -2991,7 +3623,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         # Verify parameter exists
         if not _json_key_exists(id, json_key):
             return json.dumps({"ok": False, "error": "json_key not found for id"})
-        ok = client.remove_key(animation_id=animation_id, target_id=id, json_key=json_key, time=time_v)
+        ok = client.remove_key(
+            animation_id=animation_id, target_id=id, json_key=json_key, time=time_v
+        )
         return json.dumps({"ok": ok})
 
     if name == "animation_batch":
@@ -3084,14 +3718,15 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if ok:
             try:
                 if ctx.session_store is not None:
-                    ctx.session_store.set_meta(last_animation_save_path=str(p.expanduser().resolve()))
+                    ctx.session_store.set_meta(
+                        last_animation_save_path=str(p.expanduser().resolve())
+                    )
             except Exception:
                 pass
         return json.dumps({"ok": ok})
 
     if name == "animation_export_video":
         # Export .animation3d to MP4 by invoking headless Atlas
-        
 
         out = args.get("out")
         animation_id = int(args.get("animation_id", 0) or 0)
@@ -3115,7 +3750,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     break
         if atlas_bin is None:
             return json.dumps(
-                {"ok": False, "error": "Atlas binary not found; ensure Atlas is installed"}
+                {
+                    "ok": False,
+                    "error": "Atlas binary not found; ensure Atlas is installed",
+                }
             )
         # Save the current animation to a stable temp file and export from that file.
         try:
@@ -3129,7 +3767,9 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         anim_path = tdir / "export.animation3d"
         ok_save = bool(client.save_animation(animation_id=animation_id, path=anim_path))
         if not ok_save:
-            return json.dumps({"ok": False, "error": "failed to save animation for export"})
+            return json.dumps(
+                {"ok": False, "error": "failed to save animation for export"}
+            )
         rc = export_video(
             atlas_bin=str(atlas_bin),
             animation_path=anim_path,
@@ -3156,7 +3796,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         allow = False
         try:
             if ctx.session_store is not None:
-                allow = (ctx.session_store.get_consent("screenshots") is True)
+                allow = ctx.session_store.get_consent("screenshots") is True
         except Exception:
             allow = False
         if not allow:
@@ -3216,7 +3856,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         try:
             anim = load_animation(anim_path)
             d = anim.get("Duration") if isinstance(anim, dict) else None
-            if isinstance(d, (int, float)) and math.isfinite(float(d)) and float(d) >= 0:
+            if (
+                isinstance(d, (int, float))
+                and math.isfinite(float(d))
+                and float(d) >= 0
+            ):
                 duration_s = float(d)
         except Exception:
             duration_s = None

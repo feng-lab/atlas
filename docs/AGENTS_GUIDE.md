@@ -261,15 +261,15 @@ Guidance
 ## Camera Usage (Produce → Apply)
 
 Producers (no side effects)
-- `camera_get()` → returns the current engine camera as a typed camera value (useful as a base for chaining).
+- `camera_get()` → returns the current engine camera as a typed camera value (useful as a base for scene operations, or for seeding the first camera key in a new animation).
 - `camera_focus(ids?, after_clipping=true, min_radius=0.0)` → returns a typed camera value.
 - `camera_point_to(ids?, after_clipping=true)` → returns a typed camera value.
 - `camera_reset_view(mode, ids?, after_clipping=true, min_radius=0.0)` → returns a typed camera value.
-- `camera_rotate(op, degrees, base_value?)` → returns a typed camera value.
-- `camera_move_local(op, distance, distance_is_fraction_of_bbox_radius=true, move_center=true, base_value?)` → returns a typed camera value.
+- `camera_rotate(op, degrees, base_value)` → returns a typed camera value.
+- `camera_move_local(op, distance, distance_is_fraction_of_bbox_radius=true, move_center=true, base_value)` → returns a typed camera value.
   - Use this for first-person walkthrough building blocks: `FORWARD/BACK/LEFT/RIGHT/UP/DOWN`.
-- `camera_look_at(world_point | target_bbox_center | bbox_fraction_point, base_value?)` → returns a typed camera value (sets camera center; keeps eye).
-- `camera_path_solve(waypoints, ids?, base_value?)` → returns `{time,value}` keys from waypoint geometry (does not write keys).
+- `camera_look_at(world_point | target_bbox_center | bbox_fraction_point, base_value)` → returns a typed camera value (sets camera center; keeps eye).
+- `camera_path_solve(waypoints, ids?, base_value)` → returns `{time,value}` keys from waypoint geometry (does not write keys).
  - Read current scene camera: `scene_get_values(id=0, json_keys=["Camera 3DCamera"])` (or pass empty `json_keys` to retrieve it among all values).
 
 Scene-only (stateless) apply
@@ -282,14 +282,18 @@ Animation (timeline) authoring
   - Tip: for ORBIT, use `degrees` (default 360) and optionally `max_step_degrees` to control key density (default 90; smaller → more keys/smoother). Use `params.axis` (default `"y"`).
   - FIT/STATIC semantics: the RPC server ignores `t1` and produces a single key at `t0` (it does **not** fill keys across the interval). If `clear_range=true` and `t1 > t0`, existing camera keys inside `[t0,t1]` may be removed (except solver key times) — set `t1=t0` (or `clear_range=false`) when you only want a one-shot fit.
 - Validate camera key sequences: `animation_camera_validate(animation_id, ids, times, values?, constraints?, policies?)` (values optional; when omitted, the server samples from `animation_id` at those times).
+- Sample the camera from the timeline (no validation, no key writes): `animation_camera_sample(animation_id, times)` → `samples:[{time,value}]`.
+  - Use this to get a deterministic `base_value` for `camera_rotate/camera_move_local/camera_look_at` while editing an existing animation.
 - Single-time explicit write: `animation_replace_key_camera(animation_id, time, value, easing?)`.
   - Provider compatibility: `value` may be passed as a JSON string and Atlas Agent will parse it.
 - Guided waypoint spline (one-shot apply):
-  - `animation_camera_waypoint_spline_apply(animation_id, t0, t1, waypoints=[...], constraints?, clear_range=true, easing="Linear")`
+  - `animation_camera_waypoint_spline_apply(animation_id, t0, t1, base_value, waypoints=[...], constraints?, clear_range=true, easing="Linear")`
+  - Tip: prefer `base_value = animation_camera_sample(animation_id, times=[t0]).samples[0].value` so the path is anchored to the timeline.
   - Optional: `look_at_policy="bbox_center"` fills missing `look_at` so the camera keeps tracking the bbox center; default preserves the previous view direction when `look_at` is omitted.
   - Note: this tool does **not** change the animation duration; call `animation_set_duration(animation_id, seconds)` separately if needed.
 - First-person walkthrough (one-shot apply):
-  - `animation_camera_walkthrough_apply(animation_id, t0, t1, segments=[...], step_seconds=1.0, constraints={keep_visible:false})`
+  - `animation_camera_walkthrough_apply(animation_id, t0, t1, base_value, segments=[...], step_seconds=1.0, constraints={keep_visible:false})`
+  - Tip: prefer `base_value = animation_camera_sample(animation_id, times=[t0]).samples[0].value` so motion is anchored to the existing timeline.
   - Optional: `look_at_policy="bbox_center"` keeps aiming at the bbox center (third-person track) and interprets yaw/pitch as azimuth/elevation around the center; default preserves first-person yaw/pitch look control.
   - Note: this tool does **not** change the animation duration; call `animation_set_duration(animation_id, seconds)` separately if needed.
 
@@ -391,17 +395,19 @@ Use this when you want to **enter** a volume/mesh and navigate “like a drone�
 
 Typical tool pattern (preferred: one-shot apply):
 1) `animation_ensure_animation` → capture `animation_id`, then `animation_set_duration(animation_id, seconds)`
-2) `animation_camera_walkthrough_apply(animation_id, t0, t1, segments=[...], step_seconds=1.0, constraints={keep_visible:false})`
-3) Verify:
+2) `base_value = animation_camera_sample(animation_id, times=[t0]).samples[0].value` (use `camera_focus(...)` or `camera_get()` only when seeding a new timeline with no camera keys yet)
+3) `animation_camera_walkthrough_apply(animation_id, t0, t1, base_value, segments=[...], step_seconds=1.0, constraints={keep_visible:false})`
+4) Verify:
    - `animation_list_keys(animation_id, id=0)` and optionally `animation_camera_validate(animation_id, ids, times, values?, constraints={keep_visible:false})`
 
 Low-level pattern (when you need exact control over each pose):
 1) `animation_ensure_animation` → capture `animation_id`, then `animation_set_duration(animation_id, seconds)`
 2) Build a sequence of camera values by chaining:
-   - `camera_get()` (optional) → base_value
-   - `camera_move_local(FORWARD/RIGHT/UP, distance_is_fraction_of_bbox_radius=true, ...)`
+   - `animation_camera_sample(animation_id, times=[t0])` → base_value (preferred when editing an existing timeline)
+   - `camera_get()` → base_value (useful for seeding a new timeline before any camera keys exist)
+   - `camera_move_local(FORWARD/RIGHT/UP, distance_is_fraction_of_bbox_radius=true, base_value=...)`
    - `camera_rotate(YAW/PITCH, degrees, base_value=...)`
-   - `camera_look_at(...)` (optional, for guided aiming)
+   - `camera_look_at(...)` (optional, for guided aiming; requires base_value)
 3) For each produced camera value, write a key:
    - `animation_replace_key_camera(animation_id, time=..., value=..., constraints={keep_visible:false})` for interior shots
 4) Verify:
@@ -417,11 +423,12 @@ Use this when you want a **controlled camera path** through specific locations (
 
 Typical tool pattern:
 1) `animation_ensure_animation` → capture `animation_id`, then `animation_set_duration(animation_id, t1)`
-2) `animation_camera_waypoint_spline_apply(animation_id, t0, t1, waypoints=[...])`
+2) `base_value = animation_camera_sample(animation_id, times=[t0]).samples[0].value` (use `camera_focus(...)` or `camera_get()` only when seeding a new timeline with no camera keys yet)
+3) `animation_camera_waypoint_spline_apply(animation_id, t0, t1, base_value, waypoints=[...])`
    - Waypoints can use bbox fractions to avoid guessing world units:
      - `eye: {bbox_fraction:[fx,fy,fz]}`
      - `look_at: {bbox_center:true}` or `look_at: {bbox_fraction:[fx,fy,fz]}`
-3) Verify:
+4) Verify:
    - `animation_list_keys(animation_id, id=0)` and optionally `animation_camera_validate(animation_id, ids, times, values?, constraints={keep_visible:false})`
 
 Prompting guidance (user-facing):

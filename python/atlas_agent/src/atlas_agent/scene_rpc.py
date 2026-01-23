@@ -87,7 +87,9 @@ def _expand_local_dir_non_recursive(dir_path: Path) -> list[str]:
     return files
 
 
-def _expand_sources_for_load(sources: Iterable[str]) -> tuple[list[str], dict[str, Any]]:
+def _expand_sources_for_load(
+    sources: Iterable[str],
+) -> tuple[list[str], dict[str, Any]]:
     """Expand local directory sources to immediate files (non-recursive).
 
     Returns:
@@ -122,7 +124,7 @@ def _expand_sources_for_load(sources: Iterable[str]) -> tuple[list[str], dict[st
         p = Path(t)
         try:
             if not p.is_absolute():
-                p = (Path.cwd() / p)
+                p = Path.cwd() / p
         except Exception:
             pass
 
@@ -141,7 +143,9 @@ def _expand_sources_for_load(sources: Iterable[str]) -> tuple[list[str], dict[st
                             {"dir": str(p.resolve()), "file_count": len(dir_files)}
                         )
                     except Exception:
-                        expanded_dirs.append({"dir": str(p), "file_count": len(dir_files)})
+                        expanded_dirs.append(
+                            {"dir": str(p), "file_count": len(dir_files)}
+                        )
                 else:
                     skipped_dirs.append(
                         {
@@ -587,7 +591,11 @@ class SceneClient:
 
         src_list, expand_info = _expand_sources_for_load(sources)
         if not src_list:
-            skipped = expand_info.get("skipped_dirs") if isinstance(expand_info, dict) else None
+            skipped = (
+                expand_info.get("skipped_dirs")
+                if isinstance(expand_info, dict)
+                else None
+            )
             if skipped:
                 raise ValueError(
                     "sources resolved to an empty set after folder expansion "
@@ -702,7 +710,11 @@ class SceneClient:
 
         expanded_sources, expand_info = _expand_sources_for_load(sources)
         if not expanded_sources:
-            skipped = expand_info.get("skipped_dirs") if isinstance(expand_info, dict) else None
+            skipped = (
+                expand_info.get("skipped_dirs")
+                if isinstance(expand_info, dict)
+                else None
+            )
             if skipped:
                 raise ValueError(
                     "sources resolved to an empty set after folder expansion "
@@ -812,7 +824,9 @@ class SceneClient:
                     ready_ids.append(oid)
                     seen.add(oid)
 
-        has_scene_source = any(str(s or "").lower().endswith(".scene") for s in expanded_sources)
+        has_scene_source = any(
+            str(s or "").lower().endswith(".scene") for s in expanded_sources
+        )
 
         if wait_ready and not in_progress and (ready_ids or has_scene_source):
             # Ensure a 3D view exists so engine-backed readiness checks are meaningful.
@@ -1441,14 +1455,18 @@ class SceneClient:
         return vals[0] if vals else {}
 
     def camera_rotate(
-        self, op: str, degrees: float = 90.0, base_value: Optional[dict] = None
+        self, op: str, degrees: float = 90.0, *, base_value: dict
     ) -> dict:
         self.ensure_view()
-        bv = _to_proto_value(base_value) if base_value is not None else None
+        if not isinstance(base_value, dict) or not base_value:
+            raise ValueError(
+                "camera_rotate: base_value is required and must be a typed camera object"
+            )
+        bv = _to_proto_value(base_value)
         req = self._pb2.CameraRotateRequest(
             op=str(op),
             degrees=float(degrees),
-            base_value=bv if bv is not None else None,
+            base_value=bv,
         )
         resp = self._stub.CameraRotate(
             req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
@@ -1487,12 +1505,16 @@ class SceneClient:
         ids: Optional[list[int]] = None,
         after_clipping: bool = True,
         move_center: bool = True,
-        base_value: Optional[dict] = None,
+        base_value: dict,
     ) -> dict:
         """Move camera in its local basis (first-person 'fly' building block)."""
         self.ensure_view()
         if not hasattr(self._stub, "CameraMoveLocal"):
             raise RuntimeError("CameraMoveLocal is not supported by this Atlas version")
+        if not isinstance(base_value, dict) or not base_value:
+            raise ValueError(
+                "camera_move_local: base_value is required and must be a typed camera object"
+            )
         kwargs: dict[str, Any] = {
             "op": str(op),
             "distance": float(distance),
@@ -1502,9 +1524,8 @@ class SceneClient:
             "ids": [int(i) for i in (ids or [])],
             "after_clipping": bool(after_clipping),
             "move_center": bool(move_center),
+            "base_value": _to_proto_value(base_value),
         }
-        if base_value is not None:
-            kwargs["base_value"] = _to_proto_value(base_value)
         req = self._pb2.CameraMoveLocalRequest(**kwargs)
         resp = self._stub.CameraMoveLocal(
             req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
@@ -1521,12 +1542,16 @@ class SceneClient:
         bbox_fraction_point: Optional[tuple[float, float, float]] = None,
         ids: Optional[list[int]] = None,
         after_clipping: bool = True,
-        base_value: Optional[dict] = None,
+        base_value: dict,
     ) -> dict:
         """Aim camera at a world point or bbox-derived point (no key writes)."""
         self.ensure_view()
         if not hasattr(self._stub, "CameraLookAt"):
             raise RuntimeError("CameraLookAt is not supported by this Atlas version")
+        if not isinstance(base_value, dict) or not base_value:
+            raise ValueError(
+                "camera_look_at: base_value is required and must be a typed camera object"
+            )
 
         modes = 0
         if world_point is not None:
@@ -1543,9 +1568,8 @@ class SceneClient:
         kwargs: dict[str, Any] = {
             "ids": [int(i) for i in (ids or [])],
             "after_clipping": bool(after_clipping),
+            "base_value": _to_proto_value(base_value),
         }
-        if base_value is not None:
-            kwargs["base_value"] = _to_proto_value(base_value)
 
         if world_point is not None:
             x, y, z = world_point
@@ -1572,13 +1596,17 @@ class SceneClient:
         *,
         ids: Optional[list[int]] = None,
         after_clipping: bool = True,
-        base_value: Optional[dict] = None,
+        base_value: dict,
         waypoints: list[dict],
     ) -> list[dict]:
         """Solve typed camera keys from waypoints (does not write keys)."""
         self.ensure_view()
         if not hasattr(self._stub, "CameraPathSolve"):
             raise RuntimeError("CameraPathSolve is not supported by this Atlas version")
+        if not isinstance(base_value, dict) or not base_value:
+            raise ValueError(
+                "camera_path_solve: base_value is required and must be a typed camera object"
+            )
 
         pb_wps = []
         for w in waypoints or []:
@@ -1626,9 +1654,8 @@ class SceneClient:
             "ids": [int(i) for i in (ids or [])],
             "after_clipping": bool(after_clipping),
             "waypoints": pb_wps,
+            "base_value": _to_proto_value(base_value),
         }
-        if base_value is not None:
-            req_kwargs["base_value"] = _to_proto_value(base_value)
         req = self._pb2.CameraPathSolveRequest(**req_kwargs)
         resp = self._stub.CameraPathSolve(
             req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
@@ -1795,6 +1822,35 @@ class SceneClient:
                 pass
             results.append(row)
         return {"ok": bool(getattr(resp, "ok", False)), "results": results}
+
+    def camera_sample(self, *, animation_id: int, times: list[float]) -> list[dict]:
+        """Sample evaluated camera values from an Animation3D at specific times.
+
+        This does not mutate the engine time or write any keys; it evaluates the
+        animation camera track directly.
+        """
+        if not hasattr(self._stub, "CameraSample"):
+            raise RuntimeError("CameraSample is not supported by this Atlas version")
+        if int(animation_id) <= 0:
+            raise ValueError("camera_sample: animation_id is required")
+        if not isinstance(times, list) or not times:
+            raise ValueError("camera_sample: times must be a non-empty list")
+        req = self._pb2.CameraSampleRequest(
+            animation_id=int(animation_id), times=[float(t) for t in times]
+        )
+        resp = self._stub.CameraSample(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
+        self._log_rpc("CameraSample", req, resp)
+        out: list[dict] = []
+        for s in getattr(resp, "samples", []):
+            out.append(
+                {
+                    "time": float(getattr(s, "time", 0.0)),
+                    "value": MessageToDict(getattr(s, "value")),
+                }
+            )
+        return out
 
     # Keys
     def set_key_camera(
@@ -2181,9 +2237,13 @@ class SceneClient:
         """
 
         if self._stub is None or not hasattr(self._stub, "RemoveObjects"):
-            raise RuntimeError("RPC RemoveObjects is not available in this Atlas build.")
+            raise RuntimeError(
+                "RPC RemoveObjects is not available in this Atlas build."
+            )
         if self._pb2 is None or not hasattr(self._pb2, "RemoveObjectsRequest"):
-            raise RuntimeError("RPC RemoveObjectsRequest is not available in this Atlas build.")
+            raise RuntimeError(
+                "RPC RemoveObjectsRequest is not available in this Atlas build."
+            )
 
         self.ensure_view()
         if not ids:

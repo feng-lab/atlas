@@ -239,16 +239,16 @@ These return typed camera values/keys that clients can write via `SetKey(animati
 
 - `CameraFocus(ids?, after_clipping?, min_radius?) -> { values:[Value] }`
 - `CameraPointTo(ids?, after_clipping?) -> { values:[Value] }`
-- `CameraRotate { op, degrees?, base_value? } -> { values:[Value] }`
+- `CameraRotate { op, degrees?, base_value } -> { values:[Value] }`
 - `CameraResetView { mode, ids?, after_clipping?, min_radius? } -> { values:[Value] }`
 
 ### Freeform Walkthrough Building Blocks
 
-- `CameraMoveLocal { op:"FORWARD|BACK|RIGHT|LEFT|UP|DOWN", distance, distance_is_fraction_of_bbox_radius?, ids?, after_clipping?, move_center?, base_value? } -> { values:[Value] }`
+- `CameraMoveLocal { op:"FORWARD|BACK|RIGHT|LEFT|UP|DOWN", distance, distance_is_fraction_of_bbox_radius?, ids?, after_clipping?, move_center?, base_value } -> { values:[Value] }`
   - Use this to build first-person walkthroughs without guessing world units (when `distance_is_fraction_of_bbox_radius=true`).
-- `CameraLookAt { base_value?, target=(world_point|target_bbox_center|bbox_fraction_point), ids?, after_clipping? } -> { values:[Value] }`
+- `CameraLookAt { base_value, target=(world_point|target_bbox_center|bbox_fraction_point), ids?, after_clipping? } -> { values:[Value] }`
   - Aim the camera (updates center; preserves eye).
-- `CameraPathSolve { ids?, after_clipping?, base_value?, waypoints:[...] } -> { keys:[{time,value}...] }`
+- `CameraPathSolve { ids?, after_clipping?, base_value, waypoints:[...] } -> { keys:[{time,value}...] }`
   - Produces typed camera keys from waypoint geometry (does not write keys).
   - Waypoints can specify eye/look-at in world coords or bbox fractions; missing fields are filled using the previous waypoint’s direction/distance.
 
@@ -263,6 +263,9 @@ These return typed camera values/keys that clients can write via `SetKey(animati
 - `CameraValidate { ids, times, values?, constraints?, policies?, animation_id? } -> { ok, results:[{time, within_frame, coverage, adjusted, adjusted_value?, reason}] }`
   - If `values` are omitted (or shorter than `times`), `animation_id` is required and the server samples the animation camera at those `times`.
   - Interior walkthroughs: set `constraints.keep_visible=false` to disable the coverage threshold (so the camera can go inside / let the bbox leave the frame).
+- `CameraSample { animation_id, times } -> { samples:[{time, value}] }`
+  - Samples the evaluated animation camera at the requested `times` without changing engine time or writing keys.
+  - Use this to get a deterministic `base_value` for camera operators while authoring an animation.
 
 ## Camera Animation Settings (Timeline Evaluation)
 
