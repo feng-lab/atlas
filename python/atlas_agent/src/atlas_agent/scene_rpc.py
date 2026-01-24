@@ -1728,7 +1728,6 @@ class SceneClient:
                 keep_visible=bool(constraints.get("keep_visible", True)),
                 margin=float(constraints.get("margin", 0.0)),
                 min_coverage=float(constraints.get("min_coverage", 0.95)),
-                fov_policy=str(constraints.get("fov_policy", "fixed")),
             )
         st = None
         if params:
@@ -1781,14 +1780,12 @@ class SceneClient:
                 keep_visible=bool(constraints.get("keep_visible", True)),
                 margin=float(constraints.get("margin", 0.0)),
                 min_coverage=float(constraints.get("min_coverage", 0.95)),
-                fov_policy=str(constraints.get("fov_policy", "fixed")),
             )
         pol = None
         if policies:
             pol = self._pb2.CameraPolicies(
                 adjust_fov=bool(policies.get("adjust_fov", False)),
                 adjust_distance=bool(policies.get("adjust_distance", False)),
-                adjust_clipping=bool(policies.get("adjust_clipping", False)),
             )
         req_kwargs: dict[str, Any] = {
             "ids": ids or [],

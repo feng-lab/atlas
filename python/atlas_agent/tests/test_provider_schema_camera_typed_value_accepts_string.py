@@ -37,7 +37,7 @@ def _has_string_variant(schema) -> bool:
     return False
 
 
-def _assert_tool_value_param_accepts_string(tool, *, tool_name: str) -> None:
+def _assert_tool_value_param_is_strict_typed_camera(tool, *, tool_name: str) -> None:
     assert isinstance(tool, dict)
     params = tool.get("parameters")
     assert isinstance(params, dict), f"{tool_name}: missing parameters"
@@ -45,29 +45,65 @@ def _assert_tool_value_param_accepts_string(tool, *, tool_name: str) -> None:
     assert isinstance(props, dict), f"{tool_name}: parameters.properties missing"
     assert "value" in props, f"{tool_name}: missing parameters.properties.value"
     value_schema = props.get("value")
-    assert _has_string_variant(value_schema), (
-        f"{tool_name}: value schema should accept a JSON string for provider compatibility; "
-        f"got {value_schema!r}"
+    assert isinstance(value_schema, dict), f"{tool_name}: value schema missing/invalid"
+    assert value_schema.get("type") == "object", f"{tool_name}: value must be an object"
+    vprops = value_schema.get("properties")
+    assert isinstance(vprops, dict), f"{tool_name}: value.properties missing"
+    expected = {
+        "Projection Type StringIntOption",
+        "Eye Position Vec3",
+        "Center Position Vec3",
+        "Up Vector Vec3",
+        "Eye Separation Angle Float",
+        "Field of View Float",
+    }
+    for k in expected:
+        assert k in vprops, f"{tool_name}: value schema missing key: {k}"
+    assert not _has_string_variant(value_schema), (
+        f"{tool_name}: value schema must be strict (no JSON-string variant); got {value_schema!r}"
     )
 
 
-def test_scene_camera_apply_accepts_json_string_value_in_responses_schema() -> None:
+def test_scene_camera_apply_value_is_strict_camera_object_in_responses_schema() -> None:
     raw_tools = build_tool_list()
     tools = normalize_tools_for_responses_api(raw_tools) or []
-    found = next((t for t in tools if t.get("type") == "function" and t.get("name") == "scene_camera_apply"), None)
+    found = next(
+        (
+            t
+            for t in tools
+            if t.get("type") == "function" and t.get("name") == "scene_camera_apply"
+        ),
+        None,
+    )
     assert found is not None, "scene_camera_apply not found in Responses tool list"
-    _assert_tool_value_param_accepts_string(found, tool_name="scene_camera_apply")
+    _assert_tool_value_param_is_strict_typed_camera(
+        found, tool_name="scene_camera_apply"
+    )
 
 
-def test_animation_replace_key_camera_accepts_json_string_value_in_responses_schema() -> None:
+def test_animation_replace_key_camera_value_is_strict_camera_object_in_responses_schema() -> (
+    None
+):
     raw_tools = build_tool_list()
     tools = normalize_tools_for_responses_api(raw_tools) or []
-    found = next((t for t in tools if t.get("type") == "function" and t.get("name") == "animation_replace_key_camera"), None)
-    assert found is not None, "animation_replace_key_camera not found in Responses tool list"
-    _assert_tool_value_param_accepts_string(found, tool_name="animation_replace_key_camera")
+    found = next(
+        (
+            t
+            for t in tools
+            if t.get("type") == "function"
+            and t.get("name") == "animation_replace_key_camera"
+        ),
+        None,
+    )
+    assert found is not None, (
+        "animation_replace_key_camera not found in Responses tool list"
+    )
+    _assert_tool_value_param_is_strict_typed_camera(
+        found, tool_name="animation_replace_key_camera"
+    )
 
 
-def test_scene_camera_apply_accepts_json_string_value_in_chat_schema() -> None:
+def test_scene_camera_apply_value_is_strict_camera_object_in_chat_schema() -> None:
     raw_tools = build_tool_list()
     tools = normalize_tools_for_chat_completions_api(raw_tools) or []
     found = next(
@@ -85,10 +121,14 @@ def test_scene_camera_apply_accepts_json_string_value_in_chat_schema() -> None:
     tool = {
         "parameters": fn.get("parameters"),
     }
-    _assert_tool_value_param_accepts_string(tool, tool_name="scene_camera_apply")
+    _assert_tool_value_param_is_strict_typed_camera(
+        tool, tool_name="scene_camera_apply"
+    )
 
 
-def test_animation_replace_key_camera_accepts_json_string_value_in_chat_schema() -> None:
+def test_animation_replace_key_camera_value_is_strict_camera_object_in_chat_schema() -> (
+    None
+):
     raw_tools = build_tool_list()
     tools = normalize_tools_for_chat_completions_api(raw_tools) or []
     found = next(
@@ -106,5 +146,6 @@ def test_animation_replace_key_camera_accepts_json_string_value_in_chat_schema()
     tool = {
         "parameters": fn.get("parameters"),
     }
-    _assert_tool_value_param_accepts_string(tool, tool_name="animation_replace_key_camera")
-
+    _assert_tool_value_param_is_strict_typed_camera(
+        tool, tool_name="animation_replace_key_camera"
+    )

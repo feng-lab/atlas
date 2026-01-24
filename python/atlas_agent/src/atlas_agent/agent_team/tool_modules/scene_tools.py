@@ -20,6 +20,7 @@ from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
 from .file_formats import SCENE_LOAD_CATEGORIES, get_supported_extensions
 from .preconditions import require_engine_ready, require_screenshot_consent
+from .schemas_camera_value import CAMERA_TYPED_VALUE_SCHEMA
 
 SCENE_SET_PARAMS_SCHEMA: Dict[str, Any] = {
     "type": "object",
@@ -119,11 +120,9 @@ TOOLS: List[Tool] = [
                 "value": {
                     "description": (
                         "Typed camera value (object with camera fields). "
-                        "Typically obtained from camera_* tools like camera_focus / camera_rotate / camera_reset_view.\n"
-                        "Provider compatibility: some tool-call validators cannot represent arbitrary JSON objects; "
-                        "in that case you may pass this as a JSON string and Atlas Agent will parse it."
+                        "Typically obtained from camera_* tools like camera_focus / camera_rotate / camera_reset_view."
                     ),
-                    "type": ["object", "string"],
+                    **CAMERA_TYPED_VALUE_SCHEMA,
                 }
             },
             "required": ["value"],
@@ -1812,21 +1811,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     if name == "scene_camera_apply":
         try:
             cam = args.get("value")
-            if isinstance(cam, str):
-                try:
-                    cam = json.loads(cam)
-                except Exception as e:
-                    return json.dumps(
-                        {
-                            "ok": False,
-                            "error": f"value JSON parse failed: {e}",
-                        }
-                    )
             if not cam or not isinstance(cam, dict):
                 return json.dumps(
                     {
                         "ok": False,
-                        "error": "value must be a typed camera object (dict) or a JSON string encoding one",
+                        "error": "value must be a typed camera object (dict)",
                     }
                 )
             ok = client.apply_params(

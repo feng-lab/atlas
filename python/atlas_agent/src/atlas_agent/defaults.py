@@ -20,7 +20,7 @@ DEFAULT_EXECUTOR_MAX_ROUNDS = 9600
 #
 # Note: this is a default, not a behavior cap. Users can override it via
 # `--planner-max-rounds` (including `0` for unlimited).
-DEFAULT_PLANNER_MAX_ROUNDS = 240
+DEFAULT_PLANNER_MAX_ROUNDS = 2400
 
 
 # Responses-tool-loop defaults / guardrails
@@ -30,14 +30,14 @@ DEFAULT_PLANNER_MAX_ROUNDS = 240
 # work. When these need changes, update them here so magic numbers don't drift.
 CONTEXT_TRIM_MAX_RETRIES = 32
 TRANSIENT_NETWORK_MAX_RETRIES = 3
-TRANSIENT_NETWORK_BACKOFF_SECONDS = 3
+TRANSIENT_NETWORK_BACKOFF_SECONDS = 0.6
 FINAL_OUTPUT_CONTINUE_MAX_CALLS = 8
 
 # Some OpenAI-compatible gateways occasionally return a response payload that is
 # missing the routed model name (resp["model"]). For OpenAI models, this strongly
 # suggests the request did not fully reach (or return from) the intended backend.
 # Treat it like a transient gateway hiccup and retry a few times before failing.
-GATEWAY_MODEL_DETECTION_MAX_RETRIES = 50
+GATEWAY_MODEL_DETECTION_MAX_RETRIES = 100
 
 # Context checkpoint compaction (within-turn)
 #
@@ -110,4 +110,4 @@ DEFAULT_CODEGEN_STDIO_PREVIEW_CHARS = 8000
 # When enabled:
 # - "cached": uses provider cached content (no live internet access)
 # - "live": allows live internet access (provider-controlled)
-DEFAULT_WEB_SEARCH_MODE = "off"  # "off" | "cached" | "live"
+DEFAULT_WEB_SEARCH_MODE = "cached"  # "off" | "cached" | "live"

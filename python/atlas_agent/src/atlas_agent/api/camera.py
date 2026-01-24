@@ -95,7 +95,6 @@ class CameraAPI:
             or {
                 "adjust_fov": False,
                 "adjust_distance": False,
-                "adjust_clipping": False,
             },
         )
         return res

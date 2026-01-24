@@ -116,13 +116,15 @@ def _type_from_schema(schema: Any, *, name_hint: str) -> Any:
     return Any
 
 
-def _model_from_object_schema(schema: dict[str, Any], *, name_hint: str) -> type[BaseModel]:
+def _model_from_object_schema(
+    schema: dict[str, Any], *, name_hint: str
+) -> type[BaseModel]:
     props = schema.get("properties") or {}
     required = set(schema.get("required") or [])
     extra = "forbid" if schema.get("additionalProperties") is False else "allow"
 
     fields: dict[str, tuple[Any, Any]] = {}
-    for key, sub in (props.items() if isinstance(props, dict) else []):
+    for key, sub in props.items() if isinstance(props, dict) else []:
         k = str(key)
         typ = _type_from_schema(sub, name_hint=name_hint + "_" + k)
         desc = None
@@ -180,7 +182,11 @@ def tool_from_schema(
     params = _normalize_tool_parameters_schema(parameters_schema)
 
     args_model: type[BaseModel]
-    if isinstance(params, dict) and params.get("type") == "object" and isinstance(params.get("properties"), dict):
+    if (
+        isinstance(params, dict)
+        and params.get("type") == "object"
+        and isinstance(params.get("properties"), dict)
+    ):
         args_model = _model_from_object_schema(params, name_hint=name)
     else:
         # Fallback: accept any dict-shaped args.
@@ -231,16 +237,54 @@ class ToolRegistry:
         except Exception:
             raw = {}
         if not isinstance(raw, dict):
-            return json.dumps({"ok": False, "error": "tool arguments must be a JSON object"})
+            return json.dumps(
+                {"ok": False, "error": "tool arguments must be a JSON object"}
+            )
 
         try:
             validated = tool.args_model.model_validate(raw)
         except ValidationError as e:
+            errors = e.errors()
+            missing_fields: list[str] = []
+            extra_fields: list[str] = []
+            try:
+                for err in errors:
+                    if not isinstance(err, dict):
+                        continue
+                    typ = str(err.get("type") or "")
+                    loc = err.get("loc")
+                    if typ == "missing":
+                        if isinstance(loc, tuple) and loc and isinstance(loc[0], str):
+                            missing_fields.append(loc[0])
+                    if typ == "extra_forbidden":
+                        if isinstance(loc, tuple) and loc and isinstance(loc[0], str):
+                            extra_fields.append(loc[0])
+            except Exception:
+                missing_fields = []
+                extra_fields = []
+
+            missing_fields_u = sorted(set(missing_fields))
+            extra_fields_u = sorted(set(extra_fields))
+
+            msg = f"invalid arguments for {name}"
+            if missing_fields_u:
+                shown = missing_fields_u[:6]
+                msg += f"; missing required fields: {', '.join(shown)}"
+                if len(missing_fields_u) > len(shown):
+                    msg += f" (+{len(missing_fields_u) - len(shown)} more)"
+            if extra_fields_u:
+                shown = extra_fields_u[:6]
+                msg += f"; unexpected fields: {', '.join(shown)}"
+                if len(extra_fields_u) > len(shown):
+                    msg += f" (+{len(extra_fields_u) - len(shown)} more)"
+
             return json.dumps(
                 {
                     "ok": False,
-                    "error": f"invalid arguments for {name}",
-                    "validation_error": e.errors(),
+                    "error": msg,
+                    "validation_error": errors,
+                    "missing_fields": missing_fields_u,
+                    "unexpected_fields": extra_fields_u,
                 },
                 ensure_ascii=False,
             )
@@ -253,12 +297,16 @@ class ToolRegistry:
             except Exception as e:
                 msg = str(e)
             if isinstance(msg, str) and msg.strip():
-                return json.dumps({"ok": False, "error": msg.strip()}, ensure_ascii=False)
+                return json.dumps(
+                    {"ok": False, "error": msg.strip()}, ensure_ascii=False
+                )
 
         try:
             out = tool.handler(args, ctx)
             if out is None:
-                return json.dumps({"ok": False, "error": f"tool returned no output: {name}"})
+                return json.dumps(
+                    {"ok": False, "error": f"tool returned no output: {name}"}
+                )
             if isinstance(out, str):
                 return out
             return json.dumps(out, ensure_ascii=False)

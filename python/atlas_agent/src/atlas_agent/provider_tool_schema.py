@@ -59,8 +59,10 @@ def normalize_tool_parameters_schema_for_provider(params: Any) -> dict[str, Any]
                 items = {}
             else:
                 items = _tighten(items)
-            if isinstance(items, dict) and ("type" not in items) and not any(
-                comb in items for comb in ("anyOf", "oneOf", "allOf")
+            if (
+                isinstance(items, dict)
+                and ("type" not in items)
+                and not any(comb in items for comb in ("anyOf", "oneOf", "allOf"))
             ):
                 # Keep permissive semantics while satisfying strict schema checkers.
                 items = dict(items)
@@ -80,6 +82,13 @@ def normalize_tool_parameters_schema_for_provider(params: Any) -> dict[str, Any]
                 fixed["properties"] = {str(k): _tighten(v) for k, v in props.items()}
                 fixed["required"] = list(props.keys())
                 fixed["additionalProperties"] = False
+        elif "object" in types:
+            # Generic/unstructured objects (no "properties" dict) represent
+            # arbitrary JSON payloads (e.g., typed camera/scene values). Some
+            # providers/gateways drop or mishandle object fields unless
+            # additionalProperties is explicit. Keep this permissive.
+            if "additionalProperties" not in fixed:
+                fixed["additionalProperties"] = True
 
         return fixed
 
@@ -216,7 +225,9 @@ def tighten_tools_schema_for_provider(
         # Responses-style: {"type":"function","name":"...","parameters":{...}}
         if "parameters" in t and "function" not in t:
             fixed = dict(t)
-            fixed["parameters"] = normalize_tool_parameters_schema_for_provider(fixed.get("parameters"))
+            fixed["parameters"] = normalize_tool_parameters_schema_for_provider(
+                fixed.get("parameters")
+            )
             if "strict" not in fixed:
                 fixed["strict"] = False
             out.append(fixed)
@@ -227,7 +238,9 @@ def tighten_tools_schema_for_provider(
         if isinstance(fn, dict):
             fixed = dict(t)
             f2 = dict(fn)
-            f2["parameters"] = normalize_tool_parameters_schema_for_provider(f2.get("parameters"))
+            f2["parameters"] = normalize_tool_parameters_schema_for_provider(
+                f2.get("parameters")
+            )
             fixed["function"] = f2
             out.append(fixed)
             continue

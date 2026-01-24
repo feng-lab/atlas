@@ -24,6 +24,11 @@ from .preconditions import (
     require_engine_ready,
     require_screenshot_consent,
 )
+from .schemas_camera_value import (
+    CAMERA_CONSTRAINTS_SCHEMA,
+    CAMERA_POLICIES_SCHEMA,
+    CAMERA_TYPED_VALUE_SCHEMA,
+)
 
 JSON_VALUE_SCHEMA: Dict[str, Any] = {
     "description": "Native JSON value (supports object/array/scalars; nested structures allowed).",
@@ -53,6 +58,39 @@ VEC3_NUMBER_SCHEMA: Dict[str, Any] = {
 VEC3_NUMBER_OR_NULL_SCHEMA: Dict[str, Any] = {
     **VEC3_NUMBER_SCHEMA,
     "type": ["array", "null"],
+}
+
+CAMERA_SOLVE_PARAMS_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "description": (
+        "Mode-specific camera solve parameters.\n"
+        "ORBIT: axis ('x'|'y'|'z'), degrees, max_step_degrees.\n"
+        "DOLLY: start_dist and end_dist (camera-to-center distance)."
+    ),
+    "properties": {
+        "axis": {
+            "type": "string",
+            "enum": ["x", "y", "z"],
+            "description": "ORBIT: orbit axis.",
+        },
+        "degrees": {
+            "type": "number",
+            "description": "ORBIT: total rotation in degrees.",
+        },
+        "max_step_degrees": {
+            "type": "number",
+            "description": "ORBIT: maximum degrees per solver step (controls key density).",
+        },
+        "start_dist": {
+            "type": "number",
+            "description": "DOLLY: start distance from camera eye to center. <=0 means keep the base camera distance.",
+        },
+        "end_dist": {
+            "type": "number",
+            "description": "DOLLY: end distance from camera eye to center. <=0 means keep the base camera distance.",
+        },
+    },
 }
 
 CAMERA_WAYPOINT_EYE_SCHEMA: Dict[str, Any] = {
@@ -342,12 +380,12 @@ TOOLS: List[Tool] = [
                     "description": "End time (seconds) of the write window.",
                 },
                 "constraints": {
-                    "type": "object",
+                    **CAMERA_CONSTRAINTS_SCHEMA,
                     "description": "Visibility/coverage constraints. Typical defaults: keep_visible=true for exterior presentation (with min_coverage≈0.95); keep_visible=false for interior flythroughs.",
                 },
                 "params": {
-                    "type": "object",
-                    "description": "Mode-specific parameters (e.g., axis for ORBIT).",
+                    **CAMERA_SOLVE_PARAMS_SCHEMA,
+                    "description": "Mode-specific parameters (ORBIT: axis; DOLLY: start_dist/end_dist).",
                 },
                 "degrees": {
                     "type": "number",
@@ -384,6 +422,9 @@ TOOLS: List[Tool] = [
         name="animation_camera_waypoint_spline_apply",
         description=(
             "Guided waypoint camera path (timeline; writes keys): solve camera keys from explicit bbox/world waypoints.\n\n"
+            "Required input:\n"
+            "- base_value: typed camera used as defaults for projection/fov/up and for the initial direction when look_at is omitted.\n"
+            "  Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.\n\n"
             "Use when:\n"
             "- The user provides explicit points/waypoints (world coords or bbox fractions) or clear spatial beats (A→B→C).\n\n"
             "Avoid when:\n"
@@ -416,6 +457,10 @@ TOOLS: List[Tool] = [
                 },
                 "t0": {"type": "number", "description": "Start time (seconds)."},
                 "t1": {"type": "number", "description": "End time (seconds)."},
+                "base_value": {
+                    **CAMERA_TYPED_VALUE_SCHEMA,
+                    "description": "Required base camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted. Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.",
+                },
                 "waypoints": {
                     "type": "array",
                     "items": CAMERA_SPLINE_WAYPOINT_SCHEMA,
@@ -443,12 +488,8 @@ TOOLS: List[Tool] = [
                     "description": "Time tolerance used when clearing/replacing keys.",
                 },
                 "constraints": {
-                    "type": "object",
+                    **CAMERA_CONSTRAINTS_SCHEMA,
                     "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
-                },
-                "base_value": {
-                    "type": "object",
-                    "description": "Required base camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted. Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.",
                 },
             },
             "required": ["animation_id", "t0", "t1", "waypoints", "base_value"],
@@ -461,6 +502,9 @@ TOOLS: List[Tool] = [
         description=(
             "First-person walkthrough authoring (timeline; writes keys): build a smooth camera path from motion segments "
             "(local moves + yaw/pitch/roll), optionally clear existing camera keys in [t0,t1], then write validated camera keys.\n\n"
+            "Required input:\n"
+            "- base_value: typed camera used as the initial camera pose (projection/fov/up defaults).\n"
+            "  Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.\n\n"
             "Use when:\n"
             "- The user describes motion verbs rather than explicit points: fly forward, strafe, turn, look around, pause.\n"
             '- Interior exploration (moving inside a volume/mesh) where "keep the whole bbox visible" is not desired.\n\n'
@@ -492,6 +536,10 @@ TOOLS: List[Tool] = [
                 },
                 "t0": {"type": "number", "description": "Start time (seconds)."},
                 "t1": {"type": "number", "description": "End time (seconds)."},
+                "base_value": {
+                    **CAMERA_TYPED_VALUE_SCHEMA,
+                    "description": "Required base camera value used as the initial camera pose (projection/fov/up defaults). Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.",
+                },
                 "segments": {
                     "type": "array",
                     "items": WALKTHROUGH_SEGMENT_SCHEMA,
@@ -524,12 +572,8 @@ TOOLS: List[Tool] = [
                     "description": "Time tolerance used when clearing/replacing keys.",
                 },
                 "constraints": {
-                    "type": "object",
+                    **CAMERA_CONSTRAINTS_SCHEMA,
                     "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
-                },
-                "base_value": {
-                    "type": "object",
-                    "description": "Required base camera value used as the initial camera pose (projection/fov/up defaults). Tip: use animation_camera_sample(animation_id,[t0]) to sample from the timeline.",
                 },
             },
             "required": ["animation_id", "t0", "t1", "segments", "base_value"],
@@ -556,16 +600,16 @@ TOOLS: List[Tool] = [
                 },
                 "values": {
                     "type": "array",
-                    "items": {"type": "object"},
+                    "items": CAMERA_TYPED_VALUE_SCHEMA,
                     "description": "Optional: typed camera values aligned with times. If omitted or shorter than times, the server fills by sampling.",
                 },
                 "constraints": {
-                    "type": "object",
+                    **CAMERA_CONSTRAINTS_SCHEMA,
                     "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, etc.).",
                 },
                 "policies": {
-                    "type": "object",
-                    "description": "Adjustment policies (adjust_fov, adjust_distance, adjust_clipping).",
+                    **CAMERA_POLICIES_SCHEMA,
+                    "description": "Adjustment policies (adjust_fov, adjust_distance).",
                 },
             },
             "required": ["animation_id", "ids", "times"],
@@ -677,12 +721,8 @@ TOOLS: List[Tool] = [
                     "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing curves and is separate from camera interpolation.",
                 },
                 "value": {
-                    "description": (
-                        "Typed camera value.\n"
-                        "Provider compatibility: some tool-call validators cannot represent arbitrary JSON objects; "
-                        "in that case you may pass this as a JSON string and Atlas Agent will parse it."
-                    ),
-                    "type": ["object", "string"],
+                    "description": ("Typed camera value."),
+                    **CAMERA_TYPED_VALUE_SCHEMA,
                 },
                 "ids": {
                     "type": "array",
@@ -690,7 +730,7 @@ TOOLS: List[Tool] = [
                     "description": "Optional ids for camera validation. When omitted/empty, uses fit_candidates().",
                 },
                 "constraints": {
-                    "type": "object",
+                    **CAMERA_CONSTRAINTS_SCHEMA,
                     "description": "Optional camera validation constraints. When omitted, defaults to keep_visible=true and min_coverage=0.95.",
                 },
                 "tolerance": {"type": "number", "default": 1e-3},
@@ -1484,18 +1524,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         time_v = float(args.get("time", 0.0))
         easing = _normalize_easing_name(args.get("easing"))
         value = args.get("value")
-        if isinstance(value, str):
-            try:
-                value = json.loads(value)
-            except Exception as e:
-                return json.dumps(
-                    {"ok": False, "error": f"value JSON parse failed: {e}"}
-                )
         if not isinstance(value, dict):
             return json.dumps(
                 {
                     "ok": False,
-                    "error": "value must be a typed camera object (dict) or a JSON string encoding one",
+                    "error": "value must be a typed camera object (dict)",
                 }
             )
         tol = float(args.get("tolerance", 1e-3))
@@ -1513,13 +1546,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         policies1 = {
             "adjust_fov": True,
             "adjust_distance": True,
-            "adjust_clipping": True,
         }
         # Second pass: strict verification without adjustments
         policies2 = {
             "adjust_fov": False,
             "adjust_distance": False,
-            "adjust_clipping": False,
         }
         try:
             _ensure_camera_center_interpolation(animation_id)

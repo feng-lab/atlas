@@ -193,20 +193,30 @@ ATLAS_PLANNER_SYSTEM_PROMPT = (
     + INTENT_RESOLVER_SYSTEM
 )
 
-ATLAS_PLAN_REPAIR_SYSTEM_PROMPT = (
-    "PHASE: PlanRepair\n"
+ATLAS_PLAN_REFINER_SYSTEM_PROMPT = (
+    "PHASE: PlanRefiner\n"
     "You must NOT change the Atlas scene/timeline in this phase.\n"
     "Allowed actions: read-only inspection tools, docs lookup, and update_plan.\n\n"
     "Goal:\n"
     "- Ensure the current plan is executable without a single huge animation-authoring step.\n"
-    "- If the plan is already good (segment-based, time-ranged, manageable), do NOT call update_plan.\n\n"
-    "Plan repair rules:\n"
+    "- Provide a conservative second opinion: when the TASK BRIEF leaves room, you may insert ONE short aesthetic beat segment.\n"
+    "- If the plan is already good and no meaningful refinement is needed, do NOT call update_plan.\n\n"
+    "Plan refinement rules:\n"
     "- Start by calling session_get_plan(include_explanation=true) to see the current durable plan.\n"
     "- If the plan contains a broad step that would require authoring an entire long animation in one go,\n"
     "  rewrite it into ~5–12s timeline segments with explicit time ranges in each step.\n"
+    "- If the plan is already segmented and coherent, you MAY insert at most ONE additional short segment to improve\n"
+    "  the overall aesthetic quality and viewing experience (pacing is one common reason, but not the only one), but ONLY when:\n"
+    "  - it is consistent with the TASK BRIEF and does not contradict user constraints, and\n"
+    "  - the task brief leaves room for creative sequencing/aesthetic choices.\n"
+    "  If you insert a segment, adjust neighboring time ranges so the overall timeline remains coherent.\n"
     "- Preserve completed steps as completed when rewriting; keep at most one in_progress.\n"
     "- When you update the plan, immediately call verification_set_requirements for each step_id.\n"
     "  For animation segments, prefer tool verification; add visual or human verification when needed for framing/continuity.\n\n"
+    "Guardrails:\n"
+    "- Do NOT instruct the Executor how to implement steps (no tool choices, no parameter knobs, no preview timepoints).\n"
+    "- Do NOT add requirements that force screenshots or additional permissions.\n"
+    "- Only change the plan when it meaningfully improves executability or the overall aesthetic quality.\n\n"
     + ATLAS_SHARED_SYSTEM_RULES
 )
 
@@ -354,9 +364,9 @@ class ChatTeam:
             pass
 
         self._history: list[tuple[str, str]] = []
-        # Rolling (in-memory) marker to avoid re-running PlanRepair on every turn
+        # Rolling (in-memory) marker to avoid re-running PlanRefiner on every turn
         # when only plan statuses change. This is not persisted on disk.
-        self._plan_repair_last_steps_sig: str | None = None
+        self._plan_refiner_last_steps_sig: str | None = None
 
         # Use atlas_dir from the saved session meta when the caller did not specify one.
         if not self.atlas_dir:
@@ -1502,7 +1512,7 @@ class ChatTeam:
         def _dispatch_logged(name: str, args_json: str) -> str:
             # Phase safety: nested dispatches must not bypass the phase tool allowlist.
             ph = str(current_phase or "")
-            if ph in {"Planner", "PlanRepair"}:
+            if ph in {"Planner", "PlanRefiner"}:
                 if name in ATLAS_STATE_MUTATION_TOOLS:
                     return json.dumps(
                         {
@@ -1949,7 +1959,7 @@ class ChatTeam:
             return False
 
         def _plan_steps_signature(current_plan: list[object]) -> str:
-            # Signature used to avoid re-running PlanRepair on every turn when
+            # Signature used to avoid re-running PlanRefiner on every turn when
             # only statuses change (e.g., marking steps completed). This is
             # language-agnostic and based solely on the ordered step texts.
             steps: list[str] = []
@@ -3498,30 +3508,30 @@ class ChatTeam:
             if final_result is None and _turn_is_blocked():
                 final_result = planner_res
 
-        # Plan repair pass: ensure long animation authoring is broken into manageable segments
+        # Plan refiner pass: ensure long animation authoring is broken into manageable segments
         # before the Executor starts writing lots of keys.
         try:
             plan = self.session_store.get_plan() or []
         except Exception:
             plan = []
         plan_steps_sig = _plan_steps_signature(plan)
-        last_plan_repair_sig = str(
-            getattr(self, "_plan_repair_last_steps_sig", "") or ""
+        last_plan_refiner_sig = str(
+            getattr(self, "_plan_refiner_last_steps_sig", "") or ""
         ).strip()
-        should_run_plan_repair = (
+        should_run_plan_refiner = (
             final_result is None
             and _plan_has_incomplete_steps(plan)
-            and plan_steps_sig != last_plan_repair_sig
+            and plan_steps_sig != last_plan_refiner_sig
         )
-        if should_run_plan_repair:
+        if should_run_plan_refiner:
             repair_tools = _filter_tools(
                 read_only_tool_names | set(SESSION_MUTATION_TOOLS)
             )
             if web_search_tool is not None:
                 repair_tools = list(repair_tools) + [web_search_tool]
             repair_res = _run_phase(
-                phase="PlanRepair",
-                instructions=ATLAS_PLAN_REPAIR_SYSTEM_PROMPT,
+                phase="PlanRefiner",
+                instructions=ATLAS_PLAN_REFINER_SYSTEM_PROMPT,
                 phase_tools=repair_tools,
                 phase_input_items=phase_input,
                 max_rounds=max(
@@ -3538,12 +3548,13 @@ class ChatTeam:
             )
             phase_input = list(repair_res.input_items)
             # Record the plan-step signature we just repaired/validated so we do not
-            # pay an extra PlanRepair round trip on every status update.
+            # pay an extra PlanRefiner round trip on every status update.
             try:
                 plan_after = self.session_store.get_plan() or []
             except Exception:
                 plan_after = plan
-            self._plan_repair_last_steps_sig = _plan_steps_signature(plan_after)
+            sig = _plan_steps_signature(plan_after)
+            self._plan_refiner_last_steps_sig = sig
 
         if final_result is None:
             exec_res = _run_phase(

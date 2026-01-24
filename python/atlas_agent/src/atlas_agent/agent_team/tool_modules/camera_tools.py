@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 from ...tool_registry import Tool, tool_from_schema
 from .context import ToolDispatchContext
 from .preconditions import require_engine_ready
+from .schemas_camera_value import CAMERA_TYPED_VALUE_SCHEMA
 
 VEC3_NUMBER_SCHEMA: Dict[str, Any] = {
     "type": "array",
@@ -153,7 +154,7 @@ TOOLS: List[Tool] = [
                 },
                 "degrees": {"type": "number", "default": 90.0},
                 "base_value": {
-                    "type": "object",
+                    **CAMERA_TYPED_VALUE_SCHEMA,
                     "description": "Required typed camera value to apply the operator to.",
                 },
             },
@@ -230,7 +231,7 @@ TOOLS: List[Tool] = [
                     "description": "When true, translate eye+center together (fly). When false, translate eye only (dolly/boom).",
                 },
                 "base_value": {
-                    "type": "object",
+                    **CAMERA_TYPED_VALUE_SCHEMA,
                     "description": "Required typed camera value to move from.",
                 },
             },
@@ -274,7 +275,7 @@ TOOLS: List[Tool] = [
                     "description": "Use clipped bbox (true) or full bbox (false) for bbox-derived targets.",
                 },
                 "base_value": {
-                    "type": "object",
+                    **CAMERA_TYPED_VALUE_SCHEMA,
                     "description": "Required typed camera value to aim from.",
                 },
             },
@@ -304,7 +305,7 @@ TOOLS: List[Tool] = [
                     "description": "Use clipped bbox (true) or full bbox (false) for bbox-derived points.",
                 },
                 "base_value": {
-                    "type": "object",
+                    **CAMERA_TYPED_VALUE_SCHEMA,
                     "description": "Required typed camera value used as defaults for projection/fov/up and for the initial direction when look_at is omitted.",
                 },
                 "waypoints": {
