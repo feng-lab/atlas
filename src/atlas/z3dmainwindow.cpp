@@ -11,6 +11,7 @@
 #include "zobjeditwidget.h"
 #include "zobjdoc.h"
 #include "zmainwindow.h"
+#include "zlog.h"
 #include "zsysteminfo.h"
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
@@ -50,8 +51,6 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
 
 #if defined(ATLAS_USE_OPENGLWIDGET)
   connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DMainWindow::initRenderingEngine);
-#else
-  initRenderingEngine();
 #endif
 
   setCentralWidget(m_canvas);
@@ -60,6 +59,13 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
 
   connect(m_engine, &Z3DRenderingEngine::renderingError, this, &Z3DMainWindow::onRenderingError);
   connect(m_engine, &Z3DRenderingEngine::progressChanged, this, &Z3DMainWindow::onProgressChanged);
+
+#if !defined(ATLAS_USE_OPENGLWIDGET)
+  // Without QOpenGLWidget, the rendering thread can initialize very quickly. If we start initialization
+  // before init() wires `initialized()` → `onViewReady()`, the signal can be missed and the right-side
+  // dock widgets stay empty (the dock area exists, but no widgets are inserted).
+  initRenderingEngine();
+#endif
 }
 
 Z3DMainWindow::~Z3DMainWindow()
@@ -489,6 +495,15 @@ void Z3DMainWindow::createDockWindows()
 
 void Z3DMainWindow::fillDockWindows()
 {
+  CHECK(m_engine);
+  CHECK(m_objectsDockWidget);
+  CHECK(m_viewSettingDockWidget);
+  CHECK(m_globalSettingDockWidget);
+  CHECK(m_captureDockWidget);
+  CHECK(m_backgroundDockWidget);
+  CHECK(m_axisDockWidget);
+  CHECK(m_helpDockWidget);
+
   ZObjWidget* objWidget = m_doc.createObjWidget(this);
   m_objectsDockWidget->setWidget(objWidget);
 
