@@ -209,6 +209,70 @@ def _sanitize_response_item(item: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def _looks_like_inline_image_url(value: Any) -> bool:
+    """Return true for data URLs (base64 inline images).
+
+    We treat these as high-cost prompt artifacts that should be ephemeral in the
+    tool loop when Files API (file_id) is unavailable.
+    """
+
+    if not isinstance(value, str):
+        return False
+    s = value.strip().lower()
+    return s.startswith("data:image/")
+
+
+def _strip_inline_images_from_function_call_outputs(
+    *, in_items: list[dict[str, Any]], call_ids: set[str]
+) -> None:
+    """Remove inline base64 images from selected function_call_output items.
+
+    We keep all non-image parts (e.g. text headers + JSON results) so the model
+    still has the semantic tool result in subsequent rounds without re-sending
+    large base64 payloads.
+    """
+
+    if not call_ids:
+        return
+    for it in in_items:
+        if not isinstance(it, dict):
+            continue
+        if str(it.get("type") or "") != "function_call_output":
+            continue
+        cid = str(it.get("call_id") or "").strip()
+        if not cid or cid not in call_ids:
+            continue
+        out = it.get("output")
+        if not isinstance(out, list):
+            continue
+        new_parts: list[dict[str, Any]] = []
+        removed_any = False
+        for p in out:
+            if not isinstance(p, dict):
+                continue
+            if str(p.get("type") or "") == "input_image":
+                image_url = p.get("image_url")
+                if isinstance(image_url, str) and _looks_like_inline_image_url(
+                    image_url
+                ):
+                    removed_any = True
+                    continue
+            new_parts.append(p)
+
+        if removed_any:
+            # Keep at least one part so the tool output isn't empty.
+            it["output"] = (
+                new_parts
+                if new_parts
+                else [
+                    {
+                        "type": "input_text",
+                        "text": "(preview image omitted from prompt history to save context budget)",
+                    }
+                ]
+            )
+
+
 def _extract_assistant_text_from_output_item(item: dict[str, Any]) -> str:
     if not isinstance(item, dict):
         return ""
@@ -612,6 +676,7 @@ def run_responses_tool_loop(
     reasoning_effort: str | None,
     reasoning_summary: str | None,
     text_verbosity: str | None,
+    ephemeral_inline_images: bool = False,
     post_tool_output: PostToolOutputHook | None = None,
     callbacks: ToolLoopCallbacks | None = None,
     temperature: float | None = None,
@@ -645,6 +710,11 @@ def run_responses_tool_loop(
     final_assistant_text = ""
     final_continue_calls = 0
     internal_continue_prompts: list[str] = []
+    # Ephemeral inline image attachments: when a tool output includes a base64
+    # data URL, keep it only for the *next* model call. After the model has had a
+    # chance to "see" the pixels once, strip the inline image from prompt history
+    # to avoid bloating subsequent requests.
+    pending_inline_image_call_ids: set[str] = set()
 
     def _append_message(role: str, text: str) -> None:
         in_items.append(_input_text_message(role=role, text=text))
@@ -740,7 +810,12 @@ def run_responses_tool_loop(
                                 input_items=in_items,
                                 tools=round_tools,
                             )
-                            if estimated_tokens >= limit:
+                            # The estimator is intentionally rough (provider-agnostic).
+                            # Avoid overly aggressive compaction when we are only barely over
+                            # the threshold; try the request and fall back to reactive trimming
+                            # on a real provider context error.
+                            margin = max(500, int(int(limit) * 0.05))
+                            if estimated_tokens >= (limit + margin):
                                 proactive_attempts += 1
                                 try:
                                     did_compact = bool(
@@ -852,6 +927,18 @@ def run_responses_tool_loop(
                 # Meta callbacks must not break tool execution.
                 pass
 
+        # After a successful model call, drop any inline base64 images from tool
+        # outputs that were included for this call. This keeps images ephemeral:
+        # visible to the model once, then removed to avoid repeated prompt bloat.
+        if ephemeral_inline_images and pending_inline_image_call_ids:
+            try:
+                _strip_inline_images_from_function_call_outputs(
+                    in_items=in_items, call_ids=pending_inline_image_call_ids
+                )
+            except Exception:
+                pass
+            pending_inline_image_call_ids.clear()
+
         output_items = _coerce_output_items(resp)
         # Web search (provider built-in): log calls for UI/session history. This
         # does not require local dispatch and does not drive the tool loop.
@@ -931,6 +1018,16 @@ def run_responses_tool_loop(
                         "output": output_payload,
                     }
                 )
+                if isinstance(output_payload, list):
+                    if ephemeral_inline_images:
+                        for p in output_payload:
+                            if not isinstance(p, dict):
+                                continue
+                            if str(p.get("type") or "") != "input_image":
+                                continue
+                            if _looks_like_inline_image_url(p.get("image_url")):
+                                pending_inline_image_call_ids.add(str(call_id))
+                                break
                 if extra_items:
                     in_items.extend(extra_items)
             continue

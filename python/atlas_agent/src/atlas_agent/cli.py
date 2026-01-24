@@ -120,6 +120,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--ephemeral-inline-images",
+        action="store_true",
+        help=(
+            "When enabled, inline base64 preview images (tool outputs) are only included in the *next* model call, "
+            "then removed from prompt history.\n"
+            "This reduces token usage, but the model cannot refer to older screenshots after a few tool-loop rounds."
+        ),
+    )
+    parser.add_argument(
         "--dump-tools",
         action="store_true",
         help=(
@@ -324,6 +333,7 @@ def main(argv: list[str] | None = None) -> int:
                 text_verbosity=args.text_verbosity,
                 max_rounds=int(args.max_rounds),
                 max_rounds_planner=int(args.planner_max_rounds),
+                ephemeral_inline_images=bool(args.ephemeral_inline_images),
                 session=args.session,
                 session_dir=args.session_dir,
                 enable_codegen=bool(args.enable_codegen),
@@ -343,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
             text_verbosity=args.text_verbosity,
             max_rounds=int(args.max_rounds),
             max_rounds_planner=int(args.planner_max_rounds),
+            ephemeral_inline_images=bool(args.ephemeral_inline_images),
             session=args.session,
             session_dir=args.session_dir,
             enable_codegen=bool(args.enable_codegen),

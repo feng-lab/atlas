@@ -323,6 +323,7 @@ class ChatTeam:
     temperature: float | None = None
     max_rounds_planner: int = DEFAULT_PLANNER_MAX_ROUNDS
     max_rounds_executor: int = DEFAULT_EXECUTOR_MAX_ROUNDS
+    ephemeral_inline_images: bool = False
     atlas_dir: Optional[str] = None
     atlas_version: Optional[str] = None
     session: Optional[str] = None
@@ -2498,6 +2499,78 @@ class ChatTeam:
 
                 model_token_limits_validated: set[str] = set()
 
+                def _log_effective_input_budget_confirmed_once(
+                    *, model_name: str, tokens: int, method: str
+                ) -> None:
+                    """Log the effective input prompt budget once per session+model.
+
+                    This is the single number that drives proactive compaction decisions.
+                    We log it once to avoid spamming session.jsonl, and we record a coarse
+                    method (one of 4) so debugging doesn't require reproducing compaction:
+                    - session_meta
+                    - provider_models_retrieve
+                    - context_length_error
+                    - name_guess
+                    """
+
+                    mn = str(model_name or "").strip()
+                    m = str(method or "").strip()
+                    if not mn or not m:
+                        return
+                    if m not in {
+                        "session_meta",
+                        "provider_models_retrieve",
+                        "context_length_error",
+                        "name_guess",
+                    }:
+                        return
+                    try:
+                        tok = int(tokens)
+                    except Exception:
+                        return
+                    if tok <= 0:
+                        return
+
+                    # Dedupe across resumes by storing a small marker in session meta.
+                    try:
+                        meta_now = self.session_store.get_meta() or {}
+                    except Exception:
+                        meta_now = {}
+                    logged = (
+                        meta_now.get(
+                            "model_effective_input_budget_confirmed_logged_by_model"
+                        )
+                        if isinstance(meta_now, dict)
+                        else None
+                    )
+                    if not isinstance(logged, dict):
+                        logged = {}
+                    marker = f"{m}:{int(tok)}"
+                    existing = logged.get(mn)
+                    if isinstance(existing, str) and existing.strip() == marker:
+                        return
+                    logged[mn] = marker
+                    try:
+                        self.session_store.set_meta(
+                            model_effective_input_budget_confirmed_logged_by_model=logged
+                        )
+                    except Exception:
+                        pass
+
+                    try:
+                        self.session_store.append_event(
+                            {
+                                "type": "model_effective_input_budget_confirmed",
+                                "turn_id": turn_id,
+                                "phase": phase,
+                                "model_name": mn,
+                                "effective_input_budget_tokens": int(tok),
+                                "method": m,
+                            }
+                        )
+                    except Exception:
+                        pass
+
                 def _model_prompt_budgets_for_current_model() -> tuple[
                     int | None, int | None
                 ]:
@@ -2523,6 +2596,7 @@ class ChatTeam:
                     max_output_tokens: int | None = None
                     effective_input_budget_tokens: int | None = None
                     auto_compact_tokens: int | None = None
+                    effective_method: str | None = None
 
                     try:
                         meta = self.session_store.get_meta()
@@ -2566,6 +2640,22 @@ class ChatTeam:
                                     n = int(v)
                                     if n > 0:
                                         effective_input_budget_tokens = n
+                                        eff_in_src_by_model = meta.get(
+                                            "model_effective_input_budget_tokens_source_by_model"
+                                        )
+                                        src = None
+                                        if isinstance(eff_in_src_by_model, dict):
+                                            s = eff_in_src_by_model.get(model_name)
+                                            if isinstance(s, str) and s.strip():
+                                                src = s.strip()
+                                        if src in {
+                                            "name_guess",
+                                            "provider_models_retrieve",
+                                            "context_length_error",
+                                        }:
+                                            effective_method = src
+                                        else:
+                                            effective_method = "session_meta"
                             except Exception:
                                 pass
 
@@ -2578,6 +2668,8 @@ class ChatTeam:
                             budgets = None
 
                         if budgets is not None:
+                            provider_total: int | None = None
+                            provider_max_out: int | None = None
                             # Persist provider-reported token limits so resumes have stable budgeting.
                             if (
                                 budgets.total_context_window_tokens is not None
@@ -2586,6 +2678,7 @@ class ChatTeam:
                                 total_context_window_tokens = int(
                                     budgets.total_context_window_tokens
                                 )
+                                provider_total = int(total_context_window_tokens)
                                 try:
                                     meta_now = self.session_store.get_meta() or {}
                                 except Exception:
@@ -2612,6 +2705,7 @@ class ChatTeam:
                                 and int(budgets.max_output_tokens) > 0
                             ):
                                 max_output_tokens = int(budgets.max_output_tokens)
+                                provider_max_out = int(max_output_tokens)
                                 try:
                                     meta_now = self.session_store.get_meta() or {}
                                 except Exception:
@@ -2654,18 +2748,45 @@ class ChatTeam:
                                 eff_in_now[model_name] = int(
                                     effective_input_budget_tokens
                                 )
+                                eff_in_src_now = (
+                                    meta_now.get(
+                                        "model_effective_input_budget_tokens_source_by_model"
+                                    )
+                                    if isinstance(meta_now, dict)
+                                    else None
+                                )
+                                if not isinstance(eff_in_src_now, dict):
+                                    eff_in_src_now = {}
+                                eff_in_src_now[model_name] = "provider_models_retrieve"
                                 try:
                                     self.session_store.set_meta(
-                                        model_effective_input_budget_tokens_by_model=eff_in_now
+                                        model_effective_input_budget_tokens_by_model=eff_in_now,
+                                        model_effective_input_budget_tokens_source_by_model=eff_in_src_now,
                                     )
                                 except Exception:
                                     pass
+                                effective_method = "provider_models_retrieve"
 
                             if (
                                 budgets.auto_compact_tokens is not None
                                 and int(budgets.auto_compact_tokens) > 0
                             ):
                                 auto_compact_tokens = int(budgets.auto_compact_tokens)
+
+                            # If provider exposed total+max_output, we can derive an effective
+                            # input budget even when it doesn't provide one explicitly.
+                            if (
+                                effective_input_budget_tokens is None
+                                and provider_total is not None
+                                and provider_max_out is not None
+                            ):
+                                try:
+                                    eff = int(provider_total) - int(provider_max_out)
+                                    if eff > 0:
+                                        effective_input_budget_tokens = int(eff)
+                                        effective_method = "provider_models_retrieve"
+                                except Exception:
+                                    pass
 
                     # Compute effective input budget when total+max_output are known.
                     if (
@@ -2678,6 +2799,8 @@ class ChatTeam:
                                 max_output_tokens
                             )
                             effective_input_budget_tokens = eff if eff > 0 else None
+                            if effective_input_budget_tokens is not None:
+                                effective_method = effective_method or "session_meta"
                         except Exception:
                             effective_input_budget_tokens = None
 
@@ -2693,13 +2816,16 @@ class ChatTeam:
                             effective_input_budget_tokens = min(
                                 int(total_context_window_tokens), int(guessed_eff)
                             )
+                            effective_method = "name_guess"
                         elif guessed_eff is not None:
                             effective_input_budget_tokens = int(guessed_eff)
+                            effective_method = "name_guess"
                         elif total_context_window_tokens is not None:
                             # Last resort: treat total window as input budget (optimistic).
                             effective_input_budget_tokens = int(
                                 total_context_window_tokens
                             )
+                            effective_method = effective_method or "session_meta"
 
                     # Default auto-compaction threshold (90%) when not explicitly provided.
                     if (
@@ -2713,6 +2839,54 @@ class ChatTeam:
                         except Exception:
                             auto_compact_tokens = None
 
+                    # If we didn't have a persisted effective input budget, persist a
+                    # best-effort value for this session so future turns/resumes can
+                    # avoid re-guessing. This is safe: if later we learn a more precise
+                    # budget (provider metadata or context error), that path overwrites it.
+                    if (
+                        effective_input_budget_tokens is not None
+                        and effective_method == "name_guess"
+                    ):
+                        try:
+                            meta_now = self.session_store.get_meta() or {}
+                        except Exception:
+                            meta_now = {}
+                        eff_in_now = (
+                            meta_now.get("model_effective_input_budget_tokens_by_model")
+                            if isinstance(meta_now, dict)
+                            else None
+                        )
+                        if not isinstance(eff_in_now, dict):
+                            eff_in_now = {}
+                        eff_in_src_now = (
+                            meta_now.get(
+                                "model_effective_input_budget_tokens_source_by_model"
+                            )
+                            if isinstance(meta_now, dict)
+                            else None
+                        )
+                        if not isinstance(eff_in_src_now, dict):
+                            eff_in_src_now = {}
+                        if model_name not in eff_in_src_now:
+                            eff_in_now[model_name] = int(effective_input_budget_tokens)
+                            eff_in_src_now[model_name] = "name_guess"
+                            try:
+                                self.session_store.set_meta(
+                                    model_effective_input_budget_tokens_by_model=eff_in_now,
+                                    model_effective_input_budget_tokens_source_by_model=eff_in_src_now,
+                                )
+                            except Exception:
+                                pass
+
+                    if (
+                        effective_input_budget_tokens is not None
+                        and effective_method is not None
+                    ):
+                        _log_effective_input_budget_confirmed_once(
+                            model_name=model_name,
+                            tokens=int(effective_input_budget_tokens),
+                            method=effective_method,
+                        )
                     return (effective_input_budget_tokens, auto_compact_tokens)
 
                 def _extract_message_text(item: dict[str, Any]) -> str:
@@ -2833,9 +3007,58 @@ class ChatTeam:
                                 ).strip()
                                 if model_key:
                                     by_model[model_key] = int(n)
-                                    self.session_store.set_meta(
-                                        model_total_context_window_tokens_by_model=by_model
+                                    meta_updates: dict[str, Any] = {
+                                        "model_total_context_window_tokens_by_model": by_model,
+                                    }
+
+                                    # If the provider gives us a maximum context length, we can
+                                    # use it as a best-effort *effective input* budget fallback
+                                    # for proactive compaction (until we learn more precise limits).
+                                    eff_in_by_model = (
+                                        meta.get(
+                                            "model_effective_input_budget_tokens_by_model"
+                                        )
+                                        if isinstance(meta, dict)
+                                        else None
                                     )
+                                    if not isinstance(eff_in_by_model, dict):
+                                        eff_in_by_model = {}
+                                    eff_in_src_by_model = (
+                                        meta.get(
+                                            "model_effective_input_budget_tokens_source_by_model"
+                                        )
+                                        if isinstance(meta, dict)
+                                        else None
+                                    )
+                                    if not isinstance(eff_in_src_by_model, dict):
+                                        eff_in_src_by_model = {}
+                                    existing_src = eff_in_src_by_model.get(model_key)
+                                    if not isinstance(existing_src, str):
+                                        existing_src = ""
+
+                                    # Only overwrite an existing value if it was a name-based guess.
+                                    should_set_eff_in = (
+                                        model_key not in eff_in_by_model
+                                    ) or (existing_src.strip() == "name_guess")
+                                    if should_set_eff_in:
+                                        eff_in_by_model[model_key] = int(n)
+                                        eff_in_src_by_model[model_key] = (
+                                            "context_length_error"
+                                        )
+                                        meta_updates[
+                                            "model_effective_input_budget_tokens_by_model"
+                                        ] = eff_in_by_model
+                                        meta_updates[
+                                            "model_effective_input_budget_tokens_source_by_model"
+                                        ] = eff_in_src_by_model
+
+                                    self.session_store.set_meta(**meta_updates)
+                                    if should_set_eff_in:
+                                        _log_effective_input_budget_confirmed_once(
+                                            model_name=str(model_key),
+                                            tokens=int(n),
+                                            method="context_length_error",
+                                        )
                     except Exception:
                         pass
 
@@ -3084,6 +3307,16 @@ class ChatTeam:
 
                     try:
                         removed = max(0, int(orig_len) - int(len(in_items)))
+                        compacted_meta: dict[str, Any] = {}
+                        try:
+                            est = getattr(exc, "estimated_tokens", None)
+                            lim = getattr(exc, "limit_tokens", None)
+                            if est is not None:
+                                compacted_meta["estimated_tokens"] = int(est)
+                            if lim is not None:
+                                compacted_meta["limit_tokens"] = int(lim)
+                        except Exception:
+                            compacted_meta = {}
                         self.session_store.append_event(
                             {
                                 "type": "context_compacted",
@@ -3096,6 +3329,7 @@ class ChatTeam:
                                 "kept_items": int(len(in_items) - 1),
                                 "mode": ("hard" if hard_mode else "soft"),
                                 "checkpoint_summary": summary_text,
+                                **compacted_meta,
                             }
                         )
                     except Exception:
@@ -3129,6 +3363,7 @@ class ChatTeam:
                         reasoning_effort=self.reasoning_effort,
                         reasoning_summary=self.reasoning_summary,
                         text_verbosity=self.text_verbosity,
+                        ephemeral_inline_images=bool(self.ephemeral_inline_images),
                         max_rounds=max_rounds,
                         on_context_overflow=_context_overflow_compact,
                         effective_input_budget_tokens=effective_input_budget_tokens,
@@ -3784,6 +4019,7 @@ def run_repl(
     reasoning_effort: str | None,
     reasoning_summary: str | None,
     text_verbosity: str | None,
+    ephemeral_inline_images: bool = False,
     session: Optional[str] = None,
     session_dir: Optional[str] = None,
     enable_codegen: bool = False,
@@ -3808,6 +4044,7 @@ def run_repl(
         temperature=temperature,
         max_rounds_planner=int(max_rounds_planner),
         max_rounds_executor=int(max_rounds),
+        ephemeral_inline_images=bool(ephemeral_inline_images),
         session=session,
         session_dir=session_dir,
         enable_codegen=bool(enable_codegen),

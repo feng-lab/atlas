@@ -1033,7 +1033,12 @@ TOOLS: List[Tool] = [
     ),
     tool_from_schema(
         name="animation_replace_key_param_at_times",
-        description="Replace keys at the specified times for a parameter by id (1=background,2=axis,3=global,≥4=objects).",
+        description=(
+            "Replace (or set) keys at the specified times for a parameter by id "
+            "(1=background,2=axis,3=global,≥4=objects). "
+            "Behavior: for each requested time, remove any existing key within tolerance (if present) "
+            "and then set a new key at exactly that time. This WILL create new keys when none existed."
+        ),
         parameters_schema={
             "type": "object",
             "properties": {
@@ -3613,8 +3618,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if not _json_key_exists(id, json_key):
             return json.dumps({"ok": False, "error": "json_key not found for id"})
         try:
+            per_time: list[dict[str, Any]] = []
+            all_ok = True
             for t in times:
-                _ = json.loads(
+                rm = json.loads(
                     dispatch(
                         "animation_remove_key_param_at_time",
                         json.dumps(
@@ -3628,7 +3635,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         ),
                     )
                 )
-                _ = json.loads(
+                sk = json.loads(
                     dispatch(
                         "animation_set_key_param",
                         json.dumps(
@@ -3643,7 +3650,28 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         ),
                     )
                 )
-            return json.dumps({"ok": True, "count": len(times)})
+                rm_ok = bool(rm.get("ok")) if isinstance(rm, dict) else False
+                sk_ok = bool(sk.get("ok")) if isinstance(sk, dict) else False
+                all_ok = all_ok and rm_ok and sk_ok
+                per_time.append(
+                    {
+                        "time": float(t),
+                        "remove": rm if isinstance(rm, dict) else {"ok": False},
+                        "set": sk if isinstance(sk, dict) else {"ok": False},
+                    }
+                )
+
+            if not all_ok:
+                # Do not silently report success when any per-time operation failed.
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "one or more times failed (see per_time results)",
+                        "count": len(times),
+                        "per_time": per_time,
+                    }
+                )
+            return json.dumps({"ok": True, "count": len(times), "per_time": per_time})
         except Exception as e:
             msg = str(e)
             try:

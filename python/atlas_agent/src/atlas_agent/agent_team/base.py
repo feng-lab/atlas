@@ -54,6 +54,7 @@ class LLMClient:
         init=False, default_factory=dict, repr=False
     )
     _warned_files_api_unsupported: bool = field(init=False, default=False, repr=False)
+    _files_api_disabled: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self):
         # Normalize base_url once so the rest of atlas_agent can rely on
@@ -80,6 +81,9 @@ class LLMClient:
           handle None and fall back to smaller previews or human checks.
         """
 
+        if self._files_api_disabled:
+            return None
+
         try:
             p = Path(path)
         except Exception:
@@ -90,7 +94,7 @@ class LLMClient:
         client = self._ensure_client()
         files = getattr(client, "files", None)
         if files is None or not hasattr(files, "create"):
-            self._warn_files_api_unsupported_once("OpenAI client has no files.create")
+            self._disable_files_api("OpenAI client has no files.create")
             return None
 
         # expires_after is optional; some providers reject it even if they
@@ -104,8 +108,9 @@ class LLMClient:
             except Exception:
                 expires_after = None
 
-        def _try_create(*, include_expires_after: bool) -> str | None:
-            nonlocal last_exc
+        def _try_create(
+            *, include_expires_after: bool
+        ) -> tuple[str | None, Exception | None]:
             try:
                 with open(p, "rb") as f:
                     kwargs: dict[str, Any] = {"file": f, "purpose": str(purpose)}
@@ -115,23 +120,48 @@ class LLMClient:
                 data = self._to_plain_dict(resp)
                 file_id = data.get("id") if isinstance(data, dict) else None
                 if isinstance(file_id, str) and file_id.strip():
-                    return file_id.strip()
+                    return (file_id.strip(), None)
             except Exception as e:
-                last_exc = e
-                return None
+                return (None, e)
+            return (None, None)
+
+        out1, err1 = _try_create(include_expires_after=True)
+        if out1 is not None:
+            return out1
+
+        # If the first attempt failed due to an unsupported endpoint, don't
+        # retry with a modified payload; disable uploads for this session.
+        if err1 is not None and self._is_files_unsupported_error(err1):
+            self._disable_files_api(str(err1))
             return None
 
-        last_exc: Exception | None = None
-        out = _try_create(include_expires_after=True)
-        if out is not None:
-            return out
-        out = _try_create(include_expires_after=False)
-        if out is not None:
-            return out
+        out2, err2 = _try_create(include_expires_after=False)
+        if out2 is not None:
+            return out2
 
-        if last_exc is not None and self._is_files_unsupported_error(last_exc):
-            self._warn_files_api_unsupported_once(str(last_exc))
+        if err2 is not None and self._is_files_unsupported_error(err2):
+            self._disable_files_api(str(err2))
+            return None
+
+        # Some OpenAI-compatible gateways return a generic HTTP 400 for unsupported
+        # endpoints (or for unknown/unsupported `purpose` values). If both payload
+        # variants (with and without expires_after) produce HTTP 400, treat this as
+        # a persistent incompatibility and disable further /files attempts for the
+        # rest of this session to avoid repeated noisy requests.
+        if (
+            err1 is not None
+            and err2 is not None
+            and self._http_status_code(err1) == 400
+            and self._http_status_code(err2) == 400
+        ):
+            self._disable_files_api(
+                "Files API returned HTTP 400 for both upload attempts"
+            )
         return None
+
+    def _disable_files_api(self, reason: str) -> None:
+        self._files_api_disabled = True
+        self._warn_files_api_unsupported_once(reason)
 
     def _warn_files_api_unsupported_once(self, reason: str) -> None:
         if self._warned_files_api_unsupported:
@@ -162,6 +192,15 @@ class LLMClient:
                     return True
                 if "405" in msg and "method" in msg:
                     return True
+                # Some gateways report unsupported endpoints as 400.
+                if "400" in msg and (
+                    "unknown endpoint" in msg
+                    or "unrecognized endpoint" in msg
+                    or "no such endpoint" in msg
+                    or "unsupported" in msg
+                    or "not supported" in msg
+                ):
+                    return True
             try:
                 sc = int(getattr(e, "status_code", 0) or 0)
                 if sc in {404, 405, 501}:
@@ -169,6 +208,17 @@ class LLMClient:
             except Exception:
                 pass
         return False
+
+    @classmethod
+    def _http_status_code(cls, err: Exception) -> int | None:
+        for e in cls._iter_exception_chain(err):
+            try:
+                sc = int(getattr(e, "status_code", 0) or 0)
+            except Exception:
+                sc = 0
+            if sc:
+                return sc
+        return None
 
     def _ensure_client(self):
         if self._client is None:
