@@ -33,6 +33,12 @@ TRANSIENT_NETWORK_MAX_RETRIES = 3
 TRANSIENT_NETWORK_BACKOFF_SECONDS = 0.6
 FINAL_OUTPUT_CONTINUE_MAX_CALLS = 8
 
+# Some OpenAI-compatible gateways occasionally return a response payload that is
+# missing the routed model name (resp["model"]). For OpenAI models, this strongly
+# suggests the request did not fully reach (or return from) the intended backend.
+# Treat it like a transient gateway hiccup and retry a few times before failing.
+GATEWAY_MODEL_DETECTION_MAX_RETRIES = 5
+
 # Context checkpoint compaction (within-turn)
 #
 # When a provider rejects a request due to context window overflow, atlas_agent

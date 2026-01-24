@@ -2,8 +2,14 @@ from __future__ import annotations
 
 import itertools
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Protocol
+
+from .gateway_model import (
+    gateway_model_matches_requested,
+    openai_model_requires_gateway_model,
+)
 
 from .provider_tool_schema import (
     convert_tools_to_responses_wire,
@@ -13,6 +19,7 @@ from .provider_tool_schema import (
 from .defaults import (
     CONTEXT_TRIM_MAX_RETRIES,
     FINAL_OUTPUT_CONTINUE_MAX_CALLS,
+    GATEWAY_MODEL_DETECTION_MAX_RETRIES,
     PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL,
     PROACTIVE_CONTEXT_COMPACTION_TRIGGER_RATIO,
     TRANSIENT_NETWORK_BACKOFF_SECONDS,
@@ -20,6 +27,8 @@ from .defaults import (
 )
 
 ContextOverflowHandler = Callable[[list[dict[str, Any]], BaseException], bool]
+
+log = logging.getLogger(__name__)
 
 
 class PromptBudgetExceeded(RuntimeError):
@@ -70,14 +79,23 @@ class ResponsesStreamingClient(Protocol):
         *,
         instructions: str,
         input_items: List[Dict[str, Any]],
+        reasoning_effort: str | None,
+        reasoning_summary: str | None,
+        text_verbosity: str | None,
         tools: Optional[List[Dict[str, Any]]] = None,
         temperature: float | None = None,
         parallel_tool_calls: bool = False,
-        reasoning_effort: str | None = "high",
-        reasoning_summary: str | None = "detailed",
-        text_verbosity: str | None = "high",
         on_event: Callable[[Dict[str, Any]], None] | None = None,
     ) -> Dict[str, Any]: ...
+
+
+def _detect_gateway_model(resp: dict[str, Any] | None) -> str | None:
+    if not isinstance(resp, dict):
+        return None
+    model = resp.get("model")
+    if not isinstance(model, str) or not model.strip():
+        return None
+    return model.strip()
 
 
 def _input_text_message(*, role: str, text: str) -> dict[str, Any]:
@@ -281,7 +299,9 @@ def _extract_function_calls(output_items: list[dict[str, Any]]) -> list[dict[str
     return calls
 
 
-def _extract_web_search_calls(output_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _extract_web_search_calls(
+    output_items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Extract web_search_call output items (Responses API built-in tool).
 
     The exact payload varies by provider and SDK version. We keep this very
@@ -585,11 +605,13 @@ def run_responses_tool_loop(
     input_items: list[dict[str, Any]],
     tools: list[dict[str, Any]],
     dispatch: Callable[[str, str], str],
+    max_rounds: int,
+    reasoning_effort: str | None,
+    reasoning_summary: str | None,
+    text_verbosity: str | None,
     post_tool_output: Callable[[str, str, str], list[dict[str, Any]]] | None = None,
     callbacks: ToolLoopCallbacks | None = None,
     temperature: float | None = None,
-    reasoning_effort: str | None = "high",
-    max_rounds: int,
     on_context_overflow: ContextOverflowHandler | None = None,
     effective_input_budget_tokens: int | None = None,
     auto_compact_tokens: int | None = None,
@@ -637,9 +659,15 @@ def run_responses_tool_loop(
         summary_parts: dict[int, list[str]] = {}
         assistant_chunks: list[str] = []
 
-        # Retry transient network/proxy drops. This resets our local stream buffers so
-        # the final merged assistant_text/reasoning summary does not duplicate.
-        for net_try in range(max(1, int(TRANSIENT_NETWORK_MAX_RETRIES))):
+        requested_model = str(getattr(llm, "model", "") or "").strip()
+        require_gateway_model = openai_model_requires_gateway_model(requested_model)
+
+        # Retry transient network/proxy drops. Additionally, for OpenAI models we treat
+        # missing `resp["model"]` as a gateway hiccup and retry cleanly (discarding the
+        # payload, not persisting any meta, and not appending output items).
+        transient_network_tries = 0
+        gateway_model_miss_tries = 0
+        while True:
             # Stream buffers for this attempt
             summary_parts = {}
             assistant_chunks = []
@@ -730,12 +758,12 @@ def run_responses_tool_loop(
                         resp = llm.responses_stream(
                             instructions=instructions,
                             input_items=in_items,
+                            reasoning_effort=reasoning_effort,
+                            reasoning_summary=reasoning_summary,
+                            text_verbosity=text_verbosity,
                             tools=round_tools,
                             temperature=temperature,
                             parallel_tool_calls=False,
-                            reasoning_effort=reasoning_effort,
-                            reasoning_summary="detailed",
-                            text_verbosity="high",
                             on_event=_on_event,
                         )
                         break
@@ -756,19 +784,63 @@ def run_responses_tool_loop(
                                 "Context window exceeded and could not trim further; start a new session/thread or reduce tool output sizes."
                             ) from e
             except Exception as e:
-                if (
-                    _is_transient_network_error(e)
-                    and net_try < TRANSIENT_NETWORK_MAX_RETRIES - 1
+                if _is_transient_network_error(e) and transient_network_tries < max(
+                    0, int(TRANSIENT_NETWORK_MAX_RETRIES) - 1
                 ):
                     import time
 
-                    time.sleep(TRANSIENT_NETWORK_BACKOFF_SECONDS * (2**net_try))
+                    time.sleep(
+                        TRANSIENT_NETWORK_BACKOFF_SECONDS * (2**transient_network_tries)
+                    )
+                    transient_network_tries += 1
                     continue
                 raise
-            if resp is not None:
-                break
-        if resp is None:
-            raise RuntimeError("Responses stream failed without producing a response.")
+            if resp is None:
+                raise RuntimeError(
+                    "Responses stream failed without producing a response."
+                )
+
+            if require_gateway_model:
+                gateway_model = _detect_gateway_model(resp)
+                if (gateway_model is None) or (
+                    not gateway_model_matches_requested(requested_model, gateway_model)
+                ):
+                    if gateway_model_miss_tries < max(
+                        0, int(GATEWAY_MODEL_DETECTION_MAX_RETRIES) - 1
+                    ):
+                        try:
+                            if gateway_model is None:
+                                why = "missing"
+                                got = "?"
+                            else:
+                                why = "mismatched"
+                                got = str(gateway_model)
+                            log.warning(
+                                "Gateway model %s in provider response; retrying "
+                                "(requested_model=%s, got=%s, attempt=%d/%d)",
+                                why,
+                                requested_model or "?",
+                                got,
+                                int(gateway_model_miss_tries + 1),
+                                int(GATEWAY_MODEL_DETECTION_MAX_RETRIES),
+                            )
+                        except Exception:
+                            pass
+                        import time
+
+                        time.sleep(
+                            TRANSIENT_NETWORK_BACKOFF_SECONDS
+                            * (2**gateway_model_miss_tries)
+                        )
+                        gateway_model_miss_tries += 1
+                        continue
+                    raise RuntimeError(
+                        "Provider returned an invalid routed model name (missing or unexpected resp['model']). "
+                        f"requested_model={requested_model!r}, gateway_model={gateway_model!r}. "
+                        "This usually indicates an upstream gateway/proxy issue."
+                    )
+
+            break
 
         if cb.on_response_meta is not None:
             try:

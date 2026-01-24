@@ -65,7 +65,9 @@ Screenshots (optional)
 Common options:
 
 - `--model` to choose the LLM model
-- `--reasoning-effort low|medium|high` to control how much deliberate reasoning the model uses (when supported by your model/provider)
+- `--reasoning-effort low|medium|high|xhigh` to control how much deliberate reasoning the model uses (when supported by your model/provider)
+- `--reasoning-summary auto|concise|detailed` to control whether/how a high-level reasoning summary is streamed (when supported by your model/provider)
+- `--text-verbosity low|medium|high` to control assistant output verbosity (when supported by your model/provider)
 - `--max-rounds N` to control how many tool-loop rounds the Executor is allowed to run in one turn (`0` = unlimited)
 - `--web-search off|cached|live` to expose the Responses API built-in `web_search` tool
   - `cached`: provider cached content only (no live internet access)

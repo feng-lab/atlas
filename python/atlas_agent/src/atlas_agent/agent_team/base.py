@@ -1,17 +1,29 @@
 import os
 import json
 import re
+import time
 import uuid
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from openai import OpenAI  # type: ignore
 
+from ..defaults import (
+    GATEWAY_MODEL_DETECTION_MAX_RETRIES,
+    TRANSIENT_NETWORK_BACKOFF_SECONDS,
+)
+from ..gateway_model import (
+    gateway_model_matches_requested,
+    openai_model_requires_gateway_model,
+)
 from ..provider_tool_schema import (
     convert_tools_to_responses_wire,
     normalize_tools_for_chat_completions_api,
     tighten_tools_schema_for_provider,
 )
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -366,12 +378,12 @@ class LLMClient:
         *,
         instructions: str,
         input_items: List[Dict[str, Any]],
+        reasoning_effort: str | None,
+        reasoning_summary: str | None,
+        text_verbosity: str | None,
         tools: Optional[List[Dict[str, Any]]] = None,
         temperature: float | None = None,
         parallel_tool_calls: bool = False,
-        reasoning_effort: str | None = "high",
-        reasoning_summary: str | None = "detailed",
-        text_verbosity: str | None = "high",
         on_event: Callable[[Dict[str, Any]], None] | None = None,
     ) -> Dict[str, Any]:
         """Stream a turn via an OpenAI-compatible wire API.
@@ -739,44 +751,92 @@ class LLMClient:
         if text_verbosity is not None:
             params["text"] = {"verbosity": str(text_verbosity)}
 
-        if self._responses_supports_temperature is False:
-            params.pop("temperature", None)
+        require_gateway_model = openai_model_requires_gateway_model(self.model)
+        max_tries = max(1, int(GATEWAY_MODEL_DETECTION_MAX_RETRIES))
+        last_gateway_model: str | None = None
+        last_reason: str | None = None
 
-        try:
-            resp = responses.create(**params)
-            if "temperature" in params:
-                self._responses_supports_temperature = True
-        except Exception as e:
-            if "temperature" in params and self._is_unsupported_temperature_error(e):
-                self._responses_supports_temperature = False
+        for attempt in range(max_tries):
+            if self._responses_supports_temperature is False:
                 params.pop("temperature", None)
+
+            try:
                 resp = responses.create(**params)
-            else:
-                raise
+                if "temperature" in params:
+                    self._responses_supports_temperature = True
+            except Exception as e:
+                if "temperature" in params and self._is_unsupported_temperature_error(
+                    e
+                ):
+                    self._responses_supports_temperature = False
+                    params.pop("temperature", None)
+                    resp = responses.create(**params)
+                else:
+                    raise
 
-        data = self._to_plain_dict(resp)
+            data = self._to_plain_dict(resp)
 
-        # Extract assistant output text from Responses API output items.
-        out = data.get("output") if isinstance(data, dict) else None
-        if not isinstance(out, list):
-            return ("", data if isinstance(data, dict) else {})
-        chunks: list[str] = []
-        for item in out:
-            if not isinstance(item, dict):
-                continue
-            if str(item.get("type") or "") != "message":
-                continue
-            if str(item.get("role") or "") != "assistant":
-                continue
-            content = item.get("content") or []
-            if not isinstance(content, list):
-                continue
-            for part in content:
-                if not isinstance(part, dict):
+            # Gateway model validation (OpenAI models only): if the gateway fails to report a
+            # routed model name, or reports an unexpected one, treat it as a transient
+            # upstream issue and retry cleanly.
+            gateway_model = data.get("model") if isinstance(data, dict) else None
+            last_gateway_model = (
+                gateway_model if isinstance(gateway_model, str) else None
+            )
+            if require_gateway_model:
+                if not isinstance(gateway_model, str) or not gateway_model.strip():
+                    last_reason = "missing_gateway_model"
+                elif not gateway_model_matches_requested(self.model, gateway_model):
+                    last_reason = "mismatched_gateway_model"
+                else:
+                    last_reason = None
+
+                if last_reason is not None:
+                    if attempt < max_tries - 1:
+                        try:
+                            log.warning(
+                                "Gateway model %s in internal responses.create; retrying "
+                                "(requested_model=%s, got=%s, attempt=%d/%d)",
+                                "missing"
+                                if last_gateway_model is None
+                                else "mismatched",
+                                str(self.model or "?"),
+                                str(last_gateway_model or "?"),
+                                int(attempt + 1),
+                                int(max_tries),
+                            )
+                        except Exception:
+                            pass
+                        time.sleep(TRANSIENT_NETWORK_BACKOFF_SECONDS * (2**attempt))
+                        continue
+                    raise RuntimeError(
+                        "Provider returned an invalid routed model name from responses.create "
+                        f"(reason={last_reason}, requested_model={self.model!r}, gateway_model={last_gateway_model!r})."
+                    )
+
+            # Extract assistant output text from Responses API output items.
+            out = data.get("output") if isinstance(data, dict) else None
+            if not isinstance(out, list):
+                return ("", data if isinstance(data, dict) else {})
+            chunks: list[str] = []
+            for item in out:
+                if not isinstance(item, dict):
                     continue
-                if str(part.get("type") or "") == "output_text":
-                    chunks.append(str(part.get("text") or ""))
-        return ("".join(chunks).strip(), data if isinstance(data, dict) else {})
+                if str(item.get("type") or "") != "message":
+                    continue
+                if str(item.get("role") or "") != "assistant":
+                    continue
+                content = item.get("content") or []
+                if not isinstance(content, list):
+                    continue
+                for part in content:
+                    if not isinstance(part, dict):
+                        continue
+                    if str(part.get("type") or "") == "output_text":
+                        chunks.append(str(part.get("text") or ""))
+            return ("".join(chunks).strip(), data if isinstance(data, dict) else {})
+
+        raise RuntimeError("responses.create retry loop exited unexpectedly")
 
     def complete_text(
         self,
@@ -850,24 +910,71 @@ class LLMClient:
         if max_tokens is not None:
             params["max_tokens"] = int(max_tokens)
         client = self._ensure_client()
-        try:
-            resp = client.chat.completions.create(**params)
-            if "temperature" in params:
-                self._chat_supports_temperature = True
-        except Exception as e:
-            if "temperature" in params and self._is_unsupported_temperature_error(e):
-                self._chat_supports_temperature = False
-                params.pop("temperature", None)
+        require_gateway_model = openai_model_requires_gateway_model(self.model)
+        max_tries = max(1, int(GATEWAY_MODEL_DETECTION_MAX_RETRIES))
+        last_gateway_model: str | None = None
+        last_reason: str | None = None
+
+        for attempt in range(max_tries):
+            try:
                 resp = client.chat.completions.create(**params)
-            else:
-                raise
-        data = self._to_plain_dict(resp)
-        text = ""
-        try:
-            text = (resp.choices[0].message.content or "").strip()
-        except Exception:
+                if "temperature" in params:
+                    self._chat_supports_temperature = True
+            except Exception as e:
+                if "temperature" in params and self._is_unsupported_temperature_error(
+                    e
+                ):
+                    self._chat_supports_temperature = False
+                    params.pop("temperature", None)
+                    resp = client.chat.completions.create(**params)
+                else:
+                    raise
+
+            data = self._to_plain_dict(resp)
+
+            gateway_model = data.get("model") if isinstance(data, dict) else None
+            last_gateway_model = (
+                gateway_model if isinstance(gateway_model, str) else None
+            )
+            if require_gateway_model:
+                if not isinstance(gateway_model, str) or not gateway_model.strip():
+                    last_reason = "missing_gateway_model"
+                elif not gateway_model_matches_requested(self.model, gateway_model):
+                    last_reason = "mismatched_gateway_model"
+                else:
+                    last_reason = None
+
+                if last_reason is not None:
+                    if attempt < max_tries - 1:
+                        try:
+                            log.warning(
+                                "Gateway model %s in internal chat.completions.create; retrying "
+                                "(requested_model=%s, got=%s, attempt=%d/%d)",
+                                "missing"
+                                if last_gateway_model is None
+                                else "mismatched",
+                                str(self.model or "?"),
+                                str(last_gateway_model or "?"),
+                                int(attempt + 1),
+                                int(max_tries),
+                            )
+                        except Exception:
+                            pass
+                        time.sleep(TRANSIENT_NETWORK_BACKOFF_SECONDS * (2**attempt))
+                        continue
+                    raise RuntimeError(
+                        "Provider returned an invalid routed model name from chat.completions.create "
+                        f"(reason={last_reason}, requested_model={self.model!r}, gateway_model={last_gateway_model!r})."
+                    )
+
             text = ""
-        return (text, data if isinstance(data, dict) else {})
+            try:
+                text = (resp.choices[0].message.content or "").strip()
+            except Exception:
+                text = ""
+            return (text, data if isinstance(data, dict) else {})
+
+        raise RuntimeError("chat.completions.create retry loop exited unexpectedly")
 
     def complete_with_image(
         self,

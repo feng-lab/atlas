@@ -8,9 +8,9 @@ if sys.version_info < (3, 12):
     )
 
 import argparse
+import json
 import logging
 import os
-import json
 
 from .chat_rpc_team import run_repl as run_team_repl
 from .console_ui import run_console_repl
@@ -46,9 +46,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--reasoning-effort",
-        default="high",
+        default="xhigh",
         choices=["low", "medium", "high", "xhigh"],
         help="Reasoning effort for Responses API calls (when supported by the model/provider).",
+    )
+    parser.add_argument(
+        "--reasoning-summary",
+        default="detailed",
+        choices=["auto", "concise", "detailed"],
+        help=(
+            "Reasoning summary control for Responses API calls (when supported by the model/provider).\n"
+            "- auto|concise|detailed: forwarded to the provider as reasoning.summary"
+        ),
+    )
+    parser.add_argument(
+        "--text-verbosity",
+        default="high",
+        choices=["low", "medium", "high"],
+        help="Text verbosity control for Responses API calls (when supported by the model/provider).",
     )
     parser.add_argument(
         "--temperature",
@@ -166,15 +181,15 @@ def main(argv: list[str] | None = None) -> int:
         try:
             # Build the same tool list the chat runtime advertises to the model.
             from .agent_team.tool_modules import build_tools
-            from .provider_tool_schema import (
-                normalize_tools_for_chat_completions_api,
-                normalize_tools_for_responses_api,
-            )
             from .chat_rpc_team import (
                 ATLAS_OUTPUT_TOOLS,
                 ATLAS_STATE_MUTATION_TOOLS,
                 CODEGEN_TOOLS,
                 SESSION_MUTATION_TOOLS,
+            )
+            from .provider_tool_schema import (
+                normalize_tools_for_chat_completions_api,
+                normalize_tools_for_responses_api,
             )
 
             tool_objects = build_tools()
@@ -182,7 +197,9 @@ def main(argv: list[str] | None = None) -> int:
             # Mirror scene_tools_and_dispatcher: hide codegen tools unless explicitly enabled.
             if not bool(getattr(args, "enable_codegen", False)):
                 codegen_tool_names = {"python_write_and_run", "codegen_allowed_imports"}
-                tool_objects = [t for t in tool_objects if t.name not in codegen_tool_names]
+                tool_objects = [
+                    t for t in tool_objects if t.name not in codegen_tool_names
+                ]
 
             tools = [t.to_chat_tool_spec() for t in tool_objects]
 
@@ -235,14 +252,24 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 phases = [str(args.dump_tools_phase)]
 
-            wire = str(getattr(args, "dump_tools_wire", "responses") or "responses").strip().lower()
-            fmt = str(getattr(args, "dump_tools_format", "pretty") or "pretty").strip().lower()
+            wire = (
+                str(getattr(args, "dump_tools_wire", "responses") or "responses")
+                .strip()
+                .lower()
+            )
+            fmt = (
+                str(getattr(args, "dump_tools_format", "pretty") or "pretty")
+                .strip()
+                .lower()
+            )
             pretty = fmt == "pretty"
 
             out: dict[str, object] = {
                 "meta": {
                     "wire_api_flag": str(getattr(args, "wire_api", "auto")),
-                    "web_search_mode": str(getattr(args, "web_search", DEFAULT_WEB_SEARCH_MODE)),
+                    "web_search_mode": str(
+                        getattr(args, "web_search", DEFAULT_WEB_SEARCH_MODE)
+                    ),
                     "enable_codegen": bool(getattr(args, "enable_codegen", False)),
                 },
                 "tools": {},
@@ -263,7 +290,9 @@ def main(argv: list[str] | None = None) -> int:
                 if wire in {"chat", "both"}:
                     entry["chat"] = _normalize_chat(phase_tools)
                 if wire in {"responses", "both"}:
-                    entry["responses"] = normalize_tools_for_responses_api(phase_tools) or []
+                    entry["responses"] = (
+                        normalize_tools_for_responses_api(phase_tools) or []
+                    )
                 out["tools"][ph] = entry
 
             json_kwargs = {"ensure_ascii": False, "sort_keys": True}
@@ -291,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
                 wire_api=args.wire_api,
                 temperature=args.temperature,
                 reasoning_effort=args.reasoning_effort,
+                reasoning_summary=args.reasoning_summary,
+                text_verbosity=args.text_verbosity,
                 max_rounds=int(args.max_rounds),
                 max_rounds_planner=int(args.planner_max_rounds),
                 session=args.session,
@@ -308,6 +339,8 @@ def main(argv: list[str] | None = None) -> int:
             wire_api=args.wire_api,
             temperature=args.temperature,
             reasoning_effort=args.reasoning_effort,
+            reasoning_summary=args.reasoning_summary,
+            text_verbosity=args.text_verbosity,
             max_rounds=int(args.max_rounds),
             max_rounds_planner=int(args.planner_max_rounds),
             session=args.session,

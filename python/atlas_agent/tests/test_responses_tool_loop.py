@@ -30,12 +30,12 @@ class DummyLLM:
         *,
         instructions: str,
         input_items,
+        reasoning_effort: str | None,
+        reasoning_summary: str | None,
+        text_verbosity: str | None,
         tools=None,
         temperature: float = 0.2,
         parallel_tool_calls: bool = False,
-        reasoning_effort: str | None = "high",
-        reasoning_summary: str | None = "detailed",
-        text_verbosity: str | None = "high",
         on_event=None,
     ):
         self.seen_tools.append(tools)
@@ -88,6 +88,9 @@ def test_tool_loop_returns_assistant_text_when_no_tools_called():
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
         max_rounds=3,
+        reasoning_effort="high",
+        reasoning_summary="detailed",
+        text_verbosity="high",
     )
 
     assert out.assistant_text == "Done."
@@ -161,6 +164,9 @@ def test_tool_loop_executes_function_calls_then_continues():
         dispatch=dispatch,
         callbacks=ToolLoopCallbacks(on_tool_call=on_tool_call),
         max_rounds=3,
+        reasoning_effort="high",
+        reasoning_summary="detailed",
+        text_verbosity="high",
     )
 
     assert out.assistant_text == "Applied."
@@ -245,6 +251,9 @@ def test_reasoning_summary_complete_is_emitted_before_tool_execution():
             on_reasoning_summary_complete=on_reasoning_summary_complete
         ),
         max_rounds=3,
+        reasoning_effort="high",
+        reasoning_summary="detailed",
+        text_verbosity="high",
     )
 
     assert out.assistant_text == "Done."
@@ -315,6 +324,9 @@ def test_tool_loop_preserves_assistant_message_as_output_text_in_history():
         dispatch=dispatch,
         callbacks=ToolLoopCallbacks(),
         max_rounds=3,
+        reasoning_effort="high",
+        reasoning_summary="detailed",
+        text_verbosity="high",
     )
 
     assert out.assistant_text == "Done."
@@ -346,12 +358,12 @@ def test_tool_loop_retries_on_incomplete_chunked_read():
             *,
             instructions: str,
             input_items,
+            reasoning_effort: str | None,
+            reasoning_summary: str | None,
+            text_verbosity: str | None,
             tools=None,
             temperature: float = 0.2,
             parallel_tool_calls: bool = False,
-            reasoning_effort: str | None = "high",
-            reasoning_summary: str | None = "detailed",
-            text_verbosity: str | None = "high",
             on_event=None,
         ):
             self.calls += 1
@@ -388,12 +400,166 @@ def test_tool_loop_retries_on_incomplete_chunked_read():
             dispatch=lambda name, args_json: json.dumps({"ok": True}),
             callbacks=ToolLoopCallbacks(),
             max_rounds=3,
+            reasoning_effort="high",
+            reasoning_summary="detailed",
+            text_verbosity="high",
         )
     finally:
         rtl.TRANSIENT_NETWORK_BACKOFF_SECONDS = prev_backoff
 
     assert out.assistant_text == "Done."
     assert llm.calls == 2
+
+
+def test_tool_loop_retries_when_gateway_model_missing_for_openai_models():
+    import atlas_agent.responses_tool_loop as rtl  # type: ignore
+
+    class GatewayFlakyLLM(DummyLLM):
+        def __init__(self, scripted):
+            super().__init__(scripted)
+            # Simulate an OpenAI model request where the gateway is expected to
+            # report resp["model"].
+            self.model = "gpt-5.2"
+
+    llm = GatewayFlakyLLM(
+        [
+            {
+                # Missing "model" should trigger a clean retry; this output must
+                # not be appended to history.
+                "response": {
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "Discard me"}],
+                        }
+                    ]
+                },
+            },
+            {
+                "response": {
+                    "model": "gpt-5.2",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "Done."}],
+                        }
+                    ],
+                }
+            },
+        ]
+    )
+
+    seen_meta: list[dict] = []
+
+    def on_response_meta(resp: dict, call_index: int) -> None:
+        seen_meta.append({"call_index": call_index, "model": resp.get("model")})
+
+    prev_backoff = rtl.TRANSIENT_NETWORK_BACKOFF_SECONDS
+    rtl.TRANSIENT_NETWORK_BACKOFF_SECONDS = 0.0
+    try:
+        out = run_responses_tool_loop(
+            llm=llm,
+            instructions="system",
+            input_items=[
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "hi"}],
+                }
+            ],
+            tools=[],
+            dispatch=lambda name, args_json: json.dumps({"ok": True}),
+            callbacks=ToolLoopCallbacks(on_response_meta=on_response_meta),
+            max_rounds=3,
+            reasoning_effort="high",
+            reasoning_summary="detailed",
+            text_verbosity="high",
+        )
+    finally:
+        rtl.TRANSIENT_NETWORK_BACKOFF_SECONDS = prev_backoff
+
+    assert out.assistant_text == "Done."
+    assert llm.calls == 2
+    # Only the accepted response should emit meta.
+    assert seen_meta == [{"call_index": 0, "model": "gpt-5.2"}]
+    # The second attempt should not include the discarded assistant output.
+    assert llm.seen_input_items[1] == llm.seen_input_items[0]
+
+
+def test_tool_loop_retries_when_gateway_model_mismatched_for_openai_models():
+    import atlas_agent.responses_tool_loop as rtl  # type: ignore
+
+    class GatewayMismatchLLM(DummyLLM):
+        def __init__(self, scripted):
+            super().__init__(scripted)
+            self.model = "gpt-5.2"
+
+    llm = GatewayMismatchLLM(
+        [
+            {
+                # Wrong routed model should trigger a clean retry; this output must
+                # not be appended to history.
+                "response": {
+                    "model": "gpt-4o",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "Discard me"}],
+                        }
+                    ],
+                }
+            },
+            {
+                "response": {
+                    "model": "gpt-5.2",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "Done."}],
+                        }
+                    ],
+                }
+            },
+        ]
+    )
+
+    seen_meta: list[dict] = []
+
+    def on_response_meta(resp: dict, call_index: int) -> None:
+        seen_meta.append({"call_index": call_index, "model": resp.get("model")})
+
+    prev_backoff = rtl.TRANSIENT_NETWORK_BACKOFF_SECONDS
+    rtl.TRANSIENT_NETWORK_BACKOFF_SECONDS = 0.0
+    try:
+        out = run_responses_tool_loop(
+            llm=llm,
+            instructions="system",
+            input_items=[
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "hi"}],
+                }
+            ],
+            tools=[],
+            dispatch=lambda name, args_json: json.dumps({"ok": True}),
+            callbacks=ToolLoopCallbacks(on_response_meta=on_response_meta),
+            max_rounds=3,
+            reasoning_effort="high",
+            reasoning_summary="detailed",
+            text_verbosity="high",
+        )
+    finally:
+        rtl.TRANSIENT_NETWORK_BACKOFF_SECONDS = prev_backoff
+
+    assert out.assistant_text == "Done."
+    assert llm.calls == 2
+    assert seen_meta == [{"call_index": 0, "model": "gpt-5.2"}]
+    assert llm.seen_input_items[1] == llm.seen_input_items[0]
 
 
 def test_tool_loop_prefers_parsed_output_when_stream_truncated():
@@ -433,6 +599,9 @@ def test_tool_loop_prefers_parsed_output_when_stream_truncated():
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
         max_rounds=3,
+        reasoning_effort="high",
+        reasoning_summary="detailed",
+        text_verbosity="high",
     )
 
     assert out.assistant_text == "Hello world"
@@ -487,6 +656,9 @@ def test_tool_loop_auto_continues_when_response_incomplete_and_disables_tools():
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
         max_rounds=6,
+        reasoning_effort="high",
+        reasoning_summary="detailed",
+        text_verbosity="high",
     )
 
     assert out.assistant_text == "Part1\n\nPart2"
@@ -528,6 +700,9 @@ def test_tool_loop_auto_continues_when_final_message_empty():
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
         max_rounds=6,
+        reasoning_effort="high",
+        reasoning_summary="detailed",
+        text_verbosity="high",
     )
 
     assert out.assistant_text == "Done."
@@ -549,12 +724,12 @@ def test_tool_loop_compacts_on_context_overflow_when_handler_provided():
             *,
             instructions: str,
             input_items,
+            reasoning_effort: str | None,
+            reasoning_summary: str | None,
+            text_verbosity: str | None,
             tools=None,
             temperature: float = 0.2,
             parallel_tool_calls: bool = False,
-            reasoning_effort: str | None = "high",
-            reasoning_summary: str | None = "detailed",
-            text_verbosity: str | None = "high",
             on_event=None,
         ):
             self.calls += 1
@@ -610,6 +785,9 @@ def test_tool_loop_compacts_on_context_overflow_when_handler_provided():
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
         max_rounds=3,
+        reasoning_effort="high",
+        reasoning_summary="detailed",
+        text_verbosity="high",
         on_context_overflow=compact,
     )
 
@@ -635,12 +813,12 @@ def test_tool_loop_proactively_compacts_when_estimate_near_context_window():
             *,
             instructions: str,
             input_items,
+            reasoning_effort: str | None,
+            reasoning_summary: str | None,
+            text_verbosity: str | None,
             tools=None,
             temperature: float = 0.2,
             parallel_tool_calls: bool = False,
-            reasoning_effort: str | None = "high",
-            reasoning_summary: str | None = "detailed",
-            text_verbosity: str | None = "high",
             on_event=None,
         ):
             self.calls += 1
@@ -691,6 +869,9 @@ def test_tool_loop_proactively_compacts_when_estimate_near_context_window():
         dispatch=lambda name, args_json: json.dumps({"ok": True}),
         callbacks=ToolLoopCallbacks(),
         max_rounds=3,
+        reasoning_effort="high",
+        reasoning_summary="detailed",
+        text_verbosity="high",
         on_context_overflow=compact,
         # Force proactive compaction: tiny context window so our estimate crosses the threshold.
         effective_input_budget_tokens=200,

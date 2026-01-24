@@ -9,7 +9,7 @@ import os
 import re
 import sys
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
@@ -286,7 +286,6 @@ class ChatTeam:
     wire_api: str = "auto"
     web_search_mode: str = DEFAULT_WEB_SEARCH_MODE
     temperature: float | None = None
-    reasoning_effort: str | None = "high"
     max_rounds_planner: int = DEFAULT_PLANNER_MAX_ROUNDS
     max_rounds_executor: int = DEFAULT_EXECUTOR_MAX_ROUNDS
     atlas_dir: Optional[str] = None
@@ -294,6 +293,9 @@ class ChatTeam:
     session: Optional[str] = None
     session_dir: Optional[str] = None
     enable_codegen: bool = False
+    reasoning_effort: str | None = field(kw_only=True)
+    reasoning_summary: str | None = field(kw_only=True)
+    text_verbosity: str | None = field(kw_only=True)
 
     def __post_init__(self):
         self.session_store = SessionStore.open(
@@ -416,6 +418,8 @@ class ChatTeam:
                 web_search_mode=str(self.web_search_mode or DEFAULT_WEB_SEARCH_MODE),
                 temperature=self.temperature,
                 reasoning_effort=self.reasoning_effort,
+                reasoning_summary=self.reasoning_summary,
+                text_verbosity=self.text_verbosity,
                 max_rounds_planner=int(self.max_rounds_planner),
                 max_rounds_executor=int(self.max_rounds_executor),
                 atlas_dir=self.atlas_dir,
@@ -1543,7 +1547,9 @@ class ChatTeam:
                         if isinstance(b64, str):
                             raw = b64.encode("ascii", errors="ignore")
                             redacted["data_base64_bytes"] = int(len(raw))
-                            redacted["data_base64_sha256"] = hashlib.sha256(raw).hexdigest()
+                            redacted["data_base64_sha256"] = hashlib.sha256(
+                                raw
+                            ).hexdigest()
                         elif b64 is not None:
                             redacted["data_base64_kind"] = type(b64).__name__
                     args_obj = redacted
@@ -2947,6 +2953,8 @@ class ChatTeam:
                         callbacks=phase_callbacks,
                         temperature=self.temperature,
                         reasoning_effort=self.reasoning_effort,
+                        reasoning_summary=self.reasoning_summary,
+                        text_verbosity=self.text_verbosity,
                         max_rounds=max_rounds,
                         on_context_overflow=_context_overflow_compact,
                         effective_input_budget_tokens=effective_input_budget_tokens,
@@ -3288,8 +3296,8 @@ class ChatTeam:
                     temperature=self.temperature,
                     parallel_tool_calls=False,
                     reasoning_effort=self.reasoning_effort,
-                    reasoning_summary="detailed",
-                    text_verbosity="high",
+                    reasoning_summary=self.reasoning_summary,
+                    text_verbosity=self.text_verbosity,
                     on_event=_on_finalizer_event,
                 )
 
@@ -3574,10 +3582,12 @@ def run_repl(
     wire_api: str = "auto",
     web_search_mode: str = DEFAULT_WEB_SEARCH_MODE,
     temperature: float | None = None,
-    reasoning_effort: str | None = "high",
     max_rounds_planner: int = DEFAULT_PLANNER_MAX_ROUNDS,
     max_rounds: int = DEFAULT_EXECUTOR_MAX_ROUNDS,
     *,
+    reasoning_effort: str | None,
+    reasoning_summary: str | None,
+    text_verbosity: str | None,
     session: Optional[str] = None,
     session_dir: Optional[str] = None,
     enable_codegen: bool = False,
@@ -3600,12 +3610,14 @@ def run_repl(
         wire_api=wire_api,
         web_search_mode=str(web_search_mode or DEFAULT_WEB_SEARCH_MODE),
         temperature=temperature,
-        reasoning_effort=reasoning_effort,
         max_rounds_planner=int(max_rounds_planner),
         max_rounds_executor=int(max_rounds),
         session=session,
         session_dir=session_dir,
         enable_codegen=bool(enable_codegen),
+        reasoning_effort=reasoning_effort,
+        reasoning_summary=reasoning_summary,
+        text_verbosity=text_verbosity,
     )
     logger.info(
         "Atlas Agent (RPC). Type :help for commands. Session=%s",
