@@ -965,7 +965,12 @@ TOOLS: List[Tool] = [
     ),
     tool_from_schema(
         name="animation_ensure_animation",
-        description="Ensure a 3D animation exists and is bound/selected for editing. Returns {ok, animation_id, created}. Use the returned animation_id for all subsequent animation_* tool calls.",
+        description=(
+            "Ensure a 3D animation exists and is bound/selected for editing. Returns {ok, animation_id, created}.\n"
+            "If this call created a new animation (response `created=true`; typically when `create_new=true` or when no Animation3D exists yet),\n"
+            "Atlas captures a full-scene keyframe at t=0 (UI parity) so the animation starts from a fixed baseline (no scene fallback).\n"
+            "Use the returned animation_id for all subsequent animation_* tool calls."
+        ),
         parameters_schema={
             "type": "object",
             "properties": {
@@ -1131,6 +1136,31 @@ TOOLS: List[Tool] = [
         },
         preconditions=(require_animation_id, require_engine_ready),
         handler=_tool_handler("animation_set_time"),
+    ),
+    tool_from_schema(
+        name="animation_save_keyframe",
+        description=(
+            "Capture a full-scene keyframe at the given time (UI 'Save Key Frame' parity):\n"
+            "- Writes keys for all parameters (including camera) at `time`.\n"
+            "- Use this to ensure the animation defines the FULL state (avoid scene fallback).\n"
+            "- Useful as an authoring workflow to consider: set up the scene at a beat time, call this tool, repeat for other beats, then rely on interpolation.\n"
+            "- Especially important after loading/adding new objects while authoring an animation: call at time=0 to seed their baseline keys."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "animation_id": dict(ANIMATION_ID_PARAM_SCHEMA),
+                "time": {"type": "number", "description": "Keyframe time (seconds)."},
+                "cancel_rendering": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "When true, cancel any in-progress long rendering before applying time.",
+                },
+            },
+            "required": ["animation_id", "time"],
+        },
+        preconditions=(require_animation_id, require_engine_ready),
+        handler=_tool_handler("animation_save_keyframe"),
     ),
     tool_from_schema(
         name="animation_save_animation",
@@ -3739,6 +3769,27 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             cancel_rendering=bool(args.get("cancel", False)),
         )
         return json.dumps({"ok": ok})
+
+    if name == "animation_save_keyframe":
+        animation_id = int(args.get("animation_id", 0) or 0)
+        if animation_id <= 0:
+            return json.dumps({"ok": False, "error": "animation_id is required"})
+        time_v = float(args.get("time", 0.0))
+        cancel = bool(args.get("cancel_rendering", True))
+        try:
+            ok = client.add_key_frame(
+                animation_id=animation_id,
+                time=time_v,
+                cancel_rendering=cancel,
+            )
+            return json.dumps({"ok": bool(ok)})
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_save_animation":
         animation_id = int(args.get("animation_id", 0) or 0)

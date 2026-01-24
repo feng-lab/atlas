@@ -5,6 +5,7 @@ import time
 import uuid
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from openai import OpenAI  # type: ignore
@@ -52,12 +53,122 @@ class LLMClient:
     _model_token_budgets_cache: dict[str, ModelTokenBudgets] = field(
         init=False, default_factory=dict, repr=False
     )
+    _warned_files_api_unsupported: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self):
         # Normalize base_url once so the rest of atlas_agent can rely on
         # client.base_url without re-reading environment variables.
         if not self.base_url:
             self.base_url = os.environ.get("OPENAI_BASE_URL") or None
+
+    def upload_file_for_model_input(
+        self,
+        *,
+        path: str | Path,
+        purpose: str = "user_data",
+        expires_after_sec: int | None = 3600,
+    ) -> str | None:
+        """Upload a local file and return a provider file id (Responses API compatible).
+
+        This is intended for large, session-scoped artifacts (e.g. preview images)
+        where inlining as base64 data URLs would bloat requests.
+
+        Notes:
+        - This is best-effort and provider-dependent. OpenAI supports `files.create`
+          with `purpose="user_data"` and `expires_after`.
+        - Some OpenAI-compatible gateways do not implement /files; callers must
+          handle None and fall back to smaller previews or human checks.
+        """
+
+        try:
+            p = Path(path)
+        except Exception:
+            return None
+        if not p.exists() or not p.is_file():
+            return None
+
+        client = self._ensure_client()
+        files = getattr(client, "files", None)
+        if files is None or not hasattr(files, "create"):
+            self._warn_files_api_unsupported_once("OpenAI client has no files.create")
+            return None
+
+        # expires_after is optional; some providers reject it even if they
+        # implement /files. Try with expires_after, then fall back without.
+        expires_after = None
+        if expires_after_sec is not None:
+            try:
+                sec = int(expires_after_sec)
+                if sec > 0:
+                    expires_after = {"anchor": "created_at", "seconds": sec}
+            except Exception:
+                expires_after = None
+
+        def _try_create(*, include_expires_after: bool) -> str | None:
+            nonlocal last_exc
+            try:
+                with open(p, "rb") as f:
+                    kwargs: dict[str, Any] = {"file": f, "purpose": str(purpose)}
+                    if include_expires_after and expires_after is not None:
+                        kwargs["expires_after"] = expires_after
+                    resp = files.create(**kwargs)
+                data = self._to_plain_dict(resp)
+                file_id = data.get("id") if isinstance(data, dict) else None
+                if isinstance(file_id, str) and file_id.strip():
+                    return file_id.strip()
+            except Exception as e:
+                last_exc = e
+                return None
+            return None
+
+        last_exc: Exception | None = None
+        out = _try_create(include_expires_after=True)
+        if out is not None:
+            return out
+        out = _try_create(include_expires_after=False)
+        if out is not None:
+            return out
+
+        if last_exc is not None and self._is_files_unsupported_error(last_exc):
+            self._warn_files_api_unsupported_once(str(last_exc))
+        return None
+
+    def _warn_files_api_unsupported_once(self, reason: str) -> None:
+        if self._warned_files_api_unsupported:
+            return
+        self._warned_files_api_unsupported = True
+
+        base = self.base_url or os.environ.get("OPENAI_BASE_URL") or ""
+        base_msg = base.strip() or "<default OpenAI>"
+        log.warning(
+            "Provider does not appear to support the Files API (/v1/files). "
+            "Preview images will fall back to inline base64 (small only) or text-only. "
+            "base_url=%s reason=%s",
+            base_msg,
+            (reason or "").strip() or "<unknown>",
+        )
+
+    @classmethod
+    def _is_files_unsupported_error(cls, err: Exception) -> bool:
+        for e in cls._iter_exception_chain(err):
+            name = type(e).__name__.lower()
+            msg = str(e or "").lower()
+            if "notfound" in name:
+                return True
+            if "files" in msg or "/files" in msg:
+                if "404" in msg or "not found" in msg:
+                    return True
+                if "not implemented" in msg:
+                    return True
+                if "405" in msg and "method" in msg:
+                    return True
+            try:
+                sc = int(getattr(e, "status_code", 0) or 0)
+                if sc in {404, 405, 501}:
+                    return True
+            except Exception:
+                pass
+        return False
 
     def _ensure_client(self):
         if self._client is None:
@@ -456,7 +567,27 @@ class LLMClient:
                 if itype == "function_call_output":
                     call_id = str(it.get("call_id") or "").strip()
                     output = it.get("output")
-                    if not isinstance(output, str):
+                    if isinstance(output, list):
+                        # Chat Completions tool messages are text-only. Avoid
+                        # JSON-stringifying multimodal payloads (e.g. base64
+                        # data URLs), which can explode prompt size and still
+                        # won't let the model "see" the image. Keep only text
+                        # parts and replace images with a stable placeholder.
+                        parts: list[str] = []
+                        for part in output:
+                            if not isinstance(part, dict):
+                                continue
+                            ptype = str(part.get("type") or "")
+                            if ptype in {"input_text", "output_text", "text"}:
+                                txt = part.get("text")
+                                if isinstance(txt, str) and txt:
+                                    parts.append(txt)
+                            elif ptype in {"input_image", "output_image"}:
+                                parts.append(
+                                    "[image omitted: chat tool outputs are text-only]"
+                                )
+                        output = "\n".join(parts).strip() or "(tool output omitted)"
+                    elif not isinstance(output, str):
                         try:
                             output = json.dumps(output, ensure_ascii=False)
                         except Exception:

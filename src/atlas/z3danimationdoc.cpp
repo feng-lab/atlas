@@ -30,8 +30,21 @@ Z3DAnimationDoc::Z3DAnimationDoc(ZDoc& doc)
 
 void Z3DAnimationDoc::bindView(Z3DRenderingEngine* v)
 {
+  if (m_view == v) {
+    return;
+  }
+  if (m_view && m_view != v) {
+    // Avoid stale connections when rebinding to a new engine instance.
+    // (E.g. when the 3D window is recreated.) Otherwise a later destroyed()
+    // signal from the old engine could release the new binding unexpectedly.
+    disconnect(m_view, nullptr, this, nullptr);
+    releaseView();
+  }
   m_view = v;
-  connect(m_view, &Z3DRenderingEngine::destroyed, this, &Z3DAnimationDoc::releaseView);
+  if (!m_view) {
+    return;
+  }
+  connect(m_view, &Z3DRenderingEngine::destroyed, this, &Z3DAnimationDoc::releaseView, Qt::UniqueConnection);
   for (const auto& idPack : m_idToAnimationPacks) {
     idPack.second->animation->bindView(m_view);
     idPack.second->animation->setCurrentTime(0);

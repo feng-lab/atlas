@@ -64,7 +64,18 @@ PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL = 3
 # Rationale: Some providers/models reject very large image payloads, and sending
 # large images increases latency and cost. We therefore bound the bytes we attach
 # to the model and ask for a smaller render if exceeded.
-MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL = 3_000_000
+# Maximum size (bytes) for inlining preview images as base64 data URLs in the
+# tool loop (function_call_output). Inline base64:
+# - increases payload size (~33% overhead),
+# - is re-sent in subsequent tool-loop rounds (history), and
+# - can quickly blow up context/token usage.
+#
+# Prefer file_id attachments via the Files API when possible; inline base64 only
+# as a fallback for small images.
+MAX_PREVIEW_IMAGE_INLINE_BYTES_FOR_MODEL = 1_000_000
+
+# Backwards-compatible alias (older code/tests may still import this name).
+MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL = MAX_PREVIEW_IMAGE_INLINE_BYTES_FOR_MODEL
 
 
 # Agent context shaping (internal runtime policy)

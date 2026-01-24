@@ -316,6 +316,9 @@ service Scene {
   rpc RemoveKey (RemoveKeyRequest) returns (Bool);
   rpc Batch (BatchRequest) returns (Bool);
   rpc SetTime (SetTimeRequest) returns (Bool);
+  // Capture a full-scene keyframe (UI "Save Key Frame" parity): writes keys for
+  // all parameters (including camera) at the requested time.
+  rpc AddKeyFrame(AddKeyFrameRequest) returns (Bool);
   // Camera animation settings (timeline)
   rpc SetCameraInterpolationMethod (SetCameraInterpolationMethodRequest) returns (Bool);
   rpc GetCameraInterpolationMethod (GetCameraInterpolationMethodRequest) returns (google.protobuf.StringValue);
@@ -633,6 +636,17 @@ message BatchRequest {
 message SetTimeRequest {
   uint64 animation_id = 1;
   double seconds = 2;
+  bool cancel_rendering = 3;
+}
+
+// Capture a global keyframe for all objects/parameters (UI parity).
+// This is not the same as SetKey/Batch (per-track); it snapshots the current
+// scene state into the timeline at the given time.
+message AddKeyFrameRequest
+{
+  uint64 animation_id = 1;
+  double time = 2;
+  // When true, cancels any in-progress long rendering before applying time.
   bool cancel_rendering = 3;
 }
 

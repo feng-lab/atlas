@@ -1844,6 +1844,30 @@ ZRpcUiDispatcher::EnsureAnimationResult ZRpcUiDispatcher::ensureAnimation3D(bool
     return out;
   }
 
+  auto* w3d = mainWin->get3DWindow();
+  if (!w3d) {
+    mainWin->ensure3DWindow();
+    w3d = mainWin->get3DWindow();
+  }
+  if (!w3d) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "3D window not ready";
+    return out;
+  }
+  auto* engine = w3d->engine();
+  if (!engine || !engine->thread() || !engine->thread()->isRunning() || engine->thread()->isFinished()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "engine not ready";
+    return out;
+  }
+
+  // Ensure the animation doc is bound to the current 3D engine before creating
+  // a new animation. This guarantees UI parity: a newly created Animation3D
+  // captures a full default keyframe at t=0 (no scene fallback).
+  ad.bindView(engine);
+
   const QString rawName = name.trimmed();
   const QString resolvedName = rawName.isEmpty() ? QStringLiteral("LLM Animation") : rawName;
   const size_t id = ad.createNewAnimationAndReturnId(resolvedName);
@@ -2148,6 +2172,79 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::setAnimationTime(const SetTimeReq
     out.error = r.error.isEmpty() ? "set_time failed" : r.error.toStdString();
     return out;
   }
+  out.ok = true;
+  return out;
+}
+
+ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::addAnimationKeyFrame(const AddKeyFrameRequest& req)
+{
+  BoolResult out;
+
+  if (req.animationId == 0) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "animation_id is required";
+    return out;
+  }
+  if (!(req.timeSec >= 0.0) || !std::isfinite(req.timeSec)) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "time must be finite and >= 0";
+    return out;
+  }
+
+  ZMainWindow* mainWin = mainWindowUi();
+  if (!mainWin) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "main window not ready";
+    return out;
+  }
+  ZDoc* doc = mainWin->doc();
+  if (!doc) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "doc not ready";
+    return out;
+  }
+
+  auto* w3d = mainWin->get3DWindow();
+  if (!w3d) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "3D window not ready";
+    return out;
+  }
+  auto* engine = w3d->engine();
+  if (!engine || !engine->thread() || !engine->thread()->isRunning() || engine->thread()->isFinished()) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "engine not ready";
+    return out;
+  }
+
+  auto& ad = doc->animation3DDoc();
+  auto* anim = ad.animationPtr(static_cast<size_t>(req.animationId));
+  if (!anim) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "animation_id not found";
+    return out;
+  }
+
+  // Ensure the animation doc is bound to the current 3D engine (UI parity).
+  // This guarantees anim->addKeyFrame() has a valid engine binding.
+  ad.bindView(engine);
+
+  // Mirror the UI flow: scrub to time (optionally cancelling long rendering),
+  // then capture a full keyframe snapshot at that time.
+  if (req.cancelRendering) {
+    anim->cancelRenderingAndSetCurrentTime(req.timeSec);
+  } else {
+    anim->setCurrentTime(req.timeSec);
+  }
+  anim->addKeyFrame(req.timeSec);
+
   out.ok = true;
   return out;
 }

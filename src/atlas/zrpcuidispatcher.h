@@ -379,6 +379,17 @@ public:
 
   [[nodiscard]] BoolResult setAnimationTime(const SetTimeRequest& req);
 
+  struct AddKeyFrameRequest
+  {
+    uint64_t animationId = 0;
+    double timeSec = 0.0;
+    bool cancelRendering = false;
+  };
+
+  // UI "Save Key Frame" parity: snapshot the current scene state into the
+  // animation timeline for all parameters (including camera).
+  [[nodiscard]] BoolResult addAnimationKeyFrame(const AddKeyFrameRequest& req);
+
   struct SaveAnimationResult
   {
     bool ok = false;

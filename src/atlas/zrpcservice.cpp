@@ -120,6 +120,7 @@ using atlas::rpc::BatchSetKey;
 using atlas::rpc::BatchRemoveKey;
 using atlas::rpc::BatchRequest;
 using atlas::rpc::SetTimeRequest;
+using atlas::rpc::AddKeyFrameRequest;
 using atlas::rpc::SetCameraInterpolationMethodRequest;
 using atlas::rpc::GetCameraInterpolationMethodRequest;
 using atlas::rpc::SaveAnimationRequest;
@@ -3013,6 +3014,49 @@ public:
                                       ? grpc::StatusCode::INVALID_ARGUMENT
                                       : grpc::StatusCode::FAILED_PRECONDITION;
       return Status(code, r.error.empty() ? "set_time failed" : r.error);
+    }
+
+    reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status AddKeyFrame(ServerContext* grpcContext, const AddKeyFrameRequest* req, Bool* reply) override
+  {
+    const uint64_t animationId = req->animation_id();
+    if (animationId == 0) {
+      return Status(grpc::StatusCode::INVALID_ARGUMENT, "animation_id is required");
+    }
+    const double timeSec = req->time();
+    const bool cancelRendering = req->cancel_rendering();
+    VLOG(1) << "RPC AddKeyFrame anim=" << animationId << " time=" << timeSec << " cancel=" << cancelRendering;
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "ui dispatcher not ready");
+    }
+
+    ZRpcUiDispatcher::AddKeyFrameRequest dr;
+    dr.animationId = animationId;
+    dr.timeSec = timeSec;
+    dr.cancelRendering = cancelRendering;
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->addAnimationKeyFrame(dr);
+      },
+      "add_keyframe");
+    if (!inv.ok) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, inv.error);
+    }
+
+    const auto r = inv.value;
+    if (!r.ok) {
+      const grpc::StatusCode code = (r.errorKind == ZRpcUiDispatcher::ErrorKind::InvalidArgument)
+                                      ? grpc::StatusCode::INVALID_ARGUMENT
+                                      : grpc::StatusCode::FAILED_PRECONDITION;
+      return Status(code, r.error.empty() ? "add_keyframe failed" : r.error);
     }
 
     reply->set_ok(true);

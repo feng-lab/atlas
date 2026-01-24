@@ -274,10 +274,18 @@ Producers (no side effects)
 
 Scene-only (stateless) apply
 - Apply a typed camera to the scene camera (no keys): `scene_camera_apply(value=<typed_camera>)` or `scene_apply([{id:0, json_key:"Camera 3DCamera", value:<typed_camera>}])`.
-  - Provider compatibility: if your tool-call stack cannot send arbitrary JSON objects, you may pass `value` as a JSON string and Atlas Agent will parse it.
 - One-shot fit and apply: `scene_camera_fit(ids?, after_clipping=true, min_radius=0.0)` (internally uses CameraFit and applies the result).
 
 Animation (timeline) authoring
+- Full-state baseline (UI parity):
+  - When you create a new Animation3D in the GUI, Atlas seeds the timeline with a full keyframe at `t=0`, capturing the current scene state for **all parameters** (camera + all objects + background/axis/global). This prevents playback from falling back to scene values.
+  - In agent workflows, ensure the same determinism:
+    - `animation_ensure_animation(..., create_new=true)` creates the animation and captures the default `t=0` keyframe.
+    - If you load/add objects after creating the animation, call `animation_save_keyframe(animation_id, time=0)` to add baseline keys for the new objects.
+- Full-scene keyframing (useful workflow to consider):
+  - `animation_save_keyframe(animation_id, time=t)` is the RPC equivalent of editing the scene and clicking **Save Key Frame** in the GUI.
+  - This is often the fastest way to author “beats” in an animation: pose the scene at a few key times (camera + object visibility/appearance/transforms), save keyframes, then rely on interpolation between beats.
+  - You can also refine with per-parameter key tools (`animation_set_key_param`, `animation_replace_key_*`, `animation_batch`) when you need finer control than whole-scene snapshots provide.
 - Solve and write keys: `animation_camera_solve_and_apply(animation_id, mode, ids, t0, t1, constraints?, params?, degrees?, …)`.
   - Tip: for ORBIT, use `degrees` (default 360) and optionally `max_step_degrees` to control key density (default 90; smaller → more keys/smoother). Use `params.axis` (default `"y"`).
   - FIT/STATIC semantics: the RPC server ignores `t1` and produces a single key at `t0` (it does **not** fill keys across the interval). If `clear_range=true` and `t1 > t0`, existing camera keys inside `[t0,t1]` may be removed (except solver key times) — set `t1=t0` (or `clear_range=false`) when you only want a one-shot fit.
@@ -285,7 +293,6 @@ Animation (timeline) authoring
 - Sample the camera from the timeline (no validation, no key writes): `animation_camera_sample(animation_id, times)` → `samples:[{time,value}]`.
   - Use this to get a deterministic `base_value` for `camera_rotate/camera_move_local/camera_look_at` while editing an existing animation.
 - Single-time explicit write: `animation_replace_key_camera(animation_id, time, value, easing?)`.
-  - Provider compatibility: `value` may be passed as a JSON string and Atlas Agent will parse it.
 - Guided waypoint spline (one-shot apply):
   - `animation_camera_waypoint_spline_apply(animation_id, t0, t1, base_value, waypoints=[...], constraints?, clear_range=true, easing="Linear")`
   - Tip: prefer `base_value = animation_camera_sample(animation_id, times=[t0]).samples[0].value` so the path is anchored to the timeline.

@@ -1352,6 +1352,28 @@ class SceneClient:
         self._log_rpc("SetTime", req, resp)
         return resp.ok
 
+    def add_key_frame(
+        self, *, animation_id: int, time: float, cancel_rendering: bool = True
+    ) -> bool:
+        """Capture a full-scene keyframe at the given time (UI 'Save Key Frame' parity).
+
+        This snapshots the current scene state into the animation timeline for all
+        parameters (including camera), so playback does not fall back to scene values.
+        """
+        self.ensure_view()
+        if not hasattr(self._stub, "AddKeyFrame"):
+            raise RuntimeError("AddKeyFrame is not supported by this Atlas version")
+        req = self._pb2.AddKeyFrameRequest(
+            animation_id=int(animation_id),
+            time=float(time),
+            cancel_rendering=bool(cancel_rendering),
+        )
+        resp = self._stub.AddKeyFrame(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
+        self._log_rpc("AddKeyFrame", req, resp)
+        return resp.ok
+
     def save_animation(self, *, animation_id: int, path: Path) -> bool:
         req = self._pb2.SaveAnimationRequest(
             animation_id=int(animation_id), path=str(path)

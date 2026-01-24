@@ -27,7 +27,7 @@ from .defaults import (
     DEFAULT_PLANNER_MAX_ROUNDS,
     DEFAULT_WEB_SEARCH_MODE,
     INTENT_RESOLVER_SCENE_SNAPSHOT_MAX_CHARS,
-    MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL,
+    MAX_PREVIEW_IMAGE_INLINE_BYTES_FOR_MODEL,
     SESSION_MAX_RECENT_MESSAGES,
     SESSION_MEMORY_COMPACTION_MODE,
     SESSION_MEMORY_RECENT_WRITE_EVENTS,
@@ -240,6 +240,8 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
             "- Scene vs timeline contract: any mention of time/duration implies animation_* tools. Never include time/easing in scene_apply.",
             "- Scene-only intent: do not write animation keys. Use scene_apply/scene_set_visibility and camera ops: scene_camera_fit (fit+apply) or scene_camera_apply(value=...) (apply a typed camera from camera_*). Verify with scene_get_values.",
             "- Animation intent: animation_ensure_animation → animation_set_duration → write keys (animation_batch / animation_set_key_param / animation_replace_key_param) and camera keys (animation_camera_solve_and_apply / animation_replace_key_camera).",
+            "- Animation determinism: animations should define the FULL state. Ensure a baseline keyframe exists at t=0; if you load/add objects after creating the animation, call animation_save_keyframe(animation_id, time=0) so those new objects do not fall back to scene values during playback.",
+            "- Animation authoring (UI parity): for many tasks, it can be faster and more predictable to author beats by editing the scene state at time t and calling animation_save_keyframe(animation_id, time=t) than by writing dozens of individual keys; then refine the parameters that need extra tuning.",
             "- Camera workflow: use camera_* producers (camera_focus / camera_point_to / camera_rotate / camera_reset_view) to compute typed camera values, then apply via scene_camera_apply(value=...) for scene-only or animation_* camera tools for timeline work.",
             "- Validate before committing where possible (scene_validate_params; animation_camera_validate). Verify after writing (animation_list_keys, animation_camera_validate, scene_get_values).",
             "- Large-file handling: prefer fs_tail_lines/fs_search_text; if you must scan, iterate fs_read_text in windows until EOF (no silent truncation).",
@@ -1988,81 +1990,40 @@ class ChatTeam:
             except Exception:
                 pass
 
+            # Best-effort cache: avoid re-uploading the same preview image repeatedly
+            # when using file_id based attachments.
+            uploaded_preview_file_ids_by_path: dict[str, str] = {}
+
             def _post_tool_output(
                 name: str, args_json: str, result_json: str
-            ) -> list[dict[str, Any]]:
-                # Allow the model to actually *see* previews by attaching the
-                # rendered image as an input_image in the next model call.
-                #
-                # We do this for Executor. The Planner phase is read-only and
-                # should avoid expensive/visual operations unless strictly
-                # necessary.
+            ) -> dict[str, Any] | None:
+                """Optionally augment tool outputs before feeding them back to the model.
+
+                For screenshot-like tools, we attach the rendered image to the *tool output*
+                (function_call_output) rather than injecting a fake user message. This keeps
+                conversation semantics clean and matches the Responses API pattern where
+                function_call_output.output can contain multimodal content parts.
+                """
+
+                # Only attach images for Executor. Planner is read-only and should avoid
+                # expensive/visual operations unless strictly necessary.
                 if str(runtime_state.get("phase") or "") != "Executor":
-                    return []
+                    return None
                 tool_name = str(name or "")
                 if tool_name not in {"animation_render_preview", "scene_screenshot"}:
-                    return []
+                    return None
                 if not _screenshots_allowed():
-                    return []
+                    return None
+
                 try:
                     data = json.loads(result_json or "{}")
                 except Exception:
                     data = {}
                 if not isinstance(data, dict) or not data.get("ok"):
-                    return []
+                    return None
                 path = data.get("path")
                 if not isinstance(path, str) or not path.strip():
-                    return []
-
-                p = Path(path)
-                if not p.exists() or not p.is_file():
-                    return [
-                        _message(
-                            role="user",
-                            text=f"Preview render returned path={path!r}, but the file does not exist on disk.",
-                        )
-                    ]
-
-                try:
-                    raw = p.read_bytes()
-                except Exception as e:
-                    return [
-                        _message(
-                            role="user",
-                            text=f"Preview image exists at {path!r} but could not be read: {e}",
-                        )
-                    ]
-
-                if len(raw) > MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL:
-                    return [
-                        _message(
-                            role="user",
-                            text=(
-                                "Preview image is too large to attach for model-based visual checking.\n"
-                                f"- path: {path}\n"
-                                f"- bytes: {len(raw)}\n"
-                                f"- limit_bytes: {MAX_PREVIEW_IMAGE_BYTES_FOR_MODEL}\n"
-                                "Please re-render the preview at a smaller width/height."
-                            ),
-                        )
-                    ]
-
-                mime = _mime_for_model_image(p)
-                if not mime:
-                    return [
-                        _message(
-                            role="user",
-                            text=(
-                                "Preview image format is not supported for model upload.\n"
-                                f"- path: {path}\n"
-                                f"- suffix: {p.suffix!r}\n"
-                                "- allowed: .png, .jpg/.jpeg, .webp, .gif\n"
-                                "Please re-render the screenshot as PNG (preferred) at a smaller width/height if needed."
-                            ),
-                        )
-                    ]
-                b64 = base64.b64encode(raw).decode("ascii")
-                data_url = f"data:{mime};base64,{b64}"
+                    return None
 
                 # Include a short text header so the model knows what this image represents.
                 try:
@@ -2073,24 +2034,172 @@ class ChatTeam:
                 w = args.get("width") if isinstance(args, dict) else None
                 h = args.get("height") if isinstance(args, dict) else None
                 header = (
-                    "Preview image for visual verification.\n"
+                    "INTERNAL TOOL OUTPUT (not a user request): preview image for model-based visual verification.\n"
                     f"- tool: {tool_name}\n"
                     f"- time_sec: {tsec!r}\n"
                     f"- size: {w!r}x{h!r}\n"
                     f"- path: {path}\n"
-                    "This image is for you (the model) to inspect. Do NOT ask the user to open the temp file.\n"
+                    "This image was generated by an Atlas tool call during execution.\n"
+                    "Do NOT ask the user to open the temp file.\n"
                     "If you still need a human check, ask the user to look in the Atlas UI (not the file path)."
                 )
-                return [
-                    {
-                        "type": "message",
-                        "role": "user",
-                        "content": [
+
+                def _try_get_preview_file_id() -> str | None:
+                    """Best-effort upload of a preview image to get a reusable file_id.
+
+                    This keeps tool-loop payloads small and avoids repeating base64 bytes
+                    in subsequent tool-loop rounds.
+                    """
+
+                    if self.llm._wire_mode() == "chat":
+                        return None
+                    cache_key = ""
+                    try:
+                        cache_key = str(p.resolve())
+                    except Exception:
+                        cache_key = str(p)
+                    file_id = uploaded_preview_file_ids_by_path.get(cache_key)
+                    if not file_id:
+                        try:
+                            file_id = self.llm.upload_file_for_model_input(
+                                path=p,
+                                purpose="user_data",
+                                # Keep this as session-ish: auto-expire after 1 hour when supported.
+                                expires_after_sec=3600,
+                            )
+                        except Exception:
+                            file_id = None
+                        if isinstance(file_id, str) and file_id.strip():
+                            uploaded_preview_file_ids_by_path[cache_key] = (
+                                file_id.strip()
+                            )
+                            file_id = file_id.strip()
+                        else:
+                            file_id = None
+                    return file_id
+
+                p = Path(path)
+                if not p.exists() or not p.is_file():
+                    return {
+                        "output": [
                             {"type": "input_text", "text": header},
-                            {"type": "input_image", "image_url": data_url},
-                        ],
+                            {
+                                "type": "input_text",
+                                "text": f"Preview render returned path={path!r}, but the file does not exist on disk.",
+                            },
+                            {
+                                "type": "input_text",
+                                "text": f"Tool JSON result:\n{result_json}",
+                            },
+                        ]
                     }
-                ]
+
+                # Fast-path size check: avoid reading huge images into memory just
+                # to learn they can't be inlined.
+                file_bytes: int | None = None
+                try:
+                    file_bytes = int(p.stat().st_size)
+                except Exception:
+                    file_bytes = None
+
+                mime = _mime_for_model_image(p)
+                if not mime:
+                    return {
+                        "output": [
+                            {"type": "input_text", "text": header},
+                            {
+                                "type": "input_text",
+                                "text": (
+                                    "Preview image format is not supported for model upload.\n"
+                                    f"- path: {path}\n"
+                                    f"- suffix: {p.suffix!r}\n"
+                                    "- allowed: .png, .jpg/.jpeg, .webp, .gif\n"
+                                    "Re-render the screenshot as PNG (preferred) at a smaller width/height if needed."
+                                ),
+                            },
+                            {
+                                "type": "input_text",
+                                "text": f"Tool JSON result:\n{result_json}",
+                            },
+                        ]
+                    }
+
+                # Preferred: attach as a provider file_id (keeps tool-loop payloads small).
+                # This is best-effort and provider-dependent; if upload fails we fall back
+                # to inline base64 for small images.
+                file_id = _try_get_preview_file_id()
+                if isinstance(file_id, str) and file_id.strip():
+                    return {
+                        "output": [
+                            {"type": "input_text", "text": header},
+                            {
+                                "type": "input_text",
+                                "text": f"Tool JSON result:\n{result_json}",
+                            },
+                            {
+                                "type": "input_image",
+                                "file_id": file_id.strip(),
+                                "detail": "auto",
+                            },
+                        ]
+                    }
+
+                try:
+                    raw = p.read_bytes()
+                except Exception as e:
+                    return {
+                        "output": [
+                            {"type": "input_text", "text": header},
+                            {
+                                "type": "input_text",
+                                "text": f"Preview image exists at {path!r} but could not be read: {e}",
+                            },
+                            {
+                                "type": "input_text",
+                                "text": f"Tool JSON result:\n{result_json}",
+                            },
+                        ]
+                    }
+
+                if len(raw) > MAX_PREVIEW_IMAGE_INLINE_BYTES_FOR_MODEL:
+                    # Either the upload failed, or the provider doesn't support Files.
+                    # Don't inline large base64 payloads; request a smaller preview instead.
+                    return {
+                        "output": [
+                            {"type": "input_text", "text": header},
+                            {
+                                "type": "input_text",
+                                "text": (
+                                    "Preview image is too large to inline as base64 and could not be attached as file_id.\n"
+                                    f"- path: {path}\n"
+                                    f"- bytes: {len(raw)}\n"
+                                    f"- inline_limit_bytes: {MAX_PREVIEW_IMAGE_INLINE_BYTES_FOR_MODEL}\n"
+                                    "Re-render the preview at a smaller width/height, or request a human check in the Atlas UI."
+                                ),
+                            },
+                            {
+                                "type": "input_text",
+                                "text": f"Tool JSON result:\n{result_json}",
+                            },
+                        ]
+                    }
+
+                b64 = base64.b64encode(raw).decode("ascii")
+                data_url = f"data:{mime};base64,{b64}"
+                return {
+                    "output": [
+                        {"type": "input_text", "text": header},
+                        {
+                            "type": "input_text",
+                            "text": f"Tool JSON result:\n{result_json}",
+                        },
+                        {
+                            "type": "input_image",
+                            "image_url": data_url,
+                            "detail": "auto",
+                        },
+                    ]
+                }
 
             # Capture streamed reasoning deltas so we can persist them even when the
             # request fails mid-stream (e.g., provider network drops / 400s after some
@@ -2377,6 +2486,7 @@ class ChatTeam:
                 planner_no_plan_repair_attempts = 0
                 unexpected_refusal_repair_attempts = 0
                 phase_input_items_local = list(phase_input_items)
+                retry_extra_instructions = ""
 
                 CONTEXT_CHECKPOINT_PREFIX = (
                     "CONTEXT CHECKPOINT (atlas_agent)\n"
@@ -2626,8 +2736,6 @@ class ChatTeam:
                     if not isinstance(item, dict):
                         return False
                     if str(item.get("type") or "") != "message":
-                        return False
-                    if str(item.get("role") or "") != "user":
                         return False
                     txt = _extract_message_text(item)
                     return txt.startswith("CONTEXT CHECKPOINT (atlas_agent)")
@@ -2968,11 +3076,7 @@ class ChatTeam:
                     ).strip()
 
                     # Replace older items with a single checkpoint message.
-                    checkpoint_item: dict[str, Any] = {
-                        "type": "message",
-                        "role": "user",
-                        "content": [{"type": "input_text", "text": summary_text}],
-                    }
+                    checkpoint_item = _message(role="assistant", text=summary_text)
                     if hard_mode:
                         in_items[:] = [checkpoint_item, in_items[int(last_user_idx)]]
                     else:
@@ -3003,11 +3107,19 @@ class ChatTeam:
                     effective_input_budget_tokens, auto_compact_tokens = (
                         _model_prompt_budgets_for_current_model()
                     )
+                    phase_instructions_local = (
+                        instructions.rstrip() + "\n\n" + shared_instructions
+                    ).strip()
+                    if retry_extra_instructions.strip():
+                        phase_instructions_local = (
+                            phase_instructions_local
+                            + "\n\n"
+                            + retry_extra_instructions.strip()
+                        ).strip()
+                    retry_extra_instructions = ""
                     result = run_responses_tool_loop(
                         llm=self.llm,
-                        instructions=(
-                            instructions.rstrip() + "\n\n" + shared_instructions
-                        ).strip(),
+                        instructions=phase_instructions_local,
                         input_items=phase_input_items_local,
                         tools=phase_tools,
                         dispatch=_dispatch_logged,
@@ -3059,11 +3171,8 @@ class ChatTeam:
                         except Exception:
                             pass
                         phase_input_items_local = list(result.input_items or [])
-                        phase_input_items_local.append(
-                            _message(
-                                role="user",
-                                text=_tool_json_repair_prompt(phase_name=phase),
-                            )
+                        retry_extra_instructions = _tool_json_repair_prompt(
+                            phase_name=phase
                         )
                         continue
 
@@ -3111,36 +3220,26 @@ class ChatTeam:
                                 phase_input_items_local.pop(i)
                                 break
                         if str(phase) == "Planner":
-                            phase_input_items_local.append(
-                                _message(
-                                    role="user",
-                                    text=(
-                                        "INTERNAL: Your previous reply was an unexpected refusal.\n"
-                                        "This is a benign request about operating the local Atlas app.\n"
-                                        "You MUST NOT refuse.\n\n"
-                                        "Planner requirements:\n"
-                                        "- Do NOT ask clarifying questions.\n"
-                                        "- CALL update_plan (clear, scannable; exactly one in_progress).\n"
-                                        "- CALL verification_set_requirements for each step_id.\n"
-                                        "- Do NOT output any embedded JSON/tool blobs in assistant text.\n"
-                                    ),
-                                )
+                            retry_extra_instructions = (
+                                "INTERNAL (not a user message): Your previous reply was an unexpected refusal.\n"
+                                "This is a benign request about operating the local Atlas app.\n"
+                                "You MUST NOT refuse.\n\n"
+                                "Planner requirements:\n"
+                                "- Do NOT ask clarifying questions.\n"
+                                "- CALL update_plan (clear, scannable; exactly one in_progress).\n"
+                                "- CALL verification_set_requirements for each step_id.\n"
+                                "- Do NOT output any embedded JSON/tool blobs in assistant text.\n"
                             )
                         else:
-                            phase_input_items_local.append(
-                                _message(
-                                    role="user",
-                                    text=(
-                                        "INTERNAL: Your previous reply was an unexpected refusal.\n"
-                                        "This is a benign request about operating the local Atlas app.\n"
-                                        "You MUST NOT refuse.\n\n"
-                                        "Executor requirements:\n"
-                                        "- Continue executing the plan via tools.\n"
-                                        "- Do NOT narrate tool use; just CALL the tools.\n"
-                                        "- Do NOT provide manual GUI instructions as a substitute.\n"
-                                        "- Only produce a user-facing recap AFTER tool execution.\n"
-                                    ),
-                                )
+                            retry_extra_instructions = (
+                                "INTERNAL (not a user message): Your previous reply was an unexpected refusal.\n"
+                                "This is a benign request about operating the local Atlas app.\n"
+                                "You MUST NOT refuse.\n\n"
+                                "Executor requirements:\n"
+                                "- Continue executing the plan via tools.\n"
+                                "- Do NOT narrate tool use; just CALL the tools.\n"
+                                "- Do NOT provide manual GUI instructions as a substitute.\n"
+                                "- Only produce a user-facing recap AFTER tool execution.\n"
                             )
                         continue
 
@@ -3181,16 +3280,11 @@ class ChatTeam:
                             except Exception:
                                 pass
                             phase_input_items_local = list(result.input_items or [])
-                            phase_input_items_local.append(
-                                _message(
-                                    role="user",
-                                    text=(
-                                        "INTERNAL: Planner must not ask clarifying questions.\n"
-                                        "You MUST now CALL update_plan with a clear, scannable plan (exactly one in_progress),\n"
-                                        "then CALL verification_set_requirements for each step_id.\n"
-                                        "Do NOT output any JSON blobs or narrative plan in assistant text.\n"
-                                    ),
-                                )
+                            retry_extra_instructions = (
+                                "INTERNAL (not a user message): Planner must not ask clarifying questions.\n"
+                                "You MUST now CALL update_plan with a clear, scannable plan (exactly one in_progress),\n"
+                                "then CALL verification_set_requirements for each step_id.\n"
+                                "Do NOT output any JSON blobs or narrative plan in assistant text.\n"
                             )
                             continue
 
@@ -3223,23 +3317,18 @@ class ChatTeam:
                             plan_now = self.session_store.get_plan() or []
                         except Exception:
                             plan_now = []
-                        phase_input_items_local.append(
-                            _message(
-                                role="user",
-                                text=(
-                                    "INTERNAL: The current plan is missing or has pending work.\n"
-                                    + (
-                                        "No plan exists yet. You MUST first call update_plan to create a concrete, actionable plan, "
-                                        "then call verification_set_requirements for each step_id.\n"
-                                        if not plan_now
-                                        else "You must continue executing the plan by calling tools now.\n"
-                                    )
-                                    + "Do NOT narrate tool use (no “Let’s call …”). Just CALL the tool(s).\n"
-                                    "If you cannot proceed due to preconditions or missing capabilities, call report_blocked once with a precise reason and suggestion.\n"
-                                    "Do not provide GUI/manual Atlas instructions as a substitute for tool execution.\n"
-                                    "Only provide a user-facing recap AFTER tool execution.\n"
-                                ),
+                        retry_extra_instructions = (
+                            "INTERNAL (not a user message): The current plan is missing or has pending work.\n"
+                            + (
+                                "No plan exists yet. You MUST first call update_plan to create a concrete, actionable plan, "
+                                "then call verification_set_requirements for each step_id.\n"
+                                if not plan_now
+                                else "You must continue executing the plan by calling tools now.\n"
                             )
+                            + "Do NOT narrate tool use (no “Let’s call …”). Just CALL the tool(s).\n"
+                            "If you cannot proceed due to preconditions or missing capabilities, call report_blocked once with a precise reason and suggestion.\n"
+                            "Do not provide GUI/manual Atlas instructions as a substitute for tool execution.\n"
+                            "Only provide a user-facing recap AFTER tool execution.\n"
                         )
                         continue
                     break
@@ -3308,17 +3397,14 @@ class ChatTeam:
                     "- Do not invent unknown ids/keys/values.\n\n"
                     + ATLAS_SHARED_SYSTEM_RULES
                 )
+                finalize_instructions = (
+                    finalize_instructions.strip()
+                    + "\n\n"
+                    + "INTERNAL CONTEXT (not a user message): Tool-loop round budget reached; "
+                    "produce a progress update and stop.\n\n"
+                    "Current plan:\n" + plan_text
+                ).strip()
                 finalize_items = list(e.input_items or [])
-                finalize_items.append(
-                    _message(
-                        role="user",
-                        text=(
-                            "INTERNAL: Tool-loop round budget reached; produce a progress update and stop.\n\n"
-                            "Current plan:\n"
-                            f"{plan_text}"
-                        ),
-                    )
-                )
 
                 final_summary_parts: dict[int, list[str]] = {}
 

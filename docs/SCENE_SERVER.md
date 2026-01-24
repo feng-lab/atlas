@@ -211,8 +211,12 @@ Keyframes override base scene values during playback/preview at nonzero times.
 - `EnsureAnimation { create_new?, name? } -> { ok, animation_id, created, error? }`
   - Creates or selects an `Animation3D` object and binds it for editing in the GUI.
   - All subsequent timeline operations require the returned `animation_id`.
+  - UI parity: when this RPC creates a new animation (response `created=true`), Atlas captures a full-scene keyframe at `t=0` (camera + all objects + background/axis/global). This seeds a deterministic baseline so playback does not fall back to live scene values.
 - `SetDuration { animation_id, seconds } -> { ok }`
 - `SetTime { animation_id, seconds, cancel_rendering? } -> { ok }`
+- `AddKeyFrame { animation_id, time, cancel_rendering? } -> { ok }`
+  - UI “Save Key Frame” parity: captures the **entire current scene state** into the animation at the requested time (writes keys for all parameters, including camera).
+  - This can be used as an animation authoring workflow (“pose the scene at beat time → save keyframe”), and also to re-seed baseline keys at `t=0` after loading/adding objects during authoring.
 - `SetKey { animation_id, target_id, json_key?, time, easing, value } -> { ok }`
   - `target_id=0` for camera (json_key ignored), or `>=4` for objects.
   - `value` is typed JSON via protobuf `Value` (camera is an object; options are strings; vectors are arrays).

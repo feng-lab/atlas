@@ -30,6 +30,9 @@ ContextOverflowHandler = Callable[[list[dict[str, Any]], BaseException], bool]
 
 log = logging.getLogger(__name__)
 
+ToolOutputPayload = str | list[dict[str, Any]]
+PostToolOutputHook = Callable[[str, str, str], dict[str, Any] | None]
+
 
 class PromptBudgetExceeded(RuntimeError):
     def __init__(self, *, estimated_tokens: int, limit_tokens: int):
@@ -609,7 +612,7 @@ def run_responses_tool_loop(
     reasoning_effort: str | None,
     reasoning_summary: str | None,
     text_verbosity: str | None,
-    post_tool_output: Callable[[str, str, str], list[dict[str, Any]]] | None = None,
+    post_tool_output: PostToolOutputHook | None = None,
     callbacks: ToolLoopCallbacks | None = None,
     temperature: float | None = None,
     on_context_overflow: ContextOverflowHandler | None = None,
@@ -893,23 +896,43 @@ def run_responses_tool_loop(
                 result_json = dispatch(name, args_json)
                 if cb.on_tool_result is not None:
                     cb.on_tool_result(name, call_id, result_json)
+                if post_tool_output is not None:
+                    try:
+                        hook = post_tool_output(name, args_json, result_json)
+                    except Exception:
+                        hook = None
+                else:
+                    hook = None
+
+                output_payload: ToolOutputPayload = result_json
+                extra_items: list[dict[str, Any]] = []
+                if isinstance(hook, dict):
+                    maybe_output = hook.get("output")
+                    if isinstance(maybe_output, str):
+                        output_payload = maybe_output
+                    elif isinstance(maybe_output, list):
+                        # Best-effort validation: ensure it is a list of dict parts.
+                        parts: list[dict[str, Any]] = []
+                        for p in maybe_output:
+                            if isinstance(p, dict):
+                                parts.append(p)
+                        if parts:
+                            output_payload = parts
+                    maybe_extra = hook.get("extra_input_items")
+                    if isinstance(maybe_extra, list):
+                        for it in maybe_extra:
+                            if isinstance(it, dict):
+                                extra_items.append(it)
+
                 in_items.append(
                     {
                         "type": "function_call_output",
                         "call_id": call_id,
-                        "output": result_json,
+                        "output": output_payload,
                     }
                 )
-                if post_tool_output is not None:
-                    try:
-                        extra = post_tool_output(name, args_json, result_json)
-                        if isinstance(extra, list):
-                            for it in extra:
-                                if isinstance(it, dict):
-                                    in_items.append(it)
-                    except Exception:
-                        # Hooks must not break the tool loop.
-                        pass
+                if extra_items:
+                    in_items.extend(extra_items)
             continue
 
         # No tool calls: we consider this a final assistant output.

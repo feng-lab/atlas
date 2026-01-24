@@ -42,6 +42,12 @@ def build_atlas_agent_primer() -> str:
         "Playback rule: during playback, animation keys override scene values for affected parameters; to change what plays, write/replace keys (not scene-only edits)."
     )
     lines.append(
+        "Determinism rule: any parameter without keys in the animation may fall back to the current scene value. To make an animation self-contained, ensure a full-scene baseline keyframe exists at t=0 (UI parity) and re-save a keyframe at t=0 after loading/adding new objects while authoring (animation_save_keyframe)."
+    )
+    lines.append(
+        "Keyframing strategy: one useful workflow is to edit the scene to the desired look at key beat times and call animation_save_keyframe(time=...) to capture the full state; rely on interpolation between beats, then optionally refine with per-parameter keys."
+    )
+    lines.append(
         "Atlas exposes a local gRPC API so external tools can query the live scene state and apply changes deterministically."
     )
     lines.append(
@@ -93,7 +99,9 @@ def _load_formats(schema_dir: Path) -> dict | None:
     return _load_json(Path(schema_dir) / "supported_file_formats.json")
 
 
-def build_capabilities_prompt(schema_dir: Path, *, codegen_enabled: bool = False) -> str:
+def build_capabilities_prompt(
+    schema_dir: Path, *, codegen_enabled: bool = False
+) -> str:
     caps = _load_capabilities(schema_dir) or {}
     lines: List[str] = []
     lines.extend(build_atlas_agent_primer().splitlines())
