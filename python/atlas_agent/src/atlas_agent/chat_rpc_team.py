@@ -4,8 +4,6 @@ import base64
 import hashlib
 import json
 import logging
-import mimetypes
-import os
 import re
 import sys
 import uuid
@@ -34,21 +32,20 @@ from .defaults import (
     SESSION_MEMORY_COMPACTION_MODE,
     SESSION_MEMORY_RECENT_WRITE_EVENTS,
 )
-from .responses_tool_loop import (
-    ToolLoopCallbacks,
-    ToolLoopNonConverged,
-    ToolLoopResult,
-    run_responses_tool_loop,
-)
 from .discovery import discover_schema_dir
 from .llm_usage import (
     LlmUsageDelta,
     LlmUsageTotals,
     extract_usage_delta_from_response,
 )
+from .responses_tool_loop import (
+    ToolLoopCallbacks,
+    ToolLoopNonConverged,
+    ToolLoopResult,
+    run_responses_tool_loop,
+)
 from .scene_rpc import SceneClient
 from .session_store import SessionStore
-
 
 # Internal runtime policy (intentionally not user-configurable).
 #
@@ -133,7 +130,7 @@ ATLAS_SHARED_SYSTEM_RULES = (
     "- Camera director rubric (defaults): walkthrough constraints default keep_visible=false unless the user explicitly wants framing; step_seconds defaults: slow≈0.5, medium≈1.0, fast≈1.5–2.0. For sparse waypoints, add intermediate waypoints instead of relying on interpolation modes.\n"
     "- Walkthrough planning: when inventing segments from words, you may use internal segment templates (template+amount/distance/degrees) and let the tool expand them; do not require the user to name templates.\n"
     "- File paths: classify input. Absolute/~/drive paths are exact (fs_check_paths expands ~ and env vars; if missing try fs_resolve_path). Natural-language hints use fs_hint_resolve with structured args (expected_name + possible_dirs). Always verify before loading.\n"
-    "- Maintain an explicit plan via the update_plan tool (aim for 4–7 top-level steps by default; for complex tasks you may use more, or re-plan in phases). Exactly one step may be in_progress.\n"
+    "- Maintain an explicit plan via the update_plan tool. Choose a step breakdown that keeps execution manageable and easy to verify. Exactly one step may be in_progress.\n"
     "- Verify changes after applying: scene_get_values / animation_list_keys / animation_camera_validate, etc.\n"
     "- Avoid blocking on missing user intent/input; choose defaults and proceed. Use report_blocked only for technical/capability blocks (RPC down, tool missing, preconditions cannot be satisfied, etc.).\n"
     "- For unclear workflow/semantics, consult docs via docs_search and docs_read (AGENTS_GUIDE.md, SCENE_SERVER.md).\n"
@@ -175,9 +172,16 @@ ATLAS_PLANNER_SYSTEM_PROMPT = (
     "Important: The Planner phase tool list is intentionally LIMITED (read-only). It may not include file import or animation-key authoring tools.\n"
     "Do NOT treat missing write tools in this phase as a blocker; assume the Executor phase has the full write-capable toolset.\n"
     "Do NOT ask the user clarifying questions in this phase; instead, encode defaults as assumptions in your plan explanation.\n\n"
+    "Planning rules for long animations:\n"
+    "- If the Task Brief implies a long animation (roughly >20s) or multiple distinct beats, strongly prefer planning in timeline segments.\n"
+    "- Segment size guideline: 5–12 seconds per segment (pick what best matches the pacing and number of beats).\n"
+    '- Each segment plan step MUST include an explicit time range in the step text, e.g. "[0–12s] Establishing shot".\n'
+    "- Keep each segment atomic: a single objective + the camera/visibility intent for that range.\n"
+    "- For each segment, set verification requirements appropriate to the segment. Prefer tool read-backs; add visual or human checks when needed for framing/continuity.\n"
+    '- Avoid a single step like "Create the whole animation"; this causes unmanageable key counts and hard-to-debug continuity issues.\n\n'
     "Format:\n"
     "- You will be given a TASK BRIEF in the shared context. Treat it as authoritative; do not rewrite or reinterpret it.\n"
-    "- Otherwise: update the plan via update_plan (aim for 4–7 top-level steps by default; use more or re-plan in phases for very complex tasks).\n\n"
+    "- Otherwise: update the plan via update_plan. Choose a number of steps that makes the work easy to execute and verify; long animations may require more steps.\n\n"
     "Verification requirements:\n"
     "- After update_plan, call verification_set_requirements for each plan step_id.\n"
     "- Use policy.all_of groups to express multi-mode verification. Common patterns:\n"
@@ -187,6 +191,23 @@ ATLAS_PLANNER_SYSTEM_PROMPT = (
     + ATLAS_SHARED_SYSTEM_RULES
     + "\n\nTask brief format (reference):\n"
     + INTENT_RESOLVER_SYSTEM
+)
+
+ATLAS_PLAN_REPAIR_SYSTEM_PROMPT = (
+    "PHASE: PlanRepair\n"
+    "You must NOT change the Atlas scene/timeline in this phase.\n"
+    "Allowed actions: read-only inspection tools, docs lookup, and update_plan.\n\n"
+    "Goal:\n"
+    "- Ensure the current plan is executable without a single huge animation-authoring step.\n"
+    "- If the plan is already good (segment-based, time-ranged, manageable), do NOT call update_plan.\n\n"
+    "Plan repair rules:\n"
+    "- Start by calling session_get_plan(include_explanation=true) to see the current durable plan.\n"
+    "- If the plan contains a broad step that would require authoring an entire long animation in one go,\n"
+    "  rewrite it into ~5–12s timeline segments with explicit time ranges in each step.\n"
+    "- Preserve completed steps as completed when rewriting; keep at most one in_progress.\n"
+    "- When you update the plan, immediately call verification_set_requirements for each step_id.\n"
+    "  For animation segments, prefer tool verification; add visual or human verification when needed for framing/continuity.\n\n"
+    + ATLAS_SHARED_SYSTEM_RULES
 )
 
 ATLAS_EXECUTOR_SYSTEM_PROMPT = (
@@ -214,6 +235,8 @@ ATLAS_EXECUTOR_SYSTEM_PROMPT = (
             "- Large-file handling: prefer fs_tail_lines/fs_search_text; if you must scan, iterate fs_read_text in windows until EOF (no silent truncation).",
             "- Verification ledger: satisfy the current step’s verification policy using read-back tools and/or screenshots; record outcomes via verification_record(mode=tool|visual|human).",
             "- Plan bookkeeping: after completing a step, update_plan to mark it completed and advance the next step to in_progress. Near the end, call verification_eval_plan and do a final update_plan pass to ensure statuses are consistent.",
+            "- Long animations: never author an entire long animation in a single plan step. If a step is vague or spans too much time, STOP and call update_plan to split it into ~5–12s timeline segments with explicit [t0–t1] ranges before writing keys.",
+            "- Segment workflow: for each [t0–t1] segment, author keys only within that range, then validate framing/continuity using representative checks (tool read-backs and, when appropriate, a small number of preview frames). Fix within the segment before moving on.",
             "- Visual checks: prefer scene_screenshot for current scene state; use animation_render_preview only when you need a specific animation time. If screenshots are allowed for this session, do NOT ask the user again—just call the tool and inspect the image. Never ask the user to open temp screenshot files; if a human check is needed, ask them to check in the Atlas UI.",
             "- If a plan step cannot be verified from tools alone and screenshots are unavailable/ambiguous, keep the step pending and request a human-check (in the Atlas UI). Do not mark fail without concrete contradictory evidence.",
             "- If a validation/read-back check fails, diagnose precisely (id/json_key/time/value) and retry within this run before giving up.",
@@ -331,6 +354,9 @@ class ChatTeam:
             pass
 
         self._history: list[tuple[str, str]] = []
+        # Rolling (in-memory) marker to avoid re-running PlanRepair on every turn
+        # when only plan statuses change. This is not persisted on disk.
+        self._plan_repair_last_steps_sig: str | None = None
 
         # Use atlas_dir from the saved session meta when the caller did not specify one.
         if not self.atlas_dir:
@@ -1045,13 +1071,10 @@ class ChatTeam:
             # Encode the "clarify" as an assumption and proceed with a minimal,
             # actionable brief that preserves the raw user request.
             suppressed_clarify = suppressed_clarify or task_brief.strip()
-            tl = (user_text or "").lower()
-            if any(
-                k in tl for k in ("animation", "video", "seconds", "fps", "timeline")
-            ):
-                intent = "animation"
-            else:
-                intent = "scene"
+            # Avoid language-specific heuristics. Downstream phases already have
+            # rules for choosing scene_* vs animation_* tools from the Task Brief
+            # and user request.
+            intent = "unknown"
             task_brief = (
                 "TASK BRIEF:\n"
                 f"- Intent: {intent}\n"
@@ -1479,7 +1502,7 @@ class ChatTeam:
         def _dispatch_logged(name: str, args_json: str) -> str:
             # Phase safety: nested dispatches must not bypass the phase tool allowlist.
             ph = str(current_phase or "")
-            if ph == "Planner":
+            if ph in {"Planner", "PlanRepair"}:
                 if name in ATLAS_STATE_MUTATION_TOOLS:
                     return json.dumps(
                         {
@@ -1894,20 +1917,49 @@ class ChatTeam:
             # Adaptive planner: run when there is no plan yet, or the request looks multi-step/ambiguous.
             if not plan:
                 return True
+            # When the current plan is fully completed, treat the next user message as a new task
+            # and always refresh the plan. This avoids relying on language-specific heuristics.
+            all_completed = True
+            for it in plan:
+                if not isinstance(it, dict):
+                    continue
+                st = str(it.get("status") or "").strip()
+                if st != "completed":
+                    all_completed = False
+                    break
+            if all_completed:
+                return True
             t = (user_text or "").strip()
-            tl = t.lower()
             if "\n" in t:
                 return True
             if len(t) >= 220:
                 return True
-            if any(k in tl for k in ("plan", "steps", "todo", "design", "options")):
-                return True
-            # Heuristic: multi-clause requests benefit from an explicit plan.
-            clause_hits = 0
-            for tok in (" then ", " after ", " before ", " next ", " also "):
-                if tok in tl:
-                    clause_hits += 1
-            return clause_hits >= 2
+            # Avoid keyword heuristics (may not be English). If there is already
+            # an in-progress plan and the user message is short/single-line,
+            # proceed directly to the Executor.
+            return False
+
+        def _plan_has_incomplete_steps(current_plan: list[object]) -> bool:
+            for it in current_plan:
+                if not isinstance(it, dict):
+                    continue
+                st = str(it.get("status") or "").strip()
+                if st != "completed":
+                    return True
+            return False
+
+        def _plan_steps_signature(current_plan: list[object]) -> str:
+            # Signature used to avoid re-running PlanRepair on every turn when
+            # only statuses change (e.g., marking steps completed). This is
+            # language-agnostic and based solely on the ordered step texts.
+            steps: list[str] = []
+            for it in current_plan:
+                if not isinstance(it, dict):
+                    continue
+                step = str(it.get("step") or "").strip()
+                steps.append(step)
+            payload = "\n".join(steps).encode("utf-8")
+            return hashlib.sha1(payload).hexdigest()
 
         phase_hit_round_budget_phase: str | None = None
 
@@ -2295,7 +2347,7 @@ class ChatTeam:
                             "INTERNAL: Your previous reply incorrectly embedded tool/plan JSON into assistant text.\n"
                             "That is INVALID. You must CALL tools instead of printing JSON.\n\n"
                             "Do this now:\n"
-                            "1) Call update_plan with a clear, scannable plan (default 4–7 top-level steps; more is ok if needed; exactly one in_progress).\n"
+                            "1) Call update_plan with a clear, scannable plan (choose a manageable number of steps; exactly one in_progress).\n"
                             "2) Call verification_set_requirements for each step_id.\n"
                             "3) Do NOT output any JSON in your assistant text.\n"
                         )
@@ -2303,7 +2355,7 @@ class ChatTeam:
                         "INTERNAL: Your previous reply incorrectly embedded tool/plan JSON into assistant text.\n"
                         "That is INVALID. You must CALL tools instead of printing JSON.\n\n"
                         "Do this now:\n"
-                        "- If there is no plan yet, call update_plan (default 4–7 top-level steps; more is ok if needed) and then verification_set_requirements.\n"
+                        "- If there is no plan yet, call update_plan with a clear, scannable plan and then verification_set_requirements.\n"
                         "- Otherwise, proceed to execute the plan via tools.\n"
                         "- Do NOT output any JSON in your assistant text.\n"
                     )
@@ -3058,7 +3110,7 @@ class ChatTeam:
                                         "You MUST NOT refuse.\n\n"
                                         "Planner requirements:\n"
                                         "- Do NOT ask clarifying questions.\n"
-                                        "- CALL update_plan (default 4–7 steps; exactly one in_progress).\n"
+                                        "- CALL update_plan (clear, scannable; exactly one in_progress).\n"
                                         "- CALL verification_set_requirements for each step_id.\n"
                                         "- Do NOT output any embedded JSON/tool blobs in assistant text.\n"
                                     ),
@@ -3124,7 +3176,7 @@ class ChatTeam:
                                     role="user",
                                     text=(
                                         "INTERNAL: Planner must not ask clarifying questions.\n"
-                                        "You MUST now CALL update_plan (default 4–7 top-level steps; more is ok if needed; exactly one in_progress),\n"
+                                        "You MUST now CALL update_plan with a clear, scannable plan (exactly one in_progress),\n"
                                         "then CALL verification_set_requirements for each step_id.\n"
                                         "Do NOT output any JSON blobs or narrative plan in assistant text.\n"
                                     ),
@@ -3445,6 +3497,53 @@ class ChatTeam:
             # into the Executor (avoid redundant/failed RPC calls).
             if final_result is None and _turn_is_blocked():
                 final_result = planner_res
+
+        # Plan repair pass: ensure long animation authoring is broken into manageable segments
+        # before the Executor starts writing lots of keys.
+        try:
+            plan = self.session_store.get_plan() or []
+        except Exception:
+            plan = []
+        plan_steps_sig = _plan_steps_signature(plan)
+        last_plan_repair_sig = str(
+            getattr(self, "_plan_repair_last_steps_sig", "") or ""
+        ).strip()
+        should_run_plan_repair = (
+            final_result is None
+            and _plan_has_incomplete_steps(plan)
+            and plan_steps_sig != last_plan_repair_sig
+        )
+        if should_run_plan_repair:
+            repair_tools = _filter_tools(
+                read_only_tool_names | set(SESSION_MUTATION_TOOLS)
+            )
+            if web_search_tool is not None:
+                repair_tools = list(repair_tools) + [web_search_tool]
+            repair_res = _run_phase(
+                phase="PlanRepair",
+                instructions=ATLAS_PLAN_REPAIR_SYSTEM_PROMPT,
+                phase_tools=repair_tools,
+                phase_input_items=phase_input,
+                max_rounds=max(
+                    3,
+                    min(
+                        6,
+                        (
+                            int(self.max_rounds_planner)
+                            if int(self.max_rounds_planner) > 0
+                            else 6
+                        ),
+                    ),
+                ),
+            )
+            phase_input = list(repair_res.input_items)
+            # Record the plan-step signature we just repaired/validated so we do not
+            # pay an extra PlanRepair round trip on every status update.
+            try:
+                plan_after = self.session_store.get_plan() or []
+            except Exception:
+                plan_after = plan
+            self._plan_repair_last_steps_sig = _plan_steps_signature(plan_after)
 
         if final_result is None:
             exec_res = _run_phase(
