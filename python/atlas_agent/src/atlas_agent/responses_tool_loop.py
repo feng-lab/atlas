@@ -27,6 +27,8 @@ from .defaults import (
     TRANSIENT_NETWORK_MAX_RETRIES,
 )
 
+from .llm_usage import extract_usage_delta_from_response
+
 ContextOverflowHandler = Callable[[list[dict[str, Any]], BaseException], bool]
 
 log = logging.getLogger(__name__)
@@ -349,18 +351,29 @@ def _extract_image_dimensions_from_tool_output_parts(
     return (None, None)
 
 
-def _estimate_request_tokens(
-    *,
-    model_name: str | None,
-    instructions: str,
-    input_items: list[dict[str, Any]],
-    tools: list[dict[str, Any]],
-) -> int:
-    """Best-effort prompt token estimate for proactive compaction.
+def _extract_input_tokens_from_response(resp: dict[str, Any] | None) -> int | None:
+    """Best-effort extraction of prompt/input token count from a Responses API response.
 
-    This does NOT need to be exact; it only needs to detect "we are probably too large"
-    early enough to compact and avoid a provider hard error.
+    This reuses the same parsing logic as the session meta tracking layer
+    (extract_usage_delta_from_response) to avoid drift.
     """
+
+    delta = extract_usage_delta_from_response(resp)
+    if delta is None:
+        return None
+    try:
+        n = int(delta.input_tokens) if delta.input_tokens is not None else None
+    except Exception:
+        n = None
+    if n is None or n < 0:
+        return None
+    return int(n)
+
+
+def _estimate_image_tokens_in_input_items(
+    *, model_name: str | None, input_items: list[dict[str, Any]]
+) -> int:
+    """Estimate token cost of any input_image parts within input_items (best-effort)."""
 
     image_tokens = 0
 
@@ -369,11 +382,11 @@ def _estimate_request_tokens(
     # without parsing any natural-language text.
     call_args_by_id = _extract_tool_call_args_by_call_id(input_items or [])
 
-    # Add image token costs without counting base64 bytes.
     for it in input_items or []:
         if not isinstance(it, dict):
             continue
         itype = str(it.get("type") or "")
+
         if itype == "message":
             content = it.get("content")
             if not isinstance(content, list):
@@ -392,7 +405,9 @@ def _estimate_request_tokens(
                     height_px=None,
                     detail=detail,
                 )
-        elif itype == "function_call_output":
+            continue
+
+        if itype == "function_call_output":
             call_id = str(it.get("call_id") or "").strip()
             outp = it.get("output")
             if not isinstance(outp, list):
@@ -416,6 +431,52 @@ def _estimate_request_tokens(
                     height_px=h,
                     detail=detail,
                 )
+
+    return int(image_tokens)
+
+
+def _estimate_input_items_delta_tokens(
+    *, model_name: str | None, input_items: list[dict[str, Any]]
+) -> int:
+    """Estimate the token contribution of a list of newly appended input_items.
+
+    This intentionally uses the same rough heuristics as _estimate_request_tokens,
+    but scoped to only the delta items so we can add it to a known-accurate baseline
+    from the model usage stats of the last successful call.
+    """
+
+    image_tokens = _estimate_image_tokens_in_input_items(
+        model_name=model_name, input_items=input_items
+    )
+
+    redacted_items = _redact_inline_image_data_urls(list(input_items or []))
+    try:
+        raw = json.dumps(redacted_items, ensure_ascii=False, separators=(",", ":"))
+    except Exception:
+        raw = str(redacted_items)
+    try:
+        b = len(raw.encode("utf-8", errors="replace"))
+    except Exception:
+        b = len(raw)
+    return _approx_token_count_from_bytes(b) + int(image_tokens)
+
+
+def _estimate_request_tokens(
+    *,
+    model_name: str | None,
+    instructions: str,
+    input_items: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
+) -> int:
+    """Best-effort prompt token estimate for proactive compaction.
+
+    This does NOT need to be exact; it only needs to detect "we are probably too large"
+    early enough to compact and avoid a provider hard error.
+    """
+
+    image_tokens = _estimate_image_tokens_in_input_items(
+        model_name=model_name, input_items=input_items
+    )
 
     payload = {
         "instructions": str(instructions or ""),
@@ -1072,6 +1133,14 @@ def run_responses_tool_loop(
     # to avoid bloating subsequent requests.
     pending_inline_image_call_ids: set[str] = set()
 
+    # Proactive token estimation can be improved by using the model-reported
+    # input token usage from the last successful call as a baseline, then only
+    # estimating the contribution of newly appended input_items.
+    last_call_input_tokens: int | None = None
+    last_call_sent_in_items_len: int | None = None
+    last_call_tools_id: int | None = None
+    last_call_model: str | None = None
+
     def _append_message(role: str, text: str) -> None:
         in_items.append(_input_text_message(role=role, text=text))
 
@@ -1161,12 +1230,33 @@ def run_responses_tool_loop(
                         if limit > 0 and proactive_attempts < int(
                             PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL
                         ):
-                            estimated_tokens = _estimate_request_tokens(
-                                model_name=requested_model,
-                                instructions=instructions,
-                                input_items=in_items,
-                                tools=round_tools,
-                            )
+                            # Prefer incremental estimation when we have an accurate baseline
+                            # from the last call and the request shape is stable.
+                            estimated_tokens = None
+                            if (
+                                last_call_input_tokens is not None
+                                and last_call_sent_in_items_len is not None
+                                and last_call_sent_in_items_len <= len(in_items)
+                                and last_call_model == requested_model
+                                and last_call_tools_id == id(round_tools)
+                                # Inline-image ephemerality mutates historical items after a call.
+                                # Keep the incremental path simple: fall back to full estimation.
+                                and not bool(ephemeral_inline_images)
+                            ):
+                                delta_items = in_items[last_call_sent_in_items_len:]
+                                delta_tokens = _estimate_input_items_delta_tokens(
+                                    model_name=requested_model, input_items=delta_items
+                                )
+                                estimated_tokens = int(last_call_input_tokens) + int(
+                                    delta_tokens
+                                )
+                            else:
+                                estimated_tokens = _estimate_request_tokens(
+                                    model_name=requested_model,
+                                    instructions=instructions,
+                                    input_items=in_items,
+                                    tools=round_tools,
+                                )
                             # The estimator is intentionally rough (provider-agnostic).
                             # Avoid overly aggressive compaction when we are only barely over
                             # the threshold; try the request and fall back to reactive trimming
@@ -1190,6 +1280,7 @@ def run_responses_tool_loop(
                                     continue
 
                     try:
+                        sent_in_items_len = len(in_items)
                         resp = llm.responses_stream(
                             instructions=instructions,
                             input_items=in_items,
@@ -1201,6 +1292,15 @@ def run_responses_tool_loop(
                             parallel_tool_calls=False,
                             on_event=_on_event,
                         )
+
+                        # Record the accurate prompt token usage for the request we
+                        # just sent, so subsequent proactive estimates can be incremental.
+                        last_call_input_tokens = _extract_input_tokens_from_response(
+                            resp
+                        )
+                        last_call_sent_in_items_len = int(sent_in_items_len)
+                        last_call_tools_id = int(id(round_tools))
+                        last_call_model = str(requested_model or "")
                         break
                     except Exception as e:
                         if not _is_context_length_error(e):
