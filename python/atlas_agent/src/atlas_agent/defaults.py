@@ -114,6 +114,17 @@ DEFAULT_CODEGEN_TIMEOUT_SEC = 120.0
 DEFAULT_CODEGEN_MAX_ECHO_CHARS = 4000
 DEFAULT_CODEGEN_STDIO_PREVIEW_CHARS = 8000
 
+# Subprocess output shaping (console)
+#
+# Some Atlas CLI helper operations (e.g. headless animation export/preview) can
+# emit very verbose stdout/stderr, which is helpful for debugging but noisy for
+# normal interactive use. We therefore show only a small head+tail summary by default.
+#
+# This affects only what we print to the console/logs; the tool JSON results
+# returned to the model remain unchanged.
+DEFAULT_SUBPROCESS_LOG_HEAD_LINES = 5
+DEFAULT_SUBPROCESS_LOG_TAIL_LINES = 15
+
 
 # Web search tool (Responses API built-in)
 #

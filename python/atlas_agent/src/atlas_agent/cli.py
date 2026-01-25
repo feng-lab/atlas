@@ -129,6 +129,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--live-subprocess-tail",
+        default=True,
+        action=argparse.BooleanOptionalAction,
+        help=(
+            "Show a live-updating tail for long-running subprocess output (e.g. animation export/preview).\n"
+            "This is only used in the rich console UI; it is ignored in --plain mode."
+        ),
+    )
+    parser.add_argument(
         "--dump-tools",
         action="store_true",
         help=(
@@ -185,6 +194,19 @@ def main(argv: list[str] | None = None) -> int:
             "Unknown command; this CLI supports chat only. Usage: python -m atlas_agent"
         )
         return 2
+
+    # Global runtime knobs (best-effort). Keep these centralized in the CLI so
+    # tool modules don't need to thread flags through many layers.
+    try:
+        from .subprocess_utils import set_live_subprocess_tail
+
+        # In --plain mode there is no rich UI, so live-updating output isn't used.
+        if bool(getattr(args, "plain", False)):
+            set_live_subprocess_tail(False)
+        else:
+            set_live_subprocess_tail(bool(getattr(args, "live_subprocess_tail", True)))
+    except Exception:
+        pass
 
     if bool(getattr(args, "dump_tools", False)):
         try:

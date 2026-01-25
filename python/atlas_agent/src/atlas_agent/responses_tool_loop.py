@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import json
 import logging
+import math
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
@@ -50,8 +51,310 @@ def _approx_token_count_from_bytes(nbytes: int) -> int:
     return max(1, (b + 3) // 4)
 
 
+def _is_inline_image_data_url(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    s = value.strip().lower()
+    return s.startswith("data:image/")
+
+
+def _redact_inline_image_data_urls(value: Any) -> Any:
+    """Return a deep-copied JSON-serializable structure with inline image bytes removed.
+
+    Proactive token estimation must not scale with `data:image/...;base64,...` text length.
+    We only need a "large enough" estimate to detect context-window risk, not an exact count.
+    """
+
+    if _is_inline_image_data_url(value):
+        return "data:image/...;base64,<omitted>"
+    if isinstance(value, list):
+        return [_redact_inline_image_data_urls(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _redact_inline_image_data_urls(v) for k, v in value.items()}
+    return value
+
+
+@dataclass(frozen=True)
+class _ImageTokenCostTileModel:
+    base_tokens: int
+    tile_tokens: int
+
+
+@dataclass(frozen=True)
+class _ImageTokenCostPatchModel:
+    multiplier: float
+
+
+def _image_token_cost_profile_for_model(
+    model_name: str | None,
+) -> _ImageTokenCostTileModel | _ImageTokenCostPatchModel | None:
+    """Best-effort OpenAI image token profile for proactive estimation.
+
+    Reference: OpenAI "Images and Vision" docs (Calculating costs).
+    This is intentionally partial and only covers commonly used OpenAI models.
+    Unknown models return None (caller may fall back to byte-based heuristics).
+    """
+
+    m = str(model_name or "").strip().lower()
+    if not m:
+        return None
+
+    # Patch-based models (32px patches, capped at 1536 patches), with per-model multipliers.
+    # Order matters: these prefixes overlap with broader families (e.g. gpt-5*).
+    if m.startswith("gpt-4.1-mini"):
+        return _ImageTokenCostPatchModel(multiplier=1.6)
+    if m.startswith("gpt-4.1-nano"):
+        return _ImageTokenCostPatchModel(multiplier=2.0)
+    if m.startswith("o4-mini"):
+        return _ImageTokenCostPatchModel(multiplier=1.72)
+    if m.startswith("gpt-5-mini"):
+        return _ImageTokenCostPatchModel(multiplier=1.62)
+    if m.startswith("gpt-5-nano"):
+        return _ImageTokenCostPatchModel(multiplier=2.0)
+
+    # Tile-based models (512px tiles), with base + tile tokens.
+    # Order matters: gpt-4o-mini must be checked before gpt-4o.
+    if m.startswith("gpt-4o-mini"):
+        return _ImageTokenCostTileModel(base_tokens=2833, tile_tokens=5667)
+    if m.startswith("computer-use-preview"):
+        return _ImageTokenCostTileModel(base_tokens=65, tile_tokens=129)
+    if m.startswith("gpt-5-chat-latest"):
+        return _ImageTokenCostTileModel(base_tokens=70, tile_tokens=140)
+    if m.startswith("gpt-5"):
+        return _ImageTokenCostTileModel(base_tokens=70, tile_tokens=140)
+    if m.startswith("gpt-4.5"):
+        return _ImageTokenCostTileModel(base_tokens=85, tile_tokens=170)
+    if m.startswith("gpt-4.1"):
+        return _ImageTokenCostTileModel(base_tokens=85, tile_tokens=170)
+    if m.startswith("gpt-4o"):
+        return _ImageTokenCostTileModel(base_tokens=85, tile_tokens=170)
+    if m.startswith("o1-pro"):
+        return _ImageTokenCostTileModel(base_tokens=75, tile_tokens=150)
+    if m.startswith("o1"):
+        return _ImageTokenCostTileModel(base_tokens=75, tile_tokens=150)
+    if m.startswith("o3"):
+        return _ImageTokenCostTileModel(base_tokens=75, tile_tokens=150)
+
+    return None
+
+
+def _estimate_image_tokens_tile_model(
+    *,
+    width_px: int,
+    height_px: int,
+    detail: str | None,
+    base_tokens: int,
+    tile_tokens: int,
+) -> int:
+    """Estimate image token cost for tile-based vision models."""
+
+    w = max(1, int(width_px))
+    h = max(1, int(height_px))
+
+    d = str(detail or "auto").strip().lower()
+    # For proactive estimation, treat auto as high: it is the safer upper bound
+    # and avoids underestimating for typical screenshots/previews.
+    if d == "low":
+        return int(base_tokens)
+
+    # High detail resizing rules (OpenAI docs):
+    # 1) Scale to fit within a 2048x2048 square.
+    # 2) Scale so the shortest side is 768px.
+    # 3) Count 512px tiles in the resized image.
+    # 4) Tokens = base + tile_tokens * tile_count.
+    max_side = float(max(w, h))
+    scale_2048 = 1.0
+    if max_side > 2048.0:
+        scale_2048 = 2048.0 / max_side
+    w1 = float(w) * scale_2048
+    h1 = float(h) * scale_2048
+
+    min_side = float(min(w1, h1))
+    if min_side <= 0:
+        return int(base_tokens)
+    scale_768 = 768.0 / min_side
+    w2 = w1 * scale_768
+    h2 = h1 * scale_768
+
+    tiles_w = int(math.ceil(w2 / 512.0))
+    tiles_h = int(math.ceil(h2 / 512.0))
+    tiles = max(1, tiles_w) * max(1, tiles_h)
+    return int(base_tokens) + int(tile_tokens) * int(tiles)
+
+
+def _estimate_image_tokens_patch_model(
+    *, width_px: int, height_px: int, multiplier: float
+) -> int:
+    """Estimate image token cost for patch-based vision models."""
+
+    w = max(1, int(width_px))
+    h = max(1, int(height_px))
+
+    # Patch rules (OpenAI docs): split into 32px patches, cap at 1536 patches.
+    def patch_count(width: int, height: int) -> int:
+        return int(math.ceil(width / 32.0)) * int(math.ceil(height / 32.0))
+
+    patches = patch_count(w, h)
+    if patches > 1536:
+        # Downscale so that patch_count <= 1536, preserving aspect ratio.
+        # Start from the ideal scale factor, then shrink slightly if ceil() pushes us over.
+        scale = math.sqrt(1536.0 / float(patches))
+        w2 = max(1, int(math.floor(float(w) * scale)))
+        h2 = max(1, int(math.floor(float(h) * scale)))
+        patches = patch_count(w2, h2)
+
+        # ceil() effects can still leave us slightly above; nudge down deterministically.
+        guard = 0
+        while patches > 1536 and guard < 4096 and (w2 > 1 or h2 > 1):
+            guard += 1
+            if w2 >= h2 and w2 > 1:
+                w2 -= 1
+            elif h2 > 1:
+                h2 -= 1
+            patches = patch_count(w2, h2)
+
+    tokens = float(patches) * float(multiplier)
+    return int(math.ceil(tokens))
+
+
+def _estimate_image_tokens_openai(
+    *,
+    model_name: str | None,
+    width_px: int | None,
+    height_px: int | None,
+    detail: str | None,
+) -> int:
+    """Best-effort OpenAI image token estimate for proactive prompt sizing."""
+
+    profile = _image_token_cost_profile_for_model(model_name)
+    if profile is None:
+        return 0
+
+    # If dimensions are unavailable, use a conservative "large enough" default.
+    # - Tile models: 768x768 yields a stable upper bound for most aspect ratios.
+    # - Patch models: use the maximum patch budget (1536) when unknown.
+    if isinstance(profile, _ImageTokenCostPatchModel):
+        if width_px is None or height_px is None or width_px <= 0 or height_px <= 0:
+            return int(math.ceil(1536.0 * float(profile.multiplier)))
+        return _estimate_image_tokens_patch_model(
+            width_px=int(width_px),
+            height_px=int(height_px),
+            multiplier=profile.multiplier,
+        )
+
+    if width_px is None or height_px is None or width_px <= 0 or height_px <= 0:
+        width_px = 768
+        height_px = 768
+    return _estimate_image_tokens_tile_model(
+        width_px=int(width_px),
+        height_px=int(height_px),
+        detail=detail,
+        base_tokens=profile.base_tokens,
+        tile_tokens=profile.tile_tokens,
+    )
+
+
+def _extract_tool_call_args_by_call_id(
+    input_items: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Extract tool call args keyed by call_id (best-effort JSON parse)."""
+
+    out: dict[str, dict[str, Any]] = {}
+    for it in input_items or []:
+        if not isinstance(it, dict):
+            continue
+        if str(it.get("type") or "") != "function_call":
+            continue
+        call_id = str(it.get("call_id") or "").strip()
+        if not call_id:
+            continue
+        args_json = it.get("arguments")
+        if not isinstance(args_json, str) or not args_json.strip():
+            continue
+        try:
+            args = json.loads(args_json)
+        except Exception:
+            continue
+        if isinstance(args, dict):
+            out[call_id] = args
+    return out
+
+
+def _extract_image_dimensions_from_tool_call_args(
+    args: dict[str, Any] | None,
+) -> tuple[int | None, int | None]:
+    if not isinstance(args, dict):
+        return (None, None)
+    try:
+        w = int(args.get("width", 0) or 0)
+    except Exception:
+        w = 0
+    try:
+        h = int(args.get("height", 0) or 0)
+    except Exception:
+        h = 0
+    if w > 0 and h > 0:
+        return (w, h)
+    return (None, None)
+
+
+def _extract_image_dimensions_from_tool_output_parts(
+    output_parts: Any,
+) -> tuple[int | None, int | None]:
+    """Extract width/height from our structured tool JSON result (best-effort).
+
+    The tool loop often wraps tool results as:
+      - input_text: "Tool JSON result:\\n{...json...}"
+      - input_image: {image_url|file_id,...}
+
+    We can parse that JSON reliably because we generated it (it is not free-form
+    model text), and it reflects the actual output dimensions used by the tool.
+    """
+
+    if not isinstance(output_parts, list):
+        return (None, None)
+    for p in output_parts:
+        if not isinstance(p, dict):
+            continue
+        if str(p.get("type") or "") != "input_text":
+            continue
+        text = p.get("text")
+        if not isinstance(text, str) or not text:
+            continue
+        if not text.startswith("Tool JSON result:"):
+            continue
+        # Expected format: "Tool JSON result:\n{...}"
+        newline = text.find("\n")
+        if newline < 0:
+            continue
+        raw_json = text[newline + 1 :].strip()
+        if not raw_json:
+            continue
+        try:
+            obj = json.loads(raw_json)
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        try:
+            w = int(obj.get("width", 0) or 0)
+        except Exception:
+            w = 0
+        try:
+            h = int(obj.get("height", 0) or 0)
+        except Exception:
+            h = 0
+        if w > 0 and h > 0:
+            return (w, h)
+    return (None, None)
+
+
 def _estimate_request_tokens(
-    *, instructions: str, input_items: list[dict[str, Any]], tools: list[dict[str, Any]]
+    *,
+    model_name: str | None,
+    instructions: str,
+    input_items: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
 ) -> int:
     """Best-effort prompt token estimate for proactive compaction.
 
@@ -59,9 +362,65 @@ def _estimate_request_tokens(
     early enough to compact and avoid a provider hard error.
     """
 
+    image_tokens = 0
+
+    # Use structured tool call args (call_id → args dict) to estimate dimensions
+    # for tool-produced images (e.g. scene_screenshot, animation_render_preview),
+    # without parsing any natural-language text.
+    call_args_by_id = _extract_tool_call_args_by_call_id(input_items or [])
+
+    # Add image token costs without counting base64 bytes.
+    for it in input_items or []:
+        if not isinstance(it, dict):
+            continue
+        itype = str(it.get("type") or "")
+        if itype == "message":
+            content = it.get("content")
+            if not isinstance(content, list):
+                continue
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                if str(part.get("type") or "") != "input_image":
+                    continue
+                detail = part.get("detail")
+                if not isinstance(detail, str):
+                    detail = None
+                image_tokens += _estimate_image_tokens_openai(
+                    model_name=model_name,
+                    width_px=None,
+                    height_px=None,
+                    detail=detail,
+                )
+        elif itype == "function_call_output":
+            call_id = str(it.get("call_id") or "").strip()
+            outp = it.get("output")
+            if not isinstance(outp, list):
+                continue
+            w, h = _extract_image_dimensions_from_tool_output_parts(outp)
+            if w is None or h is None:
+                w, h = _extract_image_dimensions_from_tool_call_args(
+                    call_args_by_id.get(call_id)
+                )
+            for part in outp:
+                if not isinstance(part, dict):
+                    continue
+                if str(part.get("type") or "") != "input_image":
+                    continue
+                detail = part.get("detail")
+                if not isinstance(detail, str):
+                    detail = None
+                image_tokens += _estimate_image_tokens_openai(
+                    model_name=model_name,
+                    width_px=w,
+                    height_px=h,
+                    detail=detail,
+                )
+
     payload = {
         "instructions": str(instructions or ""),
-        "input_items": list(input_items or []),
+        # Redact inline base64 image payloads so JSON size does not scale with them.
+        "input_items": _redact_inline_image_data_urls(list(input_items or [])),
         "tools": list(tools or []),
     }
     try:
@@ -73,7 +432,7 @@ def _estimate_request_tokens(
         b = len(raw.encode("utf-8", errors="replace"))
     except Exception:
         b = len(raw)
-    return _approx_token_count_from_bytes(b)
+    return _approx_token_count_from_bytes(b) + int(image_tokens)
 
 
 class ResponsesStreamingClient(Protocol):
@@ -216,10 +575,7 @@ def _looks_like_inline_image_url(value: Any) -> bool:
     tool loop when Files API (file_id) is unavailable.
     """
 
-    if not isinstance(value, str):
-        return False
-    s = value.strip().lower()
-    return s.startswith("data:image/")
+    return _is_inline_image_data_url(value)
 
 
 def _strip_inline_images_from_function_call_outputs(
@@ -806,6 +1162,7 @@ def run_responses_tool_loop(
                             PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL
                         ):
                             estimated_tokens = _estimate_request_tokens(
+                                model_name=requested_model,
                                 instructions=instructions,
                                 input_items=in_items,
                                 tools=round_tools,

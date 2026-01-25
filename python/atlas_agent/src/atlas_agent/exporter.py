@@ -1,8 +1,12 @@
 import os
 import platform
-import subprocess
 import logging
 from pathlib import Path
+
+from .subprocess_utils import (
+    SubprocessCapturePolicy,
+    run_subprocess_with_captured_output,
+)
 
 
 def _base_args() -> list[str]:
@@ -118,10 +122,13 @@ def export_video(
 
 
 def _run(args: list[str]) -> int:
-    env = os.environ.copy()
-    try:
-        proc = subprocess.run(args, env=env, check=False)
-        return proc.returncode
-    except FileNotFoundError:
-        logging.getLogger("atlas_agent.exporter").error("Could not execute: %s", args[0])
-        return 127
+    # Preserve full output for debugging (saved to a temp log) but keep the
+    # interactive console readable by default (head+tail summary on success).
+    res = run_subprocess_with_captured_output(
+        args,
+        env=os.environ.copy(),
+        logger=logging.getLogger("atlas_agent.exporter"),
+        log_prefix="Atlas exporter",
+        policy=SubprocessCapturePolicy(),
+    )
+    return int(res.returncode)

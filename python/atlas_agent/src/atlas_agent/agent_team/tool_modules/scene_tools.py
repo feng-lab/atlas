@@ -1773,6 +1773,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 path=out_path,
                 overwrite=overwrite,
             )
+            if isinstance(res, dict):
+                # Include dimensions for deterministic token estimation and for
+                # downstream consumers (e.g. postprocessing/verification tools).
+                res["width"] = int(width)
+                res["height"] = int(height)
             return json.dumps(res)
         except Exception as e:
             msg = str(e)
