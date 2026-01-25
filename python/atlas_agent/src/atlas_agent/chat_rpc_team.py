@@ -3225,6 +3225,127 @@ class ChatTeam:
                     except Exception:
                         plan_block = ""
 
+                    # Prefer the Responses API compaction endpoint when available.
+                    #
+                    # This keeps an encrypted/opaque compaction item that preserves the model's
+                    # latent understanding of the prior tool loop history, while dramatically
+                    # shrinking the next request payload. If the provider/gateway does not
+                    # implement `/v1/responses/compact`, fall back to atlas_agent's existing
+                    # checkpoint summary compaction.
+                    compacted_items: list[dict[str, Any]] | None = None
+                    compact_resp: dict[str, Any] | None = None
+                    try:
+                        compaction_input_items = list(in_items)
+                        # Avoid compounding checkpoints: we replace the existing checkpoint
+                        # message (if present) with a fresh one below.
+                        if compaction_input_items and _is_context_checkpoint_message(
+                            compaction_input_items[0]
+                        ):
+                            compaction_input_items = compaction_input_items[1:]
+
+                        compacted_items, compact_resp = (
+                            self.llm.compact_responses_input_items_with_response(
+                                input_items=compaction_input_items
+                            )
+                        )
+                    except Exception:
+                        compacted_items = None
+                        compact_resp = None
+
+                    if compacted_items:
+                        # Ensure the current ask is explicitly present in plaintext.
+                        last_user_item = in_items[int(last_user_idx)]
+                        # Trust the provider's compaction output ordering. We only enforce the
+                        # Responses API invariant that at least one user message exists.
+                        try:
+                            has_user = any(
+                                isinstance(it, dict)
+                                and str(it.get("type") or "") == "message"
+                                and str(it.get("role") or "") == "user"
+                                for it in compacted_items
+                            )
+                        except Exception:
+                            has_user = False
+                        if not has_user:
+                            compacted_items = list(compacted_items) + [last_user_item]
+
+                        checkpoint_lines = [
+                            f"- Context compacted via Responses API /responses/compact ({reason_label}).",
+                            f"- Phase: {phase}",
+                            "- Earlier details are preserved in an encrypted compaction item; "
+                            "use session_search_events/session_search_transcript for exact logs.",
+                        ]
+                        if tool_digest_lines:
+                            checkpoint_lines.extend(
+                                ["- Recent tool calls:", *tool_digest_lines]
+                            )
+                        if plan_block:
+                            checkpoint_lines.extend(
+                                ["- Plan:", *plan_block.splitlines()]
+                            )
+
+                        checkpoint_text = (
+                            CONTEXT_CHECKPOINT_PREFIX + "\n".join(checkpoint_lines)
+                        ).strip()
+                        checkpoint_item = _message(
+                            role="assistant", text=checkpoint_text
+                        )
+
+                        orig_len_pre = int(orig_len)
+                        in_items[:] = [checkpoint_item] + list(compacted_items)
+
+                        # Best-effort stats persistence (usage, gateway model, etc.).
+                        if isinstance(compact_resp, dict):
+                            try:
+                                _persist_internal_llm_call_stats(
+                                    resp=compact_resp,
+                                    phase=str(phase or "")
+                                    if phase is not None
+                                    else None,
+                                    kind="responses_compaction",
+                                )
+                            except Exception:
+                                pass
+
+                        # Session event: record that we compacted and how.
+                        try:
+                            removed = max(0, int(orig_len_pre) - int(len(in_items)))
+                            compaction_id = None
+                            if isinstance(compact_resp, dict):
+                                rid = compact_resp.get("id")
+                                if isinstance(rid, str) and rid.strip():
+                                    compaction_id = rid.strip()
+                            self.session_store.append_event(
+                                {
+                                    "type": "context_compacted",
+                                    "turn_id": turn_id,
+                                    "phase": phase,
+                                    "reason": reason_key,
+                                    "original_items": int(orig_len_pre),
+                                    "new_items": int(len(in_items)),
+                                    "removed_items": int(removed),
+                                    "kept_items": int(len(in_items) - 1),
+                                    "mode": "responses_compact",
+                                    "checkpoint_summary": checkpoint_text,
+                                    "compaction_response_id": compaction_id,
+                                    "compaction_requested_model": str(self.model),
+                                    "compaction_base_url": (
+                                        str(self.llm.base_url)
+                                        if isinstance(self.llm.base_url, str)
+                                        and self.llm.base_url.strip()
+                                        else None
+                                    ),
+                                    # Persist the actual compaction output items that we fed back
+                                    # into the tool loop. Without this, we cannot reconstruct the
+                                    # exact prompt state later (the compaction item is opaque).
+                                    "compaction_output_items": list(compacted_items),
+                                }
+                            )
+                        except Exception:
+                            pass
+
+                        return True
+
                     # Ask the model to write an updated checkpoint summary. Keep the
                     # prompt small and stable; the full raw history remains in session.jsonl.
                     sys_prompt = (

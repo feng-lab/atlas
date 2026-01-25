@@ -55,6 +55,10 @@ class LLMClient:
     )
     _warned_files_api_unsupported: bool = field(init=False, default=False, repr=False)
     _files_api_disabled: bool = field(init=False, default=False, repr=False)
+    _warned_responses_compact_unsupported: bool = field(
+        init=False, default=False, repr=False
+    )
+    _responses_compact_disabled: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self):
         # Normalize base_url once so the rest of atlas_agent can rely on
@@ -216,9 +220,180 @@ class LLMClient:
                 sc = int(getattr(e, "status_code", 0) or 0)
             except Exception:
                 sc = 0
+            if not sc:
+                try:
+                    # urllib.error.HTTPError uses `.code`.
+                    sc = int(getattr(e, "code", 0) or 0)
+                except Exception:
+                    sc = 0
             if sc:
                 return sc
         return None
+
+    def _disable_responses_compact(self, reason: str) -> None:
+        self._responses_compact_disabled = True
+        self._warn_responses_compact_unsupported_once(reason)
+
+    def _warn_responses_compact_unsupported_once(self, reason: str) -> None:
+        if self._warned_responses_compact_unsupported:
+            return
+        self._warned_responses_compact_unsupported = True
+
+        base = self.base_url or os.environ.get("OPENAI_BASE_URL") or ""
+        base_msg = base.strip() or "<default OpenAI>"
+        log.warning(
+            "Provider does not appear to support the Responses API compaction endpoint "
+            "(/v1/responses/compact). Falling back to atlas_agent checkpoint summarization. "
+            "base_url=%s reason=%s",
+            base_msg,
+            (reason or "").strip() or "<unknown>",
+        )
+
+    @classmethod
+    def _is_responses_compact_unsupported_error(cls, err: Exception) -> bool:
+        # Best-effort: vendors/gateways that don't implement /v1/responses/compact
+        # typically return 404. Only treat these as "endpoint unsupported" signals;
+        # other 4xx errors are usually real request/validation issues.
+        for e in cls._iter_exception_chain(err):
+            msg = str(e or "").lower()
+            sc = cls._http_status_code(e) or 0
+
+            # If the request returned a hard "endpoint not found / not implemented"
+            # status, treat it as unsupported even when the provider error message
+            # is generic and does not include the full URL path.
+            if sc in {404, 405, 501}:
+                return True
+
+            # Fast-path: endpoint mentioned and looks like a 404/405/501.
+            if ("/responses/compact" in msg or "responses/compact" in msg) and sc in {
+                404,
+                405,
+                501,
+            }:
+                return True
+
+            # Some gateways report unknown endpoints as HTTP 400 with a generic message.
+            if (
+                ("/responses/compact" in msg or "responses/compact" in msg)
+                and sc == 400
+                and (
+                    "unknown endpoint" in msg
+                    or "unrecognized endpoint" in msg
+                    or "no such endpoint" in msg
+                    or "unsupported" in msg
+                    or "not supported" in msg
+                )
+            ):
+                return True
+
+            # Heuristic: "not found" with both tokens.
+            if ("responses" in msg and "compact" in msg) and (
+                "404" in msg or "not found" in msg or "not implemented" in msg
+            ):
+                return True
+
+        return False
+
+    def compact_responses_input_items_with_response(
+        self, *, input_items: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]] | None, dict[str, Any] | None]:
+        """Best-effort wrapper for the Responses API compaction endpoint.
+
+        Uses the provider's `/v1/responses/compact` endpoint when available.
+        Returns `(compacted_items, response_dict)` on success, otherwise `(None, None)`.
+
+        This never mutates `input_items`.
+        """
+
+        if self._responses_compact_disabled:
+            return (None, None)
+
+        # Compaction items are only meaningful when we can keep using the Responses API.
+        if self._wire_mode() == "chat":
+            return (None, None)
+
+        if not isinstance(input_items, list) or not input_items:
+            return (None, None)
+
+        safe_items = [it for it in input_items if isinstance(it, dict)]
+        if not safe_items:
+            return (None, None)
+
+        client = self._ensure_client()
+        responses = getattr(client, "responses", None)
+        compact_fn = (
+            getattr(responses, "compact", None) if responses is not None else None
+        )
+
+        # 1) Prefer SDK support when available.
+        if callable(compact_fn):
+            try:
+                resp = compact_fn(model=self.model, input=safe_items)
+                data = self._to_plain_dict(resp)
+                out = data.get("output") if isinstance(data, dict) else None
+                if isinstance(out, list):
+                    return ([it for it in out if isinstance(it, dict)], data)
+                return (None, data if isinstance(data, dict) else None)
+            except Exception as e:
+                if self._is_responses_compact_unsupported_error(e):
+                    self._disable_responses_compact(str(e))
+                return (None, None)
+
+        # 2) SDK fallback: raw HTTP call so older `openai` versions can still use the endpoint.
+        try:
+            data = self._responses_compact_via_http(input_items=safe_items)
+        except Exception as e:
+            if self._is_responses_compact_unsupported_error(e):
+                self._disable_responses_compact(str(e))
+            return (None, None)
+
+        out = data.get("output") if isinstance(data, dict) else None
+        if isinstance(out, list):
+            return ([it for it in out if isinstance(it, dict)], data)
+        return (None, data if isinstance(data, dict) else None)
+
+    def _responses_compact_via_http(
+        self, *, input_items: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        import json as _json
+        import urllib.error
+        import urllib.request
+
+        # Respect the configured base_url. The OpenAI SDK default is typically
+        # https://api.openai.com/v1, but gateways may be different.
+        base = ""
+        try:
+            base = str(getattr(self._ensure_client(), "base_url", "") or "")
+        except Exception:
+            base = ""
+        if not base:
+            base = str(self.base_url or os.environ.get("OPENAI_BASE_URL") or "").strip()
+        if not base:
+            base = "https://api.openai.com/v1"
+
+        base = base.rstrip("/")
+        if base.endswith("/v1"):
+            url = base + "/responses/compact"
+        else:
+            url = base + "/v1/responses/compact"
+
+        payload = {"model": str(self.model), "input": list(input_items or [])}
+        body = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+
+        try:
+            with urllib.request.urlopen(req, timeout=30.0) as resp:
+                raw = resp.read()
+        except urllib.error.HTTPError:
+            # Preserve the HTTPError so _http_status_code / message heuristics can detect support.
+            raise
+
+        data = _json.loads((raw or b"{}").decode("utf-8"))
+        return data if isinstance(data, dict) else {}
 
     def _ensure_client(self):
         if self._client is None:
