@@ -61,6 +61,8 @@ public:
   [[nodiscard]] json::value jsonValue() const override;
   void readValue(const json::value& jsonValue) override;
   void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
+  void setSameAs(const ZParameter& rhs) override;
+  void setValueSameAs(const ZParameter& rhs) override;
 
   [[nodiscard]] json::object valueSchema() const override
   {

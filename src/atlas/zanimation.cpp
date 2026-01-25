@@ -16,7 +16,6 @@
 #include <QMessageBox>
 #include "zmessageboxhelpers.h"
 #include <QApplication>
-#include <QSettings>
 #include <QDir>
 #include <QProgressDialog>
 #include <QThread>
@@ -1246,10 +1245,9 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
 void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
 {
   try {
-    QSettings settings;
-    if (settings.value(QString("Animation/removeRedundantKeysWhenSaving"), QVariant(true)).toBool()) {
-      removeRedundantKeys();
-    }
+    // NOTE: Do not call removeRedundantKeys() implicitly on save.
+    // Redundant-key cleanup is a destructive edit (it can delete keys) and must
+    // remain an explicit user action via the UI button.
 
     QFileInfo fi(fn);
     QString nName;

@@ -239,7 +239,11 @@ void ZParameterAnimation::removeRedundantKeys()
   ++it;
   while (it != m_keys.end()) {
     auto next = it + 1;
-    if ((*it)->value().jsonValue() != (*result)->value().jsonValue() || // not equal to prev
+    // Keep boundary keys so future edits can insert new keys without relying on
+    // implicit "carry forward" behavior. In particular, always keep the last
+    // key (even if it is redundant) so the track has explicit endpoints.
+    const bool isLast = (next == m_keys.end());
+    if (isLast || (*it)->value().jsonValue() != (*result)->value().jsonValue() || // not equal to prev
         (next != m_keys.end() && (*it)->value().jsonValue() != (*next)->value().jsonValue())) { // or not equal to next
       ++result; // make space for new valid it
       if (it != result) {

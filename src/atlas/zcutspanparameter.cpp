@@ -4,6 +4,7 @@
 #include <QVBoxLayout>
 #include <QGroupBox>
 #include <QLabel>
+#include <QSignalBlocker>
 
 namespace nim {
 
@@ -147,15 +148,44 @@ void ZCutSpanParameter::readValue(const json::value& jsonValue)
     return;
   }
   const auto& obj = jsonValue.as_object();
+
+  // Apply all nested values atomically. (These child parameters are QObjects
+  // with their own valueChanged handlers that call back into reapplyBinding().)
+  const QSignalBlocker b0(&m_mode);
+  const QSignalBlocker b1(&m_pinLower);
+  const QSignalBlocker b2(&m_pinUpper);
+  const QSignalBlocker b3(&m_normalized);
+
   m_mode.read(obj);
   m_pinLower.read(obj);
   m_pinUpper.read(obj);
   m_normalized.read(obj);
   if (obj.if_contains("Range FloatSpan")) {
-    this->set(json::value_to<glm::vec2>(obj.at("Range FloatSpan")));
+    const glm::vec2 span = json::value_to<glm::vec2>(obj.at("Range FloatSpan"));
+
+    // Factory-created instances (e.g. animation key value containers) can have
+    // a degenerate [min,max] range (often 0..0) because they are not yet bound
+    // to real scene bounds. If we clamp against that range we silently lose the
+    // provided absolute span and later key serialization becomes [0,0].
+    //
+    // Use the provided span as a temporary range seed only when our current
+    // range is degenerate; real engine-bound instances have a meaningful range
+    // set by applyBoundsForCuts().
+    const float mn = static_cast<float>(this->minimum());
+    const float mx = static_cast<float>(this->maximum());
+    if (mn == mx) {
+      const float lo = std::min(span[0], span[1]);
+      const float hi = std::max(span[0], span[1]);
+      if (lo != hi) {
+        ZFloatSpanParameter::setRange(lo, hi);
+      }
+    }
+
+    this->set(span);
   }
 
   // Reconcile according to binding after nested parameters are applied
+  updateUiEnabling();
   reapplyBinding();
 }
 
@@ -185,6 +215,44 @@ void ZCutSpanParameter::interpolate(const ZParameter& prev, double progress, ZPa
 
   // Interpolate absolute span; set() will clamp and run makeValid() to honor binding
   desPara.set(glm::mix(prevPara.get(), this->get(), static_cast<float>(progress)));
+}
+
+void ZCutSpanParameter::setSameAs(const ZParameter& rhs)
+{
+  CHECK(this->isSameType(rhs));
+  const auto& src = static_cast<const ZCutSpanParameter&>(rhs);
+
+  const QSignalBlocker b0(&m_mode);
+  const QSignalBlocker b1(&m_pinLower);
+  const QSignalBlocker b2(&m_pinUpper);
+  const QSignalBlocker b3(&m_normalized);
+
+  // Copy binding state first so range/value reconciliation uses the correct mode.
+  m_mode.forceSetValueSameAs(src.m_mode);
+  m_pinLower.setValueSameAs(src.m_pinLower);
+  m_pinUpper.setValueSameAs(src.m_pinUpper);
+  m_normalized.setValueSameAs(src.m_normalized);
+
+  ZFloatSpanParameter::setSameAs(rhs);
+  updateUiEnabling();
+}
+
+void ZCutSpanParameter::setValueSameAs(const ZParameter& rhs)
+{
+  CHECK(this->isSameType(rhs));
+  const auto& src = static_cast<const ZCutSpanParameter&>(rhs);
+
+  const QSignalBlocker b0(&m_mode);
+  const QSignalBlocker b1(&m_pinLower);
+  const QSignalBlocker b2(&m_pinUpper);
+  const QSignalBlocker b3(&m_normalized);
+
+  m_mode.forceSetValueSameAs(src.m_mode);
+  m_pinLower.setValueSameAs(src.m_pinLower);
+  m_pinUpper.setValueSameAs(src.m_pinUpper);
+  m_normalized.setValueSameAs(src.m_normalized);
+  this->set(src.get());
+  updateUiEnabling();
 }
 
 void ZCutSpanParameter::makeValid(glm::vec2& value) const

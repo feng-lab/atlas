@@ -65,7 +65,7 @@ CAMERA_SOLVE_PARAMS_SCHEMA: Dict[str, Any] = {
     "additionalProperties": False,
     "description": (
         "Mode-specific camera solve parameters.\n"
-        "ORBIT: axis ('x'|'y'|'z'), degrees, max_step_degrees.\n"
+        "ORBIT: axis ('x'|'y'|'z').\n"
         "DOLLY: start_dist and end_dist (camera-to-center distance)."
     ),
     "properties": {
@@ -73,14 +73,6 @@ CAMERA_SOLVE_PARAMS_SCHEMA: Dict[str, Any] = {
             "type": "string",
             "enum": ["x", "y", "z"],
             "description": "ORBIT: orbit axis.",
-        },
-        "degrees": {
-            "type": "number",
-            "description": "ORBIT: total rotation in degrees.",
-        },
-        "max_step_degrees": {
-            "type": "number",
-            "description": "ORBIT: maximum degrees per solver step (controls key density).",
         },
         "start_dist": {
             "type": "number",
@@ -1688,31 +1680,61 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             # Defaults for ORBIT
             if mode_up == "ORBIT":
                 params.setdefault("axis", "y")
-                # Top-level degrees is the single agent-facing knob; backend expects 'degrees'
-                try:
-                    deg = float(args.get("degrees", 360.0))
-                except Exception:
-                    deg = 360.0
-                params["degrees"] = deg
-                # Optional: control key density by limiting per-step rotation.
-                if args.get("max_step_degrees") is not None:
+                # `params` is reserved for mode-specific knobs. For ORBIT, degrees and
+                # key density are top-level arguments to avoid conflicting sources.
+                if isinstance(params, dict) and "degrees" in params:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": (
+                                "animation_camera_solve_and_apply(mode='ORBIT') does not accept params.degrees. "
+                                "Use top-level `degrees`."
+                            ),
+                        }
+                    )
+                if isinstance(params, dict) and "max_step_degrees" in params:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": (
+                                "animation_camera_solve_and_apply(mode='ORBIT') does not accept params.max_step_degrees. "
+                                "Use top-level `max_step_degrees`."
+                            ),
+                        }
+                    )
+
+                deg_top = args.get("degrees", None) if "degrees" in args else None
+
+                def _as_finite_float(v: Any, default: float | None) -> float | None:
+                    if v is None:
+                        return default
                     try:
-                        msd = float(args.get("max_step_degrees"))
+                        x = float(v)
                     except Exception:
-                        return json.dumps(
-                            {
-                                "ok": False,
-                                "error": "max_step_degrees must be a number (degrees per solver step)",
-                            }
-                        )
-                    if (not math.isfinite(msd)) or msd <= 0.0:
+                        return default
+                    return x if math.isfinite(x) else default
+
+                deg_top_f = _as_finite_float(deg_top, None)
+                deg = deg_top_f if deg_top_f is not None else 360.0
+                params["degrees"] = float(deg)
+
+                # Optional: control key density by limiting per-step rotation.
+                msd_top = (
+                    args.get("max_step_degrees", None)
+                    if "max_step_degrees" in args
+                    else None
+                )
+                msd_top_f = _as_finite_float(msd_top, None)
+                msd = msd_top_f
+                if msd is not None:
+                    if msd <= 0.0:
                         return json.dumps(
                             {
                                 "ok": False,
                                 "error": "max_step_degrees must be a finite number > 0",
                             }
                         )
-                    params["max_step_degrees"] = msd
+                    params["max_step_degrees"] = float(msd)
             tol = float(args.get("tolerance", 1e-3))
             easing = _normalize_easing_name(args.get("easing"))
             clear_range = bool(args.get("clear_range", True))
@@ -1724,6 +1746,92 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 constraints=constraints,
                 params=params,
             )
+            if not keys:
+                return json.dumps(
+                    {"ok": False, "error": "camera_solve returned no keys"}
+                )
+
+            def _has_time(arr: list[dict], t: float, eps: float) -> bool:
+                for kk in arr:
+                    try:
+                        tv = float(kk.get("time", 0.0))
+                    except Exception:
+                        continue
+                    if abs(tv - t) <= eps:
+                        return True
+                return False
+
+            # Invariants: ORBIT/DOLLY are interval solves and must include endpoints.
+            if mode_up in ("ORBIT", "DOLLY") and t1 > t0:
+                if not _has_time(keys, float(t0), tol):
+                    times_dbg = []
+                    try:
+                        times_dbg = [float(k.get("time", 0.0)) for k in (keys or [])]
+                    except Exception:
+                        times_dbg = []
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "camera_solve did not return a key at t0",
+                            "t0": float(t0),
+                            "t1": float(t1),
+                            "times": times_dbg,
+                        }
+                    )
+                if not _has_time(keys, float(t1), tol):
+                    times_dbg = []
+                    try:
+                        times_dbg = [float(k.get("time", 0.0)) for k in (keys or [])]
+                    except Exception:
+                        times_dbg = []
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "camera_solve did not return a key at t1",
+                            "t0": float(t0),
+                            "t1": float(t1),
+                            "times": times_dbg,
+                        }
+                    )
+
+            # ORBIT contract: when key density is controlled via max_step_degrees, the
+            # solver should segment the path accordingly (segments+1 keys). If this
+            # invariant changes, we'd rather fail fast than silently author a sparse
+            # timeline that will interpolate differently downstream.
+            if mode_up == "ORBIT" and t1 > t0:
+                try:
+                    deg_val = float(params.get("degrees", 360.0))
+                except Exception:
+                    deg_val = 360.0
+                try:
+                    msd_val = float(params.get("max_step_degrees", 90.0))
+                except Exception:
+                    msd_val = 90.0
+                if msd_val > 0.0 and math.isfinite(msd_val) and math.isfinite(deg_val):
+                    expected_segments = max(
+                        1, int(math.ceil(abs(float(deg_val)) / float(msd_val)))
+                    )
+                    expected_keys = expected_segments + 1
+                    if len(keys) != expected_keys:
+                        times_dbg = []
+                        try:
+                            times_dbg = [
+                                float(k.get("time", 0.0)) for k in (keys or [])
+                            ]
+                        except Exception:
+                            times_dbg = []
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "camera_solve returned unexpected key count for ORBIT",
+                                "degrees": float(deg_val),
+                                "max_step_degrees": float(msd_val),
+                                "expected_segments": int(expected_segments),
+                                "expected_keys": int(expected_keys),
+                                "got_keys": int(len(keys)),
+                                "times": times_dbg,
+                            }
+                        )
             # Optionally clear existing keys in [t0, t1] (with tolerance), excluding solver times
             if clear_range:
                 try:
@@ -1758,6 +1866,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     except Exception:
                         pass
             applied: list[float] = []
+            apply_errors: list[dict[str, Any]] = []
             for k in keys or []:
                 try:
                     tv = float(k.get("time", 0.0))
@@ -1779,8 +1888,38 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     )
                     if rr.get("ok"):
                         applied.append(tv)
+                    else:
+                        apply_errors.append(
+                            {
+                                "time": float(tv),
+                                "error": rr.get("error")
+                                or rr.get("reason")
+                                or "unknown",
+                            }
+                        )
                 except Exception:
+                    try:
+                        apply_errors.append(
+                            {"time": float(k.get("time", 0.0)), "error": "exception"}
+                        )
+                    except Exception:
+                        apply_errors.append({"error": "exception"})
                     continue
+
+            # If we didn't apply everything we solved, treat that as a failure so
+            # the agent doesn't proceed with an incomplete/ambiguous camera track.
+            if len(applied) != len(keys):
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "failed to apply one or more solved camera keys",
+                        "applied": sorted(applied),
+                        "total": int(len(applied)),
+                        "expected": int(len(keys)),
+                        "apply_errors": apply_errors,
+                    }
+                )
+
             return json.dumps(
                 {"ok": True, "applied": sorted(applied), "total": len(applied)}
             )
@@ -3785,7 +3924,94 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             remove_keys=remove_keys,
             commit=bool(args.get("commit", True)),
         )
-        return json.dumps({"ok": ok})
+        if not ok:
+            return json.dumps({"ok": False, "error": "batch failed"})
+
+        # Post-verify: ensure all requested SetKey operations actually exist.
+        # This avoids silent partial timelines (which are extremely hard for the
+        # agent to debug downstream).
+        try:
+            # Snapshot duration to warn when keys lie outside the clip range (UI
+            # often won't show them, and playback won't reach them).
+            duration: float | None = None
+            try:
+                ts = client.get_time(animation_id=animation_id)
+                d = getattr(ts, "duration", None)
+                if (
+                    isinstance(d, (int, float))
+                    and math.isfinite(float(d))
+                    and float(d) >= 0
+                ):
+                    duration = float(d)
+            except Exception:
+                duration = None
+
+            # Group set_keys by track so we only list keys once per track.
+            track_to_times: dict[tuple[int, str], list[float]] = {}
+            max_set_time: float | None = None
+            for s in set_keys:
+                if not isinstance(s, dict):
+                    continue
+                target_id = int(s.get("target_id", s.get("id", -1)))
+                jk = "" if target_id == 0 else str(s.get("json_key") or "")
+                t = float(s.get("time", 0.0))
+                track_to_times.setdefault((target_id, jk), []).append(t)
+                if max_set_time is None or t > max_set_time:
+                    max_set_time = t
+
+            missing: list[dict[str, Any]] = []
+            eps = 1e-6  # must match engine epsilon (kKeyTimeEpsSec)
+            for (target_id, jk), want_times in track_to_times.items():
+                lr = client.list_keys(
+                    animation_id=animation_id,
+                    target_id=target_id,
+                    json_key=jk,
+                    include_values=False,
+                )
+                have_times = [float(k.time) for k in getattr(lr, "keys", [])]
+                for t in want_times:
+                    if not any(abs(float(t) - float(ht)) < eps for ht in have_times):
+                        missing.append(
+                            {"id": int(target_id), "json_key": jk, "time": float(t)}
+                        )
+
+            if missing:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "batch returned ok but some keys were not found after verify",
+                        "missing": missing,
+                        **(
+                            {"duration": float(duration)}
+                            if duration is not None
+                            else {}
+                        ),
+                    }
+                )
+
+            resp: dict[str, Any] = {
+                "ok": True,
+                "set_count": int(len(set_keys)) if isinstance(set_keys, list) else 0,
+                "remove_count": int(len(remove_keys))
+                if isinstance(remove_keys, list)
+                else 0,
+            }
+            if duration is not None:
+                resp["duration"] = float(duration)
+            if (
+                duration is not None
+                and max_set_time is not None
+                and max_set_time > float(duration) + eps
+            ):
+                resp["warning"] = (
+                    "some keys are beyond the current animation duration; they may not be visible in the UI timeline and playback won't reach them"
+                )
+                resp["max_set_time"] = float(max_set_time)
+                resp["suggested_duration"] = float(max_set_time)
+            return json.dumps(resp)
+        except Exception as e:
+            # Batch itself succeeded; verification is best-effort.
+            return json.dumps({"ok": True, "warning": f"batch verify failed: {e}"})
 
     if name == "animation_set_time":
         animation_id = int(args.get("animation_id", 0) or 0)

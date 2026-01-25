@@ -19,7 +19,10 @@ ZParameterKey::ZParameterKey(double tm, const ZParameter& p)
   : m_time(std::max(tm, 0.0))
 {
   m_value.reset(ZParameterFactory::instance().create(p.name(), p.type()));
-  m_value->forceSetValueSameAs(p);
+  // Keys must preserve the full parameter contract (including dynamic ranges,
+  // option lists, etc.) so that later readValue()/interpolation does not clamp
+  // or otherwise distort stored values.
+  m_value->setSameAs(p);
   setDefaultType();
 }
 
