@@ -572,11 +572,10 @@ public:
     std::vector<json::value> values; // may be shorter than times; additional values sampled from animationId
     uint64_t animationId = 0;
 
-    bool adjustFov = false;
     bool adjustDistance = false;
 
     bool keepVisible = true;
-    double minCoverage = 0.95;
+    double minFrameCoverage = 0.0;
     double margin = 0.0;
   };
 

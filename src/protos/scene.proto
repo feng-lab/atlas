@@ -476,8 +476,11 @@ message CameraPathSolveRequest {
 message CameraConstraints {
   bool keep_visible = 1;   // default true
   double margin = 2;       // optional margin (fraction of bbox size); default 0.0
-  double min_coverage = 3; // default 0.95
-  string fov_policy = 4;   // "fixed" | "auto" (advisory)
+  // Minimum on-screen coverage of the target bbox (0..1). This is a *screen-space* framing
+  // metric (not a distance ratio): higher values push toward tighter framing (larger subjects).
+  // The validator reports the measured value as CameraValidateResult.frame_coverage.
+  // Set to 0.0 to disable the constraint.
+  double min_frame_coverage = 3; // default 0.0
 }
 
 // Solve camera keys for a mode and targets
@@ -494,9 +497,10 @@ message CameraSolveKey { double time = 1; google.protobuf.Value value = 2; }
 message CameraSolveResponse { repeated CameraSolveKey keys = 1; }
 
 message CameraPolicies {
-  bool adjust_fov = 1;       // allow updating fieldOfView
-  bool adjust_distance = 2;  // allow updating distance to center
-  bool adjust_clipping = 3;  // advisory (server may auto-fit near/far in validation)
+  // Allow the validator to suggest a new camera value by changing the camera's
+  // distance to its center (a "dolly" along the view direction). This keeps the
+  // camera look-at point fixed and does not change the field of view.
+  bool adjust_distance = 1;
 }
 
 message CameraValidateRequest {
@@ -512,10 +516,12 @@ message CameraValidateRequest {
 message CameraValidateResult {
   double time = 1;
   bool within_frame = 2;
-  double coverage = 3;
+  // Screen-space coverage of the target bbox (0..1). Higher means the target appears larger
+  // on screen (tighter framing).
+  double frame_coverage = 3;
   bool adjusted = 4;
   google.protobuf.Value adjusted_value = 5; // present when adjusted=true
-  string reason = 6;                         // e.g., "too_close", "fov_too_small", "clipping"
+  string reason = 6; // e.g., "outside_frame", "coverage_below_threshold"
 }
 
 message CameraValidateResponse {

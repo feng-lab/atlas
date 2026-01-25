@@ -1749,7 +1749,7 @@ class SceneClient:
             cons = self._pb2.CameraConstraints(
                 keep_visible=bool(constraints.get("keep_visible", True)),
                 margin=float(constraints.get("margin", 0.0)),
-                min_coverage=float(constraints.get("min_coverage", 0.95)),
+                min_frame_coverage=float(constraints.get("min_frame_coverage", 0.0)),
             )
         st = None
         if params:
@@ -1801,12 +1801,11 @@ class SceneClient:
             cons = self._pb2.CameraConstraints(
                 keep_visible=bool(constraints.get("keep_visible", True)),
                 margin=float(constraints.get("margin", 0.0)),
-                min_coverage=float(constraints.get("min_coverage", 0.95)),
+                min_frame_coverage=float(constraints.get("min_frame_coverage", 0.0)),
             )
         pol = None
         if policies:
             pol = self._pb2.CameraPolicies(
-                adjust_fov=bool(policies.get("adjust_fov", False)),
                 adjust_distance=bool(policies.get("adjust_distance", False)),
             )
         req_kwargs: dict[str, Any] = {
@@ -1830,7 +1829,7 @@ class SceneClient:
             row: dict[str, Any] = {
                 "time": float(getattr(r, "time", 0.0)),
                 "within_frame": bool(getattr(r, "within_frame", False)),
-                "coverage": float(getattr(r, "coverage", 0.0)),
+                "frame_coverage": float(getattr(r, "frame_coverage", 0.0)),
                 "adjusted": bool(getattr(r, "adjusted", False)),
                 "reason": str(getattr(r, "reason", "")),
             }

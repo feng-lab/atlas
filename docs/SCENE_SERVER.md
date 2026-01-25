@@ -264,9 +264,13 @@ These return typed camera values/keys that clients can write via `SetKey(animati
   - Mode params (selected):
     - `ORBIT`: `params.axis` (`"x"|"y"|"z"`), `params.degrees` (double), optional `params.max_step_degrees` (double; controls key density; default 90).
     - `DOLLY`: `params.start_dist` (double), `params.end_dist` (double).
-- `CameraValidate { ids, times, values?, constraints?, policies?, animation_id? } -> { ok, results:[{time, within_frame, coverage, adjusted, adjusted_value?, reason}] }`
+- `CameraValidate { ids, times, values?, constraints?, policies?, animation_id? } -> { ok, results:[{time, within_frame, frame_coverage, adjusted, adjusted_value?, reason}] }`
   - If `values` are omitted (or shorter than `times`), `animation_id` is required and the server samples the animation camera at those `times`.
-  - Interior walkthroughs: set `constraints.keep_visible=false` to disable the coverage threshold (so the camera can go inside / let the bbox leave the frame).
+  - Interior walkthroughs: set `constraints.keep_visible=false` to disable framing validation (so the camera can go inside / let the bbox leave the frame).
+  - Semantics note:
+    - `frame_coverage` is a **screen-space framing** metric (0..1 dominant-dimension bbox fill). Higher values mean the target appears larger on screen (tighter framing).
+    - Higher `constraints.min_frame_coverage` pushes toward tighter shots (when `keep_visible=true`); set it to `0.0` to disable.
+    - If the camera looks “too wide” (targets feel small), it is usually because you are validating/solving against **too many ids** (e.g., the entire scene) and/or using a large `margin`. For close-ups, pass only the target ids and raise `min_frame_coverage`.
 - `CameraSample { animation_id, times } -> { samples:[{time, value}] }`
   - Samples the evaluated animation camera at the requested `times` without changing engine time or writing keys.
   - Use this to get a deterministic `base_value` for camera operators while authoring an animation.

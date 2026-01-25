@@ -78,6 +78,15 @@ def build_atlas_agent_primer() -> str:
         "For first-person interior flythroughs: prefer walkthrough with look_at_policy='preserve_direction' and constraints.keep_visible=false."
     )
     lines.append(
+        "Framing tip: camera solve/validate always operates on the bbox of the provided ids. Using too many ids (e.g., the whole scene) yields wide shots where each object looks small; for close-ups/highlight beats, pass only the highlighted object ids."
+    )
+    lines.append(
+        "Framing tip: constraints.min_frame_coverage is a screen-space metric (0..1 dominant-dimension bbox fill). Higher values push toward tighter framing (larger subjects). Set it to 0.0 to disable."
+    )
+    lines.append(
+        "Relative dolly tip: DOLLY uses absolute eye→center distances (world units). If you don't know world units, use walkthrough with look_at_policy='bbox_center' plus bbox-scaled move.forward/back segments."
+    )
+    lines.append(
         "For waypoint paths: omit look_at to preserve direction, or set look_at_policy='bbox_center' (or explicit waypoint look_at) to keep the target centered."
     )
     return "\n".join(lines)

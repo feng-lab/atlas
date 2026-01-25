@@ -23,7 +23,7 @@ struct Z3DCameraPlannerValidateResult
 {
   double time = 0.0;
   bool withinFrame = false;
-  double coverage = 0.0;
+  double frameCoverage = 0.0;
   bool adjusted = false;
   std::string reason;
   std::optional<json::value> adjustedValue;
@@ -96,14 +96,13 @@ public:
 
   struct ValidatePolicies
   {
-    bool adjustFov = false;
     bool adjustDistance = false;
   };
 
   struct ValidateConstraints
   {
     bool keepVisible = true;
-    double minCoverage = 0.95;
+    double minFrameCoverage = 0.0;
     double margin = 0.0;
   };
 

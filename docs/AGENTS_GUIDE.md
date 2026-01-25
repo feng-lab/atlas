@@ -379,7 +379,7 @@ Tool-level matrix (what to use, and what knobs are safe)
 | Tool | Best for | Default framing | Default aim behavior | Primary “smoothness” knob | Notes / common pitfalls |
 |---|---|---|---|---|---|
 | `animation_camera_solve_and_apply(mode="ORBIT")` | Exterior orbit / rotate-around-object shots | `constraints.keep_visible=true` (presentation framing) | Implicitly targets bbox center (orbit is around the target bbox center) | `max_step_degrees` (smaller → more keys → smoother) | If the orbit feels “wrong”, it is almost always key density or target selection (ids). Prefer tuning `max_step_degrees` over inventing new representations. |
-| `animation_camera_solve_and_apply(mode="DOLLY")` | Zoom/dolly in/out while keeping the subject framed | `constraints.keep_visible=true` | Implicitly targets bbox center (center distance changes) | Split into multiple DOLLY windows (more keys) and/or use easing | If you want an “arc” (move+rotate), DOLLY alone is not enough—use waypoints or walkthrough. |
+| `animation_camera_solve_and_apply(mode="DOLLY")` | Zoom/dolly in/out while keeping the subject framed | `constraints.keep_visible=true` | Implicitly targets bbox center (center distance changes) | Split into multiple DOLLY windows (more keys) and/or use easing | DOLLY requires explicit `params.start_dist/end_dist` (>0) to create motion. If you don’t know absolute distances, use `animation_camera_walkthrough_apply` with `look_at_policy="bbox_center"` and a bbox-scaled `move.forward/back` segment. If you want an “arc” (move+rotate), DOLLY alone is not enough—use waypoints or walkthrough. |
 | `animation_camera_waypoint_spline_apply(...)` | Camera path through explicit spatial beats (A→B→C) | `constraints.keep_visible=true` | `look_at_policy="preserve_direction"` by default; optionally lock to bbox center | Add intermediate waypoints (spatial key density) | For “orbit around object”, either use ORBIT solve or set `look_at_policy="bbox_center"` / explicit `look_at`. Leaving `look_at` omitted will preserve direction and can look like a drift rather than a track. |
 | `animation_camera_walkthrough_apply(...)` | First-person “drone” flythroughs and interior exploration | `constraints.keep_visible=false` (exploration framing) | `look_at_policy="preserve_direction"` by default; optionally track bbox center | `step_seconds` (smaller → more keys → smoother curved motion) | For third-person track/orbit behavior, set `look_at_policy="bbox_center"` (switches yaw/pitch to azimuth/elevation and uses `move_center=false`). Don’t try to approximate ORBIT with first-person yaw unless the intent is truly “look around while moving”. |
 
@@ -394,7 +394,9 @@ Aim policy semantics (explicit)
 
 Default validation constraints
 - Walkthrough/interior: default `constraints.keep_visible=false` (user intent is exploration, not framing the whole bbox).
-- Exterior presentation/orbit: default `constraints.keep_visible=true` with `min_coverage≈0.95` (framing intent).
+- Exterior presentation/orbit: default `constraints.keep_visible=true` with `min_frame_coverage=0.0` (no minimum size; only enforce no-cropping).
+  - `min_frame_coverage` is a **screen-space** framing metric (0..1 dominant-dimension bbox fill). Higher values push toward tighter framing (larger subjects).
+  - For close-ups, validate/solve against a smaller set of `ids` and raise `min_frame_coverage` (and keep `margin` small). For intentional cropping / interior exploration, use `keep_visible=false`.
 
 ### First-person walkthrough (freeform)
 

@@ -126,10 +126,11 @@ Agents: Camera Planning & Validation (Example)
 
 - Example (“rotate around the mesh 360° in 10 seconds”):
   1) Pick targets: `fit_candidates` or `scene_list_objects` → ids
-  2) Solve + write: `animation_camera_solve_and_apply(mode='ORBIT', ids=ids, t0=0, t1=10, degrees=360, params={axis:'y'}, constraints={keep_visible:true, min_coverage:0.95})`. This clears existing keys in [0,10] and writes validated keys.
+  2) Solve + write: `animation_camera_solve_and_apply(mode='ORBIT', ids=ids, t0=0, t1=10, degrees=360, params={axis:'y'}, constraints={keep_visible:true, min_frame_coverage:0.0})`. This clears existing keys in [0,10] and writes validated keys.
   3) Set duration: `animation_set_duration(10)`.
-  4) Optional validate: `animation_camera_validate(ids, times, values, constraints={keep_visible:true,min_coverage:0.95}, policies={adjust_*:false})` using the written keys.
+  4) Optional validate: `animation_camera_validate(ids, times, values, constraints={keep_visible:true,min_frame_coverage:0.0}, policies={adjust_distance:false})` using the written keys.
   5) Preview (optional): `animation_render_preview(time=5)` for a mid‑orbit frame.
+  - Note: `min_frame_coverage` is a **screen-space** framing metric (dominant-dimension bbox fill). Higher values push toward tighter framing (larger subjects). For close-ups, validate/solve against a smaller set of target ids and raise `min_frame_coverage` (and keep `margin` small).
 
 Agents: Codegen Mode
 

@@ -2560,12 +2560,11 @@ public:
 
     dr.animationId = req->animation_id();
 
-    dr.adjustFov = req->has_policies() ? req->policies().adjust_fov() : false;
     dr.adjustDistance = req->has_policies() ? req->policies().adjust_distance() : false;
 
     dr.keepVisible = req->has_constraints() ? req->constraints().keep_visible() : true;
     dr.margin = req->has_constraints() ? req->constraints().margin() : 0.0;
-    dr.minCoverage = req->has_constraints() ? req->constraints().min_coverage() : 0.95;
+    dr.minFrameCoverage = req->has_constraints() ? req->constraints().min_frame_coverage() : 0.0;
 
     auto invokeValidate = [&]() {
       return invokeOnObjectThread(
@@ -2616,7 +2615,7 @@ public:
       CameraValidateResult out;
       out.set_time(vr.time);
       out.set_within_frame(vr.withinFrame);
-      out.set_coverage(vr.coverage);
+      out.set_frame_coverage(vr.frameCoverage);
       out.set_adjusted(vr.adjusted);
       out.set_reason(vr.reason);
       if (vr.adjusted && vr.adjustedValue.has_value()) {

@@ -65,22 +65,35 @@ CAMERA_TYPED_VALUE_SCHEMA: Dict[str, Any] = {
 CAMERA_CONSTRAINTS_SCHEMA: Dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "description": "Camera visibility/coverage constraints.",
+    "description": "Camera framing constraints used by the engine-side validator.",
     "properties": {
         "keep_visible": {
             "type": "boolean",
             "default": True,
-            "description": "When true, validate that the target bbox stays within frame.",
+            "description": (
+                "When true, require the target bbox to remain fully within the camera frame (no cropping). "
+                "When false, the validator does not enforce framing constraints (but may still report metrics)."
+            ),
         },
         "margin": {
             "type": "number",
             "default": 0.0,
-            "description": "Optional margin around the bbox (fraction of bbox size).",
+            "minimum": 0.0,
+            "description": (
+                "Optional extra padding around the target bbox (fraction of bbox size). "
+                "Higher margins require the camera to back off more."
+            ),
         },
-        "min_coverage": {
+        "min_frame_coverage": {
             "type": "number",
-            "default": 0.95,
-            "description": "Minimum required bbox coverage within frame (0..1).",
+            "default": 0.0,
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": (
+                "Minimum on-screen size of the target bbox (0..1), measured as dominant-dimension fill: "
+                "max(projected_width_frac, projected_height_frac). Higher values push toward tighter framing "
+                "(larger subjects). Set to 0.0 to disable."
+            ),
         },
     },
 }
@@ -91,15 +104,13 @@ CAMERA_POLICIES_SCHEMA: Dict[str, Any] = {
     "additionalProperties": False,
     "description": "Camera adjustment policies used during validation.",
     "properties": {
-        "adjust_fov": {
-            "type": "boolean",
-            "default": False,
-            "description": "Allow the validator to adjust field of view to satisfy constraints.",
-        },
         "adjust_distance": {
             "type": "boolean",
             "default": False,
-            "description": "Allow the validator to adjust camera distance to satisfy constraints.",
+            "description": (
+                "Allow the validator to suggest a new camera value by dollying (changing eye distance to center) "
+                "to satisfy constraints."
+            ),
         },
     },
 }

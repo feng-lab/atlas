@@ -3,6 +3,7 @@
 #include "z3dcamera.h"
 #include "z3dcameraparameter.h"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -255,10 +256,76 @@ std::vector<Z3DCameraPlannerValidateResult> Z3DCameraPlanner::validate(const Z3D
   if (!bb.empty() && constraints.margin > 0.0) {
     bb = expandedByMarginFraction(bb, constraints.margin);
   }
-  const double R = bboxEnclosingSphereRadius(bb);
 
   const bool keepVisible = constraints.keepVisible;
-  const double minCov = keepVisible ? (constraints.minCoverage > 0.0 ? constraints.minCoverage : 0.95) : 0.0;
+  const double minCov = keepVisible ? std::max(0.0, constraints.minFrameCoverage) : 0.0;
+
+  struct FrameMetrics
+  {
+    bool withinFrame = true;
+    double frameCoverage = 0.0;
+  };
+
+  const auto measureFrame = [&](const Z3DCamera& cam) -> FrameMetrics {
+    FrameMetrics m;
+    if (bb.empty()) {
+      return m;
+    }
+
+    const glm::dvec3 mn = bb.minCorner;
+    const glm::dvec3 mx = bb.maxCorner;
+    const std::array<glm::vec3, 8> corners = {
+      glm::vec3(static_cast<float>(mn.x), static_cast<float>(mn.y), static_cast<float>(mn.z)),
+      glm::vec3(static_cast<float>(mx.x), static_cast<float>(mn.y), static_cast<float>(mn.z)),
+      glm::vec3(static_cast<float>(mn.x), static_cast<float>(mx.y), static_cast<float>(mn.z)),
+      glm::vec3(static_cast<float>(mx.x), static_cast<float>(mx.y), static_cast<float>(mn.z)),
+      glm::vec3(static_cast<float>(mn.x), static_cast<float>(mn.y), static_cast<float>(mx.z)),
+      glm::vec3(static_cast<float>(mx.x), static_cast<float>(mn.y), static_cast<float>(mx.z)),
+      glm::vec3(static_cast<float>(mn.x), static_cast<float>(mx.y), static_cast<float>(mx.z)),
+      glm::vec3(static_cast<float>(mx.x), static_cast<float>(mx.y), static_cast<float>(mx.z)),
+    };
+
+    const glm::mat4 pv = cam.projectionViewMatrix(MonoEye);
+    double minX = std::numeric_limits<double>::infinity();
+    double maxX = -std::numeric_limits<double>::infinity();
+    double minY = std::numeric_limits<double>::infinity();
+    double maxY = -std::numeric_limits<double>::infinity();
+
+    bool within = true;
+    for (const auto& p : corners) {
+      const glm::vec4 clip = pv * glm::vec4(p, 1.f);
+      if (!std::isfinite(clip.w) || clip.w <= 1e-6f) {
+        // Treat anything behind the camera (or numerically unstable) as not within frame.
+        m.withinFrame = false;
+        m.frameCoverage = 0.0;
+        return m;
+      }
+      const glm::vec3 ndc = clip.xyz() / clip.w;
+      if (!std::isfinite(ndc.x) || !std::isfinite(ndc.y) || !std::isfinite(ndc.z)) {
+        m.withinFrame = false;
+        m.frameCoverage = 0.0;
+        return m;
+      }
+      minX = std::min(minX, static_cast<double>(ndc.x));
+      maxX = std::max(maxX, static_cast<double>(ndc.x));
+      minY = std::min(minY, static_cast<double>(ndc.y));
+      maxY = std::max(maxY, static_cast<double>(ndc.y));
+
+      if (ndc.x < -1.0f || ndc.x > 1.0f || ndc.y < -1.0f || ndc.y > 1.0f) {
+        within = false;
+      }
+    }
+
+    const auto clamp01 = [](double v) {
+      return std::max(0.0, std::min(1.0, v));
+    };
+    const double widthFrac = clamp01((maxX - minX) * 0.5); // NDC spans [-1,1] => width 2
+    const double heightFrac = clamp01((maxY - minY) * 0.5); // NDC spans [-1,1] => height 2
+    m.withinFrame = within;
+    // Dominant-dimension fill: bigger of width/height fraction.
+    m.frameCoverage = clamp01(std::max(widthFrac, heightFrac));
+    return m;
+  };
 
   std::vector<Z3DCameraPlannerValidateResult> results;
   const int n = static_cast<int>(std::min(times.size(), values.size()));
@@ -273,7 +340,7 @@ std::vector<Z3DCameraPlannerValidateResult> Z3DCameraPlanner::validate(const Z3D
 
     if (!jv.is_object()) {
       r.withinFrame = false;
-      r.coverage = 0.0;
+      r.frameCoverage = 0.0;
       r.adjusted = false;
       r.reason = "invalid_value";
       results.push_back(std::move(r));
@@ -287,58 +354,101 @@ std::vector<Z3DCameraPlannerValidateResult> Z3DCameraPlanner::validate(const Z3D
     }
     catch (...) {
       r.withinFrame = false;
-      r.coverage = 0.0;
+      r.frameCoverage = 0.0;
       r.adjusted = false;
       r.reason = "invalid_value";
       results.push_back(std::move(r));
       continue;
     }
 
-    // Coverage heuristic.
-    const double required = (R > 0.0) ? requiredCenterDistanceForCoverage(cam.get(), R) : 0.0;
-    const double current = static_cast<double>(cam.get().centerDist());
-    double cov = 1.0;
-    if (required > 1e-9) {
-      cov = std::min(1.0, current / required);
-    }
-    bool ok = (cov + 1e-6) >= minCov;
-    r.withinFrame = ok;
-    r.coverage = cov;
+    const FrameMetrics metrics = measureFrame(cam.get());
+    r.withinFrame = metrics.withinFrame;
+    r.frameCoverage = metrics.frameCoverage;
 
-    // Adjustment policy: keep withinFrame/coverage for the original input camera
+    bool ok = true;
+    if (keepVisible) {
+      if (!metrics.withinFrame) {
+        ok = false;
+      } else if (minCov > 0.0 && (metrics.frameCoverage + 1e-6) < minCov) {
+        ok = false;
+      }
+    }
+
+    // Adjustment policy: keep withinFrame/frameCoverage for the original input camera
     // (suggested adjustment is surfaced separately).
     bool adjusted = false;
     std::optional<json::value> adjustedValue;
-    if (!ok && R > 0.0) {
-      if (policies.adjustDistance && required > 0.0) {
-        setCameraDistance(cam, required);
-        adjusted = true;
-        adjustedValue = cam.jsonValue();
-        // Recompute ok based on suggested adjustment (used for reason semantics).
-        const double cur2 = static_cast<double>(cam.get().centerDist());
-        const double cov2 = (required > 0.0) ? std::min(1.0, cur2 / required) : 1.0;
-        ok = (cov2 + 1e-6) >= minCov;
-      } else if (policies.adjustFov && current > 1e-9) {
-        // Solve desired FOV to achieve coverage with current distance.
-        const double angleUsed = 2.0 * std::asin(std::min(1.0, R / current));
-        double desiredFov = angleUsed;
-        if (cam.get().aspectRatio() < 1.0f) {
-          // angleUsed is horizontal; convert back to vertical FOV.
-          desiredFov = 2.0 * std::atan(std::tan(angleUsed * 0.5) / cam.get().aspectRatio());
+    if (policies.adjustDistance && keepVisible && !ok && !bb.empty()) {
+      const Z3DCamera baseCam = cam.get();
+      const double currentDist = static_cast<double>(baseCam.centerDist());
+      if (std::isfinite(currentDist) && currentDist > 0.0) {
+        const auto cameraAtDistance = [&](double centerDist) -> Z3DCamera {
+          Z3DCamera out = baseCam;
+          const glm::vec3 c = out.center();
+          const glm::vec3 v = out.viewVector();
+          const glm::vec3 eye = c - static_cast<float>(centerDist) * v;
+          out.setCamera(eye, c, out.upVector());
+          return out;
+        };
+
+        const auto metricsAtDistance = [&](double centerDist) -> FrameMetrics {
+          return measureFrame(cameraAtDistance(centerDist));
+        };
+
+        constexpr double kMinCenterDist = 1e-6;
+        const auto clampCenterDist = [&](double d) {
+          return std::max(kMinCenterDist, d);
+        };
+
+        // Start from either the current distance (when just outside frame) or a
+        // dolly-in estimate (when the subject is too small).
+        double candidate = currentDist;
+        if (metrics.withinFrame && minCov > 0.0 && metrics.frameCoverage > 1e-9 &&
+            (metrics.frameCoverage + 1e-6) < minCov) {
+          candidate = clampCenterDist(currentDist * (metrics.frameCoverage / minCov));
         }
-        Z3DCameraParameter cam2("Camera");
-        cam2.setValueSameAs(cam);
-        cam2.setFrustum(static_cast<float>(desiredFov),
-                        cam.get().aspectRatio(),
-                        cam.get().nearDist(),
-                        cam.get().farDist());
-        adjusted = true;
-        adjustedValue = cam2.jsonValue();
-        // Recompute ok (used for reason semantics).
-        const double req2 = requiredCenterDistanceForCoverage(cam2.get(), R);
-        const double cur2 = static_cast<double>(cam2.get().centerDist());
-        const double cov2 = (req2 > 1e-9) ? std::min(1.0, cur2 / req2) : 1.0;
-        ok = (cov2 + 1e-6) >= minCov;
+
+        // Find the smallest distance >= candidate that keeps the bbox fully within frame.
+        double lo = clampCenterDist(candidate);
+        FrameMetrics loMetrics = metricsAtDistance(lo);
+        if (!loMetrics.withinFrame) {
+          double hi = lo;
+          FrameMetrics hiMetrics = loMetrics;
+          bool found = false;
+          for (int iter = 0; iter < 32; ++iter) {
+            hi = clampCenterDist(hi * 1.25);
+            hiMetrics = metricsAtDistance(hi);
+            if (hiMetrics.withinFrame) {
+              found = true;
+              break;
+            }
+          }
+          if (found) {
+            // Binary search for the boundary (minimal within-frame distance).
+            for (int iter = 0; iter < 40; ++iter) {
+              const double mid = 0.5 * (lo + hi);
+              if (metricsAtDistance(mid).withinFrame) {
+                hi = mid;
+              } else {
+                lo = mid;
+              }
+            }
+            Z3DCameraParameter camAdj("Camera");
+            camAdj.setSameAs(cam);
+            setCameraDistance(camAdj, hi);
+            adjusted = true;
+            adjustedValue = camAdj.jsonValue();
+          }
+        } else {
+          // Already within frame at candidate; suggest the candidate dolly when it changes the camera.
+          if (std::abs(lo - currentDist) > 1e-9) {
+            Z3DCameraParameter camAdj("Camera");
+            camAdj.setSameAs(cam);
+            setCameraDistance(camAdj, lo);
+            adjusted = true;
+            adjustedValue = camAdj.jsonValue();
+          }
+        }
       }
     }
 
@@ -346,12 +456,7 @@ std::vector<Z3DCameraPlannerValidateResult> Z3DCameraPlanner::validate(const Z3D
     r.adjustedValue = std::move(adjustedValue);
 
     if (!ok) {
-      if (current < required) {
-        r.reason = policies.adjustDistance ? "too_close"
-                                           : (policies.adjustFov ? "fov_too_small" : "coverage_below_threshold");
-      } else {
-        r.reason = "coverage_below_threshold";
-      }
+      r.reason = metrics.withinFrame ? "coverage_below_threshold" : "outside_frame";
     } else {
       r.reason = "";
     }
@@ -363,4 +468,3 @@ std::vector<Z3DCameraPlannerValidateResult> Z3DCameraPlanner::validate(const Z3D
 }
 
 } // namespace nim
-

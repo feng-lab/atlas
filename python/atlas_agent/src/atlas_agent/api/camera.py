@@ -67,7 +67,8 @@ class CameraAPI:
             ids=ids,
             t0=t0,
             t1=t1,
-            constraints=constraints or {"keep_visible": True, "min_coverage": 0.95},
+            constraints=constraints
+            or {"keep_visible": True, "min_frame_coverage": 0.0},
             params=p,
         )
         if not keys:
@@ -90,10 +91,10 @@ class CameraAPI:
             ids=ids,
             times=times,
             values=values or [],
-            constraints=constraints or {"keep_visible": True, "min_coverage": 0.95},
+            constraints=constraints
+            or {"keep_visible": True, "min_frame_coverage": 0.0},
             policies=policies
             or {
-                "adjust_fov": False,
                 "adjust_distance": False,
             },
         )

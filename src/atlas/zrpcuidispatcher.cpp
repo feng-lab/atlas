@@ -27,6 +27,7 @@
 #include <QThread>
 #include <QUuid>
 #include <QUrl>
+#include <algorithm>
 #include <cmath>
 #include <sstream>
 
@@ -3905,12 +3906,11 @@ ZRpcUiDispatcher::CameraValidateResult ZRpcUiDispatcher::cameraValidate(const Ca
   }
 
   Z3DCameraPlanner::ValidatePolicies policies;
-  policies.adjustFov = req.adjustFov;
   policies.adjustDistance = req.adjustDistance;
 
   Z3DCameraPlanner::ValidateConstraints constraints;
   constraints.keepVisible = req.keepVisible;
-  constraints.minCoverage = req.minCoverage;
+  constraints.minFrameCoverage = req.minFrameCoverage;
   constraints.margin = req.margin;
 
   std::string planErr;
@@ -3925,11 +3925,21 @@ ZRpcUiDispatcher::CameraValidateResult ZRpcUiDispatcher::cameraValidate(const Ca
 
   bool allOk = true;
   const bool keepVisible = req.keepVisible;
-  const double minCov = keepVisible ? (req.minCoverage > 0.0 ? req.minCoverage : 0.95) : 0.0;
+  const double minCov = keepVisible ? std::max(0.0, req.minFrameCoverage) : 0.0;
   for (const auto& r : out.results) {
-    if (!r.withinFrame || (keepVisible && (r.coverage + 1e-6) < minCov)) {
+    if (r.reason == "invalid_value") {
       allOk = false;
       break;
+    }
+    if (keepVisible) {
+      if (!r.withinFrame) {
+        allOk = false;
+        break;
+      }
+      if (minCov > 0.0 && (r.frameCoverage + 1e-6) < minCov) {
+        allOk = false;
+        break;
+      }
     }
   }
 

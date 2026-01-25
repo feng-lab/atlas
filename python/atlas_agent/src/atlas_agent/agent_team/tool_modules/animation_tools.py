@@ -66,7 +66,7 @@ CAMERA_SOLVE_PARAMS_SCHEMA: Dict[str, Any] = {
     "description": (
         "Mode-specific camera solve parameters.\n"
         "ORBIT: axis ('x'|'y'|'z').\n"
-        "DOLLY: start_dist and end_dist (camera-to-center distance)."
+        "DOLLY: start_dist and end_dist (absolute eye-to-center distance). At least one must be > 0."
     ),
     "properties": {
         "axis": {
@@ -76,11 +76,17 @@ CAMERA_SOLVE_PARAMS_SCHEMA: Dict[str, Any] = {
         },
         "start_dist": {
             "type": "number",
-            "description": "DOLLY: start distance from camera eye to center. <=0 means keep the base camera distance.",
+            "description": (
+                "DOLLY: start distance from camera eye to center. Must be finite; >0 sets an explicit start distance. "
+                "<=0 means keep the base camera distance."
+            ),
         },
         "end_dist": {
             "type": "number",
-            "description": "DOLLY: end distance from camera eye to center. <=0 means keep the base camera distance.",
+            "description": (
+                "DOLLY: end distance from camera eye to center. Must be finite; >0 sets an explicit end distance. "
+                "<=0 means keep the base camera distance."
+            ),
         },
     },
 }
@@ -346,7 +352,12 @@ TOOLS: List[Tool] = [
             "- Timing feel: easing changes per-key timing curves only (Qt/QEasingCurve names like Linear/InOutQuad/Switch).\n\n"
             "If the result looks wrong:\n"
             "- ORBIT: usually wrong ids/target selection, or keys too sparse → lower max_step_degrees.\n"
-            "- DOLLY: if you wanted an arc (move+rotate), use waypoints/walkthrough instead of DOLLY.\n\n"
+            "- Subject looks too small / too much empty space: you're likely solving against too many ids (whole scene) "
+            "and/or using a large margin. For close-ups, solve/validate against only the highlighted ids and use "
+            "constraints.min_frame_coverage (tight framing) while keeping margin small.\n"
+            "- DOLLY: requires params.start_dist/end_dist (>0). If you don't know absolute distances, prefer walkthrough "
+            "with look_at_policy='bbox_center' and bbox-scaled move.forward/back. If you wanted an arc (move+rotate), "
+            "use waypoints/walkthrough instead of DOLLY.\n\n"
             "Camera interpolation is always evaluated using a stable look-at + distance convention; easing is separate."
         ),
         parameters_schema={
@@ -361,7 +372,10 @@ TOOLS: List[Tool] = [
                 "ids": {
                     "type": "array",
                     "items": {"type": "integer"},
-                    "description": "Target ids; empty uses fit_candidates().",
+                    "description": (
+                        "Target ids to frame. Empty uses fit_candidates() (typically 'all visual objects'), which is best for establishing shots. "
+                        "For close-ups/highlight beats, pass only the relevant object ids so the camera can frame tightly."
+                    ),
                 },
                 "t0": {
                     "type": "number",
@@ -373,7 +387,11 @@ TOOLS: List[Tool] = [
                 },
                 "constraints": {
                     **CAMERA_CONSTRAINTS_SCHEMA,
-                    "description": "Visibility/coverage constraints. Typical defaults: keep_visible=true for exterior presentation (with min_coverage≈0.95); keep_visible=false for interior flythroughs.",
+                    "description": (
+                        "Framing constraints. Typical defaults: keep_visible=true for exterior presentation (no cropping). "
+                        "For close-ups, set min_frame_coverage>0 (tighter framing) and keep margin small. For interior flythroughs, "
+                        "set keep_visible=false."
+                    ),
                 },
                 "params": {
                     **CAMERA_SOLVE_PARAMS_SCHEMA,
@@ -481,7 +499,7 @@ TOOLS: List[Tool] = [
                 },
                 "constraints": {
                     **CAMERA_CONSTRAINTS_SCHEMA,
-                    "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
+                    "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables framing validation).",
                 },
             },
             "required": ["animation_id", "t0", "t1", "waypoints", "base_value"],
@@ -565,7 +583,7 @@ TOOLS: List[Tool] = [
                 },
                 "constraints": {
                     **CAMERA_CONSTRAINTS_SCHEMA,
-                    "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables the coverage requirement).",
+                    "description": "Camera validation constraints. For interior walkthroughs, set keep_visible=false (disables framing validation).",
                 },
             },
             "required": ["animation_id", "t0", "t1", "segments", "base_value"],
@@ -575,7 +593,13 @@ TOOLS: List[Tool] = [
     ),
     tool_from_schema(
         name="animation_camera_validate",
-        description="Animation timeline: validate camera values against visibility/coverage constraints. Values are optional; when omitted, the server samples the current animation camera at the given times.",
+        description=(
+            "Animation timeline: validate camera values against framing constraints (keep_visible, margin, min_frame_coverage).\n\n"
+            "Notes:\n"
+            "- Validate against the ids you actually intend to frame. Validating against the whole scene produces wide shots.\n"
+            "- min_frame_coverage is a screen-space framing metric (dominant-dimension fill). Higher values push toward tighter framing.\n\n"
+            "Values are optional; when omitted, the server samples the current animation camera at the given times."
+        ),
         parameters_schema={
             "type": "object",
             "properties": {
@@ -583,7 +607,10 @@ TOOLS: List[Tool] = [
                 "ids": {
                     "type": "array",
                     "items": {"type": "integer"},
-                    "description": "Target ids to validate against (typically fit_candidates).",
+                    "description": (
+                        "Target ids to validate against. For establishing shots, this can be fit_candidates() (all visual objects). "
+                        "For close-ups/highlight beats, validate against only the ids you intend to frame; validating the whole scene forces wide shots."
+                    ),
                 },
                 "times": {
                     "type": "array",
@@ -597,11 +624,11 @@ TOOLS: List[Tool] = [
                 },
                 "constraints": {
                     **CAMERA_CONSTRAINTS_SCHEMA,
-                    "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, etc.).",
+                    "description": "Framing constraints (keep_visible, margin, min_frame_coverage).",
                 },
                 "policies": {
                     **CAMERA_POLICIES_SCHEMA,
-                    "description": "Adjustment policies (adjust_fov, adjust_distance).",
+                    "description": "Adjustment policies (adjust_distance).",
                 },
             },
             "required": ["animation_id", "ids", "times"],
@@ -723,7 +750,7 @@ TOOLS: List[Tool] = [
                 },
                 "constraints": {
                     **CAMERA_CONSTRAINTS_SCHEMA,
-                    "description": "Optional camera validation constraints. When omitted, defaults to keep_visible=true and min_coverage=0.95.",
+                    "description": "Optional camera validation constraints. When omitted, defaults to keep_visible=true and min_frame_coverage=0.0.",
                 },
                 "tolerance": {"type": "number", "default": 1e-3},
             },
@@ -1567,16 +1594,14 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 ids = []
         constraints = args.get("constraints") or {
             "keep_visible": True,
-            "min_coverage": 0.95,
+            "min_frame_coverage": 0.0,
         }
         # First pass policies allow adjustments
         policies1 = {
-            "adjust_fov": True,
             "adjust_distance": True,
         }
         # Second pass: strict verification without adjustments
         policies2 = {
-            "adjust_fov": False,
             "adjust_distance": False,
         }
         try:
@@ -1674,9 +1699,52 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             _ensure_camera_center_interpolation(animation_id)
             constraints = args.get("constraints") or {
                 "keep_visible": True,
-                "min_coverage": 0.95,
+                "min_frame_coverage": 0.0,
             }
             params = args.get("params") or {}
+            # DOLLY requires explicit distances to produce any motion. Both values <= 0
+            # (or missing) means "keep the base camera distance" for both endpoints,
+            # which is effectively a STATIC hold but with more confusing intent.
+            if mode_up == "DOLLY":
+                if not isinstance(params, dict):
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "params must be an object for DOLLY (use start_dist/end_dist)",
+                        }
+                    )
+
+                def _read_dist(key: str) -> float | None:
+                    if key not in params:
+                        return None
+                    try:
+                        v = float(params.get(key))
+                    except Exception:
+                        raise ValueError(f"params.{key} must be a number")
+                    if not math.isfinite(v):
+                        raise ValueError(f"params.{key} must be finite")
+                    return v
+
+                try:
+                    start_dist = _read_dist("start_dist")
+                    end_dist = _read_dist("end_dist")
+                except ValueError as e:
+                    return json.dumps({"ok": False, "error": str(e)})
+
+                if (start_dist is None or start_dist <= 0.0) and (
+                    end_dist is None or end_dist <= 0.0
+                ):
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": (
+                                "DOLLY requires params.start_dist and/or params.end_dist > 0 (absolute eye→center distance). "
+                                "If you want a hold, use mode='STATIC'. "
+                                "If you want a relative dolly (bbox-scaled), use animation_camera_walkthrough_apply with "
+                                "look_at_policy='bbox_center' and a move.forward/back segment."
+                            ),
+                        }
+                    )
             # Defaults for ORBIT
             if mode_up == "ORBIT":
                 params.setdefault("axis", "y")
@@ -2018,7 +2086,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             clear_range = bool(args.get("clear_range", True))
             constraints = args.get("constraints") or {
                 "keep_visible": True,
-                "min_coverage": 0.95,
+                "min_frame_coverage": 0.0,
             }
             base_value = args.get("base_value")
             if not isinstance(base_value, dict) or not base_value:
