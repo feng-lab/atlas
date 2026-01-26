@@ -11,6 +11,8 @@ from typing import Any, Callable, Dict, List, Optional
 from openai import OpenAI  # type: ignore
 
 from ..defaults import (
+    DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR,
+    DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR,
     GATEWAY_MODEL_DETECTION_MAX_RETRIES,
     TRANSIENT_NETWORK_BACKOFF_SECONDS,
     TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS,
@@ -485,7 +487,8 @@ class LLMClient:
 
         Priority order:
         - Provider model metadata (when available) via models.retrieve().
-        - Best-effort derivations (effective_input_budget = total - max_output, auto_compact = 90%).
+        - Best-effort derivations (effective_input_budget = total - max_output,
+          auto_compact = DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR/DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR).
         - Unknowns are returned as None.
 
         Important: providers differ in which fields they expose. We keep this tolerant
@@ -579,7 +582,11 @@ class LLMClient:
 
         if auto_compact is None and effective_input_budget is not None:
             try:
-                auto_compact = max(1, (int(effective_input_budget) * 9) // 10)
+                auto_compact = max(
+                    1,
+                    (int(effective_input_budget) * DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR)
+                    // DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR,
+                )
             except Exception:
                 auto_compact = None
 

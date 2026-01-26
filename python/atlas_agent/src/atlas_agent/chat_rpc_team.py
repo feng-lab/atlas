@@ -23,6 +23,8 @@ from .defaults import (
     AUTO_RETRIEVE_RECENT_WRITE_EVENTS,
     CONTEXT_COMPACTION_KEEP_TAIL_ITEMS,
     CONTEXT_COMPACTION_RECENT_TOOL_EVENTS,
+    DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR,
+    DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR,
     DEFAULT_EXECUTOR_MAX_ROUNDS,
     DEFAULT_PLANNER_MAX_ROUNDS,
     DEFAULT_WEB_SEARCH_MODE,
@@ -2835,14 +2837,19 @@ class ChatTeam:
                             )
                             effective_method = effective_method or "session_meta"
 
-                    # Default auto-compaction threshold (90%) when not explicitly provided.
+                    # Default auto-compaction threshold when not explicitly provided.
                     if (
                         auto_compact_tokens is None
                         and effective_input_budget_tokens is not None
                     ):
                         try:
                             auto_compact_tokens = max(
-                                1, (int(effective_input_budget_tokens) * 9) // 10
+                                1,
+                                (
+                                    int(effective_input_budget_tokens)
+                                    * DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR
+                                )
+                                // DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR,
                             )
                         except Exception:
                             auto_compact_tokens = None

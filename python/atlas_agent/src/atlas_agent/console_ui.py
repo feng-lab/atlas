@@ -7,6 +7,8 @@ from typing import Any, Optional
 
 from .chat_rpc_team import ChatTeam
 from .defaults import (
+    DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR,
+    DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR,
     DEFAULT_EXECUTOR_MAX_ROUNDS,
     DEFAULT_PLANNER_MAX_ROUNDS,
     DEFAULT_WEB_SEARCH_MODE,
@@ -212,7 +214,15 @@ def _render_token_budget(*, console: Any, team: ChatTeam) -> None:
             eff_in = v if v > 0 else None
         except Exception:
             eff_in = None
-    auto_compact = max(1, (int(eff_in) * 9) // 10) if eff_in is not None else None
+    auto_compact = (
+        max(
+            1,
+            (int(eff_in) * DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR)
+            // DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR,
+        )
+        if eff_in is not None
+        else None
+    )
 
     console.print("\n[bold]Token Budget[/bold]")
     console.print(Text(f"requested_model={requested_model or '?'}", style="dim"))
@@ -230,8 +240,11 @@ def _render_token_budget(*, console: Any, team: ChatTeam) -> None:
             Text(f"effective_input_budget_tokens={_fmt(eff_in)}", style="dim")
         )
     if auto_compact is not None:
+        pct = (
+            DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR * 100
+        ) // DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR
         console.print(
-            Text(f"auto_compact_tokens(90%)={_fmt(auto_compact)}", style="dim")
+            Text(f"auto_compact_tokens({pct}%)={_fmt(auto_compact)}", style="dim")
         )
 
     _render_llm_usage(console=console, team=team)

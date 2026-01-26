@@ -62,8 +62,17 @@ CONTEXT_COMPACTION_RECENT_TOOL_EVENTS = 24
 # This is best-effort and uses an approximate token estimate; when estimates are
 # wrong (or the provider has stricter limits), the reactive overflow path still
 # applies.
-PROACTIVE_CONTEXT_COMPACTION_TRIGGER_RATIO = 0.85
+PROACTIVE_CONTEXT_COMPACTION_TRIGGER_RATIO = 0.8
 PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL = 3
+
+
+# Model token budgeting
+#
+# Default provider-agnostic auto-compaction threshold when a provider does not
+# expose an explicit "auto compact token limit" for a model. Expressed as a
+# rational to avoid float rounding drift and keep integer math deterministic.
+DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR = 9
+DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR = 10
 
 
 # Screenshot / preview constraints

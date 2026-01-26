@@ -1370,15 +1370,30 @@ def run_responses_tool_loop(
                         try:
                             ratio = float(PROACTIVE_CONTEXT_COMPACTION_TRIGGER_RATIO)
                         except Exception:
-                            ratio = 0.85
+                            ratio = 0.8
                         ratio = min(0.98, max(0.50, ratio))
-                        limit = (
+                        # Two related thresholds:
+                        # - `auto_compact_tokens`: a best-effort *hard* limit (provider metadata
+                        #   when available, otherwise derived heuristics). Exceeding this tends to
+                        #   correlate with provider context-window errors or upstream auto-truncation.
+                        # - `PROACTIVE_CONTEXT_COMPACTION_TRIGGER_RATIO`: a softer, earlier trigger
+                        #   for our proactive checkpoint compaction. Because token estimation is
+                        #   intentionally rough, we start compacting before we are "right on the edge".
+                        #
+                        # Use the stricter (smaller) of the two so both signals remain meaningful.
+                        ratio_limit = int(int(effective_input_budget_tokens) * ratio)
+                        hard_limit = (
                             int(auto_compact_tokens)
                             if (
                                 auto_compact_tokens is not None
                                 and int(auto_compact_tokens) > 0
                             )
-                            else int(int(effective_input_budget_tokens) * ratio)
+                            else None
+                        )
+                        limit = (
+                            min(int(ratio_limit), int(hard_limit))
+                            if hard_limit is not None
+                            else int(ratio_limit)
                         )
                         if limit > 0 and proactive_attempts < int(
                             PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL
@@ -1480,13 +1495,24 @@ def run_responses_tool_loop(
                 ):
                     import time
 
-                    time.sleep(
-                        min(
-                            float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS),
-                            TRANSIENT_NETWORK_BACKOFF_SECONDS
-                            * (2.0**gateway_http_tries),
-                        )
+                    sleep_s = min(
+                        float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS),
+                        TRANSIENT_NETWORK_BACKOFF_SECONDS * (2.0**gateway_http_tries),
                     )
+                    try:
+                        status = _extract_http_status_code(e)
+                        log.warning(
+                            "Gateway/proxy HTTP %s; retrying "
+                            "(requested_model=%s, attempt=%d/%d, sleep=%.2fs)",
+                            str(status) if status is not None else "5xx",
+                            requested_model or "?",
+                            int(gateway_http_tries + 1),
+                            int(GATEWAY_MODEL_DETECTION_MAX_RETRIES),
+                            float(sleep_s),
+                        )
+                    except Exception:
+                        pass
+                    time.sleep(sleep_s)
                     gateway_http_tries += 1
                     continue
 
@@ -1506,9 +1532,23 @@ def run_responses_tool_loop(
                     # Add a small cushion so we don't wake up *exactly* at the
                     # boundary and immediately re-trigger the same limit.
                     retry_after_s = max(0.0, float(retry_after_s)) + 0.05
-                    time.sleep(
-                        min(float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS), retry_after_s)
+                    sleep_s = min(
+                        float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS), retry_after_s
                     )
+                    try:
+                        status = _extract_http_status_code(e)
+                        log.warning(
+                            "Rate limited (HTTP %s); retrying "
+                            "(requested_model=%s, attempt=%d/%d, sleep=%.2fs)",
+                            str(status) if status is not None else "?",
+                            requested_model or "?",
+                            int(rate_limit_tries + 1),
+                            int(GATEWAY_MODEL_DETECTION_MAX_RETRIES),
+                            float(sleep_s),
+                        )
+                    except Exception:
+                        pass
+                    time.sleep(sleep_s)
                     rate_limit_tries += 1
                     continue
 
