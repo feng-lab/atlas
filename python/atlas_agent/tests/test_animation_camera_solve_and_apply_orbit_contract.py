@@ -27,6 +27,13 @@ class _StubClient:
     def camera_solve(self, **kwargs):  # type: ignore[no-untyped-def]
         return list(self._solve_keys)
 
+    def set_time(
+        self, *, animation_id: int, seconds: float, cancel_rendering: bool = False
+    ) -> bool:
+        # The tool syncs the engine timeline time to t0 before solving; tests
+        # don't model engine state, so treat this as a successful no-op.
+        return True
+
 
 def _ctx_for(client: _StubClient, dispatch_fn) -> ToolDispatchContext:  # type: ignore[no-untyped-def]
     return ToolDispatchContext(

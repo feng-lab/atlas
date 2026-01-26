@@ -91,6 +91,18 @@ CAMERA_SOLVE_PARAMS_SCHEMA: Dict[str, Any] = {
     },
 }
 
+# When a camera key uses easing="Switch", the animation becomes a step function at
+# that key time (a jump cut). That is occasionally desirable, but in practice it is
+# easy for an agent to accidentally overwrite a boundary key (e.g., the end of an
+# ORBIT segment) and create a jarring camera “reset”.
+#
+# This threshold is a *tool-level guardrail* (not an engine framing constraint):
+# if a Switch key would move the camera too far from the currently evaluated
+# timeline camera at that time, we require an explicit allow_jump_cut=true.
+#
+# The unit is a fraction of the reference eye↔center distance (scale-invariant).
+DEFAULT_MAX_SWITCH_CAMERA_JUMP_FRACTION = 0.10
+
 CAMERA_WAYPOINT_EYE_SCHEMA: Dict[str, Any] = {
     "type": "object",
     "description": "Waypoint eye position. Exactly one of world or bbox_fraction should be non-null.",
@@ -338,6 +350,7 @@ TOOLS: List[Tool] = [
         name="animation_camera_solve_and_apply",
         description=(
             "Timeline camera solver (writes keys): generate validated camera keys using FIT|ORBIT|DOLLY|STATIC.\n\n"
+            "This tool first sets the engine timeline time to t0 before solving so chained segments stay continuous.\n\n"
             "Use when:\n"
             "- FIT: establish a good starting frame for ids (presentation framing).\n"
             "- ORBIT: rotate around the subject (exterior orbit / turntable shots).\n"
@@ -728,7 +741,7 @@ TOOLS: List[Tool] = [
     ),
     tool_from_schema(
         name="animation_replace_key_camera",
-        description="Replace (or set) a camera key at time: remove any camera key within tolerance then set a new camera value. Use for explicit single-time edits. If you already used animation_camera_solve_and_apply for this segment, do NOT call this afterward to 'finalize' — keys are already written.",
+        description="Replace (or set) a camera key at time: remove any camera key within tolerance then set a new camera value. Use for explicit single-time edits (small tweaks or intentional jump-cuts). For holds, prefer animation_camera_solve_and_apply(mode='STATIC') so the hold continues the timeline pose at t0. Using easing='Switch' creates an instantaneous cut; avoid unless intentional.",
         parameters_schema={
             "type": "object",
             "properties": {
@@ -738,6 +751,24 @@ TOOLS: List[Tool] = [
                     "type": "string",
                     "default": "Linear",
                     "description": "Key easing type (Qt/QEasingCurve name, e.g., Linear/InOutQuad/Switch). This affects per-key timing curves and is separate from camera interpolation.",
+                },
+                "allow_jump_cut": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "When easing='Switch' (a jump cut), require explicit opt-in to write a key that differs "
+                        "substantially from the currently evaluated camera at that time. Set true only when an "
+                        "instantaneous cut is intentional."
+                    ),
+                },
+                "max_switch_jump_fraction": {
+                    "type": "number",
+                    "default": DEFAULT_MAX_SWITCH_CAMERA_JUMP_FRACTION,
+                    "description": (
+                        "Continuity guardrail for easing='Switch' when allow_jump_cut=false. If the new camera key "
+                        "would change the camera by more than this fraction of the eye↔center distance (scale-invariant), "
+                        "the tool rejects the write. Set to 0 to require near-identical values for Switch keys."
+                    ),
                 },
                 "value": {
                     "description": ("Typed camera value."),
@@ -1577,6 +1608,26 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": "animation_id is required"})
         time_v = float(args.get("time", 0.0))
         easing = _normalize_easing_name(args.get("easing"))
+        allow_jump_cut = bool(args.get("allow_jump_cut", False))
+        try:
+            max_switch_jump_fraction = float(
+                args.get(
+                    "max_switch_jump_fraction",
+                    DEFAULT_MAX_SWITCH_CAMERA_JUMP_FRACTION,
+                )
+            )
+        except Exception:
+            max_switch_jump_fraction = DEFAULT_MAX_SWITCH_CAMERA_JUMP_FRACTION
+        if (
+            not math.isfinite(max_switch_jump_fraction)
+            or max_switch_jump_fraction < 0.0
+        ):
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "max_switch_jump_fraction must be a finite number >= 0",
+                }
+            )
         value = args.get("value")
         if not isinstance(value, dict):
             return json.dumps(
@@ -1606,22 +1657,105 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         }
         try:
             _ensure_camera_center_interpolation(animation_id)
-            # Remove camera keys within tolerance
+
+            def _read_vec3(cam: dict, key: str) -> tuple[float, float, float] | None:
+                raw = cam.get(key)
+                if not isinstance(raw, list) or len(raw) != 3:
+                    return None
+                try:
+                    x = float(raw[0])
+                    y = float(raw[1])
+                    z = float(raw[2])
+                except Exception:
+                    return None
+                if not (math.isfinite(x) and math.isfinite(y) and math.isfinite(z)):
+                    return None
+                return (x, y, z)
+
+            def _sub(
+                a: tuple[float, float, float], b: tuple[float, float, float]
+            ) -> tuple[float, float, float]:
+                return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+            def _norm(v: tuple[float, float, float]) -> float:
+                return math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+
+            # Gather removals (but do not mutate yet; we want to fail-fast on validation/guardrails).
+            to_remove: list[float] = []
             try:
                 lr = client.list_keys(
                     animation_id=animation_id, target_id=0, include_values=False
                 )
                 times = [k.time for k in getattr(lr, "keys", [])]
                 to_remove = [t for t in times if abs(t - time_v) <= tol]
-                removed = 0
-                for t in to_remove:
-                    if client.remove_key(
-                        animation_id=animation_id, target_id=0, json_key="", time=t
-                    ):
-                        removed += 1
             except Exception:
-                removed = 0
-            # Validate and accept adjusted value if provided
+                to_remove = []
+
+            # Guardrail: prevent accidental camera jump-cuts (easing='Switch') unless explicitly
+            # opted in. We compare against the *evaluated timeline camera* at this time (pre-write).
+            old_eye: tuple[float, float, float] | None = None
+            old_center: tuple[float, float, float] | None = None
+            ref_eye_center_dist: float | None = None
+            if easing == "Switch" and not allow_jump_cut:
+                try:
+                    samples = client.camera_sample(
+                        animation_id=animation_id, times=[time_v]
+                    )
+                except Exception as e:
+                    msg = str(e)
+                    try:
+                        msg = e.details()  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": (
+                                "animation_replace_key_camera: cannot validate Switch-key continuity "
+                                f"(camera_sample failed: {msg}). If you intended a cut, pass allow_jump_cut=true."
+                            ),
+                        }
+                    )
+                if not samples or not isinstance(samples[0].get("value"), dict):
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": (
+                                "animation_replace_key_camera: cannot validate Switch-key continuity "
+                                "(camera_sample returned no value). If you intended a cut, pass allow_jump_cut=true."
+                            ),
+                        }
+                    )
+                old_value = samples[0].get("value") or {}
+                old_eye = _read_vec3(old_value, "Eye Position Vec3")
+                old_center = _read_vec3(old_value, "Center Position Vec3")
+                if not (old_eye and old_center):
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": (
+                                "animation_replace_key_camera: Switch-key continuity check requires "
+                                "Eye Position Vec3 and Center Position Vec3 in the sampled timeline camera value. "
+                                "If you intended a cut, pass allow_jump_cut=true."
+                            ),
+                        }
+                    )
+                ref_eye_center_dist = _norm(_sub(old_eye, old_center))
+                if (
+                    ref_eye_center_dist is None
+                    or not math.isfinite(ref_eye_center_dist)
+                    or ref_eye_center_dist <= 0.0
+                ):
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": (
+                                "animation_replace_key_camera: Switch-key continuity check failed "
+                                "(invalid sampled eye↔center distance). If you intended a cut, pass allow_jump_cut=true."
+                            ),
+                        }
+                    )
+
             try:
                 vr = client.camera_validate(
                     animation_id=animation_id,
@@ -1636,6 +1770,59 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     value = vals[0].get("adjusted_value")
             except Exception:
                 pass
+
+            if easing == "Switch" and not allow_jump_cut:
+                new_eye = _read_vec3(value, "Eye Position Vec3")
+                new_center = _read_vec3(value, "Center Position Vec3")
+                if not (
+                    new_eye
+                    and new_center
+                    and old_eye
+                    and old_center
+                    and ref_eye_center_dist
+                ):
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": (
+                                "animation_replace_key_camera: Switch-key continuity check requires "
+                                "Eye Position Vec3 and Center Position Vec3 in both the sampled and new camera values. "
+                                "If you intended a cut, pass allow_jump_cut=true."
+                            ),
+                        }
+                    )
+                delta_eye = _norm(_sub(new_eye, old_eye))
+                delta_center = _norm(_sub(new_center, old_center))
+                delta_frac = max(delta_eye, delta_center) / ref_eye_center_dist
+                if delta_frac > max_switch_jump_fraction:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": (
+                                "animation_replace_key_camera: refusing to write an easing='Switch' key that would create "
+                                "a large camera jump (jump cut). If you intended an instantaneous cut, pass allow_jump_cut=true. "
+                                "Otherwise, use easing='Linear' with an explicit transition segment, or use "
+                                "animation_camera_solve_and_apply(mode='STATIC') for holds."
+                            ),
+                            "time": float(time_v),
+                            "jump_fraction": float(delta_frac),
+                            "max_switch_jump_fraction": float(max_switch_jump_fraction),
+                            "delta_eye": float(delta_eye),
+                            "delta_center": float(delta_center),
+                            "reference_eye_center_dist": float(ref_eye_center_dist),
+                        }
+                    )
+
+            # Remove camera keys within tolerance (now safe to mutate).
+            removed = 0
+            for t in to_remove:
+                try:
+                    if client.remove_key(
+                        animation_id=animation_id, target_id=0, json_key="", time=t
+                    ):
+                        removed += 1
+                except Exception:
+                    pass
             ok = client.set_key_camera(
                 animation_id=animation_id, time=time_v, easing=easing, value=value
             )
@@ -1806,6 +1993,24 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             tol = float(args.get("tolerance", 1e-3))
             easing = _normalize_easing_name(args.get("easing"))
             clear_range = bool(args.get("clear_range", True))
+            # Ensure the engine state matches the timeline at t0 before solving.
+            #
+            # `camera_solve` snapshots the *current engine camera + bbox* as the base for
+            # FIT/ORBIT/DOLLY/STATIC. When authoring a timeline in multiple adjacent
+            # segments (e.g., ORBIT [0,6.5] then STATIC [6.5,8]), failing to sync the
+            # engine to t0 can cause discontinuities: the solver would base the second
+            # segment on whatever camera the UI currently has (often the t=0 pose),
+            # overwriting the boundary key and producing a visible “reset”.
+            if not client.set_time(
+                animation_id=animation_id, seconds=t0, cancel_rendering=True
+            ):
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "failed to set animation time to t0 before solving",
+                        "t0": float(t0),
+                    }
+                )
             keys = client.camera_solve(
                 mode=mode_up,
                 ids=ids,
@@ -2020,8 +2225,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 constraints=constraints,
                 policies=policies,
             )
+            results = res.get("results") or []
+
             return json.dumps(
-                {"ok": bool(res.get("ok", False)), "results": res.get("results")}
+                {
+                    "ok": bool(res.get("ok", False)),
+                    "results": results,
+                }
             )
         except Exception as e:
             msg = str(e)

@@ -116,8 +116,9 @@ Agents: Camera Planning & Validation
 - Essential tools (LLM function-calling):
   - `fit_candidates` → choose ids to frame (excludes Animation3D).
   - `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view` → deterministic operators (UI parity) for stateless camera value generation.
-  - `animation_camera_solve_and_apply` (modes FIT | ORBIT | DOLLY | STATIC) → solves and writes validated camera keys; clears existing keys in the time range by default.
-  - `camera_validate` → dry‑run with constraints/policies; prefer strict first, then allow adjustments if needed.
+  - `animation_camera_solve_and_apply` (modes FIT | ORBIT | DOLLY | STATIC) → solves and writes validated camera keys; clears existing keys in the time range by default. The tool sets the engine timeline time to `t0` before solving so adjacent segments start from the timeline pose (prevents boundary “camera resets”).
+  - `animation_camera_validate` → dry‑run with constraints/policies; prefer strict first, then allow adjustments if needed.
+  - Aspect ratio: camera planning/validation currently assumes a 16:9 “planning viewport” (matches common export defaults), not the interactive UI window size.
   - `animation_batch` → write non‑camera parameter keys atomically. Camera keys are written by `animation_camera_solve_and_apply` (do not wrap in batch).
 
 - Deprecated/removed: all camera "recipe" tools. Compose motions with the general tools above; do not rely on hardcoded recipes.

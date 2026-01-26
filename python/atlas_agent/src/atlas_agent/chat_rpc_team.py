@@ -129,6 +129,7 @@ ATLAS_SHARED_SYSTEM_RULES = (
     "- Camera target selection: for establishing shots, ids may be the full relevant set (fit_candidates). For close-ups/highlight beats, choose ids as ONLY the highlighted objects (small subset) so framing can be tight; do not keep_visible-frame the whole scene by default.\n"
     "- Camera framing constraints: keep_visible=true enforces no cropping (target bbox stays fully within frame). For tight shots, set min_frame_coverage>0 (0..1 dominant-dimension fill). For interior/exploration, set keep_visible=false to skip framing validation. Keep margin small unless the user explicitly wants extra padding.\n"
     "- Relative dolly (no world-unit guessing): prefer animation_camera_walkthrough_apply with look_at_policy='bbox_center' and bbox-scaled move.forward/back (camera_move_local distance_is_fraction_of_bbox_radius=true) instead of DOLLY.\n"
+    "- Timeline continuity: when chaining camera segments, do NOT overwrite the shared boundary time with a different pose using easing='Switch' unless you want a deliberate jump cut. For holds, use mode='STATIC' at the boundary; for reframes, create an explicit transition segment.\n"
     "- Camera director rubric (routing): if the user provides explicit waypoints/points/beats, use animation_camera_waypoint_spline_apply; otherwise if the user describes motion verbs (fly/strafe/yaw/pitch/pause), use animation_camera_walkthrough_apply. Mixed prompts: do not drop waypoints/segments; add intermediate points or increase walkthrough step_seconds instead of truncating.\n"
     "- Camera director rubric (defaults): walkthrough constraints default keep_visible=false unless the user explicitly wants framing; step_seconds defaults: slow≈0.5, medium≈1.0, fast≈1.5–2.0. For sparse waypoints, add intermediate waypoints instead of relying on interpolation modes.\n"
     "- Walkthrough planning: when inventing segments from words, you may use internal segment templates (template+amount/distance/degrees) and let the tool expand them; do not require the user to name templates.\n"
@@ -1512,6 +1513,10 @@ class ChatTeam:
             | set(ATLAS_OUTPUT_TOOLS)
             | set(SESSION_MUTATION_TOOLS)
             | set(CODEGEN_TOOLS)
+            # Camera validation results are small but high-value for debugging.
+            # Store full results even when ok=true so users can inspect per-time
+            # within_frame/frame_coverage and avoid “it said ok” confusion.
+            | {"animation_camera_validate"}
         )
         current_phase = "executor"
 

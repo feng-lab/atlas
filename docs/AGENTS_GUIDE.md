@@ -287,12 +287,16 @@ Animation (timeline) authoring
   - This is often the fastest way to author “beats” in an animation: pose the scene at a few key times (camera + object visibility/appearance/transforms), save keyframes, then rely on interpolation between beats.
   - You can also refine with per-parameter key tools (`animation_set_key_param`, `animation_replace_key_*`, `animation_batch`) when you need finer control than whole-scene snapshots provide.
 - Solve and write keys: `animation_camera_solve_and_apply(animation_id, mode, ids, t0, t1, constraints?, params?, degrees?, …)`.
+  - Continuity: this tool sets the engine timeline time to `t0` before solving so chained segments (e.g., ORBIT then STATIC) start from the timeline pose at the boundary instead of the current UI camera.
   - Tip: for ORBIT, use `degrees` (default 360) and optionally `max_step_degrees` to control key density (default 90; smaller → more keys/smoother). Use `params.axis` (default `"y"`).
-  - FIT/STATIC semantics: the RPC server ignores `t1` and produces a single key at `t0` (it does **not** fill keys across the interval). If `clear_range=true` and `t1 > t0`, existing camera keys inside `[t0,t1]` may be removed (except solver key times) — set `t1=t0` (or `clear_range=false`) when you only want a one-shot fit.
-- Validate camera key sequences: `animation_camera_validate(animation_id, ids, times, values?, constraints?, policies?)` (values optional; when omitted, the server samples from `animation_id` at those times).
+  - FIT/STATIC semantics: the solver produces a single key at `t0` (it does **not** fill keys across the interval). A “hold” happens naturally because the timeline evaluates the last key until the next key. Avoid writing a second camera key at the same boundary time with `easing="Switch"` unless you intentionally want a jump cut.
+  - If `clear_range=true` and `t1 > t0`, existing camera keys inside `[t0,t1]` may be removed (except solver key times) — set `t1=t0` (or `clear_range=false`) when you only want a one-shot fit.
+  - Validate camera key sequences: `animation_camera_validate(animation_id, ids, times, values?, constraints?, policies?)` (values optional; when omitted, the server samples from `animation_id` at those times).
+    - Aspect ratio note: validation assumes a 16:9 “planning viewport” (matches common export defaults), not the current UI window size.
 - Sample the camera from the timeline (no validation, no key writes): `animation_camera_sample(animation_id, times)` → `samples:[{time,value}]`.
   - Use this to get a deterministic `base_value` for `camera_rotate/camera_move_local/camera_look_at` while editing an existing animation.
-- Single-time explicit write: `animation_replace_key_camera(animation_id, time, value, easing?)`.
+- Single-time explicit write: `animation_replace_key_camera(animation_id, time, value, easing?, allow_jump_cut?)`.
+  - Note: `easing="Switch"` creates an instantaneous jump cut. By default the tool rejects large Switch jumps (prevents accidental boundary “resets”); pass `allow_jump_cut=true` only when a cut is intentional (or tune `max_switch_jump_fraction`).
 - Guided waypoint spline (one-shot apply):
   - `animation_camera_waypoint_spline_apply(animation_id, t0, t1, base_value, waypoints=[...], constraints?, clear_range=true, easing="Linear")`
   - Tip: prefer `base_value = animation_camera_sample(animation_id, times=[t0]).samples[0].value` so the path is anchored to the timeline.

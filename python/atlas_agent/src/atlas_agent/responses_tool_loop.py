@@ -4,6 +4,7 @@ import itertools
 import json
 import logging
 import math
+import re
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
@@ -24,6 +25,7 @@ from .defaults import (
     PROACTIVE_CONTEXT_COMPACTION_MAX_ATTEMPTS_PER_CALL,
     PROACTIVE_CONTEXT_COMPACTION_TRIGGER_RATIO,
     TRANSIENT_NETWORK_BACKOFF_SECONDS,
+    TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS,
     TRANSIENT_NETWORK_MAX_RETRIES,
 )
 
@@ -904,6 +906,155 @@ def _is_transient_network_error(err: BaseException) -> bool:
     return False
 
 
+def _extract_http_status_code(err: BaseException) -> int | None:
+    """Best-effort HTTP status extraction from an exception chain."""
+
+    for e in _iter_exception_chain(err):
+        # OpenAI SDK errors commonly expose .status_code directly.
+        status = getattr(e, "status_code", None)
+        if isinstance(status, int):
+            return status
+        # Some wrappers carry an underlying response object.
+        resp = getattr(e, "response", None)
+        status2 = getattr(resp, "status_code", None)
+        if isinstance(status2, int):
+            return status2
+    return None
+
+
+def _is_gateway_http_5xx_error(err: BaseException) -> bool:
+    """Return true for 5xx gateway/proxy errors worth extended retry.
+
+    Rationale: many OpenAI-compatible gateways intermittently return 502/503/504,
+    and a longer retry loop can recover without user intervention.
+    """
+
+    status = _extract_http_status_code(err)
+    if status in {502, 503, 504}:
+        return True
+
+    # Fallback to message heuristics when status codes are not available.
+    msg = str(err or "").lower()
+    return any(
+        n in msg
+        for n in (
+            "bad gateway",
+            "service unavailable",
+            "gateway timeout",
+            "proxy error",
+            "http/1.1 502",
+            "http/1.1 503",
+            "http/1.1 504",
+        )
+    )
+
+
+def _is_rate_limit_error(err: BaseException) -> bool:
+    """Return true for rate limiting (429 / token bucket / TPM).
+
+    Note: Some OpenAI-compatible gateways return HTTP 200 with an error payload.
+    In that case status codes may be missing, so we also rely on message
+    heuristics.
+    """
+
+    status = _extract_http_status_code(err)
+    if status == 429:
+        return True
+
+    # Best-effort: avoid hard dependency on the OpenAI SDK class.
+    try:
+        from openai import RateLimitError  # type: ignore
+    except Exception:  # pragma: no cover
+        RateLimitError = None
+
+    for e in _iter_exception_chain(err):
+        if RateLimitError is not None:
+            try:
+                if isinstance(e, RateLimitError):
+                    return True
+            except Exception:
+                pass
+
+        msg = str(e or "").lower()
+        if any(
+            n in msg
+            for n in (
+                "rate limit reached",
+                "too many requests",
+                "tpm",
+                "tokens per min",
+                "tokens per minute",
+            )
+        ):
+            return True
+
+    return False
+
+
+def _extract_retry_after_seconds(err: BaseException) -> float | None:
+    """Best-effort retry-after extraction for rate limit errors.
+
+    We try, in order:
+    - explicit exception attributes (retry_after/retry_after_seconds)
+    - response headers (Retry-After)
+    - error message patterns like "Please try again in 681ms".
+    """
+
+    def _coerce_float(v: Any) -> float | None:
+        try:
+            f = float(v)
+        except Exception:
+            return None
+        if not math.isfinite(f):
+            return None
+        return f
+
+    # 1) SDK-provided attributes / headers.
+    for e in _iter_exception_chain(err):
+        for attr in ("retry_after", "retry_after_seconds", "retry_after_ms"):
+            v = getattr(e, attr, None)
+            if v is None:
+                continue
+            f = _coerce_float(v)
+            if f is None:
+                continue
+            if attr.endswith("_ms"):
+                return f / 1000.0
+            return f
+
+        headers = getattr(e, "headers", None)
+        if isinstance(headers, dict):
+            ra = headers.get("retry-after") or headers.get("Retry-After")
+            f = _coerce_float(ra)
+            if f is not None and f >= 0.0:
+                return f
+
+        resp = getattr(e, "response", None)
+        resp_headers = getattr(resp, "headers", None)
+        if isinstance(resp_headers, dict):
+            ra = resp_headers.get("retry-after") or resp_headers.get("Retry-After")
+            f = _coerce_float(ra)
+            if f is not None and f >= 0.0:
+                return f
+
+    # 2) Parse from message text (OpenAI frequently includes a recommended delay).
+    msg = str(err or "")
+    m = re.search(r"try again in\s+(\d+)\s*ms", msg, flags=re.IGNORECASE)
+    if m:
+        try:
+            return max(0.0, float(m.group(1)) / 1000.0)
+        except Exception:
+            pass
+    m = re.search(r"try again in\s+([0-9]*\.?[0-9]+)\s*s", msg, flags=re.IGNORECASE)
+    if m:
+        try:
+            return max(0.0, float(m.group(1)))
+        except Exception:
+            pass
+
+    return None
+
+
 @dataclass(slots=True)
 class ToolLoopCallbacks:
     """Optional streaming callbacks for rendering a streaming CLI."""
@@ -1164,6 +1315,8 @@ def run_responses_tool_loop(
         # missing `resp["model"]` as a gateway hiccup and retry cleanly (discarding the
         # payload, not persisting any meta, and not appending output items).
         transient_network_tries = 0
+        gateway_http_tries = 0
+        rate_limit_tries = 0
         gateway_model_miss_tries = 0
         while True:
             # Stream buffers for this attempt
@@ -1319,13 +1472,57 @@ def run_responses_tool_loop(
                                 "Context window exceeded and could not trim further; start a new session/thread or reduce tool output sizes."
                             ) from e
             except Exception as e:
+                # Some OpenAI-compatible gateways intermittently return 502/503/504
+                # while they restart/rebalance. These usually recover quickly and are
+                # worth a longer retry loop (similar to gateway-model detection).
+                if _is_gateway_http_5xx_error(e) and gateway_http_tries < max(
+                    0, int(GATEWAY_MODEL_DETECTION_MAX_RETRIES) - 1
+                ):
+                    import time
+
+                    time.sleep(
+                        min(
+                            float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS),
+                            TRANSIENT_NETWORK_BACKOFF_SECONDS
+                            * (2.0**gateway_http_tries),
+                        )
+                    )
+                    gateway_http_tries += 1
+                    continue
+
+                # Handle 429 / TPM rate limit errors with a longer retry loop. Many
+                # providers include an explicit "try again in Xms" hint; honor it
+                # when available to recover automatically without user prompting.
+                if _is_rate_limit_error(e) and rate_limit_tries < max(
+                    0, int(GATEWAY_MODEL_DETECTION_MAX_RETRIES) - 1
+                ):
+                    import time
+
+                    retry_after_s = _extract_retry_after_seconds(e)
+                    if retry_after_s is None:
+                        retry_after_s = TRANSIENT_NETWORK_BACKOFF_SECONDS * (
+                            2.0**rate_limit_tries
+                        )
+                    # Add a small cushion so we don't wake up *exactly* at the
+                    # boundary and immediately re-trigger the same limit.
+                    retry_after_s = max(0.0, float(retry_after_s)) + 0.05
+                    time.sleep(
+                        min(float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS), retry_after_s)
+                    )
+                    rate_limit_tries += 1
+                    continue
+
                 if _is_transient_network_error(e) and transient_network_tries < max(
                     0, int(TRANSIENT_NETWORK_MAX_RETRIES) - 1
                 ):
                     import time
 
                     time.sleep(
-                        TRANSIENT_NETWORK_BACKOFF_SECONDS * (2**transient_network_tries)
+                        min(
+                            float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS),
+                            TRANSIENT_NETWORK_BACKOFF_SECONDS
+                            * (2.0**transient_network_tries),
+                        )
                     )
                     transient_network_tries += 1
                     continue
@@ -1364,8 +1561,11 @@ def run_responses_tool_loop(
                         import time
 
                         time.sleep(
-                            TRANSIENT_NETWORK_BACKOFF_SECONDS
-                            * (2**gateway_model_miss_tries)
+                            min(
+                                float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS),
+                                TRANSIENT_NETWORK_BACKOFF_SECONDS
+                                * (2.0**gateway_model_miss_tries),
+                            )
                         )
                         gateway_model_miss_tries += 1
                         continue

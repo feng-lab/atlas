@@ -57,6 +57,12 @@ struct EngineCameraAndBBoxSnapshot
   ZBBox<glm::dvec3> bbox;
 };
 
+// Camera planning/validation is primarily used for authoring animations that will
+// be rendered/exported offline. The export pipeline most commonly targets a
+// widescreen frame; using a fixed planning aspect ratio keeps validation results
+// closer to final video output than the interactive UI window size.
+constexpr float kCameraPlanningWindowAspectRatio = 16.f / 9.f;
+
 [[nodiscard]] ZQObjectThreadInvokeResult<json::value> snapshotEngineCameraJson(Z3DRenderingEngine* engine,
                                                                               std::string_view what)
 {
@@ -2509,6 +2515,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFit(const CameraFit
 
   Z3DCameraParameter base("Camera");
   base.readValue(snap.cameraJson);
+  base.get().setWindowAspectRatio(kCameraPlanningWindowAspectRatio);
 
   Z3DCameraPlanner::SolveRequest solveReq;
   solveReq.mode = Z3DCameraPlanner::SolveMode::Fit;
@@ -2641,6 +2648,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraOrbitSuggest(const 
 
   Z3DCameraParameter base("Camera");
   base.readValue(snap.cameraJson);
+  base.get().setWindowAspectRatio(kCameraPlanningWindowAspectRatio);
 
   Z3DCameraPlanner::SolveRequest solveReq;
   solveReq.mode = Z3DCameraPlanner::SolveMode::Orbit;
@@ -2765,6 +2773,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraDollySuggest(const 
 
   Z3DCameraParameter base("Camera");
   base.readValue(snap.cameraJson);
+  base.get().setWindowAspectRatio(kCameraPlanningWindowAspectRatio);
 
   Z3DCameraPlanner::SolveRequest solveReq;
   solveReq.mode = Z3DCameraPlanner::SolveMode::Dolly;
@@ -2897,6 +2906,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFocus(const CameraF
 
   Z3DCameraParameter base("Camera");
   base.readValue(snap.cameraJson);
+  base.get().setWindowAspectRatio(kCameraPlanningWindowAspectRatio);
 
   Z3DCameraPlanner::SolveRequest solveReq;
   solveReq.mode = Z3DCameraPlanner::SolveMode::Fit;
@@ -3613,6 +3623,7 @@ ZRpcUiDispatcher::CameraSolveResult ZRpcUiDispatcher::cameraSolve(const CameraSo
 
   Z3DCameraParameter base("Camera");
   base.readValue(snap.cameraJson);
+  base.get().setWindowAspectRatio(kCameraPlanningWindowAspectRatio);
 
   Z3DCameraPlanner::SolveRequest solveReq;
   solveReq.t0 = req.t0;
@@ -3863,6 +3874,7 @@ ZRpcUiDispatcher::CameraValidateResult ZRpcUiDispatcher::cameraValidate(const Ca
 
   Z3DCameraParameter base("Camera");
   base.readValue(snap.cameraJson);
+  base.get().setWindowAspectRatio(kCameraPlanningWindowAspectRatio);
 
   std::vector<double> times = req.times;
   std::vector<json::value> values = req.values;

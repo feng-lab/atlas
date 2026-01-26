@@ -31,13 +31,20 @@ DEFAULT_PLANNER_MAX_ROUNDS = 2400
 CONTEXT_TRIM_MAX_RETRIES = 32
 TRANSIENT_NETWORK_MAX_RETRIES = 3
 TRANSIENT_NETWORK_BACKOFF_SECONDS = 0.6
+# Cap exponential backoff so extended retry loops don't sleep unboundedly.
+TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS = 600.0
 FINAL_OUTPUT_CONTINUE_MAX_CALLS = 8
 
 # Some OpenAI-compatible gateways occasionally return a response payload that is
 # missing the routed model name (resp["model"]). For OpenAI models, this strongly
 # suggests the request did not fully reach (or return from) the intended backend.
-# Treat it like a transient gateway hiccup and retry a few times before failing.
-GATEWAY_MODEL_DETECTION_MAX_RETRIES = 100
+#
+# We treat this (and related gateway/proxy errors) as recoverable and allow a long
+# retry loop, bounded by TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS per attempt.
+#
+# NOTE: This is a *retry budget*, not an exponential backoff exponent. Call sites
+# must cap sleeps to avoid unbounded delays and integer→float overflow.
+GATEWAY_MODEL_DETECTION_MAX_RETRIES = 4500
 
 # Context checkpoint compaction (within-turn)
 #

@@ -13,6 +13,7 @@ from openai import OpenAI  # type: ignore
 from ..defaults import (
     GATEWAY_MODEL_DETECTION_MAX_RETRIES,
     TRANSIENT_NETWORK_BACKOFF_SECONDS,
+    TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS,
 )
 from ..gateway_model import (
     gateway_model_matches_requested,
@@ -1163,7 +1164,12 @@ class LLMClient:
                             )
                         except Exception:
                             pass
-                        time.sleep(TRANSIENT_NETWORK_BACKOFF_SECONDS * (2**attempt))
+                        time.sleep(
+                            min(
+                                float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS),
+                                TRANSIENT_NETWORK_BACKOFF_SECONDS * (2.0**attempt),
+                            )
+                        )
                         continue
                     raise RuntimeError(
                         "Provider returned an invalid routed model name from responses.create "
@@ -1316,7 +1322,12 @@ class LLMClient:
                             )
                         except Exception:
                             pass
-                        time.sleep(TRANSIENT_NETWORK_BACKOFF_SECONDS * (2**attempt))
+                        time.sleep(
+                            min(
+                                float(TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS),
+                                TRANSIENT_NETWORK_BACKOFF_SECONDS * (2.0**attempt),
+                            )
+                        )
                         continue
                     raise RuntimeError(
                         "Provider returned an invalid routed model name from chat.completions.create "
