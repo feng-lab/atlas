@@ -2579,6 +2579,14 @@ void Z3DRendererVulkanBackend::ensureDevice()
   m_maxFramesInFlight = m_sharedDevice->frameExecutor().maxFramesInFlight();
 }
 
+void* Z3DRendererVulkanBackend::activeFrameKey() const
+{
+  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    return nullptr;
+  }
+  return m_activeFrameHandle->key();
+}
+
 void Z3DRendererVulkanBackend::resetFrameResources()
 {
   m_activeFrameHandle.reset();

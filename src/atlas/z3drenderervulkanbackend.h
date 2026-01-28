@@ -110,6 +110,11 @@ public:
 
   const vk::raii::CommandBuffer& commandBuffer() const;
 
+  // Stable key identifying the active frame slot (used by pipeline contexts that
+  // need per-frame scratch buffers beyond descriptor arenas).
+  // Returns null when no active frame is recording.
+  [[nodiscard]] void* activeFrameKey() const;
+
   // Shared geometry
   ZVulkanBuffer& fullscreenQuadVertexBuffer();
 

@@ -1672,8 +1672,10 @@ bool finalizeImgRaycasterRoundByKey(Z3DRendererBase& rendererBase,
                                     bool lastRound,
                                     uint32_t channelCount)
 {
-  (void)rendererBase;
   auto* ptr = reinterpret_cast<Z3DPrimitiveRenderer*>(static_cast<uintptr_t>(streamKey));
+  if (!rendererBase.isRendererRegistered(ptr)) {
+    return false;
+  }
   if (auto* rc = dynamic_cast<Z3DImgRaycasterRenderer*>(ptr)) {
     rc->finalizeProgressiveRound(eye, lastRound, channelCount);
     return true;

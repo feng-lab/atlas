@@ -690,6 +690,11 @@ Notes
 
 - Slices Path
   - `Z3DImgSliceRenderer` renders plane geometry with 3D texture coordinates and merges channels; full-res block-ID/voxel cache logic mirrors the raycaster’s but for slice geometry.
+  - Vulkan slice backend uses GPU block-ID compaction (see `block_id_compact_*` shaders) and a raycaster-style progressive schedule:
+    - First present records a fast preview (progress=0.5).
+    - Missing-block discovery is recorded into the active frame command buffer; CPU parsing + `Z3DImg::updateAndUploadPageDirectoryCaches()` runs via a post-frame fence callback.
+    - Full-res paging then refines one channel per frame (VRAM-friendly) while preserving other channel layers; channels are merged each frame.
+    - The progressive path avoids `executeImmediate()` (no per-slice/per-channel submit+wait loops).
 
 - Compositor Integration
   - Filters render into their own RTs per eye and then copy/blend into the compositing chain using `Z3DTextureCopyRenderer`.

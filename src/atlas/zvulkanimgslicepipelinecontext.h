@@ -8,6 +8,7 @@
 #include <optional>
 #include <span>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace nim {
@@ -37,6 +38,19 @@ public:
   ~ZVulkanImgSlicePipelineContext();
 
   void resetFrame();
+
+  struct Finalization
+  {
+    uint64_t streamKey = 0;
+    Z3DEye eye = Z3DEye::MonoEye;
+    bool lastRound = false;
+    uint32_t channelCount = 0;
+  };
+
+  // Called by the Vulkan backend after recording this context. If present,
+  // the backend will notify the originating renderer to advance progressive
+  // bookkeeping (channel/round progression).
+  [[nodiscard]] std::optional<Finalization> takePendingFinalization();
 
   void record(Z3DRendererBase& renderer,
               const RenderBatch& batch,
@@ -126,11 +140,45 @@ private:
     uint32_t levelCount = 0;
   };
 
+  struct SliceDrawRange
+  {
+    vk::DeviceSize vertexOffsetBytes = 0;
+    uint32_t vertexCount = 0;
+  };
+
+  struct DeferredProgressive
+  {
+    uint64_t streamKey = 0;
+    Z3DEye eye = Z3DEye::MonoEye;
+    uint32_t channelCount = 0;
+  };
+
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<SlicePipelineKey, PipelineInstance> m_slicePipelines;
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
   std::map<BlockIdPipelineKey, PipelineInstance> m_blockIdPipelines;
+
+  // Block-ID compaction (compute) to avoid full RGBA32UI readback.
+  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutSampled;
+  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutSampled;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineSampled;
+  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutStorage;
+  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutStorage;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineStorage;
+  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutBuffer;
+  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutBuffer;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineBufferAppend;
+  std::unique_ptr<ZVulkanBuffer> m_blockIdPixelBuffer;
+  size_t m_blockIdPixelBufferCapacity = 0;
+  // Per-frame-slot compaction outputs for slice block-ID discovery. This avoids
+  // clobbering host-visible buffers when multiple Vulkan frames are in flight.
+  struct FrameBlockIdOutputs
+  {
+    size_t bytesPerSlice = 0;
+    std::vector<std::unique_ptr<ZVulkanBuffer>> sliceOutputs;
+  };
+  std::unordered_map<void*, FrameBlockIdOutputs> m_blockIdOutputsByFrame;
 
   std::optional<vk::raii::DescriptorSetLayout> m_fastSliceSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_pagedSliceSetLayout;
@@ -143,12 +191,16 @@ private:
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
   size_t m_vertexCount = 0;
+  std::vector<SliceDrawRange> m_sliceDrawRanges;
+  std::unique_ptr<ZVulkanTexture> m_placeholder3D;
 
   std::unique_ptr<ZVulkanBuffer> m_quadVertexBuffer;
   size_t m_quadVertexCapacity = 0;
   size_t m_quadVertexCount = 0;
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
+  std::optional<Finalization> m_pendingFinalization;
+  std::optional<DeferredProgressive> m_deferredProgressive;
 
   void ensureDescriptorLayouts();
   void ensureEmptyDescriptor();
@@ -177,6 +229,7 @@ private:
   PipelineInstance& ensureSlicePipeline(const SlicePipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
+  void ensureBlockIdCompactionPipeline();
 
   std::vector<vk::DescriptorSet> collectSliceDescriptorSets(ChannelResources& resources, bool usePaging);
   // depthArray is optional

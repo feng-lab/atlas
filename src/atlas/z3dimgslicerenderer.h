@@ -4,9 +4,13 @@
 #include "z3dshaderprogram.h"
 #include "zcolormap.h"
 #include "zmesh.h"
+#include "z3dscratchresourcepool.h"
+#include <array>
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace nim {
 
@@ -83,12 +87,37 @@ public:
 
   bool renderingStarted(Z3DEye eye)
   {
-    return m_progress[eye] > 0;
+    // GL uses m_progress for its two-step progressive slice (0.5 -> 1.0).
+    // Vulkan uses (channelIdx, round) bookkeeping (mirrors raycaster).
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      return m_channelIdx[eye] >= 0;
+    }
+    return m_progress[eye] > 0.0;
   }
 
-  void resetProgress(Z3DEye eye)
+  // Report progressive progress for Vulkan/GL-agnostic callers.
+  // Returns [0.5,1.0] during progressive refinement, or 1.0 when complete/not started.
+  double progressiveProgress(Z3DEye eye) const;
+
+  // Reset progressive accumulation state for an eye (GL + Vulkan).
+  void resetProgress(Z3DEye eye);
+
+  // Notify renderer that a Vulkan progressive round has completed so internal
+  // bookkeeping can advance (channel/round progression).
+  void finalizeProgressiveRound(Z3DEye eye, bool lastRound, size_t channelCount);
+
+  // Release any scratch-pool backed targets retained across frames.
+  void releaseScratchResources();
+
+  void releaseBackendResources() override
   {
-    m_progress[eye] = 0;
+    // Backend switches invalidate scratch-pool resources (layer targets) and also
+    // invalidate the progressive bookkeeping that depends on their contents.
+    releaseScratchResources();
+    // Clear GL cache; textures will be deleted with unique_ptr
+    m_colormapCache.textures.clear();
+    m_colormapCache.meta.clear();
+    Z3DPrimitiveRenderer::releaseBackendResources();
   }
 
 protected:
@@ -134,7 +163,15 @@ private:
 
   double m_progress[3] = {0, 0, 0};
 
-  // No per-renderer textures; all temporary images are pooled.
+  // Vulkan progressive bookkeeping (mirrors raycaster): per-eye channel and round indices.
+  // channelIdx < 0 indicates "not started / done". Vulkan uses channelIndexRaw < 0
+  // in the payload for the fast-preview frame and flips channelIdx to 0 via
+  // finalizeProgressiveRound().
+  int m_channelIdx[3] = {-1, -1, -1};
+  int m_round[3] = {0, 0, 0};
+  std::array<uint32_t, 3> m_progressiveGeneration{};
+  // Persistent Vulkan layer targets across progressive rounds (per eye).
+  std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_progressiveLayerLease;
 
   // Output size provided via ensureInternalTargets()
   glm::uvec2 m_outputSize{32, 32};
@@ -148,15 +185,14 @@ private:
   mutable ColormapGLCache m_colormapCache;
 
   Z3DTexture* colormapTextureGL(const ZColorMap& cm, uint32_t width = 256) const;
-
-public:
-  void releaseBackendResources() override
-  {
-    // Clear GL cache; textures will be deleted with unique_ptr
-    m_colormapCache.textures.clear();
-    m_colormapCache.meta.clear();
-    Z3DPrimitiveRenderer::releaseBackendResources();
-  }
 };
+
+// Helper to finalize progressive rounds for ImgSlice by stream identity.
+// Used by the Vulkan backend to notify the originating renderer after GPU work completes.
+bool finalizeImgSliceRoundByKey(Z3DRendererBase& rendererBase,
+                                uint64_t streamKey,
+                                Z3DEye eye,
+                                bool lastRound,
+                                uint32_t channelCount);
 
 } // namespace nim

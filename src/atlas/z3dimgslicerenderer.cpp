@@ -14,6 +14,8 @@
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 
+DECLARE_uint32(atlas_volume_rendering_maximum_round);
+
 namespace nim {
 
 Z3DImgSliceRenderer::Z3DImgSliceRenderer(Z3DRendererBase& rendererBase)
@@ -58,24 +60,66 @@ void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend
   }
 
   ImgSlicePayload payload;
+  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
   payload.image = m_img;
   payload.colormaps = &m_colormapsRaw;
   payload.slices = std::span<const ZMesh>(m_slices.data(), m_slices.size());
   payload.outputSize = m_outputSize;
-  payload.fastPathOnly = m_fastRendering;
+  payload.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
   payload.maxProjectionMerge = true;
+
+  const bool usePaging = !payload.fastPathOnly && m_img->isVolumeDownsampled();
+  if (usePaging) {
+    // Progressive init parity with raycaster:
+    // - channelIdx < 0 indicates the initial fast-preview frame (handled by Vulkan pipeline context)
+    // - generation bumps only when starting a new progressive cycle
+    if (m_channelIdx[eye] < 0) {
+      ++m_progressiveGeneration[eye];
+    }
+    payload.progressiveGeneration = m_progressiveGeneration[eye];
+    payload.channelIndexRaw = m_channelIdx[eye];
+    payload.roundIndexRaw = m_round[eye];
+  }
 
   const uint32_t channelCount = static_cast<uint32_t>(m_img->numChannels());
   if (channelCount > 1u) {
     auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
-    auto lease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize,
+    // Helper to create a non-owning shared_ptr "view" of a persistent lease to avoid double-release.
+    auto shareLease = [](Z3DScratchResourcePool::RenderTargetLease& src) {
+      auto view = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
+      view->descriptor = src.descriptor;
+      view->backend = src.backend;
+      view->renderTarget = src.renderTarget;
+      view->vulkanImage = src.vulkanImage;
+      view->attachments = src.attachments;
+      // Leave view->releaser empty (no-op): the owning member lease controls lifetime.
+      return view;
+    };
+
+    if (usePaging) {
+      // Keep the layer array persistent across progressive rounds so we can
+      // refine channels incrementally (preview -> full-res).
+      auto& lease = m_progressiveLayerLease[eye];
+      const bool needsReacquire =
+        !lease.hasVulkanImage() || lease.descriptor.size != m_outputSize || lease.descriptor.layers != channelCount;
+      if (needsReacquire) {
+        lease.release();
+        lease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize,
                                                           channelCount,
                                                           ScratchFormat::RGBA16,
                                                           ScratchFormat::Depth32F,
                                                           std::optional<RenderBackend>(RenderBackend::Vulkan));
-    auto leaseHolder = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
-    *leaseHolder = std::move(lease);
-    payload.layerLease = std::move(leaseHolder);
+      }
+      payload.layerLease = shareLease(lease);
+    } else {
+      // Fast path: allocate a temporary layer array for this frame only.
+      auto lease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize,
+                                                             channelCount,
+                                                             ScratchFormat::RGBA16,
+                                                             ScratchFormat::Depth32F,
+                                                             std::optional<RenderBackend>(RenderBackend::Vulkan));
+      payload.layerLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(lease));
+    }
   }
 
   RenderBatch batch;
@@ -83,6 +127,94 @@ void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend
   batch.geometry = std::move(payload);
 
   m_rendererBase.appendBatch(std::move(batch));
+}
+
+double Z3DImgSliceRenderer::progressiveProgress(Z3DEye eye) const
+{
+  if (!m_img) {
+    return 1.0;
+  }
+  const size_t channelCount = m_img->numChannels();
+  if (channelCount == 0) {
+    return 1.0;
+  }
+
+  const int chan = m_channelIdx[eye];
+  const int round = m_round[eye];
+  if (chan < 0) {
+    return 1.0;
+  }
+  const int totalRound = static_cast<int>(channelCount) * static_cast<int>(FLAGS_atlas_volume_rendering_maximum_round);
+  const int currentRound = chan * static_cast<int>(FLAGS_atlas_volume_rendering_maximum_round) + round;
+  if (totalRound <= 0 || currentRound >= totalRound) {
+    return 1.0;
+  }
+  return static_cast<double>(currentRound) / static_cast<double>(totalRound) * 0.5 + 0.5;
+}
+
+void Z3DImgSliceRenderer::resetProgress(Z3DEye eye)
+{
+  m_progress[eye] = 0;
+  m_channelIdx[eye] = -1;
+  m_round[eye] = 0;
+  if (m_progressiveLayerLease[eye]) {
+    m_progressiveLayerLease[eye].release();
+  }
+}
+
+void Z3DImgSliceRenderer::finalizeProgressiveRound(Z3DEye eye, bool lastRound, size_t channelCount)
+{
+  if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
+    return;
+  }
+
+  if (m_channelIdx[eye] < 0 && channelCount > 0) {
+    // Preview finalized: start progressive paging at channel 0, round 0.
+    m_channelIdx[eye] = 0;
+    m_round[eye] = 0;
+    return;
+  }
+
+  if (lastRound) {
+    ++m_channelIdx[eye];
+    m_round[eye] = 0;
+    if (m_channelIdx[eye] < 0 || static_cast<size_t>(m_channelIdx[eye]) >= channelCount) {
+      // All channels complete.
+      m_channelIdx[eye] = -1;
+      m_round[eye] = 0;
+      if (m_progressiveLayerLease[eye]) {
+        m_progressiveLayerLease[eye].release();
+      }
+    }
+  } else {
+    ++m_round[eye];
+  }
+}
+
+void Z3DImgSliceRenderer::releaseScratchResources()
+{
+  for (Z3DEye eye : {MonoEye, LeftEye, RightEye}) {
+    if (m_progressiveLayerLease[eye]) {
+      m_progressiveLayerLease[eye].release();
+    }
+    m_channelIdx[eye] = -1;
+    m_round[eye] = 0;
+  }
+}
+
+bool finalizeImgSliceRoundByKey(Z3DRendererBase& rendererBase,
+                                uint64_t streamKey,
+                                Z3DEye eye,
+                                bool lastRound,
+                                uint32_t channelCount)
+{
+  (void)rendererBase;
+  auto* ptr = reinterpret_cast<Z3DPrimitiveRenderer*>(static_cast<uintptr_t>(streamKey));
+  if (auto* sr = dynamic_cast<Z3DImgSliceRenderer*>(ptr)) {
+    sr->finalizeProgressiveRound(eye, lastRound, channelCount);
+    return true;
+  }
+  return false;
 }
 
 void Z3DImgSliceRenderer::addSlice(const ZMesh& slice)

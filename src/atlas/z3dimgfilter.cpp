@@ -1097,7 +1097,9 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       throw;
     }
     m_opaqueValid[eye] = true;
-    return 1.0;
+    // Compute progressive progress to mirror GL behaviour (preview=0.5, final=1.0).
+    const double progress = m_progressiveRendering ? m_imgSliceRenderer.progressiveProgress(eye) : 1.0;
+    return progress;
   }
 
   Z3DRenderTarget& currentTarget = opaqueTarget(eye);

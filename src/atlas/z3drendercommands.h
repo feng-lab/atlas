@@ -649,6 +649,16 @@ struct TextureWeightedBlendedPayload
 
 struct ImgSlicePayload
 {
+  // Stable identity of the source renderer/stream (used by Vulkan backend to finalize progressive rounds).
+  uint64_t streamKey = 0;
+  // Per-stream generation for progressive bookkeeping (clears persistent resources when it changes).
+  uint32_t progressiveGeneration = 0u;
+  // GL-parity progressive booking:
+  // - channelIndexRaw < 0 indicates the initial fast-preview frame (progress=0.5) for Vulkan paging.
+  // - roundIndexRaw is the progressive round counter for paging/cache filling.
+  int32_t channelIndexRaw = -1;
+  int32_t roundIndexRaw = 0;
+
   Z3DImg* image = nullptr;
   const std::vector<const ZColorMap*>* colormaps = nullptr;
   std::span<const ZMesh> slices;

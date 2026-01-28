@@ -599,6 +599,14 @@ void Z3DRendererBase::unregisterRenderer(Z3DPrimitiveRenderer* renderer)
   m_renderers.erase(renderer);
 }
 
+bool Z3DRendererBase::isRendererRegistered(const Z3DPrimitiveRenderer* renderer) const
+{
+  if (!renderer) {
+    return false;
+  }
+  return m_renderers.contains(const_cast<Z3DPrimitiveRenderer*>(renderer));
+}
+
 void Z3DRendererBase::releaseBackendResources()
 {
   for (auto* renderer : m_renderers) {

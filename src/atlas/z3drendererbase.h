@@ -107,6 +107,8 @@ public:
 
   void unregisterRenderer(Z3DPrimitiveRenderer* renderer);
 
+  [[nodiscard]] bool isRendererRegistered(const Z3DPrimitiveRenderer* renderer) const;
+
   void releaseBackendResources();
 
   void buildBackendResources(RenderBackend backend);
