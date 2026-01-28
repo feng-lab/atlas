@@ -12,12 +12,19 @@ from .defaults import (
     DEFAULT_EXECUTOR_MAX_ROUNDS,
     DEFAULT_PLANNER_MAX_ROUNDS,
     DEFAULT_WEB_SEARCH_MODE,
+    RESUME_SESSION_PICKER_PREVIEW_MAX_CHARS,
 )
 from .llm_usage import (
     LlmUsageDelta,
     LlmUsageTotals,
 )
 from .responses_tool_loop import ToolLoopCallbacks
+from .session_resume import (
+    format_tool_call_summary_line,
+    format_web_search_summary_line,
+    iter_resume_items,
+    list_sessions,
+)
 
 
 def _try_parse_json(text: str) -> Any:
@@ -300,6 +307,140 @@ def _ensure_screenshot_consent(*, console: Any, team: ChatTeam) -> None:
         console.print("[yellow]Screenshots disabled for this session.[/yellow]")
 
 
+def _render_session_replay(*, console: Any, team: ChatTeam) -> None:
+    """Replay a saved session history to the terminal (UX for resume).
+
+    Policy (matches user-facing expectations):
+    - Prints all transcript messages (user + assistant).
+    - Prints a one-line summary for every tool call (and web_search event).
+    - Prints only the *current* plan (latest plan_updated), inserted at the point
+      it occurred in the session log.
+    - Skips internal-only task briefs.
+    """
+
+    from rich.text import Text  # type: ignore
+
+    log_path = getattr(team.session_store, "log_path", None)
+    if not isinstance(log_path, Path) or not log_path.exists():
+        return
+
+    items = list(iter_resume_items(log_path))
+    if not any(
+        it.kind in {"transcript", "tool_call", "web_search", "plan"} for it in items
+    ):
+        return
+
+    # Only treat this as a "resume replay" when there is real user/assistant transcript
+    # content (otherwise a brand-new session would print nothing but meta/consent noise).
+    if not any(it.kind == "transcript" for it in items):
+        return
+
+    console.print("\n[dim]--- Resuming session history (replay) ---[/dim]")
+    for it in items:
+        ev = it.event
+        kind = str(it.kind or "")
+
+        if kind == "transcript":
+            role = str(ev.get("role") or "").strip().lower()
+            content = str(ev.get("content") or "")
+            if not content:
+                continue
+            if role == "user":
+                console.print(Text(f"\n>> {content}", style="bold cyan"))
+            else:
+                console.print("\n[bold]Answer[/bold]")
+                console.print(content, markup=False)
+            continue
+
+        if kind == "tool_call":
+            try:
+                ok = None
+                policy = str(ev.get("result_policy") or "summary").strip().lower()
+                payload = (
+                    ev.get("result") if policy == "full" else ev.get("result_summary")
+                )
+                if isinstance(payload, dict):
+                    ok = payload.get("ok")
+                style = "cyan"
+                if ok is True:
+                    style = "green"
+                elif ok is False:
+                    style = "red"
+                console.print(Text(format_tool_call_summary_line(ev), style=style))
+            except Exception:
+                console.print(Text("→ <tool>: done", style="cyan"))
+            continue
+
+        if kind == "web_search":
+            console.print(Text(format_web_search_summary_line(ev), style="cyan"))
+            continue
+
+        if kind == "plan":
+            _render_plan(console=console, team=team)
+            continue
+
+
+def _pick_session_interactive(
+    *, console: Any, session_dir: Optional[str]
+) -> str | None:
+    """Return a session id/path chosen interactively, or None if cancelled."""
+
+    from rich.table import Table  # type: ignore
+
+    from .session_store import default_sessions_root
+
+    sessions_root = (
+        Path(session_dir).expanduser().resolve()
+        if isinstance(session_dir, str) and session_dir.strip()
+        else default_sessions_root()
+    )
+    if not sessions_root.exists():
+        console.print("[dim](no sessions directory)[/dim]")
+        return None
+
+    preview_max_chars = int(RESUME_SESSION_PICKER_PREVIEW_MAX_CHARS)
+    sessions = list_sessions(
+        sessions_root=sessions_root, preview_max_chars=int(preview_max_chars)
+    )
+    if not sessions:
+        console.print("[dim](no sessions found)[/dim]")
+        return None
+
+    table = Table(title="Resume a previous session", show_lines=False)
+    table.add_column("#", style="dim", justify="right")
+    table.add_column("updated", style="dim")
+    table.add_column("preview", style="dim")
+
+    rows: list[str] = []
+    for i, s in enumerate(sessions, start=1):
+        table.add_row(
+            str(i),
+            s.updated_local_time(),
+            str(s.first_user_preview or ""),
+        )
+        rows.append(str(s.session_id))
+
+    console.print(table)
+    console.print(
+        f"[dim]Preview is the first user message (truncated to {preview_max_chars} chars).[/dim]"
+    )
+    console.print(
+        "[dim]Enter a number to resume, a session id/path, or blank to cancel.[/dim]"
+    )
+    ans = console.input("[bold cyan]resume>[/bold cyan] ").strip()
+    if not ans:
+        return None
+    try:
+        idx = int(ans)
+        if 1 <= idx <= len(rows):
+            return rows[idx - 1]
+    except Exception:
+        pass
+
+    # Allow direct id/path entry.
+    return ans
+
+
 def run_console_repl(
     *,
     address: str,
@@ -363,6 +504,7 @@ def run_console_repl(
     )
     console.print(f"[dim]Atlas app:[/dim] {team.atlas_dir}", markup=False)
     console.print("[dim]Type :help for commands. Ctrl+C to exit.[/dim]")
+    _render_session_replay(console=console, team=team)
     _ensure_screenshot_consent(console=console, team=team)
 
     while True:
@@ -384,6 +526,7 @@ def run_console_repl(
                     "\n[bold]Commands[/bold]\n"
                     "[cyan]:help[/cyan]                This help\n"
                     "[cyan]:session[/cyan]             Show session paths\n"
+                    "[cyan]:resume[/cyan]              Switch to another session (interactive)\n"
                     "[cyan]:screenshots on|off[/cyan]  Toggle preview screenshots for this session\n"
                     "[cyan]:brief[/cyan]               Show the latest Task Brief\n"
                     "[cyan]:plan[/cyan]                Show current plan\n"
@@ -394,6 +537,46 @@ def run_console_repl(
                     "[cyan]:time <seconds>[/cyan]      Set current time\n"
                     "[cyan]:objects[/cyan]             List objects"
                 )
+                continue
+            if cmd == "resume":
+                # :resume [<session-id-or-path>]
+                target = ""
+                if rest:
+                    target = str(rest[0] or "").strip()
+                else:
+                    picked = _pick_session_interactive(
+                        console=console, session_dir=session_dir
+                    )
+                    target = str(picked or "").strip()
+                if not target:
+                    continue
+                try:
+                    team = ChatTeam(
+                        address=address,
+                        api_key=api_key,
+                        model=model,
+                        wire_api=wire_api,
+                        web_search_mode=str(web_search_mode or DEFAULT_WEB_SEARCH_MODE),
+                        temperature=temperature,
+                        max_rounds_executor=int(max_rounds),
+                        max_rounds_planner=int(max_rounds_planner),
+                        ephemeral_inline_images=bool(ephemeral_inline_images),
+                        session=target,
+                        session_dir=session_dir,
+                        enable_codegen=bool(enable_codegen),
+                        reasoning_effort=reasoning_effort,
+                        reasoning_summary=reasoning_summary,
+                        text_verbosity=text_verbosity,
+                    )
+                except Exception as e:
+                    console.print(f"[red]fail:[/red] {e}")
+                    continue
+                console.print(
+                    f"[bold]Atlas Agent[/bold]. Session=[cyan]{team.session_store.session_id()}[/cyan]"
+                )
+                console.print(f"[dim]Atlas app:[/dim] {team.atlas_dir}", markup=False)
+                _render_session_replay(console=console, team=team)
+                _ensure_screenshot_consent(console=console, team=team)
                 continue
             if cmd == "session":
                 console.print(

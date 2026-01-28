@@ -4194,6 +4194,80 @@ def run_repl(
     )
     logger.info("Atlas app: %s", team.atlas_dir)
 
+    def _render_session_replay_plain() -> None:
+        """Replay saved session history (transcript + tool summaries + current plan)."""
+
+        try:
+            from .session_resume import (
+                format_tool_call_summary_line,
+                format_web_search_summary_line,
+                iter_resume_items,
+            )
+        except Exception:
+            return
+
+        log_path = getattr(team.session_store, "log_path", None)
+        try:
+            from pathlib import Path as _Path  # local alias to avoid confusion
+
+            if not isinstance(log_path, _Path) or not log_path.exists():
+                return
+        except Exception:
+            return
+
+        items = list(iter_resume_items(log_path))
+        if not any(it.kind == "transcript" for it in items):
+            return
+
+        logger.info("--- Resuming session history (replay) ---")
+        for it in items:
+            ev = it.event
+            if it.kind == "transcript":
+                role = str(ev.get("role") or "").strip().lower()
+                content = str(ev.get("content") or "")
+                if not content:
+                    continue
+                if role == "user":
+                    lines = content.splitlines() or [""]
+                    first = lines[0] if lines else ""
+                    logger.info(">> %s", first)
+                    for ln in lines[1:]:
+                        logger.info("   %s", ln)
+                else:
+                    logger.info("Answer:")
+                    for ln in content.splitlines() or [""]:
+                        logger.info("%s", ln)
+                continue
+            if it.kind == "tool_call":
+                try:
+                    logger.info("%s", format_tool_call_summary_line(ev))
+                except Exception:
+                    logger.info("→ <tool>: done")
+                continue
+            if it.kind == "web_search":
+                try:
+                    logger.info("%s", format_web_search_summary_line(ev))
+                except Exception:
+                    logger.info("→ web_search")
+                continue
+            if it.kind == "plan":
+                try:
+                    plan = team.session_store.get_plan()
+                except Exception:
+                    plan = []
+                if plan:
+                    logger.info("Plan:")
+                    for p in plan:
+                        if not isinstance(p, dict):
+                            continue
+                        st = str(p.get("status") or "").strip()
+                        step = str(p.get("step") or "").strip()
+                        if step:
+                            logger.info("- [%s] %s", st, step)
+                continue
+
+    _render_session_replay_plain()
+
     # One-time per-session consent prompt for screenshot-based visual verification.
     try:
         decided = team.session_store.get_consent("screenshots")
@@ -4236,6 +4310,7 @@ def run_repl(
                     "Commands:\n"
                     ":help                This help\n"
                     ":session             Show session paths\n"
+                    ":resume              Switch to another session (interactive)\n"
                     ":screenshots on|off  Toggle preview screenshots for this session\n"
                     ":plan                Show current plan\n"
                     ":memory              Show session memory summary\n"
@@ -4244,6 +4319,77 @@ def run_repl(
                     ":time <seconds>      Set current time\n"
                     ":objects             List objects"
                 )
+                continue
+            if cmd == "resume":
+                # :resume [<session-id-or-path>]
+                target = str(rest[0] or "").strip() if rest else ""
+                if not target:
+                    try:
+                        from .session_resume import list_sessions
+                        from .session_store import default_sessions_root
+                        from .defaults import RESUME_SESSION_PICKER_PREVIEW_MAX_CHARS
+
+                        sessions_root = (
+                            Path(session_dir).expanduser().resolve()
+                            if isinstance(session_dir, str) and session_dir.strip()
+                            else default_sessions_root()
+                        )
+                        sessions = list_sessions(
+                            sessions_root=sessions_root,
+                            preview_max_chars=int(
+                                RESUME_SESSION_PICKER_PREVIEW_MAX_CHARS
+                            ),
+                        )
+                    except Exception as e:
+                        logger.info("fail: %s", e)
+                        continue
+                    if not sessions:
+                        logger.info("(no sessions found)")
+                        continue
+                    for i, s in enumerate(sessions, start=1):
+                        prev = s.first_user_preview or ""
+                        logger.info(
+                            "%d\t%s\t%s",
+                            i,
+                            s.updated_local_time(),
+                            prev,
+                        )
+                    ans = input("resume> ").strip()
+                    if not ans:
+                        continue
+                    try:
+                        idx = int(ans)
+                        if 1 <= idx <= len(sessions):
+                            target = sessions[idx - 1].session_id
+                        else:
+                            target = ans
+                    except Exception:
+                        target = ans
+                if not target:
+                    continue
+                try:
+                    team = ChatTeam(
+                        address=address,
+                        api_key=api_key,
+                        model=model,
+                        wire_api=wire_api,
+                        web_search_mode=str(web_search_mode or DEFAULT_WEB_SEARCH_MODE),
+                        temperature=temperature,
+                        max_rounds_planner=int(max_rounds_planner),
+                        max_rounds_executor=int(max_rounds),
+                        ephemeral_inline_images=bool(ephemeral_inline_images),
+                        session=target,
+                        session_dir=session_dir,
+                        enable_codegen=bool(enable_codegen),
+                        reasoning_effort=reasoning_effort,
+                        reasoning_summary=reasoning_summary,
+                        text_verbosity=text_verbosity,
+                    )
+                    logger.info("Switched session=%s", team.session_store.session_id())
+                    logger.info("Atlas app: %s", team.atlas_dir)
+                    _render_session_replay_plain()
+                except Exception as e:
+                    logger.info("fail: %s", e)
                 continue
             if cmd == "session":
                 try:

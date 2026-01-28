@@ -75,6 +75,14 @@ DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR = 9
 DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR = 10
 
 
+# Console UX
+#
+# When selecting a session via `:resume`, we show a 1-line preview derived from the
+# first user message in the session. This is a UI-only preview; the full transcript
+# is replayed on resume.
+RESUME_SESSION_PICKER_PREVIEW_MAX_CHARS = 200
+
+
 # Screenshot / preview constraints
 #
 # Rationale: Some providers/models reject very large image payloads, and sending

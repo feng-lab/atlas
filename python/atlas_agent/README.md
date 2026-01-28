@@ -99,13 +99,18 @@ Notes:
   - reasoning summaries (phase-level).
   - `--session <id-or-path>` to resume a previous session
   - `--session-dir <path>` to choose where sessions live
-  - In the REPL: `:session`, `:brief`, `:plan`, `:memory`, `:budget`
+  - In the REPL: `:session`, `:resume`, `:brief`, `:plan`, `:memory`, `:budget`
 - Default session location when `--session-dir` is omitted:
   - macOS/Linux: `$XDG_STATE_HOME/atlas_agent/sessions` if set, otherwise `~/.atlas_agent/sessions`
   - Windows: `%APPDATA%\\atlas_agent\\sessions`
 - How to resume if you didn’t set anything explicitly:
   - Use the session id printed at startup: `atlas-agent --session <session_id>`
   - Or copy/paste the on-disk path from the REPL command `:session` (you can pass a session dir or a `session.jsonl` path)
+  - Or use `:resume` to pick from existing sessions interactively (no copy/paste)
+- Resume UX: when resuming an existing session (via `--session` or `:resume`), the CLI replays the saved session history to the terminal:
+  - all transcript messages (user + assistant),
+  - a one-line summary of each tool call,
+  - the current plan (latest `update_plan`).
 - Auto-retrieval (context-window resilience): when the user says “resume/continue/last time”, the runtime injects a small “Auto-retrieved context” block derived from the session log (recent tool calls + matching transcript entries).
   - This is intentionally a small excerpt; when more detail is needed, the agent can call `session_search_transcript` or `session_search_events`.
   - `session_search_transcript` / `session_search_events` support paging via `offset` + `max_results` and can return newest-first with `reverse=true`.
