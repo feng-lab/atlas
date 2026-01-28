@@ -1,10 +1,13 @@
 #include "zvulkanpagedimageblockuploader.h"
 
+#include "z3drenderervulkanbackend.h"
 #include "z3dimg.h"
 #include "zbenchtimer.h"
 #include "zcancellation.h"
+#include "zexception.h"
 #include "zlog.h"
 #include "zvulkandevice.h"
+#include "zvulkanresidencymanager.h"
 #include "zvulkantexture.h"
 
 #include <folly/MPMCQueue.h>
@@ -12,7 +15,9 @@
 #include <folly/executors/GlobalExecutor.h>
 #include <folly/executors/ThreadPoolExecutor.h>
 
+#include <algorithm>
 #include <chrono>
+#include <limits>
 
 DECLARE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds);
 DECLARE_uint32(atlas_3d_paging_queue_poll_interval_ms);
@@ -40,25 +45,6 @@ vk::SamplerCreateInfo makeNearestSampler()
   return sampler;
 }
 
-vk::SamplerCreateInfo makeLinearSampler()
-{
-  vk::SamplerCreateInfo sampler{};
-  sampler.magFilter = vk::Filter::eLinear;
-  sampler.minFilter = vk::Filter::eLinear;
-  sampler.mipmapMode = vk::SamplerMipmapMode::eLinear;
-  sampler.addressModeU = vk::SamplerAddressMode::eClampToBorder;
-  sampler.addressModeV = vk::SamplerAddressMode::eClampToBorder;
-  sampler.addressModeW = vk::SamplerAddressMode::eClampToBorder;
-  sampler.unnormalizedCoordinates = false;
-  sampler.borderColor = vk::BorderColor::eFloatTransparentBlack;
-  sampler.compareEnable = false;
-  sampler.anisotropyEnable = false;
-  sampler.maxAnisotropy = 1.0f;
-  sampler.minLod = 0.0f;
-  sampler.maxLod = 0.0f;
-  return sampler;
-}
-
 std::unique_ptr<ZVulkanTexture> createUint3DTexture(ZVulkanDevice& device, glm::uvec3 size)
 {
   if (size.x == 0u || size.y == 0u || size.z == 0u) {
@@ -77,27 +63,6 @@ std::unique_ptr<ZVulkanTexture> createUint3DTexture(ZVulkanDevice& device, glm::
                                        vk::ImageLayout::eShaderReadOnlyOptimal);
   info.createDefaultSampler = false;
   info.samplerInfo = makeNearestSampler();
-  return std::make_unique<ZVulkanTexture>(device, info);
-}
-
-std::unique_ptr<ZVulkanTexture> createImageCacheTexture(ZVulkanDevice& device, glm::uvec3 size)
-{
-  if (size.x == 0u || size.y == 0u || size.z == 0u) {
-    return nullptr;
-  }
-
-  auto info =
-    ZVulkanTexture::CreateInfo::make3D(size.x,
-                                       size.y,
-                                       size.z,
-                                       vk::Format::eR8Unorm,
-                                       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                       vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                       1u,
-                                       false,
-                                       vk::ImageLayout::eShaderReadOnlyOptimal);
-  info.createDefaultSampler = false;
-  info.samplerInfo = makeLinearSampler();
   return std::make_unique<ZVulkanTexture>(device, info);
 }
 
@@ -136,16 +101,14 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
     return 0;
   }
 
+  // Ensure the paging resources (page directory/table) exist for this image.
+  // The image-cache residency itself is handled by the device-owned residency manager.
   ensureImageResources(image);
 
-  ZVulkanTexture* imageCacheTexture = nullptr;
-  {
-    std::scoped_lock lock(m_mutex);
-    const auto* resources = findImageResourcesLocked(image);
-    CHECK(resources != nullptr);
-    CHECK_LT(channel, resources->channels.size());
-    imageCacheTexture = resources->channels[channel].imageCache.get();
-  }
+  CHECK(channel <= static_cast<size_t>(std::numeric_limits<uint32_t>::max())) << "Channel index too large";
+  const auto cacheSize = image.imageCacheSize();
+  ZVulkanTexture* imageCacheTexture =
+    m_device.residencyManager().pagedImageCacheTexture(&image, static_cast<uint32_t>(channel), cacheSize);
 
   CHECK(imageCacheTexture) << "Vulkan image cache texture missing for channel " << channel;
 
@@ -168,6 +131,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   int remainingBlocks = static_cast<int>(pendingTasks.size());
   std::tuple<size_t, std::shared_ptr<ZImg>> elem;
   auto lastLog = std::chrono::steady_clock::now();
+  bool markedDirty = false;
 
   while (remainingBlocks > 0) {
     processEventsAndMaybeCancel(cancellationToken);
@@ -192,6 +156,10 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
         uploadRegion.extent = vk::Extent3D{extent.x, extent.y, extent.z};
         uploadRegion.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
+        if (!markedDirty) {
+          m_device.residencyManager().notifyPagedImageCacheWritten(&image, static_cast<uint32_t>(channel));
+          markedDirty = true;
+        }
         imageCacheTexture->uploadSubImage(std::get<1>(elem)->channelData(0), bytesPerBlock, uploadRegion);
       }
 
@@ -238,45 +206,57 @@ void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t chan
 
   auto pageDirectorySpan = image.pageDirectoryView(channel);
   if (pageDirectory && !pageDirectorySpan.empty()) {
-    pageDirectory->uploadData(pageDirectorySpan.data(), pageDirectorySpan.size_bytes());
+    pageDirectory->uploadData(pageDirectorySpan.data(),
+                              pageDirectorySpan.size_bytes(),
+                              vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
   auto pageTableSpan = image.pageTableCacheView(channel);
   if (pageTableCache && !pageTableSpan.empty()) {
-    pageTableCache->uploadData(pageTableSpan.data(), pageTableSpan.size_bytes());
+    pageTableCache->uploadData(pageTableSpan.data(),
+                               pageTableSpan.size_bytes(),
+                               vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
   timer.recordEvent("upload page table");
 }
 
-ZVulkanTexture* ZVulkanPagedImageBlockUploader::pageDirectoryTexture(const Z3DImg& image, size_t channel) const
+ZVulkanTexture* ZVulkanPagedImageBlockUploader::pageDirectoryTexture(Z3DImg& image, size_t channel)
 {
   std::scoped_lock lock(m_mutex);
-  const auto* resources = findImageResourcesLocked(image);
-  if (!resources || channel >= resources->channels.size()) {
-    return nullptr;
-  }
-  return resources->channels[channel].pageDirectory.get();
+  auto& resources = ensureImageResourcesLocked(image);
+  CHECK_LT(channel, resources.channels.size());
+  ensureChannelResourcesLocked(image, channel, resources.channels[channel]);
+  return resources.channels[channel].pageDirectory.get();
 }
 
-ZVulkanTexture* ZVulkanPagedImageBlockUploader::pageTableTexture(const Z3DImg& image, size_t channel) const
+ZVulkanTexture* ZVulkanPagedImageBlockUploader::pageTableTexture(Z3DImg& image, size_t channel)
 {
   std::scoped_lock lock(m_mutex);
-  const auto* resources = findImageResourcesLocked(image);
-  if (!resources || channel >= resources->channels.size()) {
-    return nullptr;
-  }
-  return resources->channels[channel].pageTableCache.get();
+  auto& resources = ensureImageResourcesLocked(image);
+  CHECK_LT(channel, resources.channels.size());
+  ensureChannelResourcesLocked(image, channel, resources.channels[channel]);
+  return resources.channels[channel].pageTableCache.get();
 }
 
-ZVulkanTexture* ZVulkanPagedImageBlockUploader::imageCacheTexture(const Z3DImg& image, size_t channel) const
+ZVulkanTexture* ZVulkanPagedImageBlockUploader::imageCacheTexture(Z3DImg& image, size_t channel)
 {
-  std::scoped_lock lock(m_mutex);
-  const auto* resources = findImageResourcesLocked(image);
-  if (!resources || channel >= resources->channels.size()) {
-    return nullptr;
+  // Ensure per-image resources exist (page directory/table) and register owner cleanup.
+  {
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    ensureChannelResourcesLocked(image, channel, resources.channels[channel]);
   }
-  return resources->channels[channel].imageCache.get();
+
+  CHECK(channel <= static_cast<size_t>(std::numeric_limits<uint32_t>::max())) << "Channel index too large";
+  const glm::uvec3 cacheSize = image.imageCacheSize();
+  ZVulkanTexture* tex =
+    m_device.residencyManager().pagedImageCacheTexture(&image, static_cast<uint32_t>(channel), cacheSize);
+  if (auto* backend = Z3DRendererVulkanBackend::current()) {
+    backend->pinTextureForActiveSubmission(tex);
+  }
+  return tex;
 }
 
 void ZVulkanPagedImageBlockUploader::ensureChannelResourcesLocked(Z3DImg& image,
@@ -295,12 +275,6 @@ void ZVulkanPagedImageBlockUploader::ensureChannelResourcesLocked(Z3DImg& image,
     resources.pageTableCache = createUint3DTexture(m_device, ptSize);
     resources.pageTableCacheSize = ptSize;
   }
-
-  const glm::uvec3 cacheSize = image.imageCacheSize();
-  if (resources.imageCacheSize != cacheSize) {
-    resources.imageCache = createImageCacheTexture(m_device, cacheSize);
-    resources.imageCacheSize = cacheSize;
-  }
 }
 
 ZVulkanPagedImageBlockUploader::ImageResources&
@@ -317,10 +291,14 @@ ZVulkanPagedImageBlockUploader::ensureImageResourcesLocked(Z3DImg& image)
   if (!it->second.destructionRegistered) {
     std::weak_ptr<bool> alive = m_aliveFlag;
     ZVulkanPagedImageBlockUploader* self = this;
-    image.addDestructionCallback([alive, self, key = &image]() {
+    ZVulkanDevice* dev = &m_device;
+    image.addDestructionCallback([alive, self, dev, key = &image]() {
       auto alivePtr = alive.lock();
       if (!alivePtr || !*alivePtr) {
         return;
+      }
+      if (dev) {
+        dev->residencyManager().releaseOwner(key);
       }
       std::scoped_lock guard(self->m_mutex);
       self->m_resources.erase(key);

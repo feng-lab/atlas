@@ -283,6 +283,28 @@ Vulkan Notes
 - Per-eye `Z3DScratchResourcePool` leases stay with each filter. Vulkan dynamic rendering targets are expressed via `RendererFrameState::ActiveSurface` and set with `setActiveSurfaceWithLoadStore(...)` at the call site.
 - Keep renderer parameters persistent at the filter; renderer objects hold transient GPU resources only.
 - Naming convention: cross‑backend code uses `Z3D*`; Vulkan-only uses `ZVulkan*`.
+- Attachment end-of-pass usage must be explicit for Vulkan:
+  - `AttachmentDesc::finalUse` is the backend-neutral signal describing how a produced attachment will be used after the pass (`RenderTarget`, `Sampled`, `TransferSrc`, `General`). `Unspecified` is a hard `CHECK` in Vulkan to avoid implicit layout assumptions.
+  - The Vulkan backend derives `ZVulkanRenderingSegmentSpec` final layouts directly from `finalUse` to avoid label/shader-hook heuristics, which were a common source of state leakage (wrong params / flicker).
+- Cross-pass image usage must be explicit for Vulkan:
+  - `BackendPassDesc::externalImageUses` lists images a pass will access that are not bound as render-target attachments (sampled inputs for fullscreen compositing, storage/transfer ops, etc.).
+  - Each use declares an `ExternalImageUseKind` (SampledRead, Storage*, Transfer*, General) and an `ExternalImageAspectHint` (Color/Depth/Stencil). Vulkan does not infer depth/stencil sampling layouts from formats; `Unspecified` is a hard `CHECK`.
+  - The Vulkan backend transitions these images to the required layouts before recording the batch; renderers/compositor populate this metadata (including shader-hook driven inputs like DDP peel pings).
+  - Invariant: external uses must not reference an image that is also bound as an active attachment in the same pass (no read-while-write feedback loop); this is enforced with a hard `CHECK`.
+- Cross-pass buffer usage must be explicit for Vulkan:
+  - `BackendPassDesc::externalBufferUses` lists buffers a pass will access that are not otherwise managed as part of the backend’s pass recording (scratch buffers shared across multiple passes, transfer staging, etc.).
+  - The Vulkan backend inserts `vkCmdPipelineBarrier2` buffer barriers based on `ExternalBufferUseKind` (UniformRead, Storage*, Transfer*, General).
+  - `ExternalBufferUseKind::Unspecified` is a hard `CHECK` to avoid implicit dependencies.
+  - `CHECK`s enforce that declared buffer use kinds match the underlying Vulkan buffer usage flags (e.g., Storage* requires `VK_BUFFER_USAGE_STORAGE_BUFFER_BIT`).
+- Texture upload final layouts must be explicit for Vulkan:
+  - `ZVulkanTexture::UploadRegion::finalLayout` defaults to `vk::ImageLayout::eUndefined` and is a hard `CHECK` in `uploadSubImage` / `uploadData`.
+  - Call sites must pass the intended post-upload layout (typically `eShaderReadOnlyOptimal` for sampled color images; `eDepthReadOnlyOptimal` when preparing depth for sampling) instead of relying on implicit defaults.
+- Enforcement (fail-fast correctness):
+  - When writing transient per-draw override descriptor sets during command recording, Vulkan `CHECK`s that any bound textures/storage images are already in the layout declared by the descriptor (or the explicit override layout). Missing usage metadata now trips deterministically instead of producing flicker/incorrect rendering due to undefined layout usage.
+- Vulkan paging cache residency (Z3DImg):
+  - `ZVulkanPagedImageBlockUploader` supports swapping large paged image caches (R8 `imageCache` textures) to host memory under device-local memory pressure; page directory / page table caches remain device-resident (small).
+  - Best-effort budget comes from `VK_EXT_memory_budget` (queried via VMA) when available; otherwise eviction is driven by allocation failures.
+  - Budget controls (gflags): `--atlas_vk_paged_image_cache_budget_bytes` (0=use device budget), `--atlas_vk_paged_image_cache_budget_ratio`, `--atlas_vk_paged_image_cache_budget_reserve_bytes`.
 
 Vulkan Pipeline Invariants
 

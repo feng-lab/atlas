@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 #include <cstddef>
+#include <cstdint>
 
 class QString;
 
@@ -97,7 +98,8 @@ public:
     uint32_t layerCount = 0u; // 0 => fill remaining array layers
     uint32_t bufferRowLength = 0u;
     uint32_t bufferImageHeight = 0u;
-    vk::ImageLayout finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    // Must be specified by callers; Vulkan does not infer post-upload layouts.
+    vk::ImageLayout finalLayout = vk::ImageLayout::eUndefined;
   };
 
   ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createInfo);
@@ -110,7 +112,6 @@ public:
                  vk::MemoryPropertyFlags memoryProperties);
   ~ZVulkanTexture();
 
-  void uploadData(const void* data, size_t size);
   void uploadData(const void* data, size_t size, vk::ImageLayout finalLayout);
   void uploadSubImage(const void* data, size_t size, const UploadRegion& region);
   void downloadData(void* data, size_t size);
@@ -128,6 +129,38 @@ public:
                         vk::ImageLayout newLayout,
                         vk::ImageAspectFlags aspectMask = {});
   void overrideCurrentLayout(vk::ImageLayout layout);
+
+  // ---------------------------------------------------------------------------
+  // Residency / allocation helpers
+  // ---------------------------------------------------------------------------
+  // Some subsystems (e.g., large paging caches) may temporarily evict device-local
+  // images under memory pressure and later recreate them. These helpers allow
+  // doing so while keeping the ZVulkanTexture object identity stable.
+  [[nodiscard]] bool resident() const
+  {
+    return m_image != vk::Image{};
+  }
+
+  // Monotonically increasing counter that changes every time the underlying
+  // VkImage is (re)created. Consumers that cache descriptor sets can use this
+  // to detect when an image view handle is no longer valid.
+  [[nodiscard]] uint64_t imageGeneration() const
+  {
+    return m_imageGeneration;
+  }
+
+  // Best-effort: returns the VMA allocation size when resident, otherwise 0.
+  [[nodiscard]] uint64_t allocationSizeBytes() const;
+
+  // Release the underlying VkImage + view, freeing device memory via VMA.
+  // After this call, the texture is non-resident and cannot be used for
+  // descriptors or layout transitions until recreateDeviceResources().
+  void releaseDeviceResources();
+
+  // Recreate the underlying VkImage + view using the original CreateInfo.
+  // This increments imageGeneration(). Callers are responsible for reinitializing
+  // image contents (upload/clear) as needed.
+  void recreateDeviceResources();
 
   vk::DescriptorImageInfo descriptorInfo() const;
   vk::DescriptorImageInfo descriptorInfo(vk::ImageLayout layoutOverride, vk::ImageAspectFlags aspectOverride) const;
@@ -240,6 +273,7 @@ private:
   mutable std::vector<std::optional<vk::raii::ImageView>> m_layerStencilViews;
   mutable std::unordered_map<uint32_t, vk::raii::ImageView> m_genericAspectViews;
   vk::ImageLayout m_currentLayout = vk::ImageLayout::eUndefined;
+  uint64_t m_imageGeneration = 0;
 };
 
 } // namespace nim

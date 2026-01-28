@@ -15,10 +15,17 @@ class ZVulkanPipeline;
 class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
 class ZVulkanFrameExecutor;
+class ZVulkanResidencyManager;
 
 class ZVulkanDevice
 {
 public:
+  struct DeviceLocalBudget
+  {
+    uint64_t budgetBytes = 0;
+    uint64_t usageBytes = 0;
+  };
+
   explicit ZVulkanDevice(ZVulkanContext& context);
   ~ZVulkanDevice();
 
@@ -58,6 +65,14 @@ public:
     return m_supportsVertexInputDynamicState;
   }
 
+  // Query the best-effort device-local heap budget/usage (via VMA).
+  // This is intended for cache residency decisions (e.g., paging caches).
+  [[nodiscard]] DeviceLocalBudget deviceLocalBudget() const;
+
+  // Vulkan-only GPU residency manager (host-backed eviction for large caches).
+  ZVulkanResidencyManager& residencyManager();
+  const ZVulkanResidencyManager& residencyManager() const;
+
   // VMA allocator handle
   VmaAllocator allocator() const
   {
@@ -87,6 +102,7 @@ public:
 private:
   ZVulkanContext& m_context;
   std::unique_ptr<ZVulkanFrameExecutor> m_frameExecutor;
+  std::unique_ptr<ZVulkanResidencyManager> m_residencyManager;
   bool m_supportsVertexInputDynamicState = false; // guarded for MoltenVK
   VmaAllocator m_allocator = nullptr;
   VmaPool m_uploadTransientPool = nullptr;

@@ -80,6 +80,33 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
     }
   }
 
+  // Populate explicit cross-pass image usage metadata for Vulkan so the backend
+  // can transition sampled inputs without payload/label heuristics.
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    auto addExternalUseIfMissing =
+      [&](const AttachmentHandle& handle, ExternalImageUseKind kind, ExternalImageAspectHint aspectHint) {
+        if (!handle.valid()) {
+          return;
+        }
+        CHECK(handle.backend == RenderBackend::Vulkan) << "Non-Vulkan external image handle used on Vulkan backend";
+        for (const auto& existing : batch.pass.externalImageUses) {
+          if (existing.handle.id == handle.id && existing.kind == kind && existing.aspectHint == aspectHint) {
+            return;
+          }
+        }
+        batch.pass.externalImageUses.push_back({handle, kind, aspectHint});
+      };
+
+    if (m_shaderHookType == ShaderHookType::DualDepthPeelingPeel) {
+      addExternalUseIfMissing(m_shaderHookPara.dualDepthPeelingDepthBlenderHandle,
+                              ExternalImageUseKind::SampledRead,
+                              ExternalImageAspectHint::Color);
+      addExternalUseIfMissing(m_shaderHookPara.dualDepthPeelingFrontBlenderHandle,
+                              ExternalImageUseKind::SampledRead,
+                              ExternalImageAspectHint::Color);
+    }
+  }
+
   // Final invariant: for Vulkan backend, a batch must target a valid surface.
   if (m_activeBackend == RenderBackend::Vulkan) {
     const bool noColors = batch.pass.colorAttachments.empty();

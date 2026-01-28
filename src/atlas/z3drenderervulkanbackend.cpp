@@ -7,6 +7,7 @@
 #include "z3dshaderprogram.h"
 #include "zlog.h"
 #include "zvulkandevice.h"
+#include "zvulkanresidencymanager.h"
 #include "zvulkancontext.h"
 #include "zvulkantexture.h"
 #include "z3dscratchresourcepool.h"
@@ -28,6 +29,7 @@
 #include "z3dimgraycasterrenderer.h"
 #include "zvulkanfontpipelinecontext.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanresourcemetadata.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanuniforms.h"
 #include "z3drenderglobalstate.h"
@@ -38,6 +40,7 @@
 
 #include <algorithm>
 #include <array>
+#include <unordered_map>
 #include <chrono>
 #include <limits>
 #include <optional>
@@ -189,7 +192,7 @@ void Z3DRendererVulkanBackend::endPassScope()
                    : 0;
   }
   VLOG(1) << fmt::format(
-    "pass_end pass='{}' cpu={:.3f} ms draws={} segs={} clr={} ld={} dsets={} ovsets={} pipes_bound_delta={} dwr={} rew={} uploads_delta={}B static_delta={}B rb_delta={}B rbinflight_delta={} transitions={} noop={}",
+    "pass_end pass='{}' cpu={:.3f} ms draws={} segs={} clr={} ld={} dsets={} ovsets={} pipes_bound_delta={} dwr={} rew={} uploads_delta={}B static_delta={}B rb_delta={}B rbinflight_delta={} transitions={} noop={} buf_barriers={} buf_noop={}",
     m_passScope.label,
     ms,
     m_passScope.draws,
@@ -206,7 +209,9 @@ void Z3DRendererVulkanBackend::endPassScope()
     rb,
     rbinflight,
     m_passScope.layoutTransitions,
-    m_passScope.layoutNoops);
+    m_passScope.layoutNoops,
+    m_passScope.bufferBarriers,
+    m_passScope.bufferBarrierNoops);
   m_passScope = {};
 }
 
@@ -226,6 +231,18 @@ void Z3DRendererVulkanBackend::notifyLayoutTransition(bool wasNoop)
     m_passScope.layoutNoops++;
   } else {
     m_passScope.layoutTransitions++;
+  }
+}
+
+void Z3DRendererVulkanBackend::notifyBufferBarrier(bool wasNoop)
+{
+  if (!m_passScope.active) {
+    return;
+  }
+  if (wasNoop) {
+    m_passScope.bufferBarrierNoops++;
+  } else {
+    m_passScope.bufferBarriers++;
   }
 }
 
@@ -457,6 +474,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.attachmentLoads = 0;
   frameResources.pipelinesCreated = 0;
   frameResources.pipelinesBound.clear();
+  frameResources.residencyPinnedTextures.clear();
   frameResources.transientOverrideSets.clear();
   frameResources.overrideSetsAllocated = 0;
   frameResources.activeSegmentFormats.reset();
@@ -643,12 +661,39 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
       frame.pendingColorReadbacks.size());
   }
 
+  // Move submission-scoped residency pins out of the frame record so we can
+  // unpin deterministically after submission, even if the frame record is reused.
+  auto residencyPins = std::move(frame.residencyPinnedTextures);
+  frame.residencyPinnedTextures.clear();
+
+  bool submitted = false;
   try {
     queue.submit(submitInfo, *frameHandle.fence());
     device().frameExecutor().markSubmitted(frameHandle);
+    submitted = true;
   }
   catch (const std::exception& e) {
     LOG(ERROR) << "Vulkan queue submit failed: " << e.what();
+  }
+
+  // Release residency pins after the GPU has finished executing this submission.
+  // If submission failed, unpin immediately to avoid leaking pins indefinitely.
+  if (!residencyPins.empty()) {
+    if (submitted) {
+      ZVulkanDevice* submitDevice = m_sharedDevice;
+      scheduleAfterActiveSubmissionFence([submitDevice, pins = std::move(residencyPins)]() mutable {
+        if (!submitDevice) {
+          return;
+        }
+        for (auto* tex : pins) {
+          submitDevice->residencyManager().unpinIfManaged(tex);
+        }
+      });
+    } else {
+      for (auto* tex : residencyPins) {
+        device().residencyManager().unpinIfManaged(tex);
+      }
+    }
   }
 
   // Stage 2: schedule exactly one descriptor arena reset for this frame.
@@ -860,9 +905,26 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       info.view = texture.imageView();
       info.format = texture.format();
       info.initialLayout = texture.layout();
-      // Default to color-attachment final layout, but allow shader-hook/geometry-driven overrides
-      // to optimize subsequent sampling passes.
-      info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+      // Choose explicit final layout based on backend-neutral attachment usage metadata.
+      // This avoids relying on shader-hook / label heuristics that are prone to state leakage.
+      switch (attachment.finalUse) {
+        case AttachmentFinalUse::Unspecified:
+          CHECK(false) << "AttachmentDesc::finalUse must be specified for Vulkan passes (explicit metadata required)";
+          info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+          break;
+        case AttachmentFinalUse::RenderTarget:
+          info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+          break;
+        case AttachmentFinalUse::Sampled:
+          info.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+          break;
+        case AttachmentFinalUse::TransferSrc:
+          info.finalLayout = vk::ImageLayout::eTransferSrcOptimal;
+          break;
+        case AttachmentFinalUse::General:
+          info.finalLayout = vk::ImageLayout::eGeneral;
+          break;
+      }
       info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
       info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
       info.aspect = vk::ImageAspectFlagBits::eColor;
@@ -873,28 +935,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
                                                              attachment.clearValue.color.b,
                                                              attachment.clearValue.color.a});
       info.clearValue = clear;
-      // Optimizations to reduce read-after-write transitions between segments:
-      const auto hook = renderer.shaderHookType();
-      if (hook == Z3DRendererBase::ShaderHookType::WeightedAverageInit ||
-          hook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
-          hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
-          hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-        info.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-      }
-      // DDP blend (texture stage) renders to the back-blend accumulation, which is sampled in the final pass.
-      if (const auto* ddp = std::get_if<TextureDualPeelPayload>(&batch.geometry)) {
-        if (ddp->stage == TextureDualPeelPayload::Stage::Blend) {
-          info.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-        }
-      }
-      // Image filter subpasses should leave outputs readable for downstream compositors.
-      // Explicitly detect the labels emitted by Z3DImgFilter.
-      {
-        std::string_view lbl = renderer.currentPassLabel();
-        if (lbl == std::string_view("raycaster") || lbl == std::string_view("bbox_overlay")) {
-          info.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-        }
-      }
       outSpec.colorAttachments.push_back(info);
     }
 
@@ -907,7 +947,24 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       info.view = texture.imageView();
       info.format = texture.format();
       info.initialLayout = texture.layout();
-      info.finalLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+      switch (attachment.finalUse) {
+        case AttachmentFinalUse::Unspecified:
+          CHECK(false) << "AttachmentDesc::finalUse must be specified for Vulkan passes (explicit metadata required)";
+          info.finalLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+          break;
+        case AttachmentFinalUse::RenderTarget:
+          info.finalLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+          break;
+        case AttachmentFinalUse::Sampled:
+          info.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
+          break;
+        case AttachmentFinalUse::TransferSrc:
+          info.finalLayout = vk::ImageLayout::eTransferSrcOptimal;
+          break;
+        case AttachmentFinalUse::General:
+          info.finalLayout = vk::ImageLayout::eGeneral;
+          break;
+      }
       info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
       info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
       // Treat all depth(-stencil) formats as depth aspect for rendering; recorder will bind stencil if needed
@@ -916,13 +973,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       vk::ClearValue clear{};
       clear.depthStencil = vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
       info.clearValue = clear;
-      // Match color override for image filter passes: make depth sampled-readable too.
-      {
-        std::string_view lbl = renderer.currentPassLabel();
-        if (lbl == std::string_view("raycaster") || lbl == std::string_view("bbox_overlay")) {
-          info.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
-        }
-      }
       outSpec.depthStencilAttachment = info;
     }
 
@@ -1025,6 +1075,14 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
   bool segmentOpen = false;
   std::optional<ZVulkanPipelineCommandRecorder::RenderingSegmentSpec> openSpec{};
   ZVulkanPipelineCommandRecorder recorder(cmd);
+
+  struct BufferUseState
+  {
+    vk::PipelineStageFlags2 stage{};
+    vk::AccessFlags2 access{};
+  };
+  std::unordered_map<uint64_t, BufferUseState> bufferUseStates;
+
   for (const auto& batch : state.batches) {
     const auto geom = describeGeometry(batch.geometry);
     VLOG(1) << fmt::format("VK batch[{}]: geom={}, colors={}, depth={} viewport=({},{} {}x{})",
@@ -1040,126 +1098,126 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     // Note: do not forcibly close segments before texture_copy; rely on
     // producers to end in sampled layouts to avoid in-segment transitions.
 
-    // Ensure any sampled inputs referenced by this batch are transitioned to shader-read
-
-    auto classifyReadLayout = [&](vk::Format format) {
-      struct
-      {
-        vk::ImageLayout layout;
-        vk::ImageAspectFlags aspect;
-      } result;
-      switch (format) {
-        case vk::Format::eD16Unorm:
-        case vk::Format::eX8D24UnormPack32:
-        case vk::Format::eD32Sfloat:
-        case vk::Format::eD16UnormS8Uint:
-        case vk::Format::eD24UnormS8Uint:
-        case vk::Format::eD32SfloatS8Uint:
-          // Treat all depth(-stencil) formats as depth-only for sampling
-          result.layout = vk::ImageLayout::eDepthReadOnlyOptimal;
-          result.aspect = vk::ImageAspectFlagBits::eDepth;
-          break;
-        case vk::Format::eS8Uint:
-          result.layout = vk::ImageLayout::eStencilReadOnlyOptimal;
-          result.aspect = vk::ImageAspectFlagBits::eStencil;
-          break;
-        default:
-          result.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-          result.aspect = {};
-      }
-      return result;
-    };
-    auto ensureSampledReadable = [&](const AttachmentHandle& handle) {
+    // Ensure any external image uses referenced by this batch are transitioned
+    // to the required layouts. This is driven by explicit pass metadata
+    // (BackendPassDesc::externalImageUses), not by payload/label heuristics.
+    auto isPassAttachment = [&](const AttachmentHandle& handle) {
       if (!handle.valid()) {
+        return false;
+      }
+      for (const auto& att : batch.pass.colorAttachments) {
+        if (att.handle.id == handle.id) {
+          return true;
+        }
+      }
+      if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.id == handle.id) {
+        return true;
+      }
+      if (batch.pass.resolveAttachment && batch.pass.resolveAttachment->handle.id == handle.id) {
+        return true;
+      }
+      return false;
+    };
+
+    auto ensureExternalImageUse = [&](const ExternalImageUseDesc& use) {
+      if (!use.handle.valid()) {
         return;
       }
-      auto& texture = vulkan::textureFromHandle(handle, device(), "renderer sampled attachment");
-      const auto samplingState = classifyReadLayout(texture.format());
-      vk::ImageAspectFlags transitionAspect = samplingState.aspect;
-      const bool needsTransition = (texture.layout() != samplingState.layout);
-      // Only log when a transition is actually required to reduce noise.
+      // Invariant: do not sample/copy from images that are also bound as attachments
+      // in the same pass; this would create a read-while-write feedback loop.
+      CHECK(!isPassAttachment(use.handle)) << "External image use references an active attachment (read-while-write)";
+
+      auto& texture = vulkan::textureFromHandle(use.handle, device(), "renderer external image use");
+
+      vk::ImageLayout desiredLayout = vk::ImageLayout::eGeneral;
+      vk::ImageAspectFlags transitionAspect{};
+      bool updateDescriptorLayout = false;
+
+      const auto useInfo = vulkan::resolveExternalImageUse(use.kind, use.aspectHint);
+      desiredLayout = useInfo.layout;
+      transitionAspect = useInfo.transitionAspect;
+      updateDescriptorLayout = useInfo.updateDescriptorLayout;
+
+      const bool needsTransition = (texture.layout() != desiredLayout);
       if (needsTransition && VLOG_IS_ON(2)) {
         std::string passLabel = std::string(renderer.currentPassLabel());
         if (passLabel.empty()) {
           passLabel = "<unlabeled-pass>";
         }
-        VLOG(2) << fmt::format("ensureSampledReadable('{}'): handle=0x{:x} {} -> {} fmt={}",
+        VLOG(2) << fmt::format("ensureExternalImageUse('{}'): handle=0x{:x} kind={} {} -> {} fmt={}",
                                passLabel,
-                               handle.id,
+                               use.handle.id,
+                               static_cast<int>(use.kind),
                                enumOrUnderlying(texture.layout(), 16),
-                               enumOrUnderlying(samplingState.layout, 16),
+                               enumOrUnderlying(desiredLayout, 16),
                                enumOrUnderlying(texture.format(), 16));
       }
-      // Skip transition if already in the desired sampled layout; still update descriptor layout for depth aspects.
+
       if (auto* be = Z3DRendererVulkanBackend::current()) {
         be->notifyLayoutTransition(!needsTransition);
       }
+
       if (needsTransition) {
-        texture.transitionLayout(cmd, texture.layout(), samplingState.layout, transitionAspect);
+        texture.transitionLayout(cmd, texture.layout(), desiredLayout, transitionAspect);
       }
-      texture.setDescriptorLayout(samplingState.layout);
+      if (updateDescriptorLayout) {
+        texture.setDescriptorLayout(desiredLayout);
+      }
     };
 
-    // Intentionally do not close active segments here. We want transitions to surface during
-    // development if producers are not ending in the correct sampled layout.
-    if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
-      const bool hasDepth = batch.pass.depthAttachment.has_value() && batch.pass.depthAttachment->handle.valid();
-      VLOG(1) << fmt::format("WA resolve depthAttachment present={} handle=0x{:x}",
-                             hasDepth,
-                             hasDepth ? batch.pass.depthAttachment->handle.id : 0ull);
-      CHECK(hasDepth) << "WA resolve batch missing depth attachment (required to write gl_FragDepth).";
-      ensureSampledReadable(weightedAverage->accumulationAttachment);
-      ensureSampledReadable(weightedAverage->momentsAttachment);
-    } else if (const auto* dualPeel = std::get_if<TextureDualPeelPayload>(&batch.geometry)) {
-      if (dualPeel->stage == TextureDualPeelPayload::Stage::Blend) {
-        ensureSampledReadable(dualPeel->tempAttachment);
-      } else {
-        const bool hasDepth = batch.pass.depthAttachment.has_value() && batch.pass.depthAttachment->handle.valid();
-        VLOG(1) << fmt::format("DDP final depthAttachment present={} handle=0x{:x}",
-                               hasDepth,
-                               hasDepth ? batch.pass.depthAttachment->handle.id : 0ull);
-        CHECK(hasDepth) << "DDP final batch missing depth attachment (required to write gl_FragDepth).";
-        ensureSampledReadable(dualPeel->depthAttachment);
-        ensureSampledReadable(dualPeel->frontAttachment);
-        ensureSampledReadable(dualPeel->backAttachment);
-      }
-    } else if (const auto* blend = std::get_if<TextureBlendPayload>(&batch.geometry)) {
-      // Alpha/depth composition requires both depth inputs to be present; a missing
-      // depth handle will cause incorrect z resolution (e.g., opaque dominates).
-      CHECK(blend->depthAttachmentHandle0.valid())
-        << "TextureBlendPayload missing depthAttachmentHandle0 (base depth).";
-      CHECK(blend->depthAttachmentHandle1.valid())
-        << "TextureBlendPayload missing depthAttachmentHandle1 (overlay depth).";
-
-      ensureSampledReadable(blend->colorAttachmentHandle0);
-      ensureSampledReadable(blend->depthAttachmentHandle0);
-      ensureSampledReadable(blend->colorAttachmentHandle1);
-      ensureSampledReadable(blend->depthAttachmentHandle1);
-    } else if (const auto* weightedBlended = std::get_if<TextureWeightedBlendedPayload>(&batch.geometry)) {
-      ensureSampledReadable(weightedBlended->accumulationAttachment);
-      ensureSampledReadable(weightedBlended->transmittanceAttachment);
-    } else if (const auto* textureCopy = std::get_if<TextureCopyPayload>(&batch.geometry)) {
-      ensureSampledReadable(textureCopy->colorAttachmentHandle);
-      ensureSampledReadable(textureCopy->depthAttachmentHandle);
-    } else if (const auto* textureGlow = std::get_if<TextureGlowPayload>(&batch.geometry)) {
-      ensureSampledReadable(textureGlow->colorAttachmentHandle);
-      ensureSampledReadable(textureGlow->depthAttachmentHandle);
+    for (const auto& use : batch.pass.externalImageUses) {
+      ensureExternalImageUse(use);
     }
 
-    // Dual-depth peeling peel stage: regardless of the specific geometry type
-    // (mesh, sphere, cone, ellipsoid), the fragment shader samples the prior
-    // ping's depth and front blender textures. Transition them to a sampled
-    // layout before any draw in this batch. Previously we only did this for
-    // MeshPayload, which left sphere/cone draws sampling attachments still in
-    // COLOR_ATTACHMENT_OPTIMAL, triggering validation errors at submit.
-    if (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-      const auto& hookPara = renderer.shaderHookPara();
-      if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-        ensureSampledReadable(hookPara.dualDepthPeelingDepthBlenderHandle);
+    // Ensure any external buffer uses referenced by this batch are synchronized
+    // for the required access masks. Like external images, this is driven by
+    // explicit metadata (BackendPassDesc::externalBufferUses).
+    auto ensureExternalBufferUse = [&](const ExternalBufferUseDesc& use) {
+      if (!use.handle.valid()) {
+        return;
       }
-      if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-        ensureSampledReadable(hookPara.dualDepthPeelingFrontBlenderHandle);
+
+      auto& buffer = vulkan::bufferFromHandle(use.handle, device(), "renderer external buffer use");
+
+      const auto useInfo = vulkan::resolveExternalBufferUse(use.kind, buffer.usage());
+      const vk::PipelineStageFlags2 desiredStage = useInfo.stage;
+      const vk::AccessFlags2 desiredAccess = useInfo.access;
+
+      const uint64_t key = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(buffer.buffer())));
+      const auto it = bufferUseStates.find(key);
+      const BufferUseState previous = (it == bufferUseStates.end()) ? BufferUseState{} : it->second;
+
+      auto hasWrite = [](vk::AccessFlags2 access) {
+        return static_cast<bool>(access & (vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eTransferWrite |
+                                           vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eHostWrite));
+      };
+
+      const bool needsBarrier = (previous.stage != desiredStage || previous.access != desiredAccess) &&
+                                (hasWrite(previous.access) || hasWrite(desiredAccess));
+
+      if (auto* be = Z3DRendererVulkanBackend::current()) {
+        be->notifyBufferBarrier(!needsBarrier);
       }
+
+      if (needsBarrier) {
+        vk::BufferMemoryBarrier2 barrier{.srcStageMask = previous.stage,
+                                         .srcAccessMask = previous.access,
+                                         .dstStageMask = desiredStage,
+                                         .dstAccessMask = desiredAccess,
+                                         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                                         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                                         .buffer = buffer.buffer(),
+                                         .offset = 0,
+                                         .size = VK_WHOLE_SIZE};
+        vk::DependencyInfo dep{.bufferMemoryBarrierCount = 1, .pBufferMemoryBarriers = &barrier};
+        cmd.pipelineBarrier2(dep);
+      }
+
+      bufferUseStates[key] = BufferUseState{desiredStage, desiredAccess};
+    };
+
+    for (const auto& use : batch.pass.externalBufferUses) {
+      ensureExternalBufferUse(use);
     }
 
     const auto vkViewport = vulkan::toVkViewport(batch.pass.viewport);
@@ -1561,6 +1619,7 @@ Z3DRendererVulkanBackend::describeSurfaceFromLease(const Z3DScratchResourcePool:
         desc.handle.backend = RenderBackend::Vulkan;
         desc.handle.id = reinterpret_cast<uint64_t>(texture);
         desc.handle.index = attachment.index;
+        desc.finalUse = AttachmentFinalUse::RenderTarget;
         surface.colorAttachments.push_back(desc);
       }
     } else if (attachment.kind == ScratchAttachmentKind::Depth) {
@@ -1569,6 +1628,7 @@ Z3DRendererVulkanBackend::describeSurfaceFromLease(const Z3DScratchResourcePool:
         desc.handle.backend = RenderBackend::Vulkan;
         desc.handle.id = reinterpret_cast<uint64_t>(texture);
         desc.handle.index = attachment.index;
+        desc.finalUse = AttachmentFinalUse::RenderTarget;
         surface.depthAttachment = desc;
       }
     }
@@ -1603,7 +1663,7 @@ void Z3DRendererVulkanBackend::ensureDefaultPlaceholders()
                                     vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
                                     vk::MemoryPropertyFlagBits::eDeviceLocal);
     uint32_t pixel = 0xffffffffu;
-    m_defaultPlaceholder2D->uploadData(&pixel, sizeof(pixel));
+    m_defaultPlaceholder2D->uploadData(&pixel, sizeof(pixel), vk::ImageLayout::eShaderReadOnlyOptimal);
   }
   ensureSharedSamplers();
 }
@@ -2437,6 +2497,25 @@ void Z3DRendererVulkanBackend::scheduleAfterActiveSubmissionFence(std::function<
   }
   VkFence raw = *m_activeFrameHandle->fence();
   m_postFenceCallbacks.emplace_back(raw, std::move(fn));
+}
+
+void Z3DRendererVulkanBackend::pinTextureForActiveSubmission(ZVulkanTexture* texture)
+{
+  if (!texture || !m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    return;
+  }
+  // Deduplicate per submission: we unpin once per unique texture, so only pin
+  // on the first insertion. This also avoids pin-count under/overflows.
+  const auto [_, inserted] = m_activeFrame->residencyPinnedTextures.insert(texture);
+  if (!inserted) {
+    return;
+  }
+
+  // Only managed textures participate in pinning. If this isn't managed, drop
+  // it from the set so we don't carry dead entries.
+  if (!device().residencyManager().pinIfManaged(texture)) {
+    m_activeFrame->residencyPinnedTextures.erase(texture);
+  }
 }
 
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()

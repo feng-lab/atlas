@@ -1732,6 +1732,10 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
           RenderBatch batch;
           batch.eye = eye;
+          batch.pass.externalImageUses.push_back(
+            {colorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+          batch.pass.externalImageUses.push_back(
+            {depthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
           // Let backend fill current active surface into batch if not set explicitly
           batch.draw.topology = PrimitiveTopology::TriangleStrip;
           batch.draw.vertexCount = 4;
@@ -2950,6 +2954,10 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
 
             RenderBatch batch;
             batch.eye = eye;
+            batch.pass.externalImageUses.push_back(
+              {colorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+            batch.pass.externalImageUses.push_back(
+              {depthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
             // Fill surface if not already set through active surface
             batch.draw.topology = PrimitiveTopology::TriangleStrip;
             batch.draw.vertexCount = 4;
@@ -3929,6 +3937,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       desc.handle = depthAttachmentHandle;
       desc.loadOp = loadOp;
       desc.storeOp = StoreOp::Store;
+      desc.finalUse = AttachmentFinalUse::RenderTarget;
       desc.clearValue.depth = 1.0f;
       surface.depthAttachment = desc;
     } else if (surface.depthAttachment) {
@@ -3987,6 +3996,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
     auto& attachment = initSurface.colorAttachments[i];
     attachment.storeOp = StoreOp::Store;
     attachment.loadOp = LoadOp::Clear;
+    attachment.finalUse = AttachmentFinalUse::Sampled;
     // Clear rule:
     //  - depth blender (0) uses depthClear (-1 in .x)
     //  - front blender (1) and back temp (2) cleared to zero
@@ -4072,6 +4082,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       for (size_t i = 0; i < peelSurface.colorAttachments.size(); ++i) {
         auto& attachment = peelSurface.colorAttachments[i];
         attachment.storeOp = StoreOp::Store;
+        attachment.finalUse = AttachmentFinalUse::Sampled;
         attachment.clearValue.color = zeroClear;
         attachment.loadOp = LoadOp::Load;
       }
@@ -4138,6 +4149,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       if (!blendSurface.colorAttachments.empty()) {
         blendSurface.colorAttachments[0].loadOp = LoadOp::Load;
         blendSurface.colorAttachments[0].storeOp = StoreOp::Store;
+        blendSurface.colorAttachments[0].finalUse = AttachmentFinalUse::Sampled;
         blendSurface.colorAttachments[0].clearValue.color = zeroClear;
       }
       m_rendererBase.setActiveSurfaceWithLoadStore(blendSurface, Z3DRendererBase::Preserve);
@@ -4162,6 +4174,8 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
           batch.pass.viewport.maxDepth = 1.0f;
           batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
           batch.pass.depthAttachment = std::nullopt;
+          batch.pass.externalImageUses.push_back(
+            {payload.tempAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
           batch.draw.topology = PrimitiveTopology::TriangleStrip;
           batch.draw.vertexCount = 4;
           batch.draw.indexCount = 0;
@@ -4231,6 +4245,12 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       batch.pass.viewport.maxDepth = 1.0f;
       batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
       batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+      batch.pass.externalImageUses.push_back(
+        {payload.frontAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+      batch.pass.externalImageUses.push_back(
+        {payload.backAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+      batch.pass.externalImageUses.push_back(
+        {payload.depthAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
       batch.draw.topology = PrimitiveTopology::TriangleStrip;
       batch.draw.vertexCount = 4;
       batch.draw.indexCount = 0;
@@ -4269,6 +4289,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
     for (auto& attachment : surface.colorAttachments) {
       attachment.loadOp = LoadOp::Clear;
       attachment.storeOp = StoreOp::Store;
+      attachment.finalUse = AttachmentFinalUse::Sampled;
       attachment.clearValue.color = glm::vec4(0.0f);
     }
     if (depthAttachmentHandle.valid()) {
@@ -4276,6 +4297,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
       depthDesc.handle = depthAttachmentHandle;
       depthDesc.loadOp = LoadOp::Load;
       depthDesc.storeOp = StoreOp::Store;
+      depthDesc.finalUse = AttachmentFinalUse::RenderTarget;
       depthDesc.clearValue.depth = 1.0f;
       surface.depthAttachment = depthDesc;
     } else {
@@ -4386,6 +4408,10 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
       batch.pass.viewport.maxDepth = 1.0f;
       batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
       batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+      batch.pass.externalImageUses.push_back(
+        {payload.accumulationAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+      batch.pass.externalImageUses.push_back(
+        {payload.momentsAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
       batch.draw.topology = PrimitiveTopology::TriangleStrip;
       batch.draw.vertexCount = 4;
       batch.draw.indexCount = 0;
@@ -4416,11 +4442,13 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
     if (surface.colorAttachments.size() > 0) {
       surface.colorAttachments[0].loadOp = LoadOp::Clear;
       surface.colorAttachments[0].storeOp = StoreOp::Store;
+      surface.colorAttachments[0].finalUse = AttachmentFinalUse::Sampled;
       surface.colorAttachments[0].clearValue.color = glm::vec4(0.0f);
     }
     if (surface.colorAttachments.size() > 1) {
       surface.colorAttachments[1].loadOp = LoadOp::Clear;
       surface.colorAttachments[1].storeOp = StoreOp::Store;
+      surface.colorAttachments[1].finalUse = AttachmentFinalUse::Sampled;
       surface.colorAttachments[1].clearValue.color = glm::vec4(1.0f);
     }
     if (depthAttachmentHandle.valid()) {
@@ -4428,6 +4456,7 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
       depthDesc.handle = depthAttachmentHandle;
       depthDesc.loadOp = LoadOp::Load;
       depthDesc.storeOp = StoreOp::Store;
+      depthDesc.finalUse = AttachmentFinalUse::RenderTarget;
       depthDesc.clearValue.depth = 1.0f;
       surface.depthAttachment = depthDesc;
     } else {
@@ -4533,6 +4562,10 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
       batch.pass.viewport.maxDepth = 1.0f;
       batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
       batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+      batch.pass.externalImageUses.push_back(
+        {payload.accumulationAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+      batch.pass.externalImageUses.push_back(
+        {payload.transmittanceAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
       batch.draw.topology = PrimitiveTopology::TriangleStrip;
       batch.draw.vertexCount = 4;
       batch.draw.indexCount = 0;

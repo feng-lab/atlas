@@ -2,6 +2,7 @@
 
 #include "zexception.h"
 #include "zvulkandevice.h"
+#include "zvulkanbuffer.h"
 #include "zvulkantexture.h"
 
 #include <algorithm>
@@ -75,6 +76,22 @@ textureFromHandle(const SampledImageHandle& handle, ZVulkanDevice& device, std::
     throw ZException(fmt::format("{} references a texture from a different Vulkan device", usageDescription));
   }
   return *texture;
+}
+
+ZVulkanBuffer& bufferFromHandle(const BufferHandle& handle, ZVulkanDevice& device, std::string_view usageDescription)
+{
+  if (!handle.valid() || handle.backend != RenderBackend::Vulkan) {
+    throw ZException(fmt::format("{} requires a Vulkan buffer handle", usageDescription));
+  }
+
+  auto* buffer = reinterpret_cast<ZVulkanBuffer*>(handle.id);
+  if (!buffer) {
+    throw ZException(fmt::format("{} provided a null Vulkan buffer handle", usageDescription));
+  }
+  if (&buffer->ownerDevice() != &device) {
+    throw ZException(fmt::format("{} references a buffer from a different Vulkan device", usageDescription));
+  }
+  return *buffer;
 }
 
 vk::Viewport toVkViewport(const ViewportDesc& viewport)

@@ -1341,6 +1341,13 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 
     // Record the main raycaster pass within the active frame.
     m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
+    // Outputs are sampled by downstream compositors as image layers; leave them in sampled-readable layouts.
+    for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+      att.finalUse = AttachmentFinalUse::Sampled;
+    }
+    if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+      m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+    }
     try {
       m_rendererBase.recordVulkanBatchesInActiveFrame(
         [&]() {
@@ -1567,6 +1574,13 @@ void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
     // Clear both color and depth for a clean overlay-only target
 
     m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
+    // Output will be sampled as a layer by the compositor; keep it sampled-readable.
+    for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+      att.finalUse = AttachmentFinalUse::Sampled;
+    }
+    if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+      m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+    }
 
     m_rendererBase.recordVulkanBatchesInActiveFrame(
       [&]() {

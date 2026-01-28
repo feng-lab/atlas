@@ -83,6 +83,15 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
     if (!m_isOverrideTransient) {
       CHECK(false) << "Descriptor write attempted during recording (texture implicit sampler) at binding " << binding;
     }
+    // Enforcement: override descriptor sets are updated during recording and
+    // are intended for immediate use. Require that the texture has already been
+    // transitioned to the layout declared in its descriptor state; missing
+    // resource-usage metadata should fail fast rather than produce undefined
+    // sampling results.
+    CHECK(texture.layout() == texture.descriptorLayout())
+      << "Texture bound while recording is not in its descriptor layout: binding=" << binding
+      << " fmt=" << enumOrUnderlying(texture.format(), 16) << " current=" << enumOrUnderlying(texture.layout(), 16)
+      << " descriptor=" << enumOrUnderlying(texture.descriptorLayout(), 16);
   }
   auto imageInfo = texture.descriptorInfo();
   if (imageInfo.sampler == vk::Sampler{}) {
@@ -113,6 +122,10 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
     if (!m_isOverrideTransient) {
       CHECK(false) << "Descriptor write attempted during recording (texture) at binding " << binding;
     }
+    CHECK(texture.layout() == texture.descriptorLayout())
+      << "Texture bound while recording is not in its descriptor layout: binding=" << binding
+      << " fmt=" << enumOrUnderlying(texture.format(), 16) << " current=" << enumOrUnderlying(texture.layout(), 16)
+      << " descriptor=" << enumOrUnderlying(texture.descriptorLayout(), 16);
   }
   if (VLOG_IS_ON(2)) {
     VLOG(2) << fmt::format(
@@ -154,6 +167,13 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding,
     if (!m_isOverrideTransient) {
       CHECK(false) << "Descriptor write attempted during recording (texture with override) at binding " << binding;
     }
+    const vk::ImageLayout effectiveLayout =
+      (layoutOverride == vk::ImageLayout::eUndefined) ? texture.descriptorLayout() : layoutOverride;
+    CHECK(texture.layout() == effectiveLayout)
+      << "Texture bound while recording is not in the requested layout override: binding=" << binding
+      << " fmt=" << enumOrUnderlying(texture.format(), 16) << " current=" << enumOrUnderlying(texture.layout(), 16)
+      << " requested=" << enumOrUnderlying(effectiveLayout, 16)
+      << " descriptor=" << enumOrUnderlying(texture.descriptorLayout(), 16);
   }
   if (layoutOverride == vk::ImageLayout::eDepthReadOnlyOptimal ||
       layoutOverride == vk::ImageLayout::eDepthAttachmentOptimal ||
@@ -279,6 +299,14 @@ void ZVulkanDescriptorSet::updateStorageImage(uint32_t binding,
     if (!m_isOverrideTransient) {
       CHECK(false) << "Descriptor write attempted during recording (storage image) at binding " << binding;
     }
+    const vk::ImageLayout effectiveLayout =
+      (layoutOverride == vk::ImageLayout::eUndefined) ? texture.descriptorLayout() : layoutOverride;
+    CHECK(effectiveLayout == vk::ImageLayout::eGeneral)
+      << "Storage image descriptor requires VK_IMAGE_LAYOUT_GENERAL: binding=" << binding
+      << " requested=" << enumOrUnderlying(effectiveLayout, 16);
+    CHECK(texture.layout() == effectiveLayout)
+      << "Storage image bound while recording is not in VK_IMAGE_LAYOUT_GENERAL: binding=" << binding
+      << " fmt=" << enumOrUnderlying(texture.format(), 16) << " current=" << enumOrUnderlying(texture.layout(), 16);
   }
   // Build image info for storage image (no sampler)
   auto info = texture.descriptorInfo(layoutOverride, aspectOverride);

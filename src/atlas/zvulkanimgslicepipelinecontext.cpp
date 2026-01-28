@@ -14,6 +14,7 @@
 #include "zvulkanbuffer.h"
 #include "zvulkanlututils.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanresourcemetadata.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanpagedimageblockuploader.h"
@@ -51,13 +52,6 @@ vk::Rect2D makeRect(const glm::uvec2& size)
     vk::Offset2D{0,                             0                            },
     vk::Extent2D{static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y)}
   };
-}
-
-// Depth-only layouts/aspects (stencil not used in this pipeline)
-static inline std::pair<vk::ImageLayout, vk::ImageAspectFlags>
-depthReadDescriptorLayoutAndAspect(const ZVulkanTexture& /*texture*/)
-{
-  return {vk::ImageLayout::eDepthReadOnlyOptimal, vk::ImageAspectFlagBits::eDepth};
 }
 
 vk::Viewport makeViewport(const glm::uvec2& size)
@@ -1163,7 +1157,7 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureVolumeTexture(size_t chann
   }
 
   if (byteSize > 0 && data != nullptr) {
-    resources.volumeTexture->uploadData(data, byteSize);
+    resources.volumeTexture->uploadData(data, byteSize, vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
   resources.volumeGeneration = generation;
@@ -1183,7 +1177,11 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureColormapTexture(size_t cha
   if (!resources.colormapTexture || resources.colormapWidth != kColormapWidth) {
     // Prefer RGBA textures in Vulkan; build an RGBA8 LUT and use
     // eR8G8B8A8Unorm to match channel order.
-    vulkan::ensure1DLUTTexture(device, resources.colormapTexture, kColormapWidth);
+    vulkan::ensure1DLUTTexture(device,
+                               resources.colormapTexture,
+                               kColormapWidth,
+                               vk::Format::eR8G8B8A8Unorm,
+                               vk::ImageLayout::eShaderReadOnlyOptimal);
     resources.colormapWidth = kColormapWidth;
     createdOrResized = true;
   }
@@ -1196,7 +1194,10 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureColormapTexture(size_t cha
     std::vector<uint8_t> texels;
     colorMap->buildLUTRGBA8(texels, kColormapWidth);
     if (!texels.empty()) {
-      vulkan::uploadLUT(*resources.colormapTexture, texels.data(), texels.size());
+      vulkan::uploadLUT(*resources.colormapTexture,
+                        texels.data(),
+                        texels.size(),
+                        vk::ImageLayout::eShaderReadOnlyOptimal);
       resources.colormapGeneration = gen;
     }
   }
@@ -1415,8 +1416,13 @@ void ZVulkanImgSlicePipelineContext::bindMergeDescriptor(ZVulkanTexture& colorAr
   CHECK(m_mergeDescriptor != nullptr) << "Slice merge: override descriptor allocation failed (fatal)";
   m_mergeDescriptor->updateTexture(0, colorArray, m_backend.defaultSampler());
   if (depthArray) {
-    const auto [depthLayout, depthAspect] = depthReadDescriptorLayoutAndAspect(*depthArray);
-    m_mergeDescriptor->updateTexture(1, *depthArray, m_backend.defaultSampler(), depthLayout, depthAspect);
+    const auto depthUse =
+      vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
+    m_mergeDescriptor->updateTexture(1,
+                                     *depthArray,
+                                     m_backend.defaultSampler(),
+                                     depthUse.layout,
+                                     depthUse.descriptorAspect);
   } else {
     m_mergeDescriptor->updateTexture(1, colorArray, m_backend.defaultSampler());
   }

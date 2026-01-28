@@ -2,7 +2,7 @@
 
 #include "z3dtypes.h"
 #include "zglmutils.h"
-#include "z3dgl.h"
+#include "zmesh.h"
 #include "z3dscratchresourcepool.h"
 
 #include <cstddef>
@@ -15,8 +15,7 @@
 #include <limits>
 
 namespace nim {
-  
-class ZMesh;
+
 class Z3DImg;
 class ZColorMap;
 class Z3DTransferFunction;
@@ -94,6 +93,12 @@ struct SampledImageHandle
 struct BufferHandle
 {
   uint64_t id = 0;
+  RenderBackend backend = RenderBackend::OpenGL;
+
+  [[nodiscard]] bool valid() const
+  {
+    return id != 0;
+  }
 };
 
 struct ShaderHandle
@@ -127,6 +132,108 @@ enum class StoreOp
   Store
 };
 
+//------------------------------------------------------------------------------
+// Attachment usage metadata (post-pass)
+//------------------------------------------------------------------------------
+// Backend-neutral hint describing how a render target attachment will be used
+// after the producing pass completes. Backends may use this to choose a
+// "final" layout/state to avoid heuristic transitions and reduce state leakage.
+//
+// NOTE: This is not a correctness contract by itself; it is an explicit signal
+// emitted by the renderer/compositor to describe intended downstream usage.
+enum class AttachmentFinalUse
+{
+  // Must be specified by producers for Vulkan passes; Vulkan backends do not
+  // infer post-pass layouts from usage patterns.
+  Unspecified,
+  // Leave the attachment in a render-target layout/state.
+  RenderTarget,
+  // Leave the attachment ready for shader sampling (read-only).
+  Sampled,
+  // Leave the attachment ready for transfer reads (readback/copy source).
+  TransferSrc,
+  // Leave the attachment in a general layout/state (storage/unknown).
+  General
+};
+
+//------------------------------------------------------------------------------
+// Image usage metadata (cross-pass reads/writes)
+//------------------------------------------------------------------------------
+// Backend-neutral description of how a pass intends to access images that are
+// not bound as render-target attachments (e.g., sampling prior outputs during a
+// fullscreen composite). Vulkan uses this to derive layout transitions without
+// payload/label heuristics.
+enum class ExternalImageUseKind
+{
+  // Read-only sampling via combined image sampler.
+  SampledRead,
+  // Read-only access via storage image.
+  StorageRead,
+  // Write-only access via storage image.
+  StorageWrite,
+  // Read/write via storage image (or otherwise unknown shader access).
+  StorageReadWrite,
+  // Transfer reads (copy source/readback).
+  TransferSrc,
+  // Transfer writes (copy destination).
+  TransferDst,
+  // Unknown access; treat as general.
+  General
+};
+
+// Hint describing which aspect of an image a pass intends to read/write.
+// Vulkan backends do not infer depth/stencil sampling layouts from formats;
+// producers must specify this explicitly (Color/Depth/Stencil).
+enum class ExternalImageAspectHint
+{
+  // Must be specified by producers for sampled reads; Vulkan does not infer
+  // depth/stencil sampling layouts from formats.
+  Unspecified,
+  Color,
+  Depth,
+  Stencil
+};
+
+struct ExternalImageUseDesc
+{
+  AttachmentHandle handle;
+  ExternalImageUseKind kind = ExternalImageUseKind::SampledRead;
+  ExternalImageAspectHint aspectHint = ExternalImageAspectHint::Unspecified;
+};
+
+//------------------------------------------------------------------------------
+// Buffer usage metadata (cross-pass reads/writes)
+//------------------------------------------------------------------------------
+// Backend-neutral description of how a pass intends to access buffers that are
+// not created/owned by the backend itself (e.g., scratch buffers shared across
+// multiple passes). Vulkan uses this to insert buffer memory barriers without
+// relying on fragile backend-side heuristics.
+enum class ExternalBufferUseKind
+{
+  // Must be specified by producers; Vulkan does not infer buffer dependencies.
+  Unspecified,
+  // Uniform reads via UBOs.
+  UniformRead,
+  // Read-only access via storage buffer.
+  StorageRead,
+  // Write-only access via storage buffer.
+  StorageWrite,
+  // Read/write access via storage buffer (or unknown shader access).
+  StorageReadWrite,
+  // Transfer reads (copy source/readback).
+  TransferSrc,
+  // Transfer writes (copy destination).
+  TransferDst,
+  // Unknown access; treat as a general memory dependency.
+  General
+};
+
+struct ExternalBufferUseDesc
+{
+  BufferHandle handle;
+  ExternalBufferUseKind kind = ExternalBufferUseKind::Unspecified;
+};
+
 struct ClearValue
 {
   glm::vec4 color = glm::vec4(0.0f);
@@ -139,6 +246,7 @@ struct AttachmentDesc
   AttachmentHandle handle;
   LoadOp loadOp = LoadOp::Load;
   StoreOp storeOp = StoreOp::Store;
+  AttachmentFinalUse finalUse = AttachmentFinalUse::Unspecified;
   ClearValue clearValue{};
 };
 
@@ -166,6 +274,12 @@ struct BackendPassDesc
   std::vector<AttachmentDesc> colorAttachments;
   std::optional<AttachmentDesc> depthAttachment;
   std::optional<AttachmentDesc> resolveAttachment;
+  // Images accessed by the pass that are not render-target attachments (e.g.,
+  // sampled inputs for a compositor fullscreen pass).
+  std::vector<ExternalImageUseDesc> externalImageUses;
+  // Buffers accessed by the pass that are not owned as part of the backend pass
+  // recording (e.g., scratch buffers produced/consumed across multiple passes).
+  std::vector<ExternalBufferUseDesc> externalBufferUses;
   // Viewport is the single source of truth for the render area.
   // Backends convert this to native viewport/scissor. If zero, the
   // renderer provides a default from the current frame viewport.
@@ -746,24 +860,6 @@ inline std::span<const T> spanOrEmpty(const std::vector<T>* ptr)
     return std::span<const T>(ptr->data(), ptr->size());
   }
   return std::span<const T>();
-}
-
-inline std::span<const float> spanFromGLfloats(const std::vector<GLfloat>& vec)
-{
-  if (vec.empty()) {
-    return std::span<const float>();
-  }
-  static_assert(sizeof(GLfloat) == sizeof(float), "GLfloat expected to match float");
-  return std::span<const float>(reinterpret_cast<const float*>(vec.data()), vec.size());
-}
-
-inline std::span<const uint32_t> spanFromGLuints(const std::vector<GLuint>& vec)
-{
-  if (vec.empty()) {
-    return std::span<const uint32_t>();
-  }
-  static_assert(sizeof(GLuint) == sizeof(uint32_t), "GLuint expected to be 32-bit");
-  return std::span<const uint32_t>(reinterpret_cast<const uint32_t*>(vec.data()), vec.size());
 }
 
 } // namespace nim

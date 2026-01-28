@@ -18,6 +18,7 @@
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanresourcemetadata.h"
 #include "zvulkanuniforms.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zsysteminfo.h"
@@ -346,22 +347,6 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
 std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
 {
   return {glm::vec4(matrix[0], 0.0f), glm::vec4(matrix[1], 0.0f), glm::vec4(matrix[2], 0.0f)};
-}
-
-// Depth-only layouts/aspects (stencil not used in this pipeline)
-std::pair<vk::ImageLayout, vk::ImageAspectFlags> depthReadDescriptorLayoutAndAspect(const ZVulkanTexture& /*texture*/)
-{
-  return {vk::ImageLayout::eDepthReadOnlyOptimal, vk::ImageAspectFlagBits::eDepth};
-}
-
-std::pair<vk::ImageLayout, vk::ImageAspectFlags> depthAttachmentLayoutAndAspect(const ZVulkanTexture& /*texture*/)
-{
-  return {vk::ImageLayout::eDepthAttachmentOptimal, vk::ImageAspectFlagBits::eDepth};
-}
-
-vk::ImageAspectFlags depthReadBarrierAspect(const ZVulkanTexture& /*texture*/)
-{
-  return vk::ImageAspectFlagBits::eDepth;
 }
 
 } // namespace
@@ -1869,8 +1854,13 @@ void ZVulkanImgRaycasterPipelineContext::bindMergeDescriptor(ZVulkanTexture& col
   CHECK(m_mergeDescriptor != nullptr) << "Raycaster merge: override descriptor allocation failed (fatal)";
   m_mergeDescriptor->updateTexture(0, colorArray, m_backend.defaultSampler());
   if (depthArray) {
-    const auto [depthLayout, depthAspect] = depthReadDescriptorLayoutAndAspect(*depthArray);
-    m_mergeDescriptor->updateTexture(1, *depthArray, m_backend.defaultSampler(), depthLayout, depthAspect);
+    const auto depthUse =
+      vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
+    m_mergeDescriptor->updateTexture(1,
+                                     *depthArray,
+                                     m_backend.defaultSampler(),
+                                     depthUse.layout,
+                                     depthUse.descriptorAspect);
   } else {
     m_mergeDescriptor->updateTexture(1, colorArray, m_backend.defaultSampler());
   }
@@ -2004,7 +1994,7 @@ ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureVolumeTexture(ChannelR
   }
 
   if (byteSize > 0 && data) {
-    resources.volumeTexture->uploadData(data, byteSize);
+    resources.volumeTexture->uploadData(data, byteSize, vk::ImageLayout::eShaderReadOnlyOptimal);
     resources.volumeGeneration = generation;
   }
 
@@ -2042,7 +2032,7 @@ ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureImage2DTexture(Channel
   }
 
   if (byteSize > 0 && data) {
-    resources.image2DTexture->uploadData(data, byteSize);
+    resources.image2DTexture->uploadData(data, byteSize, vk::ImageLayout::eShaderReadOnlyOptimal);
     resources.image2DGeneration = generation;
   }
 
@@ -2060,7 +2050,11 @@ ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureTransferTexture(Channe
   if (!resources.transferTexture || resources.transferWidth != width) {
     // Vulkan path prefers RGBA textures; build an RGBA8 LUT and use
     // eR8G8B8A8Unorm to match channel order.
-    vulkan::ensure1DLUTTexture(device, resources.transferTexture, width);
+    vulkan::ensure1DLUTTexture(device,
+                               resources.transferTexture,
+                               width,
+                               vk::Format::eR8G8B8A8Unorm,
+                               vk::ImageLayout::eShaderReadOnlyOptimal);
     resources.transferWidth = width;
     createdOrResized = true;
   }
@@ -2069,7 +2063,10 @@ ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureTransferTexture(Channe
     std::vector<uint8_t> texels;
     transferFunction.buildLUTRGBA8(texels, width);
     if (!texels.empty()) {
-      vulkan::uploadLUT(*resources.transferTexture, texels.data(), texels.size());
+      vulkan::uploadLUT(*resources.transferTexture,
+                        texels.data(),
+                        texels.size(),
+                        vk::ImageLayout::eShaderReadOnlyOptimal);
       resources.transferGeneration = gen;
     }
   }
@@ -2971,14 +2968,19 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     }
     auto& texture =
       vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster fast pass depth attachment");
-    const auto [attachLayout, attachAspect] = depthAttachmentLayoutAndAspect(texture);
+    const vk::ImageAspectFlags attachAspect = texture.aspectMask();
+    CHECK(static_cast<bool>(attachAspect & vk::ImageAspectFlagBits::eDepth))
+      << "Raycaster fast pass depth attachment must have depth aspect (fmt=" << enumOrUnderlying(texture.format(), 16)
+      << ")";
+    const auto depthSampledUse =
+      vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
     ZVulkanAttachmentInfo info{};
     info.image = texture.image();
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
     // After this pass, depth will be sampled in downstream composition/copy
-    info.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
+    info.finalLayout = depthSampledUse.layout;
     // Clear-on-first-use: ensure background depth is deterministic when no prior writes.
     // Track by VkImage per frame.
     const VkImage imgHandle = static_cast<VkImage>(texture.image());
@@ -3205,13 +3207,18 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
       depthView = layerDepth->imageView();
     }
     CHECK(depthView != vk::ImageView{}) << "Layer depth attachment view missing for volumetric layered path.";
-    const auto [attachLayout, attachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
+    const vk::ImageAspectFlags attachAspect = layerDepth->aspectMask();
+    CHECK(static_cast<bool>(attachAspect & vk::ImageAspectFlagBits::eDepth))
+      << "Layered raycaster depth attachment must have depth aspect (fmt=" << enumOrUnderlying(layerDepth->format(), 16)
+      << ")";
+    const auto depthSampledUse =
+      vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
     ZVulkanAttachmentInfo depthAttachment{};
     depthAttachment.image = layerDepth->image();
     depthAttachment.view = depthView;
     depthAttachment.format = layerDepth->format();
     depthAttachment.initialLayout = layerDepth->layout();
-    depthAttachment.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
+    depthAttachment.finalLayout = depthSampledUse.layout;
     depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
     depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -3270,10 +3277,10 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
   layerColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
   // Ensure the entire depth array is in the descriptor sampling layout before merge.
-  const auto [readLayout, _descAspect] = depthReadDescriptorLayoutAndAspect(*layerDepth);
-  const auto fullBarrierAspect = depthReadBarrierAspect(*layerDepth);
-  layerDepth->transitionLayout(cmd, layerDepth->layout(), readLayout, fullBarrierAspect);
-  layerDepth->setDescriptorLayout(readLayout);
+  const auto depthSampledUse =
+    vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
+  layerDepth->transitionLayout(cmd, layerDepth->layout(), depthSampledUse.layout, depthSampledUse.transitionAspect);
+  layerDepth->setDescriptorLayout(depthSampledUse.layout);
 
   // Optional debug dump of layered raycaster color array to TIFs (per-layer)
   if (FLAGS_atlas_debug_save_raycaster_layers) {
@@ -3522,13 +3529,18 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
     }
     auto& texture =
       vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster 2D fast depth attachment");
-    const auto [attachLayout, attachAspect] = depthAttachmentLayoutAndAspect(texture);
+    const vk::ImageAspectFlags attachAspect = texture.aspectMask();
+    CHECK(static_cast<bool>(attachAspect & vk::ImageAspectFlagBits::eDepth))
+      << "Raycaster 2D fast depth attachment must have depth aspect (fmt=" << enumOrUnderlying(texture.format(), 16)
+      << ")";
+    const auto depthSampledUse =
+      vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
     ZVulkanAttachmentInfo info{};
     info.image = texture.image();
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
+    info.finalLayout = depthSampledUse.layout;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
     info.clearValue.depthStencil =
@@ -3703,13 +3715,18 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
       depthView = layerDepth->imageView();
     }
     CHECK(depthView != vk::ImageView{}) << "Layer depth attachment view missing for 2D fast path.";
-    const auto [attachLayout, attachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
+    const vk::ImageAspectFlags attachAspect = layerDepth->aspectMask();
+    CHECK(static_cast<bool>(attachAspect & vk::ImageAspectFlagBits::eDepth))
+      << "2D layered raycaster depth attachment must have depth aspect (fmt="
+      << enumOrUnderlying(layerDepth->format(), 16) << ")";
+    const auto depthSampledUse =
+      vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
     ZVulkanAttachmentInfo depthAttachment{};
     depthAttachment.image = layerDepth->image();
     depthAttachment.view = depthView;
     depthAttachment.format = layerDepth->format();
     depthAttachment.initialLayout = layerDepth->layout();
-    depthAttachment.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
+    depthAttachment.finalLayout = depthSampledUse.layout;
     depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
     depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -3770,10 +3787,10 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
 
   layerColor->transitionLayout(cmd, layerColor->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   layerColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-  const auto [readLayout, descAspect] = depthReadDescriptorLayoutAndAspect(*layerDepth);
-  const auto barrierAspect = depthReadBarrierAspect(*layerDepth);
-  layerDepth->transitionLayout(cmd, layerDepth->layout(), readLayout, barrierAspect);
-  layerDepth->setDescriptorLayout(readLayout);
+  const auto depthSampledUse =
+    vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
+  layerDepth->transitionLayout(cmd, layerDepth->layout(), depthSampledUse.layout, depthSampledUse.transitionAspect);
+  layerDepth->setDescriptorLayout(depthSampledUse.layout);
 
   bindMergeDescriptor(*layerColor, layerDepth);
 
@@ -3860,13 +3877,18 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
     }
     auto& texture =
       vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster slice fast depth attachment");
-    const auto [attachLayout, attachAspect] = depthAttachmentLayoutAndAspect(texture);
+    const vk::ImageAspectFlags attachAspect = texture.aspectMask();
+    CHECK(static_cast<bool>(attachAspect & vk::ImageAspectFlagBits::eDepth))
+      << "Raycaster slice fast depth attachment must have depth aspect (fmt=" << enumOrUnderlying(texture.format(), 16)
+      << ")";
+    const auto depthSampledUse =
+      vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
     ZVulkanAttachmentInfo info{};
     info.image = texture.image();
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
+    info.finalLayout = depthSampledUse.layout;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
     info.clearValue.depthStencil =
@@ -4044,13 +4066,18 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
       depthView = layerDepth->imageView();
     }
     CHECK(depthView != vk::ImageView{}) << "Layer depth attachment view missing for slice layered path.";
-    const auto [attachLayout, attachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
+    const vk::ImageAspectFlags attachAspect = layerDepth->aspectMask();
+    CHECK(static_cast<bool>(attachAspect & vk::ImageAspectFlagBits::eDepth))
+      << "Slice layered path depth attachment must have depth aspect (fmt="
+      << enumOrUnderlying(layerDepth->format(), 16) << ")";
+    const auto depthSampledUse =
+      vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
     ZVulkanAttachmentInfo depthAttachment{};
     depthAttachment.image = layerDepth->image();
     depthAttachment.view = depthView;
     depthAttachment.format = layerDepth->format();
     depthAttachment.initialLayout = layerDepth->layout();
-    depthAttachment.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
+    depthAttachment.finalLayout = depthSampledUse.layout;
     depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
     depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -4112,10 +4139,10 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
 
   layerColor->transitionLayout(cmd, layerColor->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   layerColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-  const auto [readLayout, descAspect] = depthReadDescriptorLayoutAndAspect(*layerDepth);
-  const auto barrierAspect = depthReadBarrierAspect(*layerDepth);
-  layerDepth->transitionLayout(cmd, layerDepth->layout(), readLayout, barrierAspect);
-  layerDepth->setDescriptorLayout(readLayout);
+  const auto depthSampledUse =
+    vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
+  layerDepth->transitionLayout(cmd, layerDepth->layout(), depthSampledUse.layout, depthSampledUse.transitionAspect);
+  layerDepth->setDescriptorLayout(depthSampledUse.layout);
 
   bindMergeDescriptor(*layerColor, layerDepth);
 
@@ -4750,13 +4777,18 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   CHECK_LT(activeChannelIndex, layerDepth->arrayLayers());
   auto layerDepthView = layerDepth->layerImageView(activeChannelIndex);
   CHECK(layerDepthView != vk::ImageView{}) << "Layer depth attachment view missing for progressive copy.";
-  const auto [attachLayout, _attachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
+  const vk::ImageAspectFlags attachAspect = layerDepth->aspectMask();
+  CHECK(static_cast<bool>(attachAspect & vk::ImageAspectFlagBits::eDepth))
+    << "Progressive copy depth attachment must have depth aspect (fmt=" << enumOrUnderlying(layerDepth->format(), 16)
+    << ")";
+  const auto depthSampledUse =
+    vulkan::resolveExternalImageUse(ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
   ZVulkanAttachmentInfo layerDepthAttachment{};
   layerDepthAttachment.image = layerDepth->image();
   layerDepthAttachment.view = layerDepthView;
   layerDepthAttachment.format = layerDepth->format();
   layerDepthAttachment.initialLayout = layerDepth->layout();
-  layerDepthAttachment.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
+  layerDepthAttachment.finalLayout = depthSampledUse.layout;
   layerDepthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
   layerDepthAttachment.loadOp = vk::AttachmentLoadOp::eLoad;
   layerDepthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -4766,7 +4798,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerDepthAttachment.srcAccess = {};
   layerDepthAttachment.dstAccess =
     vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
-  layerDepthAttachment.aspect = _attachAspect;
+  layerDepthAttachment.aspect = attachAspect;
   layerDepthAttachment.trackingTexture = layerDepth;
 
   std::vector<vk::DescriptorSet> layerSets{m_copyDescriptor->descriptorSet()};
@@ -4826,13 +4858,17 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     }
     auto& texture =
       vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster blend pass depth attachment");
-    const auto [blendAttachLayout, blendAttachAspect] = depthAttachmentLayoutAndAspect(texture);
+    const vk::ImageAspectFlags attachAspect = texture.aspectMask();
+    CHECK(static_cast<bool>(attachAspect & vk::ImageAspectFlagBits::eDepth))
+      << "Raycaster blend pass depth attachment must have depth aspect (fmt=" << enumOrUnderlying(texture.format(), 16)
+      << ")";
+    const vk::ImageLayout attachLayout = vulkan::depthAttachmentLayoutForAspect(attachAspect);
     ZVulkanAttachmentInfo info{};
     info.image = texture.image();
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = blendAttachLayout;
+    info.finalLayout = attachLayout;
     // Clear-on-first-use (per frame) to avoid stale depth when composing layered result.
     const VkImage imgHandle = static_cast<VkImage>(texture.image());
     const bool firstUse = m_depthClearedThisFrame.insert(imgHandle).second;
@@ -4845,7 +4881,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     info.srcAccess = {};
     info.dstAccess =
       vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
-    info.aspect = blendAttachAspect;
+    info.aspect = attachAspect;
     info.trackingTexture = &texture;
     return info;
   };

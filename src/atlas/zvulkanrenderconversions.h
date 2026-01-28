@@ -9,6 +9,7 @@
 
 namespace nim {
 class ZVulkanDevice;
+class ZVulkanBuffer;
 class ZVulkanTexture;
 } // namespace nim
 
@@ -48,5 +49,10 @@ textureFromHandle(const AttachmentHandle& handle, ZVulkanDevice& device, std::st
 
 [[nodiscard]] ZVulkanTexture&
 textureFromHandle(const SampledImageHandle& handle, ZVulkanDevice& device, std::string_view usageDescription);
+
+// Converts renderer buffer handles back into Vulkan buffers. For Vulkan, `id`
+// is a reinterpret_cast<uint64_t>(ZVulkanBuffer*).
+[[nodiscard]] ZVulkanBuffer&
+bufferFromHandle(const BufferHandle& handle, ZVulkanDevice& device, std::string_view usageDescription);
 
 } // namespace nim::vulkan

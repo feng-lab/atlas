@@ -100,6 +100,7 @@ public:
   // Per-draw and transition notifications (used by recorders)
   void notifyDrawSubmitted();
   void notifyLayoutTransition(bool wasNoop);
+  void notifyBufferBarrier(bool wasNoop);
 
   ZVulkanDevice& device();
 
@@ -164,6 +165,10 @@ public:
   // Schedule a callback gated by the current submission fence. Runs as soon as
   // the submission finishes (fence signals), without waiting for frame-slot reuse.
   void scheduleAfterActiveSubmissionFence(std::function<void()> fn);
+
+  // Pin a texture in the device residency manager for the lifetime of the
+  // current GPU submission. This prevents eviction of in-flight resources.
+  void pinTextureForActiveSubmission(class ZVulkanTexture* texture);
   void notifyPipelineCreated();
   void notifyPipelineBound(vk::Pipeline pipeline);
   // Queue a static copy (upload slice -> device-local VB/IB) to be executed
@@ -262,6 +267,10 @@ private:
     // Pipelines
     uint32_t pipelinesCreated = 0; // graphics pipelines created this frame
     std::unordered_set<uint64_t> pipelinesBound; // unique pipelines bound this frame
+
+    // Residency pins for managed (evictable) textures referenced by this submission.
+    // These pins are released via a submission-fence callback after queueSubmit().
+    std::unordered_set<class ZVulkanTexture*> residencyPinnedTextures;
 
     // Per-draw override descriptor sets kept alive until fence
     std::vector<std::unique_ptr<ZVulkanDescriptorSet>> transientOverrideSets;
@@ -591,6 +600,8 @@ public:
     uint64_t draws = 0;
     uint64_t layoutTransitions = 0;
     uint64_t layoutNoops = 0;
+    uint64_t bufferBarriers = 0;
+    uint64_t bufferBarrierNoops = 0;
   };
 
   PassScope m_passScope{};

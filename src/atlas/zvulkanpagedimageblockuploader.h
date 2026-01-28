@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <cstdint>
 #include <vector>
 
 namespace nim {
@@ -30,21 +31,19 @@ public:
 
   void uploadPageCaches(Z3DImg& image, size_t channel, ZBenchTimer& timer) override;
 
-  [[nodiscard]] ZVulkanTexture* pageDirectoryTexture(const Z3DImg& image, size_t channel) const override;
+  [[nodiscard]] ZVulkanTexture* pageDirectoryTexture(Z3DImg& image, size_t channel) override;
 
-  [[nodiscard]] ZVulkanTexture* pageTableTexture(const Z3DImg& image, size_t channel) const override;
+  [[nodiscard]] ZVulkanTexture* pageTableTexture(Z3DImg& image, size_t channel) override;
 
-  [[nodiscard]] ZVulkanTexture* imageCacheTexture(const Z3DImg& image, size_t channel) const override;
+  [[nodiscard]] ZVulkanTexture* imageCacheTexture(Z3DImg& image, size_t channel) override;
 
 private:
   struct ChannelResources
   {
     glm::uvec3 pageDirectorySize{0u};
     glm::uvec3 pageTableCacheSize{0u};
-    glm::uvec3 imageCacheSize{0u};
     std::unique_ptr<ZVulkanTexture> pageDirectory;
     std::unique_ptr<ZVulkanTexture> pageTableCache;
-    std::unique_ptr<ZVulkanTexture> imageCache;
   };
 
   struct ImageResources

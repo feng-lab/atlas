@@ -702,6 +702,8 @@ set(SOURCES
     zvulkancontext.cpp
     zvulkandevice.h
     zvulkandevice.cpp
+    zvulkanresidencymanager.h
+    zvulkanresidencymanager.cpp
     zvulkanframeexecutor.h
     zvulkanframeexecutor.cpp
     zvulkanbuffer.h

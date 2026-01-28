@@ -553,7 +553,7 @@ void ZVulkanMeshPipelineContext::ensurePlaceholderTextures()
                                          vk::MemoryPropertyFlagBits::eDeviceLocal);
     m_placeholder1D = device.createTexture(info);
     const uint32_t pixel = 0xffffffffu;
-    m_placeholder1D->uploadData(&pixel, sizeof(pixel));
+    m_placeholder1D->uploadData(&pixel, sizeof(pixel), vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
   if (!m_placeholder2D) {
@@ -565,7 +565,7 @@ void ZVulkanMeshPipelineContext::ensurePlaceholderTextures()
                                          vk::MemoryPropertyFlagBits::eDeviceLocal);
     m_placeholder2D = device.createTexture(info);
     const uint32_t pixel = 0xffffffffu;
-    m_placeholder2D->uploadData(&pixel, sizeof(pixel));
+    m_placeholder2D->uploadData(&pixel, sizeof(pixel), vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
   if (!m_placeholder3D) {
@@ -578,7 +578,7 @@ void ZVulkanMeshPipelineContext::ensurePlaceholderTextures()
                                          vk::MemoryPropertyFlagBits::eDeviceLocal);
     m_placeholder3D = device.createTexture(info);
     const uint32_t pixel = 0xffffffffu;
-    m_placeholder3D->uploadData(&pixel, sizeof(pixel));
+    m_placeholder3D->uploadData(&pixel, sizeof(pixel), vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 }
 

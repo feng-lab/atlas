@@ -896,6 +896,15 @@ bool ZImgPack::needUpdate(const QRectF& viewport,
     return false;
   }
 
+  // The first viewportChanged() after loading a dataset can arrive before the
+  // caller has a valid "previous" scale (e.g. m_lastScale defaults to 0).
+  // Treat that as needing an update instead of crashing in ratioForScale(),
+  // which requires strictly-positive scales.
+  // Use `!(oldScale > 0)` so NaNs are treated as invalid too.
+  if (!(oldScale > 0)) {
+    return true;
+  }
+
   const double zScale = m_ngVolume ? scale : 1.0;
   const double oldZScale = m_ngVolume ? oldScale : 1.0;
   auto readRatio = ratioForScale(scale, scale, zScale);

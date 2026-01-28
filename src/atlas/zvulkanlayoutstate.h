@@ -34,8 +34,12 @@ inline LayoutState layoutStateFor(vk::ImageLayout layout)
     case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
     case vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal:
     case vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal:
-      return {AccessFlagBits2::eDepthStencilAttachmentRead,
-              PipelineStageFlagBits2::eEarlyFragmentTests | PipelineStageFlagBits2::eLateFragmentTests};
+      // Read-only depth/stencil layouts can be used both for depth testing and
+      // for shader sampling (e.g., sampling depth textures in a compositor).
+      // Use a superset stage/access to avoid under-synchronization when the
+      // same layout is used in different pipelines.
+      return {AccessFlagBits2::eDepthStencilAttachmentRead | AccessFlagBits2::eShaderRead,
+              PipelineStageFlagBits2::eAllGraphics | PipelineStageFlagBits2::eComputeShader};
     case vk::ImageLayout::eShaderReadOnlyOptimal:
       return {AccessFlagBits2::eShaderRead,
               PipelineStageFlagBits2::eAllGraphics | PipelineStageFlagBits2::eComputeShader};

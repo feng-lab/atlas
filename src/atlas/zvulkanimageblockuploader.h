@@ -32,11 +32,11 @@ public:
 
   virtual void uploadPageCaches(Z3DImg& image, size_t channel, ZBenchTimer& timer) = 0;
 
-  [[nodiscard]] virtual ZVulkanTexture* pageDirectoryTexture(const Z3DImg& image, size_t channel) const = 0;
+  [[nodiscard]] virtual ZVulkanTexture* pageDirectoryTexture(Z3DImg& image, size_t channel) = 0;
 
-  [[nodiscard]] virtual ZVulkanTexture* pageTableTexture(const Z3DImg& image, size_t channel) const = 0;
+  [[nodiscard]] virtual ZVulkanTexture* pageTableTexture(Z3DImg& image, size_t channel) = 0;
 
-  [[nodiscard]] virtual ZVulkanTexture* imageCacheTexture(const Z3DImg& image, size_t channel) const = 0;
+  [[nodiscard]] virtual ZVulkanTexture* imageCacheTexture(Z3DImg& image, size_t channel) = 0;
 };
 
 } // namespace nim

@@ -369,7 +369,7 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
     CHECK(tex != nullptr) << "Failed to create font atlas texture from CPU pixels (" << payload.atlasWidth << "x"
                           << payload.atlasHeight << ")";
     const size_t byteSize = static_cast<size_t>(payload.atlasWidth) * payload.atlasHeight * 4u;
-    tex->uploadData(payload.atlasPixels, byteSize);
+    tex->uploadData(payload.atlasPixels, byteSize, vk::ImageLayout::eShaderReadOnlyOptimal);
     VLOG(1) << fmt::format("VK font atlas upload: {}x{} {}B", payload.atlasWidth, payload.atlasHeight, byteSize);
     auto [inserted, _] = m_atlasCache.emplace(payload.atlasPixels, std::move(tex));
     return inserted->second.get();
@@ -393,7 +393,7 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
   auto tex = device.createTexture(info);
   CHECK(tex != nullptr) << "Failed to create fallback 1x1 white font atlas texture";
   const uint32_t white = 0xffffffffu;
-  tex->uploadData(&white, sizeof(white));
+  tex->uploadData(&white, sizeof(white), vk::ImageLayout::eShaderReadOnlyOptimal);
   auto [inserted, _] = m_atlasCache.emplace(nullptr, std::move(tex));
   return inserted->second.get();
 }

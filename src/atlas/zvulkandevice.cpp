@@ -1,5 +1,6 @@
 #include "zvulkandevice.h"
 #include "zvulkanbuffer.h"
+#include "zvulkanresidencymanager.h"
 #include "zvulkantexture.h"
 #include "zvulkanshader.h"
 #include "zvulkanpipeline.h"
@@ -34,6 +35,9 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   info.device = *m_context.device();
   info.pVulkanFunctions = &funcs;
   info.vulkanApiVersion = m_context.physicalDevice().getProperties().apiVersion;
+  // Enable VK_EXT_memory_budget integration when available so we can make
+  // best-effort cache residency decisions without hardcoding VRAM caps.
+  info.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
   const VkResult res = vmaCreateAllocator(&info, &m_allocator);
   if (static_cast<vk::Result>(res) != vk::Result::eSuccess) {
     throw ZException("Failed to create VMA allocator");
@@ -67,6 +71,9 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   // Device-local static content
   m_deviceLocalPool = createPool(static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eDeviceLocal),
                                  128ull * 1024ull * 1024ull);
+
+  // Residency manager (device-owned, Vulkan-only).
+  m_residencyManager = std::make_unique<ZVulkanResidencyManager>(*this);
 
   // Log a concise feature/format support summary relevant to Block-ID integer images
   // One-time device limits + calibrated timestamps summary for visibility
@@ -195,6 +202,18 @@ const ZVulkanFrameExecutor& ZVulkanDevice::frameExecutor() const
   return const_cast<ZVulkanDevice*>(this)->frameExecutor();
 }
 
+ZVulkanResidencyManager& ZVulkanDevice::residencyManager()
+{
+  CHECK(m_residencyManager != nullptr) << "Vulkan residency manager missing";
+  return *m_residencyManager;
+}
+
+const ZVulkanResidencyManager& ZVulkanDevice::residencyManager() const
+{
+  CHECK(m_residencyManager != nullptr) << "Vulkan residency manager missing";
+  return *m_residencyManager;
+}
+
 std::unique_ptr<ZVulkanDescriptorPool> ZVulkanDevice::createDescriptorPool()
 {
   return std::make_unique<ZVulkanDescriptorPool>(*this);
@@ -244,6 +263,48 @@ uint32_t ZVulkanDevice::findMemoryTypeIndex(VkMemoryPropertyFlags requiredFlags,
     }
   }
   return UINT32_MAX;
+}
+
+ZVulkanDevice::DeviceLocalBudget ZVulkanDevice::deviceLocalBudget() const
+{
+  DeviceLocalBudget out{};
+  if (m_allocator == nullptr) {
+    return out;
+  }
+
+  VmaBudget budgets[VK_MAX_MEMORY_HEAPS]{};
+  vmaGetHeapBudgets(m_allocator, budgets);
+
+  const auto memProps = m_context.physicalDevice().getMemoryProperties();
+  uint32_t bestHeap = UINT32_MAX;
+  VkDeviceSize bestBudget = 0;
+  for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
+    const VkMemoryHeap heap = memProps.memoryHeaps[i];
+    const bool deviceLocal = (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0u;
+    if (!deviceLocal) {
+      continue;
+    }
+    if (budgets[i].budget > bestBudget) {
+      bestBudget = budgets[i].budget;
+      bestHeap = i;
+    }
+  }
+  if (bestHeap == UINT32_MAX) {
+    // Fallback: choose the largest heap if no device-local heap is flagged.
+    for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
+      if (budgets[i].budget > bestBudget) {
+        bestBudget = budgets[i].budget;
+        bestHeap = i;
+      }
+    }
+  }
+  if (bestHeap == UINT32_MAX) {
+    return out;
+  }
+
+  out.budgetBytes = static_cast<uint64_t>(budgets[bestHeap].budget);
+  out.usageBytes = static_cast<uint64_t>(budgets[bestHeap].usage);
+  return out;
 }
 
 } // namespace nim

@@ -102,6 +102,18 @@ RenderBatch Z3DTextureBlendRenderer::buildRenderBatch(Z3DEye eye) const
   batch.pass.colorAttachments = surface.colorAttachments;
   batch.pass.depthAttachment = surface.depthAttachment;
 
+  CHECK(m_colorAttachmentHandle0.valid() && m_depthAttachmentHandle0.valid() && m_colorAttachmentHandle1.valid() &&
+        m_depthAttachmentHandle1.valid())
+    << "Texture blend renderer missing Vulkan input attachment handles.";
+  batch.pass.externalImageUses.push_back(
+    {m_colorAttachmentHandle0, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+  batch.pass.externalImageUses.push_back(
+    {m_depthAttachmentHandle0, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+  batch.pass.externalImageUses.push_back(
+    {m_colorAttachmentHandle1, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+  batch.pass.externalImageUses.push_back(
+    {m_depthAttachmentHandle1, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+
   batch.draw.topology = PrimitiveTopology::TriangleStrip;
   batch.draw.vertexCount = 4;
   batch.draw.indexCount = 0;

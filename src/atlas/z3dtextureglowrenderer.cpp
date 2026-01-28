@@ -126,6 +126,13 @@ RenderBatch Z3DTextureGlowRenderer::buildRenderBatch(Z3DEye eye) const
   batch.pass.colorAttachments = surface.colorAttachments;
   batch.pass.depthAttachment = surface.depthAttachment;
 
+  CHECK(m_colorAttachmentHandle.valid() && m_depthAttachmentHandle.valid())
+    << "Texture glow renderer missing Vulkan input attachment handles.";
+  batch.pass.externalImageUses.push_back(
+    {m_colorAttachmentHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+  batch.pass.externalImageUses.push_back(
+    {m_depthAttachmentHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+
   batch.draw.topology = PrimitiveTopology::TriangleStrip;
   batch.draw.vertexCount = 4;
   batch.draw.indexCount = 0;

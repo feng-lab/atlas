@@ -262,9 +262,65 @@ ZVulkanTexture::~ZVulkanTexture()
 }
 // ----- Public API -----------------------------------------------------------------------------
 
-void ZVulkanTexture::uploadData(const void* data, size_t size)
+uint64_t ZVulkanTexture::allocationSizeBytes() const
 {
-  uploadData(data, size, vk::ImageLayout::eShaderReadOnlyOptimal);
+  if (!m_imageAllocation) {
+    return 0;
+  }
+  VmaAllocationInfo info{};
+  vmaGetAllocationInfo(m_device.allocator(), m_imageAllocation, &info);
+  return static_cast<uint64_t>(info.size);
+}
+
+void ZVulkanTexture::releaseDeviceResources()
+{
+  if (!resident()) {
+    return;
+  }
+
+  // Destroy views first to avoid referencing the image during teardown.
+  m_layerImageViews.clear();
+  m_layerDepthViews.clear();
+  m_layerStencilViews.clear();
+  m_genericAspectViews.clear();
+  m_depthAspectView.reset();
+  m_stencilAspectView.reset();
+  if (m_imageView) {
+    m_imageView.reset();
+  }
+  // Sampler is independent from the VkImage; keep it to avoid re-creating it
+  // on each eviction/restore cycle.
+
+  if (m_image && m_imageAllocation) {
+    vmaDestroyImage(m_device.allocator(), m_image, m_imageAllocation);
+    m_image = vk::Image{};
+    m_imageAllocation = nullptr;
+  }
+
+  // With no VkImage, there is no meaningful tracked layout.
+  m_currentLayout = vk::ImageLayout::eUndefined;
+}
+
+void ZVulkanTexture::recreateDeviceResources()
+{
+  CHECK(!resident()) << "recreateDeviceResources called on a resident texture";
+  CHECK(m_imageAllocation == nullptr) << "recreateDeviceResources called with a live VMA allocation";
+
+  // Reset tracked layout to the create-info initial layout (often UNDEFINED).
+  m_currentLayout = m_createInfo.initialLayout;
+
+  createImage();
+  allocateMemory();
+  createImageView();
+  // Only create a sampler if we don't already have one.
+  if (!m_sampler) {
+    createSampler();
+  }
+  if (m_arrayLayers > 1u) {
+    m_layerImageViews.resize(m_arrayLayers);
+    m_layerDepthViews.resize(m_arrayLayers);
+    m_layerStencilViews.resize(m_arrayLayers);
+  }
 }
 
 void ZVulkanTexture::uploadData(const void* data, size_t size, vk::ImageLayout finalLayout)
@@ -1004,6 +1060,10 @@ void ZVulkanTexture::allocateMemory()
   if (res != vk::Result::eSuccess) {
     throw ZException("Failed to create VMA image (with fallbacks)");
   }
+
+  // Track each successful VkImage creation so downstream caches can detect when
+  // descriptor image views become stale (e.g., after eviction/recreate).
+  ++m_imageGeneration;
 }
 
 void ZVulkanTexture::createImageView()
@@ -1113,6 +1173,7 @@ void ZVulkanTexture::uploadInternal(const void* data, size_t size, const UploadR
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   stagingBuffer->copyData(data, size);
 
+  CHECK(region.finalLayout != vk::ImageLayout::eUndefined) << "UploadRegion finalLayout must be specified";
   const vk::ImageLayout finalLayout = region.finalLayout;
   m_device.frameExecutor().executeImmediate(
     [&](vk::raii::CommandBuffer& cmdBuffer) {

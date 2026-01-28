@@ -71,6 +71,11 @@ public:
     return m_usage;
   }
 
+  ZVulkanDevice& ownerDevice() const
+  {
+    return m_device;
+  }
+
   void copyData(const void* data, size_t size);
   void* map(vk::DeviceSize offset, vk::DeviceSize size);
   void unmap();

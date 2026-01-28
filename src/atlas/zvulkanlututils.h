@@ -9,8 +9,8 @@ namespace nim::vulkan {
 inline void ensure1DLUTTexture(ZVulkanDevice& device,
                                std::unique_ptr<ZVulkanTexture>& texture,
                                uint32_t width,
-                               vk::Format format = vk::Format::eR8G8B8A8Unorm,
-                               vk::ImageLayout finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal)
+                               vk::Format format,
+                               vk::ImageLayout finalLayout)
 {
   if (!texture || texture->extent().width != width || texture->extent().height != 1u ||
       texture->info().imageType != vk::ImageType::e2D) {
@@ -27,10 +27,7 @@ inline void ensure1DLUTTexture(ZVulkanDevice& device,
   }
 }
 
-inline void uploadLUT(ZVulkanTexture& texture,
-                      const uint8_t* data,
-                      size_t byteSize,
-                      vk::ImageLayout finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal)
+inline void uploadLUT(ZVulkanTexture& texture, const uint8_t* data, size_t byteSize, vk::ImageLayout finalLayout)
 {
   if (!data || byteSize == 0) {
     return;
