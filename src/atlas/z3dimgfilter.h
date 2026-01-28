@@ -79,8 +79,9 @@ protected:
     }
     if (backend == RenderBackend::Vulkan) {
       m_3dImg->releaseGLResources();
-    } else {
-      // Prepare GL paging resources proactively to avoid first-use hazards
+    } else if (m_3dImg->isVolumeDownsampled()) {
+      // Prepare GL paging resources proactively to avoid first-use hazards.
+      // Only downsampled (paged) volumes allocate paging state.
       m_3dImg->rebuildGLPagingResources();
     }
   }

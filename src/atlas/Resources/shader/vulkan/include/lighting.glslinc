@@ -63,7 +63,12 @@ vec4 computeColorFromLight(const in vec3 normalDirection, const in int lightIdx,
       if (clampedCosine < cos(radians(spotCutoff))) {
         attenuation = 0.0;
       } else {
-        attenuation *= pow(clampedCosine, uLighting.lights[lightIdx].spotExponent);
+        // Avoid undefined pow(0, 0) which can produce NaNs on some drivers.
+        // (clampedCosine is in [0, 1], spotExponent is expected >= 0.)
+        float spotExponent = uLighting.lights[lightIdx].spotExponent;
+        if (spotExponent > 0.0) {
+          attenuation *= pow(clampedCosine, spotExponent);
+        }
       }
     }
   }
@@ -75,7 +80,12 @@ vec4 computeColorFromLight(const in vec3 normalDirection, const in int lightIdx,
     retVal += attenuation * uLighting.lights[lightIdx].diffuse * NdotL * color;
     vec3 cameraDirection = normalize(-position);
     float NdotH = max(dot(reflect(-lightDirection, normalDirection), cameraDirection), 0.0);
-    retVal += attenuation * uLighting.lights[lightIdx].specular * materialSpecular * pow(NdotH, materialShininess);
+    // Avoid undefined pow(0, 0) which can produce NaNs on some drivers.
+    // If shininess is zero (used by some data sources to indicate "no specular"),
+    // skip the specular term entirely.
+    if (materialShininess > 0.0) {
+      retVal += attenuation * uLighting.lights[lightIdx].specular * materialSpecular * pow(NdotH, materialShininess);
+    }
   }
   return retVal;
 }

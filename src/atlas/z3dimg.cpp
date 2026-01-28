@@ -1970,12 +1970,26 @@ void Z3DImg::ensureGLPagingTexturesForChannel(size_t c)
 
 void Z3DImg::rebuildGLPagingResources()
 {
-  // Recreate GL paging textures for all channels and reset CPU arrays to zero-filled state.
-  // Page sizes and block counts are assumed already computed (constructor/setScale path).
-  //
   // Backend switches may destroy and recreate the OpenGL context; drop any GL object
   // wrappers that cache names from a previous context (e.g. PBO).
   m_PBO.reset();
+
+  // This method only applies to paged (downsampled) volumes. Non-downsampled images do not
+  // allocate/initialize paging state (block sizes, cache dimensions), so rebuilding paging
+  // resources would read uninitialized members and can crash.
+  setVulkanImageBlockUploader(nullptr);
+  if (!m_isVolumeDownsampled) {
+    return;
+  }
+
+  // Recreate GL paging textures for all channels and reset CPU arrays to zero-filled state.
+  // Page sizes and block counts are assumed already computed (constructor/setScale path).
+  CHECK(m_pageDirectorySize.x > 0u && m_pageDirectorySize.y > 0u && m_pageDirectorySize.z > 0u)
+    << "pageDirectorySize=" << m_pageDirectorySize;
+  CHECK(m_pageTableCacheNumBlocks.x > 0u && m_pageTableCacheNumBlocks.y > 0u && m_pageTableCacheNumBlocks.z > 0u)
+    << "pageTableCacheNumBlocks=" << m_pageTableCacheNumBlocks;
+  CHECK(m_imageCacheNumBlocks.x > 0u && m_imageCacheNumBlocks.y > 0u && m_imageCacheNumBlocks.z > 0u)
+    << "imageCacheNumBlocks=" << m_imageCacheNumBlocks;
 
   const auto imageBlockTotal = m_imageBlockSize + m_imageBlockSizePad;
   const glm::uvec3 imageCacheSize = m_imageCacheNumBlocks * imageBlockTotal;
@@ -2053,7 +2067,6 @@ void Z3DImg::rebuildGLPagingResources()
     m_channelImageCacheTextures[c]->clearImage();
     m_glPagingTexturesDirty[c] = 0u;
   }
-  setVulkanImageBlockUploader(nullptr); // reset Vulkan uploader if any
   VLOG(2) << "rebuildGLPagingResources finished";
 }
 

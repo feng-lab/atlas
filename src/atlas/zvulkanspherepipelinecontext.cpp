@@ -426,9 +426,13 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
 
   MaterialUBOStd140 material{};
   material.material_ambient = payload.params->materialAmbient;
-  material.material_specular =
-    pickingPass || !payload.useDynamicMaterial ? glm::vec4(0.0f) : payload.params->materialSpecular;
-  material.material_shininess = pickingPass || !payload.useDynamicMaterial ? 0.0f : payload.params->materialShininess;
+  // Match OpenGL path: when dynamic-material is disabled, spheres should still
+  // use the renderer's uniform material properties (specular/shininess).
+  // When dynamic-material is enabled, the shader reads per-vertex material
+  // values, but keeping the uniform values consistent is harmless and avoids
+  // surprising toggling behaviour.
+  material.material_specular = pickingPass ? glm::vec4(0.0f) : payload.params->materialSpecular;
+  material.material_shininess = pickingPass ? 0.0f : payload.params->materialShininess;
   material.alpha = (pickingPass || !payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
