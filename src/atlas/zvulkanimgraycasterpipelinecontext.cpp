@@ -1316,18 +1316,18 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   // consumers and ensures residency unpins (which are submission-fence gated) have already run.
   CHECK(compactOutput != nullptr);
   m_backend.scheduleAfterCurrentFrameCompletion([this,
-                                                output = compactOutput,
-                                                outputBytes = compactOutputBytes,
-                                                imgW,
-                                                imgH,
-                                                streamKey = payload.streamKey,
-                                                eye = batch.eye,
-                                                channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
-                                                attCount = effectiveAttachmentCount,
-                                                channelIndex = resolvedChannelIndex,
-                                                channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
-                                                roundIndex = static_cast<uint32_t>(payload.roundIndexRaw),
-                                                imagePtr = payload.image]() {
+                                                 output = compactOutput,
+                                                 outputBytes = compactOutputBytes,
+                                                 imgW,
+                                                 imgH,
+                                                 streamKey = payload.streamKey,
+                                                 eye = batch.eye,
+                                                 channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
+                                                 attCount = effectiveAttachmentCount,
+                                                 channelIndex = resolvedChannelIndex,
+                                                 channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
+                                                 roundIndex = static_cast<uint32_t>(payload.roundIndexRaw),
+                                                 imagePtr = payload.image]() {
     CHECK(output != nullptr);
     CHECK(imagePtr != nullptr);
     const uint32_t capacityIDs = imgW * imgH * 4u;
@@ -1342,6 +1342,11 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
     const uint32_t count = u32[0];
     const uint32_t clamped = std::min(count, capacityIDs);
+    std::array<uint32_t, 8> counts{};
+    CHECK_LE(attCount, 8u) << "Unified header supports up to 8 attachments";
+    for (uint32_t att = 0; att < attCount; ++att) {
+      counts[att] = u32[1 + att];
+    }
 
     missingBlocks.reserve(clamped);
     for (uint32_t i = 0; i < clamped; ++i) {
@@ -1362,6 +1367,10 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     }
     missingBlocks.swap(deduped);
 
+    // Drop the mapping before running any potentially expensive (or cancellable)
+    // CPU work. This also ensures we do not leak a mapped range on cancellation.
+    output->unmap();
+
     VLOG(1) << fmt::format("compaction output parsed: keys={} (non-empty)", missingBlocks.size());
 
     // Upload missing blocks (if any)
@@ -1378,8 +1387,6 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     bool allZeroAttachments = (attCount != 0);
     uint32_t zeroAtt = std::numeric_limits<uint32_t>::max();
 
-    CHECK_LE(attCount, 8u) << "Unified header supports up to 8 attachments";
-    const uint32_t* counts = u32 + 1;
     for (uint32_t att = 0; att < attCount; ++att) {
       const bool zero = counts[att] == 0u;
       if (zero) {
@@ -1407,7 +1414,6 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                              allZeroAttachments ? 1 : 0,
                              (zeroAtt == std::numeric_limits<uint32_t>::max() ? -1 : static_cast<int>(zeroAtt)));
     }
-    output->unmap();
 
     // Last-round decision: require an all-zero attachment AND union fits cache
     const size_t cacheCapacity = imagePtr->numCachedImages(channelIndex);

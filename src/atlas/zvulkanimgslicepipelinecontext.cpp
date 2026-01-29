@@ -903,23 +903,14 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
         missingBlocks.reserve(unique.size());
         missingBlocks.insert(missingBlocks.end(), unique.begin(), unique.end());
 
-        try {
-          if (!missingBlocks.empty()) {
-            auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-            ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", channelIndex));
-            imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks,
-                                                         channelIndex,
-                                                         cancellationToken,
-                                                         timer,
-                                                         static_cast<uint32_t>(roundIndex));
-          }
-        }
-        catch (const ZCancellationException&) {
-          // Mirror GL: cancellation aborts this progressive round cleanly.
-          return;
-        }
-        catch (const folly::OperationCancelled&) {
-          return;
+        if (!missingBlocks.empty()) {
+          auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+          ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", channelIndex));
+          imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks,
+                                                       channelIndex,
+                                                       cancellationToken,
+                                                       timer,
+                                                       static_cast<uint32_t>(roundIndex));
         }
 
         if (m_deferredProgressive && m_deferredProgressive->streamKey == streamKey &&
