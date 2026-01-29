@@ -104,6 +104,16 @@ void ZVulkanFrameExecutor::markSubmitted(ActiveFrame& frame)
   frame.m_frame->inFlight = true;
 }
 
+void ZVulkanFrameExecutor::scheduleAfterCompletion(ActiveFrame& frame, std::function<void()> fn)
+{
+  if (!fn) {
+    return;
+  }
+  CHECK(frame.valid()) << "scheduleAfterCompletion called with an invalid ActiveFrame";
+  CHECK(frame.m_executor == this) << "scheduleAfterCompletion called with a frame from a different executor";
+  frame.m_frame->completionCallbacks.push_back(std::move(fn));
+}
+
 void ZVulkanFrameExecutor::waitForCompletion(ActiveFrame& frame)
 {
   if (!frame.valid() || !frame.m_frame->inFlight) {
@@ -116,6 +126,73 @@ void ZVulkanFrameExecutor::waitForCompletion(ActiveFrame& frame)
     LOG(WARNING) << "Frame executor waitForFences returned " << vk::to_string(waitResult);
   }
   frame.m_frame->inFlight = false;
+  runCompletionCallbacks(*frame.m_frame);
+}
+
+void ZVulkanFrameExecutor::waitForAllInFlight()
+{
+  ensureFrames();
+  if (m_frames.empty()) {
+    return;
+  }
+
+  auto& vkDevice = m_device.context().device();
+  for (auto& frame : m_frames) {
+    if (!frame.inFlight) {
+      continue;
+    }
+    const auto waitResult = vkDevice.waitForFences({*frame.fence}, true, kFenceTimeoutNs);
+    if (waitResult != vk::Result::eSuccess) {
+      LOG(WARNING) << "Frame executor waitForFences returned " << vk::to_string(waitResult);
+    }
+    frame.inFlight = false;
+    runCompletionCallbacks(frame);
+  }
+
+  // Teardown and backend-switch paths may schedule completion callbacks on a
+  // frame that never gets submitted. At this point, we have waited for all
+  // known in-flight submissions, so it is safe to flush any remaining callbacks
+  // without tying them to a particular fence.
+  for (auto& frame : m_frames) {
+    runCompletionCallbacks(frame);
+  }
+}
+
+bool ZVulkanFrameExecutor::hasInFlightFrames()
+{
+  if (m_frames.empty() && (m_framesDirty || m_maxFramesInFlight > 0)) {
+    ensureFrames();
+  }
+  for (const auto& frame : m_frames) {
+    if (frame.inFlight) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void ZVulkanFrameExecutor::pollCompletions()
+{
+  ensureFrames();
+  if (m_frames.empty()) {
+    return;
+  }
+
+  auto& vkDevice = m_device.context().device();
+  for (auto& frame : m_frames) {
+    if (!frame.inFlight) {
+      continue;
+    }
+    const auto status = vkDevice.waitForFences({*frame.fence}, true, 0);
+    if (status == vk::Result::eTimeout) {
+      continue;
+    }
+    if (status != vk::Result::eSuccess) {
+      LOG(WARNING) << "Frame executor poll waitForFences returned " << vk::to_string(status);
+    }
+    frame.inFlight = false;
+    runCompletionCallbacks(frame);
+  }
 }
 
 void ZVulkanFrameExecutor::ensureFrames()
@@ -180,11 +257,31 @@ ZVulkanFrameExecutor::Frame& ZVulkanFrameExecutor::acquireFrame()
               << " (frames_in_flight=" << m_maxFramesInFlight << ", slot=" << slot << ")";
     }
     frame.inFlight = false;
+    runCompletionCallbacks(frame);
+  } else if (!frame.completionCallbacks.empty()) {
+    LOG(WARNING) << "VK executor: acquiring a frame slot with pending completion callbacks but no in-flight fence;"
+                 << " waiting for all in-flight frames and flushing callbacks before reuse.";
+    waitForAllInFlight();
+    runCompletionCallbacks(frame);
   }
 
   vkDevice.resetFences({*frame.fence});
   frame.commandBuffer.reset();
   return frame;
+}
+
+void ZVulkanFrameExecutor::runCompletionCallbacks(Frame& frame)
+{
+  if (frame.completionCallbacks.empty()) {
+    return;
+  }
+  auto callbacks = std::move(frame.completionCallbacks);
+  frame.completionCallbacks.clear();
+  for (auto& fn : callbacks) {
+    if (fn) {
+      fn();
+    }
+  }
 }
 
 void ZVulkanFrameExecutor::executeImmediate(const std::function<void(vk::raii::CommandBuffer&)>& record,

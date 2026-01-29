@@ -9,6 +9,7 @@
 #include "zmesh.h"
 #include "zcancellation.h"
 #include "zneuroglancerprecomputed.h"
+#include <folly/OperationCancelled.h>
 #include <folly/ScopeGuard.h>
 #include <QMenu>
 #include <cmath>
@@ -218,6 +219,14 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   }
 }
 
+Z3DImgFilter::~Z3DImgFilter()
+{
+  // Z3DImg owns Vulkan paging caches (managed textures) via destruction callbacks.
+  // Those caches are pinned per submission by the Vulkan backend; ensure all in-flight
+  // work and post-fence unpin callbacks have drained before m_3dImg is destroyed.
+  m_rendererBase.flushVulkanWorkForTeardown("Z3DImgFilter::~Z3DImgFilter");
+}
+
 void Z3DImgFilter::setData(const ZImgPack& imgPack)
 {
   if (m_widgetsGroup) {
@@ -247,6 +256,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
 
     // Z3DImg holds a reference to the provided ZImgPack, so any adapter pack
     // must live as long as m_3dImg.
+    // For Vulkan, ensure any in-flight submissions have released their residency pins
+    // before destroying the previous Z3DImg (owner-release triggers residency cleanup).
+    m_rendererBase.flushVulkanWorkForTeardown("Z3DImgFilter::setData");
     m_3dImg.reset();
     m_imgPackOverride.reset();
     const ZImgPack* packFor3D = &imgPack;
@@ -1096,6 +1108,10 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       m_imgSliceRenderer.resetProgress(eye);
       throw;
     }
+    catch (const folly::OperationCancelled&) {
+      m_imgSliceRenderer.resetProgress(eye);
+      throw;
+    }
     m_opaqueValid[eye] = true;
     // Compute progressive progress to mirror GL behaviour (preview=0.5, final=1.0).
     const double progress = m_progressiveRendering ? m_imgSliceRenderer.progressiveProgress(eye) : 1.0;
@@ -1359,6 +1375,10 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
     }
     catch (const ZCancellationException&) {
       // Mirror GL: on cancel, reset progressive state so next frame starts fresh.
+      m_imgRaycasterRenderer.resetProgress(eye);
+      throw;
+    }
+    catch (const folly::OperationCancelled&) {
       m_imgRaycasterRenderer.resetProgress(eye);
       throw;
     }

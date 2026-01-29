@@ -353,6 +353,25 @@ void Z3DRendererBase::endVulkanFrame()
   m_currentFrameLabel.clear();
 }
 
+void Z3DRendererBase::flushVulkanWorkForTeardown(std::string_view reason)
+{
+  if (m_activeBackend != RenderBackend::Vulkan || m_backend == nullptr) {
+    return;
+  }
+
+  // Do not flush with a frame left open; end it first so submissions (and their
+  // corresponding post-fence callbacks) have a well-defined lifetime.
+  if (m_vulkanFrameActive) {
+    endVulkanFrame();
+  }
+
+  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_backend.get());
+  if (vkBackend == nullptr) {
+    return;
+  }
+  vkBackend->flushForTeardown(reason);
+}
+
 void Z3DRendererBase::recordVulkanBatchesInActiveFrame(const std::function<void()>& recordBatches,
                                                        std::string_view label)
 {

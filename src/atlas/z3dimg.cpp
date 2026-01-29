@@ -1577,10 +1577,27 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     //                                           readImageBlocksToQueueAsync(c, pendingTasks, resInfo, imgQueue, bt))
     //            .scheduleOn(folly::getGlobalCPUExecutor())
     //            .start();
-    auto f = folly::coro::toFuture(
+    auto readFuture = folly::coro::toFuture(
       folly::coro::co_withCancellation(cancellationToken,
                                        readImageBlocksToQueueAsync(c, pendingTasks, resInfo, imgQueue, bt)),
       folly::getGlobalCPUExecutor());
+    // The reader coroutine captures references to imgQueue/pendingTasks/bt. If we return early (cancellation),
+    // ensure it is drained before those locals go out of scope to avoid use-after-free memory corruption.
+    auto readFutureGuard = folly::makeGuard([&]() {
+      if (!readFuture.valid()) {
+        return;
+      }
+      readFuture.wait();
+      if (!readFuture.hasException()) {
+        return;
+      }
+      const auto& result = readFuture.result();
+      if (result.hasException<ZCancellationException>() || result.hasException<folly::OperationCancelled>()) {
+        VLOG(2) << "3D paging block reader cancelled.";
+        return;
+      }
+      LOG(ERROR) << "3D paging block reader failed: " << result.exception().what();
+    });
 #else
     std::vector<folly::Future<folly::Unit>> blockFutures;
     blockFutures.reserve(pendingTasks.size());
@@ -1635,6 +1652,10 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                                          std::get<1>(elem)->channelData(0));
         }
         --remainingBlocksToUpload;
+      } else if (readFuture.isReady() && imgQueue.size() == 0) {
+        // Reader finished but no more blocks will arrive. Break to surface the underlying error
+        // (or crash if it finished "successfully" but failed to enqueue all blocks).
+        break;
       }
       if (std::chrono::steady_clock::now() - lastLogTime >=
           std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)) {
@@ -1650,6 +1671,9 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         lastLogTime = std::chrono::steady_clock::now();
       }
     }
+    // Ensure the reader finished and propagate any unexpected failures.
+    std::move(readFuture).get();
+    CHECK(remainingBlocksToUpload == 0) << "3D paging block reader ended before delivering all blocks";
     bt.recordEvent("image blocks uploading");
   } else {
     // use PBO

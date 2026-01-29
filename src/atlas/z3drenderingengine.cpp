@@ -30,6 +30,7 @@
 #include "z3dfilter.h"
 #include "zcancellation.h"
 #include "z3dperfcollector.h"
+#include <folly/OperationCancelled.h>
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
@@ -1552,6 +1553,12 @@ void Z3DRenderingEngine::renderFast(bool stereo)
     Q_EMIT progressChanged(100);
     return;
   }
+  catch (const folly::OperationCancelled&) {
+    LOG(INFO) << "cancelled (folly), schedule a update later";
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    Q_EMIT progressChanged(100);
+    return;
+  }
   catch (const ZException& e) {
     LOG(INFO) << e.what();
   }
@@ -1581,6 +1588,10 @@ void Z3DRenderingEngine::render(bool stereo)
   }
   catch (const ZCancellationException&) {
     LOG(INFO) << "cancelled, schedule a update later";
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+  }
+  catch (const folly::OperationCancelled&) {
+    LOG(INFO) << "cancelled (folly), schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   }
   catch (const ZException& e) {

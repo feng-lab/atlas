@@ -28,6 +28,7 @@ class Z3DImgFilter : public Z3DBoundedFilter
 
 public:
   explicit Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  ~Z3DImgFilter() override;
 
   void setData(const ZImgPack& imgPack);
 

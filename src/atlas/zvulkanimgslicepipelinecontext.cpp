@@ -24,6 +24,7 @@
 #include "zbenchtimer.h"
 #include "zmesh.h"
 
+#include <folly/OperationCancelled.h>
 #include <gflags/gflags.h>
 #include <QString>
 
@@ -915,6 +916,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
         }
         catch (const ZCancellationException&) {
           // Mirror GL: cancellation aborts this progressive round cleanly.
+          return;
+        }
+        catch (const folly::OperationCancelled&) {
           return;
         }
 

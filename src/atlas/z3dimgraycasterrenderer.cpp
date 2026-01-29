@@ -13,6 +13,7 @@
 #include "zstatisticsutils.h"
 #include "z3dscratchresourcepool.h"
 #include "z3drenderglobalstate.h"
+#include <folly/OperationCancelled.h>
 #include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
@@ -760,6 +761,10 @@ double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
     resetProgress(eye);
     throw;
   }
+  catch (const folly::OperationCancelled&) {
+    resetProgress(eye);
+    throw;
+  }
 }
 
 void Z3DImgRaycasterRenderer::render(Z3DEye eye)
@@ -1147,14 +1152,13 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 
   Z3DScratchResourcePool::RenderTargetLease layerLease;
   if (progressive && m_channelIdx[eye] < 0) {
-    // Acquire and clear the persistent layer array lease used across rounds
+    // Start of a new progressive (paged full-res) cycle:
+    // - Show a fast preview immediately (downsampled volume).
+    // - Seed the persistent per-channel layer array with that preview so the first progressive
+    //   merge does not start from black (matches Vulkan UX: preview -> refine).
     if (m_progressiveLayerLease) {
       // Ensure previous lease is returned to the pool before re-acquiring
       m_progressiveLayerLease.release();
-    }
-    // Show an initial fast result immediately
-    if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
-      render3DImageFast(eye, visibleIdxs);
     }
     // Initialize progressive accumulation state
     m_channelIdx[eye] = 0;
@@ -1175,14 +1179,72 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     m_rendererBase.acquirePersistentLayerArrayRenderTarget(m_progressiveLayerLease,
                                                            m_outputSize,
                                                            static_cast<uint32_t>(visibleIdxs.size()));
-    if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
-      // Clear GL-backed slices
-      for (size_t idx = 0; idx < visibleIdxs.size(); ++idx) {
-        m_progressiveLayerLease.renderTarget->attachSlice(idx);
+
+    if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+      // If there is only one visible channel, the progressive path draws directly to the
+      // final framebuffer (no layer-array merge), so we can just show the normal fast preview.
+      if (visibleIdxs.size() <= 1) {
+        render3DImageFast(eye, visibleIdxs);
+        return 0.5;
+      }
+
+      CHECK(m_progressiveLayerLease.hasGLRenderTarget())
+        << "Progressive layer lease missing GL render target during fast preview seeding.";
+      CHECK(m_scRaycasterShader != nullptr);
+      CHECK(m_mergeChannelShader != nullptr);
+
+      // Render fast preview into the persistent layer array (one slice per visible channel).
+      m_scRaycasterShader->bind();
+
+      float n = viewState.nearClip;
+      float f = viewState.farClip;
+      // http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+      //  zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+      float a = f * n / (f - n);
+      float b = 0.5f * (f + n) / (f - n) + 0.5f;
+      m_scRaycasterShader->setUniform("ze_to_zw_b", b);
+      m_scRaycasterShader->setUniform("ze_to_zw_a", a);
+
+      // entry/exit points
+      CHECK(m_entryExitLease);
+      CHECK(m_entryExitLease.renderTarget != nullptr);
+      m_scRaycasterShader->bindTexture("ray_entry_exit_tex_coord",
+                                       m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+
+      if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
+        m_scRaycasterShader->setUniform("iso_value", m_isoValue);
+      }
+
+      if (m_compositingModeValue == ImgCompositingMode::LocalMIP ||
+          m_compositingModeValue == ImgCompositingMode::LocalMIPOpaque) {
+        m_scRaycasterShader->setUniform("local_MIP_threshold", m_localMIPThreshold);
+      }
+
+      m_scRaycasterShader->setUniform("sampling_rate", m_samplingRateValue);
+
+      for (size_t slice = 0; slice < visibleIdxs.size(); ++slice) {
+        m_progressiveLayerLease.renderTarget->attachSlice(slice);
         m_progressiveLayerLease.renderTarget->bind();
         m_progressiveLayerLease.renderTarget->clear();
+
+        bindVolumeAndTransferFunc(*m_scRaycasterShader, visibleIdxs[slice]);
+        renderScreenQuad(*m_VAO, *m_scRaycasterShader);
+
         m_progressiveLayerLease.renderTarget->release();
       }
+
+      m_scRaycasterShader->release();
+
+      // Merge the seeded preview layers to the final framebuffer.
+      m_mergeChannelShader->bind();
+      m_mergeChannelShader->bindTexture("color_texture",
+                                        m_progressiveLayerLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+      m_mergeChannelShader->bindTexture("depth_texture",
+                                        m_progressiveLayerLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
+      renderScreenQuad(*m_VAO, *m_mergeChannelShader);
+      m_mergeChannelShader->release();
+
+      CHECK_GL_ERROR
     }
     return 0.5;
   }

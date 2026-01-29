@@ -69,9 +69,25 @@ public:
 
   ActiveFrame beginFrame();
   void markSubmitted(ActiveFrame& frame);
+  // Schedule a callback to run once the frame's submission fence signals.
+  // Callbacks are executed on the caller thread when the executor observes
+  // fence completion (waitForCompletion, acquireFrame reuse, or waitForAllInFlight).
+  void scheduleAfterCompletion(ActiveFrame& frame, std::function<void()> fn);
   void waitForCompletion(ActiveFrame& frame);
+  // Wait for all in-flight frames managed by this executor. This is intended
+  // for teardown paths that need to guarantee GPU-idle with respect to all
+  // per-frame submissions before releasing resources.
+  void waitForAllInFlight();
+  // Query whether any frames are currently marked in flight. This reflects
+  // whether the executor believes there are outstanding GPU submissions.
+  [[nodiscard]] bool hasInFlightFrames();
 
   void executeImmediate(const std::function<void(vk::raii::CommandBuffer&)>& record, std::string_view debugLabel = {});
+
+  // Poll in-flight fences without blocking and run completion callbacks for any
+  // frame that has already finished. Intended to reduce latency for CPU-side
+  // releases (residency unpins, retained UBO lifetimes, etc.).
+  void pollCompletions();
 
   void trim();
 
@@ -83,9 +99,11 @@ private:
     vk::raii::Semaphore acquireSemaphore{nullptr};
     vk::raii::Semaphore releaseSemaphore{nullptr};
     bool inFlight = false;
+    std::vector<std::function<void()>> completionCallbacks;
   };
 
   Frame& acquireFrame();
+  void runCompletionCallbacks(Frame& frame);
   void ensureFrames();
   void rebuildFrames();
 

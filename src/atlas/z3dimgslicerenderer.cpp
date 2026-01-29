@@ -9,6 +9,7 @@
 #include "zcancellation.h"
 #include "z3dscratchresourcepool.h"
 #include "z3drenderglobalstate.h"
+#include <folly/OperationCancelled.h>
 #include <memory>
 #include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
@@ -341,6 +342,10 @@ double Z3DImgSliceRenderer::renderProgressively(Z3DEye eye)
     return progress;
   }
   catch (const ZCancellationException&) {
+    resetProgress(eye);
+    throw;
+  }
+  catch (const folly::OperationCancelled&) {
     resetProgress(eye);
     throw;
   }

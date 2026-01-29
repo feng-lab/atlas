@@ -89,7 +89,14 @@ Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
   , m_fontContext(std::make_unique<ZVulkanFontPipelineContext>(*this))
 {}
 
-Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend() = default;
+Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend()
+{
+  // Teardown invariant: do not drop post-fence callbacks (unpins, deferred releases)
+  // while they still refer to in-flight submissions. When the owning renderer/filter
+  // is destroyed, callers may still destroy resources (e.g. Z3DImg) whose Vulkan
+  // cache textures are pinned per submission. Ensure we drain those pins now.
+  flushForTeardown("backend_dtor");
+}
 
 Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::current()
 {
@@ -98,6 +105,11 @@ Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::current()
 
 void Z3DRendererVulkanBackend::preBackendSwitch()
 {
+  // Ensure all in-flight submissions have completed and all fence-gated callbacks
+  // (residency unpins, deferred scratch-slot releases) are drained before we
+  // clear frame resources and allow renderer-owned resources to be destroyed.
+  flushForTeardown("preBackendSwitch");
+
   // Drop shared placeholders; they'll be recreated lazily on next use.
   m_defaultPlaceholder2D.reset();
   m_defaultSampler.reset();
@@ -388,8 +400,8 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Stage 2: apply descriptor arena reset when reusing this in-flight frame.
   // Safe point: frame executor waited for the fence when acquiring the frame.
   applyPendingArenaReset(frameResources);
-  // Also drain any submission-fence callbacks whose fences have already signaled.
-  drainPostFenceCallbacks();
+  // Run any completion callbacks for fences that have already signaled.
+  device().frameExecutor().pollCompletions();
   ensureArenaOnFrame(frameResources);
   ensureUniformArena(frameResources);
   // Expose frame resources early so suballocateUniform can target this frame.
@@ -702,8 +714,9 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   if (needFenceWait) {
     device().frameExecutor().waitForCompletion(frameHandle);
     applyPendingArenaReset(frame); // runs deferred readback consumers now
-    // Fence signaled: run any pending post-fence callbacks immediately.
-    drainPostFenceCallbacks();
+    // Fence signaled: completion callbacks ran in waitForCompletion. Poll any
+    // other frames that may have finished as well.
+    device().frameExecutor().pollCompletions();
 
     // Fence signaled; deferred readbacks/releases executed.
     if (m_pumpFenceAfterFirstSubmit) {
@@ -711,8 +724,8 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
       m_pumpFenceAfterFirstSubmit = false;
     }
   } else {
-    // Poll post-fence callbacks; some fences may have signaled already.
-    drainPostFenceCallbacks();
+    // Poll completion callbacks; some fences may have signaled already.
+    device().frameExecutor().pollCompletions();
   }
 
   // VLOG(1) frame recycling stats (descriptors and arena reset scheduling)
@@ -759,46 +772,6 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   s_currentBackend = nullptr;
 
   // No cross-frame uniform sizing heuristics; each frame is sized independently.
-}
-
-void Z3DRendererVulkanBackend::drainPostFenceCallbacks()
-{
-  if (m_postFenceCallbacks.empty()) {
-    return;
-  }
-  auto& vkDevice = m_sharedDevice->context().device();
-  // Identify callbacks whose fences have signaled
-  std::vector<size_t> ready;
-  ready.reserve(m_postFenceCallbacks.size());
-  for (size_t i = 0; i < m_postFenceCallbacks.size(); ++i) {
-    VkFence raw = m_postFenceCallbacks[i].first;
-    if (!raw) {
-      ready.push_back(i);
-      continue;
-    }
-    // Poll fence status without blocking: timeout = 0
-    vk::Result status = vkDevice.waitForFences({vk::Fence(raw)}, true, 0);
-    if (status == vk::Result::eSuccess) {
-      ready.push_back(i);
-    }
-  }
-  if (ready.empty()) {
-    return;
-  }
-  for (size_t idx : ready) {
-    auto fn = std::move(m_postFenceCallbacks[idx].second);
-    if (fn) {
-      fn();
-    }
-    m_postFenceCallbacks[idx].first = VK_NULL_HANDLE;
-    m_postFenceCallbacks[idx].second = nullptr;
-  }
-  m_postFenceCallbacks.erase(std::remove_if(m_postFenceCallbacks.begin(),
-                                            m_postFenceCallbacks.end(),
-                                            [](const auto& p) {
-                                              return p.first == VK_NULL_HANDLE || !static_cast<bool>(p.second);
-                                            }),
-                             m_postFenceCallbacks.end());
 }
 
 namespace {
@@ -2476,13 +2449,64 @@ void Z3DRendererVulkanBackend::scheduleAfterCurrentFrameCompletion(std::function
     return;
   }
   if (!m_activeFrame) {
-    // No active frame; execute immediately to avoid leaks.
+    // No active frame. This occurs on teardown and on backend switches when
+    // persistent Vulkan leases are released after the last submission finished
+    // recording but before another beginRender().
+    //
+    // We must not execute immediately if any submissions are still in flight, as
+    // the release closures can drop resources referenced by the GPU (scratch
+    // targets, paged image caches, etc.). In this edge state, block until all
+    // frame-executor submissions complete, then execute.
+    if (m_sharedDevice) {
+      m_sharedDevice->frameExecutor().waitForAllInFlight();
+    }
     fn();
-    VLOG(2) << "VK scheduleAfterCurrentFrameCompletion with no active frame; executed immediately";
     return;
   }
   m_activeFrame->deferredReleases.push_back(std::move(fn));
   m_activeFrame->leaseRecycleQueued++;
+}
+
+void Z3DRendererVulkanBackend::flushForTeardown(std::string_view reason)
+{
+  if (!m_sharedDevice) {
+    return;
+  }
+
+  if (VLOG_IS_ON(1)) {
+    VLOG(1) << fmt::format("VK flushForTeardown begin reason='{}' inFlight={}",
+                           reason.empty() ? "<unspecified>" : std::string(reason),
+                           m_sharedDevice->frameExecutor().hasInFlightFrames());
+  }
+
+  // If we're mid-recording and have pinned managed textures for this (not yet submitted)
+  // command buffer, unpin them now to avoid carrying pins into teardown without a fence.
+  if (m_activeFrame && (!m_activeFrameHandle || !m_activeFrameHandle->valid())) {
+    // Defensive: if m_activeFrame exists without a valid handle, it cannot be submitted.
+    if (!m_activeFrame->residencyPinnedTextures.empty()) {
+      for (auto* tex : m_activeFrame->residencyPinnedTextures) {
+        m_sharedDevice->residencyManager().unpinIfManaged(tex);
+      }
+      m_activeFrame->residencyPinnedTextures.clear();
+    }
+  } else if (m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid() && m_frameRecording) {
+    // We have an active recording. We do not attempt to submit during teardown; just drop
+    // any pins accumulated so far since they have not been consumed by the GPU.
+    if (!m_activeFrame->residencyPinnedTextures.empty()) {
+      for (auto* tex : m_activeFrame->residencyPinnedTextures) {
+        m_sharedDevice->residencyManager().unpinIfManaged(tex);
+      }
+      m_activeFrame->residencyPinnedTextures.clear();
+    }
+  }
+
+  // Wait for all submitted frames to finish so fence-gated callbacks can run safely.
+  m_sharedDevice->frameExecutor().waitForAllInFlight();
+
+  if (VLOG_IS_ON(1)) {
+    VLOG(1) << fmt::format("VK flushForTeardown end reason='{}'",
+                           reason.empty() ? "<unspecified>" : std::string(reason));
+  }
 }
 
 void Z3DRendererVulkanBackend::scheduleAfterActiveSubmissionFence(std::function<void()> fn)
@@ -2495,8 +2519,7 @@ void Z3DRendererVulkanBackend::scheduleAfterActiveSubmissionFence(std::function<
     scheduleAfterCurrentFrameCompletion(std::move(fn));
     return;
   }
-  VkFence raw = *m_activeFrameHandle->fence();
-  m_postFenceCallbacks.emplace_back(raw, std::move(fn));
+  device().frameExecutor().scheduleAfterCompletion(*m_activeFrameHandle, std::move(fn));
 }
 
 void Z3DRendererVulkanBackend::pinTextureForActiveSubmission(ZVulkanTexture* texture)

@@ -10,6 +10,7 @@
 #include "zvulkanresidencymanager.h"
 #include "zvulkantexture.h"
 
+#include <folly/OperationCancelled.h>
 #include <folly/MPMCQueue.h>
 #include <folly/coro/FutureUtil.h>
 #include <folly/executors/GlobalExecutor.h>
@@ -121,11 +122,29 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   const ZImgInfo resInfo(extent.x, extent.y, extent.z, 1);
 
   folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>>, true> imgQueue;
-  [[maybe_unused]] auto readFuture =
+  auto readFuture =
     folly::coro::toFuture(folly::coro::co_withCancellation(
                             cancellationToken,
                             image.readImageBlocksToQueueAsync(channel, pendingTasks, resInfo, imgQueue, timer)),
                           cpuExecutor);
+  // The reader coroutine captures references to imgQueue/pendingTasks/timer. If we return early (e.g. cancellation),
+  // we must wait for it to finish so background tasks don't enqueue into a destroyed queue, corrupting memory.
+  auto readFutureGuard = folly::makeGuard([&]() {
+    if (!readFuture.valid()) {
+      return;
+    }
+    readFuture.wait();
+    if (!readFuture.hasException()) {
+      return;
+    }
+    const auto& result = readFuture.result();
+    if (result.hasException<ZCancellationException>() || result.hasException<folly::OperationCancelled>()) {
+      // Cancellation is expected during progressive rendering. Avoid noisy logs.
+      VLOG(2) << "Vulkan paged-image block reader cancelled.";
+      return;
+    }
+    LOG(ERROR) << "Vulkan paged-image block reader failed: " << result.exception().what();
+  });
 
   size_t emptyBlockCount = 0;
   int remainingBlocks = static_cast<int>(pendingTasks.size());
@@ -164,6 +183,10 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
       }
 
       --remainingBlocks;
+    } else if (readFuture.isReady() && imgQueue.size() == 0) {
+      // Reader finished but no more blocks will arrive. Break to surface the underlying error
+      // (or crash if it finished "successfully" but failed to enqueue all blocks).
+      break;
     }
 
     if (std::chrono::steady_clock::now() - lastLog >=
@@ -180,6 +203,10 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
       lastLog = std::chrono::steady_clock::now();
     }
   }
+
+  // Ensure the reader finished and propagate any unexpected failures.
+  std::move(readFuture).get();
+  CHECK(remainingBlocks == 0) << "Vulkan block reader ended before delivering all blocks";
 
   timer.recordEvent("image blocks uploading");
   VLOG(2) << "Uploaded " << (pendingTasks.size() - emptyBlockCount) << " image blocks to Vulkan image cache.";
