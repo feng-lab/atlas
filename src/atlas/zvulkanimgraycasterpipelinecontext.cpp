@@ -1008,17 +1008,38 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_
 
 // (probe pipelines removed)
 
-void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactOutput(size_t bytes)
+ZVulkanImgRaycasterPipelineContext::BlockIdCompactionOutput&
+ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactOutput(size_t bytes)
 {
-  if (m_blockIdCompactOutput && m_blockIdCompactCapacity >= bytes) {
-    return;
+  CHECK(bytes > 0) << "ensureBlockIdCompactOutput called with zero bytes";
+  void* key = m_backend.activeFrameKey();
+  CHECK(key != nullptr) << "ensureBlockIdCompactOutput called with no active frame";
+
+  // The executor may rebuild its frame slots when maxFramesInFlight changes or
+  // when the shared Vulkan device is replaced. Frame keys become invalid across
+  // such rebuilds, so clear any per-slot buffers when those properties change.
+  auto& dev = m_backend.device();
+  const uint32_t maxFrames = dev.frameExecutor().maxFramesInFlight();
+  if (m_blockIdCompactDevice != &dev || m_blockIdCompactMaxFramesInFlight != maxFrames) {
+    m_blockIdCompactOutputs.clear();
+    m_blockIdCompactDevice = &dev;
+    m_blockIdCompactMaxFramesInFlight = maxFrames;
   }
-  // Allocate host-visible, coherent buffer to receive compacted block IDs or bitset
-  m_blockIdCompactOutput = m_backend.device().createBuffer(
-    bytes,
-    vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  m_blockIdCompactCapacity = bytes;
+
+  auto& out = m_blockIdCompactOutputs[key];
+  if (out.buffer && out.capacity >= bytes) {
+    return out;
+  }
+
+  // Allocate host-visible, coherent buffer to receive compacted block IDs or bitset.
+  // This buffer is written by GPU compute and then read back by CPU after fence completion.
+  auto unique =
+    dev.createBuffer(bytes,
+                     vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                     vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  out.buffer = std::shared_ptr<ZVulkanBuffer>(std::move(unique));
+  out.capacity = bytes;
+  return out;
 }
 
 // counts snapshot removed; counts are embedded in unified compact buffer header
@@ -1059,6 +1080,8 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   uint32_t imgH = firstBlock->height();
   // Optional: dual probe (sampled + storage) and skip normal compaction
   // (probes removed)
+  std::shared_ptr<ZVulkanBuffer> compactOutput;
+  size_t compactOutputBytes = 0;
   // Append-only compaction (drop hash variants): allocate append buffer
   {
     // Unified output buffer:
@@ -1066,17 +1089,21 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     const uint32_t capacityIDs = std::max<uint32_t>(1u, imgW * imgH * 4u);
     const uint32_t headerWords = 1u + 8u; // count + counts[8]
     const size_t bytes = static_cast<size_t>(headerWords + capacityIDs) * sizeof(uint32_t);
-    ensureBlockIdCompactOutput(bytes);
+    auto& out = ensureBlockIdCompactOutput(bytes);
+    CHECK(out.buffer != nullptr);
+    compactOutput = out.buffer;
+    compactOutputBytes = bytes;
     // Zero the header (count + counts[8])
     const size_t headerBytes = static_cast<size_t>(headerWords) * sizeof(uint32_t);
-    if (void* mapped = m_blockIdCompactOutput->map(0, headerBytes)) {
+    if (void* mapped = compactOutput->map(0, headerBytes)) {
       std::memset(mapped, 0x00, headerBytes);
-      m_blockIdCompactOutput->unmap();
+      compactOutput->unmap();
     }
     if (VLOG_IS_ON(1)) {
       VLOG(1) << fmt::format("BlockID compaction (append): output capacity={} bytes (header[9] + ids)", bytes);
     }
   }
+  CHECK(compactOutput != nullptr);
 
   // Record compute dispatch
   ZVulkanPipelineCommandRecorder recorder(cmd);
@@ -1223,11 +1250,11 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
       VLOG(2) << fmt::format("Compaction DS: set=0x{:x} att={} img=0x{:x} fmt={} layout={} descLayout={}",
                              reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(ds->descriptorSet())),
                              att,
-                             reinterpret_cast<uintptr_t>(static_cast<VkImage>(blockTex->image())),
-                             enumOrUnderlying(blockTex->format(), 16),
-                             enumOrUnderlying(blockTex->layout(), 16),
-                             enumOrUnderlying(blockTex->descriptorLayout(), 16));
-    }
+	                             reinterpret_cast<uintptr_t>(static_cast<VkImage>(blockTex->image())),
+	                             enumOrUnderlying(blockTex->format(), 16),
+	                             enumOrUnderlying(blockTex->layout(), 16),
+	                             enumOrUnderlying(blockTex->descriptorLayout(), 16));
+	    }
     if (bufferRead) {
       // binding 0 = SSBO texels; binding 1 = output buffer
       ds->updateStorageBuffer(0, *m_blockIdPixelBuffer);
@@ -1243,12 +1270,13 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                         vk::ImageAspectFlags{});
     }
     if (VLOG_IS_ON(2)) {
+      CHECK(compactOutput != nullptr);
       VLOG(2) << fmt::format("Compaction DS storage: set=0x{:x} buf=0x{:x} size={}B",
                              reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(ds->descriptorSet())),
-                             reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(m_blockIdCompactOutput->buffer())),
-                             m_blockIdCompactOutput->size());
+                             reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(compactOutput->buffer())),
+                             compactOutput->size());
     }
-    ds->updateStorageBuffer(1, *m_blockIdCompactOutput);
+    ds->updateStorageBuffer(1, *compactOutput);
     spec.descriptorSets = {ds->descriptorSet()};
     // Push constants: width, height, stride, capacity, att index
     struct PC
@@ -1281,28 +1309,33 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   const size_t resolvedChannelIndex = payload.visibleChannels[static_cast<size_t>(payload.channelIndexRaw)];
 
   // After submission completion: parse compacted buffer and update caches; determine if this round is complete.
-  // Use end-of-frame callback rather than per-submission fence to guarantee delivery even if
-  // drivers/platforms coalesce or reorder internal submits. This mirrors how readback consumers
-  // are gated and has identical ordering w.r.t. subsequent frames.
-  auto bufPtr = m_blockIdCompactOutput.get();
+  //
+  // Note: this work can throw cancellation exceptions (and can trigger additional uploads).
+  // To keep teardown + residency pin lifetimes robust, gate this on "current frame completion"
+  // (frame-slot reuse) rather than the raw submission fence. This mirrors other readback
+  // consumers and ensures residency unpins (which are submission-fence gated) have already run.
+  CHECK(compactOutput != nullptr);
   m_backend.scheduleAfterCurrentFrameCompletion([this,
-                                                 bufPtr,
-                                                 imgW,
-                                                 imgH,
-                                                 streamKey = payload.streamKey,
-                                                 eye = batch.eye,
-                                                 channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
-                                                 attCount = effectiveAttachmentCount,
-                                                 channelIndex = resolvedChannelIndex,
-                                                 channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
-                                                 roundIndex = static_cast<uint32_t>(payload.roundIndexRaw),
-                                                 imagePtr = payload.image]() {
-    CHECK(bufPtr != nullptr);
+                                                output = compactOutput,
+                                                outputBytes = compactOutputBytes,
+                                                imgW,
+                                                imgH,
+                                                streamKey = payload.streamKey,
+                                                eye = batch.eye,
+                                                channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
+                                                attCount = effectiveAttachmentCount,
+                                                channelIndex = resolvedChannelIndex,
+                                                channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
+                                                roundIndex = static_cast<uint32_t>(payload.roundIndexRaw),
+                                                imagePtr = payload.image]() {
+    CHECK(output != nullptr);
     CHECK(imagePtr != nullptr);
     const uint32_t capacityIDs = imgW * imgH * 4u;
     const uint32_t headerWords = 1u + 8u; // count + counts[8]
     const size_t mapBytes = static_cast<size_t>(headerWords + capacityIDs) * sizeof(uint32_t);
-    const void* mapped = bufPtr->map(0, mapBytes);
+    CHECK_LE(mapBytes, outputBytes);
+    CHECK_LE(mapBytes, static_cast<size_t>(output->size()));
+    const void* mapped = output->map(0, mapBytes);
     CHECK(mapped);
     std::vector<uint32_t> missingBlocks;
     // Unified format: [count][counts[8]][ids...]
@@ -1374,7 +1407,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                              allZeroAttachments ? 1 : 0,
                              (zeroAtt == std::numeric_limits<uint32_t>::max() ? -1 : static_cast<int>(zeroAtt)));
     }
-    bufPtr->unmap();
+    output->unmap();
 
     // Last-round decision: require an all-zero attachment AND union fits cache
     const size_t cacheCapacity = imagePtr->numCachedImages(channelIndex);

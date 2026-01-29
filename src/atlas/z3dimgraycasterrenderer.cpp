@@ -1321,7 +1321,13 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     } else {
       m_progressiveLayerLease.renderTarget->attachSlice(m_channelIdx[eye]);
       m_progressiveLayerLease.renderTarget->bind();
-      m_progressiveLayerLease.renderTarget->clear();
+      // Vulkan parity: preserve the seeded preview (or previously refined pixels) for fragments
+      // that the copy shader discards, so we don't flash black holes while paging/refining.
+      // Use depth compare Always to ensure valid fragments overwrite existing slice contents.
+      glDepthFunc(GL_ALWAYS);
+      auto depthFuncGuard = folly::makeGuard([]() {
+        glDepthFunc(GL_LESS);
+      });
 
       m_copyTextureShader->bind();
       m_copyTextureShader->bindTexture("color_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT0));

@@ -4,6 +4,7 @@
 #include "zvulkan.h"
 
 #include <map>
+#include <unordered_map>
 #include <unordered_set>
 #include <memory>
 #include <optional>
@@ -289,8 +290,17 @@ private:
   std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineBufferAppend;
   std::unique_ptr<ZVulkanBuffer> m_blockIdPixelBuffer; // device-local, TRANSFER_DST | STORAGE_BUFFER
   size_t m_blockIdPixelBufferCapacity = 0;
-  std::unique_ptr<ZVulkanBuffer> m_blockIdCompactOutput; // host-visible, compacted result
-  size_t m_blockIdCompactCapacity = 0; // bytes
+  // Block-ID compaction output is read back on CPU after the submission fence signals.
+  // With >1 frames in flight, this must be per frame-slot to avoid CPU/GPU hazards
+  // (CPU memset while GPU writes; overwrite-before-parse).
+  struct BlockIdCompactionOutput
+  {
+    std::shared_ptr<ZVulkanBuffer> buffer;
+    size_t capacity = 0; // bytes
+  };
+  std::unordered_map<void*, BlockIdCompactionOutput> m_blockIdCompactOutputs;
+  ZVulkanDevice* m_blockIdCompactDevice = nullptr; // non-owning; used to detect executor rebuilds
+  uint32_t m_blockIdCompactMaxFramesInFlight = 0;
   // Per-attachment snapshot of append counts (host-visible), used to detect
   // whether an attachment contributed any IDs (delta == 0 => attachment all zeros).
 
@@ -334,7 +344,7 @@ private:
                                      const ImgRaycasterPayload& payload);
 
   void ensureBlockIdCompactionPipeline(uint32_t attachmentCount, int mode);
-  void ensureBlockIdCompactOutput(size_t bytes);
+  BlockIdCompactionOutput& ensureBlockIdCompactOutput(size_t bytes);
   void recordBlockIdCompaction(Z3DRendererBase& renderer,
                                const RenderBatch& batch,
                                const ImgRaycasterPayload& payload,
