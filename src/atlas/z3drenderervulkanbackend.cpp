@@ -23,6 +23,7 @@
 #include "zvulkantexturedualpeelpipelinecontext.h"
 #include "zvulkantextureweightedaveragepipelinecontext.h"
 #include "zvulkantextureweightedblendedpipelinecontext.h"
+#include "zvulkantextureppllpipelinecontext.h"
 #include "zvulkantextureglowpipelinecontext.h"
 #include "zvulkanimgslicepipelinecontext.h"
 #include "zvulkanimgraycasterpipelinecontext.h"
@@ -43,6 +44,7 @@
 #include <array>
 #include <unordered_map>
 #include <chrono>
+#include <fstream>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -89,6 +91,7 @@ Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
   , m_textureDualPeelContext(std::make_unique<ZVulkanTextureDualPeelPipelineContext>(*this))
   , m_textureWeightedAverageContext(std::make_unique<ZVulkanTextureWeightedAveragePipelineContext>(*this))
   , m_textureWeightedBlendedContext(std::make_unique<ZVulkanTextureWeightedBlendedPipelineContext>(*this))
+  , m_texturePPLLContext(std::make_unique<ZVulkanTexturePPLLPipelineContext>(*this))
   , m_textureGlowContext(std::make_unique<ZVulkanTextureGlowPipelineContext>(*this))
   , m_imgSliceContext(std::make_unique<ZVulkanImgSlicePipelineContext>(*this))
   , m_imgRaycasterContext(std::make_unique<ZVulkanImgRaycasterPipelineContext>(*this))
@@ -302,6 +305,8 @@ std::string Z3DRendererVulkanBackend::generateGeomHeader(const Z3DRendererBase& 
 void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 {
   s_currentBackend = this;
+  m_activeRenderer = &renderer;
+  m_activePPLLIndex.reset();
   if (m_lineContext) {
     m_lineContext->resetFrame();
   }
@@ -332,6 +337,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
   if (m_textureWeightedBlendedContext) {
     m_textureWeightedBlendedContext->resetFrame();
+  }
+  if (m_texturePPLLContext) {
+    m_texturePPLLContext->resetFrame();
   }
   if (m_textureGlowContext) {
     m_textureGlowContext->resetFrame();
@@ -404,6 +412,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     m_activeFrameHandle.reset();
     m_activeFrame = nullptr;
     m_frameRecording = false;
+    m_activeRenderer = nullptr;
+    m_activePPLLIndex.reset();
+    s_currentBackend = nullptr;
     return;
   }
 
@@ -411,6 +422,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
     m_activeFrame = nullptr;
     m_frameRecording = false;
+    m_activeRenderer = nullptr;
+    m_activePPLLIndex.reset();
+    s_currentBackend = nullptr;
     return;
   }
 
@@ -512,6 +526,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.boundSetRewriteAttempts = 0;
   // Reset Stage 4 (readback) bookkeeping
   frameResources.pendingColorReadbacks.clear();
+  frameResources.pendingBufferReadbacks.clear();
   frameResources.readbackBytesCopied = 0;
   frameResources.readbackSlotsInFlight = 0;
   // Reset per-frame upload arena virtual block; free retired resources
@@ -530,6 +545,30 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.uploadArena.retiredBuffers.clear();
   // Ensure static arenas exist once a device is present
   ensureStaticArenas();
+
+  // PPLL (exact OIT): ensure the active ring slot is sized for the current viewport
+  // before we prime descriptor sets. This is keyed by the UI/perf frame token so
+  // multiple submissions within the same UI frame share the same buffers even
+  // when the Vulkan frame executor advances its command-buffer slot.
+  const auto hook = renderer.shaderHookType();
+  const bool ppllActive = (hook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
+                           hook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore);
+  if (ppllActive) {
+    CHECK(m_supportsFragStoresAndAtomics) << "PPLL requires fragment storage buffer atomics (fragmentStoresAndAtomics)";
+    const size_t desiredRing = std::max<size_t>(1, static_cast<size_t>(m_maxFramesInFlight));
+    if (m_ppllFrameRing.size() != desiredRing) {
+      m_ppllFrameRing.resize(desiredRing);
+    }
+    const size_t ringSize = m_ppllFrameRing.empty() ? 1 : m_ppllFrameRing.size();
+    m_activePPLLIndex = static_cast<size_t>(frameResources.realFrameToken % ringSize);
+    const uint64_t requestedFragments =
+      (hook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) ? m_nextPPLLRequestedFragmentCount : 0;
+    ensurePPLLResources(renderer.frameState().viewport, requestedFragments);
+  } else {
+    m_activePPLLIndex.reset();
+  }
+  // Consume the request (only meaningful for the next PerPixelFragmentListStore submission).
+  m_nextPPLLRequestedFragmentCount = 0;
 
   // Expose frame resources to allow pre-record descriptor priming (already set above)
 
@@ -565,6 +604,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   if (m_textureWeightedBlendedContext) {
     m_textureWeightedBlendedContext->ensureDescriptorLayout();
     m_textureWeightedBlendedContext->ensureOITResources();
+  }
+  if (m_texturePPLLContext) {
+    m_texturePPLLContext->ensureOITResources();
   }
 
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
@@ -653,6 +695,44 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     }
   }
 
+  // Insert end-of-frame buffer->buffer copies for pending readbacks
+  if (m_frameRecording && !frame.pendingBufferReadbacks.empty()) {
+    auto& cmd = frameHandle.commandBuffer();
+    for (auto& pr : frame.pendingBufferReadbacks) {
+      if (pr.slotIndex < 0 || pr.src == nullptr || pr.bytes == 0) {
+        continue;
+      }
+      CHECK(static_cast<size_t>(pr.slotIndex) < m_readbackSlots.size());
+      try {
+        // Conservative memory barrier: make all prior writes visible to transfer reads.
+        vk::BufferMemoryBarrier2 barrier{};
+        barrier.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+        barrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite;
+        barrier.dstStageMask = vk::PipelineStageFlagBits2::eTransfer;
+        barrier.dstAccessMask = vk::AccessFlagBits2::eTransferRead;
+        barrier.buffer = pr.src->buffer();
+        barrier.offset = pr.srcOffset;
+        barrier.size = pr.bytes;
+        vk::DependencyInfo dep{};
+        dep.bufferMemoryBarrierCount = 1;
+        dep.pBufferMemoryBarriers = &barrier;
+        cmd.pipelineBarrier2(dep);
+
+        vk::BufferCopy region{};
+        region.srcOffset = pr.srcOffset;
+        region.dstOffset = 0;
+        region.size = pr.bytes;
+        const auto& slot = m_readbackSlots[static_cast<size_t>(pr.slotIndex)];
+        cmd.copyBuffer(pr.src->buffer(), slot.buffer->buffer(), region);
+        frame.readbackBytesCopied += pr.bytes;
+        frame.readbackSlotsInFlight++;
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR) << "Vulkan buffer readback copy failed: " << e.what();
+      }
+    }
+  }
+
   if (m_frameRecording) {
     try {
       frameHandle.commandBuffer().end();
@@ -695,18 +775,20 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   // }
 
   // Diagnostics: log submission intent with frame identity and wait conditions.
-  const bool waitForReadbacks = (m_activeFrame && !m_activeFrame->pendingColorReadbacks.empty());
+  const bool waitForReadbacks = (m_activeFrame && (!m_activeFrame->pendingColorReadbacks.empty() ||
+                                                   !m_activeFrame->pendingBufferReadbacks.empty()));
   const bool needFenceWait = waitForReadbacks || m_pumpFenceAfterFirstSubmit;
   if (VLOG_IS_ON(1)) {
     VLOG(1) << fmt::format(
-      "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} wait_readback={} pending_readbacks={}",
+      "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} wait_readback={} pending_color_readbacks={} pending_buffer_readbacks={}",
       frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
       frame.realFrameToken,
       frame.submissionId,
       static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkCommandBuffer>(rawCmd))),
       static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkFence>(*frameHandle.fence()))),
       waitForReadbacks,
-      frame.pendingColorReadbacks.size());
+      frame.pendingColorReadbacks.size(),
+      frame.pendingBufferReadbacks.size());
   }
 
   // Move submission-scoped residency pins out of the frame record so we can
@@ -806,6 +888,8 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
+  m_activeRenderer = nullptr;
+  m_activePPLLIndex.reset();
   s_currentBackend = nullptr;
 
   // No cross-frame uniform sizing heuristics; each frame is sized independently.
@@ -847,6 +931,9 @@ std::string_view describeGeometry(const GeometryPayload& geometry)
   }
   if (std::holds_alternative<TextureWeightedBlendedPayload>(geometry)) {
     return "texture_weighted_blended";
+  }
+  if (std::holds_alternative<TexturePPLLResolvePayload>(geometry)) {
+    return "texture_ppll_resolve";
   }
   if (std::holds_alternative<EllipsoidPayload>(geometry)) {
     return "ellipsoid";
@@ -1364,6 +1451,13 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       }
     }
     if (!handled) {
+      if (const auto* ppllResolve = std::get_if<TexturePPLLResolvePayload>(&batch.geometry)) {
+        CHECK(m_texturePPLLContext != nullptr) << "TexturePPLL pipeline context missing";
+        m_texturePPLLContext->record(renderer, batch, *ppllResolve, vkViewport, vkScissor, cmd);
+        handled = true;
+      }
+    }
+    if (!handled) {
       if (const auto* ellipsoid = std::get_if<EllipsoidPayload>(&batch.geometry)) {
         CHECK(m_ellipsoidContext != nullptr) << "Ellipsoid pipeline context missing";
         m_ellipsoidContext->record(renderer, batch, *ellipsoid, vkViewport, vkScissor, cmd);
@@ -1675,6 +1769,15 @@ void Z3DRendererVulkanBackend::ensureDefaultPlaceholders()
     uint32_t pixel = 0xffffffffu;
     m_defaultPlaceholder2D->uploadData(&pixel, sizeof(pixel), vk::ImageLayout::eShaderReadOnlyOptimal);
   }
+  if (!m_defaultPlaceholderStorageBuffer) {
+    // Tiny 4-byte storage buffer used to satisfy unused SSBO bindings.
+    m_defaultPlaceholderStorageBuffer = m_sharedDevice->createBuffer(sizeof(uint32_t),
+                                                                     vk::BufferUsageFlagBits::eStorageBuffer,
+                                                                     vk::MemoryPropertyFlagBits::eHostVisible |
+                                                                       vk::MemoryPropertyFlagBits::eHostCoherent);
+    const uint32_t zero = 0u;
+    m_defaultPlaceholderStorageBuffer->copyData(&zero, sizeof(zero));
+  }
   ensureSharedSamplers();
 }
 
@@ -1761,12 +1864,43 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
   }
 
   if (!m_sharedDescriptorLayouts.oitParams) {
-    // Only DDP flag SSBO remains; the old OIT params UBO has been removed.
-    vk::DescriptorSetLayoutBinding binding{.binding = vkbind::kBindingOITDDPFlag,
-                                           .descriptorType = vk::DescriptorType::eStorageBuffer,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
+    // OIT descriptor set (set=3):
+    // - binding 0: OIT params SSBO (viewport, pixelCount) for exact per-pixel fragment list (PPLL/A-buffer)
+    // - binding 1: DDP "changed" flag SSBO (preserved binding index for existing shaders)
+    // - bindings 2..5: PPLL buffers (counts/offsets/cursors/fragments)
+    std::array<vk::DescriptorSetLayoutBinding, 6> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingOITParams,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingOITDDPFlag,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment                        },
+      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingOITPPLLCounts,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingOITPPLLOffsets,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingOITPPLLCursors,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingOITPPLLFragments,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute}
+    };
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                           .pBindings = bindings.data()};
     m_sharedDescriptorLayouts.oitParams.emplace(vkDevice, info);
   }
 
@@ -2056,7 +2190,8 @@ void Z3DRendererVulkanBackend::ensureDDPGatingResources(FrameResources& frame)
   if (!frame.ddpChangedFlag) {
     frame.ddpChangedFlag =
       m_sharedDevice->createBuffer(4,
-                                   vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                                   vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferSrc |
+                                     vk::BufferUsageFlagBits::eTransferDst,
                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
   }
   if (!frame.ddpIndirectCount) {
@@ -2079,6 +2214,115 @@ void Z3DRendererVulkanBackend::ensureDDPGatingResources(FrameResources& frame)
     // Reset cursor for new frame
     frame.ddpArgsDevice.cursor = 0;
   }
+}
+
+namespace {
+
+struct PPLLParamsStd430
+{
+  glm::uvec4 viewport{0u}; // x,y,w,h
+  uint32_t pixelCount = 0;
+  uint32_t blockCount = 0;
+  uint32_t blockSize = 0;
+  uint32_t reserved = 0;
+};
+
+static_assert(sizeof(PPLLParamsStd430) == 32, "PPLL params must match std430 layout (32B)");
+
+constexpr size_t kPPLLFragmentStrideBytes = 32; // vec4 + float (+ padding) in std430
+
+} // namespace
+
+void Z3DRendererVulkanBackend::ensurePPLLResources(const glm::uvec4& viewport, uint64_t requestedFragments)
+{
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensurePPLLResources";
+  CHECK(m_activePPLLIndex.has_value()) << "ensurePPLLResources called without an active PPLL ring slot";
+  CHECK(*m_activePPLLIndex < m_ppllFrameRing.size()) << "Active PPLL ring index out of range";
+
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  ppll.viewport = viewport;
+
+  const uint64_t pixelCount64 = static_cast<uint64_t>(viewport.z) * static_cast<uint64_t>(viewport.w);
+  CHECK(pixelCount64 <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()))
+    << fmt::format("PPLL viewport pixel count overflow: {}x{} = {}", viewport.z, viewport.w, pixelCount64);
+
+  ppll.pixelCount = static_cast<uint32_t>(pixelCount64);
+  ppll.blockCount =
+    (ppll.pixelCount == 0u) ? 0u : ((ppll.pixelCount + PPLLResources::kBlockSize - 1u) / PPLLResources::kBlockSize);
+  ppll.requestedFragmentCount = requestedFragments;
+
+  // Params SSBO (host-visible). Keep mapped across frames.
+  const size_t paramsBytes = sizeof(PPLLParamsStd430);
+  if (!ppll.params || ppll.paramsCapacity < paramsBytes) {
+    ppll.params.reset();
+    ppll.paramsMapped = nullptr;
+    ppll.params = m_sharedDevice->createBuffer(paramsBytes,
+                                               vk::BufferUsageFlagBits::eStorageBuffer,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+    ppll.paramsCapacity = paramsBytes;
+    ppll.paramsMapped = ppll.params->map(0, paramsBytes);
+  }
+  if (ppll.paramsMapped) {
+    PPLLParamsStd430 params{};
+    params.viewport = viewport;
+    params.pixelCount = ppll.pixelCount;
+    params.blockCount = ppll.blockCount;
+    params.blockSize = PPLLResources::kBlockSize;
+    std::memcpy(ppll.paramsMapped, &params, sizeof(params));
+  }
+
+  auto ensureDeviceLocal =
+    [&](std::unique_ptr<ZVulkanBuffer>& buf, size_t& capacityBytes, size_t requiredBytes, vk::BufferUsageFlags usage) {
+      const size_t req = std::max<size_t>(requiredBytes, sizeof(uint32_t));
+      if (!buf || capacityBytes < req) {
+        buf.reset();
+        buf = m_sharedDevice->createBuffer(req, usage, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        capacityBytes = req;
+      }
+    };
+
+  const size_t perPixelBytes = static_cast<size_t>(ppll.pixelCount) * sizeof(uint32_t);
+  ensureDeviceLocal(ppll.counts,
+                    ppll.countsCapacityBytes,
+                    perPixelBytes,
+                    vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst);
+  ensureDeviceLocal(ppll.offsets, ppll.offsetsCapacityBytes, perPixelBytes, vk::BufferUsageFlagBits::eStorageBuffer);
+  ensureDeviceLocal(ppll.cursors,
+                    ppll.cursorsCapacityBytes,
+                    perPixelBytes,
+                    vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst);
+
+  const size_t blocksBytes = static_cast<size_t>(ppll.blockCount) * sizeof(uint32_t);
+  ensureDeviceLocal(ppll.blockSums,
+                    ppll.blockSumsCapacityBytes,
+                    blocksBytes,
+                    vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferSrc);
+
+  const size_t prefixesBytes = std::max<size_t>(blocksBytes, sizeof(uint32_t));
+  if (!ppll.blockPrefixes || ppll.blockPrefixesCapacityBytes < prefixesBytes) {
+    ppll.blockPrefixes.reset();
+    ppll.blockPrefixesMapped = nullptr;
+    ppll.blockPrefixes = m_sharedDevice->createBuffer(prefixesBytes,
+                                                      vk::BufferUsageFlagBits::eStorageBuffer,
+                                                      vk::MemoryPropertyFlagBits::eHostVisible |
+                                                        vk::MemoryPropertyFlagBits::eHostCoherent);
+    ppll.blockPrefixesCapacityBytes = prefixesBytes;
+    ppll.blockPrefixesMapped = ppll.blockPrefixes->map(0, prefixesBytes);
+  }
+
+  // Fragment storage: grow to requestedFragments (in elements), but never shrink.
+  const uint64_t fragCount = std::max<uint64_t>(requestedFragments, 1u);
+  const uint64_t fragBytes64 = fragCount * static_cast<uint64_t>(kPPLLFragmentStrideBytes);
+  CHECK(fragBytes64 <= static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+    << fmt::format("PPLL fragment buffer size overflow: fragments={} stride={}B bytes={}",
+                   fragCount,
+                   kPPLLFragmentStrideBytes,
+                   fragBytes64);
+  ensureDeviceLocal(ppll.fragments,
+                    ppll.fragmentsCapacityBytes,
+                    static_cast<size_t>(fragBytes64),
+                    vk::BufferUsageFlagBits::eStorageBuffer);
 }
 
 void Z3DRendererVulkanBackend::ensureDDPComputePipeline()
@@ -2124,9 +2368,249 @@ void Z3DRendererVulkanBackend::ensureDDPComputePipeline()
                              vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_ddpCountPipelineLayout});
 }
 
+void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
+{
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensurePPLLComputePipelines";
+  if (m_ppllScanLocalPipeline && m_ppllScanAddPipeline) {
+    return;
+  }
+  auto& device = m_sharedDevice->context().device();
+
+  auto loadModule = [&](const std::string& spvName) -> vk::raii::ShaderModule {
+    const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
+    const std::string path = shaderBase + spvName;
+    std::ifstream file(path, std::ios::ate | std::ios::binary);
+    if (!file) {
+      throw ZException(fmt::format("Failed to open SPIR-V file: {}", path));
+    }
+    const size_t size = static_cast<size_t>(file.tellg());
+    std::vector<uint32_t> code(size / 4);
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(code.data()), size);
+    return vk::raii::ShaderModule(device, vk::ShaderModuleCreateInfo{.codeSize = size, .pCode = code.data()});
+  };
+
+  if (!m_ppllScanLocalPipeline) {
+    std::array<vk::DescriptorSetLayoutBinding, 4> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 2,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 3,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute}
+    };
+    m_ppllScanLocalSetLayout.emplace(
+      device,
+      vk::DescriptorSetLayoutCreateInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                        .pBindings = bindings.data()});
+    m_ppllScanLocalPipelineLayout.emplace(
+      device,
+      vk::PipelineLayoutCreateInfo{.setLayoutCount = 1, .pSetLayouts = &**m_ppllScanLocalSetLayout});
+
+    auto module = loadModule("ppll_scan_local.comp.spv");
+    vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
+                                            .module = *module,
+                                            .pName = "main"};
+    m_ppllScanLocalPipeline.emplace(
+      device,
+      nullptr,
+      vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_ppllScanLocalPipelineLayout});
+  }
+
+  if (!m_ppllScanAddPipeline) {
+    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 2,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute}
+    };
+    m_ppllScanAddSetLayout.emplace(
+      device,
+      vk::DescriptorSetLayoutCreateInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                        .pBindings = bindings.data()});
+    m_ppllScanAddPipelineLayout.emplace(
+      device,
+      vk::PipelineLayoutCreateInfo{.setLayoutCount = 1, .pSetLayouts = &**m_ppllScanAddSetLayout});
+
+    auto module = loadModule("ppll_scan_add.comp.spv");
+    vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
+                                            .module = *module,
+                                            .pName = "main"};
+    m_ppllScanAddPipeline.emplace(
+      device,
+      nullptr,
+      vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_ppllScanAddPipelineLayout});
+  }
+}
+
 bool Z3DRendererVulkanBackend::ddpIndirectCountEnabled() const
 {
   return FLAGS_atlas_vk_ddp_indirect_count && m_supportsDrawIndirectCount && m_supportsFragStoresAndAtomics;
+}
+
+void Z3DRendererVulkanBackend::setPPLLRequestedFragmentCount(uint64_t fragmentCount)
+{
+  m_nextPPLLRequestedFragmentCount = fragmentCount;
+}
+
+uint32_t Z3DRendererVulkanBackend::ppllPixelCount() const
+{
+  if (!m_activePPLLIndex.has_value() || *m_activePPLLIndex >= m_ppllFrameRing.size()) {
+    return 0;
+  }
+  return m_ppllFrameRing[*m_activePPLLIndex].pixelCount;
+}
+
+uint32_t Z3DRendererVulkanBackend::ppllBlockCount() const
+{
+  if (!m_activePPLLIndex.has_value() || *m_activePPLLIndex >= m_ppllFrameRing.size()) {
+    return 0;
+  }
+  return m_ppllFrameRing[*m_activePPLLIndex].blockCount;
+}
+
+ZVulkanBuffer* Z3DRendererVulkanBackend::ppllParamsBufferObj()
+{
+  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    return nullptr;
+  }
+  ensureDefaultPlaceholders();
+  if (!m_activePPLLIndex.has_value() || *m_activePPLLIndex >= m_ppllFrameRing.size()) {
+    return m_defaultPlaceholderStorageBuffer.get();
+  }
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  return ppll.params ? ppll.params.get() : m_defaultPlaceholderStorageBuffer.get();
+}
+
+ZVulkanBuffer* Z3DRendererVulkanBackend::ppllCountsBufferObj()
+{
+  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    return nullptr;
+  }
+  ensureDefaultPlaceholders();
+  if (!m_activePPLLIndex.has_value() || *m_activePPLLIndex >= m_ppllFrameRing.size()) {
+    return m_defaultPlaceholderStorageBuffer.get();
+  }
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  return ppll.counts ? ppll.counts.get() : m_defaultPlaceholderStorageBuffer.get();
+}
+
+ZVulkanBuffer* Z3DRendererVulkanBackend::ppllOffsetsBufferObj()
+{
+  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    return nullptr;
+  }
+  ensureDefaultPlaceholders();
+  if (!m_activePPLLIndex.has_value() || *m_activePPLLIndex >= m_ppllFrameRing.size()) {
+    return m_defaultPlaceholderStorageBuffer.get();
+  }
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  return ppll.offsets ? ppll.offsets.get() : m_defaultPlaceholderStorageBuffer.get();
+}
+
+ZVulkanBuffer* Z3DRendererVulkanBackend::ppllCursorsBufferObj()
+{
+  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    return nullptr;
+  }
+  ensureDefaultPlaceholders();
+  if (!m_activePPLLIndex.has_value() || *m_activePPLLIndex >= m_ppllFrameRing.size()) {
+    return m_defaultPlaceholderStorageBuffer.get();
+  }
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  return ppll.cursors ? ppll.cursors.get() : m_defaultPlaceholderStorageBuffer.get();
+}
+
+ZVulkanBuffer* Z3DRendererVulkanBackend::ppllFragmentsBufferObj()
+{
+  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    return nullptr;
+  }
+  ensureDefaultPlaceholders();
+  if (!m_activePPLLIndex.has_value() || *m_activePPLLIndex >= m_ppllFrameRing.size()) {
+    return m_defaultPlaceholderStorageBuffer.get();
+  }
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  return ppll.fragments ? ppll.fragments.get() : m_defaultPlaceholderStorageBuffer.get();
+}
+
+ZVulkanBuffer* Z3DRendererVulkanBackend::ppllBlockSumsBufferObj()
+{
+  CHECK(m_activePPLLIndex.has_value()) << "ppllBlockSumsBufferObj called without active PPLL resources";
+  CHECK(*m_activePPLLIndex < m_ppllFrameRing.size());
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  return ppll.blockSums.get();
+}
+
+ZVulkanBuffer* Z3DRendererVulkanBackend::ppllBlockPrefixesBufferObj()
+{
+  CHECK(m_activePPLLIndex.has_value()) << "ppllBlockPrefixesBufferObj called without active PPLL resources";
+  CHECK(*m_activePPLLIndex < m_ppllFrameRing.size());
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  return ppll.blockPrefixes.get();
+}
+
+void Z3DRendererVulkanBackend::ppllWriteBlockPrefixes(const uint32_t* prefixes, size_t count)
+{
+  CHECK(m_activePPLLIndex.has_value()) << "ppllWriteBlockPrefixes called without active PPLL resources";
+  CHECK(*m_activePPLLIndex < m_ppllFrameRing.size());
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  CHECK(ppll.blockPrefixesMapped != nullptr) << "PPLL blockPrefixes buffer is not mapped";
+
+  if (count == 0u) {
+    return;
+  }
+  CHECK(prefixes != nullptr) << "ppllWriteBlockPrefixes called with null prefixes pointer";
+
+  const size_t bytes = count * sizeof(uint32_t);
+  CHECK(bytes <= ppll.blockPrefixesCapacityBytes)
+    << fmt::format("PPLL blockPrefixes write out of bounds: count={} bytes={} capacity={}",
+                   count,
+                   bytes,
+                   ppll.blockPrefixesCapacityBytes);
+  std::memcpy(ppll.blockPrefixesMapped, prefixes, bytes);
+}
+
+void Z3DRendererVulkanBackend::primeOITDescriptorSet(ZVulkanDescriptorSet& set)
+{
+  // Do not write descriptors during recording; callers must prime in beginRender().
+  CHECK(!isRecording()) << "primeOITDescriptorSet called while recording";
+  if (auto* buf = ppllParamsBufferObj()) {
+    set.writeStorageBufferOnce(vkbind::kBindingOITParams, *buf);
+  }
+  if (auto* buf = ddpChangedFlagBufferObj()) {
+    set.writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
+  }
+  if (auto* buf = ppllCountsBufferObj()) {
+    set.writeStorageBufferOnce(vkbind::kBindingOITPPLLCounts, *buf);
+  }
+  if (auto* buf = ppllOffsetsBufferObj()) {
+    set.writeStorageBufferOnce(vkbind::kBindingOITPPLLOffsets, *buf);
+  }
+  if (auto* buf = ppllCursorsBufferObj()) {
+    set.writeStorageBufferOnce(vkbind::kBindingOITPPLLCursors, *buf);
+  }
+  if (auto* buf = ppllFragmentsBufferObj()) {
+    set.writeStorageBufferOnce(vkbind::kBindingOITPPLLFragments, *buf);
+  }
 }
 
 vk::Buffer Z3DRendererVulkanBackend::ddpChangedFlagBuffer()
@@ -2217,13 +2701,50 @@ void Z3DRendererVulkanBackend::ddpResetForPass(vk::raii::CommandBuffer& cmd, boo
     return;
   }
   ensureDDPGatingResources(*m_activeFrame);
-  // init count=1 for first pass; otherwise compute will have written it after previous pass.
-  const uint32_t initCount = firstPass ? 1u : 0u;
-  cmd.fillBuffer(ddpIndirectCountBuffer(), 0, 4, initCount);
+  // Indirect-count gating is a "next-pass" signal: ddp_count.comp writes the
+  // count after a peel pass based on ddpChangedFlag. Do not clobber it at the
+  // start of subsequent passes; only seed the very first peel so it executes.
+  if (firstPass) {
+    cmd.fillBuffer(ddpIndirectCountBuffer(), 0, 4, 1u);
+  }
   cmd.fillBuffer(ddpChangedFlagBuffer(), 0, 4, 0u);
 }
 
+void Z3DRendererVulkanBackend::ppllResetCounts(vk::raii::CommandBuffer& cmd)
+{
+  CHECK(m_activePPLLIndex.has_value()) << "ppllResetCounts called without active PPLL resources";
+  CHECK(*m_activePPLLIndex < m_ppllFrameRing.size());
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  if (ppll.pixelCount == 0u || !ppll.counts) {
+    return;
+  }
+  const vk::DeviceSize bytes = static_cast<vk::DeviceSize>(static_cast<size_t>(ppll.pixelCount) * sizeof(uint32_t));
+  cmd.fillBuffer(ppll.counts->buffer(), 0, bytes, 0u);
+}
+
+void Z3DRendererVulkanBackend::ppllResetCursors(vk::raii::CommandBuffer& cmd)
+{
+  CHECK(m_activePPLLIndex.has_value()) << "ppllResetCursors called without active PPLL resources";
+  CHECK(*m_activePPLLIndex < m_ppllFrameRing.size());
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  if (ppll.pixelCount == 0u || !ppll.cursors) {
+    return;
+  }
+  const vk::DeviceSize bytes = static_cast<vk::DeviceSize>(static_cast<size_t>(ppll.pixelCount) * sizeof(uint32_t));
+  cmd.fillBuffer(ppll.cursors->buffer(), 0, bytes, 0u);
+}
+
 void Z3DRendererVulkanBackend::ddpBarrierTransferToFrag(vk::raii::CommandBuffer& cmd)
+{
+  vk::MemoryBarrier2 mb{.srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
+                        .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+                        .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+                        .dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite};
+  vk::DependencyInfo dep{.memoryBarrierCount = 1, .pMemoryBarriers = &mb};
+  cmd.pipelineBarrier2(dep);
+}
+
+void Z3DRendererVulkanBackend::ppllBarrierTransferToFrag(vk::raii::CommandBuffer& cmd)
 {
   vk::MemoryBarrier2 mb{.srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
                         .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
@@ -2243,12 +2764,42 @@ void Z3DRendererVulkanBackend::ddpBarrierFragToCompute(vk::raii::CommandBuffer& 
   cmd.pipelineBarrier2(dep);
 }
 
+void Z3DRendererVulkanBackend::ppllBarrierFragToCompute(vk::raii::CommandBuffer& cmd)
+{
+  vk::MemoryBarrier2 mb{.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+                        .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
+                        .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+                        .dstAccessMask = vk::AccessFlagBits2::eShaderRead};
+  vk::DependencyInfo dep{.memoryBarrierCount = 1, .pMemoryBarriers = &mb};
+  cmd.pipelineBarrier2(dep);
+}
+
 void Z3DRendererVulkanBackend::ddpBarrierComputeToIndirect(vk::raii::CommandBuffer& cmd)
 {
   vk::MemoryBarrier2 mb{.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
                         .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
                         .dstStageMask = vk::PipelineStageFlagBits2::eDrawIndirect,
                         .dstAccessMask = vk::AccessFlagBits2::eIndirectCommandRead};
+  vk::DependencyInfo dep{.memoryBarrierCount = 1, .pMemoryBarriers = &mb};
+  cmd.pipelineBarrier2(dep);
+}
+
+void Z3DRendererVulkanBackend::ppllBarrierComputeToFrag(vk::raii::CommandBuffer& cmd)
+{
+  vk::MemoryBarrier2 mb{.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+                        .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
+                        .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+                        .dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite};
+  vk::DependencyInfo dep{.memoryBarrierCount = 1, .pMemoryBarriers = &mb};
+  cmd.pipelineBarrier2(dep);
+}
+
+void Z3DRendererVulkanBackend::ppllBarrierFragToFrag(vk::raii::CommandBuffer& cmd)
+{
+  vk::MemoryBarrier2 mb{.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+                        .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
+                        .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+                        .dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite};
   vk::DependencyInfo dep{.memoryBarrierCount = 1, .pMemoryBarriers = &mb};
   cmd.pipelineBarrier2(dep);
 }
@@ -2275,6 +2826,61 @@ void Z3DRendererVulkanBackend::ddpDispatchCountCompute(vk::raii::CommandBuffer& 
   cmd.bindPipeline(vk::PipelineBindPoint::eCompute, **m_ddpCountPipeline);
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, **m_ddpCountPipelineLayout, 0, {ds->descriptorSet()}, {});
   cmd.dispatch(1, 1, 1);
+}
+
+void Z3DRendererVulkanBackend::ppllDispatchScanLocal(vk::raii::CommandBuffer& cmd)
+{
+  CHECK(m_activePPLLIndex.has_value()) << "ppllDispatchScanLocal called without active PPLL resources";
+  CHECK(*m_activePPLLIndex < m_ppllFrameRing.size());
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  if (ppll.blockCount == 0u) {
+    return;
+  }
+  ensurePPLLComputePipelines();
+  CHECK(m_ppllScanLocalPipeline.has_value());
+  CHECK(m_ppllScanLocalPipelineLayout.has_value());
+  CHECK(m_ppllScanLocalSetLayout.has_value());
+
+  auto* ds = allocateOverrideDescriptorSet(**m_ppllScanLocalSetLayout);
+  CHECK(ds != nullptr);
+  CHECK(ppll.params && ppll.counts && ppll.offsets && ppll.blockSums);
+  ds->updateStorageBuffer(0, *ppll.params);
+  ds->updateStorageBuffer(1, *ppll.counts);
+  ds->updateStorageBuffer(2, *ppll.offsets);
+  ds->updateStorageBuffer(3, *ppll.blockSums);
+
+  cmd.bindPipeline(vk::PipelineBindPoint::eCompute, **m_ppllScanLocalPipeline);
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                         **m_ppllScanLocalPipelineLayout,
+                         0,
+                         {ds->descriptorSet()},
+                         {});
+  cmd.dispatch(ppll.blockCount, 1, 1);
+}
+
+void Z3DRendererVulkanBackend::ppllDispatchScanAdd(vk::raii::CommandBuffer& cmd)
+{
+  CHECK(m_activePPLLIndex.has_value()) << "ppllDispatchScanAdd called without active PPLL resources";
+  CHECK(*m_activePPLLIndex < m_ppllFrameRing.size());
+  auto& ppll = m_ppllFrameRing[*m_activePPLLIndex];
+  if (ppll.blockCount == 0u) {
+    return;
+  }
+  ensurePPLLComputePipelines();
+  CHECK(m_ppllScanAddPipeline.has_value());
+  CHECK(m_ppllScanAddPipelineLayout.has_value());
+  CHECK(m_ppllScanAddSetLayout.has_value());
+
+  auto* ds = allocateOverrideDescriptorSet(**m_ppllScanAddSetLayout);
+  CHECK(ds != nullptr);
+  CHECK(ppll.params && ppll.offsets && ppll.blockPrefixes);
+  ds->updateStorageBuffer(0, *ppll.params);
+  ds->updateStorageBuffer(1, *ppll.offsets);
+  ds->updateStorageBuffer(2, *ppll.blockPrefixes);
+
+  cmd.bindPipeline(vk::PipelineBindPoint::eCompute, **m_ppllScanAddPipeline);
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, **m_ppllScanAddPipelineLayout, 0, {ds->descriptorSet()}, {});
+  cmd.dispatch(ppll.blockCount, 1, 1);
 }
 
 void Z3DRendererVulkanBackend::scheduleStaticCopyIndirect(vk::Buffer dst,
@@ -3026,6 +3632,9 @@ void Z3DRendererVulkanBackend::requestEndOfFrameColorReadback(
   const size_t bytes = static_cast<size_t>(size.x) * size.y * bytesPerPixel(fmt);
   const int slotIndex = acquireReadbackSlot(bytes);
   CHECK(slotIndex >= 0) << "VK readback slot unavailable (bytes=" << bytes << ")";
+  if (static_cast<size_t>(slotIndex) < m_readbackSlots.size()) {
+    m_readbackSlots[static_cast<size_t>(slotIndex)].tag = "color";
+  }
   VLOG(1) << fmt::format("VK readback enqueue src=0x{:x} size={}x{} bytes={} slot={} eye={}",
                          reinterpret_cast<uint64_t>(&src),
                          size.x,
@@ -3063,6 +3672,53 @@ void Z3DRendererVulkanBackend::requestEndOfFrameColorReadback(
     }
   };
   scheduleAfterCurrentFrameCompletion(std::move(consumer), "vk_readback_consumer");
+}
+
+void Z3DRendererVulkanBackend::requestEndOfFrameBufferReadback(
+  ZVulkanBuffer& src,
+  vk::DeviceSize srcOffset,
+  size_t bytes,
+  std::function<void(const void* mapped, size_t bytes, std::function<void()> releaseSlot)> onReady)
+{
+  CHECK(m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid())
+    << "VK buffer readback requested outside of an active frame";
+  CHECK_GT(bytes, 0u) << "VK buffer readback requested with 0 bytes";
+  const size_t offset = static_cast<size_t>(srcOffset);
+  CHECK_LE(offset + bytes, src.size()) << "VK buffer readback range out of bounds";
+  CHECK((src.usage() & vk::BufferUsageFlagBits::eTransferSrc) != vk::BufferUsageFlags{})
+    << "VK buffer readback requires src buffer with eTransferSrc usage";
+
+  const int slotIndex = acquireReadbackSlot(bytes);
+  CHECK(slotIndex >= 0) << "VK readback slot unavailable (bytes=" << bytes << ")";
+  if (static_cast<size_t>(slotIndex) < m_readbackSlots.size()) {
+    m_readbackSlots[static_cast<size_t>(slotIndex)].tag = "buffer";
+  }
+  VLOG(2) << fmt::format("VK buffer readback enqueue src=0x{:x} offset={} bytes={} slot={}",
+                         reinterpret_cast<uint64_t>(&src),
+                         offset,
+                         bytes,
+                         slotIndex);
+
+  FrameResources::PendingBufferReadback pr{};
+  pr.src = &src;
+  pr.srcOffset = srcOffset;
+  pr.bytes = bytes;
+  pr.slotIndex = slotIndex;
+  pr.onReady = std::move(onReady);
+  m_activeFrame->pendingBufferReadbacks.emplace_back(std::move(pr));
+
+  auto consumer = [this, slotIndex, bytes, onReady = m_activeFrame->pendingBufferReadbacks.back().onReady]() {
+    CHECK(static_cast<size_t>(slotIndex) < m_readbackSlots.size());
+    const void* mapped = m_readbackSlots[static_cast<size_t>(slotIndex)].mapped;
+    CHECK(mapped != nullptr) << "VK buffer readback mapped pointer is null";
+    if (onReady) {
+      std::function<void()> releaseFn = [this, si = slotIndex]() {
+        this->releaseReadbackSlot(si);
+      };
+      onReady(mapped, bytes, std::move(releaseFn));
+    }
+  };
+  scheduleAfterCurrentFrameCompletion(std::move(consumer));
 }
 
 void Z3DRendererVulkanBackend::notifyPipelineCreated()

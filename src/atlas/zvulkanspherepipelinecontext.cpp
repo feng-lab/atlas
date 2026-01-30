@@ -376,9 +376,7 @@ void ZVulkanSpherePipelineContext::ensureDescriptorSets()
     m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
   if (m_dsOIT && !m_backend.isRecording()) {
-    if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
-      m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
-    }
+    m_backend.primeOITDescriptorSet(*m_dsOIT);
   }
 }
 
@@ -482,6 +480,10 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
         return "dual_peeling_init_sphere.frag.spv";
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
         return "dual_peeling_peel_sphere.frag.spv";
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+        return "ppll_count_sphere.frag.spv";
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+        return "ppll_store_sphere.frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
         return "wavg_init_sphere.frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
@@ -540,6 +542,12 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
     };
 
   switch (key.shaderHookType) {
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+      // Exact OIT PPLL: depth test against opaque depth, but do not write depth.
+      instance.pipeline->setDepthTestEnable(true);
+      instance.pipeline->setDepthWriteEnable(false);
+      break;
     case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
       makeAttachments(vk::BlendFactor::eOne, vk::BlendFactor::eOne, vk::BlendFactor::eOne, vk::BlendFactor::eOne);
       instance.pipeline->setDepthTestEnable(false);

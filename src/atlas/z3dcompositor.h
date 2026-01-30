@@ -172,6 +172,13 @@ private:
                                   const std::vector<Z3DCompositorImageLayer>& imageLayers,
                                   bool clearResolveTarget);
 
+  void renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilter*>& filters,
+                                   Z3DScratchResourcePool::RenderTargetLease& targetLease,
+                                   Z3DEye eye,
+                                   AttachmentHandle depthAttachmentHandle,
+                                   const std::vector<Z3DCompositorImageLayer>& imageLayers,
+                                   bool clearResolveTarget);
+
   void renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter*>& filters,
                                  Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                  Z3DEye eye,

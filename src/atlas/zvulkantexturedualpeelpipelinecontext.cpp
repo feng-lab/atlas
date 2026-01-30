@@ -55,14 +55,31 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   // Shared fullscreen quad
   m_vertexCount = 4;
 
+  const char* stageLabel = "blend";
+  switch (payload.stage) {
+    case TextureDualPeelPayload::Stage::Carry:
+      stageLabel = "carry";
+      break;
+    case TextureDualPeelPayload::Stage::Blend:
+      stageLabel = "blend";
+      break;
+    case TextureDualPeelPayload::Stage::Final:
+      stageLabel = "final";
+      break;
+  }
   VLOG(2) << fmt::format("DDP::record begin stage={} temp=0x{:x} depth=0x{:x} front=0x{:x} back=0x{:x}",
-                         payload.stage == TextureDualPeelPayload::Stage::Final ? "final" : "blend",
+                         stageLabel,
                          payload.tempAttachment.id,
                          payload.depthAttachment.id,
                          payload.frontAttachment.id,
                          payload.backAttachment.id);
 
-  Stage stage = (payload.stage == TextureDualPeelPayload::Stage::Final) ? Stage::Final : Stage::Blend;
+  Stage stage = Stage::Blend;
+  if (payload.stage == TextureDualPeelPayload::Stage::Final) {
+    stage = Stage::Final;
+  } else if (payload.stage == TextureDualPeelPayload::Stage::Carry) {
+    stage = Stage::Carry;
+  }
 
   if (stage == Stage::Blend) {
     CHECK(payload.tempAttachment.backend == RenderBackend::Vulkan)
@@ -70,6 +87,9 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
     if (!payload.tempAttachment.valid()) {
       return;
     }
+  } else if (stage == Stage::Carry) {
+    CHECK(payload.depthAttachment.valid() && payload.frontAttachment.valid())
+      << "Skipping Vulkan dual-peel carry stage due to missing attachments";
   } else {
     CHECK(payload.frontAttachment.valid() && payload.backAttachment.valid() && payload.depthAttachment.valid())
       << "Skipping Vulkan dual-peel final stage due to missing attachments";
@@ -78,14 +98,23 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   ensureDescriptorLayouts();
   ZVulkanDescriptorSet* descriptor = nullptr;
   // Allocate a fresh per-draw override set for each stage to avoid update-after-bind hazards
-  if (stage == Stage::Blend && m_blendSetLayout) {
+  if (stage == Stage::Carry && m_carrySetLayout) {
+    descriptor = m_backend.allocateOverrideDescriptorSet(**m_carrySetLayout);
+  } else if (stage == Stage::Blend && m_blendSetLayout) {
     descriptor = m_backend.allocateOverrideDescriptorSet(**m_blendSetLayout);
   } else if (stage == Stage::Final && m_finalSetLayout) {
     descriptor = m_backend.allocateOverrideDescriptorSet(**m_finalSetLayout);
   }
   CHECK(descriptor != nullptr) << "DDP texture stage: override descriptor allocation failed (fatal)";
 
-  if (stage == Stage::Blend) {
+  if (stage == Stage::Carry) {
+    auto& prevDepthTexture =
+      vulkan::textureFromHandle(payload.depthAttachment, m_backend.device(), "dual-peel carry prev depth blender");
+    auto& prevFrontTexture =
+      vulkan::textureFromHandle(payload.frontAttachment, m_backend.device(), "dual-peel carry prev front blender");
+    descriptor->updateTexture(vkbind::kBindingDDPDepthBlender, prevDepthTexture, m_backend.defaultSampler());
+    descriptor->updateTexture(vkbind::kBindingDDPFrontBlender, prevFrontTexture, m_backend.defaultSampler());
+  } else if (stage == Stage::Blend) {
     CHECK(payload.tempAttachment.valid()) << "Skipping Vulkan dual-peel blend stage because temp attachment is missing";
     auto& tempTexture =
       vulkan::textureFromHandle(payload.tempAttachment, m_backend.device(), "dual-peel blend attachment");
@@ -112,8 +141,17 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   // Composite resolve invariant: enforce single color attachment; depth optional
   if (stage == Stage::Final) {
     CHECK(formats.colorFormats.size() == 1) << "Skipping DDP final: expected exactly 1 color attachment.";
+  } else if (stage == Stage::Carry) {
+    // Carry is executed into the peel surface; it must have 3 attachments (depth/front/backTemp).
+    CHECK(formats.colorFormats.size() == 3) << "Skipping DDP carry: expected exactly 3 color attachments.";
   }
-  m_backend.validateFormatsOrCrash(formats, stage == Stage::Final ? "DDP_final" : "DDP_blend");
+  const char* formatTag = "DDP_blend";
+  if (stage == Stage::Final) {
+    formatTag = "DDP_final";
+  } else if (stage == Stage::Carry) {
+    formatTag = "DDP_carry";
+  }
+  m_backend.validateFormatsOrCrash(formats, formatTag);
 
   PipelineKey key;
   key.stage = stage;
@@ -179,6 +217,25 @@ void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorLayouts()
   auto& device = m_backend.device();
   auto& vkDevice = device.context().device();
 
+  if (!m_carrySetLayout) {
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingDDPDepthBlender,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingDDPFrontBlender,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
+    vk::Sampler immutable = m_backend.defaultSampler();
+    bindings[0].pImmutableSamplers = &immutable;
+    bindings[1].pImmutableSamplers = &immutable;
+    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                                 .pBindings = bindings.data()};
+    m_carrySetLayout.emplace(vkDevice, createInfo);
+  }
+
   if (!m_blendSetLayout) {
     vk::DescriptorSetLayoutBinding binding{.binding = 0,
                                            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
@@ -222,12 +279,7 @@ void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorLayouts()
   }
 
   if (!m_setOIT) {
-    vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
-    m_setOIT.emplace(vkDevice, createInfo);
+    m_setOIT = m_backend.oitDescriptorSetLayout();
   }
 }
 
@@ -252,9 +304,15 @@ void ZVulkanTextureDualPeelPipelineContext::ensureOITResources()
 {
   ensureDescriptorLayouts();
   if (!m_descriptorOIT && m_setOIT) {
-    m_descriptorOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_descriptorOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
   CHECK(m_descriptorOIT != nullptr) << "DDP: failed to allocate descriptor set";
+
+  if (m_descriptorOIT && !m_backend.isRecording()) {
+    if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
+      m_descriptorOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
+    }
+  }
 }
 
  
@@ -326,8 +384,12 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, co
   PipelineInstance instance;
   instance.stage = key.stage;
 
-  const char* fragmentShader =
-    (key.stage == Stage::Final) ? "dual_peeling_final.frag.spv" : "dual_peeling_blend.frag.spv";
+  const char* fragmentShader = "dual_peeling_blend.frag.spv";
+  if (key.stage == Stage::Final) {
+    fragmentShader = "dual_peeling_final.frag.spv";
+  } else if (key.stage == Stage::Carry) {
+    fragmentShader = "dual_peeling_carry.frag.spv";
+  }
 
   instance.shader =
     std::make_unique<ZVulkanShader>(device, shaderBase + "pass.vert.spv", shaderBase + fragmentShader, std::nullopt);
@@ -335,17 +397,15 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, co
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
 
+  const vk::DescriptorSetLayout oitLayout = m_setOIT ? m_setOIT : **m_setPlaceholder;
   if (key.stage == Stage::Final) {
-    std::vector<vk::DescriptorSetLayout> layouts{**m_finalSetLayout,
-                                                 **m_setPlaceholder,
-                                                 **m_setPlaceholder,
-                                                 **m_setOIT};
+    std::vector<vk::DescriptorSetLayout> layouts{**m_finalSetLayout, **m_setPlaceholder, **m_setPlaceholder, oitLayout};
+    instance.pipeline->setDescriptorSetLayouts(layouts);
+  } else if (key.stage == Stage::Carry) {
+    std::vector<vk::DescriptorSetLayout> layouts{**m_carrySetLayout, **m_setPlaceholder, **m_setPlaceholder, oitLayout};
     instance.pipeline->setDescriptorSetLayouts(layouts);
   } else {
-    std::vector<vk::DescriptorSetLayout> layouts{**m_blendSetLayout,
-                                                 **m_setPlaceholder,
-                                                 **m_setPlaceholder,
-                                                 **m_setOIT};
+    std::vector<vk::DescriptorSetLayout> layouts{**m_blendSetLayout, **m_setPlaceholder, **m_setPlaceholder, oitLayout};
     instance.pipeline->setDescriptorSetLayouts(layouts);
   }
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
@@ -374,7 +434,7 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, co
     blendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
     blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
     blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
-  } else {
+  } else if (key.stage == Stage::Final) {
     // Final composite must blend the resolved transparent layer over the
     // already-loaded background (GL behavior: ONE, ONE_MINUS_SRC_ALPHA).
     blendAttachment.blendEnable = VK_TRUE;
@@ -384,6 +444,9 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, co
     blendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
     blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
     blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
+  } else {
+    // Carry pass: overwrite current ping targets (no blending).
+    blendAttachment.blendEnable = VK_FALSE;
   }
   instance.pipeline->setColorBlendAttachment(blendAttachment);
 

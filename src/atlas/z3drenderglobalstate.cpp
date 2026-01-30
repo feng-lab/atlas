@@ -3,6 +3,7 @@
 #include "z3dscratchresourcepool.h"
 #include "z3dglobalparameters.h"
 #include "z3dcamera.h"
+#include "z3dtypes.h"
 #include "zlog.h"
 
 #include <algorithm>
@@ -44,7 +45,13 @@ RendererSceneState buildSceneState(const Z3DGlobalParameters& params)
   state.sceneAmbient = params.sceneAmbient.get();
   state.weightedBlendedDepthScale = params.weightedBlendedDepthScale.get();
   state.devicePixelRatio = params.devicePixelRatio.get();
-  state.transparency = static_cast<TransparencyMode>(params.transparencyMethod.associatedData());
+  TransparencyMode transparency = static_cast<TransparencyMode>(params.transparencyMethod.associatedData());
+  const RenderBackend backend = static_cast<RenderBackend>(params.renderBackend.associatedData());
+  if (backend == RenderBackend::OpenGL && transparency == TransparencyMode::PerPixelFragmentList) {
+    // PPLL is Vulkan-only; fall back to DDP for OpenGL while preserving the UI selection.
+    transparency = TransparencyMode::DualDepthPeeling;
+  }
+  state.transparency = transparency;
   state.multisample = static_cast<GeometryMSAAMode>(params.geometriesMultisampleMode.associatedData());
 
   state.lighting = buildLightingState(params);

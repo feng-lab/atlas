@@ -1,0 +1,37 @@
+#version 450
+
+// Adds CPU-provided per-block prefixes to the per-pixel offsets computed by ppll_scan_local.comp.
+// One workgroup handles one block of 256 pixels.
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) readonly buffer PPLLParams
+{
+  uvec4 viewport;
+  uint pixelCount;
+  uint blockCount;
+  uint blockSize;
+  uint reserved;
+} params;
+
+layout(set = 0, binding = 1, std430) buffer Offsets
+{
+  uint offsets[];
+} inOutOffsets;
+
+layout(set = 0, binding = 2, std430) readonly buffer BlockPrefixes
+{
+  uint prefixes[];
+} inPrefixes;
+
+void main()
+{
+  const uint block = gl_WorkGroupID.x;
+  const uint lane = gl_LocalInvocationID.x;
+  const uint idx = block * 256u + lane;
+  if (idx >= params.pixelCount) {
+    return;
+  }
+  inOutOffsets.offsets[idx] += inPrefixes.prefixes[block];
+}
+

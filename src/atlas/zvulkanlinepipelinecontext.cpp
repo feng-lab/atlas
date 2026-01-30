@@ -152,6 +152,7 @@ void ZVulkanLinePipelineContext::resetFrame()
   resetDescriptors();
   m_ddpTransformsFrozen = false;
   m_ddpMaterialFrozen = false;
+  m_ddpArgsByStream.clear();
 }
 
 void ZVulkanLinePipelineContext::flushRetainedUbos()
@@ -233,13 +234,8 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
   if (!m_dsOIT && m_setOIT) {
     m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
-  if (m_dsOIT) {
-    // Prime DDP flag SSBO only when not recording.
-    if (!m_backend.isRecording() && m_backend.ddpIndirectCountEnabled()) {
-      if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
-        m_dsOIT->writeStorageBufferOnce(nim::vkbind::kBindingOITDDPFlag, *buf);
-      }
-    }
+  if (m_dsOIT && !m_backend.isRecording()) {
+    m_backend.primeOITDescriptorSet(*m_dsOIT);
   }
 
   // Bind per-frame uniform arena buffer to dynamic UBO bindings once.
@@ -351,6 +347,12 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
         fragmentShader = "dual_peeling_peel_wideline.frag.spv";
         break;
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+        fragmentShader = "ppll_count_wideline.frag.spv";
+        break;
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+        fragmentShader = "ppll_store_wideline.frag.spv";
+        break;
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
         fragmentShader = "wavg_init_wideline.frag.spv";
         break;
@@ -399,7 +401,9 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, m_setLighting, m_setTransforms};
     if ((key.shaderHookType == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
          key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
-         key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) &&
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel ||
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) &&
         m_setOIT) {
       setLayouts.push_back(m_setOIT);
     }
@@ -415,6 +419,12 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     baseBlend.blendEnable = false;
 
     switch (key.shaderHookType) {
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+        // Exact OIT PPLL: depth test against opaque depth, but do not write depth.
+        instance.pipeline->setDepthTestEnable(true);
+        instance.pipeline->setDepthWriteEnable(false);
+        break;
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
         auto attachments = makeBlendAttachments(formats.colorFormats.size(), baseBlend);
         for (auto& attachment : attachments) {
@@ -508,6 +518,12 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
   } else {
     std::string fragmentShader = "line.frag.spv";
     switch (key.shaderHookType) {
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+        fragmentShader = "ppll_count_line.frag.spv";
+        break;
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+        fragmentShader = "ppll_store_line.frag.spv";
+        break;
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
@@ -529,11 +545,24 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
       key.lineStrip ? vk::PrimitiveTopology::eLineStrip : vk::PrimitiveTopology::eLineList;
     instance.pipeline = device.createPipeline(*instance.shader, vi, topology);
     std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, m_setLighting, m_setTransforms};
+    if ((key.shaderHookType == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel ||
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) &&
+        m_setOIT) {
+      setLayouts.push_back(m_setOIT);
+    }
     instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
     instance.pipeline->setDescriptorSetLayouts(setLayouts);
     // Thin lines may produce implementation-dependent winding; disable culling
     // to ensure visibility regardless of vertex order.
     instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
+    if (key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
+        key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) {
+      instance.pipeline->setDepthTestEnable(true);
+      instance.pipeline->setDepthWriteEnable(false);
+    }
     if (key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
         key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
       std::vector<vk::PipelineColorBlendAttachmentState> attachments(formats.colorFormats.size());
@@ -1150,7 +1179,9 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   std::vector<ZVulkanDescriptorBindInfo> extraBinds;
   if ((shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
        shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
-       shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) &&
+       shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel ||
+       shaderHook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
+       shaderHook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) &&
       m_dsOIT) {
     ZVulkanDescriptorBindInfo oitBind{};
     oitBind.firstSet = vkbind::kSetOITParams;
@@ -1163,6 +1194,73 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     uploadWideGeometry(payload, pickingPass);
     if (m_wideP0Buffer == VK_NULL_HANDLE || m_wideUploadIndexCount == 0) {
       return;
+    }
+
+    if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
+      // Prepare device-local indirect args during init; peel passes must not
+      // schedule upload->device copies inside dynamic rendering (copies are
+      // flushed after the init pass ends).
+      CHECK(payload.streamKey != 0) << "Line DDP init: missing streamKey";
+      auto& ddp = m_ddpArgsByStream[payload.streamKey];
+      const auto widths = payload.perSegmentWidths;
+      const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
+      const bool perSegment = !widths.empty();
+      const uint32_t drawSegments =
+        perSegment ? std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size())) : 0u;
+
+      if (ddp.widePrepared) {
+        CHECK(ddp.widePerSegment == perSegment) << "Line DDP init: wide args mode mismatch for streamKey";
+        if (perSegment) {
+          CHECK(ddp.wideOffsets.size() == static_cast<size_t>(drawSegments))
+            << "Line DDP init: wide args segment count mismatch for streamKey";
+        } else {
+          CHECK(ddp.wideOffsets.size() == 1u) << "Line DDP init: wide args table mismatch for streamKey";
+          CHECK(ddp.wideIndexCount == m_wideUploadIndexCount)
+            << "Line DDP init: wide args index count mismatch for streamKey";
+        }
+      } else {
+        CHECK(static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE)
+          << "Line DDP init: device args buffer missing (fatal)";
+        ddp.widePerSegment = perSegment;
+        if (perSegment) {
+          ddp.wideOffsets.assign(drawSegments, vk::DeviceSize(0));
+          ddp.wideSegments = drawSegments;
+          ddp.wideIndexCount = 6u;
+          for (uint32_t i = 0; i < drawSegments; ++i) {
+            struct Cmd
+            {
+              uint32_t indexCount, instanceCount, firstIndex;
+              int32_t vertexOffset;
+              uint32_t firstInstance;
+            } drawCmd{6u, 1u, i * 6u, static_cast<int32_t>(i * 4u), 0u};
+            const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+            auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+            if (slice.buffer && slice.mapped) {
+              std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
+            }
+            m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+            ddp.wideOffsets[i] = off;
+          }
+        } else {
+          ddp.wideOffsets.assign(1u, vk::DeviceSize(0));
+          ddp.wideSegments = segmentCount;
+          ddp.wideIndexCount = m_wideUploadIndexCount;
+          struct Cmd
+          {
+            uint32_t indexCount, instanceCount, firstIndex;
+            int32_t vertexOffset;
+            uint32_t firstInstance;
+          } drawCmd{m_wideUploadIndexCount, 1u, 0u, 0, 0u};
+          const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+          auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+          if (slice.buffer && slice.mapped) {
+            std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
+          }
+          m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+          ddp.wideOffsets[0] = off;
+        }
+        ddp.widePrepared = true;
+      }
     }
 
     ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
@@ -1220,6 +1318,17 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       const bool msaa2x2 =
         (renderer.sceneState().multisample == GeometryMSAAMode::MSAA2x2) && payload.enableMultisample;
       const float sizeScale = payload.params->sizeScale;
+      const bool ddpPeelIndirect =
+        (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+      const DDPArgs* ddpArgs = nullptr;
+      if (ddpPeelIndirect) {
+        auto it = m_ddpArgsByStream.find(payload.streamKey);
+        CHECK(it != m_ddpArgsByStream.end()) << "Line DDP peel: args not prepared in init";
+        ddpArgs = &it->second;
+        CHECK(ddpArgs->widePrepared) << "Line DDP peel: wide args not prepared in init";
+        const bool perSegment = !widths.empty();
+        CHECK(ddpArgs->widePerSegment == perSegment) << "Line DDP peel: wide args mode mismatch for streamKey";
+      }
       if (!widths.empty()) {
         VLOG(1) << fmt::format(
           "VK wide line: segments={} dpr={:.3f} msaa2x2={} sizeScale={:.3f} resolvedLineWidth={:.3f}",
@@ -1230,6 +1339,11 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
           payload.resolvedLineWidth);
         const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
         const uint32_t drawSegments = std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size()));
+        if (ddpPeelIndirect) {
+          CHECK(ddpArgs != nullptr);
+          CHECK(ddpArgs->wideOffsets.size() == static_cast<size_t>(drawSegments))
+            << "Line DDP peel: wide args segment table mismatch";
+        }
         for (uint32_t i = 0; i < drawSegments; ++i) {
           pc.line_width = widths[i];
           if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
@@ -1248,23 +1362,11 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                                        0,
                                        pc);
-          if (m_backend.ddpIndirectCountEnabled() &&
-              shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-            // Device-local args per segment
-            struct Cmd
-            {
-              uint32_t indexCount, instanceCount, firstIndex;
-              int32_t vertexOffset;
-              uint32_t firstInstance;
-            } cmd{6, 1, i * 6, static_cast<int32_t>(i * 4), 0};
-            const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
-            auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-            if (slice.buffer && slice.mapped) {
-              std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
-            }
-            m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+          if (ddpPeelIndirect) {
+            CHECK(ddpArgs != nullptr);
             const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
             const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+            const vk::DeviceSize off = ddpArgs->wideOffsets[i];
             cb.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
           } else {
             cb.drawIndexed(6, 1, i * 6, i * 4, 0);
@@ -1279,23 +1381,17 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
                                      vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                                      0,
                                      pc);
-        if (m_backend.ddpIndirectCountEnabled() &&
-            shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-          struct Cmd
-          {
-            uint32_t indexCount, instanceCount, firstIndex;
-            int32_t vertexOffset;
-            uint32_t firstInstance;
-          } cmd{m_wideUploadIndexCount, 1, 0, 0, 0};
-          const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
-          auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-          if (slice.buffer && slice.mapped) {
-            std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
-          }
-          m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+        if (ddpPeelIndirect) {
+          CHECK(ddpArgs != nullptr);
+          CHECK(ddpArgs->wideOffsets.size() == 1u) << "Line DDP peel: wide args table mismatch";
           const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
           const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
-          cb.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+          cb.drawIndexedIndirectCount(argsBuf,
+                                      ddpArgs->wideOffsets[0],
+                                      cntBuf,
+                                      0,
+                                      1,
+                                      sizeof(VkDrawIndexedIndirectCommand));
         } else {
           cb.drawIndexed(m_wideUploadIndexCount, 1, 0, 0, 0);
         }
@@ -1334,38 +1430,80 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   }
   drawSpec.instanceCount = 1;
 
-  ZVulkanPipelineCommandRecorder recorder(cmd);
-  if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+  if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
+    // Prepare device-local indirect args during init; copies are flushed after
+    // the init pass ends. Peel passes reference the prepared offset.
+    CHECK(payload.streamKey != 0) << "Line DDP init: missing streamKey";
+    auto& ddp = m_ddpArgsByStream[payload.streamKey];
     const bool indexed = (drawSpec.indexCount > 0);
-    recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
-      const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
-      const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+    if (ddp.thinPrepared) {
+      CHECK(ddp.thinIndexed == indexed) << "Line DDP init: thin args indexed mismatch for streamKey";
+      if (indexed) {
+        CHECK(ddp.thinIndexCount == drawSpec.indexCount)
+          << "Line DDP init: thin args index count mismatch for streamKey";
+      } else {
+        CHECK(ddp.thinVertexCount == drawSpec.vertexCount)
+          << "Line DDP init: thin args vertex count mismatch for streamKey";
+      }
+    } else {
+      CHECK(static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE)
+        << "Line DDP init: device args buffer missing (fatal)";
       if (indexed) {
         struct Cmd
         {
           uint32_t indexCount, instanceCount, firstIndex;
           int32_t vertexOffset;
           uint32_t firstInstance;
-        } cmd{drawSpec.indexCount, 1, 0, 0, 0};
+        } drawCmd{drawSpec.indexCount,
+                  drawSpec.instanceCount,
+                  drawSpec.firstIndex,
+                  drawSpec.vertexOffset,
+                  drawSpec.firstInstance};
         const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
         auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
         if (slice.buffer && slice.mapped) {
-          std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
+          std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
         }
-        m_backend.scheduleStaticCopyIndirect(argsBuf, off, slice);
-        c.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+        ddp.thinOffset = off;
+        ddp.thinIndexed = true;
+        ddp.thinIndexCount = drawSpec.indexCount;
       } else {
         struct Cmd
         {
           uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
-        } cmd{drawSpec.vertexCount, 1, 0, 0};
+        } drawCmd{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
         const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
         auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
         if (slice.buffer && slice.mapped) {
-          std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
+          std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
         }
-        m_backend.scheduleStaticCopyIndirect(argsBuf, off, slice);
-        c.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(Cmd));
+        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+        ddp.thinOffset = off;
+        ddp.thinIndexed = false;
+        ddp.thinVertexCount = drawSpec.vertexCount;
+      }
+      ddp.thinPrepared = true;
+    }
+  }
+
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    const bool indexed = (drawSpec.indexCount > 0);
+    recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
+      const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
+      const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+      auto it = m_ddpArgsByStream.find(payload.streamKey);
+      CHECK(it != m_ddpArgsByStream.end()) << "Line DDP peel: args not prepared in init";
+      const DDPArgs& ddp = it->second;
+      CHECK(ddp.thinPrepared) << "Line DDP peel: thin args not prepared in init";
+      CHECK(ddp.thinIndexed == indexed) << "Line DDP peel: thin args indexed mismatch for streamKey";
+      if (indexed) {
+        CHECK(ddp.thinIndexCount == drawSpec.indexCount) << "Line DDP peel: thin index count mismatch";
+        c.drawIndexedIndirectCount(argsBuf, ddp.thinOffset, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+      } else {
+        CHECK(ddp.thinVertexCount == drawSpec.vertexCount) << "Line DDP peel: thin vertex count mismatch";
+        c.drawIndirectCount(argsBuf, ddp.thinOffset, cntBuf, 0, 1, sizeof(VkDrawIndirectCommand));
       }
     });
   } else {

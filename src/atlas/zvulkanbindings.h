@@ -3,14 +3,22 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace nim::vkbind {
 
 // Set indices
 inline constexpr uint32_t kSetInputs = 0;       // Primary sampled inputs for a pass
 inline constexpr uint32_t kSetOITParams = 3;    // OIT (DDP flag) set
 
-// OIT DDP flag SSBO (set 3)
+// OIT (set 3) bindings
+// Binding 1 is preserved for the DDP "changed" flag to avoid churn in existing shaders.
+inline constexpr uint32_t kBindingOITParams = 0; // OIT params SSBO (viewport/pixelCount)
 inline constexpr uint32_t kBindingOITDDPFlag = 1;
+inline constexpr uint32_t kBindingOITPPLLCounts = 2; // uint counts[pixel]
+inline constexpr uint32_t kBindingOITPPLLOffsets = 3; // uint offsets[pixel]
+inline constexpr uint32_t kBindingOITPPLLCursors = 4; // uint cursors[pixel]
+inline constexpr uint32_t kBindingOITPPLLFragments = 5; // Fragment fragments[total]
 
 // Dual Depth Peeling (geometry peel) sampled inputs (set 0)
 inline constexpr uint32_t kBindingDDPDepthBlender = 0;     // depth blender

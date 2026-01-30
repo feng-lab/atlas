@@ -272,6 +272,7 @@ set(ATLAS_VK_SHADER_SOURCES
     wideline.frag
 
     # Dual depth peeling (final passes)
+    dual_peeling_carry.frag
     dual_peeling_blend.frag
     dual_peeling_final.frag
     # Dual depth peeling (shape init/peel)
@@ -312,6 +313,28 @@ set(ATLAS_VK_SHADER_SOURCES
     # Weighted OIT (image init)
     wavg_init_image.frag
     wblended_init_image.frag
+
+    # PPLL exact OIT (2-pass + resolve)
+    ppll_count_mesh.frag
+    ppll_store_mesh.frag
+    ppll_count_sphere.frag
+    ppll_store_sphere.frag
+    ppll_count_cone.frag
+    ppll_store_cone.frag
+    ppll_count_cone_2.frag
+    ppll_store_cone_2.frag
+    ppll_count_ellipsoid.frag
+    ppll_store_ellipsoid.frag
+    ppll_count_wideline.frag
+    ppll_store_wideline.frag
+    ppll_count_line.frag
+    ppll_store_line.frag
+    ppll_count_image.frag
+    ppll_store_image.frag
+    ppll_resolve.frag
+    ppll_scan_local.comp
+    ppll_scan_add.comp
+
     # DDP helpers
     ddp_count.comp
 )
@@ -750,6 +773,8 @@ set(SOURCES
     zvulkantextureweightedaveragepipelinecontext.cpp
     zvulkantextureweightedblendedpipelinecontext.h
     zvulkantextureweightedblendedpipelinecontext.cpp
+    zvulkantextureppllpipelinecontext.h
+    zvulkantextureppllpipelinecontext.cpp
     zvulkantextureglowpipelinecontext.h
     zvulkantextureglowpipelinecontext.cpp
     zvulkanimgslicepipelinecontext.h

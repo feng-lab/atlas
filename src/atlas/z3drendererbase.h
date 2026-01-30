@@ -76,7 +76,9 @@ public:
     DualDepthPeelingInit,
     DualDepthPeelingPeel,
     WeightedAverageInit,
-    WeightedBlendedInit
+    WeightedBlendedInit,
+    PerPixelFragmentListCount,
+    PerPixelFragmentListStore
   };
 
   struct ShaderHookParameter

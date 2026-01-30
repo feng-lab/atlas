@@ -323,9 +323,7 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
     m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
   if (m_dsOIT && !m_backend.isRecording()) {
-    if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
-      m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
-    }
+    m_backend.primeOITDescriptorSet(*m_dsOIT);
   }
 }
 
@@ -425,6 +423,10 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key, const vu
         return "dual_peeling_init_ellipsoid.frag.spv";
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
         return "dual_peeling_peel_ellipsoid.frag.spv";
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+        return "ppll_count_ellipsoid.frag.spv";
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+        return "ppll_store_ellipsoid.frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
         return "wavg_init_ellipsoid.frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
@@ -482,6 +484,12 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key, const vu
   baseBlend.blendEnable = VK_FALSE;
 
   switch (key.shaderHookType) {
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+      // Exact OIT PPLL: depth test against opaque depth, but do not write depth.
+      instance.pipeline->setDepthTestEnable(true);
+      instance.pipeline->setDepthWriteEnable(false);
+      break;
     case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
       std::vector<vk::PipelineColorBlendAttachmentState> attachments(formats.colorFormats.size(), baseBlend);
       for (auto& attachment : attachments) {

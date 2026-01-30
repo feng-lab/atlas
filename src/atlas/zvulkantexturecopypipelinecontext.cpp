@@ -33,7 +33,6 @@ ZVulkanTextureCopyPipelineContext::~ZVulkanTextureCopyPipelineContext() = defaul
 void ZVulkanTextureCopyPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
-  m_loggedOitPrimedThisFrame = false;
   resetDescriptors();
 }
 
@@ -116,6 +115,8 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   key.wbInit = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
   key.ddpInit = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
   key.ddpPeel = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  key.ppllCount = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
+  key.ppllStore = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore);
   key.colorFormats = formats.colorFormats;
   key.depthFormat = formats.depthFormat;
 
@@ -132,12 +133,11 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   ensureVertexCapacity(m_vertexCount);
   uploadGeometry();
 
-  // Bind set=3 only for ddpPeel image path to provide DDP changed flag SSBO
-  if (key.ddpPeel) {
-    if (!m_backend.isRecording()) {
-      ensureDescriptorLayout();
-      ensureOITResources();
-    }
+  const bool usesOITSet = key.ddpPeel || key.ppllCount || key.ppllStore;
+  // Bind set=3 for OIT passes (DDP peel / PPLL count/store). Descriptors must be primed
+  // before recording; do not write descriptors during dynamic rendering.
+  if (usesOITSet && !m_backend.isRecording()) {
+    ensureOITResources();
   }
 
   // Draw-only spec under backend-managed segment
@@ -152,10 +152,10 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.vertexOffsets = {vk::DeviceSize(0)};
   drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
   drawSpec.instanceCount = 1;
-  drawSpec.expectedDescriptorSetCount = key.ddpPeel ? 4 : 1;
-  if (key.ddpPeel && m_descriptorSetOIT) {
+  drawSpec.expectedDescriptorSetCount = usesOITSet ? 4 : 1;
+  if (usesOITSet && m_descriptorSetOIT) {
     ZVulkanDescriptorBindInfo oitBind{};
-    oitBind.firstSet = 3;
+    oitBind.firstSet = vkbind::kSetOITParams;
     oitBind.sets = {m_descriptorSetOIT->descriptorSet()};
     drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
   }
@@ -190,7 +190,7 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()
   vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                .pBindings = bindings.data()};
   m_setTextures.emplace(vkDevice, createInfo);
-  // Set=3 for DDP flag SSBO only
+  // Set 3 is reserved for OIT SSBO bindings (DDP flag / PPLL buffers).
   if (!m_setOIT) {
     m_setOIT = m_backend.oitDescriptorSetLayout();
   }
@@ -211,12 +211,8 @@ void ZVulkanTextureCopyPipelineContext::ensureOITResources()
   if (!m_descriptorSetOIT && m_setOIT) {
     m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
-  if (m_descriptorSetOIT) {
-    if (!m_backend.isRecording() && m_backend.ddpIndirectCountEnabled()) {
-      if (auto* flagBuf = m_backend.ddpChangedFlagBufferObj()) {
-        m_descriptorSetOIT->writeStorageBufferOnce(nim::vkbind::kBindingOITDDPFlag, *flagBuf);
-      }
-    }
+  if (m_descriptorSetOIT && !m_backend.isRecording()) {
+    m_backend.primeOITDescriptorSet(*m_descriptorSetOIT);
   }
 }
 
@@ -287,7 +283,11 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   PipelineInstance instance;
   // Select fragment shader for image compositing modes
   std::string frag = shaderBase + std::string("copyimage.frag.spv");
-  if (key.ddpInit) {
+  if (key.ppllCount) {
+    frag = shaderBase + std::string("ppll_count_image.frag.spv");
+  } else if (key.ppllStore) {
+    frag = shaderBase + std::string("ppll_store_image.frag.spv");
+  } else if (key.ddpInit) {
     frag = shaderBase + std::string("dual_peeling_init_image.frag.spv");
   } else if (key.ddpPeel) {
     frag = shaderBase + std::string("dual_peeling_peel_image.frag.spv");
@@ -301,13 +301,14 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  if (key.ddpPeel) {
+  const bool usesOITSet = key.ddpPeel || key.ppllCount || key.ppllStore;
+  if (usesOITSet) {
     std::vector<vk::DescriptorSetLayout> layouts;
     layouts.reserve(4);
     layouts.push_back(**m_setTextures);                                  // set 0
     layouts.push_back(m_backend.emptyDescriptorSetLayout());            // set 1 placeholder
     layouts.push_back(m_backend.emptyDescriptorSetLayout());            // set 2 placeholder
-    layouts.push_back(m_backend.oitDescriptorSetLayout());              // set 3 (DDP flag)
+    layouts.push_back(m_backend.oitDescriptorSetLayout()); // set 3 (OIT SSBOs)
     instance.pipeline->setDescriptorSetLayouts(layouts);
   } else {
     instance.pipeline->setDescriptorSetLayouts({**m_setTextures});
@@ -317,7 +318,11 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
   const bool hasDepth = formats.depthFormat.has_value();
   instance.pipeline->setDepthTestEnable(hasDepth);
-  instance.pipeline->setDepthWriteEnable(hasDepth);
+  if (key.ppllCount || key.ppllStore) {
+    instance.pipeline->setDepthWriteEnable(false);
+  } else {
+    instance.pipeline->setDepthWriteEnable(hasDepth);
+  }
   if (hasDepth) {
     instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
   }

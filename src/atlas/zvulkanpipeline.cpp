@@ -138,10 +138,28 @@ void ZVulkanPipeline::create()
                                                        .minDepthBounds = 0.0f,
                                                        .maxDepthBounds = 1.0f};
 
-  if (m_colorAttachmentFormats.size() > m_colorBlendAttachments.size() && !m_colorBlendAttachments.empty()) {
-    m_colorBlendAttachments.resize(m_colorAttachmentFormats.size(), m_colorBlendAttachments.back());
+  const uint32_t colorAttachmentCount = static_cast<uint32_t>(m_colorAttachmentFormats.size());
+  if (colorAttachmentCount == 0u) {
+    // No color attachments: Vulkan requires attachmentCount=0 and pAttachments=null.
+    // Keep m_colorBlendAttachments as-is (some callers never touch it) but do not
+    // feed it into pipeline creation.
+  } else {
+    // Ensure there is at least one blend state and replicate to cover all
+    // attachments. This keeps pipeline creation robust for passes that bind
+    // multiple render targets or use depth-only passes (count=0).
+    if (m_colorBlendAttachments.empty()) {
+      vk::PipelineColorBlendAttachmentState att{};
+      att.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+      att.blendEnable = VK_FALSE;
+      m_colorBlendAttachments.push_back(att);
+    }
+    if (m_colorBlendAttachments.size() < colorAttachmentCount) {
+      m_colorBlendAttachments.resize(colorAttachmentCount, m_colorBlendAttachments.back());
+    }
   }
-  const uint32_t blendAttachmentCount = static_cast<uint32_t>(m_colorBlendAttachments.size());
+
+  const uint32_t blendAttachmentCount = (colorAttachmentCount == 0u) ? 0u : colorAttachmentCount;
   const vk::PipelineColorBlendAttachmentState* blendAttachmentPtr =
     blendAttachmentCount == 0u ? nullptr : m_colorBlendAttachments.data();
   vk::PipelineColorBlendStateCreateInfo colorBlending{

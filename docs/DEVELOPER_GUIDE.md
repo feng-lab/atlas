@@ -737,6 +737,8 @@ Transparency Methods
 - Geometry transparency:
   - Blend No Depth Mask / Blend Delayed (dual FBO passes)
   - Dual Depth Peeling (multiple layers with depth/alpha peeling)
+    - Vulkan has two implementations for DDP-quality transparency: classic multi-pass DDP and exact OIT via a per-pixel fragment list (PPLL).
+      The selection is controlled by the `Transparency` parameter (`Dual Depth Peeling` vs `Per-Pixel Fragment List (PPLL Exact)`).
   - Weighted Average and Weighted Blended (OIT approximations)
 - Images are blended via `Z3DTextureBlendRenderer` and the compositor’s merge shaders; image layers from multiple filters are collected/merged consistently.
 

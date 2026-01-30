@@ -56,6 +56,8 @@ private:
     bool wbInit = false; // use WB-init image shader (writes 2 color attachments with specific blends)
     bool ddpInit = false; // use DDP-init image shader (writes depth blender values)
     bool ddpPeel = false; // use DDP-peel image shader (reads blender tex, updates front/back)
+    bool ppllCount = false; // exact OIT PPLL count pass (writes to SSBO, no color outputs)
+    bool ppllStore = false; // exact OIT PPLL store pass (writes to SSBO, no color outputs)
     std::vector<vk::Format> colorFormats;
     std::optional<vk::Format> depthFormat;
 
@@ -68,6 +70,8 @@ private:
                         wbInit,
                         ddpInit,
                         ddpPeel,
+                        ppllCount,
+                        ppllStore,
                         colorFormats,
                         depthFormat);
     }
@@ -89,10 +93,8 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
-  vk::DescriptorSetLayout m_setOIT{}; // set for DDP flag when needed
+  vk::DescriptorSetLayout m_setOIT{}; // set 3: OIT SSBOs (DDP flag / PPLL buffers)
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
-  // Logging guard to avoid repeating OIT priming messages every call within a frame
-  bool m_loggedOitPrimedThisFrame = false;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;

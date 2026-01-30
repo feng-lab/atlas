@@ -58,13 +58,41 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   transparencyMethod.setDescription(
     QStringLiteral("Transparency compositing method. Weighted Average (default) is fast and stable;"
                    " Weighted Blended reduces bleed-through with 'Weighted Blended Depth Scale';"
-                   " Dual Depth Peeling is more accurate but heavier."));
+                   " Dual Depth Peeling is more accurate but heavier;"
+                   " Per-Pixel Fragment List (PPLL) is exact OIT on Vulkan (falls back to DDP on OpenGL)."));
   // weightedBlendedDepthScale.setStyle("SPINBOX");
 
   //  if (Z3DGpuInfoInstance.isLinkedListSupported())
   //    m_transparencyMethod.addOption("Linked List");
 
   addParameter(transparencyMethod);
+
+  // Vulkan-only option: expose exact OIT (PPLL) only when Vulkan backend is active.
+  // Keep OpenGL UI clean (and avoid misleading selection of a Vulkan-only mode).
+  const QString ddpLabel = QStringLiteral("Dual Depth Peeling");
+  const QString ppllLabel = QStringLiteral("Per-Pixel Fragment List (PPLL Exact)");
+  auto updateTransparencyOptionsForBackend = [this, ddpLabel, ppllLabel]() {
+    const RenderBackend backend = static_cast<RenderBackend>(renderBackend.associatedData());
+    const bool shouldExposePPLL = (backend == RenderBackend::Vulkan);
+    const bool hasPPLL = transparencyMethod.hasOption(ppllLabel);
+    if (shouldExposePPLL) {
+      if (!hasPPLL) {
+        transparencyMethod.addOptionWithData(
+          std::make_pair(ppllLabel, static_cast<int>(TransparencyMode::PerPixelFragmentList)));
+      }
+      return;
+    }
+
+    if (!hasPPLL) {
+      return;
+    }
+    if (transparencyMethod.isSelected(ppllLabel)) {
+      transparencyMethod.select(ddpLabel);
+    }
+    transparencyMethod.removeOption(ppllLabel);
+  };
+
+  updateTransparencyOptionsForBackend();
   addParameter(weightedBlendedDepthScale);
   weightedBlendedDepthScale.setDescription(
     QStringLiteral("Tuning scalar for Weighted Blended transparency. Increase to reduce bleed-through;"
@@ -112,6 +140,7 @@ Z3DGlobalParameters::Z3DGlobalParameters()
           &ZStringIntOptionParameter::valueChanged,
           this,
           &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&renderBackend, &ZStringIntOptionParameter::valueChanged, this, updateTransparencyOptionsForBackend);
 
   // lights
   QString lightname = "Key Light";
