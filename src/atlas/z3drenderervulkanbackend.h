@@ -5,6 +5,11 @@
 #include "zvulkan.h"
 #include "zvulkandevice.h"
 #include "zvulkanframeexecutor.h"
+#include "zcoro_spothooks.h"
+// Expose a small awaiter type for "after fence" logic.
+#include <folly/coro/Baton.h>
+// Public hook API uses folly coroutines directly.
+#include <folly/coro/Task.h>
 // Arena allocations for per-frame descriptor sets
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
@@ -14,6 +19,7 @@
 
 #include <array>
 #include <chrono>
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -41,6 +47,7 @@ class ZVulkanImgSlicePipelineContext;
 class ZVulkanImgRaycasterPipelineContext;
 class ZVulkanFontPipelineContext;
 class ZVulkanBuffer;
+
 // Vulkan renderer backend borrows the shared ZVulkanDevice injected through the scratch pool.
 // Lifetime notes:
 //  * Z3DRenderingEngine owns the Vulkan context/device and calls setVulkanDevice() on the pool
@@ -165,11 +172,130 @@ public:
   // Use this when updating descriptors per draw to avoid update-after-bind.
   ZVulkanDescriptorSet* allocateOverrideDescriptorSet(vk::DescriptorSetLayout layout);
 
-  // Stage 2: Schedule a callback to run once the current frame's fence signals
-  void scheduleAfterCurrentFrameCompletion(std::function<void()> fn);
-  // Schedule a callback gated by the current submission fence. The callback is
-  // executed when the frame executor observes the fence completion (poll/wait).
-  void scheduleAfterActiveSubmissionFence(std::function<void()> fn);
+  // Await the active submission fence (if any) as a coroutine.
+  //
+  // This returns an awaiter object that captures the current active submission
+  // (if any) *at call time*. The await itself can happen later (e.g., from a
+  // queued coroutine) without relying on mutable backend state.
+  //
+  // - When there is an active frame submission, the awaiter suspends until its
+  //   fence is observed complete by the frame executor.
+  // - When no active submission exists, the awaiter conservatively waits for
+  //   all in-flight submissions to complete (teardown safety).
+  //
+  // Must be created on the rendering thread.
+  class ActiveSubmissionFenceAwaiter final
+  {
+  public:
+    ActiveSubmissionFenceAwaiter() = default;
+
+    [[nodiscard]] folly::coro::Baton::WaitOperation operator co_await() const noexcept
+    {
+      // If this triggers, the awaiter was default-constructed or moved-from.
+      CHECK(m_state != nullptr) << "ActiveSubmissionFenceAwaiter used without a state";
+      return m_state->baton.operator co_await();
+    }
+
+  private:
+    struct State
+    {
+      explicit State(bool signalled) noexcept
+        : baton(signalled)
+      {}
+      folly::coro::Baton baton;
+    };
+
+    explicit ActiveSubmissionFenceAwaiter(std::shared_ptr<State> state)
+      : m_state(std::move(state))
+    {}
+
+    std::shared_ptr<State> m_state;
+    friend class Z3DRendererVulkanBackend;
+  };
+
+  [[nodiscard]] ActiveSubmissionFenceAwaiter awaitActiveSubmissionFence(std::string_view debugLabel = {});
+
+private:
+  enum class FrameHookSpot
+  {
+    AfterFrameCompletionSafePoint
+  };
+
+  // Shared one-shot signal for "frame completion safe point" waits.
+  //
+  // This is intentionally a separate shared state object so multiple awaiters
+  // created during the same active frame can all wait on the same signal, and
+  // the backend can "rotate" the signal on frame-slot reuse without any baton
+  // reset races.
+  struct FrameCompletionSignal
+  {
+    explicit FrameCompletionSignal(bool signalled) noexcept
+      : baton(signalled)
+    {}
+    folly::coro::Baton baton;
+  };
+
+public:
+  // Await a "current frame completion" safe point as a coroutine.
+  //
+  // The await completes at the point where the backend is about to reuse the
+  // frame-slot resources (descriptor pools, deferred releases) after the GPU
+  // finished executing the submission and after all submission-fence completion
+  // callbacks have run.
+  //
+  // Must be created on the rendering thread.
+  class CurrentFrameCompletionAwaiter final
+  {
+  public:
+    CurrentFrameCompletionAwaiter() = default;
+
+    [[nodiscard]] folly::coro::Baton::WaitOperation operator co_await() const noexcept
+    {
+      CHECK(m_signal != nullptr) << "CurrentFrameCompletionAwaiter used without a signal";
+      return m_signal->baton.operator co_await();
+    }
+
+  private:
+    explicit CurrentFrameCompletionAwaiter(std::shared_ptr<FrameCompletionSignal> signal)
+      : m_signal(std::move(signal))
+    {}
+
+    std::shared_ptr<FrameCompletionSignal> m_signal;
+    friend class Z3DRendererVulkanBackend;
+  };
+
+  [[nodiscard]] CurrentFrameCompletionAwaiter awaitCurrentFrameCompletion(std::string_view debugLabel = {});
+
+  using AfterFrameCompletionHook = folly::Function<folly::coro::Task<void>(Z3DRendererVulkanBackend&)>;
+
+  // Register a coroutine hook to run at the "current frame completion safe point"
+  // (applyPendingArenaReset) for the active frame-slot.
+  //
+  // This is the preferred API for post-fence work that needs correct ordering
+  // with respect to frame-slot reuse while allowing the hook body to be written
+  // linearly with co_await and to run on the call-site chosen executor.
+  //
+  // Contract:
+  // - Must be called on the rendering thread.
+  // - Requires an active frame-slot context: either the backend is currently
+  //   recording a frame, or it is currently draining a completion safe point.
+  // - Does not silently block-wait; teardown code must explicitly call
+  //   flushForTeardown()/engine drain helpers.
+  void registerAfterCurrentFrameCompletionHook(folly::Executor::KeepAlive<> ex,
+                                               AfterFrameCompletionHook hook,
+                                               std::string_view debugLabel = {});
+
+  // Schedule work to run at the "current frame completion safe point" for the
+  // active frame-slot (applyPendingArenaReset()).
+  //
+  // This is the correct primitive for any work that touches per-frame-slot
+  // Vulkan resources (descriptor arenas, frame-keyed buffers, scratch leases,
+  // etc.). Coroutines that resume later on an executor are not safe for such
+  // work when multiple frames are in flight, because the frame-slot may be
+  // reused before the coroutine resumes.
+  //
+  // Must be called on the rendering thread.
+  void scheduleAfterCurrentFrameCompletion(std::function<void()> fn, std::string_view debugLabel = {});
 
   // Teardown helper: wait for all in-flight frame submissions and flush any
   // fence-gated callbacks (notably residency unpins).
@@ -265,10 +391,17 @@ private:
     uint32_t descriptorSetsAllocated = 0; // VLOG(1) counter per frame
     bool arenaResetScheduled = false; // scheduled at endRender()
     uint32_t arenaResetsPerformed = 0; // count performed resets (debug)
-    // Fence-gated deferred actions (e.g., scratch slot releases)
-    std::vector<std::function<void()>> deferredReleases;
-    uint32_t leaseRecycleQueued = 0;
-    uint32_t leaseRecycleExecuted = 0;
+    // Shared signal for "frame completion safe point" waits. Rotated at the
+    // start of a new recording session for this frame-slot (and also after an
+    // explicit wait-for-completion path).
+    std::shared_ptr<FrameCompletionSignal> frameCompletionSignal;
+    // Work to execute at the frame completion safe point. This runs after the
+    // GPU finished executing the submission, after fence completion callbacks
+    // ran, and after per-frame descriptor pool resets have been applied.
+    //
+    // Hooks are executed with a barrier at the safe point. Each hook is bound
+    // to a call-site chosen executor (render thread, CPU pool, etc.).
+    ZCoroSpotHooks<FrameHookSpot, Z3DRendererVulkanBackend> afterFrameCompletionHooks;
 
     // Stage 3: instrumentation (per-frame)
     uint32_t renderingSegmentsBegan = 0; // number of vkCmdBeginRendering calls
@@ -473,6 +606,7 @@ public:
   std::unordered_map<void*, size_t> m_frameResourceMap;
   std::optional<ZVulkanFrameExecutor::ActiveFrame> m_activeFrameHandle;
   FrameResources* m_activeFrame = nullptr;
+  std::atomic<FrameResources*> m_frameInCompletionSafePoint{nullptr};
   bool m_frameRecording = false;
   uint32_t m_maxFramesInFlight = 2;
   float m_timestampPeriod = 1.0f;

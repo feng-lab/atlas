@@ -165,7 +165,11 @@ Lookup Tables (LUTs)
   - OpenGL: per-renderer 1D RGBA8 textures for colormaps/transfer functions.
 - Vulkan: pipeline contexts create 2D Nx1 `ZVulkanTexture`s via a small helper (MoltenVK portability — Metal lacks native 1D); LUTs are uploaded as RGBA8 and bound through descriptor sets.
   - Vulkan descriptor arena (Stage 2): pipeline contexts must allocate descriptor sets from the backend’s per-frame arena via `Z3DRendererVulkanBackend::allocateFrameDescriptorSet(layout)`. Do not create per-context descriptor pools. The arena is reset once per frame (scheduled in `endRender()`, applied on the next `beginRender()` after the frame fence signals).
-  - Scratch-pool recycling: Vulkan scratch image leases are released only after the submitting frame’s fence signals. The pool defers slot reuse via a callback provided by the backend each frame.
+  - Frame-completion safe point: the backend defines a frame-slot “completion safe point” at the start of `beginRender()` when a frame slot is being reused (`applyPendingArenaReset`). At that point it:
+    - resets per-frame descriptor resources,
+    - drains all “after completion” hooks with a barrier (hooks may run on their own executors),
+    - then wakes `awaitCurrentFrameCompletion()` awaiters for the previous generation.
+  - Scratch-pool recycling: Vulkan scratch image leases are released only after the submitting frame’s fence signals. The pool defers slot reuse by scheduling work to the frame-completion safe point (via `scheduleAfterCurrentFrameCompletion()`).
   - Shared fullscreen quad: use `Z3DRendererVulkanBackend::fullscreenQuadVertexBuffer()` in full-screen passes (background, copy, blend, glow) instead of creating per-context VBOs.
   - Vulkan descriptor guardrails:
     - Do not write descriptors while a frame is recording. Persistent sets are write-once per frame; update only UBO contents via `copyData(...)` in record paths.
@@ -181,7 +185,7 @@ ImgRaycaster Vulkan
   - Progressive bookkeeping is outside the Vulkan pipeline context. The context computes whether a progressive round finished and the backend calls back to the renderer using a stable `streamKey` identity to finalize (`finalizeProgressiveRound`).
   - GL paths are unchanged.
 - On backend switch, `Z3DRendererBase::releaseBackendResources()` clears renderer caches; `Z3DImgFilter::switchRendererBackend` releases GL volume resources when switching to Vulkan.
- - Post‑fence callbacks (e.g., Block‑ID compaction parsing) are drained as soon as the submission fence signals, independent of the descriptor‑arena reset. This avoids an extra frame of latency when `maxFramesInFlight > 1` and keeps progressive channel bookkeeping in lockstep (advance/skip decisions are applied before the next record).
+  - Post‑fence CPU work that must run after submission completion callbacks (e.g., Block‑ID compaction parsing that assumes residency unpins have drained) should await the backend’s frame‑completion safe point (frame-slot reuse). This preserves ordering, but can introduce up to one frame of latency when `maxFramesInFlight > 1`.
 
 Threading Model
 
@@ -191,6 +195,10 @@ Threading Model
   - Do not manipulate engine or parameter QObjects directly from UI.
   - Use `QMetaObject::invokeMethod` to post to engine thread; use `Qt::BlockingQueuedConnection` if you must wait.
   - For parameter changes, queue to the parameter’s owning thread (see `ZParameterAnimation::setCurrentTime`).
+  - For coroutine-based flows, prefer the engine’s render-thread executor:
+    - `Z3DRenderingEngine::renderThreadExecutor()` provides a `ZQtExecutor` (a `folly::Executor`) that schedules onto the engine thread via Qt event posting.
+    - Pipeline contexts and Vulkan backend code should use `currentRenderThreadExecutorKeepAlive(...)` at call sites that need a keep-alive token for `co_withExecutor(...)`.
+    - Teardown: `Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()` must run on the engine thread before quitting it so fence-gated continuations can complete deterministically.
 
 Pointer Nullability Contract
 
@@ -544,7 +552,6 @@ Logging
   - No-op sampled-read transitions are suppressed: `ensureSampledReadable` only logs when a layout change occurs.
   - Dynamic rendering ‘begin’ logs always carry a non-empty label; empty pass labels fall back to `<unnamed>`.
   - `TextureCopy` OIT UBO priming (`set=3,binding=0`) logs at most once per frame per pipeline context.
-  - Immediate execution of deferred callbacks (no active frame) is logged at `VLOG(2)` instead of `VLOG(1)`.
   - Upload arena capacity changes are logged; steady-state per-call capacity is not repeated.
 
 Level Semantics (Vulkan)

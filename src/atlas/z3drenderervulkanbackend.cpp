@@ -37,6 +37,7 @@
 #include "zvulkanbuffer.h"
 #include "z3dperfcollector.h"
 #include "zvulkanbindings.h"
+#include "zrenderthreadexecutor_tls.h"
 
 #include <algorithm>
 #include <array>
@@ -48,6 +49,11 @@
 #include <vector>
 #include <cstring>
 #include <cstdint>
+#include <exception>
+
+#include <folly/coro/Baton.h>
+#include <folly/coro/BlockingWait.h>
+#include <folly/coro/Task.h>
 
 DEFINE_bool(vk_reserve_upload_slices,
             true,
@@ -91,11 +97,17 @@ Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
 
 Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend()
 {
-  // Teardown invariant: do not drop post-fence callbacks (unpins, deferred releases)
-  // while they still refer to in-flight submissions. When the owning renderer/filter
-  // is destroyed, callers may still destroy resources (e.g. Z3DImg) whose Vulkan
-  // cache textures are pinned per submission. Ensure we drain those pins now.
+  // Teardown invariant: do not drop fence-gated continuations (residency unpins,
+  // per-frame deferred releases) while they still refer to in-flight submissions.
+  // When the owning renderer/filter is destroyed, callers may still destroy
+  // resources (e.g. Z3DImg) whose Vulkan cache textures are pinned per submission.
+  // Ensure those pins are drained now.
   flushForTeardown("backend_dtor");
+
+  // The scratch pool may still release outstanding Vulkan leases while the
+  // engine is tearing down. Do not leave a scheduler closure capturing this
+  // backend beyond its lifetime.
+  Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
 }
 
 Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::current()
@@ -105,10 +117,16 @@ Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::current()
 
 void Z3DRendererVulkanBackend::preBackendSwitch()
 {
-  // Ensure all in-flight submissions have completed and all fence-gated callbacks
-  // (residency unpins, deferred scratch-slot releases) are drained before we
-  // clear frame resources and allow renderer-owned resources to be destroyed.
+  // Ensure all in-flight submissions have completed and all fence-gated
+  // continuations (residency unpins, deferred scratch-slot releases) are drained
+  // before we clear frame resources and allow renderer-owned resources to be
+  // destroyed.
   flushForTeardown("preBackendSwitch");
+
+  // Switching away from Vulkan: drop the scratch-pool release scheduler that is
+  // tied to this backend instance. After flushForTeardown(), immediate release
+  // is safe.
+  Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
 
   // Drop shared placeholders; they'll be recreated lazily on next use.
   m_defaultPlaceholder2D.reset();
@@ -127,9 +145,10 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
 
-  // Global coordination (device waitIdle, scratch-pool reset) is handled by
-  // the rendering engine during backend switches. Avoid touching global state
-  // here to prevent ordering conflicts with persistent lease release.
+  // Global coordination (device waitIdle, scratch-pool reset) is handled by the
+  // rendering engine during backend switches. Beyond clearing the scratch-pool
+  // release scheduler above, avoid touching global state here to prevent
+  // ordering conflicts with persistent lease release.
   if (m_sharedDevice) {
     for (auto& frame : m_frames) {
       collectFrameTimings(frame);
@@ -466,8 +485,6 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     frameResources.lightingDynOffset = slice.offset;
   }
   frameResources.descriptorSetsAllocated = 0;
-  frameResources.leaseRecycleQueued = 0;
-  frameResources.leaseRecycleExecuted = 0;
 
   collectFrameTimings(frameResources);
   frameResources.gpuScopes.clear();
@@ -560,13 +577,32 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 
   m_frameRecording = true;
 
-  // Install scratch-pool deferred release scheduler for this active frame
-  {
-    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-    pool.setVulkanReleaseScheduler([this](std::function<void()> fn) {
-      this->scheduleAfterCurrentFrameCompletion(std::move(fn));
-    });
-  }
+  // Install scratch-pool deferred release scheduler for this backend.
+  // (Used by RenderTargetLease to delay Vulkan slot reuse until the frame-slot
+  // reaches the completion safe point.)
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  pool.setVulkanReleaseScheduler([this](std::function<void()> fn) {
+    if (!fn) {
+      return;
+    }
+
+    // If no active frame is present, be conservative: wait for all in-flight
+    // frames and release immediately. This avoids freeing scratch slots while
+    // the GPU might still be using them (teardown/backend-switch edge cases).
+    if (!m_activeFrame || !m_sharedDevice) {
+      if (m_sharedDevice) {
+        m_sharedDevice->frameExecutor().waitForAllInFlight();
+      }
+      fn();
+      return;
+    }
+
+    // Common case: delay until the frame-slot reaches the completion safe
+    // point (applyPendingArenaReset).
+    scheduleAfterCurrentFrameCompletion(std::move(fn), "scratch_pool_vulkan_release");
+  });
+
+  // beginRender() ends here; command buffer recording continues in pipeline contexts.
 }
 
 void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
@@ -693,14 +729,15 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   if (!residencyPins.empty()) {
     if (submitted) {
       ZVulkanDevice* submitDevice = m_sharedDevice;
-      scheduleAfterActiveSubmissionFence([submitDevice, pins = std::move(residencyPins)]() mutable {
-        if (!submitDevice) {
-          return;
-        }
-        for (auto* tex : pins) {
-          submitDevice->residencyManager().unpinIfManaged(tex);
-        }
-      });
+      device().frameExecutor().scheduleAfterCompletion(frameHandle,
+                                                       [submitDevice, pins = std::move(residencyPins)]() mutable {
+                                                         if (!submitDevice) {
+                                                           return;
+                                                         }
+                                                         for (auto* tex : pins) {
+                                                           submitDevice->residencyManager().unpinIfManaged(tex);
+                                                         }
+                                                       });
     } else {
       for (auto* tex : residencyPins) {
         device().residencyManager().unpinIfManaged(tex);
@@ -2443,30 +2480,6 @@ ZVulkanDescriptorSet* Z3DRendererVulkanBackend::allocateOverrideDescriptorSet(vk
   return raw;
 }
 
-void Z3DRendererVulkanBackend::scheduleAfterCurrentFrameCompletion(std::function<void()> fn)
-{
-  if (!fn) {
-    return;
-  }
-  if (!m_activeFrame) {
-    // No active frame. This occurs on teardown and on backend switches when
-    // persistent Vulkan leases are released after the last submission finished
-    // recording but before another beginRender().
-    //
-    // We must not execute immediately if any submissions are still in flight, as
-    // the release closures can drop resources referenced by the GPU (scratch
-    // targets, paged image caches, etc.). In this edge state, block until all
-    // frame-executor submissions complete, then execute.
-    if (m_sharedDevice) {
-      m_sharedDevice->frameExecutor().waitForAllInFlight();
-    }
-    fn();
-    return;
-  }
-  m_activeFrame->deferredReleases.push_back(std::move(fn));
-  m_activeFrame->leaseRecycleQueued++;
-}
-
 void Z3DRendererVulkanBackend::flushForTeardown(std::string_view reason)
 {
   if (!m_sharedDevice) {
@@ -2503,23 +2516,125 @@ void Z3DRendererVulkanBackend::flushForTeardown(std::string_view reason)
   // Wait for all submitted frames to finish so fence-gated callbacks can run safely.
   m_sharedDevice->frameExecutor().waitForAllInFlight();
 
+  // After GPU idle and after all frame-executor completion callbacks ran, it is
+  // safe to drain any backend-managed per-frame deferred work (descriptor-pool
+  // resets, deferred releases, and coroutines awaiting the frame completion
+  // safe point).
+  for (auto& frame : m_frames) {
+    applyPendingArenaReset(frame);
+  }
+
   if (VLOG_IS_ON(1)) {
     VLOG(1) << fmt::format("VK flushForTeardown end reason='{}'",
                            reason.empty() ? "<unspecified>" : std::string(reason));
   }
 }
 
-void Z3DRendererVulkanBackend::scheduleAfterActiveSubmissionFence(std::function<void()> fn)
+Z3DRendererVulkanBackend::ActiveSubmissionFenceAwaiter
+Z3DRendererVulkanBackend::awaitActiveSubmissionFence(std::string_view debugLabel)
+{
+  (void)debugLabel;
+  CHECK(m_sharedDevice != nullptr) << "awaitActiveSubmissionFence requires an initialized Vulkan device";
+
+  // Capture the active frame handle at call time (this function executes on the
+  // render thread during recording/submission). The returned awaiter must not
+  // depend on mutable backend state (m_activeFrameHandle) because callers may
+  // await later from queued coroutines after endRender() resets it.
+  auto state = std::make_shared<ActiveSubmissionFenceAwaiter::State>(false);
+
+  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    // No active submission; conservatively wait for all in-flight submissions
+    // right now so the awaiter is immediately ready.
+    m_sharedDevice->frameExecutor().waitForAllInFlight();
+    state->baton.post();
+    return ActiveSubmissionFenceAwaiter(std::move(state));
+  }
+
+  // Tie completion to the frame-executor slot (not the raw VkFence) so fence
+  // reuse/reset remains safe: the executor runs callbacks before reusing a slot.
+  device().frameExecutor().scheduleAfterCompletion(*m_activeFrameHandle, [state]() {
+    state->baton.post();
+  });
+
+  return ActiveSubmissionFenceAwaiter(std::move(state));
+}
+
+Z3DRendererVulkanBackend::CurrentFrameCompletionAwaiter
+Z3DRendererVulkanBackend::awaitCurrentFrameCompletion(std::string_view debugLabel)
+{
+  (void)debugLabel;
+  CHECK(m_sharedDevice != nullptr) << "awaitCurrentFrameCompletion requires an initialized Vulkan device";
+
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    // No active frame: conservatively wait for all in-flight submissions so
+    // any frame-slot reuse work is already safe.
+    m_sharedDevice->frameExecutor().waitForAllInFlight();
+    auto signal = std::make_shared<FrameCompletionSignal>(true);
+    return CurrentFrameCompletionAwaiter(std::move(signal));
+  }
+
+  // Multiple awaiters created during the same active frame share the same
+  // one-shot signal. The backend posts it when the frame-slot reaches the
+  // reuse safe point in applyPendingArenaReset().
+  if (!m_activeFrame->frameCompletionSignal) {
+    m_activeFrame->frameCompletionSignal = std::make_shared<FrameCompletionSignal>(false);
+  }
+  return CurrentFrameCompletionAwaiter(m_activeFrame->frameCompletionSignal);
+}
+
+void Z3DRendererVulkanBackend::registerAfterCurrentFrameCompletionHook(folly::Executor::KeepAlive<> ex,
+                                                                       AfterFrameCompletionHook hook,
+                                                                       std::string_view debugLabel)
+{
+  CHECK(currentRenderThreadExecutorOrNull() != nullptr)
+    << "registerAfterCurrentFrameCompletionHook must be called on the rendering thread"
+    << (debugLabel.empty() ? "" : " (") << debugLabel << (debugLabel.empty() ? "" : ")");
+  CHECK(m_sharedDevice != nullptr) << "registerAfterCurrentFrameCompletionHook requires an initialized Vulkan device";
+
+  FrameResources* safePointFrame = m_frameInCompletionSafePoint.load(std::memory_order_acquire);
+
+  FrameResources* targetFrame = nullptr;
+  if (m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid()) {
+    targetFrame = m_activeFrame;
+  } else if (safePointFrame) {
+    targetFrame = safePointFrame;
+  }
+
+  CHECK(targetFrame != nullptr)
+    << "registerAfterCurrentFrameCompletionHook requires an active frame-slot context (recording or completion safe point)"
+    << (debugLabel.empty() ? "" : " label='") << (debugLabel.empty() ? "" : debugLabel)
+    << (debugLabel.empty() ? "" : "'");
+
+  targetFrame->afterFrameCompletionHooks.registerHook(FrameHookSpot::AfterFrameCompletionSafePoint,
+                                                      std::move(ex),
+                                                      std::move(hook),
+                                                      debugLabel);
+}
+
+void Z3DRendererVulkanBackend::scheduleAfterCurrentFrameCompletion(std::function<void()> fn,
+                                                                   std::string_view debugLabel)
 {
   if (!fn) {
     return;
   }
-  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
-    // Fallback to per-frame queue when no active submission is present.
-    scheduleAfterCurrentFrameCompletion(std::move(fn));
-    return;
+  CHECK(currentRenderThreadExecutorOrNull() != nullptr)
+    << "scheduleAfterCurrentFrameCompletion must be called on the rendering thread" << (debugLabel.empty() ? "" : " (")
+    << debugLabel << (debugLabel.empty() ? "" : ")");
+
+  if (VLOG_IS_ON(2) && !debugLabel.empty()) {
+    VLOG(2) << fmt::format("VK scheduleAfterCurrentFrameCompletion queued: '{}'", std::string(debugLabel));
   }
-  device().frameExecutor().scheduleAfterCompletion(*m_activeFrameHandle, std::move(fn));
+
+  // Legacy wrapper: schedule a non-suspending callback on the render thread.
+  // Prefer registerAfterCurrentFrameCompletionHook() for linear coroutine logic.
+  auto keepAlive = currentRenderThreadExecutorKeepAlive("scheduleAfterCurrentFrameCompletion");
+  registerAfterCurrentFrameCompletionHook(
+    std::move(keepAlive),
+    [fn = std::move(fn)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+      fn();
+      co_return;
+    },
+    debugLabel);
 }
 
 void Z3DRendererVulkanBackend::pinTextureForActiveSubmission(ZVulkanTexture* texture)
@@ -2657,10 +2772,16 @@ void Z3DRendererVulkanBackend::ensureArenaOnFrame(FrameResources& frame)
 
 void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
 {
-  if (!frame.descriptorPool) {
-    return;
-  }
+  // We are at the "frame completion safe point" for this frame-slot: either
+  // the executor just waited for the fence before reusing the slot, or the
+  // backend performed an explicit wait-for-completion. In both cases, it is
+  // now safe to run any work that must observe the end of the previous
+  // submission and then start a new generation for this slot.
+  auto completedSignal = std::move(frame.frameCompletionSignal);
+  frame.frameCompletionSignal = std::make_shared<FrameCompletionSignal>(false);
+
   if (frame.arenaResetScheduled) {
+    CHECK(frame.descriptorPool) << "Descriptor pool missing while reset was scheduled";
     // Destroy transient override sets BEFORE resetting the pool to avoid
     // vkFreeDescriptorSets after implicit free by pool reset.
     frame.transientOverrideSets.clear();
@@ -2668,15 +2789,34 @@ void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
     frame.arenaResetScheduled = false;
     frame.arenaResetsPerformed++;
   }
-  if (!frame.deferredReleases.empty()) {
-    for (auto& fn : frame.deferredReleases) {
-      if (fn) {
-        fn();
-        // Count after execution
-        frame.leaseRecycleExecuted++;
-      }
-    }
-    frame.deferredReleases.clear();
+
+  // Barrier: execute all registered hooks for this frame-slot completion safe
+  // point (including hooks registered during the drain loop), then continue.
+  //
+  // We capture and rethrow after waking awaiters so cancellation/errors do not
+  // strand coroutines waiting on the frame completion signal.
+  FrameResources* previousSafePointFrame = m_frameInCompletionSafePoint.exchange(&frame, std::memory_order_acq_rel);
+
+  std::exception_ptr deferredException;
+  try {
+    folly::coro::blockingWait(
+      frame.afterFrameCompletionHooks.reach(FrameHookSpot::AfterFrameCompletionSafePoint, *this));
+  }
+  catch (...) {
+    deferredException = std::current_exception();
+  }
+
+  m_frameInCompletionSafePoint.store(previousSafePointFrame, std::memory_order_release);
+
+  // Wake any awaiters waiting for the previous generation of this frame-slot.
+  // Post after we've applied per-frame resets, so the "completion safe point"
+  // matches backend reuse semantics.
+  if (completedSignal) {
+    completedSignal->baton.post();
+  }
+
+  if (deferredException) {
+    std::rethrow_exception(deferredException);
   }
 }
 
@@ -2689,15 +2829,12 @@ void Z3DRendererVulkanBackend::scheduleArenaReset(FrameResources& frame)
 
 void Z3DRendererVulkanBackend::vlogFrameRecyclingStats(const FrameResources& frame) const
 {
-  VLOG(1) << fmt::format(
-    "VK frame: frame='{}' token={} submit#{} descriptor_sets={} arena_resets={} lease_recycle_queued={} executed={}",
-    frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
-    frame.realFrameToken,
-    frame.submissionId,
-    frame.descriptorSetsAllocated,
-    frame.arenaResetsPerformed,
-    frame.leaseRecycleQueued,
-    frame.leaseRecycleExecuted);
+  VLOG(1) << fmt::format("VK frame: frame='{}' token={} submit#{} descriptor_sets={} arena_resets={}",
+                         frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
+                         frame.realFrameToken,
+                         frame.submissionId,
+                         frame.descriptorSetsAllocated,
+                         frame.arenaResetsPerformed);
 }
 
 const std::optional<vulkan::AttachmentFormats>& Z3DRendererVulkanBackend::currentSegmentFormats() const
@@ -2925,7 +3062,7 @@ void Z3DRendererVulkanBackend::requestEndOfFrameColorReadback(
       VLOG(1) << fmt::format("VK readback consumer: {} bytes, {:.3f} ms", bytes, ms);
     }
   };
-  scheduleAfterCurrentFrameCompletion(std::move(consumer));
+  scheduleAfterCurrentFrameCompletion(std::move(consumer), "vk_readback_consumer");
 }
 
 void Z3DRendererVulkanBackend::notifyPipelineCreated()

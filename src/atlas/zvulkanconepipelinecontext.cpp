@@ -16,9 +16,10 @@
 #include "zsysteminfo.h"
 #include "zexception.h"
 #include "zlog.h"
+#include "zcoro.h"
 #include "z3dconerenderer.h"
+#include "zrenderthreadexecutor_tls.h"
 
-#include <algorithm>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -26,6 +27,8 @@
 #include <vector>
 #include <cstring>
 #include <cstdint>
+
+#include <folly/coro/Task.h>
 
 namespace nim {
 
@@ -99,9 +102,13 @@ void ZVulkanConePipelineContext::flushRetainedUbos()
   if (m_retainedUbos.empty()) {
     return;
   }
+  const auto fence = m_backend.awaitActiveSubmissionFence("VK cone retained UBO lifetime");
+  auto keepAlive = currentRenderThreadExecutorKeepAlive("VK cone retained UBO lifetime");
   for (auto& sp : m_retainedUbos) {
-    auto keep = sp;
-    m_backend.scheduleAfterActiveSubmissionFence([keep]() {});
+    auto task = [fence, keep = sp]() mutable -> folly::coro::Task<void> {
+      co_await fence;
+    };
+    startCoroTaskChecked(folly::coro::co_withExecutor(keepAlive, task()), "VK cone retained UBO lifetime");
   }
   m_retainedUbos.clear();
 }

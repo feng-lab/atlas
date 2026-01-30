@@ -328,9 +328,11 @@ public:
   ZVulkanDevice* vulkanDevice();
   ZVulkanDevice& ensureVulkanDevice();
 
-  // Stage 2: Defer Vulkan scratch slot reuse until the frame fence signals
-  // The backend installs a scheduler that enqueues closures to run once the
-  // current frame completes. The pool uses it to delay marking Vulkan slots as free.
+  // Stage 2: Defer Vulkan scratch slot reuse until the backend reaches the
+  // "frame completion safe point" (frame-slot reuse after the submission fence
+  // signalled and completion callbacks have drained). The backend installs a
+  // scheduler that enqueues closures to run at that safe point.
+  // The pool uses it to delay marking Vulkan slots as free.
   void setVulkanReleaseScheduler(std::function<void(std::function<void()>)> scheduler)
   {
     m_vulkanReleaseScheduler = std::move(scheduler);

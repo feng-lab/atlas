@@ -17,6 +17,8 @@
 #include "z3dlinerenderer.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
+#include "zcoro.h"
+#include "zrenderthreadexecutor_tls.h"
 
 #include <algorithm>
 #include <array>
@@ -26,6 +28,8 @@
 #include <vector>
 #include <cstring>
 #include <cstdint>
+
+#include <folly/coro/Task.h>
 
 namespace nim {
 namespace {
@@ -155,11 +159,15 @@ void ZVulkanLinePipelineContext::flushRetainedUbos()
   if (m_retainedUbos.empty()) {
     return;
   }
+  const auto fence = m_backend.awaitActiveSubmissionFence("VK line retained UBO lifetime");
+  auto keepAlive = currentRenderThreadExecutorKeepAlive("VK line retained UBO lifetime");
   // Hand retained UBOs to the backend so destruction happens after the active
   // submission fence signals. Capture shared_ptr by value to extend lifetime.
   for (auto& sp : m_retainedUbos) {
-    auto keep = sp; // copy shared ownership into the closure
-    m_backend.scheduleAfterActiveSubmissionFence([keep]() {});
+    auto task = [fence, keep = sp]() mutable -> folly::coro::Task<void> {
+      co_await fence;
+    };
+    startCoroTaskChecked(folly::coro::co_withExecutor(keepAlive, task()), "VK line retained UBO lifetime");
   }
   m_retainedUbos.clear();
 }

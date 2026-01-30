@@ -21,6 +21,8 @@
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbindings.h"
 #include "zvulkanpipelinecontext_raii.h"
+#include "zcoro.h"
+#include "zrenderthreadexecutor_tls.h"
 
 #include <algorithm>
 #include <array>
@@ -31,6 +33,8 @@
 #include <span>
 #include <vector>
 #include <unordered_map>
+
+#include <folly/coro/Task.h>
 
 namespace nim {
 namespace {
@@ -172,7 +176,7 @@ void ZVulkanMeshPipelineContext::resetFrame()
   // Retire per-frame UBOs so they are not overwritten while still in use by
   // earlier in-flight frames. We defer destruction until the current active
   // submission finishes.
-  
+
   resetDescriptors();
   m_transientDescriptorSets.clear();
   m_ddpTransformsFrozen = false;
@@ -185,9 +189,13 @@ void ZVulkanMeshPipelineContext::flushRetainedUbos()
   if (m_retainedUbos.empty()) {
     return;
   }
+  const auto fence = m_backend.awaitActiveSubmissionFence("VK mesh retained UBO lifetime");
+  auto keepAlive = currentRenderThreadExecutorKeepAlive("VK mesh retained UBO lifetime");
   for (auto& sp : m_retainedUbos) {
-    auto keep = sp;
-    m_backend.scheduleAfterActiveSubmissionFence([keep]() {});
+    auto task = [fence, keep = sp]() mutable -> folly::coro::Task<void> {
+      co_await fence;
+    };
+    startCoroTaskChecked(folly::coro::co_withExecutor(keepAlive, task()), "VK mesh retained UBO lifetime");
   }
   m_retainedUbos.clear();
 }

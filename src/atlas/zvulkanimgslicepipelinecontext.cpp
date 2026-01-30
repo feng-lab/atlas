@@ -23,8 +23,10 @@
 #include "zcancellation.h"
 #include "zbenchtimer.h"
 #include "zmesh.h"
+#include "zcoro.h"
+#include "zrenderthreadexecutor_tls.h"
 
-#include <folly/OperationCancelled.h>
+#include <folly/coro/Task.h>
 #include <gflags/gflags.h>
 #include <QString>
 
@@ -698,16 +700,12 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       const bool storageRead = (compSource == BlockIdCompactionSource::Storage);
       const bool bufferRead = (compSource == BlockIdCompactionSource::Buffer);
 
-      std::vector<ZVulkanBuffer*> sliceOutputs;
-      sliceOutputs.reserve(m_sliceDrawRanges.size());
-
       for (size_t sliceIndex = 0; sliceIndex < m_sliceDrawRanges.size(); ++sliceIndex) {
         processEventsAndMaybeCancel(cancellationToken);
 
         const auto& range = m_sliceDrawRanges[sliceIndex];
         ZVulkanBuffer* outBuffer = frameOutputs.sliceOutputs[sliceIndex].get();
         CHECK(outBuffer != nullptr);
-        sliceOutputs.push_back(outBuffer);
 
         // Zero the output header before dispatch (count + counts[]).
         if (void* mapped = outBuffer->map(0, headerBytes)) {
@@ -863,68 +861,82 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
         recorder.recordComputePass(compSpec);
       }
 
-      // After the frame fence signals: union the compacted IDs and upload missing blocks for this channel.
-      m_backend.scheduleAfterCurrentFrameCompletion([this,
-                                                    sliceOutputs = std::move(sliceOutputs),
-                                                    mapBytes,
-                                                    capacityIDs,
-                                                    streamKey = payload.streamKey,
-                                                    eye = batch.eye,
-                                                    channelCount = static_cast<uint32_t>(channelCount),
-                                                    channelIndex = static_cast<size_t>(channelIndex),
-                                                    roundIndex,
-                                                    imagePtr = payload.image]() {
-        if (!imagePtr) {
-          return;
-        }
-
-        std::unordered_set<uint32_t> unique;
-        unique.reserve(1024);
-
-        for (ZVulkanBuffer* buf : sliceOutputs) {
-          if (!buf) {
-            continue;
+      // After the frame completion safe point: union the compacted IDs and
+      // upload missing blocks for this channel.
+      m_backend.scheduleAfterCurrentFrameCompletion(
+        [this,
+         frameKey,
+         bytesPerSlice,
+         mapBytes,
+         capacityIDs,
+         streamKey = payload.streamKey,
+         eye = batch.eye,
+         channelCountU32 = static_cast<uint32_t>(channelCount),
+         channelIndexSize = static_cast<size_t>(channelIndex),
+         roundIndex,
+         imagePtr = payload.image]() mutable {
+          if (!imagePtr) {
+            return;
           }
-          const void* mapped = buf->map(0, mapBytes);
-          CHECK(mapped);
-          const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
-          const uint32_t count = u32[0];
-          const uint32_t clamped = std::min<uint32_t>(count, capacityIDs);
-          for (uint32_t i = 0; i < clamped; ++i) {
-            const uint32_t v = u32[headerWords + i];
-            if (v != kInvalidBlockID && v != kUnmappedBlockID) {
-              unique.insert(v);
+
+          auto it = m_blockIdOutputsByFrame.find(frameKey);
+          if (it == m_blockIdOutputsByFrame.end()) {
+            return;
+          }
+          auto& frameOutputs = it->second;
+          if (frameOutputs.bytesPerSlice != bytesPerSlice) {
+            return;
+          }
+
+          std::unordered_set<uint32_t> unique;
+          unique.reserve(1024);
+
+          for (const auto& bufOwner : frameOutputs.sliceOutputs) {
+            ZVulkanBuffer* buf = bufOwner.get();
+            if (!buf) {
+              continue;
             }
+            const void* mapped = buf->map(0, mapBytes);
+            CHECK(mapped);
+            const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
+            const uint32_t count = u32[0];
+            const uint32_t clamped = std::min<uint32_t>(count, capacityIDs);
+            for (uint32_t i = 0; i < clamped; ++i) {
+              const uint32_t v = u32[headerWords + i];
+              if (v != kInvalidBlockID && v != kUnmappedBlockID) {
+                unique.insert(v);
+              }
+            }
+            buf->unmap();
           }
-          buf->unmap();
-        }
 
-        std::vector<uint32_t> missingBlocks;
-        missingBlocks.reserve(unique.size());
-        missingBlocks.insert(missingBlocks.end(), unique.begin(), unique.end());
+          std::vector<uint32_t> missingBlocks;
+          missingBlocks.reserve(unique.size());
+          missingBlocks.insert(missingBlocks.end(), unique.begin(), unique.end());
 
-        if (!missingBlocks.empty()) {
-          auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-          ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", channelIndex));
-          imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks,
-                                                       channelIndex,
-                                                       cancellationToken,
-                                                       timer,
-                                                       static_cast<uint32_t>(roundIndex));
-        }
+          if (!missingBlocks.empty()) {
+            auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+            ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", channelIndexSize));
+            imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks,
+                                                         channelIndexSize,
+                                                         cancellationToken,
+                                                         timer,
+                                                         static_cast<uint32_t>(roundIndex));
+          }
 
-        if (m_deferredProgressive && m_deferredProgressive->streamKey == streamKey &&
-            m_deferredProgressive->eye == eye) {
-          m_deferredProgressive.reset();
-        }
+          if (m_deferredProgressive && m_deferredProgressive->streamKey == streamKey &&
+              m_deferredProgressive->eye == eye) {
+            m_deferredProgressive.reset();
+          }
 
-        // Advance to the next progressive stage (round++). The backend will consume this
-        // on the next record() for the stream/eye.
-        if (streamKey != 0) {
-          m_pendingFinalization =
-            Finalization{.streamKey = streamKey, .eye = eye, .lastRound = false, .channelCount = channelCount};
-        }
-      });
+          // Advance to the next progressive stage (round++). The backend will consume this
+          // on the next record() for the stream/eye.
+          if (streamKey != 0) {
+            m_pendingFinalization =
+              Finalization{.streamKey = streamKey, .eye = eye, .lastRound = false, .channelCount = channelCountU32};
+          }
+        },
+        "VK slice blockid compaction parse");
     };
 
   if (channelCount == 1) {
@@ -1345,7 +1357,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
     if (backend && leaseRef && leaseRef->hasVulkanImage()) {
       const uint32_t saveLayerCount = static_cast<uint32_t>(channelCount);
-      backend->scheduleAfterCurrentFrameCompletion([leaseRef, saveLayerCount]() {
+      const auto completion = backend->awaitCurrentFrameCompletion("VK debug save slice layers");
+      auto keepAlive = currentRenderThreadExecutorKeepAlive("VK debug save slice layers");
+      auto task = [completion, leaseRef, saveLayerCount]() mutable -> folly::coro::Task<void> {
+        co_await completion;
         ZVulkanTexture* tex = leaseRef->colorAttachment(0);
         if (tex) {
           QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
@@ -1382,7 +1397,8 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
             }
           }
         }
-      });
+      };
+      startCoroTaskChecked(folly::coro::co_withExecutor(std::move(keepAlive), task()), "VK debug save slice layers");
     }
   }
 
@@ -1455,7 +1471,11 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     }
     auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
     if (backend && !colorHandles.empty()) {
-      backend->scheduleAfterCurrentFrameCompletion([this, handles = std::move(colorHandles), depthHandle]() {
+      const auto completion = backend->awaitCurrentFrameCompletion("VK debug save slice merge output");
+      auto keepAlive = currentRenderThreadExecutorKeepAlive("VK debug save slice merge output");
+      auto task =
+        [this, completion, handles = std::move(colorHandles), depthHandle]() mutable -> folly::coro::Task<void> {
+        co_await completion;
         const AttachmentHandle& handle = handles.front();
         CHECK(handle.valid() && handle.backend == RenderBackend::Vulkan)
           << "Slice merge debug save: invalid color attachment handle";
@@ -1484,7 +1504,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
             LOG(ERROR) << "Slice merge depth debug save failed";
           }
         }
-      });
+      };
+      startCoroTaskChecked(folly::coro::co_withExecutor(std::move(keepAlive), task()),
+                           "VK debug save slice merge output");
     }
   }
 }
