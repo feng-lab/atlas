@@ -4156,6 +4156,7 @@ def run_repl(
     reasoning_summary: str | None,
     text_verbosity: str | None,
     ephemeral_inline_images: bool = False,
+    replay_reasoning_summary: bool = False,
     session: Optional[str] = None,
     session_dir: Optional[str] = None,
     enable_codegen: bool = False,
@@ -4215,7 +4216,11 @@ def run_repl(
         except Exception:
             return
 
-        items = list(iter_resume_items(log_path))
+        items = list(
+            iter_resume_items(
+                log_path, include_reasoning_summary=bool(replay_reasoning_summary)
+            )
+        )
         if not any(it.kind == "transcript" for it in items):
             return
 
@@ -4237,6 +4242,33 @@ def run_repl(
                     logger.info("Answer:")
                     for ln in content.splitlines() or [""]:
                         logger.info("%s", ln)
+                continue
+            if it.kind == "reasoning_summary":
+                summaries = ev.get("summaries")
+                if isinstance(summaries, list):
+                    text = "\n\n".join(
+                        str(s).strip()
+                        for s in summaries
+                        if isinstance(s, str) and s.strip()
+                    ).strip()
+                else:
+                    text = str(summaries or "").strip()
+                if not text:
+                    continue
+
+                phase = str(ev.get("phase") or "").strip()
+                tags: list[str] = []
+                if phase:
+                    tags.append(phase)
+                if ev.get("finalizer") is True:
+                    tags.append("finalizer")
+                if ev.get("partial") is True:
+                    tags.append("partial")
+                suffix = f" ({', '.join(tags)})" if tags else ""
+
+                logger.info("Reasoning summary%s:", suffix)
+                for ln in text.splitlines() or [""]:
+                    logger.info("%s", ln)
                 continue
             if it.kind == "tool_call":
                 try:

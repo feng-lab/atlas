@@ -16,7 +16,7 @@ class ResumeItem:
     This is used only for *terminal replay* on resume (UX), not for model input.
     """
 
-    kind: str  # "transcript" | "tool_call" | "web_search" | "plan"
+    kind: str  # "transcript" | "reasoning_summary" | "tool_call" | "web_search" | "plan"
     ts: float | None
     event: dict[str, Any]
 
@@ -129,11 +129,14 @@ def list_sessions(
     return items
 
 
-def iter_resume_items(log_path: Path) -> Iterable[ResumeItem]:
+def iter_resume_items(
+    log_path: Path, *, include_reasoning_summary: bool = False
+) -> Iterable[ResumeItem]:
     """Iterate session events for resume replay, in session-log order.
 
     Policy:
     - Includes all transcript entries (user + assistant).
+    - Includes reasoning summaries when include_reasoning_summary=True.
     - Includes all tool calls as single entries (the UI prints one line per tool call).
     - Includes *only the latest* plan_updated payload (current plan), and inserts it at
       its natural position in the event stream (where it occurred in the log).
@@ -154,6 +157,10 @@ def iter_resume_items(log_path: Path) -> Iterable[ResumeItem]:
 
         if et == "transcript":
             yield ResumeItem(kind="transcript", ts=ts_f, event=ev)
+            continue
+
+        if et == "reasoning_summary" and bool(include_reasoning_summary):
+            yield ResumeItem(kind="reasoning_summary", ts=ts_f, event=ev)
             continue
 
         if et == "tool_call":

@@ -104,6 +104,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Root directory for sessions (defaults to ~/.atlas_agent/sessions or XDG/APPDATA).",
     )
     parser.add_argument(
+        "--replay-reasoning-summary",
+        action="store_true",
+        help=(
+            "When resuming a session, also replay any saved reasoning summaries from the session log.\n"
+            "By default resume replay shows transcript + tool summaries + current plan only."
+        ),
+    )
+    parser.add_argument(
         "--enable-codegen",
         action="store_true",
         help="Enable code generation tools (python_write_and_run).",
@@ -356,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_rounds=int(args.max_rounds),
                 max_rounds_planner=int(args.planner_max_rounds),
                 ephemeral_inline_images=bool(args.ephemeral_inline_images),
+                replay_reasoning_summary=bool(args.replay_reasoning_summary),
                 session=args.session,
                 session_dir=args.session_dir,
                 enable_codegen=bool(args.enable_codegen),
@@ -376,6 +385,7 @@ def main(argv: list[str] | None = None) -> int:
             max_rounds=int(args.max_rounds),
             max_rounds_planner=int(args.planner_max_rounds),
             ephemeral_inline_images=bool(args.ephemeral_inline_images),
+            replay_reasoning_summary=bool(args.replay_reasoning_summary),
             session=args.session,
             session_dir=args.session_dir,
             enable_codegen=bool(args.enable_codegen),
