@@ -8,6 +8,7 @@
 #include <map>
 #include <optional>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace nim {
@@ -228,6 +229,24 @@ private:
   // Freeze dynamic UBOs during DDP passes to avoid per-pass allocations
   bool m_ddpTransformsFrozen{false};
   bool m_ddpMaterialFrozen{false};
+  // DDP indirect-count gating requires stable per-stream indirect args prepared
+  // during the init pass; peel passes must not schedule upload->device copies
+  // inside dynamic rendering (copies are flushed after segments end).
+  struct DDPArgs
+  {
+    bool widePrepared = false;
+    bool widePerSegment = false;
+    std::vector<vk::DeviceSize> wideOffsets;
+    uint32_t wideSegments = 0;
+    uint32_t wideIndexCount = 0;
+
+    bool thinPrepared = false;
+    bool thinIndexed = false;
+    vk::DeviceSize thinOffset = 0;
+    uint32_t thinVertexCount = 0;
+    uint32_t thinIndexCount = 0;
+  };
+  std::unordered_map<uint64_t, DDPArgs> m_ddpArgsByStream;
 
   void ensureDescriptorLayouts();
   void ensurePlaceholderTexture();

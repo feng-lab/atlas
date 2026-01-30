@@ -178,6 +178,7 @@ void ZVulkanMeshPipelineContext::resetFrame()
   m_ddpTransformsFrozen = false;
   m_ddpMaterialFrozen = false;
   m_ddpArgsOffsets.clear();
+  m_ddpArgsPrepared.clear();
 }
 
 void ZVulkanMeshPipelineContext::flushRetainedUbos()
@@ -333,6 +334,14 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
   std::unordered_map<const PipelineInstance*, std::vector<DrawCallInfo>> groupedDraws;
 
+  // DDP indirect-count: prepare a stable per-mesh args table during the init pass
+  // so peel passes can reference offsets by payload mesh index (order-independent).
+  if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
+    const size_t meshCount = payload.meshes.size();
+    m_ddpArgsOffsets.assign(meshCount, vk::DeviceSize(0));
+    m_ddpArgsPrepared.assign(meshCount, 0u);
+  }
+
   auto recordDrawForKey = [&](const MeshDraw& d, bool wire, glm::vec4 wireColor) {
     PipelineKey key;
     key.colorSource = payload.colorSource;
@@ -455,34 +464,39 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
         if (m_backend.ddpIndirectCountEnabled()) {
           if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
-            // Prepare device-local args and store offsets
-            if (static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE) {
-              if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
-                struct Cmd
-                {
-                  uint32_t indexCount, instanceCount, firstIndex;
-                  int32_t vertexOffset;
-                  uint32_t firstInstance;
-                } cmd{draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0};
-                const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
-                auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-                if (slice.buffer && slice.mapped) {
-                  std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
+            // Prepare device-local args once per payload mesh index (shared by wireframe/surface draws).
+            const size_t meshIndex = draw.payloadMeshIndex;
+            CHECK(meshIndex < m_ddpArgsPrepared.size()) << "Mesh DDP init: args table size mismatch";
+            if (!m_ddpArgsPrepared[meshIndex]) {
+              if (static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE) {
+                if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
+                  struct Cmd
+                  {
+                    uint32_t indexCount, instanceCount, firstIndex;
+                    int32_t vertexOffset;
+                    uint32_t firstInstance;
+                  } cmd{draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0};
+                  const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+                  auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+                  if (slice.buffer && slice.mapped) {
+                    std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
+                  }
+                  m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+                  m_ddpArgsOffsets[meshIndex] = off;
+                } else {
+                  struct Cmd
+                  {
+                    uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
+                  } cmd{draw.vertexCount, 1, draw.firstVertex, 0};
+                  const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+                  auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+                  if (slice.buffer && slice.mapped) {
+                    std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
+                  }
+                  m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+                  m_ddpArgsOffsets[meshIndex] = off;
                 }
-                m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
-                m_ddpArgsOffsets.push_back(off);
-              } else {
-                struct Cmd
-                {
-                  uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
-                } cmd{draw.vertexCount, 1, draw.firstVertex, 0};
-                const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
-                auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-                if (slice.buffer && slice.mapped) {
-                  std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
-                }
-                m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
-                m_ddpArgsOffsets.push_back(off);
+                m_ddpArgsPrepared[meshIndex] = 1u;
               }
             }
             // Emit init draw as usual
@@ -492,10 +506,10 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
               cb.draw(draw.vertexCount, 1, draw.firstVertex, 0);
             }
           } else if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-            // Use prepared args in order
-            static size_t ddpCursor = 0;
-            CHECK(ddpCursor < m_ddpArgsOffsets.size()) << "Mesh DDP peel: args not prepared in init";
-            const vk::DeviceSize off = m_ddpArgsOffsets[ddpCursor++];
+            const size_t meshIndex = draw.payloadMeshIndex;
+            CHECK(meshIndex < m_ddpArgsPrepared.size()) << "Mesh DDP peel: args table size mismatch";
+            CHECK(m_ddpArgsPrepared[meshIndex]) << "Mesh DDP peel: args not prepared in init";
+            const vk::DeviceSize off = m_ddpArgsOffsets[meshIndex];
             const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
             const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
             if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
@@ -609,11 +623,8 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
     m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
 
-  // Set 3 now only carries the DDP flag SSBO
   if (m_dsOIT && !m_backend.isRecording()) {
-    if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
-      m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
-    }
+    m_backend.primeOITDescriptorSet(*m_dsOIT);
   }
 }
 
@@ -777,6 +788,10 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
         return "dual_peeling_init_mesh.frag.spv";
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
         return "dual_peeling_peel_mesh.frag.spv";
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+        return "ppll_count_mesh.frag.spv";
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+        return "ppll_store_mesh.frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
         return "wavg_init_mesh.frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
@@ -847,6 +862,12 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   blendAttachments.reserve(formats.colorFormats.size());
 
   switch (key.shaderHookType) {
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+      // Exact OIT PPLL: depth test against opaque depth, but do not write depth.
+      instance.pipeline->setDepthTestEnable(true);
+      instance.pipeline->setDepthWriteEnable(false);
+      break;
     case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
       for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
         auto state = makeDefaultBlendAttachment();

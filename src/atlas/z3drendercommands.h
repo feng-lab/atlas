@@ -620,6 +620,9 @@ struct TextureDualPeelPayload
 {
   enum class Stage
   {
+    // Fullscreen pre-pass used by Vulkan DDP to preserve front-blender contents
+    // across ping-pong clears when indirect-count gating skips geometry draws.
+    Carry,
     Blend,
     Final
   } stage = Stage::Blend;
@@ -645,6 +648,12 @@ struct TextureWeightedBlendedPayload
   AttachmentHandle accumulationAttachment;
   AttachmentHandle transmittanceAttachment;
   glm::vec2 screenDimRcp{1.0f};
+};
+
+struct TexturePPLLResolvePayload
+{
+  // Fullscreen resolve for exact OIT per-pixel fragment lists (PPLL).
+  // All inputs come from the Vulkan OIT SSBO set (set = 3); no additional parameters required.
 };
 
 struct ImgSlicePayload
@@ -832,6 +841,7 @@ using GeometryPayload = std::variant<std::monostate,
                                      TextureDualPeelPayload,
                                      TextureWeightedAveragePayload,
                                      TextureWeightedBlendedPayload,
+                                     TexturePPLLResolvePayload,
                                      EllipsoidPayload,
                                      ConePayload,
                                      FontPayload>;

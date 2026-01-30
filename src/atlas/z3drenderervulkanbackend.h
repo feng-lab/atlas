@@ -36,6 +36,7 @@ class ZVulkanTextureBlendPipelineContext;
 class ZVulkanTextureDualPeelPipelineContext;
 class ZVulkanTextureWeightedAveragePipelineContext;
 class ZVulkanTextureWeightedBlendedPipelineContext;
+class ZVulkanTexturePPLLPipelineContext;
 class ZVulkanTextureGlowPipelineContext;
 class ZVulkanImgSlicePipelineContext;
 class ZVulkanImgRaycasterPipelineContext;
@@ -219,6 +220,15 @@ public:
       void(const void* mapped, size_t bytes, vk::Format format, glm::uvec2 size, std::function<void()> releaseSlot)>
       onReady);
 
+  // Request an end-of-frame copy of a buffer range into a host-visible staging buffer.
+  // Useful for tiny GPU->CPU flags/counters (e.g., DDP early-stop flag on platforms
+  // without VK_KHR_draw_indirect_count).
+  void requestEndOfFrameBufferReadback(
+    class ZVulkanBuffer& src,
+    vk::DeviceSize srcOffset,
+    size_t bytes,
+    std::function<void(const void* mapped, size_t bytes, std::function<void()> releaseSlot)> onReady);
+
   // GPU timestamp scopes (public so pipeline contexts can instrument hot paths)
   std::optional<size_t> beginGpuScope(std::string_view label);
   void endGpuScope(size_t token);
@@ -312,6 +322,18 @@ private:
         onReady;
     };
     std::vector<PendingReadback> pendingColorReadbacks;
+
+    struct PendingBufferReadback
+    {
+      class ZVulkanBuffer* src = nullptr;
+      vk::DeviceSize srcOffset = 0;
+      // Assigned staging slot index in m_readbackSlots
+      int slotIndex = -1;
+      size_t bytes = 0;
+      // Consumer callback (runs after fence signal)
+      std::function<void(const void* mapped, size_t bytes, std::function<void()> releaseSlot)> onReady;
+    };
+    std::vector<PendingBufferReadback> pendingBufferReadbacks;
     size_t readbackBytesCopied = 0; // total bytes copied this frame
     uint32_t readbackSlotsInFlight = 0; // slots associated with this frame
 
@@ -348,7 +370,7 @@ private:
     vk::DeviceSize lightingDynOffset = 0;
 
     // DDP: per-frame resources for indirect-count early stop
-    std::unique_ptr<class ZVulkanBuffer> ddpChangedFlag; // STORAGE | TRANSFER_DST
+    std::unique_ptr<class ZVulkanBuffer> ddpChangedFlag; // STORAGE | TRANSFER_SRC | TRANSFER_DST
     std::unique_ptr<class ZVulkanBuffer> ddpIndirectCount; // STORAGE | INDIRECT_BUFFER | TRANSFER_DST
     // Removed host-visible args arena; device-local args only
     // Device-local arena for DDP indirect draw command payloads (args). Contents
@@ -393,8 +415,11 @@ private:
   void ensureUniformArena(FrameResources& frame);
   // DDP indirect-count: ensure per-frame buffers exist
   void ensureDDPGatingResources(FrameResources& frame);
+  // PPLL (exact OIT): ensure per-frame buffers exist
+  void ensurePPLLResources(const glm::uvec4& viewport, uint64_t requestedFragments);
   // DDP indirect-count: ensure shared compute pipeline exists
   void ensureDDPComputePipeline();
+  void ensurePPLLComputePipelines();
   size_t uniformAlignment() const;
 
 public:
@@ -407,6 +432,34 @@ public:
   // Device-local indirect args arena helpers
   vk::Buffer ddpDeviceArgsBuffer();
   vk::DeviceSize ddpAllocDeviceArgsSlot(size_t bytes);
+
+  // Exact OIT (per-pixel fragment list / A-buffer) support
+  [[nodiscard]] bool supportsFragmentStoresAndAtomics() const
+  {
+    return m_supportsFragStoresAndAtomics;
+  }
+  void setPPLLRequestedFragmentCount(uint64_t fragmentCount);
+  [[nodiscard]] uint32_t ppllPixelCount() const;
+  [[nodiscard]] uint32_t ppllBlockCount() const;
+  class ZVulkanBuffer* ppllParamsBufferObj();
+  class ZVulkanBuffer* ppllCountsBufferObj();
+  class ZVulkanBuffer* ppllOffsetsBufferObj();
+  class ZVulkanBuffer* ppllCursorsBufferObj();
+  class ZVulkanBuffer* ppllFragmentsBufferObj();
+  class ZVulkanBuffer* ppllBlockSumsBufferObj();
+  class ZVulkanBuffer* ppllBlockPrefixesBufferObj();
+  void ppllWriteBlockPrefixes(const uint32_t* prefixes, size_t count);
+  void primeOITDescriptorSet(class ZVulkanDescriptorSet& set);
+
+  // PPLL command recording helpers (must be called within an active frame)
+  void ppllResetCounts(vk::raii::CommandBuffer& cmd);
+  void ppllResetCursors(vk::raii::CommandBuffer& cmd);
+  void ppllBarrierTransferToFrag(vk::raii::CommandBuffer& cmd);
+  void ppllBarrierFragToCompute(vk::raii::CommandBuffer& cmd);
+  void ppllBarrierComputeToFrag(vk::raii::CommandBuffer& cmd);
+  void ppllBarrierFragToFrag(vk::raii::CommandBuffer& cmd);
+  void ppllDispatchScanLocal(vk::raii::CommandBuffer& cmd);
+  void ppllDispatchScanAdd(vk::raii::CommandBuffer& cmd);
   void ddpResetForPass(vk::raii::CommandBuffer& cmd, bool firstPass);
   void ddpBarrierTransferToFrag(vk::raii::CommandBuffer& cmd);
   void ddpBarrierFragToCompute(vk::raii::CommandBuffer& cmd);
@@ -473,6 +526,7 @@ public:
   std::unordered_map<void*, size_t> m_frameResourceMap;
   std::optional<ZVulkanFrameExecutor::ActiveFrame> m_activeFrameHandle;
   FrameResources* m_activeFrame = nullptr;
+  Z3DRendererBase* m_activeRenderer = nullptr;
   bool m_frameRecording = false;
   uint32_t m_maxFramesInFlight = 2;
   float m_timestampPeriod = 1.0f;
@@ -491,6 +545,7 @@ public:
   std::unique_ptr<ZVulkanTextureDualPeelPipelineContext> m_textureDualPeelContext;
   std::unique_ptr<ZVulkanTextureWeightedAveragePipelineContext> m_textureWeightedAverageContext;
   std::unique_ptr<ZVulkanTextureWeightedBlendedPipelineContext> m_textureWeightedBlendedContext;
+  std::unique_ptr<ZVulkanTexturePPLLPipelineContext> m_texturePPLLContext;
   std::unique_ptr<ZVulkanTextureGlowPipelineContext> m_textureGlowContext;
   std::unique_ptr<ZVulkanImgSlicePipelineContext> m_imgSliceContext;
   std::unique_ptr<ZVulkanImgRaycasterPipelineContext> m_imgRaycasterContext;
@@ -501,6 +556,7 @@ public:
 
   // Shared fallback resources
   std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;
+  std::unique_ptr<ZVulkanBuffer> m_defaultPlaceholderStorageBuffer;
   std::optional<vk::raii::Sampler> m_defaultSampler;
   std::optional<vk::raii::Sampler> m_nearestClampSampler;
 
@@ -531,6 +587,46 @@ public:
     size_t ibHighWatermark = 0;
   } m_staticArena;
 
+  // PPLL (exact OIT): per-pixel fragment list resources are maintained in a
+  // small ring keyed by the UI/perf frame token (not by Vulkan frame-executor
+  // slots). This ensures multiple submissions within the same UI frame (count →
+  // scan/readback → store/resolve) all reference the same buffers even when the
+  // frame executor advances its command-buffer slot.
+  struct PPLLResources
+  {
+    static constexpr uint32_t kBlockSize = 256u;
+    glm::uvec4 viewport{0u}; // x,y,w,h
+    uint32_t pixelCount = 0;
+    uint32_t blockCount = 0;
+    uint64_t requestedFragmentCount = 0;
+
+    // SSBO: viewport + pixelCount + scan metadata (host-visible, host-coherent)
+    std::unique_ptr<class ZVulkanBuffer> params;
+    void* paramsMapped = nullptr;
+    size_t paramsCapacity = 0;
+
+    // SSBO: per-pixel arrays (device-local)
+    std::unique_ptr<class ZVulkanBuffer> counts;
+    size_t countsCapacityBytes = 0;
+    std::unique_ptr<class ZVulkanBuffer> offsets;
+    size_t offsetsCapacityBytes = 0;
+    std::unique_ptr<class ZVulkanBuffer> cursors;
+    size_t cursorsCapacityBytes = 0;
+
+    // SSBO: fragment storage (device-local, grown to total fragments)
+    std::unique_ptr<class ZVulkanBuffer> fragments;
+    size_t fragmentsCapacityBytes = 0;
+
+    // SSBO: scan intermediates
+    std::unique_ptr<class ZVulkanBuffer> blockSums; // device-local, transfer-src for readback
+    size_t blockSumsCapacityBytes = 0;
+    std::unique_ptr<class ZVulkanBuffer> blockPrefixes; // host-visible, host-coherent (CPU writes)
+    void* blockPrefixesMapped = nullptr;
+    size_t blockPrefixesCapacityBytes = 0;
+  };
+  std::vector<PPLLResources> m_ppllFrameRing;
+  std::optional<size_t> m_activePPLLIndex;
+
   // Helpers for descriptor arena lifecycle
   void ensureArenaOnFrame(FrameResources& frame);
   void applyPendingArenaReset(FrameResources& frame);
@@ -546,6 +642,17 @@ public:
   std::optional<vk::raii::DescriptorSetLayout> m_ddpCountSetLayout;
   std::optional<vk::raii::PipelineLayout> m_ddpCountPipelineLayout;
   std::optional<vk::raii::Pipeline> m_ddpCountPipeline;
+
+  // PPLL scan compute pipelines (shared across frames)
+  std::optional<vk::raii::DescriptorSetLayout> m_ppllScanLocalSetLayout;
+  std::optional<vk::raii::PipelineLayout> m_ppllScanLocalPipelineLayout;
+  std::optional<vk::raii::Pipeline> m_ppllScanLocalPipeline;
+
+  std::optional<vk::raii::DescriptorSetLayout> m_ppllScanAddSetLayout;
+  std::optional<vk::raii::PipelineLayout> m_ppllScanAddPipelineLayout;
+  std::optional<vk::raii::Pipeline> m_ppllScanAddPipeline;
+
+  uint64_t m_nextPPLLRequestedFragmentCount = 0;
 
   // Device feature gates (cached on device change)
   bool m_supportsDrawIndirectCount = false;

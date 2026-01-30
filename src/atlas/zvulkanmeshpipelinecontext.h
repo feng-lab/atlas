@@ -186,8 +186,10 @@ private:
   size_t m_indexCount = 0;
 
   std::vector<MeshDraw> m_draws;
-  // Device-local indirect args per draw for DDP; prepared during init
+  // Device-local indirect args per mesh for DDP peel; prepared during init and
+  // reused for subsequent peel passes in the same frame.
   std::vector<vk::DeviceSize> m_ddpArgsOffsets;
+  std::vector<uint8_t> m_ddpArgsPrepared;
 
   // No GL texture bridging: Vulkan mesh pipeline uses placeholders or
   // backend-native textures only.

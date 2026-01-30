@@ -1,0 +1,82 @@
+// Exact OIT via per-pixel fragment lists (PPLL / A-buffer style).
+// Shared across count/store/resolve shaders.
+//
+// Note: binding indices must match the Vulkan OIT descriptor set (set = 3)
+// declared in zvulkanbindings.h and Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts().
+
+#ifndef ATLAS_PPLL_COMMON_GLSLINC
+#define ATLAS_PPLL_COMMON_GLSLINC
+
+layout(set = 3, binding = 0, std430) readonly buffer PPLLParams
+{
+  // x, y, w, h in framebuffer pixel coordinates
+  uvec4 viewport;
+  uint pixelCount;
+  uint blockCount;
+  uint blockSize;
+  uint reserved;
+} ppll_params;
+
+layout(set = 3, binding = 2, std430) buffer PPLLCounts
+{
+  uint counts[];
+} ppll_counts;
+
+layout(set = 3, binding = 3, std430) buffer PPLLOffsets
+{
+  uint offsets[];
+} ppll_offsets;
+
+layout(set = 3, binding = 4, std430) buffer PPLLCursors
+{
+  uint cursors[];
+} ppll_cursors;
+
+struct PPLLFragment
+{
+  vec4 color;
+  float depth;
+};
+
+layout(set = 3, binding = 5, std430) buffer PPLLFragments
+{
+  PPLLFragment fragments[];
+} ppll_fragments;
+
+uint ppllPixelIndexFromFragCoord(vec2 fragCoord)
+{
+  ivec2 localPix = ivec2(fragCoord) - ivec2(ppll_params.viewport.xy);
+  if (localPix.x < 0 || localPix.y < 0) {
+    return 0xffffffffu;
+  }
+
+  if (localPix.x >= int(ppll_params.viewport.z) || localPix.y >= int(ppll_params.viewport.w)) {
+    return 0xffffffffu;
+  }
+
+  return uint(localPix.y) * ppll_params.viewport.z + uint(localPix.x);
+}
+
+void ppllCountFragment()
+{
+  const uint pixelIndex = ppllPixelIndexFromFragCoord(gl_FragCoord.xy);
+  if (pixelIndex == 0xffffffffu || pixelIndex >= ppll_params.pixelCount) {
+    return;
+  }
+  atomicAdd(ppll_counts.counts[pixelIndex], 1u);
+}
+
+void ppllStoreFragment(vec4 fragColor, float fragDepth)
+{
+  const uint pixelIndex = ppllPixelIndexFromFragCoord(gl_FragCoord.xy);
+  if (pixelIndex == 0xffffffffu || pixelIndex >= ppll_params.pixelCount) {
+    return;
+  }
+
+  const uint writeIndex = ppll_offsets.offsets[pixelIndex] + atomicAdd(ppll_cursors.cursors[pixelIndex], 1u);
+  ppll_fragments.fragments[writeIndex].color = fragColor;
+  ppll_fragments.fragments[writeIndex].depth = fragDepth;
+}
+
+#endif // ATLAS_PPLL_COMMON_GLSLINC
+

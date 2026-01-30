@@ -370,9 +370,7 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
   }
 
   if (m_dsOIT && !m_backend.isRecording()) {
-    if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
-      m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
-    }
+    m_backend.primeOITDescriptorSet(*m_dsOIT);
   }
 }
 
@@ -470,6 +468,10 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
         return std::string("dual_peeling_init_cone") + suffix + ".frag.spv";
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
         return std::string("dual_peeling_peel_cone") + suffix + ".frag.spv";
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+        return std::string("ppll_count_cone") + suffix + ".frag.spv";
+      case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+        return std::string("ppll_store_cone") + suffix + ".frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
         return std::string("wavg_init_cone") + suffix + ".frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
@@ -518,6 +520,12 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   baseBlend.blendEnable = false;
 
   switch (key.shaderHookType) {
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+      // Exact OIT PPLL: depth test against opaque depth, but do not write depth.
+      instance.pipeline->setDepthTestEnable(true);
+      instance.pipeline->setDepthWriteEnable(false);
+      break;
     case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
       std::vector<vk::PipelineColorBlendAttachmentState> attachments(formats.colorFormats.size(), baseBlend);
       for (auto& attachment : attachments) {

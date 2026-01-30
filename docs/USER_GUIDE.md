@@ -555,7 +555,7 @@ Steps to load and manage images via `ZImgDoc`:
 1. **Open the Global View Setting dock**.
 2. **Camera** – set projection, focal distance, clip planes, stereo eye parameters.
 3. **Lighting** – toggle global lighting, adjust intensities.
-4. **Fog and transparency** – choose a transparency method (Blend No Depth Mask, Blend Delayed, Dual Depth Peeling, Weighted Average, Weighted Blended). Use Weighted methods for large translucent scenes.
+4. **Fog and transparency** – choose a transparency method (Blend No Depth Mask, Blend Delayed, Dual Depth Peeling, Weighted Average, Weighted Blended). On Vulkan, **Per-Pixel Fragment List (PPLL Exact)** is also available for highest-quality exact OIT (heavier than DDP).
 5. **Global cuts** – X/Y/Z plane sliders clip data globally; oblique cuts reveal interior structures.
    - Global Cut Mode (per axis) determines how the two endpoints are recalculated when dataset bounds change:
      - Absolute: hold values in world units; clamp to the new range.
@@ -845,7 +845,7 @@ This feature is intended for offline/developer scripting and may be omitted from
 
 ### 11.3 Rendering Quality Tips
 
-1. Use Dual Depth Peeling for complex translucent scenes; switch to Weighted Blended for faster previews.
+1. Use Dual Depth Peeling for complex translucent scenes; on Vulkan, Per-Pixel Fragment List (PPLL Exact) gives exact results. Switch to Weighted Blended for faster previews.
 2. Increase sampling rate for smoother DVR at the expense of performance.
 3. Use tiled exports for extremely high resolutions to avoid GPU texture limits.
 4. Enable stereo captures cautiously—eye separation settings live in Global View Setting.

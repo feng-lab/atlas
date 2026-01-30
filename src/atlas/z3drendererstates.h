@@ -104,12 +104,16 @@ struct RendererViewState
 
 enum class TransparencyMode
 {
-  BlendDelayed,
-  BlendNoDepthMask,
-  WeightedAverage,
-  WeightedBlended,
-  DualDepthPeeling,
-  Unknown
+  // NOTE: explicit values preserve on-disk / RPC stability.
+  BlendDelayed = 0,
+  BlendNoDepthMask = 1,
+  WeightedAverage = 2,
+  WeightedBlended = 3,
+  DualDepthPeeling = 4,
+  // Vulkan-only exact OIT via per-pixel fragment lists (PPLL). This is exposed
+  // via the UI only when Render Backend is Vulkan; OpenGL falls back to DDP.
+  PerPixelFragmentList = 6,
+  Unknown = 5
 };
 
 enum class GeometryMSAAMode

@@ -1,0 +1,85 @@
+#version 450
+
+// Local exclusive scan of per-pixel fragment counts.
+// One workgroup handles one block of kBlockSize pixels.
+//
+// Outputs:
+// - offsets[pixel] = exclusive prefix sum within the block
+// - blockSums[block] = total fragment count within the block
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) readonly buffer PPLLParams
+{
+  uvec4 viewport;
+  uint pixelCount;
+  uint blockCount;
+  uint blockSize;
+  uint reserved;
+} params;
+
+layout(set = 0, binding = 1, std430) readonly buffer Counts
+{
+  uint counts[];
+} inCounts;
+
+layout(set = 0, binding = 2, std430) buffer Offsets
+{
+  uint offsets[];
+} outOffsets;
+
+layout(set = 0, binding = 3, std430) buffer BlockSums
+{
+  uint sums[];
+} outSums;
+
+shared uint shData[256];
+
+void main()
+{
+  const uint block = gl_WorkGroupID.x;
+  const uint lane = gl_LocalInvocationID.x;
+  const uint idx = block * 256u + lane;
+
+  const uint v = (idx < params.pixelCount) ? inCounts.counts[idx] : 0u;
+  shData[lane] = v;
+
+  barrier();
+
+  // Blelloch scan (exclusive) in shared memory.
+  uint offset = 1u;
+  for (uint d = 256u >> 1; d > 0u; d >>= 1u) {
+    barrier();
+    if (lane < d) {
+      const uint ai = offset * (2u * lane + 1u) - 1u;
+      const uint bi = offset * (2u * lane + 2u) - 1u;
+      shData[bi] += shData[ai];
+    }
+    offset <<= 1u;
+  }
+
+  barrier();
+  if (lane == 0u) {
+    outSums.sums[block] = shData[255u];
+    shData[255u] = 0u;
+  }
+
+  for (uint d = 1u; d < 256u; d <<= 1u) {
+    offset >>= 1u;
+    barrier();
+    if (lane < d) {
+      const uint ai = offset * (2u * lane + 1u) - 1u;
+      const uint bi = offset * (2u * lane + 2u) - 1u;
+      const uint t = shData[ai];
+      shData[ai] = shData[bi];
+      shData[bi] += t;
+    }
+  }
+
+  barrier();
+
+  if (idx < params.pixelCount) {
+    outOffsets.offsets[idx] = shData[lane];
+  }
+}
+
