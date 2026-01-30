@@ -87,7 +87,10 @@ public:
   // Poll in-flight fences without blocking and run completion callbacks for any
   // frame that has already finished. Intended to reduce latency for CPU-side
   // releases (residency unpins, retained UBO lifetimes, etc.).
-  void pollCompletions();
+  // If completedKeys is non-null, appends the ActiveFrame::key() values for any
+  // frames whose fences were observed complete during this poll (after running
+  // their completion callbacks).
+  void pollCompletions(std::vector<void*>* completedKeys = nullptr);
 
   void trim();
 

@@ -79,12 +79,18 @@ void ZVulkanFrameExecutor::setMaxFramesInFlight(uint32_t frames)
   if (clamped == m_maxFramesInFlight) {
     return;
   }
+  // Changing the slot ring size invalidates ActiveFrame::key() pointer identity
+  // and would strand any fence-gated completion callbacks unless we drain first.
+  // This is primarily a debug path; pay the cost to keep correctness.
+  waitForAllInFlight();
   m_maxFramesInFlight = clamped;
   m_framesDirty = true;
 }
 
 void ZVulkanFrameExecutor::trim()
 {
+  // Be conservative: never drop in-flight fences or pending completion callbacks.
+  waitForAllInFlight();
   m_frames.clear();
   m_cursor = 0;
   m_framesDirty = true;
@@ -171,7 +177,7 @@ bool ZVulkanFrameExecutor::hasInFlightFrames()
   return false;
 }
 
-void ZVulkanFrameExecutor::pollCompletions()
+void ZVulkanFrameExecutor::pollCompletions(std::vector<void*>* completedKeys)
 {
   ensureFrames();
   if (m_frames.empty()) {
@@ -192,6 +198,9 @@ void ZVulkanFrameExecutor::pollCompletions()
     }
     frame.inFlight = false;
     runCompletionCallbacks(frame);
+    if (completedKeys) {
+      completedKeys->push_back(static_cast<void*>(&frame));
+    }
   }
 }
 

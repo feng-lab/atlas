@@ -250,7 +250,9 @@ public:
   // (applyPendingArenaReset) for the active frame-slot.
   //
   // This is the preferred API for post-fence work that needs correct ordering
-  // with respect to frame-slot reuse while allowing the hook body to be written
+  // with respect to the backend's frame completion safe point (after fence-gated
+  // completion callbacks, descriptor arena resets, and scratch releases) while
+  // allowing the hook body to be written
   // linearly with co_await and to run on the call-site chosen executor.
   //
   // Contract:
@@ -701,6 +703,9 @@ public:
   Z3DRendererBase* m_activeRenderer = nullptr;
   std::atomic<FrameResources*> m_frameInCompletionSafePoint{nullptr};
   bool m_frameRecording = false;
+  // Scratch storage for frame-executor polling: keys of frame slots whose
+  // fences completed in the last pollCompletions() call.
+  std::vector<void*> m_completedFrameKeysScratch;
   uint32_t m_maxFramesInFlight = 2;
   float m_timestampPeriod = 1.0f;
   // Deliver first Vulkan frame to UI immediately after backend switch by
@@ -803,6 +808,20 @@ public:
   // Helpers for descriptor arena lifecycle
   void ensureArenaOnFrame(FrameResources& frame);
   void applyPendingArenaReset(FrameResources& frame);
+  // Opportunistically enter the "frame completion safe point" for any frame
+  // slots whose fences have completed and whose completion callbacks have been
+  // executed by the frame executor (pollCompletions / waitForCompletion / etc).
+  //
+  // Historically, applyPendingArenaReset() (and thus safe-point hooks) would
+  // only run when a frame slot was reused (beginFrame) or after an explicit
+  // wait (endFrame). When no explicit wait occurs and frames-in-flight > 1,
+  // this can delay safe-point work by up to roughly "frames in flight".
+  //
+  // Pumping safe points after polling completions preserves the safe-point
+  // ordering guarantees (after fence-gated completion callbacks like residency
+  // unpins) while reducing latency for consumers such as paging compaction
+  // readbacks.
+  void pumpFrameCompletionSafePoints(const std::vector<void*>& completedFrameKeys);
   void scheduleArenaReset(FrameResources& frame);
   void vlogFrameRecyclingStats(const FrameResources& frame) const;
 

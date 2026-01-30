@@ -164,8 +164,8 @@ Lookup Tables (LUTs)
 - Renderers/pipeline contexts create and cache backend LUT textures:
   - OpenGL: per-renderer 1D RGBA8 textures for colormaps/transfer functions.
 - Vulkan: pipeline contexts create 2D Nx1 `ZVulkanTexture`s via a small helper (MoltenVK portability — Metal lacks native 1D); LUTs are uploaded as RGBA8 and bound through descriptor sets.
-  - Vulkan descriptor arena (Stage 2): pipeline contexts must allocate descriptor sets from the backend’s per-frame arena via `Z3DRendererVulkanBackend::allocateFrameDescriptorSet(layout)`. Do not create per-context descriptor pools. The arena is reset once per frame (scheduled in `endRender()`, applied on the next `beginRender()` after the frame fence signals).
-  - Frame-completion safe point: the backend defines a frame-slot “completion safe point” at the start of `beginRender()` when a frame slot is being reused (`applyPendingArenaReset`). At that point it:
+  - Vulkan descriptor arena (Stage 2): pipeline contexts must allocate descriptor sets from the backend’s per-frame arena via `Z3DRendererVulkanBackend::allocateFrameDescriptorSet(layout)`. Do not create per-context descriptor pools. The arena is reset once per frame (scheduled in `endRender()`, applied at the backend’s frame-completion safe point after the frame fence signals).
+  - Frame-completion safe point: the backend defines a frame-slot “completion safe point” (`applyPendingArenaReset`) that is reached after the executor observes a slot fence as complete (slot reuse, explicit waits, and opportunistic pumping after `pollCompletions()`). At that point it:
     - resets per-frame descriptor resources,
     - drains all “after completion” hooks with a barrier (hooks may run on their own executors),
     - then wakes `awaitCurrentFrameCompletion()` awaiters for the previous generation.
@@ -185,7 +185,7 @@ ImgRaycaster Vulkan
   - Progressive bookkeeping is outside the Vulkan pipeline context. The context computes whether a progressive round finished and the backend calls back to the renderer using a stable `streamKey` identity to finalize (`finalizeProgressiveRound`).
   - GL paths are unchanged.
 - On backend switch, `Z3DRendererBase::releaseBackendResources()` clears renderer caches; `Z3DImgFilter::switchRendererBackend` releases GL volume resources when switching to Vulkan.
-  - Post‑fence CPU work that must run after submission completion callbacks (e.g., Block‑ID compaction parsing that assumes residency unpins have drained) should await the backend’s frame‑completion safe point (frame-slot reuse). This preserves ordering, but can introduce up to one frame of latency when `maxFramesInFlight > 1`.
+  - Post‑fence CPU work that must run after submission completion callbacks (e.g., Block‑ID compaction parsing that assumes residency unpins have drained) should await the backend’s frame‑completion safe point (`applyPendingArenaReset`, pumped when the backend observes fence completion). This preserves ordering without depending on frame-slot reuse when `maxFramesInFlight > 1`.
 
 Threading Model
 

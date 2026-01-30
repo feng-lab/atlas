@@ -441,8 +441,15 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Stage 2: apply descriptor arena reset when reusing this in-flight frame.
   // Safe point: frame executor waited for the fence when acquiring the frame.
   applyPendingArenaReset(frameResources);
-  // Run any completion callbacks for fences that have already signaled.
-  device().frameExecutor().pollCompletions();
+  // Run any fence-gated completion callbacks for frames that have already
+  // finished, then opportunistically enter the frame completion safe point for
+  // those slots as well. This reduces latency for safe-point-gated consumers
+  // (paging compaction readbacks, deferred descriptor updates, scratch releases)
+  // without weakening ordering guarantees after completion callbacks (e.g.
+  // residency unpins).
+  m_completedFrameKeysScratch.clear();
+  device().frameExecutor().pollCompletions(&m_completedFrameKeysScratch);
+  pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
   ensureArenaOnFrame(frameResources);
   ensureUniformArena(frameResources);
   // Expose frame resources early so suballocateUniform can target this frame.
@@ -855,7 +862,9 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     applyPendingArenaReset(frame); // runs deferred readback consumers now
     // Fence signaled: completion callbacks ran in waitForCompletion. Poll any
     // other frames that may have finished as well.
-    device().frameExecutor().pollCompletions();
+    m_completedFrameKeysScratch.clear();
+    device().frameExecutor().pollCompletions(&m_completedFrameKeysScratch);
+    pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
 
     // Fence signaled; deferred readbacks/releases executed.
     if (m_pumpFenceAfterFirstSubmit) {
@@ -864,7 +873,9 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     }
   } else {
     // Poll completion callbacks; some fences may have signaled already.
-    device().frameExecutor().pollCompletions();
+    m_completedFrameKeysScratch.clear();
+    device().frameExecutor().pollCompletions(&m_completedFrameKeysScratch);
+    pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
   }
 
   // VLOG(1) frame recycling stats (descriptors and arena reset scheduling)
@@ -3342,6 +3353,9 @@ void Z3DRendererVulkanBackend::ensureDevice()
   }
   // Keep local ring sizes aligned with the device executor setting.
   m_maxFramesInFlight = m_sharedDevice->frameExecutor().maxFramesInFlight();
+  if (m_completedFrameKeysScratch.capacity() < m_maxFramesInFlight) {
+    m_completedFrameKeysScratch.reserve(m_maxFramesInFlight);
+  }
 }
 
 void* Z3DRendererVulkanBackend::activeFrameKey() const
@@ -3399,11 +3413,13 @@ void Z3DRendererVulkanBackend::ensureArenaOnFrame(FrameResources& frame)
 
 void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
 {
-  // We are at the "frame completion safe point" for this frame-slot: either
-  // the executor just waited for the fence before reusing the slot, or the
-  // backend performed an explicit wait-for-completion. In both cases, it is
-  // now safe to run any work that must observe the end of the previous
-  // submission and then start a new generation for this slot.
+  // We are at the "frame completion safe point" for this frame-slot: the
+  // backend has observed that the slot's previous submission fence is complete
+  // (either because the executor waited for the fence before reusing the slot,
+  // because the backend performed an explicit wait-for-completion, or because
+  // pollCompletions() observed the fence as signaled). In all cases, it is now
+  // safe to run work that must observe the end of the previous submission and
+  // then start a new generation for this slot.
 
   if (frame.arenaResetScheduled) {
     CHECK(frame.descriptorPool) << "Descriptor pool missing while reset was scheduled";
@@ -3435,6 +3451,26 @@ void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
 
   if (deferredException) {
     std::rethrow_exception(deferredException);
+  }
+}
+
+void Z3DRendererVulkanBackend::pumpFrameCompletionSafePoints(const std::vector<void*>& completedFrameKeys)
+{
+  if (completedFrameKeys.empty()) {
+    return;
+  }
+
+  // pollCompletions() operates on the device-owned frame-executor slots. Atlas'
+  // backend resources are keyed by the slot key (ActiveFrame::key()). Some
+  // Vulkan subsystems may use the shared executor without participating in the
+  // backend's per-frame resource map, so treat unknown keys as benign and skip.
+  for (void* key : completedFrameKeys) {
+    auto it = m_frameResourceMap.find(key);
+    if (it == m_frameResourceMap.end()) {
+      continue;
+    }
+    CHECK_LT(it->second, m_frames.size()) << "Frame resource map index out of bounds";
+    applyPendingArenaReset(m_frames[it->second]);
   }
 }
 

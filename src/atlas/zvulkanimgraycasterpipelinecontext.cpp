@@ -1319,8 +1319,9 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   //
   // Note: this work can throw cancellation exceptions (and can trigger additional uploads).
   // To keep teardown + residency pin lifetimes robust, gate this on "current frame completion"
-  // (frame-slot reuse) rather than the raw submission fence. This mirrors other readback
-  // consumers and ensures residency unpins (which are submission-fence gated) have already run.
+  // (the backend's frame completion safe point: applyPendingArenaReset) rather than the raw submission fence.
+  // This mirrors other readback consumers and ensures fence-gated completion callbacks (e.g. residency unpins)
+  // have already run before we process the readback.
   CHECK(compactOutput != nullptr);
 
   const std::string_view debugLabel = "VK raycaster compaction output parse";
