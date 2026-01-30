@@ -105,10 +105,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--replay-reasoning-summary",
-        action="store_true",
+        default=True,
+        action=argparse.BooleanOptionalAction,
         help=(
             "When resuming a session, also replay any saved reasoning summaries from the session log.\n"
-            "By default resume replay shows transcript + tool summaries + current plan only."
+            "Default is enabled; pass --no-replay-reasoning-summary to disable."
         ),
     )
     parser.add_argument(

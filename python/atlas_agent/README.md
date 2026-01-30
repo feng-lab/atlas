@@ -69,7 +69,7 @@ Common options:
 - `--reasoning-summary auto|concise|detailed` to control whether/how a high-level reasoning summary is streamed (when supported by your model/provider)
 - `--text-verbosity low|medium|high` to control assistant output verbosity (when supported by your model/provider)
 - `--max-rounds N` to control how many tool-loop rounds the Executor is allowed to run in one turn (`0` = unlimited)
-- `--replay-reasoning-summary` to include saved reasoning summaries when replaying prior session history on resume
+- Resume replay: reasoning summaries are included by default; pass `--no-replay-reasoning-summary` to disable.
 - `--web-search off|cached|live` to expose the Responses API built-in `web_search` tool
   - `cached`: provider cached content only (no live internet access)
   - `live`: allow live internet access (provider-controlled)
@@ -110,7 +110,7 @@ Notes:
   - Or use `:resume` to pick from existing sessions interactively (no copy/paste)
 - Resume UX: when resuming an existing session (via `--session` or `:resume`), the CLI replays the saved session history to the terminal:
   - all transcript messages (user + assistant),
-  - reasoning summaries (phase-level) when `--replay-reasoning-summary` is enabled,
+  - reasoning summaries (phase-level) by default (disable with `--no-replay-reasoning-summary`),
   - a one-line summary of each tool call,
   - the current plan (latest `update_plan`).
 - Auto-retrieval (context-window resilience): when the user says “resume/continue/last time”, the runtime injects a small “Auto-retrieved context” block derived from the session log (recent tool calls + matching transcript entries).
