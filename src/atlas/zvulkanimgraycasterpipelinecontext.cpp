@@ -26,8 +26,9 @@
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanpagedimageblockuploader.h"
 #include "zcancellation.h"
-#include "zcoro.h"
 #include "zrenderthreadexecutor_tls.h"
+
+#include <folly/executors/GlobalExecutor.h>
 
 #include <algorithm>
 #include <array>
@@ -1321,7 +1322,10 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   // (frame-slot reuse) rather than the raw submission fence. This mirrors other readback
   // consumers and ensures residency unpins (which are submission-fence gated) have already run.
   CHECK(compactOutput != nullptr);
-  m_backend.scheduleAfterCurrentFrameCompletion(
+
+  const std::string_view debugLabel = "VK raycaster compaction output parse";
+  m_backend.registerAfterCurrentFrameCompletionHook(
+    currentRenderThreadExecutorKeepAlive(debugLabel),
     [this,
      output = compactOutput,
      imgW,
@@ -1333,7 +1337,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
      channelIndex = resolvedChannelIndex,
      channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
      roundIndex = static_cast<uint32_t>(payload.roundIndexRaw),
-     imagePtr = payload.image]() mutable {
+     imagePtr = payload.image](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
       CHECK(output != nullptr);
       CHECK(imagePtr != nullptr);
       const uint32_t capacityIDs = imgW * imgH * 4u;
@@ -1464,9 +1468,9 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                  m_deferredProgressive->eye == eye) {
         m_deferredProgressive.reset();
       }
+      co_return;
     },
-    "VK raycaster compaction output parse");
-
+    debugLabel);
   // recordBlockIdCompaction()
 }
 
@@ -2323,14 +2327,16 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
     if (!resources.persistentPageDescriptor) {
       const size_t resIndex = channelIndex;
       auto pageBuf = resources.pageDataBuffer;
-      m_backend.scheduleAfterCurrentFrameCompletion(
-        [this, resIndex, pageBuf]() mutable {
+      const std::string_view debugLabel = "VK raycaster allocate persistent page descriptor";
+      m_backend.registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive(debugLabel),
+        [this, resIndex, pageBuf](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
           if (!pageBuf) {
-            return;
+            co_return;
           }
           ChannelResources& res = ensureChannelResources(resIndex);
           if (res.persistentPageDescriptor) {
-            return;
+            co_return;
           }
           ensureDescriptorPool();
           try {
@@ -2343,8 +2349,9 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
           catch (const std::exception& e) {
             LOG(ERROR) << "Failed to allocate persistent page descriptor: " << e.what();
           }
+          co_return;
         },
-        "VK raycaster allocate persistent page descriptor");
+        debugLabel);
     } else {
       // If the page buffer object changed since last bind, rewrite the persistent descriptor
       // after frame completion. Also bind an override descriptor for this frame so the current
@@ -2362,18 +2369,21 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
 
         // Deferred persistent update after the active submission completes.
         // Capture the buffer to keep it alive while this frame is in flight.
-        m_backend.scheduleAfterCurrentFrameCompletion(
-          [this, resIndex2, pageBuf]() mutable {
+        const std::string_view debugLabel = "VK raycaster update persistent page descriptor";
+        m_backend.registerAfterCurrentFrameCompletionHook(
+          currentRenderThreadExecutorKeepAlive(debugLabel),
+          [this, resIndex2, pageBuf](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
             if (!pageBuf) {
-              return;
+              co_return;
             }
             ChannelResources& res = ensureChannelResources(resIndex2);
             if (res.persistentPageDescriptor) {
               res.persistentPageDescriptor->updateUniformBuffer(2, *pageBuf);
               res.boundPageDataBuffer = pageBuf;
             }
+            co_return;
           },
-          "VK raycaster update persistent page descriptor");
+          debugLabel);
       }
     }
   } else {
@@ -2393,12 +2403,15 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
 
       // In force-override mode we never update the persistent descriptor. Still
       // keep the buffer alive until this submission completes.
-      m_backend.scheduleAfterCurrentFrameCompletion(
-        [resIndex2, pageBuf]() mutable {
+      const std::string_view debugLabel = "VK raycaster page descriptor override noop";
+      m_backend.registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive(debugLabel),
+        [resIndex2, pageBuf](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
           (void)resIndex2;
           (void)pageBuf;
+          co_return;
         },
-        "VK raycaster page descriptor override noop");
+        debugLabel);
     }
   }
 
@@ -2429,11 +2442,13 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
     ZVulkanTexture* ic = imageCache;
     ZVulkanTexture* vol = &volume;
     ZVulkanTexture* tf = &transfer;
-    m_backend.scheduleAfterCurrentFrameCompletion(
-      [this, resIndexStatic, pd, pt, ic, vol, tf]() mutable {
+    const std::string_view debugLabel = "VK raycaster allocate persistent static descriptor";
+    m_backend.registerAfterCurrentFrameCompletionHook(
+      currentRenderThreadExecutorKeepAlive(debugLabel),
+      [this, resIndexStatic, pd, pt, ic, vol, tf](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
         ChannelResources& res = ensureChannelResources(resIndexStatic);
         if (res.persistentStaticDescriptor) {
-          return;
+          co_return;
         }
         ensureDescriptorPool();
         try {
@@ -2455,8 +2470,9 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
         catch (const std::exception& e) {
           LOG(ERROR) << "Failed to allocate persistent static descriptor: " << e.what();
         }
+        co_return;
       },
-      "VK raycaster allocate persistent static descriptor");
+      debugLabel);
   } else {
     // If any static texture changed (recreated), rewrite persistent descriptor after frame completion.
     ZVulkanTexture* pd = pageDirectory;
@@ -2469,11 +2485,13 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
                          (tf != resources.boundTransferTex);
     if (changed) {
       const size_t resIndexStatic = channelIndex;
-      m_backend.scheduleAfterCurrentFrameCompletion(
-        [this, resIndexStatic, pd, pt, ic, vol, tf]() mutable {
+      const std::string_view debugLabel = "VK raycaster update persistent static descriptor";
+      m_backend.registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive(debugLabel),
+        [this, resIndexStatic, pd, pt, ic, vol, tf](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
           ChannelResources& res = ensureChannelResources(resIndexStatic);
           if (!res.persistentStaticDescriptor) {
-            return;
+            co_return;
           }
           res.persistentStaticDescriptor->updateTexture(0, *pd, m_backend.nearestClampSampler());
           res.persistentStaticDescriptor->updateTexture(1, *pt, m_backend.nearestClampSampler());
@@ -2485,8 +2503,9 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
           res.boundImageCacheTex = ic;
           res.boundVolumeTex = vol;
           res.boundTransferTex = tf;
+          co_return;
         },
-        "VK raycaster update persistent static descriptor");
+        debugLabel);
     }
 
     // Prefer a per-draw override static descriptor so we never rewrite a
@@ -2713,37 +2732,60 @@ void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& render
     auto leaseRef = payload.entryExitLease;
     auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
     if (backend && leaseRef && leaseRef->hasVulkanImage()) {
-      const auto completion = backend->awaitCurrentFrameCompletion("VK debug save entry/exit");
-      auto keepAlive = currentRenderThreadExecutorKeepAlive("VK debug save entry/exit");
-      auto task = [completion, leaseRef]() mutable -> folly::coro::Task<void> {
-        co_await completion;
-        ZVulkanTexture* tex = leaseRef->colorAttachment(0);
-        if (!tex) {
-          LOG(ERROR) << "Entry/exit debug save: color attachment missing";
-          co_return;
-        }
-
+      ZVulkanTexture* tex = leaseRef->colorAttachment(0);
+      if (!tex) {
+        LOG(ERROR) << "Entry/exit debug save: color attachment missing";
+      } else {
         QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
         if (!dir.isEmpty() && !dir.endsWith('/')) {
           dir += '/';
         }
 
-        auto saveLayer = [&](uint32_t layer, const QString& label) {
+        struct SaveJob
+        {
+          QString filename;
+          Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket ticket;
+        };
+        std::vector<SaveJob> jobs;
+        jobs.reserve(tex->arrayLayers() > 1u ? 2u : 1u);
+
+        auto enqueueLayer = [&](uint32_t layer, const QString& label) {
           const QString filename =
             dir + QString("entry_exit_%1_%2x%3.tif").arg(label).arg(tex->width()).arg(tex->height());
-          ZVulkanTexture::ImageSaveOptions opts;
-          opts.arrayLayer = layer;
-          if (!tex->saveToImage(filename, opts)) {
-            LOG(ERROR) << "Entry/exit debug save failed for layer " << layer;
-          }
+          jobs.push_back(SaveJob{filename,
+                                 backend->requestEndOfFrameImageReadbackTicket(*tex,
+                                                                               batch.eye,
+                                                                               layer,
+                                                                               vk::ImageAspectFlagBits::eColor,
+                                                                               "VK debug save entry/exit")});
         };
 
-        saveLayer(0u, QStringLiteral("front"));
+        enqueueLayer(0u, QStringLiteral("front"));
         if (tex->arrayLayers() > 1u) {
-          saveLayer(1u, QStringLiteral("back"));
+          enqueueLayer(1u, QStringLiteral("back"));
         }
-      };
-      startCoroTaskChecked(folly::coro::co_withExecutor(std::move(keepAlive), task()), "VK debug save entry/exit");
+
+        backend->spawnDetachedTask(
+          folly::getGlobalCPUExecutor(),
+          [jobs = std::move(jobs), leaseRef]() mutable -> folly::coro::Task<void> {
+            (void)leaseRef;
+            for (auto& job : jobs) {
+              std::vector<uint8_t> owned = co_await job.ticket.awaitOwnedBytes();
+
+              if (!ZVulkanTexture::saveReadbackToImage(job.filename,
+                                                       job.ticket.format,
+                                                       job.ticket.size.x,
+                                                       job.ticket.size.y,
+                                                       owned.data(),
+                                                       owned.size(),
+                                                       /*flipY=*/true)) {
+                LOG(ERROR) << "Entry/exit debug save failed for " << job.filename.toStdString();
+              }
+            }
+            co_return;
+          }(),
+          "VK debug save entry/exit");
+      }
     }
   }
 }
@@ -3367,78 +3409,145 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     if (backend) {
       const bool hasLease = (payload.channelLayerLease && payload.channelLayerLease->hasVulkanImage());
       if (hasLease) {
-        // Preferred: capture the lease to keep images alive until callback finishes
+        // Preferred: capture the lease to keep images alive until the GPU submission completes.
         auto leaseRef = payload.channelLayerLease;
-        const auto completion = backend->awaitCurrentFrameCompletion("VK debug save raycaster layers");
-        auto keepAlive = currentRenderThreadExecutorKeepAlive("VK debug save raycaster layers");
-        auto task = [completion, leaseRef, channelCount]() mutable -> folly::coro::Task<void> {
-          co_await completion;
-          ZVulkanTexture* tex = leaseRef->colorAttachment(0);
-          if (tex) {
-            QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
-            if (!dir.isEmpty() && !dir.endsWith('/')) {
-              dir += '/';
-            }
-            const uint32_t totalLayers = std::min<uint32_t>(static_cast<uint32_t>(channelCount), tex->arrayLayers());
-            for (uint32_t layer = 0; layer < totalLayers; ++layer) {
-              const QString filename =
-                dir + QString("raycaster_layer_%1_%2x%3.tif").arg(layer).arg(tex->width()).arg(tex->height());
-              ZVulkanTexture::ImageSaveOptions opts;
-              opts.arrayLayer = layer;
-              (void)tex->saveToImage(filename, opts);
-            }
-          }
-          ZVulkanTexture* dtex = leaseRef->depthAttachmentTexture();
-          if (dtex) {
-            QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
-            if (!dir.isEmpty() && !dir.endsWith('/')) {
-              dir += '/';
-            }
-            const uint32_t totalLayers = std::min<uint32_t>(static_cast<uint32_t>(channelCount), dtex->arrayLayers());
-            for (uint32_t layer = 0; layer < totalLayers; ++layer) {
-              const QString filename =
-                dir + QString("raycaster_layer_depth_%1_%2x%3.tif").arg(layer).arg(dtex->width()).arg(dtex->height());
-              ZVulkanTexture::ImageSaveOptions opts;
-              opts.arrayLayer = layer;
-              opts.aspectMask = vk::ImageAspectFlagBits::eDepth;
-              (void)dtex->saveToImage(filename, opts);
-            }
-          }
+        ZVulkanTexture* tex = leaseRef->colorAttachment(0);
+        ZVulkanTexture* dtex = leaseRef->depthAttachmentTexture();
+
+        QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+        if (!dir.isEmpty() && !dir.endsWith('/')) {
+          dir += '/';
+        }
+
+        struct SaveJob
+        {
+          QString filename;
+          Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket ticket;
         };
-        startCoroTaskChecked(folly::coro::co_withExecutor(std::move(keepAlive), task()),
-                             "VK debug save raycaster layers");
+        std::vector<SaveJob> jobs;
+
+        if (tex) {
+          const uint32_t totalLayers = std::min<uint32_t>(static_cast<uint32_t>(channelCount), tex->arrayLayers());
+          jobs.reserve(totalLayers + (dtex ? totalLayers : 0u));
+          for (uint32_t layer = 0; layer < totalLayers; ++layer) {
+            const QString filename =
+              dir + QString("raycaster_layer_%1_%2x%3.tif").arg(layer).arg(tex->width()).arg(tex->height());
+            jobs.push_back(SaveJob{filename,
+                                   backend->requestEndOfFrameImageReadbackTicket(*tex,
+                                                                                 batch.eye,
+                                                                                 layer,
+                                                                                 vk::ImageAspectFlagBits::eColor,
+                                                                                 "VK debug save raycaster layers")});
+          }
+        }
+
+        if (dtex) {
+          const uint32_t totalLayers = std::min<uint32_t>(static_cast<uint32_t>(channelCount), dtex->arrayLayers());
+          jobs.reserve(jobs.size() + totalLayers);
+          for (uint32_t layer = 0; layer < totalLayers; ++layer) {
+            const QString filename =
+              dir + QString("raycaster_layer_depth_%1_%2x%3.tif").arg(layer).arg(dtex->width()).arg(dtex->height());
+            jobs.push_back(
+              SaveJob{filename,
+                      backend->requestEndOfFrameImageReadbackTicket(*dtex,
+                                                                    batch.eye,
+                                                                    layer,
+                                                                    vk::ImageAspectFlagBits::eDepth,
+                                                                    "VK debug save raycaster layers depth")});
+          }
+        }
+
+        if (!jobs.empty()) {
+          backend->spawnDetachedTask(
+            folly::getGlobalCPUExecutor(),
+            [jobs = std::move(jobs), leaseRef]() mutable -> folly::coro::Task<void> {
+              (void)leaseRef;
+              for (auto& job : jobs) {
+                std::vector<uint8_t> owned = co_await job.ticket.awaitOwnedBytes();
+
+                if (!ZVulkanTexture::saveReadbackToImage(job.filename,
+                                                         job.ticket.format,
+                                                         job.ticket.size.x,
+                                                         job.ticket.size.y,
+                                                         owned.data(),
+                                                         owned.size(),
+                                                         /*flipY=*/true)) {
+                  LOG(ERROR) << "Raycaster layer debug save failed for " << job.filename.toStdString();
+                }
+              }
+              co_return;
+            }(),
+            "VK debug save raycaster layers");
+        }
       } else if (m_progressiveLayerColor && m_progressiveLayerDepth) {
         // Fallback: capture 'this' to keep context-owned progressive arrays valid
         ZVulkanTexture* tex = m_progressiveLayerColor.get();
         ZVulkanTexture* dtex = m_progressiveLayerDepth.get();
-        const auto completion = backend->awaitCurrentFrameCompletion("VK debug save raycaster layers (fallback)");
-        auto keepAlive = currentRenderThreadExecutorKeepAlive("VK debug save raycaster layers (fallback)");
-        auto task = [completion, tex, dtex, channelCount]() mutable -> folly::coro::Task<void> {
-          co_await completion;
-          QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
-          if (!dir.isEmpty() && !dir.endsWith('/')) {
-            dir += '/';
-          }
+        QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+        if (!dir.isEmpty() && !dir.endsWith('/')) {
+          dir += '/';
+        }
+
+        struct SaveJob
+        {
+          QString filename;
+          Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket ticket;
+        };
+        std::vector<SaveJob> jobs;
+
+        if (tex) {
           const uint32_t colorLayers = std::min<uint32_t>(channelCount, tex->arrayLayers());
+          jobs.reserve(colorLayers + (dtex ? colorLayers : 0u));
           for (uint32_t layer = 0; layer < colorLayers; ++layer) {
             const QString filename =
               dir + QString("raycaster_layer_%1_%2x%3.tif").arg(layer).arg(tex->width()).arg(tex->height());
-            ZVulkanTexture::ImageSaveOptions opts;
-            opts.arrayLayer = layer;
-            (void)tex->saveToImage(filename, opts);
+            jobs.push_back(
+              SaveJob{filename,
+                      backend->requestEndOfFrameImageReadbackTicket(*tex,
+                                                                    batch.eye,
+                                                                    layer,
+                                                                    vk::ImageAspectFlagBits::eColor,
+                                                                    "VK debug save raycaster layers (fallback)")});
           }
+        }
+
+        if (dtex) {
           const uint32_t depthLayers = std::min<uint32_t>(channelCount, dtex->arrayLayers());
+          jobs.reserve(jobs.size() + depthLayers);
           for (uint32_t layer = 0; layer < depthLayers; ++layer) {
             const QString filename =
               dir + QString("raycaster_layer_depth_%1_%2x%3.tif").arg(layer).arg(dtex->width()).arg(dtex->height());
-            ZVulkanTexture::ImageSaveOptions dopts;
-            dopts.arrayLayer = layer;
-            dopts.aspectMask = vk::ImageAspectFlagBits::eDepth;
-            (void)dtex->saveToImage(filename, dopts);
+            jobs.push_back(SaveJob{
+              filename,
+              backend->requestEndOfFrameImageReadbackTicket(*dtex,
+                                                            batch.eye,
+                                                            layer,
+                                                            vk::ImageAspectFlagBits::eDepth,
+                                                            "VK debug save raycaster layers depth (fallback)")});
           }
-        };
-        startCoroTaskChecked(folly::coro::co_withExecutor(std::move(keepAlive), task()),
-                             "VK debug save raycaster layers (fallback)");
+        }
+
+        if (!jobs.empty()) {
+          backend->spawnDetachedTask(
+            folly::getGlobalCPUExecutor(),
+            [jobs = std::move(jobs)]() mutable -> folly::coro::Task<void> {
+              for (auto& job : jobs) {
+                std::vector<uint8_t> owned = co_await job.ticket.awaitOwnedBytes();
+
+                if (!ZVulkanTexture::saveReadbackToImage(job.filename,
+                                                         job.ticket.format,
+                                                         job.ticket.size.x,
+                                                         job.ticket.size.y,
+                                                         owned.data(),
+                                                         owned.size(),
+                                                         /*flipY=*/true)) {
+                  LOG(ERROR) << "Raycaster layer debug save failed for " << job.filename.toStdString();
+                }
+              }
+              co_return;
+            }(),
+            "VK debug save raycaster layers (fallback)");
+        }
       }
     }
   }
@@ -3502,44 +3611,64 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     }
     auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
     if (backend && !colorHandles.empty()) {
-      const auto completion = backend->awaitCurrentFrameCompletion("VK debug save raycaster merge output");
-      auto keepAlive = currentRenderThreadExecutorKeepAlive("VK debug save raycaster merge output");
-      auto task =
-        [this, completion, handles = std::move(colorHandles), depthHandle]() mutable -> folly::coro::Task<void> {
-        co_await completion;
-        const AttachmentHandle& handle = handles.front();
-        CHECK(handle.valid() && handle.backend == RenderBackend::Vulkan)
-          << "Raycaster merge debug save: invalid color attachment handle";
+      const AttachmentHandle& handle = colorHandles.front();
+      CHECK(handle.valid() && handle.backend == RenderBackend::Vulkan)
+        << "Raycaster merge debug save: invalid color attachment handle";
 
-        auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "img raycaster merge debug");
+      QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+      if (!dir.isEmpty() && !dir.endsWith('/')) {
+        dir += '/';
+      }
 
-        QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
-        if (!dir.isEmpty() && !dir.endsWith('/')) {
-          dir += '/';
-        }
-        const QString filename = dir + QString("raycaster_merge_%1x%2.tif").arg(tex.width()).arg(tex.height());
-        ZVulkanTexture::ImageSaveOptions colorOpts;
-        if (!tex.saveToImage(filename, colorOpts)) {
-          LOG(ERROR) << "Raycaster merge debug save failed for color attachment";
-        }
-
-        // Save depth if available
-        if (depthHandle && depthHandle->valid() && depthHandle->backend == RenderBackend::Vulkan) {
-          auto& dtex = vulkan::textureFromHandle(*depthHandle, m_backend.device(), "img raycaster merge depth debug");
-          QString ddir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
-          if (!ddir.isEmpty() && !ddir.endsWith('/')) {
-            ddir += '/';
-          }
-          const QString dname = ddir + QString("raycaster_merge_depth_%1x%2.tif").arg(dtex.width()).arg(dtex.height());
-          ZVulkanTexture::ImageSaveOptions depthOpts;
-          depthOpts.aspectMask = vk::ImageAspectFlagBits::eDepth;
-          if (!dtex.saveToImage(dname, depthOpts)) {
-            LOG(ERROR) << "Raycaster merge depth save failed";
-          }
-        }
+      struct SaveJob
+      {
+        QString filename;
+        Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket ticket;
       };
-      startCoroTaskChecked(folly::coro::co_withExecutor(std::move(keepAlive), task()),
-                           "VK debug save raycaster merge output");
+      std::vector<SaveJob> jobs;
+      jobs.reserve(depthHandle ? 2u : 1u);
+
+      auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "img raycaster merge debug");
+      jobs.push_back(SaveJob{dir + QString("raycaster_merge_%1x%2.tif").arg(tex.width()).arg(tex.height()),
+                             backend->requestEndOfFrameImageReadbackTicket(tex,
+                                                                           batch.eye,
+                                                                           /*arrayLayer=*/0u,
+                                                                           vk::ImageAspectFlagBits::eColor,
+                                                                           "VK debug save raycaster merge output")});
+
+      if (depthHandle && depthHandle->valid() && depthHandle->backend == RenderBackend::Vulkan) {
+        auto& dtex = vulkan::textureFromHandle(*depthHandle, m_backend.device(), "img raycaster merge depth debug");
+        jobs.push_back(
+          SaveJob{dir + QString("raycaster_merge_depth_%1x%2.tif").arg(dtex.width()).arg(dtex.height()),
+                  backend->requestEndOfFrameImageReadbackTicket(dtex,
+                                                                batch.eye,
+                                                                /*arrayLayer=*/0u,
+                                                                vk::ImageAspectFlagBits::eDepth,
+                                                                "VK debug save raycaster merge output depth")});
+      }
+
+      backend->spawnDetachedTask(
+        folly::getGlobalCPUExecutor(),
+        [jobs = std::move(jobs)]() mutable -> folly::coro::Task<void> {
+          if (jobs.empty()) {
+            co_return;
+          }
+          for (auto& job : jobs) {
+            std::vector<uint8_t> owned = co_await job.ticket.awaitOwnedBytes();
+
+            if (!ZVulkanTexture::saveReadbackToImage(job.filename,
+                                                     job.ticket.format,
+                                                     job.ticket.size.x,
+                                                     job.ticket.size.y,
+                                                     owned.data(),
+                                                     owned.size(),
+                                                     /*flipY=*/true)) {
+              LOG(ERROR) << "Raycaster merge debug save failed for " << job.filename.toStdString();
+            }
+          }
+          co_return;
+        }(),
+        "VK debug save raycaster merge output");
     }
   }
 }
@@ -4629,25 +4758,27 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
           if (!tex) {
             continue;
           }
-          m_backend.requestEndOfFrameColorReadback(
-            *tex,
-            batch.eye,
-            [att](const void* mapped, size_t bytes, vk::Format fmt, glm::uvec2 size, std::function<void()> release) {
-              const uint32_t w = size.x;
-              const uint32_t h = size.y;
+          auto ticket = m_backend.requestEndOfFrameColorReadbackTicket(*tex, batch.eye, "vk_blockid_debug_readback");
+          m_backend.spawnDetachedTask(
+            folly::getGlobalCPUExecutor(),
+            [att, ticket = std::move(ticket)]() mutable -> folly::coro::Task<void> {
+              co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
+              const uint32_t w = ticket.size.x;
+              const uint32_t h = ticket.size.y;
               const size_t elems = static_cast<size_t>(w) * h * 4ull;
-              if (fmt != vk::Format::eR32G32B32A32Uint) {
-                LOG(WARNING) << "BlockID debug readback unexpected format: " << enumOrUnderlying(fmt, 16);
+              if (ticket.format != vk::Format::eR32G32B32A32Uint) {
+                LOG(WARNING) << "BlockID debug readback unexpected format: " << enumOrUnderlying(ticket.format, 16);
               }
-              if (bytes < elems * sizeof(uint32_t)) {
-                LOG(ERROR) << "BlockID debug readback buffer too small: bytes=" << bytes
+              if (ticket.bytes < elems * sizeof(uint32_t)) {
+                LOG(ERROR) << "BlockID debug readback buffer too small: bytes=" << ticket.bytes
                            << " need=" << (elems * sizeof(uint32_t));
-                if (release) {
-                  release();
+                if (ticket.releaseSlot) {
+                  ticket.releaseSlot();
                 }
-                return;
+                co_return;
               }
-              const uint32_t* data = static_cast<const uint32_t*>(mapped);
+              CHECK(ticket.mapped != nullptr) << "BlockID debug readback mapped pointer is null";
+              const uint32_t* data = static_cast<const uint32_t*>(ticket.mapped);
               size_t nonZero = 0;
               size_t validIds = 0;
               uint32_t rawMin = std::numeric_limits<uint32_t>::max();
@@ -4691,10 +4822,12 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                 rawMax,
                 validMin,
                 validMax);
-              if (release) {
-                release();
+              if (ticket.releaseSlot) {
+                ticket.releaseSlot();
               }
-            });
+              co_return;
+            }(),
+            "vk_blockid_debug_readback_consume");
         }
       }
     }

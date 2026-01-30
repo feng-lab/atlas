@@ -37,7 +37,7 @@ struct ZEnumClassHash
 // Design goals:
 // - Hooks choose their own executors (render thread, CPU pool, IO pool, ...).
 // - reach(spot) is a barrier: it returns only after all hooks for that spot
-//   finish (including hooks registered during execution via the drain loop).
+//   finish.
 // - Exceptions are not swallowed. We drain all hooks for correctness, then
 //   rethrow the first exception so the caller can handle cancellation (or crash
 //   on invariant violations).
@@ -60,41 +60,35 @@ public:
   // Barrier: returns only after all hooks for this spot finish.
   folly::coro::Task<void> reach(Spot spot, Context& ctx)
   {
+    std::vector<Item> local;
+    {
+      std::scoped_lock g(_state->mu);
+      auto it = _state->hooks.find(spot);
+      if (it == _state->hooks.end() || it->second.empty()) {
+        co_return;
+      }
+      local = std::move(it->second);
+      it->second.clear();
+    }
+
+    std::vector<folly::coro::TaskWithExecutor<void>> tasks;
+    tasks.reserve(local.size());
+    for (auto& item : local) {
+      tasks.push_back(folly::coro::co_withExecutor(std::move(item.ex), item.hook(ctx)));
+    }
+
+    auto results = co_await folly::coro::collectAllTryRange(std::move(tasks));
+    CHECK(results.size() == local.size()) << "collectAllTryRange result size mismatch";
+
     std::exception_ptr firstException;
-
-    // Drain loop so hooks registered during execution of this spot also run
-    // before we continue. This is important for "safe-point" semantics where
-    // a hook may enqueue follow-up work for the same spot.
-    while (true) {
-      std::vector<Item> local;
-      {
-        std::scoped_lock g(_state->mu);
-        auto it = _state->hooks.find(spot);
-        if (it == _state->hooks.end() || it->second.empty()) {
-          break;
-        }
-        local = std::move(it->second);
-        it->second.clear();
+    for (size_t i = 0; i < results.size(); ++i) {
+      if (!results[i].hasException()) {
+        continue;
       }
-
-      std::vector<folly::coro::TaskWithExecutor<void>> tasks;
-      tasks.reserve(local.size());
-      for (auto& item : local) {
-        tasks.push_back(folly::coro::co_withExecutor(std::move(item.ex), item.hook(ctx)));
-      }
-
-      auto results = co_await folly::coro::collectAllTryRange(std::move(tasks));
-      CHECK(results.size() == local.size()) << "collectAllTryRange result size mismatch";
-
-      for (size_t i = 0; i < results.size(); ++i) {
-        if (!results[i].hasException()) {
-          continue;
-        }
-        if (!firstException) {
-          firstException = results[i].exception().to_exception_ptr();
-          if (!local[i].debugLabel.empty()) {
-            LOG(ERROR) << "Coro hook failed at spot barrier: label='" << local[i].debugLabel << "'";
-          }
+      if (!firstException) {
+        firstException = results[i].exception().to_exception_ptr();
+        if (!local[i].debugLabel.empty()) {
+          LOG(ERROR) << "Coro hook failed at spot barrier: label='" << local[i].debugLabel << "'";
         }
       }
     }

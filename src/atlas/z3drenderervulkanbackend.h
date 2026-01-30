@@ -8,6 +8,8 @@
 #include "zcoro_spothooks.h"
 // Expose a small awaiter type for "after fence" logic.
 #include <folly/coro/Baton.h>
+// Track detached post-fence tasks for teardown safety.
+#include <folly/coro/AsyncScope.h>
 // Public hook API uses folly coroutines directly.
 #include <folly/coro/Task.h>
 // Arena allocations for per-frame descriptor sets
@@ -20,7 +22,9 @@
 #include <array>
 #include <chrono>
 #include <atomic>
+#include <cstdint>
 #include <functional>
+#include <folly/Executor.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -215,6 +219,16 @@ public:
   };
 
   [[nodiscard]] ActiveSubmissionFenceAwaiter awaitActiveSubmissionFence(std::string_view debugLabel = {});
+  // Executor-safe wrapper for ActiveSubmissionFenceAwaiter.
+  //
+  // Important: folly::coro::Baton resumes awaiters inline on the thread that calls
+  // baton.post(). Since the frame-executor completion callback may run on the
+  // render thread (or another thread), directly `co_await`-ing the low-level
+  // awaiter can violate executor affinity.
+  //
+  // This helper restores executor affinity by re-hopping to the coroutine's
+  // current executor after the baton is released.
+  [[nodiscard]] static folly::coro::Task<void> waitActiveSubmissionFence(ActiveSubmissionFenceAwaiter fence);
 
 private:
   enum class FrameHookSpot
@@ -222,51 +236,14 @@ private:
     AfterFrameCompletionSafePoint
   };
 
-  // Shared one-shot signal for "frame completion safe point" waits.
-  //
-  // This is intentionally a separate shared state object so multiple awaiters
-  // created during the same active frame can all wait on the same signal, and
-  // the backend can "rotate" the signal on frame-slot reuse without any baton
-  // reset races.
-  struct FrameCompletionSignal
-  {
-    explicit FrameCompletionSignal(bool signalled) noexcept
-      : baton(signalled)
-    {}
-    folly::coro::Baton baton;
-  };
+  // Fire-and-forget tasks that must not outlive the backend.
+  // This is used for post-fence work that should NOT block the render thread
+  // via the frame completion safe-point barrier, but still needs teardown safety
+  // (backend switching / renderer destruction).
+  folly::coro::AsyncScope m_detachedTaskScope;
+  bool m_detachedTaskScopeJoined = false;
 
 public:
-  // Await a "current frame completion" safe point as a coroutine.
-  //
-  // The await completes at the point where the backend is about to reuse the
-  // frame-slot resources (descriptor pools, deferred releases) after the GPU
-  // finished executing the submission and after all submission-fence completion
-  // callbacks have run.
-  //
-  // Must be created on the rendering thread.
-  class CurrentFrameCompletionAwaiter final
-  {
-  public:
-    CurrentFrameCompletionAwaiter() = default;
-
-    [[nodiscard]] folly::coro::Baton::WaitOperation operator co_await() const noexcept
-    {
-      CHECK(m_signal != nullptr) << "CurrentFrameCompletionAwaiter used without a signal";
-      return m_signal->baton.operator co_await();
-    }
-
-  private:
-    explicit CurrentFrameCompletionAwaiter(std::shared_ptr<FrameCompletionSignal> signal)
-      : m_signal(std::move(signal))
-    {}
-
-    std::shared_ptr<FrameCompletionSignal> m_signal;
-    friend class Z3DRendererVulkanBackend;
-  };
-
-  [[nodiscard]] CurrentFrameCompletionAwaiter awaitCurrentFrameCompletion(std::string_view debugLabel = {});
-
   using AfterFrameCompletionHook = folly::Function<folly::coro::Task<void>(Z3DRendererVulkanBackend&)>;
 
   // Register a coroutine hook to run at the "current frame completion safe point"
@@ -278,25 +255,39 @@ public:
   //
   // Contract:
   // - Must be called on the rendering thread.
-  // - Requires an active frame-slot context: either the backend is currently
-  //   recording a frame, or it is currently draining a completion safe point.
+  // - Requires an active frame-slot recording context.
+  // - Registration during the completion safe point is forbidden (CHECK) to
+  //   avoid re-entrant "safe-point scheduling" that is easy to reason about
+  //   incorrectly. If post-frame work is needed, register it during recording.
   // - Does not silently block-wait; teardown code must explicitly call
   //   flushForTeardown()/engine drain helpers.
   void registerAfterCurrentFrameCompletionHook(folly::Executor::KeepAlive<> ex,
                                                AfterFrameCompletionHook hook,
                                                std::string_view debugLabel = {});
 
-  // Schedule work to run at the "current frame completion safe point" for the
-  // active frame-slot (applyPendingArenaReset()).
+  // Start a fire-and-forget coroutine task, tracked so flushForTeardown() waits
+  // for completion.
   //
-  // This is the correct primitive for any work that touches per-frame-slot
-  // Vulkan resources (descriptor arenas, frame-keyed buffers, scratch leases,
-  // etc.). Coroutines that resume later on an executor are not safe for such
-  // work when multiple frames are in flight, because the frame-slot may be
-  // reused before the coroutine resumes.
+  // Unlike registerAfterCurrentFrameCompletionHook(), this does NOT execute at
+  // the frame completion safe point and does NOT block frame-slot reuse.
   //
-  // Must be called on the rendering thread.
-  void scheduleAfterCurrentFrameCompletion(std::function<void()> fn, std::string_view debugLabel = {});
+  // Intended for post-fence work that is safe to run on another executor
+  // (debug readback analysis, CPU-side decoding, file I/O, etc.).
+  void
+  spawnDetachedTask(folly::Executor::KeepAlive<> ex, folly::coro::Task<void> task, std::string_view debugLabel = {});
+  void
+  spawnDetachedTask(std::shared_ptr<folly::Executor> ex, folly::coro::Task<void> task, std::string_view debugLabel = {})
+  {
+    CHECK(ex != nullptr) << "spawnDetachedTask requires a valid executor" << (debugLabel.empty() ? "" : " (")
+                         << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
+    spawnDetachedTask(folly::getKeepAliveToken(ex.get()), std::move(task), debugLabel);
+  }
+  void spawnDetachedTask(folly::Executor* ex, folly::coro::Task<void> task, std::string_view debugLabel = {})
+  {
+    CHECK(ex != nullptr) << "spawnDetachedTask requires a valid executor" << (debugLabel.empty() ? "" : " (")
+                         << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
+    spawnDetachedTask(folly::getKeepAliveToken(ex), std::move(task), debugLabel);
+  }
 
   // Teardown helper: wait for all in-flight frame submissions and flush any
   // fence-gated callbacks (notably residency unpins).
@@ -335,25 +326,81 @@ public:
   }
 
   // Stage 4: Async Readback API (offscreen)
-  // Request an end-of-frame copy of a color attachment into a host-visible staging buffer.
-  // The provided onReady callback executes after the frame fence signals (on the
-  // rendering thread) with a pointer to the mapped staging memory and metadata.
-  // The callback must not retain the pointer beyond the callback's lifetime.
-  void requestEndOfFrameColorReadback(
-    class ZVulkanTexture& src,
-    Z3DEye eye,
-    std::function<
-      void(const void* mapped, size_t bytes, vk::Format format, glm::uvec2 size, std::function<void()> releaseSlot)>
-      onReady);
+  // Enqueue end-of-frame GPU->CPU copies into a host-visible staging ring, then
+  // hand out coroutine-friendly tickets for post-fence consumption.
 
-  // Request an end-of-frame copy of a buffer range into a host-visible staging buffer.
-  // Useful for tiny GPU->CPU flags/counters (e.g., DDP early-stop flag on platforms
-  // without VK_KHR_draw_indirect_count).
-  void requestEndOfFrameBufferReadback(
-    class ZVulkanBuffer& src,
-    vk::DeviceSize srcOffset,
-    size_t bytes,
-    std::function<void(const void* mapped, size_t bytes, std::function<void()> releaseSlot)> onReady);
+  struct EndOfFrameColorReadbackTicket
+  {
+    ActiveSubmissionFenceAwaiter fence;
+    const void* mapped = nullptr;
+    size_t bytes = 0;
+    vk::Format format = vk::Format::eUndefined;
+    glm::uvec2 size{0u, 0u};
+    // Metadata describing the captured view.
+    vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor;
+    uint32_t arrayLayer = 0;
+    std::function<void()> releaseSlot;
+
+    // Await the submission fence, copy bytes into an owned vector, and release
+    // the staging slot back to the backend.
+    [[nodiscard]] folly::coro::Task<std::vector<uint8_t>> awaitOwnedBytes();
+  };
+
+  // Coroutine-friendly readback primitive.
+  //
+  // Contract:
+  // - Must be called on the rendering thread with an active frame.
+  // - The returned mapped pointer is valid only after co_await fence.
+  // - The returned mapped pointer remains valid until releaseSlot() is invoked.
+  // - releaseSlot may be invoked from any thread; it routes the actual slot
+  //   release back to the render thread.
+  [[nodiscard]] EndOfFrameColorReadbackTicket
+  requestEndOfFrameColorReadbackTicket(class ZVulkanTexture& src, Z3DEye eye, std::string_view debugLabel = {});
+
+  // Like requestEndOfFrameColorReadbackTicket(), but allows selecting a specific
+  // array layer and aspect (e.g. depth attachment readback).
+  //
+  // Contract:
+  // - Must be called on the rendering thread with an active frame.
+  // - aspectMask must be compatible with src.format() (validated by transitionLayout()).
+  // - The returned mapped pointer is valid only after co_await fence.
+  // - The returned mapped pointer remains valid until releaseSlot() is invoked.
+  [[nodiscard]] EndOfFrameColorReadbackTicket requestEndOfFrameImageReadbackTicket(class ZVulkanTexture& src,
+                                                                                   Z3DEye eye,
+                                                                                   uint32_t arrayLayer,
+                                                                                   vk::ImageAspectFlags aspectMask,
+                                                                                   std::string_view debugLabel = {});
+
+  class EndOfFrameBufferReadbackTicket final
+  {
+  public:
+    EndOfFrameBufferReadbackTicket() = default;
+    EndOfFrameBufferReadbackTicket(const EndOfFrameBufferReadbackTicket&) = delete;
+    EndOfFrameBufferReadbackTicket& operator=(const EndOfFrameBufferReadbackTicket&) = delete;
+    EndOfFrameBufferReadbackTicket(EndOfFrameBufferReadbackTicket&&) noexcept = default;
+    EndOfFrameBufferReadbackTicket& operator=(EndOfFrameBufferReadbackTicket&&) noexcept = default;
+    ~EndOfFrameBufferReadbackTicket() = default;
+
+    // Await the submission fence, copy bytes into an owned vector, and release
+    // the staging slot back to the backend.
+    [[nodiscard]] folly::coro::Task<std::vector<uint8_t>> awaitOwnedBytes();
+
+    // Await the submission fence, copy bytes into caller-provided storage, and
+    // release the staging slot back to the backend.
+    [[nodiscard]] folly::coro::Task<void> awaitCopyTo(void* dst, size_t dstBytes);
+
+  private:
+    ActiveSubmissionFenceAwaiter m_fence;
+    const void* m_mapped = nullptr;
+    size_t m_bytes = 0;
+    std::function<void()> m_releaseSlot;
+    friend class Z3DRendererVulkanBackend;
+  };
+
+  [[nodiscard]] EndOfFrameBufferReadbackTicket requestEndOfFrameBufferReadbackTicket(class ZVulkanBuffer& src,
+                                                                                     vk::DeviceSize srcOffset,
+                                                                                     size_t bytes,
+                                                                                     std::string_view debugLabel = {});
 
   // GPU timestamp scopes (public so pipeline contexts can instrument hot paths)
   std::optional<size_t> beginGpuScope(std::string_view label);
@@ -401,10 +448,6 @@ private:
     uint32_t descriptorSetsAllocated = 0; // VLOG(1) counter per frame
     bool arenaResetScheduled = false; // scheduled at endRender()
     uint32_t arenaResetsPerformed = 0; // count performed resets (debug)
-    // Shared signal for "frame completion safe point" waits. Rotated at the
-    // start of a new recording session for this frame-slot (and also after an
-    // explicit wait-for-completion path).
-    std::shared_ptr<FrameCompletionSignal> frameCompletionSignal;
     // Work to execute at the frame completion safe point. This runs after the
     // GPU finished executing the submission, after fence completion callbacks
     // ran, and after per-frame descriptor pool resets have been applied.
@@ -446,13 +489,11 @@ private:
       Z3DEye eye = MonoEye;
       glm::uvec2 size{0u, 0u};
       vk::Format format = vk::Format::eUndefined;
+      vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor;
+      uint32_t arrayLayer = 0;
       // Assigned staging slot index in m_readbackSlots
       int slotIndex = -1;
       size_t bytes = 0;
-      // Consumer callback (runs after fence signal)
-      std::function<
-        void(const void* mapped, size_t bytes, vk::Format fmt, glm::uvec2 size, std::function<void()> releaseSlot)>
-        onReady;
     };
     std::vector<PendingReadback> pendingColorReadbacks;
 
@@ -463,8 +504,6 @@ private:
       // Assigned staging slot index in m_readbackSlots
       int slotIndex = -1;
       size_t bytes = 0;
-      // Consumer callback (runs after fence signal)
-      std::function<void(const void* mapped, size_t bytes, std::function<void()> releaseSlot)> onReady;
     };
     std::vector<PendingBufferReadback> pendingBufferReadbacks;
     size_t readbackBytesCopied = 0; // total bytes copied this frame
@@ -806,6 +845,9 @@ public:
   };
   std::vector<ReadbackSlot> m_readbackSlots; // shared across frames
   uint32_t m_readbackCursor = 0;
+  // Guards detached readback release callbacks that may outlive the backend
+  // instance (backend switches destroy and recreate the Vulkan backend).
+  std::shared_ptr<bool> m_aliveFlag = std::make_shared<bool>(true);
 
   // Ensure at least N slots exist and each has capacity >= minBytes
   void ensureReadbackSlots(size_t minBytes, uint32_t minSlots);

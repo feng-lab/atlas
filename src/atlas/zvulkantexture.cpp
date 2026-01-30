@@ -977,6 +977,234 @@ bool ZVulkanTexture::saveToImage(const QString& filename, const ImageSaveOptions
   return true;
 }
 
+bool ZVulkanTexture::saveReadbackToImage(const QString& filename,
+                                         vk::Format format,
+                                         uint32_t width,
+                                         uint32_t height,
+                                         const void* data,
+                                         size_t bytes,
+                                         bool flipY)
+{
+  if (filename.isEmpty()) {
+    LOG(ERROR) << "saveReadbackToImage called with empty filename";
+    return false;
+  }
+  if (!data || bytes == 0) {
+    LOG(ERROR) << "saveReadbackToImage called with empty readback buffer";
+    return false;
+  }
+  if (width == 0 || height == 0) {
+    LOG(ERROR) << "saveReadbackToImage received zero-sized image";
+    return false;
+  }
+
+  const size_t pixels = static_cast<size_t>(width) * height;
+
+  auto ensureBytes = [&](size_t needBytes) -> bool {
+    if (bytes < needBytes) {
+      LOG(ERROR) << "saveReadbackToImage buffer too small: have=" << bytes << " need=" << needBytes
+                 << " fmt=" << enumOrUnderlying(format, 16) << " size=" << width << "x" << height;
+      return false;
+    }
+    return true;
+  };
+
+  auto saveColorImage = [&](auto& buffer, size_t channels) -> bool {
+    ZImg src;
+    src.wrapData(buffer.data(), width, height, 1, channels);
+    try {
+      if (channels > 1) {
+        ZImg converted(src.info());
+        ZImgFormat::CXYZtoXYZC(src, converted);
+        if (flipY) {
+          converted.flip(Dimension::Y);
+        }
+        converted.save(filename);
+        return true;
+      }
+      if (flipY) {
+        src.flip(Dimension::Y);
+      }
+      src.save(filename);
+    }
+    catch (const ZException& ze) {
+      LOG(ERROR) << "saveReadbackToImage save failed: " << ze.what();
+      return false;
+    }
+    return true;
+  };
+
+  auto saveScalarImage = [&](auto& buffer) -> bool {
+    ZImg img;
+    img.wrapData(buffer.data(), width, height, 1);
+    try {
+      if (flipY) {
+        img.flip(Dimension::Y);
+      }
+      img.save(filename);
+    }
+    catch (const ZException& ze) {
+      LOG(ERROR) << "saveReadbackToImage save failed: " << ze.what();
+      return false;
+    }
+    return true;
+  };
+
+  auto saveFromUint8 = [&](size_t channels) -> bool {
+    const size_t need = pixels * channels * sizeof(uint8_t);
+    if (!ensureBytes(need)) {
+      return false;
+    }
+    std::vector<uint8_t> buffer(pixels * channels);
+    std::memcpy(buffer.data(), data, need);
+    return saveColorImage(buffer, channels);
+  };
+
+  auto saveFromUint16 = [&](size_t channels) -> bool {
+    const size_t need = pixels * channels * sizeof(uint16_t);
+    if (!ensureBytes(need)) {
+      return false;
+    }
+    std::vector<uint16_t> buffer(pixels * channels);
+    std::memcpy(buffer.data(), data, need);
+    return saveColorImage(buffer, channels);
+  };
+
+  auto saveFromFloat = [&](size_t channels) -> bool {
+    const size_t need = pixels * channels * sizeof(float);
+    if (!ensureBytes(need)) {
+      return false;
+    }
+    std::vector<float> buffer(pixels * channels);
+    std::memcpy(buffer.data(), data, need);
+    return saveColorImage(buffer, channels);
+  };
+
+  auto saveFromHalf = [&](size_t channels) -> bool {
+    const size_t need = pixels * channels * sizeof(uint16_t);
+    if (!ensureBytes(need)) {
+      return false;
+    }
+    std::vector<uint16_t> halfData(pixels * channels);
+    std::memcpy(halfData.data(), data, need);
+    std::vector<float> floatData(halfData.size());
+    for (size_t i = 0; i < halfData.size(); ++i) {
+      floatData[i] = glm::unpackHalf1x16(halfData[i]);
+    }
+    return saveColorImage(floatData, channels);
+  };
+
+  auto saveFromDouble = [&](size_t channels) -> bool {
+    const size_t need = pixels * channels * sizeof(double);
+    if (!ensureBytes(need)) {
+      return false;
+    }
+    std::vector<double> buffer(pixels * channels);
+    std::memcpy(buffer.data(), data, need);
+    return saveColorImage(buffer, channels);
+  };
+
+  try {
+    switch (format) {
+      case vk::Format::eR8G8B8A8Unorm:
+      case vk::Format::eR8G8B8A8Srgb:
+      case vk::Format::eR8G8B8A8Snorm:
+      case vk::Format::eB8G8R8A8Unorm:
+      case vk::Format::eB8G8R8A8Srgb:
+        return saveFromUint8(4u);
+      case vk::Format::eR8G8B8Unorm:
+      case vk::Format::eR8G8B8Srgb:
+      case vk::Format::eR8G8B8Snorm:
+      case vk::Format::eB8G8R8Unorm:
+      case vk::Format::eB8G8R8Srgb:
+        return saveFromUint8(3u);
+      case vk::Format::eR8G8Unorm:
+      case vk::Format::eR8G8Snorm:
+      case vk::Format::eR8G8Srgb:
+        return saveFromUint8(2u);
+
+      case vk::Format::eR16G16B16A16Unorm:
+      case vk::Format::eR16G16B16A16Snorm:
+        return saveFromUint16(4u);
+      case vk::Format::eR16G16B16Unorm:
+      case vk::Format::eR16G16B16Snorm:
+        return saveFromUint16(3u);
+      case vk::Format::eR16G16Unorm:
+      case vk::Format::eR16G16Snorm:
+        return saveFromUint16(2u);
+
+      case vk::Format::eR32G32B32A32Sfloat:
+        return saveFromFloat(4u);
+      case vk::Format::eR32G32B32Sfloat:
+        return saveFromFloat(3u);
+      case vk::Format::eR32G32Sfloat:
+        return saveFromFloat(2u);
+
+      case vk::Format::eR16G16B16A16Sfloat:
+        return saveFromHalf(4u);
+      case vk::Format::eR16G16B16Sfloat:
+        return saveFromHalf(3u);
+      case vk::Format::eR16G16Sfloat:
+        return saveFromHalf(2u);
+
+      case vk::Format::eR64G64B64A64Sfloat:
+        return saveFromDouble(4u);
+      case vk::Format::eR64G64B64Sfloat:
+        return saveFromDouble(3u);
+      case vk::Format::eR64G64Sfloat:
+        return saveFromDouble(2u);
+
+      case vk::Format::eD32Sfloat:
+      case vk::Format::eD32SfloatS8Uint: {
+        const size_t need = pixels * sizeof(float);
+        if (!ensureBytes(need)) {
+          return false;
+        }
+        std::vector<float> depth(pixels);
+        std::memcpy(depth.data(), data, need);
+        return saveScalarImage(depth);
+      }
+      case vk::Format::eD16Unorm: {
+        const size_t need = pixels * sizeof(uint16_t);
+        if (!ensureBytes(need)) {
+          return false;
+        }
+        std::vector<uint16_t> raw(pixels);
+        std::memcpy(raw.data(), data, need);
+        std::vector<float> depth(pixels);
+        constexpr float denom = 65535.0f;
+        for (size_t i = 0; i < pixels; ++i) {
+          depth[i] = static_cast<float>(raw[i]) / denom;
+        }
+        return saveScalarImage(depth);
+      }
+      case vk::Format::eD24UnormS8Uint:
+      case vk::Format::eX8D24UnormPack32: {
+        const size_t need = pixels * sizeof(uint32_t);
+        if (!ensureBytes(need)) {
+          return false;
+        }
+        std::vector<uint32_t> raw(pixels);
+        std::memcpy(raw.data(), data, need);
+        std::vector<float> depth(pixels);
+        constexpr float denom = 16777215.0f;
+        for (size_t i = 0; i < pixels; ++i) {
+          const uint32_t value = raw[i] & 0x00FFFFFFu;
+          depth[i] = static_cast<float>(value) / denom;
+        }
+        return saveScalarImage(depth);
+      }
+      default:
+        LOG(ERROR) << "saveReadbackToImage unsupported format: " << enumOrUnderlying(format, 16);
+        return false;
+    }
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "saveReadbackToImage failed: " << e.what();
+    return false;
+  }
+}
+
 // ----- Private helpers ------------------------------------------------------------------------
 
 void ZVulkanTexture::createImage()

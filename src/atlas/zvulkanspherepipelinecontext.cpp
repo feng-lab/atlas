@@ -14,7 +14,6 @@
 #include "zvulkanuniforms.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zsysteminfo.h"
-#include "zcoro.h"
 #include "zlog.h"
 #include "zexception.h"
 #include "zrenderthreadexecutor_tls.h"
@@ -96,10 +95,13 @@ void ZVulkanSpherePipelineContext::flushRetainedUbos()
   const auto fence = m_backend.awaitActiveSubmissionFence("VK sphere retained UBO lifetime");
   auto keepAlive = currentRenderThreadExecutorKeepAlive("VK sphere retained UBO lifetime");
   for (auto& sp : m_retainedUbos) {
-    auto task = [fence, keep = sp]() mutable -> folly::coro::Task<void> {
-      co_await fence;
-    };
-    startCoroTaskChecked(folly::coro::co_withExecutor(keepAlive, task()), "VK sphere retained UBO lifetime");
+    m_backend.spawnDetachedTask(
+      keepAlive,
+      [fence, keep = sp]() mutable -> folly::coro::Task<void> {
+        co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(fence);
+        co_return;
+      }(),
+      "VK sphere retained UBO lifetime");
   }
   m_retainedUbos.clear();
 }

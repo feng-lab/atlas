@@ -242,6 +242,20 @@ public:
   bool saveToImage(const QString& filename, const ImageSaveOptions& options);
   bool saveToImage(const QString& filename);
 
+  // Save an image file from an already-captured GPU->CPU readback buffer.
+  //
+  // The input buffer is expected to be the tightly-packed output of
+  // vkCmdCopyImageToBuffer for the given `format`/`width`/`height`.
+  // This performs the same format conversions as saveToImage() (including
+  // depth normalization for depth formats), but does not touch Vulkan.
+  static bool saveReadbackToImage(const QString& filename,
+                                  vk::Format format,
+                                  uint32_t width,
+                                  uint32_t height,
+                                  const void* data,
+                                  size_t bytes,
+                                  bool flipY = true);
+
 private:
   void createImage();
   void allocateMemory();

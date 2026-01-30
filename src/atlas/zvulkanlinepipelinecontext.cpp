@@ -17,7 +17,6 @@
 #include "z3dlinerenderer.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
-#include "zcoro.h"
 #include "zrenderthreadexecutor_tls.h"
 
 #include <algorithm>
@@ -165,10 +164,13 @@ void ZVulkanLinePipelineContext::flushRetainedUbos()
   // Hand retained UBOs to the backend so destruction happens after the active
   // submission fence signals. Capture shared_ptr by value to extend lifetime.
   for (auto& sp : m_retainedUbos) {
-    auto task = [fence, keep = sp]() mutable -> folly::coro::Task<void> {
-      co_await fence;
-    };
-    startCoroTaskChecked(folly::coro::co_withExecutor(keepAlive, task()), "VK line retained UBO lifetime");
+    m_backend.spawnDetachedTask(
+      keepAlive,
+      [fence, keep = sp]() mutable -> folly::coro::Task<void> {
+        co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(fence);
+        co_return;
+      }(),
+      "VK line retained UBO lifetime");
   }
   m_retainedUbos.clear();
 }

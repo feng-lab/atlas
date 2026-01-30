@@ -169,7 +169,7 @@ Lookup Tables (LUTs)
     - resets per-frame descriptor resources,
     - drains all “after completion” hooks with a barrier (hooks may run on their own executors),
     - then wakes `awaitCurrentFrameCompletion()` awaiters for the previous generation.
-  - Scratch-pool recycling: Vulkan scratch image leases are released only after the submitting frame’s fence signals. The pool defers slot reuse by scheduling work to the frame-completion safe point (via `scheduleAfterCurrentFrameCompletion()`).
+  - Scratch-pool recycling: Vulkan scratch image leases are released only after the submitting frame’s fence signals. The pool defers slot reuse by registering an “after completion” hook at the frame-completion safe point (via `registerAfterCurrentFrameCompletionHook()` through the backend-installed scratch scheduler).
   - Shared fullscreen quad: use `Z3DRendererVulkanBackend::fullscreenQuadVertexBuffer()` in full-screen passes (background, copy, blend, glow) instead of creating per-context VBOs.
   - Vulkan descriptor guardrails:
     - Do not write descriptors while a frame is recording. Persistent sets are write-once per frame; update only UBO contents via `copyData(...)` in record paths.
