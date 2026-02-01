@@ -9,7 +9,5 @@ void main()
   vec4 color;
   float fragDepth;
   fragment_func(color, fragDepth);
-  gl_FragDepth = fragDepth;
   ppllStoreFragment(color, fragDepth);
 }
-

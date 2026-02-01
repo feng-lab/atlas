@@ -24,6 +24,20 @@ layout(location = 5) flat in vec4 p0p1; // only when ROUND_CAP
 // Optional texture (emulate 1D with Wx1 2D texture)
 layout(set = 0, binding = 0) uniform sampler2D line_texture;
 
+void fragment_discard_only()
+{
+  vec3 pos = vec3(gl_FragCoord.xy, 1.0);
+  vec4 dist = vec4(dot(pos, plane1), dot(pos, plane2), dot(pos, plane3), dot(pos, plane4));
+
+  if (ROUND_CAP) {
+    if (dist.x < 0.0 || dist.y < 0.0) discard;
+    if (dist.z < 0.0 && wpc.line_width * wpc.size_scale / 2.0 - distance(pos.xy, p0p1.xy) < 0.0) discard;
+    if (dist.w < 0.0 && wpc.line_width * wpc.size_scale / 2.0 - distance(pos.xy, p0p1.zw) < 0.0) discard;
+  } else {
+    if (any(lessThan(dist, vec4(0.0)))) discard;
+  }
+}
+
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
   vec3 pos = vec3(gl_FragCoord.xy, 1.0);
