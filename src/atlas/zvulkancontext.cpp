@@ -39,6 +39,111 @@ std::string versionToString(uint32_t version)
   return fmt::format("{}.{}.{}", VK_VERSION_MAJOR(version), VK_VERSION_MINOR(version), VK_VERSION_PATCH(version));
 }
 
+std::string logVulkan10Features(const vk::PhysicalDeviceFeatures& features)
+{
+  std::string s;
+  fmt::format_to(std::back_inserter(s), "Vulkan 1.0 Core Features:\n");
+  fmt::format_to(std::back_inserter(s), "  robustBufferAccess: {}\n", features.robustBufferAccess);
+  fmt::format_to(std::back_inserter(s), "  fullDrawIndexUint32: {}\n", features.fullDrawIndexUint32);
+  fmt::format_to(std::back_inserter(s), "  imageCubeArray: {}\n", features.imageCubeArray);
+  fmt::format_to(std::back_inserter(s), "  independentBlend: {}\n", features.independentBlend);
+  fmt::format_to(std::back_inserter(s), "  geometryShader: {}\n", features.geometryShader);
+  fmt::format_to(std::back_inserter(s), "  tessellationShader: {}\n", features.tessellationShader);
+  fmt::format_to(std::back_inserter(s), "  sampleRateShading: {}\n", features.sampleRateShading);
+  fmt::format_to(std::back_inserter(s), "  dualSrcBlend: {}\n", features.dualSrcBlend);
+  fmt::format_to(std::back_inserter(s), "  logicOp: {}\n", features.logicOp);
+  fmt::format_to(std::back_inserter(s), "  multiDrawIndirect: {}\n", features.multiDrawIndirect);
+  fmt::format_to(std::back_inserter(s), "  drawIndirectFirstInstance: {}\n", features.drawIndirectFirstInstance);
+  fmt::format_to(std::back_inserter(s), "  depthClamp: {}\n", features.depthClamp);
+  fmt::format_to(std::back_inserter(s), "  depthBiasClamp: {}\n", features.depthBiasClamp);
+  fmt::format_to(std::back_inserter(s), "  fillModeNonSolid: {}\n", features.fillModeNonSolid);
+  fmt::format_to(std::back_inserter(s), "  depthBounds: {}\n", features.depthBounds);
+  fmt::format_to(std::back_inserter(s), "  wideLines: {}\n", features.wideLines);
+  fmt::format_to(std::back_inserter(s), "  largePoints: {}\n", features.largePoints);
+  fmt::format_to(std::back_inserter(s), "  alphaToOne: {}\n", features.alphaToOne);
+  fmt::format_to(std::back_inserter(s), "  multiViewport: {}\n", features.multiViewport);
+  fmt::format_to(std::back_inserter(s), "  samplerAnisotropy: {}\n", features.samplerAnisotropy);
+  fmt::format_to(std::back_inserter(s), "  textureCompressionETC2: {}\n", features.textureCompressionETC2);
+  fmt::format_to(std::back_inserter(s), "  textureCompressionASTC_LDR: {}\n", features.textureCompressionASTC_LDR);
+  fmt::format_to(std::back_inserter(s), "  textureCompressionBC: {}\n", features.textureCompressionBC);
+  fmt::format_to(std::back_inserter(s), "  occlusionQueryPrecise: {}\n", features.occlusionQueryPrecise);
+  fmt::format_to(std::back_inserter(s), "  pipelineStatisticsQuery: {}\n", features.pipelineStatisticsQuery);
+  fmt::format_to(std::back_inserter(s),
+                 "  vertexPipelineStoresAndAtomics: {}\n",
+                 features.vertexPipelineStoresAndAtomics);
+  fmt::format_to(std::back_inserter(s), "  fragmentStoresAndAtomics: {}\n", features.fragmentStoresAndAtomics);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderTessellationAndGeometryPointSize: {}\n",
+                 features.shaderTessellationAndGeometryPointSize);
+  fmt::format_to(std::back_inserter(s), "  shaderImageGatherExtended: {}\n", features.shaderImageGatherExtended);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderStorageImageExtendedFormats: {}\n",
+                 features.shaderStorageImageExtendedFormats);
+  fmt::format_to(std::back_inserter(s), "  shaderStorageImageMultisample: {}\n", features.shaderStorageImageMultisample);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderStorageImageReadWithoutFormat: {}\n",
+                 features.shaderStorageImageReadWithoutFormat);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderStorageImageWriteWithoutFormat: {}\n",
+                 features.shaderStorageImageWriteWithoutFormat);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderUniformBufferArrayDynamicIndexing: {}\n",
+                 features.shaderUniformBufferArrayDynamicIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderSampledImageArrayDynamicIndexing: {}\n",
+                 features.shaderSampledImageArrayDynamicIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderStorageBufferArrayDynamicIndexing: {}\n",
+                 features.shaderStorageBufferArrayDynamicIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderStorageImageArrayDynamicIndexing: {}\n",
+                 features.shaderStorageImageArrayDynamicIndexing);
+  fmt::format_to(std::back_inserter(s), "  shaderClipDistance: {}\n", features.shaderClipDistance);
+  fmt::format_to(std::back_inserter(s), "  shaderCullDistance: {}\n", features.shaderCullDistance);
+  fmt::format_to(std::back_inserter(s), "  shaderFloat64: {}\n", features.shaderFloat64);
+  fmt::format_to(std::back_inserter(s), "  shaderInt64: {}\n", features.shaderInt64);
+  fmt::format_to(std::back_inserter(s), "  shaderInt16: {}\n", features.shaderInt16);
+  fmt::format_to(std::back_inserter(s), "  shaderResourceResidency: {}\n", features.shaderResourceResidency);
+  fmt::format_to(std::back_inserter(s), "  shaderResourceMinLod: {}\n", features.shaderResourceMinLod);
+  fmt::format_to(std::back_inserter(s), "  sparseBinding: {}\n", features.sparseBinding);
+  fmt::format_to(std::back_inserter(s), "  sparseResidencyBuffer: {}\n", features.sparseResidencyBuffer);
+  fmt::format_to(std::back_inserter(s), "  sparseResidencyImage2D: {}\n", features.sparseResidencyImage2D);
+  fmt::format_to(std::back_inserter(s), "  sparseResidencyImage3D: {}\n", features.sparseResidencyImage3D);
+  fmt::format_to(std::back_inserter(s), "  sparseResidency2Samples: {}\n", features.sparseResidency2Samples);
+  fmt::format_to(std::back_inserter(s), "  sparseResidency4Samples: {}\n", features.sparseResidency4Samples);
+  fmt::format_to(std::back_inserter(s), "  sparseResidency8Samples: {}\n", features.sparseResidency8Samples);
+  fmt::format_to(std::back_inserter(s), "  sparseResidency16Samples: {}\n", features.sparseResidency16Samples);
+  fmt::format_to(std::back_inserter(s), "  sparseResidencyAliased: {}\n", features.sparseResidencyAliased);
+  fmt::format_to(std::back_inserter(s), "  variableMultisampleRate: {}\n", features.variableMultisampleRate);
+  fmt::format_to(std::back_inserter(s), "  inheritedQueries: {}\n", features.inheritedQueries);
+  return s;
+}
+
+std::string logVulkan11Features(const vk::PhysicalDeviceVulkan11Features& features)
+{
+  std::string s;
+  fmt::format_to(std::back_inserter(s), "Vulkan 1.1 Features:\n");
+  fmt::format_to(std::back_inserter(s), "  storageBuffer16BitAccess: {}\n", features.storageBuffer16BitAccess);
+  fmt::format_to(std::back_inserter(s),
+                 "  uniformAndStorageBuffer16BitAccess: {}\n",
+                 features.uniformAndStorageBuffer16BitAccess);
+  fmt::format_to(std::back_inserter(s), "  storagePushConstant16: {}\n", features.storagePushConstant16);
+  fmt::format_to(std::back_inserter(s), "  storageInputOutput16: {}\n", features.storageInputOutput16);
+  fmt::format_to(std::back_inserter(s), "  multiview: {}\n", features.multiview);
+  fmt::format_to(std::back_inserter(s), "  multiviewGeometryShader: {}\n", features.multiviewGeometryShader);
+  fmt::format_to(std::back_inserter(s),
+                 "  multiviewTessellationShader: {}\n",
+                 features.multiviewTessellationShader);
+  fmt::format_to(std::back_inserter(s),
+                 "  variablePointersStorageBuffer: {}\n",
+                 features.variablePointersStorageBuffer);
+  fmt::format_to(std::back_inserter(s), "  variablePointers: {}\n", features.variablePointers);
+  fmt::format_to(std::back_inserter(s), "  protectedMemory: {}\n", features.protectedMemory);
+  fmt::format_to(std::back_inserter(s), "  samplerYcbcrConversion: {}\n", features.samplerYcbcrConversion);
+  fmt::format_to(std::back_inserter(s), "  shaderDrawParameters: {}\n", features.shaderDrawParameters);
+  return s;
+}
+
 // Function to check if a layer is available
 bool isLayerAvailable(const char* layerName, const std::vector<vk::LayerProperties>& availableLayers)
 {
@@ -352,9 +457,11 @@ void ZVulkanContext::logGpuInfo() const
 
     // Limits/features summary for every device
     auto features2 = pd.getFeatures2<vk::PhysicalDeviceFeatures2,
+                                     vk::PhysicalDeviceVulkan11Features,
                                      vk::PhysicalDeviceVulkan12Features,
                                      vk::PhysicalDeviceVulkan13Features>();
     const auto& features = features2.get<vk::PhysicalDeviceFeatures2>().features;
+    const auto& features11 = features2.get<vk::PhysicalDeviceVulkan11Features>();
     const auto& features12 = features2.get<vk::PhysicalDeviceVulkan12Features>();
     const auto& features13 = features2.get<vk::PhysicalDeviceVulkan13Features>();
     fmt::format_to(std::back_inserter(summary),
@@ -374,8 +481,10 @@ void ZVulkanContext::logGpuInfo() const
                    features.samplerAnisotropy ? props.limits.maxSamplerAnisotropy : 1.0f);
     fmt::format_to(
       std::back_inserter(summary),
-      "     Features: anisotropy={} independentBlend={} fragStoresAndAtomics={} drawIndirectCount={} dynamicRendering={} synchronization2={}\n",
+      "     Features: anisotropy={} shaderClipDistance={} maxClipDistances={} independentBlend={} fragStoresAndAtomics={} drawIndirectCount={} dynamicRendering={} synchronization2={}\n",
       features.samplerAnisotropy == VK_TRUE,
+      features.shaderClipDistance == VK_TRUE,
+      props.limits.maxClipDistances,
       features.independentBlend == VK_TRUE,
       features.fragmentStoresAndAtomics == VK_TRUE,
       features12.drawIndirectCount == VK_TRUE,
@@ -393,6 +502,8 @@ void ZVulkanContext::logGpuInfo() const
                      ext.extensionName.data(),
                      ext.specVersion);
     }
+    fmt::format_to(std::back_inserter(summary), "{}", logVulkan10Features(features));
+    fmt::format_to(std::back_inserter(summary), "{}", logVulkan11Features(features11));
     fmt::format_to(std::back_inserter(summary), "{}", logVulkan12Features(features12));
     if (props.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0)) {
       fmt::format_to(std::back_inserter(summary), "{}", logVulkan13Features(features13));
@@ -774,7 +885,7 @@ void ZVulkanContext::createLogicalDevice()
                                    vk::PhysicalDeviceVulkan13Features>();
   auto& physicalDeviceFeatures = features2.get<vk::PhysicalDeviceFeatures2>().features;
   auto& physicalDeviceVulkan12Features = features2.get<vk::PhysicalDeviceVulkan12Features>();
-  // auto& physicalDeviceVulkan13Features = features2.get<vk::PhysicalDeviceVulkan13Features>();
+  auto& physicalDeviceVulkan13Features = features2.get<vk::PhysicalDeviceVulkan13Features>();
 
   // Setup enabled features
   vk::
@@ -813,10 +924,19 @@ void ZVulkanContext::createLogicalDevice()
   // Enable required extensions
   std::vector<const char*> enabledExtensions;
 
-  // Vulkan 1.3 is required; enable 1.3 core features directly
+  // Vulkan 1.3 is required, but individual features are still optional and must
+  // be queried/enabled explicitly.
+  if (physicalDeviceVulkan13Features.dynamicRendering != VK_TRUE) {
+    throw ZException("Selected Vulkan device does not support dynamicRendering (required by Vulkan backend)");
+  }
+  if (physicalDeviceVulkan13Features.synchronization2 != VK_TRUE) {
+    throw ZException("Selected Vulkan device does not support synchronization2 (required by Vulkan backend)");
+  }
   enabledPhysicalDeviceVulkan13Features.dynamicRendering = true;
   enabledPhysicalDeviceVulkan13Features.synchronization2 = true;
-  enabledPhysicalDeviceVulkan13Features.shaderDemoteToHelperInvocation = true;
+  // Optional: enable only if supported by the device.
+  enabledPhysicalDeviceVulkan13Features.shaderDemoteToHelperInvocation =
+    physicalDeviceVulkan13Features.shaderDemoteToHelperInvocation;
   // Also enable useful Vulkan 1.2 features when supported by the device
   enabledPhysicalDeviceVulkan12Features.separateDepthStencilLayouts =
     physicalDeviceVulkan12Features.separateDepthStencilLayouts;

@@ -1,6 +1,8 @@
 #include "zcutspanparameter.h"
 
+#include "zspanslider.h"
 #include "zwidgetsgroup.h"
+#include <QDoubleSpinBox>
 #include <QVBoxLayout>
 #include <QGroupBox>
 #include <QLabel>
@@ -40,6 +42,7 @@ ZCutSpanParameter::ZCutSpanParameter(const QString& name, glm::vec2 value, float
     "               newUpper = (PinUpper ? max : clamp(oldUpper, min, max)).\n"
     "- Normalized [0..1]: newLower = min + (max-min)*f0; newUpper = min + (max-min)*f1.\n\n"
     "Defaults: Mode = Track Edges; Pin Lower = ON; Pin Upper = ON (shows full range and follows edges).\n"
+    "UI: Track Edges disables pinned endpoints; Normalized disables Range (derived from fractions).\n"
     "Tip: To keep a proportional window, choose Normalized and set fractions (e.g., 0.1 to 0.9)."));
 
   // Range row is labeled in the widget layout; no separate proxy parameter
@@ -60,11 +63,13 @@ ZCutSpanParameter::ZCutSpanParameter(const QString& name, glm::vec2 value, float
     reapplyBinding();
   });
   connect(&m_pinLower, &ZBoolParameter::valueChanged, this, [this]() {
+    updateUiEnabling();
     if (mode() == Mode::TrackEdges) {
       reapplyBinding();
     }
   });
   connect(&m_pinUpper, &ZBoolParameter::valueChanged, this, [this]() {
+    updateUiEnabling();
     if (mode() == Mode::TrackEdges) {
       reapplyBinding();
     }
@@ -321,10 +326,22 @@ QWidget* ZCutSpanParameter::actualCreateWidget(QWidget* parent)
     lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     QWidget* spanWidget = ZFloatSpanParameter::actualCreateWidget(row);
+    const auto spinBoxes = spanWidget->findChildren<QDoubleSpinBox*>();
+    if (spinBoxes.size() >= 2) {
+      // The widget creates lower then upper spin boxes in that order.
+      m_rangeLowerEditorWidget = spinBoxes[0];
+      m_rangeUpperEditorWidget = spinBoxes[1];
+    } else {
+      m_rangeLowerEditorWidget = nullptr;
+      m_rangeUpperEditorWidget = nullptr;
+    }
+    const auto spanSliders = spanWidget->findChildren<ZSpanSlider*>();
+    m_rangeSpanSliderWidget = spanSliders.isEmpty() ? nullptr : spanSliders.front();
     h->addWidget(lb);
     h->addWidget(spanWidget, 1);
     row->setLayout(h);
     cutGroup.addChild(*row, 1);
+    m_rangeRowWidget = row;
   }
   cutGroup.addChild(m_mode, 1);
   cutGroup.addChild(m_pinLower, 1);
@@ -340,8 +357,22 @@ QWidget* ZCutSpanParameter::actualCreateWidget(QWidget* parent)
 
 void ZCutSpanParameter::updateUiEnabling()
 {
+  const bool abs = mode() == Mode::Absolute;
   const bool track = mode() == Mode::TrackEdges;
   const bool norm = mode() == Mode::Normalized;
+  const bool fullyPinned = track && m_pinLower.get() && m_pinUpper.get();
+  if (m_rangeRowWidget) {
+    m_rangeRowWidget->setEnabled(!norm && !fullyPinned);
+  }
+  if (m_rangeLowerEditorWidget) {
+    m_rangeLowerEditorWidget->setEnabled(abs || (track && !m_pinLower.get()));
+  }
+  if (m_rangeUpperEditorWidget) {
+    m_rangeUpperEditorWidget->setEnabled(abs || (track && !m_pinUpper.get()));
+  }
+  if (m_rangeSpanSliderWidget) {
+    m_rangeSpanSliderWidget->setEnabled(abs || (track && !m_pinLower.get() && !m_pinUpper.get()));
+  }
   m_pinLower.setEnabled(track);
   m_pinUpper.setEnabled(track);
   m_normalized.setEnabled(norm);
