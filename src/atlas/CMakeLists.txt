@@ -210,6 +210,7 @@ set(ATLAS_VK_SHADER_SOURCES
     sphere.frag
     mesh.vert
     mesh.frag
+    mesh_depth.vert
     pass.vert
     transform_with_2dtexture.vert
     pass_with_2dtexture.vert
