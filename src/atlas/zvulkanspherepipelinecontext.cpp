@@ -11,11 +11,13 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbindings.h"
+#include "zvulkanclipplanes.h"
 #include "zvulkanuniforms.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zsysteminfo.h"
 #include "zlog.h"
 #include "zexception.h"
+#include "zrenderthreadexecutor_tls.h"
 
 #include <algorithm>
 #include <array>
@@ -23,6 +25,8 @@
 #include <vector>
 #include <cstring>
 #include <cstdint>
+
+#include <folly/coro/Task.h>
 
 namespace nim {
 
@@ -89,9 +93,16 @@ void ZVulkanSpherePipelineContext::flushRetainedUbos()
   if (m_retainedUbos.empty()) {
     return;
   }
+  const auto fence = m_backend.awaitActiveSubmissionFence("VK sphere retained UBO lifetime");
+  auto keepAlive = currentRenderThreadExecutorKeepAlive("VK sphere retained UBO lifetime");
   for (auto& sp : m_retainedUbos) {
-    auto keep = sp;
-    m_backend.scheduleAfterActiveSubmissionFence([keep]() {});
+    m_backend.spawnDetachedTask(
+      keepAlive,
+      [fence, keep = sp]() mutable -> folly::coro::Task<void> {
+        co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(fence);
+        co_return;
+      }(),
+      "VK sphere retained UBO lifetime");
   }
   m_retainedUbos.clear();
 }
@@ -412,6 +423,7 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
 
   if (!(ddp && m_ddpTransformsFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));

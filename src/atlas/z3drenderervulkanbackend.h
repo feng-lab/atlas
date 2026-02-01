@@ -5,6 +5,13 @@
 #include "zvulkan.h"
 #include "zvulkandevice.h"
 #include "zvulkanframeexecutor.h"
+#include "zcoro_spothooks.h"
+// Expose a small awaiter type for "after fence" logic.
+#include <folly/coro/Baton.h>
+// Track detached post-fence tasks for teardown safety.
+#include <folly/coro/AsyncScope.h>
+// Public hook API uses folly coroutines directly.
+#include <folly/coro/Task.h>
 // Arena allocations for per-frame descriptor sets
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
@@ -14,7 +21,10 @@
 
 #include <array>
 #include <chrono>
+#include <atomic>
+#include <cstdint>
 #include <functional>
+#include <folly/Executor.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -42,6 +52,7 @@ class ZVulkanImgSlicePipelineContext;
 class ZVulkanImgRaycasterPipelineContext;
 class ZVulkanFontPipelineContext;
 class ZVulkanBuffer;
+
 // Vulkan renderer backend borrows the shared ZVulkanDevice injected through the scratch pool.
 // Lifetime notes:
 //  * Z3DRenderingEngine owns the Vulkan context/device and calls setVulkanDevice() on the pool
@@ -166,11 +177,119 @@ public:
   // Use this when updating descriptors per draw to avoid update-after-bind.
   ZVulkanDescriptorSet* allocateOverrideDescriptorSet(vk::DescriptorSetLayout layout);
 
-  // Stage 2: Schedule a callback to run once the current frame's fence signals
-  void scheduleAfterCurrentFrameCompletion(std::function<void()> fn);
-  // Schedule a callback gated by the current submission fence. The callback is
-  // executed when the frame executor observes the fence completion (poll/wait).
-  void scheduleAfterActiveSubmissionFence(std::function<void()> fn);
+  // Await the active submission fence (if any) as a coroutine.
+  //
+  // This returns an awaiter object that captures the current active submission
+  // (if any) *at call time*. The await itself can happen later (e.g., from a
+  // queued coroutine) without relying on mutable backend state.
+  //
+  // - When there is an active frame submission, the awaiter suspends until its
+  //   fence is observed complete by the frame executor.
+  // - When no active submission exists, the awaiter conservatively waits for
+  //   all in-flight submissions to complete (teardown safety).
+  //
+  // Must be created on the rendering thread.
+  class ActiveSubmissionFenceAwaiter final
+  {
+  public:
+    ActiveSubmissionFenceAwaiter() = default;
+
+    [[nodiscard]] folly::coro::Baton::WaitOperation operator co_await() const noexcept
+    {
+      // If this triggers, the awaiter was default-constructed or moved-from.
+      CHECK(m_state != nullptr) << "ActiveSubmissionFenceAwaiter used without a state";
+      return m_state->baton.operator co_await();
+    }
+
+  private:
+    struct State
+    {
+      explicit State(bool signalled) noexcept
+        : baton(signalled)
+      {}
+      folly::coro::Baton baton;
+    };
+
+    explicit ActiveSubmissionFenceAwaiter(std::shared_ptr<State> state)
+      : m_state(std::move(state))
+    {}
+
+    std::shared_ptr<State> m_state;
+    friend class Z3DRendererVulkanBackend;
+  };
+
+  [[nodiscard]] ActiveSubmissionFenceAwaiter awaitActiveSubmissionFence(std::string_view debugLabel = {});
+  // Executor-safe wrapper for ActiveSubmissionFenceAwaiter.
+  //
+  // Important: folly::coro::Baton resumes awaiters inline on the thread that calls
+  // baton.post(). Since the frame-executor completion callback may run on the
+  // render thread (or another thread), directly `co_await`-ing the low-level
+  // awaiter can violate executor affinity.
+  //
+  // This helper restores executor affinity by re-hopping to the coroutine's
+  // current executor after the baton is released.
+  [[nodiscard]] static folly::coro::Task<void> waitActiveSubmissionFence(ActiveSubmissionFenceAwaiter fence);
+
+private:
+  enum class FrameHookSpot
+  {
+    AfterFrameCompletionSafePoint
+  };
+
+  // Fire-and-forget tasks that must not outlive the backend.
+  // This is used for post-fence work that should NOT block the render thread
+  // via the frame completion safe-point barrier, but still needs teardown safety
+  // (backend switching / renderer destruction).
+  folly::coro::AsyncScope m_detachedTaskScope;
+  bool m_detachedTaskScopeJoined = false;
+
+public:
+  using AfterFrameCompletionHook = folly::Function<folly::coro::Task<void>(Z3DRendererVulkanBackend&)>;
+
+  // Register a coroutine hook to run at the "current frame completion safe point"
+  // (applyPendingArenaReset) for the active frame-slot.
+  //
+  // This is the preferred API for post-fence work that needs correct ordering
+  // with respect to the backend's frame completion safe point (after fence-gated
+  // completion callbacks, descriptor arena resets, and scratch releases) while
+  // allowing the hook body to be written
+  // linearly with co_await and to run on the call-site chosen executor.
+  //
+  // Contract:
+  // - Must be called on the rendering thread.
+  // - Requires an active frame-slot recording context.
+  // - Registration during the completion safe point is forbidden (CHECK) to
+  //   avoid re-entrant "safe-point scheduling" that is easy to reason about
+  //   incorrectly. If post-frame work is needed, register it during recording.
+  // - Does not silently block-wait; teardown code must explicitly call
+  //   flushForTeardown()/engine drain helpers.
+  void registerAfterCurrentFrameCompletionHook(folly::Executor::KeepAlive<> ex,
+                                               AfterFrameCompletionHook hook,
+                                               std::string_view debugLabel = {});
+
+  // Start a fire-and-forget coroutine task, tracked so flushForTeardown() waits
+  // for completion.
+  //
+  // Unlike registerAfterCurrentFrameCompletionHook(), this does NOT execute at
+  // the frame completion safe point and does NOT block frame-slot reuse.
+  //
+  // Intended for post-fence work that is safe to run on another executor
+  // (debug readback analysis, CPU-side decoding, file I/O, etc.).
+  void
+  spawnDetachedTask(folly::Executor::KeepAlive<> ex, folly::coro::Task<void> task, std::string_view debugLabel = {});
+  void
+  spawnDetachedTask(std::shared_ptr<folly::Executor> ex, folly::coro::Task<void> task, std::string_view debugLabel = {})
+  {
+    CHECK(ex != nullptr) << "spawnDetachedTask requires a valid executor" << (debugLabel.empty() ? "" : " (")
+                         << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
+    spawnDetachedTask(folly::getKeepAliveToken(ex.get()), std::move(task), debugLabel);
+  }
+  void spawnDetachedTask(folly::Executor* ex, folly::coro::Task<void> task, std::string_view debugLabel = {})
+  {
+    CHECK(ex != nullptr) << "spawnDetachedTask requires a valid executor" << (debugLabel.empty() ? "" : " (")
+                         << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
+    spawnDetachedTask(folly::getKeepAliveToken(ex), std::move(task), debugLabel);
+  }
 
   // Teardown helper: wait for all in-flight frame submissions and flush any
   // fence-gated callbacks (notably residency unpins).
@@ -209,25 +328,81 @@ public:
   }
 
   // Stage 4: Async Readback API (offscreen)
-  // Request an end-of-frame copy of a color attachment into a host-visible staging buffer.
-  // The provided onReady callback executes after the frame fence signals (on the
-  // rendering thread) with a pointer to the mapped staging memory and metadata.
-  // The callback must not retain the pointer beyond the callback's lifetime.
-  void requestEndOfFrameColorReadback(
-    class ZVulkanTexture& src,
-    Z3DEye eye,
-    std::function<
-      void(const void* mapped, size_t bytes, vk::Format format, glm::uvec2 size, std::function<void()> releaseSlot)>
-      onReady);
+  // Enqueue end-of-frame GPU->CPU copies into a host-visible staging ring, then
+  // hand out coroutine-friendly tickets for post-fence consumption.
 
-  // Request an end-of-frame copy of a buffer range into a host-visible staging buffer.
-  // Useful for tiny GPU->CPU flags/counters (e.g., DDP early-stop flag on platforms
-  // without VK_KHR_draw_indirect_count).
-  void requestEndOfFrameBufferReadback(
-    class ZVulkanBuffer& src,
-    vk::DeviceSize srcOffset,
-    size_t bytes,
-    std::function<void(const void* mapped, size_t bytes, std::function<void()> releaseSlot)> onReady);
+  struct EndOfFrameColorReadbackTicket
+  {
+    ActiveSubmissionFenceAwaiter fence;
+    const void* mapped = nullptr;
+    size_t bytes = 0;
+    vk::Format format = vk::Format::eUndefined;
+    glm::uvec2 size{0u, 0u};
+    // Metadata describing the captured view.
+    vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor;
+    uint32_t arrayLayer = 0;
+    std::function<void()> releaseSlot;
+
+    // Await the submission fence, copy bytes into an owned vector, and release
+    // the staging slot back to the backend.
+    [[nodiscard]] folly::coro::Task<std::vector<uint8_t>> awaitOwnedBytes();
+  };
+
+  // Coroutine-friendly readback primitive.
+  //
+  // Contract:
+  // - Must be called on the rendering thread with an active frame.
+  // - The returned mapped pointer is valid only after co_await fence.
+  // - The returned mapped pointer remains valid until releaseSlot() is invoked.
+  // - releaseSlot may be invoked from any thread; it routes the actual slot
+  //   release back to the render thread.
+  [[nodiscard]] EndOfFrameColorReadbackTicket
+  requestEndOfFrameColorReadbackTicket(class ZVulkanTexture& src, Z3DEye eye, std::string_view debugLabel = {});
+
+  // Like requestEndOfFrameColorReadbackTicket(), but allows selecting a specific
+  // array layer and aspect (e.g. depth attachment readback).
+  //
+  // Contract:
+  // - Must be called on the rendering thread with an active frame.
+  // - aspectMask must be compatible with src.format() (validated by transitionLayout()).
+  // - The returned mapped pointer is valid only after co_await fence.
+  // - The returned mapped pointer remains valid until releaseSlot() is invoked.
+  [[nodiscard]] EndOfFrameColorReadbackTicket requestEndOfFrameImageReadbackTicket(class ZVulkanTexture& src,
+                                                                                   Z3DEye eye,
+                                                                                   uint32_t arrayLayer,
+                                                                                   vk::ImageAspectFlags aspectMask,
+                                                                                   std::string_view debugLabel = {});
+
+  class EndOfFrameBufferReadbackTicket final
+  {
+  public:
+    EndOfFrameBufferReadbackTicket() = default;
+    EndOfFrameBufferReadbackTicket(const EndOfFrameBufferReadbackTicket&) = delete;
+    EndOfFrameBufferReadbackTicket& operator=(const EndOfFrameBufferReadbackTicket&) = delete;
+    EndOfFrameBufferReadbackTicket(EndOfFrameBufferReadbackTicket&&) noexcept = default;
+    EndOfFrameBufferReadbackTicket& operator=(EndOfFrameBufferReadbackTicket&&) noexcept = default;
+    ~EndOfFrameBufferReadbackTicket() = default;
+
+    // Await the submission fence, copy bytes into an owned vector, and release
+    // the staging slot back to the backend.
+    [[nodiscard]] folly::coro::Task<std::vector<uint8_t>> awaitOwnedBytes();
+
+    // Await the submission fence, copy bytes into caller-provided storage, and
+    // release the staging slot back to the backend.
+    [[nodiscard]] folly::coro::Task<void> awaitCopyTo(void* dst, size_t dstBytes);
+
+  private:
+    ActiveSubmissionFenceAwaiter m_fence;
+    const void* m_mapped = nullptr;
+    size_t m_bytes = 0;
+    std::function<void()> m_releaseSlot;
+    friend class Z3DRendererVulkanBackend;
+  };
+
+  [[nodiscard]] EndOfFrameBufferReadbackTicket requestEndOfFrameBufferReadbackTicket(class ZVulkanBuffer& src,
+                                                                                     vk::DeviceSize srcOffset,
+                                                                                     size_t bytes,
+                                                                                     std::string_view debugLabel = {});
 
   // GPU timestamp scopes (public so pipeline contexts can instrument hot paths)
   std::optional<size_t> beginGpuScope(std::string_view label);
@@ -275,10 +450,13 @@ private:
     uint32_t descriptorSetsAllocated = 0; // VLOG(1) counter per frame
     bool arenaResetScheduled = false; // scheduled at endRender()
     uint32_t arenaResetsPerformed = 0; // count performed resets (debug)
-    // Fence-gated deferred actions (e.g., scratch slot releases)
-    std::vector<std::function<void()>> deferredReleases;
-    uint32_t leaseRecycleQueued = 0;
-    uint32_t leaseRecycleExecuted = 0;
+    // Work to execute at the frame completion safe point. This runs after the
+    // GPU finished executing the submission, after fence completion callbacks
+    // ran, and after per-frame descriptor pool resets have been applied.
+    //
+    // Hooks are executed with a barrier at the safe point. Each hook is bound
+    // to a call-site chosen executor (render thread, CPU pool, etc.).
+    ZCoroSpotHooks<FrameHookSpot, Z3DRendererVulkanBackend> afterFrameCompletionHooks;
 
     // Stage 3: instrumentation (per-frame)
     uint32_t renderingSegmentsBegan = 0; // number of vkCmdBeginRendering calls
@@ -313,13 +491,11 @@ private:
       Z3DEye eye = MonoEye;
       glm::uvec2 size{0u, 0u};
       vk::Format format = vk::Format::eUndefined;
+      vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor;
+      uint32_t arrayLayer = 0;
       // Assigned staging slot index in m_readbackSlots
       int slotIndex = -1;
       size_t bytes = 0;
-      // Consumer callback (runs after fence signal)
-      std::function<
-        void(const void* mapped, size_t bytes, vk::Format fmt, glm::uvec2 size, std::function<void()> releaseSlot)>
-        onReady;
     };
     std::vector<PendingReadback> pendingColorReadbacks;
 
@@ -330,8 +506,6 @@ private:
       // Assigned staging slot index in m_readbackSlots
       int slotIndex = -1;
       size_t bytes = 0;
-      // Consumer callback (runs after fence signal)
-      std::function<void(const void* mapped, size_t bytes, std::function<void()> releaseSlot)> onReady;
     };
     std::vector<PendingBufferReadback> pendingBufferReadbacks;
     size_t readbackBytesCopied = 0; // total bytes copied this frame
@@ -527,7 +701,11 @@ public:
   std::optional<ZVulkanFrameExecutor::ActiveFrame> m_activeFrameHandle;
   FrameResources* m_activeFrame = nullptr;
   Z3DRendererBase* m_activeRenderer = nullptr;
+  std::atomic<FrameResources*> m_frameInCompletionSafePoint{nullptr};
   bool m_frameRecording = false;
+  // Scratch storage for frame-executor polling: keys of frame slots whose
+  // fences completed in the last pollCompletions() call.
+  std::vector<void*> m_completedFrameKeysScratch;
   uint32_t m_maxFramesInFlight = 2;
   float m_timestampPeriod = 1.0f;
   // Deliver first Vulkan frame to UI immediately after backend switch by
@@ -630,6 +808,20 @@ public:
   // Helpers for descriptor arena lifecycle
   void ensureArenaOnFrame(FrameResources& frame);
   void applyPendingArenaReset(FrameResources& frame);
+  // Opportunistically enter the "frame completion safe point" for any frame
+  // slots whose fences have completed and whose completion callbacks have been
+  // executed by the frame executor (pollCompletions / waitForCompletion / etc).
+  //
+  // Historically, applyPendingArenaReset() (and thus safe-point hooks) would
+  // only run when a frame slot was reused (beginFrame) or after an explicit
+  // wait (endFrame). When no explicit wait occurs and frames-in-flight > 1,
+  // this can delay safe-point work by up to roughly "frames in flight".
+  //
+  // Pumping safe points after polling completions preserves the safe-point
+  // ordering guarantees (after fence-gated completion callbacks like residency
+  // unpins) while reducing latency for consumers such as paging compaction
+  // readbacks.
+  void pumpFrameCompletionSafePoints(const std::vector<void*>& completedFrameKeys);
   void scheduleArenaReset(FrameResources& frame);
   void vlogFrameRecyclingStats(const FrameResources& frame) const;
 
@@ -672,6 +864,9 @@ public:
   };
   std::vector<ReadbackSlot> m_readbackSlots; // shared across frames
   uint32_t m_readbackCursor = 0;
+  // Guards detached readback release callbacks that may outlive the backend
+  // instance (backend switches destroy and recreate the Vulkan backend).
+  std::shared_ptr<bool> m_aliveFlag = std::make_shared<bool>(true);
 
   // Ensure at least N slots exist and each has capacity >= minBytes
   void ensureReadbackSlots(size_t minBytes, uint32_t minSlots);

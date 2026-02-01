@@ -6,6 +6,7 @@
 #include "z3dscratchresourcepool.h"
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -19,7 +20,18 @@ namespace nim {
 class Z3DImg;
 class ZColorMap;
 class Z3DTransferFunction;
+class Z3DRendererBase;
 struct RendererParameterState;
+
+inline constexpr size_t kRenderBatchMaxClipPlanes = 6;
+
+struct ClipPlanesState
+{
+  bool captured = false;
+  bool enabled = true;
+  uint32_t planeCount = 0;
+  std::array<glm::vec4, kRenderBatchMaxClipPlanes> planes{};
+};
 
 enum class BackgroundMode
 {
@@ -854,6 +866,11 @@ struct RenderBatch
   std::vector<ResourceBinding> resources;
   DrawCommand draw;
   GeometryPayload geometry;
+  ClipPlanesState clipPlanes;
+  // The renderer that originally authored this batch. This matters on Vulkan
+  // where batches can be collected and executed by an aggregator, but clip
+  // planes for local/global XYZ cuts are owned by the originating renderer.
+  const Z3DRendererBase* originatingRenderer = nullptr;
 };
 
 struct RendererCPUState

@@ -19,6 +19,7 @@ layout(location = 7) out vec3 v_V;
 layout(location = 8) out vec4 v_combo1; // bradius, tradius, height, inv_sqr_height
 
 #include "include/matrices_material.glslinc"
+#include "include/clip_distance.glslinc"
 
 // Cap style specialization to mirror GL #defines
 layout(constant_id = 90) const int CAPS_MODE = 1; // 0=NO_CAPS, 1=FLAT_CAPS, 2=ROUND_CAPS, 3=FLAT_BASE_CAP_ROUND_TOP_CAP, 4=ROUND_BASE_CAP_FLAT_TOP_CAP
@@ -85,5 +86,6 @@ void main()
 
   vec4 eyeSpacePos = xf.view_matrix * vertex;
   v_point = eyeSpacePos.xyz;
+  atlas_write_clip_distances(vertex);
   gl_Position = xf.projection_view_matrix * vertex;
 }

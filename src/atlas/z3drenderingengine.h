@@ -41,6 +41,7 @@ class ZAnimation;
 class Z3DScratchResourcePool;
 class ZVulkanContext;
 class ZVulkanDevice;
+class ZQtExecutor;
 
 // Vulkan compositor forward decl removed (classification phase)
 
@@ -226,6 +227,12 @@ public:
     }
   }
 
+  // Teardown helper: drain Vulkan frame-executor fences and execute any
+  // fence-gated completion callbacks. This is intended to be invoked on the
+  // rendering thread prior to shutting it down (e.g., when closing a 3D window),
+  // so coroutines that await fence completion can finish deterministically.
+  void drainVulkanFrameExecutorForTeardown();
+
   void reportRenderingError(const QString& error) const
   {
     Q_EMIT renderingError(error);
@@ -251,6 +258,12 @@ public:
   {
     Q_EMIT renderingError("cancelled");
   }
+
+  // Render-thread executor: a folly::Executor that schedules work onto the
+  // engine thread via QMetaObject::invokeMethod. Intended for Vulkan/GL
+  // continuations that must run on the rendering thread.
+  [[nodiscard]] ZQtExecutor& renderThreadExecutor();
+  [[nodiscard]] const ZQtExecutor& renderThreadExecutor() const;
 
   // Rebuild the filter pipeline used for rendering based on the current
   // object views and compositor connections.
@@ -388,6 +401,7 @@ private:
   // Vulkan context/device owned at engine level (mirrors GL ownership)
   std::unique_ptr<ZVulkanContext> m_vkContext;
   std::unique_ptr<ZVulkanDevice> m_vkDevice;
+  std::unique_ptr<ZQtExecutor> m_renderThreadExecutor;
 
   ZDoc& m_doc;
 

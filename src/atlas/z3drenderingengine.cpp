@@ -23,6 +23,7 @@
 #include "z3dscratchresourcepool.h"
 #include "zvulkancontext.h"
 #include "zvulkandevice.h"
+#include "zvulkanframeexecutor.h"
 #include "zvulkan.h"
 #include "z3dshadermanager.h"
 #include "z3dgpuinfo.h"
@@ -30,12 +31,15 @@
 #include "z3dfilter.h"
 #include "zcancellation.h"
 #include "z3dperfcollector.h"
+#include "zqtexecutor.h"
+#include "zrenderthreadexecutor_tls.h"
 #include <folly/OperationCancelled.h>
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
 #include <QCoreApplication>
 #include <QMetaObject>
+#include <QThread>
 #include <memory>
 
 DEFINE_bool(atlas_debug_opengl,
@@ -330,6 +334,10 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
                                                          QEvent::UpdateRequest,
                                                          QEvent::LayoutRequest};
 
+  // Render-thread executor: provides a dedicated folly executor bound to this
+  // engine's thread for linear async flows (instead of ad-hoc callback chains).
+  m_renderThreadExecutor = std::make_unique<ZQtExecutor>(this, "Z3DRenderingEngine");
+
 #if defined(__linux__)
   if (FLAGS___use_EGL) {
     return;
@@ -348,6 +356,7 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
 Z3DRenderingEngine::~Z3DRenderingEngine()
 {
   VLOG(1) << "in engine destructor";
+  setCurrentRenderThreadExecutor(nullptr);
   m_shuttingDown = true;
   detachCanvas();
   VLOG(1) << "canvas detached";
@@ -371,6 +380,18 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
 const ZDoc& Z3DRenderingEngine::doc() const
 {
   return m_doc;
+}
+
+ZQtExecutor& Z3DRenderingEngine::renderThreadExecutor()
+{
+  CHECK(m_renderThreadExecutor != nullptr);
+  return *m_renderThreadExecutor;
+}
+
+const ZQtExecutor& Z3DRenderingEngine::renderThreadExecutor() const
+{
+  CHECK(m_renderThreadExecutor != nullptr);
+  return *m_renderThreadExecutor;
 }
 
 std::shared_ptr<ZWidgetsGroup> Z3DRenderingEngine::viewSettingWidgetsGroupOf(size_t id)
@@ -997,6 +1018,7 @@ void Z3DRenderingEngine::init()
 void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
 {
   CHECK(canvas);
+  setCurrentRenderThreadExecutor(m_renderThreadExecutor.get());
   m_canvas = canvas;
   init();
 
@@ -1013,6 +1035,22 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
   connect(this, &Z3DRenderingEngine::sceneParaUpdated, m_canvas, &Z3DCanvas::sceneParaUpdated);
   connect(this, &Z3DRenderingEngine::renderingFinished, m_canvas, &Z3DCanvas::renderingFinished);
   m_canvas->setRenderingEngine(this);
+}
+
+void Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()
+{
+  // Must run on the rendering thread (engine thread affinity).
+  CHECK(QThread::currentThread() == this->thread()) << "drainVulkanFrameExecutorForTeardown must run on engine thread";
+
+  if (!m_vkDevice) {
+    return;
+  }
+  try {
+    m_vkDevice->frameExecutor().waitForAllInFlight();
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "Vulkan frame-executor drain failed during teardown: " << e.what();
+  }
 }
 
 void Z3DRenderingEngine::detachCanvas()

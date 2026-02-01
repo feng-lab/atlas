@@ -1,4 +1,13 @@
-// Shared transform and material UBOs for mesh-like pipelines
+// Shared transform and material UBOs for mesh-like pipelines.
+//
+// Keep this file in lock-step with:
+//   - src/atlas/zvulkanuniforms.h (TransformsUBOStd140, MaterialUBOStd140)
+//
+// Clip planes:
+// - Used for GL parity of local/global XYZ cuts on Vulkan.
+// - Planes are in world space (mirrors Z3DRendererBase::clipPlanes()).
+const int ATLAS_MAX_CLIP_PLANES = 6;
+
 layout(set = 2, binding = 0) uniform Transforms {
   mat4 projection_view_matrix;
   mat4 view_matrix;
@@ -7,6 +16,8 @@ layout(set = 2, binding = 0) uniform Transforms {
   mat4 projection_matrix;
   mat4 inverse_projection_matrix;
   vec4 parameters; // x=sizeScale, y=ortho flag
+  ivec4 clip_params; // x=enabled, y=planeCount
+  vec4 clip_planes[ATLAS_MAX_CLIP_PLANES];
 } xf;
 
 mat3 compute_view_normal_matrix()

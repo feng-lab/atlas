@@ -10,6 +10,4 @@ void main()
   vec4 c; float d;
   fragment_func(c, d);
   FragData0 = c;
-  gl_FragDepth = d;
 }
-

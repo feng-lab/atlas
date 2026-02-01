@@ -12,6 +12,7 @@
 #include "zexception.h"
 #include "zlog.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace nim {
@@ -21,6 +22,10 @@ DEFINE_int32(atlas_vk_frames_in_flight, 2, "Max Vulkan frames in flight (debug: 
 ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   : m_context(context)
 {
+  // Capture once at startup. Atlas assumes this remains stable for the lifetime
+  // of the Vulkan device.
+  m_framesInFlight = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_frames_in_flight));
+
   LOG(INFO) << "Vulkan device created";
   // Do not require VK_EXT_vertex_input_dynamic_state (MoltenVK lacks it).
   // Keep the flag false by default; contexts will fall back to fixed VI.
@@ -100,12 +105,11 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
     (sampledLinear ? 1 : 0));
   const size_t minAlign = static_cast<size_t>(limits.minUniformBufferOffsetAlignment);
   const size_t maxRange = static_cast<size_t>(limits.maxUniformBufferRange);
-  const uint32_t fif = std::max<int32_t>(1, FLAGS_atlas_vk_frames_in_flight);
   LOG(INFO) << fmt::format(
     "VK device uniform limits: minUniformBufferOffsetAlignment={}B maxUniformBufferRange={}B framesInFlight={}",
     (minAlign ? minAlign : static_cast<size_t>(256)),
     maxRange,
-    fif);
+    m_framesInFlight);
   try {
     auto domains = phys.getCalibrateableTimeDomainsEXT();
     bool supported = !domains.empty();
@@ -189,11 +193,16 @@ ZVulkanDevice::createPipeline(ZVulkanShader& shader,
 ZVulkanFrameExecutor& ZVulkanDevice::frameExecutor()
 {
   if (!m_frameExecutor) {
-    m_frameExecutor = std::make_unique<ZVulkanFrameExecutor>(*this);
+    m_frameExecutor = std::make_unique<ZVulkanFrameExecutor>(*this, m_framesInFlight);
+  } else {
+    // Ensure nobody mutates the debug gflag at runtime; changing frames-in-flight
+    // mid-run invalidates executor slot identities and can strand fence-gated
+    // callbacks (residency unpins, retained UBO lifetimes, etc.).
+    const uint32_t fif = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_frames_in_flight));
+    CHECK(fif == m_framesInFlight) << "FLAGS_atlas_vk_frames_in_flight changed at runtime; this is unsupported";
+    CHECK(m_frameExecutor->maxFramesInFlight() == m_framesInFlight)
+      << "Vulkan frame executor frames-in-flight changed unexpectedly";
   }
-  // Apply debug gflag on each access to allow runtime tweaks.
-  const uint32_t fif = std::max<int32_t>(1, FLAGS_atlas_vk_frames_in_flight);
-  m_frameExecutor->setMaxFramesInFlight(fif);
   return *m_frameExecutor;
 }
 

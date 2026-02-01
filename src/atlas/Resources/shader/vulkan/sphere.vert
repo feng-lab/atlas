@@ -14,6 +14,7 @@ layout(location = 3) out vec3 v_point;
 layout(location = 4) out vec4 v_material_specular; // .w packs shininess when dynamic
 
 #include "include/matrices_material.glslinc"
+#include "include/clip_distance.glslinc"
 
 layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
@@ -34,6 +35,7 @@ void main()
   float upFlag    = flags.y - 1.0; // -1 or 1
 
   vec4 centerVertex = xf.pos_transform * vec4(attr_vertex.xyz, 1.0);
+  atlas_write_clip_distances(centerVertex);
   v_color = attr_color;
   v_radius2 = radius * radius;
   if (USE_DYNAMIC_MATERIAL) {

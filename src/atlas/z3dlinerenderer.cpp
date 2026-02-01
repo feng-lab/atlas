@@ -236,6 +236,10 @@ std::string Z3DLineRenderer::generateHeader()
   if (m_roundCap) {
     header += "#define ROUND_CAP\n";
   }
+
+  // line_func.frag / wideline_func*.frag always output fragDepth = gl_FragCoord.z.
+  // Avoid redundant gl_FragDepth writes so the driver can keep early depth/stencil optimizations.
+  header += "#define ATLAS_DISABLE_FRAG_DEPTH_WRITE\n";
   return header;
 }
 

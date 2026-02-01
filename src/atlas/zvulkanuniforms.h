@@ -6,6 +6,12 @@
 
 namespace nim {
 
+// Vulkan clip planes are currently used to implement the same local/global XYZ
+// cut features as the OpenGL backend. Each axis contributes at most one lower
+// and one upper plane after combining local+global constraints, so the maximum
+// plane count is 6.
+inline constexpr size_t kVulkanMaxClipPlanes = 6;
+
 // Shared std140 UBO layouts mirrored by Vulkan mesh/line pipelines. Keep the
 // packing rules identical to the GLSL includes under Resources/shader/vulkan.
 struct alignas(16) LightingUBOStd140
@@ -60,6 +66,9 @@ struct TransformsUBOStd140
   glm::mat4 projection_matrix{1.0f};
   glm::mat4 inverse_projection_matrix{1.0f};
   glm::vec4 parameters{1.0f, 0.0f, 0.0f, 0.0f};
+  // x = enabled (0/1), y = planeCount, z/w reserved
+  glm::ivec4 clip_params{0, 0, 0, 0};
+  std::array<glm::vec4, kVulkanMaxClipPlanes> clip_planes{};
 };
 
 struct MaterialUBOStd140

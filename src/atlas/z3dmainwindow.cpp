@@ -29,6 +29,7 @@
 #include <QApplication>
 #include <QDesktopServices>
 #include <QFile>
+#include <QMetaObject>
 #include "zservicemanager.h"
 
 namespace nim {
@@ -72,6 +73,9 @@ Z3DMainWindow::~Z3DMainWindow()
 {
   if (!m_renderingThread.isFinished()) {
     m_engine->cancelLongRendering();
+    QMetaObject::invokeMethod(m_engine,
+                              &Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown,
+                              Qt::BlockingQueuedConnection);
     m_renderingThread.quit();
     m_renderingThread.wait();
   }
@@ -100,6 +104,9 @@ void Z3DMainWindow::closeEvent(QCloseEvent* event)
   if (maybeSave()) {
     writeSettings();
     m_engine->cancelLongRendering();
+    QMetaObject::invokeMethod(m_engine,
+                              &Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown,
+                              Qt::BlockingQueuedConnection);
     m_renderingThread.quit();
     m_renderingThread.wait();
     event->accept();

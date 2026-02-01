@@ -13,7 +13,6 @@ void main()
 {
   vec4 color; float fragDepth;
   fragment_func(color, fragDepth);
-  gl_FragDepth = fragDepth;
 
   float viewDepth = uLighting.ze_to_zw_a / (fragDepth - uLighting.ze_to_zw_b);
   float weight = clamp(0.03 / (1e-5 + pow(viewDepth * 0.005 * uLighting.weighted_blended_depth_scale, 4.0)), 1e-2, 3e3);

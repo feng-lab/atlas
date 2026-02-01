@@ -23,6 +23,7 @@
 #include <QEventLoop>
 #include <QProgressDialog>
 #include <QMenu>
+#include <QSignalBlocker>
 
 namespace nim {
 
@@ -426,6 +427,11 @@ bool ZView::isROIMode() const
 
 void ZView::estimateMontageColumns() const
 {
+  if (m_boundBox.empty()) {
+    VLOG(1) << "estimateMontageColumns(): skipped for empty bound box";
+    return;
+  }
+
   auto currentNCols = m_montageColumns->get();
   if (currentNCols == 0) {
     m_montageColumns->blockSignals(true);
@@ -434,7 +440,7 @@ void ZView::estimateMontageColumns() const
   auto height = m_boundBox.maxCorner.y - m_boundBox.minCorner.y + 1;
   auto depth = m_boundBox.maxCorner.z - m_boundBox.minCorner.z + 1;
   if (depth >= 1) {
-    int bestNCols = 0;
+    int bestNCols = 1;
     double bestDist = std::numeric_limits<double>::max();
     for (int nCols = 1; nCols <= depth; ++nCols) {
       int nRows = (depth + nCols - 1) / nCols;
@@ -907,6 +913,11 @@ void ZView::updateViewportPara() const
 
 void ZView::updateSceneRectFromBoundBox()
 {
+  if (m_boundBox.empty()) {
+    VLOG(1) << "updateSceneRectFromBoundBox(): skipped for empty bound box";
+    return;
+  }
+
   QRectF sceneRect(m_boundBox.minCorner.x,
                    m_boundBox.minCorner.y,
                    m_boundBox.maxCorner.x - m_boundBox.minCorner.x + 1,
@@ -915,10 +926,16 @@ void ZView::updateSceneRectFromBoundBox()
     m_scene->setSceneRect(sceneRect);
   }
 
-  if (m_montageColumns->get() == 0) {
+  int nCols = m_montageColumns->get();
+  if (nCols == 0) {
     estimateMontageColumns();
+    nCols = m_montageColumns->get();
   }
-  auto nCols = m_montageColumns->get();
+  if (nCols <= 0) {
+    // 0 means "auto". During load/unload, auto-estimation can be temporarily
+    // unavailable; fall back to a safe value to avoid division by zero.
+    nCols = 1;
+  }
   auto nRows = (m_boundBox.maxCorner.z - m_boundBox.minCorner.z + nCols) / nCols;
   sceneRect = QRectF(sceneRect.x(), sceneRect.y(), sceneRect.width() * nCols, sceneRect.height() * nRows);
   if (sceneRect != m_montageScene->sceneRect()) {
@@ -932,15 +949,29 @@ void ZView::updateMontageScene()
     return;
   }
 
-  m_scene->blockSignals(true);
-
+  const QSignalBlocker sceneSignalBlocker(m_scene);
   m_montageScene->clear();
+
+  if (m_boundBox.empty()) {
+    VLOG(1) << "updateMontageScene(): skipped for empty bound box";
+    return;
+  }
+
+  int nCols = m_montageColumns->get();
+  if (nCols == 0) {
+    estimateMontageColumns();
+    nCols = m_montageColumns->get();
+  }
+  if (nCols <= 0) {
+    VLOG(1) << "updateMontageScene(): skipped for invalid montage columns: " << nCols;
+    return;
+  }
 
   auto rgn = m_view->getCurrrentlyVisibleRegion();
 
   for (auto z = 0; z <= m_boundBox.maxCorner.z - m_boundBox.minCorner.z; ++z) {
-    auto r = z / m_montageColumns->get();
-    auto c = z % m_montageColumns->get();
+    auto r = z / nCols;
+    auto c = z % nCols;
     QRectF sceneRgn(c * m_scene->sceneRect().width(),
                     r * m_scene->sceneRect().height(),
                     m_scene->sceneRect().width(),
@@ -966,7 +997,6 @@ void ZView::updateMontageScene()
   }
 
   QApplication::processEvents();
-  m_scene->blockSignals(false);
 }
 
 void ZView::emptyFun()

@@ -17,6 +17,7 @@ layout(location = 4) flat out vec3 plane4;
 layout(location = 5) flat out vec4 p0p1;
 
 #include "include/matrices_material.glslinc"
+#include "include/clip_distance.glslinc"
 #include "include/wideline_common.glslinc"
 
 // Specialization constant for screen-aligned mode (parity with GL macro)
@@ -45,8 +46,11 @@ void main()
   float upFlag    = flags.y - 1.0;
 
   // Compute clip-space endpoints first
-  vec4 p0clip = xf.projection_view_matrix * (xf.pos_transform * vec4(attr_p0, 1.0));
-  vec4 p1clip = xf.projection_view_matrix * (xf.pos_transform * vec4(attr_p1, 1.0));
+  vec4 p0vertex = xf.pos_transform * vec4(attr_p0, 1.0);
+  vec4 p1vertex = xf.pos_transform * vec4(attr_p1, 1.0);
+  vec4 p0clip = xf.projection_view_matrix * p0vertex;
+  vec4 p1clip = xf.projection_view_matrix * p1vertex;
+  atlas_write_clip_distances(rightFlag > 0.0 ? p1vertex : p0vertex);
   // Clip against the near plane in clip coordinates. Vulkan uses depth in [0,1]
   // so the clip half-space is z >= 0 (i.e., plane (0,0,1,0)).
   ClipSegmentToPlane(p0clip, p1clip, vec4(0,0,1,0));

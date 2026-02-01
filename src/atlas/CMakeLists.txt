@@ -210,6 +210,7 @@ set(ATLAS_VK_SHADER_SOURCES
     sphere.frag
     mesh.vert
     mesh.frag
+    mesh_depth.vert
     pass.vert
     transform_with_2dtexture.vert
     pass_with_2dtexture.vert
@@ -494,6 +495,8 @@ set(SOURCES
     zviewsettingwidget.h zviewsettingwidget.cpp
     z3dmainwindow.h z3dmainwindow.cpp
     z3drenderingengine.h z3drenderingengine.cpp
+    zqtexecutor.h zqtexecutor.cpp
+    zrenderthreadexecutor_tls.h zrenderthreadexecutor_tls.cpp
     z3dobjview.h z3dobjview.cpp
     z3dimgview.h z3dimgview.cpp
     zviewsettinginterface.h

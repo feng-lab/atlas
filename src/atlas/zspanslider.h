@@ -38,6 +38,19 @@ public:
 
   void setDataRangeBlockSignals(int min, int max);
 
+  [[nodiscard]] ZSpanSlider* slider() const
+  {
+    return m_slider;
+  }
+  [[nodiscard]] ZSpinBox* lowerSpinBox() const
+  {
+    return m_lowerSpinBox;
+  }
+  [[nodiscard]] ZSpinBox* upperSpinBox() const
+  {
+    return m_upperSpinBox;
+  }
+
 Q_SIGNALS:
   void lowerValueChanged(int lower);
 
@@ -79,6 +92,19 @@ public:
   void setUpperValueBlockSignals(double upper);
 
   void setDataRangeBlockSignals(double min, double max);
+
+  [[nodiscard]] ZSpanSlider* slider() const
+  {
+    return m_slider;
+  }
+  [[nodiscard]] ZDoubleSpinBox* lowerSpinBox() const
+  {
+    return m_lowerSpinBox;
+  }
+  [[nodiscard]] ZDoubleSpinBox* upperSpinBox() const
+  {
+    return m_upperSpinBox;
+  }
 
 Q_SIGNALS:
   void lowerValueChanged(double lower);

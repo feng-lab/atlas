@@ -12,6 +12,7 @@
 #include "zimgformat.h"
 #include "zvulkantexture.h"
 #include "z3drenderervulkanbackend.h"
+#include "zrenderthreadexecutor_tls.h"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -2707,14 +2708,17 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                      rgba8Tex ? rgba8Tex->width() : 0,
                                      rgba8Tex ? rgba8Tex->height() : 0,
                                      static_cast<int>(eyeCopy));
-              backend->requestEndOfFrameColorReadback(
-                *rgba8Tex,
-                eyeCopy,
-                [this, localPtr, eyeCopy, &pool](const void* mapped,
-                                                 size_t /*bytes*/,
-                                                 vk::Format /*fmt*/,
-                                                 glm::uvec2 size,
-                                                 std::function<void()> releaseSlot) {
+              auto ticket =
+                backend->requestEndOfFrameColorReadbackTicket(*rgba8Tex, eyeCopy, "vk_final_rgba8_readback");
+              backend->registerAfterCurrentFrameCompletionHook(
+                currentRenderThreadExecutorKeepAlive("vk_final_rgba8_readback_consume"),
+                [this, localPtr, eyeCopy, &pool, ticket = std::move(ticket)](
+                  Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+                  co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
+                  const void* mapped = ticket.mapped;
+                  const glm::uvec2 size = ticket.size;
+                  std::function<void()> releaseSlot = std::move(ticket.releaseSlot);
+
                   if (localPtr->externalRelease) {
                     localPtr->externalRelease();
                     localPtr->externalRelease = {};
@@ -2760,7 +2764,9 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                     VLOG(1) << "VK renderingFinished (right)";
                     Q_EMIT renderingFinished();
                   }
-                });
+                  co_return;
+                },
+                "vk_final_rgba8_readback_consume");
             }
           },
           "final_rgba8_copy_and_readback");
@@ -2781,14 +2787,17 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                    finalColor ? finalColor->width() : 0,
                                    finalColor ? finalColor->height() : 0,
                                    static_cast<int>(eyeCopy));
-            backend->requestEndOfFrameColorReadback(
-              *finalColor,
-              eyeCopy,
-              [this, localPtr, eyeCopy, &pool](const void* mapped,
-                                               size_t /*bytes*/,
-                                               vk::Format /*fmt*/,
-                                               glm::uvec2 size,
-                                               std::function<void()> releaseSlot) {
+            auto ticket =
+              backend->requestEndOfFrameColorReadbackTicket(*finalColor, eyeCopy, "vk_final_color_readback");
+            backend->registerAfterCurrentFrameCompletionHook(
+              currentRenderThreadExecutorKeepAlive("vk_final_color_readback_consume"),
+              [this, localPtr, eyeCopy, &pool, ticket = std::move(ticket)](
+                Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+                co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
+                const void* mapped = ticket.mapped;
+                const glm::uvec2 size = ticket.size;
+                std::function<void()> releaseSlot = std::move(ticket.releaseSlot);
+
                 if (localPtr->externalRelease) {
                   localPtr->externalRelease();
                   localPtr->externalRelease = {};
@@ -2835,7 +2844,9 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                   VLOG(1) << "VK renderingFinished (right, no copy)";
                   Q_EMIT renderingFinished();
                 }
-              });
+                co_return;
+              },
+              "vk_final_color_readback_consume");
           }
         },
         "readback_enqueue");
@@ -4376,17 +4387,17 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
             }
             ZVulkanBuffer* flag = vkBackend->ddpChangedFlagBufferObj();
             CHECK(flag != nullptr) << "DDP Vulkan: missing ddpChangedFlag buffer for CPU early-stop";
-            vkBackend->requestEndOfFrameBufferReadback(
-              *flag,
-              0,
-              sizeof(uint32_t),
-              [&](const void* mapped, size_t bytes, std::function<void()> releaseSlot) {
-                CHECK_EQ(bytes, sizeof(uint32_t));
-                std::memcpy(&changedFlag, mapped, sizeof(uint32_t));
-                if (releaseSlot) {
-                  releaseSlot();
-                }
-              });
+            auto ticket = vkBackend->requestEndOfFrameBufferReadbackTicket(*flag,
+                                                                           0,
+                                                                           sizeof(uint32_t),
+                                                                           "vk_ddp_changedflag_readback");
+            vkBackend->registerAfterCurrentFrameCompletionHook(
+              currentRenderThreadExecutorKeepAlive("vk_ddp_changedflag_readback_consume"),
+              [&changedFlag, ticket = std::move(ticket)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+                co_await ticket.awaitCopyTo(&changedFlag, sizeof(uint32_t));
+                co_return;
+              },
+              "vk_ddp_changedflag_readback_consume");
           },
           "transparency_ddp_orchestrate");
 
@@ -4612,17 +4623,15 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
       blockSums.resize(blockCount, 0u);
       ZVulkanBuffer* sumsBuf = vkBackend->ppllBlockSumsBufferObj();
       CHECK(sumsBuf != nullptr) << "PPLL: missing blockSums buffer";
-      vkBackend->requestEndOfFrameBufferReadback(
-        *sumsBuf,
-        0,
-        static_cast<size_t>(blockCount) * sizeof(uint32_t),
-        [&](const void* mapped, size_t bytes, std::function<void()> releaseSlot) {
-          CHECK_EQ(bytes, static_cast<size_t>(blockCount) * sizeof(uint32_t));
-          std::memcpy(blockSums.data(), mapped, bytes);
-          if (releaseSlot) {
-            releaseSlot();
-          }
-        });
+      const size_t bytes = static_cast<size_t>(blockCount) * sizeof(uint32_t);
+      auto ticket = vkBackend->requestEndOfFrameBufferReadbackTicket(*sumsBuf, 0, bytes, "vk_ppll_blocksums_readback");
+      vkBackend->registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive("vk_ppll_blocksums_readback_consume"),
+        [&blockSums, ticket = std::move(ticket)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+          co_await ticket.awaitCopyTo(blockSums.data(), blockSums.size() * sizeof(uint32_t));
+          co_return;
+        },
+        "vk_ppll_blocksums_readback_consume");
     }
   }
 

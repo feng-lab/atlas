@@ -17,7 +17,6 @@ void main()
 {
   vec4 color; float fragDepth;
   fragment_func(color, fragDepth);
-  gl_FragDepth = fragDepth;
 
   ivec2 p = ivec2(gl_FragCoord.xy);
   vec2 depthBlender = texelFetch(DepthBlenderTex, p, 0).xy;

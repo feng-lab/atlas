@@ -49,25 +49,30 @@ void Z3DBackgroundRenderer::compile()
 
 std::string Z3DBackgroundRenderer::generateHeader()
 {
+  std::string header;
+
   if (m_modeValue == BackgroundMode::Uniform) {
-    return "#define UNIFORM\n";
+    header = "#define UNIFORM\n";
+  } else {
+    switch (m_orientationValue) {
+      case BackgroundGradientOrientation::LeftToRight:
+        header = "#define GRADIENT_LEFT_TO_RIGHT\n";
+        break;
+      case BackgroundGradientOrientation::RightToLeft:
+        header = "#define GRADIENT_RIGHT_TO_LEFT\n";
+        break;
+      case BackgroundGradientOrientation::TopToBottom:
+        header = "#define GRADIENT_TOP_TO_BOTTOM\n";
+        break;
+      case BackgroundGradientOrientation::BottomToTop:
+        header = "#define GRADIENT_BOTTOM_TO_TOP\n";
+        break;
+    }
   }
 
-  std::string header;
-  switch (m_orientationValue) {
-    case BackgroundGradientOrientation::LeftToRight:
-      header = "#define GRADIENT_LEFT_TO_RIGHT\n";
-      break;
-    case BackgroundGradientOrientation::RightToLeft:
-      header = "#define GRADIENT_RIGHT_TO_LEFT\n";
-      break;
-    case BackgroundGradientOrientation::TopToBottom:
-      header = "#define GRADIENT_TOP_TO_BOTTOM\n";
-      break;
-    case BackgroundGradientOrientation::BottomToTop:
-      header = "#define GRADIENT_BOTTOM_TO_TOP\n";
-      break;
-  }
+  // background_func.frag always outputs fragDepth = gl_FragCoord.z; avoid redundant
+  // gl_FragDepth writes so the driver can keep early depth/stencil optimizations.
+  header += "#define ATLAS_DISABLE_FRAG_DEPTH_WRITE\n";
   return header;
 }
 

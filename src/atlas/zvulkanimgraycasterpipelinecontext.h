@@ -99,9 +99,9 @@ private:
     // Page/params UBOs
     ZVulkanDescriptorSet* pageDescriptor = nullptr; // per-draw override (backend-owned)
     std::unique_ptr<ZVulkanDescriptorSet> persistentPageDescriptor; // cached across frames
-    std::unique_ptr<ZVulkanBuffer> pageDataBuffer;
+    std::shared_ptr<ZVulkanBuffer> pageDataBuffer;
     size_t pageDataCapacity = 0;
-    ZVulkanBuffer* boundPageDataBuffer = nullptr; // last buffer bound in persistentPageDescriptor
+    std::shared_ptr<ZVulkanBuffer> boundPageDataBuffer; // last buffer bound in persistentPageDescriptor
     // Tracking for persistent static set
     class ZVulkanTexture* boundPageDirectoryTex = nullptr;
     class ZVulkanTexture* boundPageTableTex = nullptr;

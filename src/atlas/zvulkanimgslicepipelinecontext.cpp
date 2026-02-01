@@ -23,8 +23,10 @@
 #include "zcancellation.h"
 #include "zbenchtimer.h"
 #include "zmesh.h"
+#include "zrenderthreadexecutor_tls.h"
 
-#include <folly/OperationCancelled.h>
+#include <folly/coro/Task.h>
+#include <folly/executors/GlobalExecutor.h>
 #include <gflags/gflags.h>
 #include <QString>
 
@@ -698,16 +700,12 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       const bool storageRead = (compSource == BlockIdCompactionSource::Storage);
       const bool bufferRead = (compSource == BlockIdCompactionSource::Buffer);
 
-      std::vector<ZVulkanBuffer*> sliceOutputs;
-      sliceOutputs.reserve(m_sliceDrawRanges.size());
-
       for (size_t sliceIndex = 0; sliceIndex < m_sliceDrawRanges.size(); ++sliceIndex) {
         processEventsAndMaybeCancel(cancellationToken);
 
         const auto& range = m_sliceDrawRanges[sliceIndex];
         ZVulkanBuffer* outBuffer = frameOutputs.sliceOutputs[sliceIndex].get();
         CHECK(outBuffer != nullptr);
-        sliceOutputs.push_back(outBuffer);
 
         // Zero the output header before dispatch (count + counts[]).
         if (void* mapped = outBuffer->map(0, headerBytes)) {
@@ -863,68 +861,85 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
         recorder.recordComputePass(compSpec);
       }
 
-      // After the frame fence signals: union the compacted IDs and upload missing blocks for this channel.
-      m_backend.scheduleAfterCurrentFrameCompletion([this,
-                                                    sliceOutputs = std::move(sliceOutputs),
-                                                    mapBytes,
-                                                    capacityIDs,
-                                                    streamKey = payload.streamKey,
-                                                    eye = batch.eye,
-                                                    channelCount = static_cast<uint32_t>(channelCount),
-                                                    channelIndex = static_cast<size_t>(channelIndex),
-                                                    roundIndex,
-                                                    imagePtr = payload.image]() {
-        if (!imagePtr) {
-          return;
-        }
-
-        std::unordered_set<uint32_t> unique;
-        unique.reserve(1024);
-
-        for (ZVulkanBuffer* buf : sliceOutputs) {
-          if (!buf) {
-            continue;
+      // After the frame completion safe point: union the compacted IDs and
+      // upload missing blocks for this channel.
+      const std::string_view debugLabel = "VK slice blockid compaction parse";
+      m_backend.registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive(debugLabel),
+        [this,
+         frameKey,
+         bytesPerSlice,
+         mapBytes,
+         capacityIDs,
+         streamKey = payload.streamKey,
+         eye = batch.eye,
+         channelCountU32 = static_cast<uint32_t>(channelCount),
+         channelIndexSize = static_cast<size_t>(channelIndex),
+         roundIndex,
+         imagePtr = payload.image](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+          if (!imagePtr) {
+            co_return;
           }
-          const void* mapped = buf->map(0, mapBytes);
-          CHECK(mapped);
-          const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
-          const uint32_t count = u32[0];
-          const uint32_t clamped = std::min<uint32_t>(count, capacityIDs);
-          for (uint32_t i = 0; i < clamped; ++i) {
-            const uint32_t v = u32[headerWords + i];
-            if (v != kInvalidBlockID && v != kUnmappedBlockID) {
-              unique.insert(v);
+
+          auto it = m_blockIdOutputsByFrame.find(frameKey);
+          if (it == m_blockIdOutputsByFrame.end()) {
+            co_return;
+          }
+          auto& frameOutputs = it->second;
+          if (frameOutputs.bytesPerSlice != bytesPerSlice) {
+            co_return;
+          }
+
+          std::unordered_set<uint32_t> unique;
+          unique.reserve(1024);
+
+          for (const auto& bufOwner : frameOutputs.sliceOutputs) {
+            ZVulkanBuffer* buf = bufOwner.get();
+            if (!buf) {
+              continue;
             }
+            const void* mapped = buf->map(0, mapBytes);
+            CHECK(mapped);
+            const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
+            const uint32_t count = u32[0];
+            const uint32_t clamped = std::min<uint32_t>(count, capacityIDs);
+            for (uint32_t i = 0; i < clamped; ++i) {
+              const uint32_t v = u32[headerWords + i];
+              if (v != kInvalidBlockID && v != kUnmappedBlockID) {
+                unique.insert(v);
+              }
+            }
+            buf->unmap();
           }
-          buf->unmap();
-        }
 
-        std::vector<uint32_t> missingBlocks;
-        missingBlocks.reserve(unique.size());
-        missingBlocks.insert(missingBlocks.end(), unique.begin(), unique.end());
+          std::vector<uint32_t> missingBlocks;
+          missingBlocks.reserve(unique.size());
+          missingBlocks.insert(missingBlocks.end(), unique.begin(), unique.end());
 
-        if (!missingBlocks.empty()) {
-          auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-          ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", channelIndex));
-          imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks,
-                                                       channelIndex,
-                                                       cancellationToken,
-                                                       timer,
-                                                       static_cast<uint32_t>(roundIndex));
-        }
+          if (!missingBlocks.empty()) {
+            auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+            ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", channelIndexSize));
+            imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks,
+                                                         channelIndexSize,
+                                                         cancellationToken,
+                                                         timer,
+                                                         static_cast<uint32_t>(roundIndex));
+          }
 
-        if (m_deferredProgressive && m_deferredProgressive->streamKey == streamKey &&
-            m_deferredProgressive->eye == eye) {
-          m_deferredProgressive.reset();
-        }
+          if (m_deferredProgressive && m_deferredProgressive->streamKey == streamKey &&
+              m_deferredProgressive->eye == eye) {
+            m_deferredProgressive.reset();
+          }
 
-        // Advance to the next progressive stage (round++). The backend will consume this
-        // on the next record() for the stream/eye.
-        if (streamKey != 0) {
-          m_pendingFinalization =
-            Finalization{.streamKey = streamKey, .eye = eye, .lastRound = false, .channelCount = channelCount};
-        }
-      });
+          // Advance to the next progressive stage (round++). The backend will consume this
+          // on the next record() for the stream/eye.
+          if (streamKey != 0) {
+            m_pendingFinalization =
+              Finalization{.streamKey = streamKey, .eye = eye, .lastRound = false, .channelCount = channelCountU32};
+          }
+          co_return;
+        },
+        debugLabel);
     };
 
   if (channelCount == 1) {
@@ -1345,44 +1360,73 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
     if (backend && leaseRef && leaseRef->hasVulkanImage()) {
       const uint32_t saveLayerCount = static_cast<uint32_t>(channelCount);
-      backend->scheduleAfterCurrentFrameCompletion([leaseRef, saveLayerCount]() {
-        ZVulkanTexture* tex = leaseRef->colorAttachment(0);
-        if (tex) {
-          QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
-          if (!dir.isEmpty() && !dir.endsWith('/')) {
-            dir += '/';
-          }
-          const uint32_t layers = std::min<uint32_t>(saveLayerCount, tex->arrayLayers());
-          for (uint32_t layer = 0; layer < layers; ++layer) {
-            const QString filename =
-              dir + QString("slice_layer_%1_%2x%3.tif").arg(layer).arg(tex->width()).arg(tex->height());
-            ZVulkanTexture::ImageSaveOptions opts;
-            opts.arrayLayer = layer;
-            if (!tex->saveToImage(filename, opts)) {
-              LOG(ERROR) << "Slice layer debug save failed for color layer " << layer;
-            }
-          }
-        }
+      ZVulkanTexture* tex = leaseRef->colorAttachment(0);
+      ZVulkanTexture* dtex = leaseRef->depthAttachmentTexture();
 
-        ZVulkanTexture* dtex = leaseRef->depthAttachmentTexture();
-        if (dtex) {
-          QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
-          if (!dir.isEmpty() && !dir.endsWith('/')) {
-            dir += '/';
-          }
-          const uint32_t layers = std::min<uint32_t>(saveLayerCount, dtex->arrayLayers());
-          for (uint32_t layer = 0; layer < layers; ++layer) {
-            const QString filename =
-              dir + QString("slice_layer_depth_%1_%2x%3.tif").arg(layer).arg(dtex->width()).arg(dtex->height());
-            ZVulkanTexture::ImageSaveOptions opts;
-            opts.arrayLayer = layer;
-            opts.aspectMask = vk::ImageAspectFlagBits::eDepth;
-            if (!dtex->saveToImage(filename, opts)) {
-              LOG(ERROR) << "Slice layer debug save failed for depth layer " << layer;
-            }
-          }
+      QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+      if (!dir.isEmpty() && !dir.endsWith('/')) {
+        dir += '/';
+      }
+
+      struct SaveJob
+      {
+        QString filename;
+        Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket ticket;
+      };
+      std::vector<SaveJob> jobs;
+
+      if (tex) {
+        const uint32_t layers = std::min<uint32_t>(saveLayerCount, tex->arrayLayers());
+        jobs.reserve(layers + (dtex ? layers : 0u));
+        for (uint32_t layer = 0; layer < layers; ++layer) {
+          const QString filename =
+            dir + QString("slice_layer_%1_%2x%3.tif").arg(layer).arg(tex->width()).arg(tex->height());
+          jobs.push_back(SaveJob{filename,
+                                 backend->requestEndOfFrameImageReadbackTicket(*tex,
+                                                                               batch.eye,
+                                                                               layer,
+                                                                               vk::ImageAspectFlagBits::eColor,
+                                                                               "VK debug save slice layers")});
         }
-      });
+      }
+
+      if (dtex) {
+        const uint32_t layers = std::min<uint32_t>(saveLayerCount, dtex->arrayLayers());
+        jobs.reserve(jobs.size() + layers);
+        for (uint32_t layer = 0; layer < layers; ++layer) {
+          const QString filename =
+            dir + QString("slice_layer_depth_%1_%2x%3.tif").arg(layer).arg(dtex->width()).arg(dtex->height());
+          jobs.push_back(SaveJob{filename,
+                                 backend->requestEndOfFrameImageReadbackTicket(*dtex,
+                                                                               batch.eye,
+                                                                               layer,
+                                                                               vk::ImageAspectFlagBits::eDepth,
+                                                                               "VK debug save slice layers depth")});
+        }
+      }
+
+      if (!jobs.empty()) {
+        backend->spawnDetachedTask(
+          folly::getGlobalCPUExecutor(),
+          [jobs = std::move(jobs), leaseRef]() mutable -> folly::coro::Task<void> {
+            (void)leaseRef;
+            for (auto& job : jobs) {
+              std::vector<uint8_t> owned = co_await job.ticket.awaitOwnedBytes();
+
+              if (!ZVulkanTexture::saveReadbackToImage(job.filename,
+                                                       job.ticket.format,
+                                                       job.ticket.size.x,
+                                                       job.ticket.size.y,
+                                                       owned.data(),
+                                                       owned.size(),
+                                                       /*flipY=*/true)) {
+                LOG(ERROR) << "Slice layer debug save failed for " << job.filename.toStdString();
+              }
+            }
+            co_return;
+          }(),
+          "VK debug save slice layers");
+      }
     }
   }
 
@@ -1455,36 +1499,64 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     }
     auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
     if (backend && !colorHandles.empty()) {
-      backend->scheduleAfterCurrentFrameCompletion([this, handles = std::move(colorHandles), depthHandle]() {
-        const AttachmentHandle& handle = handles.front();
-        CHECK(handle.valid() && handle.backend == RenderBackend::Vulkan)
-          << "Slice merge debug save: invalid color attachment handle";
+      const AttachmentHandle& handle = colorHandles.front();
+      CHECK(handle.valid() && handle.backend == RenderBackend::Vulkan)
+        << "Slice merge debug save: invalid color attachment handle";
 
-        auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "slice merge debug");
-        QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
-        if (!dir.isEmpty() && !dir.endsWith('/')) {
-          dir += '/';
-        }
-        const QString filename = dir + QString("slice_merge_%1x%2.tif").arg(tex.width()).arg(tex.height());
-        ZVulkanTexture::ImageSaveOptions colorOpts;
-        if (!tex.saveToImage(filename, colorOpts)) {
-          LOG(ERROR) << "Slice merge debug save failed for color attachment";
-        }
+      QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+      if (!dir.isEmpty() && !dir.endsWith('/')) {
+        dir += '/';
+      }
 
-        if (depthHandle && depthHandle->valid() && depthHandle->backend == RenderBackend::Vulkan) {
-          auto& dtex = vulkan::textureFromHandle(*depthHandle, m_backend.device(), "slice merge depth debug");
-          QString ddir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
-          if (!ddir.isEmpty() && !ddir.endsWith('/')) {
-            ddir += '/';
+      struct SaveJob
+      {
+        QString filename;
+        Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket ticket;
+      };
+      std::vector<SaveJob> jobs;
+      jobs.reserve(depthHandle ? 2u : 1u);
+
+      auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "slice merge debug");
+      jobs.push_back(SaveJob{dir + QString("slice_merge_%1x%2.tif").arg(tex.width()).arg(tex.height()),
+                             backend->requestEndOfFrameImageReadbackTicket(tex,
+                                                                           batch.eye,
+                                                                           /*arrayLayer=*/0u,
+                                                                           vk::ImageAspectFlagBits::eColor,
+                                                                           "VK debug save slice merge output")});
+
+      if (depthHandle && depthHandle->valid() && depthHandle->backend == RenderBackend::Vulkan) {
+        auto& dtex = vulkan::textureFromHandle(*depthHandle, m_backend.device(), "slice merge depth debug");
+        jobs.push_back(
+          SaveJob{dir + QString("slice_merge_depth_%1x%2.tif").arg(dtex.width()).arg(dtex.height()),
+                  backend->requestEndOfFrameImageReadbackTicket(dtex,
+                                                                batch.eye,
+                                                                /*arrayLayer=*/0u,
+                                                                vk::ImageAspectFlagBits::eDepth,
+                                                                "VK debug save slice merge output depth")});
+      }
+
+      backend->spawnDetachedTask(
+        folly::getGlobalCPUExecutor(),
+        [jobs = std::move(jobs)]() mutable -> folly::coro::Task<void> {
+          if (jobs.empty()) {
+            co_return;
           }
-          const QString dname = ddir + QString("slice_merge_depth_%1x%2.tif").arg(dtex.width()).arg(dtex.height());
-          ZVulkanTexture::ImageSaveOptions depthOpts;
-          depthOpts.aspectMask = vk::ImageAspectFlagBits::eDepth;
-          if (!dtex.saveToImage(dname, depthOpts)) {
-            LOG(ERROR) << "Slice merge depth debug save failed";
+          for (auto& job : jobs) {
+            std::vector<uint8_t> owned = co_await job.ticket.awaitOwnedBytes();
+
+            if (!ZVulkanTexture::saveReadbackToImage(job.filename,
+                                                     job.ticket.format,
+                                                     job.ticket.size.x,
+                                                     job.ticket.size.y,
+                                                     owned.data(),
+                                                     owned.size(),
+                                                     /*flipY=*/true)) {
+              LOG(ERROR) << "Slice merge debug save failed for " << job.filename.toStdString();
+            }
           }
-        }
-      });
+          co_return;
+        }(),
+        "VK debug save slice merge output");
     }
   }
 }

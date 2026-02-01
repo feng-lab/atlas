@@ -4,6 +4,8 @@
 #include "zoptionparameter.h"
 #include "zwidgetsgroup.h"
 
+#include <QPointer>
+
 namespace nim {
 
 // A self-contained cut span parameter with binding behavior.
@@ -103,6 +105,15 @@ private:
   ZBoolParameter m_pinLower; // TrackEdges: pin lower to min
   ZBoolParameter m_pinUpper; // TrackEdges: pin upper to max
   ZDoubleSpanParameter m_normalized; // Normalized fractions [0,1]
+
+  // Range row widget created in actualCreateWidget(). Used to disable the
+  // absolute range editor in modes where it is derived (Normalized) or fully
+  // pinned (Track Edges with both endpoints pinned) to avoid confusing
+  // "no effect" edits.
+  QPointer<QWidget> m_rangeRowWidget;
+  QPointer<QWidget> m_rangeLowerEditorWidget;
+  QPointer<QWidget> m_rangeUpperEditorWidget;
+  QPointer<QWidget> m_rangeSpanSliderWidget;
 };
 
 } // namespace nim

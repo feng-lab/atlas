@@ -307,11 +307,14 @@ def _ensure_screenshot_consent(*, console: Any, team: ChatTeam) -> None:
         console.print("[yellow]Screenshots disabled for this session.[/yellow]")
 
 
-def _render_session_replay(*, console: Any, team: ChatTeam) -> None:
+def _render_session_replay(
+    *, console: Any, team: ChatTeam, show_reasoning_summary: bool = False
+) -> None:
     """Replay a saved session history to the terminal (UX for resume).
 
     Policy (matches user-facing expectations):
     - Prints all transcript messages (user + assistant).
+    - Optionally prints reasoning summaries (behind a CLI flag).
     - Prints a one-line summary for every tool call (and web_search event).
     - Prints only the *current* plan (latest plan_updated), inserted at the point
       it occurred in the session log.
@@ -324,7 +327,11 @@ def _render_session_replay(*, console: Any, team: ChatTeam) -> None:
     if not isinstance(log_path, Path) or not log_path.exists():
         return
 
-    items = list(iter_resume_items(log_path))
+    items = list(
+        iter_resume_items(
+            log_path, include_reasoning_summary=bool(show_reasoning_summary)
+        )
+    )
     if not any(
         it.kind in {"transcript", "tool_call", "web_search", "plan"} for it in items
     ):
@@ -350,6 +357,35 @@ def _render_session_replay(*, console: Any, team: ChatTeam) -> None:
             else:
                 console.print("\n[bold]Answer[/bold]")
                 console.print(content, markup=False)
+            continue
+
+        if kind == "reasoning_summary":
+            summaries = ev.get("summaries")
+            if isinstance(summaries, list):
+                text = "\n\n".join(
+                    str(s).strip()
+                    for s in summaries
+                    if isinstance(s, str) and s.strip()
+                ).strip()
+            else:
+                text = str(summaries or "").strip()
+            if not text:
+                continue
+
+            phase = str(ev.get("phase") or "").strip()
+            tags: list[str] = []
+            if phase:
+                tags.append(phase)
+            if ev.get("finalizer") is True:
+                tags.append("finalizer")
+            if ev.get("partial") is True:
+                tags.append("partial")
+            suffix = f" [dim]({', '.join(tags)})[/dim]" if tags else ""
+
+            console.print(f"\n[bold]Reasoning summary[/bold]{suffix}")
+            # Match the live streaming UX: streamed reasoning summary deltas are rendered
+            # in a dim style, so the replay should use the same styling.
+            console.print(Text(text, style="dim"))
             continue
 
         if kind == "tool_call":
@@ -455,6 +491,7 @@ def run_console_repl(
     max_rounds: int = DEFAULT_EXECUTOR_MAX_ROUNDS,
     max_rounds_planner: int = DEFAULT_PLANNER_MAX_ROUNDS,
     ephemeral_inline_images: bool = False,
+    replay_reasoning_summary: bool = False,
     session: Optional[str] = None,
     session_dir: Optional[str] = None,
     enable_codegen: bool = False,
@@ -504,7 +541,11 @@ def run_console_repl(
     )
     console.print(f"[dim]Atlas app:[/dim] {team.atlas_dir}", markup=False)
     console.print("[dim]Type :help for commands. Ctrl+C to exit.[/dim]")
-    _render_session_replay(console=console, team=team)
+    _render_session_replay(
+        console=console,
+        team=team,
+        show_reasoning_summary=bool(replay_reasoning_summary),
+    )
     _ensure_screenshot_consent(console=console, team=team)
 
     while True:
@@ -575,7 +616,11 @@ def run_console_repl(
                     f"[bold]Atlas Agent[/bold]. Session=[cyan]{team.session_store.session_id()}[/cyan]"
                 )
                 console.print(f"[dim]Atlas app:[/dim] {team.atlas_dir}", markup=False)
-                _render_session_replay(console=console, team=team)
+                _render_session_replay(
+                    console=console,
+                    team=team,
+                    show_reasoning_summary=bool(replay_reasoning_summary),
+                )
                 _ensure_screenshot_consent(console=console, team=team)
                 continue
             if cmd == "session":

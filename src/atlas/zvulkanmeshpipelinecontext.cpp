@@ -11,6 +11,7 @@
 #include "zvulkanbuffer.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
+#include "zvulkanclipplanes.h"
 #include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
 #include "zmesh.h"
@@ -21,6 +22,7 @@
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbindings.h"
 #include "zvulkanpipelinecontext_raii.h"
+#include "zrenderthreadexecutor_tls.h"
 
 #include <algorithm>
 #include <array>
@@ -31,6 +33,8 @@
 #include <span>
 #include <vector>
 #include <unordered_map>
+
+#include <folly/coro/Task.h>
 
 namespace nim {
 namespace {
@@ -113,6 +117,31 @@ vk::PipelineVertexInputStateCreateInfo makeSoAMeshVertexInput(MeshPayload::Color
   return info;
 }
 
+vk::PipelineVertexInputStateCreateInfo makeSoAMeshDepthVertexInput()
+{
+  // Depth-only mesh pass (DDP init):
+  // - mesh_depth.vert only consumes attr_vertex at location 0.
+  // - Keep the vertex input state minimal to avoid Vulkan validation warnings
+  //   about unused attributes and to reduce vertex fetch work.
+  static std::array<vk::VertexInputBindingDescription, 1> bindings{};
+  bindings[0] = vk::VertexInputBindingDescription{.binding = 0,
+                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                                  .inputRate = vk::VertexInputRate::eVertex};
+
+  static std::array<vk::VertexInputAttributeDescription, 1> attrs{};
+  attrs[0] = vk::VertexInputAttributeDescription{.location = 0,
+                                                 .binding = 0,
+                                                 .format = vk::Format::eR32G32B32Sfloat,
+                                                 .offset = 0};
+
+  static vk::PipelineVertexInputStateCreateInfo info{};
+  info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
+  info.pVertexBindingDescriptions = bindings.data();
+  info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
+  info.pVertexAttributeDescriptions = attrs.data();
+  return info;
+}
+
 vk::PrimitiveTopology toVkTopology(ZMesh::Type type)
 {
   switch (type) {
@@ -172,7 +201,7 @@ void ZVulkanMeshPipelineContext::resetFrame()
   // Retire per-frame UBOs so they are not overwritten while still in use by
   // earlier in-flight frames. We defer destruction until the current active
   // submission finishes.
-  
+
   resetDescriptors();
   m_transientDescriptorSets.clear();
   m_ddpTransformsFrozen = false;
@@ -186,9 +215,16 @@ void ZVulkanMeshPipelineContext::flushRetainedUbos()
   if (m_retainedUbos.empty()) {
     return;
   }
+  const auto fence = m_backend.awaitActiveSubmissionFence("VK mesh retained UBO lifetime");
+  auto keepAlive = currentRenderThreadExecutorKeepAlive("VK mesh retained UBO lifetime");
   for (auto& sp : m_retainedUbos) {
-    auto keep = sp;
-    m_backend.scheduleAfterActiveSubmissionFence([keep]() {});
+    m_backend.spawnDetachedTask(
+      keepAlive,
+      [fence, keep = sp]() mutable -> folly::coro::Task<void> {
+        co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(fence);
+        co_return;
+      }(),
+      "VK mesh retained UBO lifetime");
   }
   m_retainedUbos.clear();
 }
@@ -664,6 +700,7 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
 
   if (!(ddp && m_ddpTransformsFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
@@ -804,46 +841,53 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 
   const auto fragmentShader = selectFragmentShader(key.shaderHookType);
 
+  const std::string vertexShader = (key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit)
+                                     ? "mesh_depth.vert.spv"
+                                     : "mesh.vert.spv";
+
   instance.shader =
-    std::make_unique<ZVulkanShader>(device, shaderBase + "mesh.vert.spv", shaderBase + fragmentShader, std::nullopt);
+    std::make_unique<ZVulkanShader>(device, shaderBase + vertexShader, shaderBase + fragmentShader, std::nullopt);
 
-  const uint32_t useMeshColor = key.colorSource == MeshPayload::ColorSource::MeshColor ? 1u : 0u;
-  const uint32_t use1D = key.colorSource == MeshPayload::ColorSource::Mesh1DTexture ? 1u : 0u;
-  const uint32_t use2D = key.colorSource == MeshPayload::ColorSource::Mesh2DTexture ? 1u : 0u;
-  const uint32_t use3D = key.colorSource == MeshPayload::ColorSource::Mesh3DTexture ? 1u : 0u;
+  const bool depthOnlyInit = (key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
+  if (!depthOnlyInit) {
+    const uint32_t useMeshColor = key.colorSource == MeshPayload::ColorSource::MeshColor ? 1u : 0u;
+    const uint32_t use1D = key.colorSource == MeshPayload::ColorSource::Mesh1DTexture ? 1u : 0u;
+    const uint32_t use2D = key.colorSource == MeshPayload::ColorSource::Mesh2DTexture ? 1u : 0u;
+    const uint32_t use3D = key.colorSource == MeshPayload::ColorSource::Mesh3DTexture ? 1u : 0u;
 
-  std::array<vk::SpecializationMapEntry, 4> vertexEntries{
-    vk::SpecializationMapEntry{.constantID = 40, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 41, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 42, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 43, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)}
-  };
-  std::array<uint32_t, 4> vertexData{useMeshColor, use1D, use2D, use3D};
-  const uint8_t* vertexPtr = reinterpret_cast<const uint8_t*>(vertexData.data());
-  std::vector<uint8_t> vertexBytes(vertexPtr, vertexPtr + sizeof(vertexData));
-  std::vector<vk::SpecializationMapEntry> vertexSpecs(vertexEntries.begin(), vertexEntries.end());
-  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eVertex, vertexSpecs, vertexBytes);
+    std::array<vk::SpecializationMapEntry, 4> vertexEntries{
+      vk::SpecializationMapEntry{.constantID = 40, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 41, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 42, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 43, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+    };
+    std::array<uint32_t, 4> vertexData{useMeshColor, use1D, use2D, use3D};
+    const uint8_t* vertexPtr = reinterpret_cast<const uint8_t*>(vertexData.data());
+    std::vector<uint8_t> vertexBytes(vertexPtr, vertexPtr + sizeof(vertexData));
+    std::vector<vk::SpecializationMapEntry> vertexSpecs(vertexEntries.begin(), vertexEntries.end());
+    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eVertex, vertexSpecs, vertexBytes);
 
-  const uint32_t useLinearFog = key.fogMode == FogMode::Linear ? 1u : 0u;
-  const uint32_t useExpFog = key.fogMode == FogMode::Exponential ? 1u : 0u;
-  const uint32_t useExp2Fog = key.fogMode == FogMode::ExponentialSquared ? 1u : 0u;
+    const uint32_t useLinearFog = key.fogMode == FogMode::Linear ? 1u : 0u;
+    const uint32_t useExpFog = key.fogMode == FogMode::Exponential ? 1u : 0u;
+    const uint32_t useExp2Fog = key.fogMode == FogMode::ExponentialSquared ? 1u : 0u;
 
-  std::array<vk::SpecializationMapEntry, 7> fragmentEntries{
-    vk::SpecializationMapEntry{.constantID = 40, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 41, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 42, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 43, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 20, .offset = 4 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 21, .offset = 5 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 22, .offset = 6 * sizeof(uint32_t), .size = sizeof(uint32_t)}
-  };
-  std::array<uint32_t, 7> fragmentData{useMeshColor, use1D, use2D, use3D, useLinearFog, useExpFog, useExp2Fog};
-  const uint8_t* fragmentPtr = reinterpret_cast<const uint8_t*>(fragmentData.data());
-  std::vector<uint8_t> fragmentBytes(fragmentPtr, fragmentPtr + sizeof(fragmentData));
-  std::vector<vk::SpecializationMapEntry> fragmentSpecs(fragmentEntries.begin(), fragmentEntries.end());
-  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment, fragmentSpecs, fragmentBytes);
+    std::array<vk::SpecializationMapEntry, 7> fragmentEntries{
+      vk::SpecializationMapEntry{.constantID = 40, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 41, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 42, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 43, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 20, .offset = 4 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 21, .offset = 5 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 22, .offset = 6 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+    };
+    std::array<uint32_t, 7> fragmentData{useMeshColor, use1D, use2D, use3D, useLinearFog, useExpFog, useExp2Fog};
+    const uint8_t* fragmentPtr = reinterpret_cast<const uint8_t*>(fragmentData.data());
+    std::vector<uint8_t> fragmentBytes(fragmentPtr, fragmentPtr + sizeof(fragmentData));
+    std::vector<vk::SpecializationMapEntry> fragmentSpecs(fragmentEntries.begin(), fragmentEntries.end());
+    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment, fragmentSpecs, fragmentBytes);
+  }
 
-  auto vertexInput = makeSoAMeshVertexInput(key.colorSource);
+  auto vertexInput = depthOnlyInit ? makeSoAMeshDepthVertexInput() : makeSoAMeshVertexInput(key.colorSource);
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, toVkTopology(key.meshType));
   std::vector<vk::DescriptorSetLayout> layouts{m_setTextures, m_setLighting, m_setTransforms, m_setOIT};
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);

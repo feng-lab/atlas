@@ -2,6 +2,7 @@
 
 #include "zvulkan.h"
 #include "zvulkantexture.h"
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -104,6 +105,10 @@ private:
   std::unique_ptr<ZVulkanFrameExecutor> m_frameExecutor;
   std::unique_ptr<ZVulkanResidencyManager> m_residencyManager;
   bool m_supportsVertexInputDynamicState = false; // guarded for MoltenVK
+  // Captured once at device creation. The frame executor slot ring is keyed by
+  // pointer identity, so resizing it at runtime would invalidate keys and can
+  // drop fence-gated completion callbacks unless explicitly drained.
+  uint32_t m_framesInFlight = 1;
   VmaAllocator m_allocator = nullptr;
   VmaPool m_uploadTransientPool = nullptr;
   VmaPool m_uploadStagingPool = nullptr;

@@ -14,6 +14,7 @@ layout(location = 5) out vec3 v_point;
 layout(location = 6) out vec4 v_material_specular; // .w packs shininess when dynamic
 
 #include "include/matrices_material.glslinc"
+#include "include/clip_distance.glslinc"
 
 layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
@@ -70,6 +71,7 @@ void main()
   T[1] = attr_T[1] * xf.parameters.x;
   T[2] = attr_T[2] * xf.parameters.x;
   T[3] = xf.pos_transform * attr_T[3];
+  atlas_write_clip_distances(T[3]);
 
   // Determine bounding quad in clip space
   vec4 D = vec4(1.0, 1.0, 1.0, -1.0);

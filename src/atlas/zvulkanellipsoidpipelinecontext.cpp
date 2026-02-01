@@ -16,6 +16,7 @@
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanbindings.h"
+#include "zvulkanclipplanes.h"
 #include "zexception.h"
 
 #include <algorithm>
@@ -363,6 +364,7 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
 
   if (!(ddp && m_ddpTransformsFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));

@@ -11,12 +11,14 @@
 #include "zvulkanbuffer.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
+#include "zvulkanclipplanes.h"
 #include "zvulkanuniforms.h"
 #include "zvulkanbindings.h"
 #include "zsysteminfo.h"
 #include "z3dlinerenderer.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
+#include "zrenderthreadexecutor_tls.h"
 
 #include <algorithm>
 #include <array>
@@ -26,6 +28,8 @@
 #include <vector>
 #include <cstring>
 #include <cstdint>
+
+#include <folly/coro/Task.h>
 
 namespace nim {
 namespace {
@@ -156,11 +160,18 @@ void ZVulkanLinePipelineContext::flushRetainedUbos()
   if (m_retainedUbos.empty()) {
     return;
   }
+  const auto fence = m_backend.awaitActiveSubmissionFence("VK line retained UBO lifetime");
+  auto keepAlive = currentRenderThreadExecutorKeepAlive("VK line retained UBO lifetime");
   // Hand retained UBOs to the backend so destruction happens after the active
   // submission fence signals. Capture shared_ptr by value to extend lifetime.
   for (auto& sp : m_retainedUbos) {
-    auto keep = sp; // copy shared ownership into the closure
-    m_backend.scheduleAfterActiveSubmissionFence([keep]() {});
+    m_backend.spawnDetachedTask(
+      keepAlive,
+      [fence, keep = sp]() mutable -> folly::coro::Task<void> {
+        co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(fence);
+        co_return;
+      }(),
+      "VK line retained UBO lifetime");
   }
   m_retainedUbos.clear();
 }
@@ -253,8 +264,6 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
                                             const RenderBatch& batch,
                                             const LinePayload& payload)
 {
-  (void)batch;
-  (void)payload;
   // Use shared per-frame lighting UBO dynamic offset
   m_dynLightingOffset = m_backend.frameSharedLightingOffset();
 
@@ -274,6 +283,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
   const auto hook = renderer.shaderHookType();
   const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
                     hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
