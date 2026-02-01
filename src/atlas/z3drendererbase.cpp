@@ -56,6 +56,22 @@ void Z3DRendererBase::resetCPUState()
 
 void Z3DRendererBase::appendBatch(RenderBatch batch)
 {
+  if (batch.originatingRenderer == nullptr) {
+    batch.originatingRenderer = this;
+  }
+  if (!batch.clipPlanes.captured) {
+    const auto* clipSource = batch.originatingRenderer;
+    CHECK(clipSource != nullptr) << "Render batch missing originating renderer";
+    const auto& planes = clipSource->clipPlanes();
+    CHECK(planes.size() <= kRenderBatchMaxClipPlanes)
+      << "Render batch clip plane overflow: planes=" << planes.size() << " max=" << kRenderBatchMaxClipPlanes;
+    batch.clipPlanes.captured = true;
+    batch.clipPlanes.enabled = clipSource->clipEnabled();
+    batch.clipPlanes.planeCount = static_cast<uint32_t>(planes.size());
+    for (size_t i = 0; i < planes.size(); ++i) {
+      batch.clipPlanes.planes[i] = planes[i];
+    }
+  }
   const glm::uvec4 viewportRect = m_frameState.viewport;
 
   VLOG(2) << "appendBatch initial colors=" << batch.pass.colorAttachments.size()

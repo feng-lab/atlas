@@ -11,6 +11,7 @@
 #include "zvulkanbuffer.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
+#include "zvulkanclipplanes.h"
 #include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
 #include "zmesh.h"
@@ -674,6 +675,7 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
 
   if (!(ddp && m_ddpTransformsFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));

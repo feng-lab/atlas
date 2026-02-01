@@ -5,6 +5,7 @@
 #include "zlog.h"
 #include <cmath>
 #include <algorithm>
+#include <optional>
 #include <folly/ScopeGuard.h>
 #include <Mathematics/DistLineRay.h>
 #include <boost/math/constants/constants.hpp>
@@ -397,43 +398,59 @@ void Z3DBoundedFilter::setClipPlanes()
   }
 
   std::vector<glm::vec4> clipPlanes;
-  if (m_xCut.lowerValue() != m_xCut.minimum()) {
-    clipPlanes.emplace_back(1., 0., 0., -m_xCut.lowerValue());
+
+  // Local XYZ cuts and global XYZ cuts are axis-aligned constraints. When both
+  // are active, the effective region is the intersection of the two intervals
+  // along each axis, so we only need the tightest lower/upper plane per axis.
+  // This reduces redundant planes without changing behaviour (GL parity) and
+  // keeps Vulkan clip plane payloads compact.
+  auto mergeLower = [](const ZFloatSpanParameter& para, std::optional<float>& dst) {
+    if (para.lowerValue() != para.minimum()) {
+      const float v = para.lowerValue();
+      dst = dst.has_value() ? std::max(*dst, v) : v;
+    }
+  };
+  auto mergeUpper = [](const ZFloatSpanParameter& para, std::optional<float>& dst) {
+    if (para.upperValue() != para.maximum()) {
+      const float v = para.upperValue();
+      dst = dst.has_value() ? std::min(*dst, v) : v;
+    }
+  };
+
+  std::optional<float> xLower, xUpper, yLower, yUpper, zLower, zUpper;
+  mergeLower(m_xCut, xLower);
+  mergeUpper(m_xCut, xUpper);
+  mergeLower(m_yCut, yLower);
+  mergeUpper(m_yCut, yUpper);
+  mergeLower(m_zCut, zLower);
+  mergeUpper(m_zCut, zUpper);
+
+  mergeLower(m_globalParameters.globalXCut, xLower);
+  mergeUpper(m_globalParameters.globalXCut, xUpper);
+  mergeLower(m_globalParameters.globalYCut, yLower);
+  mergeUpper(m_globalParameters.globalYCut, yUpper);
+  mergeLower(m_globalParameters.globalZCut, zLower);
+  mergeUpper(m_globalParameters.globalZCut, zUpper);
+
+  if (xLower) {
+    clipPlanes.emplace_back(1., 0., 0., -*xLower);
   }
-  if (m_xCut.upperValue() != m_xCut.maximum()) {
-    clipPlanes.emplace_back(-1., 0., 0., m_xCut.upperValue());
+  if (xUpper) {
+    clipPlanes.emplace_back(-1., 0., 0., *xUpper);
   }
-  if (m_yCut.lowerValue() != m_yCut.minimum()) {
-    clipPlanes.emplace_back(0., 1., 0., -m_yCut.lowerValue());
+  if (yLower) {
+    clipPlanes.emplace_back(0., 1., 0., -*yLower);
   }
-  if (m_yCut.upperValue() != m_yCut.maximum()) {
-    clipPlanes.emplace_back(0., -1., 0., m_yCut.upperValue());
+  if (yUpper) {
+    clipPlanes.emplace_back(0., -1., 0., *yUpper);
   }
-  if (m_zCut.lowerValue() != m_zCut.minimum()) {
-    clipPlanes.emplace_back(0., 0., 1., -m_zCut.lowerValue());
+  if (zLower) {
+    clipPlanes.emplace_back(0., 0., 1., -*zLower);
   }
-  if (m_zCut.upperValue() != m_zCut.maximum()) {
-    clipPlanes.emplace_back(0., 0., -1., m_zCut.upperValue());
+  if (zUpper) {
+    clipPlanes.emplace_back(0., 0., -1., *zUpper);
   }
 
-  if (m_globalParameters.globalXCut.lowerValue() != m_globalParameters.globalXCut.minimum()) {
-    clipPlanes.emplace_back(1., 0., 0., -m_globalParameters.globalXCut.lowerValue());
-  }
-  if (m_globalParameters.globalXCut.upperValue() != m_globalParameters.globalXCut.maximum()) {
-    clipPlanes.emplace_back(-1., 0., 0., m_globalParameters.globalXCut.upperValue());
-  }
-  if (m_globalParameters.globalYCut.lowerValue() != m_globalParameters.globalYCut.minimum()) {
-    clipPlanes.emplace_back(0., 1., 0., -m_globalParameters.globalYCut.lowerValue());
-  }
-  if (m_globalParameters.globalYCut.upperValue() != m_globalParameters.globalYCut.maximum()) {
-    clipPlanes.emplace_back(0., -1., 0., m_globalParameters.globalYCut.upperValue());
-  }
-  if (m_globalParameters.globalZCut.lowerValue() != m_globalParameters.globalZCut.minimum()) {
-    clipPlanes.emplace_back(0., 0., 1., -m_globalParameters.globalZCut.lowerValue());
-  }
-  if (m_globalParameters.globalZCut.upperValue() != m_globalParameters.globalZCut.maximum()) {
-    clipPlanes.emplace_back(0., 0., -1., m_globalParameters.globalZCut.upperValue());
-  }
   m_rendererBase.setClipPlanes(&clipPlanes);
 }
 

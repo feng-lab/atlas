@@ -11,6 +11,7 @@
 #include "zvulkanbuffer.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
+#include "zvulkanclipplanes.h"
 #include "zvulkanuniforms.h"
 #include "zvulkanbindings.h"
 #include "zsysteminfo.h"
@@ -263,8 +264,6 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
                                             const RenderBatch& batch,
                                             const LinePayload& payload)
 {
-  (void)batch;
-  (void)payload;
   // Use shared per-frame lighting UBO dynamic offset
   m_dynLightingOffset = m_backend.frameSharedLightingOffset();
 
@@ -284,6 +283,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
   const auto hook = renderer.shaderHookType();
   const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
                     hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);

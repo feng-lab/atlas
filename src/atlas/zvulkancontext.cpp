@@ -1,5 +1,6 @@
 #include "zvulkancontext.h"
 #include "zvulkandevice.h"
+#include "zvulkanuniforms.h"
 #include "zexception.h"
 #include "zlog.h"
 
@@ -783,6 +784,19 @@ void ZVulkanContext::createLogicalDevice()
   auto& enabledPhysicalDeviceVulkan12Features = enabledFeatures2.get<vk::PhysicalDeviceVulkan12Features>();
   auto& enabledPhysicalDeviceVulkan13Features = enabledFeatures2.get<vk::PhysicalDeviceVulkan13Features>();
 
+  // Clip planes are required for parity with the OpenGL backend's local/global
+  // XYZ cuts. These use gl_ClipDistance in vertex shaders, so we must enable
+  // the Vulkan core shaderClipDistance feature and validate the device limit.
+  const auto properties = m_physicalDevices[m_selectedDeviceIndex].getProperties();
+  if (physicalDeviceFeatures.shaderClipDistance != VK_TRUE) {
+    throw ZException("Selected Vulkan device does not support shaderClipDistance (required for XYZ cut clip planes)");
+  }
+  if (properties.limits.maxClipDistances < kVulkanMaxClipPlanes) {
+    throw ZException(fmt::format("Selected Vulkan device supports only {} clip distances, but Atlas requires {}",
+                                 properties.limits.maxClipDistances,
+                                 kVulkanMaxClipPlanes));
+  }
+
   // Enable basic features
   enabledPhysicalDeviceFeatures2.features.samplerAnisotropy = physicalDeviceFeatures.samplerAnisotropy;
   enabledPhysicalDeviceFeatures2.features.fillModeNonSolid = physicalDeviceFeatures.fillModeNonSolid;
@@ -790,6 +804,7 @@ void ZVulkanContext::createLogicalDevice()
   enabledPhysicalDeviceFeatures2.features.independentBlend = physicalDeviceFeatures.independentBlend;
   // Allow storage buffer/image writes in fragment shader when supported
   enabledPhysicalDeviceFeatures2.features.fragmentStoresAndAtomics = physicalDeviceFeatures.fragmentStoresAndAtomics;
+  enabledPhysicalDeviceFeatures2.features.shaderClipDistance = VK_TRUE;
 
   if (FLAGS_atlas_debug_vulkan) {
     enabledPhysicalDeviceFeatures2.features.robustBufferAccess = physicalDeviceFeatures.robustBufferAccess;

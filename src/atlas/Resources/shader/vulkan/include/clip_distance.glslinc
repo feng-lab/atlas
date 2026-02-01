@@ -1,0 +1,31 @@
+// Vertex-stage clip distance helper used by Vulkan shaders to match the
+// OpenGL backend's local/global XYZ cut behaviour.
+//
+// Requirements:
+// - matrices_material.glslinc (xf + ATLAS_MAX_CLIP_PLANES)
+// - VkPhysicalDeviceFeatures::shaderClipDistance enabled at device creation.
+
+out gl_PerVertex {
+  vec4 gl_Position;
+  float gl_ClipDistance[ATLAS_MAX_CLIP_PLANES];
+};
+
+void atlas_write_clip_distances(vec4 world_pos)
+{
+  // Vulkan has no dynamic "enable clip plane i" state like OpenGL's
+  // glEnable(GL_CLIP_DISTANCEi). If we export ClipDistance, the fixed-function
+  // stage will consume it, so we must always write a defined value.
+  for (int i = 0; i < ATLAS_MAX_CLIP_PLANES; ++i) {
+    gl_ClipDistance[i] = 1.0;
+  }
+
+  if (xf.clip_params.x == 0) {
+    return;
+  }
+
+  const int planeCount = clamp(xf.clip_params.y, 0, ATLAS_MAX_CLIP_PLANES);
+  for (int i = 0; i < planeCount; ++i) {
+    gl_ClipDistance[i] = dot(xf.clip_planes[i], world_pos);
+  }
+}
+

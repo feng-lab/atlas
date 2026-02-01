@@ -20,6 +20,7 @@ layout(location = 7) out vec3 v_V;
 layout(location = 8) out vec4 v_combo1; // bradius, tradius, height, inv_sqr_height
 
 #include "include/matrices_material.glslinc"
+#include "include/clip_distance.glslinc"
 
 // Cap specialization (kept in sync with fragment shader)
 layout(constant_id = 90) const int CAPS_MODE = 1; // 0=NO_CAPS, 1=FLAT_CAPS, 2=ROUND_CAPS, 3=FLAT_BASE_CAP_ROUND_TOP_CAP, 4=ROUND_BASE_CAP_FLAT_TOP_CAP
@@ -42,6 +43,7 @@ void main()
   vec3 scaledOrigin = (xf.pos_transform * vec4(attr_origin.xyz, 1.0)).xyz;
   vec3 scaledTopPos = (xf.pos_transform * vec4(attr_origin.xyz + attr_axis.xyz, 1.0)).xyz;
   vec3 scaledAxis   = scaledTopPos - scaledOrigin;
+  atlas_write_clip_distances(vec4(scaledOrigin + scaledAxis * 0.5, 1.0));
 
   float height = length(scaledAxis);
   float inv_sqr_height = 1.0 / max(height * height, 1e-12);
