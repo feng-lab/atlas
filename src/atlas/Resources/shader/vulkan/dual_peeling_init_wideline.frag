@@ -10,8 +10,6 @@ void main()
 {
   vec4 color; float fragDepth;
   fragment_func(color, fragDepth);
-  gl_FragDepth = fragDepth;
   FragData0.xy = vec2(-fragDepth, fragDepth);
   FragData1.x  = -fragDepth;
 }
-

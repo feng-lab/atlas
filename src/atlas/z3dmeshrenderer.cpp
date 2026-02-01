@@ -127,6 +127,10 @@ std::string Z3DMeshRenderer::generateHeader()
     case MeshColorSource::CustomColor:
       break;
   }
+
+  // mesh_func.frag always sets fragDepth = gl_FragCoord.z; avoid redundant
+  // gl_FragDepth writes so the driver can keep early depth/stencil optimizations.
+  header += "#define ATLAS_DISABLE_FRAG_DEPTH_WRITE\n";
   return header;
 }
 

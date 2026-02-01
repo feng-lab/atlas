@@ -50,7 +50,9 @@ void main(void)
 	float fragDepth;
 	vec4 color;
 	fragment_func(color, fragDepth);
+#ifndef ATLAS_DISABLE_FRAG_DEPTH_WRITE
 	gl_FragDepth = fragDepth;
+#endif
 
 	#ifdef USE_RECT_TEX
 	vec2 depthBlender = texture2DRect(DepthBlenderTex, gl_FragCoord.xy).xy;

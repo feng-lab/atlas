@@ -10,6 +10,10 @@ void fragment_func(out vec4 fragColor, out float fragDepth);
 
 void main(void)
 {
+#if defined(ATLAS_DISABLE_FRAG_DEPTH_WRITE)
+	float unusedDepth;
+	fragment_func(FragData0, unusedDepth);
+#else
 	fragment_func(FragData0, gl_FragDepth);
+#endif
 }
-

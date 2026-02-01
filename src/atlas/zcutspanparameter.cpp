@@ -2,7 +2,6 @@
 
 #include "zspanslider.h"
 #include "zwidgetsgroup.h"
-#include <QDoubleSpinBox>
 #include <QVBoxLayout>
 #include <QGroupBox>
 #include <QLabel>
@@ -325,18 +324,85 @@ QWidget* ZCutSpanParameter::actualCreateWidget(QWidget* parent)
     auto* lb = new QLabel(QStringLiteral("Range"), row);
     lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    QWidget* spanWidget = ZFloatSpanParameter::actualCreateWidget(row);
-    const auto spinBoxes = spanWidget->findChildren<QDoubleSpinBox*>();
-    if (spinBoxes.size() >= 2) {
-      // The widget creates lower then upper spin boxes in that order.
-      m_rangeLowerEditorWidget = spinBoxes[0];
-      m_rangeUpperEditorWidget = spinBoxes[1];
+    QWidget* spanWidget = nullptr;
+    m_rangeLowerEditorWidget = nullptr;
+    m_rangeUpperEditorWidget = nullptr;
+    m_rangeSpanSliderWidget = nullptr;
+
+    if (m_style == "SPINBOX") {
+      // Inline the ZFloatSpanParameter SPINBOX widget build so we have stable
+      // handles for per-endpoint enabling (no findChildren() coupling).
+      auto* w = new QWidget(row);
+      auto* lo = new QHBoxLayout();
+      lo->setContentsMargins(0, 0, 0, 0);
+
+      auto* sb1 = new ZDoubleSpinBox();
+      sb1->setRange(m_min, m_value[1]);
+      sb1->setValue(m_value[0]);
+      sb1->setSingleStep(m_step);
+      sb1->setDecimals(m_decimal);
+      sb1->setPrefix(m_prefix);
+      sb1->setSuffix(m_suffix);
+      connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZFloatSpanParameter::setLowerValue);
+      connect(this, &ZFloatSpanParameter::lowerValueWillChange, sb1, &ZDoubleSpinBox::setValueBlockSignals);
+      if (m_nameOfEachValue.at(0).isEmpty()) {
+        lo->addWidget(sb1);
+      } else {
+        auto* lowLabel = new QLabel(m_nameOfEachValue[0]);
+        lowLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+        lowLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        lo->addWidget(lowLabel);
+        lo->addWidget(sb1);
+      }
+
+      auto* sb2 = new ZDoubleSpinBox();
+      sb2->setRange(m_value[0], m_max);
+      sb2->setValue(m_value[1]);
+      sb2->setSingleStep(m_step);
+      sb2->setDecimals(m_decimal);
+      sb2->setPrefix(m_prefix);
+      sb2->setSuffix(m_suffix);
+      connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZFloatSpanParameter::setUpperValue);
+      connect(this, &ZFloatSpanParameter::upperValueWillChange, sb2, &ZDoubleSpinBox::setValueBlockSignals);
+      if (m_nameOfEachValue.at(1).isEmpty()) {
+        lo->addWidget(sb2);
+      } else {
+        auto* highLabel = new QLabel(m_nameOfEachValue[1]);
+        highLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+        highLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        lo->addWidget(highLabel);
+        lo->addWidget(sb2);
+      }
+
+      connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), sb2, &ZDoubleSpinBox::setMinimum);
+      connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), sb1, &ZDoubleSpinBox::setMaximum);
+      w->setLayout(lo);
+      spanWidget = w;
+      m_rangeLowerEditorWidget = sb1;
+      m_rangeUpperEditorWidget = sb2;
     } else {
-      m_rangeLowerEditorWidget = nullptr;
-      m_rangeUpperEditorWidget = nullptr;
+      // Default range style: span slider with spin boxes at both ends.
+      auto* spanSlider =
+        new ZDoubleSpanSliderWithSpinBox(m_value[0], m_value[1], m_min, m_max, m_step, m_decimal, m_tracking, row);
+      connect(spanSlider, &ZDoubleSpanSliderWithSpinBox::lowerValueChanged, this, &ZFloatSpanParameter::setLowerValue);
+      connect(spanSlider, &ZDoubleSpanSliderWithSpinBox::upperValueChanged, this, &ZFloatSpanParameter::setUpperValue);
+      connect(this,
+              &ZFloatSpanParameter::lowerValueWillChange,
+              spanSlider,
+              &ZDoubleSpanSliderWithSpinBox::setLowerValueBlockSignals);
+      connect(this,
+              &ZFloatSpanParameter::upperValueWillChange,
+              spanSlider,
+              &ZDoubleSpanSliderWithSpinBox::setUpperValueBlockSignals);
+      connect(this,
+              &ZFloatSpanParameter::rangeChanged,
+              spanSlider,
+              &ZDoubleSpanSliderWithSpinBox::setDataRangeBlockSignals);
+      spanWidget = spanSlider;
+      m_rangeLowerEditorWidget = spanSlider->lowerSpinBox();
+      m_rangeUpperEditorWidget = spanSlider->upperSpinBox();
+      m_rangeSpanSliderWidget = spanSlider->slider();
     }
-    const auto spanSliders = spanWidget->findChildren<ZSpanSlider*>();
-    m_rangeSpanSliderWidget = spanSliders.isEmpty() ? nullptr : spanSliders.front();
     h->addWidget(lb);
     h->addWidget(spanWidget, 1);
     row->setLayout(h);

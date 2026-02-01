@@ -55,7 +55,9 @@ void main(void)
   float fragDepth;
   vec4 color;
   fragment_func(color, fragDepth);
+#ifndef ATLAS_DISABLE_FRAG_DEPTH_WRITE
   gl_FragDepth = fragDepth;
+#endif
   // calculate z from fragDepth
   //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
   // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;

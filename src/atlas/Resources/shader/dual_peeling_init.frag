@@ -25,7 +25,9 @@ void main(void)
 	float fragDepth;
 	vec4 color;
 	fragment_func(color, fragDepth);
+#ifndef ATLAS_DISABLE_FRAG_DEPTH_WRITE
   gl_FragDepth = fragDepth;
+#endif
 	FragData0.xy = vec2(-fragDepth, fragDepth);
 	FragData1.x = -fragDepth;
 }
