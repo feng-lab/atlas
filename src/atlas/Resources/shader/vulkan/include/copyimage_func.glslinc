@@ -10,15 +10,53 @@ layout(set = 0, binding = 1) uniform sampler2D depth_texture;
 // Receive UVs from the vertex shader; Vulkan SPIR-V build uses pass_with_2dtexture.vert
 layout(location = 0) in vec2 texCoord0;
 
-void fragment_func(out vec4 fragColor, out float fragDepth)
+vec2 copyimage_compute_uv()
 {
   vec2 uv = texCoord0;
   if (YFLIP) {
     uv.y = 1.0 - uv.y;
   }
+  return uv;
+}
+
+bool copyimage_fragment_depth_only(out float fragDepth)
+{
+  vec2 uv = copyimage_compute_uv();
+
+  if (DISCARD_TRANSPARENT) {
+    float a = texture(color_texture, uv).a;
+    if (a == 0.0) {
+      return false;
+    }
+  }
+
+  fragDepth = texture(depth_texture, uv).r;
+  return true;
+}
+
+bool copyimage_fragment_color_impl(out vec4 fragColor, out float fragDepth)
+{
+  vec2 uv = copyimage_compute_uv();
   fragColor = texture(color_texture, uv);
-  if (DISCARD_TRANSPARENT && fragColor.a == 0.0) discard;
+  if (DISCARD_TRANSPARENT && fragColor.a == 0.0) {
+    return false;
+  }
   if (MULTIPLY_ALPHA) fragColor.rgb *= fragColor.a;
   if (DIVIDE_BY_ALPHA && fragColor.a > 0.0) fragColor.rgb /= fragColor.a;
   fragDepth = texture(depth_texture, uv).r;
+  return true;
 }
+
+#ifdef ATLAS_PPLL
+bool fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  return copyimage_fragment_color_impl(fragColor, fragDepth);
+}
+#else
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  if (!copyimage_fragment_color_impl(fragColor, fragDepth)) {
+    discard;
+  }
+}
+#endif

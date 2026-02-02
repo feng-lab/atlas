@@ -21,7 +21,11 @@ layout(location = 6) in vec3 v_U;
 layout(location = 7) in vec3 v_V;
 layout(location = 8) in vec4 v_combo1; // x=bradius, y=tradius, z=height, w=inv_sqr_height
 
-void fragment_func(out vec4 fragColor, out float fragDepth)
+bool cone2_fragment_hit(out vec4 baseColor,
+                        out vec3 ipoint,
+                        out vec3 normalDirection,
+                        out float fragDepth,
+                        out float alphaScale)
 {
   float bradius = v_combo1.x;
   float tradius = v_combo1.y;
@@ -57,20 +61,22 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   float delta = fwidth(d);
   float edgeAlpha = smoothstep(0.0, delta, d);
 #endif
-  if (d < 0.0) discard;
+  if (d < 0.0) {
+    return false;
+  }
 
   float dist = (-a1 - sqrt(d)) / a2;
-  vec3 ipoint = v_point + dist * rayDirection;
+  ipoint = v_point + dist * rayDirection;
 
   vec3 tmpPoint = ipoint - v_base;
   vec3 planeNormalDirection = cross(v_axis, tmpPoint);
   vec3 centerToSurfaceDirection = normalize(cross(planeNormalDirection, v_axis));
   vec3 baseEdge = v_base + centerToSurfaceDirection * bradius;
   vec3 topEdge = v_top + centerToSurfaceDirection * tradius;
-  vec3 normalDirection = normalize(cross(planeNormalDirection, topEdge - baseEdge));
+  normalDirection = normalize(cross(planeNormalDirection, topEdge - baseEdge));
 
   float ratio = dot(ipoint - v_base, vec3(v_top - v_base)) * inv_sqr_height;
-  vec4 color = mix(v_color1, v_color2, ratio);
+  baseColor = mix(v_color1, v_color2, ratio);
 
   float capTest = dot((ipoint - v_top), v_axis);
 
@@ -78,7 +84,9 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
     if (capTest > 0.0 || dot(rayDirection, -v_axis) > dot(normalize(baseEdge - topEdge), -v_axis)) {
       dist = (-a1 + sqrt(d)) / a2;
       ipoint = v_point + dist * rayDirection;
-      if (dot(ipoint - v_base, v_axis) < 0.0 || dot(ipoint - v_top, v_axis) > 0.0) discard;
+      if (dot(ipoint - v_base, v_axis) < 0.0 || dot(ipoint - v_top, v_axis) > 0.0) {
+        return false;
+      }
       tmpPoint = ipoint - v_base;
       planeNormalDirection = cross(v_axis, tmpPoint);
       centerToSurfaceDirection = normalize(cross(planeNormalDirection, v_axis));
@@ -86,33 +94,41 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
       topEdge = v_top + centerToSurfaceDirection * tradius;
       normalDirection = normalize(cross(planeNormalDirection, topEdge - baseEdge));
       ratio = dot(ipoint - v_base, vec3(v_top - v_base)) * inv_sqr_height;
-      color = mix(v_color1, v_color2, ratio);
+      baseColor = mix(v_color1, v_color2, ratio);
     }
   } else if (CAPS_MODE == 1) { // FLAT_CAPS
     if (capTest > 0.0 || dot(rayDirection, -v_axis) > dot(normalize(baseEdge - topEdge), -v_axis)) {
       ipoint = ipoint + rayDirection *
         length(v_top - ipoint) * dot(normalize(v_top - ipoint), -v_axis) / dot(rayDirection, -v_axis);
-      if (dot(ipoint - v_top, ipoint - v_top) > tradius2) discard;
-      color = v_color2;
+      if (dot(ipoint - v_top, ipoint - v_top) > tradius2) {
+        return false;
+      }
+      baseColor = v_color2;
       normalDirection = v_axis;
     }
   } else if (CAPS_MODE == 3) { // FLAT_BASE_CAP_ROUND_TOP_CAP
     if (capTest > 0.0 || dot(rayDirection, -v_axis) > dot(normalize(baseEdge - topEdge), -v_axis)) {
-      color = v_color2;
+      baseColor = v_color2;
       float dNV = dot(-v_axis, rayDirection);
-      if (dNV < 0.0) discard;
+      if (dNV < 0.0) {
+        return false;
+      }
       float t = dot(-v_axis, v_top - rayOrigin) / dNV;
       ipoint = rayDirection * t + rayOrigin;
-      if (dot(ipoint - v_top, ipoint - v_top) > tradius2) discard;
+      if (dot(ipoint - v_top, ipoint - v_top) > tradius2) {
+        return false;
+      }
       normalDirection = v_axis;
     }
   } else if (CAPS_MODE == 2 || CAPS_MODE == 4) {
     if (capTest > 0.0 || dot(rayDirection, -v_axis) > dot(normalize(baseEdge - topEdge), -v_axis)) {
-      color = v_color2;
+      baseColor = v_color2;
       vec3 sphereVector = v_top - rayOrigin;
       float b = dot(sphereVector, rayDirection);
       float pos = b * b + tradius2 - dot(sphereVector, sphereVector);
-      if (pos < 0.0) discard;
+      if (pos < 0.0) {
+        return false;
+      }
       float t = b - sqrt(pos);
       ipoint = t * rayDirection + rayOrigin;
       normalDirection = normalize(ipoint - v_top);
@@ -124,7 +140,9 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
     if (capTest < 0.0) {
       dist = (-a1 + sqrt(d)) / a2;
       ipoint = v_point + dist * rayDirection;
-      if (dot(ipoint - v_base, v_axis) < 0.0 || dot(ipoint - v_top, v_axis) > 0.0) discard;
+      if (dot(ipoint - v_base, v_axis) < 0.0 || dot(ipoint - v_top, v_axis) > 0.0) {
+        return false;
+      }
       tmpPoint = ipoint - v_base;
       planeNormalDirection = cross(v_axis, tmpPoint);
       centerToSurfaceDirection = normalize(cross(planeNormalDirection, v_axis));
@@ -132,46 +150,60 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
       topEdge = v_top + centerToSurfaceDirection * tradius;
       normalDirection = normalize(cross(planeNormalDirection, topEdge - baseEdge));
       ratio = dot(ipoint - v_base, vec3(v_top - v_base)) * inv_sqr_height;
-      color = mix(v_color1, v_color2, ratio);
+      baseColor = mix(v_color1, v_color2, ratio);
     }
   } else if (CAPS_MODE == 1) {
     if (capTest < 0.0) {
       ipoint = ipoint + rayDirection *
         length(v_base - ipoint) * dot(normalize(v_base - ipoint), -v_axis) / dot(rayDirection, -v_axis);
-      if (dot(ipoint - v_base, ipoint - v_base) > bradius2) discard;
-      color = v_color1;
+      if (dot(ipoint - v_base, ipoint - v_base) > bradius2) {
+        return false;
+      }
+      baseColor = v_color1;
       normalDirection = -v_axis;
     }
   } else if (CAPS_MODE == 4) {
     if (capTest < 0.0) {
-      if (dot(ipoint - coneTip, v_axis) < 0.0) discard;
-      color = v_color1;
+      if (dot(ipoint - coneTip, v_axis) < 0.0) {
+        return false;
+      }
+      baseColor = v_color1;
       vec3 sphereVector = v_base - rayOrigin;
       float b = dot(sphereVector, rayDirection);
       float pos = b * b + bradius2 - dot(sphereVector, sphereVector);
-      if (pos < 0.0) discard;
+      if (pos < 0.0) {
+        return false;
+      }
       float t = b - sqrt(pos);
       ipoint = t * rayDirection + rayOrigin;
       normalDirection = normalize(ipoint - v_base);
     }
   } else if (CAPS_MODE == 3) {
     if (capTest < 0.0) {
-      color = v_color1;
+      baseColor = v_color1;
       float dNV = dot(v_axis, rayDirection);
-      if (dNV < 0.0) discard;
+      if (dNV < 0.0) {
+        return false;
+      }
       float t = dot(v_axis, v_base - rayOrigin) / dNV;
       ipoint = rayDirection * t + rayOrigin;
-      if (dot(ipoint - v_base, ipoint - v_base) > bradius2) discard;
+      if (dot(ipoint - v_base, ipoint - v_base) > bradius2) {
+        return false;
+      }
       normalDirection = -v_axis;
     }
   } else if (CAPS_MODE == 2) {
     if (capTest < 0.0) {
-      if (dot(ipoint - coneTip, v_axis) < 0.0) discard;
-      color = v_color1;
+      if (dot(ipoint - coneTip, v_axis) < 0.0) {
+        return false;
+      }
+      baseColor = v_color1;
       vec3 sphereVector = v_base - rayOrigin;
       float b = dot(sphereVector, rayDirection);
       float pos = b * b + bradius2 - dot(sphereVector, sphereVector);
-      if (pos < 0.0) discard;
+      if (pos < 0.0) {
+        return false;
+      }
       float t = b - sqrt(pos);
       ipoint = t * rayDirection + rayOrigin;
       normalDirection = normalize(ipoint - v_base);
@@ -180,21 +212,59 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
 
   vec2 clipZW = ipoint.z * cpc.projection_matrix[2].zw + cpc.projection_matrix[3].zw;
   float depth = clipZW.x / clipZW.y;
-  if (depth <= 0.0 || depth >= 1.0) discard;
+  if (depth <= 0.0 || depth >= 1.0) {
+    return false;
+  }
 
   fragDepth = depth;
 
 #ifdef ANTI_ALIASING
-  float alphaScale = edgeAlpha;
+  alphaScale = edgeAlpha;
 #else
-  float alphaScale = 1.0;
+  alphaScale = 1.0;
 #endif
 
+  return true;
+}
+
+bool cone2_fragment_depth_only(out float fragDepth)
+{
+  vec4 baseColor;
+  vec3 ipoint;
+  vec3 normalDirection;
+  float alphaScale;
+  return cone2_fragment_hit(baseColor, ipoint, normalDirection, fragDepth, alphaScale);
+}
+
+bool cone2_fragment_color_impl(out vec4 fragColor, out float fragDepth)
+{
+  vec4 baseColor;
+  vec3 ipoint;
+  vec3 normalDirection;
+  float alphaScale;
+  if (!cone2_fragment_hit(baseColor, ipoint, normalDirection, fragDepth, alphaScale)) {
+    return false;
+  }
   fragColor = apply_lighting_and_fog(matu.material_shininess,
                                      matu.material_ambient,
                                      matu.material_specular,
                                      normalDirection,
                                      ipoint,
-                                     color,
+                                     baseColor,
                                      matu.alpha * alphaScale);
+  return true;
 }
+
+#ifdef ATLAS_PPLL
+bool fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  return cone2_fragment_color_impl(fragColor, fragDepth);
+}
+#else
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  if (!cone2_fragment_color_impl(fragColor, fragDepth)) {
+    discard;
+  }
+}
+#endif

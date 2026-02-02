@@ -1,11 +1,14 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
+#define ATLAS_PPLL 1
 #include "include/wideline_func1.glslinc"
 #include "include/ppll_common.glslinc"
 
 void main()
 {
-  fragment_discard_only();
+  if (!fragment_discard_only()) {
+    return;
+  }
   ppllCountFragment();
 }

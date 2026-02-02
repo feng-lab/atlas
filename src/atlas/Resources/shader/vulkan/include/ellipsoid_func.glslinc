@@ -7,7 +7,7 @@ layout(location = 6) in vec4 v_material_specular; // .w carries shininess when d
 
 layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
-void fragment_func(out vec4 fragColor, out float fragDepth)
+bool ellipsoid_fragment_ipoint_depth(out vec3 ipoint, out float fragDepth)
 {
   float ortho = xf.parameters.y;
   vec3 rayOrigin    = mix(vec3(0.0, 0.0, 0.0), v_point, ortho);
@@ -23,17 +23,38 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   float b = 2.0 * dot(xfpp * D, c3);
   float c = dot(xfpp * D, xfpp);
   float disc = b*b - 4.0*a*c;
-  if (disc < 0.0) discard;
+  if (disc < 0.0) {
+    return false;
+  }
   float dist = (-b - sqrt(disc)) / (2.0*a);
 
-  vec3 ipoint = dist * rayDirection + rayOrigin;
+  ipoint = dist * rayDirection + rayOrigin;
 
   vec2 clipZW = ipoint.z * xf.projection_matrix[2].zw + xf.projection_matrix[3].zw;
   float depth = clipZW.x / clipZW.y;
-  if (depth <= 0.0 || depth >= 1.0) discard;
+  if (depth <= 0.0 || depth >= 1.0) {
+    return false;
+  }
   fragDepth = depth;
 
-  vec4 normal4 = transpose(v_MT_inverse) * (xfpp + dist * c3);
+  return true;
+}
+
+bool ellipsoid_fragment_depth_only(out float fragDepth)
+{
+  vec3 ipoint;
+  return ellipsoid_fragment_ipoint_depth(ipoint, fragDepth);
+}
+
+bool ellipsoid_fragment_color_impl(out vec4 fragColor, out float fragDepth)
+{
+  vec3 ipoint;
+  if (!ellipsoid_fragment_ipoint_depth(ipoint, fragDepth)) {
+    return false;
+  }
+
+  vec4 ellPoint = v_MT_inverse * vec4(ipoint, 1.0);
+  vec4 normal4 = transpose(v_MT_inverse) * ellPoint;
   vec3 normalDirection = normalize(normal4.xyz);
 
   float shininess = matu.material_shininess;
@@ -45,4 +66,19 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
 
   fragColor = apply_lighting_and_fog(shininess, matu.material_ambient, specular,
                                      normalDirection, ipoint, v_color, matu.alpha);
+  return true;
 }
+
+#ifdef ATLAS_PPLL
+bool fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  return ellipsoid_fragment_color_impl(fragColor, fragDepth);
+}
+#else
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  if (!ellipsoid_fragment_color_impl(fragColor, fragDepth)) {
+    discard;
+  }
+}
+#endif

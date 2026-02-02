@@ -24,31 +24,44 @@ layout(location = 5) flat in vec4 p0p1; // only when ROUND_CAP
 // Optional texture (emulate 1D with Wx1 2D texture)
 layout(set = 0, binding = 0) uniform sampler2D line_texture;
 
-void fragment_discard_only()
+bool wideline_fragment_covered(const vec4 dist, const vec3 pos)
 {
-  vec3 pos = vec3(gl_FragCoord.xy, 1.0);
-  vec4 dist = vec4(dot(pos, plane1), dot(pos, plane2), dot(pos, plane3), dot(pos, plane4));
+  const float radius = wpc.line_width * wpc.size_scale / 2.0;
 
   if (ROUND_CAP) {
-    if (dist.x < 0.0 || dist.y < 0.0) discard;
-    if (dist.z < 0.0 && wpc.line_width * wpc.size_scale / 2.0 - distance(pos.xy, p0p1.xy) < 0.0) discard;
-    if (dist.w < 0.0 && wpc.line_width * wpc.size_scale / 2.0 - distance(pos.xy, p0p1.zw) < 0.0) discard;
+    if (dist.x < 0.0 || dist.y < 0.0) {
+      return false;
+    }
+    if (dist.z < 0.0 && radius - distance(pos.xy, p0p1.xy) < 0.0) {
+      return false;
+    }
+    if (dist.w < 0.0 && radius - distance(pos.xy, p0p1.zw) < 0.0) {
+      return false;
+    }
   } else {
-    if (any(lessThan(dist, vec4(0.0)))) discard;
+    if (any(lessThan(dist, vec4(0.0)))) {
+      return false;
+    }
   }
+
+  return true;
 }
 
-void fragment_func(out vec4 fragColor, out float fragDepth)
+bool wideline_fragment_discard_only_impl()
 {
   vec3 pos = vec3(gl_FragCoord.xy, 1.0);
   vec4 dist = vec4(dot(pos, plane1), dot(pos, plane2), dot(pos, plane3), dot(pos, plane4));
 
-  if (ROUND_CAP) {
-    if (dist.x < 0.0 || dist.y < 0.0) discard;
-    if (dist.z < 0.0 && wpc.line_width * wpc.size_scale / 2.0 - distance(pos.xy, p0p1.xy) < 0.0) discard;
-    if (dist.w < 0.0 && wpc.line_width * wpc.size_scale / 2.0 - distance(pos.xy, p0p1.zw) < 0.0) discard;
-  } else {
-    if (any(lessThan(dist, vec4(0.0)))) discard;
+  return wideline_fragment_covered(dist, pos);
+}
+
+bool wideline_fragment_color_impl(out vec4 fragColor, out float fragDepth)
+{
+  vec3 pos = vec3(gl_FragCoord.xy, 1.0);
+  vec4 dist = vec4(dot(pos, plane1), dot(pos, plane2), dot(pos, plane3), dot(pos, plane4));
+
+  if (!wideline_fragment_covered(dist, pos)) {
+    return false;
   }
 
   float d = min(dist.x, dist.y);
@@ -73,4 +86,31 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   // (Vulkan NDC z in [0,1]). Reading gl_FragDepth here is undefined; use
   // gl_FragCoord.z which reflects interpolated depth for this fragment.
   fragDepth = gl_FragCoord.z;
+  return true;
 }
+
+#ifdef ATLAS_PPLL
+bool fragment_discard_only()
+{
+  return wideline_fragment_discard_only_impl();
+}
+
+bool fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  return wideline_fragment_color_impl(fragColor, fragDepth);
+}
+#else
+void fragment_discard_only()
+{
+  if (!wideline_fragment_discard_only_impl()) {
+    discard;
+  }
+}
+
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  if (!wideline_fragment_color_impl(fragColor, fragDepth)) {
+    discard;
+  }
+}
+#endif
