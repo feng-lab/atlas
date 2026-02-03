@@ -4043,6 +4043,12 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   AttachmentHandle depthTextureHandle = makeHandle(7);
 
   auto applyDepthAttachment = [&](RendererFrameState::ActiveSurface& surface, LoadOp loadOp) {
+    // GL behavior: when an opaque depth attachment exists, DDP is depth-tested
+    // against it (depth writes disabled). When no opaque depth is provided, GL
+    // disables depth test entirely. For Vulkan, we keep depth test enabled in
+    // DDP pipelines and emulate the "no opaque depth" case by clearing the
+    // internal depth attachment to 1.0 so all fragments pass.
+    const LoadOp effectiveLoadOp = depthAttachmentHandle.valid() ? loadOp : LoadOp::Clear;
     if (depthAttachmentHandle.valid()) {
       AttachmentDesc desc;
       desc.handle = depthAttachmentHandle;
@@ -4052,7 +4058,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       desc.clearValue.depth = 1.0f;
       surface.depthAttachment = desc;
     } else if (surface.depthAttachment) {
-      surface.depthAttachment->loadOp = loadOp;
+      surface.depthAttachment->loadOp = effectiveLoadOp;
       surface.depthAttachment->storeOp = StoreOp::Store;
       surface.depthAttachment->clearValue.depth = 1.0f;
     }
@@ -4645,14 +4651,34 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   std::vector<uint32_t> blockPrefixes;
   blockPrefixes.resize(blockCount, 0u);
   uint64_t totalFragments64 = 0u;
+  uint32_t maxBlockSum = 0u;
+  uint32_t maxBlockIdx = 0u;
   for (uint32_t i = 0u; i < blockCount; ++i) {
     CHECK(totalFragments64 <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()))
       << fmt::format("PPLL fragment count overflow before block {}: total={}", i, totalFragments64);
     blockPrefixes[i] = static_cast<uint32_t>(totalFragments64);
-    totalFragments64 += static_cast<uint64_t>(blockSums[i]);
+    const uint32_t sum = blockSums[i];
+    if (sum > maxBlockSum) {
+      maxBlockSum = sum;
+      maxBlockIdx = i;
+    }
+    totalFragments64 += static_cast<uint64_t>(sum);
   }
   CHECK(totalFragments64 <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()))
     << fmt::format("PPLL fragment count overflow: totalFragments={}", totalFragments64);
+
+  if (VLOG_IS_ON(1)) {
+    const glm::uvec4 vp = m_rendererBase.frameState().viewport;
+    VLOG(1) << fmt::format(
+      "PPLL stats: viewport={}x{} pixelCount={} blocks={} totalFragments={} maxBlockSum={} (block {})",
+      vp.z,
+      vp.w,
+      static_cast<uint64_t>(vp.z) * static_cast<uint64_t>(vp.w),
+      blockCount,
+      totalFragments64,
+      maxBlockSum,
+      maxBlockIdx);
+  }
 
   // ---------------------------------------------------------------------------
   // Submission B: scan_add + store fragments + resolve

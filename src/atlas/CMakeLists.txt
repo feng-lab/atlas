@@ -289,6 +289,8 @@ set(ATLAS_VK_SHADER_SOURCES
     dual_peeling_peel_mesh.frag
     dual_peeling_init_wideline.frag
     dual_peeling_peel_wideline.frag
+    dual_peeling_init_line.frag
+    dual_peeling_peel_line.frag
     # Dual depth peeling (image init/peel)
     dual_peeling_init_image.frag
     dual_peeling_peel_image.frag
@@ -303,6 +305,7 @@ set(ATLAS_VK_SHADER_SOURCES
     wavg_init_ellipsoid.frag
     wavg_init_mesh.frag
     wavg_init_wideline.frag
+    wavg_init_line.frag
     # Weighted OIT (image init)
     wavg_init_image.frag
     wblended_init_cone.frag
@@ -311,6 +314,7 @@ set(ATLAS_VK_SHADER_SOURCES
     wblended_init_ellipsoid.frag
     wblended_init_mesh.frag
     wblended_init_wideline.frag
+    wblended_init_line.frag
     # Weighted OIT (image init)
     wavg_init_image.frag
     wblended_init_image.frag

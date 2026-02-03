@@ -426,13 +426,14 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, co
   blendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   if (key.stage == Stage::Blend) {
-    // Accumulate pass: add the temporary back color into the back-blend buffer
+    // Accumulate pass: composite the temporary back color into the back-blend
+    // buffer using premultiplied alpha (matches GL: ONE, ONE_MINUS_SRC_ALPHA).
     blendAttachment.blendEnable = VK_TRUE;
     blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
-    blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+    blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
     blendAttachment.colorBlendOp = vk::BlendOp::eAdd;
     blendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-    blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+    blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
     blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
   } else if (key.stage == Stage::Final) {
     // Final composite must blend the resolved transparent layer over the

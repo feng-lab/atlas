@@ -596,17 +596,19 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key, const vu
           state.blendEnable = VK_TRUE;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
-          state.colorBlendOp = vk::BlendOp::eAdd;
+          // Match GL DDP peel: back-temp uses MAX blending (one fragment per pixel).
+          state.colorBlendOp = vk::BlendOp::eMax;
           state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
-          state.alphaBlendOp = vk::BlendOp::eAdd;
+          state.alphaBlendOp = vk::BlendOp::eMax;
         } else {
           state.blendEnable = VK_FALSE;
         }
         attachments.push_back(state);
       }
       instance.pipeline->setColorBlendAttachments(std::move(attachments));
-      instance.pipeline->setDepthTestEnable(false);
+      // Match GL DDP: depth-tested against the (loaded) opaque depth buffer, but do not write depth.
+      instance.pipeline->setDepthTestEnable(true);
       instance.pipeline->setDepthWriteEnable(false);
       break;
     }

@@ -12,13 +12,19 @@ layout(location = 2) out vec4 FragData2;
 layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
 
 #include "include/matrices_material.glslinc"
+#define ATLAS_PPLL 1
 #include "include/cone_func_2.glslinc"
 
 void main()
 {
   vec4 color;
   float depth;
-  fragment_func(color, depth);
+  if (!fragment_func(color, depth)) {
+    FragData0.xy = vec2(-1.0);
+    FragData1 = vec4(0.0);
+    FragData2 = vec4(0.0);
+    return;
+  }
   gl_FragDepth = depth;
 
   ivec2 p = ivec2(gl_FragCoord.xy);

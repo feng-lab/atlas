@@ -12,12 +12,21 @@ layout(location = 2) out vec4 FragData2;
 layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
 
 #include "include/matrices_material.glslinc"
+#define ATLAS_PPLL 1
 #include "include/cone_func.glslinc"
 
 void main()
 {
-  vec4 color; float fragDepth;
-  fragment_func(color, fragDepth);
+  // Avoid discard in OIT shaders that use SSBO atomics. Emit no-op outputs for
+  // miss fragments so MAX blending preserves existing values.
+  vec4 color;
+  float fragDepth;
+  if (!fragment_func(color, fragDepth)) {
+    FragData0.xy = vec2(-1.0);
+    FragData1 = vec4(0.0);
+    FragData2 = vec4(0.0);
+    return;
+  }
   gl_FragDepth = fragDepth;
 
   ivec2 p = ivec2(gl_FragCoord.xy);

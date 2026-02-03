@@ -318,7 +318,8 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
   const bool hasDepth = formats.depthFormat.has_value();
   instance.pipeline->setDepthTestEnable(hasDepth);
-  if (key.ppllCount || key.ppllStore) {
+  if (key.ppllCount || key.ppllStore || key.ddpInit || key.ddpPeel) {
+    // OIT passes must not clobber the loaded opaque depth buffer.
     instance.pipeline->setDepthWriteEnable(false);
   } else {
     instance.pipeline->setDepthWriteEnable(hasDepth);
@@ -372,6 +373,23 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
     while (atts.size() < formats.colorFormats.size()) {
       atts.push_back(atts.back());
     }
+    instance.pipeline->setColorBlendAttachments(std::move(atts));
+  } else if (key.ddpInit || key.ddpPeel) {
+    // Dual depth peeling relies on MAX blending for its depth blenders and
+    // per-pass front/back accumulators (matches GL's glBlendEquation(GL_MAX)).
+    vk::PipelineColorBlendAttachmentState maxBlend{};
+    maxBlend.blendEnable = true;
+    maxBlend.srcColorBlendFactor = vk::BlendFactor::eOne;
+    maxBlend.dstColorBlendFactor = vk::BlendFactor::eOne;
+    maxBlend.colorBlendOp = vk::BlendOp::eMax;
+    maxBlend.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    maxBlend.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+    maxBlend.alphaBlendOp = vk::BlendOp::eMax;
+    maxBlend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+    std::vector<vk::PipelineColorBlendAttachmentState> atts;
+    atts.assign(std::max<size_t>(1, formats.colorFormats.size()), maxBlend);
     instance.pipeline->setColorBlendAttachments(std::move(atts));
   } else {
     vk::PipelineColorBlendAttachmentState blendAttachment{};

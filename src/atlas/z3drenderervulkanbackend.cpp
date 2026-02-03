@@ -2474,7 +2474,7 @@ struct PPLLParamsStd430
   uint32_t pixelCount = 0;
   uint32_t blockCount = 0;
   uint32_t blockSize = 0;
-  uint32_t reserved = 0;
+  uint32_t fragmentCapacity = 0;
 };
 
 static_assert(sizeof(PPLLParamsStd430) == 32, "PPLL params must match std430 layout (32B)");
@@ -2500,6 +2500,9 @@ void Z3DRendererVulkanBackend::ensurePPLLResources(const glm::uvec4& viewport, u
   ppll.blockCount =
     (ppll.pixelCount == 0u) ? 0u : ((ppll.pixelCount + PPLLResources::kBlockSize - 1u) / PPLLResources::kBlockSize);
   ppll.requestedFragmentCount = requestedFragments;
+  const uint64_t fragCount = std::max<uint64_t>(requestedFragments, 1u);
+  CHECK(fragCount <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()))
+    << fmt::format("PPLL fragment capacity overflow: fragments={}", fragCount);
 
   // Params SSBO (host-visible). Keep mapped across frames.
   const size_t paramsBytes = sizeof(PPLLParamsStd430);
@@ -2519,6 +2522,7 @@ void Z3DRendererVulkanBackend::ensurePPLLResources(const glm::uvec4& viewport, u
     params.pixelCount = ppll.pixelCount;
     params.blockCount = ppll.blockCount;
     params.blockSize = PPLLResources::kBlockSize;
+    params.fragmentCapacity = static_cast<uint32_t>(fragCount);
     std::memcpy(ppll.paramsMapped, &params, sizeof(params));
   }
 
@@ -2562,7 +2566,6 @@ void Z3DRendererVulkanBackend::ensurePPLLResources(const glm::uvec4& viewport, u
   }
 
   // Fragment storage: grow to requestedFragments (in elements), but never shrink.
-  const uint64_t fragCount = std::max<uint64_t>(requestedFragments, 1u);
   const uint64_t fragBytes64 = fragCount * static_cast<uint64_t>(kPPLLFragmentStrideBytes);
   CHECK(fragBytes64 <= static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
     << fmt::format("PPLL fragment buffer size overflow: fragments={} stride={}B bytes={}",

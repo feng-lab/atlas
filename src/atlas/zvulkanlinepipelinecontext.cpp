@@ -546,16 +546,18 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
             attachment.blendEnable = true;
             attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
             attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
-            attachment.colorBlendOp = vk::BlendOp::eAdd;
+            // Match GL DDP peel: this attachment uses MAX blending as well.
+            attachment.colorBlendOp = vk::BlendOp::eMax;
             attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
             attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
-            attachment.alphaBlendOp = vk::BlendOp::eAdd;
+            attachment.alphaBlendOp = vk::BlendOp::eMax;
           } else {
             attachment.blendEnable = false;
           }
         }
         instance.pipeline->setColorBlendAttachments(std::move(attachments));
-        instance.pipeline->setDepthTestEnable(false);
+        // Match GL DDP: depth-tested against the (loaded) opaque depth buffer, but do not write depth.
+        instance.pipeline->setDepthTestEnable(true);
         instance.pipeline->setDepthWriteEnable(false);
         break;
       }
@@ -578,12 +580,17 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
         fragmentShader = "ppll_store_line.frag.spv";
         break;
-      case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-      case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
+        fragmentShader = "dual_peeling_init_line.frag.spv";
+        break;
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-        // Thin-line specialisations are not available; fall back to normal shader.
-        fragmentShader = "line.frag.spv";
+        fragmentShader = "dual_peeling_peel_line.frag.spv";
+        break;
+      case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
+        fragmentShader = "wavg_init_line.frag.spv";
+        break;
+      case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
+        fragmentShader = "wblended_init_line.frag.spv";
         break;
       case Z3DRendererBase::ShaderHookType::Normal:
       default:
@@ -644,16 +651,18 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
           attachment.blendEnable = true;
           attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
           attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
-          attachment.colorBlendOp = vk::BlendOp::eAdd;
+          // Match GL DDP peel: this attachment uses MAX blending as well.
+          attachment.colorBlendOp = vk::BlendOp::eMax;
           attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
           attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
-          attachment.alphaBlendOp = vk::BlendOp::eAdd;
+          attachment.alphaBlendOp = vk::BlendOp::eMax;
         } else {
           attachment.blendEnable = false;
         }
       }
       instance.pipeline->setColorBlendAttachments(std::move(attachments));
-      instance.pipeline->setDepthTestEnable(false);
+      // Match GL DDP: depth-tested against the (loaded) opaque depth buffer, but do not write depth.
+      instance.pipeline->setDepthTestEnable(true);
       instance.pipeline->setDepthWriteEnable(false);
     }
     instance.pipeline->create();

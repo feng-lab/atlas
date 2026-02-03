@@ -14,7 +14,10 @@ layout(set = 3, binding = 0, std430) readonly buffer PPLLParams
   uint pixelCount;
   uint blockCount;
   uint blockSize;
-  uint reserved;
+  // Total number of valid elements in ppll_fragments.fragments[].
+  // This is expected to equal the total fragment count computed from the count pass
+  // (and the size used to allocate the fragments SSBO for the store/resolve pass).
+  uint fragmentCapacity;
 } ppll_params;
 
 layout(set = 3, binding = 2, std430) buffer PPLLCounts
@@ -74,9 +77,13 @@ void ppllStoreFragment(vec4 fragColor, float fragDepth)
   }
 
   const uint writeIndex = ppll_offsets.offsets[pixelIndex] + atomicAdd(ppll_cursors.cursors[pixelIndex], 1u);
+  // Guard against out-of-bounds writes if count/store disagree or offsets are corrupted.
+  // An OOB SSBO write in Vulkan can lead to device loss, so prefer a hard skip here.
+  if (writeIndex >= ppll_params.fragmentCapacity) {
+    return;
+  }
   ppll_fragments.fragments[writeIndex].color = fragColor;
   ppll_fragments.fragments[writeIndex].depth = fragDepth;
 }
 
 #endif // ATLAS_PPLL_COMMON_GLSLINC
-

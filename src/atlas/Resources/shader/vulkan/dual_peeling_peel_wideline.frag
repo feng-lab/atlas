@@ -11,19 +11,30 @@ layout(location = 2) out vec4 FragData2;
 
 layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
 
+#define ATLAS_PPLL 1
 #include "include/wideline_func1.glslinc"
 
 void main()
 {
-  vec4 color; float fragDepth;
-  fragment_func(color, fragDepth);
+  // Avoid discard in OIT shaders that use SSBO atomics (MoltenVK/driver stability).
+  // When a fragment is not covered by the wide-line expansion, emit no-op
+  // outputs so MAX blending leaves existing values unchanged and do not touch
+  // the DDP changed flag.
+  vec4 color;
+  float fragDepth;
+  if (!fragment_func(color, fragDepth)) {
+    FragData0.xy = vec2(-1.0);
+    FragData1 = vec4(0.0);
+    FragData2 = vec4(0.0);
+    return;
+  }
 
-  ivec2 p = ivec2(gl_FragCoord.xy);
-  vec2 depthBlender = texelFetch(DepthBlenderTex, p, 0).xy;
-  vec4 forwardTemp = texelFetch(FrontBlenderTex, p, 0);
+  const ivec2 p = ivec2(gl_FragCoord.xy);
+  const vec2 depthBlender = texelFetch(DepthBlenderTex, p, 0).xy;
+  const vec4 forwardTemp = texelFetch(FrontBlenderTex, p, 0);
 
-  FragData1 = forwardTemp;
-  FragData2 = vec4(0.0);
+  FragData1 = forwardTemp; // pass-through by default with MAX blending
+  FragData2 = vec4(0.0);   // back temp
 
   float nearestDepth = -depthBlender.x;
   float farthestDepth = depthBlender.y;

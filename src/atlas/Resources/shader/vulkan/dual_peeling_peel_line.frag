@@ -1,8 +1,8 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-layout(set = 0, binding = 3) uniform sampler2D DepthBlenderTex;
-layout(set = 0, binding = 4) uniform sampler2D FrontBlenderTex;
+layout(set = 0, binding = 1) uniform sampler2D DepthBlenderTex;
+layout(set = 0, binding = 2) uniform sampler2D FrontBlenderTex;
 
 layout(location = 0) out vec4 FragData0; // depth blender
 layout(location = 1) out vec4 FragData1; // front blender
@@ -11,22 +11,13 @@ layout(location = 2) out vec4 FragData2; // back temp
 // DDP indirect-count: mark when this pass updates any pixel
 layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
 
-#define ATLAS_PPLL 1
-#include "include/copyimage_func.glslinc"
+#include "include/line_func.glslinc"
 
 void main()
 {
-  // Avoid discard in OIT shaders that use SSBO atomics. Emit no-op outputs for
-  // transparent/empty fragments so MAX blending preserves existing values.
   vec4 color;
   float fragDepth;
-  if (!fragment_func(color, fragDepth)) {
-    FragData0.xy = vec2(-1.0);
-    FragData1 = vec4(0.0);
-    FragData2 = vec4(0.0);
-    return;
-  }
-  gl_FragDepth = fragDepth;
+  fragment_func(color, fragDepth);
 
   ivec2 p = ivec2(gl_FragCoord.xy);
   vec2 depthBlender = texelFetch(DepthBlenderTex, p, 0).xy;
@@ -56,3 +47,4 @@ void main()
   }
   atomicOr(ddp_flag.changed, 1u);
 }
+
