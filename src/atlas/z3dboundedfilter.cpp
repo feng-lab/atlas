@@ -263,10 +263,14 @@ void Z3DBoundedFilter::renderSelectionBox(Z3DEye eye)
     m_selectionLines.resize(24);
     addSelectionLines();
     m_selectionBoundBoxRenderer.setData(std::span<const glm::vec3>(m_selectionLines));
-    if (m_selectionLineColors.size() < m_selectionLines.size()) {
-      for (size_t i = m_selectionLineColors.size(); i < m_selectionLines.size(); ++i) {
-        m_selectionLineColors.push_back(m_selectionLineColor.get());
-      }
+    // Keep the renderer color buffer in sync with the current geometry size.
+    //
+    // Z3DLineRenderer::setData() resizes its internal color storage to match the
+    // new vertex count. If the vertex count grows later and we don't restage the
+    // colors, the newly-added vertices default to black (appearing grey in UI),
+    // which makes only the first selection box look "yellow".
+    if (m_selectionLineColors.size() != m_selectionLines.size()) {
+      m_selectionLineColors.resize(m_selectionLines.size(), m_selectionLineColor.get());
       m_selectionBoundBoxRenderer.setDataColors(std::span<const glm::vec4>(m_selectionLineColors));
     }
     m_rendererBase.setClipEnabled(false);
@@ -288,10 +292,10 @@ void Z3DBoundedFilter::renderEditingSelectionBox(Z3DEye eye)
       return;
     }
     m_selectionBoundBoxRenderer.setData(std::span<const glm::vec3>(m_editingSelectionLines));
-    if (m_selectionLineColors.size() < m_editingSelectionLines.size()) {
-      for (size_t i = m_selectionLineColors.size(); i < m_editingSelectionLines.size(); ++i) {
-        m_selectionLineColors.push_back(m_selectionLineColor.get());
-      }
+    // See renderSelectionBox() for why this must be keyed off geometry size,
+    // not off whether our cached vector has ever been large enough.
+    if (m_selectionLineColors.size() != m_editingSelectionLines.size()) {
+      m_selectionLineColors.resize(m_editingSelectionLines.size(), m_selectionLineColor.get());
       m_selectionBoundBoxRenderer.setDataColors(std::span<const glm::vec4>(m_selectionLineColors));
     }
     m_rendererBase.setClipEnabled(false);
