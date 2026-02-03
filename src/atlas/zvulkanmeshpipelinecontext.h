@@ -3,12 +3,14 @@
 #include "z3drendercommands.h"
 #include "z3drendererstates.h"
 #include "z3drendererbase.h"
+#include "z3drenderervulkanbackend.h"
 #include "zvulkan.h"
 #include "zglmutils.h"
 
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <tuple>
 #include <vector>
 
@@ -38,6 +40,7 @@ public:
   ~ZVulkanMeshPipelineContext();
 
   void resetFrame();
+  void evictStream(uint64_t streamKey);
 
   void record(Z3DRendererBase& renderer,
               const RenderBatch& batch,
@@ -120,17 +123,12 @@ private:
   struct CacheEntry
   {
     // Device-local static buffers per attribute (SoA)
-    vk::Buffer vbPos{};
-    vk::Buffer vbNorm{};
-    vk::Buffer vbColor{};
-    vk::Buffer vbTex{}; // optional
-    vk::DeviceSize posOffset = 0;
-    vk::DeviceSize normOffset = 0;
-    vk::DeviceSize colorOffset = 0;
-    vk::DeviceSize texOffset = 0;
+    Z3DRendererVulkanBackend::StaticSlice vbPos{};
+    Z3DRendererVulkanBackend::StaticSlice vbNorm{};
+    Z3DRendererVulkanBackend::StaticSlice vbColor{};
+    Z3DRendererVulkanBackend::StaticSlice vbTex{}; // optional
     bool hasTex = false;
-    vk::Buffer ib{};
-    vk::DeviceSize indexOffset = 0;
+    Z3DRendererVulkanBackend::StaticSlice ib{};
 
     uint32_t vertexCount = 0;
     uint32_t indexCount = 0;
@@ -141,6 +139,10 @@ private:
     bool promoted = false;
   };
   std::map<CacheKey, CacheEntry> m_staticCache;
+  // Guard: if we scheduled upload->static copies for a stream within the
+  // current submission, we must not bind the static buffers again until the
+  // next submission because copies are flushed after rendering ends.
+  std::set<CacheKey> m_staticCopyPendingKeys;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 

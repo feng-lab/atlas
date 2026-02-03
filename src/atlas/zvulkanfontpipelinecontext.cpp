@@ -35,6 +35,33 @@ void ZVulkanFontPipelineContext::resetFrame()
   m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
   resetDescriptors();
+  m_staticCopyPendingKeys.clear();
+}
+
+void ZVulkanFontPipelineContext::evictStream(uint64_t streamKey)
+{
+  if (streamKey == 0) {
+    return;
+  }
+
+  for (auto it = m_staticCopyPendingKeys.begin(); it != m_staticCopyPendingKeys.end();) {
+    if (it->streamKey == streamKey) {
+      it = m_staticCopyPendingKeys.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto it = m_staticCache.begin(); it != m_staticCache.end();) {
+    if (it->first.streamKey != streamKey) {
+      ++it;
+      continue;
+    }
+    auto& entry = it->second;
+    m_backend.releaseStaticSlice(entry.vb);
+    m_backend.releaseStaticSlice(entry.ib);
+    it = m_staticCache.erase(it);
+  }
 }
 
 void ZVulkanFontPipelineContext::resetDescriptors()
@@ -230,6 +257,34 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
       << "Font uploadGeometry colors mismatch: colors=" << payload.colors.size() << " positions=" << vtxCount;
   }
 
+  // Fast path: if this stream was promoted to device-local static buffers and
+  // nothing changed, bind the static buffers and skip per-frame staging/memcpy.
+  {
+    CHECK(payload.streamKey != 0) << "Font payload missing streamKey";
+    CacheKey key{payload.streamKey, payload.pickingPass};
+    if (!m_staticCopyPendingKeys.contains(key)) {
+      auto it = m_staticCache.find(key);
+      if (it != m_staticCache.end()) {
+        const CacheEntry& entry = it->second;
+        const bool sizeSame = (entry.vertexCount == vtxCount) && (entry.indexCount == idxCount);
+        const uint32_t colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        const bool gensSame = (entry.posGen == payload.positionsGen) && (entry.texGen == payload.texcoordsGen) &&
+                              (entry.colorGen == colorGen) && (entry.indexGen == payload.indicesGen);
+        if (entry.promoted && sizeSame && gensSame && entry.vb && entry.ib) {
+          m_vertexCount = vtxCount;
+          m_indexCount = idxCount;
+          m_vertexUploadBuffer = entry.vb.buffer;
+          m_vertexUploadOffset = entry.vb.offset;
+          m_indexUploadBuffer = entry.ib.buffer;
+          m_indexUploadOffset = entry.ib.offset;
+          m_backend.pinStaticSliceForActiveSubmission(entry.vb);
+          m_backend.pinStaticSliceForActiveSubmission(entry.ib);
+          return;
+        }
+      }
+    }
+  }
+
   auto vSlice = m_backend.suballocateUpload(vtxCount * sizeof(FontVertex), alignof(FontVertex));
   auto iSlice = m_backend.suballocateUpload(idxCount * sizeof(uint32_t), alignof(uint32_t));
   CHECK(vSlice.buffer && vSlice.mapped && iSlice.buffer && iSlice.mapped) << "Font arena slices allocation failed";
@@ -280,47 +335,82 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
       } else {
         entry.unchangedFrames = 0;
       }
+      // A previous draw in this submission scheduled upload->static copies for
+      // this stream; do not bind statics until the next submission because the
+      // copies are flushed after rendering ends.
+      if (m_staticCopyPendingKeys.contains(key)) {
+        entry.vertexCount = static_cast<uint32_t>(vtxCount);
+        entry.indexCount = static_cast<uint32_t>(idxCount);
+        entry.posGen = payload.positionsGen;
+        entry.texGen = payload.texcoordsGen;
+        entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        entry.indexGen = payload.indicesGen;
+        return;
+      }
+      if (entry.promoted && !sizeSame) {
+        m_backend.releaseStaticSlice(entry.vb);
+        m_backend.releaseStaticSlice(entry.ib);
+        entry.promoted = false;
+        entry.unchangedFrames = 0;
+        entry.vertexCount = static_cast<uint32_t>(vtxCount);
+        entry.indexCount = static_cast<uint32_t>(idxCount);
+        entry.posGen = payload.positionsGen;
+        entry.texGen = payload.texcoordsGen;
+        entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        entry.indexGen = payload.indicesGen;
+        return;
+      }
       if (entry.promoted && sizeSame) {
         // Restage VB/IB if any gen changed
         size_t restaged = 0;
         bool anyChanged = false;
         if (entry.posGen != payload.positionsGen || entry.texGen != payload.texcoordsGen ||
             entry.colorGen != (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen)) {
-          m_backend.scheduleStaticCopy(entry.vb, entry.vbOffset, vSlice, /*isIndexBuffer=*/false);
-          entry.posGen = payload.positionsGen;
-          entry.texGen = payload.texcoordsGen;
-          entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+          m_backend.scheduleStaticCopy(entry.vb.buffer, entry.vb.offset, vSlice, /*isIndexBuffer=*/false);
           restaged += vtxCount * sizeof(FontVertex);
           anyChanged = true;
         }
         if (entry.indexGen != payload.indicesGen) {
-          m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iSlice, /*isIndexBuffer=*/true);
-          entry.indexGen = payload.indicesGen;
+          m_backend.scheduleStaticCopy(entry.ib.buffer, entry.ib.offset, iSlice, /*isIndexBuffer=*/true);
           restaged += idxCount * sizeof(uint32_t);
           anyChanged = true;
         }
+        entry.vertexCount = static_cast<uint32_t>(vtxCount);
+        entry.indexCount = static_cast<uint32_t>(idxCount);
+        entry.posGen = payload.positionsGen;
+        entry.texGen = payload.texcoordsGen;
+        entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        entry.indexGen = payload.indicesGen;
         if (restaged > 0) {
           m_backend.addFontBytesStaged(restaged);
         }
         if (!anyChanged) {
           // Bind statics on steady frames
-          m_vertexUploadBuffer = entry.vb;
-          m_vertexUploadOffset = entry.vbOffset;
-          m_indexUploadBuffer = entry.ib;
-          m_indexUploadOffset = entry.ibOffset;
+          m_vertexUploadBuffer = entry.vb.buffer;
+          m_vertexUploadOffset = entry.vb.offset;
+          m_indexUploadBuffer = entry.ib.buffer;
+          m_indexUploadOffset = entry.ib.offset;
+          m_backend.pinStaticSliceForActiveSubmission(entry.vb);
+          m_backend.pinStaticSliceForActiveSubmission(entry.ib);
+        } else {
+          m_staticCopyPendingKeys.insert(key);
         }
         return;
       }
+      entry.vertexCount = static_cast<uint32_t>(vtxCount);
+      entry.indexCount = static_cast<uint32_t>(idxCount);
+      entry.posGen = payload.positionsGen;
+      entry.texGen = payload.texcoordsGen;
+      entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+      entry.indexGen = payload.indicesGen;
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
         auto vbDst = m_backend.allocateStaticVB(vtxCount * sizeof(FontVertex), alignof(FontVertex));
         auto ibDst = m_backend.allocateStaticIB(idxCount * sizeof(uint32_t), alignof(uint32_t));
-        if (vbDst.buffer && ibDst.buffer) {
+        if (vbDst && ibDst) {
           m_backend.scheduleStaticCopy(vbDst.buffer, vbDst.offset, vSlice, /*isIndexBuffer=*/false);
           m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, iSlice, /*isIndexBuffer=*/true);
-          entry.vb = vbDst.buffer;
-          entry.vbOffset = vbDst.offset;
-          entry.ib = ibDst.buffer;
-          entry.ibOffset = ibDst.offset;
+          entry.vb = vbDst;
+          entry.ib = ibDst;
           entry.posGen = payload.positionsGen;
           entry.texGen = payload.texcoordsGen;
           entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
@@ -328,6 +418,7 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
           entry.promoted = true;
           m_backend.addFontBytesStaged(vtxCount * sizeof(FontVertex) + idxCount * sizeof(uint32_t));
           // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+          m_staticCopyPendingKeys.insert(key);
           return;
         }
       }

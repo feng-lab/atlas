@@ -105,13 +105,20 @@ void main()
   pmax = max(pmax, p2); pmax = max(pmax, p3); pmax = max(pmax, p4);
   pmax = max(pmax, p5); pmax = max(pmax, p6); pmax = max(pmax, p7); pmax = max(pmax, p8);
 
-  // Vulkan: NDC z is [0,1]. If the bounding prism crosses the near plane,
-  // push slightly forward to keep the quad in front of the clear depth.
+  // Vulkan clip volume: x/y in [-w,w], z in [0,w]. We emit NDC coordinates
+  // with w=1, so allowing z outside [0,1] is important: it lets fixed-function
+  // clipping reject cones that are entirely outside the view (e.g., behind the
+  // near plane) instead of rasterizing huge quads that later discard in the
+  // fragment shader.
+  //
+  // If the bounding prism crosses the near plane, push slightly forward so the
+  // quad stays in front of the clear depth (same intent as the GL path).
   float depth = (pmin.z < 0.0 && pmax.z > 0.0) ? 0.001 : pmin.z;
-  depth = clamp(depth, 0.0, 1.0);
-  // Full-screen clamp test keeps behavior identical; XY ranges remain [-1,1]
+
+  // If the projected bounds blow up to (almost) full-screen, match the GL path
+  // by pushing the quad outside the clip volume so it is clipped away early.
   if (pmin.x < -1.0 && pmax.x > 1.0 && pmin.y < -1.0 && pmax.y > 1.0) {
-    depth = 0.0;
+    depth = -1.0;
   }
 
   // Output vertex at selected corner of bounding quad

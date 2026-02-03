@@ -2,11 +2,13 @@
 
 #include "z3drendercommands.h"
 #include "z3drendererbase.h"
+#include "z3drenderervulkanbackend.h"
 #include "zvulkan.h"
 
 #include <memory>
 #include <map>
 #include <optional>
+#include <set>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -40,6 +42,7 @@ public:
   ~ZVulkanLinePipelineContext();
 
   void resetFrame();
+  void evictStream(uint64_t streamKey);
 
   void record(Z3DRendererBase& renderer,
               const RenderBatch& batch,
@@ -152,13 +155,10 @@ private:
   struct ThinCacheEntry
   {
     // Separate static VBs for positions and colors
-    vk::Buffer vbPos{};
-    vk::Buffer vbColor{};
-    vk::DeviceSize posOffset = 0;
-    vk::DeviceSize colorOffset = 0;
+    Z3DRendererVulkanBackend::StaticSlice vbPos{};
+    Z3DRendererVulkanBackend::StaticSlice vbColor{};
     uint32_t vertexCount = 0;
-    vk::Buffer ib{}; // only for line strip
-    vk::DeviceSize ibOffset = 0;
+    Z3DRendererVulkanBackend::StaticSlice ib{}; // only for line strip
     uint32_t indexCount = 0;
     uint32_t positionsGen = 0;
     uint32_t colorsGen = 0; // picking or regular colors depending on pass
@@ -167,6 +167,7 @@ private:
     bool promoted = false;
   };
   std::map<ThinCacheKey, ThinCacheEntry> m_thinStaticCache;
+  std::set<ThinCacheKey> m_thinStaticCopyPendingKeys;
 
   struct WideCacheKey
   {
@@ -184,18 +185,12 @@ private:
   struct WideCacheEntry
   {
     // Static VBs per attribute (SoA)
-    vk::Buffer vbP0{};
-    vk::Buffer vbP1{};
-    vk::Buffer vbC0{};
-    vk::Buffer vbC1{};
-    vk::Buffer vbFlags{};
-    vk::DeviceSize p0Offset = 0;
-    vk::DeviceSize p1Offset = 0;
-    vk::DeviceSize c0Offset = 0;
-    vk::DeviceSize c1Offset = 0;
-    vk::DeviceSize flagsOffset = 0;
-    vk::Buffer ib{};
-    vk::DeviceSize ibOffset = 0;
+    Z3DRendererVulkanBackend::StaticSlice vbP0{};
+    Z3DRendererVulkanBackend::StaticSlice vbP1{};
+    Z3DRendererVulkanBackend::StaticSlice vbC0{};
+    Z3DRendererVulkanBackend::StaticSlice vbC1{};
+    Z3DRendererVulkanBackend::StaticSlice vbFlags{};
+    Z3DRendererVulkanBackend::StaticSlice ib{};
     uint32_t vertexCount = 0;
     uint32_t indexCount = 0;
     uint32_t p0Gen = 0;
@@ -209,6 +204,7 @@ private:
     bool promoted = false;
   };
   std::map<WideCacheKey, WideCacheEntry> m_wideStaticCache;
+  std::set<WideCacheKey> m_wideStaticCopyPendingKeys;
 
   // UBO lifetime guard: retain previous frame UBOs until the active submission
   // fence signals to avoid read-after-free glitches. We collect them here in

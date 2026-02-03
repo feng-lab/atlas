@@ -3,11 +3,13 @@
 #include "z3drendercommands.h"
 #include "z3drendererstates.h"
 #include "z3drendererbase.h"
+#include "z3drenderervulkanbackend.h"
 #include "zvulkan.h"
 
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <tuple>
 #include <vector>
 
@@ -33,6 +35,7 @@ public:
   ~ZVulkanConePipelineContext();
 
   void resetFrame();
+  void evictStream(uint64_t streamKey);
 
   void record(Z3DRendererBase& renderer,
               const RenderBatch& batch,
@@ -159,18 +162,12 @@ private:
   struct CacheEntry
   {
     // Separate static buffers for each attribute stream
-    vk::Buffer vbOrigin = VK_NULL_HANDLE;
-    vk::Buffer vbAxis = VK_NULL_HANDLE;
-    vk::Buffer vbFlags = VK_NULL_HANDLE;
-    vk::Buffer vbBaseColor = VK_NULL_HANDLE;
-    vk::Buffer vbTopColor = VK_NULL_HANDLE;
-    vk::DeviceSize originOffset = 0;
-    vk::DeviceSize axisOffset = 0;
-    vk::DeviceSize flagsOffset = 0;
-    vk::DeviceSize baseColorOffset = 0;
-    vk::DeviceSize topColorOffset = 0;
-    vk::Buffer ib = VK_NULL_HANDLE;
-    vk::DeviceSize ibOffset = 0;
+    Z3DRendererVulkanBackend::StaticSlice vbOrigin{};
+    Z3DRendererVulkanBackend::StaticSlice vbAxis{};
+    Z3DRendererVulkanBackend::StaticSlice vbFlags{};
+    Z3DRendererVulkanBackend::StaticSlice vbBaseColor{};
+    Z3DRendererVulkanBackend::StaticSlice vbTopColor{};
+    Z3DRendererVulkanBackend::StaticSlice ib{};
     uint32_t vertexCount = 0;
     uint32_t indexCount = 0;
     // Last observed gens
@@ -180,6 +177,10 @@ private:
     bool promoted = false;
   };
   std::map<CacheKey, CacheEntry> m_staticCache;
+  // Guard: if we scheduled upload->static copies for a stream within the
+  // current submission, we must not bind the static buffers again until the
+  // next submission because copies are flushed after rendering ends.
+  std::set<CacheKey> m_staticCopyPendingKeys;
 
   void ensureDescriptorLayouts();
   void resetDescriptors();

@@ -208,6 +208,36 @@ void ZVulkanMeshPipelineContext::resetFrame()
   m_ddpMaterialFrozen = false;
   m_ddpArgsOffsets.clear();
   m_ddpArgsPrepared.clear();
+  m_staticCopyPendingKeys.clear();
+}
+
+void ZVulkanMeshPipelineContext::evictStream(uint64_t streamKey)
+{
+  if (streamKey == 0) {
+    return;
+  }
+
+  for (auto it = m_staticCopyPendingKeys.begin(); it != m_staticCopyPendingKeys.end();) {
+    if (it->streamKey == streamKey) {
+      it = m_staticCopyPendingKeys.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto it = m_staticCache.begin(); it != m_staticCache.end();) {
+    if (it->first.streamKey != streamKey) {
+      ++it;
+      continue;
+    }
+    auto& entry = it->second;
+    m_backend.releaseStaticSlice(entry.vbPos);
+    m_backend.releaseStaticSlice(entry.vbNorm);
+    m_backend.releaseStaticSlice(entry.vbColor);
+    m_backend.releaseStaticSlice(entry.vbTex);
+    m_backend.releaseStaticSlice(entry.ib);
+    it = m_staticCache.erase(it);
+  }
 }
 
 void ZVulkanMeshPipelineContext::flushRetainedUbos()
@@ -265,7 +295,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = renderer.shaderHookType();
 
-  m_dynLightingOffset = m_backend.frameSharedLightingOffset();
+  m_dynLightingOffset = payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload);
   ensureOITResources();
   {
@@ -1067,29 +1097,147 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
   m_vertexCount = totalVertices;
   m_indexCount = totalIndices;
 
-  // Allocate SoA streams in the per-frame upload arena
-  const size_t posBytes = totalVertices * sizeof(glm::vec3);
-  const size_t normBytes = totalVertices * sizeof(glm::vec3);
-  const size_t colorBytes = totalVertices * sizeof(glm::vec4);
-  size_t texBytes = 0;
+  // Determine active texture coordinate binding (if any). This is used both by
+  // the upload path and by the static-buffer fast path.
   TexBinding texBinding = TexBinding::None;
   switch (payload.colorSource) {
     case MeshPayload::ColorSource::Mesh1DTexture:
       texBinding = TexBinding::Tex1D;
-      texBytes = totalVertices * sizeof(float);
       break;
     case MeshPayload::ColorSource::Mesh2DTexture:
       texBinding = TexBinding::Tex2D;
-      texBytes = totalVertices * sizeof(glm::vec2);
       break;
     case MeshPayload::ColorSource::Mesh3DTexture:
       texBinding = TexBinding::Tex3D;
-      texBytes = totalVertices * sizeof(glm::vec3);
       break;
     case MeshPayload::ColorSource::MeshColor:
     case MeshPayload::ColorSource::CustomColor:
     default:
       texBinding = TexBinding::None;
+      break;
+  }
+
+  // Fast path: if this stream was promoted to device-local static buffers and
+  // nothing changed, bind the static buffers and skip per-frame staging/memcpy.
+  if (payload.streamKey != 0) {
+    CacheKey key{payload.streamKey, payload.colorSource, payload.pickingPass};
+    if (!m_staticCopyPendingKeys.contains(key)) {
+      auto it = m_staticCache.find(key);
+      if (it != m_staticCache.end()) {
+        const CacheEntry& entry = it->second;
+        const bool sizeUnchanged = entry.vertexCount == m_vertexCount && entry.indexCount == m_indexCount;
+        const bool posSame = entry.posGen == payload.posGen;
+        const bool normSame = entry.normGen == payload.normGen;
+        const bool texSame = entry.texGen == payload.texGen;
+        const bool idxSame = entry.indexGen == payload.indexGen;
+        const bool colorSame = entry.colorGen == payload.colorGen;
+        const bool wantTex = (texBinding != TexBinding::None);
+        const bool texLayoutSame = (entry.hasTex == wantTex) && (!wantTex || static_cast<bool>(entry.vbTex));
+        const bool buffersOk = static_cast<bool>(entry.vbPos) && static_cast<bool>(entry.vbNorm) &&
+                               static_cast<bool>(entry.vbColor) && texLayoutSame &&
+                               ((m_indexCount == 0) || static_cast<bool>(entry.ib));
+        if (entry.promoted && sizeUnchanged && posSame && normSame && texSame && idxSame && colorSame && buffersOk) {
+          // Bind static buffers
+          m_posBuffer = entry.vbPos.buffer;
+          m_normBuffer = entry.vbNorm.buffer;
+          m_colorBuffer = entry.vbColor.buffer;
+          m_posOffset = entry.vbPos.offset;
+          m_normOffset = entry.vbNorm.offset;
+          m_colorOffset = entry.vbColor.offset;
+          m_texBinding = texBinding;
+          if (wantTex) {
+            m_texBuffer = entry.vbTex.buffer;
+            m_texOffset = entry.vbTex.offset;
+          } else {
+            m_texBuffer = vk::Buffer{};
+            m_texOffset = 0;
+          }
+          if (m_indexCount > 0) {
+            m_indexUploadBuffer = entry.ib.buffer;
+            m_indexUploadOffset = entry.ib.offset;
+          } else {
+            m_indexUploadBuffer = vk::Buffer{};
+            m_indexUploadOffset = 0;
+          }
+
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbPos);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbNorm);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbColor);
+          if (wantTex) {
+            m_backend.pinStaticSliceForActiveSubmission(entry.vbTex);
+          }
+          if (m_indexCount > 0) {
+            m_backend.pinStaticSliceForActiveSubmission(entry.ib);
+          }
+
+          // Rebuild draw list without touching CPU vertex data.
+          size_t vertexCursor = 0;
+          size_t indexCursor = 0;
+          for (size_t meshIdx = 0; meshIdx < payload.meshes.size(); ++meshIdx) {
+            ZMesh* mesh = payload.meshes[meshIdx];
+            if (!mesh || mesh->numVertices() == 0) {
+              continue;
+            }
+
+            MeshDraw draw{};
+            draw.mesh = mesh;
+            draw.payloadMeshIndex = meshIdx;
+            draw.firstVertex = static_cast<uint32_t>(vertexCursor);
+            draw.vertexCount = static_cast<uint32_t>(mesh->numVertices());
+
+            const auto& indices = mesh->indices();
+            if (!indices.empty() && m_indexCount > 0 && m_indexUploadBuffer) {
+              draw.indexed = true;
+              draw.firstIndex = static_cast<uint32_t>(indexCursor);
+              draw.indexCount = static_cast<uint32_t>(indices.size());
+              indexCursor += indices.size();
+            }
+
+            const auto& colors = mesh->colors();
+            const bool hasVertexColors =
+              payload.colorSource == MeshPayload::ColorSource::MeshColor && colors.size() >= mesh->numVertices();
+            const bool fallbackColorNeeded = payload.colorSource == MeshPayload::ColorSource::MeshColor && !hasVertexColors;
+
+            if (payload.pickingPass) {
+              draw.useFallbackColor = true;
+              if (meshIdx < payload.meshPickingColors.size()) {
+                draw.fallbackColor = payload.meshPickingColors[meshIdx];
+              } else {
+                draw.fallbackColor = glm::vec4(0.0f);
+              }
+            } else {
+              draw.useFallbackColor = fallbackColorNeeded;
+              draw.fallbackColor = fallbackColorNeeded ? kFallbackMeshColor : glm::vec4(1.0f);
+            }
+
+            m_draws.push_back(draw);
+            vertexCursor += mesh->numVertices();
+          }
+
+          return;
+        }
+      }
+    }
+  }
+
+  // Allocate SoA streams in the per-frame upload arena
+  const size_t posBytes = totalVertices * sizeof(glm::vec3);
+  const size_t normBytes = totalVertices * sizeof(glm::vec3);
+  const size_t colorBytes = totalVertices * sizeof(glm::vec4);
+  size_t texBytes = 0;
+  switch (payload.colorSource) {
+    case MeshPayload::ColorSource::Mesh1DTexture:
+      texBytes = totalVertices * sizeof(float);
+      break;
+    case MeshPayload::ColorSource::Mesh2DTexture:
+      texBytes = totalVertices * sizeof(glm::vec2);
+      break;
+    case MeshPayload::ColorSource::Mesh3DTexture:
+      texBytes = totalVertices * sizeof(glm::vec3);
+      break;
+    case MeshPayload::ColorSource::MeshColor:
+    case MeshPayload::ColorSource::CustomColor:
+    default:
       texBytes = 0;
       break;
   }
@@ -1271,51 +1419,110 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
         entry.unchangedFrames = 0;
       }
 
+      // A previous draw in this submission scheduled upload->static copies for
+      // this stream; do not bind statics until the next submission because the
+      // copies are flushed after rendering ends.
+      if (m_staticCopyPendingKeys.contains(key)) {
+        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+        entry.indexCount = static_cast<uint32_t>(m_indexCount);
+        entry.posGen = payload.posGen;
+        entry.normGen = payload.normGen;
+        entry.colorGen = payload.colorGen;
+        entry.texGen = payload.texGen;
+        entry.indexGen = payload.indexGen;
+        return;
+      }
+
       // If promoted and sizes match, restage on the next frame only. For the
       // edit frame (any stream changed), keep using upload slices to avoid
       // hazards; otherwise bind static VBs.
+      if (entry.promoted && !sizeUnchanged) {
+        m_backend.releaseStaticSlice(entry.vbPos);
+        m_backend.releaseStaticSlice(entry.vbNorm);
+        m_backend.releaseStaticSlice(entry.vbColor);
+        m_backend.releaseStaticSlice(entry.vbTex);
+        m_backend.releaseStaticSlice(entry.ib);
+        entry.promoted = false;
+        entry.unchangedFrames = 0;
+        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+        entry.indexCount = static_cast<uint32_t>(m_indexCount);
+        entry.posGen = payload.posGen;
+        entry.normGen = payload.normGen;
+        entry.colorGen = payload.colorGen;
+        entry.texGen = payload.texGen;
+        entry.indexGen = payload.indexGen;
+        return;
+      }
+
       if (entry.promoted && sizeUnchanged) {
         bool anyChanged = (!posSame) || (!normSame) || (!colorSame) || (!texSame) || (!idxSame);
         if (!posSame) {
-          m_backend.scheduleStaticCopy(entry.vbPos, entry.posOffset, posSlice, false);
+          m_backend.scheduleStaticCopy(entry.vbPos.buffer, entry.vbPos.offset, posSlice, false);
         }
         if (!normSame) {
-          m_backend.scheduleStaticCopy(entry.vbNorm, entry.normOffset, normSlice, false);
+          m_backend.scheduleStaticCopy(entry.vbNorm.buffer, entry.vbNorm.offset, normSlice, false);
         }
         if (!colorSame) {
-          m_backend.scheduleStaticCopy(entry.vbColor, entry.colorOffset, colorSlice, false);
+          m_backend.scheduleStaticCopy(entry.vbColor.buffer, entry.vbColor.offset, colorSlice, false);
         }
         if (texBytes > 0 && !texSame && entry.vbTex) {
-          m_backend.scheduleStaticCopy(entry.vbTex, entry.texOffset, texSlice, false);
+          m_backend.scheduleStaticCopy(entry.vbTex.buffer, entry.vbTex.offset, texSlice, false);
         }
         if (!idxSame && totalIndices > 0 && m_indexUploadBuffer) {
           Z3DRendererVulkanBackend::UploadSlice idxUpload{m_indexUploadBuffer,
                                                           m_indexUploadOffset,
                                                           nullptr,
                                                           totalIndices * sizeof(uint32_t)};
-          m_backend.scheduleStaticCopy(entry.ib, entry.indexOffset, idxUpload, true);
+          m_backend.scheduleStaticCopy(entry.ib.buffer, entry.ib.offset, idxUpload, true);
         }
+
+        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+        entry.indexCount = static_cast<uint32_t>(m_indexCount);
+        entry.posGen = payload.posGen;
+        entry.normGen = payload.normGen;
+        entry.colorGen = payload.colorGen;
+        entry.texGen = payload.texGen;
+        entry.indexGen = payload.indexGen;
+
         if (!anyChanged) {
           // Bind static slices (per-attribute VBs)
-          m_posBuffer = entry.vbPos;
-          m_normBuffer = entry.vbNorm;
-          m_colorBuffer = entry.vbColor;
-          m_texBuffer = entry.vbTex ? entry.vbTex : vk::Buffer{};
-          m_posOffset = entry.posOffset;
-          m_normOffset = entry.normOffset;
-          m_colorOffset = entry.colorOffset;
-          m_texOffset = entry.hasTex ? entry.texOffset : 0;
+          m_posBuffer = entry.vbPos.buffer;
+          m_normBuffer = entry.vbNorm.buffer;
+          m_colorBuffer = entry.vbColor.buffer;
+          m_texBuffer = entry.vbTex ? entry.vbTex.buffer : vk::Buffer{};
+          m_posOffset = entry.vbPos.offset;
+          m_normOffset = entry.vbNorm.offset;
+          m_colorOffset = entry.vbColor.offset;
+          m_texOffset = entry.hasTex ? entry.vbTex.offset : 0;
           if (entry.indexCount > 0 && entry.ib) {
-            m_indexUploadBuffer = entry.ib;
-            m_indexUploadOffset = entry.indexOffset;
+            m_indexUploadBuffer = entry.ib.buffer;
+            m_indexUploadOffset = entry.ib.offset;
+          }
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbPos);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbNorm);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbColor);
+          if (entry.hasTex) {
+            m_backend.pinStaticSliceForActiveSubmission(entry.vbTex);
+          }
+          if (entry.indexCount > 0) {
+            m_backend.pinStaticSliceForActiveSubmission(entry.ib);
           }
           return;
         }
         // Defer restaging to the next frame; keep upload slices bound.
+        m_staticCopyPendingKeys.insert(key);
         return;
       }
 
       // Consider promotion when stable for N frames
+      entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+      entry.indexCount = static_cast<uint32_t>(m_indexCount);
+      entry.posGen = payload.posGen;
+      entry.normGen = payload.normGen;
+      entry.colorGen = payload.colorGen;
+      entry.texGen = payload.texGen;
+      entry.indexGen = payload.indexGen;
+
       if (!entry.promoted && sizeUnchanged && entry.unchangedFrames >= kPromotionThreshold) {
         auto posDst = m_backend.allocateStaticVB(posBytes, alignof(glm::vec3));
         auto normDst = m_backend.allocateStaticVB(normBytes, alignof(glm::vec3));
@@ -1324,14 +1531,13 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
         bool haveTex = false;
         if (texBytes > 0) {
           texDst = m_backend.allocateStaticVB(texBytes, 4);
-          haveTex = static_cast<bool>(texDst.buffer);
+          haveTex = static_cast<bool>(texDst);
         }
         Z3DRendererVulkanBackend::StaticSlice idxDst{};
         if (totalIndices > 0) {
           idxDst = m_backend.allocateStaticIB(totalIndices * sizeof(uint32_t), alignof(uint32_t));
         }
-        if (posDst.buffer && normDst.buffer && colorDst.buffer && (texBytes == 0 || haveTex) &&
-            (totalIndices == 0 || idxDst.buffer)) {
+        if (posDst && normDst && colorDst && (texBytes == 0 || haveTex) && (totalIndices == 0 || idxDst)) {
           // Record copies and count bytes
           size_t staged = 0;
           m_backend.scheduleStaticCopy(posDst.buffer, posDst.offset, posSlice, false);
@@ -1356,17 +1562,12 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
             m_backend.addMeshBytesStaged(staged);
           }
           // Save cache entry (per-attribute buffers)
-          entry.vbPos = posDst.buffer;
-          entry.vbNorm = normDst.buffer;
-          entry.vbColor = colorDst.buffer;
-          entry.vbTex = texBytes > 0 ? texDst.buffer : vk::Buffer{};
-          entry.posOffset = posDst.offset;
-          entry.normOffset = normDst.offset;
-          entry.colorOffset = colorDst.offset;
-          entry.texOffset = texDst.offset;
+          entry.vbPos = posDst;
+          entry.vbNorm = normDst;
+          entry.vbColor = colorDst;
+          entry.vbTex = texBytes > 0 ? texDst : Z3DRendererVulkanBackend::StaticSlice{};
           entry.hasTex = texBytes > 0 && haveTex;
-          entry.ib = idxDst.buffer;
-          entry.indexOffset = idxDst.offset;
+          entry.ib = idxDst;
           entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
           entry.indexCount = static_cast<uint32_t>(m_indexCount);
           entry.posGen = payload.posGen;
@@ -1376,6 +1577,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
           entry.indexGen = payload.indexGen;
           entry.promoted = true;
           // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+          m_staticCopyPendingKeys.insert(key);
         } else {
           VLOG(2) << "Mesh static promotion skipped: arena out of space";
         }

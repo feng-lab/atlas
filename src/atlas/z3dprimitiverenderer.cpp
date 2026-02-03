@@ -1,6 +1,7 @@
 #include "z3dprimitiverenderer.h"
 
 #include "z3dgl.h"
+#include "z3drenderervulkanbackend.h"
 #include "zmesh.h"
 #include "z3dshaderprogram.h"
 
@@ -14,6 +15,10 @@ Z3DPrimitiveRenderer::Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase)
 
 Z3DPrimitiveRenderer::~Z3DPrimitiveRenderer()
 {
+  if (auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend())) {
+    const uint64_t streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
+    backend->requestEvictStream(streamKey);
+  }
   destroyResources();
   m_rendererBase.unregisterRenderer(this);
 }

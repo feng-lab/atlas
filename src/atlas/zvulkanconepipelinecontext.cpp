@@ -95,6 +95,37 @@ void ZVulkanConePipelineContext::resetFrame()
   m_ddpMaterialFrozen = false;
   m_ddpArgsPrepared = false;
   m_ddpArgsOffset = 0;
+  m_staticCopyPendingKeys.clear();
+}
+
+void ZVulkanConePipelineContext::evictStream(uint64_t streamKey)
+{
+  if (streamKey == 0) {
+    return;
+  }
+
+  for (auto it = m_staticCopyPendingKeys.begin(); it != m_staticCopyPendingKeys.end();) {
+    if (it->streamKey == streamKey) {
+      it = m_staticCopyPendingKeys.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto it = m_staticCache.begin(); it != m_staticCache.end();) {
+    if (it->first.streamKey != streamKey) {
+      ++it;
+      continue;
+    }
+    auto& entry = it->second;
+    m_backend.releaseStaticSlice(entry.vbOrigin);
+    m_backend.releaseStaticSlice(entry.vbAxis);
+    m_backend.releaseStaticSlice(entry.vbFlags);
+    m_backend.releaseStaticSlice(entry.vbBaseColor);
+    m_backend.releaseStaticSlice(entry.vbTopColor);
+    m_backend.releaseStaticSlice(entry.ib);
+    it = m_staticCache.erase(it);
+  }
 }
 
 void ZVulkanConePipelineContext::flushRetainedUbos()
@@ -175,7 +206,8 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = renderer.shaderHookType();
 
-  m_dynLightingOffset = m_backend.frameSharedLightingOffset();
+  m_dynLightingOffset =
+    payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload, pickingPass);
   // Ensure DDP flag descriptor set (set=3) only; no OIT UBO
   ensureOITResources();
@@ -697,6 +729,50 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   CHECK(payload.axisAndTopRadius.size() == m_vertexCount && payload.flags.size() == m_vertexCount)
     << "Vulkan cone backend skipping batch: attribute buffers are incomplete.";
 
+  // Fast path: if this stream was promoted to device-local static buffers and
+  // nothing changed, bind the static buffers and skip per-frame staging/memcpy.
+  if (payload.streamKey != 0) {
+    CacheKey key{payload.streamKey, payload.pickingPass};
+    if (!m_staticCopyPendingKeys.contains(key)) {
+      auto it = m_staticCache.find(key);
+      if (it != m_staticCache.end()) {
+        const CacheEntry& entry = it->second;
+        const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
+        const bool shapeSame = (entry.baseGen == payload.baseGen) && (entry.axisGen == payload.axisGen) &&
+                               (entry.flagsGen == payload.flagsGen) && (entry.indexGen == payload.indexGen);
+        const bool colorsSame = payload.pickingPass ? (entry.pickingColorsGen == payload.pickingColorsGen)
+                                                    : ((entry.baseColorGen == payload.baseColorGen) &&
+                                                       (entry.topColorGen == payload.topColorGen));
+        if (entry.promoted && sizeSame && shapeSame && colorsSame && entry.vbOrigin && entry.vbAxis && entry.vbFlags &&
+            entry.vbBaseColor && entry.vbTopColor && (m_indexCount == 0 || entry.ib)) {
+          m_originBuffer = entry.vbOrigin.buffer;
+          m_axisBuffer = entry.vbAxis.buffer;
+          m_flagsBuffer = entry.vbFlags.buffer;
+          m_baseColorBuffer = entry.vbBaseColor.buffer;
+          m_topColorBuffer = entry.vbTopColor.buffer;
+          m_originOffset = entry.vbOrigin.offset;
+          m_axisOffset = entry.vbAxis.offset;
+          m_flagsOffset = entry.vbFlags.offset;
+          m_baseColorOffset = entry.vbBaseColor.offset;
+          m_topColorOffset = entry.vbTopColor.offset;
+          if (m_indexCount > 0) {
+            m_indexUploadBuffer = entry.ib.buffer;
+            m_indexUploadOffset = entry.ib.offset;
+          }
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbOrigin);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbAxis);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbFlags);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbBaseColor);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbTopColor);
+          if (m_indexCount > 0) {
+            m_backend.pinStaticSliceForActiveSubmission(entry.ib);
+          }
+          return;
+        }
+      }
+    }
+  }
+
   // Allocate SoA slices
   const size_t v4Bytes = m_vertexCount * sizeof(glm::vec4);
   const size_t fBytes = m_vertexCount * sizeof(float);
@@ -829,36 +905,70 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
         entry.unchangedFrames = 0;
       }
 
+      // A previous draw in this submission scheduled upload->static copies for
+      // this stream; do not bind statics until the next submission because the
+      // copies are flushed after rendering ends.
+      if (m_staticCopyPendingKeys.contains(key)) {
+        // Still update observed state so stability tracking stays correct.
+        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+        entry.indexCount = static_cast<uint32_t>(m_indexCount);
+        entry.baseGen = payload.baseGen;
+        entry.axisGen = payload.axisGen;
+        entry.flagsGen = payload.flagsGen;
+        entry.indexGen = payload.indexGen;
+        entry.baseColorGen = payload.baseColorGen;
+        entry.topColorGen = payload.topColorGen;
+        entry.pickingColorsGen = payload.pickingColorsGen;
+        return;
+      }
+
+      // If the stream was previously promoted but the geometry sizes changed,
+      // drop the old static slices so this stream can promote again later.
+      if (entry.promoted && !sizeSame) {
+        m_backend.releaseStaticSlice(entry.vbOrigin);
+        m_backend.releaseStaticSlice(entry.vbAxis);
+        m_backend.releaseStaticSlice(entry.vbFlags);
+        m_backend.releaseStaticSlice(entry.vbBaseColor);
+        m_backend.releaseStaticSlice(entry.vbTopColor);
+        m_backend.releaseStaticSlice(entry.ib);
+        entry.promoted = false;
+        entry.unchangedFrames = 0;
+        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+        entry.indexCount = static_cast<uint32_t>(m_indexCount);
+        entry.baseGen = payload.baseGen;
+        entry.axisGen = payload.axisGen;
+        entry.flagsGen = payload.flagsGen;
+        entry.indexGen = payload.indexGen;
+        entry.baseColorGen = payload.baseColorGen;
+        entry.topColorGen = payload.topColorGen;
+        entry.pickingColorsGen = payload.pickingColorsGen;
+        return;
+      }
+
       if (entry.promoted && sizeSame) {
         bool anyChanged = false;
         const bool baseColorChanged =
           (entry.baseColorGen != payload.baseColorGen) || (entry.pickingColorsGen != payload.pickingColorsGen);
         if (baseColorChanged) {
-          m_backend.scheduleStaticCopy(entry.vbBaseColor, entry.baseColorOffset, baseColorSlice, false);
-          entry.baseColorGen = payload.baseColorGen;
-          entry.pickingColorsGen = payload.pickingColorsGen;
+          m_backend.scheduleStaticCopy(entry.vbBaseColor.buffer, entry.vbBaseColor.offset, baseColorSlice, false);
           anyChanged = true;
         }
         const bool topColorChanged = (!payload.sameColorForBaseAndTop && entry.topColorGen != payload.topColorGen) ||
                                      (payload.sameColorForBaseAndTop && baseColorChanged);
         if (topColorChanged && entry.vbTopColor) {
-          m_backend.scheduleStaticCopy(entry.vbTopColor, entry.topColorOffset, topColorSlice, false);
+          m_backend.scheduleStaticCopy(entry.vbTopColor.buffer, entry.vbTopColor.offset, topColorSlice, false);
           anyChanged = true;
         }
-        entry.topColorGen = payload.topColorGen;
         if (entry.axisGen != payload.axisGen) {
-          m_backend.scheduleStaticCopy(entry.vbAxis, entry.axisOffset, axisSlice, false);
-          entry.axisGen = payload.axisGen;
+          m_backend.scheduleStaticCopy(entry.vbAxis.buffer, entry.vbAxis.offset, axisSlice, false);
           anyChanged = true;
         }
         if (entry.baseGen != payload.baseGen) {
-          m_backend.scheduleStaticCopy(entry.vbOrigin, entry.originOffset, originSlice, false);
-          entry.baseGen = payload.baseGen;
+          m_backend.scheduleStaticCopy(entry.vbOrigin.buffer, entry.vbOrigin.offset, originSlice, false);
           anyChanged = true;
         }
         if (entry.flagsGen != payload.flagsGen) {
-          m_backend.scheduleStaticCopy(entry.vbFlags, entry.flagsOffset, flagsSlice, false);
-          entry.flagsGen = payload.flagsGen;
+          m_backend.scheduleStaticCopy(entry.vbFlags.buffer, entry.vbFlags.offset, flagsSlice, false);
           anyChanged = true;
         }
         if (entry.indexGen != payload.indexGen && m_indexCount > 0 && m_indexUploadBuffer) {
@@ -866,33 +976,63 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
                                                         m_indexUploadOffset,
                                                         nullptr,
                                                         m_indexCount * sizeof(uint32_t)};
-          m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iUpload, true);
-          entry.indexGen = payload.indexGen;
+          m_backend.scheduleStaticCopy(entry.ib.buffer, entry.ib.offset, iUpload, true);
           anyChanged = true;
         }
+
+        // Cache the new observed gens immediately. Restaged buffers take effect
+        // on the next submission; this frame binds upload slices when anyChanged.
         entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
         entry.indexCount = static_cast<uint32_t>(m_indexCount);
+        entry.baseGen = payload.baseGen;
+        entry.axisGen = payload.axisGen;
+        entry.flagsGen = payload.flagsGen;
+        entry.indexGen = payload.indexGen;
+        entry.baseColorGen = payload.baseColorGen;
+        entry.topColorGen = payload.topColorGen;
+        entry.pickingColorsGen = payload.pickingColorsGen;
         if (!anyChanged) {
-          m_originBuffer = entry.vbOrigin;
-          m_axisBuffer = entry.vbAxis;
-          m_flagsBuffer = entry.vbFlags;
-          m_baseColorBuffer = entry.vbBaseColor;
-          m_topColorBuffer = entry.vbTopColor;
-          m_originOffset = entry.originOffset;
-          m_axisOffset = entry.axisOffset;
-          m_flagsOffset = entry.flagsOffset;
-          m_baseColorOffset = entry.baseColorOffset;
-          m_topColorOffset = entry.topColorOffset;
+          m_originBuffer = entry.vbOrigin.buffer;
+          m_axisBuffer = entry.vbAxis.buffer;
+          m_flagsBuffer = entry.vbFlags.buffer;
+          m_baseColorBuffer = entry.vbBaseColor.buffer;
+          m_topColorBuffer = entry.vbTopColor.buffer;
+          m_originOffset = entry.vbOrigin.offset;
+          m_axisOffset = entry.vbAxis.offset;
+          m_flagsOffset = entry.vbFlags.offset;
+          m_baseColorOffset = entry.vbBaseColor.offset;
+          m_topColorOffset = entry.vbTopColor.offset;
           if (entry.indexCount > 0 && entry.ib) {
-            m_indexUploadBuffer = entry.ib;
-            m_indexUploadOffset = entry.ibOffset;
+            m_indexUploadBuffer = entry.ib.buffer;
+            m_indexUploadOffset = entry.ib.offset;
+          }
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbOrigin);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbAxis);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbFlags);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbBaseColor);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbTopColor);
+          if (entry.indexCount > 0) {
+            m_backend.pinStaticSliceForActiveSubmission(entry.ib);
           }
         } else {
           // Defer promotion copies to the next frame; use upload slices now.
+          m_staticCopyPendingKeys.insert(key);
           return;
         }
         return;
       }
+
+      // Not promoted: keep observed counts/gens up-to-date so unchangedFrames
+      // can reach the promotion threshold after a data change.
+      entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+      entry.indexCount = static_cast<uint32_t>(m_indexCount);
+      entry.baseGen = payload.baseGen;
+      entry.axisGen = payload.axisGen;
+      entry.flagsGen = payload.flagsGen;
+      entry.indexGen = payload.indexGen;
+      entry.baseColorGen = payload.baseColorGen;
+      entry.topColorGen = payload.topColorGen;
+      entry.pickingColorsGen = payload.pickingColorsGen;
 
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
         auto originDst = m_backend.allocateStaticVB(v4Bytes, alignof(glm::vec4));
@@ -904,8 +1044,7 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
         if (m_indexCount > 0) {
           ibDst = m_backend.allocateStaticIB(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
         }
-        if (originDst.buffer && axisDst.buffer && flagsDst.buffer && baseColorDst.buffer && topColorDst.buffer &&
-            (m_indexCount == 0 || ibDst.buffer)) {
+        if (originDst && axisDst && flagsDst && baseColorDst && topColorDst && (m_indexCount == 0 || ibDst)) {
           m_backend.scheduleStaticCopy(originDst.buffer, originDst.offset, originSlice, false);
           m_backend.scheduleStaticCopy(axisDst.buffer, axisDst.offset, axisSlice, false);
           m_backend.scheduleStaticCopy(flagsDst.buffer, flagsDst.offset, flagsSlice, false);
@@ -925,20 +1064,15 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
                                  v4Bytes,
                                  v4Bytes,
                                  m_indexCount * sizeof(uint32_t));
-          entry.vbOrigin = originDst.buffer;
-          entry.vbAxis = axisDst.buffer;
-          entry.vbFlags = flagsDst.buffer;
-          entry.vbBaseColor = baseColorDst.buffer;
-          entry.vbTopColor = topColorDst.buffer;
-          entry.originOffset = originDst.offset;
-          entry.axisOffset = axisDst.offset;
-          entry.flagsOffset = flagsDst.offset;
-          entry.baseColorOffset = baseColorDst.offset;
-          entry.topColorOffset = topColorDst.offset;
-          entry.ib = ibDst.buffer;
-          entry.ibOffset = ibDst.offset;
+          entry.vbOrigin = originDst;
+          entry.vbAxis = axisDst;
+          entry.vbFlags = flagsDst;
+          entry.vbBaseColor = baseColorDst;
+          entry.vbTopColor = topColorDst;
+          entry.ib = ibDst;
           entry.promoted = true;
           // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+          m_staticCopyPendingKeys.insert(key);
         }
       }
     }

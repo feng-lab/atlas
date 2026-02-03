@@ -72,14 +72,15 @@ private:
   float m_lineWidth = 1.0f;
   bool m_depthWriteEnable = true;
   bool m_depthTestEnable = true;
-  // Using LessOrEqual is more robust for overlay passes (axis) that may end up
-  // on the far plane after perspective math; avoids accidental rejection when
-  // clearing depth to 1.0 in small viewports.
-  vk::CompareOp m_depthCompareOp = vk::CompareOp::eLessOrEqual;
+  // Match OpenGL default: geometry uses strict LESS. Overlays that need LEQUAL
+  // (e.g. far-plane axis) should opt in per-pipeline.
+  vk::CompareOp m_depthCompareOp = vk::CompareOp::eLess;
   std::vector<vk::PipelineColorBlendAttachmentState> m_colorBlendAttachments{
-    vk::PipelineColorBlendAttachmentState{.blendEnable = VK_TRUE,
-                                          .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
-                                          .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+    // Default to no blending; passes that require alpha/accumulation blending
+    // must configure their attachments explicitly.
+    vk::PipelineColorBlendAttachmentState{.blendEnable = VK_FALSE,
+                                          .srcColorBlendFactor = vk::BlendFactor::eOne,
+                                          .dstColorBlendFactor = vk::BlendFactor::eZero,
                                           .colorBlendOp = vk::BlendOp::eAdd,
                                           .srcAlphaBlendFactor = vk::BlendFactor::eOne,
                                           .dstAlphaBlendFactor = vk::BlendFactor::eZero,

@@ -68,12 +68,14 @@ void ZVulkanSpherePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
+  m_usedStaticVBThisFrame = false;
   m_centerRadiusBuffer = nullptr;
   m_colorBuffer = nullptr;
   m_specularBuffer = nullptr;
   m_flagsBuffer = nullptr;
   m_centerRadiusOffset = 0;
   m_colorOffset = 0;
+  m_specularOffset = 0;
   m_flagsOffset = 0;
   m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
@@ -86,6 +88,36 @@ void ZVulkanSpherePipelineContext::resetFrame()
   m_ddpMaterialFrozen = false;
   m_ddpArgsPrepared = false;
   m_ddpArgsOffset = 0;
+  m_staticCopyPendingKeys.clear();
+}
+
+void ZVulkanSpherePipelineContext::evictStream(uint64_t streamKey)
+{
+  if (streamKey == 0) {
+    return;
+  }
+
+  for (auto it = m_staticCopyPendingKeys.begin(); it != m_staticCopyPendingKeys.end();) {
+    if (it->streamKey == streamKey) {
+      it = m_staticCopyPendingKeys.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto it = m_staticCache.begin(); it != m_staticCache.end();) {
+    if (it->first.streamKey != streamKey) {
+      ++it;
+      continue;
+    }
+    auto& entry = it->second;
+    m_backend.releaseStaticSlice(entry.vbCenterRadius);
+    m_backend.releaseStaticSlice(entry.vbColor);
+    m_backend.releaseStaticSlice(entry.vbSpecular);
+    m_backend.releaseStaticSlice(entry.vbFlags);
+    m_backend.releaseStaticSlice(entry.ib);
+    it = m_staticCache.erase(it);
+  }
 }
 
 void ZVulkanSpherePipelineContext::flushRetainedUbos()
@@ -157,7 +189,7 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = renderer.shaderHookType();
 
-  m_dynLightingOffset = m_backend.frameSharedLightingOffset();
+  m_dynLightingOffset = payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload, pickingPass);
   // Ensure DDP flag descriptor set (set=3) only; no OIT UBO
   ensureOITResources();
@@ -689,6 +721,50 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
 
   CHECK(payload.flags.size() == m_vertexCount) << "Vulkan sphere backend skipping batch: flag buffer is incomplete.";
 
+  // Fast path: if this stream was promoted to device-local static buffers and
+  // nothing changed, bind the static buffers and skip per-frame staging/memcpy.
+  if (payload.streamKey != 0) {
+    const bool pickingPass = payload.pickingPass;
+    CacheKey key{payload.streamKey, pickingPass, payload.useDynamicMaterial};
+    if (!m_staticCopyPendingKeys.contains(key)) {
+      auto it = m_staticCache.find(key);
+      if (it != m_staticCache.end()) {
+        const CacheEntry& entry = it->second;
+        const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
+        const uint32_t expectedColorGen = pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        const bool specularSame =
+          (!payload.useDynamicMaterial || pickingPass) ? true : (entry.specularGen == payload.specularGen);
+        const bool gensSame = (entry.centersGen == payload.centersGen) && (entry.flagsGen == payload.flagsGen) &&
+                              (entry.indexGen == payload.indexGen) && (entry.colorsGen == expectedColorGen) &&
+                              specularSame;
+        if (entry.promoted && sizeSame && gensSame && entry.vbCenterRadius && entry.vbColor && entry.vbSpecular &&
+            entry.vbFlags && (m_indexCount == 0 || entry.ib)) {
+          m_centerRadiusBuffer = entry.vbCenterRadius.buffer;
+          m_colorBuffer = entry.vbColor.buffer;
+          m_specularBuffer = entry.vbSpecular.buffer;
+          m_flagsBuffer = entry.vbFlags.buffer;
+          m_centerRadiusOffset = entry.vbCenterRadius.offset;
+          m_colorOffset = entry.vbColor.offset;
+          m_specularOffset = entry.vbSpecular.offset;
+          m_flagsOffset = entry.vbFlags.offset;
+          if (m_indexCount > 0) {
+            m_indexUploadBuffer = entry.ib.buffer;
+            m_indexUploadOffset = entry.ib.offset;
+          }
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbCenterRadius);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbColor);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbSpecular);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbFlags);
+          if (m_indexCount > 0) {
+            m_backend.pinStaticSliceForActiveSubmission(entry.ib);
+          }
+          m_usedStaticVBThisFrame = true;
+          return;
+        }
+      }
+    }
+  }
+
   const size_t crBytes = m_vertexCount * sizeof(glm::vec4);
   const size_t colBytes = m_vertexCount * sizeof(glm::vec4);
   const size_t spBytes = m_vertexCount * sizeof(glm::vec4);
@@ -786,22 +862,54 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
                             entry.specularGen == payload.specularGen;
       entry.unchangedFrames = (sizeSame && gensSame) ? (entry.unchangedFrames + 1) : 0;
 
+      // A previous draw in this submission scheduled upload->static copies for
+      // this stream; do not bind statics until the next submission because the
+      // copies are flushed after rendering ends.
+      if (m_staticCopyPendingKeys.contains(key)) {
+        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+        entry.indexCount = static_cast<uint32_t>(m_indexCount);
+        entry.centersGen = payload.centersGen;
+        entry.flagsGen = payload.flagsGen;
+        entry.indexGen = payload.indexGen;
+        entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        entry.specularGen = payload.specularGen;
+        return;
+      }
+
+      if (entry.promoted && !sizeSame) {
+        m_backend.releaseStaticSlice(entry.vbCenterRadius);
+        m_backend.releaseStaticSlice(entry.vbColor);
+        m_backend.releaseStaticSlice(entry.vbSpecular);
+        m_backend.releaseStaticSlice(entry.vbFlags);
+        m_backend.releaseStaticSlice(entry.ib);
+        entry.promoted = false;
+        entry.unchangedFrames = 0;
+        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+        entry.indexCount = static_cast<uint32_t>(m_indexCount);
+        entry.centersGen = payload.centersGen;
+        entry.flagsGen = payload.flagsGen;
+        entry.indexGen = payload.indexGen;
+        entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        entry.specularGen = payload.specularGen;
+        return;
+      }
+
       if (entry.promoted && sizeSame) {
         bool anyChanged = false;
         if (entry.centersGen != payload.centersGen) {
-          m_backend.scheduleStaticCopy(entry.vbCenterRadius, entry.centerRadiusOffset, crSlice, false);
+          m_backend.scheduleStaticCopy(entry.vbCenterRadius.buffer, entry.vbCenterRadius.offset, crSlice, false);
           anyChanged = true;
         }
         if (entry.colorsGen != (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen)) {
-          m_backend.scheduleStaticCopy(entry.vbColor, entry.colorOffset, colSlice, false);
+          m_backend.scheduleStaticCopy(entry.vbColor.buffer, entry.vbColor.offset, colSlice, false);
           anyChanged = true;
         }
         if (entry.specularGen != payload.specularGen) {
-          m_backend.scheduleStaticCopy(entry.vbSpecular, entry.specularOffset, spSlice, false);
+          m_backend.scheduleStaticCopy(entry.vbSpecular.buffer, entry.vbSpecular.offset, spSlice, false);
           anyChanged = true;
         }
         if (entry.flagsGen != payload.flagsGen) {
-          m_backend.scheduleStaticCopy(entry.vbFlags, entry.flagsOffset, flSlice, false);
+          m_backend.scheduleStaticCopy(entry.vbFlags.buffer, entry.vbFlags.offset, flSlice, false);
           anyChanged = true;
         }
         if (entry.indexGen != payload.indexGen && m_indexUploadBuffer && m_indexCount > 0) {
@@ -809,34 +917,61 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
                                                     m_indexUploadOffset,
                                                     nullptr,
                                                     m_indexCount * sizeof(uint32_t)};
-          m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, idx, true);
+          m_backend.scheduleStaticCopy(entry.ib.buffer, entry.ib.offset, idx, true);
           anyChanged = true;
         }
+
+        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+        entry.indexCount = static_cast<uint32_t>(m_indexCount);
+        entry.centersGen = payload.centersGen;
+        entry.flagsGen = payload.flagsGen;
+        entry.indexGen = payload.indexGen;
+        entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        entry.specularGen = payload.specularGen;
+
         // If anything changed, defer restaging to the next frame to avoid
         // hazards. This frame binds upload slices; at the next steady frame
         // promotion/restage will occur.
         if (anyChanged) {
+          m_staticCopyPendingKeys.insert(key);
           return;
         }
         // Safety: if we restaged any stream this frame, bind the upload slices
         // for this draw and let the static buffers take effect on the next
         // frame. This avoids driver-dependent hazards on buffer copies.
         if (!anyChanged) {
-          m_centerRadiusBuffer = entry.vbCenterRadius;
-          m_colorBuffer = entry.vbColor;
-          m_specularBuffer = entry.vbSpecular;
-          m_flagsBuffer = entry.vbFlags;
-          m_centerRadiusOffset = entry.centerRadiusOffset;
-          m_colorOffset = entry.colorOffset;
-          m_specularOffset = entry.specularOffset;
-          m_flagsOffset = entry.flagsOffset;
+          m_centerRadiusBuffer = entry.vbCenterRadius.buffer;
+          m_colorBuffer = entry.vbColor.buffer;
+          m_specularBuffer = entry.vbSpecular.buffer;
+          m_flagsBuffer = entry.vbFlags.buffer;
+          m_centerRadiusOffset = entry.vbCenterRadius.offset;
+          m_colorOffset = entry.vbColor.offset;
+          m_specularOffset = entry.vbSpecular.offset;
+          m_flagsOffset = entry.vbFlags.offset;
           if (entry.indexCount > 0 && entry.ib) {
-            m_indexUploadBuffer = entry.ib;
-            m_indexUploadOffset = entry.ibOffset;
+            m_indexUploadBuffer = entry.ib.buffer;
+            m_indexUploadOffset = entry.ib.offset;
+          }
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbCenterRadius);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbColor);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbSpecular);
+          m_backend.pinStaticSliceForActiveSubmission(entry.vbFlags);
+          if (entry.indexCount > 0) {
+            m_backend.pinStaticSliceForActiveSubmission(entry.ib);
           }
         }
         return;
       }
+
+      // Not promoted: keep observed state up to date so stability tracking can
+      // reach the promotion threshold after a data change.
+      entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+      entry.indexCount = static_cast<uint32_t>(m_indexCount);
+      entry.centersGen = payload.centersGen;
+      entry.flagsGen = payload.flagsGen;
+      entry.indexGen = payload.indexGen;
+      entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+      entry.specularGen = payload.specularGen;
 
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
         auto crDst = m_backend.allocateStaticVB(crBytes, alignof(glm::vec4));
@@ -847,7 +982,7 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
         if (m_indexCount > 0) {
           ibDst = m_backend.allocateStaticIB(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
         }
-        if (crDst.buffer && colDst.buffer && flDst.buffer && spDst.buffer && (m_indexCount == 0 || ibDst.buffer)) {
+        if (crDst && colDst && flDst && spDst && (m_indexCount == 0 || ibDst)) {
           size_t staged = 0;
           m_backend.scheduleStaticCopy(crDst.buffer, crDst.offset, crSlice, false);
           staged += crBytes;
@@ -868,16 +1003,11 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
           if (staged > 0) {
             m_backend.addSphereBytesStaged(staged);
           }
-          entry.vbCenterRadius = crDst.buffer;
-          entry.vbColor = colDst.buffer;
-          entry.vbSpecular = spDst.buffer;
-          entry.vbFlags = flDst.buffer;
-          entry.centerRadiusOffset = crDst.offset;
-          entry.colorOffset = colDst.offset;
-          entry.specularOffset = spDst.offset;
-          entry.flagsOffset = flDst.offset;
-          entry.ib = ibDst.buffer;
-          entry.ibOffset = ibDst.offset;
+          entry.vbCenterRadius = crDst;
+          entry.vbColor = colDst;
+          entry.vbSpecular = spDst;
+          entry.vbFlags = flDst;
+          entry.ib = ibDst;
           entry.centersGen = payload.centersGen;
           entry.flagsGen = payload.flagsGen;
           entry.indexGen = payload.indexGen;
@@ -889,6 +1019,7 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
                                  colBytes,
                                  flBytes,
                                  m_indexCount * sizeof(uint32_t));
+          m_staticCopyPendingKeys.insert(key);
           return;
         }
       }

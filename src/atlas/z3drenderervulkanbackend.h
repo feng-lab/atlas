@@ -26,6 +26,7 @@
 #include <functional>
 #include <folly/Executor.h>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -151,17 +152,55 @@ public:
   void reserveUploadSlices(std::initializer_list<std::pair<size_t, size_t>> slices);
 
   // Device-local static buffer arena (lifetime: backend)
+  struct StaticAllocationHandle
+  {
+    // Opaque pointer to the owning static-arena segment. This is managed by the
+    // backend and must not be dereferenced by callers.
+    void* segment = nullptr;
+    // VMA virtual allocation handle within the segment.
+    VmaVirtualAllocation allocation = nullptr;
+    // Requested byte size (used for accounting on free).
+    size_t size = 0;
+    bool isIndexBuffer = false;
+
+    explicit operator bool() const
+    {
+      return segment != nullptr && allocation != nullptr && size > 0;
+    }
+  };
+
   struct StaticSlice
   {
     vk::Buffer buffer{};
     vk::DeviceSize offset = 0;
     size_t size = 0;
+    StaticAllocationHandle alloc{};
+
+    explicit operator bool() const
+    {
+      return static_cast<bool>(buffer) && size > 0 && static_cast<bool>(alloc);
+    }
   };
 
   // Allocate space in the device-local vertex/index arenas. Returns an empty
   // slice on allocation failure.
   StaticSlice allocateStaticVB(size_t bytes, size_t alignment = 16);
   StaticSlice allocateStaticIB(size_t bytes, size_t alignment = 4);
+
+  // Release a previously allocated static slice. This is safe to call even when
+  // the slice's backing segment is still pinned by an in-flight submission:
+  // frees are deferred until the segment is unpinned to avoid reusing the same
+  // memory range before the GPU finishes reading it.
+  void releaseStaticSlice(StaticSlice& slice);
+
+  // Pin the slice's backing segment for the current submission so that evictions
+  // cannot reuse its memory until the submission fence signals. Must be called
+  // for any draw/copy that consumes static slices.
+  void pinStaticSliceForActiveSubmission(const StaticSlice& slice);
+
+  // Request eviction of all cached static geometry for a given streamKey.
+  // This is processed on the render thread during beginRender().
+  void requestEvictStream(uint64_t streamKey);
 
   // Record a copy from an upload slice into a device-local buffer at dst.
   // Inserts a barrier making the data visible to the appropriate pipeline stage.
@@ -471,6 +510,11 @@ private:
     // These pins are released via a submission-fence callback after queueSubmit().
     std::unordered_set<class ZVulkanTexture*> residencyPinnedTextures;
 
+    // Pins for static geometry segments referenced by this submission (vertex
+    // inputs and/or upload->static transfer destinations). These prevent reuse
+    // of suballocated ranges until the submission fence signals.
+    std::unordered_set<void*> pinnedStaticSegments;
+
     // Per-draw override descriptor sets kept alive until fence
     std::vector<std::unique_ptr<ZVulkanDescriptorSet>> transientOverrideSets;
     uint32_t overrideSetsAllocated = 0; // count of per-draw override sets
@@ -542,6 +586,10 @@ private:
     } uniformArena;
     // Shared per-frame dynamic offset for lighting UBO slice in the uniform arena
     vk::DeviceSize lightingDynOffset = 0;
+    // Shared per-frame dynamic offset for a "picking" lighting UBO slice in the
+    // uniform arena (lighting disabled). This matches OpenGL picking behavior
+    // (no lighting/fog applied to picking colors).
+    vk::DeviceSize pickingLightingDynOffset = 0;
 
     // DDP: per-frame resources for indirect-count early stop
     std::unique_ptr<class ZVulkanBuffer> ddpChangedFlag; // STORAGE | TRANSFER_SRC | TRANSFER_DST
@@ -662,6 +710,12 @@ public:
     CHECK(m_activeFrame != nullptr) << "frameSharedLightingOffset called without an active frame";
     return m_activeFrame->lightingDynOffset;
   }
+  // Dynamic offset of the shared per-frame picking lighting UBO slice (lighting disabled)
+  [[nodiscard]] vk::DeviceSize framePickingLightingOffset() const
+  {
+    CHECK(m_activeFrame != nullptr) << "framePickingLightingOffset called without an active frame";
+    return m_activeFrame->pickingLightingDynOffset;
+  }
   static size_t alignUp(size_t value, size_t alignment)
   {
     const size_t mask = alignment ? (alignment - 1) : 0;
@@ -755,15 +809,55 @@ public:
   // Device-local static arenas for geometry
   struct StaticArena
   {
-    std::unique_ptr<class ZVulkanBuffer> vb; // device-local, eVertexBuffer|eTransferDst
-    std::unique_ptr<class ZVulkanBuffer> ib; // device-local, eIndexBuffer|eTransferDst
-    size_t vbCapacity = 0; // bytes
-    size_t ibCapacity = 0; // bytes
-    size_t vbOffset = 0; // bump cursor
-    size_t ibOffset = 0; // bump cursor
-    size_t vbHighWatermark = 0; // peak used for telemetry
+    enum class Kind : uint8_t
+    {
+      Vertex = 0,
+      Index = 1,
+    };
+
+    struct Segment
+    {
+      Kind kind = Kind::Vertex;
+      std::unique_ptr<class ZVulkanBuffer> buffer; // device-local
+      VmaVirtualBlock block = nullptr; // virtual suballocator over [0, capacity)
+      size_t capacity = 0; // bytes
+      // Bookkeeping for eviction/trimming:
+      // - usedBytes/allocCount track live suballocations (requested sizes)
+      // - pinCount tracks in-flight submissions referencing this segment
+      size_t usedBytes = 0;
+      uint32_t allocCount = 0;
+      uint32_t pinCount = 0;
+      struct PendingFree
+      {
+        VmaVirtualAllocation allocation = nullptr;
+        size_t size = 0;
+      };
+      std::vector<PendingFree> pendingFrees;
+      ~Segment();
+    };
+
+    // Static buffers are never reallocated in place; we grow by appending
+    // segments. We use VMA virtual blocks to allow per-stream eviction and
+    // trimming without silent caps.
+    std::vector<std::unique_ptr<Segment>> vb; // eVertexBuffer|eTransferDst
+    std::vector<std::unique_ptr<Segment>> ib; // eIndexBuffer|eTransferDst
+
+    // Map VkBuffer handle to owning segment for pin/unpin and copy safety.
+    std::unordered_map<VkBuffer, Segment*> segmentByBuffer;
+
+    // Telemetry: peak total allocated bytes across all segments.
+    size_t vbHighWatermark = 0;
     size_t ibHighWatermark = 0;
   } m_staticArena;
+
+  // Static arena helpers
+  std::unique_ptr<StaticArena::Segment> createStaticArenaSegment(StaticArena::Kind kind, size_t capacityBytes);
+  void flushPendingFreesAndMaybeTrimStaticSegment(StaticArena::Segment* segment);
+
+  // Pending per-stream static-geometry evictions requested from outside the
+  // render thread (e.g., primitive renderer destruction). Drained in beginRender().
+  std::mutex m_pendingEvictionsMutex;
+  std::unordered_set<uint64_t> m_pendingEvictStreamKeys;
 
   // PPLL (exact OIT): per-pixel fragment list resources are maintained in a
   // small ring keyed by the UI/perf frame token (not by Vulkan frame-executor

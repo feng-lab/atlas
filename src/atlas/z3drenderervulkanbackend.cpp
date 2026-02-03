@@ -363,6 +363,40 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
   ensureDevice();
 
+  // Drain pending stream eviction requests. These are issued from outside the
+  // render thread (e.g., primitive renderer destruction) and processed here to
+  // keep all cache mutations on the rendering thread.
+  if (m_sharedDevice != nullptr) {
+    std::unordered_set<uint64_t> evictKeys;
+    {
+      std::lock_guard<std::mutex> lock(m_pendingEvictionsMutex);
+      evictKeys.swap(m_pendingEvictStreamKeys);
+    }
+    if (!evictKeys.empty()) {
+      VLOG(1) << fmt::format("VK static cache eviction: streams={}", evictKeys.size());
+      for (uint64_t streamKey : evictKeys) {
+        if (m_lineContext) {
+          m_lineContext->evictStream(streamKey);
+        }
+        if (m_meshContext) {
+          m_meshContext->evictStream(streamKey);
+        }
+        if (m_ellipsoidContext) {
+          m_ellipsoidContext->evictStream(streamKey);
+        }
+        if (m_sphereContext) {
+          m_sphereContext->evictStream(streamKey);
+        }
+        if (m_coneContext) {
+          m_coneContext->evictStream(streamKey);
+        }
+        if (m_fontContext) {
+          m_fontContext->evictStream(streamKey);
+        }
+      }
+    }
+  }
+
   const auto& viewport = renderer.frameState().viewport;
   const uint32_t width = viewport.z;
   const uint32_t height = viewport.w;
@@ -512,6 +546,19 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
       std::memcpy(slice.mapped, &lighting, sizeof(lighting));
     }
     frameResources.lightingDynOffset = slice.offset;
+
+    // Picking pass: match OpenGL picking shader parameters (no lighting, no fog).
+    // Vulkan shares a frame-global lighting UBO, so provide a dedicated slice
+    // with lighting disabled and bind it via dynamic offset when recording
+    // picking draws.
+    LightingUBOStd140 pickingLighting = lighting;
+    pickingLighting.lighting_enabled = 0;
+    pickingLighting.numLights = 0;
+    auto pickingSlice = suballocateUniform(sizeof(LightingUBOStd140), align);
+    if (pickingSlice.mapped) {
+      std::memcpy(pickingSlice.mapped, &pickingLighting, sizeof(pickingLighting));
+    }
+    frameResources.pickingLightingDynOffset = pickingSlice.offset;
   }
   frameResources.descriptorSetsAllocated = 0;
 
@@ -544,6 +591,14 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.pendingBufferReadbacks.clear();
   frameResources.readbackBytesCopied = 0;
   frameResources.readbackSlotsInFlight = 0;
+  // Reset Stage 4.5 (static staging) bookkeeping
+  frameResources.staticBytesStaged = 0;
+  frameResources.staticStreamRestaged = 0;
+  frameResources.linesBytesStaged = 0;
+  frameResources.fontsBytesStaged = 0;
+  frameResources.meshesBytesStaged = 0;
+  frameResources.spheresBytesStaged = 0;
+  frameResources.scheduledCopies.clear();
   // Reset per-frame upload arena virtual block; free retired resources
   if (frameResources.uploadArena.block != nullptr) {
     vmaClearVirtualBlock(frameResources.uploadArena.block);
@@ -823,6 +878,12 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   auto residencyPins = std::move(frame.residencyPinnedTextures);
   frame.residencyPinnedTextures.clear();
 
+  // Move submission-scoped static-geometry segment pins out of the frame record
+  // so we can unpin deterministically after submission, even if the frame record
+  // is reused.
+  auto staticSegmentPins = std::move(frame.pinnedStaticSegments);
+  frame.pinnedStaticSegments.clear();
+
   bool submitted = false;
   try {
     queue.submit(submitInfo, *frameHandle.fence());
@@ -850,6 +911,45 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     } else {
       for (auto* tex : residencyPins) {
         device().residencyManager().unpinIfManaged(tex);
+      }
+    }
+  }
+
+  // Release static-geometry segment pins after the GPU has finished executing
+  // this submission. This ensures deferred frees (per-stream eviction) can't
+  // reuse the same suballocated ranges while the GPU is still reading them.
+  if (!staticSegmentPins.empty()) {
+    if (submitted) {
+      Z3DRendererVulkanBackend* submitBackend = this;
+      device().frameExecutor().scheduleAfterCompletion(
+        frameHandle,
+        [submitBackend, pins = std::move(staticSegmentPins)]() mutable {
+          if (!submitBackend) {
+            return;
+          }
+          for (void* segVoid : pins) {
+            auto* seg = static_cast<StaticArena::Segment*>(segVoid);
+            if (seg == nullptr) {
+              continue;
+            }
+            CHECK_GT(seg->pinCount, 0u) << "Static segment pinCount underflow in completion callback";
+            seg->pinCount--;
+            if (seg->pinCount == 0) {
+              submitBackend->flushPendingFreesAndMaybeTrimStaticSegment(seg);
+            }
+          }
+        });
+    } else {
+      for (void* segVoid : staticSegmentPins) {
+        auto* seg = static_cast<StaticArena::Segment*>(segVoid);
+        if (seg == nullptr) {
+          continue;
+        }
+        CHECK_GT(seg->pinCount, 0u) << "Static segment pinCount underflow on failed submission";
+        seg->pinCount--;
+        if (seg->pinCount == 0) {
+          flushPendingFreesAndMaybeTrimStaticSegment(seg);
+        }
       }
     }
   }
@@ -2153,30 +2253,149 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   VLOG(2) << fmt::format("reserveUploadSlices: grew arena to {} bytes for {} slices", newCapacity, slices.size());
 }
 
+Z3DRendererVulkanBackend::StaticArena::Segment::~Segment()
+{
+  if (block) {
+    vmaDestroyVirtualBlock(block);
+    block = nullptr;
+  }
+}
+
+std::unique_ptr<Z3DRendererVulkanBackend::StaticArena::Segment>
+Z3DRendererVulkanBackend::createStaticArenaSegment(StaticArena::Kind kind, size_t capacityBytes)
+{
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in createStaticArenaSegment";
+  CHECK_GT(capacityBytes, 0u) << "createStaticArenaSegment requires non-zero capacity";
+
+  vk::BufferUsageFlags usage{};
+  switch (kind) {
+    case StaticArena::Kind::Vertex:
+      usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst;
+      break;
+    case StaticArena::Kind::Index:
+      usage = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst;
+      break;
+  }
+
+  auto seg = std::make_unique<StaticArena::Segment>();
+  seg->kind = kind;
+  seg->capacity = capacityBytes;
+  seg->buffer = m_sharedDevice->createBuffer(capacityBytes, usage, vk::MemoryPropertyFlagBits::eDeviceLocal);
+  if (!seg->buffer) {
+    LOG(ERROR) << fmt::format("Failed to allocate static arena segment: kind={} capacity={}B",
+                              kind == StaticArena::Kind::Vertex ? "VB" : "IB",
+                              capacityBytes);
+    return {};
+  }
+
+  VmaVirtualBlockCreateInfo vinfo{};
+  vinfo.size = capacityBytes;
+  if (vmaCreateVirtualBlock(&vinfo, &seg->block) != VK_SUCCESS) {
+    LOG(ERROR) << fmt::format("Failed to create VMA virtual block for static arena: kind={} capacity={}B",
+                              kind == StaticArena::Kind::Vertex ? "VB" : "IB",
+                              capacityBytes);
+    seg->buffer.reset();
+    seg->block = nullptr;
+    return {};
+  }
+
+  const VkBuffer raw = static_cast<VkBuffer>(seg->buffer->buffer());
+  CHECK(raw != VK_NULL_HANDLE) << "Static arena segment created with null VkBuffer";
+  const auto [_, inserted] = m_staticArena.segmentByBuffer.emplace(raw, seg.get());
+  CHECK(inserted) << "Static arena segmentByBuffer already contained buffer 0x"
+                  << fmt::format("{:x}", reinterpret_cast<uint64_t>(raw));
+
+  return seg;
+}
+
+void Z3DRendererVulkanBackend::flushPendingFreesAndMaybeTrimStaticSegment(StaticArena::Segment* segment)
+{
+  if (segment == nullptr) {
+    return;
+  }
+  if (segment->pinCount != 0) {
+    return;
+  }
+
+  if (!segment->pendingFrees.empty()) {
+    CHECK(segment->block != nullptr) << "Static arena segment missing virtual block";
+    for (const auto& pf : segment->pendingFrees) {
+      if (pf.allocation == nullptr) {
+        continue;
+      }
+      vmaVirtualFree(segment->block, pf.allocation);
+    }
+    segment->pendingFrees.clear();
+  }
+
+  if (segment->allocCount != 0) {
+    return;
+  }
+
+  CHECK_EQ(segment->usedBytes, 0u) << "Static arena segment allocCount==0 but usedBytes != 0";
+  CHECK(segment->pendingFrees.empty()) << "Static arena segment has pending frees while unpinned";
+
+  const size_t capacityBytes = segment->capacity;
+  const StaticArena::Kind kind = segment->kind;
+  VkBuffer raw = VK_NULL_HANDLE;
+  if (segment->buffer) {
+    raw = static_cast<VkBuffer>(segment->buffer->buffer());
+  }
+
+  if (raw != VK_NULL_HANDLE) {
+    auto it = m_staticArena.segmentByBuffer.find(raw);
+    if (it != m_staticArena.segmentByBuffer.end() && it->second == segment) {
+      m_staticArena.segmentByBuffer.erase(it);
+    }
+  }
+
+  auto& vec = (kind == StaticArena::Kind::Vertex) ? m_staticArena.vb : m_staticArena.ib;
+  auto itVec = std::find_if(vec.begin(), vec.end(), [&](const std::unique_ptr<StaticArena::Segment>& p) {
+    return p.get() == segment;
+  });
+  CHECK(itVec != vec.end()) << "Static arena segment not found for trimming";
+  vec.erase(itVec);
+
+  VLOG(1) << fmt::format("VK static arena trimmed: kind={} capacity={}B remaining_segments={}",
+                         kind == StaticArena::Kind::Vertex ? "VB" : "IB",
+                         capacityBytes,
+                         vec.size());
+}
+
 void Z3DRendererVulkanBackend::ensureStaticArenas()
 {
   CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureStaticArenas";
-  // Create on first use with conservative capacities. Grow policy can be
-  // revisited; first cut avoids reallocation to keep slices stable.
-  if (!m_staticArena.vb) {
-    const size_t cap = static_cast<size_t>(32) * 1024 * 1024; // 32 MiB
-    m_staticArena.vb =
-      m_sharedDevice->createBuffer(cap,
-                                   vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                                   vk::MemoryPropertyFlagBits::eDeviceLocal);
-    m_staticArena.vbCapacity = cap;
-    m_staticArena.vbOffset = 0;
-    m_staticArena.vbHighWatermark = 0;
+  // Create on first use with conservative capacities. We grow by appending
+  // additional segments (never reallocating in place) so previously returned
+  // vk::Buffer handles remain valid for the lifetime of the backend.
+  //
+  // We also suballocate inside each segment using VMA virtual blocks so per-stream
+  // eviction can reclaim memory without arbitrary caps.
+  constexpr size_t kDefaultVB = static_cast<size_t>(32) * 1024 * 1024; // 32 MiB
+  constexpr size_t kDefaultIB = static_cast<size_t>(8) * 1024 * 1024; // 8 MiB
+
+  if (m_staticArena.vb.empty()) {
+    auto seg = createStaticArenaSegment(StaticArena::Kind::Vertex, kDefaultVB);
+    if (seg) {
+      m_staticArena.vb.push_back(std::move(seg));
+      size_t total = 0;
+      for (const auto& s : m_staticArena.vb) {
+        total += s->capacity;
+      }
+      m_staticArena.vbHighWatermark = std::max(m_staticArena.vbHighWatermark, total);
+    }
   }
-  if (!m_staticArena.ib) {
-    const size_t cap = static_cast<size_t>(8) * 1024 * 1024; // 8 MiB
-    m_staticArena.ib =
-      m_sharedDevice->createBuffer(cap,
-                                   vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                                   vk::MemoryPropertyFlagBits::eDeviceLocal);
-    m_staticArena.ibCapacity = cap;
-    m_staticArena.ibOffset = 0;
-    m_staticArena.ibHighWatermark = 0;
+
+  if (m_staticArena.ib.empty()) {
+    auto seg = createStaticArenaSegment(StaticArena::Kind::Index, kDefaultIB);
+    if (seg) {
+      m_staticArena.ib.push_back(std::move(seg));
+      size_t total = 0;
+      for (const auto& s : m_staticArena.ib) {
+        total += s->capacity;
+      }
+      m_staticArena.ibHighWatermark = std::max(m_staticArena.ibHighWatermark, total);
+    }
   }
 }
 
@@ -3006,19 +3225,80 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB
 {
   ensureStaticArenas();
   StaticSlice slice{};
-  if (!m_staticArena.vb) {
+  if (bytes == 0) {
     return slice;
   }
-  const size_t aligned = alignUp(m_staticArena.vbOffset, std::max<size_t>(1, alignment));
-  if (aligned + bytes > m_staticArena.vbCapacity) {
-    VLOG(1) << fmt::format("Static VB arena full: requested={}B have={}B", bytes, m_staticArena.vbCapacity - aligned);
-    return slice;
+
+  const size_t align = std::max<size_t>(1, alignment);
+  VmaVirtualAllocationCreateInfo ainfo{};
+  ainfo.size = bytes;
+  ainfo.alignment = align;
+
+  auto tryAlloc = [&](StaticArena::Segment* seg) -> bool {
+    CHECK(seg != nullptr);
+    CHECK(seg->kind == StaticArena::Kind::Vertex);
+    CHECK(seg->buffer) << "Static VB segment missing buffer";
+    CHECK(seg->block != nullptr) << "Static VB segment missing VMA virtual block";
+
+    VmaVirtualAllocation alloc = nullptr;
+    VkDeviceSize vOffset = 0;
+    if (vmaVirtualAllocate(seg->block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
+      return false;
+    }
+
+    slice.buffer = seg->buffer->buffer();
+    slice.offset = static_cast<vk::DeviceSize>(vOffset);
+    slice.size = bytes;
+    slice.alloc.segment = seg;
+    slice.alloc.allocation = alloc;
+    slice.alloc.size = bytes;
+    slice.alloc.isIndexBuffer = false;
+
+    CHECK(seg->usedBytes <= std::numeric_limits<size_t>::max() - bytes) << "Static VB usedBytes overflow";
+    seg->usedBytes += bytes;
+    seg->allocCount++;
+    return true;
+  };
+
+  // First try existing segments (reusing freed ranges).
+  for (const auto& seg : m_staticArena.vb) {
+    if (tryAlloc(seg.get())) {
+      return slice;
+    }
   }
-  slice.buffer = m_staticArena.vb->buffer();
-  slice.offset = static_cast<vk::DeviceSize>(aligned);
-  slice.size = bytes;
-  m_staticArena.vbOffset = aligned + bytes;
-  m_staticArena.vbHighWatermark = std::max(m_staticArena.vbHighWatermark, m_staticArena.vbOffset);
+
+  // Need a new segment. Size it to fit this allocation and grow by powers of two
+  // to avoid pathological churn while preserving correctness.
+  constexpr size_t kDefaultSegment = static_cast<size_t>(32) * 1024 * 1024; // 32 MiB
+  size_t requiredBytes = std::max(bytes, align);
+  size_t cap = kDefaultSegment;
+  while (cap < requiredBytes) {
+    CHECK(cap <= std::numeric_limits<size_t>::max() / 2) << "Static VB segment capacity overflow";
+    cap *= 2;
+  }
+
+  auto newSeg = createStaticArenaSegment(StaticArena::Kind::Vertex, cap);
+  if (!newSeg) {
+    return {};
+  }
+  StaticArena::Segment* newSegPtr = newSeg.get();
+  m_staticArena.vb.push_back(std::move(newSeg));
+  size_t totalCapacity = 0;
+  for (const auto& s : m_staticArena.vb) {
+    totalCapacity += s->capacity;
+  }
+  m_staticArena.vbHighWatermark = std::max(m_staticArena.vbHighWatermark, totalCapacity);
+  VLOG(1) << fmt::format("Static VB arena grew: segments={} added={}B total_capacity={}B",
+                         m_staticArena.vb.size(),
+                         cap,
+                         totalCapacity);
+
+  if (!tryAlloc(newSegPtr)) {
+    LOG(ERROR) << "Static VB virtual allocation failed after segment growth";
+    flushPendingFreesAndMaybeTrimStaticSegment(newSegPtr);
+    return {};
+  }
+
   return slice;
 }
 
@@ -3026,20 +3306,136 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticIB
 {
   ensureStaticArenas();
   StaticSlice slice{};
-  if (!m_staticArena.ib) {
+  if (bytes == 0) {
     return slice;
   }
-  const size_t aligned = alignUp(m_staticArena.ibOffset, std::max<size_t>(1, alignment));
-  if (aligned + bytes > m_staticArena.ibCapacity) {
-    VLOG(1) << fmt::format("Static IB arena full: requested={}B have={}B", bytes, m_staticArena.ibCapacity - aligned);
-    return slice;
+
+  const size_t align = std::max<size_t>(1, alignment);
+  VmaVirtualAllocationCreateInfo ainfo{};
+  ainfo.size = bytes;
+  ainfo.alignment = align;
+
+  auto tryAlloc = [&](StaticArena::Segment* seg) -> bool {
+    CHECK(seg != nullptr);
+    CHECK(seg->kind == StaticArena::Kind::Index);
+    CHECK(seg->buffer) << "Static IB segment missing buffer";
+    CHECK(seg->block != nullptr) << "Static IB segment missing VMA virtual block";
+
+    VmaVirtualAllocation alloc = nullptr;
+    VkDeviceSize vOffset = 0;
+    if (vmaVirtualAllocate(seg->block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
+      return false;
+    }
+
+    slice.buffer = seg->buffer->buffer();
+    slice.offset = static_cast<vk::DeviceSize>(vOffset);
+    slice.size = bytes;
+    slice.alloc.segment = seg;
+    slice.alloc.allocation = alloc;
+    slice.alloc.size = bytes;
+    slice.alloc.isIndexBuffer = true;
+
+    CHECK(seg->usedBytes <= std::numeric_limits<size_t>::max() - bytes) << "Static IB usedBytes overflow";
+    seg->usedBytes += bytes;
+    seg->allocCount++;
+    return true;
+  };
+
+  for (const auto& seg : m_staticArena.ib) {
+    if (tryAlloc(seg.get())) {
+      return slice;
+    }
   }
-  slice.buffer = m_staticArena.ib->buffer();
-  slice.offset = static_cast<vk::DeviceSize>(aligned);
-  slice.size = bytes;
-  m_staticArena.ibOffset = aligned + bytes;
-  m_staticArena.ibHighWatermark = std::max(m_staticArena.ibHighWatermark, m_staticArena.ibOffset);
+
+  constexpr size_t kDefaultSegment = static_cast<size_t>(8) * 1024 * 1024; // 8 MiB
+  size_t requiredBytes = std::max(bytes, align);
+  size_t cap = kDefaultSegment;
+  while (cap < requiredBytes) {
+    CHECK(cap <= std::numeric_limits<size_t>::max() / 2) << "Static IB segment capacity overflow";
+    cap *= 2;
+  }
+
+  auto newSeg = createStaticArenaSegment(StaticArena::Kind::Index, cap);
+  if (!newSeg) {
+    return {};
+  }
+  StaticArena::Segment* newSegPtr = newSeg.get();
+  m_staticArena.ib.push_back(std::move(newSeg));
+  size_t totalCapacity = 0;
+  for (const auto& s : m_staticArena.ib) {
+    totalCapacity += s->capacity;
+  }
+  m_staticArena.ibHighWatermark = std::max(m_staticArena.ibHighWatermark, totalCapacity);
+  VLOG(1) << fmt::format("Static IB arena grew: segments={} added={}B total_capacity={}B",
+                         m_staticArena.ib.size(),
+                         cap,
+                         totalCapacity);
+
+  if (!tryAlloc(newSegPtr)) {
+    LOG(ERROR) << "Static IB virtual allocation failed after segment growth";
+    flushPendingFreesAndMaybeTrimStaticSegment(newSegPtr);
+    return {};
+  }
+
   return slice;
+}
+
+void Z3DRendererVulkanBackend::releaseStaticSlice(StaticSlice& slice)
+{
+  if (!slice.alloc) {
+    slice = {};
+    return;
+  }
+
+  auto* segment = static_cast<StaticArena::Segment*>(slice.alloc.segment);
+  CHECK(segment != nullptr) << "releaseStaticSlice called with null segment";
+  CHECK(segment->block != nullptr) << "releaseStaticSlice called with a segment missing VMA block";
+  CHECK(slice.alloc.allocation != nullptr) << "releaseStaticSlice called with null allocation handle";
+  CHECK_GT(slice.alloc.size, 0u) << "releaseStaticSlice called with zero size";
+  CHECK_GT(segment->allocCount, 0u) << "Static segment allocCount underflow on release";
+  CHECK_GE(segment->usedBytes, slice.alloc.size) << "Static segment usedBytes underflow on release";
+
+  segment->allocCount--;
+  segment->usedBytes -= slice.alloc.size;
+
+  if (segment->pinCount != 0) {
+    StaticArena::Segment::PendingFree pf{};
+    pf.allocation = slice.alloc.allocation;
+    pf.size = slice.alloc.size;
+    segment->pendingFrees.push_back(pf);
+  } else {
+    vmaVirtualFree(segment->block, slice.alloc.allocation);
+    flushPendingFreesAndMaybeTrimStaticSegment(segment);
+  }
+
+  slice = {};
+}
+
+void Z3DRendererVulkanBackend::pinStaticSliceForActiveSubmission(const StaticSlice& slice)
+{
+  if (!slice.alloc) {
+    return;
+  }
+  if (!m_activeFrame) {
+    return;
+  }
+  auto* segment = static_cast<StaticArena::Segment*>(slice.alloc.segment);
+  CHECK(segment != nullptr) << "pinStaticSliceForActiveSubmission called with null segment";
+
+  const auto [_, inserted] = m_activeFrame->pinnedStaticSegments.insert(segment);
+  if (inserted) {
+    CHECK(segment->pinCount < std::numeric_limits<uint32_t>::max()) << "Static segment pinCount overflow";
+    segment->pinCount++;
+  }
+}
+
+void Z3DRendererVulkanBackend::requestEvictStream(uint64_t streamKey)
+{
+  if (streamKey == 0) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(m_pendingEvictionsMutex);
+  m_pendingEvictStreamKeys.insert(streamKey);
 }
 
 void Z3DRendererVulkanBackend::stageCopy(vk::Buffer dst,
@@ -3934,6 +4330,19 @@ void Z3DRendererVulkanBackend::scheduleStaticCopy(vk::Buffer dst,
 {
   if (!m_activeFrame) {
     return;
+  }
+  // Pin the destination static segment for this submission so that any evictions
+  // cannot reuse its suballocated range until the fence signals.
+  if (dst) {
+    const VkBuffer raw = static_cast<VkBuffer>(dst);
+    auto it = m_staticArena.segmentByBuffer.find(raw);
+    if (it != m_staticArena.segmentByBuffer.end() && it->second != nullptr) {
+      const auto [_, inserted] = m_activeFrame->pinnedStaticSegments.insert(it->second);
+      if (inserted) {
+        CHECK(it->second->pinCount < std::numeric_limits<uint32_t>::max()) << "Static segment pinCount overflow";
+        it->second->pinCount++;
+      }
+    }
   }
   FrameResources::ScheduledCopy sc{};
   sc.dst = dst;
