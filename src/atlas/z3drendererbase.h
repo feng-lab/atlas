@@ -31,8 +31,6 @@ class Z3DScratchResourcePool;
 
 enum class ScratchFormat;
 
-struct Z3DCompositorPass;
-
 namespace detail {
 
 template<typename T>
@@ -70,24 +68,8 @@ public:
   // Convenience constant for callers: set surface and preserve per-attachment policy.
   static constexpr PreserveLoadStoreTag Preserve{};
 
-  enum class ShaderHookType
-  {
-    Normal,
-    DualDepthPeelingInit,
-    DualDepthPeelingPeel,
-    WeightedAverageInit,
-    WeightedBlendedInit,
-    PerPixelFragmentListCount,
-    PerPixelFragmentListStore
-  };
-
-  struct ShaderHookParameter
-  {
-    const Z3DTexture* dualDepthPeelingDepthBlenderTexture = nullptr;
-    const Z3DTexture* dualDepthPeelingFrontBlenderTexture = nullptr;
-    AttachmentHandle dualDepthPeelingDepthBlenderHandle;
-    AttachmentHandle dualDepthPeelingFrontBlenderHandle;
-  };
+  using ShaderHookType = ::nim::ShaderHookType;
+  using ShaderHookParameter = ::nim::ShaderHookParameter;
 
   Z3DRendererBase(RendererParameterState& parameterState,
                   RendererFrameState& frameState,
@@ -176,8 +158,6 @@ public:
                                        int requestedAttachments = -1,
                                        double scale = -1.0);
 
-  void executeCompositorPass(const Z3DCompositorPass& pass);
-
   RendererFrameState::ActiveSurface describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
   struct VulkanSurfaceBindings
@@ -226,6 +206,20 @@ public:
   // These apply pending surfaces, open a frame if needed, record, submit,
   // and end the frame if it was opened here.
   void executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label = {});
+
+  // Capture a set of Vulkan CPU batches without submitting them. This is used
+  // by higher-level orchestration (e.g. ZVulkanLinearScript) to build an IR of
+  // rendering work that can be optimized (segment coalescing, submission
+  // boundaries) before execution.
+  //
+  // Contract:
+  // - Vulkan backend must be active.
+  // - Does not require an active Vulkan frame.
+  // - Returns a self-contained RendererCPUState (batches carry parameter and
+  //   shader-hook snapshots, so later execution does not read mutable renderer
+  //   state).
+  [[nodiscard]] RendererCPUState captureVulkanBatches(const std::function<void()>& recordBatches,
+                                                      std::string_view label = {});
 
   // Helper to enforce pass ordering: set the surface for the next pass,
   // then record batches under a labeled scope with correct begin/end.

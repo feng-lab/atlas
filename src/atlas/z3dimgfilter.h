@@ -19,6 +19,7 @@
 namespace nim {
 
 class ZImg;
+class ZVulkanLinearScript;
 
 class Z3DImgFilter : public Z3DBoundedFilter
 {
@@ -115,15 +116,15 @@ protected:
 
   [[nodiscard]] bool hasSlices() const;
 
-  double renderSlices(Z3DEye eye);
+  double renderSlices(Z3DEye eye, /*nullable*/ ZVulkanLinearScript* script);
 
   [[nodiscard]] bool hasImage() const;
 
-  double renderImage(Z3DEye eye);
+  double renderImage(Z3DEye eye, /*nullable*/ ZVulkanLinearScript* script);
 
   [[nodiscard]] bool onlyBoundBox() const;
 
-  void renderOnlyBoundBox(Z3DEye eye);
+  void renderOnlyBoundBox(Z3DEye eye, /*nullable*/ ZVulkanLinearScript* script);
 
   void updateNotTransformedBoundBoxImpl() override;
 

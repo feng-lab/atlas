@@ -45,6 +45,7 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
                                               const vk::Rect2D& scissor,
                                               vk::raii::CommandBuffer& cmd)
 {
+  (void)renderer;
   (void)payload;
 
   // Shared fullscreen quad geometry
@@ -64,16 +65,11 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
 
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
 
-  glm::vec2 extent(viewport.width, viewport.height);
-  if (extent.x <= 0.f || extent.y <= 0.f) {
-    const auto& viewportRect = renderer.frameState().viewport;
-    extent = glm::vec2(static_cast<float>(viewportRect.z), static_cast<float>(viewportRect.w));
-  }
+  const glm::vec2 extent(viewport.width, viewport.height);
+  CHECK(extent.x > 0.0f && extent.y > 0.0f) << "Vulkan background pass requires a valid viewport extent";
 
   BackgroundPushConstants constants;
-  if (extent.x > 0.f && extent.y > 0.f) {
-    constants.screen_dim_RCP = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
-  }
+  constants.screen_dim_RCP = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
   constants.color1 = payload.color1;
   constants.color2 = payload.color2;
   constants.region = payload.region;

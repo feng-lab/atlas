@@ -53,6 +53,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
                                                           const vk::Rect2D& scissor,
                                                           vk::raii::CommandBuffer& cmd)
 {
+  (void)renderer;
   VLOG(2) << fmt::format("record begin accum=0x{:x} moments=0x{:x}",
                          payload.accumulationAttachment.id,
                          payload.momentsAttachment.id);
@@ -106,18 +107,6 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
                          formats.depthFormat.has_value());
 
   // Draw-only; backend manages attachments and render area
-
-  glm::vec2 extent = batch.pass.viewport.extent;
-  if (extent.x <= 0.0f || extent.y <= 0.0f) {
-    const auto& viewportState = renderer.frameState().viewport;
-    extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
-  }
-  if (extent.x <= 0.0f) {
-    extent.x = 1.0f;
-  }
-  if (extent.y <= 0.0f) {
-    extent.y = 1.0f;
-  }
 
   // No OIT UBO needed
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};

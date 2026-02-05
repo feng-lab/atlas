@@ -12,11 +12,13 @@
 #include <QPointer>
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <mutex>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 class QOffscreenSurface;
+class QTimer;
 
 namespace folly {
 class CancellationToken;
@@ -371,6 +373,12 @@ private:
 
   void handleRenderBackendChanged();
   void applyBackendSwitch();
+  void pollVulkanCompletionsOnce();
+  void maybeStartVulkanCompletionPolling();
+  void stopVulkanCompletionPolling();
+  [[nodiscard]] bool shouldDeferVulkanNetworkProcessing() const;
+  void deferRenderUntilVulkanIdle(QEvent::Type deferredType);
+  void maybeKickDeferredRenderAfterVulkanPoll();
 
   // Execute one pass over the current filter pipeline. If cancellationToken
   // is provided, this will check for cancellation between filters.
@@ -402,6 +410,7 @@ private:
   std::unique_ptr<ZVulkanContext> m_vkContext;
   std::unique_ptr<ZVulkanDevice> m_vkDevice;
   std::unique_ptr<ZQtExecutor> m_renderThreadExecutor;
+  QTimer* m_vkCompletionPollTimer = nullptr;
 
   ZDoc& m_doc;
 
@@ -463,6 +472,13 @@ private:
 
   // Backend switch deferred
   bool m_backendSwitchScheduled = false;
+
+  // When Vulkan readback is non-blocking, we may finish CPU submission while
+  // the GPU is still processing the previous frame. Coalesce additional render
+  // requests by deferring the expensive network processing until the Vulkan
+  // frame executor has capacity (inFlightCount < maxFramesInFlight), then post
+  // a single event to re-run rendering.
+  std::optional<QEvent::Type> m_vkDeferredRenderEventType;
 
   // Pending per-object View3D json waiting for objViewReady
   std::unordered_map<size_t, json::object> m_pendingObjViewJson;

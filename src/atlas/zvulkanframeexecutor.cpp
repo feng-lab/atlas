@@ -177,6 +177,20 @@ bool ZVulkanFrameExecutor::hasInFlightFrames()
   return false;
 }
 
+uint32_t ZVulkanFrameExecutor::inFlightCount()
+{
+  if (m_frames.empty() && (m_framesDirty || m_maxFramesInFlight > 0)) {
+    ensureFrames();
+  }
+  uint32_t count = 0;
+  for (const auto& frame : m_frames) {
+    if (frame.inFlight) {
+      count++;
+    }
+  }
+  return count;
+}
+
 void ZVulkanFrameExecutor::pollCompletions(std::vector<void*>* completedKeys)
 {
   ensureFrames();

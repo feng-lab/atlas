@@ -615,7 +615,8 @@ EllipsoidPayload Z3DEllipsoidRenderer::buildEllipsoidPayload() const
   payload.pickingColors = spanOrEmpty(m_ellipsoidPickingColors);
   payload.flags = spanFromGLfloats(m_allFlags);
   payload.indices = spanFromGLuints(m_indexs);
-  payload.params = &m_rendererBase.parameterState();
+  payload.params = m_rendererBase.parameterState();
+  payload.paramsCaptured = true;
   payload.wantsLighting = needLighting();
   payload.useDynamicMaterial = m_useDynamicMaterial;
   // Per-stream generation counters

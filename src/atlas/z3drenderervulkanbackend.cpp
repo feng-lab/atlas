@@ -2,7 +2,6 @@
 
 #include "z3drendererbase.h"
 #include "z3drendercommands.h"
-#include "z3dcompositorpass.h"
 #include "z3dboundedfilter.h"
 #include "z3dshaderprogram.h"
 #include "zexception.h"
@@ -310,11 +309,29 @@ std::string Z3DRendererVulkanBackend::generateGeomHeader(const Z3DRendererBase& 
   return std::string();
 }
 
+void Z3DRendererVulkanBackend::setPendingBeginRenderPreRecordActions(std::vector<BeginRenderPreRecordAction> actions,
+                                                                     std::string_view debugLabel)
+{
+  CHECK(m_pendingBeginRenderPreRecordActions.empty())
+    << "Pending beginRender pre-record actions already set (previous_label='" << m_pendingBeginRenderPreRecordLabel
+    << "')";
+  m_pendingBeginRenderPreRecordActions = std::move(actions);
+  m_pendingBeginRenderPreRecordLabel = std::string(debugLabel);
+}
+
 void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 {
-  s_currentBackend = this;
+  // Only expose the thread-local "current backend" while actively recording a
+  // Vulkan frame. This avoids call sites (debug validation, descriptor helpers)
+  // observing a partially-initialised backend before ensureDevice/beginFrame.
+  s_currentBackend = nullptr;
   m_activeRenderer = &renderer;
-  m_activePPLLIndex.reset();
+  auto preRecordActions = std::move(m_pendingBeginRenderPreRecordActions);
+  m_pendingBeginRenderPreRecordActions.clear();
+  std::string pendingPreRecordLabel = std::move(m_pendingBeginRenderPreRecordLabel);
+  m_pendingBeginRenderPreRecordLabel.clear();
+  // Per-frame recording state
+  m_externalBufferUseStates.clear();
   if (m_lineContext) {
     m_lineContext->resetFrame();
   }
@@ -589,6 +606,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Reset Stage 4 (readback) bookkeeping
   frameResources.pendingColorReadbacks.clear();
   frameResources.pendingBufferReadbacks.clear();
+  frameResources.forceFenceWaitForReadbacks = false;
   frameResources.readbackBytesCopied = 0;
   frameResources.readbackSlotsInFlight = 0;
   // Reset Stage 4.5 (static staging) bookkeeping
@@ -616,29 +634,28 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Ensure static arenas exist once a device is present
   ensureStaticArenas();
 
-  // PPLL (exact OIT): ensure the active ring slot is sized for the current viewport
-  // before we prime descriptor sets. This is keyed by the UI/perf frame token so
-  // multiple submissions within the same UI frame share the same buffers even
-  // when the Vulkan frame executor advances its command-buffer slot.
-  const auto hook = renderer.shaderHookType();
-  const bool ppllActive = (hook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
-                           hook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore);
-  if (ppllActive) {
-    CHECK(m_supportsFragStoresAndAtomics) << "PPLL requires fragment storage buffer atomics (fragmentStoresAndAtomics)";
-    const size_t desiredRing = std::max<size_t>(1, static_cast<size_t>(m_maxFramesInFlight));
-    if (m_ppllFrameRing.size() != desiredRing) {
-      m_ppllFrameRing.resize(desiredRing);
+  // Run any pending "pre-record" actions now that the frame slot, descriptor
+  // arena, and thread-local renderer state are established, but before descriptor
+  // priming and command-buffer recording begins.
+  //
+  // These actions are call-site defined (opaque to the script/backend) and are
+  // intended for resource priming such as PPLL sizing/activation.
+  if (!preRecordActions.empty()) {
+    if (VLOG_IS_ON(1)) {
+      const std::string frameLabel = std::string(renderer.currentFrameLabel());
+      VLOG(1) << fmt::format("VK preRecord: frame='{}' actions={} pending_label='{}'",
+                             frameLabel.empty() ? std::string("<unlabeled-frame>") : frameLabel,
+                             preRecordActions.size(),
+                             pendingPreRecordLabel.empty() ? std::string("<none>") : pendingPreRecordLabel);
     }
-    const size_t ringSize = m_ppllFrameRing.empty() ? 1 : m_ppllFrameRing.size();
-    m_activePPLLIndex = static_cast<size_t>(frameResources.realFrameToken % ringSize);
-    const uint64_t requestedFragments =
-      (hook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) ? m_nextPPLLRequestedFragmentCount : 0;
-    ensurePPLLResources(renderer.frameState().viewport, requestedFragments);
-  } else {
-    m_activePPLLIndex.reset();
+    for (auto& action : preRecordActions) {
+      CHECK(action.fn) << "VK preRecord action missing function";
+      if (VLOG_IS_ON(2)) {
+        VLOG(2) << "VK preRecord action: " << (action.label.empty() ? std::string("<unlabeled>") : action.label);
+      }
+      action.fn(*this, renderer);
+    }
   }
-  // Consume the request (only meaningful for the next PerPixelFragmentListStore submission).
-  m_nextPPLLRequestedFragmentCount = 0;
 
   // Expose frame resources to allow pre-record descriptor priming (already set above)
 
@@ -688,6 +705,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   cmdBuffer.resetQueryPool(*frameResources.queryPool, 0, kMaxTimestampQueries);
 
   m_frameRecording = true;
+  s_currentBackend = this;
 
   // Install scratch-pool deferred release scheduler for this backend.
   // (Used by RenderTargetLease to delay Vulkan slot reuse until the frame-slot
@@ -705,27 +723,54 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
       return;
     }
 
-    // If no active frame is present, be conservative: wait for all in-flight
-    // frames and release immediately. This avoids freeing scratch slots while
-    // the GPU might still be using them (teardown/backend-switch edge cases).
-    if (!m_activeFrame || !m_sharedDevice) {
-      if (m_sharedDevice) {
-        m_sharedDevice->frameExecutor().waitForAllInFlight();
-      }
+    if (!m_sharedDevice) {
       fn();
       return;
     }
 
-    // Common case: delay until the frame-slot reaches the completion safe
-    // point (applyPendingArenaReset).
+    // Common case: delay until the current frame-slot reaches the completion
+    // safe point (applyPendingArenaReset).
     const std::string_view debugLabel = "scratch_pool_vulkan_release";
-    registerAfterCurrentFrameCompletionHook(
-      currentRenderThreadExecutorKeepAlive(debugLabel),
-      [fn = std::move(fn)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-        fn();
-        co_return;
-      },
-      debugLabel);
+    if (m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid()) {
+      registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive(debugLabel),
+        [fn = std::move(fn)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+          fn();
+          co_return;
+        },
+        debugLabel);
+      return;
+    }
+
+    // If the lease is released after endRender() has cleared the active frame,
+    // defer the release to the most recently submitted slot. This preserves
+    // non-blocking submission while still preventing scratch-slot reuse until
+    // the backend observes the completion safe point for that slot.
+    if (currentRenderThreadExecutorOrNull() != nullptr && m_lastSubmittedFrameKey != nullptr &&
+        m_frameDevice == m_sharedDevice) {
+      auto it = m_frameResourceMap.find(m_lastSubmittedFrameKey);
+      if (it != m_frameResourceMap.end()) {
+        CHECK_LT(it->second, m_frames.size()) << "Last submitted frame index out of bounds";
+        m_frames[it->second].afterFrameCompletionHooks.registerHook(
+          FrameHookSpot::AfterFrameCompletionSafePoint,
+          currentRenderThreadExecutorKeepAlive(debugLabel),
+          [fn = std::move(fn)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+            fn();
+            co_return;
+          },
+          debugLabel);
+        return;
+      }
+    }
+
+    // Fallback: if we cannot tie the release to a known backend frame-slot,
+    // drain GPU work and also drain any pending safe-point hooks so we do not
+    // strand readback consumers that gate UI presentation.
+    m_sharedDevice->frameExecutor().waitForAllInFlight();
+    for (auto& frame : m_frames) {
+      applyPendingArenaReset(frame);
+    }
+    fn();
   });
 
   // beginRender() ends here; command buffer recording continues in pipeline contexts.
@@ -734,13 +779,16 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 {
   (void)renderer;
-  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+  auto clearCurrentBackendGuard = folly::makeGuard([]() {
     s_currentBackend = nullptr;
+  });
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
     return;
   }
 
   auto& frame = *m_activeFrame;
   auto& frameHandle = *m_activeFrameHandle;
+  m_lastSubmittedFrameKey = frameHandle.key();
 
   // Insert end-of-frame image->buffer copies for pending readbacks
   if (m_frameRecording && !frame.pendingColorReadbacks.empty()) {
@@ -857,18 +905,21 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   // }
 
   // Diagnostics: log submission intent with frame identity and wait conditions.
-  const bool waitForReadbacks = (m_activeFrame && (!m_activeFrame->pendingColorReadbacks.empty() ||
-                                                   !m_activeFrame->pendingBufferReadbacks.empty()));
-  const bool needFenceWait = waitForReadbacks || m_pumpFenceAfterFirstSubmit;
+  const bool hasReadbacks = (m_activeFrame && (!m_activeFrame->pendingColorReadbacks.empty() ||
+                                               !m_activeFrame->pendingBufferReadbacks.empty()));
+  const bool needFenceWait =
+    (m_pumpFenceAfterFirstSubmit || (hasReadbacks && (m_waitForReadbacks || frame.forceFenceWaitForReadbacks)));
   if (VLOG_IS_ON(1)) {
     VLOG(1) << fmt::format(
-      "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} wait_readback={} pending_color_readbacks={} pending_buffer_readbacks={}",
+      "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} has_readback={} wait_for_readbacks_policy={} will_wait={} pending_color_readbacks={} pending_buffer_readbacks={}",
       frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
       frame.realFrameToken,
       frame.submissionId,
       static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkCommandBuffer>(rawCmd))),
       static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkFence>(*frameHandle.fence()))),
-      waitForReadbacks,
+      hasReadbacks,
+      m_waitForReadbacks,
+      needFenceWait,
       frame.pendingColorReadbacks.size(),
       frame.pendingBufferReadbacks.size());
   }
@@ -1091,24 +1142,60 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
   // Reset self-managed clear tracking for this sequence of batches
   m_selfManagedClearKeys.clear();
 
-  // Build a simple attachment key for coalescing
-  struct AttachKey
+  // Segment key for coalescing dynamic-rendering segments. This must include
+  // every field that affects vkCmdBeginRendering state (render area, attachments,
+  // load/store ops, clear values, and final-use contracts) so we never merge two
+  // passes that require different begin-rendering semantics.
+  struct SegmentAttachmentKey
   {
-    std::vector<uint64_t> colors;
-    uint64_t depth = 0;
-    bool operator==(const AttachKey& o) const
+    uint64_t id = 0;
+    LoadOp loadOp = LoadOp::Load;
+    StoreOp storeOp = StoreOp::Store;
+    AttachmentFinalUse finalUse = AttachmentFinalUse::Unspecified;
+    ClearValue clearValue{};
+    bool operator==(const SegmentAttachmentKey& o) const
     {
-      return depth == o.depth && colors == o.colors;
+      const auto colorEqual = [](const glm::vec4& a, const glm::vec4& b) {
+        return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
+      };
+      return id == o.id && loadOp == o.loadOp && storeOp == o.storeOp && finalUse == o.finalUse &&
+             colorEqual(clearValue.color, o.clearValue.color) && clearValue.depth == o.clearValue.depth &&
+             clearValue.stencil == o.clearValue.stencil;
     }
   };
-  auto buildKey = [](const RenderBatch& b) {
-    AttachKey k;
+  struct SegmentKey
+  {
+    vk::Rect2D renderArea{};
+    std::vector<SegmentAttachmentKey> colors;
+    std::optional<SegmentAttachmentKey> depth;
+    bool operator==(const SegmentKey& o) const
+    {
+      return renderArea.offset.x == o.renderArea.offset.x && renderArea.offset.y == o.renderArea.offset.y &&
+             renderArea.extent.width == o.renderArea.extent.width &&
+             renderArea.extent.height == o.renderArea.extent.height && colors == o.colors && depth == o.depth;
+    }
+  };
+  auto buildKey = [](const RenderBatch& b, const vk::Rect2D& renderArea) {
+    SegmentKey k;
+    k.renderArea = renderArea;
     k.colors.reserve(b.pass.colorAttachments.size());
     for (const auto& a : b.pass.colorAttachments) {
-      k.colors.push_back(a.handle.id);
+      if (!a.handle.valid()) {
+        continue;
+      }
+      k.colors.push_back(SegmentAttachmentKey{.id = a.handle.id,
+                                              .loadOp = a.loadOp,
+                                              .storeOp = a.storeOp,
+                                              .finalUse = a.finalUse,
+                                              .clearValue = a.clearValue});
     }
-    if (b.pass.depthAttachment) {
-      k.depth = b.pass.depthAttachment->handle.id;
+    if (b.pass.depthAttachment && b.pass.depthAttachment->handle.valid()) {
+      const auto& a = *b.pass.depthAttachment;
+      k.depth = SegmentAttachmentKey{.id = a.handle.id,
+                                     .loadOp = a.loadOp,
+                                     .storeOp = a.storeOp,
+                                     .finalUse = a.finalUse,
+                                     .clearValue = a.clearValue};
     }
     return k;
   };
@@ -1248,6 +1335,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
       std::string passLabel = std::string(renderer.currentPassLabel());
+      if (passLabel.empty() && m_passScope.active) {
+        passLabel = m_passScope.label;
+      }
       if (passLabel.empty()) {
         passLabel = "<unnamed>";
       }
@@ -1299,17 +1389,37 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
   };
 
   size_t batchIndex = 0;
-  std::optional<AttachKey> currentKey;
+  std::optional<SegmentKey> currentKey;
   bool segmentOpen = false;
   std::optional<ZVulkanPipelineCommandRecorder::RenderingSegmentSpec> openSpec{};
   ZVulkanPipelineCommandRecorder recorder(cmd);
 
-  struct BufferUseState
-  {
-    vk::PipelineStageFlags2 stage{};
-    vk::AccessFlags2 access{};
+  auto endRenderingSegmentIfOpen = [&]() {
+    if (!segmentOpen) {
+      return;
+    }
+    if (openSpec) {
+      recorder.endRenderingSegment(*openSpec);
+      openSpec.reset();
+    }
+    segmentOpen = false;
+    currentKey.reset();
   };
-  std::unordered_map<uint64_t, BufferUseState> bufferUseStates;
+
+  auto openSegmentForBatch = [&](const RenderBatch& batch, const SegmentKey& key) -> bool {
+    ZVulkanPipelineCommandRecorder::RenderingSegmentSpec spec;
+    if (!beginSegmentForBatch(batch, recorder, spec)) {
+      return false;
+    }
+    segmentOpen = true;
+    currentKey = key;
+    openSpec = spec;
+    // Track active segment formats for validation.
+    if (m_activeFrame) {
+      m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
+    }
+    return true;
+  };
 
   for (const auto& batch : state.batches) {
     const auto geom = describeGeometry(batch.geometry);
@@ -1322,6 +1432,14 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
                            static_cast<int>(batch.pass.viewport.origin.y),
                            static_cast<int>(batch.pass.viewport.extent.x),
                            static_cast<int>(batch.pass.viewport.extent.y));
+    if (batch.pass.kind == BackendPassDesc::Kind::Raster) {
+      CHECK(batch.pass.viewport.extent.x > 0.0f && batch.pass.viewport.extent.y > 0.0f)
+        << "Vulkan batch missing viewport extent: geom=" << geom;
+      if (batch.pass.enableScissor) {
+        CHECK(batch.pass.scissorRect.z > 0.0f && batch.pass.scissorRect.w > 0.0f)
+          << "Vulkan batch enables scissor but has empty scissorRect: geom=" << geom;
+      }
+    }
 
     // Note: do not forcibly close segments before texture_copy; rely on
     // producers to end in sampled layouts to avoid in-segment transitions.
@@ -1412,8 +1530,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       const vk::AccessFlags2 desiredAccess = useInfo.access;
 
       const uint64_t key = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(buffer.buffer())));
-      const auto it = bufferUseStates.find(key);
-      const BufferUseState previous = (it == bufferUseStates.end()) ? BufferUseState{} : it->second;
+      const auto it = m_externalBufferUseStates.find(key);
+      const ExternalBufferUseState previous =
+        (it == m_externalBufferUseStates.end()) ? ExternalBufferUseState{} : it->second;
 
       auto hasWrite = [](vk::AccessFlags2 access) {
         return static_cast<bool>(access & (vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eTransferWrite |
@@ -1441,7 +1560,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         cmd.pipelineBarrier2(dep);
       }
 
-      bufferUseStates[key] = BufferUseState{desiredStage, desiredAccess};
+      m_externalBufferUseStates[key] = ExternalBufferUseState{desiredStage, desiredAccess};
     };
 
     for (const auto& use : batch.pass.externalBufferUses) {
@@ -1452,47 +1571,18 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     const auto vkScissor = vulkan::toVkScissor(batch.pass);
 
     const bool selfManaged = isSelfManaged(batch.geometry);
-    const auto key = buildKey(batch);
+    const auto key = buildKey(batch, vkScissor);
 
     if (selfManaged) {
-      if (segmentOpen) {
-        if (openSpec) {
-          recorder.endRenderingSegment(*openSpec);
-          openSpec.reset();
-        }
-        segmentOpen = false;
-        currentKey.reset();
-      }
+      endRenderingSegmentIfOpen();
     } else {
       if (!segmentOpen) {
-        ZVulkanPipelineCommandRecorder::RenderingSegmentSpec spec;
-        if (beginSegmentForBatch(batch, recorder, spec)) {
-          segmentOpen = true;
-          currentKey = key;
-          openSpec = spec;
-          // Track active segment formats for validation
-          if (m_activeFrame) {
-            m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
-          }
-        } else {
+        if (!openSegmentForBatch(batch, key)) {
           continue;
         }
       } else if (!currentKey || *currentKey != key) {
-        if (openSpec) {
-          recorder.endRenderingSegment(*openSpec);
-          openSpec.reset();
-        }
-        segmentOpen = false;
-        currentKey.reset();
-        ZVulkanPipelineCommandRecorder::RenderingSegmentSpec spec;
-        if (beginSegmentForBatch(batch, recorder, spec)) {
-          segmentOpen = true;
-          currentKey = key;
-          openSpec = spec;
-          if (m_activeFrame) {
-            m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
-          }
-        } else {
+        endRenderingSegmentIfOpen();
+        if (!openSegmentForBatch(batch, key)) {
           continue;
         }
       }
@@ -1623,24 +1713,12 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       CHECK(false) << "Vulkan backend has not yet implemented draw emission for geometry type '"
                    << describeGeometry(batch.geometry) << "'.";
     }
-
-    // If the context managed its own begin/end logic, treat the segment as closed.
-    if (selfManaged) {
-      segmentOpen = false;
-      currentKey.reset();
-      openSpec.reset();
-    }
   }
 
-  // Close any remaining open segment at the end of batches
-  if (segmentOpen) {
-    if (openSpec) {
-      recorder.endRenderingSegment(*openSpec);
-      openSpec.reset();
-    }
-    segmentOpen = false;
-  }
-  // Execute any queued upload->static copies now (outside dynamic rendering)
+  // Recording-session sync point:
+  // - no active dynamic rendering segment
+  // - scheduled upload->static copies flushed
+  endRenderingSegmentIfOpen();
   flushScheduledCopies(cmd);
   if (m_activeFrame) {
     m_activeFrame->activeSegmentFormats.reset();
@@ -1649,183 +1727,47 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
 // Removed: shouldSelfManagedClear was used in earlier self-managed flows.
 
-void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, const Z3DCompositorPass& pass)
+void Z3DRendererVulkanBackend::hintNextUniformArenaMinCapacity(size_t bytes)
 {
-  // Record batches, then execute as a single begin/end.
-  VLOG(1) << "processCompositorPass surface colors=" << pass.surface.colorAttachments.size()
-          << " depth=" << pass.surface.depthAttachment.has_value();
-  // Honor clear policy on this pass
-  const LoadOp colorLoad = pass.clearColor ? LoadOp::Clear : LoadOp::Load;
-  const LoadOp depthLoad = pass.clearDepth ? LoadOp::Clear : LoadOp::Load;
-  renderer
-    .setActiveSurfaceWithLoadStore(pass.surface, colorLoad, StoreOp::Store, depthLoad, StoreOp::Store, pass.clearValue);
+  m_nextUniformMinCapacity = std::max(m_nextUniformMinCapacity, bytes);
+  m_uniformMinCapacityCarry = std::max(m_uniformMinCapacityCarry, bytes);
+}
 
-  auto recordFilterBatches = [&](Z3DBoundedFilter* filter, auto&& renderFn) {
-    if (!filter) {
-      return;
-    }
-    auto& source = filter->rendererBase();
-    const glm::uvec4 previousViewport = source.frameState().viewport;
-    const auto previousSurface = source.frameState().activeSurface;
-    const auto surfaceCopy = renderer.frameState().activeSurface;
-    source.frameState().updateViewportData(renderer.frameState().viewport);
-    source.setActiveSurfaceWithLoadStore(surfaceCopy, Z3DRendererBase::Preserve);
-    renderFn();
-    auto& batches = source.cpuState().batches;
-    for (auto& batch : batches) {
-      if (batch.pass.colorAttachments.empty() && !surfaceCopy.colorAttachments.empty()) {
-        batch.pass.colorAttachments = surfaceCopy.colorAttachments;
-      }
-      if (!batch.pass.depthAttachment.has_value() && surfaceCopy.depthAttachment.has_value()) {
-        batch.pass.depthAttachment = surfaceCopy.depthAttachment;
-      }
-      if (batch.pass.viewport.extent == glm::vec2(0.0f) && renderer.frameState().viewport.z > 0u &&
-          renderer.frameState().viewport.w > 0u) {
-        batch.pass.viewport.origin = glm::vec2(static_cast<float>(renderer.frameState().viewport.x),
-                                               static_cast<float>(renderer.frameState().viewport.y));
-        batch.pass.viewport.extent = glm::vec2(static_cast<float>(renderer.frameState().viewport.z),
-                                               static_cast<float>(renderer.frameState().viewport.w));
-        batch.pass.viewport.minDepth = 0.0f;
-        batch.pass.viewport.maxDepth = 1.0f;
-      }
-      renderer.appendBatch(std::move(batch));
-    }
-    source.resetCPUState();
-    source.frameState().updateViewportData(previousViewport);
-    source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
-  };
+size_t Z3DRendererVulkanBackend::estimateFrameUniformOverheadBytes()
+{
+  // beginRender() always suballocates two lighting UBO slices (scene lighting +
+  // picking lighting). Provide a conservative (alignment-rounded) estimate so
+  // higher-level schedulers can size the arena before opening a Vulkan frame.
+  ensureDevice();
+  const size_t align = uniformAlignment();
+  const size_t szLighting = alignUp(sizeof(LightingUBOStd140), align);
+  return 2u * szLighting;
+}
 
-  // Use pass.debugLabel if provided; otherwise leave empty.
-  std::string_view scopeLabel = pass.debugLabel ? std::string_view(pass.debugLabel) : std::string_view();
+size_t Z3DRendererVulkanBackend::estimateAdditionalUniformBytesForBatches(const RendererCPUState& state)
+{
+  ensureDevice();
+  const size_t align = uniformAlignment();
+  const size_t szTransforms = alignUp(sizeof(TransformsUBOStd140), align);
+  const size_t szMaterial = alignUp(sizeof(MaterialUBOStd140), align);
 
-  // Surface is already applied via setActiveSurfaceWithLoadStore
-  // Pre-collect CPU batches to estimate uniform arena demand before we open the Vulkan frame.
-  // This avoids mid-record growth and lets us size the per-frame arena precisely.
-  auto estimateUniformBytes = [&]() -> size_t {
-    // Clear any lingering batches
-    renderer.resetCPUState();
-    // Collect opaque
-    for (auto* filter : pass.opaqueFilters) {
-      if (!filter) {
-        continue;
-      }
-      recordFilterBatches(filter, [&]() {
-        filter->renderOpaque(pass.eye);
-      });
+  size_t total = 0;
+  for (const auto& b : state.batches) {
+    if (std::holds_alternative<MeshPayload>(b.geometry)) {
+      const auto& payload = std::get<MeshPayload>(b.geometry);
+      const size_t draws = payload.meshes.size();
+      total += szTransforms + (draws * szMaterial);
+    } else if (std::holds_alternative<LinePayload>(b.geometry) || std::holds_alternative<SpherePayload>(b.geometry) ||
+               std::holds_alternative<EllipsoidPayload>(b.geometry) ||
+               std::holds_alternative<ConePayload>(b.geometry)) {
+      total += szTransforms + szMaterial;
+    } else {
+      // Most non-geometry passes use push constants or dedicated UBOs.
     }
-    // Collect transparent
-    for (const auto& tb : pass.transparentFilters) {
-      auto* filter = tb.filter;
-      if (!filter) {
-        continue;
-      }
-      recordFilterBatches(filter, [&]() {
-        filter->renderTransparent(pass.eye);
-      });
-    }
-    const size_t align = uniformAlignment();
-    const size_t szLighting = alignUp(sizeof(LightingUBOStd140), align);
-    const size_t szTransforms = alignUp(sizeof(TransformsUBOStd140), align);
-    const size_t szMaterial = alignUp(sizeof(MaterialUBOStd140), align);
-    size_t total = 0;
-    const auto& batches = renderer.cpuState().batches;
-    bool anyGeometry = false;
-    for (const auto& b : batches) {
-      // Only geometry batches consume the uniform arena
-      if (std::holds_alternative<MeshPayload>(b.geometry)) {
-        const auto& payload = std::get<MeshPayload>(b.geometry);
-        const size_t draws = payload.meshes.size();
-        total += szTransforms + (draws * szMaterial);
-        anyGeometry = true;
-      } else if (std::holds_alternative<LinePayload>(b.geometry) || std::holds_alternative<SpherePayload>(b.geometry) ||
-                 std::holds_alternative<EllipsoidPayload>(b.geometry) ||
-                 std::holds_alternative<ConePayload>(b.geometry)) {
-        // One material+lighting+transform per batch
-        total += szTransforms + szMaterial;
-        anyGeometry = true;
-      } else {
-        // Non-geometry passes (background, texture copy/blend/glow, image passes) either
-        // do not allocate from the uniform arena or use dedicated UBOs.
-      }
-    }
-    if (anyGeometry) {
-      total += szLighting; // shared per-frame lighting slice once
-    }
-    // Apply a small headroom (e.g., +20%) and align to device uniform alignment.
-    size_t padded = total + (total / 5); // +20%
-    padded = alignUp(padded, align);
-    // Leave batches in place only for estimation; clear before recording to avoid duplication.
-    renderer.resetCPUState();
-    return padded;
-  };
-
-  // Apply capacity hint before opening the frame (may be zero if no batches were collected).
-  const size_t baselineBytes = static_cast<size_t>(kUniformArenaBaseKiB) * 1024ull;
-  const size_t estimatedBytes = estimateUniformBytes();
-  const size_t minUniformBytes = std::max(baselineBytes, estimatedBytes);
-  m_nextUniformMinCapacity = std::max(m_nextUniformMinCapacity, minUniformBytes);
-
-  {
-    const bool startedHere = !renderer.isVulkanFrameActive();
-    if (startedHere) {
-      renderer.beginVulkanFrame(scopeLabel);
-    }
-    auto endGuard = folly::makeGuard([&]() {
-      if (startedHere) {
-        renderer.endVulkanFrame();
-      }
-    });
-    renderer.recordVulkanBatchesInActiveFrame(
-      [&]() {
-        // Opaque first
-        for (auto* filter : pass.opaqueFilters) {
-          const bool fullPerf = (FLAGS_atlas_perf_mode == std::string("full"));
-          if (fullPerf && filter) {
-            auto label =
-              fmt::format("comp.opaque:{}@{}", filter->className().toStdString(), static_cast<const void*>(filter));
-            if (auto scope = beginGpuScope(label)) {
-              recordFilterBatches(filter, [&]() {
-                filter->renderOpaque(pass.eye);
-              });
-              endGpuScope(*scope);
-            } else {
-              recordFilterBatches(filter, [&]() {
-                filter->renderOpaque(pass.eye);
-              });
-            }
-          } else {
-            recordFilterBatches(filter, [&]() {
-              filter->renderOpaque(pass.eye);
-            });
-          }
-        }
-        // Then transparent
-        for (const auto& tb : pass.transparentFilters) {
-          const bool fullPerf = (FLAGS_atlas_perf_mode == std::string("full"));
-          auto* filter = tb.filter;
-          if (fullPerf && filter) {
-            auto label = fmt::format("comp.transparent:{}@{}",
-                                     filter->className().toStdString(),
-                                     static_cast<const void*>(filter));
-            if (auto scope = beginGpuScope(label)) {
-              recordFilterBatches(filter, [&]() {
-                filter->renderTransparent(pass.eye);
-              });
-              endGpuScope(*scope);
-            } else {
-              recordFilterBatches(filter, [&]() {
-                filter->renderTransparent(pass.eye);
-              });
-            }
-          } else {
-            recordFilterBatches(filter, [&]() {
-              filter->renderTransparent(pass.eye);
-            });
-          }
-        }
-      },
-      scopeLabel);
   }
+
+  // Conservatively align to the device's dynamic UBO alignment.
+  return alignUp(total, align);
 }
 
 bool Z3DRendererVulkanBackend::supportsCommandLists() const
@@ -2404,7 +2346,7 @@ void Z3DRendererVulkanBackend::ensureUniformArena(FrameResources& frame)
   CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureUniformArena";
   // Create if missing
   const size_t baseRequested = static_cast<size_t>(std::max(64, kUniformArenaBaseKiB)) * 1024ull;
-  size_t requested = std::max(baseRequested, m_nextUniformMinCapacity);
+  size_t requested = std::max({baseRequested, m_nextUniformMinCapacity, m_uniformMinCapacityCarry});
   if (!frame.uniformArena.buffer) {
     const size_t cap = requested;
     frame.uniformArena.buffer = m_sharedDevice->createBuffer(cap,
@@ -2719,9 +2661,25 @@ bool Z3DRendererVulkanBackend::ddpIndirectCountEnabled() const
   return FLAGS_atlas_vk_ddp_indirect_count && m_supportsDrawIndirectCount && m_supportsFragStoresAndAtomics;
 }
 
-void Z3DRendererVulkanBackend::setPPLLRequestedFragmentCount(uint64_t fragmentCount)
+void Z3DRendererVulkanBackend::primePPLLForCountPass(const glm::uvec4& viewport)
 {
-  m_nextPPLLRequestedFragmentCount = fragmentCount;
+  primePPLLForStorePass(viewport, 0);
+}
+
+void Z3DRendererVulkanBackend::primePPLLForStorePass(const glm::uvec4& viewport, uint64_t requestedFragments)
+{
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in primePPLLForStorePass";
+  CHECK(m_supportsFragStoresAndAtomics) << "PPLL requires fragment storage buffer atomics (fragmentStoresAndAtomics)";
+
+  const size_t desiredRing = std::max<size_t>(1, static_cast<size_t>(m_maxFramesInFlight));
+  if (m_ppllFrameRing.size() != desiredRing) {
+    m_ppllFrameRing.resize(desiredRing);
+  }
+  const size_t ringSize = m_ppllFrameRing.empty() ? 1 : m_ppllFrameRing.size();
+  const uint64_t realFrameToken = Z3DRenderGlobalState::instance().currentPerfFrameToken();
+  m_activePPLLIndex = static_cast<size_t>(realFrameToken % ringSize);
+
+  ensurePPLLResources(viewport, requestedFragments);
 }
 
 uint32_t Z3DRendererVulkanBackend::ppllPixelCount() const
@@ -3152,41 +3110,18 @@ void Z3DRendererVulkanBackend::scheduleStaticCopyIndirect(vk::Buffer dst,
   m_activeFrame->scheduledCopies.push_back(sc);
 }
 
-void Z3DRendererVulkanBackend::ddpOrchestrate(uint32_t maxPasses,
-                                              bool useIndirectCount,
-                                              const std::function<void(uint32_t, vk::raii::CommandBuffer&)>& drawPass)
-{
-  auto& cmd = commandBuffer();
-  // Pass 0 init
-  ddpResetForPass(cmd, /*firstPass=*/true);
-  ddpBarrierTransferToFrag(cmd);
-  if (drawPass) {
-    drawPass(0, cmd);
-  }
-  ddpBarrierFragToCompute(cmd);
-  ddpDispatchCountCompute(cmd);
-  if (useIndirectCount) {
-    ddpBarrierComputeToIndirect(cmd);
-  }
-
-  for (uint32_t pass = 1; pass < maxPasses; ++pass) {
-    ddpResetForPass(cmd, /*firstPass=*/false);
-    ddpBarrierTransferToFrag(cmd);
-    if (drawPass) {
-      drawPass(pass, cmd);
-    }
-    ddpBarrierFragToCompute(cmd);
-    ddpDispatchCountCompute(cmd);
-    if (useIndirectCount) {
-      ddpBarrierComputeToIndirect(cmd);
-    }
-  }
-}
-
 size_t Z3DRendererVulkanBackend::uniformAlignment() const
 {
-  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in uniformAlignment";
-  auto limits = m_sharedDevice->context().physicalDevice().getProperties().limits;
+  // uniformAlignment is used in a few debug-only validation sites that run
+  // under the "current backend" thread-local pointer. Be robust to call order:
+  // if ensureDevice() has not yet cached m_sharedDevice, query the shared
+  // device directly from the scratch pool.
+  auto* dev = m_sharedDevice;
+  if (!dev) {
+    dev = Z3DRenderGlobalState::instance().scratchPool().vulkanDevice();
+  }
+  CHECK(dev != nullptr) << "Shared Vulkan device missing in uniformAlignment";
+  auto limits = dev->context().physicalDevice().getProperties().limits;
   size_t align = static_cast<size_t>(limits.minUniformBufferOffsetAlignment);
   return align ? align : 256;
 }
@@ -3573,6 +3508,38 @@ void Z3DRendererVulkanBackend::flushForTeardown(std::string_view reason)
   }
 }
 
+void Z3DRendererVulkanBackend::setWaitForReadbacks(bool wait)
+{
+  m_waitForReadbacks = wait;
+}
+
+bool Z3DRendererVulkanBackend::waitForReadbacks() const
+{
+  return m_waitForReadbacks;
+}
+
+void Z3DRendererVulkanBackend::requireReadbackWaitForActiveSubmission(std::string_view debugLabel)
+{
+  CHECK(currentRenderThreadExecutorOrNull() != nullptr)
+    << "requireReadbackWaitForActiveSubmission must be called on the rendering thread"
+    << (debugLabel.empty() ? "" : " (") << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
+  CHECK(m_activeFrame != nullptr) << "requireReadbackWaitForActiveSubmission requires an active frame";
+  m_activeFrame->forceFenceWaitForReadbacks = true;
+}
+
+void Z3DRendererVulkanBackend::pollCompletionsAndPumpSafePoints()
+{
+  CHECK(currentRenderThreadExecutorOrNull() != nullptr)
+    << "pollCompletionsAndPumpSafePoints must be called on the rendering thread";
+  if (!m_sharedDevice) {
+    return;
+  }
+
+  m_completedFrameKeysScratch.clear();
+  device().frameExecutor().pollCompletions(&m_completedFrameKeysScratch);
+  pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
+}
+
 Z3DRendererVulkanBackend::ActiveSubmissionFenceAwaiter
 Z3DRendererVulkanBackend::awaitActiveSubmissionFence(std::string_view debugLabel)
 {
@@ -3696,12 +3663,14 @@ void Z3DRendererVulkanBackend::pinTextureForActiveSubmission(ZVulkanTexture* tex
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()
 {
   CHECK(m_activeFrameHandle && m_activeFrameHandle->valid()) << "Command buffer requested outside active frame";
+  CHECK(m_frameRecording) << "Command buffer requested while not recording";
   return m_activeFrameHandle->commandBuffer();
 }
 
 const vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer() const
 {
   CHECK(m_activeFrameHandle && m_activeFrameHandle->valid()) << "Command buffer requested outside active frame";
+  CHECK(m_frameRecording) << "Command buffer requested while not recording";
   return m_activeFrameHandle->commandBuffer();
 }
 
@@ -3769,6 +3738,7 @@ void Z3DRendererVulkanBackend::resetFrameResources()
 {
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
+  m_lastSubmittedFrameKey = nullptr;
   m_frameRecording = false;
   m_frames.clear();
   m_frameResourceMap.clear();

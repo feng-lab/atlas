@@ -21,7 +21,43 @@ class Z3DImg;
 class ZColorMap;
 class Z3DTransferFunction;
 class Z3DRendererBase;
-struct RendererParameterState;
+class Z3DTexture;
+
+struct RendererParameterState
+{
+  glm::mat4 coordTransform{glm::mat4(1.f)};
+  float sizeScale{1.f};
+  float opacity{1.f};
+  glm::vec4 materialAmbient{glm::vec4(0.1f, 0.1f, 0.1f, 1.f)};
+  glm::vec4 materialSpecular{glm::vec4(1.f, 1.f, 1.f, 1.f)};
+  float materialShininess{100.f};
+};
+
+inline bool operator==(const RendererParameterState& lhs, const RendererParameterState& rhs)
+{
+  auto vecEq = [](const glm::vec4& a, const glm::vec4& b) {
+    return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
+  };
+  auto matEq = [&](const glm::mat4& a, const glm::mat4& b) {
+    for (int col = 0; col < 4; ++col) {
+      for (int row = 0; row < 4; ++row) {
+        if (a[col][row] != b[col][row]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  return matEq(lhs.coordTransform, rhs.coordTransform) && lhs.sizeScale == rhs.sizeScale &&
+         lhs.opacity == rhs.opacity && vecEq(lhs.materialAmbient, rhs.materialAmbient) &&
+         vecEq(lhs.materialSpecular, rhs.materialSpecular) && lhs.materialShininess == rhs.materialShininess;
+}
+
+inline bool operator!=(const RendererParameterState& lhs, const RendererParameterState& rhs)
+{
+  return !(lhs == rhs);
+}
 
 inline constexpr size_t kRenderBatchMaxClipPlanes = 6;
 
@@ -87,6 +123,32 @@ struct AttachmentHandle
   {
     return id != 0;
   }
+};
+
+enum class ShaderHookType
+{
+  Normal,
+  DualDepthPeelingInit,
+  DualDepthPeelingPeel,
+  WeightedAverageInit,
+  WeightedBlendedInit,
+  PerPixelFragmentListCount,
+  PerPixelFragmentListStore
+};
+
+struct ShaderHookParameter
+{
+  const Z3DTexture* dualDepthPeelingDepthBlenderTexture = nullptr;
+  const Z3DTexture* dualDepthPeelingFrontBlenderTexture = nullptr;
+  AttachmentHandle dualDepthPeelingDepthBlenderHandle;
+  AttachmentHandle dualDepthPeelingFrontBlenderHandle;
+};
+
+struct ShaderHookState
+{
+  bool captured = false;
+  ShaderHookType type = ShaderHookType::Normal;
+  ShaderHookParameter para{};
 };
 
 // Neutral handle for sampled images (textures) passed in payloads.
@@ -474,7 +536,8 @@ struct LinePayload
 
   float srcLineWidth = 1.0f;
   float resolvedLineWidth = 1.0f;
-  const RendererParameterState* params = nullptr; // originating renderer params
+  RendererParameterState params{};
+  bool paramsCaptured = false; // originating renderer params snapshot
   bool pickingPass = false;
   // GL parity toggles: whether to apply global renderer transforms/parameters in shader
   bool followCoordTransform = true;
@@ -548,7 +611,8 @@ struct MeshPayload
   uint32_t colorGen = 0;
   uint32_t texGen = 0;
   uint32_t indexGen = 0;
-  const RendererParameterState* params = nullptr; // originating renderer params
+  RendererParameterState params{};
+  bool paramsCaptured = false; // originating renderer params snapshot
 };
 
 struct SpherePayload
@@ -576,7 +640,8 @@ struct SpherePayload
   uint32_t specularGen = 0;
   uint32_t flagsGen = 0;
   uint32_t indexGen = 0;
-  const RendererParameterState* params = nullptr;
+  RendererParameterState params{};
+  bool paramsCaptured = false; // originating renderer params snapshot
 };
 
 struct BackgroundPayload
@@ -586,7 +651,8 @@ struct BackgroundPayload
   glm::vec4 region{0.0f, 1.0f, 0.0f, 1.0f};
   BackgroundMode mode = BackgroundMode::Gradient;
   BackgroundGradientOrientation orientation = BackgroundGradientOrientation::BottomToTop;
-  const RendererParameterState* params = nullptr; // originating renderer params
+  RendererParameterState params{};
+  bool paramsCaptured = false; // originating renderer params snapshot
 };
 
 struct TextureCopyPayload
@@ -759,7 +825,8 @@ struct EllipsoidPayload
   uint32_t specularGen = 0;
   uint32_t flagsGen = 0;
   uint32_t indexGen = 0;
-  const RendererParameterState* params = nullptr;
+  RendererParameterState params{};
+  bool paramsCaptured = false; // originating renderer params snapshot
 };
 
 struct ConePayload
@@ -800,7 +867,8 @@ struct ConePayload
   uint32_t pickingColorsGen = 0;
   uint32_t flagsGen = 0;
   uint32_t indexGen = 0;
-  const RendererParameterState* params = nullptr;
+  RendererParameterState params{};
+  bool paramsCaptured = false; // originating renderer params snapshot
 };
 
 struct FontPayload
@@ -837,7 +905,8 @@ struct FontPayload
   uint32_t colorsGen = 0;
   uint32_t pickingColorsGen = 0;
   uint32_t indicesGen = 0;
-  const RendererParameterState* params = nullptr;
+  RendererParameterState params{};
+  bool paramsCaptured = false; // originating renderer params snapshot
 };
 
 using GeometryPayload = std::variant<std::monostate,
@@ -867,6 +936,7 @@ struct RenderBatch
   DrawCommand draw;
   GeometryPayload geometry;
   ClipPlanesState clipPlanes;
+  ShaderHookState shaderHook;
   // The renderer that originally authored this batch. This matters on Vulkan
   // where batches can be collected and executed by an aggregator, but clip
   // planes for local/global XYZ cuts are owned by the originating renderer.

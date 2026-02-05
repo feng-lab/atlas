@@ -26,6 +26,7 @@
 #include "zvulkanframeexecutor.h"
 #include "zvulkan.h"
 #include "z3dshadermanager.h"
+#include "z3drenderervulkanbackend.h"
 #include "z3dgpuinfo.h"
 #include "z3dgl.h"
 #include "z3dfilter.h"
@@ -39,6 +40,7 @@
 #include <QOffscreenSurface>
 #include <QCoreApplication>
 #include <QMetaObject>
+#include <QTimer>
 #include <QThread>
 #include <memory>
 
@@ -356,8 +358,9 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
 Z3DRenderingEngine::~Z3DRenderingEngine()
 {
   VLOG(1) << "in engine destructor";
-  setCurrentRenderThreadExecutor(nullptr);
   m_shuttingDown = true;
+  stopVulkanCompletionPolling();
+  setCurrentRenderThreadExecutor(nullptr);
   detachCanvas();
   VLOG(1) << "canvas detached";
   getGLFocus();
@@ -922,6 +925,62 @@ void Z3DRenderingEngine::init()
   initGL();
   getGLFocus();
 
+  if (!m_vkCompletionPollTimer) {
+    // Poll interval for Vulkan fence completion. This timer is only started
+    // while the Vulkan frame executor has in-flight submissions, so it does
+    // not run during steady-state idle.
+    constexpr int kVulkanCompletionPollIntervalMs = 2;
+
+    m_vkCompletionPollTimer = new QTimer(this);
+    m_vkCompletionPollTimer->setTimerType(Qt::PreciseTimer);
+    m_vkCompletionPollTimer->setInterval(kVulkanCompletionPollIntervalMs);
+    connect(m_vkCompletionPollTimer, &QTimer::timeout, this, [this]() {
+      if (m_shuttingDown.load(std::memory_order_relaxed)) {
+        stopVulkanCompletionPolling();
+        return;
+      }
+      if (!m_vkDevice || !m_globalParas || !m_compositor) {
+        stopVulkanCompletionPolling();
+        return;
+      }
+
+      const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+      if (backend != RenderBackend::Vulkan) {
+        stopVulkanCompletionPolling();
+        return;
+      }
+
+      auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
+      if (!vkBackend) {
+        stopVulkanCompletionPolling();
+        return;
+      }
+
+      try {
+        vkBackend->pollCompletionsAndPumpSafePoints();
+      }
+      catch (const ZCancellationException&) {
+        // Cancellation is expected during interactive aborts and shutdown.
+        VLOG(1) << "Vulkan completion polling cancelled (ZCancellationException)";
+      }
+      catch (const folly::OperationCancelled&) {
+        VLOG(1) << "Vulkan completion polling cancelled (folly::OperationCancelled)";
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR) << "Vulkan completion polling failed: " << e.what();
+        CHECK(false) << "Vulkan completion polling failed (exception).";
+      }
+      catch (...) {
+        LOG(ERROR) << "Vulkan completion polling failed (unknown exception)";
+        CHECK(false) << "Vulkan completion polling failed (unknown exception).";
+      }
+      maybeKickDeferredRenderAfterVulkanPoll();
+      if (!m_vkDevice->frameExecutor().hasInFlightFrames()) {
+        stopVulkanCompletionPolling();
+      }
+    });
+  }
+
   m_globalParas = std::make_unique<Z3DGlobalParameters>();
   if (m_scratchPool) {
     m_scratchPool->setDefaultBackend(static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()));
@@ -1042,9 +1101,34 @@ void Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()
   // Must run on the rendering thread (engine thread affinity).
   CHECK(QThread::currentThread() == this->thread()) << "drainVulkanFrameExecutorForTeardown must run on engine thread";
 
+  // Stop polling first to avoid re-entrancy while we synchronously drain.
+  stopVulkanCompletionPolling();
+
   if (!m_vkDevice) {
     return;
   }
+
+  // Prefer draining through the Vulkan backend so the backend's completion-safe-point
+  // hooks (readback consumers, descriptor-pool resets, deferred scratch releases, etc.)
+  // are executed while the compositor/backend objects are still alive.
+  if (m_globalParas && m_compositor &&
+      static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan) {
+    if (auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend())) {
+      try {
+        vkBackend->flushForTeardown("engine_teardown_drain");
+        return;
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR) << "Vulkan backend flushForTeardown failed during engine teardown drain: " << e.what();
+      }
+      catch (...) {
+        LOG(ERROR) << "Vulkan backend flushForTeardown failed during engine teardown drain (unknown exception)";
+      }
+    }
+  }
+
+  // Fallback: at least ensure the frame-executor fences are drained so nothing
+  // outlives the device. Note that this does not execute backend safe-point hooks.
   try {
     m_vkDevice->frameExecutor().waitForAllInFlight();
   }
@@ -1566,6 +1650,13 @@ void Z3DRenderingEngine::renderFast(bool stereo)
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
     return;
   }
+  if (shouldDeferVulkanNetworkProcessing()) {
+    // Vulkan async readback mode: avoid starting expensive CPU network processing
+    // while the previous presentable frame is still in flight. This coalesces
+    // bursty parameter changes into a single render once the GPU is ready.
+    deferRenderUntilVulkanIdle(QEvent::UpdateRequest);
+    return;
+  }
 
   VLOG(1) << "renderFast";
   Q_EMIT progressChanged(10);
@@ -1584,6 +1675,7 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   try {
     const auto token = cancellationSource->getToken();
     m_progress = processFrame(stereo, true, &token);
+    maybeStartVulkanCompletionPolling();
   }
   catch (const ZCancellationException&) {
     LOG(INFO) << "cancelled, schedule a update later";
@@ -1615,12 +1707,18 @@ void Z3DRenderingEngine::render(bool stereo)
   CHECK(!Z3DRenderGlobalState::instance().hasCancellationSource());
 
   VLOG(1) << "render";
+  auto completionPollGuard = folly::makeGuard([this]() {
+    // Arm completion polling when returning to the event loop. The QTimer cannot
+    // fire while we are inside this tight progressive loop.
+    maybeStartVulkanCompletionPolling();
+  });
   try {
     auto cancellationSource = Z3DRenderGlobalState::instance().ensureCancellationSource();
     CHECK(cancellationSource);
     while (m_progress < 1.0) {
       auto token = cancellationSource->getToken();
       m_progress = processFrame(stereo, true, &token);
+      pollVulkanCompletionsOnce();
       Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
     }
   }
@@ -1672,6 +1770,24 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
 
     takeScreenShotPrivate(filename, sst);
   } else {
+    // Capture path: screenshots require CPU pixels immediately, so force
+    // Vulkan end-of-frame readbacks to block until the submission fence
+    // signals (interactive rendering keeps this non-blocking).
+    Z3DRendererVulkanBackend* vkBackend = nullptr;
+    bool prevWaitForReadbacks = false;
+    if (static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan) {
+      vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
+      if (vkBackend) {
+        prevWaitForReadbacks = vkBackend->waitForReadbacks();
+        vkBackend->setWaitForReadbacks(true);
+      }
+    }
+    auto waitReadbacksGuard = folly::makeGuard([vkBackend, prevWaitForReadbacks]() {
+      if (vkBackend) {
+        vkBackend->setWaitForReadbacks(prevWaitForReadbacks);
+      }
+    });
+
     ZImg img(ZImgInfo(width, height, 1, 4));
     img.infoRef().lastChannelIsAlphaChannel = true;
     ZImg rightImg;
@@ -1796,6 +1912,22 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
     m_globalParas->camera.setTileFrustum();
     m_compositor->setRenderingRegion();
   });
+  // Capture path: screenshots require CPU pixels immediately, so force Vulkan
+  // end-of-frame readbacks to block until the submission fence signals.
+  Z3DRendererVulkanBackend* vkBackend = nullptr;
+  bool prevWaitForReadbacks = false;
+  if (static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan) {
+    vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
+    if (vkBackend) {
+      prevWaitForReadbacks = vkBackend->waitForReadbacks();
+      vkBackend->setWaitForReadbacks(true);
+    }
+  }
+  auto waitReadbacksGuard = folly::makeGuard([vkBackend, prevWaitForReadbacks]() {
+    if (vkBackend) {
+      vkBackend->setWaitForReadbacks(prevWaitForReadbacks);
+    }
+  });
   // Evaluate the filter pipeline for this tile.
   processFrame(sst != Z3DScreenShotType::MonoView, false);
 
@@ -1841,6 +1973,22 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
   });
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  // Capture path: screenshots require CPU pixels immediately, so force Vulkan
+  // end-of-frame readbacks to block until the submission fence signals.
+  Z3DRendererVulkanBackend* vkBackend = nullptr;
+  bool prevWaitForReadbacks = false;
+  if (backend == RenderBackend::Vulkan) {
+    vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
+    if (vkBackend) {
+      prevWaitForReadbacks = vkBackend->waitForReadbacks();
+      vkBackend->setWaitForReadbacks(true);
+    }
+  }
+  auto waitReadbacksGuard = folly::makeGuard([vkBackend, prevWaitForReadbacks]() {
+    if (vkBackend) {
+      vkBackend->setWaitForReadbacks(prevWaitForReadbacks);
+    }
+  });
   processFrame(sst != Z3DScreenShotType::MonoView, false);
 
   if (sst == Z3DScreenShotType::MonoView) {
@@ -1920,6 +2068,7 @@ void Z3DRenderingEngine::handleRenderBackendChanged()
 void Z3DRenderingEngine::applyBackendSwitch()
 {
   VLOG(1) << "Entering applyBackendSwitch";
+  stopVulkanCompletionPolling();
   auto resetScheduleGuard = folly::makeGuard([this]() {
     m_backendSwitchScheduled = false;
   });
@@ -2087,6 +2236,169 @@ void Z3DRenderingEngine::applyBackendSwitch()
 
   QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   VLOG(1) << fmt::format("Backend switch to {} complete; update event posted", enumToString(backend));
+}
+
+void Z3DRenderingEngine::pollVulkanCompletionsOnce()
+{
+  CHECK(QThread::currentThread() == this->thread()) << "pollVulkanCompletionsOnce must run on engine thread";
+
+  if (!m_vkDevice || !m_globalParas || !m_compositor) {
+    return;
+  }
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  if (backend != RenderBackend::Vulkan) {
+    return;
+  }
+
+  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
+  if (!vkBackend) {
+    return;
+  }
+
+  // Pump completion callbacks without posting any deferred render events. This
+  // is safe inside the tight progressive render loop and allows async readback
+  // consumers (e.g. presentable RGBA8) to run as soon as fences signal.
+  try {
+    vkBackend->pollCompletionsAndPumpSafePoints();
+  }
+  catch (const ZCancellationException&) {
+    VLOG(1) << "Vulkan completion poll cancelled (ZCancellationException)";
+  }
+  catch (const folly::OperationCancelled&) {
+    VLOG(1) << "Vulkan completion poll cancelled (folly::OperationCancelled)";
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "Vulkan completion poll failed: " << e.what();
+    CHECK(false) << "Vulkan completion poll failed (exception).";
+  }
+  catch (...) {
+    LOG(ERROR) << "Vulkan completion poll failed (unknown exception)";
+    CHECK(false) << "Vulkan completion poll failed (unknown exception).";
+  }
+}
+
+void Z3DRenderingEngine::maybeStartVulkanCompletionPolling()
+{
+  CHECK(QThread::currentThread() == this->thread()) << "maybeStartVulkanCompletionPolling must run on engine thread";
+
+  if (!m_vkCompletionPollTimer || !m_vkDevice || !m_globalParas || !m_compositor) {
+    return;
+  }
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  if (backend != RenderBackend::Vulkan) {
+    stopVulkanCompletionPolling();
+    return;
+  }
+
+  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
+  if (!vkBackend) {
+    stopVulkanCompletionPolling();
+    return;
+  }
+
+  // Poll once immediately so frames that finish quickly are presented with
+  // minimal latency, then arm a timer while submissions remain in flight.
+  try {
+    vkBackend->pollCompletionsAndPumpSafePoints();
+  }
+  catch (const ZCancellationException&) {
+    VLOG(1) << "Vulkan completion polling cancelled (ZCancellationException)";
+  }
+  catch (const folly::OperationCancelled&) {
+    VLOG(1) << "Vulkan completion polling cancelled (folly::OperationCancelled)";
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "Vulkan completion polling failed: " << e.what();
+    CHECK(false) << "Vulkan completion polling failed (exception).";
+  }
+  catch (...) {
+    LOG(ERROR) << "Vulkan completion polling failed (unknown exception)";
+    CHECK(false) << "Vulkan completion polling failed (unknown exception).";
+  }
+  maybeKickDeferredRenderAfterVulkanPoll();
+  if (m_vkDevice->frameExecutor().hasInFlightFrames()) {
+    if (!m_vkCompletionPollTimer->isActive()) {
+      m_vkCompletionPollTimer->start();
+    }
+  } else {
+    stopVulkanCompletionPolling();
+  }
+}
+
+void Z3DRenderingEngine::stopVulkanCompletionPolling()
+{
+  if (m_vkCompletionPollTimer && m_vkCompletionPollTimer->isActive()) {
+    m_vkCompletionPollTimer->stop();
+  }
+}
+
+bool Z3DRenderingEngine::shouldDeferVulkanNetworkProcessing() const
+{
+  CHECK(QThread::currentThread() == this->thread()) << "shouldDeferVulkanNetworkProcessing must run on engine thread";
+
+  if (!m_vkDevice || !m_globalParas || !m_compositor) {
+    return false;
+  }
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  if (backend != RenderBackend::Vulkan) {
+    return false;
+  }
+  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
+  if (!vkBackend) {
+    return false;
+  }
+  if (vkBackend->waitForReadbacks()) {
+    // Synchronous paths already apply backpressure by waiting for readback,
+    // so do not add extra gating here.
+    return false;
+  }
+
+  auto& executor = m_vkDevice->frameExecutor();
+  const uint32_t inFlight = executor.inFlightCount();
+  const uint32_t maxInFlight = executor.maxFramesInFlight();
+  // Defer starting CPU network processing if we'd have to block in beginFrame()
+  // waiting for a frame slot fence. Allow pipelining up to maxFramesInFlight.
+  return inFlight >= maxInFlight;
+}
+
+void Z3DRenderingEngine::deferRenderUntilVulkanIdle(QEvent::Type deferredType)
+{
+  CHECK(QThread::currentThread() == this->thread()) << "deferRenderUntilVulkanIdle must run on engine thread";
+
+  if (!m_vkDeferredRenderEventType.has_value()) {
+    m_vkDeferredRenderEventType = deferredType;
+  } else if (deferredType == QEvent::UpdateRequest) {
+    // Interactive updates always win over progressive refinement.
+    m_vkDeferredRenderEventType = QEvent::UpdateRequest;
+  } else if (*m_vkDeferredRenderEventType != QEvent::UpdateRequest) {
+    m_vkDeferredRenderEventType = deferredType;
+  }
+
+  maybeStartVulkanCompletionPolling();
+}
+
+void Z3DRenderingEngine::maybeKickDeferredRenderAfterVulkanPoll()
+{
+  CHECK(QThread::currentThread() == this->thread())
+    << "maybeKickDeferredRenderAfterVulkanPoll must run on engine thread";
+
+  if (m_shuttingDown.load(std::memory_order_relaxed)) {
+    return;
+  }
+  if (!m_vkDeferredRenderEventType.has_value() || !m_vkDevice) {
+    return;
+  }
+
+  auto& executor = m_vkDevice->frameExecutor();
+  const uint32_t inFlight = executor.inFlightCount();
+  const uint32_t maxInFlight = executor.maxFramesInFlight();
+  if (inFlight >= maxInFlight) {
+    return;
+  }
+
+  const QEvent::Type type = *m_vkDeferredRenderEventType;
+  m_vkDeferredRenderEventType.reset();
+  QCoreApplication::postEvent(this, new QEvent(type), Qt::LowEventPriority);
 }
 
 bool Z3DRenderingEngine::switchVulkanDeviceIndex(int index)

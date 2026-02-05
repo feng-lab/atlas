@@ -136,17 +136,8 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
   PipelineInstance& glowPipeline = ensureGlowPipeline(glowKey, formats);
 
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  glm::vec2 finalExtent = batch.pass.viewport.extent;
-  if (finalExtent.x <= 0.0f || finalExtent.y <= 0.0f) {
-    const auto& viewportState = renderer.frameState().viewport;
-    finalExtent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
-  }
-  if (finalExtent.x <= 0.0f) {
-    finalExtent.x = 1.0f;
-  }
-  if (finalExtent.y <= 0.0f) {
-    finalExtent.y = 1.0f;
-  }
+  const glm::vec2 finalExtent(viewport.width, viewport.height);
+  CHECK(finalExtent.x > 0.0f && finalExtent.y > 0.0f) << "Vulkan glow pass requires a valid viewport extent";
 
   GlowPushConstants glowConstants;
   glowConstants.screenDimRcp = glm::vec2(1.0f / finalExtent.x, 1.0f / finalExtent.y);

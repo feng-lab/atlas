@@ -276,7 +276,8 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
   payload.texGen = m_texGen;   // Note: texcoords live on meshes; renderer cannot always detect
   payload.indexGen = m_indexGen;
 
-  payload.params = &m_rendererBase.parameterState();
+  payload.params = m_rendererBase.parameterState();
+  payload.paramsCaptured = true;
   payload.wantsLighting = needLighting();
   // GL parity: carry follow flags so Vulkan respects per-renderer toggles
   payload.followCoordTransform = m_followCoordTransform;

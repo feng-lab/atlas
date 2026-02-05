@@ -81,6 +81,7 @@ public:
   // Query whether any frames are currently marked in flight. This reflects
   // whether the executor believes there are outstanding GPU submissions.
   [[nodiscard]] bool hasInFlightFrames();
+  [[nodiscard]] uint32_t inFlightCount();
 
   void executeImmediate(const std::function<void(vk::raii::CommandBuffer&)>& record, std::string_view debugLabel = {});
 

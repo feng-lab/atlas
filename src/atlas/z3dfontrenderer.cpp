@@ -312,7 +312,8 @@ void Z3DFontRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   payload.outlineMode = (m_fontOutlineMode == FontOutlineMode::Glow) ? 0 : 1;
   payload.outlineColor = m_fontOutlineColor;
   payload.shadowColor = m_fontShadowColor;
-  payload.params = &m_rendererBase.parameterState();
+  payload.params = m_rendererBase.parameterState();
+  payload.paramsCaptured = true;
   payload.pickingPass = picking;
   payload.followCoordTransform = m_followCoordTransform;
 

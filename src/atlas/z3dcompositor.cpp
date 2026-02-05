@@ -12,6 +12,7 @@
 #include "zimgformat.h"
 #include "zvulkantexture.h"
 #include "z3drenderervulkanbackend.h"
+#include "zvulkanlinearscript.h"
 #include "zrenderthreadexecutor_tls.h"
 #include <algorithm>
 #include <array>
@@ -21,6 +22,7 @@
 #include <functional>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <span>
 #include <unordered_set>
 #include <optional>
@@ -143,11 +145,12 @@ static void vlogVulkanLease(std::string_view label, const Z3DScratchResourcePool
 // Unified compositor helper: render a filter into a given surface and ingest
 // its recorded batches back into the compositor renderer. Optionally copy the
 // source renderer's shader-hook parameters into the compositor before ingest.
-static void recordFilterBatchesToSurfaceUnified(Z3DRendererBase& compositor,
-                                                Z3DBoundedFilter* filter,
-                                                const RendererFrameState::ActiveSurface& surface,
-                                                const std::function<void()>& renderFn,
-                                                bool propagateHookPara)
+static void recordFilterBatchesToSurfaceUnifiedWithViewport(Z3DRendererBase& compositor,
+                                                            Z3DBoundedFilter* filter,
+                                                            const RendererFrameState::ActiveSurface& surface,
+                                                            const glm::uvec4& viewport,
+                                                            const std::function<void()>& renderFn,
+                                                            bool propagateHookPara)
 {
   if (!filter) {
     return;
@@ -157,8 +160,8 @@ static void recordFilterBatchesToSurfaceUnified(Z3DRendererBase& compositor,
   const glm::uvec4 previousViewport = source.frameState().viewport;
   const auto previousSurface = source.frameState().activeSurface;
 
-  // Mirror compositor viewport and target surface into the source renderer
-  source.frameState().updateViewportData(compositor.frameState().viewport);
+  // Mirror viewport and target surface into the source renderer
+  source.frameState().updateViewportData(viewport);
   source.setActiveSurfaceWithLoadStore(surface, Z3DRendererBase::Preserve);
 
   if (renderFn) {
@@ -179,12 +182,9 @@ static void recordFilterBatchesToSurfaceUnified(Z3DRendererBase& compositor,
       batch.pass.depthAttachment = surface.depthAttachment;
     }
     // Populate missing viewport from compositor viewport
-    if (batch.pass.viewport.extent == glm::vec2(0.0f) && compositor.frameState().viewport.z > 0u &&
-        compositor.frameState().viewport.w > 0u) {
-      batch.pass.viewport.origin = glm::vec2(static_cast<float>(compositor.frameState().viewport.x),
-                                             static_cast<float>(compositor.frameState().viewport.y));
-      batch.pass.viewport.extent = glm::vec2(static_cast<float>(compositor.frameState().viewport.z),
-                                             static_cast<float>(compositor.frameState().viewport.w));
+    if (batch.pass.viewport.extent == glm::vec2(0.0f) && viewport.z > 0u && viewport.w > 0u) {
+      batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+      batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
       batch.pass.viewport.minDepth = 0.0f;
       batch.pass.viewport.maxDepth = 1.0f;
     }
@@ -195,6 +195,72 @@ static void recordFilterBatchesToSurfaceUnified(Z3DRendererBase& compositor,
   // Restore source renderer state
   source.frameState().updateViewportData(previousViewport);
   source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
+}
+
+static void recordFilterBatchesToSurfaceUnified(Z3DRendererBase& compositor,
+                                                Z3DBoundedFilter* filter,
+                                                const RendererFrameState::ActiveSurface& surface,
+                                                const std::function<void()>& renderFn,
+                                                bool propagateHookPara)
+{
+  recordFilterBatchesToSurfaceUnifiedWithViewport(compositor,
+                                                  filter,
+                                                  surface,
+                                                  compositor.frameState().viewport,
+                                                  renderFn,
+                                                  propagateHookPara);
+}
+
+static void recordTransparentFilterBatchesToSurfaceUnified(Z3DRendererBase& compositor,
+                                                           Z3DBoundedFilter* filter,
+                                                           const RendererFrameState::ActiveSurface& surface,
+                                                           Z3DEye eye,
+                                                           bool propagateHookPara)
+{
+  recordFilterBatchesToSurfaceUnified(
+    compositor,
+    filter,
+    surface,
+    [filter, eye]() {
+      filter->renderTransparent(eye);
+    },
+    propagateHookPara);
+}
+
+static void
+recordHandlePickingFilterBatchesToSurfaceUnifiedWithViewport(Z3DRendererBase& compositor,
+                                                             Z3DBoundedFilter* filter,
+                                                             const RendererFrameState::ActiveSurface& surface,
+                                                             const glm::uvec4& viewport,
+                                                             Z3DEye eye)
+{
+  recordFilterBatchesToSurfaceUnifiedWithViewport(
+    compositor,
+    filter,
+    surface,
+    viewport,
+    [filter, eye]() {
+      filter->renderHandlePicking(eye);
+    },
+    false);
+}
+
+static void
+recordGeometryPickingFilterBatchesToSurfaceUnifiedWithViewport(Z3DRendererBase& compositor,
+                                                               Z3DGeometryFilter* filter,
+                                                               const RendererFrameState::ActiveSurface& surface,
+                                                               const glm::uvec4& viewport,
+                                                               Z3DEye eye)
+{
+  recordFilterBatchesToSurfaceUnifiedWithViewport(
+    compositor,
+    filter,
+    surface,
+    viewport,
+    [filter, eye]() {
+      filter->renderPicking(eye);
+    },
+    false);
 }
 
 // Like recordFilterBatchesToSurfaceUnified(), but captures the source renderer's
@@ -255,49 +321,22 @@ static void captureFilterBatchesToUnifiedList(Z3DRendererBase& compositor,
   source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
 }
 
-inline void processBatchesInActiveVulkanFrame(Z3DRendererBase& renderer,
-                                              Z3DRendererVulkanBackend& vkBackend,
-                                              const RendererCPUState& state,
-                                              std::string_view label)
+static void captureTransparentFilterBatchesToUnifiedList(Z3DRendererBase& compositor,
+                                                         Z3DBoundedFilter* filter,
+                                                         const RendererFrameState::ActiveSurface& surface,
+                                                         Z3DEye eye,
+                                                         bool propagateHookPara,
+                                                         RendererCPUState& out)
 {
-  CHECK(renderer.isVulkanFrameActive())
-    << "processBatchesInActiveVulkanFrame requires an active Vulkan frame (call beginVulkanFrame first)";
-
-  // Mirror recordVulkanBatchesInActiveFrame semantics: ensure any stale CPU
-  // batches on the renderer don't accumulate across call sites.
-  renderer.resetCPUState();
-
-  vkBackend.beginPassScope(label);
-  std::optional<size_t> gpuScope;
-  if (!label.empty()) {
-    gpuScope = vkBackend.beginGpuScope(label);
-  }
-  vkBackend.processBatches(renderer, state);
-  if (gpuScope.has_value()) {
-    vkBackend.endGpuScope(*gpuScope);
-  }
-  vkBackend.endPassScope();
-}
-
-// Record batches within a Vulkan frame, opening/closing the frame if needed.
-// Keeps per-pass priming/reset semantics by scoping begin/end to the call site.
-inline void
-recordInVulkanFrame(Z3DRendererBase& renderer, const std::function<void()>& recordBatches, std::string_view label)
-{
-  // Surfaces should already be applied by callers
-  // Apply any pending surface before beginning the frame so the backend can
-  // observe attachments from the very first segment during beginRender.
-  // (pending already applied above)
-  const bool startedHere = !renderer.isVulkanFrameActive();
-  if (startedHere) {
-    renderer.beginVulkanFrame(label);
-  }
-  auto endGuard = folly::makeGuard([&renderer, startedHere]() {
-    if (startedHere) {
-      renderer.endVulkanFrame();
-    }
-  });
-  renderer.recordVulkanBatchesInActiveFrame(recordBatches, label);
+  captureFilterBatchesToUnifiedList(
+    compositor,
+    filter,
+    surface,
+    [filter, eye]() {
+      filter->renderTransparent(eye);
+    },
+    propagateHookPara,
+    out);
 }
 
 } // namespace
@@ -1494,23 +1533,10 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     return 0.0;
   }
 
-  // NOTE: Do not keep a Vulkan frame open across the compositor passes.
-  // Rationale:
-  // - The compositor orchestrates many heterogeneous passes (background, opaque,
-  //   OIT init/peel/resolve, glow, picking) and multiple pipeline contexts
-  //   (mesh/sphere/cone/texture). The Vulkan backend primes descriptor sets,
-  //   UBOs and state per pass inside beginRender().
-  // - Forcing a single long-lived frame here prevents those per-pass priming
-  //   and resets from occurring at the correct time, and allows state to leak
-  //   between passes. In practice this breaks lighting/transparency for common
-  //   geometry (e.g., spheres/cones) and can yield wrong colors.
-  // - Per-pass execute/record helpers (executeCompositorPass/recordInVulkanFrame) already manage frame
-  //   begin/end after the target surface and load/store ops are staged. Let
-  //   them own frame lifetime in the compositor.
-  // If you ever need a single command buffer here, you must pre-prime all
-  // contexts before recording (ensureDescriptorSets/ensureOITResources), avoid
-  // descriptor writes during recording, and emulate per-pass resets — which is
-  // fragile and not recommended. Therefore we intentionally disable keep-open.
+  auto* vulkanBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
+  CHECK(vulkanBackend != nullptr) << "Compositor Vulkan path requires a Vulkan backend";
+  CHECK(!m_rendererBase.isVulkanFrameActive())
+    << "Compositor Vulkan path requires no active Vulkan frame (linear script owns submission boundaries)";
 
   // Supersample 2x2 parity (render to 2x scene lease, then downsample)
   // Note: Vulkan batches use the renderer's frame viewport to define the
@@ -1549,9 +1575,13 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     sceneOutLease = &sceneOverlayLease;
   }
 
-  // Frame lifetime is managed per pass via recordInVulkanFrame/executeCompositorPass;
-  // do not keep the frame open across compositor passes.
-  // Stage 3: background is recorded via the pass-graph driver below
+  // Declare the script after compositor scratch targets so its destructor flush
+  // (submission) runs before those move-only leases release their scratch slots.
+  ZVulkanLinearScript script(m_rendererBase, *vulkanBackend, /*frameLabel=*/{});
+
+  // Vulkan frame/submission lifetime is owned by the linear script; the
+  // compositor should only express segment order and explicit CPU readback
+  // boundaries.
 
   // Decide OIT usage and collect non-opaque image layers (volumes/slices) once
   const auto transparencyMode = m_rendererBase.sceneState().transparency;
@@ -1624,27 +1654,52 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   // white or incorrect background.
   if (useOIT && (!transparentFilters.empty() || !nonOpaqueLayers.empty())) {
     // Record background only; geometry/transparency handled by OIT path below
-    executeCompositorPassesVulkan({},
-                                  {},
-                                  *sceneOutLease,
-                                  eye,
-                                  /*includeGeometry*/ false,
-                                  /*clearAtStart*/ true,
-                                  /*drawBackground*/ m_showBackground.get());
+    recordSceneSegmentsVulkan({},
+                              {},
+                              *sceneOutLease,
+                              eye,
+                              /*includeGeometry*/ false,
+                              /*clearAtStart*/ true,
+                              /*drawBackground*/ m_showBackground.get(),
+                              script);
     auto dispatchOIT =
       [&](Z3DScratchResourcePool::RenderTargetLease& lease, AttachmentHandle depthHandle, bool clearResolve) {
         switch (transparencyMode) {
           case TransparencyMode::DualDepthPeeling:
-            renderTransparentDDPVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve);
+            renderTransparentDDPVulkan(transparentFilters,
+                                       lease,
+                                       eye,
+                                       depthHandle,
+                                       nonOpaqueLayers,
+                                       clearResolve,
+                                       script);
             break;
           case TransparencyMode::PerPixelFragmentList:
-            renderTransparentPPLLVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve);
+            renderTransparentPPLLVulkan(transparentFilters,
+                                        lease,
+                                        eye,
+                                        depthHandle,
+                                        nonOpaqueLayers,
+                                        clearResolve,
+                                        script);
             break;
           case TransparencyMode::WeightedAverage:
-            renderTransparentWAVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve);
+            renderTransparentWAVulkan(transparentFilters,
+                                      lease,
+                                      eye,
+                                      depthHandle,
+                                      nonOpaqueLayers,
+                                      clearResolve,
+                                      script);
             break;
           case TransparencyMode::WeightedBlended:
-            renderTransparentWBVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve);
+            renderTransparentWBVulkan(transparentFilters,
+                                      lease,
+                                      eye,
+                                      depthHandle,
+                                      nonOpaqueLayers,
+                                      clearResolve,
+                                      script);
             break;
           default:
             break;
@@ -1656,31 +1711,36 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       dispatchOIT(*sceneOutLease, {}, /*clearResolve=*/false);
     } else {
       const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
-      auto leaseOpaque = pool.acquireTempRenderTarget2D(targetSize,
-                                                        ScratchFormat::RGBA16,
-                                                        ScratchFormat::Depth32F,
-                                                        RenderBackend::Vulkan);
+      auto leaseOpaque = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(targetSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(leaseOpaque);
       // Render opaque geometry into an opaque-only intermediate without drawing background
-      executeCompositorPassesVulkan(opaqueFilters,
-                                    {},
-                                    leaseOpaque,
-                                    eye,
-                                    /*includeGeometry*/ true,
-                                    /*clearAtStart*/ true,
-                                    /*drawBackground*/ false);
+      recordSceneSegmentsVulkan(opaqueFilters,
+                                {},
+                                *leaseOpaque,
+                                eye,
+                                /*includeGeometry*/ true,
+                                /*clearAtStart*/ true,
+                                /*drawBackground*/ false,
+                                script);
 
-      auto leaseTrans = pool.acquireTempRenderTarget2D(targetSize,
-                                                       ScratchFormat::RGBA16,
-                                                       ScratchFormat::Depth32F,
-                                                       RenderBackend::Vulkan);
+      auto leaseTrans = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(targetSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(leaseTrans);
       AttachmentHandle depthHandle;
-      if (auto* depthTex = leaseOpaque.depthAttachmentTexture()) {
+      if (auto* depthTex = leaseOpaque->depthAttachmentTexture()) {
         depthHandle.backend = RenderBackend::Vulkan;
         depthHandle.index = 0;
         depthHandle.id = reinterpret_cast<uint64_t>(depthTex);
       }
       // Write OIT results into a temporary lease; clear it first
-      dispatchOIT(leaseTrans, depthHandle, /*clearResolve=*/true);
+      dispatchOIT(*leaseTrans, depthHandle, /*clearResolve=*/true);
 
       // Compose transparent OIT result over opaque using premultiplied alpha.
       // Transparent contributions behind opaque were already culled during the
@@ -1689,19 +1749,19 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       AttachmentHandle opaqueColor{};
       opaqueColor.backend = RenderBackend::Vulkan;
       opaqueColor.index = 0;
-      opaqueColor.id = reinterpret_cast<uint64_t>(leaseOpaque.colorAttachment(0));
+      opaqueColor.id = reinterpret_cast<uint64_t>(leaseOpaque->colorAttachment(0));
       AttachmentHandle opaqueDepth{};
       opaqueDepth.backend = RenderBackend::Vulkan;
       opaqueDepth.index = 0;
-      opaqueDepth.id = reinterpret_cast<uint64_t>(leaseOpaque.depthAttachmentTexture());
+      opaqueDepth.id = reinterpret_cast<uint64_t>(leaseOpaque->depthAttachmentTexture());
       AttachmentHandle transColor{};
       transColor.backend = RenderBackend::Vulkan;
       transColor.index = 0;
-      transColor.id = reinterpret_cast<uint64_t>(leaseTrans.colorAttachment(0));
+      transColor.id = reinterpret_cast<uint64_t>(leaseTrans->colorAttachment(0));
       AttachmentHandle transDepth{};
       transDepth.backend = RenderBackend::Vulkan;
       transDepth.index = 0;
-      transDepth.id = reinterpret_cast<uint64_t>(leaseTrans.depthAttachmentTexture());
+      transDepth.id = reinterpret_cast<uint64_t>(leaseTrans->depthAttachmentTexture());
 
       // First-on-top blending expects source 0 to be the overlay and source 1
       // the base. Put transparent (overlay) in slot 0 and opaque (base) in 1.
@@ -1710,34 +1770,32 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
       // Preserve the previously rendered background when composing OIT result
       // (GL draws background first and then overlays; mimic by loading color).
-      m_rendererBase.setActiveSurfaceWithLoadStore(*sceneOutLease,
-                                                   m_showBackground.get() ? LoadOp::Load : LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
       vlogVulkanLease("transparency_resolve", *sceneOutLease);
-      // Enable fixed-function blending when a background was drawn so the
-      // compositor shader output (premultiplied) blends over the background
-      // instead of overwriting it with black where no geometry lies.
-      m_alphaBlendRenderer.setEnableFixedBlend(m_showBackground.get());
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
-        },
-        "transparency_resolve");
+      script.raster("transparency_resolve", {}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*sceneOutLease,
+                                                     m_showBackground.get() ? LoadOp::Load : LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        // Enable fixed-function blending when a background was drawn so the
+        // compositor shader output (premultiplied) blends over the background
+        // instead of overwriting it with black where no geometry lies.
+        m_alphaBlendRenderer.setEnableFixedBlend(m_showBackground.get());
+        m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
+      });
     }
 
     imagesIntegratedViaOIT = true;
   } else {
     // No OIT path: background + geometry via single driver call
-    executeCompositorPassesVulkan(opaqueFilters,
-                                  transparentFilters,
-                                  *sceneOutLease,
-                                  eye,
-                                  /*includeGeometry*/ true,
-                                  /*clearAtStart*/ true,
-                                  /*drawBackground*/ m_showBackground.get());
+    recordSceneSegmentsVulkan(opaqueFilters,
+                              transparentFilters,
+                              *sceneOutLease,
+                              eye,
+                              /*includeGeometry*/ true,
+                              /*clearAtStart*/ true,
+                              /*drawBackground*/ m_showBackground.get(),
+                              script);
   }
 
   auto applyGlowOverlay = [&](const std::vector<Z3DBoundedFilter*>& filters) {
@@ -1757,24 +1815,25 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       }
 
       // 1) render filter geometry to temp lease
-      auto glowGeomLease = pool.acquireTempRenderTarget2D(targetSize,
-                                                          ScratchFormat::RGBA16,
-                                                          ScratchFormat::Depth32F,
-                                                          RenderBackend::Vulkan);
+      auto glowGeomLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(targetSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(glowGeomLease);
       // Clear temp attachments, record filter geometry
-
-      m_rendererBase.setActiveSurfaceWithLoadStore(glowGeomLease,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
-      vlogVulkanLease("glow_geometry", glowGeomLease);
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
+      vlogVulkanLease("glow_geometry", *glowGeomLease);
+      script.raster("glow_geometry", {}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*glowGeomLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        filter->setViewport(targetSize);
+        recordFilterBatchesToSurface(filter, *glowGeomLease, targetSize, [&]() {
           filter->renderOpaque(eye);
-        },
-        "glow_geometry");
+        });
+      });
 
       // 2) sync glow params and render glow into the output surface
       if (auto* mode = dynamic_cast<ZStringIntOptionParameter*>(filter->parameter("Glow Mode"))) {
@@ -1793,14 +1852,19 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       AttachmentHandle colorHandle;
       colorHandle.backend = RenderBackend::Vulkan;
       colorHandle.index = 0;
-      colorHandle.id = reinterpret_cast<uint64_t>(glowGeomLease.colorAttachment(0));
+      colorHandle.id = reinterpret_cast<uint64_t>(glowGeomLease->colorAttachment(0));
       AttachmentHandle depthHandle;
       depthHandle.backend = RenderBackend::Vulkan;
       depthHandle.index = 0;
-      depthHandle.id = reinterpret_cast<uint64_t>(glowGeomLease.depthAttachmentTexture());
+      depthHandle.id = reinterpret_cast<uint64_t>(glowGeomLease->depthAttachmentTexture());
 
       // Do not clear when overlaying glow; choose destination matching recent composition
       {
+        const bool compositedToFinalLocal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
+        auto& dest = compositedToFinalLocal ? *outLease : *sceneOutLease;
+        vlogVulkanLease("glow_composite", dest);
+      }
+      script.raster("glow_composite", {}, [&]() {
         const bool compositedToFinalLocal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
         auto& dest = compositedToFinalLocal ? *outLease : *sceneOutLease;
         m_rendererBase.setActiveSurfaceWithLoadStore(dest,
@@ -1808,33 +1872,27 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                      StoreOp::Store,
                                                      LoadOp::DontCare,
                                                      StoreOp::Store);
-        vlogVulkanLease("glow_composite", dest);
-      }
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          TextureGlowPayload glowPayload;
-          glowPayload.colorAttachmentHandle = colorHandle;
-          glowPayload.depthAttachmentHandle = depthHandle;
-          glowPayload.mode = m_glowRenderer.glowMode();
-          glowPayload.blurRadius = m_glowRenderer.blurRadius();
-          glowPayload.blurScale = m_glowRenderer.blurScale();
-          glowPayload.blurStrength = m_glowRenderer.blurStrength();
+        TextureGlowPayload glowPayload;
+        glowPayload.colorAttachmentHandle = colorHandle;
+        glowPayload.depthAttachmentHandle = depthHandle;
+        glowPayload.mode = m_glowRenderer.glowMode();
+        glowPayload.blurRadius = m_glowRenderer.blurRadius();
+        glowPayload.blurScale = m_glowRenderer.blurScale();
+        glowPayload.blurStrength = m_glowRenderer.blurStrength();
 
-          RenderBatch batch;
-          batch.eye = eye;
-          batch.pass.externalImageUses.push_back(
-            {colorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-          batch.pass.externalImageUses.push_back(
-            {depthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
-          // Let backend fill current active surface into batch if not set explicitly
-          batch.draw.topology = PrimitiveTopology::TriangleStrip;
-          batch.draw.vertexCount = 4;
-          batch.draw.indexCount = 0;
-          batch.geometry = std::move(glowPayload);
-          m_rendererBase.appendBatch(std::move(batch));
-        },
-        "glow_composite");
+        RenderBatch batch;
+        batch.eye = eye;
+        batch.pass.externalImageUses.push_back(
+          {colorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.pass.externalImageUses.push_back(
+          {depthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+        // Let backend fill current active surface into batch if not set explicitly
+        batch.draw.topology = PrimitiveTopology::TriangleStrip;
+        batch.draw.vertexCount = 4;
+        batch.draw.indexCount = 0;
+        batch.geometry = std::move(glowPayload);
+        m_rendererBase.appendBatch(std::move(batch));
+      });
     }
   };
 
@@ -1902,78 +1960,77 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                                  ScratchFormat::Depth32F,
                                                                  RenderBackend::Vulkan);
           }
-          m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store);
         } else {
-          m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store);
           imagesCompositedToFinal = true;
         }
 
-        m_alphaBlendRenderer.setEnableFixedBlend(m_showBackground.get());
-        recordInVulkanFrame(
-          m_rendererBase,
-          [&]() {
-            m_alphaBlendRenderer.setSourceAttachments0(outC, outD);
-            m_alphaBlendRenderer.setSourceAttachments1(layers[0].first, layers[0].second);
-            m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
-          },
-          "image_blend_single");
+        script.raster("image_blend_single", {}, [&]() {
+          if (supersample2x2) {
+            m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store);
+          } else {
+            m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store);
+          }
+
+          m_alphaBlendRenderer.setEnableFixedBlend(m_showBackground.get());
+          m_alphaBlendRenderer.setSourceAttachments0(outC, outD);
+          m_alphaBlendRenderer.setSourceAttachments1(layers[0].first, layers[0].second);
+          m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
+        });
         if (supersample2x2) {
           // Promote composite as the current scene for any follow-up overlays/passes
           sceneOutLease = &sceneCompositeLease;
         }
       } else {
         // Merge N image layers pairwise into an intermediate lease, then blend onto out
-        auto mergeLeaseA = pool.acquireTempRenderTarget2D(tgtSize,
-                                                          ScratchFormat::RGBA16,
-                                                          ScratchFormat::Depth32F,
-                                                          RenderBackend::Vulkan);
-        auto mergeLeaseB = pool.acquireTempRenderTarget2D(tgtSize,
-                                                          ScratchFormat::RGBA16,
-                                                          ScratchFormat::Depth32F,
-                                                          RenderBackend::Vulkan);
+        auto mergeLeaseA = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+          pool.acquireTempRenderTarget2D(tgtSize,
+                                         ScratchFormat::RGBA16,
+                                         ScratchFormat::Depth32F,
+                                         RenderBackend::Vulkan));
+        auto mergeLeaseB = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+          pool.acquireTempRenderTarget2D(tgtSize,
+                                         ScratchFormat::RGBA16,
+                                         ScratchFormat::Depth32F,
+                                         RenderBackend::Vulkan));
+        script.keepAlive(mergeLeaseA);
+        script.keepAlive(mergeLeaseB);
 
         // First merge: layers[0] and layers[1] -> A
-        m_rendererBase.setActiveSurfaceWithLoadStore(mergeLeaseA,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store);
-        recordInVulkanFrame(
-          m_rendererBase,
-          [&]() {
-            m_MIPImageAlphaBlendRenderer.setSourceAttachments0(layers[0].first, layers[0].second);
-            m_MIPImageAlphaBlendRenderer.setSourceAttachments1(layers[1].first, layers[1].second);
-            m_rendererBase.renderVulkan(eye, m_MIPImageAlphaBlendRenderer);
-          },
-          "image_merge_initial");
-
-        // Subsequent merges: (A + layers[i]) -> B, then swap
-        auto resHandles = handlesFromLease(mergeLeaseA);
-        for (size_t i = 2; i < layers.size(); ++i) {
-          m_rendererBase.setActiveSurfaceWithLoadStore(mergeLeaseB,
+        script.raster("image_merge_initial", {}, [&]() {
+          m_rendererBase.setActiveSurfaceWithLoadStore(*mergeLeaseA,
                                                        LoadOp::Clear,
                                                        StoreOp::Store,
                                                        LoadOp::Clear,
                                                        StoreOp::Store);
-          recordInVulkanFrame(
-            m_rendererBase,
-            [&]() {
-              m_MIPImageAlphaBlendRenderer.setSourceAttachments0(resHandles.first, resHandles.second);
-              m_MIPImageAlphaBlendRenderer.setSourceAttachments1(layers[i].first, layers[i].second);
-              m_rendererBase.renderVulkan(eye, m_MIPImageAlphaBlendRenderer);
-            },
-            "image_merge_iter");
+          m_MIPImageAlphaBlendRenderer.setSourceAttachments0(layers[0].first, layers[0].second);
+          m_MIPImageAlphaBlendRenderer.setSourceAttachments1(layers[1].first, layers[1].second);
+          m_rendererBase.renderVulkan(eye, m_MIPImageAlphaBlendRenderer);
+        });
+
+        // Subsequent merges: (A + layers[i]) -> B, then swap
+        auto resHandles = handlesFromLease(*mergeLeaseA);
+        for (size_t i = 2; i < layers.size(); ++i) {
+          script.raster("image_merge_iter", {}, [&]() {
+            m_rendererBase.setActiveSurfaceWithLoadStore(*mergeLeaseB,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store);
+            m_MIPImageAlphaBlendRenderer.setSourceAttachments0(resHandles.first, resHandles.second);
+            m_MIPImageAlphaBlendRenderer.setSourceAttachments1(layers[i].first, layers[i].second);
+            m_rendererBase.renderVulkan(eye, m_MIPImageAlphaBlendRenderer);
+          });
           // swap A<->B and update resHandles
           std::swap(mergeLeaseA, mergeLeaseB);
-          resHandles = handlesFromLease(mergeLeaseA);
+          resHandles = handlesFromLease(*mergeLeaseA);
         }
 
         // Blend geometry (out) with final merged image (res in mergeLeaseA)
@@ -1995,29 +2052,30 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                                  ScratchFormat::Depth32F,
                                                                  RenderBackend::Vulkan);
           }
-          m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store);
         } else {
-          m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store);
           imagesCompositedToFinal = true;
         }
 
-        m_alphaBlendRenderer.setEnableFixedBlend(m_showBackground.get());
-        recordInVulkanFrame(
-          m_rendererBase,
-          [&]() {
-            m_alphaBlendRenderer.setSourceAttachments0(outC, outD);
-            m_alphaBlendRenderer.setSourceAttachments1(resHandles.first, resHandles.second);
-            m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
-          },
-          "image_merge_finalize");
+        script.raster("image_merge_finalize", {}, [&]() {
+          if (supersample2x2) {
+            m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store);
+          } else {
+            m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store);
+          }
+
+          m_alphaBlendRenderer.setEnableFixedBlend(m_showBackground.get());
+          m_alphaBlendRenderer.setSourceAttachments0(outC, outD);
+          m_alphaBlendRenderer.setSourceAttachments1(resHandles.first, resHandles.second);
+          m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
+        });
         if (supersample2x2) {
           sceneOutLease = &sceneCompositeLease;
         }
@@ -2037,42 +2095,47 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
     if (!useOITOnTop) {
       // Non-OIT: render all on-top (opaque+transparent) into a temp lease, then overlay.
-      auto onTopLease = pool.acquireTempRenderTarget2D(targetSize,
-                                                       ScratchFormat::RGBA16,
-                                                       ScratchFormat::Depth32F,
-                                                       RenderBackend::Vulkan);
-      Z3DCompositorPass pass;
-      pass.targetLease = &onTopLease;
-      pass.surface = m_rendererBase.describeSurface(onTopLease);
-      pass.eye = eye;
-      pass.transparency = m_rendererBase.sceneState().transparency;
-      pass.msaaMode = m_rendererBase.sceneState().multisample;
-      pass.clearColor = true;
-      pass.clearDepth = true;
-      pass.clearStencil = false;
-      pass.clearValue.color = glm::vec4(0.0f);
-      pass.clearValue.depth = 1.0f;
-      pass.clearValue.stencil = 0u;
-      pass.opaqueFilters.assign(onTopOpaqueFilters.begin(), onTopOpaqueFilters.end());
-      pass.transparentFilters.reserve(onTopTransparentFilters.size());
-      for (auto* f : onTopTransparentFilters) {
-        Z3DCompositorTransparentBatch tb;
-        tb.filter = f;
-        tb.glowEnabled = false;
-        pass.transparentFilters.push_back(tb);
-      }
-      pass.debugLabel = "geometry_on_top_blend";
-      m_rendererBase.executeCompositorPass(pass);
+      auto onTopLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(targetSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(onTopLease);
+      script.raster("geometry_on_top_blend", {}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*onTopLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        for (auto* filter : onTopOpaqueFilters) {
+          if (!filter) {
+            continue;
+          }
+          filter->setViewport(targetSize);
+          recordFilterBatchesToSurface(filter, *onTopLease, targetSize, [&]() {
+            filter->renderOpaque(eye);
+          });
+        }
+        for (auto* filter : onTopTransparentFilters) {
+          if (!filter) {
+            continue;
+          }
+          filter->setViewport(targetSize);
+          recordFilterBatchesToSurface(filter, *onTopLease, targetSize, [&]() {
+            filter->renderTransparent(eye);
+          });
+        }
+      });
 
       // Overlay onto scene output using "first on top" blending
       AttachmentHandle overlayC{};
       overlayC.backend = RenderBackend::Vulkan;
       overlayC.index = 0;
-      overlayC.id = reinterpret_cast<uint64_t>(onTopLease.colorAttachment(0));
+      overlayC.id = reinterpret_cast<uint64_t>(onTopLease->colorAttachment(0));
       AttachmentHandle overlayD{};
       overlayD.backend = RenderBackend::Vulkan;
       overlayD.index = 0;
-      overlayD.id = reinterpret_cast<uint64_t>(onTopLease.depthAttachmentTexture());
+      overlayD.id = reinterpret_cast<uint64_t>(onTopLease->depthAttachmentTexture());
 
       AttachmentHandle outC{};
       outC.backend = RenderBackend::Vulkan;
@@ -2083,53 +2146,52 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       outD.index = 0;
       outD.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
 
-      m_rendererBase.setActiveSurfaceWithLoadStore(*sceneOutLease,
-                                                   LoadOp::Load,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
-
       // Overlay on-top content over the scene. In GL, blending is enabled
       // only when the background is drawn to the destination first. Mirror
       // that: enable fixed-function blending iff background is shown.
-      m_firstOnTopBlendRenderer.setEnableFixedBlend(m_showBackground.get());
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          m_firstOnTopBlendRenderer.setSourceAttachments0(overlayC, overlayD);
-          m_firstOnTopBlendRenderer.setSourceAttachments1(outC, outD);
-          m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
-        },
-        "on_top_overlay_blend");
-      m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
+      script.raster("on_top_overlay_blend", {}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*sceneOutLease,
+                                                     LoadOp::Load,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+
+        m_firstOnTopBlendRenderer.setEnableFixedBlend(m_showBackground.get());
+        m_firstOnTopBlendRenderer.setSourceAttachments0(overlayC, overlayD);
+        m_firstOnTopBlendRenderer.setSourceAttachments1(outC, outD);
+        m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
+        m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
+      });
 
       // Apply glow for on-top filters
       applyGlowOverlay(onTopTransparentFilters);
       applyGlowOverlay(onTopOpaqueFilters);
     } else {
       // OIT path: split opaque/transparent, run OIT for transparent with opaque depth, then overlay
-      Z3DScratchResourcePool::RenderTargetLease onTopOpaqueLease;
+      std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> onTopOpaqueLease;
       if (!onTopOpaqueFilters.empty()) {
-        onTopOpaqueLease = pool.acquireTempRenderTarget2D(targetSize,
-                                                          ScratchFormat::RGBA16,
-                                                          ScratchFormat::Depth32F,
-                                                          RenderBackend::Vulkan);
-        Z3DCompositorPass pass;
-        pass.targetLease = &onTopOpaqueLease;
-        pass.surface = m_rendererBase.describeSurface(onTopOpaqueLease);
-        pass.eye = eye;
-        pass.transparency = m_rendererBase.sceneState().transparency;
-        pass.msaaMode = m_rendererBase.sceneState().multisample;
-        pass.clearColor = true;
-        pass.clearDepth = true;
-        pass.clearStencil = false;
-        pass.clearValue.color = glm::vec4(0.0f);
-        pass.clearValue.depth = 1.0f;
-        pass.clearValue.stencil = 0u;
-        pass.opaqueFilters.assign(onTopOpaqueFilters.begin(), onTopOpaqueFilters.end());
-        pass.transparentFilters.clear();
-        pass.debugLabel = "geometry_on_top_opaque";
-        m_rendererBase.executeCompositorPass(pass);
+        onTopOpaqueLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+          pool.acquireTempRenderTarget2D(targetSize,
+                                         ScratchFormat::RGBA16,
+                                         ScratchFormat::Depth32F,
+                                         RenderBackend::Vulkan));
+        script.keepAlive(onTopOpaqueLease);
+        script.raster("geometry_on_top_opaque", {}, [&]() {
+          m_rendererBase.setActiveSurfaceWithLoadStore(*onTopOpaqueLease,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store);
+          for (auto* filter : onTopOpaqueFilters) {
+            if (!filter) {
+              continue;
+            }
+            filter->setViewport(targetSize);
+            recordFilterBatchesToSurface(filter, *onTopOpaqueLease, targetSize, [&]() {
+              filter->renderOpaque(eye);
+            });
+          }
+        });
       }
 
       auto handlesFromLease = [](const Z3DScratchResourcePool::RenderTargetLease& lease) {
@@ -2145,20 +2207,23 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       };
 
       // OIT for on-top transparent filters into a temporary lease
-      Z3DScratchResourcePool::RenderTargetLease onTopTransLease;
+      std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> onTopTransLease;
       const auto transparencyModeOnTop = m_rendererBase.sceneState().transparency;
       const bool onTopHasTrans = !onTopTransparentFilters.empty();
       const bool onTopHasOpaque = !onTopOpaqueFilters.empty();
       if (onTopHasTrans) {
-        onTopTransLease = pool.acquireTempRenderTarget2D(targetSize,
-                                                         ScratchFormat::RGBA16,
-                                                         ScratchFormat::Depth32F,
-                                                         RenderBackend::Vulkan);
+        onTopTransLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+          pool.acquireTempRenderTarget2D(targetSize,
+                                         ScratchFormat::RGBA16,
+                                         ScratchFormat::Depth32F,
+                                         RenderBackend::Vulkan));
+        script.keepAlive(onTopTransLease);
         AttachmentHandle depthHandle{};
         if (onTopHasOpaque) {
+          CHECK(onTopOpaqueLease) << "onTopHasOpaque without an opaque lease";
           depthHandle.backend = RenderBackend::Vulkan;
           depthHandle.index = 0;
-          depthHandle.id = reinterpret_cast<uint64_t>(onTopOpaqueLease.depthAttachmentTexture());
+          depthHandle.id = reinterpret_cast<uint64_t>(onTopOpaqueLease->depthAttachmentTexture());
         }
         // Restrict image layers to stay-on-top volumes
         std::vector<Z3DCompositorImageLayer> onTopImageLayers;
@@ -2185,35 +2250,39 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         switch (transparencyModeOnTop) {
           case TransparencyMode::DualDepthPeeling:
             renderTransparentDDPVulkan(onTopTransparentFilters,
-                                       onTopTransLease,
+                                       *onTopTransLease,
                                        eye,
                                        depthHandle,
                                        onTopImageLayers,
-                                       /*clearResolveTarget=*/true);
+                                       /*clearResolveTarget=*/true,
+                                       script);
             break;
           case TransparencyMode::PerPixelFragmentList:
             renderTransparentPPLLVulkan(onTopTransparentFilters,
-                                        onTopTransLease,
+                                        *onTopTransLease,
                                         eye,
                                         depthHandle,
                                         onTopImageLayers,
-                                        /*clearResolveTarget=*/true);
+                                        /*clearResolveTarget=*/true,
+                                        script);
             break;
           case TransparencyMode::WeightedAverage:
             renderTransparentWAVulkan(onTopTransparentFilters,
-                                      onTopTransLease,
+                                      *onTopTransLease,
                                       eye,
                                       depthHandle,
                                       onTopImageLayers,
-                                      /*clearResolveTarget=*/true);
+                                      /*clearResolveTarget=*/true,
+                                      script);
             break;
           case TransparencyMode::WeightedBlended:
             renderTransparentWBVulkan(onTopTransparentFilters,
-                                      onTopTransLease,
+                                      *onTopTransLease,
                                       eye,
                                       depthHandle,
                                       onTopImageLayers,
-                                      /*clearResolveTarget=*/true);
+                                      /*clearResolveTarget=*/true,
+                                      script);
             break;
           default:
             break;
@@ -2223,35 +2292,38 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       // Determine the overlay handles (opaque-only, trans-only, or merged both)
       std::pair<AttachmentHandle, AttachmentHandle> overlayHandles{};
       if (onTopHasOpaque && onTopHasTrans) {
-        auto mergeLease = pool.acquireTempRenderTarget2D(targetSize,
-                                                         ScratchFormat::RGBA16,
-                                                         ScratchFormat::Depth32F,
-                                                         RenderBackend::Vulkan);
-        // Clear merge target
-        m_rendererBase.setActiveSurfaceWithLoadStore(mergeLease,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store);
-        const auto opaqueHandles = handlesFromLease(onTopOpaqueLease);
-        const auto transHandles = handlesFromLease(onTopTransLease);
+        CHECK(onTopOpaqueLease) << "onTopHasOpaque without an opaque lease";
+        CHECK(onTopTransLease) << "onTopHasTrans without a transparent lease";
+        auto mergeLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+          pool.acquireTempRenderTarget2D(targetSize,
+                                         ScratchFormat::RGBA16,
+                                         ScratchFormat::Depth32F,
+                                         RenderBackend::Vulkan));
+        script.keepAlive(mergeLease);
+        const auto opaqueHandles = handlesFromLease(*onTopOpaqueLease);
+        const auto transHandles = handlesFromLease(*onTopTransLease);
 
-        m_alphaBlendRenderer.setEnableFixedBlend(false);
-        recordInVulkanFrame(
-          m_rendererBase,
-          [&]() {
-            // Depth-tested alpha blend to pick per-pixel front-most between opaque and transparent
-            m_alphaBlendRenderer.setSourceAttachments0(opaqueHandles.first, opaqueHandles.second);
-            m_alphaBlendRenderer.setSourceAttachments1(transHandles.first, transHandles.second);
-            m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
-          },
-          "on_top_merge");
+        script.raster("on_top_merge", {}, [&]() {
+          // Clear merge target
+          m_rendererBase.setActiveSurfaceWithLoadStore(*mergeLease,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store);
+          m_alphaBlendRenderer.setEnableFixedBlend(false);
+          // Depth-tested alpha blend to pick per-pixel front-most between opaque and transparent
+          m_alphaBlendRenderer.setSourceAttachments0(opaqueHandles.first, opaqueHandles.second);
+          m_alphaBlendRenderer.setSourceAttachments1(transHandles.first, transHandles.second);
+          m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
+        });
 
-        overlayHandles = handlesFromLease(mergeLease);
+        overlayHandles = handlesFromLease(*mergeLease);
       } else if (onTopHasTrans) {
-        overlayHandles = handlesFromLease(onTopTransLease);
+        CHECK(onTopTransLease) << "onTopHasTrans without a transparent lease";
+        overlayHandles = handlesFromLease(*onTopTransLease);
       } else if (onTopHasOpaque) {
-        overlayHandles = handlesFromLease(onTopOpaqueLease);
+        CHECK(onTopOpaqueLease) << "onTopHasOpaque without an opaque lease";
+        overlayHandles = handlesFromLease(*onTopOpaqueLease);
       }
 
       // Blend overlayHandles over the scene temp into the final output (no SS) or a supersampled composite (SS)
@@ -2276,33 +2348,35 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                                  ScratchFormat::Depth32F,
                                                                  RenderBackend::Vulkan);
           }
-          m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store);
         } else {
-          // Clear color/depth on the final surface; we compute the final pixels in the compositor
-          m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store);
+          // Non-supersampled path writes directly to the final output lease.
         }
 
         // First-on-top blend over scene temp into final (no SS) or composite (SS).
         // Destination may or may not already include background; we do not need
         // an extra blend here because the shader composes overlay+scene.
-        m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
-        recordInVulkanFrame(
-          m_rendererBase,
-          [&]() {
-            // First-on-top blending: overlay (0) over scene (1)
-            m_firstOnTopBlendRenderer.setSourceAttachments0(overlayHandles.first, overlayHandles.second);
-            m_firstOnTopBlendRenderer.setSourceAttachments1(sceneC, sceneD);
-            m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
-          },
-          "on_top_overlay");
+        script.raster("on_top_overlay", {}, [&]() {
+          if (supersample2x2) {
+            m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store);
+          } else {
+            // Clear color/depth on the final surface; we compute the final pixels in the compositor
+            m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store);
+          }
+
+          m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
+          // First-on-top blending: overlay (0) over scene (1)
+          m_firstOnTopBlendRenderer.setSourceAttachments0(overlayHandles.first, overlayHandles.second);
+          m_firstOnTopBlendRenderer.setSourceAttachments1(sceneC, sceneD);
+          m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
+        });
 
         if (supersample2x2) {
           // Promote composite result as the new scene base for subsequent overlays/passes
@@ -2318,39 +2392,40 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
   if (haveHandles) {
     const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
-    auto handleLease =
-      pool.acquireTempRenderTarget2D(targetSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
-    CHECK(handleLease && handleLease.backend == RenderBackend::Vulkan)
+    auto handleLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+      pool.acquireTempRenderTarget2D(targetSize,
+                                     ScratchFormat::RGBA16,
+                                     ScratchFormat::Depth32F,
+                                     RenderBackend::Vulkan));
+    script.keepAlive(handleLease);
+    CHECK(handleLease && *handleLease && handleLease->backend == RenderBackend::Vulkan)
       << "Failed to acquire Vulkan handle overlay render target";
 
-    m_rendererBase.setActiveSurfaceWithLoadStore(handleLease,
-                                                 LoadOp::Clear,
-                                                 StoreOp::Store,
-                                                 LoadOp::Clear,
-                                                 StoreOp::Store);
-    recordInVulkanFrame(
-      m_rendererBase,
-      [&]() {
-        for (auto* filter : showHandleFilters) {
-          if (!filter) {
-            continue;
-          }
-          filter->setViewport(targetSize);
-          recordFilterBatchesToSurface(filter, handleLease, targetSize, [&]() {
-            filter->renderHandle(eye);
-          });
+    script.raster("handles_overlay", {}, [&]() {
+      m_rendererBase.setActiveSurfaceWithLoadStore(*handleLease,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store);
+      for (auto* filter : showHandleFilters) {
+        if (!filter) {
+          continue;
         }
-      },
-      "handles_overlay");
+        filter->setViewport(targetSize);
+        recordFilterBatchesToSurface(filter, *handleLease, targetSize, [&]() {
+          filter->renderHandle(eye);
+        });
+      }
+    });
 
     AttachmentHandle handleColor{};
     handleColor.backend = RenderBackend::Vulkan;
     handleColor.index = 0;
-    handleColor.id = reinterpret_cast<uint64_t>(handleLease.colorAttachment(0));
+    handleColor.id = reinterpret_cast<uint64_t>(handleLease->colorAttachment(0));
     AttachmentHandle handleDepth{};
     handleDepth.backend = RenderBackend::Vulkan;
     handleDepth.index = 0;
-    handleDepth.id = reinterpret_cast<uint64_t>(handleLease.depthAttachmentTexture());
+    handleDepth.id = reinterpret_cast<uint64_t>(handleLease->depthAttachmentTexture());
     CHECK(handleColor.id != 0 && handleDepth.id != 0) << "Handles overlay lease missing attachments";
 
     // Sample the scene rendered into sceneOutLease (temp) and write to the
@@ -2372,38 +2447,31 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         sceneCompositeLease =
           pool.acquireTempRenderTarget2D(ssSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
       }
-      // Supersampled path always composites into a fresh intermediate
-      m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
-    } else {
-      // GL draws the scene (background + geometry) first, then overlays
-      // the handles on top. In Vulkan, depending on earlier passes we may
-      // already have composed content in the final surface (e.g., when an
-      // earlier image/overlay path wrote directly to the output). Clearing
-      // here would darken/erase that background before the compositor
-      // shader mixes the handle+scene textures, making the result look
-      // darker compared to GL. Preserve any existing color in that case.
-      const bool havePriorFinalContent = (!supersample2x2 && (haveOnTop || imagesCompositedToFinal));
-      m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
-                                                   havePriorFinalContent ? LoadOp::Load : LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
     }
     // Handle overlay composes handle over scene in-shader; do not enable
     // fixed-function blending to avoid a second blend.
-    m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
-    recordInVulkanFrame(
-      m_rendererBase,
-      [&]() {
-        m_firstOnTopBlendRenderer.setSourceAttachments0(handleColor, handleDepth);
-        m_firstOnTopBlendRenderer.setSourceAttachments1(sceneColor, sceneDepth);
-        m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
-      },
-      "handles_composite");
+    script.raster("handles_composite", {}, [&]() {
+      if (supersample2x2) {
+        // Supersampled path always composites into a fresh intermediate
+        m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+      } else {
+        const bool havePriorFinalContent = (!supersample2x2 && (haveOnTop || imagesCompositedToFinal));
+        m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
+                                                     havePriorFinalContent ? LoadOp::Load : LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+      }
+
+      m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
+      m_firstOnTopBlendRenderer.setSourceAttachments0(handleColor, handleDepth);
+      m_firstOnTopBlendRenderer.setSourceAttachments1(sceneColor, sceneDepth);
+      m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
+    });
 
     if (supersample2x2) {
       // Promote composite as the current scene for any follow-up overlays
@@ -2417,199 +2485,164 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
     Z3DScratchResourcePool::RenderTargetLease* selectionLease = compositedToFinal ? outLease : sceneOutLease;
     const glm::uvec2 targetSize = selectionLease->descriptor.size;
-    m_rendererBase.setActiveSurfaceWithLoadStore(*selectionLease,
-                                                 LoadOp::Load,
-                                                 StoreOp::Store,
-                                                 LoadOp::Load,
-                                                 StoreOp::Store);
-    recordInVulkanFrame(
-      m_rendererBase,
-      [&]() {
-        for (auto* filter : selectedFilters) {
-          if (!filter) {
-            continue;
-          }
-          filter->setViewport(targetSize);
-          recordFilterBatchesToSurface(filter, *selectionLease, targetSize, [&]() {
-            filter->renderSelectionBox(eye);
-          });
+    script.raster("selection_boxes", {}, [&]() {
+      m_rendererBase.setActiveSurfaceWithLoadStore(*selectionLease,
+                                                   LoadOp::Load,
+                                                   StoreOp::Store,
+                                                   LoadOp::Load,
+                                                   StoreOp::Store);
+      for (auto* filter : selectedFilters) {
+        if (!filter) {
+          continue;
         }
-      },
-      "selection_boxes");
+        filter->setViewport(targetSize);
+        recordFilterBatchesToSurface(filter, *selectionLease, targetSize, [&]() {
+          filter->renderSelectionBox(eye);
+        });
+      }
+    });
   }
 
   if (m_showAxis.get()) {
     // Axis should draw on the same surface as selection boxes
     const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
-    renderAxisVulkan(eye, *(compositedToFinal ? outLease : sceneOutLease));
+    renderAxisVulkan(eye, *(compositedToFinal ? outLease : sceneOutLease), script);
   }
 
   // Vulkan picking (render to RGBA8+Depth24 Vulkan scratch image)
   {
     const glm::uvec2 pickSize = sceneOutLease->descriptor.size;
     ensurePickingTargetVulkan(pickSize);
-
-    // Collect picking batches from a filter's own renderer base and append
-    // them to the compositor's renderer base under the current active surface.
-    auto recordFilterPickingBatches = [&](Z3DBoundedFilter* filter, auto&& renderFn) {
-      if (!filter) {
-        return;
-      }
-      auto& source = filter->rendererBase();
-
-      const glm::uvec4 previousViewport = source.frameState().viewport;
-      const auto previousSurface = source.frameState().activeSurface;
-      const glm::uvec4 pickViewport(0u, 0u, pickSize.x, pickSize.y);
-      const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
-
-      source.frameState().updateViewportData(pickViewport);
-      source.setActiveSurfaceWithLoadStore(surfaceCopy, Z3DRendererBase::Preserve);
-      renderFn();
-      auto& batches = source.cpuState().batches;
-      for (auto& batch : batches) {
-        if (batch.pass.colorAttachments.empty() && !surfaceCopy.colorAttachments.empty()) {
-          batch.pass.colorAttachments = surfaceCopy.colorAttachments;
-        }
-        if (!batch.pass.depthAttachment.has_value() && surfaceCopy.depthAttachment.has_value()) {
-          batch.pass.depthAttachment = surfaceCopy.depthAttachment;
-        }
-        if (batch.pass.viewport.extent == glm::vec2(0.0f)) {
-          batch.pass.viewport.origin = glm::vec2(0.0f, 0.0f);
-          batch.pass.viewport.extent = glm::vec2(static_cast<float>(pickSize.x), static_cast<float>(pickSize.y));
-          batch.pass.viewport.minDepth = 0.0f;
-          batch.pass.viewport.maxDepth = 1.0f;
-        }
-        m_rendererBase.appendBatch(std::move(batch));
-      }
-      source.resetCPUState();
-
-      source.frameState().updateViewportData(previousViewport);
-      source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
-    };
+    const glm::uvec4 pickViewport(0u, 0u, pickSize.x, pickSize.y);
 
     if (gFilters.empty() && !showHandleFilters.empty()) {
-      m_rendererBase.setActiveSurfaceWithLoadStore(m_pickingTargetLease,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
       vlogVulkanLease("picking_handles", m_pickingTargetLease);
 
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          for (auto* f : showHandleFilters) {
-            f->setViewport(pickSize);
-            recordFilterPickingBatches(f, [&]() {
-              f->renderHandlePicking(eye);
-            });
-          }
-        },
-        "picking_handles");
+      script.raster("picking_handles", {}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(m_pickingTargetLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
+        for (auto* f : showHandleFilters) {
+          f->setViewport(pickSize);
+          recordHandlePickingFilterBatchesToSurfaceUnifiedWithViewport(m_rendererBase,
+                                                                       f,
+                                                                       surfaceCopy,
+                                                                       pickViewport,
+                                                                       eye);
+        }
+      });
 
     } else if (showHandleFilters.empty() && !gFilters.empty()) {
-      m_rendererBase.setActiveSurfaceWithLoadStore(m_pickingTargetLease,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
       vlogVulkanLease("picking_geometry", m_pickingTargetLease);
 
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          for (auto* gf : gFilters) {
-            if (gf && gf->isReady(eye)) {
-              gf->setViewport(pickSize);
-              recordFilterPickingBatches(gf, [&]() {
-                gf->renderPicking(eye);
-              });
-            }
+      script.raster("picking_geometry", {}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(m_pickingTargetLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
+        for (auto* gf : gFilters) {
+          if (gf && gf->isReady(eye)) {
+            gf->setViewport(pickSize);
+            recordGeometryPickingFilterBatchesToSurfaceUnifiedWithViewport(m_rendererBase,
+                                                                           gf,
+                                                                           surfaceCopy,
+                                                                           pickViewport,
+                                                                           eye);
           }
-        },
-        "picking_geometry");
+        }
+      });
 
     } else if (!gFilters.empty() && !showHandleFilters.empty()) {
-      auto leaseHandles =
-        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
-      auto leaseGeoms =
-        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
+      auto leaseHandles = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(pickSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      auto leaseGeoms = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(pickSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(leaseHandles);
+      script.keepAlive(leaseGeoms);
 
       // Record handle picking
 
-      m_rendererBase.setActiveSurfaceWithLoadStore(leaseHandles,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
-      vlogVulkanLease("picking_handles_temp", leaseHandles);
+      vlogVulkanLease("picking_handles_temp", *leaseHandles);
 
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          for (auto* f : showHandleFilters) {
-            f->setViewport(pickSize);
-            recordFilterPickingBatches(f, [&]() {
-              f->renderHandlePicking(eye);
-            });
-          }
-        },
-        "picking_handles_temp");
+      const auto segHandles = script.raster("picking_handles_temp", {}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*leaseHandles,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
+        for (auto* f : showHandleFilters) {
+          f->setViewport(pickSize);
+          recordHandlePickingFilterBatchesToSurfaceUnifiedWithViewport(m_rendererBase,
+                                                                       f,
+                                                                       surfaceCopy,
+                                                                       pickViewport,
+                                                                       eye);
+        }
+      });
 
       // Record geometry picking
-      m_rendererBase.setActiveSurfaceWithLoadStore(leaseGeoms,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
-      vlogVulkanLease("picking_geometry_temp", leaseGeoms);
+      vlogVulkanLease("picking_geometry_temp", *leaseGeoms);
 
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          for (auto* gf : gFilters) {
-            if (gf && gf->isReady(eye)) {
-              gf->setViewport(pickSize);
-              recordFilterPickingBatches(gf, [&]() {
-                gf->renderPicking(eye);
-              });
-            }
+      const auto segGeoms = script.raster("picking_geometry_temp", {}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*leaseGeoms,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
+        for (auto* gf : gFilters) {
+          if (gf && gf->isReady(eye)) {
+            gf->setViewport(pickSize);
+            recordGeometryPickingFilterBatchesToSurfaceUnifiedWithViewport(m_rendererBase,
+                                                                           gf,
+                                                                           surfaceCopy,
+                                                                           pickViewport,
+                                                                           eye);
           }
-        },
-        "picking_geometry_temp");
+        }
+      });
 
       // Composite into picking target using first-on-top blend
       AttachmentHandle handlesColor{};
       handlesColor.backend = RenderBackend::Vulkan;
       handlesColor.index = 0;
-      handlesColor.id = reinterpret_cast<uint64_t>(leaseHandles.colorAttachment(0));
+      handlesColor.id = reinterpret_cast<uint64_t>(leaseHandles->colorAttachment(0));
       AttachmentHandle handlesDepth{};
       handlesDepth.backend = RenderBackend::Vulkan;
       handlesDepth.index = 0;
-      handlesDepth.id = reinterpret_cast<uint64_t>(leaseHandles.depthAttachmentTexture());
+      handlesDepth.id = reinterpret_cast<uint64_t>(leaseHandles->depthAttachmentTexture());
       AttachmentHandle geomsColor{};
       geomsColor.backend = RenderBackend::Vulkan;
       geomsColor.index = 0;
-      geomsColor.id = reinterpret_cast<uint64_t>(leaseGeoms.colorAttachment(0));
+      geomsColor.id = reinterpret_cast<uint64_t>(leaseGeoms->colorAttachment(0));
       AttachmentHandle geomsDepth{};
       geomsDepth.backend = RenderBackend::Vulkan;
       geomsDepth.index = 0;
-      geomsDepth.id = reinterpret_cast<uint64_t>(leaseGeoms.depthAttachmentTexture());
+      geomsDepth.id = reinterpret_cast<uint64_t>(leaseGeoms->depthAttachmentTexture());
 
       m_firstOnTopRenderer.setSourceAttachments0(handlesColor, handlesDepth);
       m_firstOnTopRenderer.setSourceAttachments1(geomsColor, geomsDepth);
 
-      m_rendererBase.setActiveSurfaceWithLoadStore(m_pickingTargetLease,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          m_rendererBase.renderVulkan(eye, m_firstOnTopRenderer);
-        },
-        "picking_composite");
+      script.raster("picking_composite", {segHandles, segGeoms}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(m_pickingTargetLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        m_rendererBase.renderVulkan(eye, m_firstOnTopRenderer);
+      });
     }
 
     // Update global picking manager with current Vulkan picking attachments for interactive queries
@@ -2628,228 +2661,204 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   if (supersample2x2) {
     // Restore viewport to the output size for the resolve/copy pass.
     m_rendererBase.frameState().updateViewportData(prevViewport);
-    m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
-                                                 LoadOp::Clear,
-                                                 StoreOp::Store,
-                                                 LoadOp::Clear,
-                                                 StoreOp::Store);
-    recordInVulkanFrame(
-      m_rendererBase,
-      [&]() {
-        // If we already composited into a supersampled composite lease, prefer that; otherwise use sceneOutLease.
-        Z3DScratchResourcePool::RenderTargetLease* copySrc = sceneOutLease;
-        AttachmentHandle srcColor{};
-        srcColor.backend = RenderBackend::Vulkan;
-        srcColor.index = 0;
-        srcColor.id = reinterpret_cast<uint64_t>(copySrc->colorAttachment(0));
-        AttachmentHandle srcDepth{};
-        srcDepth.backend = RenderBackend::Vulkan;
-        srcDepth.index = 0;
-        srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
-        // Internal resolve: no Y-flip
-        m_textureCopyRenderer.setFlipY(false);
-        m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
-        m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
-      },
-      "supersample_resolve");
+    script.raster("supersample_resolve", {}, [&]() {
+      m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store);
+      // If we already composited into a supersampled composite lease, prefer that; otherwise use sceneOutLease.
+      Z3DScratchResourcePool::RenderTargetLease* copySrc = sceneOutLease;
+      AttachmentHandle srcColor{};
+      srcColor.backend = RenderBackend::Vulkan;
+      srcColor.index = 0;
+      srcColor.id = reinterpret_cast<uint64_t>(copySrc->colorAttachment(0));
+      AttachmentHandle srcDepth{};
+      srcDepth.backend = RenderBackend::Vulkan;
+      srcDepth.index = 0;
+      srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
+      // Internal resolve: no Y-flip
+      m_textureCopyRenderer.setFlipY(false);
+      m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
+      m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
+    });
   }
 
-  // Per-pass recording ends any frame it began
+  // Per-pass recording ends any frame it began unless we kept a tail frame open.
 
   // Finalize: enqueue end-of-frame readback to staging and perform CPU copy after fence.
   {
     ZVulkanTexture* finalColor = outLease->colorAttachment(0);
+    auto* scratchPool = &pool;
+
+    auto installFinalColorReadback = [this, scratchPool](Z3DLocalColorBuffer* localPtr,
+                                                         Z3DEye eyeCopy,
+                                                         const void* mapped,
+                                                         const glm::uvec2& size,
+                                                         std::function<void()> releaseSlot,
+                                                         bool noCopy) {
+      CHECK(localPtr != nullptr) << "VK final readback install requires a valid local color buffer";
+      if (localPtr->externalRelease) {
+        localPtr->externalRelease();
+        localPtr->externalRelease = {};
+      }
+      localPtr->external = static_cast<const uint8_t*>(mapped);
+      localPtr->externalStride = static_cast<size_t>(size.x) * 4u;
+      localPtr->externalRelease = std::move(releaseSlot);
+      localPtr->width = size.x;
+      localPtr->height = size.y;
+
+      const char* suffix = noCopy ? " (no copy)" : "";
+      VLOG(1) << fmt::format("VK final readback ready{} mapped={} size={}x{} eye={}",
+                             suffix,
+                             mapped,
+                             size.x,
+                             size.y,
+                             static_cast<int>(eyeCopy));
+
+      if (eyeCopy == MonoEye) {
+        {
+          const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+          std::swap(m_monoReadyLocalBuffer, m_monoCurrentLocalBuffer);
+          std::swap(m_monoReadyTarget, m_monoCurrentTarget);
+        }
+        m_globalParameters.hasNewRendering = true;
+        static uint64_t s_lastCreate = 0, s_lastChange = 0;
+        const uint64_t curCreate = scratchPool->creationCounter();
+        const uint64_t curChange = scratchPool->changeCounter();
+        if (curCreate != s_lastCreate || curChange != s_lastChange) {
+          VLOG(1) << scratchPool->describeMemoryUsage(true);
+          s_lastCreate = curCreate;
+          s_lastChange = curChange;
+        }
+        const char* label = noCopy ? "(mono, no copy)" : "(mono)";
+        VLOG(1) << fmt::format("VK renderingFinished {} readyBuffer={}", label, (void*)m_monoReadyLocalBuffer);
+        Q_EMIT renderingFinished();
+      } else if (eyeCopy == LeftEye) {
+        const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+        std::swap(m_leftReadyLocalBuffer, m_leftCurrentLocalBuffer);
+        std::swap(m_leftReadyTarget, m_leftCurrentTarget);
+      } else {
+        {
+          const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+          std::swap(m_rightReadyLocalBuffer, m_rightCurrentLocalBuffer);
+          std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+        }
+        m_globalParameters.hasNewRendering = true;
+        const char* label = noCopy ? "(right, no copy)" : "(right)";
+        VLOG(1) << fmt::format("VK renderingFinished {}", label);
+        Q_EMIT renderingFinished();
+      }
+    };
+
+    auto enqueueFinalReadbackInActiveFrame = [installFinalColorReadback](Z3DRendererVulkanBackend& backend,
+                                                                         ZVulkanTexture& tex,
+                                                                         Z3DLocalColorBuffer* localPtr,
+                                                                         Z3DEye eyeCopy,
+                                                                         std::string_view ticketLabel,
+                                                                         std::string_view consumeLabel,
+                                                                         bool noCopy) {
+      CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
+      const char* suffix = noCopy ? " (no copy)" : "";
+      VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
+                             suffix,
+                             reinterpret_cast<uint64_t>(&tex),
+                             tex.width(),
+                             tex.height(),
+                             static_cast<int>(eyeCopy));
+      auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
+      backend.registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive(consumeLabel),
+        [installFinalColorReadback, localPtr, eyeCopy, ticket = std::move(ticket), noCopy](
+          Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+          co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
+          installFinalColorReadback(localPtr,
+                                    eyeCopy,
+                                    ticket.mapped,
+                                    ticket.size,
+                                    std::move(ticket.releaseSlot),
+                                    noCopy);
+          co_return;
+        },
+        consumeLabel);
+    };
+
     // Request readback while a Vulkan frame is active so backend can insert the copy before endRender.
     // If final color is not RGBA8, first render a copy to an RGBA8 scratch surface, then enqueue the readback inside
     // the same frame.
     if (finalColor && finalColor->format() != vk::Format::eR8G8B8A8Unorm) {
-      auto rgba8Lease = pool.acquireTempRenderTarget2D(m_outputSize,
-                                                       ScratchFormat::RGBA8,
-                                                       ScratchFormat::Depth32F,
-                                                       RenderBackend::Vulkan);
-      if (rgba8Lease && rgba8Lease.backend == RenderBackend::Vulkan) {
-        m_rendererBase.setActiveSurfaceWithLoadStore(rgba8Lease,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store);
+      auto rgba8Lease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(m_outputSize,
+                                       ScratchFormat::RGBA8,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(rgba8Lease);
+      if (*rgba8Lease && rgba8Lease->backend == RenderBackend::Vulkan) {
+        const auto segCopy = script.raster("final_rgba8_copy", {}, [&]() {
+          m_rendererBase.setActiveSurfaceWithLoadStore(*rgba8Lease,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store);
+          // GPU copy to RGBA8 first. If we composed overlays directly into the final surface
+          // (non-SS path), read from outLease; otherwise read from the current scene lease.
+          const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
+          Z3DScratchResourcePool::RenderTargetLease* copySrc = compositedToFinal ? outLease : sceneOutLease;
 
-        recordInVulkanFrame(
-          m_rendererBase,
-          [&]() {
-            // GPU copy to RGBA8 first. If we composed overlays directly into the final surface
-            // (non-SS path), read from outLease; otherwise read from the current scene lease.
-            const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
-            Z3DScratchResourcePool::RenderTargetLease* copySrc = compositedToFinal ? outLease : sceneOutLease;
-            AttachmentHandle srcColor{};
-            srcColor.backend = RenderBackend::Vulkan;
-            srcColor.index = 0;
-            srcColor.id = reinterpret_cast<uint64_t>(copySrc->colorAttachment(0));
-            AttachmentHandle srcDepth{};
-            srcDepth.backend = RenderBackend::Vulkan;
-            srcDepth.index = 0;
-            srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
-            CHECK(srcColor.id != 0 && srcDepth.id != 0) << "final_rgba8_copy: missing source attachments";
-            VLOG(1) << fmt::format("VK final_rgba8_copy srcColor=0x{:x} srcDepth=0x{:x}",
-                                   static_cast<uint64_t>(srcColor.id),
-                                   static_cast<uint64_t>(srcDepth.id));
-            m_textureCopyRenderer.setFlipY(FLAGS_atlas_vk_copy_yflip_in_shader);
-            m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
-            m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
-            // Enqueue readback while this frame is active
-            if (auto* backend = Z3DRendererVulkanBackend::current()) {
-              ZVulkanTexture* rgba8Tex = rgba8Lease.colorAttachment(0);
-              auto* localPtr = (eye == MonoEye)   ? m_monoCurrentLocalBuffer
-                               : (eye == LeftEye) ? m_leftCurrentLocalBuffer
-                                                  : m_rightCurrentLocalBuffer;
-              const Z3DEye eyeCopy = eye;
-              VLOG(1) << fmt::format("VK enqueue final readback tex=0x{:x} size={}x{} eye={}",
-                                     reinterpret_cast<uint64_t>(rgba8Tex),
-                                     rgba8Tex ? rgba8Tex->width() : 0,
-                                     rgba8Tex ? rgba8Tex->height() : 0,
-                                     static_cast<int>(eyeCopy));
-              auto ticket =
-                backend->requestEndOfFrameColorReadbackTicket(*rgba8Tex, eyeCopy, "vk_final_rgba8_readback");
-              backend->registerAfterCurrentFrameCompletionHook(
-                currentRenderThreadExecutorKeepAlive("vk_final_rgba8_readback_consume"),
-                [this, localPtr, eyeCopy, &pool, ticket = std::move(ticket)](
-                  Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-                  co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
-                  const void* mapped = ticket.mapped;
-                  const glm::uvec2 size = ticket.size;
-                  std::function<void()> releaseSlot = std::move(ticket.releaseSlot);
+          AttachmentHandle srcColor{};
+          srcColor.backend = RenderBackend::Vulkan;
+          srcColor.index = 0;
+          srcColor.id = reinterpret_cast<uint64_t>(copySrc->colorAttachment(0));
+          AttachmentHandle srcDepth{};
+          srcDepth.backend = RenderBackend::Vulkan;
+          srcDepth.index = 0;
+          srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
+          CHECK(srcColor.id != 0 && srcDepth.id != 0) << "final_rgba8_copy: missing source attachments";
+          VLOG(1) << fmt::format("VK final_rgba8_copy srcColor=0x{:x} srcDepth=0x{:x}",
+                                 static_cast<uint64_t>(srcColor.id),
+                                 static_cast<uint64_t>(srcDepth.id));
+          m_textureCopyRenderer.setFlipY(FLAGS_atlas_vk_copy_yflip_in_shader);
+          m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
+          m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
+        });
 
-                  if (localPtr->externalRelease) {
-                    localPtr->externalRelease();
-                    localPtr->externalRelease = {};
-                  }
-                  localPtr->external = static_cast<const uint8_t*>(mapped);
-                  localPtr->externalStride = static_cast<size_t>(size.x) * 4u;
-                  localPtr->externalRelease = std::move(releaseSlot);
-                  localPtr->width = size.x;
-                  localPtr->height = size.y;
-                  VLOG(1) << fmt::format("VK final readback ready mapped={} size={}x{} eye={}",
-                                         mapped,
-                                         size.x,
-                                         size.y,
-                                         static_cast<int>(eyeCopy));
-                  if (eyeCopy == MonoEye) {
-                    {
-                      const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-                      std::swap(m_monoReadyLocalBuffer, m_monoCurrentLocalBuffer);
-                      std::swap(m_monoReadyTarget, m_monoCurrentTarget);
-                    }
-                    m_globalParameters.hasNewRendering = true;
-                    static uint64_t s_lastCreate = 0, s_lastChange = 0;
-                    const uint64_t curCreate = pool.creationCounter();
-                    const uint64_t curChange = pool.changeCounter();
-                    if (curCreate != s_lastCreate || curChange != s_lastChange) {
-                      VLOG(1) << pool.describeMemoryUsage(true);
-                      s_lastCreate = curCreate;
-                      s_lastChange = curChange;
-                    }
-                    VLOG(1) << fmt::format("VK renderingFinished (mono) readyBuffer={}", (void*)m_monoReadyLocalBuffer);
-                    Q_EMIT renderingFinished();
-                  } else if (eyeCopy == LeftEye) {
-                    const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-                    std::swap(m_leftReadyLocalBuffer, m_leftCurrentLocalBuffer);
-                    std::swap(m_leftReadyTarget, m_leftCurrentTarget);
-                  } else {
-                    {
-                      const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-                      std::swap(m_rightReadyLocalBuffer, m_rightCurrentLocalBuffer);
-                      std::swap(m_rightReadyTarget, m_rightCurrentTarget);
-                    }
-                    m_globalParameters.hasNewRendering = true;
-                    VLOG(1) << "VK renderingFinished (right)";
-                    Q_EMIT renderingFinished();
-                  }
-                  co_return;
-                },
-                "vk_final_rgba8_readback_consume");
-            }
-          },
-          "final_rgba8_copy_and_readback");
+        const Z3DEye eyeCopy = eye;
+        script.commands(
+          "final_rgba8_readback_enqueue",
+          {segCopy},
+          [this, enqueueFinalReadbackInActiveFrame, rgba8Lease, eyeCopy](Z3DRendererVulkanBackend& backend) {
+            ZVulkanTexture* rgba8Tex = rgba8Lease ? rgba8Lease->colorAttachment(0) : nullptr;
+            CHECK(rgba8Tex != nullptr) << "VK final_rgba8_copy: missing RGBA8 color attachment";
+            auto* localPtr = (eyeCopy == MonoEye)   ? m_monoCurrentLocalBuffer
+                             : (eyeCopy == LeftEye) ? m_leftCurrentLocalBuffer
+                                                    : m_rightCurrentLocalBuffer;
+            enqueueFinalReadbackInActiveFrame(backend,
+                                              *rgba8Tex,
+                                              localPtr,
+                                              eyeCopy,
+                                              "vk_final_rgba8_readback",
+                                              "vk_final_rgba8_readback_consume",
+                                              /*noCopy=*/false);
+          });
       }
     } else if (finalColor) {
-      // No conversion needed; open a mini frame to enqueue readback
-
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          if (auto* backend = Z3DRendererVulkanBackend::current()) {
-            auto* localPtr = (eye == MonoEye)   ? m_monoCurrentLocalBuffer
-                             : (eye == LeftEye) ? m_leftCurrentLocalBuffer
-                                                : m_rightCurrentLocalBuffer;
-            const Z3DEye eyeCopy = eye;
-            VLOG(1) << fmt::format("VK enqueue final readback (no copy) tex=0x{:x} size={}x{} eye={}",
-                                   reinterpret_cast<uint64_t>(finalColor),
-                                   finalColor ? finalColor->width() : 0,
-                                   finalColor ? finalColor->height() : 0,
-                                   static_cast<int>(eyeCopy));
-            auto ticket =
-              backend->requestEndOfFrameColorReadbackTicket(*finalColor, eyeCopy, "vk_final_color_readback");
-            backend->registerAfterCurrentFrameCompletionHook(
-              currentRenderThreadExecutorKeepAlive("vk_final_color_readback_consume"),
-              [this, localPtr, eyeCopy, &pool, ticket = std::move(ticket)](
-                Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-                co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
-                const void* mapped = ticket.mapped;
-                const glm::uvec2 size = ticket.size;
-                std::function<void()> releaseSlot = std::move(ticket.releaseSlot);
-
-                if (localPtr->externalRelease) {
-                  localPtr->externalRelease();
-                  localPtr->externalRelease = {};
-                }
-                localPtr->external = static_cast<const uint8_t*>(mapped);
-                localPtr->externalStride = static_cast<size_t>(size.x) * 4u;
-                localPtr->externalRelease = std::move(releaseSlot);
-                localPtr->width = size.x;
-                localPtr->height = size.y;
-                VLOG(1) << fmt::format("VK final readback ready (no copy) mapped={} size={}x{} eye={}",
-                                       mapped,
-                                       size.x,
-                                       size.y,
-                                       static_cast<int>(eyeCopy));
-                if (eyeCopy == MonoEye) {
-                  {
-                    const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-                    std::swap(m_monoReadyLocalBuffer, m_monoCurrentLocalBuffer);
-                    std::swap(m_monoReadyTarget, m_monoCurrentTarget);
-                  }
-                  m_globalParameters.hasNewRendering = true;
-                  static uint64_t s_lastCreate = 0, s_lastChange = 0;
-                  const uint64_t curCreate = pool.creationCounter();
-                  const uint64_t curChange = pool.changeCounter();
-                  if (curCreate != s_lastCreate || curChange != s_lastChange) {
-                    VLOG(1) << pool.describeMemoryUsage(true);
-                    s_lastCreate = curCreate;
-                    s_lastChange = curChange;
-                  }
-                  VLOG(1) << fmt::format("VK renderingFinished (mono, no copy) readyBuffer={}",
-                                         (void*)m_monoReadyLocalBuffer);
-                  Q_EMIT renderingFinished();
-                } else if (eyeCopy == LeftEye) {
-                  const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-                  std::swap(m_leftReadyLocalBuffer, m_leftCurrentLocalBuffer);
-                  std::swap(m_leftReadyTarget, m_leftCurrentTarget);
-                } else {
-                  {
-                    const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-                    std::swap(m_rightReadyLocalBuffer, m_rightCurrentLocalBuffer);
-                    std::swap(m_rightReadyTarget, m_rightCurrentTarget);
-                  }
-                  m_globalParameters.hasNewRendering = true;
-                  VLOG(1) << "VK renderingFinished (right, no copy)";
-                  Q_EMIT renderingFinished();
-                }
-                co_return;
-              },
-              "vk_final_color_readback_consume");
-          }
-        },
-        "readback_enqueue");
+      // No conversion needed; enqueue readback on the tail submission.
+      const Z3DEye eyeCopy = eye;
+      script.commands(
+        "final_color_readback_enqueue",
+        {},
+        [this, enqueueFinalReadbackInActiveFrame, finalColor, eyeCopy](Z3DRendererVulkanBackend& backend) {
+          auto* localPtr = (eyeCopy == MonoEye)   ? m_monoCurrentLocalBuffer
+                           : (eyeCopy == LeftEye) ? m_leftCurrentLocalBuffer
+                                                  : m_rightCurrentLocalBuffer;
+          enqueueFinalReadbackInActiveFrame(backend,
+                                            *finalColor,
+                                            localPtr,
+                                            eyeCopy,
+                                            "vk_final_color_readback",
+                                            "vk_final_color_readback_consume",
+                                            /*noCopy=*/true);
+        });
     }
     // Do not enqueue picking readback; rely on synchronous 1x1 reads on demand.
   }
@@ -2872,216 +2881,196 @@ void Z3DCompositor::updateSize(const glm::uvec2& targetSize)
   invalidate(State::AllResultInvalid);
 }
 
-void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
-                                                  const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                                                  Z3DScratchResourcePool::RenderTargetLease& sceneOutLease,
-                                                  Z3DEye eye,
-                                                  bool includeGeometry,
-                                                  bool clearAtStart,
-                                                  bool drawBackground)
+void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
+                                              const std::vector<Z3DBoundedFilter*>& transparentFilters,
+                                              Z3DScratchResourcePool::RenderTargetLease& sceneOutLease,
+                                              Z3DEye eye,
+                                              bool includeGeometry,
+                                              bool clearAtStart,
+                                              bool drawBackground,
+                                              ZVulkanLinearScript& script)
 {
-  // Set initial surface with optional clear at start
-  m_rendererBase.setActiveSurfaceWithLoadStore(sceneOutLease,
-                                               clearAtStart ? LoadOp::Clear : LoadOp::Load,
-                                               StoreOp::Store,
-                                               clearAtStart ? LoadOp::Clear : LoadOp::Load,
-                                               StoreOp::Store);
+  // Note: this helper expresses compositor logic in a linear, GL-like way.
+  // It does not decide submission boundaries; ZVulkanLinearScript owns frame
+  // begin/end (and may choose to merge segments).
 
-  // First node: background (clear then draw or uniform clear when hidden)
+  const glm::uvec2 targetSize = sceneOutLease.descriptor.size;
+
+  ZVulkanLinearScript::SegmentHandle segLast{};
+
+  // Background first (mirrors GL: draw background, then blend geometry over it).
   if (drawBackground && m_showBackground.get()) {
     vlogVulkanLease("background", sceneOutLease);
-    recordInVulkanFrame(
-      m_rendererBase,
-      [&]() {
-        m_rendererBase.renderVulkan(eye, m_backgroundRenderer);
-      },
-      "background");
+    segLast = script.raster("background", {}, [&]() {
+      // Set initial surface with optional clear at start. This determines load/store
+      // semantics for the first pass that actually begins rendering on this surface.
+      m_rendererBase.setActiveSurfaceWithLoadStore(sceneOutLease,
+                                                   clearAtStart ? LoadOp::Clear : LoadOp::Load,
+                                                   StoreOp::Store,
+                                                   clearAtStart ? LoadOp::Clear : LoadOp::Load,
+                                                   StoreOp::Store);
+      m_rendererBase.renderVulkan(eye, m_backgroundRenderer);
+    });
   }
 
-  if (includeGeometry) {
-    // Build a compositor pass to record opaque + transparent filters in one submission.
-    if (!opaqueFilters.empty() || !transparentFilters.empty()) {
-      Z3DCompositorPass pass;
-      pass.kind = Z3DCompositorPass::Kind::Geometry;
-      pass.targetLease = &sceneOutLease;
-      pass.surface = m_rendererBase.describeSurface(sceneOutLease);
-      pass.eye = eye;
-      pass.transparency = m_rendererBase.sceneState().transparency;
-      pass.msaaMode = m_rendererBase.sceneState().multisample;
-      // If we didn't draw a background into this target but the caller asked
-      // for a clear at the start, clear color here so stale contents from a
-      // previous frame are not blended under geometry (e.g., opaque-only
-      // intermediates before OIT resolution).
-      pass.clearColor = (clearAtStart && !drawBackground);
-      // Clear depth before drawing scene geometry to avoid any stale
-      // depth values from previous frames showing up when content changes
-      // (e.g., color edits) but geometry/targets remain the same. Background
-      // rendering does not write depth in Vulkan, so clearing here is safe
-      // and ensures the very next frame after an edit is fully visible.
-      pass.clearDepth = true;
-      pass.clearStencil = false;
-      pass.clearValue = {};
-      pass.opaqueFilters.assign(opaqueFilters.begin(), opaqueFilters.end());
-      pass.transparentFilters.reserve(transparentFilters.size());
-      for (auto* f : transparentFilters) {
-        Z3DCompositorTransparentBatch tb;
-        tb.filter = f;
-        tb.glowEnabled = false;
-        pass.transparentFilters.push_back(tb);
-      }
-      pass.debugLabel = "geometry";
-      vlogVulkanLease("geometry", sceneOutLease);
-      m_rendererBase.executeCompositorPass(pass);
+  if (!includeGeometry) {
+    return;
+  }
+
+  const bool haveGeometry = (!opaqueFilters.empty() || !transparentFilters.empty());
+  if (!haveGeometry) {
+    return;
+  }
+
+  // Geometry should always clear depth, and should clear color only when the
+  // caller asked for it and we did not already draw the background.
+  const bool backgroundDrawn = (drawBackground && m_showBackground.get());
+  const LoadOp geomColorLoad = (clearAtStart && !backgroundDrawn) ? LoadOp::Clear : LoadOp::Load;
+  vlogVulkanLease("geometry", sceneOutLease);
+
+  const auto segGeometry =
+    script.raster("geometry",
+                  segLast ? std::initializer_list<ZVulkanLinearScript::SegmentHandle>{segLast}
+                          : std::initializer_list<ZVulkanLinearScript::SegmentHandle>{},
+                  [&]() {
+                    m_rendererBase.setActiveSurfaceWithLoadStore(sceneOutLease,
+                                                                 geomColorLoad,
+                                                                 StoreOp::Store,
+                                                                 LoadOp::Clear,
+                                                                 StoreOp::Store);
+                    const auto surface = m_rendererBase.frameState().activeSurface;
+
+                    for (auto* filter : opaqueFilters) {
+                      if (!filter) {
+                        continue;
+                      }
+                      filter->setViewport(targetSize);
+                      recordFilterBatchesToSurfaceUnified(
+                        m_rendererBase,
+                        filter,
+                        surface,
+                        [&]() {
+                          filter->renderOpaque(eye);
+                        },
+                        /*propagateHookPara=*/false);
+                    }
+
+                    for (auto* filter : transparentFilters) {
+                      if (!filter) {
+                        continue;
+                      }
+                      filter->setViewport(targetSize);
+                      recordTransparentFilterBatchesToSurfaceUnified(m_rendererBase,
+                                                                     filter,
+                                                                     surface,
+                                                                     eye,
+                                                                     /*propagateHookPara=*/false);
+                    }
+                  });
+
+  // Glow overlays (applied on top of the base scene).
+  auto overlayGlow = [&](const std::vector<Z3DBoundedFilter*>& filters, ZVulkanLinearScript::SegmentHandle depsScene) {
+    if (filters.empty()) {
+      return;
     }
 
-    // Finally, glow overlays (applied over the base scene)
-    // Helper to collect a filter's batches into the compositor using a specific lease
-    auto recordFilterBatchesToLease =
-      [&](Z3DBoundedFilter* filter, const Z3DScratchResourcePool::RenderTargetLease& lease, auto&& renderFn) {
-        if (!filter) {
-          return;
-        }
-        auto& source = filter->rendererBase();
-        const glm::uvec4 previousViewport = source.frameState().viewport;
-        const auto previousSurface = source.frameState().activeSurface;
-        // Describe the lease, then copy per-attachment load/store/clear policy
-        // from the compositor's active surface so CLEAR/LOAD intentions are
-        // preserved for brand-new temp targets.
-        auto surfaceCopy = m_rendererBase.describeSurface(lease);
-        const auto& active = m_rendererBase.frameState().activeSurface;
-        const size_t copyColorCount = std::min(surfaceCopy.colorAttachments.size(), active.colorAttachments.size());
-        for (size_t i = 0; i < copyColorCount; ++i) {
-          surfaceCopy.colorAttachments[i].loadOp = active.colorAttachments[i].loadOp;
-          surfaceCopy.colorAttachments[i].storeOp = active.colorAttachments[i].storeOp;
-          surfaceCopy.colorAttachments[i].clearValue = active.colorAttachments[i].clearValue;
-        }
-        if (surfaceCopy.depthAttachment && active.depthAttachment) {
-          surfaceCopy.depthAttachment->loadOp = active.depthAttachment->loadOp;
-          surfaceCopy.depthAttachment->storeOp = active.depthAttachment->storeOp;
-          surfaceCopy.depthAttachment->clearValue = active.depthAttachment->clearValue;
-        }
-        source.frameState().updateViewportData(m_rendererBase.frameState().viewport);
-        source.setActiveSurfaceWithLoadStore(surfaceCopy, Z3DRendererBase::Preserve);
-        renderFn();
-        auto& batches = source.cpuState().batches;
-        for (auto& batch : batches) {
-          if (batch.pass.colorAttachments.empty() && !surfaceCopy.colorAttachments.empty()) {
-            batch.pass.colorAttachments = surfaceCopy.colorAttachments;
-          }
-          if (!batch.pass.depthAttachment.has_value() && surfaceCopy.depthAttachment.has_value()) {
-            batch.pass.depthAttachment = surfaceCopy.depthAttachment;
-          }
-          if (batch.pass.viewport.extent == glm::vec2(0.0f) && m_rendererBase.frameState().viewport.z > 0u &&
-              m_rendererBase.frameState().viewport.w > 0u) {
-            batch.pass.viewport.origin = glm::vec2(static_cast<float>(m_rendererBase.frameState().viewport.x),
-                                                   static_cast<float>(m_rendererBase.frameState().viewport.y));
-            batch.pass.viewport.extent = glm::vec2(static_cast<float>(m_rendererBase.frameState().viewport.z),
-                                                   static_cast<float>(m_rendererBase.frameState().viewport.w));
-            batch.pass.viewport.minDepth = 0.0f;
-            batch.pass.viewport.maxDepth = 1.0f;
-          }
-          m_rendererBase.appendBatch(std::move(batch));
-        }
-        source.resetCPUState();
-        source.frameState().updateViewportData(previousViewport);
-        source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
-      };
-    auto overlayGlow = [&](const std::vector<Z3DBoundedFilter*>& filters) {
-      if (filters.empty()) {
-        return;
+    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+    ZVulkanLinearScript::SegmentHandle deps = depsScene;
+
+    for (auto* filter : filters) {
+      if (!filter) {
+        continue;
       }
-      const glm::uvec2 targetSize = sceneOutLease.descriptor.size;
-      auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-      for (auto* filter : filters) {
-        if (!filter) {
-          continue;
-        }
-        auto* glowPara = filter->parameter("Glow");
-        auto* glowBool = glowPara ? dynamic_cast<ZBoolParameter*>(glowPara) : nullptr;
-        if (!glowBool || !glowBool->get()) {
-          continue;
-        }
+      auto* glowPara = filter->parameter("Glow");
+      auto* glowBool = glowPara ? dynamic_cast<ZBoolParameter*>(glowPara) : nullptr;
+      if (!glowBool || !glowBool->get()) {
+        continue;
+      }
 
-        // 1) render filter geometry to temp lease
-        auto glowGeomLease = pool.acquireTempRenderTarget2D(targetSize,
-                                                            ScratchFormat::RGBA16,
-                                                            ScratchFormat::Depth32F,
-                                                            RenderBackend::Vulkan);
-        // Clear temp attachments, record filter geometry (submit immediately)
-        m_rendererBase.setActiveSurfaceWithLoadStore(glowGeomLease,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store);
-        recordInVulkanFrame(
-          m_rendererBase,
-          [&]() {
-            recordFilterBatchesToLease(filter, glowGeomLease, [&]() {
-              filter->renderOpaque(eye);
-            });
-          },
-          "glow_geometry");
+      auto glowGeomLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(targetSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(glowGeomLease);
 
-        // 2) sync glow params and render glow into the output surface
-        if (auto* mode = dynamic_cast<ZStringIntOptionParameter*>(filter->parameter("Glow Mode"))) {
-          m_glowRenderer.setGlowMode(static_cast<GlowMode>(mode->associatedData()));
-        }
-        if (auto* radius = dynamic_cast<ZIntParameter*>(filter->parameter("Glow Blur Radius"))) {
-          m_glowRenderer.setBlurRadius(radius->get());
-        }
-        if (auto* scale = dynamic_cast<ZFloatParameter*>(filter->parameter("Glow Blur Scale"))) {
-          m_glowRenderer.setBlurScale(scale->get());
-        }
-        if (auto* strength = dynamic_cast<ZFloatParameter*>(filter->parameter("Glow Blur Strength"))) {
-          m_glowRenderer.setBlurStrength(strength->get());
-        }
+      const auto segGlowGeom = script.raster("glow_geometry",
+                                             deps ? std::initializer_list<ZVulkanLinearScript::SegmentHandle>{deps}
+                                                  : std::initializer_list<ZVulkanLinearScript::SegmentHandle>{},
+                                             [&]() {
+                                               m_rendererBase.setActiveSurfaceWithLoadStore(*glowGeomLease,
+                                                                                            LoadOp::Clear,
+                                                                                            StoreOp::Store,
+                                                                                            LoadOp::Clear,
+                                                                                            StoreOp::Store);
+                                               const auto glowGeomSurface = m_rendererBase.frameState().activeSurface;
+                                               filter->setViewport(targetSize);
+                                               recordFilterBatchesToSurfaceUnified(
+                                                 m_rendererBase,
+                                                 filter,
+                                                 glowGeomSurface,
+                                                 [&]() {
+                                                   filter->renderOpaque(eye);
+                                                 },
+                                                 /*propagateHookPara=*/false);
+                                             });
 
-        AttachmentHandle colorHandle;
-        colorHandle.backend = RenderBackend::Vulkan;
-        colorHandle.index = 0;
-        colorHandle.id = reinterpret_cast<uint64_t>(glowGeomLease.colorAttachment(0));
-        AttachmentHandle depthHandle;
-        depthHandle.backend = RenderBackend::Vulkan;
-        depthHandle.index = 0;
-        depthHandle.id = reinterpret_cast<uint64_t>(glowGeomLease.depthAttachmentTexture());
+      // Sync glow parameters from the filter to the compositor renderer.
+      if (auto* mode = dynamic_cast<ZStringIntOptionParameter*>(filter->parameter("Glow Mode"))) {
+        m_glowRenderer.setGlowMode(static_cast<GlowMode>(mode->associatedData()));
+      }
+      if (auto* radius = dynamic_cast<ZIntParameter*>(filter->parameter("Glow Blur Radius"))) {
+        m_glowRenderer.setBlurRadius(radius->get());
+      }
+      if (auto* scale = dynamic_cast<ZFloatParameter*>(filter->parameter("Glow Blur Scale"))) {
+        m_glowRenderer.setBlurScale(scale->get());
+      }
+      if (auto* strength = dynamic_cast<ZFloatParameter*>(filter->parameter("Glow Blur Strength"))) {
+        m_glowRenderer.setBlurStrength(strength->get());
+      }
 
+      AttachmentHandle glowColorHandle{};
+      glowColorHandle.backend = RenderBackend::Vulkan;
+      glowColorHandle.index = 0;
+      glowColorHandle.id = reinterpret_cast<uint64_t>(glowGeomLease->colorAttachment(0));
+      AttachmentHandle glowDepthHandle{};
+      glowDepthHandle.backend = RenderBackend::Vulkan;
+      glowDepthHandle.index = 0;
+      glowDepthHandle.id = reinterpret_cast<uint64_t>(glowGeomLease->depthAttachmentTexture());
+
+      deps = script.raster("glow_composite", {segGlowGeom}, [&]() {
+        // Composite glow into the scene output without clearing.
         m_rendererBase.setActiveSurfaceWithLoadStore(sceneOutLease,
                                                      LoadOp::Load,
                                                      StoreOp::Store,
                                                      LoadOp::DontCare,
                                                      StoreOp::Store,
                                                      {});
-        recordInVulkanFrame(
-          m_rendererBase,
-          [&]() {
-            TextureGlowPayload glowPayload;
-            glowPayload.colorAttachmentHandle = colorHandle;
-            glowPayload.depthAttachmentHandle = depthHandle;
-            glowPayload.mode = m_glowRenderer.glowMode();
-            glowPayload.blurRadius = m_glowRenderer.blurRadius();
-            glowPayload.blurScale = m_glowRenderer.blurScale();
-            glowPayload.blurStrength = m_glowRenderer.blurStrength();
+        TextureGlowPayload glowPayload{};
+        glowPayload.colorAttachmentHandle = glowColorHandle;
+        glowPayload.depthAttachmentHandle = glowDepthHandle;
+        glowPayload.mode = m_glowRenderer.glowMode();
+        glowPayload.blurRadius = m_glowRenderer.blurRadius();
+        glowPayload.blurScale = m_glowRenderer.blurScale();
+        glowPayload.blurStrength = m_glowRenderer.blurStrength();
 
-            RenderBatch batch;
-            batch.eye = eye;
-            batch.pass.externalImageUses.push_back(
-              {colorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-            batch.pass.externalImageUses.push_back(
-              {depthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
-            // Fill surface if not already set through active surface
-            batch.draw.topology = PrimitiveTopology::TriangleStrip;
-            batch.draw.vertexCount = 4;
-            batch.draw.indexCount = 0;
-            batch.geometry = std::move(glowPayload);
-            m_rendererBase.appendBatch(std::move(batch));
-          },
-          "glow_composite");
-      }
-    };
+        RenderBatch batch{};
+        batch.eye = eye;
+        batch.pass.externalImageUses.push_back(
+          {glowColorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.pass.externalImageUses.push_back(
+          {glowDepthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+        batch.draw.topology = PrimitiveTopology::TriangleStrip;
+        batch.draw.vertexCount = 4;
+        batch.draw.indexCount = 0;
+        batch.geometry = std::move(glowPayload);
+        m_rendererBase.appendBatch(std::move(batch));
+      });
+    }
+  };
 
-    overlayGlow(transparentFilters);
-    overlayGlow(opaqueFilters);
-  }
+  overlayGlow(transparentFilters, segGeometry);
+  overlayGlow(opaqueFilters, segGeometry);
 }
 
 void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
@@ -4022,7 +4011,8 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
                                                Z3DEye eye,
                                                AttachmentHandle depthAttachmentHandle,
                                                const std::vector<Z3DCompositorImageLayer>& imageLayers,
-                                               bool clearResolveTarget)
+                                               bool clearResolveTarget,
+                                               ZVulkanLinearScript& script)
 {
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   auto& ddpLease = ensureDDPRenderTarget(targetSize);
@@ -4140,49 +4130,45 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   }
   applyDepthAttachment(initSurface, LoadOp::Load);
 
-  m_rendererBase.setActiveSurfaceWithLoadStore(initSurface, Z3DRendererBase::Preserve);
-
   // Use unified helper for DDP (propagate hook params for sampler bindings)
+
+  auto* vulkanBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
+  CHECK(vulkanBackend != nullptr) << "renderTransparentDDPVulkan requires Vulkan backend";
 
   // Geometry init step must see DualDepthPeelingInit on the compositor renderer
   m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
-  recordInVulkanFrame(
-    m_rendererBase,
-    [&]() {
-      for (auto* filter : filters) {
-        if (!filter) {
+  const auto segInit = script.raster("transparency_ddp_init", {}, [&]() {
+    m_rendererBase.setActiveSurfaceWithLoadStore(initSurface, Z3DRendererBase::Preserve);
+    for (auto* filter : filters) {
+      if (!filter) {
+        continue;
+      }
+      filter->setViewport(targetSize);
+      filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
+      recordTransparentFilterBatchesToSurfaceUnified(m_rendererBase,
+                                                     filter,
+                                                     initSurface,
+                                                     eye,
+                                                     /*propagateHookPara=*/true);
+    }
+    if (!imageLayers.empty()) {
+      m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
+      for (const auto& layer : imageLayers) {
+        const auto& colorDesc = layer.colorAttachment;
+        const auto& depthDesc = layer.depthAttachment;
+        if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
           continue;
         }
-        filter->setViewport(targetSize);
-        filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
-        recordFilterBatchesToSurfaceUnified(
-          m_rendererBase,
-          filter,
-          initSurface,
-          [&]() {
-            filter->renderTransparent(eye);
-          },
-          /*propagateHookPara=*/true);
-      }
-      if (!imageLayers.empty()) {
-        m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
-        for (const auto& layer : imageLayers) {
-          const auto& colorDesc = layer.colorAttachment;
-          const auto& depthDesc = layer.depthAttachment;
-          if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
-            continue;
-          }
-          if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
-            continue;
-          }
-          // Image OIT init copy: do not flip
-          m_textureCopyRenderer.setFlipY(false);
-          m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
-          m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
+        if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
+          continue;
         }
+        // Image OIT init copy: do not flip
+        m_textureCopyRenderer.setFlipY(false);
+        m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
+        m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
       }
-    },
-    "transparency_ddp_init");
+    }
+  });
 
   resetHooks();
 
@@ -4192,227 +4178,251 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   // (pass=1 -> currId=1), and update inside the drawPass.
   size_t finalPingIdx = 1;
 
-  // Orchestrated DDP: one driver call handles Transfer->Frag, Frag->Compute, Compute->Indirect per pass.
-  // We provide a drawPass lambda that records the peel geometry and back-blend accumulation for pass i.
-  if (auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend())) {
-    const bool useIndirectCount = vkBackend->ddpIndirectCountEnabled();
-    auto drawPass = [&](uint32_t pass, vk::raii::CommandBuffer& /*cmd*/) {
-      // Map orchestrator pass [0..N) to compositor's previous logic [1..N]
-      const size_t logicalPass = static_cast<size_t>(pass) + 1u;
-      const size_t currIdLocal = logicalPass % 2;
-      finalPingIdx = currIdLocal;
-      const size_t prevId = 1 - currIdLocal;
-      const size_t bufOffset = currIdLocal * 3;
+  const bool useIndirectCount = vulkanBackend->ddpIndirectCountEnabled();
 
-      // Route locations 0/1/2 to the active ping attachments for this pass.
-      RendererFrameState::ActiveSurface peelSurface;
-      peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 0]);
-      peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 1]);
-      peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 2]);
-      peelSurface.depthAttachment = ddpBindings.surface.depthAttachment;
-      for (size_t i = 0; i < peelSurface.colorAttachments.size(); ++i) {
-        auto& attachment = peelSurface.colorAttachments[i];
-        attachment.storeOp = StoreOp::Store;
-        attachment.finalUse = AttachmentFinalUse::Sampled;
-        attachment.clearValue.color = zeroClear;
-        attachment.loadOp = LoadOp::Load;
-      }
-      peelSurface.colorAttachments[0].loadOp = LoadOp::Clear;
-      peelSurface.colorAttachments[0].clearValue.color = depthClear;
-      peelSurface.colorAttachments[1].loadOp = LoadOp::Clear;
-      peelSurface.colorAttachments[1].clearValue.color = zeroClear;
-      peelSurface.colorAttachments[2].loadOp = LoadOp::Clear;
-      peelSurface.colorAttachments[2].clearValue.color = zeroClear;
-      applyDepthAttachment(peelSurface, LoadOp::Load);
+  auto drawPass = [&](uint32_t pass, ZVulkanLinearScript::SegmentHandle deps) -> ZVulkanLinearScript::SegmentHandle {
+    // Map orchestrator pass [0..N) to compositor's previous logic [1..N]
+    const size_t logicalPass = static_cast<size_t>(pass) + 1u;
+    const size_t currIdLocal = logicalPass % 2;
+    finalPingIdx = currIdLocal;
+    const size_t prevId = 1 - currIdLocal;
+    const size_t bufOffset = currIdLocal * 3;
 
+    // Route locations 0/1/2 to the active ping attachments for this pass.
+    RendererFrameState::ActiveSurface peelSurface;
+    peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 0]);
+    peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 1]);
+    peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 2]);
+    peelSurface.depthAttachment = ddpBindings.surface.depthAttachment;
+    for (size_t i = 0; i < peelSurface.colorAttachments.size(); ++i) {
+      auto& attachment = peelSurface.colorAttachments[i];
+      attachment.storeOp = StoreOp::Store;
+      attachment.finalUse = AttachmentFinalUse::Sampled;
+      attachment.clearValue.color = zeroClear;
+      attachment.loadOp = LoadOp::Load;
+    }
+    peelSurface.colorAttachments[0].loadOp = LoadOp::Clear;
+    peelSurface.colorAttachments[0].clearValue.color = depthClear;
+    peelSurface.colorAttachments[1].loadOp = LoadOp::Clear;
+    peelSurface.colorAttachments[1].clearValue.color = zeroClear;
+    peelSurface.colorAttachments[2].loadOp = LoadOp::Clear;
+    peelSurface.colorAttachments[2].clearValue.color = zeroClear;
+    applyDepthAttachment(peelSurface, LoadOp::Load);
+    const auto segPeel = script.raster("transparency_ddp_peel", {deps}, [&]() {
       m_rendererBase.setActiveSurfaceWithLoadStore(peelSurface, Z3DRendererBase::Preserve);
 
-      // Geometry peel step must see DualDepthPeelingPeel on the compositor renderer
+      // Geometry peel step must see DualDepthPeelingPeel on the compositor renderer.
       m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          // Carry the previous ping's front blender into the current ping before we
-          // emit any peel geometry. This preserves GL DDP semantics even when
-          // Vulkan uses indirect-count gating and may skip geometry draws once the
-          // peel converges (count=0). Without this, the per-pass clear would erase
-          // the accumulated front color when draws are skipped.
-          {
-            TextureDualPeelPayload payload;
-            payload.stage = TextureDualPeelPayload::Stage::Carry;
-            payload.depthAttachment = depthPing[prevId];
-            payload.frontAttachment = frontPing[prevId];
 
-            RenderBatch batch;
-            batch.eye = eye;
-            const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-            batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-            batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-            batch.pass.viewport.minDepth = 0.0f;
-            batch.pass.viewport.maxDepth = 1.0f;
-            batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
-            batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
-            batch.pass.externalImageUses.push_back(
-              {payload.depthAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-            batch.pass.externalImageUses.push_back(
-              {payload.frontAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-            batch.draw.topology = PrimitiveTopology::TriangleStrip;
-            batch.draw.vertexCount = 4;
-            batch.draw.indexCount = 0;
-            batch.geometry = payload;
-            m_rendererBase.appendBatch(std::move(batch));
-          }
+      // Carry the previous ping's front blender into the current ping before we
+      // emit any peel geometry. This preserves GL DDP semantics even when
+      // Vulkan uses indirect-count gating and may skip geometry draws once the
+      // peel converges (count=0). Without this, the per-pass clear would erase
+      // the accumulated front color when draws are skipped.
+      {
+        TextureDualPeelPayload payload;
+        payload.stage = TextureDualPeelPayload::Stage::Carry;
+        payload.depthAttachment = depthPing[prevId];
+        payload.frontAttachment = frontPing[prevId];
 
-          for (auto* filter : filters) {
-            if (!filter) {
-              continue;
-            }
-            filter->setViewport(targetSize);
-            filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-            filter->setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
-            filter->setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
-            recordFilterBatchesToSurfaceUnified(
-              m_rendererBase,
-              filter,
-              peelSurface,
-              [&]() {
-                filter->renderTransparent(eye);
-              },
-              /*propagateHookPara=*/true);
-          }
-          if (!imageLayers.empty()) {
-            m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-            // Ensure image peel path samples the correct blender textures from the previous ping (prevId).
-            m_rendererBase.setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
-            m_rendererBase.setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
-            for (const auto& layer : imageLayers) {
-              const auto& colorDesc = layer.colorAttachment;
-              const auto& depthDesc = layer.depthAttachment;
-              if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
-                continue;
-              }
-              if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
-                continue;
-              }
-              // Image OIT peel: do not flip
-              m_textureCopyRenderer.setFlipY(false);
-              m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
-              m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
-            }
-          }
-        },
-        "transparency_ddp_peel");
-
-      resetHooks();
-
-      // Accumulate back colors for this pass immediately after peel.
-      RendererFrameState::ActiveSurface blendSurface;
-      blendSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[6]);
-      if (!blendSurface.colorAttachments.empty()) {
-        blendSurface.colorAttachments[0].loadOp = LoadOp::Load;
-        blendSurface.colorAttachments[0].storeOp = StoreOp::Store;
-        blendSurface.colorAttachments[0].finalUse = AttachmentFinalUse::Sampled;
-        blendSurface.colorAttachments[0].clearValue.color = zeroClear;
+        RenderBatch batch;
+        batch.eye = eye;
+        const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+        batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+        batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+        batch.pass.viewport.minDepth = 0.0f;
+        batch.pass.viewport.maxDepth = 1.0f;
+        batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
+        batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+        batch.pass.externalImageUses.push_back(
+          {payload.depthAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.pass.externalImageUses.push_back(
+          {payload.frontAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.draw.topology = PrimitiveTopology::TriangleStrip;
+        batch.draw.vertexCount = 4;
+        batch.draw.indexCount = 0;
+        batch.geometry = payload;
+        m_rendererBase.appendBatch(std::move(batch));
       }
-      m_rendererBase.setActiveSurfaceWithLoadStore(blendSurface, Z3DRendererBase::Preserve);
 
-      const glm::vec2 screenDimRcp(targetSize.x > 0u ? 1.f / static_cast<float>(targetSize.x) : 0.f,
-                                   targetSize.y > 0u ? 1.f / static_cast<float>(targetSize.y) : 0.f);
-
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          TextureDualPeelPayload payload;
-          payload.stage = TextureDualPeelPayload::Stage::Blend;
-          payload.tempAttachment = backTempPing[currIdLocal];
-          payload.screenDimRcp = screenDimRcp;
-
-          RenderBatch batch;
-          batch.eye = eye;
-          const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-          batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-          batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-          batch.pass.viewport.minDepth = 0.0f;
-          batch.pass.viewport.maxDepth = 1.0f;
-          batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
-          batch.pass.depthAttachment = std::nullopt;
-          batch.pass.externalImageUses.push_back(
-            {payload.tempAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-          batch.draw.topology = PrimitiveTopology::TriangleStrip;
-          batch.draw.vertexCount = 4;
-          batch.draw.indexCount = 0;
-          batch.geometry = payload;
-          m_rendererBase.appendBatch(std::move(batch));
-        },
-        "transparency_ddp_blend");
-
-      resetHooks();
-    };
-
-    const uint32_t totalOrchestratedPasses = static_cast<uint32_t>(kMaxPasses > 0 ? (kMaxPasses - 1) : 0);
-
-    if (useIndirectCount || FLAGS_atlas_vk_ddp_cpu_chunk_passes <= 0) {
-      // Fast path (Windows/Linux typically): record all passes in one submission, relying
-      // on VK_KHR_draw_indirect_count gating to skip geometry after convergence.
-      recordInVulkanFrame(
-        m_rendererBase,
-        [&]() {
-          vkBackend->ddpOrchestrate(totalOrchestratedPasses, useIndirectCount, drawPass);
-        },
-        "transparency_ddp_orchestrate");
-    } else {
-      // Fallback path (macOS/MoltenVK): break the peel loop into multiple submissions
-      // and read back ddpChangedFlag between chunks so we can stop recording passes
-      // once the peel converges.
-      const uint32_t chunkPasses = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_ddp_cpu_chunk_passes));
-      uint32_t passBase = 0;
-      while (passBase < totalOrchestratedPasses) {
-        const uint32_t remaining = totalOrchestratedPasses - passBase;
-        const uint32_t thisChunk = std::min(chunkPasses, remaining);
-        const bool needReadback = (passBase + thisChunk < totalOrchestratedPasses);
-        uint32_t changedFlag = 1u;
-
-        VLOG(1) << fmt::format("DDP Vulkan CPU-chunk: passBase={} chunk={} remaining={} needReadback={}",
-                               passBase,
-                               thisChunk,
-                               remaining,
-                               needReadback);
-
-        recordInVulkanFrame(
-          m_rendererBase,
-          [&]() {
-            vkBackend->ddpOrchestrate(thisChunk,
-                                      /*useIndirectCount=*/false,
-                                      [&](uint32_t localPass, vk::raii::CommandBuffer& cmd) {
-                                        (void)cmd;
-                                        drawPass(passBase + localPass, cmd);
-                                      });
-
-            if (!needReadback) {
-              return;
-            }
-            ZVulkanBuffer* flag = vkBackend->ddpChangedFlagBufferObj();
-            CHECK(flag != nullptr) << "DDP Vulkan: missing ddpChangedFlag buffer for CPU early-stop";
-            auto ticket = vkBackend->requestEndOfFrameBufferReadbackTicket(*flag,
-                                                                           0,
-                                                                           sizeof(uint32_t),
-                                                                           "vk_ddp_changedflag_readback");
-            vkBackend->registerAfterCurrentFrameCompletionHook(
-              currentRenderThreadExecutorKeepAlive("vk_ddp_changedflag_readback_consume"),
-              [&changedFlag, ticket = std::move(ticket)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-                co_await ticket.awaitCopyTo(&changedFlag, sizeof(uint32_t));
-                co_return;
-              },
-              "vk_ddp_changedflag_readback_consume");
-          },
-          "transparency_ddp_orchestrate");
-
-        if (needReadback && changedFlag == 0u) {
-          VLOG(1) << fmt::format("DDP Vulkan CPU-chunk: converged at pass {}", passBase + thisChunk - 1);
-          break;
+      for (auto* filter : filters) {
+        if (!filter) {
+          continue;
         }
-        passBase += thisChunk;
+        filter->setViewport(targetSize);
+        filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+        filter->setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
+        filter->setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
+        recordTransparentFilterBatchesToSurfaceUnified(m_rendererBase,
+                                                       filter,
+                                                       peelSurface,
+                                                       eye,
+                                                       /*propagateHookPara=*/true);
       }
+      if (!imageLayers.empty()) {
+        m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+        // Ensure image peel path samples the correct blender textures from the previous ping (prevId).
+        m_rendererBase.setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
+        m_rendererBase.setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
+        for (const auto& layer : imageLayers) {
+          const auto& colorDesc = layer.colorAttachment;
+          const auto& depthDesc = layer.depthAttachment;
+          if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
+            continue;
+          }
+          if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
+            continue;
+          }
+          // Image OIT peel: do not flip
+          m_textureCopyRenderer.setFlipY(false);
+          m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
+          m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
+        }
+      }
+    });
+
+    resetHooks();
+
+    // Accumulate back colors for this pass immediately after peel.
+    RendererFrameState::ActiveSurface blendSurface;
+    blendSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[6]);
+    if (!blendSurface.colorAttachments.empty()) {
+      blendSurface.colorAttachments[0].loadOp = LoadOp::Load;
+      blendSurface.colorAttachments[0].storeOp = StoreOp::Store;
+      blendSurface.colorAttachments[0].finalUse = AttachmentFinalUse::Sampled;
+      blendSurface.colorAttachments[0].clearValue.color = zeroClear;
+    }
+
+    const glm::vec2 screenDimRcp(targetSize.x > 0u ? 1.f / static_cast<float>(targetSize.x) : 0.f,
+                                 targetSize.y > 0u ? 1.f / static_cast<float>(targetSize.y) : 0.f);
+
+    const auto segBlend = script.raster("transparency_ddp_blend", {segPeel}, [&]() {
+      m_rendererBase.setActiveSurfaceWithLoadStore(blendSurface, Z3DRendererBase::Preserve);
+      TextureDualPeelPayload payload;
+      payload.stage = TextureDualPeelPayload::Stage::Blend;
+      payload.tempAttachment = backTempPing[currIdLocal];
+      payload.screenDimRcp = screenDimRcp;
+
+      RenderBatch batch;
+      batch.eye = eye;
+      const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+      batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+      batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+      batch.pass.viewport.minDepth = 0.0f;
+      batch.pass.viewport.maxDepth = 1.0f;
+      batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
+      batch.pass.depthAttachment = std::nullopt;
+      batch.pass.externalImageUses.push_back(
+        {payload.tempAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+      batch.draw.topology = PrimitiveTopology::TriangleStrip;
+      batch.draw.vertexCount = 4;
+      batch.draw.indexCount = 0;
+      batch.geometry = payload;
+      m_rendererBase.appendBatch(std::move(batch));
+    });
+
+    resetHooks();
+    return segBlend;
+  };
+
+  const uint32_t totalOrchestratedPasses = static_cast<uint32_t>(kMaxPasses > 0 ? (kMaxPasses - 1) : 0);
+  ZVulkanLinearScript::SegmentHandle segLast = segInit;
+
+  if (useIndirectCount || FLAGS_atlas_vk_ddp_cpu_chunk_passes <= 0) {
+    // Fast path: record all passes in one submission, relying on
+    // VK_KHR_draw_indirect_count gating to skip geometry after convergence.
+    bool firstPass = true;
+    for (uint32_t pass = 0; pass < totalOrchestratedPasses; ++pass) {
+      const bool firstPassLocal = firstPass;
+      const auto segReset =
+        script.commands("transparency_ddp_reset", {segLast}, [firstPassLocal](Z3DRendererVulkanBackend& be) {
+          auto& cmd = be.commandBuffer();
+          be.ddpResetForPass(cmd, firstPassLocal);
+          be.ddpBarrierTransferToFrag(cmd);
+        });
+
+      const auto segBlend = drawPass(pass, segReset);
+
+      const bool useIndirectCountLocal = useIndirectCount;
+      const auto segCount =
+        script.commands("transparency_ddp_count", {segBlend}, [useIndirectCountLocal](Z3DRendererVulkanBackend& be) {
+          auto& cmd = be.commandBuffer();
+          be.ddpBarrierFragToCompute(cmd);
+          be.ddpDispatchCountCompute(cmd);
+          if (useIndirectCountLocal) {
+            be.ddpBarrierComputeToIndirect(cmd);
+          }
+        });
+
+      segLast = segCount;
+      firstPass = false;
+    }
+  } else {
+    // Fallback path (macOS/MoltenVK): break the peel loop into multiple
+    // submissions and read back ddpChangedFlag between chunks so we can stop
+    // recording passes once the peel converges.
+    const uint32_t chunkPasses = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_ddp_cpu_chunk_passes));
+    uint32_t passBase = 0;
+    while (passBase < totalOrchestratedPasses) {
+      const uint32_t remaining = totalOrchestratedPasses - passBase;
+      const uint32_t thisChunk = std::min(chunkPasses, remaining);
+      const bool needReadback = (passBase + thisChunk < totalOrchestratedPasses);
+
+      VLOG(1) << fmt::format("DDP Vulkan CPU-chunk: passBase={} chunk={} remaining={} needReadback={}",
+                             passBase,
+                             thisChunk,
+                             remaining,
+                             needReadback);
+
+      ZVulkanLinearScript::SegmentHandle segChunkLast = segLast;
+      const auto ddpChangedFlagSlot = script.makeSlot<ZVulkanBuffer*>();
+      if (needReadback) {
+        segChunkLast = script.preRecord("transparency_ddp_prime_changedflag",
+                                        {segChunkLast},
+                                        [ddpChangedFlagSlot](Z3DRendererVulkanBackend& be, Z3DRendererBase&) {
+                                          ZVulkanBuffer* flag = be.ddpChangedFlagBufferObj();
+                                          CHECK(flag != nullptr)
+                                            << "DDP Vulkan: missing ddpChangedFlag buffer for CPU early-stop";
+                                          ddpChangedFlagSlot.set(flag);
+                                        });
+      }
+      for (uint32_t local = 0; local < thisChunk; ++local) {
+        const uint32_t pass = passBase + local;
+        const bool firstPassInSubmission = (local == 0);
+
+        const auto segReset = script.commands("transparency_ddp_reset",
+                                              {segChunkLast},
+                                              [firstPassInSubmission](Z3DRendererVulkanBackend& be) {
+                                                auto& cmd = be.commandBuffer();
+                                                be.ddpResetForPass(cmd, firstPassInSubmission);
+                                                be.ddpBarrierTransferToFrag(cmd);
+                                              });
+
+        const auto segBlend = drawPass(pass, segReset);
+
+        const auto segCount = script.commands("transparency_ddp_count", {segBlend}, [](Z3DRendererVulkanBackend& be) {
+          auto& cmd = be.commandBuffer();
+          be.ddpBarrierFragToCompute(cmd);
+          be.ddpDispatchCountCompute(cmd);
+        });
+
+        segChunkLast = segCount;
+      }
+
+      segLast = segChunkLast;
+      if (!needReadback) {
+        passBase += thisChunk;
+        continue;
+      }
+
+      const uint32_t changedFlag =
+        script.readbackU32("vk_ddp_changedflag_readback", {segChunkLast}, ddpChangedFlagSlot, /*srcOffset=*/0);
+      if (changedFlag == 0u) {
+        VLOG(1) << fmt::format("DDP Vulkan CPU-chunk: converged at pass {}", passBase + thisChunk - 1);
+        break;
+      }
+
+      passBase += thisChunk;
     }
   }
 
@@ -4438,14 +4448,14 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   VLOG(1) << (clearResolveTarget ? "DDP final: Clear color for intermediate surface"
                                  : "DDP final: Load color to preserve background");
 
-  m_rendererBase.setActiveSurfaceWithLoadStore(std::move(outSurface), Z3DRendererBase::Preserve);
-
   const glm::vec2 screenDimRcp(targetSize.x > 0u ? 1.f / static_cast<float>(targetSize.x) : 0.f,
                                targetSize.y > 0u ? 1.f / static_cast<float>(targetSize.y) : 0.f);
 
-  recordInVulkanFrame(
-    m_rendererBase,
+  script.raster(
+    "transparency_ddp_final",
+    {segLast},
     [&]() {
+      m_rendererBase.setActiveSurfaceWithLoadStore(outSurface, Z3DRendererBase::Preserve);
       TextureDualPeelPayload payload;
       payload.stage = TextureDualPeelPayload::Stage::Final;
       // Use the last ping written by orchestrated peel passes
@@ -4474,8 +4484,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       batch.draw.indexCount = 0;
       batch.geometry = payload;
       m_rendererBase.appendBatch(std::move(batch));
-    },
-    "transparency_ddp_final");
+    });
 
   resetHooks();
 }
@@ -4485,11 +4494,12 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
                                                 Z3DEye eye,
                                                 AttachmentHandle depthAttachmentHandle,
                                                 const std::vector<Z3DCompositorImageLayer>& imageLayers,
-                                                bool clearResolveTarget)
+                                                bool clearResolveTarget,
+                                                ZVulkanLinearScript& script)
 {
-  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
-  CHECK(vkBackend != nullptr) << "renderTransparentPPLLVulkan requires Vulkan backend";
-  CHECK(vkBackend->supportsFragmentStoresAndAtomics()) << "PPLL requires fragmentStoresAndAtomics support";
+  auto* vulkanBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
+  CHECK(vulkanBackend != nullptr) << "renderTransparentPPLLVulkan requires Vulkan backend";
+  CHECK(vulkanBackend->supportsFragmentStoresAndAtomics()) << "PPLL requires fragmentStoresAndAtomics support";
 
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   CHECK_GT(targetSize.x, 0u);
@@ -4549,22 +4559,19 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   // for both the count and store submissions. This avoids re-enqueuing the same
   // batches twice (a measurable CPU cost for complex scenes).
   // ---------------------------------------------------------------------------
-  RendererCPUState transparentBatches;
+  auto transparentBatches = std::make_shared<RendererCPUState>();
   {
     for (auto* filter : filters) {
       if (!filter) {
         continue;
       }
       filter->setViewport(targetSize);
-      captureFilterBatchesToUnifiedList(
-        m_rendererBase,
-        filter,
-        depthOnlySurface,
-        [&]() {
-          filter->renderTransparent(eye);
-        },
-        /*propagateHookPara=*/false,
-        transparentBatches);
+      captureTransparentFilterBatchesToUnifiedList(m_rendererBase,
+                                                   filter,
+                                                   depthOnlySurface,
+                                                   eye,
+                                                   /*propagateHookPara=*/false,
+                                                   *transparentBatches);
     }
 
     if (!imageLayers.empty()) {
@@ -4585,7 +4592,7 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
         m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
       }
       for (auto& batch : m_rendererBase.cpuState().batches) {
-        transparentBatches.batches.push_back(std::move(batch));
+        transparentBatches->batches.push_back(std::move(batch));
       }
       m_rendererBase.resetCPUState();
       m_rendererBase.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
@@ -4598,22 +4605,32 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   std::vector<uint32_t> blockSums;
   uint32_t blockCount = 0u;
 
-  m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
-  m_rendererBase.setActiveSurfaceWithLoadStore(depthOnlySurface, Z3DRendererBase::Preserve);
-  m_rendererBase.beginVulkanFrame("transparency_ppll_count_scan");
-  auto endCountGuard = folly::makeGuard([&]() {
-    m_rendererBase.endVulkanFrame();
-  });
-
   {
-    auto& cmd = vkBackend->commandBuffer();
-    vkBackend->ppllResetCounts(cmd);
-    vkBackend->ppllBarrierTransferToFrag(cmd);
+    auto sumsBufSlot = script.makeSlot<ZVulkanBuffer*>();
+    const auto segPrimeCount = script.preRecord("transparency_ppll_prime_count",
+                                                {},
+                                                [sumsBufSlot](Z3DRendererVulkanBackend& be, Z3DRendererBase& renderer) {
+                                                  be.primePPLLForCountPass(renderer.frameState().viewport);
+                                                  sumsBufSlot.set(be.ppllBlockSumsBufferObj());
+                                                });
 
-    processBatchesInActiveVulkanFrame(m_rendererBase, *vkBackend, transparentBatches, "transparency_ppll_count");
+    m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
 
-    vkBackend->ppllBarrierFragToCompute(cmd);
-    vkBackend->ppllDispatchScanLocal(cmd);
+    const auto segResetCounts =
+      script.commands("transparency_ppll_reset_counts", {segPrimeCount}, [](Z3DRendererVulkanBackend& be) {
+        auto& cmd = be.commandBuffer();
+        be.ppllResetCounts(cmd);
+        be.ppllBarrierTransferToFrag(cmd);
+      });
+
+    const auto segCount = script.replay("transparency_ppll_count", {segResetCounts}, transparentBatches);
+
+    const auto segScanLocal =
+      script.commands("transparency_ppll_scan_local", {segCount}, [](Z3DRendererVulkanBackend& be) {
+        auto& cmd = be.commandBuffer();
+        be.ppllBarrierFragToCompute(cmd);
+        be.ppllDispatchScanLocal(cmd);
+      });
 
     const uint64_t pixelCount64 = static_cast<uint64_t>(m_rendererBase.frameState().viewport.z) *
                                   static_cast<uint64_t>(m_rendererBase.frameState().viewport.w);
@@ -4627,23 +4644,15 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
 
     if (blockCount > 0u) {
       blockSums.resize(blockCount, 0u);
-      ZVulkanBuffer* sumsBuf = vkBackend->ppllBlockSumsBufferObj();
-      CHECK(sumsBuf != nullptr) << "PPLL: missing blockSums buffer";
       const size_t bytes = static_cast<size_t>(blockCount) * sizeof(uint32_t);
-      auto ticket = vkBackend->requestEndOfFrameBufferReadbackTicket(*sumsBuf, 0, bytes, "vk_ppll_blocksums_readback");
-      vkBackend->registerAfterCurrentFrameCompletionHook(
-        currentRenderThreadExecutorKeepAlive("vk_ppll_blocksums_readback_consume"),
-        [&blockSums, ticket = std::move(ticket)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-          co_await ticket.awaitCopyTo(blockSums.data(), blockSums.size() * sizeof(uint32_t));
-          co_return;
-        },
-        "vk_ppll_blocksums_readback_consume");
+      script.readbackBufferTo("vk_ppll_blocksums_readback",
+                              {segScanLocal},
+                              sumsBufSlot,
+                              /*srcOffset=*/0,
+                              blockSums.data(),
+                              bytes);
     }
   }
-
-  // End frame (submits + waits so the readback callback runs)
-  endCountGuard.dismiss();
-  m_rendererBase.endVulkanFrame();
 
   resetHooks();
 
@@ -4683,7 +4692,12 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   // ---------------------------------------------------------------------------
   // Submission B: scan_add + store fragments + resolve
   // ---------------------------------------------------------------------------
-  vkBackend->setPPLLRequestedFragmentCount(totalFragments64);
+  const auto segPrimeStore =
+    script.preRecord("transparency_ppll_prime_store",
+                     {},
+                     [totalFragments64](Z3DRendererVulkanBackend& be, Z3DRendererBase& renderer) {
+                       be.primePPLLForStorePass(renderer.frameState().viewport, totalFragments64);
+                     });
 
   // Store pass should load the opaque depth buffer (if present). When we capture
   // the transparent draw list above, it is recorded against depthOnlySurface,
@@ -4691,7 +4705,7 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   // exists). Patch the load/store ops to match the store submission surface.
   if (depthOnlySurfaceLoad.depthAttachment.has_value()) {
     const uint64_t sharedDepthId = depthOnlySurfaceLoad.depthAttachment->handle.id;
-    for (auto& batch : transparentBatches.batches) {
+    for (auto& batch : transparentBatches->batches) {
       if (!batch.pass.depthAttachment.has_value()) {
         continue;
       }
@@ -4704,29 +4718,33 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   }
 
   m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore);
-  m_rendererBase.beginVulkanFrame("transparency_ppll_store_resolve");
-  auto endStoreGuard = folly::makeGuard([&]() {
-    m_rendererBase.endVulkanFrame();
-  });
-
   {
-    auto& cmd = vkBackend->commandBuffer();
+    auto blockPrefixesShared = std::make_shared<std::vector<uint32_t>>(std::move(blockPrefixes));
+    const auto segScanAdd =
+      script.commands("transparency_ppll_scan_add",
+                      {segPrimeStore},
+                      [blockPrefixesShared](Z3DRendererVulkanBackend& be) {
+                        auto& cmd = be.commandBuffer();
 
-    if (!blockPrefixes.empty()) {
-      vkBackend->ppllWriteBlockPrefixes(blockPrefixes.data(), blockPrefixes.size());
-    }
+                        if (blockPrefixesShared && !blockPrefixesShared->empty()) {
+                          be.ppllWriteBlockPrefixes(blockPrefixesShared->data(), blockPrefixesShared->size());
+                        }
 
-    vkBackend->ppllDispatchScanAdd(cmd);
-    vkBackend->ppllBarrierComputeToFrag(cmd);
+                        be.ppllDispatchScanAdd(cmd);
+                        be.ppllBarrierComputeToFrag(cmd);
 
-    vkBackend->ppllResetCursors(cmd);
-    vkBackend->ppllBarrierTransferToFrag(cmd);
+                        be.ppllResetCursors(cmd);
+                        be.ppllBarrierTransferToFrag(cmd);
+                      });
 
     // Store geometry fragments (replay transparent draw list).
-    m_rendererBase.setActiveSurfaceWithLoadStore(depthOnlySurfaceLoad, Z3DRendererBase::Preserve);
-    processBatchesInActiveVulkanFrame(m_rendererBase, *vkBackend, transparentBatches, "transparency_ppll_store");
+    const auto segStore = script.replay("transparency_ppll_store", {segScanAdd}, transparentBatches);
 
-    vkBackend->ppllBarrierFragToFrag(cmd);
+    const auto segFragBarrier =
+      script.commands("transparency_ppll_barrier_frag", {segStore}, [](Z3DRendererVulkanBackend& be) {
+        auto& cmd = be.commandBuffer();
+        be.ppllBarrierFragToFrag(cmd);
+      });
 
     // Resolve into output surface (fullscreen composite).
     if (outSurface.depthAttachment) {
@@ -4739,31 +4757,25 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
       attachment.storeOp = StoreOp::Store;
       attachment.clearValue.color = glm::vec4(0.0f);
     }
-    m_rendererBase.setActiveSurfaceWithLoadStore(outSurface, Z3DRendererBase::Preserve);
 
-    recordInVulkanFrame(
-      m_rendererBase,
-      [&]() {
-        RenderBatch batch;
-        batch.eye = eye;
-        const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-        batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-        batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-        batch.pass.viewport.minDepth = 0.0f;
-        batch.pass.viewport.maxDepth = 1.0f;
-        batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
-        batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
-        batch.draw.topology = PrimitiveTopology::TriangleStrip;
-        batch.draw.vertexCount = 4;
-        batch.draw.indexCount = 0;
-        batch.geometry = TexturePPLLResolvePayload{};
-        m_rendererBase.appendBatch(std::move(batch));
-      },
-      "transparency_ppll_resolve");
+    script.raster("transparency_ppll_resolve", {segFragBarrier}, [&]() {
+      m_rendererBase.setActiveSurfaceWithLoadStore(outSurface, Z3DRendererBase::Preserve);
+      RenderBatch batch;
+      batch.eye = eye;
+      const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+      batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+      batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+      batch.pass.viewport.minDepth = 0.0f;
+      batch.pass.viewport.maxDepth = 1.0f;
+      batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
+      batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+      batch.draw.topology = PrimitiveTopology::TriangleStrip;
+      batch.draw.vertexCount = 4;
+      batch.draw.indexCount = 0;
+      batch.geometry = TexturePPLLResolvePayload{};
+      m_rendererBase.appendBatch(std::move(batch));
+    });
   }
-
-  endStoreGuard.dismiss();
-  m_rendererBase.endVulkanFrame();
 
   resetHooks();
 }
@@ -4773,7 +4785,8 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
                                               Z3DEye eye,
                                               AttachmentHandle depthAttachmentHandle,
                                               const std::vector<Z3DCompositorImageLayer>& imageLayers,
-                                              bool clearResolveTarget)
+                                              bool clearResolveTarget,
+                                              ZVulkanLinearScript& script)
 {
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   auto& waLease = ensureWARenderTarget(targetSize);
@@ -4823,13 +4836,11 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
 
   auto waInitSurface = configureSurface(waBindings.surface);
 
-  m_rendererBase.setActiveSurfaceWithLoadStore(waInitSurface, Z3DRendererBase::Preserve);
-
   // Geometry init step must see WeightedAverageInit on the compositor renderer
   m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
-  recordInVulkanFrame(
-    m_rendererBase,
-    [&]() {
+  const auto segInit =
+    script.raster("transparency_wa_init", {}, [&]() {
+      m_rendererBase.setActiveSurfaceWithLoadStore(waInitSurface, Z3DRendererBase::Preserve);
       // 1) Geometry filters
       for (auto* filter : filters) {
         if (!filter) {
@@ -4868,8 +4879,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
           m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
         }
       }
-    },
-    "transparency_wa_init");
+    });
 
   resetHooks();
 
@@ -4889,42 +4899,37 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
-  // Depth disabled by invariant; no depth load/store
-
-  m_rendererBase.setActiveSurfaceWithLoadStore(std::move(outSurface), Z3DRendererBase::Preserve);
 
   const glm::vec2 screenDimRcp(targetSize.x > 0u ? 1.f / static_cast<float>(targetSize.x) : 0.f,
                                targetSize.y > 0u ? 1.f / static_cast<float>(targetSize.y) : 0.f);
 
-  recordInVulkanFrame(
-    m_rendererBase,
-    [&]() {
-      TextureWeightedAveragePayload payload;
-      payload.accumulationAttachment = waBindings.colorHandles[0];
-      payload.momentsAttachment = waBindings.colorHandles[1];
-      payload.screenDimRcp = screenDimRcp;
+  script.raster("transparency_wa_resolve", {segInit}, [&]() {
+    m_rendererBase.setActiveSurfaceWithLoadStore(outSurface, Z3DRendererBase::Preserve);
+    TextureWeightedAveragePayload payload;
+    payload.accumulationAttachment = waBindings.colorHandles[0];
+    payload.momentsAttachment = waBindings.colorHandles[1];
+    payload.screenDimRcp = screenDimRcp;
 
-      RenderBatch batch;
-      batch.eye = eye;
-      const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+    RenderBatch batch;
+    batch.eye = eye;
+    const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
 
-      batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-      batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-      batch.pass.viewport.minDepth = 0.0f;
-      batch.pass.viewport.maxDepth = 1.0f;
-      batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
-      batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
-      batch.pass.externalImageUses.push_back(
-        {payload.accumulationAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-      batch.pass.externalImageUses.push_back(
-        {payload.momentsAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-      batch.draw.topology = PrimitiveTopology::TriangleStrip;
-      batch.draw.vertexCount = 4;
-      batch.draw.indexCount = 0;
-      batch.geometry = payload;
-      m_rendererBase.appendBatch(std::move(batch));
-    },
-    "transparency_wa_resolve");
+    batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+    batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+    batch.pass.viewport.minDepth = 0.0f;
+    batch.pass.viewport.maxDepth = 1.0f;
+    batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
+    batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+    batch.pass.externalImageUses.push_back(
+      {payload.accumulationAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+    batch.pass.externalImageUses.push_back(
+      {payload.momentsAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+    batch.draw.topology = PrimitiveTopology::TriangleStrip;
+    batch.draw.vertexCount = 4;
+    batch.draw.indexCount = 0;
+    batch.geometry = payload;
+    m_rendererBase.appendBatch(std::move(batch));
+  });
 
   resetHooks();
 }
@@ -4934,7 +4939,8 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
                                               Z3DEye eye,
                                               AttachmentHandle depthAttachmentHandle,
                                               const std::vector<Z3DCompositorImageLayer>& imageLayers,
-                                              bool clearResolveTarget)
+                                              bool clearResolveTarget,
+                                              ZVulkanLinearScript& script)
 {
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   auto& wbLease = ensureWBRenderTarget(targetSize);
@@ -4982,47 +4988,43 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
 
   auto wbInitSurface = configureSurface(wbBindings.surface);
 
-  m_rendererBase.setActiveSurfaceWithLoadStore(wbInitSurface, Z3DRendererBase::Preserve);
-
   // Geometry init step must see WeightedBlendedInit on the compositor renderer
   m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
-  recordInVulkanFrame(
-    m_rendererBase,
-    [&]() {
-      for (auto* filter : filters) {
-        if (!filter) {
+  const auto segInit = script.raster("transparency_wb_init", {}, [&]() {
+    m_rendererBase.setActiveSurfaceWithLoadStore(wbInitSurface, Z3DRendererBase::Preserve);
+    for (auto* filter : filters) {
+      if (!filter) {
+        continue;
+      }
+      filter->setViewport(targetSize);
+      filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
+      recordFilterBatchesToSurfaceUnified(
+        m_rendererBase,
+        filter,
+        wbInitSurface,
+        [&]() {
+          filter->renderTransparent(eye);
+        },
+        /*propagateHookPara=*/false);
+    }
+    if (!imageLayers.empty()) {
+      m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
+      for (const auto& layer : imageLayers) {
+        const auto& colorDesc = layer.colorAttachment;
+        const auto& depthDesc = layer.depthAttachment;
+        if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
           continue;
         }
-        filter->setViewport(targetSize);
-        filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
-        recordFilterBatchesToSurfaceUnified(
-          m_rendererBase,
-          filter,
-          wbInitSurface,
-          [&]() {
-            filter->renderTransparent(eye);
-          },
-          /*propagateHookPara=*/false);
-      }
-      if (!imageLayers.empty()) {
-        m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
-        for (const auto& layer : imageLayers) {
-          const auto& colorDesc = layer.colorAttachment;
-          const auto& depthDesc = layer.depthAttachment;
-          if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
-            continue;
-          }
-          if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
-            continue;
-          }
-          // WB image init copy: do not flip
-          m_textureCopyRenderer.setFlipY(false);
-          m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
-          m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
+        if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
+          continue;
         }
+        // WB image init copy: do not flip
+        m_textureCopyRenderer.setFlipY(false);
+        m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
+        m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
       }
-    },
-    "transparency_wb_init");
+    }
+  });
 
   resetHooks();
 
@@ -5045,40 +5047,36 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
   }
   // Depth load/store configured above when the caller supplied an attachment.
 
-  m_rendererBase.setActiveSurfaceWithLoadStore(std::move(outSurface), Z3DRendererBase::Preserve);
-
   const glm::vec2 screenDimRcp(targetSize.x > 0u ? 1.f / static_cast<float>(targetSize.x) : 0.f,
                                targetSize.y > 0u ? 1.f / static_cast<float>(targetSize.y) : 0.f);
 
-  recordInVulkanFrame(
-    m_rendererBase,
-    [&]() {
-      TextureWeightedBlendedPayload payload;
-      payload.accumulationAttachment = wbBindings.colorHandles[0];
-      payload.transmittanceAttachment = wbBindings.colorHandles[1];
-      payload.screenDimRcp = screenDimRcp;
+  script.raster("transparency_wb_resolve", {segInit}, [&]() {
+    m_rendererBase.setActiveSurfaceWithLoadStore(outSurface, Z3DRendererBase::Preserve);
+    TextureWeightedBlendedPayload payload;
+    payload.accumulationAttachment = wbBindings.colorHandles[0];
+    payload.transmittanceAttachment = wbBindings.colorHandles[1];
+    payload.screenDimRcp = screenDimRcp;
 
-      RenderBatch batch;
-      batch.eye = eye;
-      const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+    RenderBatch batch;
+    batch.eye = eye;
+    const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
 
-      batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-      batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-      batch.pass.viewport.minDepth = 0.0f;
-      batch.pass.viewport.maxDepth = 1.0f;
-      batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
-      batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
-      batch.pass.externalImageUses.push_back(
-        {payload.accumulationAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-      batch.pass.externalImageUses.push_back(
-        {payload.transmittanceAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-      batch.draw.topology = PrimitiveTopology::TriangleStrip;
-      batch.draw.vertexCount = 4;
-      batch.draw.indexCount = 0;
-      batch.geometry = payload;
-      m_rendererBase.appendBatch(std::move(batch));
-    },
-    "transparency_wb_resolve");
+    batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+    batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+    batch.pass.viewport.minDepth = 0.0f;
+    batch.pass.viewport.maxDepth = 1.0f;
+    batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
+    batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+    batch.pass.externalImageUses.push_back(
+      {payload.accumulationAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+    batch.pass.externalImageUses.push_back(
+      {payload.transmittanceAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+    batch.draw.topology = PrimitiveTopology::TriangleStrip;
+    batch.draw.vertexCount = 4;
+    batch.draw.indexCount = 0;
+    batch.geometry = payload;
+    m_rendererBase.appendBatch(std::move(batch));
+  });
 
   resetHooks();
 }
@@ -5114,7 +5112,9 @@ void Z3DCompositor::ensureAxisCameraBackend(RenderBackend backend)
   }
 }
 
-void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderTargetLease& sceneOutLease)
+void Z3DCompositor::renderAxisVulkan(Z3DEye eye,
+                                     Z3DScratchResourcePool::RenderTargetLease& sceneOutLease,
+                                     ZVulkanLinearScript& script)
 {
   if (!sceneOutLease || sceneOutLease.backend != RenderBackend::Vulkan) {
     return;
@@ -5158,22 +5158,18 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderT
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
 
-  m_rendererBase.setActiveSurfaceWithLoadStore(std::move(axisSurface),
-                                               LoadOp::Load,
-                                               StoreOp::Store,
-                                               LoadOp::Clear,
-                                               StoreOp::Store);
-
-  recordInVulkanFrame(
-    m_rendererBase,
-    [&]() {
-      if (m_axisMode.get() == "Arrow") {
-        m_rendererBase.renderVulkan(eye, m_arrowRenderer, m_fontRenderer);
-      } else {
-        m_rendererBase.renderVulkan(eye, m_lineRenderer, m_fontRenderer);
-      }
-    },
-    "axis_overlay");
+  script.raster("axis_overlay", {}, [&]() {
+    m_rendererBase.setActiveSurfaceWithLoadStore(axisSurface,
+                                                 LoadOp::Load,
+                                                 StoreOp::Store,
+                                                 LoadOp::Clear,
+                                                 StoreOp::Store);
+    if (m_axisMode.get() == "Arrow") {
+      m_rendererBase.renderVulkan(eye, m_arrowRenderer, m_fontRenderer);
+    } else {
+      m_rendererBase.renderVulkan(eye, m_lineRenderer, m_fontRenderer);
+    }
+  });
 
   m_rendererBase.frameState().updateViewportData(prevViewport);
   m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);

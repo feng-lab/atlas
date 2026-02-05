@@ -182,7 +182,8 @@ BackgroundPayload Z3DBackgroundRenderer::buildBackgroundPayload() const
   payload.region = m_region;
   payload.mode = m_modeValue;
   payload.orientation = m_orientationValue;
-  payload.params = &m_rendererBase.parameterState();
+  payload.params = m_rendererBase.parameterState();
+  payload.paramsCaptured = true;
   return payload;
 }
 

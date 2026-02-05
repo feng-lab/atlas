@@ -11,6 +11,7 @@
 #include <optional>
 #include <set>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace nim {
@@ -134,9 +135,23 @@ private:
   // Device-local indirect args for DDP
   bool m_ddpArgsPrepared{false};
   vk::DeviceSize m_ddpArgsOffset{0};
-  // Freeze dynamic UBOs during DDP passes to avoid per-pass allocations
-  bool m_ddpTransformsFrozen{false};
-  bool m_ddpMaterialFrozen{false};
+  // DDP (Dual Depth Peeling) can replay the same draw list across multiple peel
+  // passes inside a single Vulkan submission (ddpOrchestrate). Cache per-stream
+  // dynamic UBO offsets so we do not re-suballocate uniforms for each peel pass,
+  // while still allowing distinct streams/clip-plane states to bind correct data.
+  struct DDPUboCacheEntry
+  {
+    RendererParameterState params{};
+    bool followCoordTransform = true;
+    bool followSizeScale = true;
+    bool followOpacity = true;
+    bool pickingPass = false;
+    Z3DEye eye = MonoEye;
+    ClipPlanesState clipPlanes;
+    vk::DeviceSize transformsOffset = 0;
+    vk::DeviceSize materialOffset = 0;
+  };
+  std::unordered_map<uint64_t, std::vector<DDPUboCacheEntry>> m_ddpUboCache;
 
   // Static promotion cache
   struct CacheKey

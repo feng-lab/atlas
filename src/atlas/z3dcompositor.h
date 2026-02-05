@@ -20,6 +20,8 @@
 
 namespace nim {
 
+class ZVulkanLinearScript;
+
 class Z3DCompositor : public Z3DBoundedFilter
 {
   Q_OBJECT
@@ -103,16 +105,20 @@ protected:
   void updateSize(const glm::uvec2& targetSize) override;
 
 private:
-  // Stage 3 (Vulkan): pass-graph style driver for background + geometry
+  // Stage 3 (Vulkan): record a linear sequence of background + geometry segments
+  // into the provided linear script. This helper is intentionally "record-only":
+  // it does not decide Vulkan submission boundaries (the script owns that).
+  //
   // - When includeGeometry is false, records only background into sceneOutLease.
-  // - When true, records background then enqueues opaque and transparent filters.
-  void executeCompositorPassesVulkan(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
-                                     const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                                     Z3DScratchResourcePool::RenderTargetLease& sceneOutLease,
-                                     Z3DEye eye,
-                                     bool includeGeometry,
-                                     bool clearAtStart,
-                                     bool drawBackground);
+  // - When true, records background then enqueues opaque + transparent filters.
+  void recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
+                                 const std::vector<Z3DBoundedFilter*>& transparentFilters,
+                                 Z3DScratchResourcePool::RenderTargetLease& sceneOutLease,
+                                 Z3DEye eye,
+                                 bool includeGeometry,
+                                 bool clearAtStart,
+                                 bool drawBackground,
+                                 ZVulkanLinearScript& script);
   // little helper function
   void renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                         const std::vector<Z3DBoundedFilter*>& transparentFilters,
@@ -170,28 +176,32 @@ private:
                                   Z3DEye eye,
                                   AttachmentHandle depthAttachmentHandle,
                                   const std::vector<Z3DCompositorImageLayer>& imageLayers,
-                                  bool clearResolveTarget);
+                                  bool clearResolveTarget,
+                                  ZVulkanLinearScript& script);
 
   void renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilter*>& filters,
                                    Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                    Z3DEye eye,
                                    AttachmentHandle depthAttachmentHandle,
                                    const std::vector<Z3DCompositorImageLayer>& imageLayers,
-                                   bool clearResolveTarget);
+                                   bool clearResolveTarget,
+                                   ZVulkanLinearScript& script);
 
   void renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter*>& filters,
                                  Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                  Z3DEye eye,
                                  AttachmentHandle depthAttachmentHandle,
                                  const std::vector<Z3DCompositorImageLayer>& imageLayers,
-                                 bool clearResolveTarget);
+                                 bool clearResolveTarget,
+                                 ZVulkanLinearScript& script);
 
   void renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter*>& filters,
                                  Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                  Z3DEye eye,
                                  AttachmentHandle depthAttachmentHandle,
                                  const std::vector<Z3DCompositorImageLayer>& imageLayers,
-                                 bool clearResolveTarget);
+                                 bool clearResolveTarget,
+                                 ZVulkanLinearScript& script);
 
   // Build a list of non-opaque image layers (color/depth) from connected image filters
   std::vector<Z3DCompositorImageLayer> collectNonOpaqueImageLayers(Z3DEye eye);
@@ -209,7 +219,8 @@ private:
 
   void setupAxisCamera();
 
-  void renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderTargetLease& sceneOutLease);
+  void
+  renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderTargetLease& sceneOutLease, ZVulkanLinearScript& script);
 
   [[nodiscard]] glm::uvec4 axisViewportFor(const glm::uvec4& baseViewport) const;
 

@@ -69,6 +69,7 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
                                                 const vk::Rect2D& scissor,
                                                 vk::raii::CommandBuffer& cmd)
 {
+  (void)renderer;
   (void)payload;
 
   CHECK(payload.colorAttachmentHandle0.valid() && payload.depthAttachmentHandle0.valid() &&
@@ -123,17 +124,8 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
 
-  glm::vec2 extent = batch.pass.viewport.extent;
-  if (extent.x <= 0.0f || extent.y <= 0.0f) {
-    const auto& viewportState = renderer.frameState().viewport;
-    extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
-  }
-  if (extent.x <= 0.0f) {
-    extent.x = 1.0f;
-  }
-  if (extent.y <= 0.0f) {
-    extent.y = 1.0f;
-  }
+  const glm::vec2 extent(viewport.width, viewport.height);
+  CHECK(extent.x > 0.0f && extent.y > 0.0f) << "Vulkan texture blend pass requires a valid viewport extent";
 
   TextureBlendPushConstants constants;
   constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);

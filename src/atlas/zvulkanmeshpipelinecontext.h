@@ -12,6 +12,7 @@
 #include <optional>
 #include <set>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace nim {
@@ -180,9 +181,35 @@ private:
   vk::DeviceSize m_dynLightingOffset{0};
   vk::DeviceSize m_dynTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
-  // Freeze dynamic UBOs during DDP passes to avoid per-pass allocations
-  bool m_ddpTransformsFrozen{false};
-  bool m_ddpMaterialFrozen{false};
+  // DDP (Dual Depth Peeling) can replay the same draw list across multiple peel
+  // passes inside a single Vulkan submission (ddpOrchestrate). Cache per-stream
+  // dynamic UBO offsets so we do not re-suballocate uniforms for each peel pass,
+  // while still allowing distinct streams/clip-plane states to bind correct data.
+  struct DDPTransformsCacheEntry
+  {
+    RendererParameterState params{};
+    bool followCoordTransform = true;
+    bool followSizeScale = true;
+    bool followOpacity = true;
+    bool pickingPass = false;
+    Z3DEye eye = MonoEye;
+    ClipPlanesState clipPlanes;
+    vk::DeviceSize transformsOffset = 0;
+  };
+  std::unordered_map<uint64_t, std::vector<DDPTransformsCacheEntry>> m_ddpTransformsCache;
+
+  struct DDPMaterialCacheEntry
+  {
+    RendererParameterState params{};
+    MeshPayload::ColorSource colorSource = MeshPayload::ColorSource::MeshColor;
+    size_t meshIndex = 0;
+    bool pickingPass = false;
+    bool wireframe = false;
+    bool useFallbackColor = false;
+    glm::vec4 fallbackColor{1.0f};
+    vk::DeviceSize materialOffset = 0;
+  };
+  std::unordered_map<uint64_t, std::vector<DDPMaterialCacheEntry>> m_ddpMaterialCache;
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
@@ -222,11 +249,14 @@ private:
   
   // Lighting UBO is shared per-frame; no per-batch update is needed.
   void updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const MeshPayload& payload);
-  void updateMaterialUBO(const MeshPayload& payload,
+  void updateMaterialUBO(Z3DRendererBase& renderer,
+                         const MeshPayload& payload,
                          size_t meshIndex,
                          bool useFallbackColor,
                          const glm::vec4& fallbackColor,
-                         bool pickingPass);
+                         bool pickingPass,
+                         bool wireframe,
+                         Z3DRendererBase::ShaderHookType shaderHook);
   void bindDescriptorSets(vk::raii::CommandBuffer& cmd,
                           const PipelineInstance& pipeline,
                           ZVulkanDescriptorSet* texturesOverride = nullptr) const;

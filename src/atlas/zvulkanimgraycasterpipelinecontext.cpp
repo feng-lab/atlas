@@ -437,11 +437,16 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   // Do not clear m_pendingFinalization here; it may contain a completion
   // request emitted at end of the previous frame (post-fence). The backend
   // will pull it via takePendingFinalization() after record().
-  CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
-    << "Vulkan img raycaster missing entry/exit lease.";
-
   if (payload.visibleChannels.empty()) {
     return;
+  }
+
+  const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
+  const bool planarGeometry = !hasIndices;
+  const bool needsEntryExit = !planarGeometry;
+  if (needsEntryExit) {
+    CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
+      << "Vulkan img raycaster missing entry/exit lease.";
   }
 
   ensureDescriptorLayouts();
@@ -481,8 +486,6 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   }
 
   const CompositingConfig composite = evaluateCompositing(payload.compositingMode);
-  const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
-  const bool planarGeometry = !hasIndices;
   FastPipelineVariant fastVariant = FastPipelineVariant::Volume;
   if (planarGeometry) {
     if (payload.image->is2DData()) {
@@ -492,7 +495,7 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
     }
   }
 
-  const bool needsEntryExit = fastVariant == FastPipelineVariant::Volume;
+  CHECK_EQ(needsEntryExit, fastVariant == FastPipelineVariant::Volume) << "Raycaster entry/exit need mismatch";
   // GL parity for progressive: render entry/exit exactly once per progressive
   // cycle. Use channelIndexRaw<0 to detect the pre-progressive fast-preview
   // frame; render every frame for fast-only.
@@ -3143,8 +3146,10 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
 
   glm::uvec2 outputSize = payload.outputSize;
   if (outputSize.x == 0u || outputSize.y == 0u) {
-    const auto& viewportState = renderer.frameState().viewport;
-    outputSize = glm::uvec2(std::max<uint32_t>(1u, viewportState.z), std::max<uint32_t>(1u, viewportState.w));
+    CHECK(batch.pass.viewport.extent.x > 0.0f && batch.pass.viewport.extent.y > 0.0f)
+      << "Raycaster payload missing outputSize and batch viewport is empty";
+    outputSize = glm::uvec2(static_cast<uint32_t>(batch.pass.viewport.extent.x),
+                            static_cast<uint32_t>(batch.pass.viewport.extent.y));
   }
 
   auto* entryTexture = payload.entryExitLease->colorAttachment(0);
@@ -3795,8 +3800,10 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
 
   glm::uvec2 outputSize = payload.outputSize;
   if (outputSize.x == 0u || outputSize.y == 0u) {
-    const auto& viewportState = renderer.frameState().viewport;
-    outputSize = glm::uvec2(std::max<uint32_t>(1u, viewportState.z), std::max<uint32_t>(1u, viewportState.w));
+    CHECK(batch.pass.viewport.extent.x > 0.0f && batch.pass.viewport.extent.y > 0.0f)
+      << "Raycaster payload missing outputSize and batch viewport is empty";
+    outputSize = glm::uvec2(static_cast<uint32_t>(batch.pass.viewport.extent.x),
+                            static_cast<uint32_t>(batch.pass.viewport.extent.y));
   }
 
   const auto& viewState = renderer.viewState();
@@ -4143,8 +4150,10 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
 
   glm::uvec2 outputSize = payload.outputSize;
   if (outputSize.x == 0u || outputSize.y == 0u) {
-    const auto& viewportState = renderer.frameState().viewport;
-    outputSize = glm::uvec2(std::max<uint32_t>(1u, viewportState.z), std::max<uint32_t>(1u, viewportState.w));
+    CHECK(batch.pass.viewport.extent.x > 0.0f && batch.pass.viewport.extent.y > 0.0f)
+      << "Raycaster payload missing outputSize and batch viewport is empty";
+    outputSize = glm::uvec2(static_cast<uint32_t>(batch.pass.viewport.extent.x),
+                            static_cast<uint32_t>(batch.pass.viewport.extent.y));
   }
 
   const auto& viewState = renderer.viewState();

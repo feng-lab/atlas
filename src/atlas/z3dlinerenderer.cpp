@@ -449,7 +449,8 @@ LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
 
   payload.pickingColors = spanOrEmpty(m_linePickingColors);
   payload.perSegmentWidths = spanOrEmpty(m_lineWidthArray);
-  payload.params = &m_rendererBase.parameterState();
+  payload.params = m_rendererBase.parameterState();
+  payload.paramsCaptured = true;
 
   payload.smoothP0Positions = spanOrEmpty(m_smoothLineP0s);
   payload.smoothP1Positions = spanOrEmpty(m_smoothLineP1s);

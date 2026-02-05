@@ -71,16 +71,6 @@ struct RendererFrameState
   }
 };
 
-struct RendererParameterState
-{
-  glm::mat4 coordTransform{glm::mat4(1.f)};
-  float sizeScale{1.f};
-  float opacity{1.f};
-  glm::vec4 materialAmbient{glm::vec4(0.1f, 0.1f, 0.1f, 1.f)};
-  glm::vec4 materialSpecular{glm::vec4(1.f, 1.f, 1.f, 1.f)};
-  float materialShininess{100.f};
-};
-
 struct RendererViewState
 {
   struct EyeState

@@ -113,6 +113,29 @@ std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
   return {glm::vec4(matrix[0], 0.0f), glm::vec4(matrix[1], 0.0f), glm::vec4(matrix[2], 0.0f)};
 }
 
+bool clipPlanesEqual(const ClipPlanesState& a, const ClipPlanesState& b)
+{
+  if (a.captured != b.captured) {
+    return false;
+  }
+  if (a.enabled != b.enabled) {
+    return false;
+  }
+  if (a.planeCount != b.planeCount) {
+    return false;
+  }
+
+  const uint32_t count = std::min<uint32_t>(a.planeCount, static_cast<uint32_t>(a.planes.size()));
+  for (uint32_t i = 0; i < count; ++i) {
+    const glm::vec4 pa = a.planes[i];
+    const glm::vec4 pb = b.planes[i];
+    if (pa.x != pb.x || pa.y != pb.y || pa.z != pb.z || pa.w != pb.w) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 ZVulkanLinePipelineContext::ZVulkanLinePipelineContext(Z3DRendererVulkanBackend& backend)
@@ -150,8 +173,7 @@ void ZVulkanLinePipelineContext::resetFrame()
   // reading them on the GPU.
   // No OIT UBO retention required
   resetDescriptors();
-  m_ddpTransformsFrozen = false;
-  m_ddpMaterialFrozen = false;
+  m_ddpUboCache.clear();
   m_ddpArgsByStream.clear();
   m_thinStaticCopyPendingKeys.clear();
   m_wideStaticCopyPendingKeys.clear();
@@ -323,9 +345,8 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   transforms.view_matrix = eyeState.viewMatrix;
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
-  CHECK(payload.params != nullptr) << "Line payload missing params";
-  const glm::mat4 model =
-    (payload.followCoordTransform && payload.params) ? payload.params->coordTransform : glm::mat4(1.0f);
+  CHECK(payload.paramsCaptured) << "Line payload missing params";
+  const glm::mat4 model = payload.followCoordTransform ? payload.params.coordTransform : glm::mat4(1.0f);
   transforms.pos_transform = model;
 
   // Line shaders do not consume the normal matrix; keep it as identity to
@@ -333,38 +354,61 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(glm::mat3(1.0f));
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
+  const float sizeScale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
   vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
-  const auto hook = renderer.shaderHookType();
+  CHECK(batch.shaderHook.captured) << "Line batch missing shader hook snapshot";
+  const auto hook = batch.shaderHook.type;
   const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
                     hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  if (!(ddp && m_ddpTransformsFrozen)) {
-    auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
-    std::memcpy(slice.mapped, &transforms, sizeof(transforms));
-    m_dynTransformsOffset = slice.offset;
-    if (ddp) {
-      m_ddpTransformsFrozen = true;
+  if (ddp && payload.streamKey != 0) {
+    auto it = m_ddpUboCache.find(payload.streamKey);
+    if (it != m_ddpUboCache.end()) {
+      for (const auto& cached : it->second) {
+        if (cached.params != payload.params || cached.followCoordTransform != payload.followCoordTransform ||
+            cached.followSizeScale != payload.followSizeScale || cached.followOpacity != payload.followOpacity ||
+            cached.pickingPass != payload.pickingPass || cached.eye != batch.eye ||
+            !clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
+          continue;
+        }
+        m_dynTransformsOffset = cached.transformsOffset;
+        m_dynMaterialOffset = cached.materialOffset;
+        return;
+      }
     }
   }
 
+  auto transformsSlice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
+  std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
+  m_dynTransformsOffset = transformsSlice.offset;
+
   MaterialUBOStd140 material{};
-  material.material_ambient = payload.params->materialAmbient;
-  material.material_specular = payload.params->materialSpecular;
-  material.material_shininess = payload.params->materialShininess;
-  material.alpha = (payload.pickingPass || !payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
-  if (!(ddp && m_ddpMaterialFrozen)) {
-    auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
-    std::memcpy(slice.mapped, &material, sizeof(material));
-    m_dynMaterialOffset = slice.offset;
-    if (ddp) {
-      m_ddpMaterialFrozen = true;
-    }
+  material.material_ambient = payload.params.materialAmbient;
+  material.material_specular = payload.params.materialSpecular;
+  material.material_shininess = payload.params.materialShininess;
+  material.alpha = (payload.pickingPass || !payload.followOpacity) ? 1.0f : payload.params.opacity;
+
+  auto materialSlice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
+  std::memcpy(materialSlice.mapped, &material, sizeof(material));
+  m_dynMaterialOffset = materialSlice.offset;
+
+  if (ddp && payload.streamKey != 0) {
+    DDPUboCacheEntry entry{};
+    entry.params = payload.params;
+    entry.followCoordTransform = payload.followCoordTransform;
+    entry.followSizeScale = payload.followSizeScale;
+    entry.followOpacity = payload.followOpacity;
+    entry.pickingPass = payload.pickingPass;
+    entry.eye = batch.eye;
+    entry.clipPlanes = batch.clipPlanes;
+    entry.transformsOffset = transformsSlice.offset;
+    entry.materialOffset = materialSlice.offset;
+    m_ddpUboCache[payload.streamKey].push_back(std::move(entry));
   }
 
   VLOG(2) << fmt::format("VK line params: sizeScale={:.3f} alpha={:.3f} ortho={} picking={}",
-                         payload.params->sizeScale,
-                         payload.params->opacity,
+                         payload.params.sizeScale,
+                         payload.params.opacity,
                          (eyeState.isPerspective ? 0 : 1),
                          payload.pickingPass);
 
@@ -1406,7 +1450,8 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
   CHECK(m_dsLighting && m_dsTransforms) << "Line pipeline descriptor sets missing (lighting/transforms)";
 
-  const auto shaderHook = renderer.shaderHookType();
+  CHECK(batch.shaderHook.captured) << "Line batch missing shader hook snapshot";
+  const auto shaderHook = batch.shaderHook.type;
   vk::DescriptorSet texOverride{};
   if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_setTexture) {
     // Allocate a per-draw override descriptor set for DDP peel inputs to avoid update-after-bind.
@@ -1416,7 +1461,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       auto& tex = m_backend.defaultPlaceholderTexture2D();
       auto sampler = m_backend.defaultSampler();
       ds->updateTexture(0, tex, sampler);
-      const auto& hookPara = renderer.shaderHookPara();
+      const auto& hookPara = batch.shaderHook.para;
       if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
         auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
                                                    m_backend.device(),
@@ -1602,14 +1647,14 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       const auto& frameState = renderer.frameState();
       pc.viewport_matrix = frameState.viewportMatrix;
       pc.viewport_matrix_inverse = frameState.inverseViewportMatrix;
-      CHECK(payload.params != nullptr) << "Line payload missing params";
-      pc.size_scale = payload.params->sizeScale;
+      CHECK(payload.paramsCaptured) << "Line payload missing params";
+      pc.size_scale = payload.params.sizeScale;
 
       const auto widths = payload.perSegmentWidths;
       const float dpr = renderer.sceneState().devicePixelRatio;
       const bool msaa2x2 =
         (renderer.sceneState().multisample == GeometryMSAAMode::MSAA2x2) && payload.enableMultisample;
-      const float sizeScale = payload.params->sizeScale;
+      const float sizeScale = payload.params.sizeScale;
       const bool ddpPeelIndirect =
         (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
       const DDPArgs* ddpArgs = nullptr;

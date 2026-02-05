@@ -551,7 +551,8 @@ SpherePayload Z3DSphereRenderer::buildSpherePayload() const
   payload.indices = spanFromGLuints(m_indexs);
   payload.useDynamicMaterial = m_useDynamicMaterial;
   payload.wantsLighting = needLighting();
-  payload.params = &m_rendererBase.parameterState();
+  payload.params = m_rendererBase.parameterState();
+  payload.paramsCaptured = true;
   // Per-stream generation counters
   payload.centersGen = m_centersGen;
   payload.colorsGen = m_colorsGen;

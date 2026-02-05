@@ -442,6 +442,19 @@ auto staticBackground = nim::buildStaticSecondary(info, [&](vk::raii::CommandBuf
 - Contexts must use `ZVulkanPipelineCommandRecorder::recordGraphicsDraw` with complete state: descriptor coverage, push constants, viewports, scissors, and dynamic state as needed. The debug tracker asserts missing state in debug builds.
 - Clear/load/store decisions are made at segment open; contexts must not gate clears.
 
+**Atlas Frame → Vulkan Frame → Recording Session → Rendering Segment**
+- Atlas frame: one end-to-end render request as seen by the engine/UI (“user changed a parameter, render until a stable image is ready”).
+- Vulkan frame: one GPU submission slot managed by `ZVulkanFrameExecutor` (primary command buffer + fence/semaphores). A Vulkan frame may stay open across multiple passes to reduce submission overhead.
+- Preferred callsite abstraction for orchestration (compositor DDP/PPLL/picking tail): `ZVulkanLinearScript` (`src/atlas/zvulkanlinearscript.h`).
+  - Call sites should express logic linearly as segments + explicit CPU readback boundaries (for branching/loop control flow), without directly managing `beginVulkanFrame/endVulkanFrame` or toggling global readback wait policy.
+  - CPU readback boundaries are the only place the script forces a fence wait for that submission; interactive presentation stays non-blocking by default.
+- Recording session: one “batch collection + submit” scope inside an already-open Vulkan frame. `Z3DRendererBase::recordVulkanBatchesInActiveFrame(...)` (and the compositor helper `recordInVulkanFrame`) open a session, collect CPU batches, and call `Z3DRendererVulkanBackend::processBatches(...)` to emit commands into the active command buffer.
+  - Recording-session sync point: `processBatches(...)` ends with no active dynamic rendering segment and flushes any scheduled upload→static copies (`flushScheduledCopies`). This ensures orchestration code (DDP/PPLL) can safely insert compute/copy work between sessions without accidentally recording inside `vkCmdBeginRendering`.
+- Rendering segment: a single `vkCmdBeginRendering`/`vkCmdEndRendering` region inside one recording session.
+  - Segment coalescing is allowed only when begin-rendering state matches: render area + the ordered attachment set + per-attachment load/store/clear + final-use contracts. Do not merge segments across incompatible pass metadata; doing so creates silent state leakage (wrong clears, wrong final layouts, or read-while-write feedback loops).
+  - External resource dependencies are explicit: passes must declare external image/buffer uses in `BackendPassDesc` so Vulkan can insert layout transitions and buffer memory barriers without label/payload heuristics.
+- Frame-completion safe point: after the submission fence signals, the backend reaches `applyPendingArenaReset` and runs after-completion hooks. Anything that depends on “GPU really finished” (scratch reuse, descriptor arena reset, block-ID compaction parsing) must be attached to this safe point, not to “session end”.
+
 Vulkan Entry Points (explicit)
 
 - OpenGL entry points remain `render(...)` and `renderPicking(...)`. These drive the GL path and may begin/end GL frames as needed.

@@ -47,6 +47,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
                                                           const vk::Rect2D& scissor,
                                                           vk::raii::CommandBuffer& cmd)
 {
+  (void)renderer;
   VLOG(2) << fmt::format("WB::record begin accum=0x{:x} trans=0x{:x}",
                          payload.accumulationAttachment.id,
                          payload.transmittanceAttachment.id);
@@ -103,18 +104,6 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
                          formats.depthFormat.has_value());
 
   // Draw-only: backend manages attachments and area
-
-  glm::vec2 extent = batch.pass.viewport.extent;
-  if (extent.x <= 0.0f || extent.y <= 0.0f) {
-    const auto& viewportState = renderer.frameState().viewport;
-    extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
-  }
-  if (extent.x <= 0.0f) {
-    extent.x = 1.0f;
-  }
-  if (extent.y <= 0.0f) {
-    extent.y = 1.0f;
-  }
 
   // No OIT UBO required for WB resolve
   // Pipeline uses lighting UBO (set=1) for depth scale/zw transform

@@ -83,7 +83,39 @@ public:
 
   void processBatches(Z3DRendererBase& renderer, const RendererCPUState& state) override;
 
-  void processCompositorPass(Z3DRendererBase& renderer, const Z3DCompositorPass& pass) override;
+  // ---------------------------------------------------------------------------
+  // Linear-script priming (beginRender pre-record actions)
+  // ---------------------------------------------------------------------------
+  // Higher-level orchestration (e.g. ZVulkanLinearScript) can enqueue opaque
+  // actions that must run inside beginRender() before descriptor priming and
+  // command buffer recording begins.
+  //
+  // This keeps call sites explicit ("run these PPLL priming steps before
+  // recording") without teaching the orchestration layer about backend-specific
+  // resource kinds.
+  struct BeginRenderPreRecordAction
+  {
+    std::string label;
+    std::function<void(Z3DRendererVulkanBackend&, Z3DRendererBase&)> fn;
+  };
+
+  void setPendingBeginRenderPreRecordActions(std::vector<BeginRenderPreRecordAction> actions,
+                                             std::string_view debugLabel = {});
+
+  // Estimate uniform-arena bytes that are always consumed at beginRender()
+  // regardless of which batches are recorded (e.g. frame-global lighting UBO
+  // slices). This is used by higher-level scheduling (linear scripts / segment
+  // managers) to pre-size the arena before opening a Vulkan frame.
+  [[nodiscard]] size_t estimateFrameUniformOverheadBytes();
+
+  // Estimate additional uniform-arena bytes required to execute the given CPU
+  // batches. This excludes the always-on per-frame overhead returned by
+  // estimateFrameUniformOverheadBytes().
+  [[nodiscard]] size_t estimateAdditionalUniformBytesForBatches(const RendererCPUState& state);
+
+  // Hint the minimum uniform arena capacity (bytes) for the next begun frame.
+  // The backend consumes this hint in ensureUniformArena() at beginRender().
+  void hintNextUniformArenaMinCapacity(size_t bytes);
 
   [[nodiscard]] bool supportsCommandLists() const override;
 
@@ -366,6 +398,27 @@ public:
     }
   }
 
+  // Readback wait policy:
+  // - Default (false): endRender() does NOT block the rendering thread waiting
+  //   for end-of-frame readbacks. UI display is updated asynchronously when
+  //   the frame completion safe point is reached.
+  // - When true: endRender() waits for the active submission fence whenever
+  //   this submission requested any end-of-frame readbacks. This is intended
+  //   for capture/export paths that need CPU pixels immediately.
+  void setWaitForReadbacks(bool wait);
+  [[nodiscard]] bool waitForReadbacks() const;
+
+  // Mark the currently recording submission as requiring a fence wait whenever
+  // it requested any end-of-frame readbacks. This is the explicit alternative
+  // to toggling the global wait policy from call sites.
+  void requireReadbackWaitForActiveSubmission(std::string_view debugLabel = {});
+
+  // Poll completed frame fences and enter the backend's frame completion safe
+  // point for any finished slots. This is non-blocking and is intended to be
+  // called from the rendering thread event loop when the engine is idle so
+  // queued readback consumers can run even if no further frames are rendered.
+  void pollCompletionsAndPumpSafePoints();
+
   // Stage 4: Async Readback API (offscreen)
   // Enqueue end-of-frame GPU->CPU copies into a host-visible staging ring, then
   // hand out coroutine-friendly tickets for post-fence consumption.
@@ -552,6 +605,7 @@ private:
       size_t bytes = 0;
     };
     std::vector<PendingBufferReadback> pendingBufferReadbacks;
+    bool forceFenceWaitForReadbacks = false;
     size_t readbackBytesCopied = 0; // total bytes copied this frame
     uint32_t readbackSlotsInFlight = 0; // slots associated with this frame
 
@@ -660,7 +714,11 @@ public:
   {
     return m_supportsFragStoresAndAtomics;
   }
-  void setPPLLRequestedFragmentCount(uint64_t fragmentCount);
+  // Explicit PPLL priming for a submission. Intended to be called from a
+  // beginRender pre-record action so the required buffers (and ring slot) are
+  // established before descriptor sets are primed and before recording begins.
+  void primePPLLForCountPass(const glm::uvec4& viewport);
+  void primePPLLForStorePass(const glm::uvec4& viewport, uint64_t requestedFragments);
   [[nodiscard]] uint32_t ppllPixelCount() const;
   [[nodiscard]] uint32_t ppllBlockCount() const;
   class ZVulkanBuffer* ppllParamsBufferObj();
@@ -689,12 +747,6 @@ public:
   void ddpDispatchCountCompute(vk::raii::CommandBuffer& cmd);
   // Schedule a static copy for indirect args (upload arena -> device-local args buffer)
   void scheduleStaticCopyIndirect(vk::Buffer dst, vk::DeviceSize dstOffset, const UploadSlice& src);
-
-  // Orchestrate DDP passes while the draw callback records the peel draw per pass.
-  // The callback must record all necessary batches for the given pass into 'cmd'.
-  void ddpOrchestrate(uint32_t maxPasses,
-                      bool useIndirectCount,
-                      const std::function<void(uint32_t, vk::raii::CommandBuffer&)>& drawPass);
   struct UniformSlice
   {
     vk::Buffer buffer{};
@@ -754,6 +806,10 @@ public:
   std::unordered_map<void*, size_t> m_frameResourceMap;
   std::optional<ZVulkanFrameExecutor::ActiveFrame> m_activeFrameHandle;
   FrameResources* m_activeFrame = nullptr;
+  // Key of the most recently submitted (or ended) frame-executor slot. Used to
+  // defer scratch-pool releases that occur after endRender() has cleared the
+  // active recording context, without forcing a device-wide drain.
+  void* m_lastSubmittedFrameKey = nullptr;
   Z3DRendererBase* m_activeRenderer = nullptr;
   std::atomic<FrameResources*> m_frameInCompletionSafePoint{nullptr};
   bool m_frameRecording = false;
@@ -765,6 +821,9 @@ public:
   // Deliver first Vulkan frame to UI immediately after backend switch by
   // pumping the fence and executing deferred readback consumers once.
   bool m_pumpFenceAfterFirstSubmit = true;
+  // When true, endRender() blocks on submissions that requested readbacks.
+  // Default false for interactive rendering.
+  bool m_waitForReadbacks = false;
 
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
@@ -938,7 +997,8 @@ public:
   std::optional<vk::raii::PipelineLayout> m_ppllScanAddPipelineLayout;
   std::optional<vk::raii::Pipeline> m_ppllScanAddPipeline;
 
-  uint64_t m_nextPPLLRequestedFragmentCount = 0;
+  std::vector<BeginRenderPreRecordAction> m_pendingBeginRenderPreRecordActions;
+  std::string m_pendingBeginRenderPreRecordLabel;
 
   // Device feature gates (cached on device change)
   bool m_supportsDrawIndirectCount = false;
@@ -975,6 +1035,10 @@ public:
   // If non-zero, beginRender will ensure the uniform arena capacity is at least this many bytes
   // before priming persistent descriptor sets. Reset to zero after use.
   size_t m_nextUniformMinCapacity = 0;
+  // Carry-over hint for subsequent frames. This is used to keep the uniform arena
+  // sized reasonably even when a particular frame begin does not have an explicit
+  // estimate available (e.g., multiple Vulkan frames within one Atlas frame).
+  size_t m_uniformMinCapacityCarry = 0;
 
   struct PassBaseline
   {
@@ -1006,6 +1070,17 @@ public:
   };
 
   PassScope m_passScope{};
+
+  // Tracks external buffer hazards across all recording sessions within a
+  // single Vulkan frame submission. This is cleared at beginRender() (frame
+  // start). The key is the VkBuffer handle value (stable for the buffer's
+  // lifetime).
+  struct ExternalBufferUseState
+  {
+    vk::PipelineStageFlags2 stage{};
+    vk::AccessFlags2 access{};
+  };
+  std::unordered_map<uint64_t, ExternalBufferUseState> m_externalBufferUseStates;
 
   // Submission index within a real-frame token
   std::unordered_map<uint64_t, uint32_t> m_submissionCursor;

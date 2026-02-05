@@ -758,6 +758,8 @@ set(SOURCES
     zvulkanuniforms.h
     z3dtypes.h
     zvulkanshaderstate.h
+    zvulkanlinearscript.h
+    zvulkanlinearscript.cpp
     zvulkanlinepipelinecontext.h
     zvulkanlinepipelinecontext.cpp
     zvulkanmeshpipelinecontext.h

@@ -398,8 +398,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
   glm::uvec2 outputSize = payload.outputSize;
   if (outputSize.x == 0u || outputSize.y == 0u) {
-    const auto& viewportState = renderer.frameState().viewport;
-    outputSize = glm::uvec2(std::max<uint32_t>(1u, viewportState.z), std::max<uint32_t>(1u, viewportState.w));
+    CHECK(batch.pass.viewport.extent.x > 0.0f && batch.pass.viewport.extent.y > 0.0f)
+      << "Slice payload missing outputSize and batch viewport is empty";
+    outputSize = glm::uvec2(static_cast<uint32_t>(batch.pass.viewport.extent.x),
+                            static_cast<uint32_t>(batch.pass.viewport.extent.y));
   }
 
   const auto& viewState = renderer.viewState();
@@ -1454,19 +1456,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
   vk::Viewport finalViewport = viewport;
   vk::Rect2D finalScissor = scissor;
-  if (finalViewport.width <= 0.f || finalViewport.height <= 0.f) {
-    const auto& viewportState = renderer.frameState().viewport;
-    finalViewport = vk::Viewport{0.0f,
-                                 0.0f,
-                                 static_cast<float>(std::max<uint32_t>(1u, viewportState.z)),
-                                 static_cast<float>(std::max<uint32_t>(1u, viewportState.w)),
-                                 0.0f,
-                                 1.0f};
-    finalScissor = vk::Rect2D{
-      vk::Offset2D{0,                                      0                                     },
-      vk::Extent2D{static_cast<uint32_t>(viewportState.z), static_cast<uint32_t>(viewportState.w)}
-    };
-  }
+  CHECK(finalViewport.width > 0.0f && finalViewport.height > 0.0f) << "Slice merge requires a valid viewport extent";
 
   ZVulkanGraphicsPassSpec mergeSpec{};
   mergeSpec.renderArea = finalRenderArea;

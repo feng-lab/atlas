@@ -48,9 +48,11 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
                                                const vk::Rect2D& scissor,
                                                vk::raii::CommandBuffer& cmd)
 {
+  (void)renderer;
   (void)payload;
+  CHECK(batch.shaderHook.captured) << "Texture copy batch missing shader hook snapshot";
   VLOG(2) << fmt::format("record begin hook={} color=0x{:x} depth=0x{:x}",
-                         static_cast<int>(renderer.shaderHookType()),
+                         static_cast<int>(batch.shaderHook.type),
                          payload.colorAttachmentHandle.id,
                          payload.depthAttachmentHandle.id);
 
@@ -78,7 +80,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   ensureDescriptorLayout();
   ensureDescriptorSet();
   // Always use a per-draw override descriptor set to avoid update-after-bind hazards
-  const bool ddpPeel = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  const bool ddpPeel = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   ZVulkanDescriptorSet* ds = nullptr;
   // Use linear filtering to downsample supersampled inputs (color and depth)
   const auto sampler = m_backend.defaultSampler();
@@ -90,7 +92,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   ds->updateTexture(0, colorTexture, sampler);
   ds->updateTexture(1, depthTexture, sampler);
   if (ddpPeel) {
-    const auto& hookPara = renderer.shaderHookPara();
+    const auto& hookPara = batch.shaderHook.para;
     if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
       auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
                                             m_backend.device(),
@@ -111,12 +113,12 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   key.discardTransparent = payload.discardTransparent;
   key.mode = payload.mode;
   key.flipY = payload.flipY;
-  key.waInit = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::WeightedAverageInit);
-  key.wbInit = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
-  key.ddpInit = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
-  key.ddpPeel = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  key.ppllCount = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
-  key.ppllStore = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore);
+  key.waInit = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::WeightedAverageInit);
+  key.wbInit = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
+  key.ddpInit = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
+  key.ddpPeel = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  key.ppllCount = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
+  key.ppllStore = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore);
   key.colorFormats = formats.colorFormats;
   key.depthFormat = formats.depthFormat;
 

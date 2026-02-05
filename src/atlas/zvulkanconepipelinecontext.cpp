@@ -63,6 +63,29 @@ std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
   return {glm::vec4(matrix[0], 0.0f), glm::vec4(matrix[1], 0.0f), glm::vec4(matrix[2], 0.0f)};
 }
 
+bool clipPlanesEqual(const ClipPlanesState& a, const ClipPlanesState& b)
+{
+  if (a.captured != b.captured) {
+    return false;
+  }
+  if (a.enabled != b.enabled) {
+    return false;
+  }
+  if (a.planeCount != b.planeCount) {
+    return false;
+  }
+
+  const uint32_t count = std::min<uint32_t>(a.planeCount, static_cast<uint32_t>(a.planes.size()));
+  for (uint32_t i = 0; i < count; ++i) {
+    const glm::vec4 pa = a.planes[i];
+    const glm::vec4 pb = b.planes[i];
+    if (pa.x != pb.x || pa.y != pb.y || pa.z != pb.z || pa.w != pb.w) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 ZVulkanConePipelineContext::ZVulkanConePipelineContext(Z3DRendererVulkanBackend& backend)
@@ -89,10 +112,9 @@ void ZVulkanConePipelineContext::resetFrame()
   m_indexUploadOffset = 0;
   // Retire per-frame UBOs so they are not overwritten while still in use by
   // an in-flight frame. Destruction runs after the active submission fence.
-  
+
   resetDescriptors();
-  m_ddpTransformsFrozen = false;
-  m_ddpMaterialFrozen = false;
+  m_ddpUboCache.clear();
   m_ddpArgsPrepared = false;
   m_ddpArgsOffset = 0;
   m_staticCopyPendingKeys.clear();
@@ -203,8 +225,9 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
     m_baseColorOffset,
     m_topColorOffset);
 
+  CHECK(batch.shaderHook.captured) << "Cone batch missing shader hook snapshot";
   const bool pickingPass = payload.pickingPass;
-  const auto shaderHook = renderer.shaderHookType();
+  const auto shaderHook = batch.shaderHook.type;
 
   m_dynLightingOffset =
     payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
@@ -216,7 +239,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
 
   ZVulkanDescriptorSet* dsPlaceholderOverride = nullptr;
   ensurePlaceholderTexture();
-  const auto& hookPara = renderer.shaderHookPara();
+  const auto& hookPara = batch.shaderHook.para;
   if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_setPlaceholder) {
     dsPlaceholderOverride = m_backend.allocateOverrideDescriptorSet(m_setPlaceholder);
     CHECK(dsPlaceholderOverride != nullptr) << "DDP peel: override descriptor allocation failed (fatal)";
@@ -435,18 +458,18 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
                                                     const ConePayload& payload,
                                                     bool pickingPass)
 {
-  const auto hook = renderer.shaderHookType();
+  CHECK(batch.shaderHook.captured) << "Cone batch missing shader hook snapshot";
+  const auto hook = batch.shaderHook.type;
   const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
                     hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  CHECK(payload.params != nullptr) << "Cone payload missing params";
+  CHECK(payload.paramsCaptured) << "Cone payload missing params";
 
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
 
   TransformsUBOStd140 transforms{};
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
   transforms.view_matrix = eyeState.viewMatrix;
-  const glm::mat4 model =
-    (payload.followCoordTransform && payload.params) ? payload.params->coordTransform : glm::mat4(1.0f);
+  const glm::mat4 model = payload.followCoordTransform ? payload.params.coordTransform : glm::mat4(1.0f);
   transforms.pos_transform = model;
 
   const glm::mat4 combined = eyeState.viewMatrix * model;
@@ -454,36 +477,59 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
+  const float sizeScale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
   vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
-  if (!(ddp && m_ddpTransformsFrozen)) {
-    auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
-    std::memcpy(slice.mapped, &transforms, sizeof(transforms));
-    m_dynTransformsOffset = slice.offset;
-    if (ddp) {
-      m_ddpTransformsFrozen = true;
+
+  MaterialUBOStd140 material{};
+  material.material_ambient = payload.params.materialAmbient;
+  material.material_specular = pickingPass ? glm::vec4(0.0f) : payload.params.materialSpecular;
+  material.material_shininess = pickingPass ? 0.0f : payload.params.materialShininess;
+  material.alpha = (pickingPass || !payload.followOpacity) ? 1.0f : payload.params.opacity;
+  material.use_custom_color = 0;
+  material.custom_color = glm::vec4(1.0f);
+
+  if (ddp && payload.streamKey != 0) {
+    auto it = m_ddpUboCache.find(payload.streamKey);
+    if (it != m_ddpUboCache.end()) {
+      for (const auto& cached : it->second) {
+        if (cached.params != payload.params || cached.followCoordTransform != payload.followCoordTransform ||
+            cached.followSizeScale != payload.followSizeScale || cached.followOpacity != payload.followOpacity ||
+            cached.pickingPass != pickingPass || cached.eye != batch.eye ||
+            !clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
+          continue;
+        }
+        m_dynTransformsOffset = cached.transformsOffset;
+        m_dynMaterialOffset = cached.materialOffset;
+        return;
+      }
     }
   }
 
-  MaterialUBOStd140 material{};
-  material.material_ambient = payload.params->materialAmbient;
-  material.material_specular = pickingPass ? glm::vec4(0.0f) : payload.params->materialSpecular;
-  material.material_shininess = pickingPass ? 0.0f : payload.params->materialShininess;
-  material.alpha = (pickingPass || !payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
-  material.use_custom_color = 0;
-  material.custom_color = glm::vec4(1.0f);
-  if (!(ddp && m_ddpMaterialFrozen)) {
-    auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
-    std::memcpy(slice.mapped, &material, sizeof(material));
-    m_dynMaterialOffset = slice.offset;
-    if (ddp) {
-      m_ddpMaterialFrozen = true;
-    }
+  auto transformsSlice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
+  std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
+  m_dynTransformsOffset = transformsSlice.offset;
+
+  auto materialSlice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
+  std::memcpy(materialSlice.mapped, &material, sizeof(material));
+  m_dynMaterialOffset = materialSlice.offset;
+
+  if (ddp && payload.streamKey != 0) {
+    DDPUboCacheEntry entry{};
+    entry.params = payload.params;
+    entry.followCoordTransform = payload.followCoordTransform;
+    entry.followSizeScale = payload.followSizeScale;
+    entry.followOpacity = payload.followOpacity;
+    entry.pickingPass = pickingPass;
+    entry.eye = batch.eye;
+    entry.clipPlanes = batch.clipPlanes;
+    entry.transformsOffset = transformsSlice.offset;
+    entry.materialOffset = materialSlice.offset;
+    m_ddpUboCache[payload.streamKey].push_back(std::move(entry));
   }
 
   VLOG(2) << fmt::format("VK cone params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
-                         payload.params->sizeScale,
+                         payload.params.sizeScale,
                          material.alpha,
                          pickingPass,
                          (eyeState.isPerspective ? 0 : 1));

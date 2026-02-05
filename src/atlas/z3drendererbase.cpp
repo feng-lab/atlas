@@ -7,9 +7,9 @@
 #include "z3dscratchresourcepool.h"
 #include "z3dcamera.h"
 #include "z3drenderglobalstate.h"
-#include "z3dcompositorpass.h"
 #include "zexception.h"
 #include "zlog.h"
+#include <folly/ScopeGuard.h>
 #include <algorithm>
 #include <optional>
 #include <utility>
@@ -72,6 +72,11 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
       batch.clipPlanes.planes[i] = planes[i];
     }
   }
+  if (!batch.shaderHook.captured) {
+    batch.shaderHook.captured = true;
+    batch.shaderHook.type = m_shaderHookType;
+    batch.shaderHook.para = m_shaderHookPara;
+  }
   const glm::uvec4 viewportRect = m_frameState.viewport;
 
   VLOG(2) << "appendBatch initial colors=" << batch.pass.colorAttachments.size()
@@ -84,6 +89,17 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
     batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewportRect.z), static_cast<float>(viewportRect.w));
     batch.pass.viewport.minDepth = 0.0f;
     batch.pass.viewport.maxDepth = 1.0f;
+  }
+  if (m_activeBackend == RenderBackend::Vulkan && batch.pass.kind == BackendPassDesc::Kind::Raster) {
+    CHECK(batch.pass.viewport.extent.x > 0.0f && batch.pass.viewport.extent.y > 0.0f)
+      << "Vulkan appendBatch missing viewport extent: label='" << m_currentPassLabel << "'";
+    if (batch.pass.enableScissor) {
+      CHECK(batch.pass.scissorRect.z > 0.0f && batch.pass.scissorRect.w > 0.0f)
+        << "Vulkan appendBatch with scissor enabled but empty scissorRect: label='" << m_currentPassLabel << "'";
+    }
+    CHECK(batch.pass.viewport.maxDepth >= batch.pass.viewport.minDepth)
+      << "Vulkan appendBatch invalid depth range: minDepth=" << batch.pass.viewport.minDepth
+      << " maxDepth=" << batch.pass.viewport.maxDepth << " label='" << m_currentPassLabel << "'";
   }
 
   const bool hasColorAttachments = !batch.pass.colorAttachments.empty();
@@ -113,11 +129,11 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
         batch.pass.externalImageUses.push_back({handle, kind, aspectHint});
       };
 
-    if (m_shaderHookType == ShaderHookType::DualDepthPeelingPeel) {
-      addExternalUseIfMissing(m_shaderHookPara.dualDepthPeelingDepthBlenderHandle,
+    if (batch.shaderHook.type == ShaderHookType::DualDepthPeelingPeel) {
+      addExternalUseIfMissing(batch.shaderHook.para.dualDepthPeelingDepthBlenderHandle,
                               ExternalImageUseKind::SampledRead,
                               ExternalImageAspectHint::Color);
-      addExternalUseIfMissing(m_shaderHookPara.dualDepthPeelingFrontBlenderHandle,
+      addExternalUseIfMissing(batch.shaderHook.para.dualDepthPeelingFrontBlenderHandle,
                               ExternalImageUseKind::SampledRead,
                               ExternalImageAspectHint::Color);
     }
@@ -128,7 +144,8 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
     const bool noColors = batch.pass.colorAttachments.empty();
     const bool noDepth = !batch.pass.depthAttachment.has_value();
     CHECK(!(noColors && noDepth)) << "Vulkan appendBatch without attachments: shaderHook="
-                                  << enumToString(m_shaderHookType) << " label='" << m_currentPassLabel
+                                  << enumToStringOr(batch.shaderHook.type, "<unknown>") << " label='"
+                                  << m_currentPassLabel
                                   << "' activeSurfaceColors=" << m_frameState.activeSurface.colorAttachments.size()
                                   << " activeSurfaceHasDepth="
                                   << m_frameState.activeSurface.depthAttachment.has_value();
@@ -299,12 +316,6 @@ Z3DRendererBase::acquirePersistentBlockIdRenderTarget(Z3DScratchResourcePool::Re
   return lease;
 }
 
-void Z3DRendererBase::executeCompositorPass(const Z3DCompositorPass& pass)
-{
-  CHECK(m_backend != nullptr) << "Renderer backend not set";
-  m_backend->processCompositorPass(*this, pass);
-}
-
 RendererFrameState::ActiveSurface
 Z3DRendererBase::describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease)
 {
@@ -364,9 +375,11 @@ void Z3DRendererBase::endVulkanFrame()
   }
 
   CHECK(m_backend != nullptr) << "Renderer backend not set";
+  auto clearGuard = folly::makeGuard([&]() {
+    m_vulkanFrameActive = false;
+    m_currentFrameLabel.clear();
+  });
   m_backend->endRender(*this);
-  m_vulkanFrameActive = false;
-  m_currentFrameLabel.clear();
 }
 
 void Z3DRendererBase::flushVulkanWorkForTeardown(std::string_view reason)
@@ -399,6 +412,12 @@ void Z3DRendererBase::recordVulkanBatchesInActiveFrame(const std::function<void(
   // Start a new recording session within the already-open frame
   m_recordingSessionOpen = true;
   m_currentPassLabel = std::string(label);
+  auto sessionGuard = folly::makeGuard([&]() {
+    // Always reset session state and discard any partially captured batches.
+    m_recordingSessionOpen = false;
+    m_currentPassLabel.clear();
+    resetCPUState();
+  });
 
   // Clear any previous CPU batches (surface/lifetime are managed by caller).
   resetCPUState();
@@ -409,8 +428,19 @@ void Z3DRendererBase::recordVulkanBatchesInActiveFrame(const std::function<void(
 
   std::optional<size_t> gpuScope;
   auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_backend.get());
+  bool beganPassScope = false;
+  auto passScopeGuard = folly::makeGuard([&]() {
+    if (!beganPassScope || vkBackend == nullptr) {
+      return;
+    }
+    if (gpuScope.has_value()) {
+      vkBackend->endGpuScope(*gpuScope);
+    }
+    m_backend->endPassScope();
+  });
   if (vkBackend != nullptr) {
     m_backend->beginPassScope(label);
+    beganPassScope = true;
     if (!label.empty()) {
       gpuScope = vkBackend->beginGpuScope(label);
     }
@@ -419,16 +449,40 @@ void Z3DRendererBase::recordVulkanBatchesInActiveFrame(const std::function<void(
     recordBatches();
   }
   submitBatches();
-  if (vkBackend != nullptr) {
-    if (gpuScope.has_value()) {
-      vkBackend->endGpuScope(*gpuScope);
-    }
-    m_backend->endPassScope();
+}
+
+RendererCPUState Z3DRendererBase::captureVulkanBatches(const std::function<void()>& recordBatches,
+                                                       std::string_view label)
+{
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  CHECK(m_activeBackend == RenderBackend::Vulkan) << "captureVulkanBatches requires Vulkan backend";
+  CHECK(!m_recordingSessionOpen) << "captureVulkanBatches does not support nested recording sessions";
+
+  // Start a recording session for diagnostics (appendBatch invariants) and to
+  // propagate a stable pass label into any CHECK messages during capture.
+  m_recordingSessionOpen = true;
+  m_currentPassLabel = std::string(label);
+  auto sessionGuard = folly::makeGuard([&]() {
+    m_recordingSessionOpen = false;
+    m_currentPassLabel.clear();
+    resetCPUState();
+  });
+
+  resetCPUState();
+
+  if (VLOG_IS_ON(1)) {
+    VLOG(1) << "captureVulkanBatches('" << m_currentPassLabel
+            << "') activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
+            << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
   }
 
-  // End of recording session
-  m_recordingSessionOpen = false;
-  m_currentPassLabel.clear();
+  if (recordBatches) {
+    recordBatches();
+  }
+
+  RendererCPUState captured = std::move(m_cpuState);
+  resetCPUState();
+  return captured;
 }
 
 void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label)

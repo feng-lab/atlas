@@ -5,6 +5,7 @@
 #include "z3dtexture.h"
 #include "zlog.h"
 #include "zvulkandevice.h"
+#include "zvulkanframeexecutor.h"
 #include "zvulkantexture.h"
 #include <glbinding-aux/Meta.h>
 #include <cmath>
@@ -1588,11 +1589,10 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
   lease.backend = RenderBackend::Vulkan;
   lease.vulkanImage = slot->image.get();
   lease.attachments = colorAttachmentCount(descriptor);
-  if (m_vulkanReleaseScheduler) {
-    lease.releaser = RenderTargetLease::Releaser::forVulkanSlotDeferred(this, slot);
-  } else {
-    lease.releaser = RenderTargetLease::Releaser::forSlot(slot);
-  }
+  // Always use the Vulkan deferred releaser so releases remain GPU-safe even if
+  // the backend installs the scheduler after this lease is acquired (e.g.,
+  // persistent output targets allocated before the first beginRender()).
+  lease.releaser = RenderTargetLease::Releaser::forVulkanSlotDeferred(this, slot);
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1617,9 +1617,14 @@ void Z3DScratchResourcePool::scheduleDeferredRelease(Z3DScratchResourcePool::Vul
     // Capture just the slot pointer; the scheduler executes later on the render thread.
     m_vulkanReleaseScheduler([slot]() { slot->inUse = false; });
   } else {
-    // Fallback: release immediately if no scheduler is installed (should not happen during active frames)
+    // Fallback: no scheduler is installed (startup/backend-switch edge cases).
+    // Be conservative: ensure all in-flight frame-executor submissions have
+    // completed before allowing this slot to be reused/retargeted.
+    if (m_externalVkDevice) {
+      m_externalVkDevice->frameExecutor().waitForAllInFlight();
+    }
     slot->inUse = false;
-    VLOG(1) << "scratch pool: immediate Vulkan slot release (no scheduler installed)";
+    VLOG(1) << "scratch pool: Vulkan slot release drained in-flight work (no scheduler installed)";
   }
 }
 

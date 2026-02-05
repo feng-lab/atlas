@@ -1,13 +1,16 @@
 #pragma once
 
+#include "zexception.h"
 #include "zlog.h"
 
 #include <folly/Executor.h>
 #include <folly/Function.h>
+#include <folly/OperationCancelled.h>
 #include <folly/coro/Collect.h>
 #include <folly/coro/Task.h>
 
 #include <exception>
+#include <limits>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -80,21 +83,58 @@ public:
     auto results = co_await folly::coro::collectAllTryRange(std::move(tasks));
     CHECK(results.size() == local.size()) << "collectAllTryRange result size mismatch";
 
-    std::exception_ptr firstException;
+    const auto isCancellation = [](const std::exception_ptr& ex) -> bool {
+      if (!ex) {
+        return false;
+      }
+      try {
+        std::rethrow_exception(ex);
+      }
+      catch (const ZCancellationException&) {
+        return true;
+      }
+      catch (const folly::OperationCancelled&) {
+        return true;
+      }
+      catch (...) {
+        return false;
+      }
+    };
+
+    std::exception_ptr firstNonCancellation;
+    size_t firstNonCancellationIndex = std::numeric_limits<size_t>::max();
+    std::exception_ptr firstCancellation;
+    size_t firstCancellationIndex = std::numeric_limits<size_t>::max();
     for (size_t i = 0; i < results.size(); ++i) {
       if (!results[i].hasException()) {
         continue;
       }
-      if (!firstException) {
-        firstException = results[i].exception().to_exception_ptr();
-        if (!local[i].debugLabel.empty()) {
-          LOG(ERROR) << "Coro hook failed at spot barrier: label='" << local[i].debugLabel << "'";
+      auto ex = results[i].exception().to_exception_ptr();
+      if (isCancellation(ex)) {
+        if (!firstCancellation) {
+          firstCancellation = std::move(ex);
+          firstCancellationIndex = i;
         }
+        continue;
+      }
+      if (!firstNonCancellation) {
+        firstNonCancellation = std::move(ex);
+        firstNonCancellationIndex = i;
       }
     }
 
-    if (firstException) {
-      std::rethrow_exception(firstException);
+    if (firstNonCancellation) {
+      if (firstNonCancellationIndex < local.size() && !local[firstNonCancellationIndex].debugLabel.empty()) {
+        LOG(ERROR) << "Coro hook failed at spot barrier: label='" << local[firstNonCancellationIndex].debugLabel << "'";
+      }
+      std::rethrow_exception(firstNonCancellation);
+    }
+
+    if (firstCancellation) {
+      if (firstCancellationIndex < local.size() && !local[firstCancellationIndex].debugLabel.empty()) {
+        LOG(INFO) << "Coro hook cancelled at spot barrier: label='" << local[firstCancellationIndex].debugLabel << "'";
+      }
+      std::rethrow_exception(firstCancellation);
     }
     co_return;
   }

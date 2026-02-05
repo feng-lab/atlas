@@ -4,10 +4,12 @@
 #include "zbenchtimer.h"
 #include "zeventlistenerparameter.h"
 #include "zlog.h"
+#include "z3drenderervulkanbackend.h"
 #include "z3drendertarget.h"
 #include "z3drenderglobalstate.h"
 #include "zmesh.h"
 #include "zcancellation.h"
+#include "zvulkanlinearscript.h"
 #include "zneuroglancerprecomputed.h"
 #include <folly/OperationCancelled.h>
 #include <folly/ScopeGuard.h>
@@ -953,31 +955,29 @@ double Z3DImgFilter::process(Z3DEye eye)
 
   double currentProgress = 0.0;
   double totalProgress = 0.0;
-  const bool isVulkan = (m_rendererBase.activeBackend() == RenderBackend::Vulkan);
-  bool startedHere = false;
-  if (isVulkan && !m_rendererBase.isVulkanFrameActive()) {
+
+  std::unique_ptr<ZVulkanLinearScript> scriptOwner;
+  ZVulkanLinearScript* script = nullptr;
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    auto* vulkanBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
+    CHECK(vulkanBackend != nullptr) << "Z3DImgFilter Vulkan backend missing";
+
     const char* eyeTag = (eye == MonoEye) ? "mono" : (eye == LeftEye) ? "left" : "right";
     const std::string frameLabel = std::string("img_filter_") + eyeTag;
-    m_rendererBase.beginVulkanFrame(frameLabel);
-    startedHere = true;
+    scriptOwner = std::make_unique<ZVulkanLinearScript>(m_rendererBase, *vulkanBackend, frameLabel);
+    script = scriptOwner.get();
   }
-  // Ensure we always end a frame we started, even on exceptions
-  auto vkProcessGuard = folly::makeGuard([&]() {
-    if (startedHere) {
-      m_rendererBase.endVulkanFrame();
-    }
-  });
 
   if (hasImage()) {
-    double progress = renderImage(eye);
+    double progress = renderImage(eye, script);
     currentProgress += progress;
     totalProgress += 1.0;
   } else if (onlyBoundBox()) {
-    renderOnlyBoundBox(eye);
+    renderOnlyBoundBox(eye, script);
   }
 
   if (hasSlices()) {
-    double progress = renderSlices(eye);
+    double progress = renderSlices(eye, script);
     currentProgress += progress;
     totalProgress += 1.0;
   }
@@ -996,10 +996,11 @@ bool Z3DImgFilter::hasSlices() const
          m_showZSlice2.get() || m_showObliqueSlice.get() || m_showObliqueSlice2.get();
 }
 
-double Z3DImgFilter::renderSlices(Z3DEye eye)
+double Z3DImgFilter::renderSlices(Z3DEye eye, /*nullable*/ ZVulkanLinearScript* script)
 {
   // Vulkan path: render slices into this filter's own per-eye opaque lease
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    CHECK(script != nullptr) << "Z3DImgFilter::renderSlices Vulkan path requires a linear script";
     const bool progressiveStep = m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye);
     if (!progressiveStep) {
       m_imgSliceRenderer.setOutputSize(m_outputSize);
@@ -1096,22 +1097,17 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
     // Record into opaque lease via Vulkan batches
 
     m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
+    // Outputs are sampled by downstream compositors as image layers; leave them in sampled-readable layouts.
+    for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+      att.finalUse = AttachmentFinalUse::Sampled;
+    }
+    if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+      m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+    }
 
-    try {
-      m_rendererBase.recordVulkanBatchesInActiveFrame(
-        [&]() {
-          m_rendererBase.renderVulkan(eye, m_imgSliceRenderer);
-        },
-        "img_slices");
-    }
-    catch (const ZCancellationException&) {
-      m_imgSliceRenderer.resetProgress(eye);
-      throw;
-    }
-    catch (const folly::OperationCancelled&) {
-      m_imgSliceRenderer.resetProgress(eye);
-      throw;
-    }
+    script->raster("img_slices", {}, [&]() {
+      m_rendererBase.renderVulkan(eye, m_imgSliceRenderer);
+    });
     m_opaqueValid[eye] = true;
     // Compute progressive progress to mirror GL behaviour (preview=0.5, final=1.0).
     const double progress = m_progressiveRendering ? m_imgSliceRenderer.progressiveProgress(eye) : 1.0;
@@ -1237,9 +1233,10 @@ bool Z3DImgFilter::hasImage() const
          m_zCut.lowerValue() < m_zCut.maximum();
 }
 
-double Z3DImgFilter::renderImage(Z3DEye eye)
+double Z3DImgFilter::renderImage(Z3DEye eye, /*nullable*/ ZVulkanLinearScript* script)
 {
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    CHECK(script != nullptr) << "Z3DImgFilter::renderImage Vulkan path requires a linear script";
     if (!(m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye))) {
       m_imgRaycasterRenderer.setOutputSize(m_outputSize);
 
@@ -1366,22 +1363,9 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
     if (m_rendererBase.frameState().activeSurface.depthAttachment) {
       m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
     }
-    try {
-      m_rendererBase.recordVulkanBatchesInActiveFrame(
-        [&]() {
-          m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
-        },
-        "raycaster");
-    }
-    catch (const ZCancellationException&) {
-      // Mirror GL: on cancel, reset progressive state so next frame starts fresh.
-      m_imgRaycasterRenderer.resetProgress(eye);
-      throw;
-    }
-    catch (const folly::OperationCancelled&) {
-      m_imgRaycasterRenderer.resetProgress(eye);
-      throw;
-    }
+    const auto segRaycaster = script->raster("raycaster", {}, [&]() {
+      m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
+    });
 
     // Compute progressive progress to mirror GL behaviour
     progress = m_progressiveRendering ? m_imgRaycasterRenderer.progressiveProgress(eye) : 1.0;
@@ -1391,11 +1375,9 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 
     // Bound box overlay (no clears), same surface
     m_rendererBase.setActiveSurfaceWithLoadStore(lease, Z3DRendererBase::Preserve);
-    m_rendererBase.recordVulkanBatchesInActiveFrame(
-      [&]() {
-        renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
-      },
-      "bbox_overlay");
+    script->raster("bbox_overlay", {segRaycaster}, [&]() {
+      renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
+    });
 
     // Release entry/exit when not progressive or once finished
     if (!m_progressiveRendering || progress >= 1.0) {
@@ -1581,9 +1563,10 @@ bool Z3DImgFilter::onlyBoundBox() const
   return !hasImage() && !m_boundBoxMode.isSelected("No Bound Box");
 }
 
-void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
+void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye, /*nullable*/ ZVulkanLinearScript* script)
 {
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    CHECK(script != nullptr) << "Z3DImgFilter::renderOnlyBoundBox Vulkan path requires a linear script";
     // Render bound box into this filter's transparent lease (Vulkan)
     auto& lease = m_transparentTargets[eye];
     if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
@@ -1604,11 +1587,9 @@ void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
       m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
     }
 
-    m_rendererBase.recordVulkanBatchesInActiveFrame(
-      [&]() {
-        renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
-      },
-      "bbox_overlay");
+    script->raster("bbox_overlay", {}, [&]() {
+      renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
+    });
 
     m_transparentValid[eye] = true;
     return;
