@@ -1523,12 +1523,13 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   // Use primary output lease according to eye
   Z3DScratchResourcePool::RenderTargetLease* outLease = nullptr;
   if (eye == MonoEye) {
-    outLease = &m_outRenderTarget1;
+    outLease = m_monoCurrentTarget;
   } else if (eye == LeftEye) {
-    outLease = &m_leftEyeOutRenderTarget1;
+    outLease = m_leftCurrentTarget;
   } else { // RightEye
-    outLease = &m_outRenderTarget1; // mirrors current right-eye mapping in ctor
+    outLease = m_rightCurrentTarget; // mirrors current right-eye mapping in ctor
   }
+  CHECK(outLease != nullptr) << "Compositor Vulkan path missing current output lease for eye";
   if (!outLease || !*outLease) {
     return 0.0;
   }
@@ -2692,12 +2693,14 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     auto* scratchPool = &pool;
 
     auto installFinalColorReadback = [this, scratchPool](Z3DLocalColorBuffer* localPtr,
+                                                         Z3DScratchResourcePool::RenderTargetLease* targetPtr,
                                                          Z3DEye eyeCopy,
                                                          const void* mapped,
                                                          const glm::uvec2& size,
                                                          std::function<void()> releaseSlot,
                                                          bool noCopy) {
       CHECK(localPtr != nullptr) << "VK final readback install requires a valid local color buffer";
+      CHECK(targetPtr != nullptr) << "VK final readback install requires a valid output target lease";
       if (localPtr->externalRelease) {
         localPtr->externalRelease();
         localPtr->externalRelease = {};
@@ -2719,8 +2722,21 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       if (eyeCopy == MonoEye) {
         {
           const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-          std::swap(m_monoReadyLocalBuffer, m_monoCurrentLocalBuffer);
-          std::swap(m_monoReadyTarget, m_monoCurrentTarget);
+          CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
+            << "VK mono install targeted unexpected local buffer pointer";
+          CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
+            << "VK mono install targeted unexpected output lease pointer";
+
+          // Publish the buffer/target that actually received this completed frame.
+          // With >1 frames in flight, multiple completion hooks can be queued
+          // before the UI consumes the previous signal. Using unconditional
+          // swaps here makes the ready pointers depend on the *parity* of
+          // completions (and can bounce between old/new frames). Publish the
+          // completed destinations directly to make presentation monotonic.
+          m_monoReadyLocalBuffer = localPtr;
+          m_monoReadyTarget = targetPtr;
+          m_monoCurrentLocalBuffer = (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
+          m_monoCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
         }
         m_globalParameters.hasNewRendering = true;
         static uint64_t s_lastCreate = 0, s_lastChange = 0;
@@ -2736,13 +2752,29 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         Q_EMIT renderingFinished();
       } else if (eyeCopy == LeftEye) {
         const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-        std::swap(m_leftReadyLocalBuffer, m_leftCurrentLocalBuffer);
-        std::swap(m_leftReadyTarget, m_leftCurrentTarget);
+        CHECK(localPtr == &m_leftLocalColorBuffer1 || localPtr == &m_leftLocalColorBuffer2)
+          << "VK left-eye install targeted unexpected local buffer pointer";
+        CHECK(targetPtr == &m_leftEyeOutRenderTarget1 || targetPtr == &m_leftEyeOutRenderTarget2)
+          << "VK left-eye install targeted unexpected output lease pointer";
+
+        m_leftReadyLocalBuffer = localPtr;
+        m_leftReadyTarget = targetPtr;
+        m_leftCurrentLocalBuffer =
+          (localPtr == &m_leftLocalColorBuffer1) ? &m_leftLocalColorBuffer2 : &m_leftLocalColorBuffer1;
+        m_leftCurrentTarget =
+          (targetPtr == &m_leftEyeOutRenderTarget1) ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
       } else {
         {
           const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-          std::swap(m_rightReadyLocalBuffer, m_rightCurrentLocalBuffer);
-          std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+          CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
+            << "VK right-eye install targeted unexpected local buffer pointer";
+          CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
+            << "VK right-eye install targeted unexpected output lease pointer";
+
+          m_rightReadyLocalBuffer = localPtr;
+          m_rightReadyTarget = targetPtr;
+          m_rightCurrentLocalBuffer = (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
+          m_rightCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
         }
         m_globalParameters.hasNewRendering = true;
         const char* label = noCopy ? "(right, no copy)" : "(right)";
@@ -2751,14 +2783,17 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       }
     };
 
-    auto enqueueFinalReadbackInActiveFrame = [installFinalColorReadback](Z3DRendererVulkanBackend& backend,
-                                                                         ZVulkanTexture& tex,
-                                                                         Z3DLocalColorBuffer* localPtr,
-                                                                         Z3DEye eyeCopy,
-                                                                         std::string_view ticketLabel,
-                                                                         std::string_view consumeLabel,
-                                                                         bool noCopy) {
+    auto enqueueFinalReadbackInActiveFrame = [installFinalColorReadback](
+                                               Z3DRendererVulkanBackend& backend,
+                                               ZVulkanTexture& tex,
+                                               Z3DLocalColorBuffer* localPtr,
+                                               Z3DScratchResourcePool::RenderTargetLease* targetPtr,
+                                               Z3DEye eyeCopy,
+                                               std::string_view ticketLabel,
+                                               std::string_view consumeLabel,
+                                               bool noCopy) {
       CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
+      CHECK(targetPtr != nullptr) << "VK enqueue final readback requires output target lease";
       const char* suffix = noCopy ? " (no copy)" : "";
       VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
                              suffix,
@@ -2769,10 +2804,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
       backend.registerAfterCurrentFrameCompletionHook(
         currentRenderThreadExecutorKeepAlive(consumeLabel),
-        [installFinalColorReadback, localPtr, eyeCopy, ticket = std::move(ticket), noCopy](
+        [installFinalColorReadback, localPtr, targetPtr, eyeCopy, ticket = std::move(ticket), noCopy](
           Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
           co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
           installFinalColorReadback(localPtr,
+                                    targetPtr,
                                     eyeCopy,
                                     ticket.mapped,
                                     ticket.size,
@@ -2835,6 +2871,9 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
             enqueueFinalReadbackInActiveFrame(backend,
                                               *rgba8Tex,
                                               localPtr,
+                                              (eyeCopy == MonoEye)   ? m_monoCurrentTarget
+                                              : (eyeCopy == LeftEye) ? m_leftCurrentTarget
+                                                                     : m_rightCurrentTarget,
                                               eyeCopy,
                                               "vk_final_rgba8_readback",
                                               "vk_final_rgba8_readback_consume",
@@ -2854,6 +2893,9 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           enqueueFinalReadbackInActiveFrame(backend,
                                             *finalColor,
                                             localPtr,
+                                            (eyeCopy == MonoEye)   ? m_monoCurrentTarget
+                                            : (eyeCopy == LeftEye) ? m_leftCurrentTarget
+                                                                   : m_rightCurrentTarget,
                                             eyeCopy,
                                             "vk_final_color_readback",
                                             "vk_final_color_readback_consume",
