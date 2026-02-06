@@ -29,6 +29,17 @@ class ZVulkanBuffer;
 // - CPU readbacks are explicit boundaries (no global wait toggles).
 // - Dependencies are declared for clarity and future optimization, but the
 //   initial implementation executes in call order for correctness.
+//
+// Terminology / conceptual guideline (not required for correctness):
+// - Atlas Vulkan uses dynamic rendering (`vkCmdBeginRendering`), so the classic
+//   VkRenderPass "subpass" terminology does not really apply here.
+// - A "script node" is one call to raster()/replay()/commands(). Nodes form a
+//   small IR that the script/backend may coalesce for submission efficiency.
+// - Call sites should keep nodes fine-grained and single-purpose: a raster()
+//   node should generally target one output surface / attachment set (one
+//   logical pass) and should not switch render targets mid-node. Split work into
+//   multiple nodes when changing surfaces so labels, dependencies, and
+//   load/store/final-use semantics stay easy to reason about.
 class ZVulkanLinearScript final
 {
 public:
@@ -122,6 +133,10 @@ public:
   // This does not immediately submit; execution is deferred until:
   // - a CPU readback boundary is requested, or
   // - the script is destroyed.
+  //
+  // Guideline: keep the callback focused on one logical pass. Prefer recording
+  // batches that target a single output surface / attachment set; split into
+  // multiple raster() nodes when switching render targets.
   SegmentHandle
   raster(std::string_view label, std::span<const SegmentHandle> deps, const std::function<void()>& recordBatches);
   SegmentHandle
