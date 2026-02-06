@@ -10,6 +10,7 @@
 #include "zlog.h"
 #include "zimg.h"
 #include "zimgformat.h"
+#include "zvulkandevice.h"
 #include "zvulkantexture.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanlinearscript.h"
@@ -383,23 +384,27 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
 {
   ensureOutputTargets(m_outputSize);
 
-  m_monoCurrentTarget = &m_outRenderTarget1;
-  m_monoReadyTarget = &m_outRenderTarget2;
-  m_leftCurrentTarget = &m_leftEyeOutRenderTarget1;
-  m_leftReadyTarget = &m_leftEyeOutRenderTarget2;
-  m_rightCurrentTarget = &m_outRenderTarget1;
-  m_rightReadyTarget = &m_outRenderTarget2;
+  CHECK(m_outRenderTargets.size() >= 2u);
+  CHECK(m_leftEyeOutRenderTargets.size() >= 2u);
+  CHECK(m_localColorBuffers.size() >= 2u);
+  CHECK(m_leftLocalColorBuffers.size() >= 2u);
 
-  m_monoCurrentLocalBuffer = &m_localColorBuffer1;
-  m_monoReadyLocalBuffer = &m_localColorBuffer2;
-  m_leftCurrentLocalBuffer = &m_leftLocalColorBuffer1;
-  m_leftReadyLocalBuffer = &m_leftLocalColorBuffer2;
-  m_rightCurrentLocalBuffer = &m_localColorBuffer1;
-  m_rightReadyLocalBuffer = &m_localColorBuffer2;
+  m_monoCurrentTarget = &m_outRenderTargets[0];
+  m_monoReadyTarget = &m_outRenderTargets[1];
+  m_leftCurrentTarget = &m_leftEyeOutRenderTargets[0];
+  m_leftReadyTarget = &m_leftEyeOutRenderTargets[1];
+  m_rightCurrentTarget = &m_outRenderTargets[0];
+  m_rightReadyTarget = &m_outRenderTargets[1];
+
+  m_monoCurrentLocalBuffer = &m_localColorBuffers[0];
+  m_monoReadyLocalBuffer = &m_localColorBuffers[1];
+  m_leftCurrentLocalBuffer = &m_leftLocalColorBuffers[0];
+  m_leftReadyLocalBuffer = &m_leftLocalColorBuffers[1];
+  m_rightCurrentLocalBuffer = &m_localColorBuffers[0];
+  m_rightReadyLocalBuffer = &m_localColorBuffers[1];
 
   addParameter(m_showBackground);
-  m_showBackground.setDescription(QStringLiteral(
-    "Toggle rendering of the background (uniform or gradient fill)."));
+  m_showBackground.setDescription(QStringLiteral("Toggle rendering of the background (uniform or gradient fill)."));
 
   m_textureCopyRenderer.setDiscardTransparent(true);
   m_backgroundFirstColor.setStyle("COLOR");
@@ -427,10 +432,11 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_backgroundFirstColor);
   addParameter(m_backgroundSecondColor);
   addParameter(m_backgroundGradientOrientation);
-  m_backgroundFirstColor.setDescription(QStringLiteral("Primary background color (start of gradient or uniform fill)."));
+  m_backgroundFirstColor.setDescription(
+    QStringLiteral("Primary background color (start of gradient or uniform fill)."));
   m_backgroundSecondColor.setDescription(QStringLiteral("Secondary color used at the end of the gradient."));
-  m_backgroundGradientOrientation.setDescription(QStringLiteral(
-    "Direction of the gradient when 'Background Mode' is set to 'Gradient'."));
+  m_backgroundGradientOrientation.setDescription(
+    QStringLiteral("Direction of the gradient when 'Background Mode' is set to 'Gradient'."));
 
   updateBackgroundFirstColor();
   updateBackgroundSecondColor();
@@ -495,17 +501,15 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   m_XAxisColor.setDescription(QStringLiteral("Color of the X axis and its label."));
   m_YAxisColor.setDescription(QStringLiteral("Color of the Y axis and its label."));
   m_ZAxisColor.setDescription(QStringLiteral("Color of the Z axis and its label."));
-  m_axisRegionRatio.setDescription(QStringLiteral(
-    "Fraction of the viewport reserved for the axis overlay (0.1–1.0)."));
-  m_axisMode.setDescription(QStringLiteral(
-    "Axis rendering style: 'Arrow' draws arrowheads; 'Line' draws simple lines."));
+  m_axisRegionRatio.setDescription(QStringLiteral("Fraction of the viewport reserved for the axis overlay (0.1–1.0)."));
+  m_axisMode.setDescription(
+    QStringLiteral("Axis rendering style: 'Arrow' draws arrowheads; 'Line' draws simple lines."));
   m_axisFontName.setDescription(QStringLiteral("Font face used for axis labels (if available on system)."));
   m_axisFontSize.setDescription(QStringLiteral("Axis label font size in pixels."));
-  m_axisFontSoftEdgeScale.setDescription(QStringLiteral(
-    "Soft-edge distance for signed-distance-field (SDF) font rendering; increases edge smoothing."));
+  m_axisFontSoftEdgeScale.setDescription(
+    QStringLiteral("Soft-edge distance for signed-distance-field (SDF) font rendering; increases edge smoothing."));
   m_axisShowFontOutline.setDescription(QStringLiteral("Draw an outline around axis label glyphs."));
-  m_axisFontOutlineMode.setDescription(QStringLiteral(
-    "Outline effect used when outlines are enabled (e.g., Glow)."));
+  m_axisFontOutlineMode.setDescription(QStringLiteral("Outline effect used when outlines are enabled (e.g., Glow)."));
   m_axisFontOutlineColor.setDescription(QStringLiteral("Color of the font outline."));
   m_axisShowFontShadow.setDescription(QStringLiteral("Draw a shadow behind axis label glyphs."));
   m_axisFontShadowColor.setDescription(QStringLiteral("Color of the font shadow."));
@@ -908,11 +912,12 @@ double Z3DCompositor::processGL(Z3DEye eye)
       s_lastAnyVolumeReady = anyVolumeReady;
       s_lastLogTime = now;
 
-      VLOG(1) << fmt::format("Z3DCompositor volume decision (GL): anyVolumeReady={} volFilters={} geomFilters={} eye={}",
-                             anyVolumeReady,
-                             vFilters.size(),
-                             filters.size(),
-                             static_cast<int>(eye));
+      VLOG(1) << fmt::format(
+        "Z3DCompositor volume decision (GL): anyVolumeReady={} volFilters={} geomFilters={} eye={}",
+        anyVolumeReady,
+        vFilters.size(),
+        filters.size(),
+        static_cast<int>(eye));
       if (VLOG_IS_ON(2)) {
         size_t readyCount = 0;
         size_t transparentCount = 0;
@@ -1520,6 +1525,118 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   }
 
   ensureOutputTargets(m_outputSize);
+
+  auto findPresentTargetIndex = [](const auto& targets,
+                                  size_t ringSize,
+                                  const Z3DScratchResourcePool::RenderTargetLease* ptr) -> std::optional<size_t> {
+    if (!ptr) {
+      return std::nullopt;
+    }
+    CHECK(ringSize <= targets.size());
+    for (size_t i = 0; i < ringSize; ++i) {
+      if (&targets[i] == ptr) {
+        return i;
+      }
+    }
+    return std::nullopt;
+  };
+
+  auto reservePresentSlot = [&](auto& targets,
+                                auto& locals,
+                                auto& reserved,
+                                size_t ringSize,
+                                size_t& cursor,
+                                Z3DScratchResourcePool::RenderTargetLease*& currentTarget,
+                                const Z3DScratchResourcePool::RenderTargetLease* readyTarget,
+                                Z3DLocalColorBuffer*& currentLocal,
+                                Z3DEye eyeCopy) -> size_t {
+    CHECK(ringSize >= 2u) << "Offline presentation ring must have at least 2 slots";
+    CHECK(ringSize <= targets.size()) << "Offline presentation ring exceeds target backing storage";
+    CHECK(ringSize <= locals.size()) << "Offline presentation ring exceeds local buffer backing storage";
+    CHECK(ringSize <= reserved.size()) << "Offline presentation ring exceeds reservation backing storage";
+    CHECK(readyTarget != nullptr) << "Offline presentation ring missing ready target";
+
+    const size_t n = ringSize;
+    if (cursor >= n) {
+      cursor = 0;
+    }
+
+    const auto readyIndexOpt = findPresentTargetIndex(targets, ringSize, readyTarget);
+    CHECK(readyIndexOpt.has_value()) << "Offline presentation ready pointer is not part of the ring";
+    const size_t readyIndex = *readyIndexOpt;
+    CHECK(readyIndex < n);
+
+    std::optional<size_t> chosen;
+    for (size_t attempt = 0; attempt < n; ++attempt) {
+      const size_t idx = (cursor + attempt) % n;
+      if (idx == readyIndex) {
+        continue;
+      }
+      if (reserved[idx]) {
+        continue;
+      }
+      chosen = idx;
+      break;
+    }
+    if (!chosen.has_value()) {
+      // If the ring is saturated (e.g. progressive loop without gating), fall back to
+      // any non-reserved slot. This can overwrite the current ready slot ("mailbox"),
+      // but still guarantees we never render into a slot that is still in flight.
+      for (size_t attempt = 0; attempt < n; ++attempt) {
+        const size_t idx = (cursor + attempt) % n;
+        if (reserved[idx]) {
+          continue;
+        }
+        chosen = idx;
+        break;
+      }
+      CHECK(chosen.has_value()) << "Offline presentation ring has no non-reserved slots";
+      LOG(WARNING) << fmt::format("VK present ring saturated: reusing ready slot idx={} eye={}",
+                                  *chosen,
+                                  static_cast<int>(eyeCopy));
+    }
+
+    reserved[*chosen] = 1u;
+    currentTarget = &targets[*chosen];
+    currentLocal = &locals[*chosen];
+    cursor = (*chosen + 1u) % n;
+    return *chosen;
+  };
+
+  const bool isLeftPresentRing = (eye == LeftEye);
+  size_t presentSlotIndex = 0u;
+  if (eye == MonoEye) {
+    presentSlotIndex = reservePresentSlot(m_outRenderTargets,
+                                          m_localColorBuffers,
+                                          m_outPresentReserved,
+                                          m_outPresentRingSize,
+                                          m_outPresentCursor,
+                                          m_monoCurrentTarget,
+                                          m_monoReadyTarget,
+                                          m_monoCurrentLocalBuffer,
+                                          eye);
+  } else if (eye == LeftEye) {
+    presentSlotIndex = reservePresentSlot(m_leftEyeOutRenderTargets,
+                                          m_leftLocalColorBuffers,
+                                          m_leftPresentReserved,
+                                          m_leftPresentRingSize,
+                                          m_leftPresentCursor,
+                                          m_leftCurrentTarget,
+                                          m_leftReadyTarget,
+                                          m_leftCurrentLocalBuffer,
+                                          eye);
+  } else { // RightEye
+    presentSlotIndex = reservePresentSlot(m_outRenderTargets,
+                                          m_localColorBuffers,
+                                          m_outPresentReserved,
+                                          m_outPresentRingSize,
+                                          m_outPresentCursor,
+                                          m_rightCurrentTarget,
+                                          m_rightReadyTarget,
+                                          m_rightCurrentLocalBuffer,
+                                          eye);
+  }
+
   // Use primary output lease according to eye
   Z3DScratchResourcePool::RenderTargetLease* outLease = nullptr;
   if (eye == MonoEye) {
@@ -1530,9 +1647,21 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     outLease = m_rightCurrentTarget; // mirrors current right-eye mapping in ctor
   }
   CHECK(outLease != nullptr) << "Compositor Vulkan path missing current output lease for eye";
-  if (!outLease || !*outLease) {
+  if (!*outLease) {
+    // Undo reservation so a failed acquire doesn't strand the ring in a "reserved" state.
+    auto& reserved = isLeftPresentRing ? m_leftPresentReserved : m_outPresentReserved;
+    const size_t ringSize = isLeftPresentRing ? m_leftPresentRingSize : m_outPresentRingSize;
+    CHECK(presentSlotIndex < ringSize);
+    reserved[presentSlotIndex] = 0u;
     return 0.0;
   }
+
+  Z3DLocalColorBuffer* frameLocalPtr = (eye == MonoEye)   ? m_monoCurrentLocalBuffer
+                                       : (eye == LeftEye) ? m_leftCurrentLocalBuffer
+                                                          : m_rightCurrentLocalBuffer;
+  CHECK(frameLocalPtr != nullptr) << "Compositor Vulkan path missing current local color buffer for eye";
+
+  bool finalReadbackEnqueued = false;
 
   auto* vulkanBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
   CHECK(vulkanBackend != nullptr) << "Compositor Vulkan path requires a Vulkan backend";
@@ -1663,49 +1792,38 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                               /*clearAtStart*/ true,
                               /*drawBackground*/ m_showBackground.get(),
                               script);
-    auto dispatchOIT =
-      [&](Z3DScratchResourcePool::RenderTargetLease& lease, AttachmentHandle depthHandle, bool clearResolve) {
-        switch (transparencyMode) {
-          case TransparencyMode::DualDepthPeeling:
-            renderTransparentDDPVulkan(transparentFilters,
-                                       lease,
-                                       eye,
-                                       depthHandle,
-                                       nonOpaqueLayers,
-                                       clearResolve,
-                                       script);
-            break;
-          case TransparencyMode::PerPixelFragmentList:
-            renderTransparentPPLLVulkan(transparentFilters,
-                                        lease,
-                                        eye,
-                                        depthHandle,
-                                        nonOpaqueLayers,
-                                        clearResolve,
-                                        script);
-            break;
-          case TransparencyMode::WeightedAverage:
-            renderTransparentWAVulkan(transparentFilters,
+    auto dispatchOIT = [&](Z3DScratchResourcePool::RenderTargetLease& lease,
+                           AttachmentHandle depthHandle,
+                           bool clearResolve) {
+      switch (transparencyMode) {
+        case TransparencyMode::DualDepthPeeling:
+          renderTransparentDDPVulkan(transparentFilters,
+                                     lease,
+                                     eye,
+                                     depthHandle,
+                                     nonOpaqueLayers,
+                                     clearResolve,
+                                     script);
+          break;
+        case TransparencyMode::PerPixelFragmentList:
+          renderTransparentPPLLVulkan(transparentFilters,
                                       lease,
                                       eye,
                                       depthHandle,
                                       nonOpaqueLayers,
                                       clearResolve,
                                       script);
-            break;
-          case TransparencyMode::WeightedBlended:
-            renderTransparentWBVulkan(transparentFilters,
-                                      lease,
-                                      eye,
-                                      depthHandle,
-                                      nonOpaqueLayers,
-                                      clearResolve,
-                                      script);
-            break;
-          default:
-            break;
-        }
-      };
+          break;
+        case TransparencyMode::WeightedAverage:
+          renderTransparentWAVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve, script);
+          break;
+        case TransparencyMode::WeightedBlended:
+          renderTransparentWBVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve, script);
+          break;
+        default:
+          break;
+      }
+    };
 
     if (opaqueFilters.empty()) {
       // Resolve directly to the final scene surface; preserve background
@@ -2719,24 +2837,97 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                              size.y,
                              static_cast<int>(eyeCopy));
 
+      auto publishCompletedToRing = [&](auto& targets,
+                                        auto& locals,
+                                        auto& reserved,
+                                        size_t ringSize,
+                                        size_t& cursor,
+                                        Z3DScratchResourcePool::RenderTargetLease*& readyTargetOut,
+                                        Z3DLocalColorBuffer*& readyLocalOut,
+                                        Z3DScratchResourcePool::RenderTargetLease*& currentTargetOut,
+                                        Z3DLocalColorBuffer*& currentLocalOut,
+                                        Z3DScratchResourcePool::RenderTargetLease* completedTarget,
+                                        Z3DLocalColorBuffer* completedLocal,
+                                        std::string_view tag) {
+        CHECK(ringSize >= 2u) << "VK present ring must have at least 2 slots";
+        CHECK(ringSize <= targets.size()) << "VK present ring exceeds target backing storage";
+        CHECK(ringSize <= locals.size()) << "VK present ring exceeds local backing storage";
+        CHECK(ringSize <= reserved.size()) << "VK present ring exceeds reserved backing storage";
+        CHECK(completedTarget != nullptr) << "VK present ring publish requires completed target";
+        CHECK(completedLocal != nullptr) << "VK present ring publish requires completed local buffer";
+
+        std::optional<size_t> slotIndexOpt;
+        std::optional<size_t> localIndexOpt;
+        for (size_t i = 0; i < ringSize; ++i) {
+          if (&targets[i] == completedTarget) {
+            slotIndexOpt = i;
+          }
+          if (&locals[i] == completedLocal) {
+            localIndexOpt = i;
+          }
+          if (slotIndexOpt.has_value() && localIndexOpt.has_value()) {
+            break;
+          }
+        }
+        CHECK(slotIndexOpt.has_value())
+          << fmt::format("VK present ring publish {}: completed target pointer not part of ring", tag);
+        CHECK(localIndexOpt.has_value())
+          << fmt::format("VK present ring publish {}: completed local pointer not part of ring", tag);
+
+        const size_t slotIndex = *slotIndexOpt;
+        const size_t localIndex = *localIndexOpt;
+        CHECK(slotIndex == localIndex) << fmt::format("VK present ring publish {}: target/local slot mismatch", tag);
+        CHECK(reserved[slotIndex]) << fmt::format("VK present ring publish {}: slot was not reserved", tag);
+        reserved[slotIndex] = 0u;
+
+        readyTargetOut = &targets[slotIndex];
+        readyLocalOut = &locals[slotIndex];
+
+        // Choose the next current slot: any non-reserved slot other than ready.
+        // This is only a hint; processVulkan reserves a slot at frame start.
+        const size_t n = ringSize;
+        if (cursor >= n) {
+          cursor = 0;
+        }
+        const size_t readyIndex = slotIndex;
+        std::optional<size_t> nextIndex;
+        for (size_t attempt = 0; attempt < n; ++attempt) {
+          const size_t idx = (cursor + attempt) % n;
+          if (idx == readyIndex) {
+            continue;
+          }
+          if (reserved[idx]) {
+            continue;
+          }
+          nextIndex = idx;
+          break;
+        }
+        if (!nextIndex.has_value()) {
+          // Ring is saturated; fall back to the ready slot ("mailbox").
+          nextIndex = readyIndex;
+          VLOG(1) << fmt::format("VK present ring publish {}: saturated, current=ready idx={}", tag, readyIndex);
+        }
+
+        currentTargetOut = &targets[*nextIndex];
+        currentLocalOut = &locals[*nextIndex];
+        cursor = (*nextIndex + 1u) % n;
+      };
+
       if (eyeCopy == MonoEye) {
         {
           const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-          CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
-            << "VK mono install targeted unexpected local buffer pointer";
-          CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
-            << "VK mono install targeted unexpected output lease pointer";
-
-          // Publish the buffer/target that actually received this completed frame.
-          // With >1 frames in flight, multiple completion hooks can be queued
-          // before the UI consumes the previous signal. Using unconditional
-          // swaps here makes the ready pointers depend on the *parity* of
-          // completions (and can bounce between old/new frames). Publish the
-          // completed destinations directly to make presentation monotonic.
-          m_monoReadyLocalBuffer = localPtr;
-          m_monoReadyTarget = targetPtr;
-          m_monoCurrentLocalBuffer = (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
-          m_monoCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
+          publishCompletedToRing(m_outRenderTargets,
+                                 m_localColorBuffers,
+                                 m_outPresentReserved,
+                                 m_outPresentRingSize,
+                                 m_outPresentCursor,
+                                 m_monoReadyTarget,
+                                 m_monoReadyLocalBuffer,
+                                 m_monoCurrentTarget,
+                                 m_monoCurrentLocalBuffer,
+                                 targetPtr,
+                                 localPtr,
+                                 "mono");
         }
         m_globalParameters.hasNewRendering = true;
         static uint64_t s_lastCreate = 0, s_lastChange = 0;
@@ -2752,29 +2943,33 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         Q_EMIT renderingFinished();
       } else if (eyeCopy == LeftEye) {
         const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-        CHECK(localPtr == &m_leftLocalColorBuffer1 || localPtr == &m_leftLocalColorBuffer2)
-          << "VK left-eye install targeted unexpected local buffer pointer";
-        CHECK(targetPtr == &m_leftEyeOutRenderTarget1 || targetPtr == &m_leftEyeOutRenderTarget2)
-          << "VK left-eye install targeted unexpected output lease pointer";
-
-        m_leftReadyLocalBuffer = localPtr;
-        m_leftReadyTarget = targetPtr;
-        m_leftCurrentLocalBuffer =
-          (localPtr == &m_leftLocalColorBuffer1) ? &m_leftLocalColorBuffer2 : &m_leftLocalColorBuffer1;
-        m_leftCurrentTarget =
-          (targetPtr == &m_leftEyeOutRenderTarget1) ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
+        publishCompletedToRing(m_leftEyeOutRenderTargets,
+                               m_leftLocalColorBuffers,
+                               m_leftPresentReserved,
+                               m_leftPresentRingSize,
+                               m_leftPresentCursor,
+                               m_leftReadyTarget,
+                               m_leftReadyLocalBuffer,
+                               m_leftCurrentTarget,
+                               m_leftCurrentLocalBuffer,
+                               targetPtr,
+                               localPtr,
+                               "left");
       } else {
         {
           const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-          CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
-            << "VK right-eye install targeted unexpected local buffer pointer";
-          CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
-            << "VK right-eye install targeted unexpected output lease pointer";
-
-          m_rightReadyLocalBuffer = localPtr;
-          m_rightReadyTarget = targetPtr;
-          m_rightCurrentLocalBuffer = (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
-          m_rightCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
+          publishCompletedToRing(m_outRenderTargets,
+                                 m_localColorBuffers,
+                                 m_outPresentReserved,
+                                 m_outPresentRingSize,
+                                 m_outPresentCursor,
+                                 m_rightReadyTarget,
+                                 m_rightReadyLocalBuffer,
+                                 m_rightCurrentTarget,
+                                 m_rightCurrentLocalBuffer,
+                                 targetPtr,
+                                 localPtr,
+                                 "right");
         }
         m_globalParameters.hasNewRendering = true;
         const char* label = noCopy ? "(right, no copy)" : "(right)";
@@ -2783,41 +2978,41 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       }
     };
 
-    auto enqueueFinalReadbackInActiveFrame = [installFinalColorReadback](
-                                               Z3DRendererVulkanBackend& backend,
-                                               ZVulkanTexture& tex,
-                                               Z3DLocalColorBuffer* localPtr,
-                                               Z3DScratchResourcePool::RenderTargetLease* targetPtr,
-                                               Z3DEye eyeCopy,
-                                               std::string_view ticketLabel,
-                                               std::string_view consumeLabel,
-                                               bool noCopy) {
-      CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
-      CHECK(targetPtr != nullptr) << "VK enqueue final readback requires output target lease";
-      const char* suffix = noCopy ? " (no copy)" : "";
-      VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
-                             suffix,
-                             reinterpret_cast<uint64_t>(&tex),
-                             tex.width(),
-                             tex.height(),
-                             static_cast<int>(eyeCopy));
-      auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
-      backend.registerAfterCurrentFrameCompletionHook(
-        currentRenderThreadExecutorKeepAlive(consumeLabel),
-        [installFinalColorReadback, localPtr, targetPtr, eyeCopy, ticket = std::move(ticket), noCopy](
-          Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-          co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
-          installFinalColorReadback(localPtr,
-                                    targetPtr,
-                                    eyeCopy,
-                                    ticket.mapped,
-                                    ticket.size,
-                                    std::move(ticket.releaseSlot),
-                                    noCopy);
-          co_return;
-        },
-        consumeLabel);
-    };
+    auto enqueueFinalReadbackInActiveFrame =
+      [installFinalColorReadback](Z3DRendererVulkanBackend& backend,
+                                  ZVulkanTexture& tex,
+                                  Z3DLocalColorBuffer* localPtr,
+                                  Z3DScratchResourcePool::RenderTargetLease* targetPtr,
+                                  Z3DEye eyeCopy,
+                                  std::string_view ticketLabel,
+                                  std::string_view consumeLabel,
+                                  bool noCopy) {
+        CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
+        CHECK(targetPtr != nullptr) << "VK enqueue final readback requires output target lease";
+        const char* suffix = noCopy ? " (no copy)" : "";
+        VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
+                               suffix,
+                               reinterpret_cast<uint64_t>(&tex),
+                               tex.width(),
+                               tex.height(),
+                               static_cast<int>(eyeCopy));
+        auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
+        backend.registerAfterCurrentFrameCompletionHook(
+          currentRenderThreadExecutorKeepAlive(consumeLabel),
+          [installFinalColorReadback, localPtr, targetPtr, eyeCopy, ticket = std::move(ticket), noCopy](
+            Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+            co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
+            installFinalColorReadback(localPtr,
+                                      targetPtr,
+                                      eyeCopy,
+                                      ticket.mapped,
+                                      ticket.size,
+                                      std::move(ticket.releaseSlot),
+                                      noCopy);
+            co_return;
+          },
+          consumeLabel);
+      };
 
     // Request readback while a Vulkan frame is active so backend can insert the copy before endRender.
     // If final color is not RGBA8, first render a copy to an RGBA8 scratch surface, then enqueue the readback inside
@@ -2859,47 +3054,65 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         });
 
         const Z3DEye eyeCopy = eye;
-        script.commands(
-          "final_rgba8_readback_enqueue",
-          {segCopy},
-          [this, enqueueFinalReadbackInActiveFrame, rgba8Lease, eyeCopy](Z3DRendererVulkanBackend& backend) {
-            ZVulkanTexture* rgba8Tex = rgba8Lease ? rgba8Lease->colorAttachment(0) : nullptr;
-            CHECK(rgba8Tex != nullptr) << "VK final_rgba8_copy: missing RGBA8 color attachment";
-            auto* localPtr = (eyeCopy == MonoEye)   ? m_monoCurrentLocalBuffer
-                             : (eyeCopy == LeftEye) ? m_leftCurrentLocalBuffer
-                                                    : m_rightCurrentLocalBuffer;
-            enqueueFinalReadbackInActiveFrame(backend,
-                                              *rgba8Tex,
-                                              localPtr,
-                                              (eyeCopy == MonoEye)   ? m_monoCurrentTarget
-                                              : (eyeCopy == LeftEye) ? m_leftCurrentTarget
-                                                                     : m_rightCurrentTarget,
-                                              eyeCopy,
-                                              "vk_final_rgba8_readback",
-                                              "vk_final_rgba8_readback_consume",
-                                              /*noCopy=*/false);
-          });
+        script.commands("final_rgba8_readback_enqueue",
+                        {segCopy},
+                        [enqueueFinalReadbackInActiveFrame, rgba8Lease, eyeCopy, frameLocalPtr, outLease](
+                          Z3DRendererVulkanBackend& backend) {
+                          ZVulkanTexture* rgba8Tex = rgba8Lease ? rgba8Lease->colorAttachment(0) : nullptr;
+                          CHECK(rgba8Tex != nullptr) << "VK final_rgba8_copy: missing RGBA8 color attachment";
+                          enqueueFinalReadbackInActiveFrame(backend,
+                                                            *rgba8Tex,
+                                                            frameLocalPtr,
+                                                            outLease,
+                                                            eyeCopy,
+                                                            "vk_final_rgba8_readback",
+                                                            "vk_final_rgba8_readback_consume",
+                                                            /*noCopy=*/false);
+                        });
+        finalReadbackEnqueued = true;
       }
     } else if (finalColor) {
       // No conversion needed; enqueue readback on the tail submission.
       const Z3DEye eyeCopy = eye;
+      script.commands("final_color_readback_enqueue",
+                      {},
+                      [enqueueFinalReadbackInActiveFrame, finalColor, eyeCopy, frameLocalPtr, outLease](
+                        Z3DRendererVulkanBackend& backend) {
+                        enqueueFinalReadbackInActiveFrame(backend,
+                                                          *finalColor,
+                                                          frameLocalPtr,
+                                                          outLease,
+                                                          eyeCopy,
+                                                          "vk_final_color_readback",
+                                                          "vk_final_color_readback_consume",
+                                                          /*noCopy=*/true);
+                      });
+      finalReadbackEnqueued = true;
+    }
+
+    if (!finalReadbackEnqueued) {
+      // Defensive: ensure the offline presentation slot is released once the frame
+      // completes even if we did not enqueue a presentable readback (e.g. conversion
+      // scratch allocation failed). Without this, the presentation ring can become
+      // permanently "reserved" and stall future frames.
+      const bool isLeftCopy = isLeftPresentRing;
+      const size_t slotIndexCopy = presentSlotIndex;
       script.commands(
-        "final_color_readback_enqueue",
+        "final_present_slot_release_enqueue",
         {},
-        [this, enqueueFinalReadbackInActiveFrame, finalColor, eyeCopy](Z3DRendererVulkanBackend& backend) {
-          auto* localPtr = (eyeCopy == MonoEye)   ? m_monoCurrentLocalBuffer
-                           : (eyeCopy == LeftEye) ? m_leftCurrentLocalBuffer
-                                                  : m_rightCurrentLocalBuffer;
-          enqueueFinalReadbackInActiveFrame(backend,
-                                            *finalColor,
-                                            localPtr,
-                                            (eyeCopy == MonoEye)   ? m_monoCurrentTarget
-                                            : (eyeCopy == LeftEye) ? m_leftCurrentTarget
-                                                                   : m_rightCurrentTarget,
-                                            eyeCopy,
-                                            "vk_final_color_readback",
-                                            "vk_final_color_readback_consume",
-                                            /*noCopy=*/true);
+        [this, isLeftCopy, slotIndexCopy](Z3DRendererVulkanBackend& backend) {
+          backend.registerAfterCurrentFrameCompletionHook(
+            currentRenderThreadExecutorKeepAlive("vk_present_slot_release"),
+            [this, isLeftCopy, slotIndexCopy](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+              const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+              auto& reserved = isLeftCopy ? m_leftPresentReserved : m_outPresentReserved;
+              const size_t ringSize = isLeftCopy ? m_leftPresentRingSize : m_outPresentRingSize;
+              CHECK(slotIndexCopy < ringSize);
+              CHECK(reserved[slotIndexCopy]) << "VK present slot release: slot was not reserved";
+              reserved[slotIndexCopy] = 0u;
+              co_return;
+            },
+            "vk_present_slot_release");
         });
     }
     // Do not enqueue picking readback; rely on synchronous 1x1 reads on demand.
@@ -3117,8 +3330,102 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
 
 void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
 {
+  const RenderBackend activeBackend = m_rendererBase.activeBackend();
+  size_t desiredPresentBuffers = 2u;
+  if (activeBackend == RenderBackend::Vulkan) {
+    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+    const uint32_t maxInFlight = pool.ensureVulkanDevice().frameExecutor().maxFramesInFlight();
+    desiredPresentBuffers = static_cast<size_t>(std::max<uint32_t>(2u, maxInFlight + 1u));
+  }
+
+  CHECK(desiredPresentBuffers <= kMaxOfflinePresentBuffers)
+    << fmt::format("Offline presentation ring requires {} buffers, but kMaxOfflinePresentBuffers={} (backend={}, "
+                   "maxFramesInFlight+1 policy). Refactor persistent lease tracking or raise the limit.",
+                   desiredPresentBuffers,
+                   kMaxOfflinePresentBuffers,
+                   enumToString(activeBackend));
+
+  m_outPresentRingSize = std::max(m_outPresentRingSize, desiredPresentBuffers);
+  m_leftPresentRingSize = std::max(m_leftPresentRingSize, desiredPresentBuffers);
+  CHECK(m_outPresentRingSize >= 2u);
+  CHECK(m_leftPresentRingSize >= 2u);
+
+  if (m_outPresentCursor >= m_outPresentRingSize) {
+    m_outPresentCursor = 0;
+  }
+  if (m_leftPresentCursor >= m_leftPresentRingSize) {
+    m_leftPresentCursor = 0;
+  }
+
+  auto findRingLeaseIndex =
+    [](const auto& targets,
+       size_t ringSize,
+       const Z3DScratchResourcePool::RenderTargetLease* ptr) -> std::optional<size_t> {
+    if (!ptr) {
+      return std::nullopt;
+    }
+    CHECK(ringSize <= targets.size());
+    for (size_t i = 0; i < ringSize; ++i) {
+      if (&targets[i] == ptr) {
+        return i;
+      }
+    }
+    return std::nullopt;
+  };
+
+  auto fixEyePointers = [&](auto& targets,
+                            auto& locals,
+                            size_t ringSize,
+                            Z3DScratchResourcePool::RenderTargetLease*& currentTarget,
+                            Z3DScratchResourcePool::RenderTargetLease*& readyTarget,
+                            Z3DLocalColorBuffer*& currentLocal,
+                            Z3DLocalColorBuffer*& readyLocal) {
+    CHECK(ringSize >= 2u) << "Offline presentation ring must have at least 2 slots";
+    CHECK(ringSize <= targets.size());
+    CHECK(ringSize <= locals.size());
+
+    size_t currentIndex = 0u;
+    if (const auto idx = findRingLeaseIndex(targets, ringSize, currentTarget); idx.has_value()) {
+      currentIndex = *idx;
+    }
+
+    size_t readyIndex = (currentIndex + 1u) % ringSize;
+    if (const auto idx = findRingLeaseIndex(targets, ringSize, readyTarget); idx.has_value()) {
+      readyIndex = *idx;
+    }
+    if (readyIndex == currentIndex) {
+      readyIndex = (currentIndex + 1u) % ringSize;
+    }
+
+    currentTarget = &targets[currentIndex];
+    readyTarget = &targets[readyIndex];
+    currentLocal = &locals[currentIndex];
+    readyLocal = &locals[readyIndex];
+  };
+
+  fixEyePointers(m_outRenderTargets,
+                 m_localColorBuffers,
+                 m_outPresentRingSize,
+                 m_monoCurrentTarget,
+                 m_monoReadyTarget,
+                 m_monoCurrentLocalBuffer,
+                 m_monoReadyLocalBuffer);
+  fixEyePointers(m_leftEyeOutRenderTargets,
+                 m_leftLocalColorBuffers,
+                 m_leftPresentRingSize,
+                 m_leftCurrentTarget,
+                 m_leftReadyTarget,
+                 m_leftCurrentLocalBuffer,
+                 m_leftReadyLocalBuffer);
+  fixEyePointers(m_outRenderTargets,
+                 m_localColorBuffers,
+                 m_outPresentRingSize,
+                 m_rightCurrentTarget,
+                 m_rightReadyTarget,
+                 m_rightCurrentLocalBuffer,
+                 m_rightReadyLocalBuffer);
+
   auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
-    const RenderBackend activeBackend = m_rendererBase.activeBackend();
     const bool hasVulkanImage = lease.vulkanImage != nullptr;
     const bool hasGLTarget = lease.renderTarget != nullptr;
 
@@ -3146,10 +3453,12 @@ void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
     }
   };
 
-  ensureLease(m_outRenderTarget1);
-  ensureLease(m_outRenderTarget2);
-  ensureLease(m_leftEyeOutRenderTarget1);
-  ensureLease(m_leftEyeOutRenderTarget2);
+  for (size_t i = 0; i < m_outPresentRingSize; ++i) {
+    ensureLease(m_outRenderTargets[i]);
+  }
+  for (size_t i = 0; i < m_leftPresentRingSize; ++i) {
+    ensureLease(m_leftEyeOutRenderTargets[i]);
+  }
 
   // Keep renderer viewport in sync with the active output size so batches
   // recorded immediately after a resize use a valid renderArea that matches
@@ -3183,12 +3492,12 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
       buf->external = nullptr;
       buf->externalStride = 0;
     };
-    clearExternal(m_monoCurrentLocalBuffer);
-    clearExternal(m_monoReadyLocalBuffer);
-    clearExternal(m_leftCurrentLocalBuffer);
-    clearExternal(m_leftReadyLocalBuffer);
-    clearExternal(m_rightCurrentLocalBuffer);
-    clearExternal(m_rightReadyLocalBuffer);
+    for (auto& buf : m_localColorBuffers) {
+      clearExternal(&buf);
+    }
+    for (auto& buf : m_leftLocalColorBuffers) {
+      clearExternal(&buf);
+    }
   }
 
   Z3DBoundedFilter::switchRendererBackend(backendRequest);
@@ -4493,40 +4802,37 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   const glm::vec2 screenDimRcp(targetSize.x > 0u ? 1.f / static_cast<float>(targetSize.x) : 0.f,
                                targetSize.y > 0u ? 1.f / static_cast<float>(targetSize.y) : 0.f);
 
-  script.raster(
-    "transparency_ddp_final",
-    {segLast},
-    [&]() {
-      m_rendererBase.setActiveSurfaceWithLoadStore(outSurface, Z3DRendererBase::Preserve);
-      TextureDualPeelPayload payload;
-      payload.stage = TextureDualPeelPayload::Stage::Final;
-      // Use the last ping written by orchestrated peel passes
-      payload.frontAttachment = frontPing[finalPingIdx];
-      payload.backAttachment = backBlend;
-      payload.depthAttachment = depthTextureHandle;
-      payload.screenDimRcp = screenDimRcp;
+  script.raster("transparency_ddp_final", {segLast}, [&]() {
+    m_rendererBase.setActiveSurfaceWithLoadStore(outSurface, Z3DRendererBase::Preserve);
+    TextureDualPeelPayload payload;
+    payload.stage = TextureDualPeelPayload::Stage::Final;
+    // Use the last ping written by orchestrated peel passes
+    payload.frontAttachment = frontPing[finalPingIdx];
+    payload.backAttachment = backBlend;
+    payload.depthAttachment = depthTextureHandle;
+    payload.screenDimRcp = screenDimRcp;
 
-      RenderBatch batch;
-      batch.eye = eye;
-      const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-      batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-      batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-      batch.pass.viewport.minDepth = 0.0f;
-      batch.pass.viewport.maxDepth = 1.0f;
-      batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
-      batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
-      batch.pass.externalImageUses.push_back(
-        {payload.frontAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-      batch.pass.externalImageUses.push_back(
-        {payload.backAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-      batch.pass.externalImageUses.push_back(
-        {payload.depthAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-      batch.draw.topology = PrimitiveTopology::TriangleStrip;
-      batch.draw.vertexCount = 4;
-      batch.draw.indexCount = 0;
-      batch.geometry = payload;
-      m_rendererBase.appendBatch(std::move(batch));
-    });
+    RenderBatch batch;
+    batch.eye = eye;
+    const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+    batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+    batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+    batch.pass.viewport.minDepth = 0.0f;
+    batch.pass.viewport.maxDepth = 1.0f;
+    batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
+    batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+    batch.pass.externalImageUses.push_back(
+      {payload.frontAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+    batch.pass.externalImageUses.push_back(
+      {payload.backAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+    batch.pass.externalImageUses.push_back(
+      {payload.depthAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+    batch.draw.topology = PrimitiveTopology::TriangleStrip;
+    batch.draw.vertexCount = 4;
+    batch.draw.indexCount = 0;
+    batch.geometry = payload;
+    m_rendererBase.appendBatch(std::move(batch));
+  });
 
   resetHooks();
 }
@@ -4887,48 +5193,47 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
 
   // Geometry init step must see WeightedAverageInit on the compositor renderer
   m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
-  const auto segInit =
-    script.raster("transparency_wa_init", {}, [&]() {
-      m_rendererBase.setActiveSurfaceWithLoadStore(waInitSurface, Z3DRendererBase::Preserve);
-      // 1) Geometry filters
-      for (auto* filter : filters) {
-        if (!filter) {
+  const auto segInit = script.raster("transparency_wa_init", {}, [&]() {
+    m_rendererBase.setActiveSurfaceWithLoadStore(waInitSurface, Z3DRendererBase::Preserve);
+    // 1) Geometry filters
+    for (auto* filter : filters) {
+      if (!filter) {
+        continue;
+      }
+      filter->setViewport(targetSize);
+      filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
+      recordFilterBatchesToSurfaceUnified(
+        m_rendererBase,
+        filter,
+        waInitSurface,
+        [&]() {
+          filter->renderTransparent(eye);
+        },
+        /*propagateHookPara=*/false);
+    }
+    // 2) Image layers: sample from filters' transparent leases using WA image init copy
+    if (!imageLayers.empty()) {
+      m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
+      VLOG(1) << fmt::format("WA init: merging {} image layer(s)", imageLayers.size());
+      for (const auto& layer : imageLayers) {
+        const auto& colorDesc = layer.colorAttachment;
+        const auto& depthDesc = layer.depthAttachment;
+        if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
           continue;
         }
-        filter->setViewport(targetSize);
-        filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
-        recordFilterBatchesToSurfaceUnified(
-          m_rendererBase,
-          filter,
-          waInitSurface,
-          [&]() {
-            filter->renderTransparent(eye);
-          },
-          /*propagateHookPara=*/false);
-      }
-      // 2) Image layers: sample from filters' transparent leases using WA image init copy
-      if (!imageLayers.empty()) {
-        m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
-        VLOG(1) << fmt::format("WA init: merging {} image layer(s)", imageLayers.size());
-        for (const auto& layer : imageLayers) {
-          const auto& colorDesc = layer.colorAttachment;
-          const auto& depthDesc = layer.depthAttachment;
-          if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
-            continue;
-          }
-          if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
-            continue;
-          }
-          VLOG(1) << fmt::format("WA init: texture_copy layer color=0x{:x} depth=0x{:x}",
-                                 colorDesc.handle.id,
-                                 depthDesc.handle.id);
-          // WA image init copy: do not flip
-          m_textureCopyRenderer.setFlipY(false);
-          m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
-          m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
+        if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
+          continue;
         }
+        VLOG(1) << fmt::format("WA init: texture_copy layer color=0x{:x} depth=0x{:x}",
+                               colorDesc.handle.id,
+                               depthDesc.handle.id);
+        // WA image init copy: do not flip
+        m_textureCopyRenderer.setFlipY(false);
+        m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
+        m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
       }
-    });
+    }
+  });
 
   resetHooks();
 
@@ -5205,18 +5510,20 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye,
   m_rendererBase.frameState().updateViewportData(axisViewport);
   m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
 
-  RendererCPUState axisBatches = m_rendererBase.captureVulkanBatches([&]() {
-    m_rendererBase.setActiveSurfaceWithLoadStore(axisSurface,
-                                                 LoadOp::Load,
-                                                 StoreOp::Store,
-                                                 LoadOp::Clear,
-                                                 StoreOp::Store);
-    if (m_axisMode.get() == "Arrow") {
-      m_rendererBase.renderVulkan(eye, m_arrowRenderer, m_fontRenderer);
-    } else {
-      m_rendererBase.renderVulkan(eye, m_lineRenderer, m_fontRenderer);
-    }
-  }, "axis_overlay");
+  RendererCPUState axisBatches = m_rendererBase.captureVulkanBatches(
+    [&]() {
+      m_rendererBase.setActiveSurfaceWithLoadStore(axisSurface,
+                                                   LoadOp::Load,
+                                                   StoreOp::Store,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store);
+      if (m_axisMode.get() == "Arrow") {
+        m_rendererBase.renderVulkan(eye, m_arrowRenderer, m_fontRenderer);
+      } else {
+        m_rendererBase.renderVulkan(eye, m_lineRenderer, m_fontRenderer);
+      }
+    },
+    "axis_overlay");
 
   if (axisBatches.batches.empty()) {
     return;

@@ -948,15 +948,18 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 
   const auto fragmentShader = selectFragmentShader(key.shaderHookType);
 
-  const std::string vertexShader = (key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit)
-                                     ? "mesh_depth.vert.spv"
-                                     : "mesh.vert.spv";
+  const bool depthOnlyPass = (key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                              key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
+
+  // Use the depth-only mesh vertex shader for OIT init/count passes. The corresponding
+  // fragment shaders rely on gl_FragCoord and compile (-O) to have no stage inputs,
+  // so exporting varyings from mesh.vert would trigger Vulkan interface warnings.
+  const std::string vertexShader = depthOnlyPass ? "mesh_depth.vert.spv" : "mesh.vert.spv";
 
   instance.shader =
     std::make_unique<ZVulkanShader>(device, shaderBase + vertexShader, shaderBase + fragmentShader, std::nullopt);
 
-  const bool depthOnlyInit = (key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
-  if (!depthOnlyInit) {
+  if (!depthOnlyPass) {
     const uint32_t useMeshColor = key.colorSource == MeshPayload::ColorSource::MeshColor ? 1u : 0u;
     const uint32_t use1D = key.colorSource == MeshPayload::ColorSource::Mesh1DTexture ? 1u : 0u;
     const uint32_t use2D = key.colorSource == MeshPayload::ColorSource::Mesh2DTexture ? 1u : 0u;
@@ -994,7 +997,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment, fragmentSpecs, fragmentBytes);
   }
 
-  auto vertexInput = depthOnlyInit ? makeSoAMeshDepthVertexInput() : makeSoAMeshVertexInput(key.colorSource);
+  auto vertexInput = depthOnlyPass ? makeSoAMeshDepthVertexInput() : makeSoAMeshVertexInput(key.colorSource);
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, toVkTopology(key.meshType));
   std::vector<vk::DescriptorSetLayout> layouts{m_setTextures, m_setLighting, m_setTransforms, m_setOIT};
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);

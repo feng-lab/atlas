@@ -17,6 +17,8 @@
 #include "znumericparameter.h"
 #include "z3dscratchresourcepool.h"
 #include "z3dcompositorpass.h"
+#include <array>
+#include <cstdint>
 
 namespace nim {
 
@@ -266,11 +268,25 @@ private:
   std::vector<Z3DGeometryFilter*> m_geometryFilters;
   std::vector<Z3DImgFilter*> m_volumeFilters;
 
-  Z3DScratchResourcePool::RenderTargetLease m_outRenderTarget1;
-  Z3DScratchResourcePool::RenderTargetLease m_leftEyeOutRenderTarget1;
-
-  Z3DScratchResourcePool::RenderTargetLease m_outRenderTarget2;
-  Z3DScratchResourcePool::RenderTargetLease m_leftEyeOutRenderTarget2;
+  // Offline presentation ring: persistent output targets backing the compositor's
+  // ready/current pointers.
+  //
+  // Vulkan can have >1 frames in flight (pipelined submissions). To avoid two
+  // in-flight frames writing into the same offline presentation buffer, we size
+  // this ring to (maxFramesInFlight + 1) when Vulkan is active.
+  //
+  // Important: these leases are registered as persistent leases in Z3DRendererBase.
+  // That subsystem stores raw pointers to the lease objects. To keep those pointers
+  // stable (and avoid invalidation on container growth), store the ring slots as
+  // in-object subobjects (std::array) and manage an active ring size explicitly.
+  //
+  // If you need more buffers than this constant allows, prefer refactoring the
+  // persistent-lease registry to avoid raw pointers rather than silently truncating.
+  static constexpr size_t kMaxOfflinePresentBuffers = 16u;
+  std::array<Z3DScratchResourcePool::RenderTargetLease, kMaxOfflinePresentBuffers> m_outRenderTargets;
+  std::array<Z3DScratchResourcePool::RenderTargetLease, kMaxOfflinePresentBuffers> m_leftEyeOutRenderTargets;
+  size_t m_outPresentRingSize = 2u;
+  size_t m_leftPresentRingSize = 2u;
 
   Z3DScratchResourcePool::RenderTargetLease* m_monoReadyTarget = nullptr;
   Z3DScratchResourcePool::RenderTargetLease* m_leftReadyTarget = nullptr;
@@ -336,11 +352,18 @@ private:
 
   bool m_progressiveRendering = false;
 
-  Z3DLocalColorBuffer m_localColorBuffer1 = {};
-  Z3DLocalColorBuffer m_leftLocalColorBuffer1 = {};
+  // Offline presentation ring: CPU-visible buffers backing the compositor's
+  // ready/current local buffer pointers.
+  std::array<Z3DLocalColorBuffer, kMaxOfflinePresentBuffers> m_localColorBuffers;
+  std::array<Z3DLocalColorBuffer, kMaxOfflinePresentBuffers> m_leftLocalColorBuffers;
 
-  Z3DLocalColorBuffer m_localColorBuffer2 = {};
-  Z3DLocalColorBuffer m_leftLocalColorBuffer2 = {};
+  // Reservation bits for Vulkan async readback mode: once a frame is submitted,
+  // its presentation slot stays reserved until the fence-gated completion hook
+  // publishes it as ready.
+  std::array<uint8_t, kMaxOfflinePresentBuffers> m_outPresentReserved{};
+  std::array<uint8_t, kMaxOfflinePresentBuffers> m_leftPresentReserved{};
+  size_t m_outPresentCursor = 0;
+  size_t m_leftPresentCursor = 0;
 
   Z3DLocalColorBuffer* m_monoReadyLocalBuffer = nullptr;
   Z3DLocalColorBuffer* m_leftReadyLocalBuffer = nullptr;
