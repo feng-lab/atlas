@@ -34,6 +34,29 @@
 namespace nim {
 namespace {
 
+const RendererViewState& viewStateForBatch(const Z3DRendererBase& renderer, const RenderBatch& batch)
+{
+  if (batch.viewStateOverride) {
+    return *batch.viewStateOverride;
+  }
+  return renderer.viewState();
+}
+
+glm::mat4 viewportMatrixFor(const ViewportDesc& viewport)
+{
+  CHECK(viewport.extent.x > 0.0f && viewport.extent.y > 0.0f) << "viewportMatrixFor requires a non-empty viewport";
+  const float l = viewport.origin.x;
+  const float b = viewport.origin.y;
+  const float r = l + viewport.extent.x;
+  const float t = b + viewport.extent.y;
+  constexpr float n = 0.f;
+  constexpr float f = 1.f;
+  return glm::mat4(glm::vec4((r - l) / 2.f, 0.f, 0.f, 0.f),
+                   glm::vec4(0.f, (t - b) / 2.f, 0.f, 0.f),
+                   glm::vec4(0.f, 0.f, (f - n) / 2.f, 0.f),
+                   glm::vec4((r + l) / 2.f, (t + b) / 2.f, (f + n) / 2.f, 1.f));
+}
+
 vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
 {
   static std::array<vk::VertexInputBindingDescription, 5> bindings{
@@ -342,7 +365,8 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
     payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
 
   TransformsUBOStd140 transforms{};
-  const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
+  const auto& viewState = viewStateForBatch(renderer, batch);
+  const auto& eyeState = viewState.eyes[static_cast<size_t>(batch.eye)];
   transforms.view_matrix = eyeState.viewMatrix;
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
   CHECK(payload.paramsCaptured) << "Line payload missing params";
@@ -1452,6 +1476,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
 
   CHECK(batch.shaderHook.captured) << "Line batch missing shader hook snapshot";
   const auto shaderHook = batch.shaderHook.type;
+  const auto& viewState = viewStateForBatch(renderer, batch);
   vk::DescriptorSet texOverride{};
   if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_setTexture) {
     // Allocate a per-draw override descriptor set for DDP peel inputs to avoid update-after-bind.
@@ -1644,9 +1669,9 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
         float _pad = 0.0f;
       } pc;
 
-      const auto& frameState = renderer.frameState();
-      pc.viewport_matrix = frameState.viewportMatrix;
-      pc.viewport_matrix_inverse = frameState.inverseViewportMatrix;
+      const glm::mat4 vpMatrix = viewportMatrixFor(batch.pass.viewport);
+      pc.viewport_matrix = vpMatrix;
+      pc.viewport_matrix_inverse = glm::inverse(vpMatrix);
       CHECK(payload.paramsCaptured) << "Line payload missing params";
       pc.size_scale = payload.params.sizeScale;
 
@@ -1684,8 +1709,8 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
         for (uint32_t i = 0; i < drawSegments; ++i) {
           pc.line_width = widths[i];
           if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
-            const float n = renderer.viewState().nearClip;
-            const float f = renderer.viewState().farClip;
+            const float n = viewState.nearClip;
+            const float f = viewState.farClip;
             const float denom = std::max(f - n, 1e-6f);
             pc.weighted_a = (f * n) / denom;
             pc.weighted_b = 0.5f * (f + n) / denom + 0.5f;

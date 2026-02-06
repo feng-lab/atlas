@@ -106,8 +106,8 @@ public:
   // and before command buffer recording begins.
   //
   // Contract:
-  // - Must be enqueued before any raster/replay/commands nodes for that submission.
   // - Must not record GPU commands (command buffer is not recording yet).
+  // - Runs once at the start of the next submission flush boundary.
   SegmentHandle preRecord(std::string_view label,
                           std::span<const SegmentHandle> deps,
                           const std::function<void(Z3DRendererVulkanBackend&, Z3DRendererBase&)>& fn);

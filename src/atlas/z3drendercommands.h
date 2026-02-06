@@ -22,6 +22,7 @@ class ZColorMap;
 class Z3DTransferFunction;
 class Z3DRendererBase;
 class Z3DTexture;
+struct RendererViewState;
 
 struct RendererParameterState
 {
@@ -937,6 +938,11 @@ struct RenderBatch
   GeometryPayload geometry;
   ClipPlanesState clipPlanes;
   ShaderHookState shaderHook;
+  // Optional per-batch view state snapshot. Most passes use the renderer's
+  // current view state at execution time; special overlays (e.g. axis) can
+  // attach a snapshot so deferred submission does not depend on mutable global
+  // renderer state.
+  std::shared_ptr<const RendererViewState> viewStateOverride;
   // The renderer that originally authored this batch. This matters on Vulkan
   // where batches can be collected and executed by an aggregator, but clip
   // planes for local/global XYZ cuts are owned by the originating renderer.

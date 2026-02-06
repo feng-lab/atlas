@@ -86,6 +86,14 @@ bool clipPlanesEqual(const ClipPlanesState& a, const ClipPlanesState& b)
   return true;
 }
 
+const RendererViewState& viewStateForBatch(const Z3DRendererBase& renderer, const RenderBatch& batch)
+{
+  if (batch.viewStateOverride) {
+    return *batch.viewStateOverride;
+  }
+  return renderer.viewState();
+}
+
 } // namespace
 
 ZVulkanConePipelineContext::ZVulkanConePipelineContext(Z3DRendererVulkanBackend& backend)
@@ -279,7 +287,8 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
-  const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
+  const auto& viewState = viewStateForBatch(renderer, batch);
+  const auto& eyeState = viewState.eyes[static_cast<size_t>(batch.eye)];
   ConePushConstants constants;
   constants.projectionMatrix = eyeState.projectionMatrix;
   constants.ortho = eyeState.isPerspective ? 0.0f : 1.0f;
@@ -464,7 +473,8 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
                     hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   CHECK(payload.paramsCaptured) << "Cone payload missing params";
 
-  const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
+  const auto& viewState = viewStateForBatch(renderer, batch);
+  const auto& eyeState = viewState.eyes[static_cast<size_t>(batch.eye)];
 
   TransformsUBOStd140 transforms{};
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;

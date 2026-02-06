@@ -142,7 +142,8 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   // Draw-only; backend controls attachments and render area
 
   // Compose push constants (match shader layout)
-  const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
+  const auto& viewState = batch.viewStateOverride ? *batch.viewStateOverride : renderer.viewState();
+  const auto& eyeState = viewState.eyes[static_cast<size_t>(batch.eye)];
   CHECK(payload.paramsCaptured) << "Font payload missing params";
   // Match OpenGL behaviour: renderers that opt out of coord transforms (e.g., the
   // axis overlay font) expect billboard quads in camera space.

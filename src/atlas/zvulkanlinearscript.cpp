@@ -106,8 +106,7 @@ ZVulkanLinearScript::preRecord(std::string_view label,
                                const std::function<void(Z3DRendererVulkanBackend&, Z3DRendererBase&)>& fn)
 {
   validateDeps(label, deps);
-  CHECK(!m_pendingSubmissionHasGpuNodes)
-    << "ZVulkanLinearScript::preRecord must be enqueued before raster/replay/commands nodes for that submission";
+  CHECK(!m_frameOpen) << "ZVulkanLinearScript::preRecord must be enqueued before the script begins recording";
   CHECK(fn) << "ZVulkanLinearScript::preRecord requires a valid function";
 
   const auto handle = nextHandle();

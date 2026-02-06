@@ -1203,7 +1203,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
   // Begin a dynamic rendering segment for the batch's attachments via the recorder
   auto beginSegmentForBatch = [&](const RenderBatch& batch,
                                   ZVulkanPipelineCommandRecorder& recorder,
-                                  ZVulkanPipelineCommandRecorder::RenderingSegmentSpec& outSpec) {
+                                  ZVulkanPipelineCommandRecorder::RenderingSegmentSpec& outSpec,
+                                  bool forceLoadOps) {
     outSpec = {};
     // Render area from pass viewport/scissor
     outSpec.renderArea = vulkan::toVkScissor(batch.pass);
@@ -1241,6 +1242,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
           break;
       }
       info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+      if (forceLoadOps) {
+        info.loadOp = vk::AttachmentLoadOp::eLoad;
+      }
       info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
       info.aspect = vk::ImageAspectFlagBits::eColor;
       info.trackingTexture = &texture;
@@ -1281,6 +1285,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
           break;
       }
       info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+      if (forceLoadOps) {
+        info.loadOp = vk::AttachmentLoadOp::eLoad;
+      }
       info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
       // Treat all depth(-stencil) formats as depth aspect for rendering; recorder will bind stencil if needed
       info.aspect = vk::ImageAspectFlagBits::eDepth;
@@ -1366,14 +1373,16 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (m_activeFrame) {
       m_activeFrame->renderingSegmentsBegan++;
       for (const auto& a : batch.pass.colorAttachments) {
-        if (a.loadOp == LoadOp::Clear) {
+        const LoadOp effective = forceLoadOps ? LoadOp::Load : a.loadOp;
+        if (effective == LoadOp::Clear) {
           m_activeFrame->attachmentClears++;
         } else {
           m_activeFrame->attachmentLoads++;
         }
       }
       if (batch.pass.depthAttachment) {
-        if (batch.pass.depthAttachment->loadOp == LoadOp::Clear) {
+        const LoadOp effective = forceLoadOps ? LoadOp::Load : batch.pass.depthAttachment->loadOp;
+        if (effective == LoadOp::Clear) {
           m_activeFrame->attachmentClears++;
         } else {
           m_activeFrame->attachmentLoads++;
@@ -1406,9 +1415,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     currentKey.reset();
   };
 
-  auto openSegmentForBatch = [&](const RenderBatch& batch, const SegmentKey& key) -> bool {
+  auto openSegmentForBatch = [&](const RenderBatch& batch, const SegmentKey& key, bool forceLoadOps) -> bool {
     ZVulkanPipelineCommandRecorder::RenderingSegmentSpec spec;
-    if (!beginSegmentForBatch(batch, recorder, spec)) {
+    if (!beginSegmentForBatch(batch, recorder, spec, forceLoadOps)) {
       return false;
     }
     segmentOpen = true;
@@ -1441,8 +1450,25 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       }
     }
 
-    // Note: do not forcibly close segments before texture_copy; rely on
-    // producers to end in sampled layouts to avoid in-segment transitions.
+    const auto vkViewport = vulkan::toVkViewport(batch.pass.viewport);
+    const auto vkScissor = vulkan::toVkScissor(batch.pass);
+
+    const bool selfManaged = isSelfManaged(batch.geometry);
+    const SegmentKey segmentKey = buildKey(batch, vkScissor);
+
+    // Segment boundaries must be established before emitting any barriers:
+    // Vulkan forbids vkCmdPipelineBarrier2 (image/buffer barriers) inside a
+    // dynamic-rendering instance unless dynamicRenderingLocalRead is enabled.
+    if (selfManaged) {
+      endRenderingSegmentIfOpen();
+    } else if (segmentOpen && (!currentKey || *currentKey != segmentKey)) {
+      endRenderingSegmentIfOpen();
+    }
+
+    // If we had to temporarily close a segment to emit barriers for this batch
+    // (layout transitions / buffer hazards), reopening must *not* re-clear
+    // attachments. Force all attachment loadOps to LOAD on that restart.
+    bool forceLoadOps = false;
 
     // Ensure any external image uses referenced by this batch are transitioned
     // to the required layouts. This is driven by explicit pass metadata
@@ -1511,6 +1537,61 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       }
     };
 
+    auto externalBufferUseNeedsBarrier = [&](const ExternalBufferUseDesc& use) -> bool {
+      if (!use.handle.valid()) {
+        return false;
+      }
+
+      auto& buffer = vulkan::bufferFromHandle(use.handle, device(), "renderer external buffer use");
+      const auto useInfo = vulkan::resolveExternalBufferUse(use.kind, buffer.usage());
+      const vk::PipelineStageFlags2 desiredStage = useInfo.stage;
+      const vk::AccessFlags2 desiredAccess = useInfo.access;
+
+      const uint64_t bufferKey =
+        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(buffer.buffer())));
+      const auto it = m_externalBufferUseStates.find(bufferKey);
+      const ExternalBufferUseState previous =
+        (it == m_externalBufferUseStates.end()) ? ExternalBufferUseState{} : it->second;
+
+      auto hasWrite = [](vk::AccessFlags2 access) {
+        return static_cast<bool>(access & (vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eTransferWrite |
+                                           vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eHostWrite));
+      };
+
+      return (previous.stage != desiredStage || previous.access != desiredAccess) &&
+             (hasWrite(previous.access) || hasWrite(desiredAccess));
+    };
+
+    // When a segment is already open (same attachments), avoid emitting any
+    // barriers inside dynamic rendering by restarting the segment if any
+    // external use needs a transition/barrier.
+    if (!selfManaged && segmentOpen) {
+      bool needsBarrierOutsideSegment = false;
+      for (const auto& use : batch.pass.externalImageUses) {
+        if (!use.handle.valid()) {
+          continue;
+        }
+        auto& texture = vulkan::textureFromHandle(use.handle, device(), "renderer external image use");
+        const auto useInfo = vulkan::resolveExternalImageUse(use.kind, use.aspectHint);
+        if (texture.layout() != useInfo.layout) {
+          needsBarrierOutsideSegment = true;
+          break;
+        }
+      }
+      if (!needsBarrierOutsideSegment) {
+        for (const auto& use : batch.pass.externalBufferUses) {
+          if (externalBufferUseNeedsBarrier(use)) {
+            needsBarrierOutsideSegment = true;
+            break;
+          }
+        }
+      }
+      if (needsBarrierOutsideSegment) {
+        endRenderingSegmentIfOpen();
+        forceLoadOps = true;
+      }
+    }
+
     for (const auto& use : batch.pass.externalImageUses) {
       ensureExternalImageUse(use);
     }
@@ -1529,8 +1610,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       const vk::PipelineStageFlags2 desiredStage = useInfo.stage;
       const vk::AccessFlags2 desiredAccess = useInfo.access;
 
-      const uint64_t key = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(buffer.buffer())));
-      const auto it = m_externalBufferUseStates.find(key);
+      const uint64_t bufferKey =
+        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(buffer.buffer())));
+      const auto it = m_externalBufferUseStates.find(bufferKey);
       const ExternalBufferUseState previous =
         (it == m_externalBufferUseStates.end()) ? ExternalBufferUseState{} : it->second;
 
@@ -1560,31 +1642,16 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         cmd.pipelineBarrier2(dep);
       }
 
-      m_externalBufferUseStates[key] = ExternalBufferUseState{desiredStage, desiredAccess};
+      m_externalBufferUseStates[bufferKey] = ExternalBufferUseState{desiredStage, desiredAccess};
     };
 
     for (const auto& use : batch.pass.externalBufferUses) {
       ensureExternalBufferUse(use);
     }
 
-    const auto vkViewport = vulkan::toVkViewport(batch.pass.viewport);
-    const auto vkScissor = vulkan::toVkScissor(batch.pass);
-
-    const bool selfManaged = isSelfManaged(batch.geometry);
-    const auto key = buildKey(batch, vkScissor);
-
-    if (selfManaged) {
-      endRenderingSegmentIfOpen();
-    } else {
-      if (!segmentOpen) {
-        if (!openSegmentForBatch(batch, key)) {
-          continue;
-        }
-      } else if (!currentKey || *currentKey != key) {
-        endRenderingSegmentIfOpen();
-        if (!openSegmentForBatch(batch, key)) {
-          continue;
-        }
+    if (!selfManaged && !segmentOpen) {
+      if (!openSegmentForBatch(batch, segmentKey, forceLoadOps)) {
+        continue;
       }
     }
 

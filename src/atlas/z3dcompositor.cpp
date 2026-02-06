@@ -4602,6 +4602,13 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   // batches twice (a measurable CPU cost for complex scenes).
   // ---------------------------------------------------------------------------
   auto transparentBatches = std::make_shared<RendererCPUState>();
+  auto setPPLLShaderHookOnBatches = [transparentBatches](Z3DRendererBase::ShaderHookType hook) {
+    CHECK(transparentBatches != nullptr);
+    for (auto& batch : transparentBatches->batches) {
+      CHECK(batch.shaderHook.captured) << "PPLL captured batch missing shader hook snapshot";
+      batch.shaderHook.type = hook;
+    }
+  };
   {
     for (auto* filter : filters) {
       if (!filter) {
@@ -4656,7 +4663,7 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
                                                   sumsBufSlot.set(be.ppllBlockSumsBufferObj());
                                                 });
 
-    m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
+    setPPLLShaderHookOnBatches(Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
 
     const auto segResetCounts =
       script.commands("transparency_ppll_reset_counts", {segPrimeCount}, [](Z3DRendererVulkanBackend& be) {
@@ -4759,7 +4766,7 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
     }
   }
 
-  m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore);
+  setPPLLShaderHookOnBatches(Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore);
   {
     auto blockPrefixesShared = std::make_shared<std::vector<uint32_t>>(std::move(blockPrefixes));
     const auto segScanAdd =
@@ -5178,29 +5185,27 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye,
   CHECK(!(axisSurface.colorAttachments.empty() && !axisSurface.depthAttachment.has_value()))
     << "Vulkan axis overlay skipped: compositor output lease has no Vulkan attachments.";
 
-  const glm::uvec4 prevViewport = m_rendererBase.frameState().viewport;
-  const auto prevSurface = m_rendererBase.frameState().activeSurface;
-  const auto prevHook = m_rendererBase.shaderHookType();
-  const bool hookWasNormal = prevHook == Z3DRendererBase::ShaderHookType::Normal;
-
   auto& params = m_rendererBase.parameterState();
   const glm::mat4 previousTransform = params.coordTransform;
-  params.coordTransform = axisTransform;
-  auto transformGuard = folly::makeGuard([&params, previousTransform]() {
+  const RendererViewState previousViewState = m_rendererBase.viewState();
+  const glm::uvec4 previousViewport = m_rendererBase.frameState().viewport;
+  const auto previousSurface = m_rendererBase.frameState().activeSurface;
+  const auto previousHook = m_rendererBase.shaderHookType();
+  auto stateGuard = folly::makeGuard([&]() {
     params.coordTransform = previousTransform;
-  });
-
-  const auto previousViewState = m_rendererBase.pushViewStateFromCamera(m_axisCamera);
-  auto viewGuard = folly::makeGuard([this, previousViewState]() {
     m_rendererBase.restoreViewState(previousViewState);
+    m_rendererBase.frameState().updateViewportData(previousViewport);
+    m_rendererBase.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
+    m_rendererBase.setShaderHookType(previousHook);
   });
 
+  params.coordTransform = axisTransform;
+  auto axisViewState = std::make_shared<RendererViewState>(Z3DRendererBase::buildViewStateFromCamera(m_axisCamera));
+  m_rendererBase.restoreViewState(*axisViewState);
   m_rendererBase.frameState().updateViewportData(axisViewport);
-  if (!hookWasNormal) {
-    m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
-  }
+  m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
 
-  script.raster("axis_overlay", {}, [&]() {
+  RendererCPUState axisBatches = m_rendererBase.captureVulkanBatches([&]() {
     m_rendererBase.setActiveSurfaceWithLoadStore(axisSurface,
                                                  LoadOp::Load,
                                                  StoreOp::Store,
@@ -5211,13 +5216,17 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye,
     } else {
       m_rendererBase.renderVulkan(eye, m_lineRenderer, m_fontRenderer);
     }
-  });
+  }, "axis_overlay");
 
-  m_rendererBase.frameState().updateViewportData(prevViewport);
-  m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
-  if (!hookWasNormal) {
-    m_rendererBase.setShaderHookType(prevHook);
+  if (axisBatches.batches.empty()) {
+    return;
   }
+
+  for (auto& batch : axisBatches.batches) {
+    batch.viewStateOverride = axisViewState;
+  }
+
+  script.replay("axis_overlay", {}, std::make_shared<RendererCPUState>(std::move(axisBatches)));
 }
 
 void Z3DCompositor::renderAxis(Z3DEye eye)
