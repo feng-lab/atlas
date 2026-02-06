@@ -169,8 +169,10 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = batch.shaderHook.type;
 
-  m_dynLightingOffset =
-    payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
+  // Match OpenGL: lighting is controlled per-renderer (Z3DPrimitiveRenderer::m_needLighting),
+  // not purely by whether the scene has lights.
+  m_dynLightingOffset = (payload.pickingPass || !payload.wantsLighting) ? m_backend.framePickingLightingOffset()
+                                                                        : m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload, pickingPass);
   // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
   CHECK(m_dsLighting && m_dsTransforms) << "Ellipsoid pipeline descriptor sets missing (lighting/transforms)";

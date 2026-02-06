@@ -540,6 +540,21 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
                                vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
     baseBlend.blendEnable = false;
 
+    auto enablePremultipliedAlphaBlend = [&]() {
+      auto attachments = makeBlendAttachments(formats.colorFormats.size(), baseBlend);
+      for (auto& attachment : attachments) {
+        attachment.blendEnable = true;
+        attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+        attachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+        attachment.colorBlendOp = vk::BlendOp::eAdd;
+        // Match glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
+        attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+        attachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+        attachment.alphaBlendOp = vk::BlendOp::eAdd;
+      }
+      instance.pipeline->setColorBlendAttachments(std::move(attachments));
+    };
+
     switch (key.shaderHookType) {
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
@@ -630,6 +645,13 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
         break;
       }
       default:
+        // Match OpenGL compositor selection-box pass: wide lines output
+        // premultiplied alpha coverage for anti-aliasing and must blend over
+        // the existing scene color. Keep picking pass as overwrite to preserve
+        // ID colors.
+        if (!key.picking) {
+          enablePremultipliedAlphaBlend();
+        }
         break;
     }
 
@@ -732,6 +754,22 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
       // Match GL DDP: depth-tested against the (loaded) opaque depth buffer, but do not write depth.
       instance.pipeline->setDepthTestEnable(true);
       instance.pipeline->setDepthWriteEnable(false);
+    } else if (!key.picking) {
+      // Match glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA) for line overlays
+      // and any non-opaque line draws. Picking must overwrite to keep IDs.
+      std::vector<vk::PipelineColorBlendAttachmentState> attachments(formats.colorFormats.size());
+      for (auto& attachment : attachments) {
+        attachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+        attachment.blendEnable = true;
+        attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+        attachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+        attachment.colorBlendOp = vk::BlendOp::eAdd;
+        attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+        attachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+        attachment.alphaBlendOp = vk::BlendOp::eAdd;
+      }
+      instance.pipeline->setColorBlendAttachments(std::move(attachments));
     }
     instance.pipeline->create();
   }
@@ -1673,13 +1711,15 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       pc.viewport_matrix = vpMatrix;
       pc.viewport_matrix_inverse = glm::inverse(vpMatrix);
       CHECK(payload.paramsCaptured) << "Line payload missing params";
-      pc.size_scale = payload.params.sizeScale;
+      // Match GL: allow renderers to opt out of applying the global sizeScale
+      // multiplier (used by overlays like selection bounding boxes / gizmos).
+      pc.size_scale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
 
       const auto widths = payload.perSegmentWidths;
       const float dpr = renderer.sceneState().devicePixelRatio;
       const bool msaa2x2 =
         (renderer.sceneState().multisample == GeometryMSAAMode::MSAA2x2) && payload.enableMultisample;
-      const float sizeScale = payload.params.sizeScale;
+      const float sizeScale = pc.size_scale;
       const bool ddpPeelIndirect =
         (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
       const DDPArgs* ddpArgs = nullptr;

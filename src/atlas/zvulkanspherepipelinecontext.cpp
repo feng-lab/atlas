@@ -212,7 +212,12 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = batch.shaderHook.type;
 
-  m_dynLightingOffset = payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
+  // Match OpenGL: lighting is controlled per-renderer (Z3DPrimitiveRenderer::m_needLighting),
+  // not purely by whether the scene has lights. Use the "no lighting" UBO slice whenever the
+  // payload opts out of lighting, so unlit overlays (e.g. transform gizmos) render with flat
+  // premultiplied colors like the GL backend.
+  m_dynLightingOffset = (payload.pickingPass || !payload.wantsLighting) ? m_backend.framePickingLightingOffset()
+                                                                        : m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload, pickingPass);
   // Ensure DDP flag descriptor set (set=3) only; no OIT UBO
   ensureOITResources();
@@ -264,7 +269,9 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
 
   CHECK(payload.paramsCaptured) << "Sphere payload missing params";
   SpherePushConstants constants;
-  constants.sizeScale = payload.params.sizeScale;
+  // Match GL: allow renderers to opt out of applying the global sizeScale
+  // multiplier (used by overlays like the transform gizmo).
+  constants.sizeScale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
   constants.boxCorrection = computeBoxCorrection(glm::degrees(eyeState.fieldOfView));
   constants.ortho = eyeState.isPerspective ? 0.0f : 1.0f;
   if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {

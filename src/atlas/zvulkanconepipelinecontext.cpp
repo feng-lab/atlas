@@ -237,8 +237,12 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = batch.shaderHook.type;
 
-  m_dynLightingOffset =
-    payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
+  // Match OpenGL: lighting is controlled per-renderer (Z3DPrimitiveRenderer::m_needLighting),
+  // not purely by whether the scene has lights. Use the "no lighting" UBO slice whenever the
+  // payload opts out of lighting, so unlit overlays (e.g. transform gizmos) render with flat
+  // premultiplied colors like the GL backend.
+  m_dynLightingOffset = (payload.pickingPass || !payload.wantsLighting) ? m_backend.framePickingLightingOffset()
+                                                                        : m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload, pickingPass);
   // Ensure DDP flag descriptor set (set=3) only; no OIT UBO
   ensureOITResources();

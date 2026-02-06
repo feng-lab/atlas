@@ -319,7 +319,9 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = batch.shaderHook.type;
 
-  m_dynLightingOffset = payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
+  // Match OpenGL: lighting can be disabled per-renderer even when the scene has lights.
+  m_dynLightingOffset = (payload.pickingPass || !payload.wantsLighting) ? m_backend.framePickingLightingOffset()
+                                                                        : m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload);
   ensureOITResources();
   // No OIT UBO; set 3 carries only the DDP flag

@@ -990,13 +990,6 @@ double Z3DCompositor::processGL(Z3DEye eye)
         m_textureCopyRenderer.setDepthTexture(temp1Lease.renderTarget->depthTexture());
         m_rendererBase.render(eye, m_textureCopyRenderer);
         glDepthFunc(GL_LESS);
-        if (m_showAxis.get()) {
-          if (!m_showBackground.get()) {
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-          }
-          renderAxis(eye);
-        }
         if (m_showBackground.get() || m_showAxis.get()) {
           glBlendFunc(GL_ONE, GL_ZERO);
           glDisable(GL_BLEND);
@@ -1033,13 +1026,6 @@ double Z3DCompositor::processGL(Z3DEye eye)
         m_firstOnTopBlendRenderer.setColorTexture2(temp1Lease.renderTarget->colorTexture());
         m_firstOnTopBlendRenderer.setDepthTexture2(temp1Lease.renderTarget->depthTexture());
         m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
-        if (m_showAxis.get()) {
-          if (!m_showBackground.get()) {
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-          }
-          renderAxis(eye);
-        }
         if (m_showBackground.get() || m_showAxis.get()) {
           glBlendFunc(GL_ONE, GL_ZERO);
           glDisable(GL_BLEND);
@@ -1070,13 +1056,6 @@ double Z3DCompositor::processGL(Z3DEye eye)
         m_textureCopyRenderer.setDepthTexture(depthTex);
         m_rendererBase.render(eye, m_textureCopyRenderer);
         glDepthFunc(GL_LESS);
-        if (m_showAxis.get()) {
-          if (!m_showBackground.get()) {
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-          }
-          renderAxis(eye);
-        }
         if (m_showBackground.get() || m_showAxis.get()) {
           glBlendFunc(GL_ONE, GL_ZERO);
           glDisable(GL_BLEND);
@@ -1126,13 +1105,6 @@ double Z3DCompositor::processGL(Z3DEye eye)
           m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
         }
 
-        if (m_showAxis.get()) {
-          if (!m_showBackground.get()) {
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-          }
-          renderAxis(eye);
-        }
         if (m_showBackground.get() || m_showAxis.get()) {
           glBlendFunc(GL_ONE, GL_ZERO);
           glDisable(GL_BLEND);
@@ -1186,13 +1158,6 @@ double Z3DCompositor::processGL(Z3DEye eye)
         m_firstOnTopBlendRenderer.setDepthTexture2(temp2LeaseA.renderTarget->depthTexture());
         m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
 
-        if (m_showAxis.get()) {
-          if (!m_showBackground.get()) {
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-          }
-          renderAxis(eye);
-        }
         if (m_showBackground.get() || m_showAxis.get()) {
           glBlendFunc(GL_ONE, GL_ZERO);
           glDisable(GL_BLEND);
@@ -1238,13 +1203,6 @@ double Z3DCompositor::processGL(Z3DEye eye)
       m_textureCopyRenderer.setDepthTexture(temp1Lease.renderTarget->depthTexture());
       m_rendererBase.render(eye, m_textureCopyRenderer);
       glDepthFunc(GL_LESS);
-      if (m_showAxis.get()) {
-        if (!m_showBackground.get()) {
-          glEnable(GL_BLEND);
-          glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        }
-        renderAxis(eye);
-      }
       if (m_showBackground.get() || m_showAxis.get()) {
         glBlendFunc(GL_ONE, GL_ZERO);
         glDisable(GL_BLEND);
@@ -1281,13 +1239,6 @@ double Z3DCompositor::processGL(Z3DEye eye)
       m_firstOnTopBlendRenderer.setColorTexture2(temp1Lease2.renderTarget->colorTexture());
       m_firstOnTopBlendRenderer.setDepthTexture2(temp1Lease2.renderTarget->depthTexture());
       m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
-      if (m_showAxis.get()) {
-        if (!m_showBackground.get()) {
-          glEnable(GL_BLEND);
-          glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        }
-        renderAxis(eye);
-      }
       if (m_showBackground.get() || m_showAxis.get()) {
         glBlendFunc(GL_ONE, GL_ZERO);
         glDisable(GL_BLEND);
@@ -1343,6 +1294,37 @@ double Z3DCompositor::processGL(Z3DEye eye)
     glBlendFunc(GL_ONE, GL_ZERO);
     glDisable(GL_BLEND);
     currentOutRenderTarget.release();
+    CHECK_GL_ERROR
+  }
+
+  if (m_showAxis.get()) {
+    // Draw the axis overlay after all depth-tested overlays (e.g. selection boxes).
+    //
+    // The axis overlay clears the depth buffer inside the inset viewport so the widget can
+    // depth-test itself while still sampling the main scene color. If we clear that depth
+    // region earlier, later depth-tested overlays will "pop" on top of the scene within the
+    // inset region because the scene depth has been wiped there.
+    Z3DRenderTarget* axisOutRenderTarget = nullptr;
+    if (!showHandleFilters.empty()) {
+      auto* finalOutLease = (eye == MonoEye)   ? m_monoCurrentTarget
+                            : (eye == LeftEye) ? m_leftCurrentTarget
+                                               : m_rightCurrentTarget;
+      axisOutRenderTarget = finalOutLease->renderTarget;
+    } else {
+      axisOutRenderTarget = &currentOutRenderTarget;
+    }
+    CHECK(axisOutRenderTarget != nullptr);
+
+    axisOutRenderTarget->bind();
+    setViewport(axisOutRenderTarget->size());
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    renderAxis(eye);
+    glBlendFunc(GL_ONE, GL_ZERO);
+    glDisable(GL_BLEND);
+    axisOutRenderTarget->release();
     CHECK_GL_ERROR
   }
 
@@ -4044,6 +4026,15 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   // 3. Final Pass
   // ---------------------------------------------------------------------
 
+  // The resolve shaders output a representative depth via gl_FragDepth. Ensure
+  // those values populate the output depth buffer so later overlays (selection
+  // box, handles) can depth-test against transparent geometry. When there is no
+  // incoming opaque depth attachment we disable depth testing during the peel
+  // passes above, so we must explicitly enable depth writes here.
+  glEnable(GL_DEPTH_TEST);
+  glDepthMask(GL_TRUE);
+  glDepthFunc(GL_ALWAYS);
+
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   m_ddpFinalShader->bind();
@@ -4060,6 +4051,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   m_ddpFinalShader->release();
   glTarget->release();
 
+  glDepthFunc(GL_LESS);
   glEnable(GL_DEPTH_TEST);
 }
 
@@ -4140,6 +4132,13 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
 
+  // The final resolve shader writes gl_FragDepth. Ensure the resolved depth is
+  // recorded in the output depth buffer even when we disabled depth testing for
+  // accumulation due to missing opaque depth.
+  glEnable(GL_DEPTH_TEST);
+  glDepthMask(GL_TRUE);
+  glDepthFunc(GL_ALWAYS);
+
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   m_waFinalShader->bind();
@@ -4155,6 +4154,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   m_waFinalShader->release();
   glTarget->release();
 
+  glDepthFunc(GL_LESS);
   glEnable(GL_DEPTH_TEST);
 }
 
@@ -4237,6 +4237,13 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
 
+  // Like WA/DDP, the WB resolve shader writes gl_FragDepth. Enable depth writes
+  // so downstream overlays can depth-test against the resolved transparent
+  // content, even when we disabled depth testing during accumulation.
+  glEnable(GL_DEPTH_TEST);
+  glDepthMask(GL_TRUE);
+  glDepthFunc(GL_ALWAYS);
+
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   m_wbFinalShader->bind();
@@ -4260,6 +4267,7 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   m_wbFinalShader->release();
   glTarget->release();
 
+  glDepthFunc(GL_LESS);
   glEnable(GL_DEPTH_TEST);
 }
 
