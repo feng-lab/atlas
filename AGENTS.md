@@ -45,6 +45,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - **Always read and keep this section handy during a session; it contains the canonical build/test commands.**
 - Configure with CMake presets or run `cmake -S . -B build/Release -DCMAKE_BUILD_TYPE=Release` (DO NOT adjust preset).
 - Incremental build: `cmake --build build/Release` (DO NOT use other build directory/preset, DO NOT add -j). Prefer running this to confirm edits compile; if you skip it, call out the gap in your handoff.
+- Tooling note (agents/automation): when running builds via tool wrappers, set a long timeout (>= 2 hours). Some wrappers may time out the *caller* without reliably terminating the underlying build process (e.g., `ninja`), so blindly retrying can spawn overlapping jobs and make the build effectively never finish.
 - Packaging helper: `python3 util/build_and_deploy_atlas.py [--skip-test]` (wraps build + optional smoke tests).
 - Avoid editing generated files, build artifacts, or anything matched by `.gitignore` (bin/, obj/, artifacts/, logs/, win-mirror/).
 

@@ -780,7 +780,7 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     }
   }
 
-  auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
+  auto slice = m_backend.suballocateUniformFor(payload, sizeof(TransformsUBOStd140));
   std::memcpy(slice.mapped, &transforms, sizeof(transforms));
   m_dynTransformsOffset = slice.offset;
   if (ddp && payload.streamKey != 0) {
@@ -864,7 +864,7 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
   material.custom_color = colorValue;
 
   {
-    auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
+    auto slice = m_backend.suballocateUniformFor(payload, sizeof(MaterialUBOStd140));
     std::memcpy(slice.mapped, &material, sizeof(material));
     m_dynMaterialOffset = slice.offset;
   }

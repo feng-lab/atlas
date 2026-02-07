@@ -517,11 +517,11 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     }
   }
 
-  auto transformsSlice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
+  auto transformsSlice = m_backend.suballocateUniformFor(payload, sizeof(TransformsUBOStd140));
   std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
   m_dynTransformsOffset = transformsSlice.offset;
 
-  auto materialSlice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
+  auto materialSlice = m_backend.suballocateUniformFor(payload, sizeof(MaterialUBOStd140));
   std::memcpy(materialSlice.mapped, &material, sizeof(material));
   m_dynMaterialOffset = materialSlice.offset;
 

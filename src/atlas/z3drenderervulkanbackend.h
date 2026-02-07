@@ -18,6 +18,7 @@
 // Attachment format helpers
 #include "zvulkanrenderconversions.h"
 #include "z3dtypes.h"
+#include "zvulkanuniforms.h"
 
 #include <array>
 #include <chrono>
@@ -30,6 +31,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -53,6 +55,102 @@ class ZVulkanImgSlicePipelineContext;
 class ZVulkanImgRaycasterPipelineContext;
 class ZVulkanFontPipelineContext;
 class ZVulkanBuffer;
+
+namespace vulkan {
+
+// Compile-time uniform-arena budgeting:
+// - Payloads that suballocate from the backend uniform arena must declare a
+//   conservative upper bound of per-batch uniform bytes.
+// - Call sites allocate via Z3DRendererVulkanBackend::suballocateUniformFor(...)
+//   which statically requires a budget trait specialization for the payload type.
+//
+// This prevents "remember to update the estimator" drift: new uniform-allocating
+// payloads fail to compile until they declare an estimation policy.
+template<typename PayloadT>
+struct UniformArenaBudgetTraits;
+
+inline constexpr size_t alignUp(size_t value, size_t alignment)
+{
+  const size_t mask = alignment ? (alignment - 1) : 0;
+  return alignment ? ((value + mask) & ~mask) : value;
+}
+
+template<typename PayloadT>
+inline constexpr bool kHasUniformArenaBudgetTraits =
+  requires(const PayloadT& payload, size_t uniformAlignment) {
+    UniformArenaBudgetTraits<PayloadT>::estimateAdditionalBytes(payload, uniformAlignment);
+  };
+
+template<>
+struct UniformArenaBudgetTraits<LinePayload>
+{
+  [[nodiscard]] static size_t estimateAdditionalBytes(const LinePayload&, size_t uniformAlignment)
+  {
+    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
+    static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
+    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
+    const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
+    return szTransforms + szMaterial;
+  }
+};
+
+template<>
+struct UniformArenaBudgetTraits<MeshPayload>
+{
+  [[nodiscard]] static size_t estimateAdditionalBytes(const MeshPayload& payload, size_t uniformAlignment)
+  {
+    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
+    static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
+    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
+    const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
+    const bool drawSurface = payload.wireframeMode != MeshPayload::WireframeMode::OnlyWireframe;
+    const bool drawWireframe = payload.wireframeMode != MeshPayload::WireframeMode::NoWireframe;
+    const size_t drawsPerMesh = static_cast<size_t>(drawSurface) + static_cast<size_t>(drawWireframe);
+    const size_t meshes = payload.meshes.size();
+    return szTransforms + (meshes * drawsPerMesh * szMaterial);
+  }
+};
+
+template<>
+struct UniformArenaBudgetTraits<SpherePayload>
+{
+  [[nodiscard]] static size_t estimateAdditionalBytes(const SpherePayload&, size_t uniformAlignment)
+  {
+    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
+    static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
+    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
+    const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
+    return szTransforms + szMaterial;
+  }
+};
+
+template<>
+struct UniformArenaBudgetTraits<EllipsoidPayload>
+{
+  [[nodiscard]] static size_t estimateAdditionalBytes(const EllipsoidPayload&, size_t uniformAlignment)
+  {
+    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
+    static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
+    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
+    const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
+    return szTransforms + szMaterial;
+  }
+};
+
+template<>
+struct UniformArenaBudgetTraits<ConePayload>
+{
+  [[nodiscard]] static size_t estimateAdditionalBytes(const ConePayload&, size_t uniformAlignment)
+  {
+    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
+    static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
+    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
+    const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
+    return szTransforms + szMaterial;
+  }
+};
+
+} // namespace vulkan
 
 // Vulkan renderer backend borrows the shared ZVulkanDevice injected through the scratch pool.
 // Lifetime notes:
@@ -108,8 +206,9 @@ public:
   // managers) to pre-size the arena before opening a Vulkan frame.
   [[nodiscard]] size_t estimateFrameUniformOverheadBytes();
 
-  // Estimate additional uniform-arena bytes required to execute the given CPU
-  // batches. This excludes the always-on per-frame overhead returned by
+  // Conservative upper-bound estimate of additional uniform-arena bytes
+  // required to execute the given CPU batches (e.g., dynamic transforms/material
+  // UBO slices). This excludes the always-on per-frame overhead returned by
   // estimateFrameUniformOverheadBytes().
   [[nodiscard]] size_t estimateAdditionalUniformBytesForBatches(const RendererCPUState& state);
 
@@ -637,6 +736,10 @@ private:
       size_t capacity = 0; // bytes
       size_t cursor = 0; // bump pointer
       size_t highWatermark = 0; // debug
+      // Minimum capacity hint supplied for this frame before ensureUniformArena()
+      // chose the final capacity. Used for debug validation to detect estimation
+      // drift (under-hinting) even when base/carry capacities mask overflow.
+      size_t minCapacityHint = 0;
     } uniformArena;
     // Shared per-frame dynamic offset for lighting UBO slice in the uniform arena
     vk::DeviceSize lightingDynOffset = 0;
@@ -754,7 +857,21 @@ public:
     void* mapped = nullptr;
     size_t size = 0;
   };
-  UniformSlice suballocateUniform(size_t bytes, size_t alignment = 0);
+
+  // Allocate a slice from the per-frame uniform arena for the given payload
+  // type. Payloads that allocate from this arena must declare a conservative
+  // per-batch upper bound via vulkan::UniformArenaBudgetTraits so higher-level
+  // schedulers can pre-size the arena safely.
+  template<typename PayloadT>
+  UniformSlice suballocateUniformFor(const PayloadT& payload, size_t bytes, size_t alignment = 0)
+  {
+    (void)payload;
+    using CleanPayloadT = std::remove_cvref_t<PayloadT>;
+    static_assert(vulkan::kHasUniformArenaBudgetTraits<CleanPayloadT>,
+                  "Uniform arena allocation requires vulkan::UniformArenaBudgetTraits specialization for payload");
+    return suballocateUniform(bytes, alignment);
+  }
+
   class ZVulkanBuffer& uniformArenaBuffer();
   // Dynamic offset of the shared per-frame lighting UBO slice
   [[nodiscard]] vk::DeviceSize frameSharedLightingOffset() const
@@ -768,11 +885,9 @@ public:
     CHECK(m_activeFrame != nullptr) << "framePickingLightingOffset called without an active frame";
     return m_activeFrame->pickingLightingDynOffset;
   }
-  static size_t alignUp(size_t value, size_t alignment)
-  {
-    const size_t mask = alignment ? (alignment - 1) : 0;
-    return alignment ? ((value + mask) & ~mask) : value;
-  }
+
+private:
+  UniformSlice suballocateUniform(size_t bytes, size_t alignment = 0);
 
 public:
   void addLineBytesStaged(size_t bytes)

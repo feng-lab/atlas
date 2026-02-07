@@ -445,9 +445,10 @@ auto staticBackground = nim::buildStaticSecondary(info, [&](vk::raii::CommandBuf
 **Atlas Frame → Vulkan Frame → Recording Session → Rendering Segment**
 - Atlas frame: one end-to-end render request as seen by the engine/UI (“user changed a parameter, render until a stable image is ready”).
 - Vulkan frame: one GPU submission slot managed by `ZVulkanFrameExecutor` (primary command buffer + fence/semaphores). A Vulkan frame may stay open across multiple passes to reduce submission overhead.
-- Preferred callsite abstraction for orchestration (compositor DDP/PPLL/picking tail): `ZVulkanLinearScript` (`src/atlas/zvulkanlinearscript.h`).
+- Preferred callsite abstraction for orchestration (compositor + image filter pipelines such as raycaster/slice): `ZVulkanLinearScript` (`src/atlas/zvulkanlinearscript.h`).
   - Call sites should express logic linearly as segments + explicit CPU readback boundaries (for branching/loop control flow), without directly managing `beginVulkanFrame/endVulkanFrame` or toggling global readback wait policy.
   - CPU readback boundaries are the only place the script forces a fence wait for that submission; interactive presentation stays non-blocking by default.
+  - Call sites that need cancellation (and other exceptions) to propagate must call `script.flush(...)` explicitly; the script destructor performs a best-effort flush but must not throw and therefore swallows cancellation.
   - Guideline (conceptual, not required for correctness): keep each script node small and single-purpose. In dynamic rendering there are no classic Vulkan "subpasses"; the closest equivalent is a rendering segment (`vkCmdBeginRendering`…`vkCmdEndRendering`) targeting one attachment set. Prefer one output surface / attachment set per `script.raster(...)` node, and split nodes when switching render targets so labels and load/store/final-use contracts remain easy to reason about.
 - Recording session: one “batch collection + submit” scope inside an already-open Vulkan frame. `Z3DRendererBase::recordVulkanBatchesInActiveFrame(...)` (and the compositor helper `recordInVulkanFrame`) open a session, collect CPU batches, and call `Z3DRendererVulkanBackend::processBatches(...)` to emit commands into the active command buffer.
   - Recording-session sync point: `processBatches(...)` ends with no active dynamic rendering segment and flushes any scheduled upload→static copies (`flushScheduledCopies`). This ensures orchestration code (DDP/PPLL) can safely insert compute/copy work between sessions without accidentally recording inside `vkCmdBeginRendering`.
@@ -673,6 +674,7 @@ Notes
     - `Z3DImgSliceRenderer` for explicit plane slices with colormaps.
   - The filter outputs multiple renderings (`Image`, `OpaqueImage`, stereo variants) consumed by the compositor.
   - Internally, the compositor consumes image filters via engine-managed `Z3DImgFilter*` lists.
+  - Vulkan orchestration: `Z3DImgFilter::process()` builds a per-eye `ZVulkanLinearScript` and records three nodes (raycaster → bound-box overlay → slice) targeting the filter’s own persistent scratch leases. This centralizes Vulkan submission boundaries like the compositor, enabling future backend/script optimization without changing filter call sites.
 
 - Fast vs Full-Resolution
   - On load, large volumes are downsampled to fit GPU constraints. `Z3DImg::isVolumeDownsampled()` indicates this.
@@ -701,6 +703,7 @@ Notes
   - Raycaster maintains per-eye `m_channelIdx[eye]` and `m_round[eye]` and persistent `m_progressiveLayerLease` across rounds.
   - Each round renders a subset of rays/blocks; after enough rounds or when all requested blocks are uploaded, the channel is complete.
   - Depth/color ping-pong RTs (`m_lastImageRenderTargets`/`m_currentImageRenderTargets`) support iterative integration.
+  - Vulkan: channel/round progression is advanced by backend finalization callbacks. After recording work in `ZVulkanImgRaycasterPipelineContext` / `ZVulkanImgSlicePipelineContext`, the backend consumes `takePendingFinalization()` and calls `finalizeImgRaycasterRoundByKey(...)` / `finalizeImgSliceRoundByKey(...)` on the originating renderer.
 
 - Aliases and Correctness
   - `ZImgDoc::makeAlias(id)` returns a new ID pointing to the same `ZImgPack` (shared backing data). Each 3D alias gets its own `Z3DImgFilter` with independent transforms and parameters.
@@ -735,6 +738,7 @@ User-Facing Behavior (summary)
   - On invalidation, the image filter requests cancellation via `globalParas().cancellationSource->requestCancellation()` if a render is in progress.
   - Each `Z3DImgFilter` also sets a small internal flag so it can ask its renderers to reset at the start of the next `process()` call (a safe point). Renderers expose reset as an internal operation (friend access) — it is not part of the public API.
   - Renderers also periodically check the token and may throw a cancellation exception during long passes; they perform their own safe reset in the catch paths. Together, this guarantees a clean progressive restart across all image filters without mutating state mid-pass.
+  - When orchestration is expressed via `ZVulkanLinearScript` (compositor/image filters), call sites must flush explicitly (`script.flush(...)`) so cancellation propagates; do not rely on destructor flush.
 
 Scratch Resource Pool (`Z3DScratchResourcePool`)
 
@@ -830,7 +834,7 @@ Compositor Pass Graph (Vulkan)
 - Offscreen only; no swapchain.
 - Per frame, the Vulkan compositor executes a simple pass ordering: Background → Opaque Geometry → Transparency → Glow → Overlays.
 - Background + geometry now record via a single driver (`executeCompositorPassesVulkan`), which reduces dynamic rendering begin/end churn by coalescing compatible batches.
-- Some pipeline contexts (image slice/raycast and glow) manage their own dynamic rendering segments today and will be folded into the graph later.
+- Image raycaster/slice are orchestrated by `Z3DImgFilter` via `ZVulkanLinearScript` and render into per-filter targets; they are intentionally kept outside the compositor pass graph (for now).
 - Backend VLOG(1) counters help validate improvements: per-frame segments begun and attachments cleared vs loaded.
 - Load/store policy: first writer to an attachment clears; subsequent writers load. The backend emits exactly one `beginRender`/`endRender` per frame; dynamic rendering segments only begin when attachment sets change.
 

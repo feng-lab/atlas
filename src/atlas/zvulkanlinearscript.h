@@ -21,7 +21,7 @@ class Z3DRendererVulkanBackend;
 class ZVulkanBuffer;
 
 // Callsite-facing helper for expressing Vulkan compositor logic in a linear,
-// GL-like style ("segments + explicit CPU readbacks + branches"), while the
+// GL-like style ("segments + explicit CPU readbacks + C++ branches"), while the
 // backend owns Vulkan frame/submission boundaries and safe-point handling.
 //
 // Design goals:
@@ -29,6 +29,18 @@ class ZVulkanBuffer;
 // - CPU readbacks are explicit boundaries (no global wait toggles).
 // - Dependencies are declared for clarity and future optimization, but the
 //   initial implementation executes in call order for correctness.
+//
+// Important timeline note:
+// - raster() executes its recordBatches callback immediately to CAPTURE a
+//   self-contained CPU batch list (RendererCPUState). That capture can (and
+//   often does) run normal C++ control-flow (if/for/while) and may allocate
+//   scratch resources.
+// - The captured batches are executed on GPU only later, at a submission flush
+//   boundary (flush() or a readback*() call). In other words, raster() is
+//   "record now, execute later".
+// - C++ branches are not encoded in the script IR. Only the nodes actually
+//   enqueued by the running C++ code exist in the script; flush does not
+//   "re-evaluate" any control-flow.
 //
 // Terminology / conceptual guideline (not required for correctness):
 // - Atlas Vulkan uses dynamic rendering (`vkCmdBeginRendering`), so the classic
@@ -93,6 +105,14 @@ public:
   ZVulkanLinearScript& operator=(ZVulkanLinearScript&&) = delete;
   ~ZVulkanLinearScript();
 
+  // Submit all pending nodes immediately. This is preferred over relying on the
+  // destructor when callers need exceptions (especially cancellation) to
+  // propagate so higher-level code can reset progressive state and abort cleanly.
+  //
+  // Note: flush() does not perform any CPU readback. Use readback*() APIs to
+  // create an explicit fence-wait boundary when control-flow depends on GPU data.
+  void flush(std::string_view reason = {});
+
   template<typename T>
   [[nodiscard]] Slot<T> makeSlot() const
   {
@@ -130,9 +150,11 @@ public:
   }
 
   // Record a raster segment by collecting CPU batches via recordBatches.
-  // This does not immediately submit; execution is deferred until:
-  // - a CPU readback boundary is requested, or
-  // - the script is destroyed.
+  //
+  // Timeline:
+  // - The recordBatches callback runs immediately to capture a batch list into
+  //   this script node.
+  // - GPU execution is deferred until a flush boundary.
   //
   // Guideline: keep the callback focused on one logical pass. Prefer recording
   // batches that target a single output surface / attachment set; split into

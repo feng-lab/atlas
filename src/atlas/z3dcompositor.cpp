@@ -3100,6 +3100,9 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     // Do not enqueue picking readback; rely on synchronous 1x1 reads on demand.
   }
 
+  // Explicit flush so cancellation exceptions propagate (do not rely on script destructor).
+  script.flush("compositor_done");
+
   return 1.0;
 }
 

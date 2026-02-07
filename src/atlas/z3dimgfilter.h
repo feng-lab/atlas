@@ -133,6 +133,13 @@ private:
   // void invalidateAllFRVolumeSlices();
   void updateBlockIDTarget();
 
+  // Prepare per-eye inputs for the image renderers (raycaster/slice).
+  // These helpers encapsulate the shared GL/Vulkan setup logic so the Vulkan
+  // path can express work via ZVulkanLinearScript while keeping geometry
+  // generation in one place.
+  void prepareRaycasterInputs(Z3DEye eye, const glm::uvec2& outputSize);
+  void prepareSliceInputs(Z3DEye eye, const glm::uvec2& outputSize);
+
   void volumeChanged();
 
   void channelRangeChanged();

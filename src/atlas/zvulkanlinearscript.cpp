@@ -12,6 +12,11 @@
 #include <folly/ScopeGuard.h>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
+
+DEFINE_bool(atlas_vk_linear_script_validate_batch_metadata,
+            false,
+            "Enable expensive CHECK-based validation of Vulkan batch metadata in ZVulkanLinearScript before executing");
 
 namespace nim {
 namespace {
@@ -25,6 +30,160 @@ std::string makeFrameLabel(std::string_view preferred, std::string_view firstPas
     return std::string(firstPassLabel);
   }
   return std::string("vk_script");
+}
+
+void validateVulkanBatchMetadataOrCrash(std::string_view passLabel, const RendererCPUState& state)
+{
+  // NOTE: ZVulkanLinearScript is Vulkan-only by construction. Validate the
+  // captured batch metadata so the backend never has to guess about attachment
+  // contracts (finalUse) or cross-pass resource usage (external*Uses).
+  for (size_t i = 0; i < state.batches.size(); ++i) {
+    const RenderBatch& batch = state.batches[i];
+
+    CHECK(batch.originatingRenderer != nullptr)
+      << fmt::format("Vulkan script batch missing originatingRenderer: pass='{}' batchIndex={}", passLabel, i);
+    CHECK(batch.clipPlanes.captured)
+      << fmt::format("Vulkan script batch missing captured clip planes: pass='{}' batchIndex={}", passLabel, i);
+    CHECK(batch.shaderHook.captured)
+      << fmt::format("Vulkan script batch missing captured shader hook: pass='{}' batchIndex={}", passLabel, i);
+
+    // Pass attachment contract
+    const bool hasColorAttachments = !batch.pass.colorAttachments.empty();
+    const bool hasDepthAttachment = batch.pass.depthAttachment.has_value();
+    CHECK(hasColorAttachments || hasDepthAttachment)
+      << fmt::format("Vulkan script batch missing attachments: pass='{}' batchIndex={}", passLabel, i);
+
+    // Viewport/scissor sanity (these invariants are also enforced at appendBatch
+    // time; keep them here to make any failures attributable to the submission
+    // label that ultimately executes them).
+    if (batch.pass.kind == BackendPassDesc::Kind::Raster) {
+      CHECK(batch.pass.viewport.extent.x > 0.0f && batch.pass.viewport.extent.y > 0.0f)
+        << fmt::format("Vulkan script batch missing viewport extent: pass='{}' batchIndex={}", passLabel, i);
+      if (batch.pass.enableScissor) {
+        CHECK(batch.pass.scissorRect.z > 0.0f && batch.pass.scissorRect.w > 0.0f)
+          << fmt::format("Vulkan script batch enables scissor but has empty scissorRect: pass='{}' batchIndex={}",
+                         passLabel,
+                         i);
+      }
+      CHECK(batch.pass.viewport.maxDepth >= batch.pass.viewport.minDepth)
+        << fmt::format("Vulkan script batch invalid depth range: pass='{}' batchIndex={} minDepth={} maxDepth={}",
+                       passLabel,
+                       i,
+                       batch.pass.viewport.minDepth,
+                       batch.pass.viewport.maxDepth);
+    }
+
+    for (const auto& att : batch.pass.colorAttachments) {
+      CHECK(att.handle.valid())
+        << fmt::format("Vulkan script batch has invalid color attachment handle: pass='{}' batchIndex={}",
+                       passLabel,
+                       i);
+      CHECK(att.handle.backend == RenderBackend::Vulkan)
+        << fmt::format("Vulkan script batch has non-Vulkan color attachment: pass='{}' batchIndex={} handle=0x{:x}",
+                       passLabel,
+                       i,
+                       att.handle.id);
+      CHECK(att.finalUse != AttachmentFinalUse::Unspecified)
+        << fmt::format("Vulkan script batch missing color attachment finalUse: pass='{}' batchIndex={} handle=0x{:x}",
+                       passLabel,
+                       i,
+                       att.handle.id);
+    }
+
+    if (batch.pass.depthAttachment) {
+      const auto& att = *batch.pass.depthAttachment;
+      CHECK(att.handle.valid())
+        << fmt::format("Vulkan script batch has invalid depth attachment handle: pass='{}' batchIndex={}",
+                       passLabel,
+                       i);
+      CHECK(att.handle.backend == RenderBackend::Vulkan)
+        << fmt::format("Vulkan script batch has non-Vulkan depth attachment: pass='{}' batchIndex={} handle=0x{:x}",
+                       passLabel,
+                       i,
+                       att.handle.id);
+      CHECK(att.finalUse != AttachmentFinalUse::Unspecified)
+        << fmt::format("Vulkan script batch missing depth attachment finalUse: pass='{}' batchIndex={} handle=0x{:x}",
+                       passLabel,
+                       i,
+                       att.handle.id);
+    }
+
+    if (batch.pass.resolveAttachment) {
+      const auto& att = *batch.pass.resolveAttachment;
+      if (att.handle.valid()) {
+        CHECK(att.handle.backend == RenderBackend::Vulkan)
+          << fmt::format("Vulkan script batch has non-Vulkan resolve attachment: pass='{}' batchIndex={} handle=0x{:x}",
+                         passLabel,
+                         i,
+                         att.handle.id);
+        CHECK(att.finalUse != AttachmentFinalUse::Unspecified)
+          << fmt::format(
+               "Vulkan script batch missing resolve attachment finalUse: pass='{}' batchIndex={} handle=0x{:x}",
+               passLabel,
+               i,
+               att.handle.id);
+      }
+    }
+
+    auto isPassAttachment = [&](const AttachmentHandle& handle) {
+      if (!handle.valid()) {
+        return false;
+      }
+      for (const auto& att : batch.pass.colorAttachments) {
+        if (att.handle.id == handle.id) {
+          return true;
+        }
+      }
+      if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.id == handle.id) {
+        return true;
+      }
+      if (batch.pass.resolveAttachment && batch.pass.resolveAttachment->handle.id == handle.id) {
+        return true;
+      }
+      return false;
+    };
+
+    for (const auto& use : batch.pass.externalImageUses) {
+      if (!use.handle.valid()) {
+        continue;
+      }
+      CHECK(use.handle.backend == RenderBackend::Vulkan)
+        << fmt::format("Vulkan script batch has non-Vulkan external image use: pass='{}' batchIndex={} handle=0x{:x}",
+                       passLabel,
+                       i,
+                       use.handle.id);
+      CHECK(!isPassAttachment(use.handle))
+        << fmt::format("Vulkan script batch external image use references an active attachment (read-while-write): "
+                       "pass='{}' batchIndex={} handle=0x{:x}",
+                       passLabel,
+                       i,
+                       use.handle.id);
+      if (use.kind == ExternalImageUseKind::SampledRead) {
+        CHECK(use.aspectHint != ExternalImageAspectHint::Unspecified)
+          << fmt::format(
+               "Vulkan script batch missing aspectHint for sampled external image use: pass='{}' batchIndex={} handle=0x{:x}",
+               passLabel,
+               i,
+               use.handle.id);
+      }
+    }
+
+    for (const auto& use : batch.pass.externalBufferUses) {
+      if (!use.handle.valid()) {
+        continue;
+      }
+      CHECK(use.handle.backend == RenderBackend::Vulkan)
+        << fmt::format("Vulkan script batch has non-Vulkan external buffer use: pass='{}' batchIndex={} handle=0x{:x}",
+                       passLabel,
+                       i,
+                       use.handle.id);
+      CHECK(use.kind != ExternalBufferUseKind::Unspecified)
+        << fmt::format("Vulkan script batch missing kind for external buffer use: pass='{}' batchIndex={} handle=0x{:x}",
+                       passLabel,
+                       i,
+                       use.handle.id);
+    }
+  }
 }
 
 } // namespace
@@ -68,6 +227,15 @@ ZVulkanLinearScript::~ZVulkanLinearScript()
     LOG(ERROR) << "ZVulkanLinearScript destructor flush failed (unknown exception)";
     CHECK(false) << "ZVulkanLinearScript destructor flush failed (unknown exception)";
   }
+}
+
+void ZVulkanLinearScript::flush(std::string_view reason)
+{
+  if (m_nodes.empty() && m_preRecordNodes.empty() && !m_frameOpen) {
+    return;
+  }
+  const std::string_view resolved = reason.empty() ? std::string_view("script_flush") : reason;
+  flushNodes(resolved, nullptr);
 }
 
 void ZVulkanLinearScript::validateDeps(std::string_view label, std::span<const SegmentHandle> deps) const
@@ -250,6 +418,28 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
     firstLabel = readback->label;
   }
 
+  // Uniform arena sizing: beginRender() suballocates per-frame lighting slices,
+  // and some pipelines suballocate per-batch UBOs from the same arena. Provide
+  // a conservative upper bound *before* opening the Vulkan frame so the backend
+  // can allocate a stable arena buffer for the entire submission.
+  //
+  // This intentionally does not attempt to account for commands()/preRecord()
+  // callbacks allocating from the uniform arena; those should remain rare (and
+  // ideally avoided) because they are opaque to estimation.
+  size_t uniformBytesHint = m_backend.estimateFrameUniformOverheadBytes();
+  for (const auto& node : m_nodes) {
+    if (const auto* rasterNode = std::get_if<RasterNode>(&node)) {
+      uniformBytesHint += m_backend.estimateAdditionalUniformBytesForBatches(rasterNode->state);
+    } else if (const auto* replayNode = std::get_if<ReplayNode>(&node)) {
+      CHECK(replayNode->state) << "ZVulkanLinearScript replay node missing state";
+      uniformBytesHint += m_backend.estimateAdditionalUniformBytesForBatches(*replayNode->state);
+    } else {
+      // commands()/preRecord() are call-site defined and may mutate backend state
+      // beyond what we can infer from batches.
+    }
+  }
+  m_backend.hintNextUniformArenaMinCapacity(uniformBytesHint);
+
   openFrame(firstLabel);
   auto frameGuard = folly::makeGuard([&]() {
     if (!m_frameOpen) {
@@ -303,23 +493,19 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
 void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
 {
   RendererCPUState merged;
-  std::string mergedFirstLabel;
+  std::vector<std::string_view> mergedLabels;
   size_t mergedNodeCount = 0;
 
   auto flushMerged = [&]() {
     if (merged.batches.empty()) {
       mergedNodeCount = 0;
-      mergedFirstLabel.clear();
+      mergedLabels.clear();
       return;
     }
 
-    std::string label = mergedFirstLabel;
-    if (mergedNodeCount > 1) {
-      if (label.empty()) {
-        label = fmt::format("raster_coalesced({})", mergedNodeCount);
-      } else {
-        label = fmt::format("{} (+{})", mergedFirstLabel, mergedNodeCount - 1);
-      }
+    std::string label = fmt::format("{}", fmt::join(mergedLabels, " + "));
+    if (label.empty()) {
+      label = fmt::format("raster_coalesced({})", mergedNodeCount);
     }
 
     m_backend.beginPassScope(label);
@@ -334,19 +520,20 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
       m_backend.endPassScope();
     });
 
+    if (FLAGS_atlas_vk_linear_script_validate_batch_metadata) {
+      validateVulkanBatchMetadataOrCrash(label, merged);
+    }
     m_backend.processBatches(m_renderer, merged);
 
     merged.batches.clear();
     mergedNodeCount = 0;
-    mergedFirstLabel.clear();
+    mergedLabels.clear();
   };
 
   for (auto& node : nodes) {
     if (auto* rasterNode = std::get_if<RasterNode>(&node)) {
-      if (mergedNodeCount == 0) {
-        mergedFirstLabel = rasterNode->label;
-      }
       mergedNodeCount++;
+      mergedLabels.push_back(std::string_view(rasterNode->label));
 
       if (!rasterNode->state.batches.empty()) {
         merged.batches.reserve(merged.batches.size() + rasterNode->state.batches.size());
@@ -375,6 +562,9 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
         m_backend.endPassScope();
       });
 
+      if (FLAGS_atlas_vk_linear_script_validate_batch_metadata) {
+        validateVulkanBatchMetadataOrCrash(label, *replayNode->state);
+      }
       m_backend.processBatches(m_renderer, *replayNode->state);
       continue;
     }

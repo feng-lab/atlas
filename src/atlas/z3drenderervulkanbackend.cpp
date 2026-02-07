@@ -28,6 +28,7 @@
 #include "zvulkanimgslicepipelinecontext.h"
 #include "zvulkanimgraycasterpipelinecontext.h"
 #include "z3dimgraycasterrenderer.h"
+#include "z3dimgslicerenderer.h"
 #include "zvulkanfontpipelinecontext.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanresourcemetadata.h"
@@ -1068,6 +1069,20 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     m_staticArena.vbHighWatermark,
     m_staticArena.ibHighWatermark);
 
+  // Debug-only guardrail: if a caller supplied a "min capacity" hint for the
+  // uniform arena, validate that actual usage did not exceed it. This catches
+  // estimator drift (new/unaccounted suballocateUniform sites) even when the
+  // base/carry capacity masks overflow.
+  if (frame.uniformArena.minCapacityHint > 0) {
+    DCHECK(frame.uniformArena.highWatermark <= frame.uniformArena.minCapacityHint)
+      << fmt::format("VK uniform hint under-estimated: frame='{}' token={} submit#{} hint={}B used={}B",
+                     frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
+                     frame.realFrameToken,
+                     frame.submissionId,
+                     frame.uniformArena.minCapacityHint,
+                     frame.uniformArena.highWatermark);
+  }
+
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
   m_activeRenderer = nullptr;
@@ -1686,6 +1701,12 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (const auto* slice = std::get_if<ImgSlicePayload>(&batch.geometry)) {
         CHECK(m_imgSliceContext != nullptr) << "ImgSlice pipeline context missing";
         m_imgSliceContext->record(renderer, batch, *slice, vkViewport, vkScissor, cmd);
+        // If slices just completed a progressive round, finalize it now.
+        if (auto fin = m_imgSliceContext->takePendingFinalization()) {
+          if (fin->streamKey != 0) {
+            finalizeImgSliceRoundByKey(renderer, fin->streamKey, fin->eye, fin->lastRound, fin->channelCount);
+          }
+        }
         handled = true;
       }
     }
@@ -1807,7 +1828,7 @@ size_t Z3DRendererVulkanBackend::estimateFrameUniformOverheadBytes()
   // higher-level schedulers can size the arena before opening a Vulkan frame.
   ensureDevice();
   const size_t align = uniformAlignment();
-  const size_t szLighting = alignUp(sizeof(LightingUBOStd140), align);
+  const size_t szLighting = vulkan::alignUp(sizeof(LightingUBOStd140), align);
   return 2u * szLighting;
 }
 
@@ -1815,26 +1836,22 @@ size_t Z3DRendererVulkanBackend::estimateAdditionalUniformBytesForBatches(const 
 {
   ensureDevice();
   const size_t align = uniformAlignment();
-  const size_t szTransforms = alignUp(sizeof(TransformsUBOStd140), align);
-  const size_t szMaterial = alignUp(sizeof(MaterialUBOStd140), align);
 
   size_t total = 0;
   for (const auto& b : state.batches) {
-    if (std::holds_alternative<MeshPayload>(b.geometry)) {
-      const auto& payload = std::get<MeshPayload>(b.geometry);
-      const size_t draws = payload.meshes.size();
-      total += szTransforms + (draws * szMaterial);
-    } else if (std::holds_alternative<LinePayload>(b.geometry) || std::holds_alternative<SpherePayload>(b.geometry) ||
-               std::holds_alternative<EllipsoidPayload>(b.geometry) ||
-               std::holds_alternative<ConePayload>(b.geometry)) {
-      total += szTransforms + szMaterial;
-    } else {
-      // Most non-geometry passes use push constants or dedicated UBOs.
-    }
+    total += std::visit(
+      [&](const auto& payload) -> size_t {
+        using PayloadT = std::remove_cvref_t<decltype(payload)>;
+        if constexpr (vulkan::kHasUniformArenaBudgetTraits<PayloadT>) {
+          return vulkan::UniformArenaBudgetTraits<PayloadT>::estimateAdditionalBytes(payload, align);
+        }
+        return 0u;
+      },
+      b.geometry);
   }
 
   // Conservatively align to the device's dynamic UBO alignment.
-  return alignUp(total, align);
+  return vulkan::alignUp(total, align);
 }
 
 bool Z3DRendererVulkanBackend::supportsCommandLists() const
@@ -2227,7 +2244,7 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
     if (bytes == 0) {
       continue;
     }
-    const size_t aligned = alignUp(cursor, align);
+    const size_t aligned = vulkan::alignUp(cursor, align);
     cursor = aligned + bytes;
   }
   const size_t required = cursor;
@@ -2411,6 +2428,10 @@ void Z3DRendererVulkanBackend::ensureStaticArenas()
 void Z3DRendererVulkanBackend::ensureUniformArena(FrameResources& frame)
 {
   CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureUniformArena";
+  // Track the scheduler-provided "min capacity" hint for debug validation at
+  // endRender(). This captures the caller's request before base/carry capacity
+  // heuristics are applied.
+  frame.uniformArena.minCapacityHint = m_nextUniformMinCapacity;
   // Create if missing
   const size_t baseRequested = static_cast<size_t>(std::max(64, kUniformArenaBaseKiB)) * 1024ull;
   size_t requested = std::max({baseRequested, m_nextUniformMinCapacity, m_uniformMinCapacityCarry});
@@ -2945,11 +2966,7 @@ vk::DeviceSize Z3DRendererVulkanBackend::ddpAllocDeviceArgsSlot(size_t bytes)
   auto& arena = m_activeFrame->ddpArgsDevice;
   // Align to 16 bytes to satisfy both VkDraw(Indexed)IndirectCommand requirements
   const size_t align = 16;
-  auto alignUpSz = [](size_t v, size_t a) {
-    size_t m = a - 1;
-    return (v + m) & ~m;
-  };
-  const size_t off = alignUpSz(arena.cursor, align);
+  const size_t off = vulkan::alignUp(arena.cursor, align);
   if (off + bytes > arena.capacity) {
     // Grow device-local args arena; keep old buffer alive until frame end
     size_t newCap = arena.capacity ? arena.capacity : (64 * sizeof(VkDrawIndexedIndirectCommand));
@@ -3201,7 +3218,7 @@ Z3DRendererVulkanBackend::UniformSlice Z3DRendererVulkanBackend::suballocateUnif
   // Do not allocate here; fail fast to surface ordering/estimation bugs.
   CHECK(arena.buffer) << "Uniform arena not initialised before suballocateUniform";
   const size_t align = std::max(uniformAlignment(), alignment ? alignment : static_cast<size_t>(1));
-  const size_t aligned = alignUp(arena.cursor, align);
+  const size_t aligned = vulkan::alignUp(arena.cursor, align);
   if (aligned + bytes > arena.capacity) {
     CHECK(false) << fmt::format(
       "Uniform arena capacity exceeded within frame: need={}B have={}B (cursor={}B, align={}B).",
@@ -3210,7 +3227,7 @@ Z3DRendererVulkanBackend::UniformSlice Z3DRendererVulkanBackend::suballocateUnif
       arena.cursor,
       align);
   }
-  const size_t off = alignUp(arena.cursor, align);
+  const size_t off = vulkan::alignUp(arena.cursor, align);
   slice.buffer = arena.buffer->buffer();
   slice.offset = static_cast<vk::DeviceSize>(off);
   slice.mapped = static_cast<char*>(arena.mapped) + off;
