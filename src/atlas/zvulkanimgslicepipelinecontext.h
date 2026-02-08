@@ -164,8 +164,9 @@ private:
   std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineBufferAppend;
   std::unique_ptr<ZVulkanBuffer> m_blockIdPixelBuffer;
   size_t m_blockIdPixelBufferCapacity = 0;
-  // Per-frame-slot compaction outputs for slice block-ID discovery. This avoids
-  // clobbering host-visible buffers when multiple Vulkan frames are in flight.
+  // Per-frame-slot compaction outputs for slice block-ID discovery. Per-slot
+  // storage avoids overwrite-before-readback hazards when multiple Vulkan
+  // frames are in flight.
   struct FrameBlockIdOutputs
   {
     size_t bytesPerSlice = 0;

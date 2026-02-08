@@ -3,6 +3,7 @@
 #include "z3drendererstates.h"
 
 #include <chrono>
+#include <cstdint>
 #include <folly/CancellationToken.h>
 #include <memory>
 #include <mutex>
@@ -72,11 +73,18 @@ public:
     return m_currentPerfFrameStartTime;
   }
 
+  // Allocate a monotonically increasing submission ID within the current perf
+  // token. This provides stable ordering across multiple Vulkan backends (each
+  // filter owns its own Z3DRendererBase/backend instance) while keeping IDs
+  // small and human-readable in logs.
+  uint32_t nextPerfFrameSubmissionId(uint64_t token);
+
   // Start a new perf frame token (increments by 1).
   uint64_t beginNewPerfFrameToken()
   {
     ++m_currentPerfFrameToken;
     m_currentPerfFrameStartTime = std::chrono::steady_clock::now();
+    m_currentPerfFrameSubmissionCursor = 0;
     return m_currentPerfFrameToken;
   }
 
@@ -95,6 +103,7 @@ private:
   // Monotonically increasing identifier for performance aggregation.
   uint64_t m_currentPerfFrameToken = 0;
   std::chrono::steady_clock::time_point m_currentPerfFrameStartTime{};
+  uint32_t m_currentPerfFrameSubmissionCursor = 0;
 };
 
 } // namespace nim

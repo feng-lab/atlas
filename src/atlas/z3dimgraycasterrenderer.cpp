@@ -13,6 +13,8 @@
 #include "zstatisticsutils.h"
 #include "z3dscratchresourcepool.h"
 #include "z3drenderglobalstate.h"
+#include "z3drenderervulkanbackend.h"
+#include "zvulkantexture.h"
 #include <folly/OperationCancelled.h>
 #include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
@@ -406,6 +408,382 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   CHECK(false) << "Unhandled VulkanProgressivePhase for img raycaster";
 
   return stages;
+}
+
+ZVulkanLinearScript::SegmentHandle
+Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
+                                                    Z3DEye eye,
+                                                    Z3DScratchResourcePool::RenderTargetLease& outputLease,
+                                                    ZVulkanLinearScript::SegmentHandle deps)
+{
+  if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
+    return deps;
+  }
+  CHECK(outputLease.hasVulkanImage()) << "Raycaster script recording requires a Vulkan output lease";
+
+  auto stages = buildVulkanStagePayloads(eye);
+  if (stages.empty()) {
+    return deps;
+  }
+
+  auto labelForStage = [&](const ImgRaycasterPayload& payload) -> std::string_view {
+    using Stage = ImgRaycasterPayload::Stage;
+    switch (payload.stage) {
+      case Stage::Unspecified:
+        CHECK(false) << "Unspecified ImgRaycasterPayload stage";
+        return "ray_unspecified";
+      case Stage::EntryExit:
+        return "ray_entry_exit";
+      case Stage::FastDirect:
+        return "ray_fast_direct";
+      case Stage::FastLayers:
+        return "ray_fast_layers";
+      case Stage::FastMerge:
+        return "ray_fast_merge";
+      case Stage::ProgressivePreviewLayers:
+        return "ray_preview_layers";
+      case Stage::ProgressiveBlockId:
+        return "ray_block_id";
+      case Stage::ProgressiveCompaction:
+        return "ray_block_compact";
+      case Stage::ProgressiveRaycast:
+        return "ray_progressive_raycast";
+      case Stage::ProgressiveCopyToLayers:
+        return "ray_copy_to_layers";
+      case Stage::ProgressiveMerge:
+        return (payload.channelIndexRaw < 0) ? "ray_preview_merge" : "ray_progressive_merge";
+    }
+    CHECK(false) << "Unhandled ImgRaycasterPayload stage";
+    return "ray_unknown";
+  };
+
+  auto stageWritesOutput = [](ImgRaycasterPayload::Stage stage) -> bool {
+    using Stage = ImgRaycasterPayload::Stage;
+    switch (stage) {
+      case Stage::Unspecified:
+        CHECK(false) << "Unspecified ImgRaycasterPayload stage";
+        return false;
+      case Stage::FastDirect:
+      case Stage::FastMerge:
+      case Stage::ProgressiveMerge:
+        return true;
+      case Stage::EntryExit:
+      case Stage::FastLayers:
+      case Stage::ProgressivePreviewLayers:
+      case Stage::ProgressiveBlockId:
+      case Stage::ProgressiveCompaction:
+      case Stage::ProgressiveRaycast:
+      case Stage::ProgressiveCopyToLayers:
+        return false;
+    }
+    return false;
+  };
+
+  ZVulkanLinearScript::SegmentHandle prevStage = deps;
+
+  for (auto& stagePayload : stages) {
+    const ImgRaycasterPayload::Stage stage = stagePayload.stage;
+    const std::string_view label = labelForStage(stagePayload);
+    const bool writesOutput = stageWritesOutput(stage);
+
+    if (stage == ImgRaycasterPayload::Stage::ProgressiveBlockId && stagePayload.roundIndexRaw == 0 &&
+        stagePayload.channelIndexRaw >= 0) {
+      // GL parity: clear the "last" raycast accumulators at the start of a channel (round 0)
+      // before any block-ID or raycast shaders sample them.
+      //
+      // This must run outside dynamic rendering; express it as a commands() node so the backend
+      // closes any open rendering segment before recording the transfer clear commands.
+      auto recordClear = [lastAccumLease = stagePayload.lastAccumLease](Z3DRendererVulkanBackend& backend) {
+        if (!lastAccumLease || !lastAccumLease->hasVulkanImage()) {
+          return;
+        }
+        ZVulkanTexture* lastColor = lastAccumLease->colorAttachment(0);
+        ZVulkanTexture* lastDepth = lastAccumLease->colorAttachment(1);
+        if (!lastColor || !lastDepth) {
+          return;
+        }
+
+        auto& cmd = backend.commandBuffer();
+        const vk::ClearColorValue clear = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
+        const auto range = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0u, 1u, 0u, 1u};
+
+        auto clearTex = [&](ZVulkanTexture& tex) {
+          tex.transitionLayout(cmd, tex.layout(), vk::ImageLayout::eTransferDstOptimal);
+          cmd.clearColorImage(tex.image(), vk::ImageLayout::eTransferDstOptimal, clear, range);
+          tex.transitionLayout(cmd, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+          tex.setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+        };
+
+        clearTex(*lastColor);
+        clearTex(*lastDepth);
+      };
+
+      prevStage = prevStage ? script.commands("ray_clear_last_accum", {prevStage}, recordClear)
+                            : script.commands("ray_clear_last_accum", {}, recordClear);
+    }
+
+    auto recordStage = [&]() {
+      const auto prevViewport = m_rendererBase.frameState().viewport;
+      const auto prevSurface = m_rendererBase.frameState().activeSurface;
+      auto guard = folly::makeGuard([&]() {
+        m_rendererBase.frameState().updateViewportData(prevViewport);
+        m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
+      });
+
+      auto markActiveSurfaceSampled = [&]() {
+        for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+          att.finalUse = AttachmentFinalUse::Sampled;
+        }
+        if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+          m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+        }
+      };
+
+      auto surfaceFromLeaseWithLayerIndex = [&](const Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                uint32_t layerIndex) -> RendererFrameState::ActiveSurface {
+        RendererFrameState::ActiveSurface surface = m_rendererBase.describeSurface(lease);
+        for (auto& att : surface.colorAttachments) {
+          att.handle.index = layerIndex;
+        }
+        if (surface.depthAttachment) {
+          surface.depthAttachment->handle.index = layerIndex;
+        }
+        return surface;
+      };
+
+      auto appendComputeBatch = [&](ImgRaycasterPayload payloadToMove) {
+        RenderBatch batch;
+        batch.eye = eye;
+        batch.pass.kind = BackendPassDesc::Kind::Compute;
+        batch.geometry = std::move(payloadToMove);
+        m_rendererBase.appendBatch(std::move(batch));
+      };
+
+      auto addExternalSample = [](RenderBatch& batch, const AttachmentHandle& handle, ExternalImageAspectHint hint) {
+        if (!handle.valid()) {
+          return;
+        }
+        batch.pass.externalImageUses.push_back({handle, ExternalImageUseKind::SampledRead, hint});
+      };
+
+      auto appendRasterBatchWithExternalSamples = [&](ImgRaycasterPayload payloadToMove,
+                                                      std::span<const AttachmentHandle> externalColorSamples,
+                                                      std::span<const AttachmentHandle> externalDepthSamples) {
+        RenderBatch batch;
+        batch.eye = eye;
+        batch.geometry = std::move(payloadToMove);
+        for (const auto& h : externalColorSamples) {
+          addExternalSample(batch, h, ExternalImageAspectHint::Color);
+        }
+        for (const auto& h : externalDepthSamples) {
+          addExternalSample(batch, h, ExternalImageAspectHint::Depth);
+        }
+        m_rendererBase.appendBatch(std::move(batch));
+      };
+
+      auto ensureOutputSurface = [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(outputLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        markActiveSurfaceSampled();
+      };
+
+      // (Preserve is a Z3DRendererBase tag, not a render-state mutation.)
+      auto ensurePreserveOutputSurface = [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(outputLease, Z3DRendererBase::Preserve);
+      };
+
+      auto entryExitSurfaceHandles = [&]() -> std::vector<AttachmentHandle> {
+        std::vector<AttachmentHandle> handles;
+        if (stagePayload.entryExitLease) {
+          const auto entrySurface = m_rendererBase.describeSurface(*stagePayload.entryExitLease);
+          if (!entrySurface.colorAttachments.empty()) {
+            handles.push_back(entrySurface.colorAttachments.front().handle);
+          }
+        }
+        return handles;
+      };
+
+      auto layerArraySurfaceHandles = [&]() -> std::pair<std::vector<AttachmentHandle>, std::vector<AttachmentHandle>> {
+        std::vector<AttachmentHandle> colors;
+        std::vector<AttachmentHandle> depths;
+        if (stagePayload.channelLayerLease) {
+          const auto layerSurface = m_rendererBase.describeSurface(*stagePayload.channelLayerLease);
+          if (!layerSurface.colorAttachments.empty()) {
+            colors.push_back(layerSurface.colorAttachments.front().handle);
+          }
+          if (layerSurface.depthAttachment) {
+            depths.push_back(layerSurface.depthAttachment->handle);
+          }
+        }
+        return {std::move(colors), std::move(depths)};
+      };
+
+      auto accumSurfaceHandles =
+        [&](
+          const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& leasePtr) -> std::vector<AttachmentHandle> {
+        std::vector<AttachmentHandle> handles;
+        if (!leasePtr) {
+          return handles;
+        }
+        const auto surface = m_rendererBase.describeSurface(*leasePtr);
+        handles.reserve(surface.colorAttachments.size());
+        for (const auto& att : surface.colorAttachments) {
+          handles.push_back(att.handle);
+        }
+        return handles;
+      };
+
+      switch (stage) {
+        case ImgRaycasterPayload::Stage::ProgressiveCompaction: {
+          appendComputeBatch(std::move(stagePayload));
+          return;
+        }
+
+        case ImgRaycasterPayload::Stage::FastDirect:
+        case ImgRaycasterPayload::Stage::FastMerge:
+        case ImgRaycasterPayload::Stage::ProgressiveMerge: {
+          // Output-writing stages: draw into the filter-owned output surface.
+          ensureOutputSurface();
+
+          std::vector<AttachmentHandle> colorSamples;
+          std::vector<AttachmentHandle> depthSamples;
+
+          if (stage == ImgRaycasterPayload::Stage::FastMerge || stage == ImgRaycasterPayload::Stage::ProgressiveMerge) {
+            auto [layerColors, layerDepths] = layerArraySurfaceHandles();
+            colorSamples.insert(colorSamples.end(), layerColors.begin(), layerColors.end());
+            depthSamples.insert(depthSamples.end(), layerDepths.begin(), layerDepths.end());
+          } else {
+            auto entryColors = entryExitSurfaceHandles();
+            colorSamples.insert(colorSamples.end(), entryColors.begin(), entryColors.end());
+          }
+
+          appendRasterBatchWithExternalSamples(std::move(stagePayload), colorSamples, depthSamples);
+          return;
+        }
+
+        case ImgRaycasterPayload::Stage::EntryExit: {
+          CHECK(stagePayload.entryExitLease && stagePayload.entryExitLease->hasVulkanImage())
+            << "Raycaster EntryExit stage missing Vulkan entry/exit lease";
+
+          // Entry/exit renders into a 2-layer array target. Expand to two batches so the backend
+          // can open distinct dynamic-rendering segments targeting each array-layer view.
+          ImgRaycasterPayload templatePayload = stagePayload;
+          for (uint32_t layer = 0; layer < 2; ++layer) {
+            ImgRaycasterPayload perLayer = (layer == 0) ? std::move(stagePayload) : templatePayload;
+            const auto layerSurface = surfaceFromLeaseWithLayerIndex(*templatePayload.entryExitLease, layer);
+            m_rendererBase.setActiveSurfaceWithLoadStore(layerSurface,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::DontCare,
+                                                         StoreOp::DontCare);
+            markActiveSurfaceSampled();
+            appendRasterBatchWithExternalSamples(std::move(perLayer), {}, {});
+          }
+          stagePayload = {};
+          return;
+        }
+
+        case ImgRaycasterPayload::Stage::ProgressiveBlockId: {
+          CHECK(stagePayload.blockIdLease && stagePayload.blockIdLease->hasVulkanImage())
+            << "Raycaster Block-ID stage missing Vulkan block-ID lease";
+          m_rendererBase.setActiveSurfaceWithLoadStore(*stagePayload.blockIdLease,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store,
+                                                       LoadOp::DontCare,
+                                                       StoreOp::DontCare);
+          markActiveSurfaceSampled();
+          std::vector<AttachmentHandle> colorSamples = entryExitSurfaceHandles();
+          auto lastAccumSamples = accumSurfaceHandles(stagePayload.lastAccumLease);
+          colorSamples.insert(colorSamples.end(), lastAccumSamples.begin(), lastAccumSamples.end());
+          appendRasterBatchWithExternalSamples(std::move(stagePayload), colorSamples, {});
+          return;
+        }
+
+        case ImgRaycasterPayload::Stage::ProgressiveRaycast: {
+          CHECK(stagePayload.currentAccumLease && stagePayload.currentAccumLease->hasVulkanImage())
+            << "Raycaster ProgressiveRaycast stage missing Vulkan current accum lease";
+          m_rendererBase.setActiveSurfaceWithLoadStore(*stagePayload.currentAccumLease,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store,
+                                                       LoadOp::DontCare,
+                                                       StoreOp::DontCare);
+          markActiveSurfaceSampled();
+          std::vector<AttachmentHandle> colorSamples = entryExitSurfaceHandles();
+          auto lastAccumSamples = accumSurfaceHandles(stagePayload.lastAccumLease);
+          colorSamples.insert(colorSamples.end(), lastAccumSamples.begin(), lastAccumSamples.end());
+          appendRasterBatchWithExternalSamples(std::move(stagePayload), colorSamples, {});
+          return;
+        }
+
+        case ImgRaycasterPayload::Stage::ProgressiveCopyToLayers: {
+          CHECK(stagePayload.channelLayerLease && stagePayload.channelLayerLease->hasVulkanImage())
+            << "Raycaster ProgressiveCopyToLayers stage missing Vulkan layer lease";
+          CHECK(stagePayload.channelIndexRaw >= 0)
+            << "Raycaster ProgressiveCopyToLayers stage requires non-negative channelIndexRaw";
+          const uint32_t layerIndex = static_cast<uint32_t>(stagePayload.channelIndexRaw);
+
+          const auto surface = surfaceFromLeaseWithLayerIndex(*stagePayload.channelLayerLease, layerIndex);
+          // Preserve previous per-layer contents unless the shader overwrites fully (matches existing Vulkan path).
+          m_rendererBase.setActiveSurfaceWithLoadStore(surface,
+                                                       LoadOp::Load,
+                                                       StoreOp::Store,
+                                                       LoadOp::Load,
+                                                       StoreOp::Store);
+          markActiveSurfaceSampled();
+          auto currentAccumSamples = accumSurfaceHandles(stagePayload.currentAccumLease);
+          appendRasterBatchWithExternalSamples(std::move(stagePayload), currentAccumSamples, {});
+          return;
+        }
+
+        case ImgRaycasterPayload::Stage::FastLayers:
+        case ImgRaycasterPayload::Stage::ProgressivePreviewLayers: {
+          // Layer-array writers: expand to one batch per visible channel so the backend can open
+          // a separate dynamic-rendering segment per array-layer view. The pipeline context
+          // uses AttachmentHandle.index to determine which channel to render.
+          CHECK(stagePayload.channelLayerLease && stagePayload.channelLayerLease->hasVulkanImage())
+            << "Raycaster layered stage missing Vulkan layer lease";
+          const uint32_t layerCount = static_cast<uint32_t>(stagePayload.visibleChannels.size());
+          CHECK(layerCount > 0u) << "Raycaster layered stage missing visibleChannels";
+
+          auto entryColors = entryExitSurfaceHandles();
+
+          ImgRaycasterPayload templatePayload = stagePayload;
+          for (uint32_t layer = 0; layer < layerCount; ++layer) {
+            ImgRaycasterPayload perLayer = templatePayload;
+            const auto layerSurface = surfaceFromLeaseWithLayerIndex(*templatePayload.channelLayerLease, layer);
+            m_rendererBase.setActiveSurfaceWithLoadStore(layerSurface,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store);
+            markActiveSurfaceSampled();
+            appendRasterBatchWithExternalSamples(std::move(perLayer), entryColors, {});
+          }
+          stagePayload = {};
+          return;
+        }
+
+        case ImgRaycasterPayload::Stage::Unspecified:
+          CHECK(false) << "Unspecified ImgRaycasterPayload stage";
+          break;
+      }
+
+      // Defensive fallback: keep output surface bindings consistent for any newly-added stages.
+      if (writesOutput) {
+        ensureOutputSurface();
+      } else {
+        ensurePreserveOutputSurface();
+      }
+      appendRasterBatchWithExternalSamples(std::move(stagePayload), {}, {});
+    };
+
+    prevStage = prevStage ? script.raster(label, {prevStage}, recordStage) : script.raster(label, {}, recordStage);
+  }
+
+  return prevStage;
 }
 
 void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)

@@ -72,9 +72,16 @@ public:
 
   // Mark a token closed at the end of a rendering pass (one engine-driven
   // filter pipeline evaluation).
-  // Actual flush happens once the last submission has been ingested (typically
-  // on the first begin of the next token).
+  // Actual flush happens once all submissions that were started for this token
+  // have been ingested (may be later; Vulkan submissions for different tokens
+  // can be interleaved).
   void markClosed(uint64_t token);
+
+  // Tell the collector that a submission has been started for this token.
+  // This must be called once per actual GPU submission. The collector uses the
+  // count of started submissions as the expected ingestion count for deciding
+  // when a token is safe to flush.
+  void noteSubmissionStarted(uint64_t token, uint32_t submissionId);
 
   // Attempt to flush any closed tokens that are now safe. If force is true,
   // flush all closed tokens regardless (used during backend/device switches).
@@ -84,12 +91,12 @@ private:
   struct TokenData
   {
     std::vector<Submission> submissions;
+    uint32_t startedSubmissions = 0; // count of submissions started (expected ingestions) for this token
     bool closed = false;
     bool flushed = false;
   };
 
   std::map<uint64_t, TokenData> m_tokens; // ordered by token
-  uint64_t m_maxSeenToken = 0; // largest token observed via addSubmission
 
   // Rolling statistics for diagnostics
   std::unordered_map<std::string, std::vector<double>> m_gpuLabelHistory; // last N values per label

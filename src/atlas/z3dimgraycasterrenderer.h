@@ -9,6 +9,7 @@
 #include "z3dscratchresourcepool.h"
 #include <array>
 #include "z3drendercommands.h"
+#include "zvulkanlinearscript.h"
 #include <memory>
 #include <optional>
 #include <string>
@@ -38,6 +39,23 @@ public:
   // Note: This method may update progressive bookkeeping (generation counters,
   // stats sinks) as part of preparing the per-frame payloads.
   [[nodiscard]] std::vector<ImgRaycasterPayload> buildVulkanStagePayloads(Z3DEye eye);
+
+  // Vulkan-only helper: record the raycaster's stage payloads into a linear
+  // script as fine-grained nodes. This centralizes the mapping from stages to
+  // render targets/batches (including per-layer expansion) inside the renderer,
+  // while the Vulkan pipeline context remains responsible for GPU recording.
+  //
+  // The filter owns the output lease; this method binds it for output-writing
+  // stages (fast direct/merge, progressive merge). Intermediate targets (entry/exit,
+  // layer arrays, block-id scratch, accumulators) are owned by the renderer via
+  // scratch-pool leases embedded in each stage payload.
+  //
+  // Returns the last script segment recorded (or deps if no stages were emitted).
+  [[nodiscard]] ZVulkanLinearScript::SegmentHandle
+  recordVulkanStagesToScript(ZVulkanLinearScript& script,
+                             Z3DEye eye,
+                             Z3DScratchResourcePool::RenderTargetLease& outputLease,
+                             ZVulkanLinearScript::SegmentHandle deps = {});
 
   // quad or entry_exit texture should be set before rendering
 

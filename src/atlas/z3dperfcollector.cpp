@@ -39,8 +39,9 @@ void Z3DPerfCollector::addSubmission(uint64_t token,
                                      std::vector<Scope> cpuScopes,
                                      Stats stats)
 {
-  m_maxSeenToken = std::max(m_maxSeenToken, token);
   auto& td = m_tokens[token];
+  CHECK_GT(td.startedSubmissions, 0u) << "PerfCollector missing submission-start notifications for token " << token
+                                      << " (did the backend forget to call noteSubmissionStarted?)";
   td.submissions.push_back(Submission{.submissionId = submissionId,
                                       .cpuMs = cpuMs,
                                       .gpuScopes = std::move(gpuScopes),
@@ -52,7 +53,7 @@ void Z3DPerfCollector::addSubmission(uint64_t token,
     return a.submissionId < b.submissionId;
   });
 
-  // Flush any earlier closed tokens now that we know we've advanced to (or past) this token.
+  // Ingesting a submission may complete one or more closed tokens; try flushing.
   maybeFlush(false);
 }
 
@@ -67,6 +68,19 @@ void Z3DPerfCollector::markClosed(uint64_t token)
   } else {
     it->second.closed = true;
   }
+
+  // Closure can be the last missing piece for a token that has already ingested
+  // its final submission (e.g. fast frames). Try flushing now.
+  maybeFlush(false);
+}
+
+void Z3DPerfCollector::noteSubmissionStarted(uint64_t token, uint32_t submissionId)
+{
+  CHECK_GT(token, 0u);
+  CHECK_GT(submissionId, 0u);
+  auto& td = m_tokens[token];
+  CHECK(!td.closed) << "PerfCollector token " << token << " started a submission after it was marked closed";
+  td.startedSubmissions++;
 }
 
 void Z3DPerfCollector::maybeFlush(bool force)
@@ -74,19 +88,46 @@ void Z3DPerfCollector::maybeFlush(bool force)
   if (m_tokens.empty()) {
     return;
   }
-  // Tokens strictly less than maxSeenToken are safe to flush if closed.
-  const uint64_t safeBefore = force ? std::numeric_limits<uint64_t>::max() : (m_maxSeenToken);
+
   for (auto& [tok, td] : m_tokens) {
     if (td.flushed) {
       continue;
     }
     if (!td.closed) {
-      continue;
+      // Keep summaries ordered: don't flush later tokens while an earlier token
+      // is still open.
+      break;
     }
-    if (tok < safeBefore || force) {
-      flush(tok);
-      td.flushed = true;
+
+    // We can flush once:
+    // - the token is closed (no more submissions will be created for it), and
+    // - we've ingested all submissions that were started for that token.
+    //
+    // Important: submissions for different tokens may be interleaved on the
+    // GPU queue, so we cannot use token ordering (tok < maxSeenToken) as a
+    // proxy for completeness.
+    bool safeToFlush = force;
+    if (!safeToFlush) {
+      if (td.submissions.empty()) {
+        // No ingested submissions; this is common in OpenGL mode (no producer)
+        // or in frames where nothing recorded any GPU work. Prune once closed
+        // to avoid unbounded growth.
+        safeToFlush = (td.startedSubmissions == 0u);
+      } else {
+        CHECK_GT(td.startedSubmissions, 0u)
+          << "PerfCollector token " << tok << " has submissions but no submission-start notifications";
+        safeToFlush = (td.submissions.size() >= static_cast<size_t>(td.startedSubmissions));
+      }
     }
+
+    if (!safeToFlush) {
+      // Keep summaries ordered: do not emit token N+1 while token N is still
+      // waiting for submissions to arrive.
+      break;
+    }
+
+    flush(tok);
+    td.flushed = true;
   }
 
   // Optionally prune flushed tokens to keep memory bounded.

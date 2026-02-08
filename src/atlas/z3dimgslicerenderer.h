@@ -6,6 +6,7 @@
 #include "zmesh.h"
 #include "z3dscratchresourcepool.h"
 #include "z3drendercommands.h"
+#include "zvulkanlinearscript.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -70,6 +71,21 @@ public:
   // Note: This method may update progressive bookkeeping (generation counters)
   // as part of preparing the per-frame payloads.
   [[nodiscard]] std::vector<ImgSlicePayload> buildVulkanStagePayloads(Z3DEye eye);
+
+  // Vulkan-only helper: record the slice pipeline stage payloads into a linear
+  // script as fine-grained nodes. This owns the stage→render-target mapping
+  // (including per-layer/per-slice expansion) inside the renderer, while the
+  // Vulkan pipeline context remains responsible for GPU recording.
+  //
+  // The filter owns the output lease; this method binds it for output-writing
+  // stages (direct draw, merge).
+  //
+  // Returns the last script segment recorded (or deps if no stages were emitted).
+  [[nodiscard]] ZVulkanLinearScript::SegmentHandle
+  recordVulkanStagesToScript(ZVulkanLinearScript& script,
+                             Z3DEye eye,
+                             Z3DScratchResourcePool::RenderTargetLease& outputLease,
+                             ZVulkanLinearScript::SegmentHandle deps = {});
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 

@@ -695,7 +695,7 @@ Notes
     - `Z3DImgSliceRenderer` for explicit plane slices with colormaps.
   - The filter outputs multiple renderings (`Image`, `OpaqueImage`, stereo variants) consumed by the compositor.
   - Internally, the compositor consumes image filters via engine-managed `Z3DImgFilter*` lists.
-  - Vulkan orchestration: `Z3DImgFilter::process()` builds a per-eye `ZVulkanLinearScript` and records a fine-grained node sequence (raycaster stages → optional bound-box overlay → slice stages) targeting the filter’s own persistent scratch leases. Each `script.raster(...)` node captures one stage payload (one logical pass / attachment set), so the backend can optimize/coalesce submissions later without touching filter call sites.
+  - Vulkan orchestration: `Z3DImgFilter::process()` builds a per-eye `ZVulkanLinearScript`, then delegates node population to the image renderers (`Z3DImgRaycasterRenderer::recordVulkanStagesToScript`, `Z3DImgSliceRenderer::recordVulkanStagesToScript`) with the filter optionally inserting a bound-box overlay node. Each `script.raster(...)` node captures one logical pass / attachment set, so the backend can optimize/coalesce submissions later without touching filter call sites.
 
 - Fast vs Full-Resolution
   - On load, large volumes are downsampled to fit GPU constraints. `Z3DImg::isVolumeDownsampled()` indicates this.

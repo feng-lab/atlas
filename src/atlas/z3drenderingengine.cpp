@@ -1310,7 +1310,8 @@ double Z3DRenderingEngine::processFrame(bool stereo,
   }
 
   // Mark the current perf frame token as closed for aggregation. Actual flush
-  // occurs after submission results are ingested (typically on the next frame).
+  // occurs after the Vulkan backend has ingested all submissions that were
+  // started for this token (may be later due to interleaving across tokens).
   nim::Z3DPerfCollector::instance().markClosed(renderState.currentPerfFrameToken());
 
   if (!progressiveRendering) {

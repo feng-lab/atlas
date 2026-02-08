@@ -49,7 +49,6 @@ namespace nim {
 namespace {
 
 constexpr float kQuadDepth = 0.0f;
-// Device-driven cap is applied at callsites.
 constexpr uint32_t kInvalidBlockID = 0u;
 constexpr uint32_t kUnmappedBlockID = 0xFFFFFFFFu;
 constexpr uint32_t kBlockIdCompactionHeaderWords = 1u + 8u; // [count][counts[8]]
@@ -463,7 +462,6 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     const uint32_t capacityIDs = std::max<uint32_t>(1u, imgW * imgH * 4u);
     const size_t bytesPerSlice = static_cast<size_t>(kBlockIdCompactionHeaderWords + capacityIDs) * sizeof(uint32_t);
     const size_t headerBytes = static_cast<size_t>(kBlockIdCompactionHeaderWords) * sizeof(uint32_t);
-    const size_t mapBytes = bytesPerSlice;
 
     void* frameKey = m_backend.activeFrameKey();
     CHECK(frameKey != nullptr) << "Slice block-ID compaction requested with no active Vulkan frame";
@@ -483,10 +481,22 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       frameOutputs.sliceOutputs.resize(sliceCount);
     }
     if (!frameOutputs.sliceOutputs[sliceIndex]) {
-      frameOutputs.sliceOutputs[sliceIndex] = m_backend.device().createBuffer(
-        bytesPerSlice,
-        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+      // Allocate a device-local SSBO for compaction output.
+      //
+      // Why device-local:
+      // - The compaction shader performs many atomic writes. Writing directly
+      //   into host-coherent memory is extremely slow on MoltenVK/Metal and
+      //   can lead to GPU timeouts at full resolution.
+      // - CPU parsing is done via the backend's end-of-frame readback API
+      //   (buffer->staging copy + mapped ring), so we only require eTransferSrc.
+      //
+      // Why eTransferDst:
+      // - We clear the header (count + counts[8]) via vkCmdFillBuffer.
+      frameOutputs.sliceOutputs[sliceIndex] =
+        m_backend.device().createBuffer(bytesPerSlice,
+                                        vk::BufferUsageFlagBits::eStorageBuffer |
+                                          vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst,
+                                        vk::MemoryPropertyFlagBits::eDeviceLocal);
       CHECK(frameOutputs.sliceOutputs[sliceIndex] != nullptr) << "Slice block-ID: failed to allocate output buffer";
     }
 
@@ -494,9 +504,23 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     CHECK(outBuffer != nullptr);
 
     // Zero the output header before dispatch (count + counts[]).
-    if (void* mapped = outBuffer->map(0, headerBytes)) {
-      std::memset(mapped, 0x00, headerBytes);
-      outBuffer->unmap();
+    CHECK((outBuffer->usage() & vk::BufferUsageFlagBits::eTransferDst) != vk::BufferUsageFlags{})
+      << "Slice Block-ID compaction output must support vkCmdFillBuffer (eTransferDst usage missing)";
+    cmd.fillBuffer(outBuffer->buffer(), /*dstOffset=*/0, headerBytes, /*data=*/0u);
+    // Ensure the filled header is visible to the compaction compute shader.
+    {
+      vk::BufferMemoryBarrier2 bb{};
+      bb.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
+      bb.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+      bb.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader;
+      bb.dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite;
+      bb.buffer = outBuffer->buffer();
+      bb.offset = 0;
+      bb.size = headerBytes;
+      vk::DependencyInfo dep{};
+      dep.bufferMemoryBarrierCount = 1;
+      dep.pBufferMemoryBarriers = &bb;
+      cmd.pipelineBarrier2(dep);
     }
 
     ensureBlockIdCompactionPipeline();
@@ -599,18 +623,33 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     if (sliceIndex + 1u == sliceCount) {
       const uint32_t roundIndexU32 = static_cast<uint32_t>(payload.roundIndexRaw);
       const std::string_view debugLabel = "VK slice blockid compaction parse";
+      const std::string_view readbackLabel = "slice_block_id_compact_readback";
+
+      // Request end-of-frame readbacks for each slice output. The backend will
+      // insert buffer->staging copies at endRender() and expose the results via
+      // readback tickets once the submission fence signals.
+      std::vector<Z3DRendererVulkanBackend::EndOfFrameBufferReadbackTicket> readbackTickets;
+      readbackTickets.reserve(frameOutputs.sliceOutputs.size());
+      for (auto& bufOwner : frameOutputs.sliceOutputs) {
+        if (!bufOwner) {
+          continue;
+        }
+        CHECK((bufOwner->usage() & vk::BufferUsageFlagBits::eTransferSrc) != vk::BufferUsageFlags{})
+          << "Slice Block-ID compaction output must support end-of-frame buffer readback (eTransferSrc usage missing)";
+        readbackTickets.emplace_back(
+          m_backend.requestEndOfFrameBufferReadbackTicket(*bufOwner, /*srcOffset=*/0, bytesPerSlice, readbackLabel));
+      }
+
       // Block-ID discovery cache upload is a CPU control-flow boundary: force the
       // backend to wait until the completion safe point so this hook runs before
       // client code records the next progressive stage.
       m_backend.requireCompletionSafePointWaitForActiveSubmission(debugLabel);
       m_backend.registerAfterCurrentFrameCompletionHook(
         currentRenderThreadExecutorKeepAlive(debugLabel),
-        [this,
-         rendererPtr = &renderer,
-         frameKey,
+        [rendererPtr = &renderer,
          bytesPerSlice,
-         mapBytes,
          capacityIDs,
+         tickets = std::move(readbackTickets),
          streamKey = payload.streamKey,
          eye = batch.eye,
          channelCountU32 = static_cast<uint32_t>(channelCount),
@@ -618,42 +657,55 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
          roundIndexU32,
          cancellationToken,
          imagePtr = payload.image](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-          if (cancellationToken.isCancellationRequested()) {
-            co_return;
-          }
           if (!imagePtr) {
-            co_return;
-          }
-
-          auto it = m_blockIdOutputsByFrame.find(frameKey);
-          if (it == m_blockIdOutputsByFrame.end()) {
-            co_return;
-          }
-          auto& frameOutputsLocal = it->second;
-          if (frameOutputsLocal.bytesPerSlice != bytesPerSlice) {
+            // Still release any staging slots we acquired.
+            for (auto& ticket : tickets) {
+              co_await ticket.awaitAndDiscard();
+            }
             co_return;
           }
 
           std::unordered_set<uint32_t> unique;
           unique.reserve(1024);
 
-          for (const auto& bufOwner : frameOutputsLocal.sliceOutputs) {
-            ZVulkanBuffer* buf = bufOwner.get();
-            if (!buf) {
-              continue;
+          CHECK_GT(bytesPerSlice, 0u);
+          CHECK((bytesPerSlice % sizeof(uint32_t)) == 0u) << "Slice block-ID readback bytes not u32-aligned";
+          const size_t mapWords = bytesPerSlice / sizeof(uint32_t);
+          CHECK_GE(mapWords, static_cast<size_t>(kBlockIdCompactionHeaderWords))
+            << "Slice block-ID readback smaller than header";
+
+          std::vector<uint32_t> words;
+          words.resize(mapWords);
+          const size_t mapBytes = bytesPerSlice;
+
+          for (size_t i = 0; i < tickets.size(); ++i) {
+            if (cancellationToken.isCancellationRequested()) {
+              // Drop pending CPU work on cancellation, but still release staging
+              // slots to avoid starving future readbacks.
+              for (; i < tickets.size(); ++i) {
+                co_await tickets[i].awaitAndDiscard();
+              }
+              co_return;
             }
-            const void* mapped = buf->map(0, mapBytes);
-            CHECK(mapped);
-            const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
-            const uint32_t count = u32[0];
+
+            auto& ticket = tickets[i];
+            co_await ticket.awaitCopyTo(words.data(), mapBytes);
+            if (cancellationToken.isCancellationRequested()) {
+              for (size_t j = i + 1; j < tickets.size(); ++j) {
+                co_await tickets[j].awaitAndDiscard();
+              }
+              co_return;
+            }
+
+            // Unified format: [count][counts[8]][ids...]
+            const uint32_t count = words[0];
             const uint32_t clamped = std::min<uint32_t>(count, capacityIDs);
-            for (uint32_t i = 0; i < clamped; ++i) {
-              const uint32_t v = u32[kBlockIdCompactionHeaderWords + i];
+            for (uint32_t id = 0; id < clamped; ++id) {
+              const uint32_t v = words[kBlockIdCompactionHeaderWords + id];
               if (v != kInvalidBlockID && v != kUnmappedBlockID) {
                 unique.insert(v);
               }
             }
-            buf->unmap();
           }
 
           std::vector<uint32_t> missingBlocks;
@@ -734,7 +786,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
         }
       } else {
         if (rawIdx < 0) {
-          // Preview: draw all channels via fast path (the scheduler emits one batch per layer).
+          // Preview: draw all channels via fast path (the stage recorder emits one batch per layer).
           pagingDraw = false;
         } else {
           // Round 0 should not emit DrawLayers (renderer emits BlockIdDiscovery+MergeLayers).

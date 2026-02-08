@@ -614,8 +614,9 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
     << "Vulkan raycaster progressive path missing required textures.";
 
   // NOTE: Keep barriers out of dynamic rendering.
-  // - Round-0 clear of last accum is emitted by the linear-script callsite (ImgFilter)
-  //   as a commands() node that runs outside vkCmdBeginRendering.
+  // - Round-0 clear of last accum is emitted by the linear-script stage recorder
+  //   (Z3DImgRaycasterRenderer::recordVulkanStagesToScript) as a commands() node
+  //   that runs outside vkCmdBeginRendering.
   // - Sampling layouts for entry/exit + last accum are ensured via batch metadata
   //   (BackendPassDesc::externalImageUses + AttachmentDesc::finalUse).
 
@@ -1638,8 +1639,8 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
   const float zeToZW_b = 0.5f * (farClip + nearClip) / (farClip - nearClip) + 0.5f;
 
   // Segment-managed layered rendering: this batch targets exactly one array layer via
-  // AttachmentHandle.index set by the callsite (ImgFilter). Use that index to select
-  // which channel to render into the active layer target.
+  // AttachmentHandle.index set by the stage recorder (Z3DImgRaycasterRenderer::recordVulkanStagesToScript).
+  // Use that index to select which channel to render into the active layer target.
   CHECK(!batch.pass.colorAttachments.empty()) << "FastLayers stage requires an active color attachment";
   const uint32_t order = batch.pass.colorAttachments.front().handle.index;
   CHECK(order < channelCount) << "FastLayers stage layer index out of range: " << order << " >= " << channelCount;

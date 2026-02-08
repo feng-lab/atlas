@@ -592,7 +592,11 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.cpuEnd = {};
   // Tag this submission with the current real-frame token and a submission index
   frameResources.realFrameToken = Z3DRenderGlobalState::instance().currentPerfFrameToken();
-  frameResources.submissionId = ++m_submissionCursor[frameResources.realFrameToken];
+  frameResources.submissionId =
+    Z3DRenderGlobalState::instance().nextPerfFrameSubmissionId(frameResources.realFrameToken);
+  if (frameResources.realFrameToken != 0) {
+    Z3DPerfCollector::instance().noteSubmissionStarted(frameResources.realFrameToken, frameResources.submissionId);
+  }
   // Reset Stage 3 instrumentation
   frameResources.renderingSegmentsBegan = 0;
   frameResources.attachmentClears = 0;

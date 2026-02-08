@@ -1208,9 +1208,6 @@ public:
     vk::AccessFlags2 access{};
   };
   std::unordered_map<uint64_t, ExternalBufferUseState> m_externalBufferUseStates;
-
-  // Submission index within a real-frame token
-  std::unordered_map<uint64_t, uint32_t> m_submissionCursor;
 };
 
 std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend();

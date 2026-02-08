@@ -103,6 +103,14 @@ Z3DRenderGlobalState& Z3DRenderGlobalState::instance()
 
 Z3DRenderGlobalState::Z3DRenderGlobalState() = default;
 
+uint32_t Z3DRenderGlobalState::nextPerfFrameSubmissionId(uint64_t token)
+{
+  CHECK_GT(token, 0u);
+  CHECK_EQ(token, m_currentPerfFrameToken) << "Perf submission ID requested for a non-current token. token=" << token
+                                           << " current=" << m_currentPerfFrameToken;
+  return ++m_currentPerfFrameSubmissionCursor;
+}
+
 Z3DScratchResourcePool& Z3DRenderGlobalState::accessScratchPool() const
 {
   CHECK(m_scratchPool != nullptr) << "Scratch pool not initialized";
