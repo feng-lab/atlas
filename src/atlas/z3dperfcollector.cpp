@@ -111,7 +111,8 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   double totalCpuMs = 0.0;
-  std::unordered_map<std::string, double> gpuByLabel;
+  std::unordered_map<std::string, double> gpuByLabelAll;
+  std::unordered_map<std::string, double> gpuByLabelPass;
   std::unordered_map<std::string, double> cpuByLabel;
   // Aggregate stats across submissions
   Stats agg{};
@@ -119,7 +120,10 @@ void Z3DPerfCollector::flush(uint64_t token)
   for (const auto& sub : td.submissions) {
     totalCpuMs += sub.cpuMs;
     for (const auto& s : sub.gpuScopes) {
-      gpuByLabel[s.label] += s.ms;
+      gpuByLabelAll[s.label] += s.ms;
+      if (s.isPassScope) {
+        gpuByLabelPass[s.label] += s.ms;
+      }
     }
     for (const auto& s : sub.cpuScopes) {
       cpuByLabel[s.label] += s.ms;
@@ -141,24 +145,34 @@ void Z3DPerfCollector::flush(uint64_t token)
     agg.spheresBytesStaged += sub.stats.spheresBytesStaged;
     agg.readbackBytesCopied += sub.stats.readbackBytesCopied;
     agg.readbackSlotsInFlight += sub.stats.readbackSlotsInFlight;
+    agg.allSamples += sub.stats.allSamples;
+    if (sub.stats.allSamples > 0 && sub.stats.allMaxMs > agg.allMaxMs) {
+      agg.allMaxMs = sub.stats.allMaxMs;
+    }
   }
 
-  // Compute total GPU ms and top contributors
-  double totalGpuMs = 0.0;
-  for (const auto& kv : gpuByLabel) {
-    totalGpuMs += kv.second;
+  const auto& gpuByLabelBaseline = gpuByLabelPass.empty() ? gpuByLabelAll : gpuByLabelPass;
+  std::unordered_map<std::string, double> gpuByLabel = gpuByLabelBaseline;
+
+  // Compute total GPU ms from top-level pass scopes (preferred). This avoids
+  // double-counting when nested scopes are enabled (e.g. shader-stage micro
+  // scopes inside a higher-level pass scope).
+  double totalGpuScopedMs = 0.0;
+  for (const auto& kv : gpuByLabelBaseline) {
+    totalGpuScopedMs += kv.second;
   }
+  const double totalGpuMs = totalGpuScopedMs;
 
   // Sort by contribution
   std::vector<std::pair<std::string, double>> sortedGpu(gpuByLabel.begin(), gpuByLabel.end());
   std::sort(sortedGpu.begin(), sortedGpu.end(), [](const auto& a, const auto& b) {
     return a.second > b.second;
   });
-  if (sortedGpu.size() > 8) {
-    sortedGpu.resize(8);
-  }
 
   std::string msg = fmt::format("Frame#{} CPU {:.3f} ms, GPU {:.3f} ms", token, totalCpuMs, totalGpuMs);
+  if (agg.allSamples > 0 && agg.allMaxMs >= 0.0) {
+    msg += fmt::format(" | all {:.3f} ms", agg.allMaxMs);
+  }
   for (const auto& [label, ms] : sortedGpu) {
     double pct = (totalGpuMs > 0.0) ? (ms * 100.0 / totalGpuMs) : 0.0;
     msg += fmt::format(" | {} {:.3f} ms ({:.0f}%)", label, ms, pct);
@@ -201,20 +215,20 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // One-line frame summary: include concise stats instead of a second line
-  std::string stats = fmt::format(
-    " | stats: upload_hi={}B static_staged={}B rb={}B dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={}",
-    agg.uploadHighWatermarkBytes,
-    agg.staticBytesStaged,
-    agg.readbackBytesCopied,
-    agg.descriptorSetsAllocated,
-    agg.overrideSetsAllocated,
-    agg.pipelinesCreated,
-    agg.pipelinesBoundCount,
-    agg.renderingSegmentsBegan,
-    agg.attachmentClears,
-    agg.attachmentLoads,
-    agg.descriptorWritesWhileRecording,
-    agg.boundSetRewriteAttempts);
+  std::string stats = fmt::format(" | stats: upload_hi={}B static_staged={}B rb={}B",
+                                  agg.uploadHighWatermarkBytes,
+                                  agg.staticBytesStaged,
+                                  agg.readbackBytesCopied);
+  stats += fmt::format(" dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={}",
+                       agg.descriptorSetsAllocated,
+                       agg.overrideSetsAllocated,
+                       agg.pipelinesCreated,
+                       agg.pipelinesBoundCount,
+                       agg.renderingSegmentsBegan,
+                       agg.attachmentClears,
+                       agg.attachmentLoads,
+                       agg.descriptorWritesWhileRecording,
+                       agg.boundSetRewriteAttempts);
   LOG(INFO) << (msg + stats);
 
   // Optional: emit a Chrome trace JSON for this frame
@@ -456,7 +470,7 @@ void Z3DPerfCollector::flush(uint64_t token)
         std::ofstream ofs(outPath, std::ios::out | std::ios::app);
         if (!exists) {
           ofs
-            << "frame,cpu_ms,gpu_ms,top1_label,top1_ms,top1_pct,top2_label,top2_ms,top2_pct,top3_label,top3_ms,top3_pct,top4_label,top4_ms,top4_pct,top5_label,top5_ms,top5_pct,upload_hi,static_staged,readback,dsets,ovsets,pipes_created,pipes_bound,segs,clears,loads,dwr,rew\n";
+            << "frame,cpu_ms,gpu_ms,top1_label,top1_ms,top1_pct,top2_label,top2_ms,top2_pct,top3_label,top3_ms,top3_pct,top4_label,top4_ms,top4_pct,top5_label,top5_ms,top5_pct,upload_hi,static_staged,readback,all_ms,all_samples,dsets,ovsets,pipes_created,pipes_bound,segs,clears,loads,dwr,rew\n";
         }
         auto getTop = [&](size_t i) {
           if (i < sortedGpu.size()) {
@@ -469,7 +483,7 @@ void Z3DPerfCollector::flush(uint64_t token)
           return (totalGpuMs > 0.0) ? (ms * 100.0 / totalGpuMs) : 0.0;
         };
         ofs << fmt::format(
-          "{}, {:.3f}, {:.3f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n",
+          "{}, {:.3f}, {:.3f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {}, {}, {:.3f}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n",
           token,
           totalCpuMs,
           totalGpuMs,
@@ -491,6 +505,8 @@ void Z3DPerfCollector::flush(uint64_t token)
           agg.uploadHighWatermarkBytes,
           agg.staticBytesStaged,
           agg.readbackBytesCopied,
+          agg.allMaxMs,
+          agg.allSamples,
           agg.descriptorSetsAllocated,
           agg.overrideSetsAllocated,
           agg.pipelinesCreated,
@@ -506,6 +522,7 @@ void Z3DPerfCollector::flush(uint64_t token)
         jo["frame"] = token;
         jo["cpu_ms"] = totalCpuMs;
         jo["gpu_ms"] = totalGpuMs;
+        jo["gpu_scoped_ms"] = totalGpuScopedMs;
         json::array tops;
         for (const auto& [label, ms] : sortedGpu) {
           json::object t;
@@ -519,6 +536,8 @@ void Z3DPerfCollector::flush(uint64_t token)
         st["upload_hi"] = agg.uploadHighWatermarkBytes;
         st["static_staged"] = agg.staticBytesStaged;
         st["readback"] = agg.readbackBytesCopied;
+        st["all_ms"] = agg.allMaxMs;
+        st["all_samples"] = agg.allSamples;
         st["descriptor_sets"] = agg.descriptorSetsAllocated;
         st["override_sets"] = agg.overrideSetsAllocated;
         st["pipelines_created"] = agg.pipelinesCreated;

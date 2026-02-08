@@ -11,12 +11,15 @@
 #include "zneuroglancerprecomputed.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanlinearscript.h"
+#include "zvulkantexture.h"
 #include <folly/OperationCancelled.h>
 #include <folly/ScopeGuard.h>
 #include <QMenu>
 #include <cmath>
 #include <memory>
 #include <utility>
+
+DECLARE_string(atlas_vk_blockid_compaction_source);
 
 namespace nim {
 
@@ -637,6 +640,7 @@ glm::vec3 Z3DImgFilter::get3DPosition(int x, int y, int width, int height, bool&
 void Z3DImgFilter::setProgressiveRenderingMode(bool v)
 {
   m_progressiveRendering = v;
+  m_rendererBase.setCurrentRenderPassIsProgressive(v);
 }
 
 void Z3DImgFilter::enterSubregionView(float x, float y, float z)
@@ -1022,30 +1026,382 @@ double Z3DImgFilter::process(Z3DEye eye)
 
         CHECK(transparentLease != nullptr) << "ImgFilter Vulkan image path missing transparent lease";
 
-        // Main raycaster pass (clear + store).
-        segRaycaster = script.raster("raycaster", {}, [&]() {
-          const auto prevViewport = m_rendererBase.frameState().viewport;
-          const auto prevSurface = m_rendererBase.frameState().activeSurface;
-          auto guard = folly::makeGuard([&]() {
-            m_rendererBase.frameState().updateViewportData(prevViewport);
-            m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
-          });
+        // Raycaster pipeline: record fine-grained script nodes (one logical pass per node).
+        auto rayStages = m_imgRaycasterRenderer.buildVulkanStagePayloads(eye);
+        CHECK(!rayStages.empty()) << "ImgFilter Vulkan image path produced no raycaster stages";
 
-          m_rendererBase.setActiveSurfaceWithLoadStore(*transparentLease,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store);
-          // Downstream compositors sample these as image layers; leave them ready for sampling.
-          for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
-            att.finalUse = AttachmentFinalUse::Sampled;
+        auto rayLabelForStage = [&](const ImgRaycasterPayload& payload) -> std::string_view {
+          using Stage = ImgRaycasterPayload::Stage;
+          switch (payload.stage) {
+            case Stage::Unspecified:
+              CHECK(false) << "Unspecified ImgRaycasterPayload stage";
+              return "ray_unspecified";
+            case Stage::EntryExit:
+              return "ray_entry_exit";
+            case Stage::FastDirect:
+              return "ray_fast_direct";
+            case Stage::FastLayers:
+              return "ray_fast_layers";
+            case Stage::FastMerge:
+              return "ray_fast_merge";
+            case Stage::ProgressivePreviewLayers:
+              return "ray_preview_layers";
+            case Stage::ProgressiveBlockId:
+              return "ray_block_id";
+            case Stage::ProgressiveCompaction:
+              return "ray_block_compact";
+            case Stage::ProgressiveRaycast:
+              return "ray_progressive_raycast";
+            case Stage::ProgressiveCopyToLayers:
+              return "ray_copy_to_layers";
+            case Stage::ProgressiveMerge:
+              return (payload.channelIndexRaw < 0) ? "ray_preview_merge" : "ray_progressive_merge";
           }
-          if (m_rendererBase.frameState().activeSurface.depthAttachment) {
-            m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+          CHECK(false) << "Unhandled ImgRaycasterPayload stage";
+          return "ray_unknown";
+        };
+
+        auto rayStageWritesOutput = [](ImgRaycasterPayload::Stage stage) -> bool {
+          using Stage = ImgRaycasterPayload::Stage;
+          switch (stage) {
+            case Stage::Unspecified:
+              CHECK(false) << "Unspecified ImgRaycasterPayload stage";
+              return false;
+            case Stage::FastDirect:
+            case Stage::FastMerge:
+            case Stage::ProgressiveMerge:
+              return true;
+            case Stage::EntryExit:
+            case Stage::FastLayers:
+            case Stage::ProgressivePreviewLayers:
+            case Stage::ProgressiveBlockId:
+            case Stage::ProgressiveCompaction:
+            case Stage::ProgressiveRaycast:
+            case Stage::ProgressiveCopyToLayers:
+              return false;
+          }
+          return false;
+        };
+
+        ZVulkanLinearScript::SegmentHandle prevStage{};
+        for (auto& stagePayload : rayStages) {
+          const ImgRaycasterPayload::Stage stage = stagePayload.stage;
+          const std::string_view label = rayLabelForStage(stagePayload);
+          const bool writesOutput = rayStageWritesOutput(stage);
+
+          if (stage == ImgRaycasterPayload::Stage::ProgressiveBlockId && stagePayload.roundIndexRaw == 0 &&
+              stagePayload.channelIndexRaw >= 0) {
+            // GL parity: clear the "last" raycast accumulators at the start of a channel (round 0)
+            // before any block-ID or raycast shaders sample them.
+            //
+            // This must run outside dynamic rendering; express it as a commands() node so the backend
+            // closes any open rendering segment before recording the transfer clear commands.
+            auto recordClear = [lastAccumLease = stagePayload.lastAccumLease](Z3DRendererVulkanBackend& backend) {
+              if (!lastAccumLease || !lastAccumLease->hasVulkanImage()) {
+                return;
+              }
+              ZVulkanTexture* lastColor = lastAccumLease->colorAttachment(0);
+              ZVulkanTexture* lastDepth = lastAccumLease->colorAttachment(1);
+              if (!lastColor || !lastDepth) {
+                return;
+              }
+
+              auto& cmd = backend.commandBuffer();
+              const vk::ClearColorValue clear = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
+              const auto range = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0u, 1u, 0u, 1u};
+
+              auto clearTex = [&](ZVulkanTexture& tex) {
+                tex.transitionLayout(cmd, tex.layout(), vk::ImageLayout::eTransferDstOptimal);
+                cmd.clearColorImage(tex.image(), vk::ImageLayout::eTransferDstOptimal, clear, range);
+                tex.transitionLayout(cmd,
+                                     vk::ImageLayout::eTransferDstOptimal,
+                                     vk::ImageLayout::eShaderReadOnlyOptimal);
+                tex.setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+              };
+
+              clearTex(*lastColor);
+              clearTex(*lastDepth);
+            };
+            prevStage = prevStage ? script.commands("ray_clear_last_accum", {prevStage}, recordClear)
+                                  : script.commands("ray_clear_last_accum", {}, recordClear);
           }
 
-          m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
-        });
+          auto recordStage = [&]() {
+            const auto prevViewport = m_rendererBase.frameState().viewport;
+            const auto prevSurface = m_rendererBase.frameState().activeSurface;
+            auto guard = folly::makeGuard([&]() {
+              m_rendererBase.frameState().updateViewportData(prevViewport);
+              m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
+            });
+
+            auto markActiveSurfaceSampled = [&]() {
+              for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+                att.finalUse = AttachmentFinalUse::Sampled;
+              }
+              if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+                m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+              }
+            };
+
+            auto surfaceFromLeaseWithLayerIndex = [&](const Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                      uint32_t layerIndex) -> RendererFrameState::ActiveSurface {
+              RendererFrameState::ActiveSurface surface = m_rendererBase.describeSurface(lease);
+              for (auto& att : surface.colorAttachments) {
+                att.handle.index = layerIndex;
+              }
+              if (surface.depthAttachment) {
+                surface.depthAttachment->handle.index = layerIndex;
+              }
+              return surface;
+            };
+
+            auto appendComputeBatch = [&](ImgRaycasterPayload payloadToMove) {
+              RenderBatch batch;
+              batch.eye = eye;
+              batch.pass.kind = BackendPassDesc::Kind::Compute;
+              batch.geometry = std::move(payloadToMove);
+              m_rendererBase.appendBatch(std::move(batch));
+            };
+
+            auto addExternalSample =
+              [](RenderBatch& batch, const AttachmentHandle& handle, ExternalImageAspectHint aspectHint) {
+                if (!handle.valid()) {
+                  return;
+                }
+                batch.pass.externalImageUses.push_back({handle, ExternalImageUseKind::SampledRead, aspectHint});
+              };
+
+            auto appendRasterBatchWithExternalSamples = [&](ImgRaycasterPayload payloadToMove,
+                                                            std::span<const AttachmentHandle> externalColorSamples,
+                                                            std::span<const AttachmentHandle> externalDepthSamples) {
+              RenderBatch batch;
+              batch.eye = eye;
+              batch.geometry = std::move(payloadToMove);
+              for (const auto& h : externalColorSamples) {
+                addExternalSample(batch, h, ExternalImageAspectHint::Color);
+              }
+              for (const auto& h : externalDepthSamples) {
+                addExternalSample(batch, h, ExternalImageAspectHint::Depth);
+              }
+              m_rendererBase.appendBatch(std::move(batch));
+            };
+
+            auto ensureOutputSurface = [&]() {
+              CHECK(transparentLease != nullptr) << "ImgFilter Vulkan raycaster path missing transparent output lease";
+              m_rendererBase.setActiveSurfaceWithLoadStore(*transparentLease,
+                                                           LoadOp::Clear,
+                                                           StoreOp::Store,
+                                                           LoadOp::Clear,
+                                                           StoreOp::Store);
+              markActiveSurfaceSampled();
+            };
+
+            auto ensurePreserveOutputSurface = [&]() {
+              CHECK(transparentLease != nullptr) << "ImgFilter Vulkan raycaster path missing transparent output lease";
+              m_rendererBase.setActiveSurfaceWithLoadStore(*transparentLease, Z3DRendererBase::Preserve);
+            };
+
+            auto entryExitSurfaceHandles = [&]() -> std::vector<AttachmentHandle> {
+              std::vector<AttachmentHandle> handles;
+              if (stagePayload.entryExitLease) {
+                const auto entrySurface = m_rendererBase.describeSurface(*stagePayload.entryExitLease);
+                if (!entrySurface.colorAttachments.empty()) {
+                  handles.push_back(entrySurface.colorAttachments.front().handle);
+                }
+              }
+              return handles;
+            };
+
+            auto layerArraySurfaceHandles =
+              [&]() -> std::pair<std::vector<AttachmentHandle>, std::vector<AttachmentHandle>> {
+              std::vector<AttachmentHandle> colors;
+              std::vector<AttachmentHandle> depths;
+              if (stagePayload.channelLayerLease) {
+                const auto layerSurface = m_rendererBase.describeSurface(*stagePayload.channelLayerLease);
+                if (!layerSurface.colorAttachments.empty()) {
+                  colors.push_back(layerSurface.colorAttachments.front().handle);
+                }
+                if (layerSurface.depthAttachment) {
+                  depths.push_back(layerSurface.depthAttachment->handle);
+                }
+              }
+              return {std::move(colors), std::move(depths)};
+            };
+
+            auto accumSurfaceHandles = [&](const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& leasePtr)
+              -> std::vector<AttachmentHandle> {
+              std::vector<AttachmentHandle> handles;
+              if (!leasePtr) {
+                return handles;
+              }
+              const auto surface = m_rendererBase.describeSurface(*leasePtr);
+              handles.reserve(surface.colorAttachments.size());
+              for (const auto& att : surface.colorAttachments) {
+                handles.push_back(att.handle);
+              }
+              return handles;
+            };
+
+            // Decide which render target this stage writes to and which sampled inputs
+            // the Vulkan backend must transition before recording.
+            switch (stage) {
+              case ImgRaycasterPayload::Stage::ProgressiveCompaction: {
+                // Compute-only stage: no attachments.
+                appendComputeBatch(std::move(stagePayload));
+                return;
+              }
+
+              case ImgRaycasterPayload::Stage::FastDirect:
+              case ImgRaycasterPayload::Stage::FastMerge:
+              case ImgRaycasterPayload::Stage::ProgressiveMerge: {
+                // Output-writing stages: draw into the filter's transparent target.
+                ensureOutputSurface();
+
+                // These stages sample from either the layer array (merge) or from
+                // entry/exit directly (FastDirect volumetric).
+                std::vector<AttachmentHandle> colorSamples;
+                std::vector<AttachmentHandle> depthSamples;
+
+                if (stage == ImgRaycasterPayload::Stage::FastMerge ||
+                    stage == ImgRaycasterPayload::Stage::ProgressiveMerge) {
+                  auto [layerColors, layerDepths] = layerArraySurfaceHandles();
+                  colorSamples.insert(colorSamples.end(), layerColors.begin(), layerColors.end());
+                  depthSamples.insert(depthSamples.end(), layerDepths.begin(), layerDepths.end());
+                } else {
+                  auto entryColors = entryExitSurfaceHandles();
+                  colorSamples.insert(colorSamples.end(), entryColors.begin(), entryColors.end());
+                }
+
+                appendRasterBatchWithExternalSamples(std::move(stagePayload), colorSamples, depthSamples);
+                return;
+              }
+
+              case ImgRaycasterPayload::Stage::EntryExit: {
+                CHECK(stagePayload.entryExitLease && stagePayload.entryExitLease->hasVulkanImage())
+                  << "Raycaster EntryExit stage missing Vulkan entry/exit lease";
+
+                // Entry/exit renders into a 2-layer array target. Expand to two batches so the backend
+                // can open distinct dynamic-rendering segments targeting each array-layer view.
+                ImgRaycasterPayload templatePayload = stagePayload;
+                for (uint32_t layer = 0; layer < 2; ++layer) {
+                  ImgRaycasterPayload perLayer = (layer == 0) ? std::move(stagePayload) : templatePayload;
+                  const auto layerSurface = surfaceFromLeaseWithLayerIndex(*templatePayload.entryExitLease, layer);
+                  m_rendererBase.setActiveSurfaceWithLoadStore(layerSurface,
+                                                               LoadOp::Clear,
+                                                               StoreOp::Store,
+                                                               LoadOp::DontCare,
+                                                               StoreOp::DontCare);
+                  markActiveSurfaceSampled();
+                  appendRasterBatchWithExternalSamples(std::move(perLayer), {}, {});
+                }
+                // Consume the moved-from stagePayload for loop correctness.
+                stagePayload = {};
+                return;
+              }
+
+              case ImgRaycasterPayload::Stage::ProgressiveBlockId: {
+                CHECK(stagePayload.blockIdLease && stagePayload.blockIdLease->hasVulkanImage())
+                  << "Raycaster Block-ID stage missing Vulkan block-ID lease";
+                m_rendererBase.setActiveSurfaceWithLoadStore(*stagePayload.blockIdLease,
+                                                             LoadOp::Clear,
+                                                             StoreOp::Store,
+                                                             LoadOp::DontCare,
+                                                             StoreOp::DontCare);
+                markActiveSurfaceSampled();
+                std::vector<AttachmentHandle> colorSamples = entryExitSurfaceHandles();
+                auto lastAccumSamples = accumSurfaceHandles(stagePayload.lastAccumLease);
+                colorSamples.insert(colorSamples.end(), lastAccumSamples.begin(), lastAccumSamples.end());
+                appendRasterBatchWithExternalSamples(std::move(stagePayload), colorSamples, {});
+                return;
+              }
+
+              case ImgRaycasterPayload::Stage::ProgressiveRaycast: {
+                CHECK(stagePayload.currentAccumLease && stagePayload.currentAccumLease->hasVulkanImage())
+                  << "Raycaster ProgressiveRaycast stage missing Vulkan current accum lease";
+                m_rendererBase.setActiveSurfaceWithLoadStore(*stagePayload.currentAccumLease,
+                                                             LoadOp::Clear,
+                                                             StoreOp::Store,
+                                                             LoadOp::DontCare,
+                                                             StoreOp::DontCare);
+                markActiveSurfaceSampled();
+                std::vector<AttachmentHandle> colorSamples = entryExitSurfaceHandles();
+                auto lastAccumSamples = accumSurfaceHandles(stagePayload.lastAccumLease);
+                colorSamples.insert(colorSamples.end(), lastAccumSamples.begin(), lastAccumSamples.end());
+                appendRasterBatchWithExternalSamples(std::move(stagePayload), colorSamples, {});
+                return;
+              }
+
+              case ImgRaycasterPayload::Stage::ProgressiveCopyToLayers: {
+                CHECK(stagePayload.channelLayerLease && stagePayload.channelLayerLease->hasVulkanImage())
+                  << "Raycaster ProgressiveCopyToLayers stage missing Vulkan layer lease";
+                CHECK(stagePayload.channelIndexRaw >= 0)
+                  << "Raycaster ProgressiveCopyToLayers stage requires non-negative channelIndexRaw";
+                const uint32_t layerIndex = static_cast<uint32_t>(stagePayload.channelIndexRaw);
+
+                const auto surface = surfaceFromLeaseWithLayerIndex(*stagePayload.channelLayerLease, layerIndex);
+                // Preserve previous per-layer contents unless the shader overwrites fully (matches existing Vulkan
+                // path).
+                m_rendererBase.setActiveSurfaceWithLoadStore(surface,
+                                                             LoadOp::Load,
+                                                             StoreOp::Store,
+                                                             LoadOp::Load,
+                                                             StoreOp::Store);
+                markActiveSurfaceSampled();
+                auto currentAccumSamples = accumSurfaceHandles(stagePayload.currentAccumLease);
+                appendRasterBatchWithExternalSamples(std::move(stagePayload), currentAccumSamples, {});
+                return;
+              }
+
+              case ImgRaycasterPayload::Stage::FastLayers:
+              case ImgRaycasterPayload::Stage::ProgressivePreviewLayers: {
+                // Layer-array writers: expand to one batch per visible channel so the backend
+                // can open a separate dynamic-rendering segment per layer view.
+                CHECK(stagePayload.channelLayerLease && stagePayload.channelLayerLease->hasVulkanImage())
+                  << "Raycaster layered stage missing Vulkan layer lease";
+                const uint32_t layerCount = static_cast<uint32_t>(stagePayload.visibleChannels.size());
+                CHECK(layerCount > 0u) << "Raycaster layered stage missing visibleChannels";
+
+                auto entryColors = entryExitSurfaceHandles();
+
+                // stagePayload is reused as a template; emit one batch per layer.
+                ImgRaycasterPayload templatePayload = stagePayload;
+                for (uint32_t layer = 0; layer < layerCount; ++layer) {
+                  ImgRaycasterPayload perLayer = templatePayload;
+                  const auto layerSurface = surfaceFromLeaseWithLayerIndex(*templatePayload.channelLayerLease, layer);
+                  m_rendererBase.setActiveSurfaceWithLoadStore(layerSurface,
+                                                               LoadOp::Clear,
+                                                               StoreOp::Store,
+                                                               LoadOp::Clear,
+                                                               StoreOp::Store);
+                  markActiveSurfaceSampled();
+                  appendRasterBatchWithExternalSamples(std::move(perLayer), entryColors, {});
+                }
+                // Consume the moved-from stagePayload for loop correctness.
+                stagePayload = {};
+                return;
+              }
+
+              case ImgRaycasterPayload::Stage::Unspecified:
+                CHECK(false) << "Unspecified ImgRaycasterPayload stage";
+                break;
+            }
+
+            if (writesOutput) {
+              // Fallback: preserve prior behavior for any newly-added stages.
+              ensureOutputSurface();
+            } else {
+              ensurePreserveOutputSurface();
+            }
+            appendRasterBatchWithExternalSamples(std::move(stagePayload), {}, {});
+          };
+
+          if (prevStage) {
+            prevStage = script.raster(label, {prevStage}, recordStage);
+          } else {
+            prevStage = script.raster(label, {}, recordStage);
+          }
+        }
+        segRaycaster = prevStage;
 
         // Bound box overlay (preserve, same surface).
         script.raster("bbox_overlay", {segRaycaster}, [&]() {
@@ -1098,28 +1454,278 @@ double Z3DImgFilter::process(Z3DEye eye)
         }
 
         CHECK(opaqueLease != nullptr) << "ImgFilter Vulkan slice path missing opaque lease";
-        script.raster("img_slices", {}, [&]() {
-          const auto prevViewport = m_rendererBase.frameState().viewport;
-          const auto prevSurface = m_rendererBase.frameState().activeSurface;
-          auto guard = folly::makeGuard([&]() {
-            m_rendererBase.frameState().updateViewportData(prevViewport);
-            m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
-          });
+        auto sliceStages = m_imgSliceRenderer.buildVulkanStagePayloads(eye);
+        CHECK(!sliceStages.empty()) << "ImgFilter Vulkan slice path produced no slice stages";
 
-          m_rendererBase.setActiveSurfaceWithLoadStore(*opaqueLease,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store);
-          for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
-            att.finalUse = AttachmentFinalUse::Sampled;
+        auto sliceLabelForStage = [&](const ImgSlicePayload& stagePayload) -> std::string_view {
+          const bool paging =
+            stagePayload.image != nullptr && stagePayload.image->isVolumeDownsampled() && !stagePayload.fastPathOnly;
+
+          using Stage = ImgSlicePayload::Stage;
+          switch (stagePayload.stage) {
+            case Stage::Unspecified:
+              CHECK(false) << "Unspecified ImgSlicePayload stage";
+              return "slice_unspecified";
+            case Stage::DrawLayers: {
+              if (!stagePayload.layerLease) {
+                return "slice_draw_direct";
+              }
+              if (paging && stagePayload.channelIndexRaw < 0) {
+                return "slice_preview_layers";
+              }
+              if (paging && stagePayload.roundIndexRaw > 0) {
+                return "slice_paged_layer_update";
+              }
+              return "slice_draw_layers";
+            }
+            case Stage::BlockIdDiscovery:
+              return "slice_block_id";
+            case Stage::MergeLayers:
+              return (paging && stagePayload.channelIndexRaw < 0) ? "slice_preview_merge" : "slice_merge";
           }
-          if (m_rendererBase.frameState().activeSurface.depthAttachment) {
-            m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+          CHECK(false) << "Unhandled ImgSlicePayload stage";
+          return "slice_unknown";
+        };
+
+        auto sliceStageWritesOutput = [](const ImgSlicePayload& stagePayload) -> bool {
+          using Stage = ImgSlicePayload::Stage;
+          switch (stagePayload.stage) {
+            case Stage::Unspecified:
+              CHECK(false) << "Unspecified ImgSlicePayload stage";
+              return false;
+            case Stage::DrawLayers:
+              // Single-channel: draws directly into the active surface.
+              // Multi-channel: draws into layer array (output merge happens later).
+              return !stagePayload.layerLease;
+            case Stage::BlockIdDiscovery:
+              return false;
+            case Stage::MergeLayers:
+              return true;
+          }
+          return false;
+        };
+
+        ZVulkanLinearScript::SegmentHandle prevStage{};
+        for (auto& stagePayload : sliceStages) {
+          const std::string_view label = sliceLabelForStage(stagePayload);
+          const bool writesOutput = sliceStageWritesOutput(stagePayload);
+
+          auto markOutputSurfaceSampled = [&]() {
+            for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+              att.finalUse = AttachmentFinalUse::Sampled;
+            }
+            if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+              m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+            }
+          };
+
+          auto surfaceFromLeaseWithLayerIndex = [&](const Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                    uint32_t layerIndex) -> RendererFrameState::ActiveSurface {
+            RendererFrameState::ActiveSurface surface = m_rendererBase.describeSurface(lease);
+            for (auto& att : surface.colorAttachments) {
+              att.handle.index = layerIndex;
+            }
+            if (surface.depthAttachment) {
+              surface.depthAttachment->handle.index = layerIndex;
+            }
+            return surface;
+          };
+
+          auto addExternalUse = [](RenderBatch& batch,
+                                   const AttachmentHandle& handle,
+                                   ExternalImageUseKind kind,
+                                   ExternalImageAspectHint aspectHint) {
+            if (!handle.valid()) {
+              return;
+            }
+            batch.pass.externalImageUses.push_back({handle, kind, aspectHint});
+          };
+
+          auto layerArraySurfaceHandles =
+            [&](const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& leasePtr)
+            -> std::pair<std::vector<AttachmentHandle>, std::vector<AttachmentHandle>> {
+            std::vector<AttachmentHandle> colors;
+            std::vector<AttachmentHandle> depths;
+            if (!leasePtr) {
+              return {colors, depths};
+            }
+            const auto surface = m_rendererBase.describeSurface(*leasePtr);
+            if (!surface.colorAttachments.empty()) {
+              colors.push_back(surface.colorAttachments.front().handle);
+            }
+            if (surface.depthAttachment) {
+              depths.push_back(surface.depthAttachment->handle);
+            }
+            return {std::move(colors), std::move(depths)};
+          };
+
+          auto blockIdExternalKind = []() -> ExternalImageUseKind {
+            const std::string v = FLAGS_atlas_vk_blockid_compaction_source;
+            if (v.empty() || v == "buffer" || v == "Buffer" || v == "BUFFER") {
+              return ExternalImageUseKind::TransferSrc;
+            }
+            if (v == "storage" || v == "Storage" || v == "STORAGE") {
+              return ExternalImageUseKind::StorageRead;
+            }
+            if (v == "sampled" || v == "Sampled" || v == "SAMPLED") {
+              return ExternalImageUseKind::SampledRead;
+            }
+            CHECK(false) << "Unknown --atlas_vk_blockid_compaction_source='" << v
+                         << "'. Expected one of: buffer, storage, sampled.";
+            return ExternalImageUseKind::TransferSrc;
+          };
+
+          if (stagePayload.stage == ImgSlicePayload::Stage::BlockIdDiscovery) {
+            // Block-ID discovery is paging-only and requires per-slice isolation (clear -> draw -> compact)
+            // to avoid slice overlap/occlusion. Express it as a single node that emits an ordered
+            // batch list (Raster + Compute pairs) so the backend can own segment boundaries.
+            auto recordBlockId = [&]() {
+              const auto prevViewport = m_rendererBase.frameState().viewport;
+              const auto prevSurface = m_rendererBase.frameState().activeSurface;
+              auto guard = folly::makeGuard([&]() {
+                m_rendererBase.frameState().updateViewportData(prevViewport);
+                m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
+              });
+
+              CHECK(stagePayload.blockIdLease && stagePayload.blockIdLease->hasVulkanImage())
+                << "ImgFilter Vulkan slice BlockIdDiscovery stage missing Vulkan blockIdLease";
+              const auto blockSurface = m_rendererBase.describeSurface(*stagePayload.blockIdLease);
+              CHECK(!blockSurface.colorAttachments.empty()) << "Slice blockIdLease missing color attachment";
+
+              const size_t sliceCount = stagePayload.slices.size();
+              CHECK_GT(sliceCount, 0u) << "Slice BlockIdDiscovery stage missing slices span";
+
+              for (size_t sliceIndex = 0; sliceIndex < sliceCount; ++sliceIndex) {
+                // Raster: render block IDs for a single slice into the scratch blockId surface.
+                {
+                  ImgSlicePayload perSlice = stagePayload;
+                  perSlice.blockIdSliceIndexRaw = static_cast<int32_t>(sliceIndex);
+                  m_rendererBase.setActiveSurfaceWithLoadStore(*stagePayload.blockIdLease,
+                                                               LoadOp::Clear,
+                                                               StoreOp::Store,
+                                                               LoadOp::DontCare,
+                                                               StoreOp::DontCare);
+                  RenderBatch batch;
+                  batch.eye = eye;
+                  batch.geometry = std::move(perSlice);
+                  m_rendererBase.appendBatch(std::move(batch));
+                }
+
+                // Compute: compact IDs into buffers for CPU-side union/upload decisions.
+                {
+                  ImgSlicePayload perSlice = stagePayload;
+                  perSlice.blockIdSliceIndexRaw = static_cast<int32_t>(sliceIndex);
+                  RenderBatch batch;
+                  batch.eye = eye;
+                  batch.pass.kind = BackendPassDesc::Kind::Compute;
+                  batch.geometry = std::move(perSlice);
+                  addExternalUse(batch,
+                                 blockSurface.colorAttachments.front().handle,
+                                 blockIdExternalKind(),
+                                 ExternalImageAspectHint::Color);
+                  m_rendererBase.appendBatch(std::move(batch));
+                }
+              }
+            };
+
+            if (prevStage) {
+              prevStage = script.raster(label, {prevStage}, recordBlockId);
+            } else {
+              prevStage = script.raster(label, {}, recordBlockId);
+            }
+            continue;
           }
 
-          m_rendererBase.renderVulkan(eye, m_imgSliceRenderer);
-        });
+          auto recordStage = [&]() {
+            const auto prevViewport = m_rendererBase.frameState().viewport;
+            const auto prevSurface = m_rendererBase.frameState().activeSurface;
+            auto guard = folly::makeGuard([&]() {
+              m_rendererBase.frameState().updateViewportData(prevViewport);
+              m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
+            });
+
+            const bool paging =
+              stagePayload.image != nullptr && stagePayload.image->isVolumeDownsampled() && !stagePayload.fastPathOnly;
+
+            if (writesOutput) {
+              m_rendererBase.setActiveSurfaceWithLoadStore(*opaqueLease,
+                                                           LoadOp::Clear,
+                                                           StoreOp::Store,
+                                                           LoadOp::Clear,
+                                                           StoreOp::Store);
+              markOutputSurfaceSampled();
+
+              RenderBatch batch;
+              batch.eye = eye;
+              batch.geometry = stagePayload;
+              m_rendererBase.appendBatch(std::move(batch));
+              return;
+            }
+
+            if (stagePayload.stage == ImgSlicePayload::Stage::MergeLayers) {
+              m_rendererBase.setActiveSurfaceWithLoadStore(*opaqueLease,
+                                                           LoadOp::Clear,
+                                                           StoreOp::Store,
+                                                           LoadOp::Clear,
+                                                           StoreOp::Store);
+              markOutputSurfaceSampled();
+
+              RenderBatch batch;
+              batch.eye = eye;
+              batch.geometry = stagePayload;
+
+              auto [layerColors, layerDepths] = layerArraySurfaceHandles(stagePayload.layerLease);
+              for (const auto& h : layerColors) {
+                addExternalUse(batch, h, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color);
+              }
+              for (const auto& h : layerDepths) {
+                addExternalUse(batch, h, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
+              }
+              m_rendererBase.appendBatch(std::move(batch));
+              return;
+            }
+
+            CHECK(stagePayload.stage == ImgSlicePayload::Stage::DrawLayers)
+              << "Unexpected non-output slice stage (expected DrawLayers/MergeLayers)";
+            CHECK(stagePayload.layerLease && stagePayload.layerLease->hasVulkanImage())
+              << "Slice DrawLayers stage expected a Vulkan layerLease for multi-channel rendering";
+            CHECK(stagePayload.image != nullptr) << "Slice DrawLayers stage missing image pointer";
+
+            const uint32_t channelCount = static_cast<uint32_t>(stagePayload.image->numChannels());
+            CHECK(channelCount > 1u) << "Slice layered DrawLayers requires multi-channel image";
+
+            auto recordLayer = [&](uint32_t layerIndex) {
+              const auto layerSurface = surfaceFromLeaseWithLayerIndex(*stagePayload.layerLease, layerIndex);
+              m_rendererBase.setActiveSurfaceWithLoadStore(layerSurface,
+                                                           LoadOp::Clear,
+                                                           StoreOp::Store,
+                                                           LoadOp::Clear,
+                                                           StoreOp::Store);
+
+              RenderBatch batch;
+              batch.eye = eye;
+              batch.geometry = stagePayload;
+              m_rendererBase.appendBatch(std::move(batch));
+            };
+
+            if (paging && stagePayload.channelIndexRaw >= 0 && stagePayload.roundIndexRaw > 0) {
+              const uint32_t active = static_cast<uint32_t>(stagePayload.channelIndexRaw);
+              CHECK(active < channelCount)
+                << "Slice paging active channel out of range: " << active << " >= " << channelCount;
+              recordLayer(active);
+            } else {
+              for (uint32_t layer = 0; layer < channelCount; ++layer) {
+                recordLayer(layer);
+              }
+            }
+          };
+
+          if (prevStage) {
+            prevStage = script.raster(label, {prevStage}, recordStage);
+          } else {
+            prevStage = script.raster(label, {}, recordStage);
+          }
+        }
       }
 
       // Explicit flush so cancellation exceptions propagate (do not rely on destructor).

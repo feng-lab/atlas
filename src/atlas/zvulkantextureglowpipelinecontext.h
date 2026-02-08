@@ -48,10 +48,12 @@ private:
   struct BlurPipelineKey
   {
     bool horizontal = true;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(horizontal);
+      return std::tuple(horizontal, colorFormats, depthFormat);
     }
 
     bool operator<(const BlurPipelineKey& rhs) const
@@ -118,38 +120,14 @@ private:
 
   std::optional<vk::raii::DescriptorSetLayout> m_blurSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_glowSetLayout;
-  std::unique_ptr<ZVulkanDescriptorSet> m_blurDescriptor;
-  std::unique_ptr<ZVulkanDescriptorSet> m_glowDescriptor;
-
-  BlurIntermediate m_blurIntermediate0;
-  BlurIntermediate m_blurIntermediate1;
-
-  std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
-  size_t m_vertexCount = 0;
 
   void ensureDescriptorLayouts();
   void resetDescriptors();
 
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
-  void ensureIntermediateTextures(const glm::uvec2& size, vk::Format colorFormat);
-
-  void ensureVertexCapacity(size_t vertexCount);
-  void uploadGeometry();
-
   PipelineInstance& ensureBlurPipeline(const BlurPipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureGlowPipeline(const GlowPipelineKey& key, const vulkan::AttachmentFormats& formats);
-
-  void runBlurPass(Z3DRendererBase& renderer,
-                   vk::raii::CommandBuffer& cmd,
-                   ZVulkanTexture& inputColor,
-                   ZVulkanTexture& inputDepth,
-                   BlurIntermediate& output,
-                   bool horizontal,
-                   const glm::uvec2& size,
-                   int blurRadius,
-                   float blurScale,
-                   float blurStrength);
 };
 
 } // namespace nim

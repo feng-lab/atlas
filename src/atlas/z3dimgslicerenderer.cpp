@@ -56,20 +56,42 @@ void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend
     return;
   }
 
-  if (!m_img || m_slices.empty()) {
+  auto stages = buildVulkanStagePayloads(eye);
+  if (stages.empty()) {
     return;
   }
 
-  ImgSlicePayload payload;
-  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
-  payload.image = m_img;
-  payload.colormaps = &m_colormapsRaw;
-  payload.slices = std::span<const ZMesh>(m_slices.data(), m_slices.size());
-  payload.outputSize = m_outputSize;
-  payload.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
-  payload.maxProjectionMerge = true;
+  for (auto& payload : stages) {
+    RenderBatch batch;
+    batch.eye = eye;
+    batch.geometry = std::move(payload);
+    m_rendererBase.appendBatch(std::move(batch));
+  }
+}
 
-  const bool usePaging = !payload.fastPathOnly && m_img->isVolumeDownsampled();
+std::vector<ImgSlicePayload> Z3DImgSliceRenderer::buildVulkanStagePayloads(Z3DEye eye)
+{
+  std::vector<ImgSlicePayload> stages;
+  if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
+    return stages;
+  }
+  if (!m_img || m_slices.empty()) {
+    return stages;
+  }
+  CHECK(m_outputSize.x > 0u && m_outputSize.y > 0u) << "Vulkan img slice output size is zero.";
+
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+
+  ImgSlicePayload common;
+  common.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
+  common.image = m_img;
+  common.colormaps = &m_colormapsRaw;
+  common.slices = std::span<const ZMesh>(m_slices.data(), m_slices.size());
+  common.outputSize = m_outputSize;
+  common.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
+  common.maxProjectionMerge = true;
+
+  const bool usePaging = !common.fastPathOnly && m_img->isVolumeDownsampled();
   if (usePaging) {
     // Progressive init parity with raycaster:
     // - channelIdx < 0 indicates the initial fast-preview frame (handled by Vulkan pipeline context)
@@ -77,14 +99,13 @@ void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend
     if (m_channelIdx[eye] < 0) {
       ++m_progressiveGeneration[eye];
     }
-    payload.progressiveGeneration = m_progressiveGeneration[eye];
-    payload.channelIndexRaw = m_channelIdx[eye];
-    payload.roundIndexRaw = m_round[eye];
+    common.progressiveGeneration = m_progressiveGeneration[eye];
+    common.channelIndexRaw = m_channelIdx[eye];
+    common.roundIndexRaw = m_round[eye];
   }
 
   const uint32_t channelCount = static_cast<uint32_t>(m_img->numChannels());
   if (channelCount > 1u) {
-    auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
     // Helper to create a non-owning shared_ptr "view" of a persistent lease to avoid double-release.
     auto shareLease = [](Z3DScratchResourcePool::RenderTargetLease& src) {
       auto view = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
@@ -111,7 +132,7 @@ void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend
                                                           ScratchFormat::Depth32F,
                                                           std::optional<RenderBackend>(RenderBackend::Vulkan));
       }
-      payload.layerLease = shareLease(lease);
+      common.layerLease = shareLease(lease);
     } else {
       // Fast path: allocate a temporary layer array for this frame only.
       auto lease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize,
@@ -119,15 +140,69 @@ void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend
                                                              ScratchFormat::RGBA16,
                                                              ScratchFormat::Depth32F,
                                                              std::optional<RenderBackend>(RenderBackend::Vulkan));
-      payload.layerLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(lease));
+      common.layerLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(lease));
     }
   }
 
-  RenderBatch batch;
-  batch.eye = eye;
-  batch.geometry = std::move(payload);
+  auto attachBlockIdLeaseIfNeeded = [&](ImgSlicePayload& payload) {
+    const bool usePagingLocal = !payload.fastPathOnly && payload.image && payload.image->isVolumeDownsampled();
+    if (!usePagingLocal) {
+      return;
+    }
+    if (payload.stage != ImgSlicePayload::Stage::BlockIdDiscovery) {
+      return;
+    }
+    if (payload.channelIndexRaw < 0 || payload.roundIndexRaw != 0) {
+      return;
+    }
+    auto lease = scratchPool.acquireBlockIdRenderTarget(payload.outputSize, 1, 1.0, RenderBackend::Vulkan);
+    payload.blockIdLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(lease));
+  };
 
-  m_rendererBase.appendBatch(std::move(batch));
+  stages.reserve(4);
+  if (channelCount <= 1u || !common.layerLease) {
+    if (usePaging && common.channelIndexRaw >= 0 && common.roundIndexRaw == 0) {
+      // Single-channel paging round 0: split block-ID discovery from the
+      // output-writing draw so linear scripts can keep raster() callbacks
+      // focused on one logical pass / render target.
+      ImgSlicePayload blockId = common;
+      blockId.stage = ImgSlicePayload::Stage::BlockIdDiscovery;
+      attachBlockIdLeaseIfNeeded(blockId);
+      stages.push_back(std::move(blockId));
+
+      ImgSlicePayload draw = common;
+      draw.stage = ImgSlicePayload::Stage::DrawLayers;
+      stages.push_back(std::move(draw));
+      return stages;
+    }
+
+    ImgSlicePayload draw = common;
+    draw.stage = ImgSlicePayload::Stage::DrawLayers;
+    stages.push_back(std::move(draw));
+    return stages;
+  }
+
+  if (usePaging && common.channelIndexRaw >= 0 && common.roundIndexRaw == 0) {
+    ImgSlicePayload blockId = common;
+    blockId.stage = ImgSlicePayload::Stage::BlockIdDiscovery;
+    attachBlockIdLeaseIfNeeded(blockId);
+    stages.push_back(std::move(blockId));
+
+    ImgSlicePayload merge = common;
+    merge.stage = ImgSlicePayload::Stage::MergeLayers;
+    stages.push_back(std::move(merge));
+    return stages;
+  }
+
+  ImgSlicePayload draw = common;
+  draw.stage = ImgSlicePayload::Stage::DrawLayers;
+  stages.push_back(std::move(draw));
+
+  ImgSlicePayload merge = common;
+  merge.stage = ImgSlicePayload::Stage::MergeLayers;
+  stages.push_back(std::move(merge));
+
+  return stages;
 }
 
 double Z3DImgSliceRenderer::progressiveProgress(Z3DEye eye) const
@@ -209,8 +284,10 @@ bool finalizeImgSliceRoundByKey(Z3DRendererBase& rendererBase,
                                 bool lastRound,
                                 uint32_t channelCount)
 {
-  (void)rendererBase;
   auto* ptr = reinterpret_cast<Z3DPrimitiveRenderer*>(static_cast<uintptr_t>(streamKey));
+  if (!rendererBase.isRendererRegistered(ptr)) {
+    return false;
+  }
   if (auto* sr = dynamic_cast<Z3DImgSliceRenderer*>(ptr)) {
     sr->finalizeProgressiveRound(eye, lastRound, channelCount);
     return true;

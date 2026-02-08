@@ -51,6 +51,7 @@
 #include <limits>
 #include <optional>
 #include <string_view>
+#include <thread>
 #include <vector>
 #include <cstring>
 #include <cstdint>
@@ -586,6 +587,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.nextQuery = 0;
   // Capture the frame name from the renderer (if provided)
   frameResources.frameName = std::string(renderer.currentFrameLabel());
+  frameResources.progressivePassHint = renderer.currentRenderPassIsProgressive();
   frameResources.cpuStart = std::chrono::steady_clock::now();
   frameResources.cpuEnd = {};
   // Tag this submission with the current real-frame token and a submission index
@@ -607,9 +609,11 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Reset Stage 4 (readback) bookkeeping
   frameResources.pendingColorReadbacks.clear();
   frameResources.pendingBufferReadbacks.clear();
-  frameResources.forceFenceWaitForReadbacks = false;
+  frameResources.forceFenceWaitForCompletionSafePoint = false;
   frameResources.readbackBytesCopied = 0;
   frameResources.readbackSlotsInFlight = 0;
+  frameResources.allSamples = 0;
+  frameResources.allMaxMs.reset();
   // Reset Stage 4.5 (static staging) bookkeeping
   frameResources.staticBytesStaged = 0;
   frameResources.staticStreamRestaged = 0;
@@ -791,6 +795,14 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   auto& frameHandle = *m_activeFrameHandle;
   m_lastSubmittedFrameKey = frameHandle.key();
 
+  auto resetActiveStateGuard = folly::makeGuard([this]() {
+    m_frameRecording = false;
+    m_activeFrameHandle.reset();
+    m_activeFrame = nullptr;
+    m_activeRenderer = nullptr;
+    m_activePPLLIndex.reset();
+  });
+
   // Insert end-of-frame image->buffer copies for pending readbacks
   if (m_frameRecording && !frame.pendingColorReadbacks.empty()) {
     auto& cmd = frameHandle.commandBuffer();
@@ -873,9 +885,6 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     }
     catch (const std::exception& e) {
       LOG(ERROR) << "Vulkan command buffer end failed: " << e.what();
-      m_frameRecording = false;
-      m_activeFrameHandle.reset();
-      m_activeFrame = nullptr;
       return;
     }
   }
@@ -908,18 +917,22 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   // Diagnostics: log submission intent with frame identity and wait conditions.
   const bool hasReadbacks = (m_activeFrame && (!m_activeFrame->pendingColorReadbacks.empty() ||
                                                !m_activeFrame->pendingBufferReadbacks.empty()));
-  const bool needFenceWait =
-    (m_pumpFenceAfterFirstSubmit || (hasReadbacks && (m_waitForReadbacks || frame.forceFenceWaitForReadbacks)));
+  const bool progressivePassHint = frame.progressivePassHint;
+  const bool waitForReadbacksPolicy = !progressivePassHint;
+  const bool needFenceWait = (m_pumpFenceAfterFirstSubmit || frame.forceFenceWaitForCompletionSafePoint ||
+                              (hasReadbacks && waitForReadbacksPolicy));
   if (VLOG_IS_ON(1)) {
     VLOG(1) << fmt::format(
-      "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} has_readback={} wait_for_readbacks_policy={} will_wait={} pending_color_readbacks={} pending_buffer_readbacks={}",
+      "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} has_readback={} progressive_pass_hint={} wait_for_readbacks_policy={} force_safe_point_wait={} will_wait={} pending_color_readbacks={} pending_buffer_readbacks={}",
       frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
       frame.realFrameToken,
       frame.submissionId,
       static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkCommandBuffer>(rawCmd))),
       static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkFence>(*frameHandle.fence()))),
       hasReadbacks,
-      m_waitForReadbacks,
+      progressivePassHint,
+      waitForReadbacksPolicy,
+      frame.forceFenceWaitForCompletionSafePoint,
       needFenceWait,
       frame.pendingColorReadbacks.size(),
       frame.pendingBufferReadbacks.size());
@@ -1010,15 +1023,47 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   scheduleArenaReset(frame);
 
   if (needFenceWait) {
-    device().frameExecutor().waitForCompletion(frameHandle);
-    applyPendingArenaReset(frame); // runs deferred readback consumers now
-    // Fence signaled: completion callbacks ran in waitForCompletion. Poll any
-    // other frames that may have finished as well.
-    m_completedFrameKeysScratch.clear();
-    device().frameExecutor().pollCompletions(&m_completedFrameKeysScratch);
-    pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
+    // If the caller requested a synchronous safe-point boundary, do not rely on
+    // the engine's opportunistic pollVulkanCompletionsOnce(). Instead, wait
+    // here until the current submission reaches the backend's frame completion
+    // safe point (applyPendingArenaReset), so hooks that gate progressive flow
+    // (paging cache uploads, compaction readbacks, etc.) are observed before we
+    // return to client code.
+    if (submitted) {
+      constexpr auto kPollInterval = std::chrono::milliseconds(1);
+      const folly::CancellationToken cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+      void* waitedKey = frameHandle.key();
+      bool waitedKeyCompleted = false;
+      while (!waitedKeyCompleted) {
+        if (cancellationToken.isCancellationRequested()) {
+          throw ZCancellationException();
+        }
 
-    // Fence signaled; deferred readbacks/releases executed.
+        m_completedFrameKeysScratch.clear();
+        device().frameExecutor().pollCompletions(&m_completedFrameKeysScratch);
+        if (!m_completedFrameKeysScratch.empty()) {
+          for (void* key : m_completedFrameKeysScratch) {
+            if (key == waitedKey) {
+              waitedKeyCompleted = true;
+              break;
+            }
+          }
+          pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
+        }
+
+        if (!waitedKeyCompleted) {
+          std::this_thread::sleep_for(kPollInterval);
+        }
+      }
+
+      // We reached the safe point for the active submission; opportunistically
+      // drain any other completions as well.
+      m_completedFrameKeysScratch.clear();
+      device().frameExecutor().pollCompletions(&m_completedFrameKeysScratch);
+      pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
+    }
+
+    // Fence signaled; safe-point work executed.
     if (m_pumpFenceAfterFirstSubmit) {
       VLOG(1) << "VK pumped first-frame fence: delivered readback callbacks";
       m_pumpFenceAfterFirstSubmit = false;
@@ -1082,12 +1127,6 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
                      frame.uniformArena.minCapacityHint,
                      frame.uniformArena.highWatermark);
   }
-
-  m_activeFrameHandle.reset();
-  m_activeFrame = nullptr;
-  m_activeRenderer = nullptr;
-  m_activePPLLIndex.reset();
-  s_currentBackend = nullptr;
 
   // No cross-frame uniform sizing heuristics; each frame is sized independently.
 }
@@ -1154,9 +1193,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
   auto& cmd = m_activeFrameHandle->commandBuffer();
 
-  // Reset self-managed clear tracking for this sequence of batches
-  m_selfManagedClearKeys.clear();
-
   // Segment key for coalescing dynamic-rendering segments. This must include
   // every field that affects vkCmdBeginRendering state (render area, attachments,
   // load/store ops, clear values, and final-use contracts) so we never merge two
@@ -1164,6 +1200,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
   struct SegmentAttachmentKey
   {
     uint64_t id = 0;
+    uint32_t index = 0;
     LoadOp loadOp = LoadOp::Load;
     StoreOp storeOp = StoreOp::Store;
     AttachmentFinalUse finalUse = AttachmentFinalUse::Unspecified;
@@ -1173,7 +1210,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       const auto colorEqual = [](const glm::vec4& a, const glm::vec4& b) {
         return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
       };
-      return id == o.id && loadOp == o.loadOp && storeOp == o.storeOp && finalUse == o.finalUse &&
+      return id == o.id && index == o.index && loadOp == o.loadOp && storeOp == o.storeOp && finalUse == o.finalUse &&
              colorEqual(clearValue.color, o.clearValue.color) && clearValue.depth == o.clearValue.depth &&
              clearValue.stencil == o.clearValue.stencil;
     }
@@ -1199,6 +1236,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         continue;
       }
       k.colors.push_back(SegmentAttachmentKey{.id = a.handle.id,
+                                              .index = a.handle.index,
                                               .loadOp = a.loadOp,
                                               .storeOp = a.storeOp,
                                               .finalUse = a.finalUse,
@@ -1207,6 +1245,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (b.pass.depthAttachment && b.pass.depthAttachment->handle.valid()) {
       const auto& a = *b.pass.depthAttachment;
       k.depth = SegmentAttachmentKey{.id = a.handle.id,
+                                     .index = a.handle.index,
                                      .loadOp = a.loadOp,
                                      .storeOp = a.storeOp,
                                      .finalUse = a.finalUse,
@@ -1224,6 +1263,17 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     // Render area from pass viewport/scissor
     outSpec.renderArea = vulkan::toVkScissor(batch.pass);
 
+    auto chooseAttachmentView =
+      [](ZVulkanTexture& texture, uint32_t layerIndex, vk::ImageAspectFlags aspect) -> vk::ImageView {
+      // AttachmentHandle.index is treated as the array layer for 2D array textures. This enables
+      // segment-managed pipelines (backend-owned vkCmdBeginRendering) to target individual layers without
+      // self-managed recording.
+      const vk::ImageView view = texture.layerImageView(layerIndex, aspect);
+      CHECK(static_cast<VkImageView>(view) != VK_NULL_HANDLE)
+        << "Vulkan attachment view unavailable: layer=" << layerIndex << " layers=" << texture.arrayLayers();
+      return view;
+    };
+
     // Build color attachments
     outSpec.colorAttachments.reserve(batch.pass.colorAttachments.size());
     for (const auto& attachment : batch.pass.colorAttachments) {
@@ -1233,9 +1283,10 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       auto& texture = vulkan::textureFromHandle(attachment.handle, device(), "renderer color attachment");
       ZVulkanAttachmentInfo info{};
       info.image = texture.image();
-      info.view = texture.imageView();
+      info.view = chooseAttachmentView(texture, attachment.handle.index, vk::ImageAspectFlagBits::eColor);
       info.format = texture.format();
       info.initialLayout = texture.layout();
+
       // Choose explicit final layout based on backend-neutral attachment usage metadata.
       // This avoids relying on shader-hook / label heuristics that are prone to state leakage.
       switch (attachment.finalUse) {
@@ -1278,7 +1329,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       auto& texture = vulkan::textureFromHandle(attachment.handle, device(), "renderer depth attachment");
       ZVulkanAttachmentInfo info{};
       info.image = texture.image();
-      info.view = texture.imageView();
+      info.view = chooseAttachmentView(texture, attachment.handle.index, vk::ImageAspectFlagBits::eDepth);
       info.format = texture.format();
       info.initialLayout = texture.layout();
       switch (attachment.finalUse) {
@@ -1407,11 +1458,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     return true;
   };
 
-  auto isSelfManaged = [](const GeometryPayload& g) -> bool {
-    return std::holds_alternative<TextureGlowPayload>(g) || std::holds_alternative<ImgSlicePayload>(g) ||
-           std::holds_alternative<ImgRaycasterPayload>(g);
-  };
-
   size_t batchIndex = 0;
   std::optional<SegmentKey> currentKey;
   bool segmentOpen = false;
@@ -1429,6 +1475,17 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     segmentOpen = false;
     currentKey.reset();
   };
+
+  // Ensure we never leave a Vulkan recording session with an active dynamic-rendering
+  // instance. Cancellation/exception paths can unwind out of a pipeline context's
+  // record() call; without this guard we would hit:
+  //   vkEndCommandBuffer(): invalid inside active vkCmdBeginRendering instance.
+  auto segmentCloseGuard = folly::makeGuard([&]() {
+    endRenderingSegmentIfOpen();
+    if (m_activeFrame) {
+      m_activeFrame->activeSegmentFormats.reset();
+    }
+  });
 
   auto openSegmentForBatch = [&](const RenderBatch& batch, const SegmentKey& key, bool forceLoadOps) -> bool {
     ZVulkanPipelineCommandRecorder::RenderingSegmentSpec spec;
@@ -1468,15 +1525,19 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     const auto vkViewport = vulkan::toVkViewport(batch.pass.viewport);
     const auto vkScissor = vulkan::toVkScissor(batch.pass);
 
-    const bool selfManaged = isSelfManaged(batch.geometry);
-    const SegmentKey segmentKey = buildKey(batch, vkScissor);
+    const bool isRaster = (batch.pass.kind == BackendPassDesc::Kind::Raster);
+    const bool isCompute = (batch.pass.kind == BackendPassDesc::Kind::Compute);
+    std::optional<SegmentKey> segmentKey;
+    if (isRaster) {
+      segmentKey = buildKey(batch, vkScissor);
+    }
 
     // Segment boundaries must be established before emitting any barriers:
     // Vulkan forbids vkCmdPipelineBarrier2 (image/buffer barriers) inside a
     // dynamic-rendering instance unless dynamicRenderingLocalRead is enabled.
-    if (selfManaged) {
+    if (isCompute) {
       endRenderingSegmentIfOpen();
-    } else if (segmentOpen && (!currentKey || *currentKey != segmentKey)) {
+    } else if (segmentOpen && (!currentKey || !segmentKey || *currentKey != *segmentKey)) {
       endRenderingSegmentIfOpen();
     }
 
@@ -1580,7 +1641,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     // When a segment is already open (same attachments), avoid emitting any
     // barriers inside dynamic rendering by restarting the segment if any
     // external use needs a transition/barrier.
-    if (!selfManaged && segmentOpen) {
+    if (segmentOpen) {
       bool needsBarrierOutsideSegment = false;
       for (const auto& use : batch.pass.externalImageUses) {
         if (!use.handle.valid()) {
@@ -1664,8 +1725,11 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       ensureExternalBufferUse(use);
     }
 
-    if (!selfManaged && !segmentOpen) {
-      if (!openSegmentForBatch(batch, segmentKey, forceLoadOps)) {
+    if (isCompute) {
+      endRenderingSegmentIfOpen();
+    } else if (isRaster && !segmentOpen) {
+      CHECK(segmentKey.has_value());
+      if (!openSegmentForBatch(batch, *segmentKey, forceLoadOps)) {
         continue;
       }
     }
@@ -1812,8 +1876,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     m_activeFrame->activeSegmentFormats.reset();
   }
 }
-
-// Removed: shouldSelfManagedClear was used in earlier self-managed flows.
 
 void Z3DRendererVulkanBackend::hintNextUniformArenaMinCapacity(size_t bytes)
 {
@@ -3592,23 +3654,13 @@ void Z3DRendererVulkanBackend::flushForTeardown(std::string_view reason)
   }
 }
 
-void Z3DRendererVulkanBackend::setWaitForReadbacks(bool wait)
-{
-  m_waitForReadbacks = wait;
-}
-
-bool Z3DRendererVulkanBackend::waitForReadbacks() const
-{
-  return m_waitForReadbacks;
-}
-
-void Z3DRendererVulkanBackend::requireReadbackWaitForActiveSubmission(std::string_view debugLabel)
+void Z3DRendererVulkanBackend::requireCompletionSafePointWaitForActiveSubmission(std::string_view debugLabel)
 {
   CHECK(currentRenderThreadExecutorOrNull() != nullptr)
-    << "requireReadbackWaitForActiveSubmission must be called on the rendering thread"
+    << "requireCompletionSafePointWaitForActiveSubmission must be called on the rendering thread"
     << (debugLabel.empty() ? "" : " (") << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
-  CHECK(m_activeFrame != nullptr) << "requireReadbackWaitForActiveSubmission requires an active frame";
-  m_activeFrame->forceFenceWaitForReadbacks = true;
+  CHECK(m_activeFrame != nullptr) << "requireCompletionSafePointWaitForActiveSubmission requires an active frame";
+  m_activeFrame->forceFenceWaitForCompletionSafePoint = true;
 }
 
 void Z3DRendererVulkanBackend::pollCompletionsAndPumpSafePoints()
@@ -3622,6 +3674,21 @@ void Z3DRendererVulkanBackend::pollCompletionsAndPumpSafePoints()
   m_completedFrameKeysScratch.clear();
   device().frameExecutor().pollCompletions(&m_completedFrameKeysScratch);
   pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
+}
+
+bool Z3DRendererVulkanBackend::hasInFlightFrames() const
+{
+  return m_sharedDevice != nullptr && m_sharedDevice->frameExecutor().hasInFlightFrames();
+}
+
+uint32_t Z3DRendererVulkanBackend::inFlightCount() const
+{
+  return m_sharedDevice != nullptr ? m_sharedDevice->frameExecutor().inFlightCount() : 0u;
+}
+
+uint32_t Z3DRendererVulkanBackend::maxFramesInFlight() const
+{
+  return m_sharedDevice != nullptr ? m_sharedDevice->frameExecutor().maxFramesInFlight() : 0u;
 }
 
 Z3DRendererVulkanBackend::ActiveSubmissionFenceAwaiter
@@ -3904,6 +3971,20 @@ void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
 
   if (deferredException) {
     std::rethrow_exception(deferredException);
+  }
+}
+
+void Z3DRendererVulkanBackend::recordAllMsForCompletionSafePoint(double milliseconds)
+{
+  FrameResources* frame = m_frameInCompletionSafePoint.load(std::memory_order_acquire);
+  CHECK(frame != nullptr) << "recordAllMsForCompletionSafePoint must be called during the completion safe point";
+  if (milliseconds < 0.0) {
+    return;
+  }
+
+  frame->allSamples++;
+  if (!frame->allMaxMs.has_value() || milliseconds > *frame->allMaxMs) {
+    frame->allMaxMs = milliseconds;
   }
 }
 
@@ -4362,6 +4443,18 @@ folly::coro::Task<void> Z3DRendererVulkanBackend::EndOfFrameBufferReadbackTicket
   co_return;
 }
 
+folly::coro::Task<void> Z3DRendererVulkanBackend::EndOfFrameBufferReadbackTicket::awaitAndDiscard()
+{
+  CHECK(m_mapped != nullptr) << "EndOfFrameBufferReadbackTicket used without a mapped pointer";
+  CHECK_GT(m_bytes, 0u) << "EndOfFrameBufferReadbackTicket used with 0 bytes";
+  CHECK(m_releaseSlot) << "EndOfFrameBufferReadbackTicket already consumed (release slot missing)";
+
+  co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(m_fence);
+  m_releaseSlot();
+  m_releaseSlot = {};
+  co_return;
+}
+
 void Z3DRendererVulkanBackend::notifyPipelineCreated()
 {
   if (m_activeFrame) {
@@ -4560,7 +4653,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
         }
         const double ns = static_cast<double>(endTicks - startTicks) * static_cast<double>(m_timestampPeriod);
         const double ms = ns * 1e-6;
-        message += fmt::format(" | {} {:.3f} ms", scope.label, ms);
+        message += fmt::format(" | gpu:{} {:.3f} ms", scope.label, ms);
       }
     } else {
       VLOG(1) << "Vulkan query results unavailable: " << vk::to_string(result);
@@ -4569,8 +4662,15 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     VLOG(1) << "No GPU timestamp scopes recorded this frame";
   }
 
+  // Report end-to-end (perf-frame-start → host-ready) latency separately from
+  // CPU/GPU scopes. This keeps GPU totals/percentages scoped to timestamped GPU
+  // work while still exposing a user-visible "frame done" metric in a single line.
+  if (frame.allMaxMs.has_value() && *frame.allMaxMs >= 0.0) {
+    message += fmt::format(" | all {:.3f} ms", *frame.allMaxMs);
+  }
+
   for (const auto& cpuScope : frame.cpuScopes) {
-    message += fmt::format(" | {} {:.3f} ms", cpuScope.label, cpuScope.milliseconds);
+    message += fmt::format(" | cpu:{} {:.3f} ms", cpuScope.label, cpuScope.milliseconds);
   }
 
   // Append concise per-submission stats (counts and resource deltas)
@@ -4622,6 +4722,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
                                       static_cast<double>(m_timestampPeriod);
           sc.tsUs = startNsCpu * 1e-3;
         }
+        sc.isPassScope = scope.isPassScope;
         gpuScopesForCollector.push_back(std::move(sc));
       }
     }
@@ -4650,6 +4751,8 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     stats.spheresBytesStaged = frame.spheresBytesStaged;
     stats.readbackBytesCopied = frame.readbackBytesCopied;
     stats.readbackSlotsInFlight = frame.readbackSlotsInFlight;
+    stats.allSamples = frame.allSamples;
+    stats.allMaxMs = frame.allMaxMs.value_or(0.0);
 
     Z3DPerfCollector::instance().addSubmission(frame.realFrameToken,
                                                frame.submissionId,
@@ -4681,7 +4784,8 @@ std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view l
                                                       *frame.queryPool,
                                                       startIndex);
   const uint32_t endIndex = frame.nextQuery++;
-  frame.gpuScopes.push_back(GpuScopeRecord{std::string(label), startIndex, endIndex});
+  const bool isPassScope = (m_passScope.active && (m_passScope.label == label));
+  frame.gpuScopes.push_back(GpuScopeRecord{std::string(label), startIndex, endIndex, isPassScope});
   return frame.gpuScopes.size() - 1;
 }
 

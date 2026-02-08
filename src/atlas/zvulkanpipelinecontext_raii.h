@@ -41,69 +41,6 @@ struct ZVulkanDescriptorBindInfo
   std::vector<uint32_t> dynamicOffsets{};
 };
 
-struct ZVulkanGraphicsPassSpec
-{
-  vk::Rect2D renderArea{};
-  std::vector<vk::Viewport> viewports{};
-  std::vector<vk::Rect2D> scissors{};
-
-  std::vector<ZVulkanAttachmentInfo> colorAttachments{};
-  std::optional<ZVulkanAttachmentInfo> depthStencilAttachment{};
-
-  const vk::raii::Pipeline* pipeline{nullptr};
-  const vk::raii::PipelineLayout* pipelineLayout{nullptr};
-  vk::Pipeline pipelineHandle{VK_NULL_HANDLE};
-  vk::PipelineLayout pipelineLayoutHandle{VK_NULL_HANDLE};
-  std::vector<vk::DescriptorSet> descriptorSets{};
-  std::vector<uint32_t> dynamicOffsets{};
-  std::optional<uint32_t> expectedDescriptorSetCount{};
-  uint32_t descriptorSetFirst{0};
-  std::vector<ZVulkanDescriptorBindInfo> extraDescriptorBinds{};
-
-  std::vector<vk::Buffer> vertexBuffers{};
-  std::vector<vk::DeviceSize> vertexOffsets{};
-  vk::Buffer indexBuffer{};
-  vk::DeviceSize indexOffset{0};
-  vk::IndexType indexType{vk::IndexType::eUint32};
-
-  const void* pushConstantsData{nullptr};
-  uint32_t pushConstantsSize{0};
-  vk::ShaderStageFlags pushConstantsStages{};
-  bool requirePushConstants{false};
-
-  std::optional<float> lineWidth{};
-  std::optional<vk::Bool32> depthBiasEnable{};
-  std::optional<float> depthBiasConstant{};
-  std::optional<float> depthBiasClamp{};
-  std::optional<float> depthBiasSlope{};
-  std::optional<std::array<float, 4>> blendConstants{};
-  std::optional<uint32_t> stencilCompareMask{};
-  std::optional<uint32_t> stencilWriteMask{};
-  std::optional<uint32_t> stencilRef{};
-  std::optional<vk::CullModeFlags> cullMode{};
-  std::optional<vk::FrontFace> frontFace{};
-  std::optional<vk::Bool32> primitiveRestartEnable{};
-  std::optional<vk::Bool32> depthTestEnable{};
-  std::optional<vk::Bool32> depthWriteEnable{};
-  std::optional<vk::CompareOp> depthCompareOp{};
-  std::optional<vk::Bool32> stencilTestEnable{};
-  std::optional<vk::PrimitiveTopology> topology{};
-  std::optional<vk::Bool32> rasterizerDiscardEnable{};
-
-  uint32_t indexCount{0};
-  uint32_t instanceCount{1};
-  uint32_t firstIndex{0};
-  uint32_t firstInstance{0};
-  int32_t vertexOffset{0};
-  uint32_t vertexCount{0};
-  uint32_t firstVertex{0};
-
-  bool allowActiveQueries{false};
-  bool allowConditionalRendering{false};
-  bool activeQueries{false};
-  bool conditionalRendering{false};
-};
-
 struct ZVulkanComputePassSpec
 {
   const vk::raii::Pipeline* pipeline{nullptr};
@@ -204,7 +141,6 @@ struct ZVulkanGraphicsDrawSpec
 class ZVulkanDebugStateTracker
 {
 public:
-  void reset(const ZVulkanGraphicsPassSpec& spec);
   void reset(const ZVulkanComputePassSpec& spec);
   // Draw-only reset (no attachments) for segment-managed flows
   void reset(const ZVulkanGraphicsDrawSpec& spec);
@@ -227,9 +163,7 @@ public:
   void markDescriptorSets(uint32_t firstSet, uint32_t boundCount);
   void markPushConstants(uint32_t size);
 
-  void assertGraphicsPreDraw(const ZVulkanGraphicsPassSpec& spec) const;
   void assertComputePreDispatch(const ZVulkanComputePassSpec& spec) const;
-  // Draw-only assertion counterpart
   void assertGraphicsPreDraw(const ZVulkanGraphicsDrawSpec& spec) const;
 
 private:
@@ -282,8 +216,6 @@ class ZVulkanPipelineCommandRecorder
 public:
   explicit ZVulkanPipelineCommandRecorder(vk::raii::CommandBuffer& commandBuffer);
 
-  void recordGraphicsPass(const ZVulkanGraphicsPassSpec& spec,
-                          const std::function<void(vk::raii::CommandBuffer&)>& drawFn = {});
   void recordComputePass(const ZVulkanComputePassSpec& spec);
 
   // Segment-managed API (backend/compositor): begin/end segment once, then issue draw-only commands.
@@ -299,7 +231,6 @@ public:
 private:
   static vk::ImageLayout depthAttachmentLayoutForAspect(vk::ImageAspectFlags aspect);
   static void validateAttachmentInfo(const ZVulkanAttachmentInfo& info, const char* role);
-  static void validateDescriptorSets(const ZVulkanGraphicsPassSpec& spec);
   static void validateDescriptorSets(const ZVulkanComputePassSpec& spec);
   static void validateDescriptorSets(const ZVulkanGraphicsDrawSpec& spec);
 

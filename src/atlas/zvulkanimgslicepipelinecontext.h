@@ -146,13 +146,6 @@ private:
     uint32_t vertexCount = 0;
   };
 
-  struct DeferredProgressive
-  {
-    uint64_t streamKey = 0;
-    Z3DEye eye = Z3DEye::MonoEye;
-    uint32_t channelCount = 0;
-  };
-
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<SlicePipelineKey, PipelineInstance> m_slicePipelines;
@@ -200,7 +193,6 @@ private:
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
   std::optional<Finalization> m_pendingFinalization;
-  std::optional<DeferredProgressive> m_deferredProgressive;
 
   void ensureDescriptorLayouts();
   void ensureEmptyDescriptor();
@@ -213,7 +205,6 @@ private:
   ZVulkanTexture&
   ensureVolumeTexture(size_t channel, uint64_t generation, const ZImg& image, ChannelResources& resources);
   ZVulkanTexture& ensureColormapTexture(size_t channel, const ZColorMap* colorMap, ChannelResources& resources);
-  void transitionToSampled(vk::raii::CommandBuffer& cmd, ZVulkanTexture& texture, vk::ImageLayout desiredLayout);
 
   void updateFastDescriptors(ChannelResources& resources, ZVulkanTexture& volume, ZVulkanTexture& colormap);
   bool updatePagedDescriptors(ChannelResources& resources,
@@ -234,6 +225,11 @@ private:
   std::vector<vk::DescriptorSet> collectSliceDescriptorSets(ChannelResources& resources, bool usePaging);
   // depthArray is optional
   void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
+
+  // Cached slice-geometry identity to avoid re-uploading for each per-layer batch.
+  uint64_t m_geometryStreamKey = 0;
+  const ZMesh* m_geometryPtr = nullptr;
+  size_t m_geometryCount = 0;
 };
 
 } // namespace nim

@@ -10,6 +10,7 @@
 #include <array>
 #include "z3drendercommands.h"
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,15 @@ public:
 
   void setData(Z3DImg& img);
   // Targets are owned internally; no external override needed
+
+  // Vulkan-only helper: build a sequence of stage-specific payloads that
+  // represent the raycaster pipeline as fine-grained passes (entry/exit, layers,
+  // merge, progressive stages, ...). This is used by Z3DImgFilter's linear-script
+  // orchestration so each script node records one logical pass.
+  //
+  // Note: This method may update progressive bookkeeping (generation counters,
+  // stats sinks) as part of preparing the per-frame payloads.
+  [[nodiscard]] std::vector<ImgRaycasterPayload> buildVulkanStagePayloads(Z3DEye eye);
 
   // quad or entry_exit texture should be set before rendering
 
@@ -251,6 +261,9 @@ protected:
   // Raycast accumulators are acquired from the scratch pool on demand
   std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_lastRaycastAccum;
   std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_currentRaycastAccum;
+  // Vulkan progressive layer-array targets (one per eye) used to accumulate and
+  // merge per-channel results across progressive rounds.
+  std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_vulkanProgressiveLayerLease;
 
   float m_samplingRateValue = 1.f; // Sampling rate of the raycasting, specified relative to the size of one voxel
   float m_isoValue = 0.5f; // The used isovalue, when isosurface raycasting is enabled
@@ -280,6 +293,15 @@ private:
   int m_channelIdx[3] = {-1, -1, -1};
   int m_round[3] = {0, 0, 0};
   std::array<uint32_t, 3> m_progressiveGeneration{};
+
+  enum class VulkanProgressivePhase : uint8_t
+  {
+    BlockIdDiscovery,
+    Raycast
+  };
+  std::array<VulkanProgressivePhase, 3> m_vulkanProgressivePhase{VulkanProgressivePhase::BlockIdDiscovery,
+                                                                 VulkanProgressivePhase::BlockIdDiscovery,
+                                                                 VulkanProgressivePhase::BlockIdDiscovery};
 
   // Optional per-frame paging read statistics (created only when logging is enabled).
   std::array<std::shared_ptr<Z3DImgPagingFrameStats>, 3> m_pagingFrameStats;

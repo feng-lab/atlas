@@ -105,8 +105,10 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
   const bool hasColorAttachments = !batch.pass.colorAttachments.empty();
   const bool hasDepthAttachment = batch.pass.depthAttachment.has_value();
   if (!hasColorAttachments && !hasDepthAttachment) {
-    // Prefer current active surface if present
-    if (!m_frameState.activeSurface.empty()) {
+    // Prefer current active surface if present, but only for raster passes.
+    // Compute passes intentionally run without attachments; they rely on
+    // externalImageUses/externalBufferUses metadata for synchronization.
+    if (batch.pass.kind == BackendPassDesc::Kind::Raster && !m_frameState.activeSurface.empty()) {
       batch.pass.colorAttachments = m_frameState.activeSurface.colorAttachments;
       batch.pass.depthAttachment = m_frameState.activeSurface.depthAttachment;
     }
@@ -143,12 +145,17 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
   if (m_activeBackend == RenderBackend::Vulkan) {
     const bool noColors = batch.pass.colorAttachments.empty();
     const bool noDepth = !batch.pass.depthAttachment.has_value();
-    CHECK(!(noColors && noDepth)) << "Vulkan appendBatch without attachments: shaderHook="
-                                  << enumToStringOr(batch.shaderHook.type, "<unknown>") << " label='"
-                                  << m_currentPassLabel
-                                  << "' activeSurfaceColors=" << m_frameState.activeSurface.colorAttachments.size()
-                                  << " activeSurfaceHasDepth="
-                                  << m_frameState.activeSurface.depthAttachment.has_value();
+    if (batch.pass.kind == BackendPassDesc::Kind::Raster) {
+      CHECK(!(noColors && noDepth)) << "Vulkan appendBatch without attachments: shaderHook="
+                                    << enumToStringOr(batch.shaderHook.type, "<unknown>") << " label='"
+                                    << m_currentPassLabel
+                                    << "' activeSurfaceColors=" << m_frameState.activeSurface.colorAttachments.size()
+                                    << " activeSurfaceHasDepth="
+                                    << m_frameState.activeSurface.depthAttachment.has_value();
+    } else {
+      CHECK(batch.pass.kind == BackendPassDesc::Kind::Compute);
+      CHECK(noColors && noDepth) << "Compute batches must not specify attachments";
+    }
   }
 
   // Strict backend separation: do not accept GL attachments when targeting Vulkan.

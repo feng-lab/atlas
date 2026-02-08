@@ -22,6 +22,7 @@ public:
     double ms = 0.0;
     // Optional: calibrated CPU-axis timestamp in microseconds (relative baseline handled at writer)
     double tsUs = -1.0;
+    bool isPassScope = false; // true for top-level pass scopes (non-nested "frame budget" scopes)
   };
 
   struct Stats
@@ -46,6 +47,8 @@ public:
     size_t spheresBytesStaged = 0;
     size_t readbackBytesCopied = 0;
     uint32_t readbackSlotsInFlight = 0;
+    uint32_t allSamples = 0; // perf-frame-start → host-ready observations (end-to-end UX latency)
+    double allMaxMs = 0.0; // max over allSamples
   };
 
   struct Submission

@@ -514,6 +514,10 @@ private:
   bool m_recordingSessionOpen = false;
   std::string m_currentPassLabel;
   std::string m_currentFrameLabel;
+  // See setCurrentRenderPassIsProgressive(). Stored on the renderer base so the
+  // backend can snapshot it into per-submission state for correct behavior with
+  // multiple frames-in-flight.
+  bool m_currentRenderPassIsProgressive = true;
 
 public:
   // Expose current pass label for backend diagnostics/logging
@@ -526,6 +530,20 @@ public:
   std::string_view currentFrameLabel() const
   {
     return m_currentFrameLabel;
+  }
+
+  // Render-pass hint: whether the current filter-pipeline evaluation is running
+  // in progressive mode. Vulkan backend uses this to decide the default
+  // end-of-frame readback wait policy (async for progressive, sync for non-progressive
+  // capture/export passes) without requiring call sites to toggle backend flags.
+  void setCurrentRenderPassIsProgressive(bool progressive)
+  {
+    m_currentRenderPassIsProgressive = progressive;
+  }
+
+  [[nodiscard]] bool currentRenderPassIsProgressive() const
+  {
+    return m_currentRenderPassIsProgressive;
   }
 
   std::vector<Z3DScratchResourcePool::RenderTargetLease*> m_persistentLeases;

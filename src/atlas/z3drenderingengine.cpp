@@ -23,10 +23,8 @@
 #include "z3dscratchresourcepool.h"
 #include "zvulkancontext.h"
 #include "zvulkandevice.h"
-#include "zvulkanframeexecutor.h"
 #include "zvulkan.h"
 #include "z3dshadermanager.h"
-#include "z3drenderervulkanbackend.h"
 #include "z3dgpuinfo.h"
 #include "z3dgl.h"
 #include "z3dfilter.h"
@@ -950,14 +948,14 @@ void Z3DRenderingEngine::init()
         return;
       }
 
-      auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
-      if (!vkBackend) {
+      auto* backendImpl = m_compositor->rendererBase().backend();
+      if (!backendImpl) {
         stopVulkanCompletionPolling();
         return;
       }
 
       try {
-        vkBackend->pollCompletionsAndPumpSafePoints();
+        backendImpl->pollCompletionsAndPumpSafePoints();
       }
       catch (const ZCancellationException&) {
         // Cancellation is expected during interactive aborts and shutdown.
@@ -975,7 +973,7 @@ void Z3DRenderingEngine::init()
         CHECK(false) << "Vulkan completion polling failed (unknown exception).";
       }
       maybeKickDeferredRenderAfterVulkanPoll();
-      if (!m_vkDevice->frameExecutor().hasInFlightFrames()) {
+      if (!backendImpl->hasInFlightFrames()) {
         stopVulkanCompletionPolling();
       }
     });
@@ -1113,27 +1111,30 @@ void Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()
   // are executed while the compositor/backend objects are still alive.
   if (m_globalParas && m_compositor &&
       static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan) {
-    if (auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend())) {
+    if (auto* backendImpl = m_compositor->rendererBase().backend()) {
       try {
-        vkBackend->flushForTeardown("engine_teardown_drain");
-        return;
+        backendImpl->flushForTeardown("engine_teardown_drain");
+        if (backendImpl->supportsCommandLists()) {
+          return;
+        }
       }
       catch (const std::exception& e) {
-        LOG(ERROR) << "Vulkan backend flushForTeardown failed during engine teardown drain: " << e.what();
+        LOG(ERROR) << "Backend flushForTeardown failed during engine teardown drain: " << e.what();
       }
       catch (...) {
-        LOG(ERROR) << "Vulkan backend flushForTeardown failed during engine teardown drain (unknown exception)";
+        LOG(ERROR) << "Backend flushForTeardown failed during engine teardown drain (unknown exception)";
       }
     }
   }
 
-  // Fallback: at least ensure the frame-executor fences are drained so nothing
-  // outlives the device. Note that this does not execute backend safe-point hooks.
+  // Fallback: at least ensure the VkDevice is idle so nothing outlives it.
+  // Note: this does not execute backend safe-point hooks; it is a last resort
+  // when the backend cannot be reached during teardown.
   try {
-    m_vkDevice->frameExecutor().waitForAllInFlight();
+    m_vkDevice->context().device().waitIdle();
   }
   catch (const std::exception& e) {
-    LOG(ERROR) << "Vulkan frame-executor drain failed during teardown: " << e.what();
+    LOG(ERROR) << "Vulkan waitIdle failed during teardown: " << e.what();
   }
 }
 
@@ -1770,24 +1771,6 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
 
     takeScreenShotPrivate(filename, sst);
   } else {
-    // Capture path: screenshots require CPU pixels immediately, so force
-    // Vulkan end-of-frame readbacks to block until the submission fence
-    // signals (interactive rendering keeps this non-blocking).
-    Z3DRendererVulkanBackend* vkBackend = nullptr;
-    bool prevWaitForReadbacks = false;
-    if (static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan) {
-      vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
-      if (vkBackend) {
-        prevWaitForReadbacks = vkBackend->waitForReadbacks();
-        vkBackend->setWaitForReadbacks(true);
-      }
-    }
-    auto waitReadbacksGuard = folly::makeGuard([vkBackend, prevWaitForReadbacks]() {
-      if (vkBackend) {
-        vkBackend->setWaitForReadbacks(prevWaitForReadbacks);
-      }
-    });
-
     ZImg img(ZImgInfo(width, height, 1, 4));
     img.infoRef().lastChannelIsAlphaChannel = true;
     ZImg rightImg;
@@ -1912,22 +1895,6 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
     m_globalParas->camera.setTileFrustum();
     m_compositor->setRenderingRegion();
   });
-  // Capture path: screenshots require CPU pixels immediately, so force Vulkan
-  // end-of-frame readbacks to block until the submission fence signals.
-  Z3DRendererVulkanBackend* vkBackend = nullptr;
-  bool prevWaitForReadbacks = false;
-  if (static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan) {
-    vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
-    if (vkBackend) {
-      prevWaitForReadbacks = vkBackend->waitForReadbacks();
-      vkBackend->setWaitForReadbacks(true);
-    }
-  }
-  auto waitReadbacksGuard = folly::makeGuard([vkBackend, prevWaitForReadbacks]() {
-    if (vkBackend) {
-      vkBackend->setWaitForReadbacks(prevWaitForReadbacks);
-    }
-  });
   // Evaluate the filter pipeline for this tile.
   processFrame(sst != Z3DScreenShotType::MonoView, false);
 
@@ -1973,22 +1940,6 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
   });
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-  // Capture path: screenshots require CPU pixels immediately, so force Vulkan
-  // end-of-frame readbacks to block until the submission fence signals.
-  Z3DRendererVulkanBackend* vkBackend = nullptr;
-  bool prevWaitForReadbacks = false;
-  if (backend == RenderBackend::Vulkan) {
-    vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
-    if (vkBackend) {
-      prevWaitForReadbacks = vkBackend->waitForReadbacks();
-      vkBackend->setWaitForReadbacks(true);
-    }
-  }
-  auto waitReadbacksGuard = folly::makeGuard([vkBackend, prevWaitForReadbacks]() {
-    if (vkBackend) {
-      vkBackend->setWaitForReadbacks(prevWaitForReadbacks);
-    }
-  });
   processFrame(sst != Z3DScreenShotType::MonoView, false);
 
   if (sst == Z3DScreenShotType::MonoView) {
@@ -2250,8 +2201,8 @@ void Z3DRenderingEngine::pollVulkanCompletionsOnce()
     return;
   }
 
-  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
-  if (!vkBackend) {
+  auto* backendImpl = m_compositor->rendererBase().backend();
+  if (!backendImpl) {
     return;
   }
 
@@ -2259,7 +2210,7 @@ void Z3DRenderingEngine::pollVulkanCompletionsOnce()
   // is safe inside the tight progressive render loop and allows async readback
   // consumers (e.g. presentable RGBA8) to run as soon as fences signal.
   try {
-    vkBackend->pollCompletionsAndPumpSafePoints();
+    backendImpl->pollCompletionsAndPumpSafePoints();
   }
   catch (const ZCancellationException&) {
     VLOG(1) << "Vulkan completion poll cancelled (ZCancellationException)";
@@ -2290,8 +2241,8 @@ void Z3DRenderingEngine::maybeStartVulkanCompletionPolling()
     return;
   }
 
-  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
-  if (!vkBackend) {
+  auto* backendImpl = m_compositor->rendererBase().backend();
+  if (!backendImpl) {
     stopVulkanCompletionPolling();
     return;
   }
@@ -2299,7 +2250,7 @@ void Z3DRenderingEngine::maybeStartVulkanCompletionPolling()
   // Poll once immediately so frames that finish quickly are presented with
   // minimal latency, then arm a timer while submissions remain in flight.
   try {
-    vkBackend->pollCompletionsAndPumpSafePoints();
+    backendImpl->pollCompletionsAndPumpSafePoints();
   }
   catch (const ZCancellationException&) {
     VLOG(1) << "Vulkan completion polling cancelled (ZCancellationException)";
@@ -2316,7 +2267,7 @@ void Z3DRenderingEngine::maybeStartVulkanCompletionPolling()
     CHECK(false) << "Vulkan completion polling failed (unknown exception).";
   }
   maybeKickDeferredRenderAfterVulkanPoll();
-  if (m_vkDevice->frameExecutor().hasInFlightFrames()) {
+  if (backendImpl->hasInFlightFrames()) {
     if (!m_vkCompletionPollTimer->isActive()) {
       m_vkCompletionPollTimer->start();
     }
@@ -2343,19 +2294,17 @@ bool Z3DRenderingEngine::shouldDeferVulkanNetworkProcessing() const
   if (backend != RenderBackend::Vulkan) {
     return false;
   }
-  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_compositor->rendererBase().backend());
-  if (!vkBackend) {
-    return false;
-  }
-  if (vkBackend->waitForReadbacks()) {
-    // Synchronous paths already apply backpressure by waiting for readback,
-    // so do not add extra gating here.
+  auto* backendImpl = m_compositor->rendererBase().backend();
+  if (!backendImpl) {
     return false;
   }
 
-  auto& executor = m_vkDevice->frameExecutor();
-  const uint32_t inFlight = executor.inFlightCount();
-  const uint32_t maxInFlight = executor.maxFramesInFlight();
+  const uint32_t inFlight = backendImpl->inFlightCount();
+  const uint32_t maxInFlight = backendImpl->maxFramesInFlight();
+  if (maxInFlight == 0u) {
+    // Backend does not expose an in-flight frame limit; do not apply Vulkan-style backpressure.
+    return false;
+  }
   // Defer starting CPU network processing if we'd have to block in beginFrame()
   // waiting for a frame slot fence. Allow pipelining up to maxFramesInFlight.
   return inFlight >= maxInFlight;
@@ -2388,11 +2337,21 @@ void Z3DRenderingEngine::maybeKickDeferredRenderAfterVulkanPoll()
   if (!m_vkDeferredRenderEventType.has_value() || !m_vkDevice) {
     return;
   }
+  if (!m_globalParas || !m_compositor ||
+      static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) != RenderBackend::Vulkan) {
+    return;
+  }
+  auto* backendImpl = m_compositor->rendererBase().backend();
+  if (!backendImpl) {
+    return;
+  }
 
-  auto& executor = m_vkDevice->frameExecutor();
-  const uint32_t inFlight = executor.inFlightCount();
-  const uint32_t maxInFlight = executor.maxFramesInFlight();
-  if (inFlight >= maxInFlight) {
+  const uint32_t inFlight = backendImpl->inFlightCount();
+  const uint32_t maxInFlight = backendImpl->maxFramesInFlight();
+  if (maxInFlight == 0u) {
+    // Backend does not expose an in-flight frame limit; treat as unconstrained.
+    // (This should not happen for Vulkan, but keep the engine backend-agnostic.)
+  } else if (inFlight >= maxInFlight) {
     return;
   }
 

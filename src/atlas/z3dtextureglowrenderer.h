@@ -17,20 +17,12 @@ public:
   void setColorTexture(/*nullable*/ const Z3DTexture* colorTex)
   {
     m_colorTexture = colorTex;
-    m_colorAttachmentHandle = {};
   }
 
   // depthTex may be null to clear
   void setDepthTexture(/*nullable*/ const Z3DTexture* depthTex)
   {
     m_depthTexture = depthTex;
-    m_depthAttachmentHandle = {};
-  }
-
-  void setSourceAttachments(AttachmentHandle colorHandle, AttachmentHandle depthHandle)
-  {
-    m_colorAttachmentHandle = colorHandle;
-    m_depthAttachmentHandle = depthHandle;
   }
 
   void setGlowMode(GlowMode mode);
@@ -66,21 +58,11 @@ protected:
 
   void render(Z3DEye eye) override;
 
-  [[nodiscard]] TextureGlowPayload buildTextureGlowPayload() const;
-  [[nodiscard]] TextureGlowPayload buildTextureGlowPayload(AttachmentHandle colorHandle,
-                                                           AttachmentHandle depthHandle) const;
-  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
-  [[nodiscard]] RenderBatch
-  buildRenderBatch(Z3DEye eye, AttachmentHandle colorHandle, AttachmentHandle depthHandle) const;
-
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
-  void renderVulkan(Z3DEye eye, AttachmentHandle colorHandle, AttachmentHandle depthHandle);
 
 protected:
   const Z3DTexture* m_colorTexture = nullptr;
   const Z3DTexture* m_depthTexture = nullptr;
-  AttachmentHandle m_colorAttachmentHandle;
-  AttachmentHandle m_depthAttachmentHandle;
 
   void createResources(RenderBackend backend) override;
 

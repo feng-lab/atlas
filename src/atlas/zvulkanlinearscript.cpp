@@ -47,11 +47,21 @@ void validateVulkanBatchMetadataOrCrash(std::string_view passLabel, const Render
     CHECK(batch.shaderHook.captured)
       << fmt::format("Vulkan script batch missing captured shader hook: pass='{}' batchIndex={}", passLabel, i);
 
-    // Pass attachment contract
+    // Pass attachment contract:
+    // - Raster passes must target attachments.
+    // - Compute passes must not target attachments (they rely on explicit
+    //   externalImageUses/externalBufferUses metadata for synchronization).
     const bool hasColorAttachments = !batch.pass.colorAttachments.empty();
     const bool hasDepthAttachment = batch.pass.depthAttachment.has_value();
-    CHECK(hasColorAttachments || hasDepthAttachment)
-      << fmt::format("Vulkan script batch missing attachments: pass='{}' batchIndex={}", passLabel, i);
+    if (batch.pass.kind == BackendPassDesc::Kind::Raster) {
+      CHECK(hasColorAttachments || hasDepthAttachment)
+        << fmt::format("Vulkan raster batch missing attachments: pass='{}' batchIndex={}", passLabel, i);
+    } else {
+      CHECK(batch.pass.kind == BackendPassDesc::Kind::Compute)
+        << fmt::format("Vulkan script batch has unknown pass kind: pass='{}' batchIndex={}", passLabel, i);
+      CHECK(!hasColorAttachments && !hasDepthAttachment)
+        << fmt::format("Vulkan compute batch must not specify attachments: pass='{}' batchIndex={}", passLabel, i);
+    }
 
     // Viewport/scissor sanity (these invariants are also enforced at appendBatch
     // time; keep them here to make any failures attributable to the submission
@@ -469,7 +479,7 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
     // Readback is a CPU control-flow boundary: force the backend to wait for the
     // active submission fence and run completion safe-point hooks before
     // returning to the caller.
-    m_backend.requireReadbackWaitForActiveSubmission(readback->label);
+    m_backend.requireCompletionSafePointWaitForActiveSubmission(readback->label);
 
     auto ticket =
       m_backend.requestEndOfFrameBufferReadbackTicket(*src, readback->srcOffset, readback->bytes, readback->label);
@@ -633,8 +643,11 @@ void ZVulkanLinearScript::closeFrame(std::string_view reason)
   if (VLOG_IS_ON(2) && !reason.empty()) {
     VLOG(2) << "ZVulkanLinearScript submit: reason=" << std::string(reason);
   }
-  m_renderer.endVulkanFrame();
+  // Mark the script frame as closed *before* ending the Vulkan frame so that
+  // exceptional exits (e.g. cancellation thrown from safe-point hooks) do not
+  // trigger a second close attempt from flushNodes()'s frame guard.
   m_frameOpen = false;
+  m_renderer.endVulkanFrame();
 }
 
 } // namespace nim

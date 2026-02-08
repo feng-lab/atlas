@@ -5,6 +5,7 @@
 #include "zcolormap.h"
 #include "zmesh.h"
 #include "z3dscratchresourcepool.h"
+#include "z3drendercommands.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -60,6 +61,15 @@ public:
     // Store output size provided by the filter; pooled render targets use this on acquire
     m_outputSize = size;
   }
+
+  // Vulkan-only helper: build a sequence of stage-specific payloads that
+  // represent the slice pipeline as fine-grained passes (draw layers, paging
+  // cache discovery, merge). This is used by Z3DImgFilter's linear-script
+  // orchestration so each script node records one logical pass.
+  //
+  // Note: This method may update progressive bookkeeping (generation counters)
+  // as part of preparing the per-frame payloads.
+  [[nodiscard]] std::vector<ImgSlicePayload> buildVulkanStagePayloads(Z3DEye eye);
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 

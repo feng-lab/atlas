@@ -35,7 +35,7 @@ private:
 TEST_F(VulkanPipelineDebugTest, MissingScissorTriggersCheck)
 {
   nim::ZVulkanDebugStateTracker tracker;
-  nim::ZVulkanGraphicsPassSpec spec{};
+  nim::ZVulkanGraphicsDrawSpec spec{};
   spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
   spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
   spec.viewports.emplace_back(0.0f, 0.0f, 16.0f, 16.0f, 0.0f, 1.0f);
@@ -50,7 +50,7 @@ TEST_F(VulkanPipelineDebugTest, MissingScissorTriggersCheck)
 TEST_F(VulkanPipelineDebugTest, DescriptorCoverageEnforced)
 {
   nim::ZVulkanDebugStateTracker tracker;
-  nim::ZVulkanGraphicsPassSpec spec{};
+  nim::ZVulkanGraphicsDrawSpec spec{};
   spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
   spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
   spec.viewports.emplace_back(0.0f, 0.0f, 8.0f, 8.0f, 0.0f, 1.0f);
@@ -82,7 +82,7 @@ TEST_F(VulkanPipelineDebugTest, ComputePushConstantsRequired)
 TEST_F(VulkanPipelineDebugTest, CompleteGraphicsStatePasses)
 {
   nim::ZVulkanDebugStateTracker tracker;
-  nim::ZVulkanGraphicsPassSpec spec{};
+  nim::ZVulkanGraphicsDrawSpec spec{};
   spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
   spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
   spec.viewports.emplace_back(0.0f, 0.0f, 32.0f, 32.0f, 0.0f, 1.0f);
@@ -133,7 +133,7 @@ TEST_F(VulkanPipelineDebugTest, TrackerResetsBetweenPasses)
 
   // Pass 1: sets viewport and scissor; should succeed
   {
-    nim::ZVulkanGraphicsPassSpec spec{};
+    nim::ZVulkanGraphicsDrawSpec spec{};
     spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
     spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
     spec.viewports.emplace_back(0.0f, 0.0f, 16.0f, 16.0f, 0.0f, 1.0f);
@@ -146,7 +146,7 @@ TEST_F(VulkanPipelineDebugTest, TrackerResetsBetweenPasses)
 
   // Pass 2: only sets viewport, not scissor; reset must force a failure on scissor
   {
-    nim::ZVulkanGraphicsPassSpec spec{};
+    nim::ZVulkanGraphicsDrawSpec spec{};
     spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
     spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
     spec.viewports.emplace_back(0.0f, 0.0f, 16.0f, 16.0f, 0.0f, 1.0f);

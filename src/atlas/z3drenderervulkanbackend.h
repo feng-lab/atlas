@@ -465,7 +465,7 @@ public:
   // fence-gated callbacks (notably residency unpins).
   // This is intended to run before destroying resources that may still be pinned
   // by an earlier submission.
-  void flushForTeardown(std::string_view reason = {});
+  void flushForTeardown(std::string_view reason = {}) override;
 
   // Pin a texture in the device residency manager for the lifetime of the
   // current GPU submission. This prevents eviction of in-flight resources.
@@ -497,26 +497,24 @@ public:
     }
   }
 
-  // Readback wait policy:
-  // - Default (false): endRender() does NOT block the rendering thread waiting
-  //   for end-of-frame readbacks. UI display is updated asynchronously when
-  //   the frame completion safe point is reached.
-  // - When true: endRender() waits for the active submission fence whenever
-  //   this submission requested any end-of-frame readbacks. This is intended
-  //   for capture/export paths that need CPU pixels immediately.
-  void setWaitForReadbacks(bool wait);
-  [[nodiscard]] bool waitForReadbacks() const;
-
-  // Mark the currently recording submission as requiring a fence wait whenever
-  // it requested any end-of-frame readbacks. This is the explicit alternative
-  // to toggling the global wait policy from call sites.
-  void requireReadbackWaitForActiveSubmission(std::string_view debugLabel = {});
+  // Mark the currently recording submission as requiring endRender() to wait
+  // for the active submission fence and then enter the backend's "frame
+  // completion safe point" (applyPendingArenaReset) before returning.
+  //
+  // This is the preferred primitive for GPU->CPU control-flow boundaries that
+  // gate the next progressive stage (e.g. block-ID compaction uploads) and for
+  // script readback boundaries. It is intentionally independent of whether the
+  // submission requested any end-of-frame readbacks.
+  void requireCompletionSafePointWaitForActiveSubmission(std::string_view debugLabel = {});
 
   // Poll completed frame fences and enter the backend's frame completion safe
   // point for any finished slots. This is non-blocking and is intended to be
   // called from the rendering thread event loop when the engine is idle so
   // queued readback consumers can run even if no further frames are rendered.
-  void pollCompletionsAndPumpSafePoints();
+  void pollCompletionsAndPumpSafePoints() override;
+  [[nodiscard]] bool hasInFlightFrames() const override;
+  [[nodiscard]] uint32_t inFlightCount() const override;
+  [[nodiscard]] uint32_t maxFramesInFlight() const override;
 
   // Stage 4: Async Readback API (offscreen)
   // Enqueue end-of-frame GPU->CPU copies into a host-visible staging ring, then
@@ -582,6 +580,11 @@ public:
     // release the staging slot back to the backend.
     [[nodiscard]] folly::coro::Task<void> awaitCopyTo(void* dst, size_t dstBytes);
 
+    // Await the submission fence and release the staging slot back to the
+    // backend without copying. Useful for cancellation paths that must drop
+    // pending CPU work but still release staging slots.
+    [[nodiscard]] folly::coro::Task<void> awaitAndDiscard();
+
   private:
     ActiveSubmissionFenceAwaiter m_fence;
     const void* m_mapped = nullptr;
@@ -595,13 +598,19 @@ public:
                                                                                      size_t bytes,
                                                                                      std::string_view debugLabel = {});
 
+  // Telemetry hook: record a perf-frame-start → host-ready latency sample for
+  // the submission that just reached the backend's frame completion safe point.
+  //
+  // Contract:
+  // - Must be called from an AfterFrameCompletionSafePoint hook (i.e. while the
+  //   backend is executing applyPendingArenaReset()).
+  // - This hook may execute during teardown from non-render threads (e.g.
+  //   flushForTeardown()), so do not require render-thread TLS state here.
+  void recordAllMsForCompletionSafePoint(double milliseconds);
+
   // GPU timestamp scopes (public so pipeline contexts can instrument hot paths)
   std::optional<size_t> beginGpuScope(std::string_view label);
   void endGpuScope(size_t token);
-
-  // For self-managed recorder passes: decide whether to Clear or Load attachments.
-  // Returns true exactly once per unique attachment set (color IDs + depth ID)
-  // within the current processBatches() invocation.
 
 private:
   friend class Z3DRendererBase;
@@ -616,6 +625,7 @@ private:
     std::string label;
     uint32_t startQuery = 0;
     uint32_t endQuery = 0;
+    bool isPassScope = false; // true for top-level pass scopes (ZVulkanLinearScript / beginPassScope)
   };
   struct CpuScopeRecord
   {
@@ -631,6 +641,9 @@ private:
     std::vector<GpuScopeRecord> gpuScopes;
     std::vector<CpuScopeRecord> cpuScopes;
     std::string frameName; // optional: name of this frame for logs
+    // Snapshot of Z3DRendererBase::currentRenderPassIsProgressive() at beginRender().
+    // Used to derive the default end-of-frame readback wait policy for this submission.
+    bool progressivePassHint = true;
     uint32_t nextQuery = 0;
 
     std::chrono::steady_clock::time_point cpuStart;
@@ -704,9 +717,14 @@ private:
       size_t bytes = 0;
     };
     std::vector<PendingBufferReadback> pendingBufferReadbacks;
-    bool forceFenceWaitForReadbacks = false;
+    // Force endRender() to synchronously wait for submission completion and
+    // enter the frame completion safe point before returning. This is used for
+    // control-flow boundaries (paging compaction, script readback, etc.).
+    bool forceFenceWaitForCompletionSafePoint = false;
     size_t readbackBytesCopied = 0; // total bytes copied this frame
     uint32_t readbackSlotsInFlight = 0; // slots associated with this frame
+    uint32_t allSamples = 0; // count of perf-frame-start → host-ready samples recorded
+    std::optional<double> allMaxMs; // max perf-frame-start → host-ready latency within this submission
 
     // Per-frame CPU→GPU upload arena for transient vertex/index data
     struct UploadArena
@@ -936,9 +954,6 @@ public:
   // Deliver first Vulkan frame to UI immediately after backend switch by
   // pumping the fence and executing deferred readback consumers once.
   bool m_pumpFenceAfterFirstSubmit = true;
-  // When true, endRender() blocks on submissions that requested readbacks.
-  // Default false for interactive rendering.
-  bool m_waitForReadbacks = false;
 
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
@@ -956,9 +971,6 @@ public:
   std::unique_ptr<ZVulkanImgSlicePipelineContext> m_imgSliceContext;
   std::unique_ptr<ZVulkanImgRaycasterPipelineContext> m_imgRaycasterContext;
   std::unique_ptr<ZVulkanFontPipelineContext> m_fontContext;
-
-  // Tracking for self-managed clear policy within a single processBatches call
-  std::unordered_set<uint64_t> m_selfManagedClearKeys;
 
   // Shared fallback resources
   std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;

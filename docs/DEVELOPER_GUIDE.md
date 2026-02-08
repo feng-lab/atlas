@@ -341,7 +341,9 @@ Descriptor & Recording Guardrails (Vulkan)
 
 Pipeline Context Recorder
 
-- Use `ZVulkanPipelineCommandRecorder` to emit hermetic passes. Populate a `ZVulkanGraphicsPassSpec`/`ZVulkanComputePassSpec` with every state your shader relies on (pipeline, layout, descriptor sets, push constants, vertex/index buffers, dynamic state, attachment barriers) and call `recordGraphicsPass` / `recordComputePass`.
+- Use `ZVulkanPipelineCommandRecorder` to record draw/dispatch commands with explicit state:
+  - **Compute**: populate a `ZVulkanComputePassSpec` and call `recordComputePass`.
+  - **Graphics**: backend owns attachments and `vkCmdBeginRendering` via `beginRenderingSegment`/`endRenderingSegment` with a `ZVulkanRenderingSegmentSpec`; pipeline contexts are draw-only and must call `recordGraphicsDraw` with a `ZVulkanGraphicsDrawSpec`.
 - Debug builds enforce the contract when `--atlas_vk_enforce_pipeline_context=true`: missing viewports/scissors, incomplete descriptor coverage, absent push constants, or unexpected active queries trigger a hard `CHECK`. Disable with the flag only when debugging third-party drivers.
 - `buildStaticSecondary` and `buildStaticSecondaryAsync` wrap secondary command buffer creation (render-pass continue + simultaneous use by default), making it easy to pre-record background layers on worker threads (`folly::coro` ready).
 - Example – graphics pass:
@@ -350,25 +352,31 @@ Pipeline Context Recorder
 vk::raii::CommandBuffer& cb = ...; // primary command buffer (already begun)
 nim::ZVulkanPipelineCommandRecorder recorder(cb);
 
-nim::ZVulkanGraphicsPassSpec pass{};
-pass.pipeline = &gPipeline;
-pass.pipelineLayout = &gLayout;
-pass.renderArea = vk::Rect2D{{0, 0}, {width, height}};
-pass.viewports = {vk::Viewport{0.f, 0.f, float(width), float(height), 0.f, 1.f}};
-pass.scissors = {vk::Rect2D{{0, 0}, {width, height}}};
-pass.colorAttachments = {colorAttachmentInfo};
-pass.depthStencilAttachment = depthAttachmentInfo;
-pass.descriptorSets = {**frameSet};
-pass.lineWidth = 1.0f;
-pass.depthTestEnable = VK_TRUE;
-pass.depthWriteEnable = VK_TRUE;
-pass.topology = vk::PrimitiveTopology::eTriangleList;
-pass.vertexBuffers = {positionBuffer};
-pass.vertexOffsets = {0};
-pass.indexBuffer = indexBuffer;
-pass.indexType = vk::IndexType::eUint32;
-pass.indexCount = indexCount;
-recorder.recordGraphicsPass(pass);
+nim::ZVulkanRenderingSegmentSpec segment{};
+segment.debugLabel = "example_pass";
+segment.renderArea = vk::Rect2D{{0, 0}, {width, height}};
+segment.colorAttachments = {colorAttachmentInfo};
+segment.depthStencilAttachment = depthAttachmentInfo;
+recorder.beginRenderingSegment(segment);
+
+nim::ZVulkanGraphicsDrawSpec draw{};
+draw.pipeline = &gPipeline;
+draw.pipelineLayout = &gLayout;
+draw.viewports = {vk::Viewport{0.f, 0.f, float(width), float(height), 0.f, 1.f}};
+draw.scissors = {vk::Rect2D{{0, 0}, {width, height}}};
+draw.descriptorSets = {**frameSet};
+draw.lineWidth = 1.0f;
+draw.depthTestEnable = VK_TRUE;
+draw.depthWriteEnable = VK_TRUE;
+draw.topology = vk::PrimitiveTopology::eTriangleList;
+draw.vertexBuffers = {positionBuffer};
+draw.vertexOffsets = {0};
+draw.indexBuffer = indexBuffer;
+draw.indexType = vk::IndexType::eUint32;
+draw.indexCount = indexCount;
+recorder.recordGraphicsDraw(draw);
+
+recorder.endRenderingSegment(segment);
 ```
 
 - Example – compute dispatch:
@@ -414,8 +422,16 @@ gbufferNormal.srcStage = vk::PipelineStageFlagBits2::eComputeShader;
 gbufferNormal.srcAccess = vk::AccessFlagBits2::eShaderWrite;
 gbufferNormal.dstStage = vk::PipelineStageFlagBits2::eFragmentShader;
 gbufferNormal.dstAccess = vk::AccessFlagBits2::eShaderSampledRead;
-lightingPass.colorAttachments = {gbufferNormal, colourAttachment, ...};
-lightingRecorder.recordGraphicsPass(lightingPass);
+nim::ZVulkanRenderingSegmentSpec lightingSegment{};
+lightingSegment.debugLabel = "lighting";
+lightingSegment.renderArea = vk::Rect2D{{0, 0}, {width, height}};
+lightingSegment.colorAttachments = {gbufferNormal, colourAttachment, ...};
+lightingRecorder.beginRenderingSegment(lightingSegment);
+
+// Draw-only state (pipeline, descriptors, dynamic state) must be expressed as a ZVulkanGraphicsDrawSpec.
+lightingRecorder.recordGraphicsDraw(lightingDraw);
+
+lightingRecorder.endRenderingSegment(lightingSegment);
 ```
 
 - Static background recording pattern:
@@ -428,9 +444,14 @@ nim::ZVulkanSecondaryBuildInfo info{
 };
 auto staticBackground = nim::buildStaticSecondary(info, [&](vk::raii::CommandBuffer& scb) {
   nim::ZVulkanPipelineCommandRecorder secondaryRecorder(scb);
-  secondaryRecorder.recordGraphicsPass(backgroundPass);
+  secondaryRecorder.recordGraphicsDraw(backgroundDraw);
 });
-  primaryCmd.executeCommands({*staticBackground});
+
+// Execute secondary draw commands inside an active dynamic-rendering segment.
+nim::ZVulkanPipelineCommandRecorder primaryRecorder(primaryCmd);
+primaryRecorder.beginRenderingSegment(backgroundSegment);
+primaryCmd.executeCommands({*staticBackground});
+primaryRecorder.endRenderingSegment(backgroundSegment);
   ```
 
  - Pair the recorder with back-end stats to guarantee no state leaks between passes; OpenGL-equivalent code should set the same dynamic values to ease diffing.
@@ -674,7 +695,7 @@ Notes
     - `Z3DImgSliceRenderer` for explicit plane slices with colormaps.
   - The filter outputs multiple renderings (`Image`, `OpaqueImage`, stereo variants) consumed by the compositor.
   - Internally, the compositor consumes image filters via engine-managed `Z3DImgFilter*` lists.
-  - Vulkan orchestration: `Z3DImgFilter::process()` builds a per-eye `ZVulkanLinearScript` and records three nodes (raycaster → bound-box overlay → slice) targeting the filter’s own persistent scratch leases. This centralizes Vulkan submission boundaries like the compositor, enabling future backend/script optimization without changing filter call sites.
+  - Vulkan orchestration: `Z3DImgFilter::process()` builds a per-eye `ZVulkanLinearScript` and records a fine-grained node sequence (raycaster stages → optional bound-box overlay → slice stages) targeting the filter’s own persistent scratch leases. Each `script.raster(...)` node captures one stage payload (one logical pass / attachment set), so the backend can optimize/coalesce submissions later without touching filter call sites.
 
 - Fast vs Full-Resolution
   - On load, large volumes are downsampled to fit GPU constraints. `Z3DImg::isVolumeDownsampled()` indicates this.

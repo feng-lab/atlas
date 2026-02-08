@@ -17,6 +17,7 @@
 #include "zrenderthreadexecutor_tls.h"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <folly/ScopeGuard.h>
@@ -803,6 +804,7 @@ void Z3DCompositor::invalidate(State inv)
 void Z3DCompositor::setProgressiveRenderingMode(bool v)
 {
   m_progressiveRendering = v;
+  m_rendererBase.setCurrentRenderPassIsProgressive(v);
 }
 
 double Z3DCompositor::process(Z3DEye eye)
@@ -1619,6 +1621,26 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                           eye);
   }
 
+  // Option A (reservation RAII): if cancellation/early-exit occurs before we
+  // successfully install a completion-safe-point release hook, clear the
+  // reservation bit so we don't permanently strand this ring slot.
+  auto presentSlotSafePointHookInstalled = std::make_shared<std::atomic<bool>>(false);
+  [[maybe_unused]] auto presentSlotEarlyReleaseGuard =
+    folly::makeGuard([this,
+                      isLeftCopy = isLeftPresentRing,
+                      slotIndexCopy = presentSlotIndex,
+                      hookInstalled = presentSlotSafePointHookInstalled]() {
+      if (hookInstalled && hookInstalled->load(std::memory_order_acquire)) {
+        return;
+      }
+      const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+      auto& reserved = isLeftCopy ? m_leftPresentReserved : m_outPresentReserved;
+      const size_t ringSize = isLeftCopy ? m_leftPresentRingSize : m_outPresentRingSize;
+      if (slotIndexCopy < ringSize) {
+        reserved[slotIndexCopy] = 0u;
+      }
+    });
+
   // Use primary output lease according to eye
   Z3DScratchResourcePool::RenderTargetLease* outLease = nullptr;
   if (eye == MonoEye) {
@@ -1642,8 +1664,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                        : (eye == LeftEye) ? m_leftCurrentLocalBuffer
                                                           : m_rightCurrentLocalBuffer;
   CHECK(frameLocalPtr != nullptr) << "Compositor Vulkan path missing current local color buffer for eye";
-
-  bool finalReadbackEnqueued = false;
 
   auto* vulkanBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
   CHECK(vulkanBackend != nullptr) << "Compositor Vulkan path requires a Vulkan backend";
@@ -1690,6 +1710,60 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   // Declare the script after compositor scratch targets so its destructor flush
   // (submission) runs before those move-only leases release their scratch slots.
   ZVulkanLinearScript script(m_rendererBase, *vulkanBackend, /*frameLabel=*/{});
+
+  // Slot-leak guard for cancellation paths:
+  // - We reserve an offline-present ring slot up front to avoid two in-flight frames
+  //   writing into the same persistent output lease.
+  // - Cancellation can unwind before the final-color readback is enqueued/published,
+  //   leaving the slot permanently "reserved" and eventually saturating the ring.
+  // - Install a completion-safe-point hook that releases the reserved bit *only*
+  //   on cancellation/unwind paths. Do not release merely because publish has not
+  //   been scheduled yet: Vulkan OIT modes like PPLL (and DDP CPU chunking) create
+  //   intermediate CPU readback boundaries that force submission flushes before
+  //   final-color publish is enqueued.
+  //
+  // This is registered as a preRecord action so it runs after beginRender()
+  // established the active frame-slot context but before command-buffer recording
+  // begins.
+  auto presentSlotPublishScheduled = std::make_shared<std::atomic<bool>>(false);
+  {
+    const bool isLeftCopy = isLeftPresentRing;
+    const size_t slotIndexCopy = presentSlotIndex;
+    script.preRecord(
+      "vk_present_slot_guard",
+      {},
+      [this,
+       isLeftCopy,
+       slotIndexCopy,
+       publishScheduled = presentSlotPublishScheduled,
+       hookInstalled = presentSlotSafePointHookInstalled](Z3DRendererVulkanBackend& backend, Z3DRendererBase&) {
+        const folly::CancellationToken cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+        backend.registerAfterCurrentFrameCompletionHook(
+          currentRenderThreadExecutorKeepAlive("vk_present_slot_guard"),
+          [this, isLeftCopy, slotIndexCopy, cancellationToken, publishScheduled](
+            Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+            if (publishScheduled && publishScheduled->load(std::memory_order_acquire)) {
+              co_return;
+            }
+            if (!cancellationToken.isCancellationRequested()) {
+              co_return;
+            }
+            const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+            auto& reserved = isLeftCopy ? m_leftPresentReserved : m_outPresentReserved;
+            const size_t ringSize = isLeftCopy ? m_leftPresentRingSize : m_outPresentRingSize;
+            CHECK(slotIndexCopy < ringSize);
+            if (reserved[slotIndexCopy]) {
+              reserved[slotIndexCopy] = 0u;
+              VLOG(1) << fmt::format("VK present slot guard released idx={} (cancellation)", slotIndexCopy);
+            }
+            co_return;
+          },
+          "vk_present_slot_guard");
+
+        CHECK(hookInstalled != nullptr);
+        hookInstalled->store(true, std::memory_order_release);
+      });
+  }
 
   // Vulkan frame/submission lifetime is owned by the linear script; the
   // compositor should only express segment order and explicit CPU readback
@@ -1922,14 +1996,32 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                        ScratchFormat::Depth32F,
                                        RenderBackend::Vulkan));
       script.keepAlive(glowGeomLease);
+      auto blurXLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(targetSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(blurXLease);
+      auto blurYLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(targetSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(blurYLease);
       // Clear temp attachments, record filter geometry
       vlogVulkanLease("glow_geometry", *glowGeomLease);
-      script.raster("glow_geometry", {}, [&]() {
+      const auto segGlowGeom = script.raster("glow_geometry", {}, [&]() {
         m_rendererBase.setActiveSurfaceWithLoadStore(*glowGeomLease,
                                                      LoadOp::Clear,
                                                      StoreOp::Store,
                                                      LoadOp::Clear,
                                                      StoreOp::Store);
+        for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+          att.finalUse = AttachmentFinalUse::Sampled;
+        }
+        if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+          m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+        }
         filter->setViewport(targetSize);
         recordFilterBatchesToSurface(filter, *glowGeomLease, targetSize, [&]() {
           filter->renderOpaque(eye);
@@ -1959,13 +2051,102 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       depthHandle.index = 0;
       depthHandle.id = reinterpret_cast<uint64_t>(glowGeomLease->depthAttachmentTexture());
 
+      AttachmentHandle blurXColorHandle{};
+      blurXColorHandle.backend = RenderBackend::Vulkan;
+      blurXColorHandle.index = 0;
+      blurXColorHandle.id = reinterpret_cast<uint64_t>(blurXLease->colorAttachment(0));
+      AttachmentHandle blurXDepthHandle{};
+      blurXDepthHandle.backend = RenderBackend::Vulkan;
+      blurXDepthHandle.index = 0;
+      blurXDepthHandle.id = reinterpret_cast<uint64_t>(blurXLease->depthAttachmentTexture());
+
+      AttachmentHandle blurYColorHandle{};
+      blurYColorHandle.backend = RenderBackend::Vulkan;
+      blurYColorHandle.index = 0;
+      blurYColorHandle.id = reinterpret_cast<uint64_t>(blurYLease->colorAttachment(0));
+      AttachmentHandle blurYDepthHandle{};
+      blurYDepthHandle.backend = RenderBackend::Vulkan;
+      blurYDepthHandle.index = 0;
+      blurYDepthHandle.id = reinterpret_cast<uint64_t>(blurYLease->depthAttachmentTexture());
+
       // Do not clear when overlaying glow; choose destination matching recent composition
       {
         const bool compositedToFinalLocal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
         auto& dest = compositedToFinalLocal ? *outLease : *sceneOutLease;
         vlogVulkanLease("glow_composite", dest);
       }
-      script.raster("glow_composite", {}, [&]() {
+
+      const auto segBlurX = script.raster("glow_blur_x", {segGlowGeom}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*blurXLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+          att.finalUse = AttachmentFinalUse::Sampled;
+        }
+        if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+          m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+        }
+
+        TextureGlowPayload blurPayload{};
+        blurPayload.stage = TextureGlowPayload::Stage::BlurX;
+        blurPayload.mode = m_glowRenderer.glowMode();
+        blurPayload.blurRadius = m_glowRenderer.blurRadius();
+        blurPayload.blurScale = m_glowRenderer.blurScale();
+        blurPayload.blurStrength = m_glowRenderer.blurStrength();
+        blurPayload.colorAttachmentHandle = colorHandle;
+        blurPayload.depthAttachmentHandle = depthHandle;
+
+        RenderBatch batch{};
+        batch.eye = eye;
+        batch.pass.externalImageUses.push_back(
+          {colorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.pass.externalImageUses.push_back(
+          {depthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+        batch.draw.topology = PrimitiveTopology::TriangleStrip;
+        batch.draw.vertexCount = 4;
+        batch.draw.indexCount = 0;
+        batch.geometry = std::move(blurPayload);
+        m_rendererBase.appendBatch(std::move(batch));
+      });
+
+      const auto segBlurY = script.raster("glow_blur_y", {segBlurX}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*blurYLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+          att.finalUse = AttachmentFinalUse::Sampled;
+        }
+        if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+          m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+        }
+
+        TextureGlowPayload blurPayload{};
+        blurPayload.stage = TextureGlowPayload::Stage::BlurY;
+        blurPayload.mode = m_glowRenderer.glowMode();
+        blurPayload.blurRadius = m_glowRenderer.blurRadius();
+        blurPayload.blurScale = m_glowRenderer.blurScale();
+        blurPayload.blurStrength = m_glowRenderer.blurStrength();
+        blurPayload.colorAttachmentHandle = blurXColorHandle;
+        blurPayload.depthAttachmentHandle = blurXDepthHandle;
+
+        RenderBatch batch{};
+        batch.eye = eye;
+        batch.pass.externalImageUses.push_back(
+          {blurXColorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.pass.externalImageUses.push_back(
+          {blurXDepthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+        batch.draw.topology = PrimitiveTopology::TriangleStrip;
+        batch.draw.vertexCount = 4;
+        batch.draw.indexCount = 0;
+        batch.geometry = std::move(blurPayload);
+        m_rendererBase.appendBatch(std::move(batch));
+      });
+
+      script.raster("glow_composite", {segBlurY}, [&]() {
         const bool compositedToFinalLocal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
         auto& dest = compositedToFinalLocal ? *outLease : *sceneOutLease;
         m_rendererBase.setActiveSurfaceWithLoadStore(dest,
@@ -1973,20 +2154,28 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                      StoreOp::Store,
                                                      LoadOp::DontCare,
                                                      StoreOp::Store);
-        TextureGlowPayload glowPayload;
-        glowPayload.colorAttachmentHandle = colorHandle;
-        glowPayload.depthAttachmentHandle = depthHandle;
+
+        TextureGlowPayload glowPayload{};
+        glowPayload.stage = TextureGlowPayload::Stage::Composite;
         glowPayload.mode = m_glowRenderer.glowMode();
         glowPayload.blurRadius = m_glowRenderer.blurRadius();
         glowPayload.blurScale = m_glowRenderer.blurScale();
         glowPayload.blurStrength = m_glowRenderer.blurStrength();
+        glowPayload.colorAttachmentHandle = colorHandle;
+        glowPayload.depthAttachmentHandle = depthHandle;
+        glowPayload.blurColorAttachmentHandle = blurYColorHandle;
+        glowPayload.blurDepthAttachmentHandle = blurYDepthHandle;
 
-        RenderBatch batch;
+        RenderBatch batch{};
         batch.eye = eye;
         batch.pass.externalImageUses.push_back(
           {colorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
         batch.pass.externalImageUses.push_back(
           {depthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+        batch.pass.externalImageUses.push_back(
+          {blurYColorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.pass.externalImageUses.push_back(
+          {blurYDepthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
         // Let backend fill current active surface into batch if not set explicitly
         batch.draw.topology = PrimitiveTopology::TriangleStrip;
         batch.draw.vertexCount = 4;
@@ -2960,41 +3149,59 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       }
     };
 
-    auto enqueueFinalReadbackInActiveFrame =
-      [installFinalColorReadback](Z3DRendererVulkanBackend& backend,
-                                  ZVulkanTexture& tex,
-                                  Z3DLocalColorBuffer* localPtr,
-                                  Z3DScratchResourcePool::RenderTargetLease* targetPtr,
-                                  Z3DEye eyeCopy,
-                                  std::string_view ticketLabel,
-                                  std::string_view consumeLabel,
-                                  bool noCopy) {
-        CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
-        CHECK(targetPtr != nullptr) << "VK enqueue final readback requires output target lease";
-        const char* suffix = noCopy ? " (no copy)" : "";
-        VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
-                               suffix,
-                               reinterpret_cast<uint64_t>(&tex),
-                               tex.width(),
-                               tex.height(),
-                               static_cast<int>(eyeCopy));
-        auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
-        backend.registerAfterCurrentFrameCompletionHook(
-          currentRenderThreadExecutorKeepAlive(consumeLabel),
-          [installFinalColorReadback, localPtr, targetPtr, eyeCopy, ticket = std::move(ticket), noCopy](
-            Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-            co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
-            installFinalColorReadback(localPtr,
-                                      targetPtr,
-                                      eyeCopy,
-                                      ticket.mapped,
-                                      ticket.size,
-                                      std::move(ticket.releaseSlot),
-                                      noCopy);
-            co_return;
-          },
-          consumeLabel);
-      };
+    auto enqueueFinalReadbackInActiveFrame = [installFinalColorReadback,
+                                              publishScheduled = presentSlotPublishScheduled](
+                                               Z3DRendererVulkanBackend& backend,
+                                               ZVulkanTexture& tex,
+                                               Z3DLocalColorBuffer* localPtr,
+                                               Z3DScratchResourcePool::RenderTargetLease* targetPtr,
+                                               Z3DEye eyeCopy,
+                                               std::string_view ticketLabel,
+                                               std::string_view consumeLabel,
+                                               bool noCopy) {
+      CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
+      CHECK(targetPtr != nullptr) << "VK enqueue final readback requires output target lease";
+      const char* suffix = noCopy ? " (no copy)" : "";
+      VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
+                             suffix,
+                             reinterpret_cast<uint64_t>(&tex),
+                             tex.width(),
+                             tex.height(),
+                             static_cast<int>(eyeCopy));
+      // Measure end-to-end latency from the engine's perf-frame start (Network
+      // wrapper "Since Start") until the result is published/host-ready and
+      // renderingFinished is emitted. This matches OpenGL's synchronous UX
+      // timing better than measuring only enqueue→ready latency in Vulkan.
+      auto perfFrameStartTs = Z3DRenderGlobalState::instance().currentPerfFrameStartTime();
+      if (perfFrameStartTs.time_since_epoch().count() == 0) {
+        // Perf timing should never be missing, but do not crash on a logging
+        // metric. Fall back to "now" so the value is still bounded.
+        perfFrameStartTs = std::chrono::steady_clock::now();
+      }
+      auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
+      backend.registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive(consumeLabel),
+        [installFinalColorReadback, localPtr, targetPtr, eyeCopy, perfFrameStartTs, ticket = std::move(ticket), noCopy](
+          Z3DRendererVulkanBackend& backend) mutable -> folly::coro::Task<void> {
+          co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
+          installFinalColorReadback(localPtr,
+                                    targetPtr,
+                                    eyeCopy,
+                                    ticket.mapped,
+                                    ticket.size,
+                                    std::move(ticket.releaseSlot),
+                                    noCopy);
+          const double allMs =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - perfFrameStartTs).count();
+          backend.recordAllMsForCompletionSafePoint(allMs);
+          co_return;
+        },
+        consumeLabel);
+
+      if (publishScheduled) {
+        publishScheduled->store(true, std::memory_order_release);
+      }
+    };
 
     // Request readback while a Vulkan frame is active so backend can insert the copy before endRender.
     // If final color is not RGBA8, first render a copy to an RGBA8 scratch surface, then enqueue the readback inside
@@ -3051,7 +3258,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                             "vk_final_rgba8_readback_consume",
                                                             /*noCopy=*/false);
                         });
-        finalReadbackEnqueued = true;
       }
     } else if (finalColor) {
       // No conversion needed; enqueue readback on the tail submission.
@@ -3069,33 +3275,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                           "vk_final_color_readback_consume",
                                                           /*noCopy=*/true);
                       });
-      finalReadbackEnqueued = true;
-    }
-
-    if (!finalReadbackEnqueued) {
-      // Defensive: ensure the offline presentation slot is released once the frame
-      // completes even if we did not enqueue a presentable readback (e.g. conversion
-      // scratch allocation failed). Without this, the presentation ring can become
-      // permanently "reserved" and stall future frames.
-      const bool isLeftCopy = isLeftPresentRing;
-      const size_t slotIndexCopy = presentSlotIndex;
-      script.commands(
-        "final_present_slot_release_enqueue",
-        {},
-        [this, isLeftCopy, slotIndexCopy](Z3DRendererVulkanBackend& backend) {
-          backend.registerAfterCurrentFrameCompletionHook(
-            currentRenderThreadExecutorKeepAlive("vk_present_slot_release"),
-            [this, isLeftCopy, slotIndexCopy](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-              const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-              auto& reserved = isLeftCopy ? m_leftPresentReserved : m_outPresentReserved;
-              const size_t ringSize = isLeftCopy ? m_leftPresentRingSize : m_outPresentRingSize;
-              CHECK(slotIndexCopy < ringSize);
-              CHECK(reserved[slotIndexCopy]) << "VK present slot release: slot was not reserved";
-              reserved[slotIndexCopy] = 0u;
-              co_return;
-            },
-            "vk_present_slot_release");
-        });
     }
     // Do not enqueue picking readback; rely on synchronous 1x1 reads on demand.
   }
@@ -3234,6 +3413,20 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
                                        RenderBackend::Vulkan));
       script.keepAlive(glowGeomLease);
 
+      auto blurXLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(targetSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(blurXLease);
+
+      auto blurYLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
+        pool.acquireTempRenderTarget2D(targetSize,
+                                       ScratchFormat::RGBA16,
+                                       ScratchFormat::Depth32F,
+                                       RenderBackend::Vulkan));
+      script.keepAlive(blurYLease);
+
       const auto segGlowGeom = script.raster("glow_geometry",
                                              deps ? std::initializer_list<ZVulkanLinearScript::SegmentHandle>{deps}
                                                   : std::initializer_list<ZVulkanLinearScript::SegmentHandle>{},
@@ -3243,6 +3436,14 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
                                                                                             StoreOp::Store,
                                                                                             LoadOp::Clear,
                                                                                             StoreOp::Store);
+                                               for (auto& att :
+                                                    m_rendererBase.frameState().activeSurface.colorAttachments) {
+                                                 att.finalUse = AttachmentFinalUse::Sampled;
+                                               }
+                                               if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+                                                 m_rendererBase.frameState().activeSurface.depthAttachment->finalUse =
+                                                   AttachmentFinalUse::Sampled;
+                                               }
                                                const auto glowGeomSurface = m_rendererBase.frameState().activeSurface;
                                                filter->setViewport(targetSize);
                                                recordFilterBatchesToSurfaceUnified(
@@ -3278,7 +3479,95 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
       glowDepthHandle.index = 0;
       glowDepthHandle.id = reinterpret_cast<uint64_t>(glowGeomLease->depthAttachmentTexture());
 
-      deps = script.raster("glow_composite", {segGlowGeom}, [&]() {
+      AttachmentHandle blurXColorHandle{};
+      blurXColorHandle.backend = RenderBackend::Vulkan;
+      blurXColorHandle.index = 0;
+      blurXColorHandle.id = reinterpret_cast<uint64_t>(blurXLease->colorAttachment(0));
+      AttachmentHandle blurXDepthHandle{};
+      blurXDepthHandle.backend = RenderBackend::Vulkan;
+      blurXDepthHandle.index = 0;
+      blurXDepthHandle.id = reinterpret_cast<uint64_t>(blurXLease->depthAttachmentTexture());
+
+      AttachmentHandle blurYColorHandle{};
+      blurYColorHandle.backend = RenderBackend::Vulkan;
+      blurYColorHandle.index = 0;
+      blurYColorHandle.id = reinterpret_cast<uint64_t>(blurYLease->colorAttachment(0));
+      AttachmentHandle blurYDepthHandle{};
+      blurYDepthHandle.backend = RenderBackend::Vulkan;
+      blurYDepthHandle.index = 0;
+      blurYDepthHandle.id = reinterpret_cast<uint64_t>(blurYLease->depthAttachmentTexture());
+
+      const auto segBlurX = script.raster("glow_blur_x", {segGlowGeom}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*blurXLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+          att.finalUse = AttachmentFinalUse::Sampled;
+        }
+        if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+          m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+        }
+
+        TextureGlowPayload blurPayload{};
+        blurPayload.stage = TextureGlowPayload::Stage::BlurX;
+        blurPayload.colorAttachmentHandle = glowColorHandle;
+        blurPayload.depthAttachmentHandle = glowDepthHandle;
+        blurPayload.mode = m_glowRenderer.glowMode();
+        blurPayload.blurRadius = m_glowRenderer.blurRadius();
+        blurPayload.blurScale = m_glowRenderer.blurScale();
+        blurPayload.blurStrength = m_glowRenderer.blurStrength();
+
+        RenderBatch batch{};
+        batch.eye = eye;
+        batch.pass.externalImageUses.push_back(
+          {glowColorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.pass.externalImageUses.push_back(
+          {glowDepthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+        batch.draw.topology = PrimitiveTopology::TriangleStrip;
+        batch.draw.vertexCount = 4;
+        batch.draw.indexCount = 0;
+        batch.geometry = std::move(blurPayload);
+        m_rendererBase.appendBatch(std::move(batch));
+      });
+
+      const auto segBlurY = script.raster("glow_blur_y", {segBlurX}, [&]() {
+        m_rendererBase.setActiveSurfaceWithLoadStore(*blurYLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+          att.finalUse = AttachmentFinalUse::Sampled;
+        }
+        if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+          m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+        }
+
+        TextureGlowPayload blurPayload{};
+        blurPayload.stage = TextureGlowPayload::Stage::BlurY;
+        blurPayload.colorAttachmentHandle = blurXColorHandle;
+        blurPayload.depthAttachmentHandle = blurXDepthHandle;
+        blurPayload.mode = m_glowRenderer.glowMode();
+        blurPayload.blurRadius = m_glowRenderer.blurRadius();
+        blurPayload.blurScale = m_glowRenderer.blurScale();
+        blurPayload.blurStrength = m_glowRenderer.blurStrength();
+
+        RenderBatch batch{};
+        batch.eye = eye;
+        batch.pass.externalImageUses.push_back(
+          {blurXColorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.pass.externalImageUses.push_back(
+          {blurXDepthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+        batch.draw.topology = PrimitiveTopology::TriangleStrip;
+        batch.draw.vertexCount = 4;
+        batch.draw.indexCount = 0;
+        batch.geometry = std::move(blurPayload);
+        m_rendererBase.appendBatch(std::move(batch));
+      });
+
+      deps = script.raster("glow_composite", {segBlurY}, [&]() {
         // Composite glow into the scene output without clearing.
         m_rendererBase.setActiveSurfaceWithLoadStore(sceneOutLease,
                                                      LoadOp::Load,
@@ -3286,9 +3575,13 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
                                                      LoadOp::DontCare,
                                                      StoreOp::Store,
                                                      {});
+
         TextureGlowPayload glowPayload{};
+        glowPayload.stage = TextureGlowPayload::Stage::Composite;
         glowPayload.colorAttachmentHandle = glowColorHandle;
         glowPayload.depthAttachmentHandle = glowDepthHandle;
+        glowPayload.blurColorAttachmentHandle = blurYColorHandle;
+        glowPayload.blurDepthAttachmentHandle = blurYDepthHandle;
         glowPayload.mode = m_glowRenderer.glowMode();
         glowPayload.blurRadius = m_glowRenderer.blurRadius();
         glowPayload.blurScale = m_glowRenderer.blurScale();
@@ -3300,6 +3593,10 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
           {glowColorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
         batch.pass.externalImageUses.push_back(
           {glowDepthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+        batch.pass.externalImageUses.push_back(
+          {blurYColorHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        batch.pass.externalImageUses.push_back(
+          {blurYDepthHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
         batch.draw.topology = PrimitiveTopology::TriangleStrip;
         batch.draw.vertexCount = 4;
         batch.draw.indexCount = 0;

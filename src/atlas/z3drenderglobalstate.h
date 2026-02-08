@@ -2,6 +2,7 @@
 
 #include "z3drendererstates.h"
 
+#include <chrono>
 #include <folly/CancellationToken.h>
 #include <memory>
 #include <mutex>
@@ -66,10 +67,16 @@ public:
     return m_currentPerfFrameToken;
   }
 
+  std::chrono::steady_clock::time_point currentPerfFrameStartTime() const
+  {
+    return m_currentPerfFrameStartTime;
+  }
+
   // Start a new perf frame token (increments by 1).
   uint64_t beginNewPerfFrameToken()
   {
     ++m_currentPerfFrameToken;
+    m_currentPerfFrameStartTime = std::chrono::steady_clock::now();
     return m_currentPerfFrameToken;
   }
 
@@ -87,6 +94,7 @@ private:
 
   // Monotonically increasing identifier for performance aggregation.
   uint64_t m_currentPerfFrameToken = 0;
+  std::chrono::steady_clock::time_point m_currentPerfFrameStartTime{};
 };
 
 } // namespace nim

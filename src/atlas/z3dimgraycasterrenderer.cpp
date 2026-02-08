@@ -67,14 +67,15 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
   compile();
 }
 
-void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloads(Z3DEye eye)
 {
-  if (backend != RenderBackend::Vulkan || picking) {
-    return;
+  std::vector<ImgRaycasterPayload> stages;
+  if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
+    return stages;
   }
 
   if (!m_img || !hasVisibleRendering()) {
-    return;
+    return stages;
   }
 
   std::vector<size_t> visibleChannels;
@@ -86,40 +87,38 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   }
 
   if (visibleChannels.empty()) {
-    return;
+    return stages;
   }
 
   CHECK(m_outputSize.x > 0u && m_outputSize.y > 0u) << "Vulkan img raycaster output size is zero.";
 
-  ImgRaycasterPayload payload;
-  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
-  payload.image = m_img;
-  payload.outputSize = m_outputSize;
-  payload.samplingRate = m_samplingRateValue;
-  payload.isoValue = m_isoValue;
-  payload.localMIPThreshold = m_localMIPThreshold;
-  payload.compositingMode = m_compositingModeValue;
-  payload.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
-  // Vulkan path uses the output size for entry/exit
-  payload.visibleChannels = visibleChannels;
+  ImgRaycasterPayload common;
+  common.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
+  common.image = m_img;
+  common.outputSize = m_outputSize;
+  common.samplingRate = m_samplingRateValue;
+  common.isoValue = m_isoValue;
+  common.localMIPThreshold = m_localMIPThreshold;
+  common.compositingMode = m_compositingModeValue;
+  common.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
+  common.visibleChannels = visibleChannels;
+  common.transferFunctions = &m_transferFunctions;
+  common.roundsRemaining = FLAGS_atlas_volume_rendering_maximum_round;
+  common.channelIndexRaw = m_channelIdx[eye];
+  common.roundIndexRaw = m_round[eye];
+
   // Progressive init parity with GL: if starting progressive (channelIdx < 0), bump
-  // generation so the Vulkan path clears/refreshes progressive targets. Otherwise,
-  // leave bookkeeping untouched; the pipeline enforces invariants and uses raw values.
-  if (!payload.fastPathOnly) {
+  // generation so the Vulkan path clears/refreshes progressive targets.
+  if (!common.fastPathOnly) {
     if (m_channelIdx[eye] < 0) {
       ++m_progressiveGeneration[eye];
     }
   }
-  payload.progressiveGeneration = m_progressiveGeneration[eye];
-  payload.transferFunctions = &m_transferFunctions;
-  payload.roundsRemaining = FLAGS_atlas_volume_rendering_maximum_round;
-  // Also pass raw GL-parity booking for clarity
-  payload.channelIndexRaw = m_channelIdx[eye];
-  payload.roundIndexRaw = m_round[eye];
+  common.progressiveGeneration = m_progressiveGeneration[eye];
 
   if (FLAGS_atlas_log_3d_paging_frame_stats) {
-    if (!payload.fastPathOnly && m_img) {
-      const uint32_t gen = payload.progressiveGeneration;
+    if (!common.fastPathOnly && m_img) {
+      const uint32_t gen = common.progressiveGeneration;
       auto& statsPtr = m_pagingFrameStats[eye];
       auto& statsGen = m_pagingFrameStatsGeneration[eye];
       if (!statsPtr || statsGen != gen) {
@@ -127,7 +126,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
         info.label = m_img->imgPack().name().toStdString();
         info.numChannels = m_img->numChannels();
         info.maxRounds = FLAGS_atlas_volume_rendering_maximum_round;
-        info.streamKey = payload.streamKey;
+        info.streamKey = common.streamKey;
         info.progressiveGeneration = gen;
         statsPtr = std::make_shared<Z3DImgPagingFrameStats>(std::move(info));
         statsGen = gen;
@@ -141,19 +140,23 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     }
   }
 
+  // Entry geometry: either indexed entry/exit mesh (volumetric) or expanded quads (planar).
+  std::vector<glm::vec3> entryPositions;
+  std::vector<glm::vec3> entryTexCoords;
+
   auto populateFromEntryExitMesh = [&]() {
     const auto& positions = m_entryExitMesh.vertices();
     const auto& texCoords = m_entryExitMesh.textureCoordinates3D();
     const auto& indices = m_entryExitMesh.indices();
 
-    payload.entryPositions.assign(positions.begin(), positions.end());
-    payload.entryTexCoords.assign(texCoords.begin(), texCoords.end());
-    payload.entryHasIndices = m_entryExitMesh.hasIndices();
-    if (payload.entryHasIndices) {
-      payload.entryIndices.assign(indices.begin(), indices.end());
+    entryPositions.assign(positions.begin(), positions.end());
+    entryTexCoords.assign(texCoords.begin(), texCoords.end());
+    common.entryHasIndices = m_entryExitMesh.hasIndices();
+    if (common.entryHasIndices) {
+      common.entryIndices.assign(indices.begin(), indices.end());
     }
-    payload.entryPrimitive = static_cast<uint32_t>(m_entryExitMesh.type());
-    payload.entryFlipped = m_entryExitMeshFlipped;
+    common.entryPrimitive = static_cast<uint32_t>(m_entryExitMesh.type());
+    common.entryFlipped = m_entryExitMeshFlipped;
   };
 
   auto populateFromQuads = [&]() {
@@ -221,11 +224,11 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     }
 
     if (!positions.empty()) {
-      payload.entryHasIndices = false;
-      payload.entryPrimitive = static_cast<uint32_t>(ZMesh::Type::TRIANGLES);
-      payload.entryPositions = std::move(positions);
-      payload.entryTexCoords = std::move(texCoords);
-      payload.entryFlipped = false;
+      common.entryHasIndices = false;
+      common.entryPrimitive = static_cast<uint32_t>(ZMesh::Type::TRIANGLES);
+      common.entryFlipped = false;
+      entryPositions = std::move(positions);
+      entryTexCoords = std::move(texCoords);
     }
   };
 
@@ -235,7 +238,14 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     populateFromQuads();
   }
 
-  CHECK(!payload.entryPositions.empty()) << "Vulkan img raycaster is missing entry geometry for the current draw.";
+  CHECK(!entryPositions.empty()) << "Vulkan img raycaster is missing entry geometry for the current draw.";
+
+  const bool hasIndices = common.entryHasIndices && !common.entryIndices.empty();
+  const bool planarGeometry = !hasIndices;
+  const bool needsEntryExit = !planarGeometry;
+  // GL parity for progressive: render entry/exit exactly once per progressive cycle.
+  // For fast-only rendering, render every frame.
+  const bool entryExitThisFrame = needsEntryExit && (common.fastPathOnly || common.channelIndexRaw < 0);
 
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   // Provide a persistent entry/exit lease across progressive frames (GL parity).
@@ -254,54 +264,167 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   // Ensure a persistent Vulkan entry/exit lease of the correct size.
   if (!m_entryExitLease.hasVulkanImage() || m_entryExitLease.descriptor.size != m_outputSize) {
     m_entryExitLease.release();
-    m_entryExitLease =
-      pool.acquireEntryExitRenderTarget(m_outputSize,
-                                        2u,
-                                        ScratchFormat::RGBA32F,
-                                        std::optional<RenderBackend>(RenderBackend::Vulkan));
+    m_entryExitLease = pool.acquireEntryExitRenderTarget(m_outputSize,
+                                                         2u,
+                                                         ScratchFormat::RGBA32F,
+                                                         std::optional<RenderBackend>(RenderBackend::Vulkan));
   }
-  payload.entryExitLease = shareLease(m_entryExitLease);
+  common.entryExitLease = shareLease(m_entryExitLease);
 
-  if (visibleChannels.size() > 1 && payload.fastPathOnly) {
+  if (!common.fastPathOnly) {
+    ensureRaycastAccumulators(eye);
+
+    CHECK(m_lastRaycastAccum[eye]) << "Vulkan progressive raycaster missing last accum lease.";
+    CHECK(m_currentRaycastAccum[eye]) << "Vulkan progressive raycaster missing current accum lease.";
+    common.lastAccumLease = shareLease(m_lastRaycastAccum[eye]);
+    common.currentAccumLease = shareLease(m_currentRaycastAccum[eye]);
+
+    // Persistent per-eye layer array used for preview + progressive merges.
+    // This mirrors the GL path's m_progressiveLayerLease behavior but is scoped
+    // per eye for Vulkan.
+    auto& layerLease = m_vulkanProgressiveLayerLease[eye];
+    const uint32_t layerCount = static_cast<uint32_t>(visibleChannels.size());
+    const bool needsReacquire = !layerLease.hasVulkanImage() || layerLease.descriptor.size != m_outputSize ||
+                                layerLease.descriptor.layers < layerCount;
+    if (needsReacquire) {
+      layerLease.release();
+      layerLease = pool.acquireLayerArrayRenderTarget(m_outputSize,
+                                                      layerCount,
+                                                      ScratchFormat::RGBA16,
+                                                      ScratchFormat::Depth32F,
+                                                      std::optional<RenderBackend>(RenderBackend::Vulkan));
+    }
+    common.channelLayerLease = shareLease(layerLease);
+
+  } else if (visibleChannels.size() > 1u) {
+    // Fast multi-channel rendering (volume or planar): render per-channel results into a temporary
+    // layer array then merge into the final output (GL parity).
     auto layerLease = pool.acquireLayerArrayRenderTarget(m_outputSize,
                                                          static_cast<uint32_t>(visibleChannels.size()),
                                                          ScratchFormat::RGBA16,
                                                          ScratchFormat::Depth32F,
                                                          std::optional<RenderBackend>(RenderBackend::Vulkan));
-    payload.channelLayerLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(layerLease));
+    common.channelLayerLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(layerLease));
   }
 
-  if (!payload.fastPathOnly) {
-    ensureRaycastAccumulators(eye);
+  stages.reserve(8);
 
-    // Create a non-owning "view" lease that snapshots the pointers/descriptor
-    // from the persistent member lease. The view has an empty releaser so it
-    // will not double-release the underlying slot. This avoids dangling
-    // references when the persistent lease is released during backend switches
-    // (Vulkan path defers actual slot release until the frame fence signals).
-    if (m_lastRaycastAccum[eye]) {
-      payload.lastAccumLease = shareLease(m_lastRaycastAccum[eye]);
+  if (entryExitThisFrame) {
+    ImgRaycasterPayload entryExit = common;
+    entryExit.stage = ImgRaycasterPayload::Stage::EntryExit;
+    entryExit.entryPositions = std::move(entryPositions);
+    entryExit.entryTexCoords = std::move(entryTexCoords);
+    stages.push_back(std::move(entryExit));
+  }
+
+  if (common.fastPathOnly) {
+    if (visibleChannels.size() > 1u) {
+      ImgRaycasterPayload layers = common;
+      layers.stage = ImgRaycasterPayload::Stage::FastLayers;
+      if (planarGeometry) {
+        layers.entryPositions = std::move(entryPositions);
+        layers.entryTexCoords = std::move(entryTexCoords);
+      }
+      stages.push_back(std::move(layers));
+
+      ImgRaycasterPayload merge = common;
+      merge.stage = ImgRaycasterPayload::Stage::FastMerge;
+      stages.push_back(std::move(merge));
+    } else {
+      ImgRaycasterPayload direct = common;
+      direct.stage = ImgRaycasterPayload::Stage::FastDirect;
+      if (planarGeometry) {
+        direct.entryPositions = std::move(entryPositions);
+        direct.entryTexCoords = std::move(entryTexCoords);
+      }
+      stages.push_back(std::move(direct));
     }
-    if (m_currentRaycastAccum[eye]) {
-      payload.currentAccumLease = shareLease(m_currentRaycastAccum[eye]);
+    return stages;
+  }
+
+  // Progressive (paging) path is volumetric-only.
+  CHECK(!planarGeometry) << "Vulkan progressive raycaster stages are volumetric-only.";
+
+  if (common.channelIndexRaw < 0) {
+    ImgRaycasterPayload preview = common;
+    preview.stage = ImgRaycasterPayload::Stage::ProgressivePreviewLayers;
+    stages.push_back(std::move(preview));
+
+    ImgRaycasterPayload merge = common;
+    merge.stage = ImgRaycasterPayload::Stage::ProgressiveMerge;
+    merge.requestFinalization = true;
+    stages.push_back(std::move(merge));
+
+    // Ensure the next progressive step starts with Block-ID discovery.
+    m_vulkanProgressivePhase[eye] = VulkanProgressivePhase::BlockIdDiscovery;
+    return stages;
+  }
+
+  // Split progressive paging into fine-grained per-frame stages (GL parity):
+  // - BlockIdDiscovery frame: BlockId + Compaction (schedule readback + cache upload), then return.
+  // - Raycast frame: Raycast + CopyToLayers + Merge, then return (round++ or channel advance).
+  const VulkanProgressivePhase phase = m_vulkanProgressivePhase[eye];
+  switch (phase) {
+    case VulkanProgressivePhase::BlockIdDiscovery: {
+      auto blockLease =
+        pool.acquireBlockIdRenderTarget(m_outputSize, -1, -1.0, std::optional<RenderBackend>(RenderBackend::Vulkan));
+      common.blockIdAttachmentCount = blockLease.attachments;
+      common.blockIdEffectiveAttachmentCount = FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments;
+      common.blockIdLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(blockLease));
+
+      ImgRaycasterPayload blockId = common;
+      blockId.stage = ImgRaycasterPayload::Stage::ProgressiveBlockId;
+      stages.push_back(std::move(blockId));
+
+      ImgRaycasterPayload compact = common;
+      compact.stage = ImgRaycasterPayload::Stage::ProgressiveCompaction;
+      stages.push_back(std::move(compact));
+
+      // Block-ID discovery (compaction + CPU upload) is a synchronous safe-point
+      // boundary in the Vulkan backend; once this frame returns, the cache is
+      // ready for the next stage.
+      m_vulkanProgressivePhase[eye] = VulkanProgressivePhase::Raycast;
+      return stages;
     }
+    case VulkanProgressivePhase::Raycast: {
+      ImgRaycasterPayload progressive = common;
+      progressive.stage = ImgRaycasterPayload::Stage::ProgressiveRaycast;
+      stages.push_back(std::move(progressive));
 
-    auto blockLease =
-      pool.acquireBlockIdRenderTarget(m_outputSize, -1, -1.0, std::optional<RenderBackend>(RenderBackend::Vulkan));
-    payload.blockIdAttachmentCount = blockLease.attachments;
-    payload.blockIdEffectiveAttachmentCount = FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments;
-    payload.blockIdLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(blockLease));
+      ImgRaycasterPayload copyToLayers = common;
+      copyToLayers.stage = ImgRaycasterPayload::Stage::ProgressiveCopyToLayers;
+      stages.push_back(std::move(copyToLayers));
+
+      ImgRaycasterPayload merge = common;
+      merge.stage = ImgRaycasterPayload::Stage::ProgressiveMerge;
+      merge.requestFinalization = true;
+      stages.push_back(std::move(merge));
+      return stages;
+    }
   }
 
-  if (!m_blockIDs.empty()) {
-    payload.blockIdReadback = m_blockIDs;
+  CHECK(false) << "Unhandled VulkanProgressivePhase for img raycaster";
+
+  return stages;
+}
+
+void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan || picking) {
+    return;
   }
 
-  RenderBatch batch;
-  batch.eye = eye;
-  batch.geometry = std::move(payload);
+  auto stages = buildVulkanStagePayloads(eye);
+  if (stages.empty()) {
+    return;
+  }
 
-  m_rendererBase.appendBatch(std::move(batch));
+  for (auto& payload : stages) {
+    RenderBatch batch;
+    batch.eye = eye;
+    batch.geometry = std::move(payload);
+    m_rendererBase.appendBatch(std::move(batch));
+  }
 }
 
 void Z3DImgRaycasterRenderer::ensureRaycastAccumulators(Z3DEye eye)
@@ -352,6 +475,7 @@ void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye, bool lastRoun
     // Initialize progressive state for Vulkan to mirror GL’s first-entry behavior
     m_channelIdx[eye] = 0;
     m_round[eye] = 0;
+    m_vulkanProgressivePhase[eye] = VulkanProgressivePhase::BlockIdDiscovery;
     return;
   }
 
@@ -363,6 +487,7 @@ void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye, bool lastRoun
       // All channels complete; mark as finished
       m_channelIdx[eye] = -1;
       m_round[eye] = 0;
+      m_vulkanProgressivePhase[eye] = VulkanProgressivePhase::BlockIdDiscovery;
 
       if (FLAGS_atlas_log_3d_paging_frame_stats) {
         auto& stats = m_pagingFrameStats[eye];
@@ -380,6 +505,9 @@ void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye, bool lastRoun
     // Continue rounds on current channel
     ++m_round[eye];
   }
+
+  // After completing a (raycast) round, start the next stage with Block-ID discovery.
+  m_vulkanProgressivePhase[eye] = VulkanProgressivePhase::BlockIdDiscovery;
 }
 
 void Z3DImgRaycasterRenderer::releaseRaycastAccumulators(Z3DEye eye)
@@ -406,6 +534,7 @@ void Z3DImgRaycasterRenderer::resetProgress(Z3DEye eye)
 {
   m_channelIdx[eye] = -1;
   m_round[eye] = 0;
+  m_vulkanProgressivePhase[eye] = VulkanProgressivePhase::BlockIdDiscovery;
 
   m_pagingFrameStats[eye].reset();
   m_pagingFrameStatsGeneration[eye] = 0;
@@ -417,6 +546,9 @@ void Z3DImgRaycasterRenderer::resetProgress(Z3DEye eye)
   // Also release per-frame resources that can be reacquired on demand.
   if (m_entryExitLease) {
     m_entryExitLease.release();
+  }
+  if (m_vulkanProgressiveLayerLease[eye]) {
+    m_vulkanProgressiveLayerLease[eye].release();
   }
   if (m_progressiveLayerLease) {
     m_progressiveLayerLease.release();

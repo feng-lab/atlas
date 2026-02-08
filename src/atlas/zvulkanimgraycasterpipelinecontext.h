@@ -57,6 +57,7 @@ public:
     uint64_t streamKey = 0;
     Z3DEye eye = MonoEye;
     uint32_t channelCount = 0;
+    uint32_t progressiveGeneration = 0u;
   };
 
   // Expose pending-finalization pull for the backend driver (no friendship).
@@ -231,10 +232,24 @@ private:
   Z3DRendererVulkanBackend& m_backend;
 
   // Entry/exit state
-  std::unique_ptr<ZVulkanBuffer> m_entryVertexBuffer;
-  std::unique_ptr<ZVulkanBuffer> m_entryIndexBuffer;
-  size_t m_entryVertexCapacity = 0;
-  size_t m_entryIndexCapacity = 0;
+  struct EntryGeometryBuffers
+  {
+    std::unique_ptr<ZVulkanBuffer> vertexBuffer;
+    std::unique_ptr<ZVulkanBuffer> indexBuffer;
+    size_t vertexCapacity = 0;
+    size_t indexCapacity = 0;
+  };
+  // Per-frame-slot entry geometry buffers (host-visible). Keyed by backend activeFrameKey()
+  // so resizing/replacement is safe even with multiple frames in flight.
+  std::unordered_map<void*, EntryGeometryBuffers> m_entryGeometryBuffers;
+  // Convenience pointers to the current active frame-slot buffers (set by ensureEntryVertexCapacity()).
+  ZVulkanBuffer* m_entryVertexBuffer = nullptr;
+  ZVulkanBuffer* m_entryIndexBuffer = nullptr;
+  // Entry geometry is shared by per-layer batches (EntryExit + planar fast paths).
+  // Upload at most once per frame and verify it does not change mid-frame.
+  bool m_entryGeometryUploadedThisFrame = false;
+  size_t m_entryGeometryVertexCountThisFrame = 0;
+  size_t m_entryGeometryIndexCountThisFrame = 0;
 
   // Screen quad
   std::unique_ptr<ZVulkanBuffer> m_quadVertexBuffer;
@@ -306,14 +321,71 @@ private:
 
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
-  std::unique_ptr<ZVulkanTexture> m_progressiveLayerColor;
-  std::unique_ptr<ZVulkanTexture> m_progressiveLayerDepth;
-  glm::uvec2 m_progressiveLayerSize{0u, 0u};
-  uint32_t m_progressiveLayerCount = 0u;
-  uint32_t m_progressiveGeneration = 0u;
 
   std::optional<Finalization> m_pendingFinalization;
   std::optional<DeferredProgressive> m_deferredProgressive;
+
+  struct StreamEyeKey
+  {
+    uint64_t streamKey = 0;
+    Z3DEye eye = MonoEye;
+    bool operator==(const StreamEyeKey& o) const
+    {
+      return streamKey == o.streamKey && eye == o.eye;
+    }
+  };
+
+  struct StreamEyeKeyHash
+  {
+    size_t operator()(const StreamEyeKey& key) const
+    {
+      const size_t h0 = std::hash<uint64_t>{}(key.streamKey);
+      const size_t h1 = std::hash<int>{}(static_cast<int>(key.eye));
+      return h0 ^ (h1 + 0x9e3779b97f4a7c15ULL + (h0 << 6) + (h0 >> 2));
+    }
+  };
+
+  // When a progressive finalization is pending for a stream/eye, the first
+  // stage batch will cause the backend to consume the finalization and update
+  // the originating renderer. Subsequent stage batches in the same frame must
+  // no-op (otherwise we'd accidentally record work after the channel advances).
+  std::unordered_set<StreamEyeKey, StreamEyeKeyHash> m_skipStagesThisFrame;
+
+  struct ProgressivePrepKey
+  {
+    uint64_t streamKey = 0;
+    Z3DEye eye = MonoEye;
+    uint32_t progressiveGeneration = 0u;
+    int32_t channelIndexRaw = -1;
+    int32_t roundIndexRaw = 0;
+
+    bool operator==(const ProgressivePrepKey& o) const
+    {
+      return streamKey == o.streamKey && eye == o.eye && progressiveGeneration == o.progressiveGeneration &&
+             channelIndexRaw == o.channelIndexRaw && roundIndexRaw == o.roundIndexRaw;
+    }
+  };
+
+  struct ProgressivePrepState
+  {
+    ProgressivePrepKey key{};
+    bool ready = false;
+    uint32_t channelCount = 0u;
+    uint32_t activeChannelIndex = 0u; // index into visibleChannels
+    size_t channelIndex = 0; // actual image channel index
+    bool skipBlockIdPass = false;
+    std::optional<Finalization> finalizeAfterProgressive;
+    float zeToZW_a = 0.0f;
+    float zeToZW_b = 0.0f;
+    float zeToScreenPixelVoxelSize = 0.0f;
+    ZVulkanTexture* entryTexture = nullptr;
+    ZVulkanTexture* lastColor = nullptr;
+    ZVulkanTexture* lastDepth = nullptr;
+    ZVulkanTexture* currentColor = nullptr;
+    ZVulkanTexture* currentDepth = nullptr;
+  };
+
+  std::optional<ProgressivePrepState> m_progressivePrep;
 
   // Track which depth images have been cleared this frame (for first-use clear on merge).
   std::unordered_set<VkImage> m_depthClearedThisFrame;
@@ -339,6 +411,7 @@ private:
   PipelineInstance& ensureCopyPipeline(const CopyPipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
   void uploadEntryGeometry(const ImgRaycasterPayload& payload);
+  void ensureEntryGeometryUploadedThisFrame(const ImgRaycasterPayload& payload);
   void ensureEntryTransformResources(Z3DRendererBase& renderer,
                                      const RenderBatch& batch,
                                      const ImgRaycasterPayload& payload);
@@ -386,62 +459,103 @@ private:
                                                                   bool preferOverrideStatic = false);
   // depthArray is optional
   void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
-  void ensureProgressiveLayerTargets(const glm::uvec2& size,
-                                     uint32_t layerCount,
-                                     uint32_t generation,
-                                     vk::raii::CommandBuffer& cmd);
 
   ZVulkanTexture&
   ensureVolumeTexture(ChannelResources& resources, const ZImg& image, size_t channelIndex, uint64_t generation);
   ZVulkanTexture& ensureImage2DTexture(ChannelResources& resources, const ZImg& image, uint64_t generation);
   ZVulkanTexture& ensureTransferTexture(ChannelResources& resources, const Z3DTransferFunction& transferFunction);
 
-  void renderEntryExit(Z3DRendererBase& renderer,
-                       const RenderBatch& batch,
-                       const ImgRaycasterPayload& payload,
-                       const vk::Viewport& viewport,
-                       const vk::Rect2D& scissor,
-                       vk::raii::CommandBuffer& cmd);
-
-  void renderFastPath(Z3DRendererBase& renderer,
-                      const RenderBatch& batch,
-                      const ImgRaycasterPayload& payload,
-                      const vk::Viewport& viewport,
-                      const vk::Rect2D& scissor,
-                      vk::raii::CommandBuffer& cmd,
-                      FastPipelineVariant variant,
-                      const CompositingConfig& composite);
-  void renderFastVolume(Z3DRendererBase& renderer,
-                        const RenderBatch& batch,
-                        const ImgRaycasterPayload& payload,
-                        const vk::Viewport& viewport,
-                        const vk::Rect2D& scissor,
-                        vk::raii::CommandBuffer& cmd,
-                        const CompositingConfig& composite);
-  void renderFastImage2D(Z3DRendererBase& renderer,
-                         const RenderBatch& batch,
-                         const ImgRaycasterPayload& payload,
-                         const vk::Viewport& viewport,
-                         const vk::Rect2D& scissor,
-                         vk::raii::CommandBuffer& cmd,
-                         const CompositingConfig& composite);
-  void renderFastSlice2D(Z3DRendererBase& renderer,
-                         const RenderBatch& batch,
-                         const ImgRaycasterPayload& payload,
-                         const vk::Viewport& viewport,
-                         const vk::Rect2D& scissor,
-                         vk::raii::CommandBuffer& cmd,
-                         const CompositingConfig& composite);
-
-  void renderProgressivePath(Z3DRendererBase& renderer,
+  // ---------------------------------------------------------------------------
+  // Stage-based recording helpers (linear-script friendly).
+  // Each stage records work for one logical target/pass; see ImgRaycasterPayload::Stage.
+  // ---------------------------------------------------------------------------
+  void recordStageEntryExit(Z3DRendererBase& renderer,
+                            const RenderBatch& batch,
+                            const ImgRaycasterPayload& payload,
+                            const vk::Viewport& viewport,
+                            const vk::Rect2D& scissor,
+                            vk::raii::CommandBuffer& cmd);
+  void recordStageFastDirect(Z3DRendererBase& renderer,
                              const RenderBatch& batch,
                              const ImgRaycasterPayload& payload,
                              const vk::Viewport& viewport,
                              const vk::Rect2D& scissor,
+                             vk::raii::CommandBuffer& cmd);
+  void recordStageFastLayers(Z3DRendererBase& renderer,
+                             const RenderBatch& batch,
+                             const ImgRaycasterPayload& payload,
+                             const vk::Viewport& viewport,
+                             const vk::Rect2D& scissor,
+                             vk::raii::CommandBuffer& cmd);
+  void recordStageFastMerge(Z3DRendererBase& renderer,
+                            const RenderBatch& batch,
+                            const ImgRaycasterPayload& payload,
+                            const vk::Viewport& viewport,
+                            const vk::Rect2D& scissor,
+                            vk::raii::CommandBuffer& cmd);
+  void recordStageProgressivePreviewLayers(Z3DRendererBase& renderer,
+                                           const RenderBatch& batch,
+                                           const ImgRaycasterPayload& payload,
+                                           const vk::Viewport& viewport,
+                                           const vk::Rect2D& scissor,
+                                           vk::raii::CommandBuffer& cmd);
+  void recordStageProgressiveBlockId(Z3DRendererBase& renderer,
+                                     const RenderBatch& batch,
+                                     const ImgRaycasterPayload& payload,
+                                     const vk::Viewport& viewport,
+                                     const vk::Rect2D& scissor,
+                                     vk::raii::CommandBuffer& cmd);
+  void recordStageProgressiveCompaction(Z3DRendererBase& renderer,
+                                        const RenderBatch& batch,
+                                        const ImgRaycasterPayload& payload,
+                                        const vk::Viewport& viewport,
+                                        const vk::Rect2D& scissor,
+                                        vk::raii::CommandBuffer& cmd);
+  void recordStageProgressiveRaycast(Z3DRendererBase& renderer,
+                                     const RenderBatch& batch,
+                                     const ImgRaycasterPayload& payload,
+                                     const vk::Viewport& viewport,
+                                     const vk::Rect2D& scissor,
+                                     vk::raii::CommandBuffer& cmd);
+  void recordStageProgressiveCopyToLayers(Z3DRendererBase& renderer,
+                                          const RenderBatch& batch,
+                                          const ImgRaycasterPayload& payload,
+                                          const vk::Viewport& viewport,
+                                          const vk::Rect2D& scissor,
+                                          vk::raii::CommandBuffer& cmd);
+  void recordStageProgressiveMerge(Z3DRendererBase& renderer,
+                                   const RenderBatch& batch,
+                                   const ImgRaycasterPayload& payload,
+                                   const vk::Viewport& viewport,
+                                   const vk::Rect2D& scissor,
+                                   vk::raii::CommandBuffer& cmd);
+
+  [[nodiscard]] bool stageSkippedThisFrame(uint64_t streamKey, Z3DEye eye) const;
+  void markStageSkippedThisFrame(uint64_t streamKey, Z3DEye eye);
+
+  [[nodiscard]] std::optional<ProgressivePrepState> ensurePreparedProgressiveRound(Z3DRendererBase& renderer,
+                                                                                   const RenderBatch& batch,
+                                                                                   const ImgRaycasterPayload& payload,
+                                                                                   const vk::Viewport& viewport,
+                                                                                   const vk::Rect2D& scissor,
+                                                                                   vk::raii::CommandBuffer& cmd,
+                                                                                   const CompositingConfig& composite);
+
+  void recordFastVolumeLayersOnly(Z3DRendererBase& renderer,
+                                  const RenderBatch& batch,
+                                  const ImgRaycasterPayload& payload,
+                                  const vk::Viewport& viewport,
+                                  const vk::Rect2D& scissor,
+                                  vk::raii::CommandBuffer& cmd,
+                                  const CompositingConfig& composite);
+  void recordMergeFromLayers(const RenderBatch& batch,
+                             const vk::Viewport& viewport,
+                             const vk::Rect2D& scissor,
                              vk::raii::CommandBuffer& cmd,
                              const CompositingConfig& composite,
-                             bool skipBlockIdPass,
-                             std::optional<Finalization> finalizeAfterProgressive);
+                             ZVulkanTexture& layerColor,
+                             /*nullable*/ ZVulkanTexture* layerDepth,
+                             uint32_t channelCount);
 
   // (public) see takePendingFinalization() above
 };

@@ -6,7 +6,9 @@
 #include "z3dscratchresourcepool.h"
 
 #include <memory>
+#include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace nim {
 
@@ -49,10 +51,36 @@ public:
   // of resources referenced by in-flight work.
   virtual void preBackendSwitch() {}
 
+  // Teardown helper: backends that schedule fence-gated work (e.g. Vulkan safe-point
+  // hooks, async readbacks) can override this to synchronously drain in-flight work
+  // and execute any completion callbacks before dependent resources are destroyed.
+  // Default no-op for immediate backends (e.g. OpenGL).
+  virtual void flushForTeardown(std::string_view /*reason*/ = {}) {}
+
   // Optional pass-scope hooks (no-op by default). Vulkan backend uses these
   // to aggregate per-pass counters and emit a concise end-of-pass summary.
   virtual void beginPassScope(std::string_view /*label*/) {}
   virtual void endPassScope() {}
+
+  // ---------------------------------------------------------------------------
+  // Optional async-completion hooks (no-op by default)
+  // ---------------------------------------------------------------------------
+  // Backends that queue GPU work (e.g. Vulkan) can override these to allow the
+  // engine to pump completion callbacks and to apply backpressure when frame
+  // slots are exhausted. Immediate backends (e.g. OpenGL) keep defaults.
+  virtual void pollCompletionsAndPumpSafePoints() {}
+  [[nodiscard]] virtual bool hasInFlightFrames() const
+  {
+    return false;
+  }
+  [[nodiscard]] virtual uint32_t inFlightCount() const
+  {
+    return 0;
+  }
+  [[nodiscard]] virtual uint32_t maxFramesInFlight() const
+  {
+    return 0;
+  }
 };
 
 std::unique_ptr<Z3DRendererBackend> createGLRendererBackend();

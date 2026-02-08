@@ -157,8 +157,12 @@ public:
   // - GPU execution is deferred until a flush boundary.
   //
   // Guideline: keep the callback focused on one logical pass. Prefer recording
-  // batches that target a single output surface / attachment set; split into
-  // multiple raster() nodes when switching render targets.
+  // batches that target a single logical output surface / attachment set; split
+  // into multiple raster() nodes when switching render targets.
+  //
+  // Note: array-layer targets are still a single logical render target. It is
+  // acceptable (and often clearer) to record multiple batches that differ only
+  // by AttachmentHandle.index (layer) within one raster() callback.
   SegmentHandle
   raster(std::string_view label, std::span<const SegmentHandle> deps, const std::function<void()>& recordBatches);
   SegmentHandle

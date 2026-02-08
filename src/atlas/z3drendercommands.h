@@ -687,12 +687,28 @@ struct TextureBlendPayload
 
 struct TextureGlowPayload
 {
+  enum class Stage : uint8_t
+  {
+    Unspecified,
+    BlurX,
+    BlurY,
+    Composite,
+  };
+
+  Stage stage = Stage::Unspecified;
   GlowMode mode = GlowMode::Screen;
   int blurRadius = 0;
   float blurScale = 1.0f;
   float blurStrength = 0.5f;
+
+  // Stage inputs (sampled images).
+  // For BlurX/BlurY: colorAttachmentHandle + depthAttachmentHandle are the blur input.
+  // For Composite: colorAttachmentHandle + depthAttachmentHandle are the base ("dst") inputs,
+  // and blur*AttachmentHandle are the blurred glow-map inputs.
   AttachmentHandle colorAttachmentHandle;
   AttachmentHandle depthAttachmentHandle;
+  AttachmentHandle blurColorAttachmentHandle;
+  AttachmentHandle blurDepthAttachmentHandle;
 };
 
 struct TextureDualPeelPayload
@@ -737,6 +753,20 @@ struct TexturePPLLResolvePayload
 
 struct ImgSlicePayload
 {
+  enum class Stage : uint8_t
+  {
+    Unspecified,
+    // Record slice draws into the layer array target (multi-channel) or
+    // directly into the active surface (single-channel).
+    DrawLayers,
+    // Block-ID discovery + cache upload stage used by paging workflows.
+    BlockIdDiscovery,
+    // Merge layer array into the active surface.
+    MergeLayers,
+  };
+
+  Stage stage = Stage::Unspecified;
+
   // Stable identity of the source renderer/stream (used by Vulkan backend to finalize progressive rounds).
   uint64_t streamKey = 0;
   // Per-stream generation for progressive bookkeeping (clears persistent resources when it changes).
@@ -746,6 +776,11 @@ struct ImgSlicePayload
   // - roundIndexRaw is the progressive round counter for paging/cache filling.
   int32_t channelIndexRaw = -1;
   int32_t roundIndexRaw = 0;
+  // Block-ID discovery (paging) sub-stage selector:
+  // - blockIdSliceIndexRaw >= 0 means this batch targets exactly one slice mesh
+  //   (payload.slices[blockIdSliceIndexRaw]).
+  // - For non-block-id stages, leave as -1.
+  int32_t blockIdSliceIndexRaw = -1;
 
   Z3DImg* image = nullptr;
   const std::vector<const ZColorMap*>* colormaps = nullptr;
@@ -754,10 +789,46 @@ struct ImgSlicePayload
   bool fastPathOnly = true;
   bool maxProjectionMerge = true;
   std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> layerLease;
+  // Scratch target for block-ID discovery (paging workflows). When present,
+  // BlockIdDiscovery stages render into this surface and subsequent compute
+  // stages compact the IDs into buffers for CPU upload decisions.
+  std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> blockIdLease;
 };
 
 struct ImgRaycasterPayload
 {
+  enum class Stage : uint8_t
+  {
+    Unspecified,
+    // Generate entry/exit texture (volumetric raycasting only).
+    EntryExit,
+    // Fast path (single-channel volume OR planar geometry) rendering directly
+    // into the active surface.
+    FastDirect,
+    // Fast multi-channel volume rendering: render per-channel results into a
+    // layer array (scratch or progressive arrays).
+    FastLayers,
+    // Fast multi-channel volume rendering: merge layer array into the active surface.
+    FastMerge,
+    // Progressive preview: render all channels into the progressive layer arrays.
+    ProgressivePreviewLayers,
+    // Progressive stages (volumetric only):
+    ProgressiveBlockId,
+    ProgressiveCompaction,
+    ProgressiveRaycast,
+    ProgressiveCopyToLayers,
+    ProgressiveMerge,
+  };
+
+  Stage stage = Stage::Unspecified;
+  // Stage-local control flags.
+  //
+  // For progressive rendering, some frames may enqueue a "keep-alive" merge stage
+  // that re-presents the current layer state while waiting for block-ID cache
+  // readback/upload completion. In that case, the merge must *not* advance the
+  // progressive bookkeeping (round/channel).
+  bool requestFinalization = false;
+
   // Stable identity of the source renderer/stream
   uint64_t streamKey = 0;
   Z3DImg* image = nullptr;
@@ -782,7 +853,6 @@ struct ImgRaycasterPayload
   // Transfer function inputs (one per channel). The vector must be non-null
   // and have size >= max(visibleChannels)+1 when used by Vulkan.
   const std::vector<Z3DTransferFunction*>* transferFunctions = nullptr;
-  std::vector<uint32_t> blockIdReadback;
   uint32_t blockIdAttachmentCount = 0u;
   // If non-zero, caps how many block-ID attachments should be *processed* (compacted/read back)
   // for missing-block discovery in progressive rendering. This is primarily a UX/perf knob:

@@ -2,17 +2,16 @@
 
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
-#include "z3dtextureglowrenderer.h"
 #include "zsysteminfo.h"
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
+#include "zvulkanbuffer.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbindings.h"
-#include "zvulkanbuffer.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zlog.h"
 
@@ -23,8 +22,6 @@
 namespace nim {
 
 namespace {
-
-constexpr float kQuadDepth = 0.0f;
 
 int toGlowModeConstant(GlowMode mode)
 {
@@ -51,15 +48,10 @@ ZVulkanTextureGlowPipelineContext::~ZVulkanTextureGlowPipelineContext() = defaul
 
 void ZVulkanTextureGlowPipelineContext::resetFrame()
 {
-  m_vertexCount = 0;
   resetDescriptors();
 }
 
-void ZVulkanTextureGlowPipelineContext::resetDescriptors()
-{
-  m_blurDescriptor.reset();
-  m_glowDescriptor.reset();
-}
+void ZVulkanTextureGlowPipelineContext::resetDescriptors() {}
 
 void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
                                                const RenderBatch& batch,
@@ -68,165 +60,132 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
                                                const vk::Rect2D& scissor,
                                                vk::raii::CommandBuffer& cmd)
 {
-  (void)payload;
-
+  (void)renderer;
+  CHECK(payload.stage != TextureGlowPayload::Stage::Unspecified) << "Vulkan glow pass missing stage";
   CHECK(payload.colorAttachmentHandle.valid() && payload.depthAttachmentHandle.valid())
-    << "Skipping Vulkan glow pass due to missing attachments";
+    << "Vulkan glow pass missing base input handles";
 
-  auto& colorTexture =
-    vulkan::textureFromHandle(payload.colorAttachmentHandle, m_backend.device(), "texture-glow color attachment");
-  auto& depthTexture =
-    vulkan::textureFromHandle(payload.depthAttachmentHandle, m_backend.device(), "texture-glow depth attachment");
+  auto& inputColor =
+    vulkan::textureFromHandle(payload.colorAttachmentHandle, m_backend.device(), "texture-glow input color attachment");
+  auto& inputDepth =
+    vulkan::textureFromHandle(payload.depthAttachmentHandle, m_backend.device(), "texture-glow input depth attachment");
 
-  glm::uvec2 size(colorTexture.width(), colorTexture.height());
-  if (size.x == 0u || size.y == 0u) {
+  const glm::uvec2 inputSize(inputColor.width(), inputColor.height());
+  if (inputSize.x == 0u || inputSize.y == 0u) {
     return;
   }
-
-  // Shared fullscreen quad
-  m_vertexCount = 4;
 
   ensureDescriptorLayouts();
 
-  const vk::Format colorFormat = colorTexture.format();
-  ensureIntermediateTextures(size, colorFormat);
-  if (!m_blurIntermediate0.color.texture || !m_blurIntermediate0.depth.texture || !m_blurIntermediate1.color.texture ||
-      !m_blurIntermediate1.depth.texture) {
+  const auto formats = vulkan::extractAttachmentFormats(batch);
+  if (formats.colorFormats.empty()) {
     return;
   }
-
-  runBlurPass(renderer,
-              cmd,
-              colorTexture,
-              depthTexture,
-              m_blurIntermediate0,
-              true,
-              size,
-              payload.blurRadius,
-              payload.blurScale,
-              payload.blurStrength);
-
-  runBlurPass(renderer,
-              cmd,
-              *m_blurIntermediate0.color.texture,
-              *m_blurIntermediate0.depth.texture,
-              m_blurIntermediate1,
-              false,
-              size,
-              payload.blurRadius,
-              payload.blurScale,
-              payload.blurStrength);
-
-  ZVulkanDescriptorSet* glowDS = nullptr;
-  if (m_glowSetLayout) {
-    glowDS = m_backend.allocateOverrideDescriptorSet(**m_glowSetLayout);
-  }
-  CHECK(glowDS != nullptr) << "Glow final: override descriptor allocation failed (fatal)";
-  glowDS->updateTexture(vkbind::kGlowBindingColorIn, colorTexture, m_backend.defaultSampler());
-  glowDS->updateTexture(vkbind::kGlowBindingDepthIn, depthTexture, m_backend.defaultSampler());
-  glowDS->updateTexture(vkbind::kGlowBindingBlurIn0, *m_blurIntermediate1.color.texture, m_backend.defaultSampler());
-  glowDS->updateTexture(vkbind::kGlowBindingBlurIn1, *m_blurIntermediate1.depth.texture, m_backend.defaultSampler());
-
-  const auto formats = vulkan::extractAttachmentFormats(batch);
-  GlowPipelineKey glowKey;
-  glowKey.mode = payload.mode;
-  glowKey.colorFormats = formats.colorFormats;
-  glowKey.depthFormat = formats.depthFormat;
-
-  PipelineInstance& glowPipeline = ensureGlowPipeline(glowKey, formats);
+  CHECK(formats.depthFormat.has_value()) << "Vulkan glow passes require a depth attachment";
 
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  const glm::vec2 finalExtent(viewport.width, viewport.height);
-  CHECK(finalExtent.x > 0.0f && finalExtent.y > 0.0f) << "Vulkan glow pass requires a valid viewport extent";
+  ZVulkanPipelineCommandRecorder recorder(cmd);
 
-  GlowPushConstants glowConstants;
-  glowConstants.screenDimRcp = glm::vec2(1.0f / finalExtent.x, 1.0f / finalExtent.y);
-  std::vector<ZVulkanAttachmentInfo> colorAttachmentInfos;
-  colorAttachmentInfos.reserve(batch.pass.colorAttachments.size());
-  for (const auto& attachment : batch.pass.colorAttachments) {
-    if (!attachment.handle.valid()) {
-      continue;
-    }
-    auto& attachmentTexture =
-      vulkan::textureFromHandle(attachment.handle, m_backend.device(), "texture-glow final color attachment");
-    ZVulkanAttachmentInfo info{};
-    info.image = attachmentTexture.image();
-    info.view = attachmentTexture.imageView();
-    info.format = attachmentTexture.format();
-    info.initialLayout = attachmentTexture.layout();
-    info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
-    info.clearValue.color = vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
-                                                                     attachment.clearValue.color.g,
-                                                                     attachment.clearValue.color.b,
-                                                                     attachment.clearValue.color.a});
-    info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
-    info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    info.srcStage = {};
-    info.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-    info.srcAccess = {};
-    info.dstAccess = vk::AccessFlagBits2::eColorAttachmentWrite;
-    info.aspect = vk::ImageAspectFlagBits::eColor;
-    info.trackingTexture = &attachmentTexture;
-    colorAttachmentInfos.push_back(info);
-  }
+  auto recordBlur = [&](bool horizontal) {
+    CHECK(m_blurSetLayout.has_value()) << "Glow blur requires blur descriptor set layout";
+    ZVulkanDescriptorSet* blurDS = m_backend.allocateOverrideDescriptorSet(**m_blurSetLayout);
+    CHECK(blurDS != nullptr) << "Glow blur: override descriptor allocation failed (fatal)";
+    blurDS->updateTexture(vkbind::kBlurBindingColorIn, inputColor, m_backend.defaultSampler());
+    blurDS->updateTexture(vkbind::kBlurBindingDepthIn, inputDepth, m_backend.defaultSampler());
 
-  std::optional<ZVulkanAttachmentInfo> depthAttachmentInfo;
-  if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid()) {
-    const auto& attachment = *batch.pass.depthAttachment;
-    auto& attachmentTexture =
-      vulkan::textureFromHandle(attachment.handle, m_backend.device(), "texture-glow final depth attachment");
-    ZVulkanAttachmentInfo depthInfo{};
-    depthInfo.image = attachmentTexture.image();
-    depthInfo.view = attachmentTexture.imageView();
-    depthInfo.format = attachmentTexture.format();
-    depthInfo.initialLayout = attachmentTexture.layout();
-    depthInfo.finalLayout = vk::ImageLayout::eDepthAttachmentOptimal;
-    depthInfo.clearValue.depthStencil =
-      vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
-    depthInfo.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
-    depthInfo.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    depthInfo.srcStage = {};
-    depthInfo.dstStage =
-      vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
-    depthInfo.srcAccess = {};
-    depthInfo.dstAccess =
-      vk::AccessFlagBits2::eDepthStencilAttachmentWrite | vk::AccessFlagBits2::eDepthStencilAttachmentRead;
-    const vk::ImageAspectFlags depthAspect = (attachmentTexture.info().aspectMask == vk::ImageAspectFlags{})
-                                               ? vk::ImageAspectFlagBits::eDepth
-                                               : attachmentTexture.info().aspectMask;
-    depthInfo.aspect = depthAspect;
-    depthInfo.trackingTexture = &attachmentTexture;
-    depthAttachmentInfo = depthInfo;
-  }
+    BlurPipelineKey blurKey{};
+    blurKey.horizontal = horizontal;
+    blurKey.colorFormats = formats.colorFormats;
+    blurKey.depthFormat = formats.depthFormat;
+    PipelineInstance& blurPipeline = ensureBlurPipeline(blurKey, formats);
 
-  const vk::Rect2D renderArea{
-    vk::Offset2D{static_cast<int32_t>(batch.pass.viewport.origin.x),
-                 static_cast<int32_t>(batch.pass.viewport.origin.y)},
-    vk::Extent2D{static_cast<uint32_t>(std::max(0.0f, batch.pass.viewport.extent.x)),
-                 static_cast<uint32_t>(std::max(0.0f, batch.pass.viewport.extent.y))}
+    CHECK(viewport.width > 0.0f && viewport.height > 0.0f) << "Glow blur requires a valid viewport extent";
+    BlurPushConstants blurConstants{};
+    blurConstants.screenDimRcp = glm::vec2(1.0f / viewport.width, 1.0f / viewport.height);
+    blurConstants.blurRadius = payload.blurRadius;
+    blurConstants.blurScale = payload.blurScale;
+    blurConstants.blurStrength = payload.blurStrength;
+
+    ZVulkanGraphicsDrawSpec drawSpec{};
+    drawSpec.viewports = {viewport};
+    drawSpec.scissors = {scissor};
+    drawSpec.pipelineHandle = blurPipeline.pipeline->pipelineHandle();
+    drawSpec.pipelineLayoutHandle = blurPipeline.pipeline->pipelineLayoutHandle();
+    drawSpec.descriptorSets = {blurDS->descriptorSet()};
+    drawSpec.descriptorSetFirst = 0;
+    drawSpec.expectedDescriptorSetCount = 1;
+    drawSpec.vertexBuffers = {quad.buffer()};
+    drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+    drawSpec.vertexCount = 4;
+    drawSpec.instanceCount = 1;
+    drawSpec.pushConstantsData = &blurConstants;
+    drawSpec.pushConstantsSize = sizeof(blurConstants);
+    drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+    drawSpec.requirePushConstants = true;
+    recorder.recordGraphicsDraw(drawSpec);
   };
 
-  ZVulkanGraphicsPassSpec glowSpec{};
-  glowSpec.renderArea = renderArea;
-  glowSpec.viewports = {viewport};
-  glowSpec.scissors = {scissor};
-  glowSpec.colorAttachments = std::move(colorAttachmentInfos);
-  glowSpec.depthStencilAttachment = depthAttachmentInfo;
-  glowSpec.pipelineHandle = glowPipeline.pipeline->pipelineHandle();
-  glowSpec.pipelineLayoutHandle = glowPipeline.pipeline->pipelineLayoutHandle();
-  glowSpec.descriptorSets = {glowDS->descriptorSet()};
-  glowSpec.expectedDescriptorSetCount = 1;
-  glowSpec.vertexBuffers = {quad.buffer()};
-  glowSpec.vertexOffsets = {vk::DeviceSize(0)};
-  glowSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
-  glowSpec.instanceCount = 1;
-  glowSpec.pushConstantsData = &glowConstants;
-  glowSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(GlowPushConstants));
-  glowSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
-  glowSpec.requirePushConstants = true;
+  auto recordComposite = [&]() {
+    CHECK(m_glowSetLayout.has_value()) << "Glow composite requires glow descriptor set layout";
+    CHECK(payload.blurColorAttachmentHandle.valid() && payload.blurDepthAttachmentHandle.valid())
+      << "Glow composite stage missing blur inputs";
+    auto& blurColor = vulkan::textureFromHandle(payload.blurColorAttachmentHandle,
+                                                m_backend.device(),
+                                                "texture-glow blur color attachment");
+    auto& blurDepth = vulkan::textureFromHandle(payload.blurDepthAttachmentHandle,
+                                                m_backend.device(),
+                                                "texture-glow blur depth attachment");
 
-  ZVulkanPipelineCommandRecorder recorder(cmd);
-  recorder.recordGraphicsPass(glowSpec);
+    ZVulkanDescriptorSet* glowDS = m_backend.allocateOverrideDescriptorSet(**m_glowSetLayout);
+    CHECK(glowDS != nullptr) << "Glow composite: override descriptor allocation failed (fatal)";
+    glowDS->updateTexture(vkbind::kGlowBindingColorIn, inputColor, m_backend.defaultSampler());
+    glowDS->updateTexture(vkbind::kGlowBindingDepthIn, inputDepth, m_backend.defaultSampler());
+    glowDS->updateTexture(vkbind::kGlowBindingBlurIn0, blurColor, m_backend.defaultSampler());
+    glowDS->updateTexture(vkbind::kGlowBindingBlurIn1, blurDepth, m_backend.defaultSampler());
+
+    GlowPipelineKey glowKey{};
+    glowKey.mode = payload.mode;
+    glowKey.colorFormats = formats.colorFormats;
+    glowKey.depthFormat = formats.depthFormat;
+    PipelineInstance& glowPipeline = ensureGlowPipeline(glowKey, formats);
+
+    CHECK(viewport.width > 0.0f && viewport.height > 0.0f) << "Glow composite requires a valid viewport extent";
+    GlowPushConstants glowConstants{};
+    glowConstants.screenDimRcp = glm::vec2(1.0f / viewport.width, 1.0f / viewport.height);
+
+    ZVulkanGraphicsDrawSpec drawSpec{};
+    drawSpec.viewports = {viewport};
+    drawSpec.scissors = {scissor};
+    drawSpec.pipelineHandle = glowPipeline.pipeline->pipelineHandle();
+    drawSpec.pipelineLayoutHandle = glowPipeline.pipeline->pipelineLayoutHandle();
+    drawSpec.descriptorSets = {glowDS->descriptorSet()};
+    drawSpec.descriptorSetFirst = 0;
+    drawSpec.expectedDescriptorSetCount = 1;
+    drawSpec.vertexBuffers = {quad.buffer()};
+    drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+    drawSpec.vertexCount = 4;
+    drawSpec.instanceCount = 1;
+    drawSpec.pushConstantsData = &glowConstants;
+    drawSpec.pushConstantsSize = sizeof(glowConstants);
+    drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+    drawSpec.requirePushConstants = true;
+    recorder.recordGraphicsDraw(drawSpec);
+  };
+
+  switch (payload.stage) {
+    case TextureGlowPayload::Stage::Unspecified:
+      CHECK(false) << "Glow payload stage is Unspecified";
+      break;
+    case TextureGlowPayload::Stage::BlurX:
+      recordBlur(true);
+      break;
+    case TextureGlowPayload::Stage::BlurY:
+      recordBlur(false);
+      break;
+    case TextureGlowPayload::Stage::Composite:
+      recordComposite();
+      break;
+  }
 }
 
 void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()
@@ -309,48 +268,6 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureGlowPipelineContext::makeVe
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
   info.pVertexAttributeDescriptions = attrs.data();
   return info;
-}
-
-void ZVulkanTextureGlowPipelineContext::ensureIntermediateTextures(const glm::uvec2& size, vk::Format colorFormat)
-{
-  auto ensureTexture =
-    [&](TextureUpload& upload, vk::Format format, vk::ImageUsageFlags usage, vk::ImageLayout descriptorLayout) {
-      const glm::uvec3 extent(size.x, size.y, 1u);
-      if (!upload.texture || upload.extent != extent || upload.format != format) {
-        auto& device = m_backend.device();
-        auto info = ZVulkanTexture::CreateInfo::make2D(static_cast<uint32_t>(size.x),
-                                                       static_cast<uint32_t>(size.y),
-                                                       format,
-                                                       usage,
-                                                       vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                       1,
-                                                       true,
-                                                       descriptorLayout);
-        upload.texture = device.createTexture(info);
-        CHECK(upload.texture != nullptr) << "Glow: failed to create intermediate texture";
-        upload.extent = extent;
-        upload.format = format;
-      }
-    };
-
-  const auto colorUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled;
-  const auto depthUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled;
-  ensureTexture(m_blurIntermediate0.color, colorFormat, colorUsage, vk::ImageLayout::eShaderReadOnlyOptimal);
-  ensureTexture(m_blurIntermediate0.depth, vk::Format::eD32Sfloat, depthUsage, vk::ImageLayout::eDepthReadOnlyOptimal);
-  ensureTexture(m_blurIntermediate1.color, colorFormat, colorUsage, vk::ImageLayout::eShaderReadOnlyOptimal);
-  ensureTexture(m_blurIntermediate1.depth, vk::Format::eD32Sfloat, depthUsage, vk::ImageLayout::eDepthReadOnlyOptimal);
-}
-
-void ZVulkanTextureGlowPipelineContext::ensureVertexCapacity(size_t) {}
-
-void ZVulkanTextureGlowPipelineContext::uploadGeometry()
-{
-  const std::array<QuadVertex, 4> vertices{QuadVertex{glm::vec3(-1.f, 1.f, kQuadDepth)},
-                                           QuadVertex{glm::vec3(-1.f, -1.f, kQuadDepth)},
-                                           QuadVertex{glm::vec3(1.f, 1.f, kQuadDepth)},
-                                           QuadVertex{glm::vec3(1.f, -1.f, kQuadDepth)}};
-
-  m_vertexCount = vertices.size();
 }
 
 ZVulkanTextureGlowPipelineContext::PipelineInstance&
@@ -451,124 +368,6 @@ ZVulkanTextureGlowPipelineContext::ensureGlowPipeline(const GlowPipelineKey& key
 
   auto [inserted, _] = m_glowPipelines.insert({key, std::move(instance)});
   return inserted->second;
-}
-
-void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
-                                                    vk::raii::CommandBuffer& cmd,
-                                                    ZVulkanTexture& inputColor,
-                                                    ZVulkanTexture& inputDepth,
-                                                    BlurIntermediate& output,
-                                                    bool horizontal,
-                                                    const glm::uvec2& size,
-                                                    int blurRadius,
-                                                    float blurScale,
-                                                    float blurStrength)
-{
-  (void)renderer;
-  if (!output.color.texture || !output.depth.texture) {
-    return;
-  }
-
-  output.color.texture->transitionLayout(cmd, output.color.texture->layout(), vk::ImageLayout::eColorAttachmentOptimal);
-  {
-    // Always use depth-only layout/aspect (stencil unused)
-    output.depth.texture->transitionLayout(cmd,
-                                           output.depth.texture->layout(),
-                                           vk::ImageLayout::eDepthAttachmentOptimal,
-                                           vk::ImageAspectFlagBits::eDepth);
-  }
-
-  vk::RenderingAttachmentInfo colorAttachment;
-  colorAttachment.imageView = output.color.texture->imageView();
-  colorAttachment.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-  colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
-  colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-  colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
-
-  vk::RenderingAttachmentInfo depthAttachment;
-  depthAttachment.imageView = output.depth.texture->imageView();
-  depthAttachment.imageLayout = output.depth.texture->layout();
-  depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
-  depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-  depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
-
-  vk::RenderingInfo renderingInfo;
-  renderingInfo.renderArea = vk::Rect2D{
-    vk::Offset2D{0,      0     },
-    vk::Extent2D{size.x, size.y}
-  };
-  renderingInfo.layerCount = 1;
-  renderingInfo.colorAttachmentCount = 1;
-  renderingInfo.pColorAttachments = &colorAttachment;
-  renderingInfo.pDepthAttachment = &depthAttachment;
-
-  cmd.beginRendering(renderingInfo);
-
-  ZVulkanDescriptorSet* blurDS = nullptr;
-  if (m_blurSetLayout) {
-    blurDS = m_backend.allocateOverrideDescriptorSet(**m_blurSetLayout);
-  }
-  CHECK(blurDS != nullptr) << "Glow blur: override descriptor allocation failed (fatal)";
-
-  blurDS->updateTexture(vkbind::kBlurBindingColorIn, inputColor, m_backend.defaultSampler());
-  blurDS->updateTexture(vkbind::kBlurBindingDepthIn, inputDepth, m_backend.defaultSampler());
-
-  vulkan::AttachmentFormats formats;
-  formats.colorFormats.push_back(output.color.texture->format());
-  formats.depthFormat = output.depth.texture->format();
-
-  BlurPipelineKey key;
-  key.horizontal = horizontal;
-  PipelineInstance& pipeline = ensureBlurPipeline(key, formats);
-
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  const vk::DeviceSize offsets[] = {0};
-  cmd.bindVertexBuffers(0, {quad.buffer()}, offsets);
-  {
-    std::array<vk::DescriptorSet, 1> sets{blurDS->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           pipeline.pipeline->pipelineLayout(),
-                           vkbind::kSetInputs,
-                           sets,
-                           {});
-  }
-
-  vk::Viewport localViewport;
-  localViewport.x = 0.0f;
-  localViewport.y = 0.0f;
-  localViewport.width = static_cast<float>(size.x);
-  localViewport.height = static_cast<float>(size.y);
-  localViewport.minDepth = 0.0f;
-  localViewport.maxDepth = 1.0f;
-  cmd.setViewport(0, localViewport);
-
-  vk::Rect2D localScissor{
-    vk::Offset2D{0,      0     },
-    vk::Extent2D{size.x, size.y}
-  };
-  cmd.setScissor(0, localScissor);
-
-  BlurPushConstants constants;
-  constants.screenDimRcp = glm::vec2(1.0f / size.x, 1.0f / size.y);
-  constants.blurRadius = blurRadius;
-  constants.blurScale = blurScale;
-  constants.blurStrength = blurStrength;
-  cmd.pushConstants<BlurPushConstants>(pipeline.pipeline->pipelineLayout(),
-                                       vk::ShaderStageFlagBits::eFragment,
-                                       0,
-                                       constants);
-
-  cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
-  cmd.endRendering();
-
-  output.color.texture->transitionLayout(cmd,
-                                         vk::ImageLayout::eColorAttachmentOptimal,
-                                         vk::ImageLayout::eShaderReadOnlyOptimal);
-  output.depth.texture->transitionLayout(cmd,
-                                         vk::ImageLayout::eDepthAttachmentOptimal,
-                                         vk::ImageLayout::eDepthReadOnlyOptimal,
-                                         vk::ImageAspectFlagBits::eDepth);
 }
 
 } // namespace nim

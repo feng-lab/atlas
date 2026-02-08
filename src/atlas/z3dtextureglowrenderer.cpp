@@ -98,68 +98,13 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
   m_glowTextureShaderGrp->release();
 }
 
-TextureGlowPayload Z3DTextureGlowRenderer::buildTextureGlowPayload() const
-{
-  TextureGlowPayload payload;
-  payload.mode = m_glowMode;
-  payload.blurRadius = m_blurRadius;
-  payload.blurScale = m_blurScale;
-  payload.blurStrength = m_blurStrength;
-  payload.colorAttachmentHandle = m_colorAttachmentHandle;
-  payload.depthAttachmentHandle = m_depthAttachmentHandle;
-  return payload;
-}
-
-RenderBatch Z3DTextureGlowRenderer::buildRenderBatch(Z3DEye eye) const
-{
-  RenderBatch batch;
-
-  batch.eye = eye;
-
-  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-  batch.pass.viewport.minDepth = 0.0f;
-  batch.pass.viewport.maxDepth = 1.0f;
-
-  const auto& surface = m_rendererBase.frameState().activeSurface;
-  batch.pass.colorAttachments = surface.colorAttachments;
-  batch.pass.depthAttachment = surface.depthAttachment;
-
-  CHECK(m_colorAttachmentHandle.valid() && m_depthAttachmentHandle.valid())
-    << "Texture glow renderer missing Vulkan input attachment handles.";
-  batch.pass.externalImageUses.push_back(
-    {m_colorAttachmentHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-  batch.pass.externalImageUses.push_back(
-    {m_depthAttachmentHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
-
-  batch.draw.topology = PrimitiveTopology::TriangleStrip;
-  batch.draw.vertexCount = 4;
-  batch.draw.indexCount = 0;
-
-  batch.geometry = buildTextureGlowPayload();
-
-  return batch;
-}
-
 void Z3DTextureGlowRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
 {
+  (void)eye;
   if (backend != RenderBackend::Vulkan || picking) {
     return;
   }
-
-  CHECK(m_colorAttachmentHandle.valid() && m_depthAttachmentHandle.valid())
-    << "Texture glow renderer missing Vulkan attachment handles.";
-
-  auto batch = buildRenderBatch(eye);
-  m_rendererBase.appendBatch(std::move(batch));
-}
-
-void Z3DTextureGlowRenderer::renderVulkan(Z3DEye eye, AttachmentHandle colorHandle, AttachmentHandle depthHandle)
-{
-  setSourceAttachments(colorHandle, depthHandle);
-  auto batch = buildRenderBatch(eye);
-  m_rendererBase.appendBatch(std::move(batch));
+  CHECK(false) << "Z3DTextureGlowRenderer does not emit Vulkan batches; compositor must schedule staged glow passes";
 }
 
 void Z3DTextureGlowRenderer::setGlowMode(GlowMode mode)
