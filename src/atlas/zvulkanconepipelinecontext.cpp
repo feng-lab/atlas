@@ -641,7 +641,9 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
         attachment.alphaBlendOp = vk::BlendOp::eAdd;
       }
       instance.pipeline->setColorBlendAttachments(std::move(attachments));
-      instance.pipeline->setDepthTestEnable(false);
+      // Match GL WA init: depth-test against the (loaded) opaque depth buffer
+      // when a depth attachment is present, but do not write depth.
+      instance.pipeline->setDepthTestEnable(key.depthFormat.has_value());
       instance.pipeline->setDepthWriteEnable(false);
       break;
     }

@@ -1026,7 +1026,11 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     pipelineKey.variant = FastPipelineVariant::Image2D;
     pipelineKey.mode = composite.mode;
     pipelineKey.resultOpaque = composite.resultOpaque;
-    pipelineKey.depthEnabled = false;
+    // GL parity: 2D image rendering participates in scene depth (and exports depth
+    // for later compositing). If we don't write depth here, the layer depth stays
+    // at the clear value (typically 1.0), and downstream depth-based composition
+    // will only show the bounding box overlay that writes depth.
+    pipelineKey.depthEnabled = formats.depthFormat.has_value();
     pipelineKey.colorFormats = formats.colorFormats;
     pipelineKey.depthFormat = formats.depthFormat;
     PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
@@ -1085,7 +1089,8 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
   pipelineKey.variant = FastPipelineVariant::Slice2D;
   pipelineKey.mode = composite.mode;
   pipelineKey.resultOpaque = composite.resultOpaque;
-  pipelineKey.depthEnabled = false;
+  // GL parity: slices are depth-tested and must write depth for later composition.
+  pipelineKey.depthEnabled = formats.depthFormat.has_value();
   pipelineKey.colorFormats = formats.colorFormats;
   pipelineKey.depthFormat = formats.depthFormat;
   PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
@@ -1164,11 +1169,21 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastLayers(Z3DRendererBase& 
   ensureQuadVertexBuffer();
 
   const CompositingConfig composite = evaluateCompositing(payload.compositingMode);
+  const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
+  const bool planarGeometry = !hasIndices;
   if (auto t = m_backend.beginGpuScope("ray_fast_layers")) {
-    recordFastVolumeLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
+    if (planarGeometry) {
+      recordFastPlanarLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
+    } else {
+      recordFastVolumeLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
+    }
     m_backend.endGpuScope(*t);
   } else {
-    recordFastVolumeLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
+    if (planarGeometry) {
+      recordFastPlanarLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
+    } else {
+      recordFastVolumeLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
+    }
   }
 }
 
@@ -1708,6 +1723,167 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
   drawSpec.requirePushConstants = true;
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
+  recorder.recordGraphicsDraw(drawSpec);
+}
+
+void ZVulkanImgRaycasterPipelineContext::recordFastPlanarLayersOnly(Z3DRendererBase& renderer,
+                                                                    const RenderBatch& batch,
+                                                                    const ImgRaycasterPayload& payload,
+                                                                    const vk::Viewport& viewport,
+                                                                    const vk::Rect2D& scissor,
+                                                                    vk::raii::CommandBuffer& cmd,
+                                                                    const CompositingConfig& composite)
+{
+  const size_t channelCount = payload.visibleChannels.size();
+  CHECK_GT(channelCount, 1u) << "recordFastPlanarLayersOnly requires multi-channel payload";
+  CHECK(payload.image) << "Vulkan img raycaster missing image context.";
+  CHECK(payload.transferFunctions != nullptr)
+    << "Raycaster fast path: payload missing transferFunctions vector (fatal)";
+  const auto& transferFunctions = *payload.transferFunctions;
+
+  // Segment-managed layered rendering: this batch targets exactly one array layer via
+  // AttachmentHandle.index set by the stage recorder (Z3DImgRaycasterRenderer::recordVulkanStagesToScript).
+  // Use that index to select which channel to render into the active layer target.
+  CHECK(!batch.pass.colorAttachments.empty()) << "FastLayers stage requires an active color attachment";
+  const uint32_t order = batch.pass.colorAttachments.front().handle.index;
+  CHECK(order < channelCount) << "FastLayers stage layer index out of range: " << order << " >= " << channelCount;
+  const size_t channelIndex = payload.visibleChannels[static_cast<size_t>(order)];
+  CHECK(channelIndex < transferFunctions.size() && transferFunctions[channelIndex] != nullptr)
+    << "Missing transfer function for channel " << channelIndex;
+
+  // Planar geometry uses the uploaded entry vertex buffer (expanded quads/slices).
+  ensureEntryGeometryUploadedThisFrame(payload);
+  CHECK(m_entryVertexBuffer != nullptr) << "Raycaster fast planar layers stage missing entry vertex buffer";
+
+  const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
+  if (formats.colorFormats.empty()) {
+    return;
+  }
+
+  const size_t eyeIndex = std::min<size_t>(static_cast<size_t>(batch.eye), renderer.viewState().eyes.size() - 1);
+  const auto& eyeState = renderer.viewState().eyes[eyeIndex];
+  const glm::mat4 projectionView = eyeState.projectionMatrix * eyeState.viewMatrix;
+
+  const uint32_t vertexCount = static_cast<uint32_t>(payload.entryPositions.size());
+  CHECK_GT(vertexCount, 0u) << "Raycaster fast planar layers stage missing vertex data";
+
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+
+  if (payload.image->is2DData()) {
+    ChannelResources& resources = ensureChannelResources(channelIndex);
+    const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
+    const uint64_t imgGen = payload.image->volumeGeneration(channelIndex);
+    ZVulkanTexture& imageTex = ensureImage2DTexture(resources, channelImage, imgGen);
+    ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
+    updateChannelImage2DDescriptors(resources, imageTex, transferTex);
+
+    FastPipelineKey pipelineKey;
+    pipelineKey.variant = FastPipelineVariant::Image2D;
+    pipelineKey.mode = composite.mode;
+    pipelineKey.resultOpaque = composite.resultOpaque;
+    pipelineKey.depthEnabled = formats.depthFormat.has_value();
+    pipelineKey.colorFormats = formats.colorFormats;
+    pipelineKey.depthFormat = formats.depthFormat;
+    PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
+
+    CHECK(resources.image2DDescriptor != nullptr) << "Raycaster fast planar layers: missing image2D descriptor";
+    std::vector<vk::DescriptorSet> descriptorSets{resources.image2DDescriptor->descriptorSet()};
+
+    struct Image2DPush
+    {
+      glm::mat4 projectionView;
+    } pc{projectionView};
+
+    ZVulkanGraphicsDrawSpec drawSpec{};
+    drawSpec.viewports = {viewport};
+    drawSpec.scissors = {scissor};
+    drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+    drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+    drawSpec.descriptorSets = std::move(descriptorSets);
+    drawSpec.descriptorSetFirst = 0;
+    drawSpec.expectedDescriptorSetCount = 1;
+    drawSpec.vertexBuffers = {m_entryVertexBuffer->buffer()};
+    drawSpec.vertexOffsets = {0};
+    drawSpec.pushConstantsData = &pc;
+    drawSpec.pushConstantsSize = sizeof(pc);
+    drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex;
+    drawSpec.requirePushConstants = true;
+    drawSpec.instanceCount = 1;
+
+    if (payload.entryHasIndices && m_entryIndexBuffer && !payload.entryIndices.empty()) {
+      drawSpec.indexBuffer = m_entryIndexBuffer->buffer();
+      drawSpec.indexOffset = 0;
+      drawSpec.indexType = vk::IndexType::eUint32;
+      drawSpec.indexCount = static_cast<uint32_t>(payload.entryIndices.size());
+      drawSpec.firstIndex = 0;
+      drawSpec.vertexOffset = 0;
+      drawSpec.firstInstance = 0;
+    } else {
+      drawSpec.vertexCount = vertexCount;
+      drawSpec.firstVertex = 0;
+      drawSpec.firstInstance = 0;
+    }
+
+    recorder.recordGraphicsDraw(drawSpec);
+    return;
+  }
+
+  const glm::mat4 viewMatrix = eyeState.viewMatrix;
+  ChannelResources& resources = ensureChannelResources(channelIndex);
+  const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
+  const uint64_t volGen = payload.image->volumeGeneration(channelIndex);
+  ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex, volGen);
+  ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
+  updateChannelSliceDescriptors(resources, volumeTex, transferTex);
+
+  FastPipelineKey pipelineKey;
+  pipelineKey.variant = FastPipelineVariant::Slice2D;
+  pipelineKey.mode = composite.mode;
+  pipelineKey.resultOpaque = composite.resultOpaque;
+  pipelineKey.depthEnabled = formats.depthFormat.has_value();
+  pipelineKey.colorFormats = formats.colorFormats;
+  pipelineKey.depthFormat = formats.depthFormat;
+  PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
+
+  CHECK(resources.sliceDescriptor != nullptr) << "Raycaster fast planar layers: missing slice descriptor";
+  std::vector<vk::DescriptorSet> descriptorSets{resources.sliceDescriptor->descriptorSet()};
+
+  struct SlicePush
+  {
+    glm::mat4 projectionView;
+    glm::mat4 view;
+  } pc{projectionView, viewMatrix};
+
+  ZVulkanGraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = {viewport};
+  drawSpec.scissors = {scissor};
+  drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+  drawSpec.descriptorSets = std::move(descriptorSets);
+  drawSpec.descriptorSetFirst = 0;
+  drawSpec.expectedDescriptorSetCount = 1;
+  drawSpec.vertexBuffers = {m_entryVertexBuffer->buffer()};
+  drawSpec.vertexOffsets = {0};
+  drawSpec.pushConstantsData = &pc;
+  drawSpec.pushConstantsSize = sizeof(pc);
+  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex;
+  drawSpec.requirePushConstants = true;
+  drawSpec.instanceCount = 1;
+
+  if (payload.entryHasIndices && m_entryIndexBuffer && !payload.entryIndices.empty()) {
+    drawSpec.indexBuffer = m_entryIndexBuffer->buffer();
+    drawSpec.indexOffset = 0;
+    drawSpec.indexType = vk::IndexType::eUint32;
+    drawSpec.indexCount = static_cast<uint32_t>(payload.entryIndices.size());
+    drawSpec.firstIndex = 0;
+    drawSpec.vertexOffset = 0;
+    drawSpec.firstInstance = 0;
+  } else {
+    drawSpec.vertexCount = vertexCount;
+    drawSpec.firstVertex = 0;
+    drawSpec.firstInstance = 0;
+  }
+
   recorder.recordGraphicsDraw(drawSpec);
 }
 

@@ -1533,6 +1533,12 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   CHECK(!m_rendererBase.isVulkanFrameActive())
     << "Compositor Vulkan path requires no active Vulkan frame (linear script owns submission boundaries)";
 
+  // Ensure Vulkan device feature gates are cached before deciding OIT paths.
+  // The Vulkan backend caches fragmentStoresAndAtomics/drawIndirectCount gates
+  // on first device access (ensureDevice). Some compositor decisions (PPLL/indirect
+  // count gating) happen before beginRender() opens a frame, so prime them here.
+  static_cast<void>(vulkanBackend->device());
+
   // Supersample 2x2 parity (render to 2x scene lease, then downsample)
   // Note: Vulkan batches use the renderer's frame viewport to define the
   // render area. When rendering into a supersampled lease, we must temporarily
@@ -1556,14 +1562,32 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     m_rendererBase.frameState().updateViewportData(ssSize);
   }
 
-  // Mirror GL: when handle or on-top overlays are present, render the scene into a
-  // temporary lease first. We'll composite handles over this scene image into
-  // the final outLease later, avoiding any read-while-write feedback loop.
+  // Decide OIT usage and collect non-opaque image layers (volumes/slices) once.
+  const auto transparencyMode = m_rendererBase.sceneState().transparency;
+  const bool useOIT = transparencyMode == TransparencyMode::DualDepthPeeling ||
+                      transparencyMode == TransparencyMode::PerPixelFragmentList ||
+                      transparencyMode == TransparencyMode::WeightedAverage ||
+                      transparencyMode == TransparencyMode::WeightedBlended;
+  const auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
+  const bool haveAnyNonOpaqueLayer = std::any_of(nonOpaqueLayers.begin(),
+                                                 nonOpaqueLayers.end(),
+                                                 [](const Z3DCompositorImageLayer& layer) {
+                                                   const auto& c = layer.colorAttachment.handle;
+                                                   const auto& d = layer.depthAttachment.handle;
+                                                   return c.backend == RenderBackend::Vulkan && c.valid() &&
+                                                          d.backend == RenderBackend::Vulkan && d.valid();
+                                                 });
+  const bool needTempSceneForNonOITImages = (!useOIT && haveAnyNonOpaqueLayer && (sceneOutLease == outLease));
+
+  // Mirror GL: when handle/on-top overlays are present (or when we need to composite
+  // non-opaque image layers in a non-OIT path), render the scene into a temporary
+  // lease first. Later compositing passes must sample the scene color/depth while
+  // writing to a different attachment set; Vulkan forbids read-while-write feedback.
   Z3DScratchResourcePool::RenderTargetLease sceneOverlayLease;
   Z3DScratchResourcePool::RenderTargetLease sceneCompositeLease; // supersampled composite target when needed
   const bool haveHandles = !showHandleFilters.empty();
   const bool haveOnTop = !onTopOpaqueFilters.empty() || !onTopTransparentFilters.empty();
-  if (haveHandles || haveOnTop) {
+  if (haveHandles || haveOnTop || needTempSceneForNonOITImages) {
     const glm::uvec2 sz = sceneOutLease->descriptor.size;
     sceneOverlayLease =
       pool.acquireTempRenderTarget2D(sz, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
@@ -1577,14 +1601,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   // Vulkan frame/submission lifetime is owned by the linear script; the
   // compositor should only express segment order and explicit CPU readback
   // boundaries.
-
-  // Decide OIT usage and collect non-opaque image layers (volumes/slices) once
-  const auto transparencyMode = m_rendererBase.sceneState().transparency;
-  const bool useOIT = transparencyMode == TransparencyMode::DualDepthPeeling ||
-                      transparencyMode == TransparencyMode::PerPixelFragmentList ||
-                      transparencyMode == TransparencyMode::WeightedAverage ||
-                      transparencyMode == TransparencyMode::WeightedBlended;
-  const auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
   bool imagesIntegratedViaOIT = false;
   bool imagesCompositedToFinal = false; // track ping-pong writes to final out (non-SS)
 
@@ -2009,10 +2025,9 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   if (!imagesIntegratedViaOIT) {
     using LayerHandles = std::pair<AttachmentHandle, AttachmentHandle>;
     std::vector<LayerHandles> layers;
-    layers.reserve(vFilters.size());
+    layers.reserve(nonOpaqueLayers.size());
 
-    const auto imageLayers = collectNonOpaqueImageLayers(eye);
-    for (const auto& layer : imageLayers) {
+    for (const auto& layer : nonOpaqueLayers) {
       const auto& colorDesc = layer.colorAttachment;
       const auto& depthDesc = layer.depthAttachment;
       if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {

@@ -167,8 +167,16 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
     }
   }
 
-  // Flush any closed perf tokens now that we've ingested outstanding timings.
-  Z3DPerfCollector::instance().maybeFlush(true);
+  // Try flushing closed perf tokens now that we've ingested outstanding timings.
+  //
+  // Important: do *not* force-flush here. During a global backend switch we
+  // switch multiple Vulkan backends (one per filter) sequentially, and each
+  // backend ingests its own per-submission timings during preBackendSwitch().
+  // A forced flush can prune token state (startedSubmissions/closed) before
+  // other Vulkan backends have a chance to ingest their submissions for the
+  // same real-frame token, leading to CHECK failures when those late ingestions
+  // arrive.
+  Z3DPerfCollector::instance().maybeFlush(false);
 
   resetFrameResources();
 }
@@ -692,6 +700,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
   if (m_textureCopyContext) {
     m_textureCopyContext->ensureDescriptorLayout();
+    m_textureCopyContext->ensureLightingResources();
     m_textureCopyContext->ensureOITResources();
   }
   if (m_textureWeightedAverageContext) {

@@ -10,6 +10,8 @@
 #include "z3dscratchresourcepool.h"
 #include "z3drenderglobalstate.h"
 #include <folly/OperationCancelled.h>
+#include <cstdint>
+#include <cstring>
 #include <memory>
 #include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
@@ -19,6 +21,77 @@ DECLARE_uint32(atlas_volume_rendering_maximum_round);
 DECLARE_string(atlas_vk_blockid_compaction_source);
 
 namespace nim {
+
+namespace {
+
+inline constexpr uint64_t kFnv1aOffsetBasis64 = 14695981039346656037ull;
+inline constexpr uint64_t kFnv1aPrime64 = 1099511628211ull;
+
+inline void fnv1aUpdateBytes(uint64_t& hash, const void* data, size_t size)
+{
+  const auto* bytes = static_cast<const uint8_t*>(data);
+  for (size_t i = 0; i < size; ++i) {
+    hash ^= static_cast<uint64_t>(bytes[i]);
+    hash *= kFnv1aPrime64;
+  }
+}
+
+inline void fnv1aUpdateU64(uint64_t& hash, uint64_t v)
+{
+  fnv1aUpdateBytes(hash, &v, sizeof(v));
+}
+
+inline void fnv1aUpdateU32(uint64_t& hash, uint32_t v)
+{
+  fnv1aUpdateBytes(hash, &v, sizeof(v));
+}
+
+inline void fnv1aUpdateFloat(uint64_t& hash, float v)
+{
+  static_assert(sizeof(float) == sizeof(uint32_t));
+  uint32_t bits = 0u;
+  std::memcpy(&bits, &v, sizeof(bits));
+  fnv1aUpdateU32(hash, bits);
+}
+
+inline void fnv1aUpdateVec3(uint64_t& hash, const glm::vec3& v)
+{
+  fnv1aUpdateFloat(hash, v.x);
+  fnv1aUpdateFloat(hash, v.y);
+  fnv1aUpdateFloat(hash, v.z);
+}
+
+uint64_t computeSliceMeshesSignature(std::span<const ZMesh> slices)
+{
+  uint64_t hash = kFnv1aOffsetBasis64;
+  fnv1aUpdateU64(hash, static_cast<uint64_t>(slices.size()));
+
+  for (const auto& slice : slices) {
+    fnv1aUpdateU32(hash, static_cast<uint32_t>(slice.type()));
+
+    const auto& vertices = slice.vertices();
+    fnv1aUpdateU64(hash, static_cast<uint64_t>(vertices.size()));
+    for (const auto& v : vertices) {
+      fnv1aUpdateVec3(hash, v);
+    }
+
+    const auto& texCoords = slice.textureCoordinates3D();
+    fnv1aUpdateU64(hash, static_cast<uint64_t>(texCoords.size()));
+    for (const auto& t : texCoords) {
+      fnv1aUpdateVec3(hash, t);
+    }
+
+    const auto& indices = slice.indices();
+    fnv1aUpdateU64(hash, static_cast<uint64_t>(indices.size()));
+    for (const auto idx : indices) {
+      fnv1aUpdateU32(hash, idx);
+    }
+  }
+
+  return hash;
+}
+
+} // namespace
 
 Z3DImgSliceRenderer::Z3DImgSliceRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -88,6 +161,7 @@ std::vector<ImgSlicePayload> Z3DImgSliceRenderer::buildVulkanStagePayloads(Z3DEy
   common.image = m_img;
   common.colormaps = &m_colormapsRaw;
   common.slices = std::span<const ZMesh>(m_slices.data(), m_slices.size());
+  common.slicesSignature = computeSliceMeshesSignature(common.slices);
   common.outputSize = m_outputSize;
   common.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
   common.maxProjectionMerge = true;

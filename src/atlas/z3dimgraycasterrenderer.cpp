@@ -211,7 +211,9 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
       }
 
       if (verts.size() == 4) {
-        static constexpr std::array<uint32_t, 6> kQuadTris{0, 1, 2, 0, 2, 3};
+        // Expand the triangle strip quad (0,1,2,3) into a triangle list. The second
+        // triangle must swap winding relative to strip order so the quad is watertight.
+        static constexpr std::array<uint32_t, 6> kQuadTris{0, 1, 2, 2, 1, 3};
         for (auto idx : kQuadTris) {
           if (idx < verts.size()) {
             appendVertex(verts[idx], texAt(idx));

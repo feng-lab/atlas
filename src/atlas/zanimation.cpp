@@ -1286,7 +1286,21 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
       if (!pas.empty()) {
         json::object jObj;
         for (const auto& pa : pas) {
+          // Backend neutrality: do not persist the render-backend selection in
+          // 3D animation files. Render backend is a runtime/engine configuration
+          // (and Vulkan is still experimental), so encoding it into timelines
+          // makes animations fragile across machines and sessions.
+          //
+          // NOTE: Loading remains backward-compatible: existing .animation3d
+          // files that contain this track will still be parsed and can still
+          // drive backend switches during playback. We only omit it on write.
+          if (pa && pa->jsonKey() == QStringLiteral("Render Backend ZStringIntOption")) {
+            continue;
+          }
           pa->write(jObj);
+        }
+        if (jObj.empty()) {
+          continue;
         }
         QString name;
         if (i->objType == "Background") {

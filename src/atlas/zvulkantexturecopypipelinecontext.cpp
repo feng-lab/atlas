@@ -39,6 +39,7 @@ void ZVulkanTextureCopyPipelineContext::resetFrame()
 void ZVulkanTextureCopyPipelineContext::resetDescriptors()
 {
   m_descriptorSetOIT.reset();
+  m_dsLighting.reset();
 }
 
 void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
@@ -136,11 +137,14 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   uploadGeometry();
 
   const bool usesOITSet = key.ddpPeel || key.ppllCount || key.ppllStore;
+  const bool usesLightingSet = key.wbInit;
   // Bind set=3 for OIT passes (DDP peel / PPLL count/store). Descriptors must be primed
   // before recording; do not write descriptors during dynamic rendering.
   if (usesOITSet && !m_backend.isRecording()) {
     ensureOITResources();
   }
+  // WB init image shader uses the lighting UBO (set=1,b0) for depth-transform constants.
+  CHECK(!usesLightingSet || m_dsLighting) << "WB init: lighting descriptor set not initialised";
 
   // Draw-only spec under backend-managed segment
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
@@ -149,12 +153,17 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = vkbind::kSetInputs;
-  drawSpec.descriptorSets = {ds->descriptorSet()};
+  if (usesLightingSet) {
+    drawSpec.descriptorSets = {ds->descriptorSet(), m_dsLighting->descriptorSet()};
+    drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_backend.frameSharedLightingOffset())}; // (set1,b0)
+  } else {
+    drawSpec.descriptorSets = {ds->descriptorSet()};
+  }
   drawSpec.vertexBuffers = {m_vertexBuffer->buffer()};
   drawSpec.vertexOffsets = {vk::DeviceSize(0)};
   drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
   drawSpec.instanceCount = 1;
-  drawSpec.expectedDescriptorSetCount = usesOITSet ? 4 : 1;
+  drawSpec.expectedDescriptorSetCount = usesOITSet ? 4u : (usesLightingSet ? 2u : 1u);
   if (usesOITSet && m_descriptorSetOIT) {
     ZVulkanDescriptorBindInfo oitBind{};
     oitBind.firstSet = vkbind::kSetOITParams;
@@ -205,6 +214,20 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorSet()
   if (!m_descriptorSetOIT && m_setOIT) {
     m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
+}
+
+void ZVulkanTextureCopyPipelineContext::ensureLightingResources()
+{
+  CHECK(!m_backend.isRecording()) << "Texture copy lighting descriptors must be primed before recording begins";
+  if (!m_setLighting) {
+    m_setLighting = m_backend.lightingDescriptorSetLayout();
+  }
+  CHECK(m_setLighting) << "Texture copy: missing lighting descriptor set layout";
+  if (!m_dsLighting) {
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(m_setLighting);
+  }
+  CHECK(m_dsLighting) << "Texture copy: lighting descriptor set allocation failed (fatal)";
+  m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
 }
 
 void ZVulkanTextureCopyPipelineContext::ensureOITResources()
@@ -304,6 +327,7 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
   const bool usesOITSet = key.ddpPeel || key.ppllCount || key.ppllStore;
+  const bool usesLightingSet = key.wbInit;
   if (usesOITSet) {
     std::vector<vk::DescriptorSetLayout> layouts;
     layouts.reserve(4);
@@ -312,6 +336,13 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
     layouts.push_back(m_backend.emptyDescriptorSetLayout());            // set 2 placeholder
     layouts.push_back(m_backend.oitDescriptorSetLayout()); // set 3 (OIT SSBOs)
     instance.pipeline->setDescriptorSetLayouts(layouts);
+  } else if (usesLightingSet) {
+    if (!m_setLighting) {
+      m_setLighting = m_backend.lightingDescriptorSetLayout();
+    }
+    CHECK(m_setLighting) << "WB init requires lighting descriptor set layout";
+    // Sets: 0 = inputs (samplers), 1 = lighting UBO (depth transform)
+    instance.pipeline->setDescriptorSetLayouts({**m_setTextures, m_setLighting});
   } else {
     instance.pipeline->setDescriptorSetLayouts({**m_setTextures});
   }
@@ -320,7 +351,7 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
   const bool hasDepth = formats.depthFormat.has_value();
   instance.pipeline->setDepthTestEnable(hasDepth);
-  if (key.ppllCount || key.ppllStore || key.ddpInit || key.ddpPeel) {
+  if (key.ppllCount || key.ppllStore || key.ddpInit || key.ddpPeel || key.waInit || key.wbInit) {
     // OIT passes must not clobber the loaded opaque depth buffer.
     instance.pipeline->setDepthWriteEnable(false);
   } else {

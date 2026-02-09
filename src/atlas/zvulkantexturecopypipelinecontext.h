@@ -93,8 +93,10 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
+  vk::DescriptorSetLayout m_setLighting{}; // set 1: lighting UBO (used by WB init image shader)
   vk::DescriptorSetLayout m_setOIT{}; // set 3: OIT SSBOs (DDP flag / PPLL buffers)
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
+  std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
@@ -103,6 +105,7 @@ private:
   void ensureDescriptorLayout();
   void resetDescriptors();
   void ensureDescriptorSet();
+  void ensureLightingResources();
   void ensureOITResources();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 

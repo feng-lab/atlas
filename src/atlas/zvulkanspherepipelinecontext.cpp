@@ -637,7 +637,9 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
       break;
     case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
       makeAttachments(vk::BlendFactor::eOne, vk::BlendFactor::eOne, vk::BlendFactor::eOne, vk::BlendFactor::eOne);
-      instance.pipeline->setDepthTestEnable(false);
+      // Match GL WA init: depth-test against the (loaded) opaque depth buffer
+      // when a depth attachment is present, but do not write depth.
+      instance.pipeline->setDepthTestEnable(key.depthFormat.has_value());
       instance.pipeline->setDepthWriteEnable(false);
       break;
     case Z3DRendererBase::ShaderHookType::WeightedBlendedInit: {

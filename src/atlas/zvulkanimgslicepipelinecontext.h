@@ -229,8 +229,7 @@ private:
 
   // Cached slice-geometry identity to avoid re-uploading for each per-layer batch.
   uint64_t m_geometryStreamKey = 0;
-  const ZMesh* m_geometryPtr = nullptr;
-  size_t m_geometryCount = 0;
+  uint64_t m_geometrySignature = 0u;
 };
 
 } // namespace nim

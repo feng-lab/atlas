@@ -319,15 +319,14 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   };
 
   auto ensureSliceGeometry = [&]() {
-    const bool changed = (m_geometryStreamKey != payload.streamKey) || (m_geometryPtr != payload.slices.data()) ||
-                         (m_geometryCount != payload.slices.size());
+    const bool changed =
+      (m_geometryStreamKey != payload.streamKey) || (m_geometrySignature != payload.slicesSignature);
     if (!changed && !m_sliceDrawRanges.empty()) {
       return;
     }
     uploadSliceGeometry(payload.slices);
     m_geometryStreamKey = payload.streamKey;
-    m_geometryPtr = payload.slices.data();
-    m_geometryCount = payload.slices.size();
+    m_geometrySignature = payload.slicesSignature;
   };
 
   auto channelIndexFromLayerAttachment = [&]() -> size_t {

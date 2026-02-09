@@ -541,6 +541,14 @@ private:
                                                                                    vk::raii::CommandBuffer& cmd,
                                                                                    const CompositingConfig& composite);
 
+  void recordFastPlanarLayersOnly(Z3DRendererBase& renderer,
+                                  const RenderBatch& batch,
+                                  const ImgRaycasterPayload& payload,
+                                  const vk::Viewport& viewport,
+                                  const vk::Rect2D& scissor,
+                                  vk::raii::CommandBuffer& cmd,
+                                  const CompositingConfig& composite);
+
   void recordFastVolumeLayersOnly(Z3DRendererBase& renderer,
                                   const RenderBatch& batch,
                                   const ImgRaycasterPayload& payload,

@@ -1036,7 +1036,9 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
         state.alphaBlendOp = vk::BlendOp::eAdd;
         blendAttachments.push_back(state);
       }
-      instance.pipeline->setDepthTestEnable(false);
+      // Match GL WA init: depth-test against the (loaded) opaque depth buffer
+      // when a depth attachment is present, but do not write depth.
+      instance.pipeline->setDepthTestEnable(key.depthFormat.has_value());
       instance.pipeline->setDepthWriteEnable(false);
       break;
     }

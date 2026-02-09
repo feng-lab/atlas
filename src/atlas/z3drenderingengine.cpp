@@ -2162,6 +2162,18 @@ void Z3DRenderingEngine::applyBackendSwitch()
     }
   }
 
+  // PerfCollector aggregation spans multiple Vulkan backends (one per filter).
+  // Each Vulkan backend ingests its own submissions during preBackendSwitch().
+  //
+  // Force-flushing per-backend is unsafe because it can prune token state before
+  // other backends ingest their submissions for the same real-frame token. Now
+  // that all filters have switched away from Vulkan, it is safe to force-flush
+  // any closed tokens to prevent incomplete tokens (e.g. dropped submissions)
+  // from blocking ordered summaries in subsequent frames.
+  if (backend == RenderBackend::OpenGL) {
+    Z3DPerfCollector::instance().maybeFlush(true);
+  }
+
   // Set the pool default backend so subsequent allocations use the new API
   VLOG(1) << "Resetting scratch pool state after backend switch";
   m_scratchPool->reset();

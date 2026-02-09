@@ -769,6 +769,11 @@ struct ImgSlicePayload
 
   // Stable identity of the source renderer/stream (used by Vulkan backend to finalize progressive rounds).
   uint64_t streamKey = 0;
+  // Hash of the slice mesh contents (positions + 3D texcoords + indices).
+  // This is used by the Vulkan backend to detect in-place slice updates where
+  // the std::vector storage (and thus pointers) may be reused (e.g., changing
+  // XYZ slice position without changing slice count/capacity).
+  uint64_t slicesSignature = 0u;
   // Per-stream generation for progressive bookkeeping (clears persistent resources when it changes).
   uint32_t progressiveGeneration = 0u;
   // GL-parity progressive booking:
