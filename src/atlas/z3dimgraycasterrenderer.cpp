@@ -582,6 +582,7 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
       };
 
       auto ensureOutputSurface = [&]() {
+        m_rendererBase.frameState().updateViewportData(outputLease.descriptor.size);
         m_rendererBase.setActiveSurfaceWithLoadStore(outputLease,
                                                      LoadOp::Clear,
                                                      StoreOp::Store,
@@ -592,6 +593,7 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
 
       // (Preserve is a Z3DRendererBase tag, not a render-state mutation.)
       auto ensurePreserveOutputSurface = [&]() {
+        m_rendererBase.frameState().updateViewportData(outputLease.descriptor.size);
         m_rendererBase.setActiveSurfaceWithLoadStore(outputLease, Z3DRendererBase::Preserve);
       };
 
@@ -667,6 +669,7 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
         case ImgRaycasterPayload::Stage::EntryExit: {
           CHECK(stagePayload.entryExitLease && stagePayload.entryExitLease->hasVulkanImage())
             << "Raycaster EntryExit stage missing Vulkan entry/exit lease";
+          m_rendererBase.frameState().updateViewportData(stagePayload.entryExitLease->descriptor.size);
 
           // Entry/exit renders into a 2-layer array target. Expand to two batches so the backend
           // can open distinct dynamic-rendering segments targeting each array-layer view.
@@ -689,6 +692,7 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
         case ImgRaycasterPayload::Stage::ProgressiveBlockId: {
           CHECK(stagePayload.blockIdLease && stagePayload.blockIdLease->hasVulkanImage())
             << "Raycaster Block-ID stage missing Vulkan block-ID lease";
+          m_rendererBase.frameState().updateViewportData(stagePayload.blockIdLease->descriptor.size);
           m_rendererBase.setActiveSurfaceWithLoadStore(*stagePayload.blockIdLease,
                                                        LoadOp::Clear,
                                                        StoreOp::Store,
@@ -705,6 +709,7 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
         case ImgRaycasterPayload::Stage::ProgressiveRaycast: {
           CHECK(stagePayload.currentAccumLease && stagePayload.currentAccumLease->hasVulkanImage())
             << "Raycaster ProgressiveRaycast stage missing Vulkan current accum lease";
+          m_rendererBase.frameState().updateViewportData(stagePayload.currentAccumLease->descriptor.size);
           m_rendererBase.setActiveSurfaceWithLoadStore(*stagePayload.currentAccumLease,
                                                        LoadOp::Clear,
                                                        StoreOp::Store,
@@ -723,6 +728,7 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
             << "Raycaster ProgressiveCopyToLayers stage missing Vulkan layer lease";
           CHECK(stagePayload.channelIndexRaw >= 0)
             << "Raycaster ProgressiveCopyToLayers stage requires non-negative channelIndexRaw";
+          m_rendererBase.frameState().updateViewportData(stagePayload.channelLayerLease->descriptor.size);
           const uint32_t layerIndex = static_cast<uint32_t>(stagePayload.channelIndexRaw);
 
           const auto surface = surfaceFromLeaseWithLayerIndex(*stagePayload.channelLayerLease, layerIndex);
@@ -745,6 +751,7 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
           // uses AttachmentHandle.index to determine which channel to render.
           CHECK(stagePayload.channelLayerLease && stagePayload.channelLayerLease->hasVulkanImage())
             << "Raycaster layered stage missing Vulkan layer lease";
+          m_rendererBase.frameState().updateViewportData(stagePayload.channelLayerLease->descriptor.size);
           const uint32_t layerCount = static_cast<uint32_t>(stagePayload.visibleChannels.size());
           CHECK(layerCount > 0u) << "Raycaster layered stage missing visibleChannels";
 

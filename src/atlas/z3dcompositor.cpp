@@ -161,9 +161,17 @@ static void recordFilterBatchesToSurfaceUnifiedWithViewport(Z3DRendererBase& com
 
   const glm::uvec4 previousViewport = source.frameState().viewport;
   const auto previousSurface = source.frameState().activeSurface;
+  auto restoreGuard = folly::makeGuard([&]() {
+    // Restore both the renderer-base viewport and any derived filter viewport
+    // propagation (e.g., annotation filters that forward to child mesh filters).
+    filter->setViewport(previousViewport);
+    source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
+  });
 
-  // Mirror viewport and target surface into the source renderer
-  source.frameState().updateViewportData(viewport);
+  // Mirror viewport and target surface into the source filter/renderer.
+  // Note: use filter->setViewport() (not frameState().updateViewportData())
+  // so any derived viewport propagation is applied only for this capture.
+  filter->setViewport(viewport);
   source.setActiveSurfaceWithLoadStore(surface, Z3DRendererBase::Preserve);
 
   if (renderFn) {
@@ -193,10 +201,6 @@ static void recordFilterBatchesToSurfaceUnifiedWithViewport(Z3DRendererBase& com
     compositor.appendBatch(std::move(batch));
   }
   source.resetCPUState();
-
-  // Restore source renderer state
-  source.frameState().updateViewportData(previousViewport);
-  source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
 }
 
 static void recordFilterBatchesToSurfaceUnified(Z3DRendererBase& compositor,
@@ -282,9 +286,13 @@ static void captureFilterBatchesToUnifiedList(Z3DRendererBase& compositor,
 
   const glm::uvec4 previousViewport = source.frameState().viewport;
   const auto previousSurface = source.frameState().activeSurface;
+  auto restoreGuard = folly::makeGuard([&]() {
+    filter->setViewport(previousViewport);
+    source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
+  });
 
   // Mirror compositor viewport and target surface into the source renderer
-  source.frameState().updateViewportData(compositor.frameState().viewport);
+  filter->setViewport(compositor.frameState().viewport);
   source.setActiveSurfaceWithLoadStore(surface, Z3DRendererBase::Preserve);
 
   if (renderFn) {
@@ -317,10 +325,6 @@ static void captureFilterBatchesToUnifiedList(Z3DRendererBase& compositor,
     out.batches.push_back(std::move(batch));
   }
   source.resetCPUState();
-
-  // Restore source renderer state
-  source.frameState().updateViewportData(previousViewport);
-  source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
 }
 
 static void captureTransparentFilterBatchesToUnifiedList(Z3DRendererBase& compositor,
@@ -1594,6 +1598,10 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     auto& source = filter->rendererBase();
     const glm::uvec4 previousViewport = source.frameState().viewport;
     const auto previousSurface = source.frameState().activeSurface;
+    auto restoreGuard = folly::makeGuard([&]() {
+      filter->setViewport(previousViewport);
+      source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
+    });
     // Describe the target lease into a surface description, then preserve
     // the per-attachment load/store+clear policy from the current active
     // surface on the compositor renderer. This ensures that upstream calls
@@ -1614,7 +1622,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       surfaceCopy.depthAttachment->storeOp = active.depthAttachment->storeOp;
       surfaceCopy.depthAttachment->clearValue = active.depthAttachment->clearValue;
     }
-    source.frameState().updateViewportData(glm::uvec4(0u, 0u, viewportSize.x, viewportSize.y));
+    filter->setViewport(glm::uvec4(0u, 0u, viewportSize.x, viewportSize.y));
     source.setActiveSurfaceWithLoadStore(surfaceCopy, Z3DRendererBase::Preserve);
     renderFn();
     auto& batches = source.cpuState().batches;
@@ -1634,8 +1642,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_rendererBase.appendBatch(std::move(batch));
     }
     source.resetCPUState();
-    source.frameState().updateViewportData(previousViewport);
-    source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
   };
 
   // Only engage OIT when there is actual transparency to resolve (either
@@ -1827,7 +1833,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         if (m_rendererBase.frameState().activeSurface.depthAttachment) {
           m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
         }
-        filter->setViewport(targetSize);
         recordFilterBatchesToSurface(filter, *glowGeomLease, targetSize, [&]() {
           filter->renderOpaque(eye);
         });
@@ -2206,7 +2211,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           if (!filter) {
             continue;
           }
-          filter->setViewport(targetSize);
           recordFilterBatchesToSurface(filter, *onTopLease, targetSize, [&]() {
             filter->renderOpaque(eye);
           });
@@ -2215,7 +2219,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           if (!filter) {
             continue;
           }
-          filter->setViewport(targetSize);
           recordFilterBatchesToSurface(filter, *onTopLease, targetSize, [&]() {
             filter->renderTransparent(eye);
           });
@@ -2281,7 +2284,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
             if (!filter) {
               continue;
             }
-            filter->setViewport(targetSize);
             recordFilterBatchesToSurface(filter, *onTopOpaqueLease, targetSize, [&]() {
               filter->renderOpaque(eye);
             });
@@ -2506,7 +2508,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         if (!filter) {
           continue;
         }
-        filter->setViewport(targetSize);
         recordFilterBatchesToSurface(filter, *handleLease, targetSize, [&]() {
           filter->renderHandle(eye);
         });
@@ -2590,7 +2591,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         if (!filter) {
           continue;
         }
-        filter->setViewport(targetSize);
         recordFilterBatchesToSurface(filter, *selectionLease, targetSize, [&]() {
           filter->renderSelectionBox(eye);
         });
@@ -2621,7 +2621,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                      StoreOp::Store);
         const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
         for (auto* f : showHandleFilters) {
-          f->setViewport(pickSize);
           recordHandlePickingFilterBatchesToSurfaceUnifiedWithViewport(m_rendererBase,
                                                                        f,
                                                                        surfaceCopy,
@@ -2642,7 +2641,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
         for (auto* gf : gFilters) {
           if (gf && gf->isReady(eye)) {
-            gf->setViewport(pickSize);
             recordGeometryPickingFilterBatchesToSurfaceUnifiedWithViewport(m_rendererBase,
                                                                            gf,
                                                                            surfaceCopy,
@@ -2678,7 +2676,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                      StoreOp::Store);
         const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
         for (auto* f : showHandleFilters) {
-          f->setViewport(pickSize);
           recordHandlePickingFilterBatchesToSurfaceUnifiedWithViewport(m_rendererBase,
                                                                        f,
                                                                        surfaceCopy,
@@ -2699,7 +2696,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
         for (auto* gf : gFilters) {
           if (gf && gf->isReady(eye)) {
-            gf->setViewport(pickSize);
             recordGeometryPickingFilterBatchesToSurfaceUnifiedWithViewport(m_rendererBase,
                                                                            gf,
                                                                            surfaceCopy,
@@ -3140,7 +3136,6 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
                       if (!filter) {
                         continue;
                       }
-                      filter->setViewport(targetSize);
                       recordFilterBatchesToSurfaceUnified(
                         m_rendererBase,
                         filter,
@@ -3155,7 +3150,6 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
                       if (!filter) {
                         continue;
                       }
-                      filter->setViewport(targetSize);
                       recordTransparentFilterBatchesToSurfaceUnified(m_rendererBase,
                                                                      filter,
                                                                      surface,
@@ -3222,7 +3216,6 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
                                                    AttachmentFinalUse::Sampled;
                                                }
                                                const auto glowGeomSurface = m_rendererBase.frameState().activeSurface;
-                                               filter->setViewport(targetSize);
                                                recordFilterBatchesToSurfaceUnified(
                                                  m_rendererBase,
                                                  filter,
@@ -4483,7 +4476,6 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       if (!filter) {
         continue;
       }
-      filter->setViewport(targetSize);
       filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
       recordTransparentFilterBatchesToSurfaceUnified(m_rendererBase,
                                                      filter,
@@ -4589,7 +4581,6 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
         if (!filter) {
           continue;
         }
-        filter->setViewport(targetSize);
         filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
         filter->setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
         filter->setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
@@ -4841,6 +4832,14 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   CHECK_GT(targetSize.x, 0u);
   CHECK_GT(targetSize.y, 0u);
+  const glm::uvec4 ppllViewport(0u, 0u, targetSize.x, targetSize.y);
+  CHECK(m_rendererBase.frameState().viewport.z == targetSize.x &&
+        m_rendererBase.frameState().viewport.w == targetSize.y)
+    << fmt::format("PPLL expected compositor viewport to match target surface size (viewport={}x{} target={}x{})",
+                   m_rendererBase.frameState().viewport.z,
+                   m_rendererBase.frameState().viewport.w,
+                   targetSize.x,
+                   targetSize.y);
 
   auto resetHooks = [&]() {
     for (auto* filter : filters) {
@@ -4909,7 +4908,6 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
       if (!filter) {
         continue;
       }
-      filter->setViewport(targetSize);
       captureTransparentFilterBatchesToUnifiedList(m_rendererBase,
                                                    filter,
                                                    depthOnlySurface,
@@ -4951,12 +4949,13 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
 
   {
     auto sumsBufSlot = script.makeSlot<ZVulkanBuffer*>();
-    const auto segPrimeCount = script.preRecord("transparency_ppll_prime_count",
-                                                {},
-                                                [sumsBufSlot](Z3DRendererVulkanBackend& be, Z3DRendererBase& renderer) {
-                                                  be.primePPLLForCountPass(renderer.frameState().viewport);
-                                                  sumsBufSlot.set(be.ppllBlockSumsBufferObj());
-                                                });
+    const auto segPrimeCount =
+      script.preRecord("transparency_ppll_prime_count",
+                       {},
+                       [ppllViewport, sumsBufSlot](Z3DRendererVulkanBackend& be, Z3DRendererBase& /*renderer*/) {
+                         be.primePPLLForCountPass(ppllViewport);
+                         sumsBufSlot.set(be.ppllBlockSumsBufferObj());
+                       });
 
     setPPLLShaderHookOnBatches(Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
 
@@ -4976,13 +4975,9 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
         be.ppllDispatchScanLocal(cmd);
       });
 
-    const uint64_t pixelCount64 = static_cast<uint64_t>(m_rendererBase.frameState().viewport.z) *
-                                  static_cast<uint64_t>(m_rendererBase.frameState().viewport.w);
+    const uint64_t pixelCount64 = static_cast<uint64_t>(ppllViewport.z) * static_cast<uint64_t>(ppllViewport.w);
     CHECK(pixelCount64 <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()))
-      << fmt::format("PPLL pixel count overflow: {}x{} = {}",
-                     m_rendererBase.frameState().viewport.z,
-                     m_rendererBase.frameState().viewport.w,
-                     pixelCount64);
+      << fmt::format("PPLL pixel count overflow: {}x{} = {}", ppllViewport.z, ppllViewport.w, pixelCount64);
     const uint32_t pixelCount = static_cast<uint32_t>(pixelCount64);
     blockCount = (pixelCount == 0u) ? 0u : ((pixelCount + 256u - 1u) / 256u);
 
@@ -5021,7 +5016,7 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
     << fmt::format("PPLL fragment count overflow: totalFragments={}", totalFragments64);
 
   if (VLOG_IS_ON(1)) {
-    const glm::uvec4 vp = m_rendererBase.frameState().viewport;
+    const glm::uvec4 vp = ppllViewport;
     VLOG(1) << fmt::format(
       "PPLL stats: viewport={}x{} pixelCount={} blocks={} totalFragments={} maxBlockSum={} (block {})",
       vp.z,
@@ -5039,8 +5034,8 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   const auto segPrimeStore =
     script.preRecord("transparency_ppll_prime_store",
                      {},
-                     [totalFragments64](Z3DRendererVulkanBackend& be, Z3DRendererBase& renderer) {
-                       be.primePPLLForStorePass(renderer.frameState().viewport, totalFragments64);
+                     [ppllViewport, totalFragments64](Z3DRendererVulkanBackend& be, Z3DRendererBase& /*renderer*/) {
+                       be.primePPLLForStorePass(ppllViewport, totalFragments64);
                      });
 
   // Store pass should load the opaque depth buffer (if present). When we capture
@@ -5106,9 +5101,8 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
       m_rendererBase.setActiveSurfaceWithLoadStore(outSurface, Z3DRendererBase::Preserve);
       RenderBatch batch;
       batch.eye = eye;
-      const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-      batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-      batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+      batch.pass.viewport.origin = glm::vec2(static_cast<float>(ppllViewport.x), static_cast<float>(ppllViewport.y));
+      batch.pass.viewport.extent = glm::vec2(static_cast<float>(ppllViewport.z), static_cast<float>(ppllViewport.w));
       batch.pass.viewport.minDepth = 0.0f;
       batch.pass.viewport.maxDepth = 1.0f;
       batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
@@ -5189,7 +5183,6 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
       if (!filter) {
         continue;
       }
-      filter->setViewport(targetSize);
       filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
       recordFilterBatchesToSurfaceUnified(
         m_rendererBase,
@@ -5339,7 +5332,6 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
       if (!filter) {
         continue;
       }
-      filter->setViewport(targetSize);
       filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
       recordFilterBatchesToSurfaceUnified(
         m_rendererBase,

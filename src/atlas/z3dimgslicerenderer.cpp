@@ -353,6 +353,10 @@ Z3DImgSliceRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
 
         CHECK(stagePayload.blockIdLease && stagePayload.blockIdLease->hasVulkanImage())
           << "Slice BlockIdDiscovery stage missing Vulkan blockIdLease";
+        const glm::uvec2 blockViewportSize = stagePayload.blockIdLease->descriptor.size;
+        CHECK_GT(blockViewportSize.x, 0u) << "Slice BlockIdDiscovery blockIdLease has zero width";
+        CHECK_GT(blockViewportSize.y, 0u) << "Slice BlockIdDiscovery blockIdLease has zero height";
+        m_rendererBase.frameState().updateViewportData(blockViewportSize);
         const auto blockSurface = m_rendererBase.describeSurface(*stagePayload.blockIdLease);
         CHECK(!blockSurface.colorAttachments.empty()) << "Slice blockIdLease missing color attachment";
 
@@ -409,6 +413,7 @@ Z3DImgSliceRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
         stagePayload.image != nullptr && stagePayload.image->isVolumeDownsampled() && !stagePayload.fastPathOnly;
 
       if (writesOutput) {
+        m_rendererBase.frameState().updateViewportData(outputLease.descriptor.size);
         m_rendererBase.setActiveSurfaceWithLoadStore(outputLease,
                                                      LoadOp::Clear,
                                                      StoreOp::Store,
@@ -424,6 +429,7 @@ Z3DImgSliceRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
       }
 
       if (stagePayload.stage == ImgSlicePayload::Stage::MergeLayers) {
+        m_rendererBase.frameState().updateViewportData(outputLease.descriptor.size);
         m_rendererBase.setActiveSurfaceWithLoadStore(outputLease,
                                                      LoadOp::Clear,
                                                      StoreOp::Store,
@@ -451,6 +457,8 @@ Z3DImgSliceRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
       CHECK(stagePayload.layerLease && stagePayload.layerLease->hasVulkanImage())
         << "Slice DrawLayers stage expected a Vulkan layerLease for multi-channel rendering";
       CHECK(stagePayload.image != nullptr) << "Slice DrawLayers stage missing image pointer";
+
+      m_rendererBase.frameState().updateViewportData(stagePayload.layerLease->descriptor.size);
 
       const uint32_t channelCount = static_cast<uint32_t>(stagePayload.image->numChannels());
       CHECK(channelCount > 1u) << "Slice layered DrawLayers requires multi-channel image";
