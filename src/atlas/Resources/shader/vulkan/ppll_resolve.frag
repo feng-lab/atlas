@@ -3,6 +3,10 @@
 
 layout(location = 0) out vec4 FragData0;
 
+// Opaque depth buffer used to cull transparent fragments that lie behind already-rendered opaque geometry.
+// This is provided by the compositor when an opaque pass exists; otherwise a 1.0 placeholder is bound.
+layout(set = 0, binding = 0) uniform sampler2D opaque_depth_texture;
+
 #include "include/ppll_common.glslinc"
 
 const uint kPPLLSmallListInsertionSortThreshold = 32u;
@@ -86,6 +90,20 @@ void main()
 
   const uint base = ppll_offsets.offsets[pixelIndex];
 
+  // Opaque depth at this pixel. Any transparent fragments with depth >= opaqueDepth are occluded and should not
+  // contribute to the resolved transparent layer. This mirrors the intended "depth-test against opaque" behavior
+  // of the count/store passes, without relying on early fragment tests (SSBO writes can force late depth tests).
+  //
+  // Note: when the compositor binds a 1x1 placeholder texture (no opaque pass), texelFetch() must clamp to avoid
+  // undefined out-of-bounds reads for screen-sized fragment coordinates.
+  float opaqueDepth = 1.0;
+  const ivec2 opaqueDepthSize = textureSize(opaque_depth_texture, 0);
+  if (opaqueDepthSize.x > 0 && opaqueDepthSize.y > 0) {
+    const ivec2 clampedCoord =
+      clamp(ivec2(gl_FragCoord.xy), ivec2(0), opaqueDepthSize - ivec2(1));
+    opaqueDepth = texelFetch(opaque_depth_texture, clampedCoord, 0).r;
+  }
+
   // Guard against out-of-bounds reads if offsets/counts are corrupted.
   const uint capacity = ppll_params.fragmentCapacity;
   if (base >= capacity) {
@@ -119,9 +137,25 @@ void main()
     ppllHeapSortByDepth(base, count);
   }
 
+  // Compute the number of visible transparent fragments in front of opaqueDepth.
+  // Since the list is sorted near->far, we can stop at the first occluded fragment.
+  uint visibleCount = 0u;
+  for (uint i = 0u; i < count; ++i) {
+    const float d = ppll_fragments.fragments[base + i].depth;
+    if (d >= opaqueDepth) {
+      break;
+    }
+    visibleCount = i + 1u;
+  }
+  if (visibleCount == 0u) {
+    FragData0 = vec4(0.0);
+    gl_FragDepth = 1.0;
+    return;
+  }
+
   vec3 accumRgb = vec3(0.0);
   float accumAlpha = 0.0;
-  for (uint i = 0u; i < count; ++i) {
+  for (uint i = 0u; i < visibleCount; ++i) {
     const PPLLFragment frag = ppll_fragments.fragments[base + i];
     const float oneMinusA = 1.0 - accumAlpha;
     accumRgb += frag.color.rgb * oneMinusA;
@@ -129,6 +163,6 @@ void main()
   }
 
   FragData0 = vec4(accumRgb, accumAlpha);
-  // Nearest depth (first element after sort)
+  // Nearest visible depth (first element after sort).
   gl_FragDepth = ppll_fragments.fragments[base].depth;
 }

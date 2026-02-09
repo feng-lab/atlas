@@ -41,11 +41,28 @@ void ZVulkanTexturePPLLPipelineContext::record(Z3DRendererBase& renderer,
                                                vk::raii::CommandBuffer& cmd)
 {
   (void)renderer;
-  (void)payload;
 
   ensureOITResources();
   if (!m_descriptorOIT) {
     return;
+  }
+
+  // Bind opaque depth (or a 1.0 placeholder) so the resolve shader can drop any
+  // stored fragments that lie behind already-rendered opaque geometry.
+  ensureDescriptorLayouts();
+  CHECK(m_setOpaqueDepth) << "PPLL resolve missing opaque-depth descriptor set layout";
+  ZVulkanDescriptorSet* dsOpaqueDepth = m_backend.allocateOverrideDescriptorSet(**m_setOpaqueDepth);
+  CHECK(dsOpaqueDepth != nullptr) << "PPLL resolve: override descriptor allocation failed (fatal)";
+
+  vk::Sampler sampler = m_backend.nearestClampSampler();
+  if (payload.opaqueDepthAttachment.valid() && payload.opaqueDepthAttachment.backend == RenderBackend::Vulkan) {
+    auto& opaqueDepthTex =
+      vulkan::textureFromHandle(payload.opaqueDepthAttachment, m_backend.device(), "PPLL opaque depth attachment");
+    dsOpaqueDepth->updateTexture(0, opaqueDepthTex, sampler);
+  } else {
+    // No opaque pass: bind a constant 1.0 texture so all fragments are treated as visible.
+    auto& fallback = m_backend.defaultPlaceholderTexture2D();
+    dsOpaqueDepth->updateTexture(0, fallback, sampler);
   }
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
@@ -64,7 +81,11 @@ void ZVulkanTexturePPLLPipelineContext::record(Z3DRendererBase& renderer,
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   cmd.bindVertexBuffers(0, {quad.buffer()}, {vk::DeviceSize(0)});
 
-  // Bind set 3 (OIT SSBOs). Sets 0..2 are unused by the resolve shader.
+  // Bind set 0 (opaque depth sampler).
+  std::array<vk::DescriptorSet, 1> sets0{dsOpaqueDepth->descriptorSet()};
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 0, sets0, {});
+
+  // Bind set 3 (OIT SSBOs). Sets 1/2 are unused placeholders.
   std::array<vk::DescriptorSet, 1> sets3{m_descriptorOIT->descriptorSet()};
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                          instance.pipeline->pipelineLayout(),
@@ -81,6 +102,19 @@ void ZVulkanTexturePPLLPipelineContext::ensureDescriptorLayouts()
 {
   auto& device = m_backend.device();
   auto& vkDevice = device.context().device();
+
+  if (!m_setOpaqueDepth) {
+    // One combined image sampler (opaque depth). Use nearest clamp to avoid
+    // filtering depth comparisons at edges.
+    vk::Sampler imm = m_backend.nearestClampSampler();
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                                           .pImmutableSamplers = &imm};
+    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
+    m_setOpaqueDepth.emplace(vkDevice, createInfo);
+  }
 
   if (!m_setPlaceholder) {
     vk::DescriptorSetLayoutCreateInfo emptyInfo{.bindingCount = 0, .pBindings = nullptr};
@@ -145,8 +179,10 @@ ZVulkanTexturePPLLPipelineContext::ensurePipeline(const PipelineKey& key, const 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
 
-  const vk::DescriptorSetLayout oitLayout = m_setOIT ? m_setOIT : **m_setPlaceholder;
-  std::vector<vk::DescriptorSetLayout> layouts{**m_setPlaceholder, **m_setPlaceholder, **m_setPlaceholder, oitLayout};
+  const vk::DescriptorSetLayout set0 = m_setOpaqueDepth ? **m_setOpaqueDepth : **m_setPlaceholder;
+  const vk::DescriptorSetLayout empty = **m_setPlaceholder;
+  const vk::DescriptorSetLayout oitLayout = m_setOIT ? m_setOIT : empty;
+  std::vector<vk::DescriptorSetLayout> layouts{set0, empty, empty, oitLayout};
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);

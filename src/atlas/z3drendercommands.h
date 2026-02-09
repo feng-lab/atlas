@@ -748,7 +748,15 @@ struct TextureWeightedBlendedPayload
 struct TexturePPLLResolvePayload
 {
   // Fullscreen resolve for exact OIT per-pixel fragment lists (PPLL).
-  // All inputs come from the Vulkan OIT SSBO set (set = 3); no additional parameters required.
+  // The resolve shader reads fragment data from the Vulkan OIT SSBO set (set = 3) and produces a
+  // premultiplied RGBA layer.
+  //
+  // To correctly occlude behind opaque geometry (including XYZ slices rendered as opaque),
+  // the resolve pass also samples the opaque depth buffer and discards any stored transparent
+  // fragments whose depth is behind that opaque depth.
+  //
+  // When this handle is invalid, the resolve pass treats the opaque depth as 1.0 (no occlusion).
+  AttachmentHandle opaqueDepthAttachment;
 };
 
 struct ImgSlicePayload

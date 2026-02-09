@@ -5114,6 +5114,9 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
 
     script.raster("transparency_ppll_resolve", {segFragBarrier}, [&]() {
       m_rendererBase.setActiveSurfaceWithLoadStore(outSurface, Z3DRendererBase::Preserve);
+      TexturePPLLResolvePayload payload{};
+      payload.opaqueDepthAttachment = depthAttachmentHandle;
+
       RenderBatch batch;
       batch.eye = eye;
       batch.pass.viewport.origin = glm::vec2(static_cast<float>(ppllViewport.x), static_cast<float>(ppllViewport.y));
@@ -5122,10 +5125,14 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
       batch.pass.viewport.maxDepth = 1.0f;
       batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
       batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+      if (payload.opaqueDepthAttachment.valid()) {
+        batch.pass.externalImageUses.push_back(
+          {payload.opaqueDepthAttachment, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+      }
       batch.draw.topology = PrimitiveTopology::TriangleStrip;
       batch.draw.vertexCount = 4;
       batch.draw.indexCount = 0;
-      batch.geometry = TexturePPLLResolvePayload{};
+      batch.geometry = payload;
       m_rendererBase.appendBatch(std::move(batch));
     });
   }

@@ -68,7 +68,12 @@ private:
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
-  std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // set 0/1/2 alignment
+  // Descriptor sets:
+  // - set 0: opaque depth texture (used to cull transparent fragments behind opaque)
+  // - set 1/2: placeholders (kept to match other pipeline layouts)
+  // - set 3: OIT SSBO bindings (PPLL buffers)
+  std::optional<vk::raii::DescriptorSetLayout> m_setOpaqueDepth; // set = 0 (sampler2D)
+  std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // set = 1/2 (empty)
   vk::DescriptorSetLayout m_setOIT{}; // set = 3 OIT SSBO layout (params + PPLL buffers)
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorOIT;
 

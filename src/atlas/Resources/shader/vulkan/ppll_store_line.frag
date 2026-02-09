@@ -1,6 +1,8 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
+layout(early_fragment_tests) in;
+
 #include "include/line_func.glslinc"
 #include "include/ppll_common.glslinc"
 
