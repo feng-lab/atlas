@@ -2789,51 +2789,122 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     auto installFinalColorReadback = [this, scratchPool](Z3DLocalColorBuffer* localPtr,
                                                          Z3DScratchResourcePool::RenderTargetLease* targetPtr,
                                                          Z3DEye eyeCopy,
+                                                         uint64_t perfFrameToken,
                                                          const void* mapped,
                                                          const glm::uvec2& size,
                                                          std::function<void()> releaseSlot,
                                                          bool noCopy) {
       CHECK(localPtr != nullptr) << "VK final readback install requires a valid local color buffer";
       CHECK(targetPtr != nullptr) << "VK final readback install requires a valid output target lease";
-      if (localPtr->externalRelease) {
-        localPtr->externalRelease();
-        localPtr->externalRelease = {};
-      }
-      localPtr->external = static_cast<const uint8_t*>(mapped);
-      localPtr->externalStride = static_cast<size_t>(size.x) * 4u;
-      localPtr->externalRelease = std::move(releaseSlot);
-      localPtr->width = size.x;
-      localPtr->height = size.y;
 
       const char* suffix = noCopy ? " (no copy)" : "";
-      VLOG(1) << fmt::format("VK final readback ready{} mapped={} size={}x{} eye={}",
+      VLOG(1) << fmt::format("VK final readback ready{} frame#{} mapped={} size={}x{} eye={}",
                              suffix,
+                             perfFrameToken,
                              mapped,
                              size.x,
                              size.y,
                              static_cast<int>(eyeCopy));
 
-      if (eyeCopy == MonoEye) {
-        {
-          const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+      const size_t eyeIndex = static_cast<size_t>(eyeCopy);
+      CHECK_LT(eyeIndex, m_lastPublishedPerfFrameToken.size())
+        << "VK final readback eye index out of range: eye=" << static_cast<int>(eyeCopy);
 
-          CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
-            << "VK mono install targeted unexpected local buffer pointer";
-          CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
-            << "VK mono install targeted unexpected output lease pointer";
+      bool dropStale = false;
+      uint64_t lastPublishedToken = 0;
+      bool emitFinished = false;
+      const char* finishedLabel = nullptr;
+      Z3DLocalColorBuffer* readyBufferForLog = nullptr;
 
-          // Publish the buffer/target that actually received this completed frame.
-          // With >1 frames in flight, multiple completion hooks can be queued
-          // before the UI consumes the previous signal. Using unconditional
-          // swaps here makes the ready pointers depend on the *parity* of
-          // completions (and can bounce between old/new frames). Publish the
-          // completed destinations directly to make presentation monotonic.
-          m_monoReadyLocalBuffer = localPtr;
-          m_monoReadyTarget = targetPtr;
-          m_monoCurrentLocalBuffer = (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
-          m_monoCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
+      {
+        const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+
+        lastPublishedToken = m_lastPublishedPerfFrameToken[eyeIndex];
+        if (perfFrameToken != 0 && lastPublishedToken != 0 && perfFrameToken < lastPublishedToken) {
+          dropStale = true;
+        } else if (perfFrameToken != 0) {
+          m_lastPublishedPerfFrameToken[eyeIndex] = perfFrameToken;
         }
+
+        if (!dropStale) {
+          // Replace the external mapping for the destination local buffer. This must
+          // happen under targetSwitchMutex so the UI never observes a half-updated
+          // ready buffer.
+          if (localPtr->externalRelease) {
+            localPtr->externalRelease();
+            localPtr->externalRelease = {};
+          }
+          localPtr->external = static_cast<const uint8_t*>(mapped);
+          localPtr->externalStride = static_cast<size_t>(size.x) * 4u;
+          localPtr->externalRelease = std::move(releaseSlot);
+          localPtr->width = size.x;
+          localPtr->height = size.y;
+
+          if (eyeCopy == MonoEye) {
+            CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
+              << "VK mono install targeted unexpected local buffer pointer";
+            CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
+              << "VK mono install targeted unexpected output lease pointer";
+
+            // Publish the buffer/target that actually received this completed frame.
+            // With >1 frames in flight, multiple completion hooks can be queued
+            // before the UI consumes the previous signal. Using unconditional
+            // swaps here makes the ready pointers depend on the *parity* of
+            // completions (and can bounce between old/new frames). Publish the
+            // completed destinations directly to make presentation monotonic.
+            m_monoReadyLocalBuffer = localPtr;
+            m_monoReadyTarget = targetPtr;
+            m_monoCurrentLocalBuffer = (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
+            m_monoCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
+            emitFinished = true;
+            finishedLabel = noCopy ? "(mono, no copy)" : "(mono)";
+            readyBufferForLog = m_monoReadyLocalBuffer;
+          } else if (eyeCopy == LeftEye) {
+            CHECK(localPtr == &m_leftLocalColorBuffer1 || localPtr == &m_leftLocalColorBuffer2)
+              << "VK left-eye install targeted unexpected local buffer pointer";
+            CHECK(targetPtr == &m_leftEyeOutRenderTarget1 || targetPtr == &m_leftEyeOutRenderTarget2)
+              << "VK left-eye install targeted unexpected output lease pointer";
+
+            m_leftReadyLocalBuffer = localPtr;
+            m_leftReadyTarget = targetPtr;
+            m_leftCurrentLocalBuffer =
+              (localPtr == &m_leftLocalColorBuffer1) ? &m_leftLocalColorBuffer2 : &m_leftLocalColorBuffer1;
+            m_leftCurrentTarget =
+              (targetPtr == &m_leftEyeOutRenderTarget1) ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
+          } else {
+            CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
+              << "VK right-eye install targeted unexpected local buffer pointer";
+            CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
+              << "VK right-eye install targeted unexpected output lease pointer";
+
+            m_rightReadyLocalBuffer = localPtr;
+            m_rightReadyTarget = targetPtr;
+            m_rightCurrentLocalBuffer =
+              (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
+            m_rightCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
+            emitFinished = true;
+            finishedLabel = noCopy ? "(right, no copy)" : "(right)";
+          }
+        }
+      }
+
+      if (dropStale) {
+        VLOG(1) << fmt::format("VK final readback drop stale frame#{} < last#{} eye={}",
+                               perfFrameToken,
+                               lastPublishedToken,
+                               static_cast<int>(eyeCopy));
+        if (releaseSlot) {
+          releaseSlot();
+        }
+        return;
+      }
+
+      // Mono/right-eye publish complete. Emit update signal (left eye waits for right).
+      if (emitFinished) {
         m_globalParameters.hasNewRendering = true;
+      }
+
+      if (eyeCopy == MonoEye) {
         static uint64_t s_lastCreate = 0, s_lastChange = 0;
         const uint64_t curCreate = scratchPool->creationCounter();
         const uint64_t curChange = scratchPool->changeCounter();
@@ -2842,40 +2913,12 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           s_lastCreate = curCreate;
           s_lastChange = curChange;
         }
-        const char* label = noCopy ? "(mono, no copy)" : "(mono)";
-        VLOG(1) << fmt::format("VK renderingFinished {} readyBuffer={}", label, (void*)m_monoReadyLocalBuffer);
+        CHECK(finishedLabel != nullptr) << "VK mono publish expected a finished label";
+        VLOG(1) << fmt::format("VK renderingFinished {} readyBuffer={}", finishedLabel, (void*)readyBufferForLog);
         Q_EMIT renderingFinished();
-      } else if (eyeCopy == LeftEye) {
-        const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-
-        CHECK(localPtr == &m_leftLocalColorBuffer1 || localPtr == &m_leftLocalColorBuffer2)
-          << "VK left-eye install targeted unexpected local buffer pointer";
-        CHECK(targetPtr == &m_leftEyeOutRenderTarget1 || targetPtr == &m_leftEyeOutRenderTarget2)
-          << "VK left-eye install targeted unexpected output lease pointer";
-
-        m_leftReadyLocalBuffer = localPtr;
-        m_leftReadyTarget = targetPtr;
-        m_leftCurrentLocalBuffer =
-          (localPtr == &m_leftLocalColorBuffer1) ? &m_leftLocalColorBuffer2 : &m_leftLocalColorBuffer1;
-        m_leftCurrentTarget =
-          (targetPtr == &m_leftEyeOutRenderTarget1) ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
-      } else {
-        {
-          const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-
-          CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
-            << "VK right-eye install targeted unexpected local buffer pointer";
-          CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
-            << "VK right-eye install targeted unexpected output lease pointer";
-
-          m_rightReadyLocalBuffer = localPtr;
-          m_rightReadyTarget = targetPtr;
-          m_rightCurrentLocalBuffer = (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
-          m_rightCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
-        }
-        m_globalParameters.hasNewRendering = true;
-        const char* label = noCopy ? "(right, no copy)" : "(right)";
-        VLOG(1) << fmt::format("VK renderingFinished {}", label);
+      } else if (eyeCopy == RightEye) {
+        CHECK(finishedLabel != nullptr) << "VK right-eye publish expected a finished label";
+        VLOG(1) << fmt::format("VK renderingFinished {}", finishedLabel);
         Q_EMIT renderingFinished();
       }
     };
@@ -2908,15 +2951,23 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         // metric. Fall back to "now" so the value is still bounded.
         perfFrameStartTs = std::chrono::steady_clock::now();
       }
+      const uint64_t perfFrameToken = Z3DRenderGlobalState::instance().currentPerfFrameToken();
       auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
       backend.registerAfterCurrentFrameCompletionHook(
         currentRenderThreadExecutorKeepAlive(consumeLabel),
-        [installFinalColorReadback, localPtr, targetPtr, eyeCopy, perfFrameStartTs, ticket = std::move(ticket), noCopy](
-          Z3DRendererVulkanBackend& backend) mutable -> folly::coro::Task<void> {
+        [installFinalColorReadback,
+         localPtr,
+         targetPtr,
+         eyeCopy,
+         perfFrameStartTs,
+         perfFrameToken,
+         ticket = std::move(ticket),
+         noCopy](Z3DRendererVulkanBackend& backend) mutable -> folly::coro::Task<void> {
           co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
           installFinalColorReadback(localPtr,
                                     targetPtr,
                                     eyeCopy,
+                                    perfFrameToken,
                                     ticket.mapped,
                                     ticket.size,
                                     std::move(ticket.releaseSlot),

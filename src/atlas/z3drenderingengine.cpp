@@ -1230,6 +1230,16 @@ double Z3DRenderingEngine::processFrame(bool stereo,
   // Mark the start of a new user-visible frame for perf aggregation.
   Z3DRenderGlobalState::instance().beginNewPerfFrameToken();
   auto& renderState = Z3DRenderGlobalState::instance();
+  const uint64_t perfFrameToken = renderState.currentPerfFrameToken();
+  auto closePerfTokenGuard = folly::makeGuard([perfFrameToken]() {
+    // Progressive rendering is intentionally interruptible: deep render loops
+    // (raycaster paging, compaction, etc.) call processEventsAndMaybeCancel()
+    // which can throw ZCancellationException mid-frame. If we don't close the
+    // perf token on exceptional exits, Z3DPerfCollector will observe an "open"
+    // token and refuse to flush later ones (ordered summaries), making perf
+    // logs appear to never trigger.
+    nim::Z3DPerfCollector::instance().markClosed(perfFrameToken);
+  });
 
   // Notify filter wrappers (now that token is available for tagging).
   for (auto& wrapper : m_filterWrappers) {
@@ -1308,11 +1318,6 @@ double Z3DRenderingEngine::processFrame(bool stereo,
   if (glMode) {
     CHECK_GL_ERROR
   }
-
-  // Mark the current perf frame token as closed for aggregation. Actual flush
-  // occurs after the Vulkan backend has ingested all submissions that were
-  // started for this token (may be later due to interleaving across tokens).
-  nim::Z3DPerfCollector::instance().markClosed(renderState.currentPerfFrameToken());
 
   if (!progressiveRendering) {
     CHECK(currentProgress == totalProgress) << currentProgress << " " << totalProgress;

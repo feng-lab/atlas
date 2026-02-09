@@ -18,6 +18,9 @@
 #include "z3dscratchresourcepool.h"
 #include "z3dcompositorpass.h"
 
+#include <array>
+#include <cstdint>
+
 namespace nim {
 
 class ZVulkanLinearScript;
@@ -348,6 +351,10 @@ private:
   Z3DLocalColorBuffer* m_monoCurrentLocalBuffer = nullptr;
   Z3DLocalColorBuffer* m_leftCurrentLocalBuffer = nullptr;
   Z3DLocalColorBuffer* m_rightCurrentLocalBuffer = nullptr;
+
+  // Vulkan async readback can complete later than newer frames; keep presentation
+  // monotonic by dropping stale publishes (older perf-frame tokens) per eye.
+  std::array<uint64_t, 3> m_lastPublishedPerfFrameToken{};
 
   // Z3DVertexBufferObject m_PBO;
 };
