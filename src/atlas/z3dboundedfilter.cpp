@@ -758,7 +758,7 @@ void Z3DBoundedFilter::expandCutRange()
                   std::max(m_xCut.maximum(), float(std::ceil(bound.maxCorner.x) + 1)));
   m_yCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound.minCorner.y) - 1)),
                   std::max(m_yCut.maximum(), float(std::ceil(bound.maxCorner.y) + 1)));
-  m_zCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound.minCorner.z) - 1)),
+  m_zCut.setRange(std::min(m_zCut.minimum(), float(std::floor(bound.minCorner.z) - 1)),
                   std::max(m_zCut.maximum(), float(std::ceil(bound.maxCorner.z) + 1)));
   float xCutLow = noLowXCut ? m_xCut.minimum() : m_xCut.get().x;
   float xCutHigh = noHighXCut ? m_xCut.maximum() : m_xCut.get().y;
