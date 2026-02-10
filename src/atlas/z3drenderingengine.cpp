@@ -52,6 +52,7 @@ DECLARE_string(output_image_name_prefix);
 DECLARE_int32(output_image_name_field_width);
 DECLARE_int32(maximum_output_width);
 DECLARE_int32(maximum_output_height);
+DECLARE_bool(atlas_vk_copy_yflip_in_shader);
 
 #if defined(__linux__)
 DECLARE_bool(__use_EGL);
@@ -186,6 +187,25 @@ int numDigits(int32_t x)
 } // namespace
 
 namespace nim {
+
+namespace {
+
+bool shouldFlipYWhenSaving(RenderBackend backend)
+{
+  if (backend == RenderBackend::OpenGL) {
+    return true;
+  }
+  if (backend == RenderBackend::Vulkan) {
+    // Vulkan: UI orientation is controlled by atlas_vk_copy_yflip_in_shader.
+    // When the compositor does *not* apply the flip in the final copy shader,
+    // the host buffer effectively matches OpenGL's bottom-origin convention and
+    // must be flipped before saving to a top-origin image file.
+    return !FLAGS_atlas_vk_copy_yflip_in_shader;
+  }
+  return false;
+}
+
+} // namespace
 
 void Z3DRenderingEngine::CheckOpenGLStateFilterWrapper::afterFilterProcess(const Z3DFilter* p)
 {
@@ -751,19 +771,28 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
           reportCancelError();
           return;
         }
+
+        const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+        const bool flipYForSave = shouldFlipYWhenSaving(backend);
+
         QString targetFilename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
         auto targetFilepath = tmpdir.filePath(targetFilename);
         ZImg img(ZImgInfo(width, height, 1, 4));
         img.infoRef().lastChannelIsAlphaChannel = true;
+
         ZImg rightImg;
         if (sst != Z3DScreenShotType::MonoView) {
           rightImg = ZImg(ZImgInfo(width, height, 1, 4));
           rightImg.infoRef().lastChannelIsAlphaChannel = true;
         }
+
         for (auto c = 0; c < numCols; ++c) {
           for (auto r = 0; r < numRows; ++r) {
             auto tileStartX = c * tileSize;
             auto tileStartY = r * tileSize;
+            const int tileTop = std::min(tileStartY + tileSize, height);
+            const int pasteY = flipYForSave ? tileStartY : (height - tileTop);
+
             if (sst == Z3DScreenShotType::MonoView) {
               QString filename = QString("_%1%2_%3_%4.png")
                                    .arg(namePrefix)
@@ -772,7 +801,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                    .arg(tileStartY);
               QString filepath = tmpdir.filePath(filename);
               if (tmpdir.exists(filename)) {
-                img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, tileStartY));
+                img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, pasteY));
               } else {
                 LOG(ERROR) << "Could not find file: " << filepath;
               }
@@ -784,17 +813,18 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                    .arg(tileStartY);
               QString filepath = tmpdir.filePath(filename);
               if (tmpdir.exists(filename)) {
-                img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, tileStartY));
+                img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, pasteY));
               } else {
                 LOG(ERROR) << "Could not find left file: " << filepath;
               }
+
               filename = QString("_%1%2_%3_%4_right.png")
                            .arg(namePrefix)
                            .arg(i, fieldWidth, 10, QChar('0'))
                            .arg(tileStartX)
                            .arg(tileStartY);
               if (tmpdir.exists(filename)) {
-                rightImg.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, tileStartY));
+                rightImg.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, pasteY));
               } else {
                 LOG(ERROR) << "Could not find right file: " << filepath;
               }
@@ -802,10 +832,8 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
           }
         }
 
-        const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-
         if (sst == Z3DScreenShotType::MonoView) {
-          if (backend == RenderBackend::OpenGL) {
+          if (flipYForSave) {
             img.flip(Dimension::Y).save(targetFilepath);
           } else {
             img.save(targetFilepath);
@@ -813,7 +841,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
           LOG(INFO) << fmt::format("Saved rendering ({}, {}) to file: {}", img.width(), img.height(), targetFilepath);
         } else {
           if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-            if (backend == RenderBackend::OpenGL) {
+            if (flipYForSave) {
               ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
                 .flip(Dimension::Y)
                 .save(targetFilepath);
@@ -825,7 +853,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                      img.height(),
                                      targetFilepath);
           } else {
-            if (backend == RenderBackend::OpenGL) {
+            if (flipYForSave) {
               ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
                 .zoom(0.5, 1)
                 .flip(Dimension::Y)
@@ -1768,7 +1796,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
   auto renderingGuard = folly::makeGuard([this]() {
     m_isRendering = false;
   });
-  const int tileSize = 7680; // 2048;
+  const int tileSize = 2048;
   const int tileBorder = 128;
 
   if (width <= tileSize && height <= tileSize) {
@@ -1777,6 +1805,18 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
 
     takeScreenShotPrivate(filename, sst);
   } else {
+    // Guard against leaving a tile frustum / compositor rendering region active
+    // if the render is cancelled or throws (Vulkan path can propagate cancellation
+    // exceptions via linear-script flush). A stale tile frustum can look like a
+    // clean "half viewport" cut that is not reflected in clip plane UI.
+    auto tileRegionGuard = folly::makeGuard([this]() {
+      m_globalParas->camera.setTileFrustum();
+      m_compositor->setRenderingRegion();
+    });
+
+    const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+    const bool flipYForSave = shouldFlipYWhenSaving(backend);
+
     ZImg img(ZImgInfo(width, height, 1, 4));
     img.infoRef().lastChannelIsAlphaChannel = true;
     ZImg rightImg;
@@ -1814,22 +1854,21 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
         // Evaluate the filter pipeline for this tile.
         processFrame(sst != Z3DScreenShotType::MonoView, false);
 
+        const int pasteY = flipYForSave ? tileStartY : (height - top);
         if (sst == Z3DScreenShotType::MonoView) {
           img.pasteImg(localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion),
-                       ZVoxelCoordinate(tileStartX, tileStartY));
+                       ZVoxelCoordinate(tileStartX, pasteY));
         } else {
           img.pasteImg(localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer()).crop(validRegion),
-                       ZVoxelCoordinate(tileStartX, tileStartY));
+                       ZVoxelCoordinate(tileStartX, pasteY));
           rightImg.pasteImg(localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer()).crop(validRegion),
-                            ZVoxelCoordinate(tileStartX, tileStartY));
+                            ZVoxelCoordinate(tileStartX, pasteY));
         }
       }
     }
 
-    const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-
     if (sst == Z3DScreenShotType::MonoView) {
-      if (backend == RenderBackend::OpenGL) {
+      if (flipYForSave) {
         img.flip(Dimension::Y).save(filename);
       } else {
         img.save(filename);
@@ -1837,14 +1876,14 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
       LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
     } else {
       if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-        if (backend == RenderBackend::OpenGL) {
+        if (flipYForSave) {
           ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
         } else {
           ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).save(filename);
         }
         LOG(INFO) << "Saved stereo rendering (" << img.width() << " x 2, " << img.height() << ") to file: " << filename;
       } else {
-        if (backend == RenderBackend::OpenGL) {
+        if (flipYForSave) {
           ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
             .zoom(0.5, 1)
             .flip(Dimension::Y)
@@ -1856,9 +1895,6 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
                   << ") to file:" << filename;
       }
     }
-
-    m_globalParas->camera.setTileFrustum();
-    m_compositor->setRenderingRegion();
   }
 }
 
@@ -1946,11 +1982,12 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
   });
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  const bool flipYForSave = shouldFlipYWhenSaving(backend);
   processFrame(sst != Z3DScreenShotType::MonoView, false);
 
   if (sst == Z3DScreenShotType::MonoView) {
     auto img = localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer());
-    if (backend == RenderBackend::OpenGL) {
+    if (flipYForSave) {
       img.flip(Dimension::Y).save(filename);
     } else {
       img.save(filename);
@@ -1961,7 +1998,7 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
     auto rightImg = localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer());
 
     if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-      if (backend == RenderBackend::OpenGL) {
+      if (flipYForSave) {
         ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
       } else {
         ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).save(filename);
@@ -1969,7 +2006,7 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
       LOG(INFO) << "Saved stereo rendering (" << leftImg.width() << " x 2, " << leftImg.height()
                 << ") to file: " << filename;
     } else {
-      if (backend == RenderBackend::OpenGL) {
+      if (flipYForSave) {
         ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X)
           .zoom(0.5, 1)
           .flip(Dimension::Y)

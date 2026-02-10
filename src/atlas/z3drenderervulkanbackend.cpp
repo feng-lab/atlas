@@ -1517,7 +1517,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
   for (const auto& batch : state.batches) {
     const auto geom = describeGeometry(batch.geometry);
-    VLOG(1) << fmt::format("VK batch[{}]: geom={}, colors={}, depth={} viewport=({},{} {}x{})",
+    VLOG(1) << fmt::format("VK batch[{}]: geom={}, colors={}, depth={} viewport=({},{} {}x{}) clip={} planes={}",
                            batchIndex++,
                            geom,
                            batch.pass.colorAttachments.size(),
@@ -1525,7 +1525,18 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
                            static_cast<int>(batch.pass.viewport.origin.x),
                            static_cast<int>(batch.pass.viewport.origin.y),
                            static_cast<int>(batch.pass.viewport.extent.x),
-                           static_cast<int>(batch.pass.viewport.extent.y));
+                           static_cast<int>(batch.pass.viewport.extent.y),
+                           (batch.clipPlanes.captured && batch.clipPlanes.enabled) ? 1 : 0,
+                           batch.clipPlanes.captured ? batch.clipPlanes.planeCount : 0u);
+    if (VLOG_IS_ON(2) && batch.clipPlanes.captured && batch.clipPlanes.enabled && batch.clipPlanes.planeCount > 0u) {
+      const auto& p0 = batch.clipPlanes.planes[0];
+      VLOG(2) << fmt::format("VK batch clip planes: count={} plane0=({:.3f},{:.3f},{:.3f},{:.3f})",
+                             batch.clipPlanes.planeCount,
+                             p0.x,
+                             p0.y,
+                             p0.z,
+                             p0.w);
+    }
     if (batch.pass.kind == BackendPassDesc::Kind::Raster) {
       CHECK(batch.pass.viewport.extent.x > 0.0f && batch.pass.viewport.extent.y > 0.0f)
         << "Vulkan batch missing viewport extent: geom=" << geom;
