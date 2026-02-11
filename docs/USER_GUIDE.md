@@ -463,11 +463,114 @@ Steps to load and manage images via `ZImgDoc`:
 
 `Z3DAnimationDoc` governs 3D timelines.
 
-1. **Load** – **File → Load 3D Animations...**.
+1. **Load** – **File → Load 3D Animations...** (`*.animation3d`).
 2. **Create** – in the 3D window use **Animation → Make 3D Animation**.
-3. **Bind view** – the 3D window emits `viewReady` so the animation doc can bind to the engine. Logs show “3D animation parameters bound”.
-4. **Edit** – use Edit and Output dock to tweak camera paths, object transforms, opacity over time.
-5. **Export** – see section 8 for GUI and CLI exports.
+3. **Bind view** – the animation binds to the 3D rendering engine once the 3D window is ready. Logs show “3D animation parameters bound”.
+4. **Edit** – double-click the animation object in **Objects Manager** to open the animation editor in the bottom **Edit and Output** dock.
+5. **Export** – use the animation editor’s export panel (section 8.3) or headless export (section 8.4).
+
+#### How 3D animations work (keyframes + interpolation)
+
+Atlas 3D animations are **keyframe-based**:
+
+- Each animatable “thing” (camera or a UI parameter like visibility, opacity, transform, clipping, etc.) has a **track**.
+- A track contains **keys**: `(time, easing/type, value)`.
+- During playback at time `t`, Atlas evaluates each track:
+  - If a track has keys, Atlas interpolates between the surrounding keys and writes the result into the live scene parameter.
+  - If a track has **no keys**, Atlas leaves the parameter at its current scene value (**scene fallback**). This is useful while authoring, but it also means an animation can become non-deterministic if you never keyframe a parameter.
+
+**Key easing / interpolation**
+
+- Each key has a **Type** (Qt `QEasingCurve`) that controls how time is eased between the previous key and this key:
+  - **Linear** – constant speed change.
+  - **In/Out/InOut Quad/Cubic/...** – ease-in/ease-out curves.
+  - **Switch** – step/hold (no interpolation; value jumps at the key time).
+- Parameters that do not support interpolation automatically restrict to **Switch** keys.
+
+#### The “Save Key Frame” button (full-scene snapshot)
+
+The main workflow tool is **Save Key Frame**:
+
+- **What it does:** At the current timeline time, Atlas snapshots the **entire current 3D scene state** into the animation by writing keys for:
+  - the **Camera** (global track),
+  - each object’s **3D view-setting parameters** (including visibility, transforms, appearance, and per-object cuts),
+  - plus the 3D “pseudo-objects” that also have view settings: **Background**, **Axis**, and **Lighting**.
+- **Why it matters:** This avoids accidental scene fallback and makes playback/export reproducible.
+- **Best practice:** Always create a baseline keyframe at `t = 0.0` after you have loaded the objects you care about. If you load/add more objects later, re-run **Save Key Frame** at `t = 0.0` so the animation remains self-contained.
+
+#### Editing UI: timeline, tracks, and keys
+
+Open the editor by double-clicking the animation object (type `Animation3D`) in **Objects Manager**.
+
+<!-- > 📸 **Screenshot to add:** Animation3D editor inside the bottom “Edit and Output” dock.
+  Suggested filename: docs/images/animation_editor.png
+
+  Suggested embed (uncomment when ready):
+  <p align="center">
+    <img src="./images/animation_editor.png" alt="animation_editor" width="900">
+  </p>
+
+  Annotate:
+  - Playback row: Speed, Go to Start/End, Reverse Play, Play, Repeat, Duration, Current Time, Save Key Frame.
+  - Timeline toolbar icons: Export Animation (camcorder), Remove Redundant Keys (cleanup), Zoom In/Out, Fit Timeline.
+  - Timeline view: object rows (Camera + objects), expanded parameter tracks, colored tracks, and example keys.
+  - Export panel visible (after toggling Export Animation).
+-->
+
+The editor has three parts:
+
+1. **Playback row (top)**
+   - **Speed** (playback multiplier), **Go to Start**, **Reverse Play/Pause**, **Play/Pause**, **Go to End**, **Repeat**.
+   - **Duration** (seconds) and **Current Time** (seconds).
+   - **Save Key Frame**:
+     - Button: **Save Key Frame**
+     - Shortcut (when the editor has focus): `Ctrl+K`
+
+2. **Timeline toolbar (left of the time axis)**
+   - **Export Animation** (camcorder icon): toggles an export panel inside the editor.
+     - Use it to render the current animation to a video file (`*.mp4` / `*.mov`).
+     - Export options (3D):
+       - **Stereo** + **Stereo Type** (Half/Full side-by-side).
+       - **Use Window Size** or a **Custom Image Size**.
+       - **Frames per Second**, **Start Frame**, **End Frame** (`-1` means “until the end”).
+       - **Tile Size / Tile Border** for very large outputs.
+       - **Output filename**, then click **Export**.
+     - See section 8.3 for export details and troubleshooting.
+   - **Remove Redundant Keys** (cleanup icon): removes keys that do not change the track’s value.
+     - This is a cleanup step to reduce timeline clutter after you are happy with the motion.
+     - Keys are considered redundant when their stored value matches neighboring keys (i.e., they do not affect interpolation).
+     - Boundary keys are preserved so the track keeps explicit endpoints.
+     - This operation is undoable (standard Undo/Redo) and **never** runs implicitly on save.
+   - **Zoom In / Zoom Out**: changes timeline scale (seconds → pixels) without changing the animation timing.
+   - **Fit Timeline to Window**: rescales so the full duration fits in the visible area.
+
+3. **Timeline view (object list + key area)**
+   - **Rows**:
+     - Global rows: e.g., **Camera**.
+     - Per-object rows: one row per object included in the animation.
+   - **Expand/collapse an object**:
+     - Double-click an object row (or click the arrow) to expand.
+   - **Track filtering (“Show All ...”)**:
+     - When expanded, Atlas shows a minimal set of tracks by default (always includes `Visible`, plus any tracks that already have more than one key).
+     - Click **Show All ...** to reveal all available parameter tracks for that object; click again (now labeled **Hide ...**) to return to the minimal view.
+   - **Track color**:
+     - Each parameter track has a colored square; click it to change the track color (useful when many keys overlap visually).
+   - **Missing objects**:
+     - If an animation references an object that is not loaded in the current scene, its row appears as “`<Type> not loaded`”, and its tracks may not be editable until the object is loaded.
+
+**Key operations**
+
+- **Add a key at a specific time:** Right-click a parameter-track row and choose **Add Key Here**.
+  - The key’s value is captured from the current bound parameter state.
+- **Move a key in time:** Drag the key horizontally.
+- **Edit a key:** Double-click a key to open the key editor dialog:
+  - Edit **Time**, **Type (easing)**, and the **Value**.
+  - Camera keys additionally expose position-spline controls (tension/continuity/bias) for smooth camera paths.
+- **Delete keys:** select one or more keys (rubber-band selection works), then press `Delete` or `Backspace`.
+
+**Undo/redo**
+
+- Animation edits are undoable using the standard **Edit → Undo / Redo** (or `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`).
 
 ### 4.11 Alias Objects
 
@@ -482,10 +585,30 @@ Steps to load and manage images via `ZImgDoc`:
 
 ### 5.1 Navigation Fundamentals
 
-1. **Zoom** – use mouse wheel, `Ctrl/Cmd` + `+`/`-`, or View toolbar buttons.
-2. **Pan** – enable Scroll Hand Drag mode or press Spacebar while dragging.
-3. **Rubber band selection** – choose Rubber Band Drag and draw selection boxes.
-4. **Fit to window** – reframe the dataset.
+Atlas is designed to stay responsive on **large-scale images**. The 2D view is viewport-driven: when you pan/zoom, Atlas updates the visible region and (for paged/progressive sources) may refine imagery as data becomes available.
+
+1. **Zoom (keyboard / toolbar)**
+   - Use **View → Zoom In / Zoom Out**, the toolbar zoom icons, or:
+     - Zoom in: `Ctrl/Cmd` + `=` (or `+`)
+     - Zoom out: `Ctrl/Cmd` + `-`
+   - **Zoom to the mouse cursor (highly useful on large images):**
+     1. Move the mouse over the feature/area you care about.
+     2. Press the zoom shortcut (or click the zoom toolbar buttons).
+     3. Atlas zooms **around that point** (the view zoom anchor is “under mouse”).
+     - If your cursor is not over the 2D view, zoom behaves like a normal centered zoom.
+   - You can also type an exact zoom percentage in the **Zoom** widget (percent scale).
+   - Trackpad/touch devices: pinch zoom is supported (Qt pinch gesture).
+
+2. **Pan / scroll**
+   - Mouse wheel scroll pans the view (scrollbars) when the scene is larger than the viewport.
+   - Switch to **Scroll Hand Drag** mode to pan by left-dragging.
+   - Trackpad/touch devices: two-finger pan is supported (Qt pan gesture).
+
+3. **Rubber band selection**
+   - Switch to **Rubber Band Drag** mode, then left-drag to draw a selection rectangle.
+
+4. **Fit into window**
+   - Use **View → Fit Into Window** (or the toolbar button) to fit the full scene bounds into the current view.
 
 ### 5.2 View Styles and Slicing
 
@@ -495,19 +618,113 @@ Steps to load and manage images via `ZImgDoc`:
 4. **Time navigation** – for time-series data, adjust the time spin box.
 5. **Viewport parameter** – read `ZView::viewportPara` to track the exact bounding box displayed.
 
+Shortcuts and tips:
+
+- **Slice stepping (Normal View only):** `Left` / `Right` arrow keys move one slice backward/forward.
+- **ROI across slices:** ROI tools operate over the “current slice range”:
+  - Normal View: current slice only
+  - Maximum Z Projection: the full Z range shown by the projection
+
 ### 5.3 ROI Authoring Tools
 
-1. **Activate ROI mode** – choose ROI or RegionAnnotation from the ROI Mode drop-down.
-2. **Select a drawing tool** – spline, polygon, rectangle, ellipse, or Cut (splits existing ROIs).
-3. **Draw** – click to place control points. For splines, double-click to finish; for polygons, close the shape.
-4. **Edit** – use context handles in the Edit and Output dock or switch to selection mode to move points.
-5. **Undo/Redo** – `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` operate on the ROI’s undo stack.
-6. **Convert to masks** – use the ROI document actions described in section 4.3.
+Atlas provides interactive ROI drawing tools that work in two closely related modes:
+
+- **ROI mode**: creates/edits ROI objects (`ZROIDoc`).
+- **RegionAnnotation mode**: creates region-annotation ROIs (ROIs associated with regions; may expose region-specific actions).
+
+#### Step 1: choose ROI mode
+
+Use the **ROI Mode** drop-down in the toolbar:
+
+- **ROI** – writes ROI shapes into the current ROI object.
+- **RegionAnnotation** – writes shapes into the current Region Annotation object.
+
+#### Step 2: choose a drawing tool
+
+Select one of the ROI tools (toolbar icons):
+
+- **Spline**
+- **Polygon**
+- **Rectangle**
+- **Ellipse**
+- **Cut** (polyline; primarily used for line-style annotations in RegionAnnotation mode)
+
+#### Step 3: choose how your new shape combines with existing ROI
+
+At the moment you start drawing (first click), the keyboard modifier determines the operation:
+
+- **No modifier**: **New** (create a new shape operation).
+- **`Ctrl` held**: **Add** (union / merge into existing ROI).
+- **`Alt` held**: **Subtract** (carve out from existing ROI).
+
+Keep the modifier consistent while placing points; the operation is chosen at the start of the gesture.
+
+#### Step 4: draw the ROI (per tool)
+
+All drawing happens directly in the 2D view.
+
+**Spline tool (closed shape)**
+
+- **Add points:** left-click to place control points; move the mouse to preview the next segment.
+- **Freehand sketch:** you can left-drag to sketch; Atlas will sample points as you move.
+- **Finish / close:** either:
+  - **Double-click** to close the spline and commit it, or
+  - Click the **starting marker** (the first white point) to close and commit.
+- **Undo last point while drawing:** press `Esc`.
+  - `Esc` removes the last placed point; pressing `Esc` repeatedly walks back.
+  - If you have not placed any additional points, `Esc` cancels the in-progress shape.
+
+**Polygon tool (closed shape)**
+
+- **Add vertices:** left-click to add vertices; move the mouse to preview the next edge.
+- **Freehand sketch:** you can left-drag to trace a polygonal outline (adds many vertices).
+- **Finish / close:** either:
+  - **Double-click** to close and commit, or
+  - Click the **starting marker** to close and commit.
+- **Undo last vertex while drawing:** press `Esc` (same behavior as spline).
+
+**Rectangle tool**
+
+- **Draw:** left-click and drag to define the rectangle.
+- **Commit:** release the mouse button to create the rectangle ROI.
+- The `Ctrl`/`Alt` modifier at the initial press selects Add/Subtract semantics.
+
+**Ellipse tool**
+
+- **Draw:** left-click and drag to define the ellipse bounds.
+- **Commit:** release the mouse button to create the ellipse ROI.
+- The `Ctrl`/`Alt` modifier at the initial press selects Add/Subtract semantics.
+
+**Cut tool (polyline)**
+
+- **Draw:** left-click to start; add points by clicking (or sketch by dragging).
+- **Finish:** double-click to end the line.
+- In **RegionAnnotation** mode this creates a line-style ROI/annotation; for “cutting away” from an ROI object, use `Alt` (Subtract) with Spline/Polygon/Rectangle/Ellipse tools.
+
+#### Step 5: edit existing ROI geometry (after creation)
+
+- **Control points:** ROI shapes expose editable control points (small markers). You can rubber-band select them and press `Delete`/`Backspace` to remove selected control points.
+- **Rotate selected control points (ROI refinement):**
+  - Clockwise: `Ctrl+R`
+  - Counterclockwise: `Ctrl+Alt+R`
+  - Each press rotates selected control points by **1°** around the **last point you clicked** in the 2D view (rotation pivot).
+- **Context menu (right-click):**
+  - On polygon/spline/line shapes you can use **Add Ctrl Point Here** to insert a new control point.
+  - Some modes expose additional operations like “Subtract Next Selected Shape...” for boolean edits.
+
+#### Step 6: undo/redo and conversion
+
+- **Undo/redo:** `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` apply to ROI edits through the ROI document undo stack.
+- **Convert to masks:** use the ROI document actions described in section 4.3.
 
 ### 5.4 Selection, Copy, and Paste
 
 - `Ctrl/Cmd+C` (`ZView::copy`) copies the current ROI/selection.
-- `Ctrl/Cmd+V` (`ZView::paste`) pastes into the current document (ROI or RegionAnnotation as dictated by ROI mode).
+- `Ctrl/Cmd+V` (`ZView::paste`) pastes into the current document (ROI or RegionAnnotation as dictated by ROI mode) at the **last left-clicked point** in the 2D view.
+- Right-click in the 2D view for paste variants:
+  - **Paste Here**
+  - **Paste Horizontally Flipped**
+  - **Paste Vertically Flipped**
 - Use the context menu in Objects Manager to copy file paths or show items in the OS file browser.
 
 ### 5.5 The Edit and Output Dock
@@ -515,8 +732,7 @@ Steps to load and manage images via `ZImgDoc`:
 1. **Access** – double-click an object in Objects Manager or choose **Open Edit Widget** from context.
 2. **Tabs** – each object with an editor gets its own tab labeled `Edit <Name [ID]>`. Titles update automatically when objects are renamed or modified.
 3. **Log Output** – pinned first tab collects log lines (via `ZLogWidget`).
-4. **Closing tabs** – click the close button. The log tab cannot be closed (
-`ZObjEditWidget` hides the button for tab index 0).
+4. **Closing tabs** – click the close button. The log tab cannot be closed (`ZObjEditWidget` hides the close button for tab index 0).
 
 ### 5.6 Logging View Changes
 
@@ -536,12 +752,31 @@ Steps to load and manage images via `ZImgDoc`:
 
 ### 6.2 Camera Navigation
 
-- **Rotate** – left-click drag.
-- **Pan** – `Shift` + left-click drag.
-- **Zoom/Dolly** – mouse wheel, `Ctrl/Cmd +`/`-`.
-- **Roll** – `Alt` + drag.
-- **Reset Camera** – toolbar button or **View → Reset Camera** fits all visible objects.
-- **Context menu** – right-click for quick options.
+Atlas uses a classical **trackball/orbit** camera controller centered on the camera’s focal point (“Center”).
+
+**Mouse (trackball)**
+
+- **Rotate / orbit**: left-drag (also works with `Ctrl` + left-drag).
+- **Pan / shift**: `Shift` + left-drag (moves both Eye and Center together, keeping the view direction).
+- **Dolly / zoom**: mouse wheel scroll.
+- **Roll**: `Alt` + left-drag (spins around the view axis).
+
+**Keyboard nudges (discrete steps)**
+
+- **Rotate**: `Ctrl` + arrow keys *(may require a numeric keypad on some keyboards/layouts)*.
+- **Pan**: `Shift` + arrow keys *(same note as above)*.
+- **Roll**: `Alt` + Left/Right *(same note as above)*.
+- **Zoom in/out**: `Ctrl/Cmd` + `=`/`-` (the standard Zoom In/Out menu shortcuts in the 3D window).
+
+**Reset / framing**
+
+- **Reset Camera**: toolbar button or **View → Reset Camera** fits all visible objects.
+- **Frame specific objects**: use **Global View Setting → Camera Control → Focuses on Objects...** (section 6.4).
+
+**Notes**
+
+- Modifier keys are matched exactly. If you hold a different modifier (for example `Cmd`/Meta on macOS) while dragging, that gesture may stop matching the trackball controls.
+- Right-click opens a context menu whose contents depend on what is under the cursor (some object types provide object-specific actions).
 
 ### 6.3 Object View Settings in 3D
 
@@ -550,23 +785,85 @@ Steps to load and manage images via `ZImgDoc`:
 3. Use the Global/Per-object tabs to manage render passes.
 4. Changes immediately affect the 3D canvas; for heavy operations (full-resolution volume streaming) watch the progress toolbar.
 
+**Quick transform shortcut (selected objects)**
+
+- When a transform-enabled object is selected in 3D, you can rotate it in small increments:
+  - `Alt+X`, `Alt+Y`, `Alt+Z`: rotate +1° around X/Y/Z.
+  - `Alt+Shift+X`, `Alt+Shift+Y`, `Alt+Shift+Z`: rotate −1° around X/Y/Z.
+
 ### 6.4 Global View Settings in 3D
 
-1. **Open the Global View Setting dock**.
-2. **Camera** – set projection, focal distance, clip planes, stereo eye parameters.
-3. **Lighting** – toggle global lighting, adjust intensities.
-4. **Fog and transparency** – choose a transparency method (Blend No Depth Mask, Blend Delayed, Dual Depth Peeling, Weighted Average, Weighted Blended). On Vulkan, **Per-Pixel Fragment List (PPLL Exact)** is also available for highest-quality exact OIT (heavier than DDP).
-5. **Global cuts** – X/Y/Z plane sliders clip data globally; oblique cuts reveal interior structures.
-   - Global Cut Mode (per axis) determines how the two endpoints are recalculated when dataset bounds change:
-     - Absolute: hold values in world units; clamp to the new range.
-       - newLower = clamp(oldLower, min, max); newUpper = clamp(oldUpper, min, max)
-     - Track Edges: pin each endpoint independently to the moving min/max using “Pin Lower/Pin Upper”. If a toggle is OFF, that endpoint holds its absolute value (clamped).
-       - newLower = (PinLower ? min : clamp(oldLower, min, max))
-       - newUpper = (PinUpper ? max : clamp(oldUpper, min, max))
-     - Normalized [0..1]: store fractional endpoints f0,f1; recompute by linear interpolation on each bounds change.
-       - newLower = min + (max−min)·f0; newUpper = min + (max−min)·f1
-   - Defaults: Track Edges with both toggles ON (shows full range and follows edges).
-   - Tips: Track Edges to keep “show all” or pin sides while the other stays fixed; Absolute to lock a fixed window; Normalized to keep a proportional window (e.g., 0.1→0.9).
+Global View Setting contains 3D parameters that apply to the **entire** 3D scene (camera, lighting, transparency, and global clipping/cuts). These settings are particularly useful while authoring 3D animations because they can be adjusted at a given time and captured with **Save Key Frame**.
+
+#### Camera Control (buttons)
+
+At the top of the global settings you will see a **Camera Control** widget with action buttons. These are higher-level camera operations than editing `Eye/Center/Up` numerically:
+
+<!-- > 📸 **Screenshot to add:** Global View Setting dock focused on the “Camera Control” widget.
+  Suggested filename: docs/images/global_view_setting_camera_control.png
+
+  Suggested embed (uncomment when ready):
+  <p align="center">
+    <img src="./images/global_view_setting_camera_control.png" alt="global_view_setting_camera_control" width="800">
+  </p>
+
+  Annotate:
+  - Azimuth/Elevation/Roll/Yaw/Pitch buttons + degree spin boxes.
+  - Focuses on Objects... / Focuses on Objects (ignore clipping)...
+  - Camera Points to Objects... / Camera Points to Objects (ignore clipping)...
+  - Flip + XY/XZ/YZ preset buttons.
+-->
+
+- **Azimuth Camera**: orbit horizontally around the focal point (rotate the camera about the view-up vector).
+- **Elevation Camera**: orbit vertically around the focal point.
+- **Roll Camera**: rotate around the view axis (spin the camera).
+- **Yaw Camera**: rotate the focal point around the camera position (turn the scene left/right from a fixed eye point).
+- **Pitch Camera**: rotate the focal point around the camera position (turn up/down from a fixed eye point).
+
+Framing helpers (opens an object chooser dialog):
+
+- **Focuses on Objects...**: fits the camera to the selected objects **after clipping** (respects current cuts); preserves your current view direction.
+- **Focuses on Objects (ignore clipping)...**: fits to the full object bounds, even if the objects are clipped.
+- **Camera Points to Objects...**: moves the camera **Center** to the selected objects (after clipping) without moving the camera eye position.
+- **Camera Points to Objects (ignore clipping)...**: same, but uses unclipped bounds.
+
+View presets:
+
+- **Flip**: look from the opposite side (flip view direction).
+- **XY / XZ / YZ**: reset to an orthogonal view preset (fits the scene first, then rotates to the requested plane).
+
+Animation tip: at a key moment, use these buttons to get the framing you want, then press **Save Key Frame** to capture the camera and global settings at that time.
+
+#### Camera (parameters)
+
+The **Camera** parameter group exposes the underlying camera state (for example `Eye Position`, `Center Position`, `Up Vector`, `Field of View`, and `Projection Type`). These values are animatable and are captured by **Save Key Frame**.
+
+In general:
+
+- Use **Camera Control** for framing/orbit-style moves.
+- Use **Camera** parameters when you need exact numeric values (for reproducible views or fine adjustment).
+
+#### Transparency, lighting, and fog
+
+- **Transparency**: choose a transparency method (Blend No Depth Mask, Blend Delayed, Dual Depth Peeling, Weighted Average, Weighted Blended).
+  - On Vulkan, **Per-Pixel Fragment List (PPLL Exact)** is also available for exact OIT (heavier than Dual Depth Peeling).
+- **Lighting**: adjust scene ambient and per-light parameters (positions/colors/attenuation).
+- **Fog**: choose mode and tune colors/range/density for depth cues.
+
+#### Global cuts (scene-wide clipping)
+
+X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
+
+- Global Cut Mode (per axis) determines how the two endpoints are recalculated when dataset bounds change:
+  - Absolute: hold values in world units; clamp to the new range.
+    - newLower = clamp(oldLower, min, max); newUpper = clamp(oldUpper, min, max)
+  - Track Edges: pin each endpoint independently to the moving min/max using “Pin Lower/Pin Upper”. If a toggle is OFF, that endpoint holds its absolute value (clamped).
+    - newLower = (PinLower ? min : clamp(oldLower, min, max))
+    - newUpper = (PinUpper ? max : clamp(oldUpper, min, max))
+  - Normalized [0..1]: store fractional endpoints f0,f1; recompute by linear interpolation on each bounds change.
+    - newLower = min + (max−min)·f0; newUpper = min + (max−min)·f1
+- Defaults: Track Edges with both toggles ON (shows full range and follows edges).
+- Tips: Track Edges to keep “show all” or pin sides while the other stays fixed; Absolute to lock a fixed window; Normalized to keep a proportional window (e.g., 0.1→0.9).
 
 ### 6.5 Background, Axis, and Help Panels
 
@@ -651,15 +948,18 @@ Steps to load and manage images via `ZImgDoc`:
 
 ### 8.3 3D Animation Export in the GUI
 
-1. Prepare a 3D animation (section 4.10).
-2. In the 3D Capture dock, switch to animation export mode.
-3. Configure parameters:
-   - Output filename (video file).
-   - Frame rate, start frame, end frame.
-   - Output size, stereo mode, tiling.
-   - Optional flags (overwrite existing output, limit memory usage).
-4. Start export. Atlas renders frames, optionally encodes a video (ffmpeg integration), and reports progress.
-5. Completion is indicated by progress bar reaching 100% and logs noting success.
+1. Prepare a 3D animation (section 4.10) and open its editor (double-click the animation in **Objects Manager**).
+2. In the timeline toolbar, click the **camcorder icon** (**Export Animation**) to show the export panel.
+3. Configure export options:
+   - **Stereo** (optional) and **Stereo Type**:
+     - Half side-by-side (default)
+     - Full side-by-side
+   - **Use Window Size** or set a **Custom Image Size**.
+   - **Frames per Second**, **Start Frame**, **End Frame** (set `-1` to export until the end).
+   - Optional: **Tile Size** and **Tile Border** for very large outputs (reduces GPU texture pressure).
+   - **Output filename** (`*.mp4` / `*.mov`).
+4. Click **Export**. Atlas renders frames and encodes the video, showing progress in the 3D window’s progress UI.
+5. To stop an export, use **Cancel Rendering** in the 3D window progress toolbar. Check logs if an export fails mid-way (GPU memory pressure, missing files, or encoder errors).
 <p align="center">
   <img src="./images/animationexport.png" alt="animationexport" width="800">
 </p>
@@ -724,12 +1024,51 @@ For automation or cluster rendering:
 
 ### 9.3 Build a 3D Animation for Presentation
 
-1. **Prepare scene**: load objects, arrange view, save base scene.
-2. **Create animation**: in 3D window **Animation → Make 3D Animation**, name it “Presentation”.
-3. **Set keyframes**: in Edit and Output dock, add keyframes for camera positions, object visibility, channel changes.
-4. **Preview**: play the animation in the 3D window, adjust timing as needed.
-5. **Export**: follow section 8.3 to produce a video (e.g., 1920×1080 @ 30 fps).
-6. **Document**: capture still frames for slides.
+1. **Prepare a clean scene**
+   - Load your objects (images/meshes/SWC/etc.), set visibility, shading, and global cuts.
+   - Open the 3D window (**View → Open 3D Window**) and confirm you can navigate smoothly.
+   - Save the base scene (`File → Save Scene...`) so you can always return to a known starting state.
+
+2. **Create the animation**
+   - In the 3D window: **Animation → Make 3D Animation**.
+   - Give it a descriptive name (e.g., “Presentation”).
+
+3. **Open the animation editor**
+   - In **Objects Manager**, find the new `Animation3D` object and **double-click** it.
+   - The animation editor appears in the bottom **Edit and Output** dock.
+
+4. **Set duration + baseline**
+   - Set **Duration** to your desired length (e.g., 10–30 seconds).
+   - Ensure **Current Time = 0.0**.
+   - Adjust the scene to your desired starting look (camera framing, visibility, lighting, transparency method).
+   - Press **Save Key Frame** to capture a deterministic baseline at `t = 0.0`.
+
+5. **Author “beats” using Save Key Frame**
+   - Move **Current Time** to the next beat (e.g., `t = 3.0`).
+   - Make changes in the scene:
+     - Use trackball navigation (section 6.2).
+     - Use **Global View Setting → Camera Control** for precise framing:
+       - **Focuses on Objects...** for tight shots,
+       - **Camera Points to Objects...** to shift the look-at point,
+       - **XY/XZ/YZ** and **Flip** for clean orthogonal views.
+     - Adjust per-object parameters in **Object View Setting** (opacity/transform/colormap/cuts).
+   - Press **Save Key Frame** again to capture the full scene state at that time.
+   - Repeat for all beats in your timeline.
+
+6. **Preview + refine**
+   - Use **Play/Pause** and **Reverse Play/Pause** in the editor to preview motion.
+   - If motion feels too abrupt:
+     - Edit key **Type (easing)** by double-clicking a key (try `InOutQuad` for smooth transitions).
+     - Add more keys between beats (right-click a track row → **Add Key Here**).
+     - Drag keys to fine-tune timing (snap-free; uses continuous seconds).
+
+7. **Keep the timeline readable**
+   - Expand an object to see its tracks; use **Show All ...** only when you need to keyframe rarely-used parameters.
+   - Use **Remove Redundant Keys** after you are happy with the look to remove “no-op” keys and reduce clutter.
+
+8. **Export**
+   - In the timeline toolbar, click the **camcorder icon** to open the export panel (section 8.3).
+   - Export a video (e.g., 1920×1080 @ 30 fps), then review it outside Atlas.
 
 ### 9.4 Generate High-Resolution Stereo Captures
 
@@ -858,18 +1197,31 @@ This feature is intended for offline/developer scripting and may be omitted from
 
 | Context | Action | Shortcut |
 | --- | --- | --- |
-| 2D | Zoom in | `Ctrl/Cmd` + `=` or `+` |
-| 2D | Zoom out | `Ctrl/Cmd` + `-` |
-| 2D | Fit into window | `F` (via menu) |
-| 2D | Pan | Scroll Hand Drag or Space + drag |
-| 2D | Rubber band select | Rubber Band Drag |
+| 2D | Zoom in (around cursor when mouse is over view) | `Ctrl/Cmd` + `=` (or `+`) |
+| 2D | Zoom out (around cursor when mouse is over view) | `Ctrl/Cmd` + `-` |
+| 2D | Fit into window | View → Fit Into Window (toolbar; no default shortcut) |
+| 2D | Pan / scroll | Mouse wheel scroll, or Scroll Hand Drag mode + left-drag |
+| 2D | Slice step (Normal View only) | `Left` / `Right` |
+| 2D (ROI) | Close polygon/spline | Double-click (or click the starting marker) |
+| 2D (ROI) | Undo last point while drawing | `Esc` |
+| 2D (ROI) | Delete selected control points | `Delete` or `Backspace` |
+| 2D (ROI) | Rotate selected control points (+1°) | `Ctrl+R` (around last clicked point) |
+| 2D (ROI) | Rotate selected control points (−1°) | `Ctrl+Alt+R` (around last clicked point) |
+| 2D | Rubber band select | Rubber Band Drag mode |
 | 2D | Copy | `Ctrl/Cmd+C` |
-| 2D | Paste | `Ctrl/Cmd+V` |
-| 3D | Rotate | Left drag or `Ctrl/Cmd` + arrow keys |
-| 3D | Pan | `Shift` + drag or `Shift` + arrow keys |
-| 3D | Zoom | Mouse wheel or `Ctrl/Cmd` + `+`/`-` |
-| 3D | Roll | `Alt` + drag or `Alt` + left/right |
+| 2D | Paste (at last left-clicked point) | `Ctrl/Cmd+V` |
+| 3D | Orbit (trackball rotate) | Left drag (or `Ctrl` + left drag) |
+| 3D | Pan (trackball shift) | `Shift` + left drag |
+| 3D | Dolly (trackball zoom) | Mouse wheel scroll |
+| 3D | Zoom in/out (menu) | `Ctrl/Cmd` + `=` / `-` |
+| 3D | Roll | `Alt` + left drag |
+| 3D | Rotate (keyboard nudge) | `Ctrl` + arrow keys *(may require numeric keypad)* |
+| 3D | Pan (keyboard nudge) | `Shift` + arrow keys *(may require numeric keypad)* |
+| 3D | Roll (keyboard nudge) | `Alt` + Left/Right *(may require numeric keypad)* |
+| 3D | Rotate selected object | `Alt+X/Y/Z`, `Alt+Shift+X/Y/Z` |
 | 3D | Reset camera | Toolbar or menu |
+| Animation | Save key frame | `Ctrl+K` |
+| Animation | Delete selected keys | `Delete` or `Backspace` |
 | Global | Undo / Redo | `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` |
 | Global | Delete selected objects | `Delete` or `Backspace` |
 
