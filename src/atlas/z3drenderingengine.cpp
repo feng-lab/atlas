@@ -947,6 +947,18 @@ void Z3DRenderingEngine::setYZView()
 
 void Z3DRenderingEngine::init()
 {
+  // All engine initialization must run on the engine's owning thread. In GUI
+  // mode this is the dedicated rendering thread; in headless/offscreen export
+  // paths the engine lives on the main thread.
+  CHECK(QThread::currentThread() == this->thread()) << "Z3DRenderingEngine::init must run on engine thread";
+
+  // Ensure Vulkan/linear-script call sites can reliably detect the render thread
+  // even when we don't create a dedicated QThread (headless export).
+  //
+  // initAndAttachToCanvas() also sets this, but headless paths call init()
+  // directly, so set it here as well to keep the invariant consistent.
+  setCurrentRenderThreadExecutor(m_renderThreadExecutor.get());
+
   Q_EMIT progressChanged(10);
   initGL();
   getGLFocus();
