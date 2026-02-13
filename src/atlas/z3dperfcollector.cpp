@@ -7,6 +7,7 @@
 #include <fstream>
 #include <fmt/format.h>
 #include <limits>
+#include <optional>
 #include <unordered_map>
 #include "zjson.h"
 
@@ -155,6 +156,11 @@ void Z3DPerfCollector::flush(uint64_t token)
   std::unordered_map<std::string, double> gpuByLabelAll;
   std::unordered_map<std::string, double> gpuByLabelPass;
   std::unordered_map<std::string, double> cpuByLabel;
+  // "pre_cpu" (perf-frame-start → first CPU encode scope start) is reported
+  // once per perf token (frame). Each submission carries its own preCpuStartMs,
+  // but we only care about the earliest submission.
+  std::optional<double> preCpuStartFirstMs;
+  uint32_t preCpuStartFirstSubmissionId = 0;
   // Aggregate stats across submissions
   Stats agg{};
 
@@ -188,6 +194,12 @@ void Z3DPerfCollector::flush(uint64_t token)
     agg.spheresBytesStaged += sub.stats.spheresBytesStaged;
     agg.readbackBytesCopied += sub.stats.readbackBytesCopied;
     agg.readbackSlotsInFlight += sub.stats.readbackSlotsInFlight;
+    if (sub.stats.preCpuStartSamples > 0) {
+      if (!preCpuStartFirstMs.has_value() || sub.submissionId < preCpuStartFirstSubmissionId) {
+        preCpuStartFirstSubmissionId = sub.submissionId;
+        preCpuStartFirstMs = sub.stats.preCpuStartMs;
+      }
+    }
     agg.allSamples += sub.stats.allSamples;
     if (sub.stats.allSamples > 0 && sub.stats.allMaxMs > agg.allMaxMs) {
       agg.allMaxMs = sub.stats.allMaxMs;
@@ -225,6 +237,9 @@ void Z3DPerfCollector::flush(uint64_t token)
   });
 
   std::string msg = fmt::format("Frame#{} CPU {:.3f} ms, GPU {:.3f} ms", token, totalCpuMs, totalGpuMs);
+  if (preCpuStartFirstMs.has_value() && *preCpuStartFirstMs >= 0.0) {
+    msg += fmt::format(" | pre_cpu {:.3f} ms", *preCpuStartFirstMs);
+  }
   if (agg.allSamples > 0 && agg.allMaxMs >= 0.0) {
     msg += fmt::format(" | all {:.3f} ms", agg.allMaxMs);
   }

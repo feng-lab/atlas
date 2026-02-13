@@ -51,6 +51,11 @@ public:
     size_t spheresBytesStaged = 0;
     size_t readbackBytesCopied = 0;
     uint32_t readbackSlotsInFlight = 0;
+    // Perf-frame-start → first Vulkan submission CPU-scope start.
+    // Populated per submission; the perf collector reports the earliest
+    // submission's value as "pre_cpu" in the per-frame summary line.
+    uint32_t preCpuStartSamples = 0;
+    double preCpuStartMs = 0.0;
     uint32_t allSamples = 0; // perf-frame-start → host-ready observations (end-to-end UX latency)
     double allMaxMs = 0.0; // max over allSamples
 

@@ -691,6 +691,13 @@ private:
 
     std::chrono::steady_clock::time_point cpuStart;
     std::chrono::steady_clock::time_point cpuEnd;
+    // Time between perf-frame start (Z3DRenderGlobalState::beginNewPerfFrameToken)
+    // and the start of this submission's CPU encode window (cpuStart).
+    //
+    // This captures engine/filter overhead, Vulkan frame-slot acquisition, safe
+    // point pumping, and any other per-frame work that occurs before the backend
+    // starts its measured CPU scope for this submission.
+    std::optional<double> preCpuStartMs;
 
     // Descriptor arena (per-frame)
     std::unique_ptr<ZVulkanDescriptorPool> descriptorPool; // reset only after fence signal

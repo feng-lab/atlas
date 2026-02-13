@@ -614,7 +614,14 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Capture the frame name from the renderer (if provided)
   frameResources.frameName = std::string(renderer.currentFrameLabel());
   frameResources.progressivePassHint = renderer.currentRenderPassIsProgressive();
-  frameResources.cpuStart = std::chrono::steady_clock::now();
+  const auto now = std::chrono::steady_clock::now();
+  const auto perfStart = Z3DRenderGlobalState::instance().currentPerfFrameStartTime();
+  if (perfStart.time_since_epoch().count() != 0) {
+    frameResources.preCpuStartMs = std::chrono::duration<double, std::milli>(now - perfStart).count();
+  } else {
+    frameResources.preCpuStartMs.reset();
+  }
+  frameResources.cpuStart = now;
   frameResources.cpuEnd = {};
   // Tag this submission with the current real-frame token and a submission index
   frameResources.realFrameToken = Z3DRenderGlobalState::instance().currentPerfFrameToken();
@@ -5114,6 +5121,10 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     stats.spheresBytesStaged = frame.spheresBytesStaged;
     stats.readbackBytesCopied = frame.readbackBytesCopied;
     stats.readbackSlotsInFlight = frame.readbackSlotsInFlight;
+    if (frame.preCpuStartMs.has_value() && *frame.preCpuStartMs >= 0.0) {
+      stats.preCpuStartSamples = 1;
+      stats.preCpuStartMs = *frame.preCpuStartMs;
+    }
     stats.allSamples = frame.allSamples;
     stats.allMaxMs = frame.allMaxMs.value_or(0.0);
     stats.drawSecondaryCacheAttempts = frame.drawSecondaryCacheAttempts;
@@ -5137,6 +5148,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
   frame.nextQuery = 0;
   frame.cpuStart = {};
   frame.cpuEnd = {};
+  frame.preCpuStartMs.reset();
 }
 
 std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view label)
