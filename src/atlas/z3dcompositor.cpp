@@ -579,6 +579,19 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   }
 }
 
+Z3DCompositor::~Z3DCompositor()
+{
+  resetVulkanSceneBatchCaches();
+}
+
+void Z3DCompositor::resetVulkanSceneBatchCaches()
+{
+  m_vkSceneBgGeomCacheKey = {};
+  for (auto& cached : m_vkSceneBgGeomCache) {
+    cached.reset();
+  }
+}
+
 void Z3DCompositor::updateBackgroundMode()
 {
   const auto mode = static_cast<BackgroundMode>(m_backgroundMode.associatedData());

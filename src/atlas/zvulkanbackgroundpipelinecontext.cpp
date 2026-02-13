@@ -77,12 +77,15 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
 
 
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.vertexBuffers = {quad.buffer()};
-  drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+
+  const std::array<vk::Buffer, 1> vertexBuffers{quad.buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{vk::DeviceSize(0)};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.vertexCount = vertexCount;
   drawSpec.instanceCount = 1;
   drawSpec.pushConstantsData = &constants;

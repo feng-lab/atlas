@@ -112,7 +112,8 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   ds->updateTexture(0, *atlas, m_backend.defaultSampler());
 
   // Debug: verify viewport/scissor and atlas metadata for MoltenVK issues
-  VLOG(1) << fmt::format(
+  // Per-draw diagnostic; keep behind VLOG(2) so --v=1 remains usable for perf runs.
+  VLOG(2) << fmt::format(
     "VK font state: viewport=({:.1f},{:.1f} {:.1f}x{:.1f}) scissor=({},{} {}x{}) atlas={}x{} fmt={} picking={}",
     viewport.x,
     viewport.y,
@@ -158,15 +159,18 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   constants.shadowColor = payload.shadowColor;
 
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = 0;
-  drawSpec.descriptorSets = {ds->descriptorSet()};
+  const std::array<vk::DescriptorSet, 1> descriptorSets{ds->descriptorSet()};
+  drawSpec.descriptorSets = std::span<const vk::DescriptorSet>(descriptorSets);
   drawSpec.expectedDescriptorSetCount = 1;
-  drawSpec.vertexBuffers = {m_vertexUploadBuffer};
-  drawSpec.vertexOffsets = {m_vertexUploadOffset};
+  const std::array<vk::Buffer, 1> vertexBuffers{m_vertexUploadBuffer};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{m_vertexUploadOffset};
+  drawSpec.vertexBuffers = std::span<const vk::Buffer>(vertexBuffers);
+  drawSpec.vertexOffsets = std::span<const vk::DeviceSize>(vertexOffsets);
   drawSpec.indexBuffer = m_indexUploadBuffer;
   drawSpec.indexOffset = m_indexUploadOffset;
   drawSpec.indexType = vk::IndexType::eUint32;
@@ -177,7 +181,7 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
   drawSpec.requirePushConstants = true;
 
-  VLOG(1) << fmt::format("VK font draw(recorder): verts={} idx={} picking={} dpr={:.3f} usesCoordXf=1",
+  VLOG(2) << fmt::format("VK font draw(recorder): verts={} idx={} picking={} dpr={:.3f} usesCoordXf=1",
                          m_vertexCount,
                          m_indexCount,
                          payload.pickingPass,

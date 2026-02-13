@@ -11,12 +11,20 @@
 #include <folly/coro/Task.h>
 #include <folly/ScopeGuard.h>
 
+#include <chrono>
+
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
 DEFINE_bool(atlas_vk_linear_script_validate_batch_metadata,
             false,
             "Enable expensive CHECK-based validation of Vulkan batch metadata in ZVulkanLinearScript before executing");
+
+DEFINE_bool(
+  atlas_vk_linear_script_merge_rasters,
+  true,
+  "If true, merge consecutive raster nodes into a single Vulkan submission (reduces overhead). When false, each raster "
+  "node is executed as its own submission to aid profiling.");
 
 namespace nim {
 namespace {
@@ -273,7 +281,9 @@ ZVulkanLinearScript::SegmentHandle ZVulkanLinearScript::raster(std::string_view 
   m_pendingSubmissionHasGpuNodes = true;
   RasterNode node;
   node.label = std::string(label);
+  const auto captureStart = std::chrono::steady_clock::now();
   node.state = m_renderer.captureVulkanBatches(recordBatches, label);
+  node.captureMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - captureStart).count();
   m_nodes.emplace_back(std::move(node));
   return handle;
 }
@@ -502,20 +512,29 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
 
 void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
 {
+  const bool mergeRasters = FLAGS_atlas_vk_linear_script_merge_rasters;
   RendererCPUState merged;
   std::vector<std::string_view> mergedLabels;
   size_t mergedNodeCount = 0;
+  double mergedCaptureMs = 0.0;
 
   auto flushMerged = [&]() {
     if (merged.batches.empty()) {
       mergedNodeCount = 0;
       mergedLabels.clear();
+      mergedCaptureMs = 0.0;
       return;
     }
 
     std::string label = fmt::format("{}", fmt::join(mergedLabels, " + "));
     if (label.empty()) {
       label = fmt::format("raster_coalesced({})", mergedNodeCount);
+    }
+
+    if (mergedCaptureMs > 0.0) {
+      const std::string captureLabel = fmt::format("capture {}", label);
+      m_backend.recordCpuScope(captureLabel, mergedCaptureMs);
+      mergedCaptureMs = 0.0;
     }
 
     m_backend.beginPassScope(label);
@@ -542,8 +561,41 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
 
   for (auto& node : nodes) {
     if (auto* rasterNode = std::get_if<RasterNode>(&node)) {
+      if (!mergeRasters) {
+        flushMerged();
+
+        const std::string& label = rasterNode->label;
+        if (rasterNode->captureMs > 0.0) {
+          const std::string captureLabel = fmt::format("capture {}", label);
+          m_backend.recordCpuScope(captureLabel, rasterNode->captureMs);
+        }
+
+        if (rasterNode->state.batches.empty()) {
+          continue;
+        }
+
+        m_backend.beginPassScope(label);
+        std::optional<size_t> gpuScope;
+        if (!label.empty()) {
+          gpuScope = m_backend.beginGpuScope(label);
+        }
+        auto scopeGuard = folly::makeGuard([&]() {
+          if (gpuScope.has_value()) {
+            m_backend.endGpuScope(*gpuScope);
+          }
+          m_backend.endPassScope();
+        });
+
+        if (FLAGS_atlas_vk_linear_script_validate_batch_metadata) {
+          validateVulkanBatchMetadataOrCrash(label, rasterNode->state);
+        }
+        m_backend.processBatches(m_renderer, rasterNode->state);
+        continue;
+      }
+
       mergedNodeCount++;
       mergedLabels.push_back(std::string_view(rasterNode->label));
+      mergedCaptureMs += rasterNode->captureMs;
 
       if (!rasterNode->state.batches.empty()) {
         merged.batches.reserve(merged.batches.size() + rasterNode->state.batches.size());

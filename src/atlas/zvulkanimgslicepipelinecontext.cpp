@@ -411,7 +411,17 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       BlockIdPipelineKey blockKey{resources.levelCount, blockFormat};
       auto& blockPipeline = ensureBlockIdPipeline(blockKey, blockFormat);
 
-      const std::vector<vk::DescriptorSet> descriptorSets = collectSliceDescriptorSets(resources, /*usePaging=*/true);
+      std::array<vk::DescriptorSet, 3> descriptorSets{};
+      {
+        CHECK(resources.pagedTextureDescriptor != nullptr)
+          << "Slice pipeline requires paged descriptor when paging is enabled";
+        CHECK(resources.pageDescriptor != nullptr) << "Slice pipeline missing paging params descriptor set";
+        ensureEmptyDescriptor();
+        CHECK(m_emptyDescriptor != nullptr) << "Slice pipeline missing fallback empty descriptor";
+        descriptorSets[0] = resources.pagedTextureDescriptor->descriptorSet();
+        descriptorSets[1] = m_emptyDescriptor->descriptorSet();
+        descriptorSets[2] = resources.pageDescriptor->descriptorSet();
+      }
 
       struct SlicePushConstant
       {
@@ -425,15 +435,18 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       }
 
       ZVulkanGraphicsDrawSpec drawSpec{};
-      drawSpec.viewports = {viewport};
-      drawSpec.scissors = {scissor};
+      drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+      drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
       drawSpec.pipelineHandle = blockPipeline.pipeline->pipelineHandle();
       drawSpec.pipelineLayoutHandle = blockPipeline.pipeline->pipelineLayoutHandle();
       drawSpec.descriptorSetFirst = 0;
       drawSpec.descriptorSets = descriptorSets;
       drawSpec.expectedDescriptorSetCount = 3;
-      drawSpec.vertexBuffers = {m_vertexBuffer->buffer()};
-      drawSpec.vertexOffsets = {0};
+
+      const std::array<vk::Buffer, 1> vertexBuffers{m_vertexBuffer->buffer()};
+      const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+      drawSpec.vertexBuffers = vertexBuffers;
+      drawSpec.vertexOffsets = vertexOffsets;
       CHECK((range.vertexOffsetBytes % sizeof(SliceVertex)) == 0u)
         << "Slice vertex offset not aligned to vertex stride";
       drawSpec.vertexCount = range.vertexCount;
@@ -604,7 +617,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                         vk::ImageAspectFlags{});
     }
     ds->updateStorageBuffer(1, *outBuffer);
-    compSpec.descriptorSets = {ds->descriptorSet()};
+
+    const std::array<vk::DescriptorSet, 1> descriptorSets{ds->descriptorSet()};
+    compSpec.descriptorSets = descriptorSets;
 
     struct PC
     {
@@ -832,7 +847,23 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     sliceKey.depthFormat = formats.depthFormat;
     auto& pipeline = ensureSlicePipeline(sliceKey, formats);
 
-    std::vector<vk::DescriptorSet> descriptorSets = collectSliceDescriptorSets(resources, pagingDraw);
+    std::array<vk::DescriptorSet, 3> descriptorSets{};
+    uint32_t descriptorSetCount = 0;
+    if (pagingDraw) {
+      CHECK(resources.pagedTextureDescriptor != nullptr)
+        << "Slice pipeline requires paged descriptor when paging is enabled";
+      CHECK(resources.pageDescriptor != nullptr) << "Slice pipeline missing paging params descriptor set";
+      ensureEmptyDescriptor();
+      CHECK(m_emptyDescriptor != nullptr) << "Slice pipeline missing fallback empty descriptor";
+      descriptorSets[0] = resources.pagedTextureDescriptor->descriptorSet();
+      descriptorSets[1] = m_emptyDescriptor->descriptorSet();
+      descriptorSets[2] = resources.pageDescriptor->descriptorSet();
+      descriptorSetCount = 3;
+    } else {
+      CHECK(resources.fastTextureDescriptor != nullptr) << "Slice pipeline fast path missing descriptor set";
+      descriptorSets[0] = resources.fastTextureDescriptor->descriptorSet();
+      descriptorSetCount = 1;
+    }
 
     struct SlicePushConstant
     {
@@ -846,15 +877,18 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     }
 
     ZVulkanGraphicsDrawSpec drawSpec{};
-    drawSpec.viewports = {viewport};
-    drawSpec.scissors = {scissor};
+    drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+    drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
     drawSpec.descriptorSetFirst = 0;
-    drawSpec.descriptorSets = std::move(descriptorSets);
+    drawSpec.descriptorSets = std::span<const vk::DescriptorSet>(descriptorSets.data(), descriptorSetCount);
     drawSpec.expectedDescriptorSetCount = pagingDraw ? std::optional<uint32_t>(3u) : std::optional<uint32_t>(1u);
-    drawSpec.vertexBuffers = {m_vertexBuffer->buffer()};
-    drawSpec.vertexOffsets = {0};
+
+    const std::array<vk::Buffer, 1> vertexBuffers{m_vertexBuffer->buffer()};
+    const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+    drawSpec.vertexBuffers = vertexBuffers;
+    drawSpec.vertexOffsets = vertexOffsets;
     drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
     drawSpec.instanceCount = 1;
     drawSpec.pushConstantsData = &pc;
@@ -903,22 +937,22 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   mergeKey.depthFormat = formats.depthFormat;
   auto& mergePipeline = ensureMergePipeline(mergeKey, formats);
 
-  std::vector<vk::DescriptorSet> mergeSets;
-  if (m_mergeDescriptor) {
-    mergeSets.push_back(m_mergeDescriptor->descriptorSet());
-  }
-  CHECK(!mergeSets.empty()) << "Slice merge requires descriptor set with layer textures";
+  CHECK(m_mergeDescriptor != nullptr) << "Slice merge requires descriptor set with layer textures";
+  const std::array<vk::DescriptorSet, 1> mergeSets{m_mergeDescriptor->descriptorSet()};
 
   ZVulkanGraphicsDrawSpec mergeDraw{};
-  mergeDraw.viewports = {viewport};
-  mergeDraw.scissors = {scissor};
+  mergeDraw.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  mergeDraw.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   mergeDraw.pipelineHandle = mergePipeline.pipeline->pipelineHandle();
   mergeDraw.pipelineLayoutHandle = mergePipeline.pipeline->pipelineLayoutHandle();
   mergeDraw.descriptorSetFirst = 0;
-  mergeDraw.descriptorSets = std::move(mergeSets);
+  mergeDraw.descriptorSets = mergeSets;
   mergeDraw.expectedDescriptorSetCount = 1;
-  mergeDraw.vertexBuffers = {m_quadVertexBuffer->buffer()};
-  mergeDraw.vertexOffsets = {0};
+
+  const std::array<vk::Buffer, 1> vertexBuffers{m_quadVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  mergeDraw.vertexBuffers = vertexBuffers;
+  mergeDraw.vertexOffsets = vertexOffsets;
   mergeDraw.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
   mergeDraw.instanceCount = 1;
   recorder.recordGraphicsDraw(mergeDraw);
@@ -1851,24 +1885,6 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
                                                      : (shaderBase + "block_id_compact_append.comp.spv");
     VLOG(1) << fmt::format("ensureSliceBlockIdCompactionPipeline: source={} shader='{}'", sourceTag(source), compPath);
   }
-}
-
-std::vector<vk::DescriptorSet> ZVulkanImgSlicePipelineContext::collectSliceDescriptorSets(ChannelResources& resources,
-                                                                                          bool usePaging)
-{
-  if (usePaging) {
-    CHECK(resources.pagedTextureDescriptor != nullptr)
-      << "Slice pipeline requires paged descriptor when paging is enabled";
-    CHECK(resources.pageDescriptor != nullptr) << "Slice pipeline missing paging params descriptor set";
-    ensureEmptyDescriptor();
-    CHECK(m_emptyDescriptor != nullptr) << "Slice pipeline missing fallback empty descriptor";
-    return {resources.pagedTextureDescriptor->descriptorSet(),
-            m_emptyDescriptor->descriptorSet(),
-            resources.pageDescriptor->descriptorSet()};
-  }
-
-  CHECK(resources.fastTextureDescriptor != nullptr) << "Slice pipeline fast path missing descriptor set";
-  return {resources.fastTextureDescriptor->descriptorSet()};
 }
 
 } // namespace nim

@@ -169,6 +169,7 @@ void Z3DPerfCollector::flush(uint64_t token)
     for (const auto& s : sub.cpuScopes) {
       cpuByLabel[s.label] += s.ms;
     }
+    agg.drawsSubmitted += sub.stats.drawsSubmitted;
     agg.descriptorSetsAllocated += sub.stats.descriptorSetsAllocated;
     agg.overrideSetsAllocated += sub.stats.overrideSetsAllocated;
     agg.pipelinesCreated += sub.stats.pipelinesCreated;
@@ -179,6 +180,7 @@ void Z3DPerfCollector::flush(uint64_t token)
     agg.descriptorWritesWhileRecording += sub.stats.descriptorWritesWhileRecording;
     agg.boundSetRewriteAttempts += sub.stats.boundSetRewriteAttempts;
     agg.uploadHighWatermarkBytes = std::max(agg.uploadHighWatermarkBytes, sub.stats.uploadHighWatermarkBytes);
+    agg.uniformHighWatermarkBytes = std::max(agg.uniformHighWatermarkBytes, sub.stats.uniformHighWatermarkBytes);
     agg.staticBytesStaged += sub.stats.staticBytesStaged;
     agg.linesBytesStaged += sub.stats.linesBytesStaged;
     agg.fontsBytesStaged += sub.stats.fontsBytesStaged;
@@ -190,6 +192,13 @@ void Z3DPerfCollector::flush(uint64_t token)
     if (sub.stats.allSamples > 0 && sub.stats.allMaxMs > agg.allMaxMs) {
       agg.allMaxMs = sub.stats.allMaxMs;
     }
+    agg.drawSecondaryCacheAttempts += sub.stats.drawSecondaryCacheAttempts;
+    agg.drawSecondaryCacheKeyFound += sub.stats.drawSecondaryCacheKeyFound;
+    agg.drawSecondaryCacheSignatureMismatches += sub.stats.drawSecondaryCacheSignatureMismatches;
+    agg.drawSecondaryCacheSignatureMismatchMaskOr |= sub.stats.drawSecondaryCacheSignatureMismatchMaskOr;
+    agg.drawSecondaryCacheHits += sub.stats.drawSecondaryCacheHits;
+    agg.drawSecondaryCacheBuilds += sub.stats.drawSecondaryCacheBuilds;
+    agg.drawSecondaryCacheExecutes += sub.stats.drawSecondaryCacheExecutes;
   }
 
   const auto& gpuByLabelBaseline = gpuByLabelPass.empty() ? gpuByLabelAll : gpuByLabelPass;
@@ -207,6 +216,11 @@ void Z3DPerfCollector::flush(uint64_t token)
   // Sort by contribution
   std::vector<std::pair<std::string, double>> sortedGpu(gpuByLabel.begin(), gpuByLabel.end());
   std::sort(sortedGpu.begin(), sortedGpu.end(), [](const auto& a, const auto& b) {
+    return a.second > b.second;
+  });
+
+  std::vector<std::pair<std::string, double>> sortedCpu(cpuByLabel.begin(), cpuByLabel.end());
+  std::sort(sortedCpu.begin(), sortedCpu.end(), [](const auto& a, const auto& b) {
     return a.second > b.second;
   });
 
@@ -256,21 +270,39 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // One-line frame summary: include concise stats instead of a second line
-  std::string stats = fmt::format(" | stats: upload_hi={}B static_staged={}B rb={}B",
+  std::string stats = fmt::format(" | stats: draws={} upload_hi={}B ubo_hi={}B static_staged={}B rb={}B",
+                                  agg.drawsSubmitted,
                                   agg.uploadHighWatermarkBytes,
+                                  agg.uniformHighWatermarkBytes,
                                   agg.staticBytesStaged,
                                   agg.readbackBytesCopied);
-  stats += fmt::format(" dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={}",
-                       agg.descriptorSetsAllocated,
-                       agg.overrideSetsAllocated,
-                       agg.pipelinesCreated,
-                       agg.pipelinesBoundCount,
-                       agg.renderingSegmentsBegan,
-                       agg.attachmentClears,
-                       agg.attachmentLoads,
-                       agg.descriptorWritesWhileRecording,
-                       agg.boundSetRewriteAttempts);
+  stats += fmt::format(
+    " dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={} sec2=a{} f{} m{} h{} b{} e{} mask=0x{:x}",
+    agg.descriptorSetsAllocated,
+    agg.overrideSetsAllocated,
+    agg.pipelinesCreated,
+    agg.pipelinesBoundCount,
+    agg.renderingSegmentsBegan,
+    agg.attachmentClears,
+    agg.attachmentLoads,
+    agg.descriptorWritesWhileRecording,
+    agg.boundSetRewriteAttempts,
+    agg.drawSecondaryCacheAttempts,
+    agg.drawSecondaryCacheKeyFound,
+    agg.drawSecondaryCacheSignatureMismatches,
+    agg.drawSecondaryCacheHits,
+    agg.drawSecondaryCacheBuilds,
+    agg.drawSecondaryCacheExecutes,
+    agg.drawSecondaryCacheSignatureMismatchMaskOr);
   LOG(INFO) << (msg + stats);
+
+  if (!sortedCpu.empty()) {
+    std::string cpuMsg = fmt::format("Frame#{} CPU scopes", token);
+    for (const auto& [label, ms] : sortedCpu) {
+      cpuMsg += fmt::format(" | {} {:.3f} ms", label, ms);
+    }
+    LOG(INFO) << cpuMsg;
+  }
 
   // Optional: emit a Chrome trace JSON for this frame
   if (!FLAGS_atlas_perf_trace.empty()) {

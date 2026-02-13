@@ -329,6 +329,13 @@ public:
   // for any draw/copy that consumes static slices.
   void pinStaticSliceForActiveSubmission(const StaticSlice& slice);
 
+  // Return a stable identity for static-arena buffers (device-local VB/IB
+  // segments). This is used by per-draw secondary command-buffer caches to
+  // avoid false cache hits when VkBuffer handles are reused after destruction.
+  //
+  // Returns 0 when the buffer does not belong to the backend static arenas.
+  [[nodiscard]] uint64_t staticArenaSegmentIdForBuffer(vk::Buffer buffer) const;
+
   // Request eviction of all cached static geometry for a given streamKey.
   // This is processed on the render thread during beginRender().
   void requestEvictStream(uint64_t streamKey);
@@ -341,6 +348,12 @@ public:
   // Allocate a descriptor set from the current frame's arena. Returns null when
   // no active frame exists (e.g., zero-sized viewport), and logs at VLOG(1).
   std::unique_ptr<ZVulkanDescriptorSet> allocateFrameDescriptorSet(vk::DescriptorSetLayout layout);
+  // Allocate a descriptor set that persists for the lifetime of the current
+  // frame-slot (ActiveFrame::key()). These sets are allocated from a per-slot
+  // descriptor pool that is *not* reset every submission, enabling cached
+  // secondary command buffers to bind stable descriptor-set handles across
+  // frames.
+  std::unique_ptr<ZVulkanDescriptorSet> allocatePersistentDescriptorSet(vk::DescriptorSetLayout layout);
 
   // Allocate a per-draw override descriptor set and keep it alive until the
   // current frame fence signals. Returns a raw pointer owned by the backend.
@@ -472,6 +485,35 @@ public:
   void pinTextureForActiveSubmission(class ZVulkanTexture* texture);
   void notifyPipelineCreated();
   void notifyPipelineBound(vk::Pipeline pipeline);
+
+  struct DrawSecondarySignatureMismatchMask
+  {
+    static constexpr uint32_t kPipeline = 1u << 0;
+    static constexpr uint32_t kLayout = 1u << 1;
+    static constexpr uint32_t kBaseDescriptorSets = 1u << 2;
+    static constexpr uint32_t kBaseDescriptorGenerations = 1u << 3;
+    static constexpr uint32_t kOitDescriptorPresence = 1u << 4;
+    static constexpr uint32_t kOitDescriptorSet = 1u << 5;
+    static constexpr uint32_t kOitDescriptorGeneration = 1u << 6;
+    static constexpr uint32_t kDynamicOffsets = 1u << 7;
+    static constexpr uint32_t kVertexBuffers = 1u << 8;
+    static constexpr uint32_t kVertexOffsets = 1u << 9;
+    static constexpr uint32_t kIndexState = 1u << 10;
+    static constexpr uint32_t kCounts = 1u << 11;
+    static constexpr uint32_t kPushConstants = 1u << 12;
+    static constexpr uint32_t kViewport = 1u << 13;
+    static constexpr uint32_t kScissor = 1u << 14;
+    static constexpr uint32_t kVertexBufferLifetime = 1u << 15;
+    static constexpr uint32_t kIndexBufferLifetime = 1u << 16;
+  };
+
+  void notifyDrawSecondaryCacheAttempt();
+  void notifyDrawSecondaryCacheKeyFound();
+  void notifyDrawSecondaryCacheSignatureMismatch();
+  void notifyDrawSecondaryCacheSignatureMismatchMask(uint32_t mask);
+  void notifyDrawSecondaryCacheHit();
+  void notifyDrawSecondaryCacheBuild();
+  void notifyDrawSecondaryCacheExecute();
   // Queue a static copy (upload slice -> device-local VB/IB) to be executed
   // outside dynamic rendering before command buffer end in this frame.
   void scheduleStaticCopy(vk::Buffer dst, vk::DeviceSize dstOffset, const UploadSlice& src, bool isIndexBuffer);
@@ -487,6 +529,7 @@ public:
   {
     return m_frameRecording;
   }
+
   void notifyDescriptorWriteWhileRecording(bool rewriteAttempt)
   {
     if (m_activeFrame) {
@@ -651,6 +694,10 @@ private:
 
     // Descriptor arena (per-frame)
     std::unique_ptr<ZVulkanDescriptorPool> descriptorPool; // reset only after fence signal
+    // Descriptor arena that persists for the lifetime of this frame-slot. This
+    // is intentionally not reset each submission so cached command buffers can
+    // keep binding the same descriptor-set handles across frames.
+    std::unique_ptr<ZVulkanDescriptorPool> persistentDescriptorPool;
     uint32_t descriptorSetsAllocated = 0; // VLOG(1) counter per frame
     bool arenaResetScheduled = false; // scheduled at endRender()
     uint32_t arenaResetsPerformed = 0; // count performed resets (debug)
@@ -666,6 +713,16 @@ private:
     uint32_t renderingSegmentsBegan = 0; // number of vkCmdBeginRendering calls
     uint32_t attachmentClears = 0; // number of attachments begun with Clear loadOp
     uint32_t attachmentLoads = 0; // number of attachments begun with Load loadOp
+    uint32_t drawsSubmitted = 0; // number of draw calls recorded in this submission
+
+    // Command buffer reuse diagnostics (optional; populated by pipeline contexts)
+    uint32_t drawSecondaryCacheAttempts = 0;
+    uint32_t drawSecondaryCacheKeyFound = 0;
+    uint32_t drawSecondaryCacheSignatureMismatches = 0;
+    uint32_t drawSecondaryCacheSignatureMismatchMaskOr = 0;
+    uint32_t drawSecondaryCacheHits = 0;
+    uint32_t drawSecondaryCacheBuilds = 0;
+    uint32_t drawSecondaryCacheExecutes = 0;
 
     // Pipelines
     uint32_t pipelinesCreated = 0; // graphics pipelines created this frame
@@ -759,6 +816,19 @@ private:
       // drift (under-hinting) even when base/carry capacities mask overflow.
       size_t minCapacityHint = 0;
     } uniformArena;
+
+    // Persistent host-visible uniform arena intended for per-stream/per-draw
+    // UBO slices whose dynamic offsets must remain stable across frames (e.g.
+    // cached command buffers). This arena is NOT reset each frame; it grows as
+    // new streams are observed for this frame-slot.
+    struct PersistentUniformArena
+    {
+      std::unique_ptr<class ZVulkanBuffer> buffer; // host-visible, host-coherent
+      void* mapped = nullptr; // persistent mapping
+      size_t capacity = 0; // bytes
+      size_t cursor = 0; // bump pointer (never reset while buffer remains valid)
+      size_t highWatermark = 0; // debug
+    } persistentUniformArena;
     // Shared per-frame dynamic offset for lighting UBO slice in the uniform arena
     vk::DeviceSize lightingDynOffset = 0;
     // Shared per-frame dynamic offset for a "picking" lighting UBO slice in the
@@ -807,9 +877,9 @@ private:
 
   void collectFrameTimings(FrameResources& frame);
   void flushScheduledCopies(vk::raii::CommandBuffer& cmd);
-  void recordCpuScope(std::string_view label, double milliseconds);
   void ensureStaticArenas();
   void ensureUniformArena(FrameResources& frame);
+  void ensurePersistentUniformArena(FrameResources& frame);
   // DDP indirect-count: ensure per-frame buffers exist
   void ensureDDPGatingResources(FrameResources& frame);
   // PPLL (exact OIT): ensure per-frame buffers exist
@@ -820,6 +890,10 @@ private:
   size_t uniformAlignment() const;
 
 public:
+  // Record an additional CPU scope for perf collection. Intended for
+  // external bookkeeping (e.g. batch capture time) during an active frame.
+  void recordCpuScope(std::string_view label, double milliseconds);
+
   // DDP indirect-count gating (device-side early stop for DDP peel)
   bool ddpIndirectCountEnabled() const;
   vk::Buffer ddpChangedFlagBuffer();
@@ -890,7 +964,25 @@ public:
     return suballocateUniform(bytes, alignment);
   }
 
+  // Allocate a slice from the persistent uniform arena for the given payload
+  // type. Intended for per-stream/per-draw UBO data whose dynamic offsets must
+  // remain stable across frames for command buffer reuse.
+  template<typename PayloadT>
+  UniformSlice suballocatePersistentUniformFor(const PayloadT& payload, size_t bytes, size_t alignment = 0)
+  {
+    (void)payload;
+    using CleanPayloadT = std::remove_cvref_t<PayloadT>;
+    static_assert(
+      vulkan::kHasUniformArenaBudgetTraits<CleanPayloadT>,
+      "Persistent uniform arena allocation requires vulkan::UniformArenaBudgetTraits specialization for payload");
+    return suballocatePersistentUniform(bytes, alignment);
+  }
+
   class ZVulkanBuffer& uniformArenaBuffer();
+  class ZVulkanBuffer& persistentUniformArenaBuffer();
+  // Obtain a mapped pointer into the persistent uniform arena for a previously
+  // allocated offset range (debug-checked).
+  [[nodiscard]] void* persistentUniformMappedAt(vk::DeviceSize offset, size_t bytes);
   // Dynamic offset of the shared per-frame lighting UBO slice
   [[nodiscard]] vk::DeviceSize frameSharedLightingOffset() const
   {
@@ -906,6 +998,7 @@ public:
 
 private:
   UniformSlice suballocateUniform(size_t bytes, size_t alignment = 0);
+  UniformSlice suballocatePersistentUniform(size_t bytes, size_t alignment = 0);
 
 public:
   void addLineBytesStaged(size_t bytes)
@@ -1004,6 +1097,7 @@ public:
     struct Segment
     {
       Kind kind = Kind::Vertex;
+      uint64_t id = 0;
       std::unique_ptr<class ZVulkanBuffer> buffer; // device-local
       VmaVirtualBlock block = nullptr; // virtual suballocator over [0, capacity)
       size_t capacity = 0; // bytes
@@ -1030,6 +1124,10 @@ public:
 
     // Map VkBuffer handle to owning segment for pin/unpin and copy safety.
     std::unordered_map<VkBuffer, Segment*> segmentByBuffer;
+
+    // Monotonic segment identity counter. Used to disambiguate VkBuffer handle
+    // reuse after segment destruction.
+    uint64_t nextSegmentId = 1;
 
     // Telemetry: peak total allocated bytes across all segments.
     size_t vbHighWatermark = 0;
@@ -1087,6 +1185,7 @@ public:
 
   // Helpers for descriptor arena lifecycle
   void ensureArenaOnFrame(FrameResources& frame);
+  void ensurePersistentArenaOnFrame(FrameResources& frame);
   void applyPendingArenaReset(FrameResources& frame);
   // Opportunistically enter the "frame completion safe point" for any frame
   // slots whose fences have completed and whose completion callbacks have been

@@ -20,10 +20,12 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 
 namespace nim {
 
 class ZVulkanLinearScript;
+struct RendererCPUState;
 
 class Z3DCompositor : public Z3DBoundedFilter
 {
@@ -31,6 +33,7 @@ class Z3DCompositor : public Z3DBoundedFilter
 
 public:
   explicit Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  ~Z3DCompositor() override;
 
   bool isReady(Z3DEye eye) const override;
 
@@ -46,11 +49,13 @@ public:
   void setGeometryFilters(const std::vector<Z3DGeometryFilter*>& filters)
   {
     m_geometryFilters = filters;
+    resetVulkanSceneBatchCaches();
   }
 
   void setVolumeFilters(const std::vector<Z3DImgFilter*>& filters)
   {
     m_volumeFilters = filters;
+    resetVulkanSceneBatchCaches();
   }
 
   // Debug helpers: save the current output attachments directly to disk.
@@ -355,6 +360,18 @@ private:
   // Vulkan async readback can complete later than newer frames; keep presentation
   // monotonic by dropping stale publishes (older perf-frame tokens) per eye.
   std::array<uint64_t, 3> m_lastPublishedPerfFrameToken{};
+
+  struct VulkanBatchesCacheKey
+  {
+    glm::uvec2 targetSize{0u, 0u};
+    bool clearAtStart = false;
+    bool drawBackground = false;
+  };
+
+  VulkanBatchesCacheKey m_vkSceneBgGeomCacheKey{};
+  std::array<std::shared_ptr<RendererCPUState>, 3> m_vkSceneBgGeomCache{};
+
+  void resetVulkanSceneBatchCaches();
 
   // Z3DVertexBufferObject m_PBO;
 };

@@ -65,6 +65,9 @@ struct TransformsUBOStd140
                                                        glm::vec4(0.0f, 0.0f, 1.0f, 0.0f)};
   glm::mat4 projection_matrix{1.0f};
   glm::mat4 inverse_projection_matrix{1.0f};
+  // parameters.x = sizeScale (global)
+  // parameters.y = ortho flag (0 perspective, 1 ortho)
+  // parameters.z = sphere boxCorrection (used by sphere shaders; 0 for most pipelines)
   glm::vec4 parameters{1.0f, 0.0f, 0.0f, 0.0f};
   // x = enabled (0/1), y = planeCount, z/w reserved
   glm::ivec4 clip_params{0, 0, 0, 0};

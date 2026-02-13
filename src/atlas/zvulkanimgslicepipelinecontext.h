@@ -223,7 +223,6 @@ private:
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
   void ensureBlockIdCompactionPipeline();
 
-  std::vector<vk::DescriptorSet> collectSliceDescriptorSets(ChannelResources& resources, bool usePaging);
   // depthArray is optional
   void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
 

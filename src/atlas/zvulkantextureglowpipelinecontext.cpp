@@ -107,15 +107,18 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     blurConstants.blurStrength = payload.blurStrength;
 
     ZVulkanGraphicsDrawSpec drawSpec{};
-    drawSpec.viewports = {viewport};
-    drawSpec.scissors = {scissor};
+    drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+    drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = blurPipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = blurPipeline.pipeline->pipelineLayoutHandle();
-    drawSpec.descriptorSets = {blurDS->descriptorSet()};
+    const std::array<vk::DescriptorSet, 1> descriptorSets{blurDS->descriptorSet()};
+    drawSpec.descriptorSets = descriptorSets;
     drawSpec.descriptorSetFirst = 0;
     drawSpec.expectedDescriptorSetCount = 1;
-    drawSpec.vertexBuffers = {quad.buffer()};
-    drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+    const std::array<vk::Buffer, 1> vertexBuffers{quad.buffer()};
+    const std::array<vk::DeviceSize, 1> vertexOffsets{vk::DeviceSize(0)};
+    drawSpec.vertexBuffers = vertexBuffers;
+    drawSpec.vertexOffsets = vertexOffsets;
     drawSpec.vertexCount = 4;
     drawSpec.instanceCount = 1;
     drawSpec.pushConstantsData = &blurConstants;
@@ -154,15 +157,18 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     glowConstants.screenDimRcp = glm::vec2(1.0f / viewport.width, 1.0f / viewport.height);
 
     ZVulkanGraphicsDrawSpec drawSpec{};
-    drawSpec.viewports = {viewport};
-    drawSpec.scissors = {scissor};
+    drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+    drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = glowPipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = glowPipeline.pipeline->pipelineLayoutHandle();
-    drawSpec.descriptorSets = {glowDS->descriptorSet()};
+    const std::array<vk::DescriptorSet, 1> descriptorSets{glowDS->descriptorSet()};
+    drawSpec.descriptorSets = descriptorSets;
     drawSpec.descriptorSetFirst = 0;
     drawSpec.expectedDescriptorSetCount = 1;
-    drawSpec.vertexBuffers = {quad.buffer()};
-    drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+    const std::array<vk::Buffer, 1> vertexBuffers{quad.buffer()};
+    const std::array<vk::DeviceSize, 1> vertexOffsets{vk::DeviceSize(0)};
+    drawSpec.vertexBuffers = vertexBuffers;
+    drawSpec.vertexOffsets = vertexOffsets;
     drawSpec.vertexCount = 4;
     drawSpec.instanceCount = 1;
     drawSpec.pushConstantsData = &glowConstants;

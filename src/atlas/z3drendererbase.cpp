@@ -518,7 +518,7 @@ void Z3DRendererBase::setActiveSurfaceWithLoadStore(const RendererFrameState::Ac
                                                     const ClearValue& clearValue)
 {
   m_frameState.setActiveSurface(surface);
-  VLOG(1) << "activeSurface set: colors=" << m_frameState.activeSurface.colorAttachments.size()
+  VLOG(2) << "activeSurface set: colors=" << m_frameState.activeSurface.colorAttachments.size()
           << " depth=" << m_frameState.activeSurface.depthAttachment.has_value()
           << " colorLoad=" << enumToString(colorLoad) << " colorStore=" << enumToString(colorStore)
           << " depthLoad=" << enumToString(depthLoad) << " depthStore=" << enumToString(depthStore);
@@ -539,7 +539,7 @@ void Z3DRendererBase::setActiveSurfaceWithLoadStore(const RendererFrameState::Ac
 {
   // Apply the surface as-is without overriding per-attachment load/store.
   m_frameState.setActiveSurface(surface);
-  VLOG(1) << "activeSurface preserved: colors=" << m_frameState.activeSurface.colorAttachments.size()
+  VLOG(2) << "activeSurface preserved: colors=" << m_frameState.activeSurface.colorAttachments.size()
           << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
 }
 
@@ -959,7 +959,7 @@ void Z3DRendererBase::renderVulkan(Z3DEye eye, Z3DRendererBase::RendererSpan ren
   // different renderer purely to collect CPU batches. Do not require an active
   // recording session here; submission happens on the owning renderer.
 
-  VLOG(1) << "VK render label='" << m_currentPassLabel << "' renderers=" << renderers.size()
+  VLOG(2) << "VK render label='" << m_currentPassLabel << "' renderers=" << renderers.size()
           << " activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
           << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
 
@@ -974,7 +974,7 @@ void Z3DRendererBase::renderPickingVulkan(Z3DEye eye, Z3DRendererBase::RendererS
   CHECK(m_activeBackend == RenderBackend::Vulkan) << "renderPickingVulkan requires Vulkan backend (got GL)";
   // See comment in renderVulkan: allow out-of-session collection for aggregators.
 
-  VLOG(1) << "VK renderPicking label='" << m_currentPassLabel << "' renderers=" << renderers.size()
+  VLOG(2) << "VK renderPicking label='" << m_currentPassLabel << "' renderers=" << renderers.size()
           << " activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
           << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
 

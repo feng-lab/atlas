@@ -265,6 +265,7 @@ private:
   {
     std::string label;
     RendererCPUState state;
+    double captureMs = 0.0;
   };
 
   struct ReplayNode

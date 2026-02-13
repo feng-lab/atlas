@@ -18,17 +18,9 @@ layout(location = 4) out vec4 v_material_specular; // .w packs shininess when dy
 
 layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
-// Sphere-specific push constants
-layout(push_constant) uniform SpherePC {
-  float size_scale;
-  float box_correction;
-  float ortho;
-  float _pad_sp;
-} spc;
-
 void main()
 {
-  float radius = attr_vertex.w * spc.size_scale;
+  float radius = attr_vertex.w * xf.parameters.x;
 
   vec2 flags = mod(floor(vec2(attr_flags / 16.0, attr_flags)), 16.0);
   float rightFlag = flags.x - 1.0; // -1 or 1
@@ -47,7 +39,7 @@ void main()
 
   vec3 rightVector = vec3(xf.view_matrix[0][0], xf.view_matrix[1][0], xf.view_matrix[2][0]);
   vec3 upVector    = vec3(xf.view_matrix[0][1], xf.view_matrix[1][1], xf.view_matrix[2][1]);
-  vec3 cornerDirection = (spc.box_correction * upFlag) * upVector + (spc.box_correction * rightFlag) * rightVector;
+  vec3 cornerDirection = (xf.parameters.z * upFlag) * upVector + (xf.parameters.z * rightFlag) * rightVector;
 
   vec4 vertex = vec4(centerVertex.xyz + radius * cornerDirection, 1.0);
   vec4 eyeSpacePos = xf.view_matrix * vertex;

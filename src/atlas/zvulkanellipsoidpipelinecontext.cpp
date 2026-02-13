@@ -232,39 +232,57 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
 
   // Build draw-only spec
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = vkbind::kSetInputs;
 
   CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
     << "Ellipsoid pipeline placeholder descriptor set not initialised";
-  std::vector<vk::DescriptorSet> sets;
   const vk::DescriptorSet ds0 =
     dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : m_dsPlaceholder->descriptorSet();
-  sets.push_back(ds0);
-  sets.push_back(m_dsLighting->descriptorSet());
-  sets.push_back(m_dsTransforms->descriptorSet());
-  drawSpec.descriptorSets = sets;
-  drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_dynLightingOffset),
-                             static_cast<uint32_t>(m_dynTransformsOffset),
-                             static_cast<uint32_t>(m_dynMaterialOffset)};
+  const std::array<vk::DescriptorSet, 3> descriptorSets{ds0,
+                                                        m_dsLighting->descriptorSet(),
+                                                        m_dsTransforms->descriptorSet()};
+  drawSpec.descriptorSets = descriptorSets;
+  const std::array<uint32_t, 3> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
+                                               static_cast<uint32_t>(m_dynTransformsOffset),
+                                               static_cast<uint32_t>(m_dynMaterialOffset)};
+  drawSpec.dynamicOffsets = dynamicOffsets;
 
-  uint32_t expectedSets = static_cast<uint32_t>(sets.size());
+  uint32_t expectedSets = static_cast<uint32_t>(descriptorSets.size());
+  std::array<vk::DescriptorSet, 1> oitDescriptorSets{};
+  std::array<ZVulkanDescriptorBindInfo, 1> extraBinds{};
+  uint32_t extraBindCount = 0;
   if (m_dsOIT) {
     ZVulkanDescriptorBindInfo oitBind{};
     oitBind.firstSet = vkbind::kSetOITParams;
-    oitBind.sets = {m_dsOIT->descriptorSet()};
-    drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
+    oitDescriptorSets[0] = m_dsOIT->descriptorSet();
+    oitBind.sets = oitDescriptorSets;
+    extraBinds[0] = oitBind;
+    extraBindCount = 1;
     expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
   }
+  drawSpec.extraDescriptorBinds = std::span<const ZVulkanDescriptorBindInfo>(extraBinds.data(), extraBindCount);
   drawSpec.expectedDescriptorSetCount = expectedSets;
 
-  drawSpec.vertexBuffers =
-    {m_axis1Buffer, m_axis2Buffer, m_axis3Buffer, m_centerBuffer, m_colorBuffer, m_flagsBuffer, m_specularBuffer};
-  drawSpec.vertexOffsets =
-    {m_axis1Offset, m_axis2Offset, m_axis3Offset, m_centerOffset, m_colorOffset, m_flagsOffset, m_specularOffset};
+  const std::array<vk::Buffer, 7> vertexBuffers{m_axis1Buffer,
+                                                m_axis2Buffer,
+                                                m_axis3Buffer,
+                                                m_centerBuffer,
+                                                m_colorBuffer,
+                                                m_flagsBuffer,
+                                                m_specularBuffer};
+  const std::array<vk::DeviceSize, 7> vertexOffsets{m_axis1Offset,
+                                                    m_axis2Offset,
+                                                    m_axis3Offset,
+                                                    m_centerOffset,
+                                                    m_colorOffset,
+                                                    m_flagsOffset,
+                                                    m_specularOffset};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   if (m_indexCount > 0 && m_indexUploadBuffer) {
     drawSpec.indexBuffer = m_indexUploadBuffer;
     drawSpec.indexOffset = m_indexUploadOffset;

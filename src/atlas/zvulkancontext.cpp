@@ -882,18 +882,28 @@ void ZVulkanContext::createLogicalDevice()
   auto features2 = m_physicalDevices[m_selectedDeviceIndex]
                      .getFeatures2<vk::PhysicalDeviceFeatures2,
                                    vk::PhysicalDeviceVulkan12Features,
-                                   vk::PhysicalDeviceVulkan13Features>();
+                                   vk::PhysicalDeviceVulkan13Features,
+                                   vk::PhysicalDeviceMaintenance7FeaturesKHR,
+                                   vk::PhysicalDeviceNestedCommandBufferFeaturesEXT>();
   auto& physicalDeviceFeatures = features2.get<vk::PhysicalDeviceFeatures2>().features;
   auto& physicalDeviceVulkan12Features = features2.get<vk::PhysicalDeviceVulkan12Features>();
   auto& physicalDeviceVulkan13Features = features2.get<vk::PhysicalDeviceVulkan13Features>();
+  auto& physicalDeviceMaintenance7Features = features2.get<vk::PhysicalDeviceMaintenance7FeaturesKHR>();
+  auto& physicalDeviceNestedCommandBufferFeatures = features2.get<vk::PhysicalDeviceNestedCommandBufferFeaturesEXT>();
 
   // Setup enabled features
-  vk::
-    StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan12Features, vk::PhysicalDeviceVulkan13Features>
-      enabledFeatures2;
+  vk::StructureChain<vk::PhysicalDeviceFeatures2,
+                     vk::PhysicalDeviceVulkan12Features,
+                     vk::PhysicalDeviceVulkan13Features,
+                     vk::PhysicalDeviceMaintenance7FeaturesKHR,
+                     vk::PhysicalDeviceNestedCommandBufferFeaturesEXT>
+    enabledFeatures2;
   auto& enabledPhysicalDeviceFeatures2 = enabledFeatures2.get<vk::PhysicalDeviceFeatures2>();
   auto& enabledPhysicalDeviceVulkan12Features = enabledFeatures2.get<vk::PhysicalDeviceVulkan12Features>();
   auto& enabledPhysicalDeviceVulkan13Features = enabledFeatures2.get<vk::PhysicalDeviceVulkan13Features>();
+  auto& enabledPhysicalDeviceMaintenance7Features = enabledFeatures2.get<vk::PhysicalDeviceMaintenance7FeaturesKHR>();
+  auto& enabledPhysicalDeviceNestedCommandBufferFeatures =
+    enabledFeatures2.get<vk::PhysicalDeviceNestedCommandBufferFeaturesEXT>();
 
   // Clip planes are required for parity with the OpenGL backend's local/global
   // XYZ cuts. These use gl_ClipDistance in vertex shaders, so we must enable
@@ -949,17 +959,43 @@ void ZVulkanContext::createLogicalDevice()
 #ifdef __APPLE__
   auto deviceExtensionProperties = m_physicalDevices[m_selectedDeviceIndex].enumerateDeviceExtensionProperties();
   addRequiredExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, enabledExtensions, deviceExtensionProperties, true);
+#else
+  auto deviceExtensionProperties = m_physicalDevices[m_selectedDeviceIndex].enumerateDeviceExtensionProperties();
 #endif
 
   // Optional: enable calibrated timestamps device extension when available
-  try {
-    auto devExtPropsAll = m_physicalDevices[m_selectedDeviceIndex].enumerateDeviceExtensionProperties();
-    // Optional: memory budgeting (VK_EXT_memory_budget). Used for cache residency decisions.
-    addRequiredExtension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, enabledExtensions, devExtPropsAll, true);
-    addRequiredExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, enabledExtensions, devExtPropsAll, true);
+  // Optional: memory budgeting (VK_EXT_memory_budget). Used for cache residency decisions.
+  if (isExtensionAvailable(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, deviceExtensionProperties)) {
+    enabledExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
   }
-  catch (...) {
-    // Ignore; we'll fall back to uncalibrated traces if unavailable
+  if (isExtensionAvailable(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, deviceExtensionProperties)) {
+    enabledExtensions.push_back(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+  }
+
+  // Optional: allow mixing inline draws and secondary command buffers inside a
+  // vkCmdBeginRendering instance (needed for cached per-draw secondaries).
+  const bool hasMaintenance7 = isExtensionAvailable(VK_KHR_MAINTENANCE_7_EXTENSION_NAME, deviceExtensionProperties);
+  const bool hasNestedCmdBuf =
+    isExtensionAvailable(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME, deviceExtensionProperties);
+  if (hasMaintenance7) {
+    enabledExtensions.push_back(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
+  }
+  if (hasNestedCmdBuf) {
+    enabledExtensions.push_back(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
+  }
+  enabledPhysicalDeviceMaintenance7Features.maintenance7 =
+    hasMaintenance7 ? physicalDeviceMaintenance7Features.maintenance7 : VK_FALSE;
+  enabledPhysicalDeviceNestedCommandBufferFeatures.nestedCommandBuffer =
+    hasNestedCmdBuf ? physicalDeviceNestedCommandBufferFeatures.nestedCommandBuffer : VK_FALSE;
+  m_supportsInlineAndSecondaryDynamicRendering =
+    (enabledPhysicalDeviceMaintenance7Features.maintenance7 == VK_TRUE) ||
+    (enabledPhysicalDeviceNestedCommandBufferFeatures.nestedCommandBuffer == VK_TRUE);
+  if (VLOG_IS_ON(1)) {
+    VLOG(1) << fmt::format("VK nested command buffers: ext={} feat={} | maintenance7: ext={} feat={}",
+                           hasNestedCmdBuf,
+                           (enabledPhysicalDeviceNestedCommandBufferFeatures.nestedCommandBuffer == VK_TRUE),
+                           hasMaintenance7,
+                           (enabledPhysicalDeviceMaintenance7Features.maintenance7 == VK_TRUE));
   }
 
   // Create the logical device

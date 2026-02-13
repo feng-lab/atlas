@@ -76,6 +76,15 @@ public:
     return *m_commandPool;
   }
 
+  // True when the device was created with either VK_KHR_maintenance7
+  // (maintenance7 feature) or VK_EXT_nested_command_buffer (nestedCommandBuffer
+  // feature) enabled. This gates using VkRenderingInfo::flags with both inline
+  // and secondary-contents bits inside vkCmdBeginRendering.
+  [[nodiscard]] bool supportsInlineAndSecondaryDynamicRendering() const
+  {
+    return m_supportsInlineAndSecondaryDynamicRendering;
+  }
+
   // Queue family indices for the selected physical device
   struct QueueFamilyIndices
   {
@@ -130,6 +139,7 @@ private:
   std::optional<vk::raii::CommandPool> m_commandPool;
 
   QueueFamilyIndices m_queueFamilyIndices;
+  bool m_supportsInlineAndSecondaryDynamicRendering = false;
 };
 
 } // namespace nim

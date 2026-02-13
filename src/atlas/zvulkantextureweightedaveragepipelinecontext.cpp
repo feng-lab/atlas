@@ -110,16 +110,21 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
 
   // No OIT UBO needed
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = instance.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = instance.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = vkbind::kSetInputs;
-  drawSpec.descriptorSets = {ds->descriptorSet()};
+
+  const std::array<vk::DescriptorSet, 1> descriptorSets{ds->descriptorSet()};
+  drawSpec.descriptorSets = descriptorSets;
   drawSpec.expectedDescriptorSetCount = 1;
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  drawSpec.vertexBuffers = {quad.buffer()};
-  drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+
+  const std::array<vk::Buffer, 1> vertexBuffers{quad.buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{vk::DeviceSize(0)};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
   drawSpec.instanceCount = 1;
   drawSpec.pushConstantsData = nullptr;

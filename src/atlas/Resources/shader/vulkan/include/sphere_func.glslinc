@@ -3,14 +3,6 @@
 
 layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
-// Push constants specific to spheres
-layout(push_constant) uniform SpherePC {
-  float size_scale;
-  float box_correction;
-  float ortho;
-  float _pad_sp;
-} spc;
-
 layout(location = 0) in vec4 v_color;
 layout(location = 1) in vec3 v_sphere_center;
 layout(location = 2) in float v_radius2;
@@ -20,7 +12,7 @@ layout(location = 4) in vec4 v_material_specular; // .w carries shininess when d
 bool sphere_fragment_hit(out vec3 ipoint, out float fragDepth, out float alphaScale)
 {
   vec3 rayOrigin = v_point;
-  vec3 rayDirection = mix(normalize(v_point), vec3(0.0, 0.0, -1.0), spc.ortho);
+  vec3 rayDirection = mix(normalize(v_point), vec3(0.0, 0.0, -1.0), xf.parameters.y);
 
   vec3 sphereVector = v_sphere_center - rayOrigin;
   float b = dot(sphereVector, rayDirection);

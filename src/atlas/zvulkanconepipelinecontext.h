@@ -6,6 +6,8 @@
 #include "z3drenderervulkanbackend.h"
 #include "zvulkan.h"
 
+#include <array>
+#include <cstring>
 #include <map>
 #include <memory>
 #include <optional>
@@ -59,23 +61,40 @@ private:
     float pad2 = 0.0f;
   };
 
+  struct FormatsKey
+  {
+    enum : size_t
+    {
+      kMaxColors = 8
+    };
+    std::array<vk::Format, kMaxColors> colorFormats{};
+    uint32_t colorCount = 0;
+    vk::Format depthFormat = vk::Format::eUndefined; // eUndefined means "no depth"
+
+    static FormatsKey from(const vulkan::AttachmentFormats& formats);
+
+    auto tie() const
+    {
+      return std::tuple(colorCount, colorFormats, depthFormat);
+    }
+
+    bool operator<(const FormatsKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+
   struct PipelineKey
   {
     bool dynamicMaterial = true;
     bool useConeShader2 = false;
     int capsMode = 1;
     Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
-    std::vector<vk::Format> colorFormats;
-    std::optional<vk::Format> depthFormat;
+    FormatsKey formats;
 
     auto tie() const
     {
-      return std::tuple(dynamicMaterial,
-                        useConeShader2,
-                        capsMode,
-                        static_cast<int>(shaderHookType),
-                        colorFormats,
-                        depthFormat);
+      return std::tuple(dynamicMaterial, useConeShader2, capsMode, static_cast<int>(shaderHookType), formats);
     }
 
     bool operator<(const PipelineKey& rhs) const
@@ -98,10 +117,14 @@ private:
   vk::DescriptorSetLayout m_setLighting{};
   vk::DescriptorSetLayout m_setTransforms{};
   vk::DescriptorSetLayout m_setOIT{}; // set = 3
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsPlaceholder;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsOIT;
+  struct FrameDescriptorSets
+  {
+    std::unique_ptr<ZVulkanDescriptorSet> placeholder;
+    std::unique_ptr<ZVulkanDescriptorSet> lighting;
+    std::unique_ptr<ZVulkanDescriptorSet> transforms;
+    std::unique_ptr<ZVulkanDescriptorSet> oit;
+  };
+  std::unordered_map<void*, FrameDescriptorSets> m_descriptorSetsByFrameKey;
 
   std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
   std::optional<vk::raii::Sampler> m_sampler;
@@ -110,6 +133,7 @@ private:
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
+  bool m_usedStaticVBThisFrame = false;
   // Upload arena-backed SoA slices
   vk::Buffer m_originBuffer{};
   vk::Buffer m_axisBuffer{};
@@ -139,23 +163,22 @@ private:
   vk::DeviceSize m_dynLightingOffset{0};
   vk::DeviceSize m_dynTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
-  // DDP (Dual Depth Peeling) can replay the same draw list across multiple peel
-  // passes inside a single Vulkan submission (ddpOrchestrate). Cache per-stream
-  // dynamic UBO offsets so we do not re-suballocate uniforms for each peel pass,
-  // while still allowing distinct streams/clip-plane states to bind correct data.
-  struct DDPUboCacheEntry
+
+  // Cache per-stream dynamic UBO offsets in the persistent uniform arena so
+  // Vulkan command buffers can be reused across frames even when per-frame draw
+  // ordering changes (e.g. camera-driven sorting).
+  struct UboCacheEntry
   {
-    RendererParameterState params{};
-    bool followCoordTransform = true;
-    bool followSizeScale = true;
-    bool followOpacity = true;
     bool pickingPass = false;
     Z3DEye eye = MonoEye;
-    ClipPlanesState clipPlanes;
     vk::DeviceSize transformsOffset = 0;
     vk::DeviceSize materialOffset = 0;
   };
-  std::unordered_map<uint64_t, std::vector<DDPUboCacheEntry>> m_ddpUboCache;
+  struct FrameUboCache
+  {
+    std::unordered_map<uint64_t, std::vector<UboCacheEntry>> byStream;
+  };
+  std::unordered_map<void*, FrameUboCache> m_uboCacheByFrameKey;
   // Device-local indirect args; prepared during DDP init
   bool m_ddpArgsPrepared{false};
   vk::DeviceSize m_ddpArgsOffset{0};
@@ -196,6 +219,91 @@ private:
   // current submission, we must not bind the static buffers again until the
   // next submission because copies are flushed after rendering ends.
   std::set<CacheKey> m_staticCopyPendingKeys;
+
+  // Cached per-draw secondary command buffers (steady-state optimization).
+  struct SecondaryCacheKey
+  {
+    void* frameKey = nullptr;
+    uint64_t streamKey = 0;
+    bool picking = false;
+    bool dynamicMaterial = true;
+    bool useConeShader2 = false;
+    int capsMode = 1;
+    Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
+    Z3DEye eye = MonoEye;
+
+    bool operator==(const SecondaryCacheKey& rhs) const
+    {
+      return frameKey == rhs.frameKey && streamKey == rhs.streamKey && picking == rhs.picking &&
+             dynamicMaterial == rhs.dynamicMaterial && useConeShader2 == rhs.useConeShader2 &&
+             capsMode == rhs.capsMode && shaderHookType == rhs.shaderHookType && eye == rhs.eye;
+    }
+  };
+
+  struct SecondaryCacheKeyHash
+  {
+    size_t operator()(const SecondaryCacheKey& key) const noexcept
+    {
+      size_t h = std::hash<uintptr_t>{}(reinterpret_cast<uintptr_t>(key.frameKey));
+      h ^= std::hash<uint64_t>{}(key.streamKey) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.picking)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^=
+        std::hash<uint8_t>{}(static_cast<uint8_t>(key.dynamicMaterial)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.useConeShader2)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<int>{}(key.capsMode) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<int>{}(static_cast<int>(key.shaderHookType)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<int>{}(static_cast<int>(key.eye)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      return h;
+    }
+  };
+
+  struct SecondarySignature
+  {
+    vk::Pipeline pipeline{};
+    vk::PipelineLayout layout{};
+    std::array<vk::DescriptorSet, 3> baseDescriptorSets{};
+    bool hasOit = false;
+    vk::DescriptorSet oitDescriptorSet{};
+    std::array<uint32_t, 3> dynamicOffsets{};
+    std::array<vk::Buffer, 5> vertexBuffers{};
+    std::array<vk::DeviceSize, 5> vertexOffsets{};
+    std::array<uint64_t, 5> vertexBufferSegmentIds{};
+    vk::Buffer indexBuffer{};
+    vk::DeviceSize indexOffset{0};
+    uint64_t indexBufferSegmentId = 0;
+    vk::IndexType indexType{vk::IndexType::eUint32};
+    uint32_t indexCount = 0;
+    uint32_t vertexCount = 0;
+    vk::Viewport viewport{};
+    vk::Rect2D scissor{};
+
+    bool operator==(const SecondarySignature& rhs) const
+    {
+      const bool viewportEq = (viewport.x == rhs.viewport.x) && (viewport.y == rhs.viewport.y) &&
+                              (viewport.width == rhs.viewport.width) && (viewport.height == rhs.viewport.height) &&
+                              (viewport.minDepth == rhs.viewport.minDepth) &&
+                              (viewport.maxDepth == rhs.viewport.maxDepth);
+      const bool scissorEq = (scissor.offset.x == rhs.scissor.offset.x) && (scissor.offset.y == rhs.scissor.offset.y) &&
+                             (scissor.extent.width == rhs.scissor.extent.width) &&
+                             (scissor.extent.height == rhs.scissor.extent.height);
+      return pipeline == rhs.pipeline && layout == rhs.layout && baseDescriptorSets == rhs.baseDescriptorSets &&
+             hasOit == rhs.hasOit && oitDescriptorSet == rhs.oitDescriptorSet && dynamicOffsets == rhs.dynamicOffsets &&
+             vertexBuffers == rhs.vertexBuffers && vertexOffsets == rhs.vertexOffsets &&
+             vertexBufferSegmentIds == rhs.vertexBufferSegmentIds && indexBuffer == rhs.indexBuffer &&
+             indexOffset == rhs.indexOffset && indexType == rhs.indexType && indexCount == rhs.indexCount &&
+             vertexCount == rhs.vertexCount && indexBufferSegmentId == rhs.indexBufferSegmentId && viewportEq &&
+             scissorEq;
+    }
+  };
+
+  struct SecondaryCacheEntry
+  {
+    SecondarySignature signature{};
+    vk::raii::CommandBuffer commandBuffer{nullptr};
+    bool recorded = false;
+  };
+
+  std::unordered_map<SecondaryCacheKey, SecondaryCacheEntry, SecondaryCacheKeyHash> m_secondaryCache;
 
   void ensureDescriptorLayouts();
   void resetDescriptors();

@@ -779,12 +779,15 @@ void ZVulkanImgRaycasterPipelineContext::recordStageEntryExit(Z3DRendererBase& r
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   ZVulkanGraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline->pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline->pipeline->pipelineLayoutHandle();
-  drawSpec.vertexBuffers = {m_entryVertexBuffer->buffer()};
-  drawSpec.vertexOffsets = {0};
+
+  const std::array<vk::Buffer, 1> vertexBuffers{m_entryVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.pushConstantsData = &pushConstant;
   drawSpec.pushConstantsSize = sizeof(pushConstant);
   drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex;
@@ -971,7 +974,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
 
     CHECK(resources.fastDescriptor != nullptr) << "Raycaster fast volume stage missing descriptor";
-    std::vector<vk::DescriptorSet> descriptorSets{resources.fastDescriptor->descriptorSet()};
+    const std::array<vk::DescriptorSet, 1> descriptorSets{resources.fastDescriptor->descriptorSet()};
 
     struct RayPC
     {
@@ -983,15 +986,17 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     } pc{payload.samplingRate, payload.isoValue, payload.localMIPThreshold, zeToZW_a, zeToZW_b};
 
     ZVulkanGraphicsDrawSpec drawSpec{};
-    drawSpec.viewports = {viewport};
-    drawSpec.scissors = {scissor};
+    drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+    drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-    drawSpec.descriptorSets = std::move(descriptorSets);
+    drawSpec.descriptorSets = descriptorSets;
     drawSpec.descriptorSetFirst = 0;
     drawSpec.expectedDescriptorSetCount = 1;
-    drawSpec.vertexBuffers = {m_quadVertexBuffer->buffer()};
-    drawSpec.vertexOffsets = {0};
+    const std::array<vk::Buffer, 1> vertexBuffers{m_quadVertexBuffer->buffer()};
+    const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+    drawSpec.vertexBuffers = vertexBuffers;
+    drawSpec.vertexOffsets = vertexOffsets;
     drawSpec.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
     drawSpec.instanceCount = 1;
     drawSpec.pushConstantsData = &pc;
@@ -1036,7 +1041,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
 
     CHECK(resources.image2DDescriptor != nullptr) << "Raycaster fast image2D stage missing descriptor";
-    std::vector<vk::DescriptorSet> descriptorSets{resources.image2DDescriptor->descriptorSet()};
+    const std::array<vk::DescriptorSet, 1> descriptorSets{resources.image2DDescriptor->descriptorSet()};
 
     struct Image2DPush
     {
@@ -1044,15 +1049,17 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     } pc{projectionView};
 
     ZVulkanGraphicsDrawSpec drawSpec{};
-    drawSpec.viewports = {viewport};
-    drawSpec.scissors = {scissor};
+    drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+    drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-    drawSpec.descriptorSets = std::move(descriptorSets);
+    drawSpec.descriptorSets = descriptorSets;
     drawSpec.descriptorSetFirst = 0;
     drawSpec.expectedDescriptorSetCount = 1;
-    drawSpec.vertexBuffers = {m_entryVertexBuffer->buffer()};
-    drawSpec.vertexOffsets = {0};
+    const std::array<vk::Buffer, 1> vertexBuffers{m_entryVertexBuffer->buffer()};
+    const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+    drawSpec.vertexBuffers = vertexBuffers;
+    drawSpec.vertexOffsets = vertexOffsets;
     drawSpec.pushConstantsData = &pc;
     drawSpec.pushConstantsSize = sizeof(pc);
     drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex;
@@ -1096,7 +1103,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
   PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
 
   CHECK(resources.sliceDescriptor != nullptr) << "Raycaster fast slice stage missing descriptor";
-  std::vector<vk::DescriptorSet> descriptorSets{resources.sliceDescriptor->descriptorSet()};
+  const std::array<vk::DescriptorSet, 1> descriptorSets{resources.sliceDescriptor->descriptorSet()};
 
   struct SlicePush
   {
@@ -1105,15 +1112,17 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
   } pc{projectionView, viewMatrix};
 
   ZVulkanGraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSets = std::move(descriptorSets);
+  drawSpec.descriptorSets = descriptorSets;
   drawSpec.descriptorSetFirst = 0;
   drawSpec.expectedDescriptorSetCount = 1;
-  drawSpec.vertexBuffers = {m_entryVertexBuffer->buffer()};
-  drawSpec.vertexOffsets = {0};
+  const std::array<vk::Buffer, 1> vertexBuffers{m_entryVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.pushConstantsData = &pc;
   drawSpec.pushConstantsSize = sizeof(pc);
   drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex;
@@ -1354,15 +1363,21 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveBlockId(Z3DRender
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   ZVulkanGraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = blockPipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = blockPipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSets = std::move(blockDescriptorSets);
+
+  const std::array<vk::DescriptorSet, 3> descriptorSets{blockDescriptorSets[0],
+                                                        blockDescriptorSets[1],
+                                                        blockDescriptorSets[2]};
+  drawSpec.descriptorSets = descriptorSets;
   drawSpec.descriptorSetFirst = 0;
   drawSpec.expectedDescriptorSetCount = 3;
-  drawSpec.vertexBuffers = {m_quadVertexBuffer->buffer()};
-  drawSpec.vertexOffsets = {0};
+  const std::array<vk::Buffer, 1> vertexBuffers{m_quadVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
   drawSpec.instanceCount = 1;
   drawSpec.pushConstantsData = &pcB;
@@ -1455,15 +1470,19 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveRaycast(Z3DRender
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   ZVulkanGraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = progressivePipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = progressivePipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSets = std::move(progressiveSets);
+
+  const std::array<vk::DescriptorSet, 3> descriptorSets{progressiveSets[0], progressiveSets[1], progressiveSets[2]};
+  drawSpec.descriptorSets = descriptorSets;
   drawSpec.descriptorSetFirst = 0;
   drawSpec.expectedDescriptorSetCount = 3;
-  drawSpec.vertexBuffers = {m_quadVertexBuffer->buffer()};
-  drawSpec.vertexOffsets = {0};
+  const std::array<vk::Buffer, 1> vertexBuffers{m_quadVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
   drawSpec.instanceCount = 1;
   drawSpec.pushConstantsData = &pcP;
@@ -1529,19 +1548,21 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveCopyToLayers(Z3DR
                                   vk::ImageLayout::eShaderReadOnlyOptimal,
                                   vk::ImageAspectFlags{});
 
-  std::vector<vk::DescriptorSet> layerSets{m_copyDescriptor->descriptorSet()};
+  const std::array<vk::DescriptorSet, 1> descriptorSets{m_copyDescriptor->descriptorSet()};
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   ZVulkanGraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = layerCopyPipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = layerCopyPipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSets = std::move(layerSets);
+  drawSpec.descriptorSets = descriptorSets;
   drawSpec.descriptorSetFirst = 0;
   drawSpec.expectedDescriptorSetCount = 1;
-  drawSpec.vertexBuffers = {m_quadVertexBuffer->buffer()};
-  drawSpec.vertexOffsets = {0};
+  const std::array<vk::Buffer, 1> vertexBuffers{m_quadVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
   drawSpec.instanceCount = 1;
 
@@ -1694,7 +1715,7 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
   PipelineInstance& layerPipeline = ensureFastPipeline(layerKey);
 
   CHECK(resources.fastDescriptor != nullptr) << "Raycaster fast path missing fast descriptor (layered)";
-  std::vector<vk::DescriptorSet> layeredSets{resources.fastDescriptor->descriptorSet()};
+  const std::array<vk::DescriptorSet, 1> descriptorSets{resources.fastDescriptor->descriptorSet()};
 
   struct RayPC
   {
@@ -1706,15 +1727,17 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
   } pcL{payload.samplingRate, payload.isoValue, payload.localMIPThreshold, zeToZW_a, zeToZW_b};
 
   ZVulkanGraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = layerPipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = layerPipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSets = std::move(layeredSets);
+  drawSpec.descriptorSets = descriptorSets;
   drawSpec.descriptorSetFirst = 0;
   drawSpec.expectedDescriptorSetCount = 1;
-  drawSpec.vertexBuffers = {m_quadVertexBuffer->buffer()};
-  drawSpec.vertexOffsets = {0};
+  const std::array<vk::Buffer, 1> vertexBuffers{m_quadVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
   drawSpec.instanceCount = 1;
   drawSpec.pushConstantsData = &pcL;
@@ -1787,7 +1810,7 @@ void ZVulkanImgRaycasterPipelineContext::recordFastPlanarLayersOnly(Z3DRendererB
     PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
 
     CHECK(resources.image2DDescriptor != nullptr) << "Raycaster fast planar layers: missing image2D descriptor";
-    std::vector<vk::DescriptorSet> descriptorSets{resources.image2DDescriptor->descriptorSet()};
+    const std::array<vk::DescriptorSet, 1> descriptorSets{resources.image2DDescriptor->descriptorSet()};
 
     struct Image2DPush
     {
@@ -1795,15 +1818,17 @@ void ZVulkanImgRaycasterPipelineContext::recordFastPlanarLayersOnly(Z3DRendererB
     } pc{projectionView};
 
     ZVulkanGraphicsDrawSpec drawSpec{};
-    drawSpec.viewports = {viewport};
-    drawSpec.scissors = {scissor};
+    drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+    drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-    drawSpec.descriptorSets = std::move(descriptorSets);
+    drawSpec.descriptorSets = descriptorSets;
     drawSpec.descriptorSetFirst = 0;
     drawSpec.expectedDescriptorSetCount = 1;
-    drawSpec.vertexBuffers = {m_entryVertexBuffer->buffer()};
-    drawSpec.vertexOffsets = {0};
+    const std::array<vk::Buffer, 1> vertexBuffers{m_entryVertexBuffer->buffer()};
+    const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+    drawSpec.vertexBuffers = vertexBuffers;
+    drawSpec.vertexOffsets = vertexOffsets;
     drawSpec.pushConstantsData = &pc;
     drawSpec.pushConstantsSize = sizeof(pc);
     drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex;
@@ -1846,7 +1871,7 @@ void ZVulkanImgRaycasterPipelineContext::recordFastPlanarLayersOnly(Z3DRendererB
   PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
 
   CHECK(resources.sliceDescriptor != nullptr) << "Raycaster fast planar layers: missing slice descriptor";
-  std::vector<vk::DescriptorSet> descriptorSets{resources.sliceDescriptor->descriptorSet()};
+  const std::array<vk::DescriptorSet, 1> descriptorSets{resources.sliceDescriptor->descriptorSet()};
 
   struct SlicePush
   {
@@ -1855,15 +1880,17 @@ void ZVulkanImgRaycasterPipelineContext::recordFastPlanarLayersOnly(Z3DRendererB
   } pc{projectionView, viewMatrix};
 
   ZVulkanGraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSets = std::move(descriptorSets);
+  drawSpec.descriptorSets = descriptorSets;
   drawSpec.descriptorSetFirst = 0;
   drawSpec.expectedDescriptorSetCount = 1;
-  drawSpec.vertexBuffers = {m_entryVertexBuffer->buffer()};
-  drawSpec.vertexOffsets = {0};
+  const std::array<vk::Buffer, 1> vertexBuffers{m_entryVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.pushConstantsData = &pc;
   drawSpec.pushConstantsSize = sizeof(pc);
   drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex;
@@ -1910,19 +1937,21 @@ void ZVulkanImgRaycasterPipelineContext::recordMergeFromLayers(const RenderBatch
   bindMergeDescriptor(layerColor, layerDepth);
 
   CHECK(m_mergeDescriptor != nullptr) << "Raycaster merge requires descriptor set";
-  std::vector<vk::DescriptorSet> mergeSets{m_mergeDescriptor->descriptorSet()};
+  const std::array<vk::DescriptorSet, 1> descriptorSets{m_mergeDescriptor->descriptorSet()};
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   ZVulkanGraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = mergePipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = mergePipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSets = std::move(mergeSets);
+  drawSpec.descriptorSets = descriptorSets;
   drawSpec.descriptorSetFirst = 0;
   drawSpec.expectedDescriptorSetCount = 1;
-  drawSpec.vertexBuffers = {m_quadVertexBuffer->buffer()};
-  drawSpec.vertexOffsets = {0};
+  const std::array<vk::Buffer, 1> vertexBuffers{m_quadVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
   drawSpec.instanceCount = 1;
 
@@ -2691,7 +2720,9 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                              compactOutput->size());
     }
     ds->updateStorageBuffer(1, *compactOutput);
-    spec.descriptorSets = {ds->descriptorSet()};
+
+    const std::array<vk::DescriptorSet, 1> descriptorSets{ds->descriptorSet()};
+    spec.descriptorSets = descriptorSets;
     // Push constants: width, height, stride, capacity, att index
     struct PC
     {

@@ -8,6 +8,7 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkanbuffer.h"
+#include "zvulkantexture.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbindings.h"
@@ -28,6 +29,8 @@
 
 #include <folly/coro/Task.h>
 
+DECLARE_bool(atlas_vk_cache_draw_secondaries);
+
 namespace nim {
 
 namespace {
@@ -40,43 +43,9 @@ float computeBoxCorrection(float fovyDegrees)
   return 2.02082f - 0.033935f * fovyDegrees + 0.00037854f * fovyDegrees * fovyDegrees;
 }
 
-struct SpherePushConstants
-{
-  float sizeScale = 1.0f;
-  float boxCorrection = 1.0f;
-  float ortho = 0.0f;
-  float weighted_a = 0.0f;
-  float weighted_b = 0.0f;
-  float weighted_depth_scale = 0.0f;
-  float pad0 = 0.0f;
-};
-
 std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
 {
   return {glm::vec4(matrix[0], 0.0f), glm::vec4(matrix[1], 0.0f), glm::vec4(matrix[2], 0.0f)};
-}
-
-bool clipPlanesEqual(const ClipPlanesState& a, const ClipPlanesState& b)
-{
-  if (a.captured != b.captured) {
-    return false;
-  }
-  if (a.enabled != b.enabled) {
-    return false;
-  }
-  if (a.planeCount != b.planeCount) {
-    return false;
-  }
-
-  const uint32_t count = std::min<uint32_t>(a.planeCount, static_cast<uint32_t>(a.planes.size()));
-  for (uint32_t i = 0; i < count; ++i) {
-    const glm::vec4 pa = a.planes[i];
-    const glm::vec4 pb = b.planes[i];
-    if (pa.x != pb.x || pa.y != pb.y || pa.z != pb.z || pa.w != pb.w) {
-      return false;
-    }
-  }
-  return true;
 }
 
 } // namespace
@@ -86,6 +55,21 @@ ZVulkanSpherePipelineContext::ZVulkanSpherePipelineContext(Z3DRendererVulkanBack
 {}
 
 ZVulkanSpherePipelineContext::~ZVulkanSpherePipelineContext() = default;
+
+ZVulkanSpherePipelineContext::FormatsKey
+ZVulkanSpherePipelineContext::FormatsKey::from(const vulkan::AttachmentFormats& formats)
+{
+  FormatsKey key{};
+  const size_t count = std::min(formats.colorFormats.size(), key.colorFormats.size());
+  key.colorCount = static_cast<uint32_t>(count);
+  for (size_t i = 0; i < count; ++i) {
+    key.colorFormats[i] = formats.colorFormats[i];
+  }
+  if (formats.depthFormat.has_value()) {
+    key.depthFormat = *formats.depthFormat;
+  }
+  return key;
+}
 
 void ZVulkanSpherePipelineContext::resetFrame()
 {
@@ -102,12 +86,8 @@ void ZVulkanSpherePipelineContext::resetFrame()
   m_flagsOffset = 0;
   m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
-  // Retire per-frame UBOs so previous frames can complete safely on GPU
-  // when multiple frames are in flight. Destruction is deferred until the
-  // active submission fence signals.
-
-  resetDescriptors();
-  m_ddpUboCache.clear();
+  // Per-stream UBO offsets are cached per frame-slot in the backend's persistent
+  // uniform arena; keep them across submissions to stabilize dynamic offsets.
   m_ddpArgsPrepared = false;
   m_ddpArgsOffset = 0;
   m_staticCopyPendingKeys.clear();
@@ -140,6 +120,19 @@ void ZVulkanSpherePipelineContext::evictStream(uint64_t streamKey)
     m_backend.releaseStaticSlice(entry.ib);
     it = m_staticCache.erase(it);
   }
+
+  for (auto it = m_secondaryCache.begin(); it != m_secondaryCache.end();) {
+    if (it->first.streamKey == streamKey) {
+      it = m_secondaryCache.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto& [frameKey, cache] : m_uboCacheByFrameKey) {
+    (void)frameKey;
+    cache.byStream.erase(streamKey);
+  }
 }
 
 void ZVulkanSpherePipelineContext::flushRetainedUbos()
@@ -163,10 +156,8 @@ void ZVulkanSpherePipelineContext::flushRetainedUbos()
 
 void ZVulkanSpherePipelineContext::resetDescriptors()
 {
-  m_dsPlaceholder.reset();
-  m_dsLighting.reset();
-  m_dsTransforms.reset();
-  m_dsOIT.reset();
+  m_descriptorSetsByFrameKey.clear();
+  m_secondaryCache.clear();
 }
 
 void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
@@ -194,7 +185,8 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  VLOG(1) << fmt::format(
+  // Per-draw diagnostic; keep behind VLOG(2) so --v=1 remains usable for perf runs.
+  VLOG(2) << fmt::format(
     "VK sphere draw: picking={} verts={} idx={} buf(center={}, color={}, spec={}, flags={}) offs(cr={}, c={}, s={}, f={})",
     payload.pickingPass,
     m_vertexCount,
@@ -219,10 +211,15 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
   m_dynLightingOffset = (payload.pickingPass || !payload.wantsLighting) ? m_backend.framePickingLightingOffset()
                                                                         : m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload, pickingPass);
-  // Ensure DDP flag descriptor set (set=3) only; no OIT UBO
-  ensureOITResources();
-  // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
-  CHECK(m_dsLighting && m_dsTransforms) << "Sphere pipeline descriptor sets missing (lighting/transforms)";
+  // Descriptor sets are primed in beginRender(); avoid record-time allocation/updates.
+  void* frameKey = m_backend.activeFrameKey();
+  CHECK(frameKey != nullptr) << "Sphere record called without an active Vulkan frame-slot key";
+  const auto itSets = m_descriptorSetsByFrameKey.find(frameKey);
+  CHECK(itSets != m_descriptorSetsByFrameKey.end())
+    << "Sphere pipeline descriptor sets missing for active frame-slot (expected beginRender priming)";
+  FrameDescriptorSets& sets = itSets->second;
+  CHECK(sets.placeholder && sets.lighting && sets.transforms)
+    << "Sphere pipeline descriptor sets missing (placeholder/lighting/transforms)";
 
   ZVulkanDescriptorSet* dsPlaceholderOverride = nullptr;
   const auto& hookPara = batch.shaderHook.para;
@@ -251,72 +248,59 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
     }
   }
 
-  const auto formats = vulkan::extractAttachmentFormats(batch);
+  const auto& formatsOpt = m_backend.currentSegmentFormats();
+  CHECK(formatsOpt.has_value()) << "Sphere pipeline context requires an active Vulkan rendering segment";
+  const auto& formats = *formatsOpt;
 
   m_backend.validateFormatsOrCrash(formats, "sphere");
 
   PipelineKey key;
   key.dynamicMaterial = payload.useDynamicMaterial && !pickingPass;
   key.shaderHookType = shaderHook;
-  key.colorFormats = formats.colorFormats;
-  key.depthFormat = formats.depthFormat;
+  key.formats = FormatsKey::from(formats);
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
   // Draw-only recording under backend-managed segment: no attachment handling here
 
-  const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
-
-  CHECK(payload.paramsCaptured) << "Sphere payload missing params";
-  SpherePushConstants constants;
-  // Match GL: allow renderers to opt out of applying the global sizeScale
-  // multiplier (used by overlays like the transform gizmo).
-  constants.sizeScale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
-  constants.boxCorrection = computeBoxCorrection(glm::degrees(eyeState.fieldOfView));
-  constants.ortho = eyeState.isPerspective ? 0.0f : 1.0f;
-  if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
-    const float n = renderer.viewState().nearClip;
-    const float f = renderer.viewState().farClip;
-    const float denom = std::max(f - n, 1e-6f);
-    constants.weighted_a = (f * n) / denom;
-    constants.weighted_b = 0.5f * (f + n) / denom + 0.5f;
-    constants.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-  } else {
-    constants.weighted_a = 0.0f;
-    constants.weighted_b = 0.0f;
-    constants.weighted_depth_scale = 0.0f;
-  }
-
-  CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
-    << "Sphere pipeline placeholder descriptor set not initialised";
-  std::vector<vk::DescriptorSet> boundSets;
-  boundSets.reserve(3);
   const vk::DescriptorSet ds0 =
-    dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : m_dsPlaceholder->descriptorSet();
-  boundSets.push_back(ds0);
-  boundSets.push_back(m_dsLighting->descriptorSet());
-  boundSets.push_back(m_dsTransforms->descriptorSet());
+    dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : sets.placeholder->descriptorSet();
+  const std::array<vk::DescriptorSet, 3> boundSets{
+    ds0,
+    sets.lighting->descriptorSet(),
+    sets.transforms->descriptorSet(),
+  };
 
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = vkbind::kSetInputs;
   drawSpec.descriptorSets = boundSets;
 
   uint32_t expectedSets = static_cast<uint32_t>(boundSets.size());
-  if (m_dsOIT) {
-    ZVulkanDescriptorBindInfo oitBind{};
-    oitBind.firstSet = vkbind::kSetOITParams;
-    oitBind.sets = {m_dsOIT->descriptorSet()};
-    drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
+  std::array<vk::DescriptorSet, 1> oitSets{};
+  std::array<ZVulkanDescriptorBindInfo, 1> extraDescriptorBinds{};
+  std::span<const ZVulkanDescriptorBindInfo> extraDescriptorBindsSpan{};
+  if (sets.oit) {
+    oitSets = {sets.oit->descriptorSet()};
+    extraDescriptorBinds[0].firstSet = vkbind::kSetOITParams;
+    extraDescriptorBinds[0].sets = oitSets;
+    extraDescriptorBinds[0].dynamicOffsets = {};
+    extraDescriptorBindsSpan = extraDescriptorBinds;
     expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
   }
+  drawSpec.extraDescriptorBinds = extraDescriptorBindsSpan;
   drawSpec.expectedDescriptorSetCount = expectedSets;
 
-  drawSpec.vertexBuffers = {m_centerRadiusBuffer, m_colorBuffer, m_flagsBuffer, m_specularBuffer};
-  drawSpec.vertexOffsets = {m_centerRadiusOffset, m_colorOffset, m_flagsOffset, m_specularOffset};
+  const std::array<vk::Buffer, 4> vertexBuffers{m_centerRadiusBuffer, m_colorBuffer, m_flagsBuffer, m_specularBuffer};
+  const std::array<vk::DeviceSize, 4> vertexOffsets{m_centerRadiusOffset,
+                                                    m_colorOffset,
+                                                    m_flagsOffset,
+                                                    m_specularOffset};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   if (m_indexCount > 0 && m_indexUploadBuffer) {
     drawSpec.indexBuffer = m_indexUploadBuffer;
     drawSpec.indexOffset = m_indexUploadOffset;
@@ -327,14 +311,186 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
   }
   drawSpec.instanceCount = 1;
 
-  drawSpec.pushConstantsData = &constants;
-  drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(SpherePushConstants));
-  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
-  drawSpec.requirePushConstants = true;
+  const std::array<uint64_t, 4> vertexBufferSegmentIds{
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[0]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[1]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[2]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[3]),
+  };
+  uint64_t indexBufferSegmentId = 0;
+  if (drawSpec.indexCount > 0 && drawSpec.indexBuffer) {
+    indexBufferSegmentId = m_backend.staticArenaSegmentIdForBuffer(drawSpec.indexBuffer);
+  }
+  const bool allStaticSegments = (vertexBufferSegmentIds[0] != 0) && (vertexBufferSegmentIds[1] != 0) &&
+                                 (vertexBufferSegmentIds[2] != 0) && (vertexBufferSegmentIds[3] != 0) &&
+                                 ((drawSpec.indexCount == 0) || (indexBufferSegmentId != 0));
   // Dynamic offsets for (set1,b0), (set2,b0), (set2,b1)
-  drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_dynLightingOffset),
-                             static_cast<uint32_t>(m_dynTransformsOffset),
-                             static_cast<uint32_t>(m_dynMaterialOffset)};
+  const std::array<uint32_t, 3> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
+                                               static_cast<uint32_t>(m_dynTransformsOffset),
+                                               static_cast<uint32_t>(m_dynMaterialOffset)};
+  drawSpec.dynamicOffsets = dynamicOffsets;
+
+  const bool ddpHook = (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                        shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  if (FLAGS_atlas_vk_cache_draw_secondaries &&
+      m_backend.device().context().supportsInlineAndSecondaryDynamicRendering() && payload.streamKey != 0 &&
+      m_usedStaticVBThisFrame && allStaticSegments && dsPlaceholderOverride == nullptr && !ddpHook) {
+    m_backend.notifyDrawSecondaryCacheAttempt();
+    SecondaryCacheKey cacheKey{};
+    cacheKey.frameKey = frameKey;
+    cacheKey.streamKey = payload.streamKey;
+    cacheKey.picking = pickingPass;
+    cacheKey.dynamicMaterial = key.dynamicMaterial;
+    cacheKey.shaderHookType = shaderHook;
+    cacheKey.eye = batch.eye;
+
+    SecondarySignature signature{};
+    signature.pipeline = drawSpec.pipelineHandle;
+    signature.layout = drawSpec.pipelineLayoutHandle;
+    signature.baseDescriptorSets = boundSets;
+    signature.hasOit = static_cast<bool>(sets.oit);
+    signature.oitDescriptorSet = sets.oit ? sets.oit->descriptorSet() : vk::DescriptorSet{};
+    signature.dynamicOffsets = dynamicOffsets;
+    signature.vertexBuffers = vertexBuffers;
+    signature.vertexOffsets = vertexOffsets;
+    signature.vertexBufferSegmentIds = vertexBufferSegmentIds;
+    signature.indexBuffer = drawSpec.indexBuffer;
+    signature.indexOffset = drawSpec.indexOffset;
+    signature.indexBufferSegmentId = indexBufferSegmentId;
+    signature.indexType = drawSpec.indexType;
+    signature.indexCount = drawSpec.indexCount;
+    signature.vertexCount = drawSpec.vertexCount;
+    signature.viewport = viewport;
+    signature.scissor = scissor;
+
+    auto itCache = m_secondaryCache.find(cacheKey);
+    if (itCache != m_secondaryCache.end()) {
+      m_backend.notifyDrawSecondaryCacheKeyFound();
+      SecondaryCacheEntry& entry = itCache->second;
+      const vk::CommandBuffer rawSecondary = entry.commandBuffer;
+      if (entry.recorded && rawSecondary != vk::CommandBuffer{}) {
+        if (entry.signature == signature) {
+          m_backend.notifyDrawSecondaryCacheHit();
+          m_backend.notifyDrawSecondaryCacheExecute();
+          cmd.executeCommands({rawSecondary});
+          m_backend.notifyDrawSubmitted();
+          return;
+        }
+      }
+      uint32_t mask = 0;
+      const auto& prev = entry.signature;
+      if (prev.pipeline != signature.pipeline) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kPipeline;
+      }
+      if (prev.layout != signature.layout) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kLayout;
+      }
+      if (prev.baseDescriptorSets != signature.baseDescriptorSets) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kBaseDescriptorSets;
+      }
+      if (prev.hasOit != signature.hasOit) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorPresence;
+      }
+      if (prev.oitDescriptorSet != signature.oitDescriptorSet) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorSet;
+      }
+      if (prev.dynamicOffsets != signature.dynamicOffsets) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kDynamicOffsets;
+      }
+      if (prev.vertexBuffers != signature.vertexBuffers) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kVertexBuffers;
+      }
+      if (prev.vertexOffsets != signature.vertexOffsets) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kVertexOffsets;
+      }
+      if (prev.vertexBufferSegmentIds != signature.vertexBufferSegmentIds) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kVertexBufferLifetime;
+      }
+      if (prev.indexBuffer != signature.indexBuffer || prev.indexOffset != signature.indexOffset ||
+          prev.indexType != signature.indexType) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kIndexState;
+      }
+      if (prev.indexBufferSegmentId != signature.indexBufferSegmentId) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kIndexBufferLifetime;
+      }
+      if (prev.indexCount != signature.indexCount || prev.vertexCount != signature.vertexCount) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kCounts;
+      }
+      if (prev.viewport.x != signature.viewport.x || prev.viewport.y != signature.viewport.y ||
+          prev.viewport.width != signature.viewport.width || prev.viewport.height != signature.viewport.height ||
+          prev.viewport.minDepth != signature.viewport.minDepth ||
+          prev.viewport.maxDepth != signature.viewport.maxDepth) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kViewport;
+      }
+      if (prev.scissor.offset.x != signature.scissor.offset.x || prev.scissor.offset.y != signature.scissor.offset.y ||
+          prev.scissor.extent.width != signature.scissor.extent.width ||
+          prev.scissor.extent.height != signature.scissor.extent.height) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kScissor;
+      }
+      m_backend.notifyDrawSecondaryCacheSignatureMismatchMask(mask);
+    }
+
+    SecondaryCacheEntry& entry = m_secondaryCache[cacheKey];
+    entry.signature = signature;
+    m_backend.notifyDrawSecondaryCacheBuild();
+
+    vk::SampleCountFlagBits rasterSamples = vk::SampleCountFlagBits::e1;
+    bool samplesCaptured = false;
+    for (const auto& attachment : batch.pass.colorAttachments) {
+      if (!attachment.handle.valid()) {
+        continue;
+      }
+      const auto& tex =
+        vulkan::textureFromHandle(attachment.handle, m_backend.device(), "sphere secondary inheritance color");
+      if (!samplesCaptured) {
+        rasterSamples = tex.info().samples;
+        samplesCaptured = true;
+      } else {
+        CHECK(tex.info().samples == rasterSamples) << "Sphere secondary: mismatched MSAA sample counts in attachments";
+      }
+    }
+    if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid()) {
+      const auto& tex = vulkan::textureFromHandle(batch.pass.depthAttachment->handle,
+                                                  m_backend.device(),
+                                                  "sphere secondary inheritance depth");
+      if (!samplesCaptured) {
+        rasterSamples = tex.info().samples;
+        samplesCaptured = true;
+      } else {
+        CHECK(tex.info().samples == rasterSamples) << "Sphere secondary: mismatched MSAA sample counts in attachments";
+      }
+    }
+
+    const bool hasColors = !formats.colorFormats.empty();
+    const vk::Format* colorFormatsPtr = hasColors ? formats.colorFormats.data() : nullptr;
+    const vk::Format dsFormat = formats.depthFormat.value_or(vk::Format::eUndefined);
+    vk::CommandBufferInheritanceRenderingInfo renderingInheritance{};
+    renderingInheritance.rasterizationSamples = rasterSamples;
+    renderingInheritance.colorAttachmentCount = static_cast<uint32_t>(formats.colorFormats.size());
+    renderingInheritance.pColorAttachmentFormats = colorFormatsPtr;
+    renderingInheritance.depthAttachmentFormat = dsFormat;
+    // Atlas uses depth-only dynamic rendering segments (pStencilAttachment == nullptr).
+    // Keep stencilAttachmentFormat UNDEFINED to match vkCmdBeginRendering.
+    renderingInheritance.stencilAttachmentFormat = vk::Format::eUndefined;
+
+    vk::CommandBufferInheritanceInfo inheritance{};
+    inheritance.pNext = &renderingInheritance;
+
+    ZVulkanSecondaryBuildInfo secondaryInfo{};
+    secondaryInfo.device = &m_backend.device().context().device();
+    secondaryInfo.commandPool = m_backend.device().context().commandPool();
+    secondaryInfo.inheritance = inheritance;
+
+    entry.commandBuffer = buildStaticSecondary(secondaryInfo, [&](vk::raii::CommandBuffer& secondaryCmd) {
+      ZVulkanPipelineCommandRecorder secondaryRecorder(secondaryCmd);
+      secondaryRecorder.recordGraphicsDraw(drawSpec);
+    });
+    entry.recorded = true;
+
+    m_backend.notifyDrawSecondaryCacheExecute();
+    cmd.executeCommands({static_cast<vk::CommandBuffer>(entry.commandBuffer)});
+    return;
+  }
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
@@ -410,47 +566,52 @@ void ZVulkanSpherePipelineContext::ensureDescriptorLayouts()
 
 void ZVulkanSpherePipelineContext::ensureDescriptorSets()
 {
+  CHECK(!m_backend.isRecording()) << "Sphere ensureDescriptorSets called while recording";
   ensureDescriptorLayouts();
+  void* frameKey = m_backend.activeFrameKey();
+  CHECK(frameKey != nullptr) << "Sphere ensureDescriptorSets called without an active Vulkan frame-slot key";
 
-  if (!m_dsPlaceholder) {
-    m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(m_setPlaceholder);
+  FrameDescriptorSets& sets = m_descriptorSetsByFrameKey[frameKey];
+  if (!sets.placeholder && m_setPlaceholder) {
+    sets.placeholder = m_backend.allocatePersistentDescriptorSet(m_setPlaceholder);
   }
-  if (!m_dsLighting) {
-    m_dsLighting = m_backend.allocateFrameDescriptorSet(m_setLighting);
+  if (!sets.lighting && m_setLighting) {
+    sets.lighting = m_backend.allocatePersistentDescriptorSet(m_setLighting);
   }
-  if (!m_dsTransforms) {
-    m_dsTransforms = m_backend.allocateFrameDescriptorSet(m_setTransforms);
+  if (!sets.transforms && m_setTransforms) {
+    sets.transforms = m_backend.allocatePersistentDescriptorSet(m_setTransforms);
   }
-  if (!m_dsOIT && m_setOIT) {
-    m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
+  if (!sets.oit && m_setOIT) {
+    sets.oit = m_backend.allocatePersistentDescriptorSet(m_setOIT);
   }
 
   ensurePlaceholderTexture();
-  if (m_dsPlaceholder) {
+  if (sets.placeholder) {
     auto& tex = m_backend.defaultPlaceholderTexture2D();
-    m_dsPlaceholder->writeTextureOnce(0, tex, m_backend.defaultSampler());
-    m_dsPlaceholder->writeTextureOnce(1, tex, m_backend.defaultSampler());
+    sets.placeholder->writeTextureOnce(0, tex, m_backend.defaultSampler());
+    sets.placeholder->writeTextureOnce(1, tex, m_backend.defaultSampler());
   }
 
-  // Bind dynamic UBOs to the per-frame uniform arena once
-  if (m_dsLighting) {
-    m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
+  // Bind dynamic UBOs to the per-frame uniform arena for this frame-slot.
+  // NOTE: This is intentionally an update (not write-once) so we rebind if the
+  // uniform arena grows and a new VkBuffer is allocated.
+  if (sets.lighting) {
+    sets.lighting->updateUniformBufferDynamic(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
   }
-  if (m_dsTransforms) {
-    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(TransformsUBOStd140));
-    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
+  if (sets.transforms) {
+    sets.transforms->updateUniformBufferDynamic(0,
+                                                m_backend.persistentUniformArenaBuffer(),
+                                                sizeof(TransformsUBOStd140));
+    sets.transforms->updateUniformBufferDynamic(1, m_backend.persistentUniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
-  if (m_dsOIT && !m_backend.isRecording()) {
-    m_backend.primeOITDescriptorSet(*m_dsOIT);
+  if (sets.oit) {
+    m_backend.primeOITDescriptorSet(*sets.oit);
   }
 }
 
 void ZVulkanSpherePipelineContext::ensureOITResources()
 {
-  ensureDescriptorLayouts();
-  if (!m_dsOIT && m_setOIT) {
-    m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
-  }
+  ensureDescriptorSets();
 }
 
  
@@ -465,9 +626,6 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
                                                       bool pickingPass)
 {
   CHECK(batch.shaderHook.captured) << "Sphere batch missing shader hook snapshot";
-  const auto hook = batch.shaderHook.type;
-  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
-                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   CHECK(payload.paramsCaptured) << "Sphere payload missing params";
 
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
@@ -484,7 +642,8 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
-  transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  const float boxCorrection = computeBoxCorrection(glm::degrees(eyeState.fieldOfView));
+  transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, boxCorrection, 0.0f);
   vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
 
   MaterialUBOStd140 material{};
@@ -500,23 +659,49 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
 
-  if (ddp && payload.streamKey != 0) {
-    auto it = m_ddpUboCache.find(payload.streamKey);
-    if (it != m_ddpUboCache.end()) {
-      for (const auto& cached : it->second) {
-        if (cached.params != payload.params || cached.followCoordTransform != payload.followCoordTransform ||
-            cached.followSizeScale != payload.followSizeScale || cached.followOpacity != payload.followOpacity ||
-            cached.pickingPass != pickingPass || cached.eye != batch.eye ||
-            !clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
-          continue;
-        }
-        m_dynTransformsOffset = cached.transformsOffset;
-        m_dynMaterialOffset = cached.materialOffset;
-        return;
+  void* frameKey = m_backend.activeFrameKey();
+  CHECK(frameKey != nullptr) << "Sphere updateTransformUBO called without an active Vulkan frame-slot key";
+  if (payload.streamKey != 0) {
+    FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
+    auto& entries = frameCache.byStream[payload.streamKey];
+
+    auto writeAt = [&](vk::DeviceSize transformsOffset, vk::DeviceSize materialOffset) {
+      std::memcpy(m_backend.persistentUniformMappedAt(transformsOffset, sizeof(TransformsUBOStd140)),
+                  &transforms,
+                  sizeof(transforms));
+      std::memcpy(m_backend.persistentUniformMappedAt(materialOffset, sizeof(MaterialUBOStd140)),
+                  &material,
+                  sizeof(material));
+    };
+
+    for (const auto& cached : entries) {
+      if (cached.pickingPass != pickingPass || cached.eye != batch.eye) {
+        continue;
       }
+      m_dynTransformsOffset = cached.transformsOffset;
+      m_dynMaterialOffset = cached.materialOffset;
+      writeAt(cached.transformsOffset, cached.materialOffset);
+      return;
     }
+
+    auto transformsSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(TransformsUBOStd140));
+    std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
+    m_dynTransformsOffset = transformsSlice.offset;
+
+    auto materialSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(MaterialUBOStd140));
+    std::memcpy(materialSlice.mapped, &material, sizeof(material));
+    m_dynMaterialOffset = materialSlice.offset;
+
+    UboCacheEntry entry{};
+    entry.pickingPass = pickingPass;
+    entry.eye = batch.eye;
+    entry.transformsOffset = transformsSlice.offset;
+    entry.materialOffset = materialSlice.offset;
+    entries.push_back(std::move(entry));
+    return;
   }
 
+  // Fallback (should be rare): no stream key, so we cannot assign a stable slice.
   auto transformsSlice = m_backend.suballocateUniformFor(payload, sizeof(TransformsUBOStd140));
   std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
   m_dynTransformsOffset = transformsSlice.offset;
@@ -524,20 +709,6 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   auto materialSlice = m_backend.suballocateUniformFor(payload, sizeof(MaterialUBOStd140));
   std::memcpy(materialSlice.mapped, &material, sizeof(material));
   m_dynMaterialOffset = materialSlice.offset;
-
-  if (ddp && payload.streamKey != 0) {
-    DDPUboCacheEntry entry{};
-    entry.params = payload.params;
-    entry.followCoordTransform = payload.followCoordTransform;
-    entry.followSizeScale = payload.followSizeScale;
-    entry.followOpacity = payload.followOpacity;
-    entry.pickingPass = pickingPass;
-    entry.eye = batch.eye;
-    entry.clipPlanes = batch.clipPlanes;
-    entry.transformsOffset = transformsSlice.offset;
-    entry.materialOffset = materialSlice.offset;
-    m_ddpUboCache[payload.streamKey].push_back(std::move(entry));
-  }
 
   VLOG(2) << fmt::format("VK sphere params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
                          payload.params.sizeScale,
@@ -639,7 +810,7 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
       makeAttachments(vk::BlendFactor::eOne, vk::BlendFactor::eOne, vk::BlendFactor::eOne, vk::BlendFactor::eOne);
       // Match GL WA init: depth-test against the (loaded) opaque depth buffer
       // when a depth attachment is present, but do not write depth.
-      instance.pipeline->setDepthTestEnable(key.depthFormat.has_value());
+      instance.pipeline->setDepthTestEnable(formats.depthFormat.has_value());
       instance.pipeline->setDepthWriteEnable(false);
       break;
     case Z3DRendererBase::ShaderHookType::WeightedBlendedInit: {
@@ -716,10 +887,6 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
       break;
   }
 
-  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                              .offset = 0,
-                              .size = static_cast<uint32_t>(sizeof(SpherePushConstants))};
-  instance.pipeline->setPushConstantRanges({range});
   instance.pipeline->create();
 
   auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});
@@ -767,6 +934,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanSpherePipelineContext::makeVertexI
 
 void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
 {
+  m_usedStaticVBThisFrame = false;
   m_vertexCount = payload.pointsAndRadius.size();
   m_indexCount = payload.indices.size();
 

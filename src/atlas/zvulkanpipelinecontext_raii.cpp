@@ -112,7 +112,7 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
   const vk::ImageAspectFlags aspect = resolveAttachmentAspect(info);
 
   // Diagnostics to help trace unexpected layout state.
-  if (VLOG_IS_ON(2)) {
+  if (VLOG_IS_ON(3)) {
     VLOG(2) << fmt::format(
       "transitionImage(pass='{}'): img=0x{:x} initial={} tracked={} effectiveOld={} new={} aspect=0x{:x}",
       g_currentTransitionLabel.empty() ? std::string("<unlabeled-pass>") : g_currentTransitionLabel,
@@ -591,6 +591,8 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
 
   validateDescriptorSets(spec);
   if (!spec.descriptorSets.empty()) {
+    const vk::ArrayProxy<const vk::DescriptorSet> sets(spec.descriptorSets.size(), spec.descriptorSets.data());
+    const vk::ArrayProxy<const uint32_t> offsets(spec.dynamicOffsets.size(), spec.dynamicOffsets.data());
     // Debug-only alignment validation for compute binds
 #ifndef NDEBUG
     if (!spec.dynamicOffsets.empty()) {
@@ -606,8 +608,8 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
     m_commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                                        **spec.pipelineLayout,
                                        spec.descriptorSetFirst,
-                                       spec.descriptorSets,
-                                       spec.dynamicOffsets);
+                                       sets,
+                                       offsets);
     if (VLOG_IS_ON(2)) {
       std::string setsStr;
       for (size_t i = 0; i < spec.descriptorSets.size(); ++i) {
@@ -630,11 +632,13 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
     if (bind.sets.empty()) {
       continue;
     }
+    const vk::ArrayProxy<const vk::DescriptorSet> sets(bind.sets.size(), bind.sets.data());
+    const vk::ArrayProxy<const uint32_t> offsets(bind.dynamicOffsets.size(), bind.dynamicOffsets.data());
     m_commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                                        **spec.pipelineLayout,
                                        bind.firstSet,
-                                       bind.sets,
-                                       bind.dynamicOffsets);
+                                       sets,
+                                       offsets);
     if (VLOG_IS_ON(1)) {
       std::string setsStr;
       for (size_t i = 0; i < bind.sets.size(); ++i) {
@@ -736,8 +740,19 @@ void ZVulkanPipelineCommandRecorder::beginRenderingSegment(const ZVulkanRenderin
       stencilAttachmentInfo = depthAttachmentInfo;
     }
   }
+  vk::RenderingFlags renderingFlags{};
+  if (auto* be = Z3DRendererVulkanBackend::current()) {
+    if (be->device().context().supportsInlineAndSecondaryDynamicRendering()) {
+      // Allow mixing inline draws and cached secondary command buffers within the
+      // dynamic rendering instance (requires maintenance7 or nestedCommandBuffer).
+      renderingFlags =
+        vk::RenderingFlagBits::eContentsInlineKHR | vk::RenderingFlagBits::eContentsSecondaryCommandBuffers;
+    }
+  }
+
   vk::RenderingInfo renderingInfo{.renderArea = spec.renderArea,
                                   .layerCount = 1,
+                                  .flags = renderingFlags,
                                   .colorAttachmentCount = static_cast<uint32_t>(colorInfos.size()),
                                   .pColorAttachments = colorInfos.data(),
                                   .pDepthAttachment = depthAttachmentInfo ? &*depthAttachmentInfo : nullptr,
@@ -754,7 +769,7 @@ void ZVulkanPipelineCommandRecorder::endRenderingSegment(const ZVulkanRenderingS
     const bool hasDepth = spec.depthStencilAttachment.has_value();
     const auto& r = spec.renderArea;
     const std::string& lbl = g_currentTransitionLabel;
-    VLOG(2) << fmt::format("VK cmdEndRendering: label='{}' colors={} depth={} renderArea=({},{} {}x{})",
+    VLOG(3) << fmt::format("VK cmdEndRendering: label='{}' colors={} depth={} renderArea=({},{} {}x{})",
                            lbl.empty() ? std::string("<unlabeled-pass>") : lbl,
                            colors,
                            hasDepth,
@@ -816,12 +831,14 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
 
   validateDescriptorSets(spec);
   if (!spec.descriptorSets.empty()) {
-  m_commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                     layoutHandle,
-                                     spec.descriptorSetFirst,
-                                     spec.descriptorSets,
-                                     spec.dynamicOffsets);
-  // Debug-only alignment validation for draw binds
+    const vk::ArrayProxy<const vk::DescriptorSet> sets(spec.descriptorSets.size(), spec.descriptorSets.data());
+    const vk::ArrayProxy<const uint32_t> offsets(spec.dynamicOffsets.size(), spec.dynamicOffsets.data());
+    m_commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                       layoutHandle,
+                                       spec.descriptorSetFirst,
+                                       sets,
+                                       offsets);
+    // Debug-only alignment validation for draw binds
 #ifndef NDEBUG
   if (!spec.dynamicOffsets.empty()) {
     if (auto* be = Z3DRendererVulkanBackend::current()) {
@@ -841,11 +858,9 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
     if (bind.sets.empty()) {
       continue;
     }
-    m_commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                       layoutHandle,
-                                       bind.firstSet,
-                                       bind.sets,
-                                       bind.dynamicOffsets);
+    const vk::ArrayProxy<const vk::DescriptorSet> sets(bind.sets.size(), bind.sets.data());
+    const vk::ArrayProxy<const uint32_t> offsets(bind.dynamicOffsets.size(), bind.dynamicOffsets.data());
+    m_commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layoutHandle, bind.firstSet, sets, offsets);
 #ifndef NDEBUG
     m_debug.markDescriptorSets(bind.firstSet, static_cast<uint32_t>(bind.sets.size()));
 #endif
@@ -864,7 +879,9 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
   if (!spec.vertexBuffers.empty()) {
     CHECK(spec.vertexBuffers.size() == spec.vertexOffsets.size())
       << "Vertex buffers and offsets must have matching counts";
-    m_commandBuffer.bindVertexBuffers(0, spec.vertexBuffers, spec.vertexOffsets);
+    const vk::ArrayProxy<const vk::Buffer> buffers(spec.vertexBuffers.size(), spec.vertexBuffers.data());
+    const vk::ArrayProxy<const vk::DeviceSize> offsets(spec.vertexOffsets.size(), spec.vertexOffsets.data());
+    m_commandBuffer.bindVertexBuffers(0, buffers, offsets);
   }
   if (spec.indexCount > 0) {
     CHECK(static_cast<VkBuffer>(spec.indexBuffer) != VK_NULL_HANDLE) << "Indexed draw missing index buffer";
@@ -872,13 +889,15 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
   }
 
   if (!spec.viewports.empty()) {
-    m_commandBuffer.setViewport(0, spec.viewports);
+    const vk::ArrayProxy<const vk::Viewport> viewports(spec.viewports.size(), spec.viewports.data());
+    m_commandBuffer.setViewport(0, viewports);
 #ifndef NDEBUG
     m_debug.markViewport();
 #endif
   }
   if (!spec.scissors.empty()) {
-    m_commandBuffer.setScissor(0, spec.scissors);
+    const vk::ArrayProxy<const vk::Rect2D> scissors(spec.scissors.size(), spec.scissors.data());
+    m_commandBuffer.setScissor(0, scissors);
 #ifndef NDEBUG
     m_debug.markScissor();
 #endif
@@ -1017,10 +1036,10 @@ vk::raii::CommandBuffer buildStaticSecondary(const ZVulkanSecondaryBuildInfo& in
                                              const std::function<void(vk::raii::CommandBuffer&)>& recorder)
 {
   CHECK(info.device != nullptr) << "Secondary build requires a device";
-  CHECK(info.commandPool != nullptr) << "Secondary build requires a command pool";
+  CHECK(static_cast<VkCommandPool>(info.commandPool) != VK_NULL_HANDLE) << "Secondary build requires a command pool";
   CHECK(static_cast<bool>(recorder)) << "Secondary build requires a recording callback";
 
-  vk::CommandBufferAllocateInfo allocInfo{.commandPool = **info.commandPool,
+  vk::CommandBufferAllocateInfo allocInfo{.commandPool = info.commandPool,
                                           .level = vk::CommandBufferLevel::eSecondary,
                                           .commandBufferCount = 1};
   vk::raii::CommandBuffers buffers{*info.device, allocInfo};

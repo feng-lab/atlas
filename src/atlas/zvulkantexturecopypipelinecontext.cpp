@@ -148,28 +148,47 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
 
   // Draw-only spec under backend-managed segment
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = vkbind::kSetInputs;
+
+  std::array<vk::DescriptorSet, 2> descriptorSets{};
+  uint32_t descriptorSetCount = 0;
+  std::array<uint32_t, 1> dynamicOffsets{};
+  uint32_t dynamicOffsetCount = 0;
   if (usesLightingSet) {
-    drawSpec.descriptorSets = {ds->descriptorSet(), m_dsLighting->descriptorSet()};
-    drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_backend.frameSharedLightingOffset())}; // (set1,b0)
+    descriptorSets[0] = ds->descriptorSet();
+    descriptorSets[1] = m_dsLighting->descriptorSet();
+    descriptorSetCount = 2;
+    dynamicOffsets[0] = static_cast<uint32_t>(m_backend.frameSharedLightingOffset());
+    dynamicOffsetCount = 1;
   } else {
-    drawSpec.descriptorSets = {ds->descriptorSet()};
+    descriptorSets[0] = ds->descriptorSet();
+    descriptorSetCount = 1;
   }
-  drawSpec.vertexBuffers = {m_vertexBuffer->buffer()};
-  drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+  drawSpec.descriptorSets = std::span<const vk::DescriptorSet>(descriptorSets.data(), descriptorSetCount);
+  drawSpec.dynamicOffsets = std::span<const uint32_t>(dynamicOffsets.data(), dynamicOffsetCount);
+  const std::array<vk::Buffer, 1> vertexBuffers{m_vertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{vk::DeviceSize(0)};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
   drawSpec.instanceCount = 1;
   drawSpec.expectedDescriptorSetCount = usesOITSet ? 4u : (usesLightingSet ? 2u : 1u);
+  std::array<vk::DescriptorSet, 1> oitDescriptorSets{};
+  std::array<ZVulkanDescriptorBindInfo, 1> extraBinds{};
+  uint32_t extraBindCount = 0;
   if (usesOITSet && m_descriptorSetOIT) {
     ZVulkanDescriptorBindInfo oitBind{};
     oitBind.firstSet = vkbind::kSetOITParams;
-    oitBind.sets = {m_descriptorSetOIT->descriptorSet()};
-    drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
+    oitDescriptorSets[0] = m_descriptorSetOIT->descriptorSet();
+    oitBind.sets = oitDescriptorSets;
+    extraBinds[0] = oitBind;
+    extraBindCount = 1;
   }
+  drawSpec.extraDescriptorBinds = std::span<const ZVulkanDescriptorBindInfo>(extraBinds.data(), extraBindCount);
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   recorder.recordGraphicsDraw(drawSpec);

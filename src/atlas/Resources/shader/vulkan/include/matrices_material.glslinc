@@ -15,7 +15,7 @@ layout(set = 2, binding = 0) uniform Transforms {
   mat3 pos_transform_normal_matrix;
   mat4 projection_matrix;
   mat4 inverse_projection_matrix;
-  vec4 parameters; // x=sizeScale, y=ortho flag
+  vec4 parameters; // x=sizeScale, y=ortho flag, z=sphere boxCorrection (0 for most pipelines)
   ivec4 clip_params; // x=enabled, y=planeCount
   vec4 clip_planes[ATLAS_MAX_CLIP_PLANES];
 } xf;

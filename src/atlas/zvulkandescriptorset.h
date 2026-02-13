@@ -2,6 +2,9 @@
 
 #include "zvulkan.h"
 
+#include <array>
+#include <cstdint>
+
 namespace nim {
 
 class ZVulkanDevice;
@@ -41,7 +44,29 @@ public:
     return m_descriptorSet;
   }
 
+  // Monotonically increasing generation counter that changes whenever this
+  // descriptor set's contents are updated via vkUpdateDescriptorSets.
+  [[nodiscard]] uint64_t generation() const
+  {
+    return m_generation;
+  }
+
 private:
+  struct BindingState
+  {
+    enum class Kind : uint8_t
+    {
+      None,
+      Buffer,
+      Image
+    };
+
+    Kind kind = Kind::None;
+    vk::DescriptorType type = vk::DescriptorType::eUniformBuffer;
+    vk::DescriptorBufferInfo bufferInfo{};
+    vk::DescriptorImageInfo imageInfo{};
+  };
+
   ZVulkanDevice& m_device;
   // Raw handle; lifetime is tied to the owning vk::DescriptorPool. We never
   // call vkFreeDescriptorSets on this, relying on pool reset per frame.
@@ -49,6 +74,10 @@ private:
   bool m_isOverrideTransient = false;
   // Track which bindings have been initialized (bit per binding index, up to 64)
   uint64_t m_initializedMask = 0ull;
+  // Per-binding last-write state used to avoid redundant vkUpdateDescriptorSets
+  // calls that would invalidate cached command buffers.
+  std::array<BindingState, 64> m_bindingStates{};
+  uint64_t m_generation = 0;
 };
 
 } // namespace nim

@@ -391,14 +391,18 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   }
   // Bind only the textures set up-front. Lighting/transforms use dynamic UBOs and are
   // re-bound per draw with the correct dynamic offsets below to satisfy validation.
-  std::vector<vk::DescriptorSet> baseDescriptorSets{texturesSet};
-  std::vector<ZVulkanDescriptorBindInfo> baseExtraBinds;
+  const std::array<vk::DescriptorSet, 1> baseDescriptorSets{texturesSet};
+  std::array<vk::DescriptorSet, 1> oitDescriptorSets{};
+  std::array<ZVulkanDescriptorBindInfo, 1> baseExtraBinds{};
+  uint32_t baseExtraBindCount = 0;
   uint32_t expectedSetCount = 1;
   if (m_dsOIT) {
     ZVulkanDescriptorBindInfo oitBind{};
     oitBind.firstSet = vkbind::kSetOITParams;
-    oitBind.sets = {m_dsOIT->descriptorSet()};
-    baseExtraBinds.push_back(oitBind);
+    oitDescriptorSets[0] = m_dsOIT->descriptorSet();
+    oitBind.sets = oitDescriptorSets;
+    baseExtraBinds[0] = oitBind;
+    baseExtraBindCount = 1;
     expectedSetCount = std::max(expectedSetCount, vkbind::kSetOITParams + 1);
   }
 
@@ -416,7 +420,36 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
     glm::vec4 wireColor;
   };
 
-  std::unordered_map<const PipelineInstance*, std::vector<DrawCallInfo>> groupedDraws;
+  // Mesh payloads often contain thousands of meshes, but the pipeline key
+  // varies only by mesh topology (triangles/strip/fan) and wireframe flag.
+  // Avoid per-draw PipelineKey construction (which includes std::vector copies
+  // for attachment formats) by grouping into a fixed small set of variants.
+  auto meshTypeSlot = [](ZMesh::Type type) -> size_t {
+    switch (type) {
+      case ZMesh::Type::TRIANGLES:
+        return 0u;
+      case ZMesh::Type::TRIANGLE_STRIP:
+        return 1u;
+      case ZMesh::Type::TRIANGLE_FAN:
+        return 2u;
+      default:
+        return 0u;
+    }
+  };
+  constexpr std::array<ZMesh::Type, 3> kMeshTypes{ZMesh::Type::TRIANGLES,
+                                                  ZMesh::Type::TRIANGLE_STRIP,
+                                                  ZMesh::Type::TRIANGLE_FAN};
+  constexpr size_t kMeshTypeSlots = kMeshTypes.size();
+  constexpr size_t kWireVariants = 2;
+  constexpr size_t kVariantCount = kMeshTypeSlots * kWireVariants;
+
+  auto variantIndex = [&](ZMesh::Type type, bool wireframe) -> size_t {
+    const size_t typeIndex = meshTypeSlot(type);
+    const size_t wireIndex = wireframe ? 1u : 0u;
+    return typeIndex * kWireVariants + wireIndex;
+  };
+
+  std::array<std::vector<DrawCallInfo>, kVariantCount> groupedDraws;
 
   // DDP indirect-count: prepare a stable per-mesh args table during the init pass
   // so peel passes can reference offsets by payload mesh index (order-independent).
@@ -426,29 +459,16 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
     m_ddpArgsPrepared.assign(meshCount, 0u);
   }
 
-  auto recordDrawForKey = [&](const MeshDraw& d, bool wire, glm::vec4 wireColor) {
-    PipelineKey key;
-    key.colorSource = payload.colorSource;
-    key.meshType = d.mesh->type();
-    key.wireframe = wire;
-    key.fogMode = fogMode;
-    key.shaderHookType = shaderHook;
-    key.colorFormats = formats.colorFormats;
-    key.depthFormat = formats.depthFormat;
-    PipelineInstance& pipeline = ensurePipeline(key, formats);
-    groupedDraws[&pipeline].push_back(DrawCallInfo{&d, wire, wireColor});
-  };
-
   for (const auto& draw : m_draws) {
     if (!draw.mesh) {
       continue;
     }
     if (drawSurface) {
-      recordDrawForKey(draw, false, glm::vec4(0.0f));
+      groupedDraws[variantIndex(draw.mesh->type(), false)].push_back(DrawCallInfo{&draw, false, glm::vec4(0.0f)});
     }
     if (drawWireframe) {
       const glm::vec4 wireColor = pickingPass ? draw.fallbackColor : payload.wireframeColor;
-      recordDrawForKey(draw, true, wireColor);
+      groupedDraws[variantIndex(draw.mesh->type(), true)].push_back(DrawCallInfo{&draw, true, wireColor});
     }
   }
 
@@ -495,28 +515,42 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
     }
   };
 
-  for (const auto& groupedEntry : groupedDraws) {
-    const PipelineInstance* pipelinePtr = groupedEntry.first;
-    const auto& draws = groupedEntry.second;
+  for (size_t variant = 0; variant < groupedDraws.size(); ++variant) {
+    auto& draws = groupedDraws[variant];
     if (draws.empty()) {
       continue;
     }
 
+    const size_t meshTypeIndex = variant / kWireVariants;
+    const bool wireframe = (variant % kWireVariants) == 1u;
+    CHECK(meshTypeIndex < kMeshTypes.size()) << "Mesh pipeline: variant index out of range";
+
+    PipelineKey key;
+    key.colorSource = payload.colorSource;
+    key.meshType = kMeshTypes[meshTypeIndex];
+    key.wireframe = wireframe;
+    key.fogMode = fogMode;
+    key.shaderHookType = shaderHook;
+    key.colorFormats = formats.colorFormats;
+    key.depthFormat = formats.depthFormat;
+    PipelineInstance& pipeline = ensurePipeline(key, formats);
+
     ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-    drawSpec.viewports = {viewport};
-    drawSpec.scissors = {scissor};
-    drawSpec.pipelineHandle = pipelinePtr->pipeline->pipelineHandle();
-    drawSpec.pipelineLayoutHandle = pipelinePtr->pipeline->pipelineLayoutHandle();
+    drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+    drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
+    drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+    drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
     drawSpec.descriptorSetFirst = vkbind::kSetInputs;
     drawSpec.descriptorSets = baseDescriptorSets;
-    drawSpec.extraDescriptorBinds = baseExtraBinds;
+    drawSpec.extraDescriptorBinds =
+      std::span<const ZVulkanDescriptorBindInfo>(baseExtraBinds.data(), baseExtraBindCount);
     drawSpec.expectedDescriptorSetCount = expectedSetCount;
     drawSpec.instanceCount = 1;
 
     ZVulkanPipelineCommandRecorder recorder(cmd);
     recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& cb) {
       bindCommonBuffers(cb);
-      const vk::PipelineLayout layoutHandle = pipelinePtr->pipeline->pipelineLayout();
+      const vk::PipelineLayout layoutHandle = pipeline.pipeline->pipelineLayout();
 
       for (const auto& entry : draws) {
         const MeshDraw& draw = *entry.draw;

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <vector>
 #include <string>
 
@@ -37,19 +38,19 @@ struct ZVulkanAttachmentInfo
 struct ZVulkanDescriptorBindInfo
 {
   uint32_t firstSet{0};
-  std::vector<vk::DescriptorSet> sets{};
-  std::vector<uint32_t> dynamicOffsets{};
+  std::span<const vk::DescriptorSet> sets{};
+  std::span<const uint32_t> dynamicOffsets{};
 };
 
 struct ZVulkanComputePassSpec
 {
   const vk::raii::Pipeline* pipeline{nullptr};
   const vk::raii::PipelineLayout* pipelineLayout{nullptr};
-  std::vector<vk::DescriptorSet> descriptorSets{};
-  std::vector<uint32_t> dynamicOffsets{};
+  std::span<const vk::DescriptorSet> descriptorSets{};
+  std::span<const uint32_t> dynamicOffsets{};
   std::optional<uint32_t> expectedDescriptorSetCount{};
   uint32_t descriptorSetFirst{0};
-  std::vector<ZVulkanDescriptorBindInfo> extraDescriptorBinds{};
+  std::span<const ZVulkanDescriptorBindInfo> extraDescriptorBinds{};
   const void* pushConstantsData{nullptr};
   uint32_t pushConstantsSize{0};
   vk::ShaderStageFlags pushConstantsStages{};
@@ -83,14 +84,14 @@ struct ZVulkanGraphicsDrawSpec
   vk::Pipeline pipelineHandle{VK_NULL_HANDLE};
   vk::PipelineLayout pipelineLayoutHandle{VK_NULL_HANDLE};
 
-  std::vector<vk::DescriptorSet> descriptorSets{};
-  std::vector<uint32_t> dynamicOffsets{};
+  std::span<const vk::DescriptorSet> descriptorSets{};
+  std::span<const uint32_t> dynamicOffsets{};
   std::optional<uint32_t> expectedDescriptorSetCount{};
   uint32_t descriptorSetFirst{0};
-  std::vector<ZVulkanDescriptorBindInfo> extraDescriptorBinds{};
+  std::span<const ZVulkanDescriptorBindInfo> extraDescriptorBinds{};
 
-  std::vector<vk::Buffer> vertexBuffers{};
-  std::vector<vk::DeviceSize> vertexOffsets{};
+  std::span<const vk::Buffer> vertexBuffers{};
+  std::span<const vk::DeviceSize> vertexOffsets{};
   vk::Buffer indexBuffer{};
   vk::DeviceSize indexOffset{0};
   vk::IndexType indexType{vk::IndexType::eUint32};
@@ -100,8 +101,8 @@ struct ZVulkanGraphicsDrawSpec
   vk::ShaderStageFlags pushConstantsStages{};
   bool requirePushConstants{false};
 
-  std::vector<vk::Viewport> viewports{};
-  std::vector<vk::Rect2D> scissors{};
+  std::span<const vk::Viewport> viewports{};
+  std::span<const vk::Rect2D> scissors{};
 
   std::optional<float> lineWidth{};
   std::optional<vk::Bool32> depthBiasEnable{};
@@ -244,7 +245,7 @@ private:
 struct ZVulkanSecondaryBuildInfo
 {
   vk::raii::Device* device{};
-  vk::raii::CommandPool* commandPool{};
+  vk::CommandPool commandPool{};
   vk::CommandBufferInheritanceInfo inheritance{};
   vk::CommandBufferUsageFlags usage{vk::CommandBufferUsageFlagBits::eRenderPassContinue |
                                     vk::CommandBufferUsageFlagBits::eSimultaneousUse};

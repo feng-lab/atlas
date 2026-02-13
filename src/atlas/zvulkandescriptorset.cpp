@@ -30,6 +30,15 @@ void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& 
     }
   }
   vk::DescriptorBufferInfo bufferInfo{.buffer = buffer.buffer(), .offset = 0, .range = buffer.size()};
+  const uint64_t bit = (1ull << binding);
+  if ((m_initializedMask & bit) != 0ull) {
+    const BindingState& state = m_bindingStates[binding];
+    if (state.kind == BindingState::Kind::Buffer && state.type == vk::DescriptorType::eUniformBuffer &&
+        state.bufferInfo.buffer == bufferInfo.buffer && state.bufferInfo.offset == bufferInfo.offset &&
+        state.bufferInfo.range == bufferInfo.range) {
+      return;
+    }
+  }
   vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
                                          .dstBinding = binding,
                                          .dstArrayElement = 0,
@@ -41,7 +50,12 @@ void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& 
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedMask |= (1ull << binding);
+  m_initializedMask |= bit;
+  BindingState& state = m_bindingStates[binding];
+  state.kind = BindingState::Kind::Buffer;
+  state.type = vk::DescriptorType::eUniformBuffer;
+  state.bufferInfo = bufferInfo;
+  m_generation++;
   VLOG(3) << "Updated uniform buffer descriptor at binding " << binding;
 }
 
@@ -59,6 +73,15 @@ void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding,
     }
   }
   vk::DescriptorBufferInfo bufferInfo{.buffer = buffer.buffer(), .offset = 0, .range = range};
+  const uint64_t bit = (1ull << binding);
+  if ((m_initializedMask & bit) != 0ull) {
+    const BindingState& state = m_bindingStates[binding];
+    if (state.kind == BindingState::Kind::Buffer && state.type == vk::DescriptorType::eUniformBufferDynamic &&
+        state.bufferInfo.buffer == bufferInfo.buffer && state.bufferInfo.offset == bufferInfo.offset &&
+        state.bufferInfo.range == bufferInfo.range) {
+      return;
+    }
+  }
   vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
                                          .dstBinding = binding,
                                          .dstArrayElement = 0,
@@ -70,7 +93,12 @@ void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding,
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedMask |= (1ull << binding);
+  m_initializedMask |= bit;
+  BindingState& state = m_bindingStates[binding];
+  state.kind = BindingState::Kind::Buffer;
+  state.type = vk::DescriptorType::eUniformBufferDynamic;
+  state.bufferInfo = bufferInfo;
+  m_generation++;
   VLOG(2) << "Updated uniform buffer dynamic descriptor (range) at binding " << binding;
 }
 
@@ -97,6 +125,15 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
   if (imageInfo.sampler == vk::Sampler{}) {
     throw ZException("Texture descriptor requires a valid sampler");
   }
+  const uint64_t bit = (1ull << binding);
+  if ((m_initializedMask & bit) != 0ull) {
+    const BindingState& state = m_bindingStates[binding];
+    if (state.kind == BindingState::Kind::Image && state.type == vk::DescriptorType::eCombinedImageSampler &&
+        state.imageInfo.sampler == imageInfo.sampler && state.imageInfo.imageView == imageInfo.imageView &&
+        state.imageInfo.imageLayout == imageInfo.imageLayout) {
+      return;
+    }
+  }
 
   vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
                                          .dstBinding = binding,
@@ -109,7 +146,12 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedMask |= (1ull << binding);
+  m_initializedMask |= bit;
+  BindingState& state = m_bindingStates[binding];
+  state.kind = BindingState::Kind::Image;
+  state.type = vk::DescriptorType::eCombinedImageSampler;
+  state.imageInfo = imageInfo;
+  m_generation++;
   VLOG(2) << "Updated texture descriptor (sampler-owned) at binding " << binding;
 }
 
@@ -139,6 +181,15 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
   }
   auto imageInfo = texture.descriptorInfo();
   imageInfo.sampler = sampler;
+  const uint64_t bit = (1ull << binding);
+  if ((m_initializedMask & bit) != 0ull) {
+    const BindingState& state = m_bindingStates[binding];
+    if (state.kind == BindingState::Kind::Image && state.type == vk::DescriptorType::eCombinedImageSampler &&
+        state.imageInfo.sampler == imageInfo.sampler && state.imageInfo.imageView == imageInfo.imageView &&
+        state.imageInfo.imageLayout == imageInfo.imageLayout) {
+      return;
+    }
+  }
   vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
                                          .dstBinding = binding,
                                          .dstArrayElement = 0,
@@ -150,7 +201,12 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedMask |= (1ull << binding);
+  m_initializedMask |= bit;
+  BindingState& state = m_bindingStates[binding];
+  state.kind = BindingState::Kind::Image;
+  state.type = vk::DescriptorType::eCombinedImageSampler;
+  state.imageInfo = imageInfo;
+  m_generation++;
   VLOG(2) << "Updated texture descriptor at binding " << binding;
 }
 
@@ -203,6 +259,15 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding,
   } else {
     imageInfo.sampler = sampler;
   }
+  const uint64_t bit = (1ull << binding);
+  if ((m_initializedMask & bit) != 0ull) {
+    const BindingState& state = m_bindingStates[binding];
+    if (state.kind == BindingState::Kind::Image && state.type == vk::DescriptorType::eCombinedImageSampler &&
+        state.imageInfo.sampler == imageInfo.sampler && state.imageInfo.imageView == imageInfo.imageView &&
+        state.imageInfo.imageLayout == imageInfo.imageLayout) {
+      return;
+    }
+  }
   vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
                                          .dstBinding = binding,
                                          .dstArrayElement = 0,
@@ -214,7 +279,12 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding,
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedMask |= (1ull << binding);
+  m_initializedMask |= bit;
+  BindingState& state = m_bindingStates[binding];
+  state.kind = BindingState::Kind::Image;
+  state.type = vk::DescriptorType::eCombinedImageSampler;
+  state.imageInfo = imageInfo;
+  m_generation++;
   VLOG(2) << "Updated texture descriptor (override) at binding " << binding;
 }
 
@@ -272,6 +342,15 @@ void ZVulkanDescriptorSet::updateStorageBuffer(uint32_t binding, ZVulkanBuffer& 
   CHECK(static_cast<bool>(buffer.usage() & vk::BufferUsageFlagBits::eStorageBuffer))
     << "Storage buffer bound at binding " << binding << " was not created with VK_BUFFER_USAGE_STORAGE_BUFFER_BIT";
   vk::DescriptorBufferInfo bufferInfo{.buffer = buffer.buffer(), .offset = 0, .range = buffer.size()};
+  const uint64_t bit = (1ull << binding);
+  if ((m_initializedMask & bit) != 0ull) {
+    const BindingState& state = m_bindingStates[binding];
+    if (state.kind == BindingState::Kind::Buffer && state.type == vk::DescriptorType::eStorageBuffer &&
+        state.bufferInfo.buffer == bufferInfo.buffer && state.bufferInfo.offset == bufferInfo.offset &&
+        state.bufferInfo.range == bufferInfo.range) {
+      return;
+    }
+  }
   vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
                                          .dstBinding = binding,
                                          .dstArrayElement = 0,
@@ -283,7 +362,12 @@ void ZVulkanDescriptorSet::updateStorageBuffer(uint32_t binding, ZVulkanBuffer& 
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedMask |= (1ull << binding);
+  m_initializedMask |= bit;
+  BindingState& state = m_bindingStates[binding];
+  state.kind = BindingState::Kind::Buffer;
+  state.type = vk::DescriptorType::eStorageBuffer;
+  state.bufferInfo = bufferInfo;
+  m_generation++;
   VLOG(2) << "Updated storage buffer descriptor at binding " << binding;
 }
 
@@ -311,6 +395,15 @@ void ZVulkanDescriptorSet::updateStorageImage(uint32_t binding,
   // Build image info for storage image (no sampler)
   auto info = texture.descriptorInfo(layoutOverride, aspectOverride);
   info.sampler = vk::Sampler{};
+  const uint64_t bit = (1ull << binding);
+  if ((m_initializedMask & bit) != 0ull) {
+    const BindingState& state = m_bindingStates[binding];
+    if (state.kind == BindingState::Kind::Image && state.type == vk::DescriptorType::eStorageImage &&
+        state.imageInfo.sampler == info.sampler && state.imageInfo.imageView == info.imageView &&
+        state.imageInfo.imageLayout == info.imageLayout) {
+      return;
+    }
+  }
   vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
                                          .dstBinding = binding,
                                          .dstArrayElement = 0,
@@ -322,7 +415,12 @@ void ZVulkanDescriptorSet::updateStorageImage(uint32_t binding,
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedMask |= (1ull << binding);
+  m_initializedMask |= bit;
+  BindingState& state = m_bindingStates[binding];
+  state.kind = BindingState::Kind::Image;
+  state.type = vk::DescriptorType::eStorageImage;
+  state.imageInfo = info;
+  m_generation++;
   VLOG(2) << "Updated storage image descriptor at binding " << binding;
 }
 

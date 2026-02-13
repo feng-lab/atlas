@@ -1567,18 +1567,18 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   auto& pipeline = ensurePipeline(key, payload, formats);
 
   // Build descriptor sets for draw-only recording
-  std::vector<vk::DescriptorSet> descriptorSets;
-  descriptorSets.reserve(3);
   const vk::DescriptorSet dsTex =
     texOverride ? texOverride : (m_dsTexture ? m_dsTexture->descriptorSet() : vk::DescriptorSet{});
   CHECK(dsTex) << "Line pipeline texture descriptor set not initialised";
-  descriptorSets.push_back(dsTex);
-  descriptorSets.push_back(m_dsLighting->descriptorSet());
-  descriptorSets.push_back(m_dsTransforms->descriptorSet());
+  const std::array<vk::DescriptorSet, 3> descriptorSets{dsTex,
+                                                        m_dsLighting->descriptorSet(),
+                                                        m_dsTransforms->descriptorSet()};
   // Dynamic offsets added to drawSpec after it is constructed below.
 
   uint32_t expectedSets = static_cast<uint32_t>(descriptorSets.size());
-  std::vector<ZVulkanDescriptorBindInfo> extraBinds;
+  std::array<vk::DescriptorSet, 1> oitDescriptorSets{};
+  std::array<ZVulkanDescriptorBindInfo, 1> extraBinds{};
+  uint32_t extraBindCount = 0;
   if ((shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
        shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
        shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel ||
@@ -1587,8 +1587,10 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       m_dsOIT) {
     ZVulkanDescriptorBindInfo oitBind{};
     oitBind.firstSet = vkbind::kSetOITParams;
-    oitBind.sets = {m_dsOIT->descriptorSet()};
-    extraBinds.push_back(oitBind);
+    oitDescriptorSets[0] = m_dsOIT->descriptorSet();
+    oitBind.sets = oitDescriptorSets;
+    extraBinds[0] = oitBind;
+    extraBindCount = 1;
     expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
   }
 
@@ -1666,17 +1668,18 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     }
 
     ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-    drawSpec.viewports = {viewport};
-    drawSpec.scissors = {scissor};
+    drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+    drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
     drawSpec.descriptorSetFirst = 0;
     drawSpec.descriptorSets = descriptorSets;
     // Dynamic offsets order must match set/binding order: lighting (set1,b0), transforms (set2,b0), material (set2,b1)
-    drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_dynLightingOffset),
-                               static_cast<uint32_t>(m_dynTransformsOffset),
-                               static_cast<uint32_t>(m_dynMaterialOffset)};
-    drawSpec.extraDescriptorBinds = extraBinds;
+    const std::array<uint32_t, 3> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
+                                                 static_cast<uint32_t>(m_dynTransformsOffset),
+                                                 static_cast<uint32_t>(m_dynMaterialOffset)};
+    drawSpec.dynamicOffsets = dynamicOffsets;
+    drawSpec.extraDescriptorBinds = std::span<const ZVulkanDescriptorBindInfo>(extraBinds.data(), extraBindCount);
     drawSpec.expectedDescriptorSetCount = expectedSets;
 
     const vk::PipelineLayout pipelineLayout = pipeline.pipeline->pipelineLayout();
@@ -1810,20 +1813,23 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   }
 
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = {viewport};
-  drawSpec.scissors = {scissor};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = 0;
   drawSpec.descriptorSets = descriptorSets;
-  drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_dynLightingOffset),
-                             static_cast<uint32_t>(m_dynTransformsOffset),
-                             static_cast<uint32_t>(m_dynMaterialOffset)};
-  drawSpec.extraDescriptorBinds = extraBinds;
+  const std::array<uint32_t, 3> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
+                                               static_cast<uint32_t>(m_dynTransformsOffset),
+                                               static_cast<uint32_t>(m_dynMaterialOffset)};
+  drawSpec.dynamicOffsets = dynamicOffsets;
+  drawSpec.extraDescriptorBinds = std::span<const ZVulkanDescriptorBindInfo>(extraBinds.data(), extraBindCount);
   drawSpec.expectedDescriptorSetCount = expectedSets;
 
-  drawSpec.vertexBuffers = {m_thinPosBuffer, m_thinColorBuffer};
-  drawSpec.vertexOffsets = {m_thinPosOffset, m_thinColorOffset};
+  const std::array<vk::Buffer, 2> vertexBuffers{m_thinPosBuffer, m_thinColorBuffer};
+  const std::array<vk::DeviceSize, 2> vertexOffsets{m_thinPosOffset, m_thinColorOffset};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
   if (payload.isLineStrip && m_thinUploadIndexBuffer && m_thinUploadIndexCount > 0) {
     drawSpec.indexBuffer = m_thinUploadIndexBuffer;
     drawSpec.indexOffset = m_thinUploadIndexOffset;

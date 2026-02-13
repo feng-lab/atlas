@@ -50,6 +50,7 @@
 #include <fstream>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -70,6 +71,17 @@ DECLARE_bool(atlas_perf_trace_calibrated);
 DEFINE_bool(atlas_vk_ddp_indirect_count,
             true,
             "Use drawIndirectCount gating for Vulkan dual-depth peeling (device-side early stop)");
+DEFINE_bool(
+  atlas_vk_profile_pipeline_contexts,
+  false,
+  "If true, record additional CPU scopes attributing Vulkan batch processing time to individual pipeline contexts "
+  "(mesh/line/sphere/etc). Adds overhead; intended for perf triage.");
+DEFINE_bool(
+  atlas_vk_cache_draw_secondaries,
+  true,
+  "If true, cache per-draw secondary command buffers for Vulkan raster pipeline contexts (currently sphere/cone). "
+  "This avoids repeating expensive vkCmd recording work in steady state (camera-only changes) at the cost of "
+  "extra memory for cached command buffers.");
 
 // Baseline capacity for the per-frame uniform arena (in KiB). This buffer backs
 // all dynamic UBO bindings for the frame. The backend pre-sizes beyond this baseline
@@ -268,6 +280,9 @@ void Z3DRendererVulkanBackend::endPassScope()
 
 void Z3DRendererVulkanBackend::notifyDrawSubmitted()
 {
+  if (m_activeFrame) {
+    m_activeFrame->drawsSubmitted++;
+  }
   if (m_passScope.active) {
     m_passScope.draws++;
   }
@@ -513,6 +528,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
   ensureArenaOnFrame(frameResources);
   ensureUniformArena(frameResources);
+  ensurePersistentUniformArena(frameResources);
   // Expose frame resources early so suballocateUniform can target this frame.
   m_activeFrame = &frameResources;
   // Compute and publish the shared per-frame lighting UBO slice before descriptor priming.
@@ -587,9 +603,11 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     }
     frameResources.pickingLightingDynOffset = pickingSlice.offset;
   }
-  frameResources.descriptorSetsAllocated = 0;
-
   collectFrameTimings(frameResources);
+  // Reset per-submission descriptor set counters after reporting the previous
+  // frame-slot use (collectFrameTimings reads the counters for logging and the
+  // perf collector).
+  frameResources.descriptorSetsAllocated = 0;
   frameResources.gpuScopes.clear();
   frameResources.cpuScopes.clear();
   frameResources.nextQuery = 0;
@@ -609,6 +627,14 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.renderingSegmentsBegan = 0;
   frameResources.attachmentClears = 0;
   frameResources.attachmentLoads = 0;
+  frameResources.drawsSubmitted = 0;
+  frameResources.drawSecondaryCacheAttempts = 0;
+  frameResources.drawSecondaryCacheKeyFound = 0;
+  frameResources.drawSecondaryCacheSignatureMismatches = 0;
+  frameResources.drawSecondaryCacheSignatureMismatchMaskOr = 0;
+  frameResources.drawSecondaryCacheHits = 0;
+  frameResources.drawSecondaryCacheBuilds = 0;
+  frameResources.drawSecondaryCacheExecutes = 0;
   frameResources.pipelinesCreated = 0;
   frameResources.pipelinesBound.clear();
   frameResources.residencyPinnedTextures.clear();
@@ -1204,6 +1230,28 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     return;
   }
 
+  const bool profilePipelineContexts = FLAGS_atlas_vk_profile_pipeline_contexts;
+  struct PipelineCpuTimes
+  {
+    double lineMs = 0.0;
+    double meshMs = 0.0;
+    double sphereMs = 0.0;
+    double ellipsoidMs = 0.0;
+    double coneMs = 0.0;
+    double backgroundMs = 0.0;
+    double imgSliceMs = 0.0;
+    double imgRaycasterMs = 0.0;
+    double fontMs = 0.0;
+    double textureCopyMs = 0.0;
+    double textureBlendMs = 0.0;
+    double textureGlowMs = 0.0;
+    double textureDualPeelMs = 0.0;
+    double textureWeightedAverageMs = 0.0;
+    double textureWeightedBlendedMs = 0.0;
+    double texturePPLLResolveMs = 0.0;
+  };
+  PipelineCpuTimes cpuTimes{};
+
   auto& cmd = m_activeFrameHandle->commandBuffer();
 
   // Segment key for coalescing dynamic-rendering segments. This must include
@@ -1231,29 +1279,65 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
   struct SegmentKey
   {
     vk::Rect2D renderArea{};
-    std::vector<SegmentAttachmentKey> colors;
+    // Attachment keys are built for every raster batch during steady-state
+    // rendering. Most passes use a single color attachment (or a small handful),
+    // so keep a small inline array to avoid per-batch heap allocations.
+    enum : size_t
+    {
+      kInlineColorCapacity = 8
+    };
+    std::array<SegmentAttachmentKey, kInlineColorCapacity> inlineColors{};
+    uint32_t inlineColorCount = 0;
+    std::vector<SegmentAttachmentKey> overflowColors{};
     std::optional<SegmentAttachmentKey> depth;
+
+    [[nodiscard]] std::span<const SegmentAttachmentKey> colors() const
+    {
+      if (!overflowColors.empty()) {
+        return std::span<const SegmentAttachmentKey>(overflowColors.data(), overflowColors.size());
+      }
+      return std::span<const SegmentAttachmentKey>(inlineColors.data(), inlineColorCount);
+    }
+
     bool operator==(const SegmentKey& o) const
     {
-      return renderArea.offset.x == o.renderArea.offset.x && renderArea.offset.y == o.renderArea.offset.y &&
-             renderArea.extent.width == o.renderArea.extent.width &&
-             renderArea.extent.height == o.renderArea.extent.height && colors == o.colors && depth == o.depth;
+      if (renderArea.offset.x != o.renderArea.offset.x || renderArea.offset.y != o.renderArea.offset.y ||
+          renderArea.extent.width != o.renderArea.extent.width ||
+          renderArea.extent.height != o.renderArea.extent.height) {
+        return false;
+      }
+      const auto a = colors();
+      const auto b = o.colors();
+      if (a.size() != b.size() || !std::equal(a.begin(), a.end(), b.begin())) {
+        return false;
+      }
+      return depth == o.depth;
     }
   };
   auto buildKey = [](const RenderBatch& b, const vk::Rect2D& renderArea) {
     SegmentKey k;
     k.renderArea = renderArea;
-    k.colors.reserve(b.pass.colorAttachments.size());
     for (const auto& a : b.pass.colorAttachments) {
       if (!a.handle.valid()) {
         continue;
       }
-      k.colors.push_back(SegmentAttachmentKey{.id = a.handle.id,
-                                              .index = a.handle.index,
-                                              .loadOp = a.loadOp,
-                                              .storeOp = a.storeOp,
-                                              .finalUse = a.finalUse,
-                                              .clearValue = a.clearValue});
+      SegmentAttachmentKey key{.id = a.handle.id,
+                               .index = a.handle.index,
+                               .loadOp = a.loadOp,
+                               .storeOp = a.storeOp,
+                               .finalUse = a.finalUse,
+                               .clearValue = a.clearValue};
+      if (k.overflowColors.empty() && k.inlineColorCount < SegmentKey::kInlineColorCapacity) {
+        k.inlineColors[k.inlineColorCount++] = key;
+      } else {
+        if (k.overflowColors.empty()) {
+          k.overflowColors.reserve(b.pass.colorAttachments.size());
+          k.overflowColors.insert(k.overflowColors.end(),
+                                  k.inlineColors.begin(),
+                                  k.inlineColors.begin() + k.inlineColorCount);
+        }
+        k.overflowColors.push_back(key);
+      }
     }
     if (b.pass.depthAttachment && b.pass.depthAttachment->handle.valid()) {
       const auto& a = *b.pass.depthAttachment;
@@ -1397,7 +1481,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     uint64_t depthHandle = 0;
     auto depthFmt = enumOrUnderlying(vk::Format{}, 16);
     uint32_t depthW = 0, depthH = 0;
-    if (VLOG_IS_ON(2)) {
+    if (VLOG_IS_ON(3)) {
       if (!batch.pass.colorAttachments.empty()) {
         const auto& a = batch.pass.colorAttachments.front();
         if (a.handle.valid() && a.handle.backend == RenderBackend::Vulkan) {
@@ -1428,7 +1512,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         passLabel = "<unnamed>";
       }
       outSpec.debugLabel = passLabel;
-      VLOG(2) << fmt::format(
+      VLOG(3) << fmt::format(
         "VK cmdBeginRendering: label='{}' colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{} renderArea=({},{} {}x{})",
         passLabel,
         outSpec.colorAttachments.size(),
@@ -1515,9 +1599,21 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     return true;
   };
 
+  auto timeContext = [&](double& accumulator, auto&& fn) {
+    if (!profilePipelineContexts) {
+      fn();
+      return;
+    }
+    const auto t0 = std::chrono::steady_clock::now();
+    fn();
+    accumulator += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+  };
+
   for (const auto& batch : state.batches) {
     const auto geom = describeGeometry(batch.geometry);
-    VLOG(1) << fmt::format("VK batch[{}]: geom={}, colors={}, depth={} viewport=({},{} {}x{}) clip={} planes={}",
+    // Per-batch logs are extremely verbose for large scenes; keep them behind
+    // VLOG(2) so --v=1 remains usable for performance investigations.
+    VLOG(2) << fmt::format("VK batch[{}]: geom={}, colors={}, depth={} viewport=({},{} {}x{}) clip={} planes={}",
                            batchIndex++,
                            geom,
                            batch.pass.colorAttachments.size(),
@@ -1528,9 +1624,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
                            static_cast<int>(batch.pass.viewport.extent.y),
                            (batch.clipPlanes.captured && batch.clipPlanes.enabled) ? 1 : 0,
                            batch.clipPlanes.captured ? batch.clipPlanes.planeCount : 0u);
-    if (VLOG_IS_ON(2) && batch.clipPlanes.captured && batch.clipPlanes.enabled && batch.clipPlanes.planeCount > 0u) {
+    if (VLOG_IS_ON(3) && batch.clipPlanes.captured && batch.clipPlanes.enabled && batch.clipPlanes.planeCount > 0u) {
       const auto& p0 = batch.clipPlanes.planes[0];
-      VLOG(2) << fmt::format("VK batch clip planes: count={} plane0=({:.3f},{:.3f},{:.3f},{:.3f})",
+      VLOG(3) << fmt::format("VK batch clip planes: count={} plane0=({:.3f},{:.3f},{:.3f},{:.3f})",
                              batch.clipPlanes.planeCount,
                              p0.x,
                              p0.y,
@@ -1761,34 +1857,44 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     bool handled = false;
     if (const auto* line = std::get_if<LinePayload>(&batch.geometry)) {
       CHECK(m_lineContext != nullptr) << "Line pipeline context missing";
-      m_lineContext->record(renderer, batch, *line, vkViewport, vkScissor, cmd);
+      timeContext(cpuTimes.lineMs, [&]() {
+        m_lineContext->record(renderer, batch, *line, vkViewport, vkScissor, cmd);
+      });
       handled = true;
     }
     if (!handled) {
       if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
         CHECK(m_meshContext != nullptr) << "Mesh pipeline context missing";
-        m_meshContext->record(renderer, batch, *mesh, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.meshMs, [&]() {
+          m_meshContext->record(renderer, batch, *mesh, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* sphere = std::get_if<SpherePayload>(&batch.geometry)) {
         CHECK(m_sphereContext != nullptr) << "Sphere pipeline context missing";
-        m_sphereContext->record(renderer, batch, *sphere, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.sphereMs, [&]() {
+          m_sphereContext->record(renderer, batch, *sphere, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* background = std::get_if<BackgroundPayload>(&batch.geometry)) {
         CHECK(m_backgroundContext != nullptr) << "Background pipeline context missing";
-        m_backgroundContext->record(renderer, batch, *background, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.backgroundMs, [&]() {
+          m_backgroundContext->record(renderer, batch, *background, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* slice = std::get_if<ImgSlicePayload>(&batch.geometry)) {
         CHECK(m_imgSliceContext != nullptr) << "ImgSlice pipeline context missing";
-        m_imgSliceContext->record(renderer, batch, *slice, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.imgSliceMs, [&]() {
+          m_imgSliceContext->record(renderer, batch, *slice, vkViewport, vkScissor, cmd);
+        });
         // If slices just completed a progressive round, finalize it now.
         if (auto fin = m_imgSliceContext->takePendingFinalization()) {
           if (fin->streamKey != 0) {
@@ -1801,70 +1907,90 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (!handled) {
       if (const auto* font = std::get_if<FontPayload>(&batch.geometry)) {
         CHECK(m_fontContext != nullptr) << "Font pipeline context missing";
-        m_fontContext->record(renderer, batch, *font, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.fontMs, [&]() {
+          m_fontContext->record(renderer, batch, *font, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* textureCopy = std::get_if<TextureCopyPayload>(&batch.geometry)) {
         CHECK(m_textureCopyContext != nullptr) << "TextureCopy pipeline context missing";
-        m_textureCopyContext->record(renderer, batch, *textureCopy, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.textureCopyMs, [&]() {
+          m_textureCopyContext->record(renderer, batch, *textureCopy, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* textureBlend = std::get_if<TextureBlendPayload>(&batch.geometry)) {
         CHECK(m_textureBlendContext != nullptr) << "TextureBlend pipeline context missing";
-        m_textureBlendContext->record(renderer, batch, *textureBlend, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.textureBlendMs, [&]() {
+          m_textureBlendContext->record(renderer, batch, *textureBlend, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* textureGlow = std::get_if<TextureGlowPayload>(&batch.geometry)) {
         CHECK(m_textureGlowContext != nullptr) << "TextureGlow pipeline context missing";
-        m_textureGlowContext->record(renderer, batch, *textureGlow, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.textureGlowMs, [&]() {
+          m_textureGlowContext->record(renderer, batch, *textureGlow, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* dualPeel = std::get_if<TextureDualPeelPayload>(&batch.geometry)) {
         CHECK(m_textureDualPeelContext != nullptr) << "TextureDualPeel pipeline context missing";
-        m_textureDualPeelContext->record(renderer, batch, *dualPeel, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.textureDualPeelMs, [&]() {
+          m_textureDualPeelContext->record(renderer, batch, *dualPeel, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
         CHECK(m_textureWeightedAverageContext != nullptr) << "TextureWeightedAverage pipeline context missing";
-        m_textureWeightedAverageContext->record(renderer, batch, *weightedAverage, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.textureWeightedAverageMs, [&]() {
+          m_textureWeightedAverageContext->record(renderer, batch, *weightedAverage, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* weightedBlended = std::get_if<TextureWeightedBlendedPayload>(&batch.geometry)) {
         CHECK(m_textureWeightedBlendedContext != nullptr) << "TextureWeightedBlended pipeline context missing";
-        m_textureWeightedBlendedContext->record(renderer, batch, *weightedBlended, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.textureWeightedBlendedMs, [&]() {
+          m_textureWeightedBlendedContext->record(renderer, batch, *weightedBlended, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* ppllResolve = std::get_if<TexturePPLLResolvePayload>(&batch.geometry)) {
         CHECK(m_texturePPLLContext != nullptr) << "TexturePPLL pipeline context missing";
-        m_texturePPLLContext->record(renderer, batch, *ppllResolve, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.texturePPLLResolveMs, [&]() {
+          m_texturePPLLContext->record(renderer, batch, *ppllResolve, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* ellipsoid = std::get_if<EllipsoidPayload>(&batch.geometry)) {
         CHECK(m_ellipsoidContext != nullptr) << "Ellipsoid pipeline context missing";
-        m_ellipsoidContext->record(renderer, batch, *ellipsoid, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.ellipsoidMs, [&]() {
+          m_ellipsoidContext->record(renderer, batch, *ellipsoid, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* cone = std::get_if<ConePayload>(&batch.geometry)) {
         CHECK(m_coneContext != nullptr) << "Cone pipeline context missing";
-        m_coneContext->record(renderer, batch, *cone, vkViewport, vkScissor, cmd);
+        timeContext(cpuTimes.coneMs, [&]() {
+          m_coneContext->record(renderer, batch, *cone, vkViewport, vkScissor, cmd);
+        });
         handled = true;
       }
     }
@@ -1872,7 +1998,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (const auto* raycaster = std::get_if<ImgRaycasterPayload>(&batch.geometry)) {
         if (raycaster->image) {
           CHECK(m_imgRaycasterContext != nullptr) << "ImgRaycaster pipeline context missing";
-          m_imgRaycasterContext->record(renderer, batch, *raycaster, vkViewport, vkScissor, cmd);
+          timeContext(cpuTimes.imgRaycasterMs, [&]() {
+            m_imgRaycasterContext->record(renderer, batch, *raycaster, vkViewport, vkScissor, cmd);
+          });
           // If the raycaster just completed a progressive round, finalize it now.
           if (auto fin = m_imgRaycasterContext->takePendingFinalization()) {
             if (fin->streamKey != 0) {
@@ -1889,6 +2017,32 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       CHECK(false) << "Vulkan backend has not yet implemented draw emission for geometry type '"
                    << describeGeometry(batch.geometry) << "'.";
     }
+  }
+
+  if (profilePipelineContexts) {
+    const std::string passLabel = m_passScope.active ? m_passScope.label : std::string("processBatches");
+    auto emit = [&](std::string_view ctx, double ms) {
+      if (ms <= 0.0) {
+        return;
+      }
+      recordCpuScope(fmt::format("{} ctx={}", passLabel, ctx), ms);
+    };
+    emit("line", cpuTimes.lineMs);
+    emit("mesh", cpuTimes.meshMs);
+    emit("sphere", cpuTimes.sphereMs);
+    emit("ellipsoid", cpuTimes.ellipsoidMs);
+    emit("cone", cpuTimes.coneMs);
+    emit("background", cpuTimes.backgroundMs);
+    emit("img_slice", cpuTimes.imgSliceMs);
+    emit("img_raycaster", cpuTimes.imgRaycasterMs);
+    emit("font", cpuTimes.fontMs);
+    emit("tex_copy", cpuTimes.textureCopyMs);
+    emit("tex_blend", cpuTimes.textureBlendMs);
+    emit("tex_glow", cpuTimes.textureGlowMs);
+    emit("tex_ddp", cpuTimes.textureDualPeelMs);
+    emit("tex_wa", cpuTimes.textureWeightedAverageMs);
+    emit("tex_wb", cpuTimes.textureWeightedBlendedMs);
+    emit("tex_ppll_resolve", cpuTimes.texturePPLLResolveMs);
   }
 
   // Recording-session sync point:
@@ -2391,6 +2545,7 @@ Z3DRendererVulkanBackend::createStaticArenaSegment(StaticArena::Kind kind, size_
 
   auto seg = std::make_unique<StaticArena::Segment>();
   seg->kind = kind;
+  seg->id = m_staticArena.nextSegmentId++;
   seg->capacity = capacityBytes;
   seg->buffer = m_sharedDevice->createBuffer(capacityBytes, usage, vk::MemoryPropertyFlagBits::eDeviceLocal);
   if (!seg->buffer) {
@@ -2548,6 +2703,43 @@ void Z3DRendererVulkanBackend::ensureUniformArena(FrameResources& frame)
   }
   // Consume the hint once
   m_nextUniformMinCapacity = 0;
+}
+
+void Z3DRendererVulkanBackend::ensurePersistentUniformArena(FrameResources& frame)
+{
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensurePersistentUniformArena";
+
+  // Persistent uniforms are used for dynamic-UBO slices whose offsets must stay
+  // stable across frames (e.g., cached command buffers). Because descriptor set
+  // writes during recording are forbidden for persistent sets, this arena must
+  // be sized conservatively up front and must not need to grow mid-recording.
+  constexpr size_t kBase = static_cast<size_t>(32) * 1024ull * 1024ull; // 32 MiB
+
+  // If the arena already exists, keep its current capacity unless we detect an
+  // invariant violation (cursor beyond capacity). Growth is expected to be rare
+  // in steady state.
+  size_t requested = frame.persistentUniformArena.buffer ? frame.persistentUniformArena.capacity : kBase;
+  requested = std::max(requested, kBase);
+  requested = std::max(requested, frame.persistentUniformArena.cursor);
+
+  if (!frame.persistentUniformArena.buffer) {
+    frame.persistentUniformArena.buffer = m_sharedDevice->createBuffer(requested,
+                                                                       vk::BufferUsageFlagBits::eUniformBuffer,
+                                                                       vk::MemoryPropertyFlagBits::eHostVisible |
+                                                                         vk::MemoryPropertyFlagBits::eHostCoherent);
+    frame.persistentUniformArena.capacity = requested;
+    frame.persistentUniformArena.cursor = 0;
+    frame.persistentUniformArena.highWatermark = 0;
+    frame.persistentUniformArena.mapped = frame.persistentUniformArena.buffer->map(0, requested);
+    return;
+  }
+
+  // Sanity: persistent cursor must always fit. If this triggers, something
+  // corrupted cursor bookkeeping.
+  CHECK(frame.persistentUniformArena.capacity >= frame.persistentUniformArena.cursor)
+    << fmt::format("Persistent uniform arena cursor out of bounds: cursor={}B capacity={}B",
+                   frame.persistentUniformArena.cursor,
+                   frame.persistentUniformArena.capacity);
 }
 
 void Z3DRendererVulkanBackend::ensureDDPGatingResources(FrameResources& frame)
@@ -2979,22 +3171,22 @@ void Z3DRendererVulkanBackend::primeOITDescriptorSet(ZVulkanDescriptorSet& set)
   // Do not write descriptors during recording; callers must prime in beginRender().
   CHECK(!isRecording()) << "primeOITDescriptorSet called while recording";
   if (auto* buf = ppllParamsBufferObj()) {
-    set.writeStorageBufferOnce(vkbind::kBindingOITParams, *buf);
+    set.updateStorageBuffer(vkbind::kBindingOITParams, *buf);
   }
   if (auto* buf = ddpChangedFlagBufferObj()) {
-    set.writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
+    set.updateStorageBuffer(vkbind::kBindingOITDDPFlag, *buf);
   }
   if (auto* buf = ppllCountsBufferObj()) {
-    set.writeStorageBufferOnce(vkbind::kBindingOITPPLLCounts, *buf);
+    set.updateStorageBuffer(vkbind::kBindingOITPPLLCounts, *buf);
   }
   if (auto* buf = ppllOffsetsBufferObj()) {
-    set.writeStorageBufferOnce(vkbind::kBindingOITPPLLOffsets, *buf);
+    set.updateStorageBuffer(vkbind::kBindingOITPPLLOffsets, *buf);
   }
   if (auto* buf = ppllCursorsBufferObj()) {
-    set.writeStorageBufferOnce(vkbind::kBindingOITPPLLCursors, *buf);
+    set.updateStorageBuffer(vkbind::kBindingOITPPLLCursors, *buf);
   }
   if (auto* buf = ppllFragmentsBufferObj()) {
-    set.writeStorageBufferOnce(vkbind::kBindingOITPPLLFragments, *buf);
+    set.updateStorageBuffer(vkbind::kBindingOITPPLLFragments, *buf);
   }
 }
 
@@ -3323,10 +3515,54 @@ Z3DRendererVulkanBackend::UniformSlice Z3DRendererVulkanBackend::suballocateUnif
   return slice;
 }
 
+Z3DRendererVulkanBackend::UniformSlice Z3DRendererVulkanBackend::suballocatePersistentUniform(size_t bytes,
+                                                                                              size_t alignment)
+{
+  UniformSlice slice{};
+  CHECK(m_activeFrame != nullptr) << "suballocatePersistentUniform called without an active frame";
+  auto& arena = m_activeFrame->persistentUniformArena;
+  CHECK(arena.buffer) << "Persistent uniform arena not initialised before suballocatePersistentUniform";
+  const size_t align = std::max(uniformAlignment(), alignment ? alignment : static_cast<size_t>(1));
+  const size_t aligned = vulkan::alignUp(arena.cursor, align);
+  if (aligned + bytes > arena.capacity) {
+    CHECK(false) << fmt::format(
+      "Persistent uniform arena capacity exceeded: need={}B have={}B (cursor={}B, align={}B).",
+      aligned + bytes,
+      arena.capacity,
+      arena.cursor,
+      align);
+  }
+  const size_t off = vulkan::alignUp(arena.cursor, align);
+  slice.buffer = arena.buffer->buffer();
+  slice.offset = static_cast<vk::DeviceSize>(off);
+  slice.mapped = static_cast<char*>(arena.mapped) + off;
+  slice.size = bytes;
+  arena.cursor = off + bytes;
+  arena.highWatermark = std::max(arena.highWatermark, arena.cursor);
+  return slice;
+}
+
 class ZVulkanBuffer& Z3DRendererVulkanBackend::uniformArenaBuffer()
 {
   CHECK(m_activeFrame && m_activeFrame->uniformArena.buffer) << "Uniform arena not initialised";
   return *m_activeFrame->uniformArena.buffer;
+}
+
+class ZVulkanBuffer& Z3DRendererVulkanBackend::persistentUniformArenaBuffer()
+{
+  CHECK(m_activeFrame && m_activeFrame->persistentUniformArena.buffer) << "Persistent uniform arena not initialised";
+  return *m_activeFrame->persistentUniformArena.buffer;
+}
+
+void* Z3DRendererVulkanBackend::persistentUniformMappedAt(vk::DeviceSize offset, size_t bytes)
+{
+  CHECK(m_activeFrame && m_activeFrame->persistentUniformArena.buffer) << "Persistent uniform arena not initialised";
+  auto& arena = m_activeFrame->persistentUniformArena;
+  CHECK(arena.mapped != nullptr) << "Persistent uniform arena missing mapped pointer";
+  const size_t off = static_cast<size_t>(offset);
+  CHECK(off + bytes <= arena.capacity)
+    << fmt::format("Persistent uniform arena mappedAt OOB: off={}B bytes={}B cap={}B", off, bytes, arena.capacity);
+  return static_cast<char*>(arena.mapped) + off;
 }
 
 Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB(size_t bytes, size_t alignment)
@@ -3537,6 +3773,19 @@ void Z3DRendererVulkanBackend::pinStaticSliceForActiveSubmission(const StaticSli
   }
 }
 
+uint64_t Z3DRendererVulkanBackend::staticArenaSegmentIdForBuffer(vk::Buffer buffer) const
+{
+  if (!buffer) {
+    return 0;
+  }
+  const VkBuffer raw = static_cast<VkBuffer>(buffer);
+  auto it = m_staticArena.segmentByBuffer.find(raw);
+  if (it == m_staticArena.segmentByBuffer.end() || it->second == nullptr) {
+    return 0;
+  }
+  return it->second->id;
+}
+
 void Z3DRendererVulkanBackend::requestEvictStream(uint64_t streamKey)
 {
   if (streamKey == 0) {
@@ -3595,6 +3844,28 @@ Z3DRendererVulkanBackend::allocateFrameDescriptorSet(vk::DescriptorSetLayout lay
     return {};
   }
   auto set = m_sharedDevice->createDescriptorSet(*m_activeFrame->descriptorPool, layout, /*isOverrideTransient*/ false);
+  if (set) {
+    m_activeFrame->descriptorSetsAllocated++;
+  }
+  return set;
+}
+
+std::unique_ptr<ZVulkanDescriptorSet>
+Z3DRendererVulkanBackend::allocatePersistentDescriptorSet(vk::DescriptorSetLayout layout)
+{
+  if (!m_activeFrame) {
+    VLOG(1) << "allocatePersistentDescriptorSet called with no active frame";
+    return {};
+  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in allocatePersistentDescriptorSet";
+  ensurePersistentArenaOnFrame(*m_activeFrame);
+  if (!m_activeFrame->persistentDescriptorPool) {
+    VLOG(1) << "Persistent descriptor arena missing; allocation skipped";
+    return {};
+  }
+  auto set = m_sharedDevice->createDescriptorSet(*m_activeFrame->persistentDescriptorPool,
+                                                 layout,
+                                                 /*isOverrideTransient*/ false);
   if (set) {
     m_activeFrame->descriptorSetsAllocated++;
   }
@@ -3945,6 +4216,7 @@ Z3DRendererVulkanBackend::FrameResources& Z3DRendererVulkanBackend::ensureFrameR
   vk::QueryPoolCreateInfo queryInfo{.queryType = vk::QueryType::eTimestamp, .queryCount = kMaxTimestampQueries};
   frame.queryPool = vk::raii::QueryPool(vkDevice, queryInfo);
   frame.descriptorPool = m_sharedDevice->createDescriptorPool();
+  frame.persistentDescriptorPool = m_sharedDevice->createDescriptorPool();
   return frame;
 }
 
@@ -3952,6 +4224,13 @@ void Z3DRendererVulkanBackend::ensureArenaOnFrame(FrameResources& frame)
 {
   if (!frame.descriptorPool) {
     frame.descriptorPool = m_sharedDevice->createDescriptorPool();
+  }
+}
+
+void Z3DRendererVulkanBackend::ensurePersistentArenaOnFrame(FrameResources& frame)
+{
+  if (!frame.persistentDescriptorPool) {
+    frame.persistentDescriptorPool = m_sharedDevice->createDescriptorPool();
   }
 }
 
@@ -4496,6 +4775,55 @@ void Z3DRendererVulkanBackend::notifyPipelineBound(vk::Pipeline pipeline)
   m_activeFrame->pipelinesBound.insert(reinterpret_cast<uint64_t>(raw));
 }
 
+void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheAttempt()
+{
+  if (m_activeFrame) {
+    m_activeFrame->drawSecondaryCacheAttempts++;
+  }
+}
+
+void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheKeyFound()
+{
+  if (m_activeFrame) {
+    m_activeFrame->drawSecondaryCacheKeyFound++;
+  }
+}
+
+void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheSignatureMismatch()
+{
+  notifyDrawSecondaryCacheSignatureMismatchMask(0);
+}
+
+void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheSignatureMismatchMask(uint32_t mask)
+{
+  if (!m_activeFrame) {
+    return;
+  }
+  m_activeFrame->drawSecondaryCacheSignatureMismatches++;
+  m_activeFrame->drawSecondaryCacheSignatureMismatchMaskOr |= mask;
+}
+
+void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheHit()
+{
+  if (m_activeFrame) {
+    m_activeFrame->drawSecondaryCacheHits++;
+  }
+}
+
+void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheBuild()
+{
+  if (m_activeFrame) {
+    m_activeFrame->drawSecondaryCacheBuilds++;
+  }
+}
+
+void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheExecute()
+{
+  if (m_activeFrame) {
+    m_activeFrame->drawSecondaryCacheExecutes++;
+  }
+}
+
 // Queue a static copy to be performed outside dynamic rendering in this frame
 void Z3DRendererVulkanBackend::scheduleStaticCopy(vk::Buffer dst,
                                                   vk::DeviceSize dstOffset,
@@ -4699,7 +5027,8 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
 
   // Append concise per-submission stats (counts and resource deltas)
   message += fmt::format(
-    " | dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={} upload_hi={}B static={}B rb={}B rbinflight={}",
+    " | draws={} dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={} upload_hi={}B ubo_hi={}B static={}B rb={}B rbinflight={} sec2=a{} f{} m{} h{} b{} e{} mask=0x{:x}",
+    frame.drawsSubmitted,
     frame.descriptorSetsAllocated,
     frame.overrideSetsAllocated,
     frame.pipelinesCreated,
@@ -4710,9 +5039,17 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     frame.descriptorWritesWhileRecording,
     frame.boundSetRewriteAttempts,
     frame.uploadArena.highWatermark,
+    frame.uniformArena.highWatermark,
     frame.staticBytesStaged,
     frame.readbackBytesCopied,
-    frame.readbackSlotsInFlight);
+    frame.readbackSlotsInFlight,
+    frame.drawSecondaryCacheAttempts,
+    frame.drawSecondaryCacheKeyFound,
+    frame.drawSecondaryCacheSignatureMismatches,
+    frame.drawSecondaryCacheHits,
+    frame.drawSecondaryCacheBuilds,
+    frame.drawSecondaryCacheExecutes,
+    frame.drawSecondaryCacheSignatureMismatchMaskOr);
 
   LOG(INFO) << message;
 
@@ -4758,6 +5095,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
 
   if (frame.realFrameToken != 0) {
     Z3DPerfCollector::Stats stats{};
+    stats.drawsSubmitted = frame.drawsSubmitted;
     stats.descriptorSetsAllocated = frame.descriptorSetsAllocated;
     stats.overrideSetsAllocated = frame.overrideSetsAllocated;
     stats.pipelinesCreated = frame.pipelinesCreated;
@@ -4768,6 +5106,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     stats.descriptorWritesWhileRecording = frame.descriptorWritesWhileRecording;
     stats.boundSetRewriteAttempts = frame.boundSetRewriteAttempts;
     stats.uploadHighWatermarkBytes = frame.uploadArena.highWatermark;
+    stats.uniformHighWatermarkBytes = frame.uniformArena.highWatermark;
     stats.staticBytesStaged = frame.staticBytesStaged;
     stats.linesBytesStaged = frame.linesBytesStaged;
     stats.fontsBytesStaged = frame.fontsBytesStaged;
@@ -4777,6 +5116,13 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     stats.readbackSlotsInFlight = frame.readbackSlotsInFlight;
     stats.allSamples = frame.allSamples;
     stats.allMaxMs = frame.allMaxMs.value_or(0.0);
+    stats.drawSecondaryCacheAttempts = frame.drawSecondaryCacheAttempts;
+    stats.drawSecondaryCacheKeyFound = frame.drawSecondaryCacheKeyFound;
+    stats.drawSecondaryCacheSignatureMismatches = frame.drawSecondaryCacheSignatureMismatches;
+    stats.drawSecondaryCacheSignatureMismatchMaskOr = frame.drawSecondaryCacheSignatureMismatchMaskOr;
+    stats.drawSecondaryCacheHits = frame.drawSecondaryCacheHits;
+    stats.drawSecondaryCacheBuilds = frame.drawSecondaryCacheBuilds;
+    stats.drawSecondaryCacheExecutes = frame.drawSecondaryCacheExecutes;
 
     Z3DPerfCollector::instance().addSubmission(frame.realFrameToken,
                                                frame.submissionId,

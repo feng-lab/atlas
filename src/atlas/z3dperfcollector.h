@@ -27,6 +27,9 @@ public:
 
   struct Stats
   {
+    // Work submitted
+    uint32_t drawsSubmitted = 0;
+
     // Descriptor/arena
     uint32_t descriptorSetsAllocated = 0;
     uint32_t overrideSetsAllocated = 0;
@@ -40,6 +43,7 @@ public:
 
     // Upload/readback/staging
     size_t uploadHighWatermarkBytes = 0; // max within submission
+    size_t uniformHighWatermarkBytes = 0; // max within submission
     size_t staticBytesStaged = 0;
     size_t linesBytesStaged = 0;
     size_t fontsBytesStaged = 0;
@@ -49,6 +53,15 @@ public:
     uint32_t readbackSlotsInFlight = 0;
     uint32_t allSamples = 0; // perf-frame-start → host-ready observations (end-to-end UX latency)
     double allMaxMs = 0.0; // max over allSamples
+
+    // Optional: command buffer reuse diagnostics
+    uint32_t drawSecondaryCacheAttempts = 0;
+    uint32_t drawSecondaryCacheKeyFound = 0;
+    uint32_t drawSecondaryCacheSignatureMismatches = 0;
+    uint32_t drawSecondaryCacheSignatureMismatchMaskOr = 0;
+    uint32_t drawSecondaryCacheHits = 0;
+    uint32_t drawSecondaryCacheBuilds = 0;
+    uint32_t drawSecondaryCacheExecutes = 0;
   };
 
   struct Submission

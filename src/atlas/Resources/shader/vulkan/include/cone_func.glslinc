@@ -6,12 +6,6 @@ layout(constant_id = 90) const int CAPS_MODE = 1;
 // The following specialization constant is unused but kept for potential pipeline control.
 layout(constant_id = 91) const bool _AA_UNUSED = false;
 
-layout(push_constant) uniform ConePC {
-  mat4 projection_matrix; // for depth
-  float ortho;
-  vec3 _pad;
-} cpc;
-
 // Inputs from vertex stage
 layout(location = 0) in vec4 v_color1;
 layout(location = 1) in vec4 v_color2;
@@ -38,8 +32,8 @@ bool cone_fragment_hit(out vec4 baseColor,
   float height  = v_combo1.z;
   float inv_sqr_height = v_combo1.w;
 
-  vec3 rayOrigin    = mix(vec3(0.0), v_point, cpc.ortho);
-  vec3 rayDirection = mix(normalize(v_point), vec3(0.0, 0.0, -1.0), cpc.ortho);
+  vec3 rayOrigin    = mix(vec3(0.0), v_point, xf.parameters.y);
+  vec3 rayDirection = mix(normalize(v_point), vec3(0.0, 0.0, -1.0), xf.parameters.y);
 
   // Local basis for the cone
   mat3 basis = mat3(v_U, v_V, v_axis);
@@ -230,7 +224,7 @@ bool cone_fragment_hit(out vec4 baseColor,
   }
 
   // Depth from projection matrix (Vulkan NDC z in [0,1])
-  vec2 clipZW = ipoint.z * cpc.projection_matrix[2].zw + cpc.projection_matrix[3].zw;
+  vec2 clipZW = ipoint.z * xf.projection_matrix[2].zw + xf.projection_matrix[3].zw;
   float depth = clipZW.x / clipZW.y;
   if (depth <= 0.0 || depth >= 1.0) {
     return false;
