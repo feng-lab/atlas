@@ -11,12 +11,19 @@ layout(location = 2) out vec4 FragData2;
 // DDP indirect-count: mark when this pass updates any pixel
 layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
 
+#define ATLAS_CLIP_DISTANCE_EXTRA_USE_DISCARD 0
 #include "include/matrices_material.glslinc"
 #define ATLAS_PPLL 1
 #include "include/cone_func_2.glslinc"
 
 void main()
 {
+  if (atlas_should_reject_extra_clip_planes()) {
+    FragData0.xy = vec2(-1.0);
+    FragData1 = vec4(0.0);
+    FragData2 = vec4(0.0);
+    return;
+  }
   vec4 color;
   float depth;
   if (!fragment_func(color, depth)) {

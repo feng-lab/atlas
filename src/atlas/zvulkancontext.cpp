@@ -912,10 +912,13 @@ void ZVulkanContext::createLogicalDevice()
   if (physicalDeviceFeatures.shaderClipDistance != VK_TRUE) {
     throw ZException("Selected Vulkan device does not support shaderClipDistance (required for XYZ cut clip planes)");
   }
-  if (properties.limits.maxClipDistances < kVulkanMaxClipPlanes) {
-    throw ZException(fmt::format("Selected Vulkan device supports only {} clip distances, but Atlas requires {}",
+  if (properties.limits.maxClipDistances < kVulkanMaxClipDistances ||
+      properties.limits.maxCombinedClipAndCullDistances < kVulkanMaxClipDistances) {
+    throw ZException(fmt::format("Selected Vulkan device supports only {} clip distances (combined {}), but Atlas "
+                                 "requires at least {} (extra planes are applied in the fragment shader)",
                                  properties.limits.maxClipDistances,
-                                 kVulkanMaxClipPlanes));
+                                 properties.limits.maxCombinedClipAndCullDistances,
+                                 kVulkanMaxClipDistances));
   }
 
   // Enable basic features

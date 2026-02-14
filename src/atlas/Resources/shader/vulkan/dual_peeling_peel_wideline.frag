@@ -11,11 +11,18 @@ layout(location = 2) out vec4 FragData2;
 
 layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
 
+#define ATLAS_CLIP_DISTANCE_EXTRA_USE_DISCARD 0
 #define ATLAS_PPLL 1
 #include "include/wideline_func1.glslinc"
 
 void main()
 {
+  if (atlas_should_reject_extra_clip_planes()) {
+    FragData0.xy = vec2(-1.0);
+    FragData1 = vec4(0.0);
+    FragData2 = vec4(0.0);
+    return;
+  }
   // Avoid discard in OIT shaders that use SSBO atomics (MoltenVK/driver stability).
   // When a fragment is not covered by the wide-line expansion, emit no-op
   // outputs so MAX blending leaves existing values unchanged and do not touch

@@ -92,9 +92,12 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_xCut.setSingleStep(1);
   m_yCut.setSingleStep(1);
   m_zCut.setSingleStep(1);
-  m_xCut.setDescription(QStringLiteral("Local clipping interval along the X axis (world units)."));
-  m_yCut.setDescription(QStringLiteral("Local clipping interval along the Y axis (world units)."));
-  m_zCut.setDescription(QStringLiteral("Local clipping interval along the Z axis (world units)."));
+  m_xCut.setDescription(
+    QStringLiteral("Local clipping interval along the X axis in the object's pre-transform space."));
+  m_yCut.setDescription(
+    QStringLiteral("Local clipping interval along the Y axis in the object's pre-transform space."));
+  m_zCut.setDescription(
+    QStringLiteral("Local clipping interval along the Z axis in the object's pre-transform space."));
   connect(&m_xCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_yCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_zCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
@@ -133,6 +136,16 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
 
   connect(&m_rendererParameters.coordTransform, &Z3DTransformParameter::valueChanged, this, [this]() {
     m_rendererParameterState.coordTransform = m_rendererParameters.coordTransform.get();
+    // Local XYZ cuts are defined in the filter's untransformed/object space,
+    // but clipping is evaluated in world space. Z3DRendererBase::setClipPlanes()
+    // transforms plane equations by the inverse-transpose of coordTransform.
+    //
+    // When coordTransform is animated (timeline scrubbing / keyframes), we must
+    // recompute those transformed planes; otherwise the clip planes remain at
+    // the previous world-space location and appear as a "stuck" axis cut that
+    // slices through the moving object (Vulkan and OpenGL both consume the
+    // stored world-space planes).
+    setClipPlanes();
     updateAxisAlignedBoundBox();
     Q_EMIT rendererCoordTransformChanged();
   });
@@ -403,56 +416,67 @@ void Z3DBoundedFilter::setClipPlanes()
 
   std::vector<glm::vec4> clipPlanes;
 
-  // Local XYZ cuts and global XYZ cuts are axis-aligned constraints. When both
-  // are active, the effective region is the intersection of the two intervals
-  // along each axis, so we only need the tightest lower/upper plane per axis.
-  // This reduces redundant planes without changing behaviour (GL parity) and
-  // keeps Vulkan clip plane payloads compact.
-  auto mergeLower = [](const ZFloatSpanParameter& para, std::optional<float>& dst) {
-    if (para.lowerValue() != para.minimum()) {
-      const float v = para.lowerValue();
-      dst = dst.has_value() ? std::max(*dst, v) : v;
-    }
+  // Semantics:
+  // - Local XYZ cuts (m_xCut/m_yCut/m_zCut) are defined in the filter's
+  //   untransformed/object space.
+  // - Global XYZ cuts (globalXCut/globalYCut/globalZCut) are defined in world
+  //   space and must remain fixed as objects animate via coordTransform.
+  //
+  // Z3DRendererBase::setClipPlanes() expects *object-space* plane equations and
+  // converts them to world space via M^{-T}, where M is coordTransform.
+  //
+  // Therefore:
+  // - Local planes are appended directly (object-space).
+  // - Global (world-space) planes are converted into the expected input space:
+  //     p_in = M^{T} * p_world
+  //   so that the renderer's internal transform yields:
+  //     M^{-T} * p_in = p_world
+  const glm::mat4 coordTransform = m_rendererParameters.coordTransform.get();
+  const glm::mat4 coordTransformT = glm::transpose(coordTransform);
+
+  auto appendLocalPlane = [&](const glm::vec4& pObject) {
+    clipPlanes.emplace_back(pObject);
   };
-  auto mergeUpper = [](const ZFloatSpanParameter& para, std::optional<float>& dst) {
-    if (para.upperValue() != para.maximum()) {
-      const float v = para.upperValue();
-      dst = dst.has_value() ? std::min(*dst, v) : v;
-    }
+  auto appendWorldPlane = [&](const glm::vec4& pWorld) {
+    clipPlanes.emplace_back(coordTransformT * pWorld);
   };
 
-  std::optional<float> xLower, xUpper, yLower, yUpper, zLower, zUpper;
-  mergeLower(m_xCut, xLower);
-  mergeUpper(m_xCut, xUpper);
-  mergeLower(m_yCut, yLower);
-  mergeUpper(m_yCut, yUpper);
-  mergeLower(m_zCut, zLower);
-  mergeUpper(m_zCut, zUpper);
+  if (m_xCut.lowerValue() != m_xCut.minimum()) {
+    appendLocalPlane(glm::vec4(1.f, 0.f, 0.f, -m_xCut.lowerValue()));
+  }
+  if (m_xCut.upperValue() != m_xCut.maximum()) {
+    appendLocalPlane(glm::vec4(-1.f, 0.f, 0.f, m_xCut.upperValue()));
+  }
+  if (m_yCut.lowerValue() != m_yCut.minimum()) {
+    appendLocalPlane(glm::vec4(0.f, 1.f, 0.f, -m_yCut.lowerValue()));
+  }
+  if (m_yCut.upperValue() != m_yCut.maximum()) {
+    appendLocalPlane(glm::vec4(0.f, -1.f, 0.f, m_yCut.upperValue()));
+  }
+  if (m_zCut.lowerValue() != m_zCut.minimum()) {
+    appendLocalPlane(glm::vec4(0.f, 0.f, 1.f, -m_zCut.lowerValue()));
+  }
+  if (m_zCut.upperValue() != m_zCut.maximum()) {
+    appendLocalPlane(glm::vec4(0.f, 0.f, -1.f, m_zCut.upperValue()));
+  }
 
-  mergeLower(m_globalParameters.globalXCut, xLower);
-  mergeUpper(m_globalParameters.globalXCut, xUpper);
-  mergeLower(m_globalParameters.globalYCut, yLower);
-  mergeUpper(m_globalParameters.globalYCut, yUpper);
-  mergeLower(m_globalParameters.globalZCut, zLower);
-  mergeUpper(m_globalParameters.globalZCut, zUpper);
-
-  if (xLower) {
-    clipPlanes.emplace_back(1., 0., 0., -*xLower);
+  if (m_globalParameters.globalXCut.lowerValue() != m_globalParameters.globalXCut.minimum()) {
+    appendWorldPlane(glm::vec4(1.f, 0.f, 0.f, -m_globalParameters.globalXCut.lowerValue()));
   }
-  if (xUpper) {
-    clipPlanes.emplace_back(-1., 0., 0., *xUpper);
+  if (m_globalParameters.globalXCut.upperValue() != m_globalParameters.globalXCut.maximum()) {
+    appendWorldPlane(glm::vec4(-1.f, 0.f, 0.f, m_globalParameters.globalXCut.upperValue()));
   }
-  if (yLower) {
-    clipPlanes.emplace_back(0., 1., 0., -*yLower);
+  if (m_globalParameters.globalYCut.lowerValue() != m_globalParameters.globalYCut.minimum()) {
+    appendWorldPlane(glm::vec4(0.f, 1.f, 0.f, -m_globalParameters.globalYCut.lowerValue()));
   }
-  if (yUpper) {
-    clipPlanes.emplace_back(0., -1., 0., *yUpper);
+  if (m_globalParameters.globalYCut.upperValue() != m_globalParameters.globalYCut.maximum()) {
+    appendWorldPlane(glm::vec4(0.f, -1.f, 0.f, m_globalParameters.globalYCut.upperValue()));
   }
-  if (zLower) {
-    clipPlanes.emplace_back(0., 0., 1., -*zLower);
+  if (m_globalParameters.globalZCut.lowerValue() != m_globalParameters.globalZCut.minimum()) {
+    appendWorldPlane(glm::vec4(0.f, 0.f, 1.f, -m_globalParameters.globalZCut.lowerValue()));
   }
-  if (zUpper) {
-    clipPlanes.emplace_back(0., 0., -1., *zUpper);
+  if (m_globalParameters.globalZCut.upperValue() != m_globalParameters.globalZCut.maximum()) {
+    appendWorldPlane(glm::vec4(0.f, 0.f, -1.f, m_globalParameters.globalZCut.upperValue()));
   }
 
   m_rendererBase.setClipPlanes(&clipPlanes);

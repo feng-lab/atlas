@@ -60,7 +60,13 @@ inline bool operator!=(const RendererParameterState& lhs, const RendererParamete
   return !(lhs == rhs);
 }
 
-inline constexpr size_t kRenderBatchMaxClipPlanes = 6;
+// Local XYZ cuts contribute up to 6 planes (object-space AABB), and global XYZ
+// cuts contribute up to 6 planes (world-space AABB). The combined semantics are
+// the intersection of both constraints, so a frame can require up to 12 planes.
+//
+// This is primarily a correctness/logic check (we should never exceed 12 for
+// XYZ cuts). Backend device limits are validated separately.
+inline constexpr size_t kRenderBatchMaxClipPlanes = 12;
 
 struct ClipPlanesState
 {

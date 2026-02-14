@@ -1,0 +1,22 @@
+// Shared clip-plane constants for Vulkan shaders.
+//
+// Keep in sync with:
+//   - src/atlas/z3drendercommands.h (kRenderBatchMaxClipPlanes)
+//   - src/atlas/zvulkanuniforms.h (kVulkanMaxClipPlanes / kVulkanMaxClipDistances)
+//
+// Notes:
+// - Planes: Atlas may provide up to 12 clip planes (6 local + 6 global).
+// - Clip distances: Many devices expose maxClipDistances=8, so Vulkan shaders
+//   only export the first 8 planes via gl_ClipDistance for early clipping.
+// - Extra planes: remaining planes are applied via fragment discard using
+//   interpolated signed distances.
+
+#ifndef ATLAS_CLIP_DISTANCE_CONFIG_GLSLINC
+#define ATLAS_CLIP_DISTANCE_CONFIG_GLSLINC
+
+#define ATLAS_MAX_CLIP_PLANES 12
+#define ATLAS_MAX_CLIP_DISTANCES 8
+#define ATLAS_MAX_EXTRA_CLIP_PLANES (ATLAS_MAX_CLIP_PLANES - ATLAS_MAX_CLIP_DISTANCES)
+#define ATLAS_EXTRA_CLIP_DISTANCE_LOCATION 9
+
+#endif // ATLAS_CLIP_DISTANCE_CONFIG_GLSLINC

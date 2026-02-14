@@ -3,6 +3,10 @@
 //
 // Note: binding indices must match the Vulkan OIT descriptor set (set = 3)
 // declared in zvulkanbindings.h and Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts().
+//
+// Important: do not include clip-plane varyings here. ppll_resolve.frag is a
+// fullscreen pass paired with pass.vert (no vertex outputs), so any added
+// fragment-stage inputs would break pipeline interface matching.
 
 #ifndef ATLAS_PPLL_COMMON_GLSLINC
 #define ATLAS_PPLL_COMMON_GLSLINC

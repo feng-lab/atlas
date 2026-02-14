@@ -22,6 +22,9 @@ uniform sampler3D texture;
 
 in vec3 normal;
 in vec3 point;
+#if defined(HAS_CLIP_PLANE) && EXTRA_CLIP_PLANE_COUNT > 0
+in float atlas_extra_clip_distance[EXTRA_CLIP_PLANE_COUNT];
+#endif
 #else
 #if defined(USE_MESH_COLOR)
 varying vec4 color;
@@ -54,6 +57,14 @@ vec4 apply_lighting_and_fog(const in vec4 sceneAmbient,
 
 void main(void)
 {
+#if defined(HAS_CLIP_PLANE) && GLSL_VERSION >= 130 && EXTRA_CLIP_PLANE_COUNT > 0
+  if (clip_planes_enabled) {
+    for (int i = 0; i < EXTRA_CLIP_PLANE_COUNT; ++i) {
+      if (atlas_extra_clip_distance[i] < 0.0)
+        discard;
+    }
+  }
+#endif
   if (use_custom_color) {
     FragData0 = apply_lighting_and_fog(scene_ambient, material_shininess, material_ambient, material_specular,
                                        normal, point, custom_color, alpha);
@@ -84,4 +95,3 @@ void main(void)
 #endif
   }
 }
-

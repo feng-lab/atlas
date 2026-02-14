@@ -26,6 +26,9 @@ in vec4 combo1;
 #define inv_sqr_height combo1.w
 in vec4 color1;
 in vec4 color2;
+#if defined(HAS_CLIP_PLANE) && EXTRA_CLIP_PLANE_COUNT > 0
+in float atlas_extra_clip_distance[EXTRA_CLIP_PLANE_COUNT];
+#endif
 #else
 varying vec3 point;
 varying vec3 axis;
@@ -48,6 +51,14 @@ vec4 apply_lighting_and_fog(const in vec4 sceneAmbient,
 
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
+#if defined(HAS_CLIP_PLANE) && GLSL_VERSION >= 130 && EXTRA_CLIP_PLANE_COUNT > 0
+  if (clip_planes_enabled) {
+    for (int i = 0; i < EXTRA_CLIP_PLANE_COUNT; ++i) {
+      if (atlas_extra_clip_distance[i] < 0.0)
+        discard;
+    }
+  }
+#endif
   vec3 rayOrigin = mix(vec3(0.0), point, ortho);
   vec3 rayDirection = mix(normalize(point), vec3(0.0, 0.0, -1.0), ortho);
 
@@ -248,4 +259,3 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
 #endif
 
 }
-

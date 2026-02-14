@@ -211,6 +211,14 @@ public:
     return m_maxDrawBuffer;
   }
 
+  // Max number of clip distances supported in vertex shaders (OpenGL
+  // GL_MAX_CLIP_DISTANCES). This bounds gl_ClipDistance[] size and how many
+  // clip planes can be active at once.
+  [[nodiscard]] int maxClipDistances() const
+  {
+    return m_maxClipDistances;
+  }
+
   [[nodiscard]] float minSmoothPointSize() const
   {
     return m_minSmoothPointSize;
@@ -292,6 +300,7 @@ private:
   float m_maxTextureAnisotropy = 1.0f;
   int m_maxColorAttachments = 4;
   int m_maxDrawBuffer = 8;
+  int m_maxClipDistances = 8;
   int m_maxGeometryOutputVertices = 0;
   int m_maxArrayTextureLayers = 256;
 

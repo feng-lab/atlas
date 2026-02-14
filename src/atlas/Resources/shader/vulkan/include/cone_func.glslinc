@@ -1,4 +1,5 @@
 #include "lighting.glslinc"
+#include "clip_distance_extra_frag.glslinc"
 
 // Cap modes: 0=NO_CAPS, 1=FLAT_CAPS, 2=ROUND_CAPS, 3=FLAT_BASE_CAP_ROUND_TOP_CAP, 4=ROUND_BASE_CAP_FLAT_TOP_CAP
 layout(constant_id = 90) const int CAPS_MODE = 1;
@@ -272,11 +273,13 @@ bool cone_fragment_color_impl(out vec4 fragColor, out float fragDepth)
 #ifdef ATLAS_PPLL
 bool fragment_func(out vec4 fragColor, out float fragDepth)
 {
+  atlas_discard_extra_clip_planes();
   return cone_fragment_color_impl(fragColor, fragDepth);
 }
 #else
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
+  atlas_discard_extra_clip_planes();
   if (!cone_fragment_color_impl(fragColor, fragDepth)) {
     discard;
   }

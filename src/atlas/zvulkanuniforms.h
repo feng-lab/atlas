@@ -6,11 +6,19 @@
 
 namespace nim {
 
-// Vulkan clip planes are currently used to implement the same local/global XYZ
-// cut features as the OpenGL backend. Each axis contributes at most one lower
-// and one upper plane after combining local+global constraints, so the maximum
-// plane count is 6.
-inline constexpr size_t kVulkanMaxClipPlanes = 6;
+// Vulkan clip planes are used to implement the same local/global XYZ cut
+// features as the OpenGL backend. Local cuts (object-space AABB) and global
+// cuts (world-space AABB) are both applied, so the combined region can require
+// up to 12 planes (6 local + 6 global).
+//
+// Device limits are validated at Vulkan device creation time; see ZVulkanContext.
+inline constexpr size_t kVulkanMaxClipPlanes = 12;
+// We only export up to this many planes via gl_ClipDistance (fixed-function
+// early clipping). Any remaining planes are applied via fragment discard using
+// interpolated distances.
+inline constexpr size_t kVulkanMaxClipDistances = 8;
+static_assert(kVulkanMaxClipDistances <= kVulkanMaxClipPlanes);
+inline constexpr size_t kVulkanMaxExtraClipPlanes = kVulkanMaxClipPlanes - kVulkanMaxClipDistances;
 
 // Shared std140 UBO layouts mirrored by Vulkan mesh/line pipelines. Keep the
 // packing rules identical to the GLSL includes under Resources/shader/vulkan.

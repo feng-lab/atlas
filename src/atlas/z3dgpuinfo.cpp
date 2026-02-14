@@ -228,6 +228,7 @@ void Z3DGpuInfo::logGpuInfo() const
                  max3DTextureSize());
   fmt::format_to(std::back_inserter(msg), "Max Color Attachments:         {}\n", m_maxColorAttachments);
   fmt::format_to(std::back_inserter(msg), "Max Draw Buffer:               {}\n", m_maxDrawBuffer);
+  fmt::format_to(std::back_inserter(msg), "Max Clip Distances:            {}\n", m_maxClipDistances);
   if (m_maxGeometryOutputVertices > 0) {
     fmt::format_to(std::back_inserter(msg), "Max GS Output Vertices:        {}\n", m_maxGeometryOutputVertices);
   }
@@ -345,6 +346,8 @@ void Z3DGpuInfo::detectGpuInfo()
 
     glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS_EXT, &m_maxColorAttachments);
     glGetIntegerv(GL_MAX_DRAW_BUFFERS, &m_maxDrawBuffer);
+    m_maxClipDistances = -1;
+    glGetIntegerv(GL_MAX_CLIP_DISTANCES, &m_maxClipDistances);
 
     // Point
     GLfloat range[2];

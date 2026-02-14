@@ -1,5 +1,6 @@
 // Specialization constants
 #include "matrices_material.glslinc"
+#include "clip_distance_extra_frag.glslinc"
 
 layout(constant_id = 98) const bool USE_1DTEXTURE = false;
 layout(constant_id = 99) const bool ROUND_CAP     = false;
@@ -92,16 +93,19 @@ bool wideline_fragment_color_impl(out vec4 fragColor, out float fragDepth)
 #ifdef ATLAS_PPLL
 bool fragment_discard_only()
 {
+  atlas_discard_extra_clip_planes();
   return wideline_fragment_discard_only_impl();
 }
 
 bool fragment_func(out vec4 fragColor, out float fragDepth)
 {
+  atlas_discard_extra_clip_planes();
   return wideline_fragment_color_impl(fragColor, fragDepth);
 }
 #else
 void fragment_discard_only()
 {
+  atlas_discard_extra_clip_planes();
   if (!wideline_fragment_discard_only_impl()) {
     discard;
   }
@@ -109,6 +113,7 @@ void fragment_discard_only()
 
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
+  atlas_discard_extra_clip_planes();
   if (!wideline_fragment_color_impl(fragColor, fragDepth)) {
     discard;
   }

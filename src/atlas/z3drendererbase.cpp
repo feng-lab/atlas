@@ -1,9 +1,11 @@
 #include "z3drendererbase.h"
 
 #include "z3dgl.h"
+#include "z3dgpuinfo.h"
 #include "z3dprimitiverenderer.h"
 #include "z3drendererbackend.h"
 #include "z3drenderervulkanbackend.h"
+#include "zvulkanuniforms.h"
 #include "z3dscratchresourcepool.h"
 #include "z3dcamera.h"
 #include "z3drenderglobalstate.h"
@@ -729,6 +731,30 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
     }
   }
   size_t nNewClipPlanes = m_clipPlanes.size();
+  if (nNewClipPlanes > 0) {
+    size_t clipDistanceBudget = 0;
+    if (m_activeBackend == RenderBackend::Vulkan) {
+      clipDistanceBudget = kVulkanMaxClipDistances;
+    } else {
+      const int deviceMaxClipDistances = std::max(0, Z3DGpuInfo::instance().maxClipDistances());
+      clipDistanceBudget = static_cast<size_t>(deviceMaxClipDistances);
+    }
+
+    if (nNewClipPlanes > clipDistanceBudget) {
+      if (!m_lastLoggedClipPlaneOverflowCount.has_value() || *m_lastLoggedClipPlaneOverflowCount != nNewClipPlanes) {
+        LOG(WARNING) << "Clip planes (" << nNewClipPlanes << ") exceed device clip-distance budget ("
+                     << clipDistanceBudget << "). Atlas will export the first " << clipDistanceBudget
+                     << " planes via gl_ClipDistance for early clipping and apply the remaining "
+                     << (nNewClipPlanes - clipDistanceBudget)
+                     << " plane(s) in the fragment shader (correct but slower).";
+        m_lastLoggedClipPlaneOverflowCount = nNewClipPlanes;
+      }
+    } else {
+      m_lastLoggedClipPlaneOverflowCount.reset();
+    }
+  } else {
+    m_lastLoggedClipPlaneOverflowCount.reset();
+  }
   if (nNewClipPlanes != nOldClipPlanes) { // need to recompile shader to define or undefine HAS_CLIP_PLANE
     compile();
   }
@@ -1031,7 +1057,9 @@ void Z3DRendererBase::activateClipPlanesGLSL()
   if (!m_clipEnabled) {
     return;
   }
-  for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
+  const int deviceMaxClipDistances = std::max(0, Z3DGpuInfo::instance().maxClipDistances());
+  const size_t clipDistanceCount = std::min(m_clipPlanes.size(), static_cast<size_t>(deviceMaxClipDistances));
+  for (size_t i = 0; i < clipDistanceCount; ++i) {
     glEnable(GL_CLIP_DISTANCE0 + i);
   }
 }
@@ -1041,7 +1069,9 @@ void Z3DRendererBase::deactivateClipPlanesGLSL()
   if (!m_clipEnabled) {
     return;
   }
-  for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
+  const int deviceMaxClipDistances = std::max(0, Z3DGpuInfo::instance().maxClipDistances());
+  const size_t clipDistanceCount = std::min(m_clipPlanes.size(), static_cast<size_t>(deviceMaxClipDistances));
+  for (size_t i = 0; i < clipDistanceCount; ++i) {
     glDisable(GL_CLIP_DISTANCE0 + i);
   }
 }

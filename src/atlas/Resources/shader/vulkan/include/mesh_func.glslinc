@@ -13,6 +13,7 @@ layout(set = 0, binding = 2) uniform sampler3D tex3D;
 
 // Shared UBOs for transforms and material
 #include "matrices_material.glslinc"
+#include "clip_distance_extra_frag.glslinc"
 
 // Varyings from vertex
 layout(location = 0) in vec4 v_color;      // when USE_MESH_COLOR
@@ -24,6 +25,8 @@ layout(location = 5) in vec3  v_point;
 
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
+  atlas_discard_extra_clip_planes();
+
   vec4 color;
   if (matu.use_custom_color != 0) {
     color = matu.custom_color;

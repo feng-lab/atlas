@@ -498,6 +498,7 @@ protected:
   std::vector<glm::vec4> m_clipPlanes;
   std::vector<glm::dvec4> m_doubleClipPlanes;
   bool m_clipEnabled;
+  std::optional<size_t> m_lastLoggedClipPlaneOverflowCount;
 
   ShaderHookType m_shaderHookType;
   ShaderHookParameter m_shaderHookPara{};

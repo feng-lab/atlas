@@ -6,7 +6,7 @@
 // Clip planes:
 // - Used for GL parity of local/global XYZ cuts on Vulkan.
 // - Planes are in world space (mirrors Z3DRendererBase::clipPlanes()).
-const int ATLAS_MAX_CLIP_PLANES = 6;
+#include "clip_distance_config.glslinc"
 
 layout(set = 2, binding = 0) uniform Transforms {
   mat4 projection_view_matrix;

@@ -11,10 +11,17 @@ layout(location = 2) out vec4 FragData2;
 
 layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
 
+#define ATLAS_CLIP_DISTANCE_EXTRA_USE_DISCARD 0
 #include "include/mesh_func.glslinc"
 
 void main()
 {
+  if (atlas_should_reject_extra_clip_planes()) {
+    FragData0.xy = vec2(-1.0);
+    FragData1 = vec4(0.0);
+    FragData2 = vec4(0.0);
+    return;
+  }
   vec4 color; float fragDepth;
   fragment_func(color, fragDepth);
 

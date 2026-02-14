@@ -22,7 +22,12 @@ uniform mat4 view_matrix;
 uniform mat4 projection_view_matrix;
 #if GLSL_VERSION >= 130 && defined(HAS_CLIP_PLANE)
 uniform vec4 clip_planes[CLIP_PLANE_COUNT];
-out float gl_ClipDistance[CLIP_PLANE_COUNT];
+#if CLIP_DISTANCE_COUNT > 0
+out float gl_ClipDistance[CLIP_DISTANCE_COUNT];
+#endif
+#if EXTRA_CLIP_PLANE_COUNT > 0
+out float atlas_extra_clip_distance[EXTRA_CLIP_PLANE_COUNT];
+#endif
 #endif
 
 #if GLSL_VERSION >= 130
@@ -85,11 +90,16 @@ void main(void)
   gl_Position = projection_view_matrix * vertex;
 #if defined(HAS_CLIP_PLANE)
 #if GLSL_VERSION >= 130
-  for (int i=0; i<CLIP_PLANE_COUNT; ++i)
+#if CLIP_DISTANCE_COUNT > 0
+  for (int i=0; i<CLIP_DISTANCE_COUNT; ++i)
     gl_ClipDistance[i] = dot(clip_planes[i], centerVertex);
+#endif
+#if EXTRA_CLIP_PLANE_COUNT > 0
+  for (int i=0; i<EXTRA_CLIP_PLANE_COUNT; ++i)
+    atlas_extra_clip_distance[i] = dot(clip_planes[CLIP_DISTANCE_COUNT + i], centerVertex);
+#endif
 #else
   gl_ClipVertex = centerVertex;
 #endif   // version 130 or up
 #endif  // has clipplane
 }
-

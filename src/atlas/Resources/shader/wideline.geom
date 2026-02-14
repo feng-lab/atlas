@@ -11,9 +11,18 @@ uniform mat4 viewport_matrix_inverse;
 #if GLSL_VERSION >= 130 && defined(HAS_CLIP_PLANE)
 in gl_PerVertex {
    vec4 gl_Position;
-   float gl_ClipDistance[CLIP_PLANE_COUNT];
+#if CLIP_DISTANCE_COUNT > 0
+   float gl_ClipDistance[CLIP_DISTANCE_COUNT];
+#endif
 } gl_in[];
-out float gl_ClipDistance[CLIP_PLANE_COUNT];
+#if CLIP_DISTANCE_COUNT > 0
+out float gl_ClipDistance[CLIP_DISTANCE_COUNT];
+#endif
+#if EXTRA_CLIP_PLANE_COUNT > 0
+uniform vec4 clip_planes[CLIP_PLANE_COUNT];
+in vec4 atlas_world_vertex[2];
+out float atlas_extra_clip_distance[EXTRA_CLIP_PLANE_COUNT];
+#endif
 #endif
 
 #if GLSL_VERSION >= 150
@@ -125,7 +134,14 @@ void main()
 #endif
 #if defined(HAS_CLIP_PLANE)
 #if GLSL_VERSION >= 130
+#if CLIP_DISTANCE_COUNT > 0
   gl_ClipDistance = gl_in[0].gl_ClipDistance;
+#endif
+#if EXTRA_CLIP_PLANE_COUNT > 0
+  for (int i = 0; i < EXTRA_CLIP_PLANE_COUNT; ++i) {
+    atlas_extra_clip_distance[i] = dot(clip_planes[CLIP_DISTANCE_COUNT + i], atlas_world_vertex[0]);
+  }
+#endif
 #endif   // version 130 or up
 #endif  // has clipplane
   gl_Position = v0; EmitVertex();
@@ -139,7 +155,14 @@ void main()
 #endif
 #if defined(HAS_CLIP_PLANE)
 #if GLSL_VERSION >= 130
+#if CLIP_DISTANCE_COUNT > 0
   gl_ClipDistance = gl_in[0].gl_ClipDistance;
+#endif
+#if EXTRA_CLIP_PLANE_COUNT > 0
+  for (int i = 0; i < EXTRA_CLIP_PLANE_COUNT; ++i) {
+    atlas_extra_clip_distance[i] = dot(clip_planes[CLIP_DISTANCE_COUNT + i], atlas_world_vertex[0]);
+  }
+#endif
 #endif   // version 130 or up
 #endif  // has clipplane
   gl_Position = v3; EmitVertex();
@@ -153,7 +176,14 @@ void main()
 #endif
 #if defined(HAS_CLIP_PLANE)
 #if GLSL_VERSION >= 130
+#if CLIP_DISTANCE_COUNT > 0
   gl_ClipDistance = gl_in[1].gl_ClipDistance;
+#endif
+#if EXTRA_CLIP_PLANE_COUNT > 0
+  for (int i = 0; i < EXTRA_CLIP_PLANE_COUNT; ++i) {
+    atlas_extra_clip_distance[i] = dot(clip_planes[CLIP_DISTANCE_COUNT + i], atlas_world_vertex[1]);
+  }
+#endif
 #endif   // version 130 or up
 #endif  // has clipplane
   gl_Position = v1; EmitVertex();
@@ -167,7 +197,14 @@ void main()
 #endif
 #if defined(HAS_CLIP_PLANE)
 #if GLSL_VERSION >= 130
+#if CLIP_DISTANCE_COUNT > 0
   gl_ClipDistance = gl_in[1].gl_ClipDistance;
+#endif
+#if EXTRA_CLIP_PLANE_COUNT > 0
+  for (int i = 0; i < EXTRA_CLIP_PLANE_COUNT; ++i) {
+    atlas_extra_clip_distance[i] = dot(clip_planes[CLIP_DISTANCE_COUNT + i], atlas_world_vertex[1]);
+  }
+#endif
 #endif   // version 130 or up
 #endif  // has clipplane
   gl_Position = v2; EmitVertex();

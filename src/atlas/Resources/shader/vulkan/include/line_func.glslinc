@@ -1,10 +1,13 @@
 #include "lighting.glslinc"
 #include "matrices_material.glslinc"
+#include "clip_distance_extra_frag.glslinc"
 
 layout(location = 0) in vec4 v_color;
 
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
+  atlas_discard_extra_clip_planes();
+
   fragDepth = gl_FragCoord.z;
   if (uLighting.lighting_enabled == 0) {
     fragColor = v_color;

@@ -1,5 +1,6 @@
 #include "lighting.glslinc"
 #include "matrices_material.glslinc"
+#include "clip_distance_extra_frag.glslinc"
 
 layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
@@ -80,11 +81,13 @@ bool sphere_fragment_color_impl(out vec4 fragColor, out float fragDepth)
 #ifdef ATLAS_PPLL
 bool fragment_func(out vec4 fragColor, out float fragDepth)
 {
+  atlas_discard_extra_clip_planes();
   return sphere_fragment_color_impl(fragColor, fragDepth);
 }
 #else
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
+  atlas_discard_extra_clip_planes();
   if (!sphere_fragment_color_impl(fragColor, fragDepth)) {
     discard;
   }

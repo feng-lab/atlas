@@ -10,6 +10,9 @@ uniform sampler1D texture;
 #ifndef USE_1DTEXTURE
 in vec4 color;
 #endif
+#if defined(HAS_CLIP_PLANE) && EXTRA_CLIP_PLANE_COUNT > 0
+in float atlas_extra_clip_distance[EXTRA_CLIP_PLANE_COUNT];
+#endif
 flat in vec3 plane1;
 flat in vec3 plane2;
 flat in vec3 plane3;
@@ -32,6 +35,14 @@ varying vec4 p0p1;
 
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
+#if defined(HAS_CLIP_PLANE) && GLSL_VERSION >= 130 && EXTRA_CLIP_PLANE_COUNT > 0
+  if (clip_planes_enabled) {
+    for (int i = 0; i < EXTRA_CLIP_PLANE_COUNT; ++i) {
+      if (atlas_extra_clip_distance[i] < 0.0)
+        discard;
+    }
+  }
+#endif
   // Get fragment distances to quad boundary
   vec3 pos = vec3(gl_FragCoord.xy, 1.0);
   vec4 dist = vec4(dot(pos, plane1), dot(pos, plane2), dot(pos, plane3), dot(pos, plane4));
