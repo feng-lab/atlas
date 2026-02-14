@@ -86,11 +86,11 @@ struct UniformArenaBudgetTraits<LinePayload>
 {
   [[nodiscard]] static size_t estimateAdditionalBytes(const LinePayload&, size_t uniformAlignment)
   {
-    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
+    static constexpr size_t kObjectBytes = sizeof(ObjectTransformsUBOStd140);
     static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
-    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
+    const size_t szObject = alignUp(kObjectBytes, uniformAlignment);
     const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
-    return szTransforms + szMaterial;
+    return szObject + szMaterial;
   }
 };
 
@@ -99,15 +99,15 @@ struct UniformArenaBudgetTraits<MeshPayload>
 {
   [[nodiscard]] static size_t estimateAdditionalBytes(const MeshPayload& payload, size_t uniformAlignment)
   {
-    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
+    static constexpr size_t kObjectBytes = sizeof(ObjectTransformsUBOStd140);
     static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
-    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
+    const size_t szObject = alignUp(kObjectBytes, uniformAlignment);
     const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
     const bool drawSurface = payload.wireframeMode != MeshPayload::WireframeMode::OnlyWireframe;
     const bool drawWireframe = payload.wireframeMode != MeshPayload::WireframeMode::NoWireframe;
     const size_t drawsPerMesh = static_cast<size_t>(drawSurface) + static_cast<size_t>(drawWireframe);
     const size_t meshes = payload.meshes.size();
-    return szTransforms + (meshes * drawsPerMesh * szMaterial);
+    return szObject + (meshes * drawsPerMesh * szMaterial);
   }
 };
 
@@ -116,11 +116,10 @@ struct UniformArenaBudgetTraits<SpherePayload>
 {
   [[nodiscard]] static size_t estimateAdditionalBytes(const SpherePayload&, size_t uniformAlignment)
   {
-    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
-    static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
-    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
-    const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
-    return szTransforms + szMaterial;
+    (void)uniformAlignment;
+    // Spheres use persistent uniform slices for per-stream object/material UBOs.
+    // (Frame UBO is allocated once in beginRender().)
+    return 0u;
   }
 };
 
@@ -129,11 +128,11 @@ struct UniformArenaBudgetTraits<EllipsoidPayload>
 {
   [[nodiscard]] static size_t estimateAdditionalBytes(const EllipsoidPayload&, size_t uniformAlignment)
   {
-    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
+    static constexpr size_t kObjectBytes = sizeof(ObjectTransformsUBOStd140);
     static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
-    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
+    const size_t szObject = alignUp(kObjectBytes, uniformAlignment);
     const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
-    return szTransforms + szMaterial;
+    return szObject + szMaterial;
   }
 };
 
@@ -142,11 +141,10 @@ struct UniformArenaBudgetTraits<ConePayload>
 {
   [[nodiscard]] static size_t estimateAdditionalBytes(const ConePayload&, size_t uniformAlignment)
   {
-    static constexpr size_t kTransformsBytes = sizeof(TransformsUBOStd140);
-    static constexpr size_t kMaterialBytes = sizeof(MaterialUBOStd140);
-    const size_t szTransforms = alignUp(kTransformsBytes, uniformAlignment);
-    const size_t szMaterial = alignUp(kMaterialBytes, uniformAlignment);
-    return szTransforms + szMaterial;
+    (void)uniformAlignment;
+    // Cones use persistent uniform slices for per-stream object/material UBOs.
+    // (Frame UBO is allocated once in beginRender().)
+    return 0u;
   }
 };
 
@@ -200,6 +198,27 @@ public:
   void setPendingBeginRenderPreRecordActions(std::vector<BeginRenderPreRecordAction> actions,
                                              std::string_view debugLabel = {});
 
+  // ---------------------------------------------------------------------------
+  // Linear-script stats (pre_cpu attribution)
+  // ---------------------------------------------------------------------------
+  // ZVulkanLinearScript performs some CPU work before opening a Vulkan frame
+  // (uniform-arena sizing, node bookkeeping, etc). These stats are captured at
+  // the call site and forwarded to beginRender() so they can be included in the
+  // per-frame perf summary line for easy diffing across runs.
+  struct BeginRenderScriptStats
+  {
+    double uniformHintMs = 0.0;
+    size_t uniformHintBytes = 0;
+    uint32_t nodeCount = 0;
+    uint32_t rasterNodeCount = 0;
+    uint32_t replayNodeCount = 0;
+    uint32_t commandsNodeCount = 0;
+    uint32_t preRecordNodeCount = 0;
+    uint32_t batchCount = 0;
+  };
+
+  void setPendingBeginRenderScriptStats(BeginRenderScriptStats stats);
+
   // Estimate uniform-arena bytes that are always consumed at beginRender()
   // regardless of which batches are recorded (e.g. frame-global lighting UBO
   // slices). This is used by higher-level scheduling (linear scripts / segment
@@ -215,6 +234,18 @@ public:
   // Hint the minimum uniform arena capacity (bytes) for the next begun frame.
   // The backend consumes this hint in ensureUniformArena() at beginRender().
   void hintNextUniformArenaMinCapacity(size_t bytes);
+
+  // Expose the device's dynamic UBO alignment (minUniformBufferOffsetAlignment)
+  // for CPU-side budgeting during batch capture/scheduling.
+  [[nodiscard]] size_t uniformAlignmentForEstimates() const;
+
+  // Monotonic revision that changes only when the injected Vulkan device
+  // pointer changes. Used by higher-level schedulers to invalidate CPU-side
+  // cached values derived from VkPhysicalDevice limits.
+  [[nodiscard]] uint64_t deviceRevision() const noexcept
+  {
+    return m_deviceRevision;
+  }
 
   [[nodiscard]] bool supportsCommandLists() const override;
 
@@ -699,6 +730,20 @@ private:
     // starts its measured CPU scope for this submission.
     std::optional<double> preCpuStartMs;
 
+    // beginRender() preamble time: duration of Z3DRendererVulkanBackend::beginRender()
+    // up to (but not including) cpuStart. This is a subset of pre_cpu.
+    double beginRenderPreambleMs = 0.0;
+
+    // Linear-script stats forwarded from ZVulkanLinearScript for this submission.
+    double scriptUniformHintMs = 0.0;
+    size_t scriptUniformHintBytes = 0;
+    uint32_t scriptNodeCount = 0;
+    uint32_t scriptRasterNodeCount = 0;
+    uint32_t scriptReplayNodeCount = 0;
+    uint32_t scriptCommandsNodeCount = 0;
+    uint32_t scriptPreRecordNodeCount = 0;
+    uint32_t scriptBatchCount = 0;
+
     // Descriptor arena (per-frame)
     std::unique_ptr<ZVulkanDescriptorPool> descriptorPool; // reset only after fence signal
     // Descriptor arena that persists for the lifetime of this frame-slot. This
@@ -842,6 +887,13 @@ private:
     // uniform arena (lighting disabled). This matches OpenGL picking behavior
     // (no lighting/fog applied to picking colors).
     vk::DeviceSize pickingLightingDynOffset = 0;
+
+    // Shared per-frame dynamic offsets for the split frame-transform UBO slice
+    // in the uniform arena. One slice per eye (Left/Mono/Right) so stereo
+    // rendering can bind the correct view/projection matrices without per-batch
+    // UBO rebuilds.
+    std::array<vk::DeviceSize, 3> frameTransformsDynOffsetByEye{0, 0, 0};
+    uint32_t frameTransformsDynOffsetValidMask = 0;
 
     // DDP: per-frame resources for indirect-count early stop
     std::unique_ptr<class ZVulkanBuffer> ddpChangedFlag; // STORAGE | TRANSFER_SRC | TRANSFER_DST
@@ -1017,6 +1069,17 @@ public:
     return m_activeFrame->pickingLightingDynOffset;
   }
 
+  // Dynamic offset of the shared per-eye frame transform UBO slice.
+  [[nodiscard]] vk::DeviceSize frameTransformsOffset(Z3DEye eye) const
+  {
+    CHECK(m_activeFrame != nullptr) << "frameTransformsOffset called without an active frame";
+    const uint32_t idx = static_cast<uint32_t>(eye);
+    CHECK(idx < m_activeFrame->frameTransformsDynOffsetByEye.size()) << "frameTransformsOffset eye index out of bounds";
+    CHECK((m_activeFrame->frameTransformsDynOffsetValidMask & (1u << idx)) != 0u)
+      << "frameTransformsOffset requested before allocation for eye index " << idx;
+    return m_activeFrame->frameTransformsDynOffsetByEye[idx];
+  }
+
 private:
   UniformSlice suballocateUniform(size_t bytes, size_t alignment = 0);
   UniformSlice suballocatePersistentUniform(size_t bytes, size_t alignment = 0);
@@ -1048,6 +1111,7 @@ public:
   }
 
   ZVulkanDevice* m_sharedDevice = nullptr; // non-owning; provided by engine/scratch-pool
+  uint64_t m_deviceRevision = 0;
   ZVulkanDevice* m_frameDevice = nullptr; // tracked to rebuild frame resources on device changes
   std::vector<FrameResources> m_frames;
   std::unordered_map<void*, size_t> m_frameResourceMap;
@@ -1065,6 +1129,7 @@ public:
   std::vector<void*> m_completedFrameKeysScratch;
   uint32_t m_maxFramesInFlight = 2;
   float m_timestampPeriod = 1.0f;
+  mutable size_t m_cachedUniformAlignment = 0;
   // Deliver first Vulkan frame to UI immediately after backend switch by
   // pumping the fence and executing deferred readback consumers once.
   bool m_pumpFenceAfterFirstSubmit = true;
@@ -1248,6 +1313,7 @@ public:
 
   std::vector<BeginRenderPreRecordAction> m_pendingBeginRenderPreRecordActions;
   std::string m_pendingBeginRenderPreRecordLabel;
+  std::optional<BeginRenderScriptStats> m_pendingBeginRenderScriptStats;
 
   // Device feature gates (cached on device change)
   bool m_supportsDrawIndirectCount = false;

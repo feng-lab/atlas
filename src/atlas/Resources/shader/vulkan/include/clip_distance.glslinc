@@ -2,7 +2,7 @@
 // OpenGL backend's local/global XYZ cut behaviour.
 //
 // Requirements:
-// - matrices_material.glslinc (xf + ATLAS_MAX_CLIP_PLANES)
+// - matrices_material.glslinc (xo + ATLAS_MAX_CLIP_PLANES)
 // - VkPhysicalDeviceFeatures::shaderClipDistance enabled at device creation.
 
 out gl_PerVertex {
@@ -24,18 +24,18 @@ void atlas_write_clip_distances(vec4 world_pos)
     atlas_extra_clip_distance[i] = 1.0;
   }
 
-  if (xf.clip_params.x == 0) {
+  if (xo.clip_params.x == 0) {
     return;
   }
 
-  const int planeCount = clamp(xf.clip_params.y, 0, ATLAS_MAX_CLIP_PLANES);
+  const int planeCount = clamp(xo.clip_params.y, 0, ATLAS_MAX_CLIP_PLANES);
   const int clipDistanceCount = min(planeCount, ATLAS_MAX_CLIP_DISTANCES);
   for (int i = 0; i < clipDistanceCount; ++i) {
-    gl_ClipDistance[i] = dot(xf.clip_planes[i], world_pos);
+    gl_ClipDistance[i] = dot(xo.clip_planes[i], world_pos);
   }
 
   const int extraCount = clamp(planeCount - ATLAS_MAX_CLIP_DISTANCES, 0, ATLAS_MAX_EXTRA_CLIP_PLANES);
   for (int i = 0; i < extraCount; ++i) {
-    atlas_extra_clip_distance[i] = dot(xf.clip_planes[ATLAS_MAX_CLIP_DISTANCES + i], world_pos);
+    atlas_extra_clip_distance[i] = dot(xo.clip_planes[ATLAS_MAX_CLIP_DISTANCES + i], world_pos);
   }
 }

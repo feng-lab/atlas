@@ -92,6 +92,17 @@ namespace nim {
 
 namespace {
 constexpr uint32_t kMaxTimestampQueries = 64u;
+
+float computeSphereBoxCorrection(float fovyDegrees)
+{
+  // Match the legacy sphere pipeline behaviour. This factor expands the
+  // billboard quad slightly so the raycast sphere does not clip at the corners
+  // under wide FOV. (Empirical fit preserved for GL parity.)
+  if (fovyDegrees <= 90.0f) {
+    return 1.0027f + 0.000111f * fovyDegrees + 0.000098f * fovyDegrees * fovyDegrees;
+  }
+  return 2.02082f - 0.033935f * fovyDegrees + 0.00037854f * fovyDegrees * fovyDegrees;
+}
 } // namespace
 
 thread_local Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::s_currentBackend = nullptr;
@@ -344,8 +355,16 @@ void Z3DRendererVulkanBackend::setPendingBeginRenderPreRecordActions(std::vector
   m_pendingBeginRenderPreRecordLabel = std::string(debugLabel);
 }
 
+void Z3DRendererVulkanBackend::setPendingBeginRenderScriptStats(BeginRenderScriptStats stats)
+{
+  CHECK(!m_pendingBeginRenderScriptStats.has_value()) << "Pending beginRender script stats already set";
+  m_pendingBeginRenderScriptStats = std::move(stats);
+}
+
 void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 {
+  const auto beginRenderEntry = std::chrono::steady_clock::now();
+
   // Only expose the thread-local "current backend" while actively recording a
   // Vulkan frame. This avoids call sites (debug validation, descriptor helpers)
   // observing a partially-initialised backend before ensureDevice/beginFrame.
@@ -355,6 +374,8 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   m_pendingBeginRenderPreRecordActions.clear();
   std::string pendingPreRecordLabel = std::move(m_pendingBeginRenderPreRecordLabel);
   m_pendingBeginRenderPreRecordLabel.clear();
+  std::optional<BeginRenderScriptStats> scriptStats = std::move(m_pendingBeginRenderScriptStats);
+  m_pendingBeginRenderScriptStats.reset();
   // Per-frame recording state
   m_externalBufferUseStates.clear();
   if (m_lineContext) {
@@ -514,6 +535,17 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 
   auto& frameResources = ensureFrameResourcesForKey(m_activeFrameHandle->key());
 
+  // Populate script stats (if provided by ZVulkanLinearScript) early so they're
+  // available for per-frame logging even if later code returns early.
+  frameResources.scriptUniformHintMs = scriptStats ? scriptStats->uniformHintMs : 0.0;
+  frameResources.scriptUniformHintBytes = scriptStats ? scriptStats->uniformHintBytes : 0;
+  frameResources.scriptNodeCount = scriptStats ? scriptStats->nodeCount : 0u;
+  frameResources.scriptRasterNodeCount = scriptStats ? scriptStats->rasterNodeCount : 0u;
+  frameResources.scriptReplayNodeCount = scriptStats ? scriptStats->replayNodeCount : 0u;
+  frameResources.scriptCommandsNodeCount = scriptStats ? scriptStats->commandsNodeCount : 0u;
+  frameResources.scriptPreRecordNodeCount = scriptStats ? scriptStats->preRecordNodeCount : 0u;
+  frameResources.scriptBatchCount = scriptStats ? scriptStats->batchCount : 0u;
+
   // Stage 2: apply descriptor arena reset when reusing this in-flight frame.
   // Safe point: frame executor waited for the fence when acquiring the frame.
   applyPendingArenaReset(frameResources);
@@ -603,6 +635,40 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     }
     frameResources.pickingLightingDynOffset = pickingSlice.offset;
   }
+  // Compute and publish per-eye frame transform UBO slices. These are shared
+  // across all draw calls and are the only transforms expected to change during
+  // camera-only motion (view/projection matrices).
+  {
+    const size_t align = uniformAlignment();
+    frameResources.frameTransformsDynOffsetByEye = {0, 0, 0};
+    frameResources.frameTransformsDynOffsetValidMask = 0u;
+
+    const auto& viewState = renderer.viewState();
+    CHECK(viewState.eyes.size() == frameResources.frameTransformsDynOffsetByEye.size())
+      << "Frame transform UBO eye-count mismatch";
+
+    for (size_t eyeIndex = 0; eyeIndex < viewState.eyes.size(); ++eyeIndex) {
+      const auto& eyeState = viewState.eyes[eyeIndex];
+
+      FrameTransformsUBOStd140 xf{};
+      xf.projection_view_matrix = eyeState.projectionViewMatrix;
+      xf.view_matrix = eyeState.viewMatrix;
+      xf.projection_matrix = eyeState.projectionMatrix;
+      xf.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
+
+      const float orthoFlag = eyeState.isPerspective ? 0.0f : 1.0f;
+      const float boxCorrection = computeSphereBoxCorrection(glm::degrees(eyeState.fieldOfView));
+      xf.parameters = glm::vec4(0.0f, orthoFlag, boxCorrection, 0.0f);
+
+      auto slice = suballocateUniform(sizeof(FrameTransformsUBOStd140), align);
+      if (slice.mapped) {
+        std::memcpy(slice.mapped, &xf, sizeof(xf));
+      }
+
+      frameResources.frameTransformsDynOffsetByEye[eyeIndex] = slice.offset;
+      frameResources.frameTransformsDynOffsetValidMask |= (1u << static_cast<uint32_t>(eyeIndex));
+    }
+  }
   // Reset per-submission descriptor set counters after entering the completion
   // safe point for this frame-slot. The safe point already ingested the
   // previous submission's timings (if any) into Z3DPerfCollector.
@@ -614,6 +680,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.frameName = std::string(renderer.currentFrameLabel());
   frameResources.progressivePassHint = renderer.currentRenderPassIsProgressive();
   const auto now = std::chrono::steady_clock::now();
+  frameResources.beginRenderPreambleMs = std::chrono::duration<double, std::milli>(now - beginRenderEntry).count();
   const auto perfStart = Z3DRenderGlobalState::instance().currentPerfFrameStartTime();
   if (perfStart.time_since_epoch().count() != 0) {
     frameResources.preCpuStartMs = std::chrono::duration<double, std::milli>(now - perfStart).count();
@@ -2127,15 +2194,23 @@ void Z3DRendererVulkanBackend::hintNextUniformArenaMinCapacity(size_t bytes)
   m_uniformMinCapacityCarry = std::max(m_uniformMinCapacityCarry, bytes);
 }
 
+size_t Z3DRendererVulkanBackend::uniformAlignmentForEstimates() const
+{
+  return uniformAlignment();
+}
+
 size_t Z3DRendererVulkanBackend::estimateFrameUniformOverheadBytes()
 {
   // beginRender() always suballocates two lighting UBO slices (scene lighting +
-  // picking lighting). Provide a conservative (alignment-rounded) estimate so
-  // higher-level schedulers can size the arena before opening a Vulkan frame.
+  // picking lighting), plus one per-eye frame transform UBO slice.
+  //
+  // Provide a conservative (alignment-rounded) estimate so higher-level
+  // schedulers can size the arena before opening a Vulkan frame.
   ensureDevice();
   const size_t align = uniformAlignment();
   const size_t szLighting = vulkan::alignUp(sizeof(LightingUBOStd140), align);
-  return 2u * szLighting;
+  const size_t szFrameTransforms = vulkan::alignUp(sizeof(FrameTransformsUBOStd140), align);
+  return 2u * szLighting + 3u * szFrameTransforms;
 }
 
 size_t Z3DRendererVulkanBackend::estimateAdditionalUniformBytesForBatches(const RendererCPUState& state)
@@ -2309,13 +2384,18 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
   }
 
   if (!m_sharedDescriptorLayouts.transforms) {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
                                      .descriptorCount = 1,
                                      .stageFlags =
                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
       vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
+                                     .descriptorCount = 1,
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 2,
                                      .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
                                      .descriptorCount = 1,
                                      .stageFlags =
@@ -3557,6 +3637,10 @@ void Z3DRendererVulkanBackend::scheduleStaticCopyIndirect(vk::Buffer dst,
 
 size_t Z3DRendererVulkanBackend::uniformAlignment() const
 {
+  if (m_cachedUniformAlignment != 0) {
+    return m_cachedUniformAlignment;
+  }
+
   // uniformAlignment is used in a few debug-only validation sites that run
   // under the "current backend" thread-local pointer. Be robust to call order:
   // if ensureDevice() has not yet cached m_sharedDevice, query the shared
@@ -3568,7 +3652,11 @@ size_t Z3DRendererVulkanBackend::uniformAlignment() const
   CHECK(dev != nullptr) << "Shared Vulkan device missing in uniformAlignment";
   auto limits = dev->context().physicalDevice().getProperties().limits;
   size_t align = static_cast<size_t>(limits.minUniformBufferOffsetAlignment);
-  return align ? align : 256;
+  if (!align) {
+    align = 256;
+  }
+  m_cachedUniformAlignment = align;
+  return align;
 }
 
 Z3DRendererVulkanBackend::UniformSlice Z3DRendererVulkanBackend::suballocateUniform(size_t bytes, size_t alignment)
@@ -4217,6 +4305,8 @@ void Z3DRendererVulkanBackend::ensureDevice()
   if (m_sharedDevice != dev) {
     m_sharedDescriptorLayouts = {};
     m_sharedDevice = dev;
+    m_deviceRevision++;
+    m_cachedUniformAlignment = 0;
     resetFrameResources();
     // Cache device feature gates for DDP and fragment SSBO writes
     try {
@@ -5243,6 +5333,17 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     stats.drawSecondaryCacheHits = frame.drawSecondaryCacheHits;
     stats.drawSecondaryCacheBuilds = frame.drawSecondaryCacheBuilds;
     stats.drawSecondaryCacheExecutes = frame.drawSecondaryCacheExecutes;
+
+    // Pre_cpu attribution helpers
+    stats.vkBeginRenderPreambleMs = frame.beginRenderPreambleMs;
+    stats.scriptUniformHintMs = frame.scriptUniformHintMs;
+    stats.scriptUniformHintBytes = frame.scriptUniformHintBytes;
+    stats.scriptNodeCount = frame.scriptNodeCount;
+    stats.scriptRasterNodeCount = frame.scriptRasterNodeCount;
+    stats.scriptReplayNodeCount = frame.scriptReplayNodeCount;
+    stats.scriptCommandsNodeCount = frame.scriptCommandsNodeCount;
+    stats.scriptPreRecordNodeCount = frame.scriptPreRecordNodeCount;
+    stats.scriptBatchCount = frame.scriptBatchCount;
 
     Z3DPerfCollector::instance().addSubmission(frame.realFrameToken,
                                                frame.submissionId,

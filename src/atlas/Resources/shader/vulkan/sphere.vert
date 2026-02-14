@@ -20,13 +20,13 @@ layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
 void main()
 {
-  float radius = attr_vertex.w * xf.parameters.x;
+  float radius = attr_vertex.w * xo.parameters.x;
 
   vec2 flags = mod(floor(vec2(attr_flags / 16.0, attr_flags)), 16.0);
   float rightFlag = flags.x - 1.0; // -1 or 1
   float upFlag    = flags.y - 1.0; // -1 or 1
 
-  vec4 centerVertex = xf.pos_transform * vec4(attr_vertex.xyz, 1.0);
+  vec4 centerVertex = xo.pos_transform * vec4(attr_vertex.xyz, 1.0);
   atlas_write_clip_distances(centerVertex);
   v_color = attr_color;
   v_radius2 = radius * radius;

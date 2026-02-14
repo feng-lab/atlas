@@ -510,6 +510,10 @@ private:
   RenderMethod m_renderMethod;
   bool m_vulkanFrameActive = false;
   bool m_keepVulkanFrameOpen = false;
+  // Cached Vulkan device uniform alignment (minUniformBufferOffsetAlignment).
+  // Used only for CPU-side uniform-arena budgeting during batch capture.
+  size_t m_vkUniformAlignmentForEstimates = 0;
+  uint64_t m_vkDeviceRevisionForUniformEstimates = 0;
 
   // Recording-session diagnostics (Vulkan ordering/attachments invariants)
   bool m_recordingSessionOpen = false;

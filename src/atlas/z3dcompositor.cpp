@@ -324,6 +324,7 @@ static void captureFilterBatchesToUnifiedList(Z3DRendererBase& compositor,
     }
     out.batches.push_back(std::move(batch));
   }
+  out.uniformBytesEstimate += source.cpuState().uniformBytesEstimate;
   source.resetCPUState();
 }
 
@@ -4964,6 +4965,7 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
       for (auto& batch : m_rendererBase.cpuState().batches) {
         transparentBatches->batches.push_back(std::move(batch));
       }
+      transparentBatches->uniformBytesEstimate += m_rendererBase.cpuState().uniformBytesEstimate;
       m_rendererBase.resetCPUState();
       m_rendererBase.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
     }

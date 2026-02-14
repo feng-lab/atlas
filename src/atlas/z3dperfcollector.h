@@ -67,6 +67,29 @@ public:
     uint32_t drawSecondaryCacheHits = 0;
     uint32_t drawSecondaryCacheBuilds = 0;
     uint32_t drawSecondaryCacheExecutes = 0;
+
+    // -----------------------------------------------------------------------
+    // Vulkan CPU overhead attribution (per-submission)
+    // -----------------------------------------------------------------------
+    // Time spent inside Z3DRendererVulkanBackend::beginRender() before the
+    // backend starts its measured CPU encode window (cpuStart).
+    //
+    // This is a subset of "pre_cpu" (perf-frame-start → cpuStart) and is useful
+    // for separating engine/script overhead from backend preamble work (frame
+    // slot acquisition, safe-point pumping, arena setup, etc).
+    double vkBeginRenderPreambleMs = 0.0;
+
+    // Script/build overhead that occurs before beginRender() opens a submission.
+    // These values are measured by ZVulkanLinearScript and forwarded to the
+    // backend for inclusion in the per-frame stats line.
+    double scriptUniformHintMs = 0.0;
+    size_t scriptUniformHintBytes = 0;
+    uint32_t scriptNodeCount = 0;
+    uint32_t scriptRasterNodeCount = 0;
+    uint32_t scriptReplayNodeCount = 0;
+    uint32_t scriptCommandsNodeCount = 0;
+    uint32_t scriptPreRecordNodeCount = 0;
+    uint32_t scriptBatchCount = 0;
   };
 
   struct Submission

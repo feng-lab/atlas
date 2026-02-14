@@ -67,10 +67,10 @@ void main()
 {
   // Scale and transform T
   mat4 T;
-  T[0] = attr_T[0] * xf.parameters.x;
-  T[1] = attr_T[1] * xf.parameters.x;
-  T[2] = attr_T[2] * xf.parameters.x;
-  T[3] = xf.pos_transform * attr_T[3];
+  T[0] = attr_T[0] * xo.parameters.x;
+  T[1] = attr_T[1] * xo.parameters.x;
+  T[2] = attr_T[2] * xo.parameters.x;
+  T[3] = xo.pos_transform * attr_T[3];
   atlas_write_clip_distances(T[3]);
 
   // Determine bounding quad in clip space

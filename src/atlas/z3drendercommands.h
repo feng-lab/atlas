@@ -1041,6 +1041,13 @@ struct RenderBatch
 struct RendererCPUState
 {
   std::vector<RenderBatch> batches;
+  // Upper-bound estimate of additional per-batch uniform-arena bytes required
+  // to execute these batches on the Vulkan backend. This allows higher-level
+  // schedulers to size the arena without rescanning every batch every frame.
+  //
+  // Note: this excludes the always-on per-frame overhead accounted separately
+  // by Z3DRendererVulkanBackend::estimateFrameUniformOverheadBytes().
+  size_t uniformBytesEstimate = 0;
 };
 
 // ---------------------------------------------------------------------------

@@ -54,6 +54,7 @@ void Z3DRendererBase::restoreViewState(const RendererViewState& state)
 void Z3DRendererBase::resetCPUState()
 {
   m_cpuState.batches.clear();
+  m_cpuState.uniformBytesEstimate = 0;
 }
 
 void Z3DRendererBase::appendBatch(RenderBatch batch)
@@ -178,6 +179,33 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
           << m_frameState.activeSurface.colorAttachments.size() << " depth "
           << m_frameState.activeSurface.depthAttachment.has_value() << ")";
 
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    auto* vkBackend = static_cast<Z3DRendererVulkanBackend*>(m_backend.get());
+    CHECK(vkBackend != nullptr) << "Vulkan backend missing while capturing CPU batches";
+
+    const uint64_t deviceRevision = vkBackend->deviceRevision();
+    if (m_vkDeviceRevisionForUniformEstimates != deviceRevision) {
+      m_vkDeviceRevisionForUniformEstimates = deviceRevision;
+      m_vkUniformAlignmentForEstimates = 0;
+    }
+
+    if (m_vkUniformAlignmentForEstimates == 0) {
+      m_vkUniformAlignmentForEstimates = vkBackend->uniformAlignmentForEstimates();
+      CHECK_NE(m_vkUniformAlignmentForEstimates, 0u) << "Vulkan uniform alignment must be non-zero";
+    }
+
+    const size_t align = m_vkUniformAlignmentForEstimates;
+    m_cpuState.uniformBytesEstimate += std::visit(
+      [&](const auto& payload) -> size_t {
+        using PayloadT = std::remove_cvref_t<decltype(payload)>;
+        if constexpr (vulkan::kHasUniformArenaBudgetTraits<PayloadT>) {
+          return vulkan::UniformArenaBudgetTraits<PayloadT>::estimateAdditionalBytes(payload, align);
+        }
+        return 0u;
+      },
+      batch.geometry);
+  }
+
   m_cpuState.batches.push_back(std::move(batch));
 }
 
@@ -196,6 +224,7 @@ void Z3DRendererBase::submitBatches()
   CHECK(m_backend != nullptr) << "Renderer backend not set";
   m_backend->processBatches(*this, m_cpuState);
   m_cpuState.batches.clear();
+  m_cpuState.uniformBytesEstimate = 0;
 }
 
 Z3DRendererBase::~Z3DRendererBase()
@@ -650,6 +679,8 @@ void Z3DRendererBase::setBackend(RenderBackend backendType)
 
   m_backend = std::move(newBackend);
   m_activeBackend = backendType;
+  m_vkUniformAlignmentForEstimates = 0;
+  m_vkDeviceRevisionForUniformEstimates = 0;
   buildBackendResources(backendType);
   if (initializing) {
     VLOG(2) << fmt::format("RendererBase backend init complete: active={}", enumToString(m_activeBackend));

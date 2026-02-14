@@ -179,7 +179,8 @@ private:
 
   // Dynamic UBO offsets for this draw
   vk::DeviceSize m_dynLightingOffset{0};
-  vk::DeviceSize m_dynTransformsOffset{0};
+  vk::DeviceSize m_dynFrameTransformsOffset{0};
+  vk::DeviceSize m_dynObjectTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
   // DDP (Dual Depth Peeling) can replay the same draw list across multiple peel
   // passes inside a single Vulkan submission (ddpOrchestrate). Cache per-stream
@@ -192,9 +193,8 @@ private:
     bool followSizeScale = true;
     bool followOpacity = true;
     bool pickingPass = false;
-    Z3DEye eye = MonoEye;
     ClipPlanesState clipPlanes;
-    vk::DeviceSize transformsOffset = 0;
+    vk::DeviceSize objectTransformsOffset = 0;
   };
   std::unordered_map<uint64_t, std::vector<DDPTransformsCacheEntry>> m_ddpTransformsCache;
 

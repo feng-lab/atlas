@@ -59,12 +59,21 @@ std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
   return {glm::vec4(matrix[0], 0.0f), glm::vec4(matrix[1], 0.0f), glm::vec4(matrix[2], 0.0f)};
 }
 
-const RendererViewState& viewStateForBatch(const Z3DRendererBase& renderer, const RenderBatch& batch)
+bool clipPlanesEqual(const ClipPlanesState& a, const ClipPlanesState& b)
 {
-  if (batch.viewStateOverride) {
-    return *batch.viewStateOverride;
+  if (a.enabled != b.enabled || a.planeCount != b.planeCount) {
+    return false;
   }
-  return renderer.viewState();
+  auto vec4Equal = [](const glm::vec4& x, const glm::vec4& y) {
+    return x.x == y.x && x.y == y.y && x.z == y.z && x.w == y.w;
+  };
+  const size_t count = std::min(static_cast<size_t>(a.planeCount), kRenderBatchMaxClipPlanes);
+  for (size_t i = 0; i < count; ++i) {
+    if (!vec4Equal(a.planes[i], b.planes[i])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 } // namespace
@@ -309,9 +318,14 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = vkbind::kSetInputs;
   drawSpec.descriptorSets = boundSets;
-  // Dynamic offsets order: lighting (set1,b0), transforms (set2,b0), material (set2,b1)
-  const std::array<uint32_t, 3> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
-                                               static_cast<uint32_t>(m_dynTransformsOffset),
+  // Dynamic offsets order must match set/binding order:
+  // - lighting (set1,b0)
+  // - frame transforms (set2,b0)
+  // - object transforms (set2,b1)
+  // - material (set2,b2)
+  const std::array<uint32_t, 4> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
+                                               static_cast<uint32_t>(m_dynFrameTransformsOffset),
+                                               static_cast<uint32_t>(m_dynObjectTransformsOffset),
                                                static_cast<uint32_t>(m_dynMaterialOffset)};
   drawSpec.dynamicOffsets = dynamicOffsets;
 
@@ -644,10 +658,11 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
     sets.lighting->updateUniformBufferDynamic(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
   }
   if (sets.transforms) {
-    sets.transforms->updateUniformBufferDynamic(0,
+    sets.transforms->updateUniformBufferDynamic(0, m_backend.uniformArenaBuffer(), sizeof(FrameTransformsUBOStd140));
+    sets.transforms->updateUniformBufferDynamic(1,
                                                 m_backend.persistentUniformArenaBuffer(),
-                                                sizeof(TransformsUBOStd140));
-    sets.transforms->updateUniformBufferDynamic(1, m_backend.persistentUniformArenaBuffer(), sizeof(MaterialUBOStd140));
+                                                sizeof(ObjectTransformsUBOStd140));
+    sets.transforms->updateUniformBufferDynamic(2, m_backend.persistentUniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
 
   if (sets.oit) {
@@ -672,25 +687,38 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
                                                     bool pickingPass)
 {
   CHECK(batch.shaderHook.captured) << "Cone batch missing shader hook snapshot";
+  (void)renderer;
   CHECK(payload.paramsCaptured) << "Cone payload missing params";
 
-  const auto& viewState = viewStateForBatch(renderer, batch);
-  const auto& eyeState = viewState.eyes[static_cast<size_t>(batch.eye)];
+  // Frame transforms are shared per eye and updated once per submission in beginRender().
+  // If the batch carries a viewStateOverride snapshot, allocate a dedicated
+  // frame UBO slice for this draw.
+  if (batch.viewStateOverride) {
+    const auto& viewState = *batch.viewStateOverride;
+    const auto& eyeState = viewState.eyes[static_cast<size_t>(batch.eye)];
+    FrameTransformsUBOStd140 xf{};
+    xf.projection_view_matrix = eyeState.projectionViewMatrix;
+    xf.view_matrix = eyeState.viewMatrix;
+    xf.projection_matrix = eyeState.projectionMatrix;
+    xf.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
+    const float orthoFlag = eyeState.isPerspective ? 0.0f : 1.0f;
+    xf.parameters = glm::vec4(0.0f, orthoFlag, 0.0f, 0.0f);
+    auto slice = m_backend.suballocateUniformFor(payload, sizeof(FrameTransformsUBOStd140));
+    std::memcpy(slice.mapped, &xf, sizeof(xf));
+    m_dynFrameTransformsOffset = slice.offset;
+  } else {
+    m_dynFrameTransformsOffset = m_backend.frameTransformsOffset(batch.eye);
+  }
 
-  TransformsUBOStd140 transforms{};
-  transforms.projection_view_matrix = eyeState.projectionViewMatrix;
-  transforms.view_matrix = eyeState.viewMatrix;
+  ObjectTransformsUBOStd140 objectTransforms{};
   const glm::mat4 model = payload.followCoordTransform ? payload.params.coordTransform : glm::mat4(1.0f);
-  transforms.pos_transform = model;
-
-  const glm::mat4 combined = eyeState.viewMatrix * model;
-  const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(combined)));
-  transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
-  transforms.projection_matrix = eyeState.projectionMatrix;
-  transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
+  objectTransforms.pos_transform = model;
+  // Cone shaders do not consume the normal matrix; keep identity to avoid
+  // redundant inverse/transpose work on static geometry.
+  objectTransforms.pos_transform_normal_matrix = encodeMat3ToStd140(glm::mat3(1.0f));
   const float sizeScale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
-  transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
-  vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
+  objectTransforms.parameters = glm::vec4(sizeScale, 0.0f, 0.0f, 0.0f);
+  vulkan::applyBatchClipPlanesToTransforms(batch, objectTransforms);
 
   MaterialUBOStd140 material{};
   material.material_ambient = payload.params.materialAmbient;
@@ -706,28 +734,38 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     auto& entries = frameCache.byStream[payload.streamKey];
 
-    auto writeAt = [&](vk::DeviceSize transformsOffset, vk::DeviceSize materialOffset) {
-      std::memcpy(m_backend.persistentUniformMappedAt(transformsOffset, sizeof(TransformsUBOStd140)),
-                  &transforms,
-                  sizeof(transforms));
-      std::memcpy(m_backend.persistentUniformMappedAt(materialOffset, sizeof(MaterialUBOStd140)),
-                  &material,
-                  sizeof(material));
-    };
-
-    for (const auto& cached : entries) {
-      if (cached.pickingPass != pickingPass || cached.eye != batch.eye) {
+    for (auto& cached : entries) {
+      if (cached.pickingPass != pickingPass) {
         continue;
       }
-      m_dynTransformsOffset = cached.transformsOffset;
+
+      m_dynObjectTransformsOffset = cached.objectTransformsOffset;
       m_dynMaterialOffset = cached.materialOffset;
-      writeAt(cached.transformsOffset, cached.materialOffset);
+
+      if (cached.params == payload.params && cached.followCoordTransform == payload.followCoordTransform &&
+          cached.followSizeScale == payload.followSizeScale && cached.followOpacity == payload.followOpacity &&
+          clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
+        return;
+      }
+
+      std::memcpy(m_backend.persistentUniformMappedAt(cached.objectTransformsOffset, sizeof(ObjectTransformsUBOStd140)),
+                  &objectTransforms,
+                  sizeof(objectTransforms));
+      std::memcpy(m_backend.persistentUniformMappedAt(cached.materialOffset, sizeof(MaterialUBOStd140)),
+                  &material,
+                  sizeof(material));
+
+      cached.params = payload.params;
+      cached.followCoordTransform = payload.followCoordTransform;
+      cached.followSizeScale = payload.followSizeScale;
+      cached.followOpacity = payload.followOpacity;
+      cached.clipPlanes = batch.clipPlanes;
       return;
     }
 
-    auto transformsSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(TransformsUBOStd140));
-    std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
-    m_dynTransformsOffset = transformsSlice.offset;
+    auto objectSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
+    std::memcpy(objectSlice.mapped, &objectTransforms, sizeof(objectTransforms));
+    m_dynObjectTransformsOffset = objectSlice.offset;
 
     auto materialSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(MaterialUBOStd140));
     std::memcpy(materialSlice.mapped, &material, sizeof(material));
@@ -735,27 +773,25 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
 
     UboCacheEntry entry{};
     entry.pickingPass = pickingPass;
-    entry.eye = batch.eye;
-    entry.transformsOffset = transformsSlice.offset;
+    entry.params = payload.params;
+    entry.followCoordTransform = payload.followCoordTransform;
+    entry.followSizeScale = payload.followSizeScale;
+    entry.followOpacity = payload.followOpacity;
+    entry.clipPlanes = batch.clipPlanes;
+    entry.objectTransformsOffset = objectSlice.offset;
     entry.materialOffset = materialSlice.offset;
     entries.push_back(std::move(entry));
     return;
   }
 
   // Fallback (should be rare): no stream key, so we cannot assign a stable slice.
-  auto transformsSlice = m_backend.suballocateUniformFor(payload, sizeof(TransformsUBOStd140));
-  std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
-  m_dynTransformsOffset = transformsSlice.offset;
+  auto objectSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
+  std::memcpy(objectSlice.mapped, &objectTransforms, sizeof(objectTransforms));
+  m_dynObjectTransformsOffset = objectSlice.offset;
 
-  auto materialSlice = m_backend.suballocateUniformFor(payload, sizeof(MaterialUBOStd140));
+  auto materialSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(MaterialUBOStd140));
   std::memcpy(materialSlice.mapped, &material, sizeof(material));
   m_dynMaterialOffset = materialSlice.offset;
-
-  VLOG(2) << fmt::format("VK cone params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
-                         payload.params.sizeScale,
-                         material.alpha,
-                         pickingPass,
-                         (eyeState.isPerspective ? 0 : 1));
 }
 
 ZVulkanConePipelineContext::PipelineInstance&

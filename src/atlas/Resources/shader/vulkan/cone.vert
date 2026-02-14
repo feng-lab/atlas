@@ -27,8 +27,8 @@ layout(constant_id = 90) const int CAPS_MODE = 1; // 0=NO_CAPS, 1=FLAT_CAPS, 2=R
 void main()
 {
   // Match GL: radii are scaled by global sizeScale (xf.parameters.x).
-  float bradius = attr_origin.w * xf.parameters.x;
-  float tradius = attr_axis.w * xf.parameters.x;
+  float bradius = attr_origin.w * xo.parameters.x;
+  float tradius = attr_axis.w * xo.parameters.x;
 
   v_color1 = attr_color1;
   v_color2 = attr_color2;
@@ -38,8 +38,8 @@ void main()
   float upFlag      = flags.y;                         // 0 or 1
   float forwardFlag = flags.z;                         // 0 or 1
 
-  vec3 scaledAxis   = (xf.pos_transform * vec4(attr_axis.xyz, 1.0)).xyz;
-  vec3 scaledOrigin = (xf.pos_transform * vec4(attr_origin.xyz, 1.0)).xyz;
+  vec3 scaledAxis   = (xo.pos_transform * vec4(attr_axis.xyz, 1.0)).xyz;
+  vec3 scaledOrigin = (xo.pos_transform * vec4(attr_origin.xyz, 1.0)).xyz;
 
   float height = length(scaledAxis);
   float inv_sqr_height = max(height * height, 1e-6);

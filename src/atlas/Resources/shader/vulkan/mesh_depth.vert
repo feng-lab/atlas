@@ -15,8 +15,7 @@ layout(location = 0) in vec3 attr_vertex;
 
 void main()
 {
-  vec4 vertex = xf.pos_transform * vec4(attr_vertex, 1.0);
+  vec4 vertex = xo.pos_transform * vec4(attr_vertex, 1.0);
   atlas_write_clip_distances(vertex);
   gl_Position = xf.projection_view_matrix * vertex;
 }
-

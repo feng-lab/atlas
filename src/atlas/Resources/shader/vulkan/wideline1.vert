@@ -46,8 +46,8 @@ void main()
   float upFlag    = flags.y - 1.0;
 
   // Compute clip-space endpoints first
-  vec4 p0vertex = xf.pos_transform * vec4(attr_p0, 1.0);
-  vec4 p1vertex = xf.pos_transform * vec4(attr_p1, 1.0);
+  vec4 p0vertex = xo.pos_transform * vec4(attr_p0, 1.0);
+  vec4 p1vertex = xo.pos_transform * vec4(attr_p1, 1.0);
   vec4 p0clip = xf.projection_view_matrix * p0vertex;
   vec4 p1clip = xf.projection_view_matrix * p1vertex;
   atlas_write_clip_distances(rightFlag > 0.0 ? p1vertex : p0vertex);

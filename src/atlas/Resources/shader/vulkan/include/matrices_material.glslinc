@@ -1,23 +1,21 @@
-// Shared transform and material UBOs for mesh-like pipelines.
+// Shared frame/object transform and material UBOs for mesh-like pipelines.
 //
 // Keep this file in lock-step with:
-//   - src/atlas/zvulkanuniforms.h (TransformsUBOStd140, MaterialUBOStd140)
+//   - src/atlas/zvulkanuniforms.h (FrameTransformsUBOStd140, ObjectTransformsUBOStd140, MaterialUBOStd140)
 //
 // Clip planes:
 // - Used for GL parity of local/global XYZ cuts on Vulkan.
 // - Planes are in world space (mirrors Z3DRendererBase::clipPlanes()).
 #include "clip_distance_config.glslinc"
 
-layout(set = 2, binding = 0) uniform Transforms {
+layout(set = 2, binding = 0) uniform FrameTransforms {
   mat4 projection_view_matrix;
   mat4 view_matrix;
-  mat4 pos_transform;
-  mat3 pos_transform_normal_matrix;
   mat4 projection_matrix;
   mat4 inverse_projection_matrix;
-  vec4 parameters; // x=sizeScale, y=ortho flag, z=sphere boxCorrection (0 for most pipelines)
-  ivec4 clip_params; // x=enabled, y=planeCount
-  vec4 clip_planes[ATLAS_MAX_CLIP_PLANES];
+  // parameters.y = ortho flag (0 perspective, 1 ortho)
+  // parameters.z = sphere boxCorrection (0 for most pipelines)
+  vec4 parameters;
 } xf;
 
 mat3 compute_view_normal_matrix()
@@ -28,7 +26,18 @@ mat3 compute_view_normal_matrix()
   return transpose(inverse(mat3(xf.view_matrix)));
 }
 
-layout(set = 2, binding = 1) uniform MaterialUBO {
+layout(set = 2, binding = 1) uniform ObjectTransforms {
+  mat4 pos_transform;
+  // Model-space normal matrix (inverse-transpose of the model matrix). View-space
+  // transform is applied in shaders using xf.view_matrix.
+  mat3 pos_transform_normal_matrix;
+  // parameters.x = sizeScale
+  vec4 parameters;
+  ivec4 clip_params; // x=enabled, y=planeCount
+  vec4 clip_planes[ATLAS_MAX_CLIP_PLANES];
+} xo;
+
+layout(set = 2, binding = 2) uniform MaterialUBO {
   vec4 material_ambient;
   vec4 material_specular;
   float material_shininess;

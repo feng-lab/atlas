@@ -63,6 +63,13 @@ static_assert(alignof(LightingUBOStd140) == 16, "Lighting UBO must be 16-byte al
 static_assert(alignof(LightingUBOStd140::LightSource) == 16,
               "Lighting light source must be 16-byte aligned (std140 element stride)");
 
+// Deprecated (Vulkan): legacy combined view+object transform layout used by
+// early pipeline contexts. New code should prefer the split layout:
+//   - FrameTransformsUBOStd140 (camera-only changes)
+//   - ObjectTransformsUBOStd140 (static object state)
+//
+// NOTE: We intentionally keep this struct for now to avoid forcing unrelated
+// compilation failures while incrementally migrating pipeline contexts.
 struct TransformsUBOStd140
 {
   glm::mat4 projection_view_matrix{1.0f};
@@ -76,6 +83,43 @@ struct TransformsUBOStd140
   // parameters.x = sizeScale (global)
   // parameters.y = ortho flag (0 perspective, 1 ortho)
   // parameters.z = sphere boxCorrection (used by sphere shaders; 0 for most pipelines)
+  glm::vec4 parameters{1.0f, 0.0f, 0.0f, 0.0f};
+  // x = enabled (0/1), y = planeCount, z/w reserved
+  glm::ivec4 clip_params{0, 0, 0, 0};
+  std::array<glm::vec4, kVulkanMaxClipPlanes> clip_planes{};
+};
+
+// Per-frame transform UBO (std140). This carries only the state that is expected
+// to vary when the camera moves (view/projection matrices, ortho flag, etc).
+//
+// Keep this file in lock-step with:
+//   - Resources/shader/vulkan/include/matrices_material.glslinc
+struct FrameTransformsUBOStd140
+{
+  glm::mat4 projection_view_matrix{1.0f};
+  glm::mat4 view_matrix{1.0f};
+  glm::mat4 projection_matrix{1.0f};
+  glm::mat4 inverse_projection_matrix{1.0f};
+  // parameters.y = ortho flag (0 perspective, 1 ortho)
+  // parameters.z = sphere boxCorrection (used by sphere shaders; 0 for most pipelines)
+  glm::vec4 parameters{0.0f, 0.0f, 0.0f, 0.0f};
+};
+
+// Per-object transform UBO (std140). This carries state that is expected to
+// remain stable during camera-only motion (model transform, local/global clip
+// planes, etc).
+//
+// Keep this file in lock-step with:
+//   - Resources/shader/vulkan/include/matrices_material.glslinc
+struct ObjectTransformsUBOStd140
+{
+  glm::mat4 pos_transform{1.0f};
+  // Model-space normal matrix (inverse-transpose of the model matrix's upper 3x3).
+  // View-space normal transform is applied in the shader using the frame view matrix.
+  std::array<glm::vec4, 3> pos_transform_normal_matrix{glm::vec4(1.0f, 0.0f, 0.0f, 0.0f),
+                                                       glm::vec4(0.0f, 1.0f, 0.0f, 0.0f),
+                                                       glm::vec4(0.0f, 0.0f, 1.0f, 0.0f)};
+  // parameters.x = sizeScale (global)
   glm::vec4 parameters{1.0f, 0.0f, 0.0f, 0.0f};
   // x = enabled (0/1), y = planeCount, z/w reserved
   glm::ivec4 clip_params{0, 0, 0, 0};

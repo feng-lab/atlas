@@ -28,8 +28,8 @@ layout(constant_id = 90) const int CAPS_MODE = 1; // 0=NO_CAPS, 1=FLAT_CAPS, 2=R
 void main()
 {
   // Match GL path: radii scale with global size scale
-  float bradius = attr_origin.w * xf.parameters.x;
-  float tradius = attr_axis.w   * xf.parameters.x;
+  float bradius = attr_origin.w * xo.parameters.x;
+  float tradius = attr_axis.w   * xo.parameters.x;
 
   v_color1 = attr_color1;
   v_color2 = attr_color2;
@@ -40,8 +40,8 @@ void main()
   float upFlag    = flags.y;
 
   // Transform endpoints into object space scaled by coord transform
-  vec3 scaledOrigin = (xf.pos_transform * vec4(attr_origin.xyz, 1.0)).xyz;
-  vec3 scaledTopPos = (xf.pos_transform * vec4(attr_origin.xyz + attr_axis.xyz, 1.0)).xyz;
+  vec3 scaledOrigin = (xo.pos_transform * vec4(attr_origin.xyz, 1.0)).xyz;
+  vec3 scaledTopPos = (xo.pos_transform * vec4(attr_origin.xyz + attr_axis.xyz, 1.0)).xyz;
   vec3 scaledAxis   = scaledTopPos - scaledOrigin;
   atlas_write_clip_distances(vec4(scaledOrigin + scaledAxis * 0.5, 1.0));
 

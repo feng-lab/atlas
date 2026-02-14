@@ -161,7 +161,8 @@ private:
 
   // Dynamic UBO offsets for this draw
   vk::DeviceSize m_dynLightingOffset{0};
-  vk::DeviceSize m_dynTransformsOffset{0};
+  vk::DeviceSize m_dynFrameTransformsOffset{0};
+  vk::DeviceSize m_dynObjectTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
 
   // Cache per-stream dynamic UBO offsets in the persistent uniform arena so
@@ -170,8 +171,14 @@ private:
   struct UboCacheEntry
   {
     bool pickingPass = false;
-    Z3DEye eye = MonoEye;
-    vk::DeviceSize transformsOffset = 0;
+    // Cache signatures: only rewrite persistent UBOs when the originating
+    // renderer state or captured clip planes change.
+    RendererParameterState params{};
+    bool followCoordTransform = true;
+    bool followSizeScale = true;
+    bool followOpacity = true;
+    ClipPlanesState clipPlanes{};
+    vk::DeviceSize objectTransformsOffset = 0;
     vk::DeviceSize materialOffset = 0;
   };
   struct FrameUboCache
@@ -275,7 +282,7 @@ private:
     // executing cached secondaries recorded against now-destroyed VkBuffer
     // handles, without forcing rebuilds on benign per-frame descriptor updates.
     uint64_t oitResourcesRevision = 0;
-    std::array<uint32_t, 3> dynamicOffsets{};
+    std::array<uint32_t, 4> dynamicOffsets{};
     std::array<vk::Buffer, 5> vertexBuffers{};
     std::array<vk::DeviceSize, 5> vertexOffsets{};
     std::array<uint64_t, 5> vertexBufferSegmentIds{};

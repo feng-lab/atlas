@@ -130,7 +130,8 @@ private:
 
   // Dynamic UBO offsets for this draw
   vk::DeviceSize m_dynLightingOffset{0};
-  vk::DeviceSize m_dynTransformsOffset{0};
+  vk::DeviceSize m_dynFrameTransformsOffset{0};
+  vk::DeviceSize m_dynObjectTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
   // Device-local indirect args for DDP
   bool m_ddpArgsPrepared{false};
@@ -146,9 +147,8 @@ private:
     bool followSizeScale = true;
     bool followOpacity = true;
     bool pickingPass = false;
-    Z3DEye eye = MonoEye;
     ClipPlanesState clipPlanes;
-    vk::DeviceSize transformsOffset = 0;
+    vk::DeviceSize objectTransformsOffset = 0;
     vk::DeviceSize materialOffset = 0;
   };
   std::unordered_map<uint64_t, std::vector<DDPUboCacheEntry>> m_ddpUboCache;

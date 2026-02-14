@@ -246,8 +246,9 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
                                                         m_dsLighting->descriptorSet(),
                                                         m_dsTransforms->descriptorSet()};
   drawSpec.descriptorSets = descriptorSets;
-  const std::array<uint32_t, 3> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
-                                               static_cast<uint32_t>(m_dynTransformsOffset),
+  const std::array<uint32_t, 4> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
+                                               static_cast<uint32_t>(m_dynFrameTransformsOffset),
+                                               static_cast<uint32_t>(m_dynObjectTransformsOffset),
                                                static_cast<uint32_t>(m_dynMaterialOffset)};
   drawSpec.dynamicOffsets = dynamicOffsets;
 
@@ -397,8 +398,9 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
     m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
   }
   if (m_dsTransforms) {
-    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(TransformsUBOStd140));
-    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(FrameTransformsUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(ObjectTransformsUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(2, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
   if (m_dsOIT && !m_backend.isRecording()) {
     m_backend.primeOITDescriptorSet(*m_dsOIT);
@@ -425,23 +427,20 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
                                                          bool pickingPass)
 {
   CHECK(batch.shaderHook.captured) << "Ellipsoid batch missing shader hook snapshot";
+  (void)renderer;
   const auto hook = batch.shaderHook.type;
   const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
                     hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   CHECK(payload.paramsCaptured) << "Ellipsoid payload missing params";
 
-  TransformsUBOStd140 transforms{};
-  const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
-  transforms.projection_view_matrix = eyeState.projectionViewMatrix;
-  transforms.view_matrix = eyeState.viewMatrix;
-  transforms.pos_transform = payload.params.coordTransform;
+  // Frame transforms are shared per eye and updated once per submission in beginRender().
+  m_dynFrameTransformsOffset = m_backend.frameTransformsOffset(batch.eye);
 
-  const glm::mat4 combined = eyeState.viewMatrix * transforms.pos_transform;
-  const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(combined)));
-  transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
-  transforms.projection_matrix = eyeState.projectionMatrix;
-  transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  transforms.parameters = glm::vec4(payload.params.sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  ObjectTransformsUBOStd140 transforms{};
+  transforms.pos_transform = payload.params.coordTransform;
+  // Ellipsoid shaders do not consume the normal matrix; keep identity.
+  transforms.pos_transform_normal_matrix = encodeMat3ToStd140(glm::mat3(1.0f));
+  transforms.parameters = glm::vec4(payload.params.sizeScale, 0.0f, 0.0f, 0.0f);
   vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
 
   MaterialUBOStd140 material{};
@@ -461,20 +460,20 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
     auto it = m_ddpUboCache.find(payload.streamKey);
     if (it != m_ddpUboCache.end()) {
       for (const auto& cached : it->second) {
-        if (cached.params != payload.params || cached.pickingPass != pickingPass || cached.eye != batch.eye ||
+        if (cached.params != payload.params || cached.pickingPass != pickingPass ||
             !clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
           continue;
         }
-        m_dynTransformsOffset = cached.transformsOffset;
+        m_dynObjectTransformsOffset = cached.objectTransformsOffset;
         m_dynMaterialOffset = cached.materialOffset;
         return;
       }
     }
   }
 
-  auto transformsSlice = m_backend.suballocateUniformFor(payload, sizeof(TransformsUBOStd140));
+  auto transformsSlice = m_backend.suballocateUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
   std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
-  m_dynTransformsOffset = transformsSlice.offset;
+  m_dynObjectTransformsOffset = transformsSlice.offset;
 
   auto materialSlice = m_backend.suballocateUniformFor(payload, sizeof(MaterialUBOStd140));
   std::memcpy(materialSlice.mapped, &material, sizeof(material));
@@ -484,18 +483,11 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
     DDPUboCacheEntry entry{};
     entry.params = payload.params;
     entry.pickingPass = pickingPass;
-    entry.eye = batch.eye;
     entry.clipPlanes = batch.clipPlanes;
-    entry.transformsOffset = transformsSlice.offset;
+    entry.objectTransformsOffset = transformsSlice.offset;
     entry.materialOffset = materialSlice.offset;
     m_ddpUboCache[payload.streamKey].push_back(std::move(entry));
   }
-
-  VLOG(2) << fmt::format("VK ellipsoid params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
-                         payload.params.sizeScale,
-                         material.alpha,
-                         pickingPass,
-                         (eyeState.isPerspective ? 0 : 1));
 }
 
 ZVulkanEllipsoidPipelineContext::PipelineInstance&

@@ -211,6 +211,17 @@ void Z3DPerfCollector::flush(uint64_t token)
     agg.drawSecondaryCacheHits += sub.stats.drawSecondaryCacheHits;
     agg.drawSecondaryCacheBuilds += sub.stats.drawSecondaryCacheBuilds;
     agg.drawSecondaryCacheExecutes += sub.stats.drawSecondaryCacheExecutes;
+
+    // Vulkan CPU overhead attribution
+    agg.vkBeginRenderPreambleMs += sub.stats.vkBeginRenderPreambleMs;
+    agg.scriptUniformHintMs += sub.stats.scriptUniformHintMs;
+    agg.scriptUniformHintBytes = std::max(agg.scriptUniformHintBytes, sub.stats.scriptUniformHintBytes);
+    agg.scriptNodeCount += sub.stats.scriptNodeCount;
+    agg.scriptRasterNodeCount += sub.stats.scriptRasterNodeCount;
+    agg.scriptReplayNodeCount += sub.stats.scriptReplayNodeCount;
+    agg.scriptCommandsNodeCount += sub.stats.scriptCommandsNodeCount;
+    agg.scriptPreRecordNodeCount += sub.stats.scriptPreRecordNodeCount;
+    agg.scriptBatchCount += sub.stats.scriptBatchCount;
   }
 
   const auto& gpuByLabelBaseline = gpuByLabelPass.empty() ? gpuByLabelAll : gpuByLabelPass;
@@ -309,6 +320,19 @@ void Z3DPerfCollector::flush(uint64_t token)
     agg.drawSecondaryCacheBuilds,
     agg.drawSecondaryCacheExecutes,
     agg.drawSecondaryCacheSignatureMismatchMaskOr);
+  // Script + backend preamble attribution (pre_cpu breakdown support)
+  if (agg.scriptNodeCount > 0 || agg.scriptUniformHintMs > 0.0 || agg.vkBeginRenderPreambleMs > 0.0) {
+    stats += fmt::format(" pre_vk={:.3f}ms hint={:.3f}ms hintB={}B script:n{} r{} p{} c{} pre{} b{}",
+                         agg.vkBeginRenderPreambleMs,
+                         agg.scriptUniformHintMs,
+                         agg.scriptUniformHintBytes,
+                         agg.scriptNodeCount,
+                         agg.scriptRasterNodeCount,
+                         agg.scriptReplayNodeCount,
+                         agg.scriptCommandsNodeCount,
+                         agg.scriptPreRecordNodeCount,
+                         agg.scriptBatchCount);
+  }
   LOG(INFO) << (msg + stats);
 
   if (!sortedCpu.empty()) {

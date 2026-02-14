@@ -446,19 +446,48 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
   // This intentionally does not attempt to account for commands()/preRecord()
   // callbacks allocating from the uniform arena; those should remain rare (and
   // ideally avoided) because they are opaque to estimation.
+  uint32_t nodeCount = static_cast<uint32_t>(m_nodes.size());
+  uint32_t rasterNodeCount = 0;
+  uint32_t replayNodeCount = 0;
+  uint32_t commandsNodeCount = 0;
+  uint32_t batchCount = 0;
+  const uint32_t preRecordNodeCount = static_cast<uint32_t>(m_preRecordNodes.size());
+
+  const auto uniformHintStart = std::chrono::steady_clock::now();
   size_t uniformBytesHint = m_backend.estimateFrameUniformOverheadBytes();
   for (const auto& node : m_nodes) {
     if (const auto* rasterNode = std::get_if<RasterNode>(&node)) {
-      uniformBytesHint += m_backend.estimateAdditionalUniformBytesForBatches(rasterNode->state);
+      rasterNodeCount++;
+      batchCount += static_cast<uint32_t>(rasterNode->state.batches.size());
+      uniformBytesHint += rasterNode->state.uniformBytesEstimate;
     } else if (const auto* replayNode = std::get_if<ReplayNode>(&node)) {
+      replayNodeCount++;
       CHECK(replayNode->state) << "ZVulkanLinearScript replay node missing state";
-      uniformBytesHint += m_backend.estimateAdditionalUniformBytesForBatches(*replayNode->state);
-    } else {
+      batchCount += static_cast<uint32_t>(replayNode->state->batches.size());
+      uniformBytesHint += replayNode->state->uniformBytesEstimate;
+    } else if (const auto* cmdNode = std::get_if<CommandsNode>(&node)) {
+      (void)cmdNode;
+      commandsNodeCount++;
       // commands()/preRecord() are call-site defined and may mutate backend state
       // beyond what we can infer from batches.
     }
   }
   m_backend.hintNextUniformArenaMinCapacity(uniformBytesHint);
+  const double uniformHintMs =
+    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - uniformHintStart).count();
+
+  if (!m_frameOpen) {
+    Z3DRendererVulkanBackend::BeginRenderScriptStats stats{};
+    stats.uniformHintMs = uniformHintMs;
+    stats.uniformHintBytes = uniformBytesHint;
+    stats.nodeCount = nodeCount;
+    stats.rasterNodeCount = rasterNodeCount;
+    stats.replayNodeCount = replayNodeCount;
+    stats.commandsNodeCount = commandsNodeCount;
+    stats.preRecordNodeCount = preRecordNodeCount;
+    stats.batchCount = batchCount;
+    m_backend.setPendingBeginRenderScriptStats(std::move(stats));
+  }
 
   openFrame(firstLabel);
   auto frameGuard = folly::makeGuard([&]() {
@@ -520,6 +549,7 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
 
   auto flushMerged = [&]() {
     if (merged.batches.empty()) {
+      merged.uniformBytesEstimate = 0;
       mergedNodeCount = 0;
       mergedLabels.clear();
       mergedCaptureMs = 0.0;
@@ -555,6 +585,7 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
     m_backend.processBatches(m_renderer, merged);
 
     merged.batches.clear();
+    merged.uniformBytesEstimate = 0;
     mergedNodeCount = 0;
     mergedLabels.clear();
   };
@@ -604,6 +635,8 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
         }
         rasterNode->state.batches.clear();
       }
+      merged.uniformBytesEstimate += rasterNode->state.uniformBytesEstimate;
+      rasterNode->state.uniformBytesEstimate = 0;
       continue;
     }
 

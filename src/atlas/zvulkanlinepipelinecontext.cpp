@@ -342,8 +342,9 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
     m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
   }
   if (m_dsTransforms) {
-    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(TransformsUBOStd140));
-    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(FrameTransformsUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(ObjectTransformsUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(2, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
 
   ensurePlaceholderTexture();
@@ -364,11 +365,28 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   m_dynLightingOffset =
     payload.pickingPass ? m_backend.framePickingLightingOffset() : m_backend.frameSharedLightingOffset();
 
-  TransformsUBOStd140 transforms{};
   const auto& viewState = viewStateForBatch(renderer, batch);
   const auto& eyeState = viewState.eyes[static_cast<size_t>(batch.eye)];
-  transforms.view_matrix = eyeState.viewMatrix;
-  transforms.projection_view_matrix = eyeState.projectionViewMatrix;
+
+  // Frame transforms are shared per eye and updated once per submission in beginRender().
+  // If the batch carries a viewStateOverride snapshot, allocate a dedicated
+  // frame UBO slice for this draw.
+  if (batch.viewStateOverride) {
+    FrameTransformsUBOStd140 xf{};
+    xf.projection_view_matrix = eyeState.projectionViewMatrix;
+    xf.view_matrix = eyeState.viewMatrix;
+    xf.projection_matrix = eyeState.projectionMatrix;
+    xf.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
+    const float orthoFlag = eyeState.isPerspective ? 0.0f : 1.0f;
+    xf.parameters = glm::vec4(0.0f, orthoFlag, 0.0f, 0.0f);
+    auto slice = m_backend.suballocateUniformFor(payload, sizeof(FrameTransformsUBOStd140));
+    std::memcpy(slice.mapped, &xf, sizeof(xf));
+    m_dynFrameTransformsOffset = slice.offset;
+  } else {
+    m_dynFrameTransformsOffset = m_backend.frameTransformsOffset(batch.eye);
+  }
+
+  ObjectTransformsUBOStd140 transforms{};
   CHECK(payload.paramsCaptured) << "Line payload missing params";
   const glm::mat4 model = payload.followCoordTransform ? payload.params.coordTransform : glm::mat4(1.0f);
   transforms.pos_transform = model;
@@ -376,10 +394,8 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   // Line shaders do not consume the normal matrix; keep it as identity to
   // avoid redundant inverse/transpose work.
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(glm::mat3(1.0f));
-  transforms.projection_matrix = eyeState.projectionMatrix;
-  transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
-  transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  transforms.parameters = glm::vec4(sizeScale, 0.0f, 0.0f, 0.0f);
   vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
   CHECK(batch.shaderHook.captured) << "Line batch missing shader hook snapshot";
   const auto hook = batch.shaderHook.type;
@@ -391,20 +407,19 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
       for (const auto& cached : it->second) {
         if (cached.params != payload.params || cached.followCoordTransform != payload.followCoordTransform ||
             cached.followSizeScale != payload.followSizeScale || cached.followOpacity != payload.followOpacity ||
-            cached.pickingPass != payload.pickingPass || cached.eye != batch.eye ||
-            !clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
+            cached.pickingPass != payload.pickingPass || !clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
           continue;
         }
-        m_dynTransformsOffset = cached.transformsOffset;
+        m_dynObjectTransformsOffset = cached.objectTransformsOffset;
         m_dynMaterialOffset = cached.materialOffset;
         return;
       }
     }
   }
 
-  auto transformsSlice = m_backend.suballocateUniformFor(payload, sizeof(TransformsUBOStd140));
+  auto transformsSlice = m_backend.suballocateUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
   std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
-  m_dynTransformsOffset = transformsSlice.offset;
+  m_dynObjectTransformsOffset = transformsSlice.offset;
 
   MaterialUBOStd140 material{};
   material.material_ambient = payload.params.materialAmbient;
@@ -423,20 +438,11 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
     entry.followSizeScale = payload.followSizeScale;
     entry.followOpacity = payload.followOpacity;
     entry.pickingPass = payload.pickingPass;
-    entry.eye = batch.eye;
     entry.clipPlanes = batch.clipPlanes;
-    entry.transformsOffset = transformsSlice.offset;
+    entry.objectTransformsOffset = transformsSlice.offset;
     entry.materialOffset = materialSlice.offset;
     m_ddpUboCache[payload.streamKey].push_back(std::move(entry));
   }
-
-  VLOG(2) << fmt::format("VK line params: sizeScale={:.3f} alpha={:.3f} ortho={} picking={}",
-                         payload.params.sizeScale,
-                         payload.params.opacity,
-                         (eyeState.isPerspective ? 0 : 1),
-                         payload.pickingPass);
-
-  // No OIT UBO
 }
 
 ZVulkanLinePipelineContext::PipelineInstance&
@@ -1674,9 +1680,14 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
     drawSpec.descriptorSetFirst = 0;
     drawSpec.descriptorSets = descriptorSets;
-    // Dynamic offsets order must match set/binding order: lighting (set1,b0), transforms (set2,b0), material (set2,b1)
-    const std::array<uint32_t, 3> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
-                                                 static_cast<uint32_t>(m_dynTransformsOffset),
+    // Dynamic offsets order must match set/binding order:
+    // - lighting (set1,b0)
+    // - frame transforms (set2,b0)
+    // - object transforms (set2,b1)
+    // - material (set2,b2)
+    const std::array<uint32_t, 4> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
+                                                 static_cast<uint32_t>(m_dynFrameTransformsOffset),
+                                                 static_cast<uint32_t>(m_dynObjectTransformsOffset),
                                                  static_cast<uint32_t>(m_dynMaterialOffset)};
     drawSpec.dynamicOffsets = dynamicOffsets;
     drawSpec.extraDescriptorBinds = std::span<const ZVulkanDescriptorBindInfo>(extraBinds.data(), extraBindCount);
@@ -1819,8 +1830,9 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = 0;
   drawSpec.descriptorSets = descriptorSets;
-  const std::array<uint32_t, 3> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
-                                               static_cast<uint32_t>(m_dynTransformsOffset),
+  const std::array<uint32_t, 4> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
+                                               static_cast<uint32_t>(m_dynFrameTransformsOffset),
+                                               static_cast<uint32_t>(m_dynObjectTransformsOffset),
                                                static_cast<uint32_t>(m_dynMaterialOffset)};
   drawSpec.dynamicOffsets = dynamicOffsets;
   drawSpec.extraDescriptorBinds = std::span<const ZVulkanDescriptorBindInfo>(extraBinds.data(), extraBindCount);

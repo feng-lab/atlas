@@ -28,8 +28,9 @@ layout(location = 5) out vec3  v_point;
 
 void main()
 {
-  v_normal = normalize(xf.pos_transform_normal_matrix * attr_normal);
-  vec4 vertex = xf.pos_transform * vec4(attr_vertex, 1.0);
+  vec3 normalWorld = xo.pos_transform_normal_matrix * attr_normal;
+  v_normal = normalize(compute_view_normal_matrix() * normalWorld);
+  vec4 vertex = xo.pos_transform * vec4(attr_vertex, 1.0);
   atlas_write_clip_distances(vertex);
   vec4 eyeSpacePos = xf.view_matrix * vertex;
   v_point = eyeSpacePos.xyz / eyeSpacePos.w;
