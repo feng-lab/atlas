@@ -603,10 +603,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     }
     frameResources.pickingLightingDynOffset = pickingSlice.offset;
   }
-  collectFrameTimings(frameResources);
-  // Reset per-submission descriptor set counters after reporting the previous
-  // frame-slot use (collectFrameTimings reads the counters for logging and the
-  // perf collector).
+  // Reset per-submission descriptor set counters after entering the completion
+  // safe point for this frame-slot. The safe point already ingested the
+  // previous submission's timings (if any) into Z3DPerfCollector.
   frameResources.descriptorSetsAllocated = 0;
   frameResources.gpuScopes.clear();
   frameResources.cpuScopes.clear();
@@ -1062,6 +1061,66 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
           flushPendingFreesAndMaybeTrimStaticSegment(seg);
         }
       }
+    }
+  }
+
+  // Collect this submission's CPU/GPU timings when the fence completes.
+  //
+  // Why: all Vulkan renderer backends share a single ZVulkanFrameExecutor ring
+  // (command buffers + fences). Slot reuse (beginFrame) can therefore be driven
+  // by *other* backends, which means relying solely on this backend re-entering
+  // the completion safe point via beginRender() is not robust.
+  //
+  // If a backend never re-acquires the slot that recorded a given submission
+  // (common when multiple backends interleave submissions), that submission is
+  // never ingested into Z3DPerfCollector, and the per-frame perf summary stalls
+  // because Z3DPerfCollector preserves token ordering.
+  //
+  // Ordering: schedule this AFTER other completion callbacks (readback-fence
+  // batons, residency unpins, static segment unpins) so that the backend can
+  // safely enter the "completion safe point" (AfterFrameCompletion hooks) and
+  // allow the compositor to record end-to-end `all` latency before we ingest
+  // into Z3DPerfCollector.
+  if (frame.realFrameToken != 0 && frame.submissionId != 0) {
+    if (submitted) {
+      const std::weak_ptr<bool> alive = m_aliveFlag;
+      void* frameKey = frameHandle.key();
+      const uint64_t expectedToken = frame.realFrameToken;
+      const uint32_t expectedSubmissionId = frame.submissionId;
+      auto renderEx = currentRenderThreadExecutorKeepAlive("vk_collect_frame_timings");
+      device().frameExecutor().scheduleAfterCompletion(
+        frameHandle,
+        [alive,
+         renderEx = std::move(renderEx),
+         backend = this,
+         frameKey,
+         expectedToken,
+         expectedSubmissionId]() mutable {
+          auto aliveStrong = alive.lock();
+          if (!aliveStrong || !*aliveStrong) {
+            return;
+          }
+
+          // If the frame executor observed completion on the render thread (the
+          // common case), collect inline to minimize latency.
+          if (currentRenderThreadExecutorOrNull() != nullptr) {
+            backend->enterCompletionSafePointForKeyIfMatches(frameKey, expectedToken, expectedSubmissionId);
+            return;
+          }
+
+          renderEx->add([alive, backend, frameKey, expectedToken, expectedSubmissionId]() mutable {
+            auto aliveStrong2 = alive.lock();
+            if (!aliveStrong2 || !*aliveStrong2) {
+              return;
+            }
+            backend->enterCompletionSafePointForKeyIfMatches(frameKey, expectedToken, expectedSubmissionId);
+          });
+        });
+    } else {
+      // Avoid stalling the perf collector on a started submission that never
+      // reaches the GPU. This is an external failure path, so we still emit the
+      // CPU-side timing/log line best-effort (GPU scopes may be unavailable).
+      collectFrameTimings(frame);
     }
   }
 
@@ -2822,6 +2881,11 @@ void Z3DRendererVulkanBackend::ensurePPLLResources(const glm::uvec4& viewport, u
   // Params SSBO (host-visible). Keep mapped across frames.
   const size_t paramsBytes = sizeof(PPLLParamsStd430);
   if (!ppll.params || ppll.paramsCapacity < paramsBytes) {
+    if (ppll.params) {
+      // Replacing an OIT buffer invalidates cached secondaries that were
+      // recorded against the old VkBuffer handles.
+      ++m_oitResourcesRevision;
+    }
     ppll.params.reset();
     ppll.paramsMapped = nullptr;
     ppll.params = m_sharedDevice->createBuffer(paramsBytes,
@@ -2845,6 +2909,11 @@ void Z3DRendererVulkanBackend::ensurePPLLResources(const glm::uvec4& viewport, u
     [&](std::unique_ptr<ZVulkanBuffer>& buf, size_t& capacityBytes, size_t requiredBytes, vk::BufferUsageFlags usage) {
       const size_t req = std::max<size_t>(requiredBytes, sizeof(uint32_t));
       if (!buf || capacityBytes < req) {
+        if (buf) {
+          // Replacing an OIT buffer invalidates cached secondaries that were
+          // recorded against the old VkBuffer handles.
+          ++m_oitResourcesRevision;
+        }
         buf.reset();
         buf = m_sharedDevice->createBuffer(req, usage, vk::MemoryPropertyFlagBits::eDeviceLocal);
         capacityBytes = req;
@@ -2870,6 +2939,9 @@ void Z3DRendererVulkanBackend::ensurePPLLResources(const glm::uvec4& viewport, u
 
   const size_t prefixesBytes = std::max<size_t>(blocksBytes, sizeof(uint32_t));
   if (!ppll.blockPrefixes || ppll.blockPrefixesCapacityBytes < prefixesBytes) {
+    if (ppll.blockPrefixes) {
+      ++m_oitResourcesRevision;
+    }
     ppll.blockPrefixes.reset();
     ppll.blockPrefixesMapped = nullptr;
     ppll.blockPrefixes = m_sharedDevice->createBuffer(prefixesBytes,
@@ -3046,6 +3118,10 @@ void Z3DRendererVulkanBackend::primePPLLForStorePass(const glm::uvec4& viewport,
 
   const size_t desiredRing = std::max<size_t>(1, static_cast<size_t>(m_maxFramesInFlight));
   if (m_ppllFrameRing.size() != desiredRing) {
+    // Resizing the PPLL ring can destroy buffers for dropped slots. Make sure
+    // cached secondaries rebuild before executing any command buffer recorded
+    // against now-destroyed OIT resources.
+    ++m_oitResourcesRevision;
     m_ppllFrameRing.resize(desiredRing);
   }
   const size_t ringSize = m_ppllFrameRing.empty() ? 1 : m_ppllFrameRing.size();
@@ -4279,6 +4355,15 @@ void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
 
   m_frameInCompletionSafePoint.store(previousSafePointFrame, std::memory_order_release);
 
+  // Timing ingestion: once we've reached the completion safe point barrier,
+  // any fence-gated consumers (notably compositor readback publish + end-to-end
+  // `all` latency measurement) have finished, and it is now safe to ingest this
+  // submission into Z3DPerfCollector.
+  //
+  // Important: do this even if a hook threw (we rethrow below) so the perf
+  // collector doesn't stall ordered summaries on missing submissions.
+  collectFrameTimings(frame);
+
   if (deferredException) {
     std::rethrow_exception(deferredException);
   }
@@ -4911,6 +4996,30 @@ void Z3DRendererVulkanBackend::flushScheduledCopies(vk::raii::CommandBuffer& cmd
   }
   VLOG(1) << fmt::format("VK flush copies: queued={} flushed={} bytes={}", queued, flushed, bytes);
   m_activeFrame->scheduledCopies.clear();
+}
+
+void Z3DRendererVulkanBackend::enterCompletionSafePointForKeyIfMatches(void* key,
+                                                                       uint64_t expectedRealFrameToken,
+                                                                       uint32_t expectedSubmissionId)
+{
+  if (!m_sharedDevice || key == nullptr || expectedRealFrameToken == 0 || expectedSubmissionId == 0) {
+    return;
+  }
+
+  auto it = m_frameResourceMap.find(key);
+  if (it == m_frameResourceMap.end()) {
+    return;
+  }
+  CHECK_LT(it->second, m_frames.size()) << "Frame resource map index out of bounds";
+  FrameResources& frame = m_frames[it->second];
+  if (frame.realFrameToken != expectedRealFrameToken || frame.submissionId != expectedSubmissionId) {
+    return;
+  }
+  // Enter the "frame completion safe point" (after-fence). This executes all
+  // registered safe-point hooks (notably final readback publish + end-to-end
+  // `all` latency measurement in Z3DCompositor) and then ingests the completed
+  // submission into Z3DPerfCollector.
+  applyPendingArenaReset(frame);
 }
 
 void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)

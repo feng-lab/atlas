@@ -348,8 +348,12 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
     signature.pipeline = drawSpec.pipelineHandle;
     signature.layout = drawSpec.pipelineLayoutHandle;
     signature.baseDescriptorSets = boundSets;
+    signature.baseDescriptorGenerations = {sets.placeholder->generation(),
+                                           sets.lighting->generation(),
+                                           sets.transforms->generation()};
     signature.hasOit = static_cast<bool>(sets.oit);
     signature.oitDescriptorSet = sets.oit ? sets.oit->descriptorSet() : vk::DescriptorSet{};
+    signature.oitResourcesRevision = sets.oit ? m_backend.oitResourcesRevision() : 0;
     signature.dynamicOffsets = dynamicOffsets;
     signature.vertexBuffers = vertexBuffers;
     signature.vertexOffsets = vertexOffsets;
@@ -388,11 +392,17 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
       if (prev.baseDescriptorSets != signature.baseDescriptorSets) {
         mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kBaseDescriptorSets;
       }
+      if (prev.baseDescriptorGenerations != signature.baseDescriptorGenerations) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kBaseDescriptorGenerations;
+      }
       if (prev.hasOit != signature.hasOit) {
         mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorPresence;
       }
       if (prev.oitDescriptorSet != signature.oitDescriptorSet) {
         mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorSet;
+      }
+      if (prev.oitResourcesRevision != signature.oitResourcesRevision) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitResourcesRevision;
       }
       if (prev.dynamicOffsets != signature.dynamicOffsets) {
         mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kDynamicOffsets;

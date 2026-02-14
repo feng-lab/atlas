@@ -271,8 +271,19 @@ private:
     vk::Pipeline pipeline{};
     vk::PipelineLayout layout{};
     std::array<vk::DescriptorSet, 3> baseDescriptorSets{};
+    // Descriptor set generations are included so cached secondary command
+    // buffers are rebuilt whenever any bound descriptor set contents change.
+    // This avoids executing a secondary recorded against resources that were
+    // later destroyed/recreated (a common cause of validation errors like
+    // VUID-vkCmdExecuteCommands-pCommandBuffers-00089).
+    std::array<uint64_t, 3> baseDescriptorGenerations{};
     bool hasOit = false;
     vk::DescriptorSet oitDescriptorSet{};
+    // OIT resources revision: changes only when underlying PPLL buffers are
+    // replaced (destroyed + recreated). This prevents validation errors from
+    // executing cached secondaries recorded against now-destroyed VkBuffer
+    // handles, without forcing rebuilds on benign per-frame descriptor updates.
+    uint64_t oitResourcesRevision = 0;
     std::array<uint32_t, 3> dynamicOffsets{};
     std::array<vk::Buffer, 4> vertexBuffers{};
     std::array<vk::DeviceSize, 4> vertexOffsets{};
@@ -296,12 +307,13 @@ private:
                              (scissor.extent.width == rhs.scissor.extent.width) &&
                              (scissor.extent.height == rhs.scissor.extent.height);
       return pipeline == rhs.pipeline && layout == rhs.layout && baseDescriptorSets == rhs.baseDescriptorSets &&
-             hasOit == rhs.hasOit && oitDescriptorSet == rhs.oitDescriptorSet && dynamicOffsets == rhs.dynamicOffsets &&
-             vertexBuffers == rhs.vertexBuffers && vertexOffsets == rhs.vertexOffsets &&
-             vertexBufferSegmentIds == rhs.vertexBufferSegmentIds && indexBuffer == rhs.indexBuffer &&
-             indexOffset == rhs.indexOffset && indexType == rhs.indexType && indexCount == rhs.indexCount &&
-             indexBufferSegmentId == rhs.indexBufferSegmentId && vertexCount == rhs.vertexCount && viewportEq &&
-             scissorEq;
+             baseDescriptorGenerations == rhs.baseDescriptorGenerations && hasOit == rhs.hasOit &&
+             oitDescriptorSet == rhs.oitDescriptorSet && oitResourcesRevision == rhs.oitResourcesRevision &&
+             dynamicOffsets == rhs.dynamicOffsets && vertexBuffers == rhs.vertexBuffers &&
+             vertexOffsets == rhs.vertexOffsets && vertexBufferSegmentIds == rhs.vertexBufferSegmentIds &&
+             indexBuffer == rhs.indexBuffer && indexOffset == rhs.indexOffset && indexType == rhs.indexType &&
+             indexCount == rhs.indexCount && indexBufferSegmentId == rhs.indexBufferSegmentId &&
+             vertexCount == rhs.vertexCount && viewportEq && scissorEq;
     }
   };
 

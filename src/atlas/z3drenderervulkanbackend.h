@@ -494,7 +494,7 @@ public:
     static constexpr uint32_t kBaseDescriptorGenerations = 1u << 3;
     static constexpr uint32_t kOitDescriptorPresence = 1u << 4;
     static constexpr uint32_t kOitDescriptorSet = 1u << 5;
-    static constexpr uint32_t kOitDescriptorGeneration = 1u << 6;
+    static constexpr uint32_t kOitResourcesRevision = 1u << 6;
     static constexpr uint32_t kDynamicOffsets = 1u << 7;
     static constexpr uint32_t kVertexBuffers = 1u << 8;
     static constexpr uint32_t kVertexOffsets = 1u << 9;
@@ -883,6 +883,8 @@ private:
   };
 
   void collectFrameTimings(FrameResources& frame);
+  void
+  enterCompletionSafePointForKeyIfMatches(void* key, uint64_t expectedRealFrameToken, uint32_t expectedSubmissionId);
   void flushScheduledCopies(vk::raii::CommandBuffer& cmd);
   void ensureStaticArenas();
   void ensureUniformArena(FrameResources& frame);
@@ -932,6 +934,18 @@ public:
   class ZVulkanBuffer* ppllBlockPrefixesBufferObj();
   void ppllWriteBlockPrefixes(const uint32_t* prefixes, size_t count);
   void primeOITDescriptorSet(class ZVulkanDescriptorSet& set);
+  // Monotonic revision that changes ONLY when the underlying OIT (PPLL/DDP)
+  // resources are destroyed/recreated (i.e. VkBuffer handles change because a
+  // buffer was replaced).
+  //
+  // Cached secondary command buffers use this to decide when they must be
+  // rebuilt to avoid executing a secondary recorded against objects that were
+  // later destroyed (a common source of validation errors like
+  // VUID-vkCmdExecuteCommands-pCommandBuffers-00089).
+  [[nodiscard]] uint64_t oitResourcesRevision() const noexcept
+  {
+    return m_oitResourcesRevision;
+  }
 
   // PPLL command recording helpers (must be called within an active frame)
   void ppllResetCounts(vk::raii::CommandBuffer& cmd);
@@ -1189,6 +1203,8 @@ public:
   };
   std::vector<PPLLResources> m_ppllFrameRing;
   std::optional<size_t> m_activePPLLIndex;
+  // Bumped whenever any PPLL buffer is replaced (destroyed + recreated).
+  uint64_t m_oitResourcesRevision = 1;
 
   // Helpers for descriptor arena lifecycle
   void ensureArenaOnFrame(FrameResources& frame);
