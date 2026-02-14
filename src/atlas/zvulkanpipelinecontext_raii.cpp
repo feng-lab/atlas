@@ -750,9 +750,10 @@ void ZVulkanPipelineCommandRecorder::beginRenderingSegment(const ZVulkanRenderin
     }
   }
 
-  vk::RenderingInfo renderingInfo{.renderArea = spec.renderArea,
+  vk::RenderingInfo renderingInfo{.flags = renderingFlags,
+                                  .renderArea = spec.renderArea,
                                   .layerCount = 1,
-                                  .flags = renderingFlags,
+                                  .viewMask = 0,
                                   .colorAttachmentCount = static_cast<uint32_t>(colorInfos.size()),
                                   .pColorAttachments = colorInfos.data(),
                                   .pDepthAttachment = depthAttachmentInfo ? &*depthAttachmentInfo : nullptr,
