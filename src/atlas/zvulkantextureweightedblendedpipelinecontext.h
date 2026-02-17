@@ -15,8 +15,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorPool;
-class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 
@@ -63,29 +61,22 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
+  // Matches layout(push_constant) WBlendedFinalPC in Resources/shader/vulkan/wblended_final.frag.
+  struct WBlendedFinalPushConstants
+  {
+    uint32_t accumTex = 0;
+    uint32_t transmittanceTex = 0;
+  };
+
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
-  std::optional<vk::raii::DescriptorSetLayout> m_setLayout;
-  vk::DescriptorSetLayout m_setPlaceholder{}; // empty layout for set index alignment
-  vk::DescriptorSetLayout m_setLighting{};    // shared lighting UBO layout (set = 1)
-  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting; // per-frame lighting UBO set
   vk::DeviceSize m_dynLightingOffset{0};
-  
-  std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
-  size_t m_vertexCapacity = 0;
+
   size_t m_vertexCount = 0;
 
-  void ensureDescriptorLayout();
-  void ensureDescriptorSet();
-  void ensureOITResources();
-  void resetDescriptors();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
-  void ensureVertexCapacity(size_t vertexCount);
-  void uploadGeometry();
-  
 
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
 };

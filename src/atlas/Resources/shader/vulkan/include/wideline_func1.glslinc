@@ -1,18 +1,12 @@
 // Specialization constants
 #include "matrices_material.glslinc"
 #include "clip_distance_extra_frag.glslinc"
+#include "wideline_common.glslinc"
+#include "bindless.glslinc"
 
 layout(constant_id = 98) const bool USE_1DTEXTURE = false;
 layout(constant_id = 99) const bool ROUND_CAP     = false;
 layout(constant_id = 100) const bool LIGHTING_ENABLED = true;
-
-// Push constants for screen-space line expansion
-layout(push_constant) uniform WideLinePC {
-  mat4 viewport_matrix;
-  mat4 viewport_matrix_inverse;
-  float line_width;
-  float size_scale;
-} wpc;
 
 // Inputs
 layout(location = 0) in vec4 v_color;  // only when not USE_1DTEXTURE
@@ -21,9 +15,6 @@ layout(location = 2) flat in vec3 plane2;
 layout(location = 3) flat in vec3 plane3;
 layout(location = 4) flat in vec3 plane4;
 layout(location = 5) flat in vec4 p0p1; // only when ROUND_CAP
-
-// Optional texture (emulate 1D with Wx1 2D texture)
-layout(set = 0, binding = 0) uniform sampler2D line_texture;
 
 bool wideline_fragment_covered(const vec4 dist, const vec3 pos)
 {
@@ -70,7 +61,7 @@ bool wideline_fragment_color_impl(out vec4 fragColor, out float fragDepth)
   vec4 col;
   if (USE_1DTEXTURE) {
     float texCoord0 = 1.0 - (d - 1.0) * 2.0 * wpc.size_scale / wpc.line_width;
-    col = texture(line_texture, vec2(texCoord0, 0.5));
+    col = texture(atlas_bindlessSampler2DLinear(wpc.line_texture), vec2(texCoord0, 0.5));
   } else {
     col = v_color;
   }

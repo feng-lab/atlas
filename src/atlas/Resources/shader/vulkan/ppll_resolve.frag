@@ -3,9 +3,11 @@
 
 layout(location = 0) out vec4 FragData0;
 
-// Opaque depth buffer used to cull transparent fragments that lie behind already-rendered opaque geometry.
-// This is provided by the compositor when an opaque pass exists; otherwise a 1.0 placeholder is bound.
-layout(set = 0, binding = 0) uniform sampler2D opaque_depth_texture;
+#include "include/bindless.glslinc"
+
+layout(push_constant) uniform PPLLResolvePC {
+  uint opaque_depth_texture;
+} pc;
 
 #include "include/ppll_common.glslinc"
 
@@ -97,11 +99,11 @@ void main()
   // Note: when the compositor binds a 1x1 placeholder texture (no opaque pass), texelFetch() must clamp to avoid
   // undefined out-of-bounds reads for screen-sized fragment coordinates.
   float opaqueDepth = 1.0;
-  const ivec2 opaqueDepthSize = textureSize(opaque_depth_texture, 0);
+  const ivec2 opaqueDepthSize = textureSize(atlas_bindlessSampler2DNearest(pc.opaque_depth_texture), 0);
   if (opaqueDepthSize.x > 0 && opaqueDepthSize.y > 0) {
     const ivec2 clampedCoord =
       clamp(ivec2(gl_FragCoord.xy), ivec2(0), opaqueDepthSize - ivec2(1));
-    opaqueDepth = texelFetch(opaque_depth_texture, clampedCoord, 0).r;
+    opaqueDepth = texelFetch(atlas_bindlessSampler2DNearest(pc.opaque_depth_texture), clampedCoord, 0).r;
   }
 
   // Guard against out-of-bounds reads if offsets/counts are corrupted.

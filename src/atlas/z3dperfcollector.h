@@ -32,7 +32,6 @@ public:
 
     // Descriptor/arena
     uint32_t descriptorSetsAllocated = 0;
-    uint32_t overrideSetsAllocated = 0;
     uint32_t pipelinesCreated = 0;
     uint32_t pipelinesBoundCount = 0;
     uint32_t renderingSegmentsBegan = 0;

@@ -2,6 +2,7 @@
 
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
+#include "z3dimg.h"
 #include "zcancellation.h"
 #include "zlog.h"
 #include "zrenderthreadexecutor_tls.h"
@@ -11,7 +12,11 @@
 #include <folly/coro/Task.h>
 #include <folly/ScopeGuard.h>
 
+#include <algorithm>
 #include <chrono>
+#include <unordered_map>
+#include <unordered_set>
+#include <type_traits>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -202,6 +207,186 @@ void validateVulkanBatchMetadataOrCrash(std::string_view passLabel, const Render
                        use.handle.id);
     }
   }
+}
+
+struct BindlessUseKey
+{
+  uint64_t id = 0;
+  ExternalImageUseKind kind = ExternalImageUseKind::SampledRead;
+  ExternalImageAspectHint aspectHint = ExternalImageAspectHint::Unspecified;
+
+  bool operator==(const BindlessUseKey& o) const noexcept
+  {
+    return id == o.id && kind == o.kind && aspectHint == o.aspectHint;
+  }
+};
+
+struct BindlessUseKeyHash
+{
+  size_t operator()(const BindlessUseKey& k) const noexcept
+  {
+    size_t seed = std::hash<uint64_t>{}(k.id);
+    seed ^= (static_cast<size_t>(k.kind) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    seed ^= (static_cast<size_t>(k.aspectHint) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    return seed;
+  }
+};
+
+struct FontAtlasKey
+{
+  const uint8_t* pixelsBGRA8 = nullptr;
+  uint32_t width = 0;
+  uint32_t height = 0;
+
+  bool operator==(const FontAtlasKey& o) const noexcept
+  {
+    return pixelsBGRA8 == o.pixelsBGRA8 && width == o.width && height == o.height;
+  }
+};
+
+struct FontAtlasKeyHash
+{
+  size_t operator()(const FontAtlasKey& k) const noexcept
+  {
+    size_t seed = std::hash<const void*>{}(static_cast<const void*>(k.pixelsBGRA8));
+    seed ^= (static_cast<size_t>(k.width) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    seed ^= (static_cast<size_t>(k.height) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    return seed;
+  }
+};
+
+struct RaycasterWarmupKey
+{
+  Z3DImg* image = nullptr;
+  const std::vector<Z3DTransferFunction*>* transferFunctions = nullptr;
+  bool wants2D = false;
+  bool wantsVolume3D = true;
+  bool wantsPaging = false;
+
+  bool operator==(const RaycasterWarmupKey& o) const noexcept
+  {
+    return image == o.image && transferFunctions == o.transferFunctions && wants2D == o.wants2D &&
+           wantsVolume3D == o.wantsVolume3D && wantsPaging == o.wantsPaging;
+  }
+};
+
+struct RaycasterWarmupKeyHash
+{
+  size_t operator()(const RaycasterWarmupKey& k) const noexcept
+  {
+    size_t seed = std::hash<const void*>{}(static_cast<const void*>(k.image));
+    seed ^= (std::hash<const void*>{}(static_cast<const void*>(k.transferFunctions)) + 0x9e3779b97f4a7c15ull +
+             (seed << 6) + (seed >> 2));
+    seed ^= (static_cast<size_t>(k.wants2D) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    seed ^= (static_cast<size_t>(k.wantsVolume3D) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    seed ^= (static_cast<size_t>(k.wantsPaging) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    return seed;
+  }
+};
+
+struct RaycasterWarmupGroup
+{
+  RaycasterWarmupKey key{};
+  std::vector<size_t> channels;
+};
+
+struct SliceWarmupKey
+{
+  Z3DImg* image = nullptr;
+  const std::vector<const ZColorMap*>* colormaps = nullptr;
+  bool wantsVolume3D = true;
+  bool wantsColormap = true;
+  bool wantsPaging = false;
+
+  bool operator==(const SliceWarmupKey& o) const noexcept
+  {
+    return image == o.image && colormaps == o.colormaps && wantsVolume3D == o.wantsVolume3D &&
+           wantsColormap == o.wantsColormap && wantsPaging == o.wantsPaging;
+  }
+};
+
+struct SliceWarmupKeyHash
+{
+  size_t operator()(const SliceWarmupKey& k) const noexcept
+  {
+    size_t seed = std::hash<const void*>{}(static_cast<const void*>(k.image));
+    seed ^= (std::hash<const void*>{}(static_cast<const void*>(k.colormaps)) + 0x9e3779b97f4a7c15ull + (seed << 6) +
+             (seed >> 2));
+    seed ^= (static_cast<size_t>(k.wantsVolume3D) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    seed ^= (static_cast<size_t>(k.wantsColormap) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    seed ^= (static_cast<size_t>(k.wantsPaging) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    return seed;
+  }
+};
+
+struct SliceWarmupGroup
+{
+  SliceWarmupKey key{};
+  std::vector<size_t> channels;
+};
+
+void appendBindlessSampledImageUsesFromBatch(
+  const RenderBatch& batch,
+  std::vector<ExternalImageUseDesc>& out,
+  std::vector<Z3DRendererVulkanBackend::BindlessFontAtlasPixelsDesc>* outFontAtlases)
+{
+  // Primary source of sampled-image usage metadata: pass.externalImageUses.
+  for (const auto& use : batch.pass.externalImageUses) {
+    if (!use.handle.valid() || use.handle.backend != RenderBackend::Vulkan) {
+      continue;
+    }
+    if (use.kind != ExternalImageUseKind::SampledRead) {
+      continue;
+    }
+    out.push_back(use);
+  }
+
+  // Shader-hook sampled images are not always represented in externalImageUses
+  // (they are often already in the correct final layout), but they still need
+  // bindless indices.
+  if (batch.shaderHook.captured && batch.shaderHook.type == ShaderHookType::DualDepthPeelingPeel) {
+    if (batch.shaderHook.para.dualDepthPeelingDepthBlenderHandle.valid()) {
+      out.push_back(ExternalImageUseDesc{batch.shaderHook.para.dualDepthPeelingDepthBlenderHandle,
+                                         ExternalImageUseKind::SampledRead,
+                                         ExternalImageAspectHint::Color});
+    }
+    if (batch.shaderHook.para.dualDepthPeelingFrontBlenderHandle.valid()) {
+      out.push_back(ExternalImageUseDesc{batch.shaderHook.para.dualDepthPeelingFrontBlenderHandle,
+                                         ExternalImageUseKind::SampledRead,
+                                         ExternalImageAspectHint::Color});
+    }
+  }
+
+  // Payload-provided sampled images (Mesh/Font).
+  std::visit(
+    [&](auto&& payload) {
+      using T = std::decay_t<decltype(payload)>;
+      if constexpr (std::is_same_v<T, MeshPayload>) {
+        if (payload.textureHandle.valid() && payload.textureHandle.backend == RenderBackend::Vulkan) {
+          AttachmentHandle h{};
+          h.id = payload.textureHandle.id;
+          h.backend = RenderBackend::Vulkan;
+          out.push_back(ExternalImageUseDesc{h, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        }
+      } else if constexpr (std::is_same_v<T, FontPayload>) {
+        if (payload.atlasHandle.valid() && payload.atlasHandle.backend == RenderBackend::Vulkan) {
+          AttachmentHandle h{};
+          h.id = payload.atlasHandle.id;
+          h.backend = RenderBackend::Vulkan;
+          out.push_back(ExternalImageUseDesc{h, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
+        } else if (outFontAtlases != nullptr && payload.atlasPixels != nullptr && payload.atlasWidth > 0u &&
+                   payload.atlasHeight > 0u) {
+          Z3DRendererVulkanBackend::BindlessFontAtlasPixelsDesc desc{};
+          desc.pixelsBGRA8 = payload.atlasPixels;
+          desc.width = payload.atlasWidth;
+          desc.height = payload.atlasHeight;
+          outFontAtlases->push_back(desc);
+        }
+      } else {
+        // Other payload types expose sampled textures via pass.externalImageUses.
+      }
+    },
+    batch.geometry);
 }
 
 } // namespace
@@ -487,6 +672,686 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
     stats.preRecordNodeCount = preRecordNodeCount;
     stats.batchCount = batchCount;
     m_backend.setPendingBeginRenderScriptStats(std::move(stats));
+  }
+
+  // Bindless pre-registration:
+  // Scan all nodes to discover sampled image usage before opening the Vulkan
+  // frame (beginRender) so the backend can update the per-frame-slot bindless
+  // descriptor tables before command-buffer recording begins.
+  //
+  // This avoids per-draw descriptor churn and preserves the invariant that we
+  // never update descriptors while a command buffer might read them.
+  if (!m_frameOpen) {
+    std::vector<ExternalImageUseDesc> sampledUses;
+    sampledUses.reserve(64);
+    std::vector<Z3DRendererVulkanBackend::BindlessFontAtlasPixelsDesc> fontAtlases;
+    fontAtlases.reserve(8);
+    std::unordered_map<RaycasterWarmupKey, std::vector<size_t>, RaycasterWarmupKeyHash> raycasterWarmupChannels;
+    raycasterWarmupChannels.reserve(16);
+    std::unordered_map<SliceWarmupKey, std::vector<size_t>, SliceWarmupKeyHash> sliceWarmupChannels;
+    sliceWarmupChannels.reserve(16);
+
+    struct RaycasterBlockIdCompactionPrime
+    {
+      std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lease;
+      // 0 means "use lease->attachments" (parity with record() semantics).
+      uint32_t effectiveAttachmentCount = 0;
+    };
+    std::unordered_map<const Z3DScratchResourcePool::RenderTargetLease*, RaycasterBlockIdCompactionPrime>
+      raycasterBlockIdCompactionPrimes;
+    raycasterBlockIdCompactionPrimes.reserve(8);
+
+    struct SliceBlockIdCompactionPrime
+    {
+      std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lease;
+      uint32_t sliceCount = 0;
+      std::unordered_set<uint32_t> sliceIndices;
+    };
+    std::unordered_map<const Z3DScratchResourcePool::RenderTargetLease*, SliceBlockIdCompactionPrime>
+      sliceBlockIdCompactionPrimes;
+    sliceBlockIdCompactionPrimes.reserve(8);
+
+    for (const auto& node : m_nodes) {
+      if (const auto* rasterNode = std::get_if<RasterNode>(&node)) {
+        for (const auto& batch : rasterNode->state.batches) {
+          appendBindlessSampledImageUsesFromBatch(batch, sampledUses, &fontAtlases);
+          std::visit(
+            [&](auto&& payload) {
+              using T = std::decay_t<decltype(payload)>;
+              if constexpr (std::is_same_v<T, ImgRaycasterPayload>) {
+                if (payload.image == nullptr || payload.visibleChannels.empty()) {
+                  return;
+                }
+
+                if (payload.stage == ImgRaycasterPayload::Stage::ProgressiveCompaction) {
+                  if (payload.blockIdLease && payload.blockIdLease->hasVulkanImage()) {
+                    auto* raw = payload.blockIdLease.get();
+                    auto& entry = raycasterBlockIdCompactionPrimes[raw];
+                    if (!entry.lease) {
+                      entry.lease = payload.blockIdLease;
+                    }
+                    const uint32_t request = payload.blockIdEffectiveAttachmentCount;
+                    if (entry.effectiveAttachmentCount == 0u || request == 0u) {
+                      // 0 means "use all attachments" (parity with record() logic).
+                      entry.effectiveAttachmentCount = 0u;
+                    } else {
+                      entry.effectiveAttachmentCount = std::max(entry.effectiveAttachmentCount, request);
+                    }
+                  }
+                }
+
+                const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
+                const bool planarGeometry = !hasIndices;
+
+                bool needsWarmup = false;
+                bool wants2D = false;
+                bool wantsVolume3D = true;
+                bool wantsPaging = false;
+                std::vector<size_t> channels;
+
+                auto resolveProgressiveChannel = [&]() -> std::optional<size_t> {
+                  if (payload.channelIndexRaw < 0) {
+                    return std::nullopt;
+                  }
+                  const size_t raw = static_cast<size_t>(payload.channelIndexRaw);
+                  CHECK_LT(raw, payload.visibleChannels.size())
+                    << "Vulkan script: raycaster channelIndexRaw out of range for visibleChannels";
+                  return payload.visibleChannels[raw];
+                };
+
+                switch (payload.stage) {
+                  case ImgRaycasterPayload::Stage::FastDirect: {
+                    needsWarmup = true;
+                    wants2D = planarGeometry && payload.image->is2DData();
+                    wantsVolume3D = !wants2D;
+                    channels.assign(payload.visibleChannels.begin(), payload.visibleChannels.end());
+                    break;
+                  }
+                  case ImgRaycasterPayload::Stage::FastLayers: {
+                    needsWarmup = true;
+                    wants2D = planarGeometry && payload.image->is2DData();
+                    wantsVolume3D = !(planarGeometry && payload.image->is2DData());
+                    channels.assign(payload.visibleChannels.begin(), payload.visibleChannels.end());
+                    break;
+                  }
+                  case ImgRaycasterPayload::Stage::ProgressivePreviewLayers: {
+                    needsWarmup = true;
+                    wants2D = false;
+                    wantsVolume3D = true;
+                    wantsPaging = false;
+                    channels.assign(payload.visibleChannels.begin(), payload.visibleChannels.end());
+                    break;
+                  }
+                  case ImgRaycasterPayload::Stage::ProgressiveBlockId:
+                  case ImgRaycasterPayload::Stage::ProgressiveRaycast: {
+                    const auto resolved = resolveProgressiveChannel();
+                    if (!resolved.has_value()) {
+                      return;
+                    }
+                    needsWarmup = true;
+                    wants2D = false;
+                    wantsVolume3D = true;
+                    wantsPaging = true;
+                    channels.push_back(*resolved);
+                    break;
+                  }
+                  default:
+                    break;
+                }
+
+                if (!needsWarmup || channels.empty()) {
+                  return;
+                }
+                CHECK(payload.transferFunctions != nullptr)
+                  << "Vulkan script: raycaster warmup requires transferFunctions vector";
+
+                RaycasterWarmupKey key{};
+                key.image = payload.image;
+                key.transferFunctions = payload.transferFunctions;
+                key.wants2D = wants2D;
+                key.wantsVolume3D = wantsVolume3D;
+                key.wantsPaging = wantsPaging;
+
+                auto& dest = raycasterWarmupChannels[key];
+                dest.insert(dest.end(), channels.begin(), channels.end());
+              } else if constexpr (std::is_same_v<T, ImgSlicePayload>) {
+                if (payload.image == nullptr || payload.slices.empty()) {
+                  return;
+                }
+
+                const bool usePaging = (!payload.fastPathOnly && payload.image->isVolumeDownsampled());
+
+                if (batch.pass.kind == BackendPassDesc::Kind::Compute &&
+                    payload.stage == ImgSlicePayload::Stage::BlockIdDiscovery) {
+                  const bool primeCompaction = usePaging && payload.streamKey != 0u && payload.channelIndexRaw >= 0 &&
+                                               payload.roundIndexRaw == 0 && payload.blockIdLease &&
+                                               payload.blockIdLease->hasVulkanImage() &&
+                                               payload.blockIdSliceIndexRaw >= 0;
+                  if (primeCompaction) {
+                    const size_t sliceCount = payload.slices.size();
+                    CHECK_GT(sliceCount, 0u);
+                    const size_t sliceIndex = static_cast<size_t>(payload.blockIdSliceIndexRaw);
+                    CHECK_LT(sliceIndex, sliceCount) << "Vulkan script: slice blockId slice index out of range";
+                    CHECK(sliceCount <= static_cast<size_t>(std::numeric_limits<uint32_t>::max()))
+                      << "Vulkan script: sliceCount exceeds uint32 range";
+
+                    auto* raw = payload.blockIdLease.get();
+                    auto& entry = sliceBlockIdCompactionPrimes[raw];
+                    if (!entry.lease) {
+                      entry.lease = payload.blockIdLease;
+                    }
+                    const uint32_t sliceCountU32 = static_cast<uint32_t>(sliceCount);
+                    const uint32_t sliceIndexU32 = static_cast<uint32_t>(sliceIndex);
+                    if (entry.sliceCount == 0u) {
+                      entry.sliceCount = sliceCountU32;
+                    } else {
+                      CHECK(entry.sliceCount == sliceCountU32)
+                        << "Vulkan script: inconsistent sliceCount for blockIdLease";
+                    }
+                    entry.sliceIndices.insert(sliceIndexU32);
+                  }
+                }
+
+                bool needsWarmup = false;
+                bool wantsVolume3D = false;
+                bool wantsColormap = false;
+                bool wantsPaging = false;
+                std::vector<size_t> channels;
+
+                switch (payload.stage) {
+                  case ImgSlicePayload::Stage::DrawLayers: {
+                    needsWarmup = true;
+                    wantsVolume3D = true;
+                    wantsColormap = true;
+                    wantsPaging =
+                      usePaging && payload.streamKey != 0u && payload.channelIndexRaw >= 0 && payload.roundIndexRaw > 0;
+
+                    const bool layered = (payload.layerLease != nullptr);
+                    if (layered) {
+                      CHECK(!batch.pass.colorAttachments.empty())
+                        << "Vulkan script: slice layered draw missing attachments";
+                      channels.push_back(static_cast<size_t>(batch.pass.colorAttachments.front().handle.index));
+                    } else {
+                      channels.push_back(0u);
+                    }
+                    break;
+                  }
+                  case ImgSlicePayload::Stage::BlockIdDiscovery: {
+                    if (!usePaging || payload.streamKey == 0u) {
+                      return;
+                    }
+                    if (payload.channelIndexRaw < 0) {
+                      return;
+                    }
+                    needsWarmup = true;
+                    wantsVolume3D = false;
+                    wantsColormap = false;
+                    wantsPaging = true;
+                    channels.push_back(static_cast<size_t>(payload.channelIndexRaw));
+                    break;
+                  }
+                  default:
+                    break;
+                }
+
+                if (!needsWarmup || channels.empty()) {
+                  return;
+                }
+
+                SliceWarmupKey key{};
+                key.image = payload.image;
+                key.colormaps = payload.colormaps;
+                key.wantsVolume3D = wantsVolume3D;
+                key.wantsColormap = wantsColormap;
+                key.wantsPaging = wantsPaging;
+
+                auto& dest = sliceWarmupChannels[key];
+                dest.insert(dest.end(), channels.begin(), channels.end());
+              } else {
+                // Other payload types expose bindless sampled images via externalImageUses and shaderHook metadata.
+              }
+            },
+            batch.geometry);
+        }
+        continue;
+      }
+      if (const auto* replayNode = std::get_if<ReplayNode>(&node)) {
+        if (!replayNode->state) {
+          continue;
+        }
+        for (const auto& batch : replayNode->state->batches) {
+          appendBindlessSampledImageUsesFromBatch(batch, sampledUses, &fontAtlases);
+          std::visit(
+            [&](auto&& payload) {
+              using T = std::decay_t<decltype(payload)>;
+              if constexpr (std::is_same_v<T, ImgRaycasterPayload>) {
+                if (payload.image == nullptr || payload.visibleChannels.empty()) {
+                  return;
+                }
+
+                if (payload.stage == ImgRaycasterPayload::Stage::ProgressiveCompaction) {
+                  if (payload.blockIdLease && payload.blockIdLease->hasVulkanImage()) {
+                    auto* raw = payload.blockIdLease.get();
+                    auto& entry = raycasterBlockIdCompactionPrimes[raw];
+                    if (!entry.lease) {
+                      entry.lease = payload.blockIdLease;
+                    }
+                    const uint32_t request = payload.blockIdEffectiveAttachmentCount;
+                    if (entry.effectiveAttachmentCount == 0u || request == 0u) {
+                      // 0 means "use all attachments" (parity with record() logic).
+                      entry.effectiveAttachmentCount = 0u;
+                    } else {
+                      entry.effectiveAttachmentCount = std::max(entry.effectiveAttachmentCount, request);
+                    }
+                  }
+                }
+
+                const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
+                const bool planarGeometry = !hasIndices;
+
+                bool needsWarmup = false;
+                bool wants2D = false;
+                bool wantsVolume3D = true;
+                bool wantsPaging = false;
+                std::vector<size_t> channels;
+
+                auto resolveProgressiveChannel = [&]() -> std::optional<size_t> {
+                  if (payload.channelIndexRaw < 0) {
+                    return std::nullopt;
+                  }
+                  const size_t raw = static_cast<size_t>(payload.channelIndexRaw);
+                  CHECK_LT(raw, payload.visibleChannels.size())
+                    << "Vulkan script: raycaster channelIndexRaw out of range for visibleChannels";
+                  return payload.visibleChannels[raw];
+                };
+
+                switch (payload.stage) {
+                  case ImgRaycasterPayload::Stage::FastDirect: {
+                    needsWarmup = true;
+                    wants2D = planarGeometry && payload.image->is2DData();
+                    wantsVolume3D = !wants2D;
+                    channels.assign(payload.visibleChannels.begin(), payload.visibleChannels.end());
+                    break;
+                  }
+                  case ImgRaycasterPayload::Stage::FastLayers: {
+                    needsWarmup = true;
+                    wants2D = planarGeometry && payload.image->is2DData();
+                    wantsVolume3D = !(planarGeometry && payload.image->is2DData());
+                    channels.assign(payload.visibleChannels.begin(), payload.visibleChannels.end());
+                    break;
+                  }
+                  case ImgRaycasterPayload::Stage::ProgressivePreviewLayers: {
+                    needsWarmup = true;
+                    wants2D = false;
+                    wantsVolume3D = true;
+                    wantsPaging = false;
+                    channels.assign(payload.visibleChannels.begin(), payload.visibleChannels.end());
+                    break;
+                  }
+                  case ImgRaycasterPayload::Stage::ProgressiveBlockId:
+                  case ImgRaycasterPayload::Stage::ProgressiveRaycast: {
+                    const auto resolved = resolveProgressiveChannel();
+                    if (!resolved.has_value()) {
+                      return;
+                    }
+                    needsWarmup = true;
+                    wants2D = false;
+                    wantsVolume3D = true;
+                    wantsPaging = true;
+                    channels.push_back(*resolved);
+                    break;
+                  }
+                  default:
+                    break;
+                }
+
+                if (!needsWarmup || channels.empty()) {
+                  return;
+                }
+                CHECK(payload.transferFunctions != nullptr)
+                  << "Vulkan script: raycaster warmup requires transferFunctions vector";
+
+                RaycasterWarmupKey key{};
+                key.image = payload.image;
+                key.transferFunctions = payload.transferFunctions;
+                key.wants2D = wants2D;
+                key.wantsVolume3D = wantsVolume3D;
+                key.wantsPaging = wantsPaging;
+
+                auto& dest = raycasterWarmupChannels[key];
+                dest.insert(dest.end(), channels.begin(), channels.end());
+              } else if constexpr (std::is_same_v<T, ImgSlicePayload>) {
+                if (payload.image == nullptr || payload.slices.empty()) {
+                  return;
+                }
+
+                const bool usePaging = (!payload.fastPathOnly && payload.image->isVolumeDownsampled());
+
+                if (batch.pass.kind == BackendPassDesc::Kind::Compute &&
+                    payload.stage == ImgSlicePayload::Stage::BlockIdDiscovery) {
+                  const bool primeCompaction = usePaging && payload.streamKey != 0u && payload.channelIndexRaw >= 0 &&
+                                               payload.roundIndexRaw == 0 && payload.blockIdLease &&
+                                               payload.blockIdLease->hasVulkanImage() &&
+                                               payload.blockIdSliceIndexRaw >= 0;
+                  if (primeCompaction) {
+                    const size_t sliceCount = payload.slices.size();
+                    CHECK_GT(sliceCount, 0u);
+                    const size_t sliceIndex = static_cast<size_t>(payload.blockIdSliceIndexRaw);
+                    CHECK_LT(sliceIndex, sliceCount) << "Vulkan script: slice blockId slice index out of range";
+                    CHECK(sliceCount <= static_cast<size_t>(std::numeric_limits<uint32_t>::max()))
+                      << "Vulkan script: sliceCount exceeds uint32 range";
+
+                    auto* raw = payload.blockIdLease.get();
+                    auto& entry = sliceBlockIdCompactionPrimes[raw];
+                    if (!entry.lease) {
+                      entry.lease = payload.blockIdLease;
+                    }
+                    const uint32_t sliceCountU32 = static_cast<uint32_t>(sliceCount);
+                    const uint32_t sliceIndexU32 = static_cast<uint32_t>(sliceIndex);
+                    if (entry.sliceCount == 0u) {
+                      entry.sliceCount = sliceCountU32;
+                    } else {
+                      CHECK(entry.sliceCount == sliceCountU32)
+                        << "Vulkan script: inconsistent sliceCount for blockIdLease";
+                    }
+                    entry.sliceIndices.insert(sliceIndexU32);
+                  }
+                }
+
+                bool needsWarmup = false;
+                bool wantsVolume3D = false;
+                bool wantsColormap = false;
+                bool wantsPaging = false;
+                std::vector<size_t> channels;
+
+                switch (payload.stage) {
+                  case ImgSlicePayload::Stage::DrawLayers: {
+                    needsWarmup = true;
+                    wantsVolume3D = true;
+                    wantsColormap = true;
+                    wantsPaging =
+                      usePaging && payload.streamKey != 0u && payload.channelIndexRaw >= 0 && payload.roundIndexRaw > 0;
+
+                    const bool layered = (payload.layerLease != nullptr);
+                    if (layered) {
+                      CHECK(!batch.pass.colorAttachments.empty())
+                        << "Vulkan script: slice layered draw missing attachments";
+                      channels.push_back(static_cast<size_t>(batch.pass.colorAttachments.front().handle.index));
+                    } else {
+                      channels.push_back(0u);
+                    }
+                    break;
+                  }
+                  case ImgSlicePayload::Stage::BlockIdDiscovery: {
+                    if (!usePaging || payload.streamKey == 0u) {
+                      return;
+                    }
+                    if (payload.channelIndexRaw < 0) {
+                      return;
+                    }
+                    needsWarmup = true;
+                    wantsVolume3D = false;
+                    wantsColormap = false;
+                    wantsPaging = true;
+                    channels.push_back(static_cast<size_t>(payload.channelIndexRaw));
+                    break;
+                  }
+                  default:
+                    break;
+                }
+
+                if (!needsWarmup || channels.empty()) {
+                  return;
+                }
+
+                SliceWarmupKey key{};
+                key.image = payload.image;
+                key.colormaps = payload.colormaps;
+                key.wantsVolume3D = wantsVolume3D;
+                key.wantsColormap = wantsColormap;
+                key.wantsPaging = wantsPaging;
+
+                auto& dest = sliceWarmupChannels[key];
+                dest.insert(dest.end(), channels.begin(), channels.end());
+              } else {
+                // Other payload types expose bindless sampled images via externalImageUses and shaderHook metadata.
+              }
+            },
+            batch.geometry);
+        }
+        continue;
+      }
+      // CommandsNode is opaque; call sites must register their own bindless
+      // sampled images via script.preRecord() if they introduce new textures.
+    }
+
+    // Font atlases are supplied as CPU pixels (BGRA8) rather than Vulkan handles.
+    // They must be uploaded and registered before recording begins.
+    if (!fontAtlases.empty()) {
+      std::unordered_set<FontAtlasKey, FontAtlasKeyHash> seenAtlases;
+      seenAtlases.reserve(fontAtlases.size());
+      std::vector<Z3DRendererVulkanBackend::BindlessFontAtlasPixelsDesc> uniqueAtlases;
+      uniqueAtlases.reserve(fontAtlases.size());
+
+      for (const auto& atlas : fontAtlases) {
+        if (atlas.pixelsBGRA8 == nullptr || atlas.width == 0u || atlas.height == 0u) {
+          continue;
+        }
+        FontAtlasKey k{};
+        k.pixelsBGRA8 = atlas.pixelsBGRA8;
+        k.width = atlas.width;
+        k.height = atlas.height;
+        if (seenAtlases.insert(k).second) {
+          uniqueAtlases.push_back(atlas);
+        }
+      }
+
+      if (!uniqueAtlases.empty()) {
+        auto sharedAtlases = std::make_shared<std::vector<Z3DRendererVulkanBackend::BindlessFontAtlasPixelsDesc>>(
+          std::move(uniqueAtlases));
+        PreRecordNode fontNode;
+        fontNode.label = "bindless_register_font_atlases";
+        fontNode.fn = [atlases = std::move(sharedAtlases)](Z3DRendererVulkanBackend& backend,
+                                                           Z3DRendererBase& renderer) {
+          (void)renderer;
+          backend.bindlessPreRegisterFontAtlasPixels(
+            std::span<const Z3DRendererVulkanBackend::BindlessFontAtlasPixelsDesc>(atlases->data(), atlases->size()),
+            "linear_script");
+        };
+        m_preRecordNodes.emplace_back(std::move(fontNode));
+      }
+    }
+
+    if (!sampledUses.empty()) {
+      std::unordered_set<BindlessUseKey, BindlessUseKeyHash> seen;
+      seen.reserve(sampledUses.size());
+
+      std::vector<ExternalImageUseDesc> uniqueUses;
+      uniqueUses.reserve(sampledUses.size());
+      for (const auto& use : sampledUses) {
+        if (!use.handle.valid() || use.handle.backend != RenderBackend::Vulkan) {
+          continue;
+        }
+        BindlessUseKey key{};
+        key.id = use.handle.id;
+        key.kind = use.kind;
+        key.aspectHint = use.aspectHint;
+        if (seen.insert(key).second) {
+          uniqueUses.push_back(use);
+        }
+      }
+
+      if (!uniqueUses.empty()) {
+        auto sharedUses = std::make_shared<std::vector<ExternalImageUseDesc>>(std::move(uniqueUses));
+        PreRecordNode bindlessNode;
+        bindlessNode.label = "bindless_register_sampled_images";
+        bindlessNode.fn = [uses = std::move(sharedUses)](Z3DRendererVulkanBackend& backend, Z3DRendererBase& renderer) {
+          (void)renderer;
+          backend.bindlessPreRegisterExternalSampledImageUses(
+            std::span<const ExternalImageUseDesc>(uses->data(), uses->size()),
+            "linear_script");
+        };
+        m_preRecordNodes.emplace_back(std::move(bindlessNode));
+      }
+    }
+
+    if (!raycasterWarmupChannels.empty()) {
+      std::vector<RaycasterWarmupGroup> groups;
+      groups.reserve(raycasterWarmupChannels.size());
+      for (auto& [key, channels] : raycasterWarmupChannels) {
+        if (channels.empty()) {
+          continue;
+        }
+        std::sort(channels.begin(), channels.end());
+        channels.erase(std::unique(channels.begin(), channels.end()), channels.end());
+        RaycasterWarmupGroup g{};
+        g.key = key;
+        g.channels = std::move(channels);
+        groups.emplace_back(std::move(g));
+      }
+
+      if (!groups.empty()) {
+        auto sharedGroups = std::make_shared<std::vector<RaycasterWarmupGroup>>(std::move(groups));
+        PreRecordNode warmupNode;
+        warmupNode.label = "bindless_warmup_img_raycaster";
+        warmupNode.fn = [groups = std::move(sharedGroups)](Z3DRendererVulkanBackend& backend,
+                                                           Z3DRendererBase& renderer) {
+          (void)renderer;
+          for (const auto& g : *groups) {
+            backend.bindlessPreWarmupImgRaycaster(g.key.image,
+                                                  g.key.transferFunctions,
+                                                  std::span<const size_t>(g.channels.data(), g.channels.size()),
+                                                  g.key.wants2D,
+                                                  g.key.wantsVolume3D,
+                                                  g.key.wantsPaging,
+                                                  "linear_script");
+          }
+        };
+        m_preRecordNodes.emplace_back(std::move(warmupNode));
+      }
+    }
+
+    if (!sliceWarmupChannels.empty()) {
+      std::vector<SliceWarmupGroup> groups;
+      groups.reserve(sliceWarmupChannels.size());
+      for (auto& [key, channels] : sliceWarmupChannels) {
+        if (channels.empty()) {
+          continue;
+        }
+        std::sort(channels.begin(), channels.end());
+        channels.erase(std::unique(channels.begin(), channels.end()), channels.end());
+        SliceWarmupGroup g{};
+        g.key = key;
+        g.channels = std::move(channels);
+        groups.emplace_back(std::move(g));
+      }
+
+      if (!groups.empty()) {
+        auto sharedGroups = std::make_shared<std::vector<SliceWarmupGroup>>(std::move(groups));
+        PreRecordNode warmupNode;
+        warmupNode.label = "bindless_warmup_img_slice";
+        warmupNode.fn = [groups = std::move(sharedGroups)](Z3DRendererVulkanBackend& backend,
+                                                           Z3DRendererBase& renderer) {
+          (void)renderer;
+          for (const auto& g : *groups) {
+            backend.bindlessPreWarmupImgSlice(g.key.image,
+                                              g.key.colormaps,
+                                              std::span<const size_t>(g.channels.data(), g.channels.size()),
+                                              g.key.wantsVolume3D,
+                                              g.key.wantsColormap,
+                                              g.key.wantsPaging,
+                                              "linear_script");
+          }
+        };
+        m_preRecordNodes.emplace_back(std::move(warmupNode));
+      }
+    }
+
+    if (!raycasterBlockIdCompactionPrimes.empty()) {
+      struct PrimeGroup
+      {
+        const Z3DScratchResourcePool::RenderTargetLease* rawLease = nullptr;
+        std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lease;
+        uint32_t effectiveAttachmentCount = 0;
+      };
+      std::vector<PrimeGroup> groups;
+      groups.reserve(raycasterBlockIdCompactionPrimes.size());
+
+      for (auto& [raw, entry] : raycasterBlockIdCompactionPrimes) {
+        if (!entry.lease) {
+          continue;
+        }
+        PrimeGroup g{};
+        g.rawLease = raw;
+        g.lease = entry.lease;
+        g.effectiveAttachmentCount = entry.effectiveAttachmentCount;
+        groups.emplace_back(std::move(g));
+      }
+
+      std::sort(groups.begin(), groups.end(), [](const PrimeGroup& a, const PrimeGroup& b) {
+        return a.rawLease < b.rawLease;
+      });
+
+      if (!groups.empty()) {
+        auto sharedGroups = std::make_shared<std::vector<PrimeGroup>>(std::move(groups));
+        PreRecordNode primeNode;
+        primeNode.label = "bindless_prime_raycaster_blockid_compaction";
+        primeNode.fn = [groups = std::move(sharedGroups)](Z3DRendererVulkanBackend& backend,
+                                                          Z3DRendererBase& renderer) {
+          (void)renderer;
+          for (const auto& g : *groups) {
+            backend.bindlessPrePrimeImgRaycasterBlockIdCompaction(g.lease, g.effectiveAttachmentCount, "linear_script");
+          }
+        };
+        m_preRecordNodes.emplace_back(std::move(primeNode));
+      }
+    }
+
+    if (!sliceBlockIdCompactionPrimes.empty()) {
+      struct PrimeGroup
+      {
+        const Z3DScratchResourcePool::RenderTargetLease* rawLease = nullptr;
+        std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lease;
+        uint32_t sliceCount = 0;
+        std::vector<uint32_t> sliceIndices;
+      };
+
+      std::vector<PrimeGroup> groups;
+      groups.reserve(sliceBlockIdCompactionPrimes.size());
+
+      for (auto& [raw, entry] : sliceBlockIdCompactionPrimes) {
+        if (!entry.lease || entry.sliceCount == 0u || entry.sliceIndices.empty()) {
+          continue;
+        }
+        PrimeGroup g{};
+        g.rawLease = raw;
+        g.lease = entry.lease;
+        g.sliceCount = entry.sliceCount;
+        g.sliceIndices.assign(entry.sliceIndices.begin(), entry.sliceIndices.end());
+        std::sort(g.sliceIndices.begin(), g.sliceIndices.end());
+        groups.emplace_back(std::move(g));
+      }
+
+      std::sort(groups.begin(), groups.end(), [](const PrimeGroup& a, const PrimeGroup& b) {
+        return a.rawLease < b.rawLease;
+      });
+
+      if (!groups.empty()) {
+        auto sharedGroups = std::make_shared<std::vector<PrimeGroup>>(std::move(groups));
+        PreRecordNode primeNode;
+        primeNode.label = "bindless_prime_slice_blockid_compaction";
+        primeNode.fn = [groups = std::move(sharedGroups)](Z3DRendererVulkanBackend& backend,
+                                                          Z3DRendererBase& renderer) {
+          (void)renderer;
+          for (const auto& g : *groups) {
+            for (uint32_t sliceIndex : g.sliceIndices) {
+              backend.bindlessPrePrimeImgSliceBlockIdCompaction(g.lease, g.sliceCount, sliceIndex, "linear_script");
+            }
+          }
+        };
+        m_preRecordNodes.emplace_back(std::move(primeNode));
+      }
+    }
   }
 
   openFrame(firstLabel);

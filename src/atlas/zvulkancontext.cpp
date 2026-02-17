@@ -6,9 +6,17 @@
 
 #include <set>
 #include <algorithm>
+#include <initializer_list>
+#include <gflags/gflags.h>
 
 DEFINE_bool(atlas_debug_vulkan, false, "Whether to enable Vulkan validation and debug utils");
 DEFINE_int32(atlas_vk_device_index, -1, "Preferred Vulkan physical device index (sorted); -1 for auto");
+
+DECLARE_int32(atlas_vk_bindless_texture2d_capacity);
+DECLARE_int32(atlas_vk_bindless_texture2darray_capacity);
+DECLARE_int32(atlas_vk_bindless_texture3d_capacity);
+DECLARE_int32(atlas_vk_bindless_utexture2d_capacity);
+DECLARE_int32(atlas_vk_bindless_utexture3d_capacity);
 
 namespace nim {
 
@@ -958,6 +966,55 @@ void ZVulkanContext::createLogicalDevice()
   enabledPhysicalDeviceVulkan12Features.scalarBlockLayout = physicalDeviceVulkan12Features.scalarBlockLayout;
   enabledPhysicalDeviceVulkan12Features.drawIndirectCount = physicalDeviceVulkan12Features.drawIndirectCount;
 
+  // ---------------------------------------------------------------------------
+  // Descriptor indexing (bindless sampled images)
+  // ---------------------------------------------------------------------------
+  // Atlas' Vulkan backend relies on descriptor indexing + runtime descriptor
+  // arrays to eliminate per-draw descriptor churn and to keep descriptor
+  // updates outside command-buffer recording. We intentionally do NOT require
+  // update-after-bind for correctness: the backend mutates per-frame-slot
+  // descriptor tables only after the slot's previous submission fence is
+  // observed complete. However, some drivers (notably MoltenVK) report very
+  // small legacy per-stage sampler limits; enabling update-after-bind when
+  // available allows large bindless arrays to be validated against the
+  // descriptor indexing update-after-bind limits instead.
+  const bool hasDescriptorIndexing = (physicalDeviceVulkan12Features.descriptorIndexing == VK_TRUE);
+  const bool hasRuntimeDescriptorArray = (physicalDeviceVulkan12Features.runtimeDescriptorArray == VK_TRUE);
+  const bool hasNonUniformSampledImages =
+    (physicalDeviceVulkan12Features.shaderSampledImageArrayNonUniformIndexing == VK_TRUE);
+  const bool hasPartiallyBound = (physicalDeviceVulkan12Features.descriptorBindingPartiallyBound == VK_TRUE);
+  if (!hasDescriptorIndexing || !hasRuntimeDescriptorArray || !hasNonUniformSampledImages || !hasPartiallyBound) {
+    throw ZException(
+      fmt::format("Selected Vulkan device does not support required descriptor indexing features "
+                  "(descriptorIndexing={}, runtimeDescriptorArray={}, shaderSampledImageArrayNonUniformIndexing={}, "
+                  "descriptorBindingPartiallyBound={}).",
+                  (hasDescriptorIndexing ? 1 : 0),
+                  (hasRuntimeDescriptorArray ? 1 : 0),
+                  (hasNonUniformSampledImages ? 1 : 0),
+                  (hasPartiallyBound ? 1 : 0)));
+  }
+  enabledPhysicalDeviceVulkan12Features.descriptorIndexing = true;
+  enabledPhysicalDeviceVulkan12Features.runtimeDescriptorArray = true;
+  enabledPhysicalDeviceVulkan12Features.shaderSampledImageArrayNonUniformIndexing = true;
+  enabledPhysicalDeviceVulkan12Features.descriptorBindingPartiallyBound = true;
+
+  // Optional: enable update-after-bind for sampled images when available. Atlas
+  // does not update bindless tables while they can be read by the GPU; this is
+  // enabled to satisfy descriptor limit accounting on platforms with low
+  // legacy sampler limits (e.g., MoltenVK).
+  enabledPhysicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind =
+    physicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind;
+  m_supportsDescriptorIndexingSampledImageUpdateAfterBind =
+    (enabledPhysicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind == VK_TRUE);
+
+  // Optional: enable variable descriptor count support when available. Atlas
+  // currently sizes bindless tables explicitly, but keeping this enabled when
+  // supported is future-proof for layout evolution.
+  enabledPhysicalDeviceVulkan12Features.descriptorBindingVariableDescriptorCount =
+    physicalDeviceVulkan12Features.descriptorBindingVariableDescriptorCount;
+
+  computeBindlessSampledImageCapacities();
+
   // Add platform-specific required extensions
 #ifdef __APPLE__
   auto deviceExtensionProperties = m_physicalDevices[m_selectedDeviceIndex].enumerateDeviceExtensionProperties();
@@ -1017,6 +1074,167 @@ void ZVulkanContext::createLogicalDevice()
   m_graphicsQueue.emplace(*m_device, m_queueFamilyIndices.graphicsFamily.value(), 0);
   m_presentQueue.emplace(*m_device, m_queueFamilyIndices.presentFamily.value(), 0);
   LOG(INFO) << "Device queues retrieved successfully";
+}
+
+void ZVulkanContext::computeBindlessSampledImageCapacities()
+{
+  if (m_physicalDevices.empty()) {
+    throw ZException("Attempted to compute bindless capacities without a physical device");
+  }
+
+  // Requested capacities are developer overrides. Clamp to at least 1 so index
+  // 0 can always be reserved for the placeholder texture.
+  BindlessSampledImageCapacities requested{};
+  requested.texture2D = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_texture2d_capacity));
+  requested.texture2DArray =
+    static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_texture2darray_capacity));
+  requested.texture3D = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_texture3d_capacity));
+  requested.uTexture2D = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_utexture2d_capacity));
+  requested.uTexture3D = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_utexture3d_capacity));
+
+  const bool usesUpdateAfterBind = m_supportsDescriptorIndexingSampledImageUpdateAfterBind;
+
+  auto props2 = m_physicalDevices[m_selectedDeviceIndex]
+                  .getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDescriptorIndexingProperties>();
+  const auto& limits = props2.get<vk::PhysicalDeviceProperties2>().properties.limits;
+  const auto& indexingProps = props2.get<vk::PhysicalDeviceDescriptorIndexingProperties>();
+
+  const uint32_t perStageSamplerLimit = usesUpdateAfterBind ? indexingProps.maxPerStageDescriptorUpdateAfterBindSamplers
+                                                            : limits.maxPerStageDescriptorSamplers;
+  const uint32_t perSetSamplerLimit =
+    usesUpdateAfterBind ? indexingProps.maxDescriptorSetUpdateAfterBindSamplers : limits.maxDescriptorSetSamplers;
+  const uint32_t perStageSampledImageLimit = usesUpdateAfterBind
+                                               ? indexingProps.maxPerStageDescriptorUpdateAfterBindSampledImages
+                                               : limits.maxPerStageDescriptorSampledImages;
+  const uint32_t perSetSampledImageLimit = usesUpdateAfterBind
+                                             ? indexingProps.maxDescriptorSetUpdateAfterBindSampledImages
+                                             : limits.maxDescriptorSetSampledImages;
+
+  if (perStageSamplerLimit == 0u || perSetSamplerLimit == 0u || perStageSampledImageLimit == 0u ||
+      perSetSampledImageLimit == 0u) {
+    throw ZException(
+      fmt::format("Selected Vulkan device reports invalid descriptor limits for bindless tables "
+                  "(perStageSamplers={} perSetSamplers={} perStageSampledImages={} perSetSampledImages={})",
+                  perStageSamplerLimit,
+                  perSetSamplerLimit,
+                  perStageSampledImageLimit,
+                  perSetSampledImageLimit));
+  }
+
+  // Atlas' bindless layout includes immutable samplers (linear clamp + nearest clamp).
+  constexpr uint32_t kSamplerCountTotal = 2u;
+  constexpr uint32_t kSamplerCountFragment = 2u;
+  constexpr uint32_t kSamplerCountCompute = 1u; // nearest clamp only
+  if (perStageSamplerLimit < kSamplerCountFragment || perSetSamplerLimit < kSamplerCountTotal ||
+      perStageSamplerLimit < kSamplerCountCompute) {
+    throw ZException(
+      fmt::format("Selected Vulkan device cannot satisfy the minimum bindless sampler contract "
+                  "(need samplers: total={} frag={} comp={} | limits: perStageSamplers={} perSetSamplers={})",
+                  kSamplerCountTotal,
+                  kSamplerCountFragment,
+                  kSamplerCountCompute,
+                  perStageSamplerLimit,
+                  perSetSamplerLimit));
+  }
+
+  auto effective = requested;
+  bool clamped = false;
+  std::string clampReason;
+
+  auto clampByPriority = [&](std::initializer_list<uint32_t*> ordered, uint32_t limit, std::string_view reason) {
+    uint32_t sum = 0;
+    for (auto* ptr : ordered) {
+      sum += *ptr;
+    }
+    const uint32_t minSum = static_cast<uint32_t>(ordered.size()); // min 1 each
+    if (limit < minSum) {
+      throw ZException(fmt::format("Selected Vulkan device cannot satisfy the minimum bindless descriptor contract: "
+                                   "need at least {} descriptors for {} but device limit is {}",
+                                   minSum,
+                                   reason,
+                                   limit));
+    }
+    if (sum <= limit) {
+      return;
+    }
+    uint32_t toReduce = sum - limit;
+    for (auto* ptr : ordered) {
+      if (toReduce == 0u) {
+        break;
+      }
+      const uint32_t reducible = (*ptr > 1u) ? (*ptr - 1u) : 0u;
+      const uint32_t dec = std::min(reducible, toReduce);
+      *ptr -= dec;
+      toReduce -= dec;
+    }
+    CHECK(toReduce == 0u) << "Failed to clamp bindless capacities to device limit";
+    clamped = true;
+    if (!clampReason.empty()) {
+      clampReason.append(", ");
+    }
+    clampReason.append(reason);
+  };
+
+  // Enforce per-stage limits based on the actual shader stage visibility used
+  // by Atlas' bindless bindings (fragment-only for most tables, compute-only
+  // for utexture2D).
+  clampByPriority({&effective.uTexture2D}, perStageSampledImageLimit, "compute-stage bindless sampled-image capacity");
+  clampByPriority({&effective.texture2D, &effective.texture2DArray, &effective.texture3D, &effective.uTexture3D},
+                  perStageSampledImageLimit,
+                  "fragment-stage bindless sampled-image capacity");
+
+  // Enforce overall descriptor set limits.
+  clampByPriority({&effective.texture2D,
+                   &effective.texture2DArray,
+                   &effective.texture3D,
+                   &effective.uTexture3D,
+                   &effective.uTexture2D},
+                  perSetSampledImageLimit,
+                  "descriptor-set bindless sampled-image capacity");
+
+  m_requestedBindlessSampledImageCapacities = requested;
+  m_effectiveBindlessSampledImageCapacities = effective;
+  m_bindlessSampledImageCapacitiesClamped = clamped;
+
+  const auto reqTotal = requested.totalSampledImages();
+  const auto reqFrag = requested.fragmentVisibleSampledImages();
+  const auto reqComp = requested.computeVisibleSampledImages();
+  const auto effTotal = effective.totalSampledImages();
+  const auto effFrag = effective.fragmentVisibleSampledImages();
+  const auto effComp = effective.computeVisibleSampledImages();
+
+  LOG(INFO) << fmt::format(
+    "VK bindless sampled-image capacity policy: update_after_bind={} requested={{2d={} 2darray={} 3d={} u2d={} u3d={} "
+    "total={} frag={} comp={}}} effective={{2d={} 2darray={} 3d={} u2d={} u3d={} total={} frag={} comp={}}} "
+    "limits={{perStageSamplers={} perSetSamplers={} perStageSampledImages={} perSetSampledImages={}}}",
+    usesUpdateAfterBind,
+    requested.texture2D,
+    requested.texture2DArray,
+    requested.texture3D,
+    requested.uTexture2D,
+    requested.uTexture3D,
+    reqTotal,
+    reqFrag,
+    reqComp,
+    effective.texture2D,
+    effective.texture2DArray,
+    effective.texture3D,
+    effective.uTexture2D,
+    effective.uTexture3D,
+    effTotal,
+    effFrag,
+    effComp,
+    perStageSamplerLimit,
+    perSetSamplerLimit,
+    perStageSampledImageLimit,
+    perSetSampledImageLimit);
+
+  if (clamped) {
+    LOG(WARNING) << fmt::format("VK bindless sampled-image capacities were clamped to device limits ({}). "
+                                "If you expected larger tables, adjust the requested gflags and/or use a different "
+                                "Vulkan device.",
+                                clampReason.empty() ? "unknown reason" : clampReason);
+  }
 }
 
 void ZVulkanContext::createCommandPool()

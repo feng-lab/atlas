@@ -27,8 +27,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorPool;
-class ZVulkanDescriptorSet;
 class ZVulkanBuffer;
 
 class ZVulkanSpherePipelineContext
@@ -48,7 +46,6 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
-  friend class Z3DRendererVulkanBackend; // allow backend to prime descriptor sets
   struct SphereVertex
   {
     glm::vec4 centerRadius{0.0f};
@@ -105,27 +102,16 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
+  // Matches layout(push_constant) DDPPeelPC in Resources/shader/vulkan/dual_peeling_peel_sphere.frag.
+  struct DDPPeelPushConstants
+  {
+    uint32_t ddpDepthBlender = 0;
+    uint32_t ddpFrontBlender = 0;
+  };
+
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
-
-  vk::DescriptorSetLayout m_setPlaceholder{};
-  vk::DescriptorSetLayout m_setLighting{};
-  vk::DescriptorSetLayout m_setTransforms{};
-  vk::DescriptorSetLayout m_setOIT{}; // set = 3 (DDP flag only)
-  struct FrameDescriptorSets
-  {
-    std::unique_ptr<ZVulkanDescriptorSet> placeholder;
-    std::unique_ptr<ZVulkanDescriptorSet> lighting;
-    std::unique_ptr<ZVulkanDescriptorSet> transforms;
-    std::unique_ptr<ZVulkanDescriptorSet> oit;
-  };
-  std::unordered_map<void*, FrameDescriptorSets> m_descriptorSetsByFrameKey;
-
-  std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
-  std::optional<vk::raii::Sampler> m_sampler;
-
-  // No OIT UBO retained; only DDP flag SSBO remains on set 3
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
@@ -185,11 +171,6 @@ private:
   bool m_ddpArgsPrepared{false};
   vk::DeviceSize m_ddpArgsOffset{0};
 
-  void ensureDescriptorLayouts();
-  void resetDescriptors();
-  void ensureDescriptorSets();
-  void ensureOITResources();
-  void ensurePlaceholderTexture();
   // Lighting UBO is shared per-frame; no per-batch update is needed.
   void updateTransformUBO(Z3DRendererBase& renderer,
                           const RenderBatch& batch,
@@ -232,6 +213,7 @@ private:
     uint32_t indexGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
+    bool usedStaticOnce = false;
   };
   std::map<CacheKey, CacheEntry> m_staticCache;
   // Guard: if we scheduled upload->static copies for a stream within the
@@ -250,11 +232,13 @@ private:
     bool dynamicMaterial = true;
     Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
     Z3DEye eye = MonoEye;
+    uint32_t oitRingIndex = 0;
 
     bool operator==(const SecondaryCacheKey& rhs) const
     {
       return frameKey == rhs.frameKey && streamKey == rhs.streamKey && picking == rhs.picking &&
-             dynamicMaterial == rhs.dynamicMaterial && shaderHookType == rhs.shaderHookType && eye == rhs.eye;
+             dynamicMaterial == rhs.dynamicMaterial && shaderHookType == rhs.shaderHookType && eye == rhs.eye &&
+             oitRingIndex == rhs.oitRingIndex;
     }
   };
 
@@ -269,6 +253,7 @@ private:
         std::hash<uint8_t>{}(static_cast<uint8_t>(key.dynamicMaterial)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^= std::hash<int>{}(static_cast<int>(key.shaderHookType)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^= std::hash<int>{}(static_cast<int>(key.eye)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint32_t>{}(key.oitRingIndex) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       return h;
     }
   };
@@ -286,11 +271,12 @@ private:
     std::array<uint64_t, 3> baseDescriptorGenerations{};
     bool hasOit = false;
     vk::DescriptorSet oitDescriptorSet{};
-    // OIT resources revision: changes only when underlying PPLL buffers are
-    // replaced (destroyed + recreated). This prevents validation errors from
-    // executing cached secondaries recorded against now-destroyed VkBuffer
-    // handles, without forcing rebuilds on benign per-frame descriptor updates.
-    uint64_t oitResourcesRevision = 0;
+    // OIT descriptor-set generation: changes whenever the shared OIT descriptor
+    // set is updated (vkUpdateDescriptorSets). Cached secondary command buffers
+    // recorded against the previous contents must be rebuilt, otherwise Vulkan
+    // validation will flag VUID-vkCmdExecuteCommands-pCommandBuffers-00089 and
+    // drivers may exhibit undefined behavior.
+    uint64_t oitDescriptorGeneration = 0;
     std::array<uint32_t, 4> dynamicOffsets{};
     std::array<vk::Buffer, 4> vertexBuffers{};
     std::array<vk::DeviceSize, 4> vertexOffsets{};
@@ -315,7 +301,7 @@ private:
                              (scissor.extent.height == rhs.scissor.extent.height);
       return pipeline == rhs.pipeline && layout == rhs.layout && baseDescriptorSets == rhs.baseDescriptorSets &&
              baseDescriptorGenerations == rhs.baseDescriptorGenerations && hasOit == rhs.hasOit &&
-             oitDescriptorSet == rhs.oitDescriptorSet && oitResourcesRevision == rhs.oitResourcesRevision &&
+             oitDescriptorSet == rhs.oitDescriptorSet && oitDescriptorGeneration == rhs.oitDescriptorGeneration &&
              dynamicOffsets == rhs.dynamicOffsets && vertexBuffers == rhs.vertexBuffers &&
              vertexOffsets == rhs.vertexOffsets && vertexBufferSegmentIds == rhs.vertexBufferSegmentIds &&
              indexBuffer == rhs.indexBuffer && indexOffset == rhs.indexOffset && indexType == rhs.indexType &&

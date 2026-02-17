@@ -744,6 +744,8 @@ set(SOURCES
     zvulkandescriptorpool.cpp
     zvulkandescriptorset.h
     zvulkandescriptorset.cpp
+    zvulkanbindlessdescriptorset.h
+    zvulkanbindlessdescriptorset.cpp
     zvulkan.cpp
     zvulkan_vma.cpp
     zvulkanshader.h

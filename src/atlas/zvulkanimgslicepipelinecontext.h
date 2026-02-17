@@ -17,7 +17,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
@@ -58,6 +57,31 @@ public:
               const vk::Viewport& viewport,
               const vk::Rect2D& scissor,
               vk::raii::CommandBuffer& cmd);
+
+  // ---------------------------------------------------------------------------
+  // Pre-record priming (must run before command-buffer recording begins).
+  // These are invoked by ZVulkanLinearScript via backend preRecord actions so
+  // bindless descriptor mutations never happen while recording.
+  // ---------------------------------------------------------------------------
+
+  struct BindlessWarmupDesc
+  {
+    Z3DImg* image = nullptr;
+    const std::vector<const ZColorMap*>* colormaps = nullptr;
+    std::vector<size_t> channels;
+    bool wantsVolume3D = true;
+    bool wantsColormap = true;
+    bool wantsPaging = false;
+  };
+
+  void preRecordBindlessWarmup(const BindlessWarmupDesc& desc);
+
+  // Prime descriptor sets and per-slice output buffers for block-ID compaction.
+  // This must run before command-buffer recording begins; record() assumes the
+  // required per-slice descriptor sets already exist.
+  void preRecordPrimeBlockIdCompaction(const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
+                                       uint32_t sliceCount,
+                                       uint32_t sliceIndex);
 
 private:
   struct SliceVertex
@@ -132,11 +156,6 @@ private:
     std::unique_ptr<ZVulkanTexture> colormapTexture;
     uint64_t colormapGeneration = 0;
     uint32_t colormapWidth = 0;
-    ZVulkanDescriptorSet* fastTextureDescriptor = nullptr; // per-draw override (owned by backend)
-    ZVulkanDescriptorSet* pagedTextureDescriptor = nullptr; // per-draw override (owned by backend)
-    ZVulkanDescriptorSet* pageDescriptor = nullptr; // per-draw override (owned by backend)
-    std::unique_ptr<ZVulkanBuffer> pageDataBuffer;
-    size_t pageDataCapacity = 0;
     uint32_t levelCount = 0;
   };
 
@@ -173,20 +192,22 @@ private:
     std::vector<std::unique_ptr<ZVulkanBuffer>> sliceOutputs;
   };
   std::unordered_map<void*, FrameBlockIdOutputs> m_blockIdOutputsByFrame;
+  // Pre-record prepared descriptor state for block-ID compaction. Descriptor
+  // sets are allocated from the per-frame descriptor arena and must not be
+  // mutated while recording.
+  std::vector<std::unique_ptr<ZVulkanDescriptorSet>> m_blockIdCompactDescriptors;
+  uint32_t m_blockIdCompactDescriptorSliceCount = 0;
+  size_t m_blockIdCompactDescriptorBytesPerSlice = 0;
 
-  std::optional<vk::raii::DescriptorSetLayout> m_fastSliceSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_pagedSliceSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_slicePageSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_emptySetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_mergeSetLayout;
-  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor; // frame-owned placeholder
-  ZVulkanDescriptorSet* m_mergeDescriptor = nullptr; // per-draw override (owned by backend)
+  // Bindless + dynamic-UBO descriptor state.
+  // - set 0: backend bindless sampled-image tables (shared, per frame-slot)
+  // - set 1: small per-draw UBO for bindless texture indices (fast slice path)
+  // - set 2: paging PageData UBO (paged slice + block-ID discovery)
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
   size_t m_vertexCount = 0;
   std::vector<SliceDrawRange> m_sliceDrawRanges;
-  std::unique_ptr<ZVulkanTexture> m_placeholder3D;
 
   std::unique_ptr<ZVulkanBuffer> m_quadVertexBuffer;
   size_t m_quadVertexCapacity = 0;
@@ -195,9 +216,6 @@ private:
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
   std::optional<Finalization> m_pendingFinalization;
 
-  void ensureDescriptorLayouts();
-  void ensureEmptyDescriptor();
-  void resetDescriptors();
   vk::PipelineVertexInputStateCreateInfo makeSliceVertexInputState() const;
   vk::PipelineVertexInputStateCreateInfo makeQuadVertexInputState() const;
   void ensureSliceVertexCapacity(size_t vertexCount);
@@ -207,24 +225,10 @@ private:
   ensureVolumeTexture(size_t channel, uint64_t generation, const ZImg& image, ChannelResources& resources);
   ZVulkanTexture& ensureColormapTexture(size_t channel, const ZColorMap* colorMap, ChannelResources& resources);
 
-  void updateFastDescriptors(ChannelResources& resources, ZVulkanTexture& volume, ZVulkanTexture& colormap);
-  bool updatePagedDescriptors(ChannelResources& resources,
-                              ZVulkanTexture& pageDirectory,
-                              ZVulkanTexture& pageTable,
-                              ZVulkanTexture& imageCache,
-                              ZVulkanTexture& volume,
-                              ZVulkanTexture& colormap,
-                              const Z3DImg& image,
-                              size_t channel,
-                              float zeToScreenPixelVoxelSize);
-
   PipelineInstance& ensureSlicePipeline(const SlicePipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
   void ensureBlockIdCompactionPipeline();
-
-  // depthArray is optional
-  void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
 
   // Cached slice-geometry identity to avoid re-uploading for each per-layer batch.
   uint64_t m_geometryStreamKey = 0;

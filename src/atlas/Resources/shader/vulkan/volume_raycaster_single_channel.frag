@@ -1,13 +1,12 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "include/bindless.glslinc"
 
 // Ray modes: 0=DVR, 1=MIP, 2=ISO, 3=XRAY
 layout(constant_id = 80) const int RAY_MODE = 0;
 layout(constant_id = 81) const bool LOCAL_MIP = false;
 layout(constant_id = 51) const bool RESULT_OPAQUE = false;
-
-layout(set = 0, binding = 0) uniform sampler2DArray ray_entry_exit_tex_coord;
-layout(set = 0, binding = 1) uniform sampler3D      volume_1;
-layout(set = 0, binding = 2) uniform sampler2D      transfer_function_1;
 
 // Push constants for ray params
 layout(push_constant) uniform RayParams {
@@ -16,6 +15,10 @@ layout(push_constant) uniform RayParams {
   float local_MIP_threshold;
   float ze_to_zw_a;
   float ze_to_zw_b;
+
+  uint ray_entry_exit_tex_coord;
+  uint volume_1;
+  uint transfer_function_1;
 } rp;
 
 layout(location = 0) out vec4 FragData0;
@@ -49,8 +52,14 @@ vec4 compositeXRay(vec4 curResult, vec4 color, float currentRayLength, inout flo
 
 void main()
 {
-  vec4 entryTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 0), 0);
-  vec4 exitTexCoordAndZ  = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 1), 0);
+  vec4 entryTexCoordAndZ =
+    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord),
+               ivec3(gl_FragCoord.xy, 0),
+               0);
+  vec4 exitTexCoordAndZ =
+    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord),
+               ivec3(gl_FragCoord.xy, 1),
+               0);
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition  = exitTexCoordAndZ.xyz;
   if (all(equal(startRayPosition, exitRayPosition))) { discard; }
@@ -58,7 +67,9 @@ void main()
   vec4 result = vec4(0.0);
   float ch1V = 0.0;
 
-  vec3 numVoxels = abs((exitRayPosition - startRayPosition) * vec3(textureSize(volume_1, 0)));
+  vec3 numVoxels =
+    abs((exitRayPosition - startRayPosition) *
+        vec3(textureSize(atlas_bindlessSampler3DLinear(rp.volume_1), 0)));
   float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
   float stepSize = 1.0 / (rp.sampling_rate * numVoxel);
 
@@ -68,7 +79,7 @@ void main()
   for (int loop0=0; !finished && loop0<255; ++loop0) {
     for (int loop1=0; !finished && loop1<255; ++loop1) {
       vec3 samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-      float voxel = texture(volume_1, samplePos).r;
+      float voxel = texture(atlas_bindlessSampler3DLinear(rp.volume_1), samplePos).r;
 
       if (RAY_MODE == 1) { // MIP
         if (LOCAL_MIP) {
@@ -79,7 +90,7 @@ void main()
           finished = ch1V >= 1.0;
         }
       } else {
-        vec4 color = texture(transfer_function_1, vec2(voxel, 0.5));
+        vec4 color = texture(atlas_bindlessSampler2DLinear(rp.transfer_function_1), vec2(voxel, 0.5));
         if (color.a > 0.0) {
           color.a /= rp.sampling_rate;
           if (RAY_MODE == 2) result = compositeISO(result, color, currentRayLength, rayDepth);
@@ -94,7 +105,7 @@ void main()
     }
   }
 
-  if (RAY_MODE == 1) result = texture(transfer_function_1, vec2(ch1V, 0.5));
+  if (RAY_MODE == 1) result = texture(atlas_bindlessSampler2DLinear(rp.transfer_function_1), vec2(ch1V, 0.5));
   if (RESULT_OPAQUE) result.a = 1.0;
 
   // Depth

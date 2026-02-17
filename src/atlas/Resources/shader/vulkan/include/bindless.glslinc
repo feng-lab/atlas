@@ -1,0 +1,52 @@
+// Bindless sampled-image tables (descriptor indexing) + a tiny immutable
+// sampler table.
+//
+// Atlas binds these tables at set = 0 for Vulkan graphics pipelines.
+//
+// Conventions:
+// - Index 0 in every table is reserved for a well-defined placeholder texture.
+//   Shaders may use 0 as "no texture" when an optional input is absent.
+// - All dynamic indexing must be marked non-uniform to satisfy Vulkan's
+//   descriptor indexing rules.
+//
+// Important:
+// - These bindings are VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE (not combined image samplers).
+// - Sampler state is provided via immutable samplers to keep sampler limits tiny
+//   (critical for MoltenVK/Metal portability) while allowing large bindless
+//   sampled-image arrays.
+
+#extension GL_EXT_nonuniform_qualifier : require
+
+// Bindless sampled images (set 0). Binding numbers must match
+// src/atlas/zvulkanbindings.h.
+layout(set = 0, binding = 0) uniform texture2D      atlas_bindlessTexture2D[];
+layout(set = 0, binding = 1) uniform texture2DArray atlas_bindlessTexture2DArray[];
+layout(set = 0, binding = 2) uniform texture3D      atlas_bindlessTexture3D[];
+layout(set = 0, binding = 3) uniform utexture2D     atlas_bindlessUTexture2D[];
+layout(set = 0, binding = 4) uniform utexture3D     atlas_bindlessUTexture3D[];
+
+// Immutable samplers (set 0).
+layout(set = 0, binding = 5) uniform sampler atlas_samplerLinearClamp;
+layout(set = 0, binding = 6) uniform sampler atlas_samplerNearestClamp;
+
+// Convenience constructors for sampling bindless tables. Use these instead of
+// spelling sampler2D(texture2D(...), sampler) at call sites.
+#define atlas_bindlessSampler2DLinear(idx) \
+  sampler2D(atlas_bindlessTexture2D[nonuniformEXT(idx)], atlas_samplerLinearClamp)
+#define atlas_bindlessSampler2DNearest(idx) \
+  sampler2D(atlas_bindlessTexture2D[nonuniformEXT(idx)], atlas_samplerNearestClamp)
+
+#define atlas_bindlessSampler2DArrayLinear(idx) \
+  sampler2DArray(atlas_bindlessTexture2DArray[nonuniformEXT(idx)], atlas_samplerLinearClamp)
+#define atlas_bindlessSampler2DArrayNearest(idx) \
+  sampler2DArray(atlas_bindlessTexture2DArray[nonuniformEXT(idx)], atlas_samplerNearestClamp)
+
+#define atlas_bindlessSampler3DLinear(idx) \
+  sampler3D(atlas_bindlessTexture3D[nonuniformEXT(idx)], atlas_samplerLinearClamp)
+#define atlas_bindlessSampler3DNearest(idx) \
+  sampler3D(atlas_bindlessTexture3D[nonuniformEXT(idx)], atlas_samplerNearestClamp)
+
+#define atlas_bindlessUSampler2DNearest(idx) \
+  usampler2D(atlas_bindlessUTexture2D[nonuniformEXT(idx)], atlas_samplerNearestClamp)
+#define atlas_bindlessUSampler3DNearest(idx) \
+  usampler3D(atlas_bindlessUTexture3D[nonuniformEXT(idx)], atlas_samplerNearestClamp)

@@ -1,4 +1,5 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 // Block ID capture ray pass
 
@@ -24,11 +25,14 @@ const uint UINTMAX = 0xFFFFFFFFu;
 void main()
 {
   // Parity with GL: initialize currentRayLength from last ray depth and discard if already complete
-  float currentRayLength = texelFetch(last_ray_depth_tex, ivec2(gl_FragCoord.xy), 0).x;
+  float currentRayLength =
+    texelFetch(atlas_bindlessSampler2DNearest(rp.last_ray_depth_tex), ivec2(gl_FragCoord.xy), 0).x;
   if (currentRayLength >= 1.0) { discard; }
 
-  vec4 entryTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 0), 0);
-  vec4 exitTexCoordAndZ  = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 1), 0);
+  vec4 entryTexCoordAndZ =
+    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord), ivec3(gl_FragCoord.xy, 0), 0);
+  vec4 exitTexCoordAndZ =
+    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord), ivec3(gl_FragCoord.xy, 1), 0);
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition  = exitTexCoordAndZ.xyz;
   if (all(equal(startRayPosition, exitRayPosition))) discard;
@@ -92,11 +96,15 @@ void main()
       uvec3 curPageDirAddress = pg.levels[curLevel].page_directory_base.xyz + pageTableCoord / pg.page_table_block_size.xyz;
       if (curPageDirAddress != pageDirAddress) {
         pageDirAddress = curPageDirAddress;
-        pageDirEntry = texelFetch(page_directory, ivec3(pageDirAddress), 0);
+        pageDirEntry =
+          texelFetch(atlas_bindlessUSampler3DNearest(rp.page_directory), ivec3(pageDirAddress), 0);
       }
       uint pagingFlag = pageDirEntry.w;
       if (pagingFlag != 0u && pagingFlag != 40000u) {
-        uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + (pageTableCoord % pg.page_table_block_size.xyz)), 0);
+        uvec4 pageTableEntry =
+          texelFetch(atlas_bindlessUSampler3DNearest(rp.page_table_cache),
+                     ivec3(pageDirEntry.xyz + (pageTableCoord % pg.page_table_block_size.xyz)),
+                     0);
         if (pageTableEntry.w != 40000u) {
           // record block id
           if (missBlockIDsIndex < 32) {

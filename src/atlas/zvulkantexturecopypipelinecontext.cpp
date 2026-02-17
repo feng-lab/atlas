@@ -8,8 +8,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorset.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbindings.h"
@@ -33,13 +31,6 @@ ZVulkanTextureCopyPipelineContext::~ZVulkanTextureCopyPipelineContext() = defaul
 void ZVulkanTextureCopyPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
-  resetDescriptors();
-}
-
-void ZVulkanTextureCopyPipelineContext::resetDescriptors()
-{
-  m_descriptorSetOIT.reset();
-  m_dsLighting.reset();
 }
 
 void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
@@ -78,33 +69,23 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   // Fullscreen quad with UVs
   m_vertexCount = 4;
 
-  ensureDescriptorLayout();
-  ensureDescriptorSet();
-  // Always use a per-draw override descriptor set to avoid update-after-bind hazards
   const bool ddpPeel = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  ZVulkanDescriptorSet* ds = nullptr;
-  // Use linear filtering to downsample supersampled inputs (color and depth)
-  const auto sampler = m_backend.defaultSampler();
-  // Allocate a fresh per-draw override descriptor set and write all required bindings
-  CHECK(m_setTextures) << "Texture copy: descriptor set layout not initialized";
-  ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
-  CHECK(ds != nullptr) << "Texture copy: override descriptor allocation failed (fatal)";
-  VLOG(2) << "writing per-draw override descriptors";
-  ds->updateTexture(0, colorTexture, sampler);
-  ds->updateTexture(1, depthTexture, sampler);
+  CopyImagePushConstants copyPC{};
+  copyPC.colorTex = m_backend.bindlessLookupSampledImageAutoOrCrash(colorTexture, "texture_copy color");
+  copyPC.depthTex = m_backend.bindlessLookupSampledImageAutoOrCrash(depthTexture, "texture_copy depth");
   if (ddpPeel) {
     const auto& hookPara = batch.shaderHook.para;
     if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
       auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
                                             m_backend.device(),
                                             "DDP depth blender for image peel");
-      ds->updateTexture(3, tex, sampler);
+      copyPC.ddpDepthBlender = m_backend.bindlessLookupSampledImageAutoOrCrash(tex, "ddp_depth_blender");
     }
     if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
       auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
                                             m_backend.device(),
                                             "DDP front blender for image peel");
-      ds->updateTexture(4, tex, sampler);
+      copyPC.ddpFrontBlender = m_backend.bindlessLookupSampledImageAutoOrCrash(tex, "ddp_front_blender");
     }
   }
 
@@ -138,13 +119,9 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
 
   const bool usesOITSet = key.ddpPeel || key.ppllCount || key.ppllStore;
   const bool usesLightingSet = key.wbInit;
-  // Bind set=3 for OIT passes (DDP peel / PPLL count/store). Descriptors must be primed
-  // before recording; do not write descriptors during dynamic rendering.
-  if (usesOITSet && !m_backend.isRecording()) {
-    ensureOITResources();
-  }
-  // WB init image shader uses the lighting UBO (set=1,b0) for depth-transform constants.
-  CHECK(!usesLightingSet || m_dsLighting) << "WB init: lighting descriptor set not initialised";
+  // Descriptor sets are primed by the backend in beginRender(); avoid record-time rewrites.
+  const vk::DescriptorSet dsLighting = usesLightingSet ? m_backend.sharedLightingDescriptorSet() : vk::DescriptorSet{};
+  CHECK(!usesLightingSet || dsLighting) << "WB init: shared lighting descriptor set missing";
 
   // Draw-only spec under backend-managed segment
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
@@ -152,20 +129,20 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSetFirst = vkbind::kSetInputs;
+  drawSpec.descriptorSetFirst = 0;
 
   std::array<vk::DescriptorSet, 2> descriptorSets{};
   uint32_t descriptorSetCount = 0;
   std::array<uint32_t, 1> dynamicOffsets{};
   uint32_t dynamicOffsetCount = 0;
   if (usesLightingSet) {
-    descriptorSets[0] = ds->descriptorSet();
-    descriptorSets[1] = m_dsLighting->descriptorSet();
+    descriptorSets[0] = m_backend.bindlessSampledImageDescriptorSet();
+    descriptorSets[1] = dsLighting;
     descriptorSetCount = 2;
     dynamicOffsets[0] = static_cast<uint32_t>(m_backend.frameSharedLightingOffset());
     dynamicOffsetCount = 1;
   } else {
-    descriptorSets[0] = ds->descriptorSet();
+    descriptorSets[0] = m_backend.bindlessSampledImageDescriptorSet();
     descriptorSetCount = 1;
   }
   drawSpec.descriptorSets = std::span<const vk::DescriptorSet>(descriptorSets.data(), descriptorSetCount);
@@ -176,14 +153,18 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.vertexOffsets = vertexOffsets;
   drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
   drawSpec.instanceCount = 1;
+  drawSpec.pushConstantsData = &copyPC;
+  drawSpec.pushConstantsSize = sizeof(copyPC);
+  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+  drawSpec.requirePushConstants = true;
   drawSpec.expectedDescriptorSetCount = usesOITSet ? 4u : (usesLightingSet ? 2u : 1u);
   std::array<vk::DescriptorSet, 1> oitDescriptorSets{};
   std::array<ZVulkanDescriptorBindInfo, 1> extraBinds{};
   uint32_t extraBindCount = 0;
-  if (usesOITSet && m_descriptorSetOIT) {
+  if (usesOITSet) {
     ZVulkanDescriptorBindInfo oitBind{};
-    oitBind.firstSet = vkbind::kSetOITParams;
-    oitDescriptorSets[0] = m_descriptorSetOIT->descriptorSet();
+    oitBind.firstSet = vkbind::kSetOIT;
+    oitDescriptorSets[0] = m_backend.sharedOITDescriptorSet();
     oitBind.sets = oitDescriptorSets;
     extraBinds[0] = oitBind;
     extraBindCount = 1;
@@ -193,71 +174,6 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   ZVulkanPipelineCommandRecorder recorder(cmd);
   recorder.recordGraphicsDraw(drawSpec);
   VLOG(2) << fmt::format("draw {} verts", m_vertexCount);
-}
-
-void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()
-{
-  if (m_setTextures) {
-    return;
-  }
-
-  auto& device = m_backend.device();
-  auto& vkDevice = device.context().device();
-
-  // Immutable linear clamp sampler to match GL resolve filtering for color and depth
-  vk::Sampler imm = m_backend.defaultSampler();
-  std::array<vk::Sampler, 4> imms{imm, imm, imm, imm};
-  std::array<vk::DescriptorSetLayoutBinding, 4> bindings{};
-  const uint32_t map[4] = {0, 1, 3, 4};
-  for (uint32_t i = 0; i < 4; ++i) {
-    bindings[i].binding = map[i];
-    bindings[i].descriptorType = vk::DescriptorType::eCombinedImageSampler;
-    bindings[i].descriptorCount = 1;
-    bindings[i].stageFlags = vk::ShaderStageFlagBits::eFragment;
-    bindings[i].pImmutableSamplers = &imms[i];
-  }
-
-  vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                               .pBindings = bindings.data()};
-  m_setTextures.emplace(vkDevice, createInfo);
-  // Set 3 is reserved for OIT SSBO bindings (DDP flag / PPLL buffers).
-  if (!m_setOIT) {
-    m_setOIT = m_backend.oitDescriptorSetLayout();
-  }
-}
-
-void ZVulkanTextureCopyPipelineContext::ensureDescriptorSet()
-{
-  ensureDescriptorLayout();
-  // Textures set is persistent or override per-frame; avoid per-frame alloc here
-  if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
-  }
-}
-
-void ZVulkanTextureCopyPipelineContext::ensureLightingResources()
-{
-  CHECK(!m_backend.isRecording()) << "Texture copy lighting descriptors must be primed before recording begins";
-  if (!m_setLighting) {
-    m_setLighting = m_backend.lightingDescriptorSetLayout();
-  }
-  CHECK(m_setLighting) << "Texture copy: missing lighting descriptor set layout";
-  if (!m_dsLighting) {
-    m_dsLighting = m_backend.allocateFrameDescriptorSet(m_setLighting);
-  }
-  CHECK(m_dsLighting) << "Texture copy: lighting descriptor set allocation failed (fatal)";
-  m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
-}
-
-void ZVulkanTextureCopyPipelineContext::ensureOITResources()
-{
-  ensureDescriptorLayout();
-  if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
-  }
-  if (m_descriptorSetOIT && !m_backend.isRecording()) {
-    m_backend.primeOITDescriptorSet(*m_descriptorSetOIT);
-  }
 }
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureCopyPipelineContext::makeVertexInputState() const
@@ -319,8 +235,6 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
     return it->second;
   }
 
-  ensureDescriptorLayout();
-
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
@@ -347,23 +261,22 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
   const bool usesOITSet = key.ddpPeel || key.ppllCount || key.ppllStore;
   const bool usesLightingSet = key.wbInit;
+  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
   if (usesOITSet) {
     std::vector<vk::DescriptorSetLayout> layouts;
     layouts.reserve(4);
-    layouts.push_back(**m_setTextures);                                  // set 0
+    layouts.push_back(bindlessLayout); // set 0 (bindless sampled images)
     layouts.push_back(m_backend.emptyDescriptorSetLayout());            // set 1 placeholder
     layouts.push_back(m_backend.emptyDescriptorSetLayout());            // set 2 placeholder
     layouts.push_back(m_backend.oitDescriptorSetLayout()); // set 3 (OIT SSBOs)
     instance.pipeline->setDescriptorSetLayouts(layouts);
   } else if (usesLightingSet) {
-    if (!m_setLighting) {
-      m_setLighting = m_backend.lightingDescriptorSetLayout();
-    }
-    CHECK(m_setLighting) << "WB init requires lighting descriptor set layout";
-    // Sets: 0 = inputs (samplers), 1 = lighting UBO (depth transform)
-    instance.pipeline->setDescriptorSetLayouts({**m_setTextures, m_setLighting});
+    const vk::DescriptorSetLayout lightingLayout = m_backend.lightingDescriptorSetLayout();
+    CHECK(lightingLayout) << "WB init requires lighting descriptor set layout";
+    // Sets: 0 = bindless sampled images, 1 = lighting UBO (depth transform)
+    instance.pipeline->setDescriptorSetLayouts({bindlessLayout, lightingLayout});
   } else {
-    instance.pipeline->setDescriptorSetLayouts({**m_setTextures});
+    instance.pipeline->setDescriptorSetLayouts({bindlessLayout});
   }
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
@@ -473,7 +386,10 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
     std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
                          reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
 
-  // No push constants used in copy pipeline; UVs drive sampling
+  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
+                              .offset = 0,
+                              .size = static_cast<uint32_t>(sizeof(CopyImagePushConstants))};
+  instance.pipeline->setPushConstantRanges({range});
   instance.pipeline->create();
 
   auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});

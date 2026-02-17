@@ -3,20 +3,17 @@
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
 #include "zsysteminfo.h"
+#include "zvulkanbuffer.h"
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
+#include "zvulkanrenderconversions.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorset.h"
-#include "zvulkancontext.h"
-#include "zvulkanrenderconversions.h"
-#include "zvulkanpipelinecontext_raii.h"
-#include "zvulkanbindings.h"
-#include "zvulkanbuffer.h"
 #include "zvulkanuniforms.h"
 #include "zlog.h"
 
 #include <array>
+#include <cstdint>
 #include <vector>
 
 namespace nim {
@@ -31,13 +28,7 @@ ZVulkanTextureWeightedBlendedPipelineContext::~ZVulkanTextureWeightedBlendedPipe
 void ZVulkanTextureWeightedBlendedPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
-  resetDescriptors();
-}
-
-void ZVulkanTextureWeightedBlendedPipelineContext::resetDescriptors()
-{
-  m_descriptorSet.reset();
-  m_dsLighting.reset();
+  m_dynLightingOffset = 0;
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& renderer,
@@ -51,6 +42,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   VLOG(2) << fmt::format("WB::record begin accum=0x{:x} trans=0x{:x}",
                          payload.accumulationAttachment.id,
                          payload.transmittanceAttachment.id);
+
   CHECK(payload.accumulationAttachment.backend == RenderBackend::Vulkan)
     << "GL accumulationAttachment in Vulkan path";
   CHECK(payload.transmittanceAttachment.backend == RenderBackend::Vulkan)
@@ -59,16 +51,8 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     return;
   }
 
-  // Shared fullscreen quad
-  m_vertexCount = 4;
-
-  ensureDescriptorLayout();
-  ensureDescriptorSet();
-  if (!m_descriptorSet) {
-    return;
-  }
-
-  
+  const vk::DescriptorSet dsLighting = m_backend.sharedLightingDescriptorSet();
+  CHECK(dsLighting) << "WB resolve: shared lighting descriptor set missing";
 
   auto& accumulationTexture = vulkan::textureFromHandle(payload.accumulationAttachment,
                                                         m_backend.device(),
@@ -77,20 +61,12 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
                                                          m_backend.device(),
                                                          "texture-weighted-blended transmittance attachment");
 
-  // Allocate a fresh per-draw override descriptor set to avoid update-after-bind hazards
-  ZVulkanDescriptorSet* ds = nullptr;
-  if (m_setLayout) {
-    ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
-  }
-  CHECK(ds != nullptr) << "WB resolve: override descriptor allocation failed (fatal)";
-  // Like the weighted-average resolve, override descriptor sets arrive with undefined
-  // bindings, so prime both textures before the draw.
-  ds->updateTexture(vkbind::kBindingWBAccum, accumulationTexture, m_backend.defaultSampler());
-  ds->updateTexture(vkbind::kBindingWBTransmittance, transmittanceTexture, m_backend.defaultSampler());
+  const uint32_t accumIdx =
+    m_backend.bindlessLookupSampledImageAutoOrCrash(accumulationTexture, "texture_weighted_blended accum");
+  const uint32_t transIdx =
+    m_backend.bindlessLookupSampledImageAutoOrCrash(transmittanceTexture, "texture_weighted_blended transmittance");
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
-
-  // Composite resolve invariant: single color attachment; depth optional
   CHECK_EQ(formats.colorFormats.size(), size_t{1}) << "WB resolve requires exactly one color attachment.";
   m_backend.validateFormatsOrCrash(formats, "WB_resolve");
 
@@ -98,103 +74,32 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   key.colorFormats = formats.colorFormats;
   key.depthFormat = formats.depthFormat;
 
-  PipelineInstance& instance = ensurePipeline(key, formats);
-  VLOG(2) << fmt::format("WB: ensured pipeline colors={} depth={}",
-                         formats.colorFormats.size(),
-                         formats.depthFormat.has_value());
+  PipelineInstance& pipeline = ensurePipeline(key, formats);
 
-  // Draw-only: backend manages attachments and area
+  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
 
-  // No OIT UBO required for WB resolve
-  // Pipeline uses lighting UBO (set=1) for depth scale/zw transform
-  m_dynLightingOffset = m_backend.frameSharedLightingOffset();
-  CHECK(m_dsLighting) << "WB resolve: lighting descriptor set not initialised";
-
-  ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
-  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
-  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
-  drawSpec.pipelineHandle = instance.pipeline->pipelineHandle();
-  drawSpec.pipelineLayoutHandle = instance.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSetFirst = vkbind::kSetInputs;
-  const std::array<vk::DescriptorSet, 2> descriptorSets{ds->descriptorSet(), m_dsLighting->descriptorSet()};
-  const std::array<uint32_t, 1> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset)};
-  drawSpec.descriptorSets = descriptorSets;
-  drawSpec.dynamicOffsets = dynamicOffsets; // (set1,b0)
-  drawSpec.expectedDescriptorSetCount = 2;
+  // Shared fullscreen quad
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  const std::array<vk::Buffer, 1> vertexBuffers{quad.buffer()};
-  const std::array<vk::DeviceSize, 1> vertexOffsets{vk::DeviceSize(0)};
-  drawSpec.vertexBuffers = vertexBuffers;
-  drawSpec.vertexOffsets = vertexOffsets;
-  drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
-  drawSpec.instanceCount = 1;
-  drawSpec.pushConstantsData = nullptr;
-  drawSpec.pushConstantsSize = 0;
-  drawSpec.pushConstantsStages = {};
-  drawSpec.requirePushConstants = false;
+  cmd.bindVertexBuffers(0, {quad.buffer()}, {vk::DeviceSize(0)});
 
-  VLOG(2) << fmt::format("WB(draw-only): draw {} verts", m_vertexCount);
-  ZVulkanPipelineCommandRecorder recorder(cmd);
-  recorder.recordGraphicsDraw(drawSpec);
-}
-
-void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorLayout()
-{
-  if (!m_setLayout) {
-    auto& device = m_backend.device();
-    auto& vkDevice = device.context().device();
-
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
-    };
-    // Immutable samplers for resolve inputs
-    vk::Sampler immutable = m_backend.defaultSampler();
-    bindings[0].pImmutableSamplers = &immutable;
-    bindings[1].pImmutableSamplers = &immutable;
-
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                                 .pBindings = bindings.data()};
-    m_setLayout.emplace(vkDevice, createInfo);
+  m_dynLightingOffset = m_backend.frameSharedLightingOffset();
+  {
+    std::array<vk::DescriptorSet, 2> sets{m_backend.bindlessSampledImageDescriptorSet(), dsLighting};
+    std::array<uint32_t, 1> dynOffsets{static_cast<uint32_t>(m_dynLightingOffset)};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, dynOffsets);
   }
 
-  // Ensure placeholder to align set indices (for set 1 and 2)
-  if (!m_setPlaceholder) {
-    m_setPlaceholder = m_backend.emptyDescriptorSetLayout();
-  }
+  cmd.setViewport(0, viewport);
+  cmd.setScissor(0, scissor);
 
-  if (!m_setLighting) {
-    m_setLighting = m_backend.lightingDescriptorSetLayout();
-  }
-  
-}
+  WBlendedFinalPushConstants constants;
+  constants.accumTex = accumIdx;
+  constants.transmittanceTex = transIdx;
+  const auto* bytes = reinterpret_cast<const std::uint8_t*>(&constants);
+  vk::ArrayProxy<const std::uint8_t> payloadBytes(sizeof(constants), bytes);
+  cmd.pushConstants(pipeline.pipeline->pipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, payloadBytes);
 
-void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorSet()
-{
-  ensureDescriptorLayout();
-
-  if (!m_descriptorSet) {
-    m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setLayout);
-  }
-}
-
-void ZVulkanTextureWeightedBlendedPipelineContext::ensureOITResources()
-{
-  // Pre-prime persistent lighting descriptor set (set=1) before recording begins.
-  ensureDescriptorLayout();
-  if (!m_dsLighting && m_setLighting) {
-    m_dsLighting = m_backend.allocateFrameDescriptorSet(m_setLighting);
-  }
-  if (m_dsLighting && !m_backend.isRecording()) {
-    // Safe to write descriptors only when not recording
-    m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
-  }
+  cmd.draw(4, 1, 0, 0);
 }
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureWeightedBlendedPipelineContext::makeVertexInputState() const
@@ -217,24 +122,6 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureWeightedBlendedPipelineCont
   return info;
 }
 
-void ZVulkanTextureWeightedBlendedPipelineContext::ensureVertexCapacity(size_t vertexCount)
-{
-  const size_t requiredBytes = vertexCount * sizeof(glm::vec3);
-  if (requiredBytes <= m_vertexCapacity) {
-    return;
-  }
-
-  size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
-  auto& device = m_backend.device();
-  m_vertexBuffer =
-    device.createBuffer(newCapacity,
-                        vk::BufferUsageFlagBits::eVertexBuffer,
-                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  m_vertexCapacity = newCapacity;
-}
-
-void ZVulkanTextureWeightedBlendedPipelineContext::uploadGeometry() {}
-
 ZVulkanTextureWeightedBlendedPipelineContext::PipelineInstance&
 ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& key,
                                                              const vulkan::AttachmentFormats& formats)
@@ -243,8 +130,6 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
   if (it != m_pipelineCache.end()) {
     return it->second;
   }
-
-  ensureDescriptorLayout();
 
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
@@ -257,17 +142,22 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  // Sets: 0 = inputs (samplers), 1 = lighting UBO
-  instance.pipeline->setDescriptorSetLayouts({**m_setLayout, m_setLighting});
+
+  const vk::DescriptorSetLayout lightingLayout = m_backend.lightingDescriptorSetLayout();
+  CHECK(lightingLayout) << "WB resolve requires lighting descriptor set layout";
+
+  // Sets: 0 = bindless sampled images, 1 = lighting UBO
+  instance.pipeline->setDescriptorSetLayouts({m_backend.bindlessSampledImageDescriptorSetLayout(), lightingLayout});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+
   const bool hasDepth = formats.depthFormat.has_value();
   instance.pipeline->setDepthTestEnable(hasDepth);
   if (hasDepth) {
-    // Keep Vulkan resolve depth semantics aligned with the OpenGL path: only
-    // commit the resolved depth when it is not farther than the stored value.
-    // This preserves the compositor's follow-up depth-tested blend step.
+    // Keep resolve depth semantics aligned with the OpenGL path: only commit the
+    // resolved depth when it is not farther than the stored value. This preserves
+    // the compositor's follow-up depth-tested blend step.
     instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
     instance.pipeline->setDepthWriteEnable(true);
   } else {
@@ -287,8 +177,10 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   instance.pipeline->setColorBlendAttachment(blendAttachment);
 
-  // No push constants
-  instance.pipeline->setPushConstantRanges({});
+  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
+                              .offset = 0,
+                              .size = static_cast<uint32_t>(sizeof(WBlendedFinalPushConstants))};
+  instance.pipeline->setPushConstantRanges({range});
   instance.pipeline->create();
 
   auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});

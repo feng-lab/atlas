@@ -15,8 +15,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorPool;
-class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 
@@ -40,7 +38,6 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
-  friend class Z3DRendererVulkanBackend; // allow backend to pre-prime OIT resources
   struct PipelineKey
   {
     std::vector<vk::Format> colorFormats;
@@ -63,27 +60,19 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
-  // No push constants required for resolve shaders
+  // Matches layout(push_constant) WAvgFinalPC in Resources/shader/vulkan/wavg_final.frag.
+  struct WAvgFinalPushConstants
+  {
+    uint32_t accumTex = 0;
+    uint32_t momentsTex = 0;
+  };
 
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
-
-  std::optional<vk::raii::DescriptorSetLayout> m_setLayout;
-  vk::DescriptorSetLayout m_setPlaceholder{}; // for set 1/2 alignment
-  // No OIT set required for WA resolve
-  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
-  
-  std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
-  size_t m_vertexCapacity = 0;
   size_t m_vertexCount = 0;
 
-  void ensureDescriptorLayout();
-  void ensureDescriptorSet();
-  void resetDescriptors();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
-  void ensureVertexCapacity(size_t vertexCount);
-  void uploadGeometry();
 
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
 };

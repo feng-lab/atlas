@@ -1,5 +1,10 @@
-// Centralized Vulkan descriptor set and binding constants for OIT/composite paths.
-// Keep these aligned across all ZVulkan* pipeline contexts.
+// Centralized Vulkan descriptor set and binding constants.
+//
+// Conventions:
+// - set 0 is reserved for Atlas bindless sampled-image tables (descriptor indexing),
+//   shared across Vulkan shaders via Resources/shader/vulkan/include/bindless.glslinc.
+// - Graphics pipeline contexts follow a fixed set map (bindless + UBOs + optional OIT).
+// - Compute helper pipelines may use their own set layouts beyond set 0.
 
 #pragma once
 
@@ -7,11 +12,31 @@
 
 namespace nim::vkbind {
 
-// Set indices
-inline constexpr uint32_t kSetInputs = 0;       // Primary sampled inputs for a pass
-inline constexpr uint32_t kSetOITParams = 3;    // OIT (DDP flag) set
+// Common graphics set indices.
+inline constexpr uint32_t kSetBindlessSampledImages = 0;
+inline constexpr uint32_t kSetLighting = 1;
+inline constexpr uint32_t kSetTransforms = 2;
+inline constexpr uint32_t kSetOIT = 3;
 
+// ---------------------------------------------------------------------------
+// Bindless sampled images (set 0)
+// ---------------------------------------------------------------------------
+// Atlas uses descriptor indexing to provide bindless tables for sampled images.
+// These bindings are shared across graphics pipeline contexts.
+inline constexpr uint32_t kBindingBindlessTexture2D = 0;
+inline constexpr uint32_t kBindingBindlessTexture2DArray = 1;
+inline constexpr uint32_t kBindingBindlessTexture3D = 2;
+inline constexpr uint32_t kBindingBindlessUTexture2D = 3;
+inline constexpr uint32_t kBindingBindlessUTexture3D = 4;
+// Fixed immutable samplers used to construct sampler2D/3D objects from bindless
+// sampled images in shaders. These keep sampler limits tiny (MoltenVK/Metal
+// portability) while allowing large bindless sampled-image tables.
+inline constexpr uint32_t kBindingBindlessSamplerLinearClamp = 5;
+inline constexpr uint32_t kBindingBindlessSamplerNearestClamp = 6;
+
+// ---------------------------------------------------------------------------
 // OIT (set 3) bindings
+// ---------------------------------------------------------------------------
 // Binding 1 is preserved for the DDP "changed" flag to avoid churn in existing shaders.
 inline constexpr uint32_t kBindingOITParams = 0; // OIT params SSBO (viewport/pixelCount)
 inline constexpr uint32_t kBindingOITDDPFlag = 1;
@@ -19,37 +44,5 @@ inline constexpr uint32_t kBindingOITPPLLCounts = 2; // uint counts[pixel]
 inline constexpr uint32_t kBindingOITPPLLOffsets = 3; // uint offsets[pixel]
 inline constexpr uint32_t kBindingOITPPLLCursors = 4; // uint cursors[pixel]
 inline constexpr uint32_t kBindingOITPPLLFragments = 5; // Fragment fragments[total]
-
-// Dual Depth Peeling (geometry peel) sampled inputs (set 0)
-inline constexpr uint32_t kBindingDDPDepthBlender = 0;     // depth blender
-inline constexpr uint32_t kBindingDDPFrontBlender = 1;     // front blender
-
-// Dual Depth Peeling (mesh peel) bindings avoid collisions with mesh_func.glslinc
-// texture bindings at set 0 (0,1,2). Use 3,4 for mesh-only DDP samplers.
-inline constexpr uint32_t kBindingDDPMeshDepthBlender = 3; // mesh-only depth blender
-inline constexpr uint32_t kBindingDDPMeshFrontBlender = 4; // mesh-only front blender
-
-// Dual Depth Peeling final composition inputs (set 0)
-inline constexpr uint32_t kBindingDDPFinalDepth = 0;
-inline constexpr uint32_t kBindingDDPFinalFront = 1;
-inline constexpr uint32_t kBindingDDPFinalBack  = 2;
-
-// Weighted Average resolve inputs (set 0)
-inline constexpr uint32_t kBindingWAAccum   = 0;
-inline constexpr uint32_t kBindingWAMoments = 1;
-
-// Weighted Blended resolve inputs (set 0)
-inline constexpr uint32_t kBindingWBAccum         = 0;
-inline constexpr uint32_t kBindingWBTransmittance = 1;
-
-// Glow pipelines
-inline constexpr uint32_t kGlowBindingColorIn  = 0;
-inline constexpr uint32_t kGlowBindingDepthIn  = 1;
-inline constexpr uint32_t kGlowBindingBlurIn0  = 2;
-inline constexpr uint32_t kGlowBindingBlurIn1  = 3;
-
-// Simple blur pipeline inputs
-inline constexpr uint32_t kBlurBindingColorIn = 0;
-inline constexpr uint32_t kBlurBindingDepthIn = 1;
 
 } // namespace nim::vkbind

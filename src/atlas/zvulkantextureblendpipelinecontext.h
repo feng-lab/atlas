@@ -15,8 +15,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorPool;
-class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 
@@ -72,22 +70,19 @@ private:
   struct TextureBlendPushConstants
   {
     glm::vec2 screenDimRcp{1.0f};
-    glm::vec2 _pad{0.0f};
+    uint32_t colorTexture0 = 0;
+    uint32_t depthTexture0 = 0;
+    uint32_t colorTexture1 = 0;
+    uint32_t depthTexture1 = 0;
   };
 
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
-  std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
-  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
-
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCount = 0;
 
-  void ensureDescriptorLayout();
-  void resetDescriptors();
-  void ensureDescriptorSet();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
   void ensureVertexCapacity(size_t vertexCount);

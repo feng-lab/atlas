@@ -5,6 +5,7 @@
 #include "z3drenderervulkanbackend.h"
 #include "zvulkan.h"
 
+#include <array>
 #include <memory>
 #include <map>
 #include <optional>
@@ -23,8 +24,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorPool;
-class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 class Z3DLineRenderer;
@@ -52,7 +51,26 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
-  friend class Z3DRendererVulkanBackend; // allow backend to prime descriptor sets
+  // Matches layout(push_constant) DDPPeelPC in Resources/shader/vulkan/dual_peeling_peel_line.frag.
+  struct DDPPeelPushConstants
+  {
+    uint32_t ddpDepthBlender = 0;
+    uint32_t ddpFrontBlender = 0;
+  };
+
+  // Matches layout(push_constant) WideLinePC in Resources/shader/vulkan/include/wideline_common.glslinc.
+  struct WideLinePushConstants
+  {
+    glm::mat4 viewport_matrix{1.0f};
+    glm::mat4 viewport_matrix_inverse{1.0f};
+    float line_width = 1.0f;
+    float size_scale = 1.0f;
+    uint32_t line_texture = 0;
+    uint32_t ddpDepthBlender = 0;
+    uint32_t ddpFrontBlender = 0;
+    uint32_t _pad = 0;
+  };
+
   struct PipelineKey
   {
     bool useSmooth = true;
@@ -94,21 +112,6 @@ private:
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
-  std::optional<vk::raii::DescriptorSetLayout> m_setTexture;
-  vk::DescriptorSetLayout m_setLighting{};
-  vk::DescriptorSetLayout m_setTransforms{};
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsTexture;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsOIT;
-
-  std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
-  std::optional<vk::raii::Sampler> m_sampler;
-
-  // No OIT UBO; set 3 only carries DDP flag SSBO
-
-  vk::DescriptorSetLayout m_setOIT{};
-
   // All line geometry uses the per-frame upload arena; no per-context VBOs
 
   // Upload arena-backed SoA for thin line (per-draw, per-attribute buffers)
@@ -120,6 +123,7 @@ private:
   vk::Buffer m_thinUploadIndexBuffer{};
   vk::DeviceSize m_thinUploadIndexOffset{0};
   uint32_t m_thinUploadIndexCount{0};
+  bool m_usedThinStaticVBThisFrame{false};
 
   // Upload arena-backed SoA for wide line (per-draw, per-attribute buffers)
   vk::Buffer m_wideP0Buffer{};
@@ -165,6 +169,7 @@ private:
     uint32_t indexGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
+    bool usedStaticOnce = false;
   };
   std::map<ThinCacheKey, ThinCacheEntry> m_thinStaticCache;
   std::set<ThinCacheKey> m_thinStaticCopyPendingKeys;
@@ -202,9 +207,97 @@ private:
     uint32_t indexGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
+    bool usedStaticOnce = false;
   };
   std::map<WideCacheKey, WideCacheEntry> m_wideStaticCache;
   std::set<WideCacheKey> m_wideStaticCopyPendingKeys;
+
+  // Cached per-draw secondary command buffers (steady-state optimization).
+  struct ThinSecondaryCacheKey
+  {
+    void* frameKey = nullptr;
+    uint64_t streamKey = 0;
+    bool picking = false;
+    bool lineStrip = false;
+    Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
+    Z3DEye eye = MonoEye;
+    bool hasOit = false;
+    uint32_t oitRingIndex = 0;
+
+    bool operator==(const ThinSecondaryCacheKey& rhs) const
+    {
+      return frameKey == rhs.frameKey && streamKey == rhs.streamKey && picking == rhs.picking &&
+             lineStrip == rhs.lineStrip && shaderHookType == rhs.shaderHookType && eye == rhs.eye &&
+             hasOit == rhs.hasOit && oitRingIndex == rhs.oitRingIndex;
+    }
+  };
+
+  struct ThinSecondaryCacheKeyHash
+  {
+    size_t operator()(const ThinSecondaryCacheKey& key) const noexcept
+    {
+      size_t h = std::hash<uintptr_t>{}(reinterpret_cast<uintptr_t>(key.frameKey));
+      h ^= std::hash<uint64_t>{}(key.streamKey) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.picking)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.lineStrip)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<int>{}(static_cast<int>(key.shaderHookType)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<int>{}(static_cast<int>(key.eye)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.hasOit)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint32_t>{}(key.oitRingIndex) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      return h;
+    }
+  };
+
+  struct ThinSecondarySignature
+  {
+    vk::Pipeline pipeline{};
+    vk::PipelineLayout layout{};
+    std::array<vk::DescriptorSet, 3> baseDescriptorSets{};
+    std::array<uint64_t, 3> baseDescriptorGenerations{};
+    bool hasOit = false;
+    vk::DescriptorSet oitDescriptorSet{};
+    uint64_t oitDescriptorGeneration = 0;
+    std::array<uint32_t, 4> dynamicOffsets{};
+    std::array<vk::Buffer, 2> vertexBuffers{};
+    std::array<vk::DeviceSize, 2> vertexOffsets{};
+    std::array<uint64_t, 2> vertexBufferSegmentIds{};
+    vk::Buffer indexBuffer{};
+    vk::DeviceSize indexOffset{0};
+    uint64_t indexBufferSegmentId = 0;
+    vk::IndexType indexType{vk::IndexType::eUint32};
+    uint32_t indexCount = 0;
+    uint32_t vertexCount = 0;
+    vk::Viewport viewport{};
+    vk::Rect2D scissor{};
+
+    bool operator==(const ThinSecondarySignature& rhs) const
+    {
+      const bool viewportEq = (viewport.x == rhs.viewport.x) && (viewport.y == rhs.viewport.y) &&
+                              (viewport.width == rhs.viewport.width) && (viewport.height == rhs.viewport.height) &&
+                              (viewport.minDepth == rhs.viewport.minDepth) &&
+                              (viewport.maxDepth == rhs.viewport.maxDepth);
+      const bool scissorEq = (scissor.offset.x == rhs.scissor.offset.x) && (scissor.offset.y == rhs.scissor.offset.y) &&
+                             (scissor.extent.width == rhs.scissor.extent.width) &&
+                             (scissor.extent.height == rhs.scissor.extent.height);
+      return pipeline == rhs.pipeline && layout == rhs.layout && baseDescriptorSets == rhs.baseDescriptorSets &&
+             baseDescriptorGenerations == rhs.baseDescriptorGenerations && hasOit == rhs.hasOit &&
+             oitDescriptorSet == rhs.oitDescriptorSet && oitDescriptorGeneration == rhs.oitDescriptorGeneration &&
+             dynamicOffsets == rhs.dynamicOffsets && vertexBuffers == rhs.vertexBuffers &&
+             vertexOffsets == rhs.vertexOffsets && vertexBufferSegmentIds == rhs.vertexBufferSegmentIds &&
+             indexBuffer == rhs.indexBuffer && indexOffset == rhs.indexOffset && indexType == rhs.indexType &&
+             indexCount == rhs.indexCount && vertexCount == rhs.vertexCount &&
+             indexBufferSegmentId == rhs.indexBufferSegmentId && viewportEq && scissorEq;
+    }
+  };
+
+  struct ThinSecondaryCacheEntry
+  {
+    ThinSecondarySignature signature{};
+    vk::raii::CommandBuffer commandBuffer{nullptr};
+    bool recorded = false;
+  };
+
+  std::unordered_map<ThinSecondaryCacheKey, ThinSecondaryCacheEntry, ThinSecondaryCacheKeyHash> m_thinSecondaryCache;
 
   // UBO lifetime guard: retain previous frame UBOs until the active submission
   // fence signals to avoid read-after-free glitches. We collect them here in
@@ -223,22 +316,24 @@ private:
   vk::DeviceSize m_dynFrameTransformsOffset{0};
   vk::DeviceSize m_dynObjectTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
-  // DDP (Dual Depth Peeling) can replay the same draw list across multiple peel
-  // passes inside a single Vulkan submission (ddpOrchestrate). Cache per-stream
-  // dynamic UBO offsets so we do not re-suballocate uniforms for each peel pass,
-  // while still allowing distinct streams/clip-plane states to bind correct data.
-  struct DDPUboCacheEntry
+  // Cache per-stream dynamic UBO offsets in the persistent uniform arena so
+  // command buffers can be reused across frames (steady-state).
+  struct UboCacheEntry
   {
+    bool pickingPass = false;
     RendererParameterState params{};
     bool followCoordTransform = true;
     bool followSizeScale = true;
     bool followOpacity = true;
-    bool pickingPass = false;
-    ClipPlanesState clipPlanes;
+    ClipPlanesState clipPlanes{};
     vk::DeviceSize objectTransformsOffset = 0;
     vk::DeviceSize materialOffset = 0;
   };
-  std::unordered_map<uint64_t, std::vector<DDPUboCacheEntry>> m_ddpUboCache;
+  struct FrameUboCache
+  {
+    std::unordered_map<uint64_t, std::vector<UboCacheEntry>> byStream;
+  };
+  std::unordered_map<void*, FrameUboCache> m_uboCacheByFrameKey;
   // DDP indirect-count gating requires stable per-stream indirect args prepared
   // during the init pass; peel passes must not schedule upload->device copies
   // inside dynamic rendering (copies are flushed after segments end).
@@ -258,15 +353,11 @@ private:
   };
   std::unordered_map<uint64_t, DDPArgs> m_ddpArgsByStream;
 
-  void ensureDescriptorLayouts();
-  void ensurePlaceholderTexture();
-  void ensureDescriptorSets(Z3DRendererBase& renderer);
   void updateUBOs(Z3DRendererBase& renderer, const RenderBatch& batch, const LinePayload& payload);
   PipelineInstance&
   ensurePipeline(const PipelineKey& key, const LinePayload& payload, const vulkan::AttachmentFormats& formats);
   void uploadWideGeometry(const LinePayload& payload, bool pickingPass);
   void uploadThinGeometry(const LinePayload& payload, bool pickingPass);
-  void resetDescriptors();
 };
 
 } // namespace nim

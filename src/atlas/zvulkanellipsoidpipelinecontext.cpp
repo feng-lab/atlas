@@ -9,12 +9,12 @@
 #include "zvulkancontext.h"
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
-#include "zvulkandescriptorset.h"
 #include "zvulkanbuffer.h"
 #include "zsysteminfo.h"
 #include "zlog.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
+#include "zvulkanstaticpromotionutils.h"
 #include "zvulkanbindings.h"
 #include "zvulkanclipplanes.h"
 #include "zexception.h"
@@ -27,6 +27,8 @@
 #include <vector>
 #include <cstring>
 #include <cstdint>
+
+DECLARE_bool(atlas_vk_cache_draw_secondaries);
 
 namespace nim {
 namespace {
@@ -59,14 +61,6 @@ bool clipPlanesEqual(const ClipPlanesState& a, const ClipPlanesState& b)
   return true;
 }
 
-struct EllipsoidPushConstants
-{
-  float weighted_a = 0.0f;
-  float weighted_b = 0.0f;
-  float weighted_depth_scale = 0.0f;
-  float _pad = 0.0f;
-};
-
 } // namespace
 
 ZVulkanEllipsoidPipelineContext::ZVulkanEllipsoidPipelineContext(Z3DRendererVulkanBackend& backend)
@@ -79,6 +73,7 @@ void ZVulkanEllipsoidPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
+  m_usedStaticVBThisFrame = false;
   m_axis1Buffer = VK_NULL_HANDLE;
   m_axis2Buffer = VK_NULL_HANDLE;
   m_axis3Buffer = VK_NULL_HANDLE;
@@ -95,10 +90,8 @@ void ZVulkanEllipsoidPipelineContext::resetFrame()
   m_specularOffset = 0;
   m_indexUploadBuffer = VK_NULL_HANDLE;
   m_indexUploadOffset = 0;
-  resetDescriptors();
   m_ddpArgsPrepared = false;
   m_ddpArgsOffset = 0;
-  m_ddpUboCache.clear();
   m_staticCopyPendingKeys.clear();
 }
 
@@ -132,14 +125,19 @@ void ZVulkanEllipsoidPipelineContext::evictStream(uint64_t streamKey)
     m_backend.releaseStaticSlice(entry.ib);
     it = m_staticCache.erase(it);
   }
-}
 
-void ZVulkanEllipsoidPipelineContext::resetDescriptors()
-{
-  m_dsPlaceholder.reset();
-  m_dsLighting.reset();
-  m_dsTransforms.reset();
-  m_dsOIT.reset();
+  for (auto it = m_secondaryCache.begin(); it != m_secondaryCache.end();) {
+    if (it->first.streamKey == streamKey) {
+      it = m_secondaryCache.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto& [frameKey, cache] : m_uboCacheByFrameKey) {
+    (void)frameKey;
+    cache.byStream.erase(streamKey);
+  }
 }
 
 void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
@@ -174,35 +172,27 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   m_dynLightingOffset = (payload.pickingPass || !payload.wantsLighting) ? m_backend.framePickingLightingOffset()
                                                                         : m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload, pickingPass);
-  // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
-  CHECK(m_dsLighting && m_dsTransforms) << "Ellipsoid pipeline descriptor sets missing (lighting/transforms)";
+  // Descriptor sets are primed by the backend in beginRender(); avoid record-time rewrites.
+  const vk::DescriptorSet dsLighting = m_backend.sharedLightingDescriptorSet();
+  const vk::DescriptorSet dsTransforms = m_backend.sharedTransformsDescriptorSetPersistent();
+  CHECK(dsLighting && dsTransforms) << "Ellipsoid pipeline shared descriptor sets missing (lighting/transforms)";
 
-  ZVulkanDescriptorSet* dsPlaceholderOverride = nullptr;
-  ensurePlaceholderTexture();
   const auto& hookPara = batch.shaderHook.para;
-  if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_setPlaceholder) {
-    dsPlaceholderOverride = m_backend.allocateOverrideDescriptorSet(m_setPlaceholder);
-    CHECK(dsPlaceholderOverride != nullptr) << "Ellipsoid DDP peel: override descriptor allocation failed (fatal)";
-    if (dsPlaceholderOverride) {
-      if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-        auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
-                                                   m_backend.device(),
-                                                   "ellipsoid dual-depth-peeling depth blender");
-        dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPDepthBlender, depthTex, m_backend.defaultSampler());
-      } else {
-        auto& tex = m_backend.defaultPlaceholderTexture2D();
-        dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPDepthBlender, tex, m_backend.defaultSampler());
-      }
-      if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-        auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
-                                                   m_backend.device(),
-                                                   "ellipsoid dual-depth-peeling front blender");
-        dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPFrontBlender, frontTex, m_backend.defaultSampler());
-      } else {
-        auto& tex = m_backend.defaultPlaceholderTexture2D();
-        dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPFrontBlender, tex, m_backend.defaultSampler());
-      }
-    }
+  DDPPeelPushConstants ddpPc{};
+  const bool usesDdpPeelPc = (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  if (usesDdpPeelPc) {
+    CHECK(hookPara.dualDepthPeelingDepthBlenderHandle.valid())
+      << "Ellipsoid DDP peel requires a valid depth blender handle";
+    CHECK(hookPara.dualDepthPeelingFrontBlenderHandle.valid())
+      << "Ellipsoid DDP peel requires a valid front blender handle";
+    auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                               m_backend.device(),
+                                               "ellipsoid dual-depth-peeling depth blender");
+    auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                               m_backend.device(),
+                                               "ellipsoid dual-depth-peeling front blender");
+    ddpPc.ddpDepthBlender = m_backend.bindlessLookupSampledImageAutoOrCrash(depthTex, "ellipsoid ddp depth blender");
+    ddpPc.ddpFrontBlender = m_backend.bindlessLookupSampledImageAutoOrCrash(frontTex, "ellipsoid ddp front blender");
   }
 
   const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
@@ -220,31 +210,17 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
 
   // Draw-only path: backend manages render area/attachments
 
-  EllipsoidPushConstants constants{};
-  if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
-    const float n = renderer.viewState().nearClip;
-    const float f = renderer.viewState().farClip;
-    const float denom = std::max(f - n, 1e-6f);
-    constants.weighted_a = (f * n) / denom;
-    constants.weighted_b = 0.5f * (f + n) / denom + 0.5f;
-    constants.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-  }
-
   // Build draw-only spec
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
   drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
   drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSetFirst = vkbind::kSetInputs;
+  drawSpec.descriptorSetFirst = vkbind::kSetBindlessSampledImages;
 
-  CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
-    << "Ellipsoid pipeline placeholder descriptor set not initialised";
-  const vk::DescriptorSet ds0 =
-    dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : m_dsPlaceholder->descriptorSet();
-  const std::array<vk::DescriptorSet, 3> descriptorSets{ds0,
-                                                        m_dsLighting->descriptorSet(),
-                                                        m_dsTransforms->descriptorSet()};
+  const std::array<vk::DescriptorSet, 3> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
+                                                        dsLighting,
+                                                        dsTransforms};
   drawSpec.descriptorSets = descriptorSets;
   const std::array<uint32_t, 4> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
                                                static_cast<uint32_t>(m_dynFrameTransformsOffset),
@@ -252,19 +228,24 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
                                                static_cast<uint32_t>(m_dynMaterialOffset)};
   drawSpec.dynamicOffsets = dynamicOffsets;
 
+  if (usesDdpPeelPc) {
+    drawSpec.pushConstantsData = &ddpPc;
+    drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(ddpPc));
+    drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+    drawSpec.requirePushConstants = true;
+  }
+
   uint32_t expectedSets = static_cast<uint32_t>(descriptorSets.size());
   std::array<vk::DescriptorSet, 1> oitDescriptorSets{};
   std::array<ZVulkanDescriptorBindInfo, 1> extraBinds{};
-  uint32_t extraBindCount = 0;
-  if (m_dsOIT) {
-    ZVulkanDescriptorBindInfo oitBind{};
-    oitBind.firstSet = vkbind::kSetOITParams;
-    oitDescriptorSets[0] = m_dsOIT->descriptorSet();
-    oitBind.sets = oitDescriptorSets;
-    extraBinds[0] = oitBind;
-    extraBindCount = 1;
-    expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
-  }
+  // Ellipsoid pipelines always include set 3 (OIT params) in the layout.
+  ZVulkanDescriptorBindInfo oitBind{};
+  oitBind.firstSet = vkbind::kSetOIT;
+  oitDescriptorSets[0] = m_backend.sharedOITDescriptorSet();
+  oitBind.sets = oitDescriptorSets;
+  extraBinds[0] = oitBind;
+  const uint32_t extraBindCount = 1;
+  expectedSets = std::max(expectedSets, vkbind::kSetOIT + 1u);
   drawSpec.extraDescriptorBinds = std::span<const ZVulkanDescriptorBindInfo>(extraBinds.data(), extraBindCount);
   drawSpec.expectedDescriptorSetCount = expectedSets;
 
@@ -294,10 +275,200 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   }
   drawSpec.instanceCount = 1;
 
-  drawSpec.pushConstantsData = &constants;
-  drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(EllipsoidPushConstants));
-  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
-  drawSpec.requirePushConstants = true;
+  void* frameKey = m_backend.activeFrameKey();
+  CHECK(frameKey != nullptr) << "Ellipsoid record called without an active Vulkan frame-slot key";
+
+  const std::array<uint64_t, 7> vertexBufferSegmentIds{
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[0]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[1]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[2]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[3]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[4]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[5]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[6]),
+  };
+  uint64_t indexBufferSegmentId = 0;
+  if (drawSpec.indexCount > 0 && drawSpec.indexBuffer) {
+    indexBufferSegmentId = m_backend.staticArenaSegmentIdForBuffer(drawSpec.indexBuffer);
+  }
+  const bool allStaticSegments =
+    (vertexBufferSegmentIds[0] != 0) && (vertexBufferSegmentIds[1] != 0) && (vertexBufferSegmentIds[2] != 0) &&
+    (vertexBufferSegmentIds[3] != 0) && (vertexBufferSegmentIds[4] != 0) && (vertexBufferSegmentIds[5] != 0) &&
+    (vertexBufferSegmentIds[6] != 0) && ((drawSpec.indexCount == 0) || (indexBufferSegmentId != 0));
+
+  const bool ddpHook = (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                        shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  if (FLAGS_atlas_vk_cache_draw_secondaries &&
+      m_backend.device().context().supportsInlineAndSecondaryDynamicRendering() && payload.streamKey != 0 &&
+      m_usedStaticVBThisFrame && allStaticSegments && !ddpHook) {
+    m_backend.notifyDrawSecondaryCacheAttempt();
+    SecondaryCacheKey cacheKey{};
+    cacheKey.frameKey = frameKey;
+    cacheKey.streamKey = payload.streamKey;
+    cacheKey.picking = pickingPass;
+    cacheKey.dynamicMaterial = key.dynamicMaterial;
+    cacheKey.shaderHookType = shaderHook;
+    cacheKey.eye = batch.eye;
+    cacheKey.oitRingIndex = m_backend.sharedOITDescriptorSetRingIndex();
+
+    SecondarySignature signature{};
+    signature.pipeline = drawSpec.pipelineHandle;
+    signature.layout = drawSpec.pipelineLayoutHandle;
+    signature.baseDescriptorSets = descriptorSets;
+    signature.baseDescriptorGenerations = {m_backend.bindlessSampledImageDescriptorSetGeneration(),
+                                           m_backend.sharedLightingDescriptorSetGeneration(),
+                                           m_backend.sharedTransformsDescriptorSetPersistentGeneration()};
+    signature.hasOit = true;
+    signature.oitDescriptorSet = m_backend.sharedOITDescriptorSet();
+    signature.oitDescriptorGeneration = m_backend.sharedOITDescriptorSetGeneration();
+    signature.dynamicOffsets = dynamicOffsets;
+    signature.vertexBuffers = vertexBuffers;
+    signature.vertexOffsets = vertexOffsets;
+    signature.vertexBufferSegmentIds = vertexBufferSegmentIds;
+    signature.indexBuffer = drawSpec.indexBuffer;
+    signature.indexOffset = drawSpec.indexOffset;
+    signature.indexBufferSegmentId = indexBufferSegmentId;
+    signature.indexType = drawSpec.indexType;
+    signature.indexCount = drawSpec.indexCount;
+    signature.vertexCount = drawSpec.vertexCount;
+    signature.viewport = viewport;
+    signature.scissor = scissor;
+
+    auto itCache = m_secondaryCache.find(cacheKey);
+    if (itCache != m_secondaryCache.end()) {
+      m_backend.notifyDrawSecondaryCacheKeyFound();
+      SecondaryCacheEntry& entry = itCache->second;
+      const vk::CommandBuffer rawSecondary = entry.commandBuffer;
+      if (entry.recorded && rawSecondary != vk::CommandBuffer{}) {
+        if (entry.signature == signature) {
+          m_backend.notifyDrawSecondaryCacheHit();
+          m_backend.notifyDrawSecondaryCacheExecute();
+          cmd.executeCommands({rawSecondary});
+          m_backend.notifyDrawSubmitted();
+          return;
+        }
+      }
+      uint32_t mask = 0;
+      const auto& prev = entry.signature;
+      if (prev.pipeline != signature.pipeline) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kPipeline;
+      }
+      if (prev.layout != signature.layout) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kLayout;
+      }
+      if (prev.baseDescriptorSets != signature.baseDescriptorSets) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kBaseDescriptorSets;
+      }
+      if (prev.baseDescriptorGenerations != signature.baseDescriptorGenerations) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kBaseDescriptorGenerations;
+      }
+      if (prev.hasOit != signature.hasOit) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorPresence;
+      }
+      if (prev.oitDescriptorSet != signature.oitDescriptorSet) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorSet;
+      }
+      if (prev.oitDescriptorGeneration != signature.oitDescriptorGeneration) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorGeneration;
+      }
+      if (prev.dynamicOffsets != signature.dynamicOffsets) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kDynamicOffsets;
+      }
+      if (prev.vertexBuffers != signature.vertexBuffers) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kVertexBuffers;
+      }
+      if (prev.vertexOffsets != signature.vertexOffsets) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kVertexOffsets;
+      }
+      if (prev.vertexBufferSegmentIds != signature.vertexBufferSegmentIds) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kVertexBufferLifetime;
+      }
+      if (prev.indexBuffer != signature.indexBuffer || prev.indexOffset != signature.indexOffset ||
+          prev.indexType != signature.indexType) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kIndexState;
+      }
+      if (prev.indexBufferSegmentId != signature.indexBufferSegmentId) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kIndexBufferLifetime;
+      }
+      if (prev.indexCount != signature.indexCount || prev.vertexCount != signature.vertexCount) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kCounts;
+      }
+      if (prev.viewport.x != signature.viewport.x || prev.viewport.y != signature.viewport.y ||
+          prev.viewport.width != signature.viewport.width || prev.viewport.height != signature.viewport.height ||
+          prev.viewport.minDepth != signature.viewport.minDepth ||
+          prev.viewport.maxDepth != signature.viewport.maxDepth) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kViewport;
+      }
+      if (prev.scissor.offset.x != signature.scissor.offset.x || prev.scissor.offset.y != signature.scissor.offset.y ||
+          prev.scissor.extent.width != signature.scissor.extent.width ||
+          prev.scissor.extent.height != signature.scissor.extent.height) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kScissor;
+      }
+      m_backend.notifyDrawSecondaryCacheSignatureMismatchMask(mask);
+    }
+
+    SecondaryCacheEntry& entry = m_secondaryCache[cacheKey];
+    entry.signature = signature;
+    m_backend.notifyDrawSecondaryCacheBuild();
+
+    vk::SampleCountFlagBits rasterSamples = vk::SampleCountFlagBits::e1;
+    bool samplesCaptured = false;
+    for (const auto& attachment : batch.pass.colorAttachments) {
+      if (!attachment.handle.valid()) {
+        continue;
+      }
+      const auto& tex =
+        vulkan::textureFromHandle(attachment.handle, m_backend.device(), "ellipsoid secondary inheritance color");
+      if (!samplesCaptured) {
+        rasterSamples = tex.info().samples;
+        samplesCaptured = true;
+      } else {
+        CHECK(tex.info().samples == rasterSamples)
+          << "Ellipsoid secondary: mismatched MSAA sample counts in attachments";
+      }
+    }
+    if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid()) {
+      const auto& tex = vulkan::textureFromHandle(batch.pass.depthAttachment->handle,
+                                                  m_backend.device(),
+                                                  "ellipsoid secondary inheritance depth");
+      if (!samplesCaptured) {
+        rasterSamples = tex.info().samples;
+        samplesCaptured = true;
+      } else {
+        CHECK(tex.info().samples == rasterSamples)
+          << "Ellipsoid secondary: mismatched MSAA sample counts in attachments";
+      }
+    }
+
+    const vk::Format* colorFormatsPtr = formats.colorFormats.empty() ? nullptr : formats.colorFormats.data();
+    const vk::Format depthFormat = formats.depthFormat.value_or(vk::Format::eUndefined);
+    vk::CommandBufferInheritanceRenderingInfo renderingInheritance{};
+    renderingInheritance.rasterizationSamples = rasterSamples;
+    renderingInheritance.colorAttachmentCount = static_cast<uint32_t>(formats.colorFormats.size());
+    renderingInheritance.pColorAttachmentFormats = colorFormatsPtr;
+    renderingInheritance.depthAttachmentFormat = depthFormat;
+    // Atlas uses depth-only dynamic rendering segments (pStencilAttachment == nullptr).
+    // Keep stencilAttachmentFormat UNDEFINED to match vkCmdBeginRendering.
+    renderingInheritance.stencilAttachmentFormat = vk::Format::eUndefined;
+
+    vk::CommandBufferInheritanceInfo inheritance{};
+    inheritance.pNext = &renderingInheritance;
+
+    ZVulkanSecondaryBuildInfo secondaryInfo{};
+    secondaryInfo.device = &m_backend.device().context().device();
+    secondaryInfo.commandPool = m_backend.device().context().commandPool();
+    secondaryInfo.inheritance = inheritance;
+
+    entry.commandBuffer = buildStaticSecondary(secondaryInfo, [&](vk::raii::CommandBuffer& secondaryCmd) {
+      ZVulkanPipelineCommandRecorder secondaryRecorder(secondaryCmd);
+      secondaryRecorder.recordGraphicsDraw(drawSpec);
+    });
+    entry.recorded = true;
+
+    m_backend.notifyDrawSecondaryCacheExecute();
+    cmd.executeCommands({static_cast<vk::CommandBuffer>(entry.commandBuffer)});
+    return;
+  }
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
@@ -353,72 +524,6 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   }
 }
 
-void ZVulkanEllipsoidPipelineContext::ensureDescriptorLayouts()
-{
-  if (!m_setPlaceholder) {
-    m_setPlaceholder = m_backend.dualTexturePlaceholderDescriptorSetLayout();
-  }
-  if (!m_setLighting) {
-    m_setLighting = m_backend.lightingDescriptorSetLayout();
-  }
-  if (!m_setTransforms) {
-    m_setTransforms = m_backend.transformDescriptorSetLayout();
-  }
-  if (!m_setOIT) {
-    m_setOIT = m_backend.oitDescriptorSetLayout();
-  }
-}
-
-void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
-{
-  ensureDescriptorLayouts();
-
-  if (!m_dsPlaceholder) {
-    m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(m_setPlaceholder);
-  }
-  if (!m_dsLighting) {
-    m_dsLighting = m_backend.allocateFrameDescriptorSet(m_setLighting);
-  }
-  if (!m_dsTransforms) {
-    m_dsTransforms = m_backend.allocateFrameDescriptorSet(m_setTransforms);
-  }
-  if (!m_dsOIT && m_setOIT) {
-    m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
-  }
-
-  ensurePlaceholderTexture();
-  if (m_dsPlaceholder) {
-    auto& tex = m_backend.defaultPlaceholderTexture2D();
-    m_dsPlaceholder->writeTextureOnce(0, tex, m_backend.defaultSampler());
-    m_dsPlaceholder->writeTextureOnce(1, tex, m_backend.defaultSampler());
-  }
-
-  // Bind dynamic UBOs to the per-frame uniform arena once
-  if (m_dsLighting) {
-    m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
-  }
-  if (m_dsTransforms) {
-    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(FrameTransformsUBOStd140));
-    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(ObjectTransformsUBOStd140));
-    m_dsTransforms->writeUniformBufferDynamicOnce(2, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
-  }
-  if (m_dsOIT && !m_backend.isRecording()) {
-    m_backend.primeOITDescriptorSet(*m_dsOIT);
-  }
-}
-
-void ZVulkanEllipsoidPipelineContext::ensureOITResources()
-{
-  ensureDescriptorLayouts();
-  if (!m_dsOIT && m_setOIT) {
-    m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
-  }
-}
-
- 
-
-void ZVulkanEllipsoidPipelineContext::ensurePlaceholderTexture() {}
-
 // Lighting UBO is shared per frame; no per-batch update required.
 
 void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
@@ -428,9 +533,6 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
 {
   CHECK(batch.shaderHook.captured) << "Ellipsoid batch missing shader hook snapshot";
   (void)renderer;
-  const auto hook = batch.shaderHook.type;
-  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
-                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   CHECK(payload.paramsCaptured) << "Ellipsoid payload missing params";
 
   // Frame transforms are shared per eye and updated once per submission in beginRender().
@@ -456,38 +558,62 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
     material.material_shininess = 0.0f;
   }
 
-  if (ddp && payload.streamKey != 0) {
-    auto it = m_ddpUboCache.find(payload.streamKey);
-    if (it != m_ddpUboCache.end()) {
-      for (const auto& cached : it->second) {
-        if (cached.params != payload.params || cached.pickingPass != pickingPass ||
-            !clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
-          continue;
-        }
-        m_dynObjectTransformsOffset = cached.objectTransformsOffset;
-        m_dynMaterialOffset = cached.materialOffset;
+  void* frameKey = m_backend.activeFrameKey();
+  CHECK(frameKey != nullptr) << "Ellipsoid updateTransformUBO called without an active Vulkan frame-slot key";
+  if (payload.streamKey != 0) {
+    FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
+    auto& entries = frameCache.byStream[payload.streamKey];
+
+    for (auto& cached : entries) {
+      if (cached.pickingPass != pickingPass) {
+        continue;
+      }
+
+      m_dynObjectTransformsOffset = cached.objectTransformsOffset;
+      m_dynMaterialOffset = cached.materialOffset;
+
+      if (cached.params == payload.params && clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
         return;
       }
+
+      std::memcpy(m_backend.persistentUniformMappedAt(cached.objectTransformsOffset, sizeof(ObjectTransformsUBOStd140)),
+                  &transforms,
+                  sizeof(transforms));
+      std::memcpy(m_backend.persistentUniformMappedAt(cached.materialOffset, sizeof(MaterialUBOStd140)),
+                  &material,
+                  sizeof(material));
+
+      cached.params = payload.params;
+      cached.clipPlanes = batch.clipPlanes;
+      return;
     }
-  }
 
-  auto transformsSlice = m_backend.suballocateUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
-  std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
-  m_dynObjectTransformsOffset = transformsSlice.offset;
+    auto transformsSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
+    std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
+    m_dynObjectTransformsOffset = transformsSlice.offset;
 
-  auto materialSlice = m_backend.suballocateUniformFor(payload, sizeof(MaterialUBOStd140));
-  std::memcpy(materialSlice.mapped, &material, sizeof(material));
-  m_dynMaterialOffset = materialSlice.offset;
+    auto materialSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(MaterialUBOStd140));
+    std::memcpy(materialSlice.mapped, &material, sizeof(material));
+    m_dynMaterialOffset = materialSlice.offset;
 
-  if (ddp && payload.streamKey != 0) {
-    DDPUboCacheEntry entry{};
-    entry.params = payload.params;
+    UboCacheEntry entry{};
     entry.pickingPass = pickingPass;
+    entry.params = payload.params;
     entry.clipPlanes = batch.clipPlanes;
     entry.objectTransformsOffset = transformsSlice.offset;
     entry.materialOffset = materialSlice.offset;
-    m_ddpUboCache[payload.streamKey].push_back(std::move(entry));
+    entries.push_back(std::move(entry));
+    return;
   }
+
+  // Fallback (should be rare): no stream key, so we cannot assign a stable slice.
+  auto transformsSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
+  std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
+  m_dynObjectTransformsOffset = transformsSlice.offset;
+
+  auto materialSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(MaterialUBOStd140));
+  std::memcpy(materialSlice.mapped, &material, sizeof(material));
+  m_dynMaterialOffset = materialSlice.offset;
 }
 
 ZVulkanEllipsoidPipelineContext::PipelineInstance&
@@ -500,8 +626,6 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key, const vu
 
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
-
-  ensureDescriptorLayouts();
 
   PipelineInstance instance;
 
@@ -560,11 +684,25 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key, const vu
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
-  std::vector<vk::DescriptorSetLayout> layouts{m_setPlaceholder, m_setLighting, m_setTransforms, m_setOIT};
+  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
+  CHECK(bindlessLayout) << "Ellipsoid pipeline missing bindless descriptor set layout";
+  const vk::DescriptorSetLayout lightingLayout = m_backend.lightingDescriptorSetLayout();
+  CHECK(lightingLayout) << "Ellipsoid pipeline missing lighting descriptor set layout";
+  const vk::DescriptorSetLayout transformsLayout = m_backend.transformDescriptorSetLayout();
+  CHECK(transformsLayout) << "Ellipsoid pipeline missing transforms descriptor set layout";
+  const vk::DescriptorSetLayout oitLayout = m_backend.oitDescriptorSetLayout();
+  CHECK(oitLayout) << "Ellipsoid pipeline missing OIT descriptor set layout";
+  std::vector<vk::DescriptorSetLayout> layouts{bindlessLayout, lightingLayout, transformsLayout, oitLayout};
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+
+  // Dual-depth-peeling peel shader consumes bindless blender indices via push constants.
+  vk::PushConstantRange pcRange{.stageFlags = vk::ShaderStageFlagBits::eFragment,
+                                .offset = 0,
+                                .size = static_cast<uint32_t>(sizeof(DDPPeelPushConstants))};
+  instance.pipeline->setPushConstantRanges({pcRange});
 
   vk::PipelineColorBlendAttachmentState baseBlend{};
   baseBlend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
@@ -670,10 +808,6 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key, const vu
       break;
   }
 
-  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
-                              .offset = 0,
-                              .size = static_cast<uint32_t>(sizeof(EllipsoidPushConstants))};
-  instance.pipeline->setPushConstantRanges({range});
   instance.pipeline->create();
 
   auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});
@@ -700,7 +834,7 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
     if (!m_staticCopyPendingKeys.contains(key)) {
       auto it = m_staticCache.find(key);
       if (it != m_staticCache.end()) {
-        const CacheEntry& entry = it->second;
+        CacheEntry& entry = it->second;
         const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
         const bool shapeSame = (entry.centersGen == payload.centersGen) && (entry.axesGen == payload.axesGen) &&
                                (entry.flagsGen == payload.flagsGen) && (entry.indexGen == payload.indexGen);
@@ -729,16 +863,17 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
             m_indexUploadBuffer = entry.ib.buffer;
             m_indexUploadOffset = entry.ib.offset;
           }
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbAxis1);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbAxis2);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbAxis3);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbCenter);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbColor);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbFlags);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbSpecular);
-          if (m_indexCount > 0) {
-            m_backend.pinStaticSliceForActiveSubmission(entry.ib);
-          }
+          vulkan::pinStaticSlicesForActiveSubmission(m_backend,
+                                                     {&entry.vbAxis1,
+                                                      &entry.vbAxis2,
+                                                      &entry.vbAxis3,
+                                                      &entry.vbCenter,
+                                                      &entry.vbColor,
+                                                      &entry.vbFlags,
+                                                      &entry.vbSpecular,
+                                                      &entry.ib});
+          m_usedStaticVBThisFrame = true;
+          entry.usedStaticOnce = true;
           return;
         }
       }
@@ -853,6 +988,45 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
     CacheKey key{payload.streamKey, payload.pickingPass, payload.useDynamicMaterial};
     auto it = m_staticCache.find(key);
     const int kPromotionThreshold = 2;
+    const auto promoteToStatics = [&](CacheEntry& dstEntry) -> bool {
+      const size_t idxBytes = m_indexCount > 0 ? m_indexCount * sizeof(uint32_t) : 0u;
+      Z3DRendererVulkanBackend::UploadSlice idxUpload{};
+      const Z3DRendererVulkanBackend::UploadSlice* idxSrc = nullptr;
+      if (idxBytes > 0) {
+        if (!m_indexUploadBuffer) {
+          return false;
+        }
+        idxUpload = Z3DRendererVulkanBackend::UploadSlice{m_indexUploadBuffer, m_indexUploadOffset, nullptr, idxBytes};
+        idxSrc = &idxUpload;
+      }
+
+      if (!vulkan::allocateAndScheduleStaticCopies(
+            m_backend,
+            {
+              {&dstEntry.vbAxis1,    &axis1Slice,  axisBytes,   alignof(glm::vec4), false},
+              {&dstEntry.vbAxis2,    &axis2Slice,  axisBytes,   alignof(glm::vec4), false},
+              {&dstEntry.vbAxis3,    &axis3Slice,  axisBytes,   alignof(glm::vec4), false},
+              {&dstEntry.vbCenter,   &centerSlice, centerBytes, alignof(glm::vec4), false},
+              {&dstEntry.vbColor,    &colorSlice,  colorBytes,  alignof(glm::vec4), false},
+              {&dstEntry.vbFlags,    &flagsSlice,  flagsBytes,  alignof(float),     false},
+              {&dstEntry.vbSpecular, &specSlice,   specBytes,   alignof(glm::vec4), false},
+              {&dstEntry.ib,         idxSrc,       idxBytes,    alignof(uint32_t),  true }
+      })) {
+        return false;
+      }
+
+      VLOG(1) << fmt::format(
+        "VK ellipsoid promote: axis1={}B axis2={}B axis3={}B center={}B color={}B flags={}B spec={}B idx={}B",
+        axisBytes,
+        axisBytes,
+        axisBytes,
+        centerBytes,
+        colorBytes,
+        flagsBytes,
+        specBytes,
+        idxBytes);
+      return true;
+    };
     if (it == m_staticCache.end()) {
       CacheEntry entry{};
       entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
@@ -864,7 +1038,18 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
       entry.specularGen = payload.specularGen;
       entry.flagsGen = payload.flagsGen;
       entry.indexGen = payload.indexGen;
-      m_staticCache.emplace(key, entry);
+      auto [inserted, _] = m_staticCache.emplace(key, entry);
+      CacheEntry& insertedEntry = inserted->second;
+
+      // UX: stage into device-local statics on first sight so steady-state
+      // frames can bind fast device-local buffers starting on the next frame.
+      if (promoteToStatics(insertedEntry)) {
+        insertedEntry.promoted = true;
+        insertedEntry.usedStaticOnce = false;
+        // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+        m_staticCopyPendingKeys.insert(key);
+        return;
+      }
     } else {
       CacheEntry& entry = it->second;
       const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
@@ -894,15 +1079,17 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
       }
 
       if (entry.promoted && !sizeSame) {
-        m_backend.releaseStaticSlice(entry.vbAxis1);
-        m_backend.releaseStaticSlice(entry.vbAxis2);
-        m_backend.releaseStaticSlice(entry.vbAxis3);
-        m_backend.releaseStaticSlice(entry.vbCenter);
-        m_backend.releaseStaticSlice(entry.vbColor);
-        m_backend.releaseStaticSlice(entry.vbFlags);
-        m_backend.releaseStaticSlice(entry.vbSpecular);
-        m_backend.releaseStaticSlice(entry.ib);
+        vulkan::releaseStaticSlices(m_backend,
+                                    {&entry.vbAxis1,
+                                     &entry.vbAxis2,
+                                     &entry.vbAxis3,
+                                     &entry.vbCenter,
+                                     &entry.vbColor,
+                                     &entry.vbFlags,
+                                     &entry.vbSpecular,
+                                     &entry.ib});
         entry.promoted = false;
+        entry.usedStaticOnce = false;
         entry.unchangedFrames = 0;
         entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
         entry.indexCount = static_cast<uint32_t>(m_indexCount);
@@ -913,6 +1100,16 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
         entry.specularGen = payload.specularGen;
         entry.flagsGen = payload.flagsGen;
         entry.indexGen = payload.indexGen;
+
+        // Recreate static slices immediately so the next steady frame can bind
+        // device-local buffers without a multi-frame warmup.
+        if (promoteToStatics(entry)) {
+          entry.promoted = true;
+          entry.usedStaticOnce = false;
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+          m_staticCopyPendingKeys.insert(key);
+          return;
+        }
         return;
       }
 
@@ -925,6 +1122,35 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
           anyChanged =
             anyChanged || (entry.colorsGen != payload.colorsGen) || (entry.specularGen != payload.specularGen);
         }
+
+        // If this stream is still changing before we've ever bound the static
+        // buffers, drop the statics and fall back to upload-only mode to avoid
+        // paying upload->device copies every frame without a benefit.
+        if (anyChanged && !entry.usedStaticOnce) {
+          vulkan::releaseStaticSlices(m_backend,
+                                      {&entry.vbAxis1,
+                                       &entry.vbAxis2,
+                                       &entry.vbAxis3,
+                                       &entry.vbCenter,
+                                       &entry.vbColor,
+                                       &entry.vbFlags,
+                                       &entry.vbSpecular,
+                                       &entry.ib});
+          entry.promoted = false;
+          entry.usedStaticOnce = false;
+          entry.unchangedFrames = 0;
+          entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+          entry.indexCount = static_cast<uint32_t>(m_indexCount);
+          entry.centersGen = payload.centersGen;
+          entry.axesGen = payload.axesGen;
+          entry.colorsGen = payload.colorsGen;
+          entry.pickingColorsGen = payload.pickingColorsGen;
+          entry.specularGen = payload.specularGen;
+          entry.flagsGen = payload.flagsGen;
+          entry.indexGen = payload.indexGen;
+          return;
+        }
+
         if (entry.axesGen != payload.axesGen) {
           m_backend.scheduleStaticCopy(entry.vbAxis1.buffer, entry.vbAxis1.offset, axis1Slice, false);
           m_backend.scheduleStaticCopy(entry.vbAxis2.buffer, entry.vbAxis2.offset, axis2Slice, false);
@@ -990,16 +1216,16 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
           m_indexUploadBuffer = entry.ib.buffer;
           m_indexUploadOffset = entry.ib.offset;
         }
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbAxis1);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbAxis2);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbAxis3);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbCenter);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbColor);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbFlags);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbSpecular);
-        if (entry.indexCount > 0) {
-          m_backend.pinStaticSliceForActiveSubmission(entry.ib);
-        }
+        vulkan::pinStaticSlicesForActiveSubmission(m_backend,
+                                                   {&entry.vbAxis1,
+                                                    &entry.vbAxis2,
+                                                    &entry.vbAxis3,
+                                                    &entry.vbCenter,
+                                                    &entry.vbColor,
+                                                    &entry.vbFlags,
+                                                    &entry.vbSpecular,
+                                                    &entry.ib});
+        entry.usedStaticOnce = true;
         return;
       }
 
@@ -1016,54 +1242,9 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
       entry.indexGen = payload.indexGen;
 
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
-        // Allocate per-stream static slices
-        auto axis1Dst = m_backend.allocateStaticVB(axisBytes, alignof(glm::vec4));
-        auto axis2Dst = m_backend.allocateStaticVB(axisBytes, alignof(glm::vec4));
-        auto axis3Dst = m_backend.allocateStaticVB(axisBytes, alignof(glm::vec4));
-        auto centerDst = m_backend.allocateStaticVB(centerBytes, alignof(glm::vec4));
-        auto colorDst = m_backend.allocateStaticVB(colorBytes, alignof(glm::vec4));
-        auto flagsDst = m_backend.allocateStaticVB(flagsBytes, alignof(float));
-        auto specDst = m_backend.allocateStaticVB(specBytes, alignof(glm::vec4));
-        Z3DRendererVulkanBackend::StaticSlice ibDst{};
-        if (m_indexCount > 0) {
-          ibDst = m_backend.allocateStaticIB(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
-        }
-        if (axis1Dst && axis2Dst && axis3Dst && centerDst && colorDst && flagsDst && specDst &&
-            (m_indexCount == 0 || ibDst)) {
-          // Record per-stream copies
-          m_backend.scheduleStaticCopy(axis1Dst.buffer, axis1Dst.offset, axis1Slice, false);
-          m_backend.scheduleStaticCopy(axis2Dst.buffer, axis2Dst.offset, axis2Slice, false);
-          m_backend.scheduleStaticCopy(axis3Dst.buffer, axis3Dst.offset, axis3Slice, false);
-          m_backend.scheduleStaticCopy(centerDst.buffer, centerDst.offset, centerSlice, false);
-          m_backend.scheduleStaticCopy(colorDst.buffer, colorDst.offset, colorSlice, false);
-          m_backend.scheduleStaticCopy(flagsDst.buffer, flagsDst.offset, flagsSlice, false);
-          m_backend.scheduleStaticCopy(specDst.buffer, specDst.offset, specSlice, false);
-          if (m_indexCount > 0) {
-            Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer,
-                                                          m_indexUploadOffset,
-                                                          nullptr,
-                                                          m_indexCount * sizeof(uint32_t)};
-            m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
-          }
-          VLOG(1) << fmt::format(
-            "VK ellipsoid promote: axis1={}B axis2={}B axis3={}B center={}B color={}B flags={}B spec={}B idx={}B",
-            axisBytes,
-            axisBytes,
-            axisBytes,
-            centerBytes,
-            colorBytes,
-            flagsBytes,
-            specBytes,
-            m_indexCount * sizeof(uint32_t));
-          entry.vbAxis1 = axis1Dst;
-          entry.vbAxis2 = axis2Dst;
-          entry.vbAxis3 = axis3Dst;
-          entry.vbCenter = centerDst;
-          entry.vbColor = colorDst;
-          entry.vbFlags = flagsDst;
-          entry.vbSpecular = specDst;
-          entry.ib = ibDst;
+        if (promoteToStatics(entry)) {
           entry.promoted = true;
+          entry.usedStaticOnce = false;
           // Do not bind statics this frame; keep upload slices. Statics bind next frame.
           m_staticCopyPendingKeys.insert(key);
         }

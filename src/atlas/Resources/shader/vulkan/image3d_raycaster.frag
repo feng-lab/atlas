@@ -15,15 +15,19 @@ void main()
     discard;
   }
 
-  vec2 last = texelFetch(last_ray_depth_tex, ivec2(gl_FragCoord.xy), 0).xy;
-  vec4 result = texelFetch(last_color_tex, ivec2(gl_FragCoord.xy), 0);
+  vec2 last =
+    texelFetch(atlas_bindlessSampler2DNearest(rp.last_ray_depth_tex), ivec2(gl_FragCoord.xy), 0).xy;
+  vec4 result =
+    texelFetch(atlas_bindlessSampler2DNearest(rp.last_color_tex), ivec2(gl_FragCoord.xy), 0);
   float currentRayLength = last.x;
   float rayDepth = last.y;
   if (currentRayLength >= 1.0) { FragData0 = result; FragData1.xy = last; return; }
   if (currentRayLength == 0.0) { rayDepth = -1.0; }
 
-  vec4 entryTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 0), 0);
-  vec4 exitTexCoordAndZ  = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 1), 0);
+  vec4 entryTexCoordAndZ =
+    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord), ivec3(gl_FragCoord.xy, 0), 0);
+  vec4 exitTexCoordAndZ =
+    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord), ivec3(gl_FragCoord.xy, 1), 0);
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition  = exitTexCoordAndZ.xyz;
   if (all(equal(startRayPosition, exitRayPosition))) { discard; }
@@ -68,11 +72,14 @@ void main()
       uvec3 curPageDirAddress = pg.levels[curLevel].page_directory_base.xyz + pageTableCoord / pg.page_table_block_size.xyz;
       if (curPageDirAddress != pageDirAddress) {
         pageDirAddress = curPageDirAddress;
-        pageDirEntry = texelFetch(page_directory, ivec3(pageDirAddress), 0);
+        pageDirEntry = texelFetch(atlas_bindlessUSampler3DNearest(rp.page_directory), ivec3(pageDirAddress), 0);
       }
       uint pagingFlag = pageDirEntry.w;
       if (pagingFlag != 0u && pagingFlag != 40000u) {
-        uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + (pageTableCoord % pg.page_table_block_size.xyz)), 0);
+        uvec4 pageTableEntry =
+          texelFetch(atlas_bindlessUSampler3DNearest(rp.page_table_cache),
+                     ivec3(pageDirEntry.xyz + (pageTableCoord % pg.page_table_block_size.xyz)),
+                     0);
         pagingFlag = pageTableEntry.w;
         if (pagingFlag != 0u && pagingFlag != 40000u) {
           sampleBlock(pageTableEntry, curLevel, pageTableCoord,
@@ -108,7 +115,7 @@ void main()
     return;
   }
 
-  if (RAY_MODE == 1) result = texture(transfer_function, vec2(mipValue, 0.5));
+  if (RAY_MODE == 1) result = texture(atlas_bindlessSampler2DLinear(rp.transfer_function), vec2(mipValue, 0.5));
   // Force opaque alpha when requested
   if (RESULT_OPAQUE) {
     result.a = 1.0;

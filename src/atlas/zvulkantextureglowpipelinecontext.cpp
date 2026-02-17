@@ -8,10 +8,8 @@
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
 #include "zvulkanbuffer.h"
-#include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
-#include "zvulkanbindings.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zlog.h"
 
@@ -48,10 +46,8 @@ ZVulkanTextureGlowPipelineContext::~ZVulkanTextureGlowPipelineContext() = defaul
 
 void ZVulkanTextureGlowPipelineContext::resetFrame()
 {
-  resetDescriptors();
+  // No per-frame descriptor state retained; bindless set is owned by the backend.
 }
-
-void ZVulkanTextureGlowPipelineContext::resetDescriptors() {}
 
 void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
                                                const RenderBatch& batch,
@@ -75,8 +71,6 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  ensureDescriptorLayouts();
-
   const auto formats = vulkan::extractAttachmentFormats(batch);
   if (formats.colorFormats.empty()) {
     return;
@@ -85,13 +79,11 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
 
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   ZVulkanPipelineCommandRecorder recorder(cmd);
+  const vk::DescriptorSet bindlessSet = m_backend.bindlessSampledImageDescriptorSet();
 
   auto recordBlur = [&](bool horizontal) {
-    CHECK(m_blurSetLayout.has_value()) << "Glow blur requires blur descriptor set layout";
-    ZVulkanDescriptorSet* blurDS = m_backend.allocateOverrideDescriptorSet(**m_blurSetLayout);
-    CHECK(blurDS != nullptr) << "Glow blur: override descriptor allocation failed (fatal)";
-    blurDS->updateTexture(vkbind::kBlurBindingColorIn, inputColor, m_backend.defaultSampler());
-    blurDS->updateTexture(vkbind::kBlurBindingDepthIn, inputDepth, m_backend.defaultSampler());
+    const uint32_t inputColorIdx = m_backend.bindlessLookupSampledImageAutoOrCrash(inputColor, "glow_blur input color");
+    const uint32_t inputDepthIdx = m_backend.bindlessLookupSampledImageAutoOrCrash(inputDepth, "glow_blur input depth");
 
     BlurPipelineKey blurKey{};
     blurKey.horizontal = horizontal;
@@ -105,13 +97,15 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     blurConstants.blurRadius = payload.blurRadius;
     blurConstants.blurScale = payload.blurScale;
     blurConstants.blurStrength = payload.blurStrength;
+    blurConstants.colorTexture = inputColorIdx;
+    blurConstants.depthTexture = inputDepthIdx;
 
     ZVulkanGraphicsDrawSpec drawSpec{};
     drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
     drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = blurPipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = blurPipeline.pipeline->pipelineLayoutHandle();
-    const std::array<vk::DescriptorSet, 1> descriptorSets{blurDS->descriptorSet()};
+    const std::array<vk::DescriptorSet, 1> descriptorSets{bindlessSet};
     drawSpec.descriptorSets = descriptorSets;
     drawSpec.descriptorSetFirst = 0;
     drawSpec.expectedDescriptorSetCount = 1;
@@ -129,7 +123,6 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
   };
 
   auto recordComposite = [&]() {
-    CHECK(m_glowSetLayout.has_value()) << "Glow composite requires glow descriptor set layout";
     CHECK(payload.blurColorAttachmentHandle.valid() && payload.blurDepthAttachmentHandle.valid())
       << "Glow composite stage missing blur inputs";
     auto& blurColor = vulkan::textureFromHandle(payload.blurColorAttachmentHandle,
@@ -139,12 +132,14 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
                                                 m_backend.device(),
                                                 "texture-glow blur depth attachment");
 
-    ZVulkanDescriptorSet* glowDS = m_backend.allocateOverrideDescriptorSet(**m_glowSetLayout);
-    CHECK(glowDS != nullptr) << "Glow composite: override descriptor allocation failed (fatal)";
-    glowDS->updateTexture(vkbind::kGlowBindingColorIn, inputColor, m_backend.defaultSampler());
-    glowDS->updateTexture(vkbind::kGlowBindingDepthIn, inputDepth, m_backend.defaultSampler());
-    glowDS->updateTexture(vkbind::kGlowBindingBlurIn0, blurColor, m_backend.defaultSampler());
-    glowDS->updateTexture(vkbind::kGlowBindingBlurIn1, blurDepth, m_backend.defaultSampler());
+    const uint32_t inputColorIdx =
+      m_backend.bindlessLookupSampledImageAutoOrCrash(inputColor, "glow_composite input color");
+    const uint32_t inputDepthIdx =
+      m_backend.bindlessLookupSampledImageAutoOrCrash(inputDepth, "glow_composite input depth");
+    const uint32_t blurColorIdx =
+      m_backend.bindlessLookupSampledImageAutoOrCrash(blurColor, "glow_composite blur color");
+    const uint32_t blurDepthIdx =
+      m_backend.bindlessLookupSampledImageAutoOrCrash(blurDepth, "glow_composite blur depth");
 
     GlowPipelineKey glowKey{};
     glowKey.mode = payload.mode;
@@ -155,13 +150,17 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     CHECK(viewport.width > 0.0f && viewport.height > 0.0f) << "Glow composite requires a valid viewport extent";
     GlowPushConstants glowConstants{};
     glowConstants.screenDimRcp = glm::vec2(1.0f / viewport.width, 1.0f / viewport.height);
+    glowConstants.colorTexture = inputColorIdx;
+    glowConstants.depthTexture = inputDepthIdx;
+    glowConstants.glowmapColorTexture = blurColorIdx;
+    glowConstants.glowmapDepthTexture = blurDepthIdx;
 
     ZVulkanGraphicsDrawSpec drawSpec{};
     drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
     drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = glowPipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = glowPipeline.pipeline->pipelineLayoutHandle();
-    const std::array<vk::DescriptorSet, 1> descriptorSets{glowDS->descriptorSet()};
+    const std::array<vk::DescriptorSet, 1> descriptorSets{bindlessSet};
     drawSpec.descriptorSets = descriptorSets;
     drawSpec.descriptorSetFirst = 0;
     drawSpec.expectedDescriptorSetCount = 1;
@@ -191,68 +190,6 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     case TextureGlowPayload::Stage::Composite:
       recordComposite();
       break;
-  }
-}
-
-void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()
-{
-  if (!m_blurSetLayout) {
-    auto& device = m_backend.device();
-    auto& vkDevice = device.context().device();
-
-    std::array<vk::DescriptorSetLayoutBinding, 2> blurBindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
-    };
-    // Immutable default samplers for blur inputs
-    vk::Sampler immutable = m_backend.defaultSampler();
-    blurBindings[0].pImmutableSamplers = &immutable;
-    blurBindings[1].pImmutableSamplers = &immutable;
-
-    vk::DescriptorSetLayoutCreateInfo blurInfo{.bindingCount = static_cast<uint32_t>(blurBindings.size()),
-                                               .pBindings = blurBindings.data()};
-    m_blurSetLayout.emplace(vkDevice, blurInfo);
-  }
-
-  if (!m_glowSetLayout) {
-    auto& device = m_backend.device();
-    auto& vkDevice = device.context().device();
-
-    std::array<vk::DescriptorSetLayoutBinding, 4> glowBindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 2,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 3,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
-    };
-
-    // Immutable default samplers for glow inputs
-    vk::Sampler immutableGlow = m_backend.defaultSampler();
-    glowBindings[0].pImmutableSamplers = &immutableGlow;
-    glowBindings[1].pImmutableSamplers = &immutableGlow;
-    glowBindings[2].pImmutableSamplers = &immutableGlow;
-    glowBindings[3].pImmutableSamplers = &immutableGlow;
-
-    vk::DescriptorSetLayoutCreateInfo glowInfo{.bindingCount = static_cast<uint32_t>(glowBindings.size()),
-                                               .pBindings = glowBindings.data()};
-    m_glowSetLayout.emplace(vkDevice, glowInfo);
   }
 }
 
@@ -294,7 +231,7 @@ ZVulkanTextureGlowPipelineContext::ensureBlurPipeline(const BlurPipelineKey& key
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  instance.pipeline->setDescriptorSetLayouts({**m_blurSetLayout});
+  instance.pipeline->setDescriptorSetLayouts({m_backend.bindlessSampledImageDescriptorSetLayout()});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
@@ -344,7 +281,7 @@ ZVulkanTextureGlowPipelineContext::ensureGlowPipeline(const GlowPipelineKey& key
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  instance.pipeline->setDescriptorSetLayouts({**m_glowSetLayout});
+  instance.pipeline->setDescriptorSetLayouts({m_backend.bindlessSampledImageDescriptorSetLayout()});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);

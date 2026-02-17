@@ -1,9 +1,6 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-layout(set = 0, binding = 3) uniform sampler2D DepthBlenderTex;
-layout(set = 0, binding = 4) uniform sampler2D FrontBlenderTex;
-
 layout(location = 0) out vec4 FragData0; // depth blender
 layout(location = 1) out vec4 FragData1; // front blender
 layout(location = 2) out vec4 FragData2; // back temp
@@ -29,8 +26,8 @@ void main()
   gl_FragDepth = fragDepth;
 
   ivec2 p = ivec2(gl_FragCoord.xy);
-  vec2 depthBlender = texelFetch(DepthBlenderTex, p, 0).xy;
-  vec4 forwardTemp = texelFetch(FrontBlenderTex, p, 0);
+  vec2 depthBlender = texelFetch(atlas_bindlessSampler2DNearest(copy_pc.ddpDepthBlender), p, 0).xy;
+  vec4 forwardTemp = texelFetch(atlas_bindlessSampler2DNearest(copy_pc.ddpFrontBlender), p, 0);
 
   FragData1 = forwardTemp;
   FragData2 = vec4(0.0);

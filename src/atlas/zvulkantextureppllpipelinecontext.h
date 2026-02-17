@@ -15,7 +15,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorSet;
 
 namespace vulkan {
 struct AttachmentFormats;
@@ -40,8 +39,6 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
-  friend class Z3DRendererVulkanBackend; // allow backend to pre-prime OIT resources
-
   struct PipelineKey
   {
     std::vector<vk::Format> colorFormats;
@@ -64,22 +61,16 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
+  // Matches layout(push_constant) PPLLResolvePC in Resources/shader/vulkan/ppll_resolve.frag.
+  struct PPLLResolvePushConstants
+  {
+    uint32_t opaqueDepthTexture = 0;
+  };
+
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
-  // Descriptor sets:
-  // - set 0: opaque depth texture (used to cull transparent fragments behind opaque)
-  // - set 1/2: placeholders (kept to match other pipeline layouts)
-  // - set 3: OIT SSBO bindings (PPLL buffers)
-  std::optional<vk::raii::DescriptorSetLayout> m_setOpaqueDepth; // set = 0 (sampler2D)
-  std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // set = 1/2 (empty)
-  vk::DescriptorSetLayout m_setOIT{}; // set = 3 OIT SSBO layout (params + PPLL buffers)
-  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorOIT;
-
-  void ensureDescriptorLayouts();
-  void resetDescriptors();
-  void ensureOITResources();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);

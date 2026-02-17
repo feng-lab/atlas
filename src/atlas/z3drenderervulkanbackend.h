@@ -29,6 +29,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -55,6 +56,10 @@ class ZVulkanImgSlicePipelineContext;
 class ZVulkanImgRaycasterPipelineContext;
 class ZVulkanFontPipelineContext;
 class ZVulkanBuffer;
+class ZVulkanBindlessDescriptorSet;
+class Z3DImg;
+class Z3DTransferFunction;
+class ZColorMap;
 
 namespace vulkan {
 
@@ -146,6 +151,18 @@ struct UniformArenaBudgetTraits<ConePayload>
     // (Frame UBO is allocated once in beginRender().)
     return 0u;
   }
+};
+
+template<>
+struct UniformArenaBudgetTraits<ImgRaycasterPayload>
+{
+  [[nodiscard]] static size_t estimateAdditionalBytes(const ImgRaycasterPayload& payload, size_t uniformAlignment);
+};
+
+template<>
+struct UniformArenaBudgetTraits<ImgSlicePayload>
+{
+  [[nodiscard]] static size_t estimateAdditionalBytes(const ImgSlicePayload& payload, size_t uniformAlignment);
 };
 
 } // namespace vulkan
@@ -253,18 +270,119 @@ public:
   describeSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease) override;
 
   // Shared fallback resources used across pipeline contexts to avoid redundant
-  // tiny texture/sampler creation.
+  // tiny texture creation.
   ZVulkanTexture& defaultPlaceholderTexture2D();
-  vk::Sampler defaultSampler();
-  vk::Sampler nearestClampSampler();
 
   // Shared descriptor set layouts reused across pipeline contexts.
-  vk::DescriptorSetLayout meshTextureDescriptorSetLayout();
+  vk::DescriptorSetLayout bindlessSampledImageDescriptorSetLayout();
   vk::DescriptorSetLayout lightingDescriptorSetLayout();
   vk::DescriptorSetLayout transformDescriptorSetLayout();
   vk::DescriptorSetLayout oitDescriptorSetLayout();
-  vk::DescriptorSetLayout dualTexturePlaceholderDescriptorSetLayout();
-  vk::DescriptorSetLayout emptyDescriptorSetLayout();  
+  vk::DescriptorSetLayout emptyDescriptorSetLayout();
+  // Image renderer helper descriptor set layouts:
+  // - set 1 (binding 0): indices UBO (dynamic)
+  // - set 2 (binding 2): page-data UBO (dynamic)
+  vk::DescriptorSetLayout imgIndicesDescriptorSetLayout();
+  vk::DescriptorSetLayout imgPageDataDescriptorSetLayout();
+
+  // Shared per-frame-slot descriptor sets allocated from the persistent
+  // descriptor pool. These are updated only at the frame completion safe point
+  // (beginRender after slot acquisition) so command buffer recording never
+  // performs descriptor writes.
+  [[nodiscard]] vk::DescriptorSet sharedEmptyDescriptorSet() const;
+  [[nodiscard]] vk::DescriptorSet sharedLightingDescriptorSet() const;
+  [[nodiscard]] uint64_t sharedLightingDescriptorSetGeneration() const;
+  // Transforms descriptor set variants:
+  // - Uniform: all bindings point at the per-frame uniform arena buffer.
+  // - Persistent: bindings 1/2 point at the persistent uniform arena buffer.
+  [[nodiscard]] vk::DescriptorSet sharedTransformsDescriptorSetUniform() const;
+  [[nodiscard]] uint64_t sharedTransformsDescriptorSetUniformGeneration() const;
+  [[nodiscard]] vk::DescriptorSet sharedTransformsDescriptorSetPersistent() const;
+  [[nodiscard]] uint64_t sharedTransformsDescriptorSetPersistentGeneration() const;
+  [[nodiscard]] vk::DescriptorSet sharedOITDescriptorSet() const;
+  [[nodiscard]] uint64_t sharedOITDescriptorSetGeneration() const;
+  // Ring slot index used to select the shared OIT descriptor set for the
+  // current submission (0 when PPLL ring is inactive).
+  [[nodiscard]] uint32_t sharedOITDescriptorSetRingIndex() const noexcept;
+  [[nodiscard]] vk::DescriptorSet sharedImgIndicesDescriptorSet() const;
+  [[nodiscard]] vk::DescriptorSet sharedImgPageDataDescriptorSet() const;
+
+  // Bindless sampled-image table (descriptor indexing). This is a per-frame-slot
+  // descriptor set that is bound at set=0 for Atlas graphics pipelines.
+  //
+  // Mutations (descriptor writes) must happen before command-buffer recording
+  // begins for the frame-slot; lookups are allowed during recording.
+  [[nodiscard]] vk::DescriptorSet bindlessSampledImageDescriptorSet() const;
+  [[nodiscard]] uint64_t bindlessSampledImageDescriptorSetGeneration() const;
+  // Convenience wrappers that choose bindless table based on the texture's
+  // view type + format (float vs unsigned integer). Sampler state is selected
+  // in shaders via bindless.glslinc's immutable sampler bindings.
+  //
+  // Policy:
+  // - Unsigned integer formats use UTexture* tables.
+  // - All other sampled images use Texture* tables.
+  [[nodiscard]] uint32_t bindlessRegisterSampledImageAuto(class ZVulkanTexture& texture,
+                                                          std::string_view debugLabel = {});
+  [[nodiscard]] uint32_t bindlessLookupSampledImageAutoOrCrash(class ZVulkanTexture& texture,
+                                                               std::string_view debugLabel = {}) const;
+
+  // Debug: dump bindless descriptor entry state for a sampled-image texture.
+  // This helps diagnose silent correctness failures where a shader samples a
+  // stale or unintended bindless entry while remaining Vulkan-valid.
+  void debugDumpBindlessSampledImageEntry(class ZVulkanTexture& texture, std::string_view label = {}) const;
+
+  // Pre-record hook used by ZVulkanLinearScript to build bindless descriptor
+  // state once per submission (before command-buffer recording begins).
+  void bindlessPreRegisterExternalSampledImageUses(std::span<const ExternalImageUseDesc> uses,
+                                                   std::string_view debugLabel = {});
+
+  struct BindlessFontAtlasPixelsDesc
+  {
+    const uint8_t* pixelsBGRA8 = nullptr;
+    uint32_t width = 0;
+    uint32_t height = 0;
+  };
+
+  // Pre-record hook used by ZVulkanLinearScript for the Vulkan font renderer.
+  // Fonts supply CPU atlas pixels instead of a VkImage handle; the backend must
+  // upload those atlases and register them into the bindless tables before
+  // command-buffer recording begins.
+  void bindlessPreRegisterFontAtlasPixels(std::span<const BindlessFontAtlasPixelsDesc> atlases,
+                                          std::string_view debugLabel = {});
+
+  // Pre-record hooks used by ZVulkanLinearScript for image renderers that own
+  // internal Vulkan textures (volume uploads, LUTs, paging tables).
+  // These must run before command-buffer recording begins so bindless descriptor
+  // mutations never happen while recording.
+  void bindlessPreWarmupImgRaycaster(Z3DImg* image,
+                                     const std::vector<Z3DTransferFunction*>* transferFunctions,
+                                     std::span<const size_t> channels,
+                                     bool wants2D,
+                                     bool wantsVolume3D,
+                                     bool wantsPaging,
+                                     std::string_view debugLabel = {});
+
+  void bindlessPreWarmupImgSlice(Z3DImg* image,
+                                 const std::vector<const ZColorMap*>* colormaps,
+                                 std::span<const size_t> channels,
+                                 bool wantsVolume3D,
+                                 bool wantsColormap,
+                                 bool wantsPaging,
+                                 std::string_view debugLabel = {});
+
+  // Pre-record hooks for progressive block-ID compaction workflows. These
+  // allocate and write per-frame descriptor sets so compute passes never update
+  // descriptors while recording.
+  void bindlessPrePrimeImgRaycasterBlockIdCompaction(
+    const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
+    uint32_t effectiveAttachmentCount,
+    std::string_view debugLabel = {});
+
+  void bindlessPrePrimeImgSliceBlockIdCompaction(
+    const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
+    uint32_t sliceCount,
+    uint32_t sliceIndex,
+    std::string_view debugLabel = {});
 
   void preBackendSwitch() override;
 
@@ -385,11 +503,6 @@ public:
   // secondary command buffers to bind stable descriptor-set handles across
   // frames.
   std::unique_ptr<ZVulkanDescriptorSet> allocatePersistentDescriptorSet(vk::DescriptorSetLayout layout);
-
-  // Allocate a per-draw override descriptor set and keep it alive until the
-  // current frame fence signals. Returns a raw pointer owned by the backend.
-  // Use this when updating descriptors per draw to avoid update-after-bind.
-  ZVulkanDescriptorSet* allocateOverrideDescriptorSet(vk::DescriptorSetLayout layout);
 
   // Await the active submission fence (if any) as a coroutine.
   //
@@ -526,6 +639,7 @@ public:
     static constexpr uint32_t kOitDescriptorPresence = 1u << 4;
     static constexpr uint32_t kOitDescriptorSet = 1u << 5;
     static constexpr uint32_t kOitResourcesRevision = 1u << 6;
+    static constexpr uint32_t kOitDescriptorGeneration = 1u << 17;
     static constexpr uint32_t kDynamicOffsets = 1u << 7;
     static constexpr uint32_t kVertexBuffers = 1u << 8;
     static constexpr uint32_t kVertexOffsets = 1u << 9;
@@ -694,6 +808,7 @@ private:
   void ensureSharedDescriptorLayouts();
   struct FrameResources;
   FrameResources& ensureFrameResourcesForKey(void* key);
+  void ensureSharedDescriptorSetsOnFrame(FrameResources& frame);
   struct GpuScopeRecord
   {
     std::string label;
@@ -750,6 +865,26 @@ private:
     // is intentionally not reset each submission so cached command buffers can
     // keep binding the same descriptor-set handles across frames.
     std::unique_ptr<ZVulkanDescriptorPool> persistentDescriptorPool;
+    // Per-frame-slot bindless sampled-image tables (descriptor indexing). These
+    // descriptor-set handles remain stable for the lifetime of the frame-slot
+    // and are updated only after the slot's previous submission completes.
+    std::unique_ptr<ZVulkanBindlessDescriptorSet> bindlessSampledImages;
+    // Shared per-frame-slot descriptor sets used across pipeline contexts to
+    // avoid per-submission descriptor-set churn. These are allocated from the
+    // persistent descriptor pool and updated only at beginRender() (after the
+    // frame completion safe point for this slot).
+    std::unique_ptr<ZVulkanDescriptorSet> sharedEmpty;
+    std::unique_ptr<ZVulkanDescriptorSet> sharedLighting;
+    std::unique_ptr<ZVulkanDescriptorSet> sharedTransformsUniform;
+    std::unique_ptr<ZVulkanDescriptorSet> sharedTransformsPersistent;
+    // Shared OIT descriptor sets are tracked per PPLL ring slot so we can
+    // bind a stable VkDescriptorSet handle for cached secondary command buffers
+    // without rewriting descriptors every frame-token (which would invalidate
+    // previously recorded secondary command buffers and trigger validation
+    // errors like VUID-vkCmdExecuteCommands-pCommandBuffers-00089).
+    std::vector<std::unique_ptr<ZVulkanDescriptorSet>> sharedOITByRing;
+    std::unique_ptr<ZVulkanDescriptorSet> sharedImgIndices;
+    std::unique_ptr<ZVulkanDescriptorSet> sharedImgPageData;
     uint32_t descriptorSetsAllocated = 0; // VLOG(1) counter per frame
     bool arenaResetScheduled = false; // scheduled at endRender()
     uint32_t arenaResetsPerformed = 0; // count performed resets (debug)
@@ -789,9 +924,15 @@ private:
     // of suballocated ranges until the submission fence signals.
     std::unordered_set<void*> pinnedStaticSegments;
 
-    // Per-draw override descriptor sets kept alive until fence
-    std::vector<std::unique_ptr<ZVulkanDescriptorSet>> transientOverrideSets;
-    uint32_t overrideSetsAllocated = 0; // count of per-draw override sets
+    // Pre-record primed compute descriptor sets (no descriptor writes during recording).
+    // These descriptor-set handles are allocated from the persistent descriptor
+    // arena and remain stable for the lifetime of the frame-slot (activeFrameKey()).
+    //
+    // They are updated only at beginRender()/preRecord safe points (after the
+    // slot's previous submission completed).
+    std::unique_ptr<ZVulkanDescriptorSet> ddpCountComputeDescriptorSet;
+    std::unique_ptr<ZVulkanDescriptorSet> ppllScanLocalComputeDescriptorSet;
+    std::unique_ptr<ZVulkanDescriptorSet> ppllScanAddComputeDescriptorSet;
 
     // Formats of currently open dynamic rendering segment
     std::optional<vulkan::AttachmentFormats> activeSegmentFormats;
@@ -1153,18 +1294,24 @@ public:
 
   // Shared fallback resources
   std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;
+  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2DArray;
+  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder3D;
+  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholderU2D;
+  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholderU3D;
   std::unique_ptr<ZVulkanBuffer> m_defaultPlaceholderStorageBuffer;
   std::optional<vk::raii::Sampler> m_defaultSampler;
   std::optional<vk::raii::Sampler> m_nearestClampSampler;
 
   struct SharedDescriptorLayouts
   {
-    std::optional<vk::raii::DescriptorSetLayout> meshTextures;
+    std::optional<vk::raii::DescriptorSetLayout> bindlessSampledImages;
     std::optional<vk::raii::DescriptorSetLayout> lighting;
     std::optional<vk::raii::DescriptorSetLayout> transforms;
     std::optional<vk::raii::DescriptorSetLayout> oitParams;
-    std::optional<vk::raii::DescriptorSetLayout> dualTexturePlaceholder;
     std::optional<vk::raii::DescriptorSetLayout> empty;
+    // Image renderer helper layouts (slice/raycaster).
+    std::optional<vk::raii::DescriptorSetLayout> imgIndices; // set 1 (binding 0)
+    std::optional<vk::raii::DescriptorSetLayout> imgPageData; // set 2 (binding 2)
   } m_sharedDescriptorLayouts;
 
   // Shared geometry: fullscreen quad VBO
@@ -1274,6 +1421,7 @@ public:
   // Helpers for descriptor arena lifecycle
   void ensureArenaOnFrame(FrameResources& frame);
   void ensurePersistentArenaOnFrame(FrameResources& frame);
+  void ensureBindlessSampledImagesOnFrame(FrameResources& frame);
   void applyPendingArenaReset(FrameResources& frame);
   // Opportunistically enter the "frame completion safe point" for any frame
   // slots whose fences have completed and whose completion callbacks have been
@@ -1358,7 +1506,6 @@ public:
   struct PassBaseline
   {
     uint32_t descriptorSetsAllocated = 0;
-    uint32_t overrideSetsAllocated = 0;
     size_t pipelinesBoundUnique = 0;
     uint32_t renderingSegmentsBegan = 0;
     uint32_t attachmentClears = 0;

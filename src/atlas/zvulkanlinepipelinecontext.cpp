@@ -9,7 +9,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkanbuffer.h"
-#include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
 #include "zvulkanclipplanes.h"
 #include "zvulkanuniforms.h"
@@ -18,6 +17,7 @@
 #include "z3dlinerenderer.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
+#include "zvulkanstaticpromotionutils.h"
 #include "zrenderthreadexecutor_tls.h"
 
 #include <algorithm>
@@ -30,6 +30,8 @@
 #include <cstdint>
 
 #include <folly/coro/Task.h>
+
+DECLARE_bool(atlas_vk_cache_draw_secondaries);
 
 namespace nim {
 namespace {
@@ -194,9 +196,8 @@ void ZVulkanLinePipelineContext::resetFrame()
   // more than one frame is in flight. The buffers are released after the
   // current submission fence signals so the previous frame can safely finish
   // reading them on the GPU.
-  // No OIT UBO retention required
-  resetDescriptors();
-  m_ddpUboCache.clear();
+  // No OIT UBO retention required.
+  m_usedThinStaticVBThisFrame = false;
   m_ddpArgsByStream.clear();
   m_thinStaticCopyPendingKeys.clear();
   m_wideStaticCopyPendingKeys.clear();
@@ -249,6 +250,19 @@ void ZVulkanLinePipelineContext::evictStream(uint64_t streamKey)
     m_backend.releaseStaticSlice(entry.ib);
     it = m_wideStaticCache.erase(it);
   }
+
+  for (auto it = m_thinSecondaryCache.begin(); it != m_thinSecondaryCache.end();) {
+    if (it->first.streamKey == streamKey) {
+      it = m_thinSecondaryCache.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto& [frameKey, cache] : m_uboCacheByFrameKey) {
+    (void)frameKey;
+    cache.byStream.erase(streamKey);
+  }
 }
 
 void ZVulkanLinePipelineContext::flushRetainedUbos()
@@ -270,91 +284,6 @@ void ZVulkanLinePipelineContext::flushRetainedUbos()
       "VK line retained UBO lifetime");
   }
   m_retainedUbos.clear();
-}
-
-void ZVulkanLinePipelineContext::resetDescriptors()
-{
-  m_dsTexture.reset();
-  m_dsLighting.reset();
-  m_dsTransforms.reset();
-  m_dsOIT.reset();
-}
-
-void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
-{
-  if (!m_setTexture) {
-    auto& vkDevice = m_backend.device().context().device();
-    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 2,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
-    };
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                                 .pBindings = bindings.data()};
-    m_setTexture.emplace(vkDevice, createInfo);
-  }
-  if (!m_setLighting) {
-    m_setLighting = m_backend.lightingDescriptorSetLayout();
-  }
-  if (!m_setTransforms) {
-    m_setTransforms = m_backend.transformDescriptorSetLayout();
-  }
-  if (!m_setOIT) {
-    m_setOIT = m_backend.oitDescriptorSetLayout();
-  }
-}
-
-void ZVulkanLinePipelineContext::ensurePlaceholderTexture() {}
-
-void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
-{
-  (void)renderer;
-  ensureDescriptorLayouts();
-  if (!m_dsLighting) {
-    m_dsLighting = m_backend.allocateFrameDescriptorSet(m_setLighting);
-  }
-  if (!m_dsTransforms) {
-    m_dsTransforms = m_backend.allocateFrameDescriptorSet(m_setTransforms);
-  }
-  if (!m_dsTexture) {
-    m_dsTexture = m_backend.allocateFrameDescriptorSet(**m_setTexture);
-  }
-
-  // Ensure OIT descriptor set (set 3) for DDP flag SSBO
-  if (!m_dsOIT && m_setOIT) {
-    m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
-  }
-  if (m_dsOIT && !m_backend.isRecording()) {
-    m_backend.primeOITDescriptorSet(*m_dsOIT);
-  }
-
-  // Bind per-frame uniform arena buffer to dynamic UBO bindings once.
-  if (m_dsLighting) {
-    m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
-  }
-  if (m_dsTransforms) {
-    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(FrameTransformsUBOStd140));
-    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(ObjectTransformsUBOStd140));
-    m_dsTransforms->writeUniformBufferDynamicOnce(2, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
-  }
-
-  ensurePlaceholderTexture();
-  if (m_dsTexture) {
-    auto& tex = m_backend.defaultPlaceholderTexture2D();
-    auto sampler = m_backend.defaultSampler();
-    m_dsTexture->writeTextureOnce(0, tex, sampler);
-    m_dsTexture->writeTextureOnce(1, tex, sampler);
-    m_dsTexture->writeTextureOnce(2, tex, sampler);
-  }
 }
 
 void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
@@ -397,29 +326,6 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   const float sizeScale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, 0.0f, 0.0f, 0.0f);
   vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
-  CHECK(batch.shaderHook.captured) << "Line batch missing shader hook snapshot";
-  const auto hook = batch.shaderHook.type;
-  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
-                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  if (ddp && payload.streamKey != 0) {
-    auto it = m_ddpUboCache.find(payload.streamKey);
-    if (it != m_ddpUboCache.end()) {
-      for (const auto& cached : it->second) {
-        if (cached.params != payload.params || cached.followCoordTransform != payload.followCoordTransform ||
-            cached.followSizeScale != payload.followSizeScale || cached.followOpacity != payload.followOpacity ||
-            cached.pickingPass != payload.pickingPass || !clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
-          continue;
-        }
-        m_dynObjectTransformsOffset = cached.objectTransformsOffset;
-        m_dynMaterialOffset = cached.materialOffset;
-        return;
-      }
-    }
-  }
-
-  auto transformsSlice = m_backend.suballocateUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
-  std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
-  m_dynObjectTransformsOffset = transformsSlice.offset;
 
   MaterialUBOStd140 material{};
   material.material_ambient = payload.params.materialAmbient;
@@ -427,22 +333,70 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   material.material_shininess = payload.params.materialShininess;
   material.alpha = (payload.pickingPass || !payload.followOpacity) ? 1.0f : payload.params.opacity;
 
-  auto materialSlice = m_backend.suballocateUniformFor(payload, sizeof(MaterialUBOStd140));
-  std::memcpy(materialSlice.mapped, &material, sizeof(material));
-  m_dynMaterialOffset = materialSlice.offset;
+  void* frameKey = m_backend.activeFrameKey();
+  CHECK(frameKey != nullptr) << "Line updateUBOs called without an active Vulkan frame-slot key";
+  if (payload.streamKey != 0) {
+    FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
+    auto& entries = frameCache.byStream[payload.streamKey];
 
-  if (ddp && payload.streamKey != 0) {
-    DDPUboCacheEntry entry{};
+    for (auto& cached : entries) {
+      if (cached.pickingPass != payload.pickingPass) {
+        continue;
+      }
+
+      m_dynObjectTransformsOffset = cached.objectTransformsOffset;
+      m_dynMaterialOffset = cached.materialOffset;
+
+      if (cached.params == payload.params && cached.followCoordTransform == payload.followCoordTransform &&
+          cached.followSizeScale == payload.followSizeScale && cached.followOpacity == payload.followOpacity &&
+          clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
+        return;
+      }
+
+      std::memcpy(m_backend.persistentUniformMappedAt(cached.objectTransformsOffset, sizeof(ObjectTransformsUBOStd140)),
+                  &transforms,
+                  sizeof(transforms));
+      std::memcpy(m_backend.persistentUniformMappedAt(cached.materialOffset, sizeof(MaterialUBOStd140)),
+                  &material,
+                  sizeof(material));
+
+      cached.params = payload.params;
+      cached.followCoordTransform = payload.followCoordTransform;
+      cached.followSizeScale = payload.followSizeScale;
+      cached.followOpacity = payload.followOpacity;
+      cached.clipPlanes = batch.clipPlanes;
+      return;
+    }
+
+    auto transformsSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
+    std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
+    m_dynObjectTransformsOffset = transformsSlice.offset;
+
+    auto materialSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(MaterialUBOStd140));
+    std::memcpy(materialSlice.mapped, &material, sizeof(material));
+    m_dynMaterialOffset = materialSlice.offset;
+
+    UboCacheEntry entry{};
+    entry.pickingPass = payload.pickingPass;
     entry.params = payload.params;
     entry.followCoordTransform = payload.followCoordTransform;
     entry.followSizeScale = payload.followSizeScale;
     entry.followOpacity = payload.followOpacity;
-    entry.pickingPass = payload.pickingPass;
     entry.clipPlanes = batch.clipPlanes;
     entry.objectTransformsOffset = transformsSlice.offset;
     entry.materialOffset = materialSlice.offset;
-    m_ddpUboCache[payload.streamKey].push_back(std::move(entry));
+    entries.push_back(std::move(entry));
+    return;
   }
+
+  // Fallback (should be rare): no stream key, so we cannot assign a stable slice.
+  auto transformsSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
+  std::memcpy(transformsSlice.mapped, &transforms, sizeof(transforms));
+  m_dynObjectTransformsOffset = transformsSlice.offset;
+
+  auto materialSlice = m_backend.suballocatePersistentUniformFor(payload, sizeof(MaterialUBOStd140));
+  std::memcpy(materialSlice.mapped, &material, sizeof(material));
+  m_dynMaterialOffset = materialSlice.offset;
 }
 
 ZVulkanLinePipelineContext::PipelineInstance&
@@ -451,6 +405,14 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
                                            const vulkan::AttachmentFormats& formats)
 {
   (void)payload;
+  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
+  CHECK(bindlessLayout) << "Line pipeline missing bindless descriptor set layout";
+  const vk::DescriptorSetLayout lightingLayout = m_backend.lightingDescriptorSetLayout();
+  CHECK(lightingLayout) << "Line pipeline missing lighting descriptor set layout";
+  const vk::DescriptorSetLayout transformsLayout = m_backend.transformDescriptorSetLayout();
+  CHECK(transformsLayout) << "Line pipeline missing transforms descriptor set layout";
+  const vk::DescriptorSetLayout oitLayout = m_backend.oitDescriptorSetLayout();
+  CHECK(oitLayout) << "Line pipeline missing OIT descriptor set layout";
   auto it = m_pipelineCache.find(key);
   if (it != m_pipelineCache.end()) {
     return it->second;
@@ -526,14 +488,13 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
 
     auto vi = makeWideVertexInput();
     instance.pipeline = device.createPipeline(*instance.shader, vi, vk::PrimitiveTopology::eTriangleList);
-    std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, m_setLighting, m_setTransforms};
+    std::vector<vk::DescriptorSetLayout> setLayouts = {bindlessLayout, lightingLayout, transformsLayout};
     if ((key.shaderHookType == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
          key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
          key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel ||
          key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
-         key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) &&
-        m_setOIT) {
-      setLayouts.push_back(m_setOIT);
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore)) {
+      setLayouts.push_back(oitLayout);
     }
     instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
     instance.pipeline->setDescriptorSetLayouts(setLayouts);
@@ -663,10 +624,9 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
         break;
     }
 
-    constexpr uint32_t wideLinePCSize = static_cast<uint32_t>(sizeof(glm::mat4) * 2 + sizeof(float) * 6);
     vk::PushConstantRange pushRange{.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                                     .offset = 0,
-                                    .size = wideLinePCSize};
+                                    .size = static_cast<uint32_t>(sizeof(WideLinePushConstants))};
     instance.pipeline->setPushConstantRanges({pushRange});
     instance.pipeline->create();
   } else {
@@ -703,20 +663,25 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     const vk::PrimitiveTopology topology =
       key.lineStrip ? vk::PrimitiveTopology::eLineStrip : vk::PrimitiveTopology::eLineList;
     instance.pipeline = device.createPipeline(*instance.shader, vi, topology);
-    std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, m_setLighting, m_setTransforms};
+    std::vector<vk::DescriptorSetLayout> setLayouts = {bindlessLayout, lightingLayout, transformsLayout};
     if ((key.shaderHookType == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
          key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
          key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel ||
          key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
-         key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) &&
-        m_setOIT) {
-      setLayouts.push_back(m_setOIT);
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore)) {
+      setLayouts.push_back(oitLayout);
     }
     instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
     instance.pipeline->setDescriptorSetLayouts(setLayouts);
     // Thin lines may produce implementation-dependent winding; disable culling
     // to ensure visibility regardless of vertex order.
     instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
+
+    // Dual-depth-peeling peel shader consumes bindless blender indices via push constants.
+    vk::PushConstantRange pcRange{.stageFlags = vk::ShaderStageFlagBits::eFragment,
+                                  .offset = 0,
+                                  .size = static_cast<uint32_t>(sizeof(DDPPeelPushConstants))};
+    instance.pipeline->setPushConstantRanges({pcRange});
     if (key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
         key.shaderHookType == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) {
       instance.pipeline->setDepthTestEnable(true);
@@ -832,7 +797,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
     if (!m_wideStaticCopyPendingKeys.contains(key)) {
       auto it = m_wideStaticCache.find(key);
       if (it != m_wideStaticCache.end()) {
-        const WideCacheEntry& entry = it->second;
+        WideCacheEntry& entry = it->second;
         const bool sizeSame = (entry.vertexCount == vertexCount) && (entry.indexCount == indexCount);
         bool gensSame = (entry.p0Gen == payload.smoothP0PositionsGen) &&
                         (entry.p1Gen == payload.smoothP1PositionsGen) && (entry.flagsGen == payload.smoothFlagsGen) &&
@@ -864,14 +829,10 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
             m_wideIndexBuffer = VK_NULL_HANDLE;
             m_wideUploadIndexOffset = 0;
           }
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbP0);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbP1);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbC0);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbC1);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbFlags);
-          if (indexCount > 0) {
-            m_backend.pinStaticSliceForActiveSubmission(entry.ib);
-          }
+          vulkan::pinStaticSlicesForActiveSubmission(
+            m_backend,
+            {&entry.vbP0, &entry.vbP1, &entry.vbC0, &entry.vbC1, &entry.vbFlags, &entry.ib});
+          entry.usedStaticOnce = true;
           return;
         }
       }
@@ -984,6 +945,31 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
     WideCacheKey key{payload.streamKey, payload.pickingPass};
     auto it = m_wideStaticCache.find(key);
     const int kPromotionThreshold = 2;
+    const auto promoteToStatics = [&](WideCacheEntry& dstEntry) -> bool {
+      const size_t idxBytes = indexCount * sizeof(uint32_t);
+      size_t stagedBytes = 0;
+      if (!vulkan::allocateAndScheduleStaticCopies(m_backend,
+                                                   {
+                                                     {&dstEntry.vbP0,    &p0Slice,    pBytes,   alignof(glm::vec3), false},
+                                                     {&dstEntry.vbP1,    &p1Slice,    pBytes,   alignof(glm::vec3), false},
+                                                     {&dstEntry.vbC0,    &c0Slice,    cBytes,   alignof(glm::vec4), false},
+                                                     {&dstEntry.vbC1,    &c1Slice,    cBytes,   alignof(glm::vec4), false},
+                                                     {&dstEntry.vbFlags, &flagsSlice, fBytes,   alignof(float),     false},
+                                                     {&dstEntry.ib,      &idxSlice,   idxBytes, alignof(uint32_t),  true }
+      },
+                                                   &stagedBytes)) {
+        return false;
+      }
+      m_backend.addLineBytesStaged(stagedBytes);
+      VLOG(1) << fmt::format("VK line wide promote: p0={}B p1={}B c0={}B c1={}B flags={}B idx={}B",
+                             pBytes,
+                             pBytes,
+                             cBytes,
+                             cBytes,
+                             fBytes,
+                             idxBytes);
+      return true;
+    };
     if (it == m_wideStaticCache.end()) {
       WideCacheEntry entry{};
       entry.vertexCount = static_cast<uint32_t>(vertexCount);
@@ -998,7 +984,18 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
         entry.c1Gen = payload.smoothP1ColorsGen;
       }
       entry.indexGen = payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen;
-      m_wideStaticCache.emplace(key, entry);
+      auto [inserted, _] = m_wideStaticCache.emplace(key, entry);
+      WideCacheEntry& insertedEntry = inserted->second;
+
+      // UX: stage into device-local statics on first sight so the next frame
+      // can bind fast device-local buffers when geometry is steady.
+      if (promoteToStatics(insertedEntry)) {
+        insertedEntry.promoted = true;
+        insertedEntry.usedStaticOnce = false;
+        // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+        m_wideStaticCopyPendingKeys.insert(key);
+        return;
+      }
     } else {
       WideCacheEntry& entry = it->second;
       const bool sizeSame = (entry.vertexCount == vertexCount) && (entry.indexCount == indexCount);
@@ -1036,13 +1033,10 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
       }
 
       if (entry.promoted && !sizeSame) {
-        m_backend.releaseStaticSlice(entry.vbP0);
-        m_backend.releaseStaticSlice(entry.vbP1);
-        m_backend.releaseStaticSlice(entry.vbC0);
-        m_backend.releaseStaticSlice(entry.vbC1);
-        m_backend.releaseStaticSlice(entry.vbFlags);
-        m_backend.releaseStaticSlice(entry.ib);
+        vulkan::releaseStaticSlices(m_backend,
+                                    {&entry.vbP0, &entry.vbP1, &entry.vbC0, &entry.vbC1, &entry.vbFlags, &entry.ib});
         entry.promoted = false;
+        entry.usedStaticOnce = false;
         entry.unchangedFrames = 0;
         entry.vertexCount = static_cast<uint32_t>(vertexCount);
         entry.indexCount = static_cast<uint32_t>(indexCount);
@@ -1056,6 +1050,16 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           entry.c1Gen = payload.smoothP1ColorsGen;
         }
         entry.indexGen = payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen;
+
+        // Recreate static slices immediately so the next steady frame can bind
+        // device-local buffers without a multi-frame warmup.
+        if (promoteToStatics(entry)) {
+          entry.promoted = true;
+          entry.usedStaticOnce = false;
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+          m_wideStaticCopyPendingKeys.insert(key);
+          return;
+        }
         return;
       }
 
@@ -1070,6 +1074,31 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           anyChanged =
             anyChanged || (entry.c0Gen != payload.smoothP0ColorsGen) || (entry.c1Gen != payload.smoothP1ColorsGen);
         }
+
+        // If this stream is still changing before we've ever bound the static
+        // buffers, drop the statics and fall back to upload-only mode to avoid
+        // paying upload->device copies every frame without a benefit.
+        if (anyChanged && !entry.usedStaticOnce) {
+          vulkan::releaseStaticSlices(m_backend,
+                                      {&entry.vbP0, &entry.vbP1, &entry.vbC0, &entry.vbC1, &entry.vbFlags, &entry.ib});
+          entry.promoted = false;
+          entry.usedStaticOnce = false;
+          entry.unchangedFrames = 0;
+          entry.vertexCount = static_cast<uint32_t>(vertexCount);
+          entry.indexCount = static_cast<uint32_t>(indexCount);
+          entry.p0Gen = payload.smoothP0PositionsGen;
+          entry.p1Gen = payload.smoothP1PositionsGen;
+          entry.flagsGen = payload.smoothFlagsGen;
+          if (pickingPass) {
+            entry.pickGen = payload.smoothPickingColorsGen;
+          } else {
+            entry.c0Gen = payload.smoothP0ColorsGen;
+            entry.c1Gen = payload.smoothP1ColorsGen;
+          }
+          entry.indexGen = payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen;
+          return;
+        }
+
         if (entry.p0Gen != payload.smoothP0PositionsGen) {
           m_backend.scheduleStaticCopy(entry.vbP0.buffer, entry.vbP0.offset, p0Slice, false);
         }
@@ -1127,14 +1156,10 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
         m_wideFlagsOffset = entry.vbFlags.offset;
         m_wideIndexBuffer = entry.ib ? entry.ib.buffer : VK_NULL_HANDLE;
         m_wideUploadIndexOffset = entry.ib.offset;
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbP0);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbP1);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbC0);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbC1);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbFlags);
-        if (indexCount > 0) {
-          m_backend.pinStaticSliceForActiveSubmission(entry.ib);
-        }
+        vulkan::pinStaticSlicesForActiveSubmission(
+          m_backend,
+          {&entry.vbP0, &entry.vbP1, &entry.vbC0, &entry.vbC1, &entry.vbFlags, &entry.ib});
+        entry.usedStaticOnce = true;
         return;
       }
 
@@ -1154,46 +1179,11 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
       entry.indexGen = payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen;
 
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
-        auto p0Dst = m_backend.allocateStaticVB(pBytes, alignof(glm::vec3));
-        auto p1Dst = m_backend.allocateStaticVB(pBytes, alignof(glm::vec3));
-        auto c0Dst = m_backend.allocateStaticVB(cBytes, alignof(glm::vec4));
-        auto c1Dst = m_backend.allocateStaticVB(cBytes, alignof(glm::vec4));
-        auto fDst = m_backend.allocateStaticVB(fBytes, alignof(float));
-        auto ibDst = m_backend.allocateStaticIB(indexCount * sizeof(uint32_t), alignof(uint32_t));
-        if (p0Dst && p1Dst && c0Dst && c1Dst && fDst && ibDst) {
-          m_backend.scheduleStaticCopy(p0Dst.buffer, p0Dst.offset, p0Slice, false);
-          m_backend.scheduleStaticCopy(p1Dst.buffer, p1Dst.offset, p1Slice, false);
-          m_backend.scheduleStaticCopy(c0Dst.buffer, c0Dst.offset, c0Slice, false);
-          m_backend.scheduleStaticCopy(c1Dst.buffer, c1Dst.offset, c1Slice, false);
-          m_backend.scheduleStaticCopy(fDst.buffer, fDst.offset, flagsSlice, false);
-          m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, idxSlice, true);
-          entry.vbP0 = p0Dst;
-          entry.vbP1 = p1Dst;
-          entry.vbC0 = c0Dst;
-          entry.vbC1 = c1Dst;
-          entry.vbFlags = fDst;
-          entry.ib = ibDst;
-          entry.p0Gen = payload.smoothP0PositionsGen;
-          entry.p1Gen = payload.smoothP1PositionsGen;
-          entry.flagsGen = payload.smoothFlagsGen;
-          if (pickingPass) {
-            entry.pickGen = payload.smoothPickingColorsGen;
-          } else {
-            entry.c0Gen = payload.smoothP0ColorsGen;
-            entry.c1Gen = payload.smoothP1ColorsGen;
-          }
-          entry.indexGen = payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen;
+        if (promoteToStatics(entry)) {
           entry.promoted = true;
+          entry.usedStaticOnce = false;
           // Do not bind statics this frame; keep upload slices. Statics bind next frame.
           m_wideStaticCopyPendingKeys.insert(key);
-          m_backend.addLineBytesStaged(2 * pBytes + 2 * cBytes + fBytes + indexCount * sizeof(uint32_t));
-          VLOG(1) << fmt::format("VK line wide promote: p0={}B p1={}B c0={}B c1={}B flags={}B idx={}B",
-                                 pBytes,
-                                 pBytes,
-                                 cBytes,
-                                 cBytes,
-                                 fBytes,
-                                 indexCount * sizeof(uint32_t));
           return;
         }
       }
@@ -1246,7 +1236,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
     if (!m_thinStaticCopyPendingKeys.contains(key)) {
       auto it = m_thinStaticCache.find(key);
       if (it != m_thinStaticCache.end()) {
-        const ThinCacheEntry& entry = it->second;
+        ThinCacheEntry& entry = it->second;
         const bool sizeSame = (entry.vertexCount == vertexCount) && (entry.indexCount == expectedIndexCount);
         const bool gensSame = (entry.positionsGen == payload.positionsGen) && (entry.indexGen == payload.indicesGen) &&
                               (entry.colorsGen == colorGen);
@@ -1265,11 +1255,9 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
             m_thinUploadIndexBuffer = VK_NULL_HANDLE;
             m_thinUploadIndexOffset = 0;
           }
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbPos);
-          m_backend.pinStaticSliceForActiveSubmission(entry.vbColor);
-          if (payload.isLineStrip) {
-            m_backend.pinStaticSliceForActiveSubmission(entry.ib);
-          }
+          vulkan::pinStaticSlicesForActiveSubmission(m_backend, {&entry.vbPos, &entry.vbColor, &entry.ib});
+          m_usedThinStaticVBThisFrame = true;
+          entry.usedStaticOnce = true;
           return;
         }
       }
@@ -1350,6 +1338,35 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
     ThinCacheKey key{payload.streamKey, payload.pickingPass, payload.isLineStrip};
     auto it = m_thinStaticCache.find(key);
     const int kPromotionThreshold = 2;
+    const auto promoteToStatics = [&](ThinCacheEntry& dstEntry) -> bool {
+      const size_t idxBytes = payload.isLineStrip ? static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t) : 0u;
+      Z3DRendererVulkanBackend::UploadSlice idxUpload{};
+      const Z3DRendererVulkanBackend::UploadSlice* idxSrc = nullptr;
+      if (idxBytes > 0) {
+        if (!m_thinUploadIndexBuffer) {
+          return false;
+        }
+        idxUpload =
+          Z3DRendererVulkanBackend::UploadSlice{m_thinUploadIndexBuffer, m_thinUploadIndexOffset, nullptr, idxBytes};
+        idxSrc = &idxUpload;
+      }
+
+      size_t stagedBytes = 0;
+      if (!vulkan::allocateAndScheduleStaticCopies(
+            m_backend,
+            {
+              {&dstEntry.vbPos,   &posSlice, posBytes, alignof(glm::vec3), false},
+              {&dstEntry.vbColor, &colSlice, colBytes, alignof(glm::vec4), false},
+              {&dstEntry.ib,      idxSrc,    idxBytes, alignof(uint32_t),  true }
+      },
+            &stagedBytes)) {
+        return false;
+      }
+
+      m_backend.addLineBytesStaged(stagedBytes);
+      VLOG(1) << fmt::format("VK line thin promote: pos={}B col={}B idx={}B", posBytes, colBytes, idxBytes);
+      return true;
+    };
     if (it == m_thinStaticCache.end()) {
       ThinCacheEntry entry{};
       entry.vertexCount = vertexCount;
@@ -1357,7 +1374,18 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
       entry.positionsGen = payload.positionsGen;
       entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
       entry.indexGen = payload.indicesGen;
-      m_thinStaticCache.emplace(key, entry);
+      auto [inserted, _] = m_thinStaticCache.emplace(key, entry);
+      ThinCacheEntry& insertedEntry = inserted->second;
+
+      // UX: stage into device-local statics on first sight so the next frame can
+      // bind fast device-local buffers when geometry is steady.
+      if (promoteToStatics(insertedEntry)) {
+        insertedEntry.promoted = true;
+        insertedEntry.usedStaticOnce = false;
+        // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+        m_thinStaticCopyPendingKeys.insert(key);
+        return;
+      }
     } else {
       ThinCacheEntry& entry = it->second;
       const bool sizeSame = (entry.vertexCount == vertexCount) && (entry.indexCount == m_thinUploadIndexCount);
@@ -1382,22 +1410,48 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
       }
 
       if (entry.promoted && !sizeSame) {
-        m_backend.releaseStaticSlice(entry.vbPos);
-        m_backend.releaseStaticSlice(entry.vbColor);
-        m_backend.releaseStaticSlice(entry.ib);
+        vulkan::releaseStaticSlices(m_backend, {&entry.vbPos, &entry.vbColor, &entry.ib});
         entry.promoted = false;
+        entry.usedStaticOnce = false;
         entry.unchangedFrames = 0;
         entry.vertexCount = vertexCount;
         entry.indexCount = m_thinUploadIndexCount;
         entry.positionsGen = payload.positionsGen;
         entry.colorsGen = colorGen;
         entry.indexGen = payload.indicesGen;
+
+        // Recreate static slices immediately so the next steady frame can bind
+        // device-local buffers without a multi-frame warmup.
+        if (promoteToStatics(entry)) {
+          entry.promoted = true;
+          entry.usedStaticOnce = false;
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+          m_thinStaticCopyPendingKeys.insert(key);
+          return;
+        }
         return;
       }
 
       if (entry.promoted && sizeSame) {
         bool anyChanged = (entry.positionsGen != payload.positionsGen) || (entry.colorsGen != colorGen) ||
                           (payload.isLineStrip && entry.indexGen != payload.indicesGen);
+
+        // If this stream is still changing before we've ever bound the static
+        // buffers, drop the statics and fall back to upload-only mode to avoid
+        // paying upload->device copies every frame without a benefit.
+        if (anyChanged && !entry.usedStaticOnce) {
+          vulkan::releaseStaticSlices(m_backend, {&entry.vbPos, &entry.vbColor, &entry.ib});
+          entry.promoted = false;
+          entry.usedStaticOnce = false;
+          entry.unchangedFrames = 0;
+          entry.vertexCount = vertexCount;
+          entry.indexCount = m_thinUploadIndexCount;
+          entry.positionsGen = payload.positionsGen;
+          entry.colorsGen = colorGen;
+          entry.indexGen = payload.indicesGen;
+          return;
+        }
+
         if (entry.positionsGen != payload.positionsGen) {
           m_backend.scheduleStaticCopy(entry.vbPos.buffer, entry.vbPos.offset, posSlice, false);
         }
@@ -1433,11 +1487,8 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           m_thinUploadIndexBuffer = entry.ib.buffer;
           m_thinUploadIndexOffset = entry.ib.offset;
         }
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbPos);
-        m_backend.pinStaticSliceForActiveSubmission(entry.vbColor);
-        if (payload.isLineStrip) {
-          m_backend.pinStaticSliceForActiveSubmission(entry.ib);
-        }
+        vulkan::pinStaticSlicesForActiveSubmission(m_backend, {&entry.vbPos, &entry.vbColor, &entry.ib});
+        entry.usedStaticOnce = true;
         return;
       }
 
@@ -1448,43 +1499,11 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
       entry.indexGen = payload.indicesGen;
 
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
-        auto posDst = m_backend.allocateStaticVB(posBytes, alignof(glm::vec3));
-        auto colDst = m_backend.allocateStaticVB(colBytes, alignof(glm::vec4));
-        Z3DRendererVulkanBackend::StaticSlice ibDst{};
-        if (payload.isLineStrip && m_thinUploadIndexCount > 0) {
-          ibDst = m_backend.allocateStaticIB(static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t),
-                                             alignof(uint32_t));
-        }
-        if (posDst && colDst && (!payload.isLineStrip || ibDst)) {
-          m_backend.scheduleStaticCopy(posDst.buffer, posDst.offset, posSlice, false);
-          m_backend.scheduleStaticCopy(colDst.buffer, colDst.offset, colSlice, false);
-          if (payload.isLineStrip && m_thinUploadIndexCount > 0) {
-            Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer,
-                                                          m_thinUploadIndexOffset,
-                                                          nullptr,
-                                                          static_cast<size_t>(m_thinUploadIndexCount) *
-                                                            sizeof(uint32_t)};
-            m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
-          }
-          entry.vbPos = posDst;
-          entry.vbColor = colDst;
-          entry.ib = ibDst;
-          entry.vertexCount = vertexCount;
-          entry.indexCount = m_thinUploadIndexCount;
-          entry.positionsGen = payload.positionsGen;
-          entry.colorsGen = colorGen;
-          entry.indexGen = payload.indicesGen;
+        if (promoteToStatics(entry)) {
           entry.promoted = true;
+          entry.usedStaticOnce = false;
           // Do not bind statics this frame; keep upload slices. Statics bind next frame.
           m_thinStaticCopyPendingKeys.insert(key);
-          m_backend.addLineBytesStaged(
-            posBytes + colBytes +
-            (payload.isLineStrip ? static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t) : 0u));
-          VLOG(1) << fmt::format("VK line thin promote: pos={}B col={}B idx={}B",
-                                 posBytes,
-                                 colBytes,
-                                 payload.isLineStrip ? static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t)
-                                                     : 0u);
           return;
         }
       }
@@ -1517,45 +1536,28 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
 
   updateUBOs(renderer, batch, payload);
-  // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
-  CHECK(m_dsLighting && m_dsTransforms) << "Line pipeline descriptor sets missing (lighting/transforms)";
+  // Descriptor sets are primed by the backend in beginRender(); avoid record-time rewrites.
+  const vk::DescriptorSet dsLighting = m_backend.sharedLightingDescriptorSet();
+  const vk::DescriptorSet dsTransforms = m_backend.sharedTransformsDescriptorSetPersistent();
+  CHECK(dsLighting && dsTransforms) << "Line pipeline shared descriptor sets missing (lighting/transforms)";
 
   CHECK(batch.shaderHook.captured) << "Line batch missing shader hook snapshot";
   const auto shaderHook = batch.shaderHook.type;
-  const auto& viewState = viewStateForBatch(renderer, batch);
-  vk::DescriptorSet texOverride{};
-  if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_setTexture) {
-    // Allocate a per-draw override descriptor set for DDP peel inputs to avoid update-after-bind.
-    auto* ds = m_backend.allocateOverrideDescriptorSet(**m_setTexture);
-    CHECK(ds != nullptr) << "Line DDP peel: override descriptor allocation failed (fatal)";
-    if (ds) {
-      auto& tex = m_backend.defaultPlaceholderTexture2D();
-      auto sampler = m_backend.defaultSampler();
-      ds->updateTexture(0, tex, sampler);
-      const auto& hookPara = batch.shaderHook.para;
-      if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-        auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
-                                                   m_backend.device(),
-                                                   "line dual-depth-peeling depth blender");
-        ds->updateTexture(1, depthTex, sampler);
-      } else {
-        ds->updateTexture(1, tex, sampler);
-      }
-      if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-        auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
-                                                   m_backend.device(),
-                                                   "line dual-depth-peeling front blender");
-        ds->updateTexture(2, frontTex, sampler);
-      } else {
-        ds->updateTexture(2, tex, sampler);
-      }
-      texOverride = ds->descriptorSet();
-    }
+  const auto& hookPara = batch.shaderHook.para;
+  DDPPeelPushConstants ddpPc{};
+  const bool usesDdpPeelPc = (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  if (usesDdpPeelPc) {
+    CHECK(hookPara.dualDepthPeelingDepthBlenderHandle.valid()) << "Line DDP peel requires a valid depth blender handle";
+    CHECK(hookPara.dualDepthPeelingFrontBlenderHandle.valid()) << "Line DDP peel requires a valid front blender handle";
+    auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                               m_backend.device(),
+                                               "line dual-depth-peeling depth blender");
+    auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                               m_backend.device(),
+                                               "line dual-depth-peeling front blender");
+    ddpPc.ddpDepthBlender = m_backend.bindlessLookupSampledImageAutoOrCrash(depthTex, "line ddp depth blender");
+    ddpPc.ddpFrontBlender = m_backend.bindlessLookupSampledImageAutoOrCrash(frontTex, "line ddp front blender");
   }
-  if (shaderHook != Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-    CHECK(m_dsTexture != nullptr) << "Line pipeline texture descriptor set not initialised";
-  }
-  // No record-time rewrites of persistent texture set; initialized in ensureDescriptorSets()
 
   PipelineKey key;
   key.useSmooth = payload.useSmoothLine;
@@ -1573,12 +1575,9 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   auto& pipeline = ensurePipeline(key, payload, formats);
 
   // Build descriptor sets for draw-only recording
-  const vk::DescriptorSet dsTex =
-    texOverride ? texOverride : (m_dsTexture ? m_dsTexture->descriptorSet() : vk::DescriptorSet{});
-  CHECK(dsTex) << "Line pipeline texture descriptor set not initialised";
-  const std::array<vk::DescriptorSet, 3> descriptorSets{dsTex,
-                                                        m_dsLighting->descriptorSet(),
-                                                        m_dsTransforms->descriptorSet()};
+  const std::array<vk::DescriptorSet, 3> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
+                                                        dsLighting,
+                                                        dsTransforms};
   // Dynamic offsets added to drawSpec after it is constructed below.
 
   uint32_t expectedSets = static_cast<uint32_t>(descriptorSets.size());
@@ -1589,15 +1588,14 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
        shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
        shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel ||
        shaderHook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount ||
-       shaderHook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore) &&
-      m_dsOIT) {
+       shaderHook == Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore)) {
     ZVulkanDescriptorBindInfo oitBind{};
-    oitBind.firstSet = vkbind::kSetOITParams;
-    oitDescriptorSets[0] = m_dsOIT->descriptorSet();
+    oitBind.firstSet = vkbind::kSetOIT;
+    oitDescriptorSets[0] = m_backend.sharedOITDescriptorSet();
     oitBind.sets = oitDescriptorSets;
     extraBinds[0] = oitBind;
     extraBindCount = 1;
-    expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
+    expectedSets = std::max(expectedSets, vkbind::kSetOIT + 1);
   }
 
   if (payload.useSmoothLine) {
@@ -1711,18 +1709,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       vk::Buffer idxBuf = m_wideIndexBuffer ? m_wideIndexBuffer : m_wideP0Buffer;
       cb.bindIndexBuffer(idxBuf, m_wideUploadIndexOffset, vk::IndexType::eUint32);
 
-      struct WideLinePC
-      {
-        glm::mat4 viewport_matrix{1.0f};
-        glm::mat4 viewport_matrix_inverse{1.0f};
-        float line_width = 1.0f;
-        float size_scale = 1.0f;
-        float weighted_a = 0.0f;
-        float weighted_b = 0.0f;
-        float weighted_depth_scale = 0.0f;
-        float _pad = 0.0f;
-      } pc;
-
+      WideLinePushConstants pc{};
       const glm::mat4 vpMatrix = viewportMatrixFor(batch.pass.viewport);
       pc.viewport_matrix = vpMatrix;
       pc.viewport_matrix_inverse = glm::inverse(vpMatrix);
@@ -1730,6 +1717,9 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       // Match GL: allow renderers to opt out of applying the global sizeScale
       // multiplier (used by overlays like selection bounding boxes / gizmos).
       pc.size_scale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
+      pc.line_texture = 0;
+      pc.ddpDepthBlender = usesDdpPeelPc ? ddpPc.ddpDepthBlender : 0;
+      pc.ddpFrontBlender = usesDdpPeelPc ? ddpPc.ddpFrontBlender : 0;
 
       const auto widths = payload.perSegmentWidths;
       const float dpr = renderer.sceneState().devicePixelRatio;
@@ -1764,22 +1754,10 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
         }
         for (uint32_t i = 0; i < drawSegments; ++i) {
           pc.line_width = widths[i];
-          if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
-            const float n = viewState.nearClip;
-            const float f = viewState.farClip;
-            const float denom = std::max(f - n, 1e-6f);
-            pc.weighted_a = (f * n) / denom;
-            pc.weighted_b = 0.5f * (f + n) / denom + 0.5f;
-            pc.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-          } else {
-            pc.weighted_a = 0.0f;
-            pc.weighted_b = 0.0f;
-            pc.weighted_depth_scale = 0.0f;
-          }
-          cb.pushConstants<WideLinePC>(pipelineLayout,
-                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                                       0,
-                                       pc);
+          cb.pushConstants<WideLinePushConstants>(pipelineLayout,
+                                                  vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+                                                  0,
+                                                  pc);
           if (ddpPeelIndirect) {
             CHECK(ddpArgs != nullptr);
             const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
@@ -1795,10 +1773,10 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
         VLOG(1) << fmt::format("VK wide line: single width resolvedLineWidth={:.3f} sizeScale={:.3f}",
                                payload.resolvedLineWidth,
                                sizeScale);
-        cb.pushConstants<WideLinePC>(pipelineLayout,
-                                     vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                                     0,
-                                     pc);
+        cb.pushConstants<WideLinePushConstants>(pipelineLayout,
+                                                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+                                                0,
+                                                pc);
         if (ddpPeelIndirect) {
           CHECK(ddpArgs != nullptr);
           CHECK(ddpArgs->wideOffsets.size() == 1u) << "Line DDP peel: wide args table mismatch";
@@ -1837,6 +1815,13 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.dynamicOffsets = dynamicOffsets;
   drawSpec.extraDescriptorBinds = std::span<const ZVulkanDescriptorBindInfo>(extraBinds.data(), extraBindCount);
   drawSpec.expectedDescriptorSetCount = expectedSets;
+
+  if (usesDdpPeelPc && !payload.useSmoothLine) {
+    drawSpec.pushConstantsData = &ddpPc;
+    drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(ddpPc));
+    drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+    drawSpec.requirePushConstants = true;
+  }
 
   const std::array<vk::Buffer, 2> vertexBuffers{m_thinPosBuffer, m_thinColorBuffer};
   const std::array<vk::DeviceSize, 2> vertexOffsets{m_thinPosOffset, m_thinColorOffset};
@@ -1907,6 +1892,195 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       }
       ddp.thinPrepared = true;
     }
+  }
+
+  void* frameKey = m_backend.activeFrameKey();
+  CHECK(frameKey != nullptr) << "Line record called without an active Vulkan frame-slot key";
+
+  const std::array<uint64_t, 2> vertexBufferSegmentIds{
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[0]),
+    m_backend.staticArenaSegmentIdForBuffer(vertexBuffers[1]),
+  };
+  uint64_t indexBufferSegmentId = 0;
+  if (drawSpec.indexCount > 0 && drawSpec.indexBuffer) {
+    indexBufferSegmentId = m_backend.staticArenaSegmentIdForBuffer(drawSpec.indexBuffer);
+  }
+  const bool allStaticSegments = (vertexBufferSegmentIds[0] != 0) && (vertexBufferSegmentIds[1] != 0) &&
+                                 ((drawSpec.indexCount == 0) || (indexBufferSegmentId != 0));
+
+  const bool ddpHook = (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                        shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  const bool hasOit = (extraBindCount != 0);
+  if (FLAGS_atlas_vk_cache_draw_secondaries &&
+      m_backend.device().context().supportsInlineAndSecondaryDynamicRendering() && payload.streamKey != 0 &&
+      m_usedThinStaticVBThisFrame && allStaticSegments && !ddpHook) {
+    m_backend.notifyDrawSecondaryCacheAttempt();
+
+    ThinSecondaryCacheKey cacheKey{};
+    cacheKey.frameKey = frameKey;
+    cacheKey.streamKey = payload.streamKey;
+    cacheKey.picking = pickingPass;
+    cacheKey.lineStrip = payload.isLineStrip;
+    cacheKey.shaderHookType = shaderHook;
+    cacheKey.eye = batch.eye;
+    cacheKey.hasOit = hasOit;
+    cacheKey.oitRingIndex = hasOit ? m_backend.sharedOITDescriptorSetRingIndex() : 0u;
+
+    ThinSecondarySignature signature{};
+    signature.pipeline = drawSpec.pipelineHandle;
+    signature.layout = drawSpec.pipelineLayoutHandle;
+    signature.baseDescriptorSets = descriptorSets;
+    signature.baseDescriptorGenerations = {m_backend.bindlessSampledImageDescriptorSetGeneration(),
+                                           m_backend.sharedLightingDescriptorSetGeneration(),
+                                           m_backend.sharedTransformsDescriptorSetPersistentGeneration()};
+    signature.hasOit = hasOit;
+    if (hasOit) {
+      signature.oitDescriptorSet = m_backend.sharedOITDescriptorSet();
+      signature.oitDescriptorGeneration = m_backend.sharedOITDescriptorSetGeneration();
+    }
+    signature.dynamicOffsets = dynamicOffsets;
+    signature.vertexBuffers = vertexBuffers;
+    signature.vertexOffsets = vertexOffsets;
+    signature.vertexBufferSegmentIds = vertexBufferSegmentIds;
+    signature.indexBuffer = drawSpec.indexBuffer;
+    signature.indexOffset = drawSpec.indexOffset;
+    signature.indexBufferSegmentId = indexBufferSegmentId;
+    signature.indexType = drawSpec.indexType;
+    signature.indexCount = drawSpec.indexCount;
+    signature.vertexCount = drawSpec.vertexCount;
+    signature.viewport = viewport;
+    signature.scissor = scissor;
+
+    auto itCache = m_thinSecondaryCache.find(cacheKey);
+    if (itCache != m_thinSecondaryCache.end()) {
+      m_backend.notifyDrawSecondaryCacheKeyFound();
+      ThinSecondaryCacheEntry& entry = itCache->second;
+      const vk::CommandBuffer rawSecondary = entry.commandBuffer;
+      if (entry.recorded && rawSecondary != vk::CommandBuffer{}) {
+        if (entry.signature == signature) {
+          m_backend.notifyDrawSecondaryCacheHit();
+          m_backend.notifyDrawSecondaryCacheExecute();
+          cmd.executeCommands({rawSecondary});
+          m_backend.notifyDrawSubmitted();
+          return;
+        }
+      }
+      uint32_t mask = 0;
+      const auto& prev = entry.signature;
+      if (prev.pipeline != signature.pipeline) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kPipeline;
+      }
+      if (prev.layout != signature.layout) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kLayout;
+      }
+      if (prev.baseDescriptorSets != signature.baseDescriptorSets) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kBaseDescriptorSets;
+      }
+      if (prev.baseDescriptorGenerations != signature.baseDescriptorGenerations) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kBaseDescriptorGenerations;
+      }
+      if (prev.hasOit != signature.hasOit) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorPresence;
+      }
+      if (prev.oitDescriptorSet != signature.oitDescriptorSet) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorSet;
+      }
+      if (prev.oitDescriptorGeneration != signature.oitDescriptorGeneration) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kOitDescriptorGeneration;
+      }
+      if (prev.dynamicOffsets != signature.dynamicOffsets) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kDynamicOffsets;
+      }
+      if (prev.vertexBuffers != signature.vertexBuffers) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kVertexBuffers;
+      }
+      if (prev.vertexOffsets != signature.vertexOffsets) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kVertexOffsets;
+      }
+      if (prev.vertexBufferSegmentIds != signature.vertexBufferSegmentIds) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kVertexBufferLifetime;
+      }
+      if (prev.indexBuffer != signature.indexBuffer || prev.indexOffset != signature.indexOffset ||
+          prev.indexType != signature.indexType) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kIndexState;
+      }
+      if (prev.indexBufferSegmentId != signature.indexBufferSegmentId) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kIndexBufferLifetime;
+      }
+      if (prev.indexCount != signature.indexCount || prev.vertexCount != signature.vertexCount) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kCounts;
+      }
+      if (prev.viewport.x != signature.viewport.x || prev.viewport.y != signature.viewport.y ||
+          prev.viewport.width != signature.viewport.width || prev.viewport.height != signature.viewport.height ||
+          prev.viewport.minDepth != signature.viewport.minDepth ||
+          prev.viewport.maxDepth != signature.viewport.maxDepth) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kViewport;
+      }
+      if (prev.scissor.offset.x != signature.scissor.offset.x || prev.scissor.offset.y != signature.scissor.offset.y ||
+          prev.scissor.extent.width != signature.scissor.extent.width ||
+          prev.scissor.extent.height != signature.scissor.extent.height) {
+        mask |= Z3DRendererVulkanBackend::DrawSecondarySignatureMismatchMask::kScissor;
+      }
+      m_backend.notifyDrawSecondaryCacheSignatureMismatchMask(mask);
+    }
+
+    ThinSecondaryCacheEntry& entry = m_thinSecondaryCache[cacheKey];
+    entry.signature = signature;
+    m_backend.notifyDrawSecondaryCacheBuild();
+
+    vk::SampleCountFlagBits rasterSamples = vk::SampleCountFlagBits::e1;
+    bool samplesCaptured = false;
+    for (const auto& attachment : batch.pass.colorAttachments) {
+      if (!attachment.handle.valid()) {
+        continue;
+      }
+      const auto& tex =
+        vulkan::textureFromHandle(attachment.handle, m_backend.device(), "line secondary inheritance color");
+      if (!samplesCaptured) {
+        rasterSamples = tex.info().samples;
+        samplesCaptured = true;
+      } else {
+        CHECK(tex.info().samples == rasterSamples) << "Line secondary: mismatched MSAA sample counts in attachments";
+      }
+    }
+    if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid()) {
+      const auto& tex = vulkan::textureFromHandle(batch.pass.depthAttachment->handle,
+                                                  m_backend.device(),
+                                                  "line secondary inheritance depth");
+      if (!samplesCaptured) {
+        rasterSamples = tex.info().samples;
+        samplesCaptured = true;
+      } else {
+        CHECK(tex.info().samples == rasterSamples) << "Line secondary: mismatched MSAA sample counts in attachments";
+      }
+    }
+
+    const vk::Format* colorFormatsPtr = formats.colorFormats.empty() ? nullptr : formats.colorFormats.data();
+    const vk::Format depthFormat = formats.depthFormat.value_or(vk::Format::eUndefined);
+    vk::CommandBufferInheritanceRenderingInfo renderingInheritance{};
+    renderingInheritance.rasterizationSamples = rasterSamples;
+    renderingInheritance.colorAttachmentCount = static_cast<uint32_t>(formats.colorFormats.size());
+    renderingInheritance.pColorAttachmentFormats = colorFormatsPtr;
+    renderingInheritance.depthAttachmentFormat = depthFormat;
+    renderingInheritance.stencilAttachmentFormat = vk::Format::eUndefined;
+
+    vk::CommandBufferInheritanceInfo inheritance{};
+    inheritance.pNext = &renderingInheritance;
+
+    ZVulkanSecondaryBuildInfo secondaryInfo{};
+    secondaryInfo.device = &m_backend.device().context().device();
+    secondaryInfo.commandPool = m_backend.device().context().commandPool();
+    secondaryInfo.inheritance = inheritance;
+
+    entry.commandBuffer = buildStaticSecondary(secondaryInfo, [&](vk::raii::CommandBuffer& secondaryCmd) {
+      ZVulkanPipelineCommandRecorder secondaryRecorder(secondaryCmd);
+      secondaryRecorder.recordGraphicsDraw(drawSpec);
+    });
+    entry.recorded = true;
+
+    m_backend.notifyDrawSecondaryCacheExecute();
+    cmd.executeCommands({static_cast<vk::CommandBuffer>(entry.commandBuffer)});
+    return;
   }
 
   ZVulkanPipelineCommandRecorder recorder(cmd);

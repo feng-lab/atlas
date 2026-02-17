@@ -1,14 +1,18 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "include/bindless.glslinc"
 
 // Number of paging levels (specialization constant)
 layout(constant_id = 70) const int LEVEL_COUNT = 1;
 
-// Samplers
-layout(set = 0, binding = 0) uniform usampler3D page_directory;
-layout(set = 0, binding = 1) uniform usampler3D page_table_cache;
-layout(set = 0, binding = 2) uniform sampler3D  image_cache;
-layout(set = 0, binding = 3) uniform sampler3D  volume;
-layout(set = 0, binding = 4) uniform sampler2D  colormap;
+layout(push_constant) uniform SliceBindlessPC {
+  uint page_directory;
+  uint page_table_cache;
+  uint image_cache;
+  uint volume;
+  uint colormap;
+} sbpc;
 
 // Paging/geometry parameters
 struct PageLevelData {
@@ -46,7 +50,8 @@ void main()
   vec4 color = vec4(0.0);
 
   if (curLevel + 1 == LEVEL_COUNT) {
-    color = texture(colormap, vec2(texture(volume, texCoord0).r, 0.5));
+    color = texture(atlas_bindlessSampler2DLinear(sbpc.colormap),
+                    vec2(texture(atlas_bindlessSampler3DLinear(sbpc.volume), texCoord0).r, 0.5));
     color.rgb *= color.a;
     FragData0 = color;
     return;
@@ -58,19 +63,30 @@ void main()
   vec3 fFracVoxelCoord = texCoord0 * pg.levels[curLevel].image_dimensions.xyz - vec3(voxelCoord);
 
   uvec3 pageTableCoord = voxelCoord / pg.image_block_size.xyz;
-  uvec4 pageDirEntry = texelFetch(page_directory, ivec3(pg.levels[curLevel].page_directory_base.xyz + pageTableCoord / pg.page_table_block_size.xyz), 0);
+  uvec4 pageDirEntry =
+    texelFetch(atlas_bindlessUSampler3DNearest(sbpc.page_directory),
+               ivec3(pg.levels[curLevel].page_directory_base.xyz + pageTableCoord / pg.page_table_block_size.xyz),
+               0);
   uint pagingFlag = pageDirEntry.w;
   if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-    uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + (pageTableCoord % pg.page_table_block_size.xyz)), 0);
+    uvec4 pageTableEntry =
+      texelFetch(atlas_bindlessUSampler3DNearest(sbpc.page_table_cache),
+                 ivec3(pageDirEntry.xyz + (pageTableCoord % pg.page_table_block_size.xyz)),
+                 0);
     pagingFlag = pageTableEntry.w;
     if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
       voxelAddress = pageTableEntry.xyz + (voxelCoord % pg.image_block_size.xyz) + fFracVoxelCoord + 2.0;
-      color = texture(colormap, vec2(texture(image_cache, voxelAddress * pg.image_address_to_normalized_texture_coord.xyz).r, 0.5));
+      color = texture(
+        atlas_bindlessSampler2DLinear(sbpc.colormap),
+        vec2(texture(atlas_bindlessSampler3DLinear(sbpc.image_cache),
+                     voxelAddress * pg.image_address_to_normalized_texture_coord.xyz)
+               .r,
+             0.5));
       color.rgb *= color.a;
     }
   }
   if (pagingFlag == EMPTY) {
-    color = texture(colormap, vec2(0.0, 0.5));
+    color = texture(atlas_bindlessSampler2DLinear(sbpc.colormap), vec2(0.0, 0.5));
     color.rgb *= color.a;
   }
 

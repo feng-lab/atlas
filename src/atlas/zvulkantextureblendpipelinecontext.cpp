@@ -8,7 +8,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbuffer.h"
@@ -54,12 +53,7 @@ ZVulkanTextureBlendPipelineContext::~ZVulkanTextureBlendPipelineContext() = defa
 void ZVulkanTextureBlendPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
-  resetDescriptors();
-}
-
-void ZVulkanTextureBlendPipelineContext::resetDescriptors()
-{
-  m_descriptorSet.reset();
+  // No per-frame descriptor state retained; bindless set is owned by the backend.
 }
 
 void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
@@ -88,19 +82,10 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
   // Shared fullscreen quad
   m_vertexCount = 4;
 
-  ensureDescriptorLayout();
-  ensureDescriptorSet();
-  // Allocate per-draw override descriptor set to avoid update-after-bind
-  ZVulkanDescriptorSet* ds = nullptr;
-  if (m_setTextures) {
-    ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
-  }
-  CHECK(ds != nullptr) << "Texture blend: override descriptor allocation failed (fatal)";
-  auto sampler = m_backend.defaultSampler();
-  ds->updateTexture(0, color0, sampler);
-  ds->updateTexture(1, depth0, sampler);
-  ds->updateTexture(2, color1, sampler);
-  ds->updateTexture(3, depth1, sampler);
+  const uint32_t color0Idx = m_backend.bindlessLookupSampledImageAutoOrCrash(color0, "texture_blend color0");
+  const uint32_t depth0Idx = m_backend.bindlessLookupSampledImageAutoOrCrash(depth0, "texture_blend depth0");
+  const uint32_t color1Idx = m_backend.bindlessLookupSampledImageAutoOrCrash(color1, "texture_blend color1");
+  const uint32_t depth1Idx = m_backend.bindlessLookupSampledImageAutoOrCrash(depth1, "texture_blend depth1");
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
@@ -117,7 +102,7 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
   cmd.bindVertexBuffers(0, {quad.buffer()}, {vk::DeviceSize(0)});
 
   {
-    std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
+    std::array<vk::DescriptorSet, 1> sets{m_backend.bindlessSampledImageDescriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
   }
 
@@ -129,6 +114,10 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
 
   TextureBlendPushConstants constants;
   constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
+  constants.colorTexture0 = color0Idx;
+  constants.depthTexture0 = depth0Idx;
+  constants.colorTexture1 = color1Idx;
+  constants.depthTexture1 = depth1Idx;
 
   cmd.pushConstants<TextureBlendPushConstants>(pipeline.pipeline->pipelineLayout(),
                                                vk::ShaderStageFlagBits::eFragment,
@@ -136,55 +125,6 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
                                                constants);
 
   cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
-}
-
-void ZVulkanTextureBlendPipelineContext::ensureDescriptorLayout()
-{
-  if (m_setTextures) {
-    return;
-  }
-
-  auto& device = m_backend.device();
-  auto& vkDevice = device.context().device();
-
-  std::array<vk::DescriptorSetLayoutBinding, 4> bindings{
-    vk::DescriptorSetLayoutBinding{.binding = 0,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment},
-    vk::DescriptorSetLayoutBinding{.binding = 1,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment},
-    vk::DescriptorSetLayoutBinding{.binding = 2,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment},
-    vk::DescriptorSetLayoutBinding{.binding = 3,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment}
-  };
-
-  // Immutable default samplers across blend inputs to avoid per-draw sampler writes
-  vk::Sampler immutable = m_backend.defaultSampler();
-  bindings[0].pImmutableSamplers = &immutable;
-  bindings[1].pImmutableSamplers = &immutable;
-  bindings[2].pImmutableSamplers = &immutable;
-  bindings[3].pImmutableSamplers = &immutable;
-
-  vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                               .pBindings = bindings.data()};
-  m_setTextures.emplace(vkDevice, createInfo);
-}
-
-void ZVulkanTextureBlendPipelineContext::ensureDescriptorSet()
-{
-  ensureDescriptorLayout();
-
-  if (!m_descriptorSet) {
-    m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setTextures);
-  }
 }
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureBlendPipelineContext::makeVertexInputState() const
@@ -218,8 +158,6 @@ ZVulkanTextureBlendPipelineContext::ensurePipeline(const PipelineKey& key, const
     return it->second;
   }
 
-  ensureDescriptorLayout();
-
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
@@ -231,7 +169,7 @@ ZVulkanTextureBlendPipelineContext::ensurePipeline(const PipelineKey& key, const
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  instance.pipeline->setDescriptorSetLayouts({**m_setTextures});
+  instance.pipeline->setDescriptorSetLayouts({m_backend.bindlessSampledImageDescriptorSetLayout()});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);

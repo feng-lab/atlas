@@ -1,10 +1,6 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-layout(set = 0, binding = 1) uniform sampler2D DepthBlenderTex;
-layout(set = 0, binding = 2) uniform sampler2D FrontBlenderTex;
-
-
 layout(location = 0) out vec4 FragData0;
 layout(location = 1) out vec4 FragData1;
 layout(location = 2) out vec4 FragData2;
@@ -37,8 +33,8 @@ void main()
   }
 
   const ivec2 p = ivec2(gl_FragCoord.xy);
-  const vec2 depthBlender = texelFetch(DepthBlenderTex, p, 0).xy;
-  const vec4 forwardTemp = texelFetch(FrontBlenderTex, p, 0);
+  const vec2 depthBlender = texelFetch(atlas_bindlessSampler2DNearest(wpc.ddpDepthBlender), p, 0).xy;
+  const vec4 forwardTemp = texelFetch(atlas_bindlessSampler2DNearest(wpc.ddpFrontBlender), p, 0);
 
   FragData1 = forwardTemp; // pass-through by default with MAX blending
   FragData2 = vec4(0.0);   // back temp

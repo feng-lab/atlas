@@ -246,7 +246,7 @@ enum class AttachmentFinalUse
 // payload/label heuristics.
 enum class ExternalImageUseKind
 {
-  // Read-only sampling via combined image sampler.
+  // Read-only sampling via sampled image (shader read-only).
   SampledRead,
   // Read-only access via storage image.
   StorageRead,

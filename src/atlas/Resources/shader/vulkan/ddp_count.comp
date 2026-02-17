@@ -1,12 +1,12 @@
 #version 450
 
 // CS: set next draw-count based on flag
-layout(set = 0, binding = 0) readonly buffer Flag { uint changed; } flag;
-layout(set = 0, binding = 1) writeonly buffer Cnt  { uint count;   } cnt;
+// set 0 is reserved for Atlas bindless sampled images (see include/bindless.glslinc).
+layout(set = 1, binding = 0) readonly buffer Flag { uint changed; } flag;
+layout(set = 1, binding = 1) writeonly buffer Cnt  { uint count;   } cnt;
 
 layout(local_size_x = 1) in;
 
 void main() {
   cnt.count = (flag.changed != 0u) ? 1u : 0u;
 }
-

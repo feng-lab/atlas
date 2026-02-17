@@ -4,5 +4,7 @@ layout(push_constant) uniform WideLinePC {
   mat4 viewport_matrix_inverse;
   float line_width;
   float size_scale;
+  uint line_texture;
+  uint ddpDepthBlender;
+  uint ddpFrontBlender;
 } wpc;
-

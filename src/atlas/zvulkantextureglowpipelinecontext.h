@@ -15,8 +15,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorPool;
-class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 
@@ -104,25 +102,23 @@ private:
     int blurRadius = 0;
     float blurScale = 1.0f;
     float blurStrength = 0.5f;
-    float _pad = 0.0f;
+    uint32_t colorTexture = 0;
+    uint32_t depthTexture = 0;
   };
 
   struct GlowPushConstants
   {
     glm::vec2 screenDimRcp{1.0f};
-    glm::vec2 _pad{0.0f};
+    uint32_t colorTexture = 0;
+    uint32_t depthTexture = 0;
+    uint32_t glowmapColorTexture = 0;
+    uint32_t glowmapDepthTexture = 0;
   };
 
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<BlurPipelineKey, PipelineInstance> m_blurPipelines;
   std::map<GlowPipelineKey, PipelineInstance> m_glowPipelines;
-
-  std::optional<vk::raii::DescriptorSetLayout> m_blurSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_glowSetLayout;
-
-  void ensureDescriptorLayouts();
-  void resetDescriptors();
 
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 

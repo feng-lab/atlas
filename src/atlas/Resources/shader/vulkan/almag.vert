@@ -18,6 +18,10 @@ layout(push_constant) uniform PushConstants {
     vec2  _pad0;
     vec4  outline_color;
     vec4  shadow_color;
+    uint  atlas_texture;
+    uint  _pad1;
+    uint  _pad2;
+    uint  _pad3;
 } pc;
 
 void main()
@@ -26,4 +30,3 @@ void main()
     texCoord0 = attr_2dTexCoord0;
     color = attr_color;
 }
-

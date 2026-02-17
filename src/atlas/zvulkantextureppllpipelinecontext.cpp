@@ -4,16 +4,16 @@
 #include "z3drenderervulkanbackend.h"
 #include "zlog.h"
 #include "zsysteminfo.h"
-#include "zvulkanbindings.h"
 #include "zvulkanbuffer.h"
-#include "zvulkancontext.h"
 #include "zvulkandevice.h"
-#include "zvulkandescriptorset.h"
 #include "zvulkanpipeline.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanshader.h"
+#include "zvulkantexture.h"
 
 #include <array>
+#include <cstdint>
+#include <vector>
 
 namespace nim {
 
@@ -23,15 +23,7 @@ ZVulkanTexturePPLLPipelineContext::ZVulkanTexturePPLLPipelineContext(Z3DRenderer
 
 ZVulkanTexturePPLLPipelineContext::~ZVulkanTexturePPLLPipelineContext() = default;
 
-void ZVulkanTexturePPLLPipelineContext::resetFrame()
-{
-  resetDescriptors();
-}
-
-void ZVulkanTexturePPLLPipelineContext::resetDescriptors()
-{
-  m_descriptorOIT.reset();
-}
+void ZVulkanTexturePPLLPipelineContext::resetFrame() {}
 
 void ZVulkanTexturePPLLPipelineContext::record(Z3DRendererBase& renderer,
                                                const RenderBatch& batch,
@@ -42,100 +34,59 @@ void ZVulkanTexturePPLLPipelineContext::record(Z3DRendererBase& renderer,
 {
   (void)renderer;
 
-  ensureOITResources();
-  if (!m_descriptorOIT) {
-    return;
-  }
+  const vk::DescriptorSet oitSet = m_backend.sharedOITDescriptorSet();
+  CHECK(oitSet) << "PPLL resolve missing shared OIT descriptor set";
 
-  // Bind opaque depth (or a 1.0 placeholder) so the resolve shader can drop any
-  // stored fragments that lie behind already-rendered opaque geometry.
-  ensureDescriptorLayouts();
-  CHECK(m_setOpaqueDepth) << "PPLL resolve missing opaque-depth descriptor set layout";
-  ZVulkanDescriptorSet* dsOpaqueDepth = m_backend.allocateOverrideDescriptorSet(**m_setOpaqueDepth);
-  CHECK(dsOpaqueDepth != nullptr) << "PPLL resolve: override descriptor allocation failed (fatal)";
-
-  vk::Sampler sampler = m_backend.nearestClampSampler();
+  // Opaque depth (or a constant-1.0 placeholder) so the resolve shader can drop
+  // any stored fragments that lie behind already-rendered opaque geometry.
+  ZVulkanTexture* opaqueDepthTex = nullptr;
   if (payload.opaqueDepthAttachment.valid() && payload.opaqueDepthAttachment.backend == RenderBackend::Vulkan) {
-    auto& opaqueDepthTex =
-      vulkan::textureFromHandle(payload.opaqueDepthAttachment, m_backend.device(), "PPLL opaque depth attachment");
-    dsOpaqueDepth->updateTexture(0, opaqueDepthTex, sampler);
+    opaqueDepthTex =
+      &vulkan::textureFromHandle(payload.opaqueDepthAttachment, m_backend.device(), "PPLL opaque depth attachment");
   } else {
-    // No opaque pass: bind a constant 1.0 texture so all fragments are treated as visible.
-    auto& fallback = m_backend.defaultPlaceholderTexture2D();
-    dsOpaqueDepth->updateTexture(0, fallback, sampler);
+    // No opaque pass: treat all fragments as visible.
+    opaqueDepthTex = &m_backend.defaultPlaceholderTexture2D();
   }
+  CHECK(opaqueDepthTex != nullptr) << "PPLL resolve missing opaque depth texture (unexpected)";
+  const uint32_t opaqueDepthIdx =
+    m_backend.bindlessLookupSampledImageAutoOrCrash(*opaqueDepthTex, "ppll_resolve opaque_depth");
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
-
-  // PPLL resolve composites the accumulated transparent layer onto the active
-  // surface; it must have exactly one color attachment.
   CHECK_EQ(formats.colorFormats.size(), size_t{1}) << "PPLL resolve requires exactly one color attachment.";
   m_backend.validateFormatsOrCrash(formats, "PPLL_resolve");
 
   PipelineKey key;
   key.colorFormats = formats.colorFormats;
   key.depthFormat = formats.depthFormat;
-  PipelineInstance& instance = ensurePipeline(key, formats);
+  PipelineInstance& pipeline = ensurePipeline(key, formats);
 
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
+  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
+
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   cmd.bindVertexBuffers(0, {quad.buffer()}, {vk::DeviceSize(0)});
 
-  // Bind set 0 (opaque depth sampler).
-  std::array<vk::DescriptorSet, 1> sets0{dsOpaqueDepth->descriptorSet()};
-  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 0, sets0, {});
+  // Bind set 0 (bindless sampled images).
+  {
+    std::array<vk::DescriptorSet, 1> sets0{m_backend.bindlessSampledImageDescriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets0, {});
+  }
 
   // Bind set 3 (OIT SSBOs). Sets 1/2 are unused placeholders.
-  std::array<vk::DescriptorSet, 1> sets3{m_descriptorOIT->descriptorSet()};
-  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                         instance.pipeline->pipelineLayout(),
-                         vkbind::kSetOITParams,
-                         sets3,
-                         {});
+  {
+    std::array<vk::DescriptorSet, 1> sets3{oitSet};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 3, sets3, {});
+  }
 
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
+
+  PPLLResolvePushConstants constants;
+  constants.opaqueDepthTexture = opaqueDepthIdx;
+  const auto* bytes = reinterpret_cast<const std::uint8_t*>(&constants);
+  vk::ArrayProxy<const std::uint8_t> payloadBytes(sizeof(constants), bytes);
+  cmd.pushConstants(pipeline.pipeline->pipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, payloadBytes);
+
   cmd.draw(4, 1, 0, 0);
-}
-
-void ZVulkanTexturePPLLPipelineContext::ensureDescriptorLayouts()
-{
-  auto& device = m_backend.device();
-  auto& vkDevice = device.context().device();
-
-  if (!m_setOpaqueDepth) {
-    // One combined image sampler (opaque depth). Use nearest clamp to avoid
-    // filtering depth comparisons at edges.
-    vk::Sampler imm = m_backend.nearestClampSampler();
-    vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                           .pImmutableSamplers = &imm};
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
-    m_setOpaqueDepth.emplace(vkDevice, createInfo);
-  }
-
-  if (!m_setPlaceholder) {
-    vk::DescriptorSetLayoutCreateInfo emptyInfo{.bindingCount = 0, .pBindings = nullptr};
-    m_setPlaceholder.emplace(vkDevice, emptyInfo);
-  }
-
-  if (!m_setOIT) {
-    m_setOIT = m_backend.oitDescriptorSetLayout();
-  }
-}
-
-void ZVulkanTexturePPLLPipelineContext::ensureOITResources()
-{
-  ensureDescriptorLayouts();
-  if (!m_descriptorOIT && m_setOIT) {
-    m_descriptorOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
-  }
-
-  if (m_descriptorOIT && !m_backend.isRecording()) {
-    m_backend.primeOITDescriptorSet(*m_descriptorOIT);
-  }
 }
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTexturePPLLPipelineContext::makeVertexInputState() const
@@ -165,8 +116,6 @@ ZVulkanTexturePPLLPipelineContext::ensurePipeline(const PipelineKey& key, const 
     return it->second;
   }
 
-  ensureDescriptorLayouts();
-
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
@@ -179,22 +128,27 @@ ZVulkanTexturePPLLPipelineContext::ensurePipeline(const PipelineKey& key, const 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
 
-  const vk::DescriptorSetLayout set0 = m_setOpaqueDepth ? **m_setOpaqueDepth : **m_setPlaceholder;
-  const vk::DescriptorSetLayout empty = **m_setPlaceholder;
-  const vk::DescriptorSetLayout oitLayout = m_setOIT ? m_setOIT : empty;
-  std::vector<vk::DescriptorSetLayout> layouts{set0, empty, empty, oitLayout};
+  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
+  CHECK(bindlessLayout) << "PPLL resolve missing bindless descriptor set layout";
+  const vk::DescriptorSetLayout empty = m_backend.emptyDescriptorSetLayout();
+  CHECK(empty) << "PPLL resolve missing empty descriptor set layout";
+  const vk::DescriptorSetLayout oitLayout = m_backend.oitDescriptorSetLayout();
+  CHECK(oitLayout) << "PPLL resolve missing OIT descriptor set layout";
+  std::vector<vk::DescriptorSetLayout> layouts{bindlessLayout, empty, empty, oitLayout};
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
 
-  if (formats.depthFormat.has_value()) {
-    // Resolve pass writes resolved depth. Use ALWAYS to ensure depth writes.
-    instance.pipeline->setDepthTestEnable(true);
-    instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+  const bool hasDepth = formats.depthFormat.has_value();
+  instance.pipeline->setDepthTestEnable(hasDepth);
+  if (hasDepth) {
+    // Resolve pass writes resolved depth. Only commit it when in front of (or equal to)
+    // the loaded opaque depth buffer. This prevents pixels with no visible transparent
+    // fragments from clobbering opaque depth with 1.0.
+    instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
     instance.pipeline->setDepthWriteEnable(true);
   } else {
-    instance.pipeline->setDepthTestEnable(false);
     instance.pipeline->setDepthWriteEnable(false);
   }
 
@@ -211,7 +165,10 @@ ZVulkanTexturePPLLPipelineContext::ensurePipeline(const PipelineKey& key, const 
   blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
   instance.pipeline->setColorBlendAttachment(blendAttachment);
 
-  instance.pipeline->setPushConstantRanges({});
+  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
+                              .offset = 0,
+                              .size = static_cast<uint32_t>(sizeof(PPLLResolvePushConstants))};
+  instance.pipeline->setPushConstantRanges({range});
   instance.pipeline->create();
 
   auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});

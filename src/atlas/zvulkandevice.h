@@ -54,8 +54,8 @@ public:
                  const vk::PrimitiveTopology& topology = vk::PrimitiveTopology::eTriangleList);
 
   std::unique_ptr<ZVulkanDescriptorPool> createDescriptorPool();
-  std::unique_ptr<ZVulkanDescriptorSet>
-  createDescriptorSet(ZVulkanDescriptorPool& pool, vk::DescriptorSetLayout layout, bool isOverrideTransient = false);
+  std::unique_ptr<ZVulkanDescriptorSet> createDescriptorSet(ZVulkanDescriptorPool& pool,
+                                                            vk::DescriptorSetLayout layout);
 
   ZVulkanFrameExecutor& frameExecutor();
   const ZVulkanFrameExecutor& frameExecutor() const;

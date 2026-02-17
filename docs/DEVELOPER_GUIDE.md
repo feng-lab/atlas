@@ -163,8 +163,10 @@ Lookup Tables (LUTs)
   - `generation()` that increments on change for cache invalidation.
 - Renderers/pipeline contexts create and cache backend LUT textures:
   - OpenGL: per-renderer 1D RGBA8 textures for colormaps/transfer functions.
-- Vulkan: pipeline contexts create 2D Nx1 `ZVulkanTexture`s via a small helper (MoltenVK portability — Metal lacks native 1D); LUTs are uploaded as RGBA8 and bound through descriptor sets.
-  - Vulkan descriptor arena (Stage 2): pipeline contexts must allocate descriptor sets from the backend’s per-frame arena via `Z3DRendererVulkanBackend::allocateFrameDescriptorSet(layout)`. Do not create per-context descriptor pools. The arena is reset once per frame (scheduled in `endRender()`, applied at the backend’s frame-completion safe point after the frame fence signals).
+- Vulkan: pipeline contexts create 2D Nx1 `ZVulkanTexture`s via a small helper (MoltenVK portability — Metal lacks native 1D); LUTs are uploaded as RGBA8, registered in the bindless sampled-image tables (set=0), and referenced by index from shaders (push constants / UBOs).
+  - Vulkan descriptor arena (Stage 2): pipeline contexts allocate truly transient *per-pass* descriptor sets from the backend’s per-frame arena via `Z3DRendererVulkanBackend::allocateFrameDescriptorSet(layout)`. Do not create per-context descriptor pools. The arena is reset once per frame (scheduled in `endRender()`, applied at the backend’s frame-completion safe point after the frame fence signals).
+  - Per-frame-slot persistent descriptor arena: descriptor sets that must keep stable handles across frames (notably bindless tables) are allocated from the backend’s per-slot pool via `allocatePersistentDescriptorSet(layout)` and are not reset each submission. These are created/updated only after the slot’s completion safe point.
+  - Backend-shared per-frame-slot descriptor sets: Atlas centralizes common descriptor state (lighting UBO, transforms UBOs, OIT SSBOs, and image helper UBO views) in backend-owned descriptor sets allocated from the persistent pool and reused across pipeline contexts. Pipeline contexts should bind these shared sets rather than allocating duplicate “common UBO sets” each submission.
   - Frame-completion safe point: the backend defines a frame-slot “completion safe point” (`applyPendingArenaReset`) that is reached after the executor observes a slot fence as complete (slot reuse, explicit waits, and opportunistic pumping after `pollCompletions()`). At that point it:
     - resets per-frame descriptor resources,
     - drains all “after completion” hooks with a barrier (hooks may run on their own executors),
@@ -172,10 +174,11 @@ Lookup Tables (LUTs)
   - Scratch-pool recycling: Vulkan scratch image leases are released only after the submitting frame’s fence signals. The pool defers slot reuse by registering an “after completion” hook at the frame-completion safe point (via `registerAfterCurrentFrameCompletionHook()` through the backend-installed scratch scheduler).
   - Shared fullscreen quad: use `Z3DRendererVulkanBackend::fullscreenQuadVertexBuffer()` in full-screen passes (background, copy, blend, glow) instead of creating per-context VBOs.
   - Vulkan descriptor guardrails:
-    - Do not write descriptors while a frame is recording. Persistent sets are write-once per frame; update only UBO contents via `copyData(...)` in record paths.
-    - Route volatile inputs (peel/resolve/composite) through per-draw override sets allocated with `allocateOverrideDescriptorSet(...)`.
-    - Always pass explicit samplers for combined image samplers unless layouts use immutable samplers.
-    - Never free descriptor sets individually; rely on the per-frame pool reset. Clear any retained override sets before reset (backend handles this at frame start).
+    - No `vkUpdateDescriptorSets` during command-buffer recording. All descriptor writes must happen in the `beginRender()` pre-record phase (after the frame-slot completion safe point, before `vk::CommandBuffer::begin()`).
+    - Sampled-image inputs are bindless (set=0). Register textures into the per-frame-slot bindless tables during the pre-record phase and pass indices via push constants / UBOs; do not bind per-pass sampled-image descriptor sets.
+    - Per-draw variation must use dynamic UBO offsets and push constants; do not allocate/update per-draw descriptor sets.
+    - Bindless sampled-image tables use `VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE` (not combined image samplers). Sampler state is provided via immutable samplers in the set 0 layout (see `Resources/shader/vulkan/include/bindless.glslinc`).
+    - Never free descriptor sets individually; rely on per-frame pool reset for transient descriptor arenas. Per-frame-slot persistent pools live for the lifetime of the slot. Clear any retained per-frame descriptor wrappers before reset (backend handles this at the completion safe point).
 
 ImgRaycaster Vulkan
 
@@ -308,7 +311,7 @@ Vulkan Notes
   - `ZVulkanTexture::UploadRegion::finalLayout` defaults to `vk::ImageLayout::eUndefined` and is a hard `CHECK` in `uploadSubImage` / `uploadData`.
   - Call sites must pass the intended post-upload layout (typically `eShaderReadOnlyOptimal` for sampled color images; `eDepthReadOnlyOptimal` when preparing depth for sampling) instead of relying on implicit defaults.
 - Enforcement (fail-fast correctness):
-  - When writing transient per-draw override descriptor sets during command recording, Vulkan `CHECK`s that any bound textures/storage images are already in the layout declared by the descriptor (or the explicit override layout). Missing usage metadata now trips deterministically instead of producing flicker/incorrect rendering due to undefined layout usage.
+  - Atlas does not rely on UPDATE_AFTER_BIND for correctness. When supported, Atlas enables update-after-bind for bindless set/layout/pool creation so large bindless arrays are accounted against descriptor indexing limits. Atlas still treats descriptor writes during recording as invariant violations (hard `CHECK` in `ZVulkanDescriptorSet`).
 - Vulkan paging cache residency (Z3DImg):
   - `ZVulkanPagedImageBlockUploader` supports swapping large paged image caches (R8 `imageCache` textures) to host memory under device-local memory pressure; page directory / page table caches remain device-resident (small).
   - Best-effort budget comes from `VK_EXT_memory_budget` (queried via VMA) when available; otherwise eviction is driven by allocation failures.
@@ -319,7 +322,7 @@ Vulkan Pipeline Invariants
 - Dynamic rendering is used; a new segment is begun only when attachment sets change.
 - Graphics pipeline keys include attachment formats: `colorFormats[]` and optional `depthFormat` are part of the key in all Vulkan pipeline contexts to avoid layout mismatches.
 - Composite/resolve passes (DDP final, WA resolve, WB resolve) must write to exactly one color attachment; depth is disabled in the pipeline and no depth attachment is bound.
-- Descriptor updates after binding are forbidden. Per‑draw overrides are allocated from the backend’s per‑frame arena and kept alive until the frame fence to satisfy validation rules.
+- Descriptor writes during command-buffer recording are forbidden. All descriptor sets must be primed before recording begins; per-draw variation uses dynamic offsets and bindless indices.
 - Dynamic UBO arena (Vulkan): all per‑draw UBOs are suballocated from a per‑frame, host‑visible "uniform arena" buffer. Capacity is fixed for the frame; exceeding it is a hard CHECK. The backend provisions a baseline capacity (default 256 KiB) and will pre‑size above it when needed (based on a cheap pre‑record estimate). Growth within a frame is not supported (would invalidate already‑bound descriptors).
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
 
@@ -333,10 +336,13 @@ Performance Instrumentation
 
 Descriptor & Recording Guardrails (Vulkan)
 
-- No descriptor writes while a frame is recording. Persistent/frame descriptor sets are write-once before `vkCmdBeginRendering`; per‑draw override sets are allowed during recording.
-- Volatile inputs must use per‑draw override sets (e.g., DDP peel/resolve, WA/WB resolves, glow/copy/blend sources).
+- No descriptor writes while a frame is recording. Atlas treats any `vkUpdateDescriptorSets` during recording as an invariant violation (hard `CHECK`).
+- Sampled-image inputs are bindless:
+  - Shaders read from set=0 tables (`Resources/shader/vulkan/include/bindless.glslinc`) using indices passed via push constants / UBOs and `nonuniformEXT(...)`.
+  - Bindless registration happens in the `beginRender()` pre-record phase (typically via `ZVulkanLinearScript` preRecord actions). Record paths use lookup-only APIs and crash if an expected texture is missing.
+- Helper compute pipelines (DDP/PPLL/Block-ID compaction) must allocate + write descriptor sets in the pre-record phase; dispatch paths only bind pre-primed sets.
 - Prefer explicit or immutable samplers in set layouts to avoid platform-specific sampler class issues.
-- Per‑frame descriptor arenas are monotonic: allocate during the frame, reset once after the frame fence. Clear transient override sets before reset.
+- Per‑frame descriptor arenas are monotonic: allocate during the frame, reset once after the frame fence. Clear any retained per-frame descriptor wrappers before reset.
 - Validation/telemetry: end‑of‑frame VLOG may include segment counts, descriptor guardrail counters, and skip reasons (format mismatches, etc.).
 
 Pipeline Context Recorder
@@ -403,9 +409,14 @@ Vulkan Block-ID Compaction
     - `buffer` (default): Copy image → SSBO in-cmd then read from SSBO.
     - `storage`: Read via `uimage2D + imageLoad` (layout `GENERAL`).
     - `sampled`: Read via `usampler2D + texelFetch`.
-- Deprecated flag: `--atlas_vk_blockid_compaction_mode`
-  - Ignored; append-only. Keep for compatibility.
 - Synchronization: ColorAttachmentWrite → Compute barrier; for buffer source, image transitions to `TRANSFER_SRC_OPTIMAL`, copy to SSBO, and transitions back. A Transfer→Compute buffer barrier makes the SSBO visible to compute.
+- Output buffer format (SSBO header, u32 words):
+  - `[count][counts[8]][overflow][ids...]`
+  - `overflow` is a fail-fast signal (GPU sets it via atomics when capacity is exceeded). CPU parsing `CHECK`s `overflow == 0` and `count <= capacity` — Atlas never silently truncates block IDs.
+- Descriptor/layout conventions:
+  - Set 0 is reserved for bindless sampled images.
+  - Compaction pipelines bind their per-pass resources at set=1 (output SSBO + input buffer/storage image as needed).
+  - Descriptor sets for compaction are allocated and written in the pre-record phase (via `ZVulkanLinearScript`-inserted priming actions). Record paths only bind + dispatch.
 
 - Compute → graphics hazards are spelled out in the attachment descriptors. Example: transition a storage image written by compute into a sampled image for the lighting pass.
 
@@ -528,27 +539,67 @@ renderer.setCollectOnly(false);
 
 Vulkan Descriptor Set/Binding Map
 
-- See `src/atlas/zvulkanbindings.h` for canonical indices. Standard layout:
-  - Set 0 — Inputs (sampled images):
-    - Mesh textures (1D/2D/3D) and wideline texture (emulated 1D)
-    - DDP peel: binding 0 = depth blender, 1 = front blender
-    - WA resolve: binding 0 = accumulation, 1 = moments
-    - WB resolve: binding 0 = accumulation, 1 = transmittance
-  - Set 1 — Lighting UBO (std140):
-    - `lighting_enabled`, `numLights`, fog parameters, per‑light arrays
-    - `screen_dim_RCP`, `weighted_blended_depth_scale`, `ze_to_zw_a/b`
-    - Fragment stage; see `Resources/shader/vulkan/include/lighting.glslinc`
-  - Set 2 — Transforms/Material UBOs (std140):
-    - Binding 0: `Transforms` (proj/view matrices, `pos_transform`, normal matrix, `parameters.x=sizeScale`)
-    - Binding 1: `MaterialUBO` (sceneAmbient, materialAmbient/specular/shininess, alpha, optional customColor)
-    - Vertex + fragment stages; see `Resources/shader/vulkan/include/matrices_material.glslinc`
-  - Set 3 — OIT (DDP flag only):
-    - Binding 1: `DDPFlag` SSBO used by dual-depth-peeling peel passes to mark any-pixel-updated
+- See `src/atlas/zvulkanbindings.h` for canonical binding numbers.
+  - Atlas uses a shared set ordering across Vulkan graphics pipelines when feasible:
+  - Set 0 — Bindless sampled images (`Resources/shader/vulkan/include/bindless.glslinc`):
+    - binding 0: `texture2D atlas_bindlessTexture2D[]` (sampled images)
+    - binding 1: `texture2DArray atlas_bindlessTexture2DArray[]` (sampled images)
+    - binding 2: `texture3D atlas_bindlessTexture3D[]` (sampled images)
+    - binding 3: `utexture2D atlas_bindlessUTexture2D[]` (sampled images; compute-only visibility today)
+    - binding 4: `utexture3D atlas_bindlessUTexture3D[]` (sampled images)
+    - binding 5: immutable sampler `atlas_samplerLinearClamp`
+    - binding 6: immutable sampler `atlas_samplerNearestClamp`
+    - Index 0 in every table is reserved for a placeholder texture ("no texture").
+    - Shaders should use the helper macros (e.g., `atlas_bindlessSampler2DLinear(idx)`) instead of directly spelling sampler constructors.
+  - Set 1 — Lighting UBO (std140, dynamic):
+    - binding 0: `vk::DescriptorType::eUniformBufferDynamic` slice (vertex + fragment).
+    - Shader: `Resources/shader/vulkan/include/lighting.glslinc`
+  - Set 2 — Transforms/Material UBOs (std140, dynamic):
+    - binding 0: frame transforms dynamic slice (per-eye)
+    - binding 1: object transforms dynamic slice
+    - binding 2: material UBO dynamic slice
+    - Shader: `Resources/shader/vulkan/include/matrices_material.glslinc`
+  - Set 3 — OIT buffers (storage; exact PPLL + DDP flag):
+    - binding 0: PPLL params SSBO
+    - binding 1: DDP "changed" flag SSBO
+    - binding 2: PPLL counts SSBO
+    - binding 3: PPLL offsets SSBO
+    - binding 4: PPLL cursors SSBO
+    - binding 5: PPLL fragments SSBO
+
+- Passing sampled inputs:
+  - Shaders receive bindless indices via push constants or small UBOs; sampling uses `nonuniformEXT(index)`.
+  - Registration and index assignment happens in the beginRender pre-record phase (typically via `ZVulkanLinearScript`).
+  - Bindless descriptor sets are per frame-executor slot (keyed by `activeFrameKey()`): allocate once from the slot’s persistent pool, keep the handle stable for cached command buffers, and only mutate the table after the slot’s previous submission completes (the completion safe point) and before command buffer recording begins.
+- Required device features (Vulkan 1.2; enabled in `ZVulkanContext`): `descriptorIndexing`, `runtimeDescriptorArray`, `shaderSampledImageArrayNonUniformIndexing`, `descriptorBindingPartiallyBound`. (`descriptorBindingVariableDescriptorCount` is optional; Atlas sizes bindless tables explicitly.)
+- Compute helpers may bind additional sets for non-sampled resources (e.g., Block-ID compaction uses a per-pass set for its output SSBO). Set 0 remains reserved for bindless sampled images.
+
+Bindless capacity flags (requested; clamped to device limits):
+- `--atlas_vk_bindless_texture2d_capacity`
+- `--atlas_vk_bindless_texture2darray_capacity`
+- `--atlas_vk_bindless_texture3d_capacity`
+- `--atlas_vk_bindless_utexture2d_capacity`
+- `--atlas_vk_bindless_utexture3d_capacity`
+
+Policy:
+- These flags specify the *requested* bindless descriptor table capacities for set=0 sampled images.
+- Atlas computes an *effective* capacity policy once per Vulkan logical device creation:
+  - Queries classic descriptor limits (`VkPhysicalDeviceLimits`) and descriptor indexing limits
+    (`VkPhysicalDeviceDescriptorIndexingProperties`).
+  - If `descriptorBindingSampledImageUpdateAfterBind` is enabled, Atlas creates the bindless set/layout/pools with
+    update-after-bind enabled so large descriptor arrays are accounted against the descriptor indexing limits (this is
+    required on some drivers such as MoltenVK which expose very small legacy sampler limits).
+  - If the requested capacities exceed the device’s limits, Atlas clamps them downward and logs a warning with the
+    requested vs effective values and the limiting constraint.
+  - If the device cannot satisfy the minimum bindless contract (at least 1 entry in each table so index 0 can be the
+    reserved placeholder), Atlas fails fast during Vulkan device creation with a clear error.
+- Effective capacities are treated as immutable for the device lifetime because pipeline layouts depend on them. To
+  apply new requested values, restart Atlas (or switch Vulkan devices).
 
 Guidelines
 - Allocate frame‑scoped descriptor sets from the backend arena; avoid per‑context pools.
-- Do not rewrite persistent descriptors during recording; update UBO contents only.
-- Use per‑draw override sets for volatile inputs (peel/resolve/composite images).
+- Do not write descriptors during recording; update UBO contents only.
+- Use bindless indices (push constants/UBOs) for volatile sampled-image inputs; register them in the pre-record phase.
 - Keep this set ordering consistent across contexts.
 
 Invalidation & Progressive Rendering
@@ -687,7 +738,7 @@ Invariant Checks and GL Parity (Vulkan)
 
 Notes
 - OOM or external resource exhaustion may trip CHECKs: we treat these as fatal in Vulkan paths to avoid silent rendering fallthrough. If a path is expected to be optional/transient, prefer a guarded early return and document the GL parity.
-- Per‑draw override descriptor sets are used to avoid update‑after‑bind hazards. Allocation failures are fatal (CHECK) because they indicate broken per‑frame descriptor arenas.
+- Descriptor writes during recording are treated as invariant violations (CHECK). If a path needs per-draw resource variation, express it via dynamic offsets (UBOs) and bindless indices (sampled images).
 
 - Overview
   - 3D images are rendered via `Z3DImgFilter`, which hosts two renderer paths:
@@ -809,11 +860,6 @@ Performance Tips (dev)
 - Keep `m_outputSize` consistent across renderers that collaborate in a pass.
 - Use `--v=1` to sample stage timings; wrap expensive sections with `ZBenchTimer`.
 - For very large volumes, tune `atlas_image_block_size` and sampling rates; avoid over-aggressive sampling in DVR.
-
-Vulkan Raycaster (paging) debug flag
-
-- To rule out descriptor persistence/lifetime issues for the Page UBO, you can force per-draw override binding:
-  - `--atlas_vk_force_page_ubo_override=true` — always bind the Page UBO via an override descriptor (no persistent set). Default is false.
 
 Additional Architecture Notes
 

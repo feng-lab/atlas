@@ -177,7 +177,6 @@ void Z3DPerfCollector::flush(uint64_t token)
     }
     agg.drawsSubmitted += sub.stats.drawsSubmitted;
     agg.descriptorSetsAllocated += sub.stats.descriptorSetsAllocated;
-    agg.overrideSetsAllocated += sub.stats.overrideSetsAllocated;
     agg.pipelinesCreated += sub.stats.pipelinesCreated;
     agg.pipelinesBoundCount += sub.stats.pipelinesBoundCount;
     agg.renderingSegmentsBegan += sub.stats.renderingSegmentsBegan;
@@ -303,9 +302,8 @@ void Z3DPerfCollector::flush(uint64_t token)
                                   agg.staticBytesStaged,
                                   agg.readbackBytesCopied);
   stats += fmt::format(
-    " dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={} sec2=a{} f{} m{} h{} b{} e{} mask=0x{:x}",
+    " dsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={} sec2=a{} f{} m{} h{} b{} e{} mask=0x{:x}",
     agg.descriptorSetsAllocated,
-    agg.overrideSetsAllocated,
     agg.pipelinesCreated,
     agg.pipelinesBoundCount,
     agg.renderingSegmentsBegan,
@@ -582,7 +580,7 @@ void Z3DPerfCollector::flush(uint64_t token)
         std::ofstream ofs(outPath, std::ios::out | std::ios::app);
         if (!exists) {
           ofs
-            << "frame,cpu_ms,gpu_ms,top1_label,top1_ms,top1_pct,top2_label,top2_ms,top2_pct,top3_label,top3_ms,top3_pct,top4_label,top4_ms,top4_pct,top5_label,top5_ms,top5_pct,upload_hi,static_staged,readback,all_ms,all_samples,dsets,ovsets,pipes_created,pipes_bound,segs,clears,loads,dwr,rew\n";
+            << "frame,cpu_ms,gpu_ms,top1_label,top1_ms,top1_pct,top2_label,top2_ms,top2_pct,top3_label,top3_ms,top3_pct,top4_label,top4_ms,top4_pct,top5_label,top5_ms,top5_pct,upload_hi,static_staged,readback,all_ms,all_samples,dsets,pipes_created,pipes_bound,segs,clears,loads,dwr,rew\n";
         }
         auto getTop = [&](size_t i) {
           if (i < sortedGpu.size()) {
@@ -595,7 +593,7 @@ void Z3DPerfCollector::flush(uint64_t token)
           return (totalGpuMs > 0.0) ? (ms * 100.0 / totalGpuMs) : 0.0;
         };
         ofs << fmt::format(
-          "{}, {:.3f}, {:.3f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {}, {}, {:.3f}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n",
+          "{}, {:.3f}, {:.3f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {}, {}, {:.3f}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n",
           token,
           totalCpuMs,
           totalGpuMs,
@@ -620,7 +618,6 @@ void Z3DPerfCollector::flush(uint64_t token)
           agg.allMaxMs,
           agg.allSamples,
           agg.descriptorSetsAllocated,
-          agg.overrideSetsAllocated,
           agg.pipelinesCreated,
           agg.pipelinesBoundCount,
           agg.renderingSegmentsBegan,
@@ -651,7 +648,6 @@ void Z3DPerfCollector::flush(uint64_t token)
         st["all_ms"] = agg.allMaxMs;
         st["all_samples"] = agg.allSamples;
         st["descriptor_sets"] = agg.descriptorSetsAllocated;
-        st["override_sets"] = agg.overrideSetsAllocated;
         st["pipelines_created"] = agg.pipelinesCreated;
         st["pipelines_bound"] = agg.pipelinesBoundCount;
         st["segments"] = agg.renderingSegmentsBegan;

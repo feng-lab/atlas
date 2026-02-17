@@ -10,10 +10,10 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorset.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
+#include "zvulkanstaticpromotionutils.h"
 #include "zlog.h"
 
 #include <array>
@@ -34,7 +34,6 @@ void ZVulkanFontPipelineContext::resetFrame()
   m_vertexUploadOffset = 0;
   m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
-  resetDescriptors();
   m_staticCopyPendingKeys.clear();
 }
 
@@ -62,11 +61,6 @@ void ZVulkanFontPipelineContext::evictStream(uint64_t streamKey)
     m_backend.releaseStaticSlice(entry.ib);
     it = m_staticCache.erase(it);
   }
-}
-
-void ZVulkanFontPipelineContext::resetDescriptors()
-{
-  m_descriptorSet.reset();
 }
 
 void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
@@ -102,14 +96,9 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   CHECK(m_vertexUploadBuffer && m_indexUploadBuffer) << "Font buffers not created after uploadGeometry";
   CHECK(m_vertexCount > 0 && m_indexCount > 0) << "Uploaded empty font geometry";
 
-  // Ensure texture descriptor via per-draw override set
-  ensureDescriptorLayout();
-  CHECK(m_setTexture.has_value()) << "Failed to create font descriptor set layout";
   ZVulkanTexture* atlas = ensureAtlasFromPayload(payload);
   CHECK(atlas != nullptr) << "Font atlas texture unavailable";
-  ZVulkanDescriptorSet* ds = m_backend.allocateOverrideDescriptorSet(**m_setTexture);
-  CHECK(ds != nullptr) << "Failed to allocate override descriptor set for font atlas";
-  ds->updateTexture(0, *atlas, m_backend.defaultSampler());
+  const uint32_t atlasIdx = m_backend.bindlessLookupSampledImageAutoOrCrash(*atlas, "font atlas");
 
   // Debug: verify viewport/scissor and atlas metadata for MoltenVK issues
   // Per-draw diagnostic; keep behind VLOG(2) so --v=1 remains usable for perf runs.
@@ -157,6 +146,7 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   constants.softedgeScale = payload.softedgeScale;
   constants.outlineColor = payload.outlineColor;
   constants.shadowColor = payload.shadowColor;
+  constants.atlasTexture = atlasIdx;
 
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
   drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
@@ -164,7 +154,7 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = 0;
-  const std::array<vk::DescriptorSet, 1> descriptorSets{ds->descriptorSet()};
+  const std::array<vk::DescriptorSet, 1> descriptorSets{m_backend.bindlessSampledImageDescriptorSet()};
   drawSpec.descriptorSets = std::span<const vk::DescriptorSet>(descriptorSets);
   drawSpec.expectedDescriptorSetCount = 1;
   const std::array<vk::Buffer, 1> vertexBuffers{m_vertexUploadBuffer};
@@ -190,28 +180,6 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   ZVulkanPipelineCommandRecorder recorder(cmd);
   recorder.recordGraphicsDraw(drawSpec);
 }
-
-void ZVulkanFontPipelineContext::ensureDescriptorLayout()
-{
-  if (m_setTexture) {
-    return;
-  }
-  auto& device = m_backend.device();
-  auto& vkDevice = device.context().device();
-
-  std::array<vk::DescriptorSetLayoutBinding, 1> bindings{
-    vk::DescriptorSetLayoutBinding{.binding = 0,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment}
-  };
-
-  vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                               .pBindings = bindings.data()};
-  m_setTexture.emplace(vkDevice, createInfo);
-}
-
-void ZVulkanFontPipelineContext::ensureDescriptorSet() {}
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanFontPipelineContext::makeVertexInputState() const
 {
@@ -270,7 +238,7 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
     if (!m_staticCopyPendingKeys.contains(key)) {
       auto it = m_staticCache.find(key);
       if (it != m_staticCache.end()) {
-        const CacheEntry& entry = it->second;
+        CacheEntry& entry = it->second;
         const bool sizeSame = (entry.vertexCount == vtxCount) && (entry.indexCount == idxCount);
         const uint32_t colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
         const bool gensSame = (entry.posGen == payload.positionsGen) && (entry.texGen == payload.texcoordsGen) &&
@@ -282,8 +250,8 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
           m_vertexUploadOffset = entry.vb.offset;
           m_indexUploadBuffer = entry.ib.buffer;
           m_indexUploadOffset = entry.ib.offset;
-          m_backend.pinStaticSliceForActiveSubmission(entry.vb);
-          m_backend.pinStaticSliceForActiveSubmission(entry.ib);
+          vulkan::pinStaticSlicesForActiveSubmission(m_backend, {&entry.vb, &entry.ib});
+          entry.usedStaticOnce = true;
           return;
         }
       }
@@ -320,6 +288,22 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
     CacheKey key{payload.streamKey, payload.pickingPass};
     auto it = m_staticCache.find(key);
     const int kPromotionThreshold = 2;
+    const auto promoteToStatics = [&](CacheEntry& dstEntry) -> bool {
+      size_t stagedBytes = 0;
+      if (!vulkan::allocateAndScheduleStaticCopies(
+            m_backend,
+            {
+              {&dstEntry.vb, &vSlice, vtxCount * sizeof(FontVertex), alignof(FontVertex), false},
+              {&dstEntry.ib, &iSlice, idxCount * sizeof(uint32_t),   alignof(uint32_t),   true }
+      },
+            &stagedBytes)) {
+        return false;
+      }
+      if (stagedBytes > 0) {
+        m_backend.addFontBytesStaged(stagedBytes);
+      }
+      return true;
+    };
     if (it == m_staticCache.end()) {
       CacheEntry entry{};
       entry.vertexCount = static_cast<uint32_t>(vtxCount);
@@ -328,7 +312,18 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
       entry.texGen = payload.texcoordsGen;
       entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
       entry.indexGen = payload.indicesGen;
-      m_staticCache.emplace(key, entry);
+      auto [inserted, _] = m_staticCache.emplace(key, entry);
+      CacheEntry& insertedEntry = inserted->second;
+
+      // UX: stage into device-local statics on first sight so steady-state
+      // frames can bind fast device-local buffers starting on the next frame.
+      if (promoteToStatics(insertedEntry)) {
+        insertedEntry.promoted = true;
+        insertedEntry.usedStaticOnce = false;
+        // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+        m_staticCopyPendingKeys.insert(key);
+        return;
+      }
     } else {
       CacheEntry& entry = it->second;
       const bool sizeSame = (entry.vertexCount == vtxCount) && (entry.indexCount == idxCount);
@@ -353,9 +348,9 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
         return;
       }
       if (entry.promoted && !sizeSame) {
-        m_backend.releaseStaticSlice(entry.vb);
-        m_backend.releaseStaticSlice(entry.ib);
+        vulkan::releaseStaticSlices(m_backend, {&entry.vb, &entry.ib});
         entry.promoted = false;
+        entry.usedStaticOnce = false;
         entry.unchangedFrames = 0;
         entry.vertexCount = static_cast<uint32_t>(vtxCount);
         entry.indexCount = static_cast<uint32_t>(idxCount);
@@ -363,28 +358,57 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
         entry.texGen = payload.texcoordsGen;
         entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
         entry.indexGen = payload.indicesGen;
+
+        // Recreate static slices immediately so the next steady frame can bind
+        // device-local buffers without a multi-frame warmup.
+        if (promoteToStatics(entry)) {
+          entry.promoted = true;
+          entry.usedStaticOnce = false;
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
+          m_staticCopyPendingKeys.insert(key);
+          return;
+        }
         return;
       }
       if (entry.promoted && sizeSame) {
+        const uint32_t expectedColorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        const bool vbChanged = (entry.posGen != payload.positionsGen) || (entry.texGen != payload.texcoordsGen) ||
+                               (entry.colorGen != expectedColorGen);
+        const bool ibChanged = (entry.indexGen != payload.indicesGen);
+        const bool anyChanged = vbChanged || ibChanged;
+
+        // If this stream is still changing before we've ever bound the static
+        // buffers, drop the statics and fall back to upload-only mode to avoid
+        // paying upload->device copies every frame without a benefit.
+        if (anyChanged && !entry.usedStaticOnce) {
+          vulkan::releaseStaticSlices(m_backend, {&entry.vb, &entry.ib});
+          entry.promoted = false;
+          entry.usedStaticOnce = false;
+          entry.unchangedFrames = 0;
+          entry.vertexCount = static_cast<uint32_t>(vtxCount);
+          entry.indexCount = static_cast<uint32_t>(idxCount);
+          entry.posGen = payload.positionsGen;
+          entry.texGen = payload.texcoordsGen;
+          entry.colorGen = expectedColorGen;
+          entry.indexGen = payload.indicesGen;
+          return;
+        }
+
         // Restage VB/IB if any gen changed
         size_t restaged = 0;
-        bool anyChanged = false;
-        if (entry.posGen != payload.positionsGen || entry.texGen != payload.texcoordsGen ||
-            entry.colorGen != (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen)) {
+        if (vbChanged) {
           m_backend.scheduleStaticCopy(entry.vb.buffer, entry.vb.offset, vSlice, /*isIndexBuffer=*/false);
           restaged += vtxCount * sizeof(FontVertex);
-          anyChanged = true;
         }
-        if (entry.indexGen != payload.indicesGen) {
+        if (ibChanged) {
           m_backend.scheduleStaticCopy(entry.ib.buffer, entry.ib.offset, iSlice, /*isIndexBuffer=*/true);
           restaged += idxCount * sizeof(uint32_t);
-          anyChanged = true;
         }
         entry.vertexCount = static_cast<uint32_t>(vtxCount);
         entry.indexCount = static_cast<uint32_t>(idxCount);
         entry.posGen = payload.positionsGen;
         entry.texGen = payload.texcoordsGen;
-        entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+        entry.colorGen = expectedColorGen;
         entry.indexGen = payload.indicesGen;
         if (restaged > 0) {
           m_backend.addFontBytesStaged(restaged);
@@ -395,8 +419,8 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
           m_vertexUploadOffset = entry.vb.offset;
           m_indexUploadBuffer = entry.ib.buffer;
           m_indexUploadOffset = entry.ib.offset;
-          m_backend.pinStaticSliceForActiveSubmission(entry.vb);
-          m_backend.pinStaticSliceForActiveSubmission(entry.ib);
+          vulkan::pinStaticSlicesForActiveSubmission(m_backend, {&entry.vb, &entry.ib});
+          entry.usedStaticOnce = true;
         } else {
           m_staticCopyPendingKeys.insert(key);
         }
@@ -409,19 +433,9 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
       entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
       entry.indexGen = payload.indicesGen;
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
-        auto vbDst = m_backend.allocateStaticVB(vtxCount * sizeof(FontVertex), alignof(FontVertex));
-        auto ibDst = m_backend.allocateStaticIB(idxCount * sizeof(uint32_t), alignof(uint32_t));
-        if (vbDst && ibDst) {
-          m_backend.scheduleStaticCopy(vbDst.buffer, vbDst.offset, vSlice, /*isIndexBuffer=*/false);
-          m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, iSlice, /*isIndexBuffer=*/true);
-          entry.vb = vbDst;
-          entry.ib = ibDst;
-          entry.posGen = payload.positionsGen;
-          entry.texGen = payload.texcoordsGen;
-          entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
-          entry.indexGen = payload.indicesGen;
+        if (promoteToStatics(entry)) {
           entry.promoted = true;
-          m_backend.addFontBytesStaged(vtxCount * sizeof(FontVertex) + idxCount * sizeof(uint32_t));
+          entry.usedStaticOnce = false;
           // Do not bind statics this frame; keep upload slices. Statics bind next frame.
           m_staticCopyPendingKeys.insert(key);
           return;
@@ -429,6 +443,50 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
       }
     }
   }
+}
+
+ZVulkanTexture& ZVulkanFontPipelineContext::ensureAtlasFromCpuPixelsOrCrash(const uint8_t* atlasPixelsBGRA8,
+                                                                            uint32_t width,
+                                                                            uint32_t height)
+{
+  CHECK(atlasPixelsBGRA8 != nullptr) << "Font atlas pixels must be non-null";
+  CHECK(width > 0u && height > 0u) << "Font atlas dimensions must be non-zero";
+
+  auto it = m_atlasCache.find(atlasPixelsBGRA8);
+  if (it != m_atlasCache.end()) {
+    auto* tex = it->second.get();
+    CHECK(tex != nullptr) << "Font atlas cache entry contained a null texture";
+    const auto& ext = tex->extent();
+    if (ext.width == width && ext.height == height) {
+      return *tex;
+    }
+    // Size changed, recreate.
+    m_atlasCache.erase(it);
+  }
+
+  // Creating/uploading textures can submit immediate transfer work; require a
+  // pre-record safe point.
+  CHECK(!m_backend.isRecording()) << "Font atlas upload must occur before command recording begins";
+
+  auto& device = m_backend.device();
+  auto info =
+    ZVulkanTexture::CreateInfo::make2D(width,
+                                       height,
+                                       vk::Format::eB8G8R8A8Unorm,
+                                       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                       vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                       1u,
+                                       true,
+                                       vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto tex = device.createTexture(info);
+  CHECK(tex != nullptr) << "Failed to create font atlas texture from CPU pixels (" << width << "x" << height << ")";
+  const size_t byteSize = static_cast<size_t>(width) * height * 4u;
+  tex->uploadData(atlasPixelsBGRA8, byteSize, vk::ImageLayout::eShaderReadOnlyOptimal);
+  VLOG(1) << fmt::format("VK font atlas upload: {}x{} {}B", width, height, byteSize);
+
+  auto [inserted, _] = m_atlasCache.emplace(atlasPixelsBGRA8, std::move(tex));
+  CHECK(inserted->second != nullptr) << "Font atlas cache insert produced null texture";
+  return *inserted->second;
 }
 
 ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPayload& payload)
@@ -440,35 +498,7 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
   }
 
   if (payload.atlasPixels && payload.atlasWidth > 0 && payload.atlasHeight > 0) {
-    auto it = m_atlasCache.find(payload.atlasPixels);
-    if (it != m_atlasCache.end()) {
-      auto* tex = it->second.get();
-      const auto& ext = tex->extent();
-      if (ext.width == payload.atlasWidth && ext.height == payload.atlasHeight) {
-        return tex;
-      }
-      // size changed, recreate
-      m_atlasCache.erase(it);
-    }
-
-    auto& device = m_backend.device();
-    auto info =
-      ZVulkanTexture::CreateInfo::make2D(payload.atlasWidth,
-                                         payload.atlasHeight,
-                                         vk::Format::eB8G8R8A8Unorm,
-                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                         1u,
-                                         true,
-                                         vk::ImageLayout::eShaderReadOnlyOptimal);
-    auto tex = device.createTexture(info);
-    CHECK(tex != nullptr) << "Failed to create font atlas texture from CPU pixels (" << payload.atlasWidth << "x"
-                          << payload.atlasHeight << ")";
-    const size_t byteSize = static_cast<size_t>(payload.atlasWidth) * payload.atlasHeight * 4u;
-    tex->uploadData(payload.atlasPixels, byteSize, vk::ImageLayout::eShaderReadOnlyOptimal);
-    VLOG(1) << fmt::format("VK font atlas upload: {}x{} {}B", payload.atlasWidth, payload.atlasHeight, byteSize);
-    auto [inserted, _] = m_atlasCache.emplace(payload.atlasPixels, std::move(tex));
-    return inserted->second.get();
+    return &ensureAtlasFromCpuPixelsOrCrash(payload.atlasPixels, payload.atlasWidth, payload.atlasHeight);
   }
 
   // Fallback: tiny white
@@ -477,6 +507,7 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
     return it->second.get();
   }
   auto& device = m_backend.device();
+  CHECK(!m_backend.isRecording()) << "Font fallback atlas creation must occur before command recording begins";
   auto info =
     ZVulkanTexture::CreateInfo::make2D(1,
                                        1,
@@ -502,8 +533,6 @@ ZVulkanFontPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     return it->second;
   }
 
-  ensureDescriptorLayout();
-
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
@@ -513,7 +542,7 @@ ZVulkanFontPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
-  instance.pipeline->setDescriptorSetLayouts({**m_setTexture});
+  instance.pipeline->setDescriptorSetLayouts({m_backend.bindlessSampledImageDescriptorSetLayout()});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);

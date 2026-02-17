@@ -9,6 +9,7 @@
 #include <optional>
 #include <set>
 #include <tuple>
+#include <cstdint>
 #include <vector>
 #include <unordered_map>
 
@@ -18,8 +19,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorPool;
-class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 class Z3DFontRenderer;
@@ -36,6 +35,10 @@ public:
 
   void resetFrame();
   void evictStream(uint64_t streamKey);
+
+  // Pre-record helper for bindless sampled images: ensure the font atlas texture
+  // exists (CPU pixels upload path) before command recording begins.
+  ZVulkanTexture& ensureAtlasFromCpuPixelsOrCrash(const uint8_t* atlasPixelsBGRA8, uint32_t width, uint32_t height);
 
   void record(Z3DRendererBase& renderer,
               const RenderBatch& batch,
@@ -87,14 +90,15 @@ private:
     glm::vec2 _pad0{0.0f};
     glm::vec4 outlineColor{1.0f};
     glm::vec4 shadowColor{0.0f, 0.0f, 0.0f, 1.0f};
+    uint32_t atlasTexture = 0;
+    uint32_t _pad1 = 0;
+    uint32_t _pad2 = 0;
+    uint32_t _pad3 = 0;
   };
 
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
-
-  std::optional<vk::raii::DescriptorSetLayout> m_setTexture;
-  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
@@ -133,6 +137,7 @@ private:
     uint32_t indexGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
+    bool usedStaticOnce = false;
   };
   std::map<CacheKey, CacheEntry> m_staticCache;
   // Guard: if we scheduled upload->static copies for a stream within the
@@ -140,9 +145,6 @@ private:
   // next submission because copies are flushed after rendering ends.
   std::set<CacheKey> m_staticCopyPendingKeys;
 
-  void ensureDescriptorLayout();
-  void resetDescriptors();
-  void ensureDescriptorSet();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
   void uploadGeometry(const FontPayload& payload);

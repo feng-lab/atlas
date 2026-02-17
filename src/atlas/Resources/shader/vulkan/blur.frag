@@ -1,17 +1,18 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "include/bindless.glslinc"
 
 // Orientation: 0=X, 1=Y
 layout(constant_id = 100) const int ORIENTATION = 0;
-
-layout(set = 0, binding = 0) uniform sampler2D color_texture;
-layout(set = 0, binding = 1) uniform sampler2D depth_texture;
 
 layout(push_constant) uniform BlurPC {
   vec2  screen_dim_RCP;
   int   blur_radius;
   float blur_scale;
   float blur_strength;
-  float _pad0;
+  uint  color_texture;
+  uint  depth_texture;
 } pc;
 
 layout(location = 0) out vec4 FragData0;
@@ -37,11 +38,10 @@ void main()
                                 : vec2(0.0, offset * pc.blur_scale);
     float w = Gaussian(offset * strength, deviation);
     vec2 tc = (gl_FragCoord.xy + o) * pc.screen_dim_RCP;
-    color += texture(color_texture, tc) * w;
-    depth = min(depth, texture(depth_texture, tc).r * w);
+    color += texture(atlas_bindlessSampler2DLinear(pc.color_texture), tc) * w;
+    depth = min(depth, texture(atlas_bindlessSampler2DLinear(pc.depth_texture), tc).r * w);
   }
 
   FragData0 = clamp(color, 0.0, 1.0);
   gl_FragDepth = depth;
 }
-

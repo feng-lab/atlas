@@ -1,10 +1,13 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 // GPU compaction of Block-IDs with workgroup-local dedupe + global append buffer
 // - Input: RGBA32UI usampler2D
 // - Output: SSBO { uint count; uint ids[...] } (append via atomicAdd on count)
 // - FULL 32-bit ID coverage; global writes are coalesced, no global hash atomics
 // - Workgroup size 16x16; dispatch sized to cover the image dimensions
+
+#include "include/bindless.glslinc"
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
@@ -15,10 +18,8 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 #define LOCAL_SIZE      (1u << LOCAL_BITS)
 #define LOCAL_MASK      (LOCAL_SIZE - 1u)
 
-layout(set = 0, binding = 0) uniform usampler2D uBlockIdImage;
-
 // Unified output buffer: header (count + per-attachment counts[8]) + ids[]
-layout(std430, set = 0, binding = 1) buffer BlockList {
+layout(std430, set = 1, binding = 0) buffer BlockList {
     uint count;       // number of ids written
     uint counts[8];   // per-attachment contribution counters
     uint ids[];       // capacity provided via push constants
@@ -30,6 +31,7 @@ layout(push_constant) uniform PushConstants {
     uint stride;
     uint capacity; // max ids[] entries
     uint att;      // current attachment index [0,7]
+    uint block_id_image; // bindless index (usampler2D table)
 } pc;
 
 uint hash32(uint x) { return x * 2654435761u; }
@@ -65,7 +67,7 @@ void main()
         return;
     }
 
-    uvec4 ids4 = texelFetch(uBlockIdImage, ivec2(gid.xy), 0);
+    uvec4 ids4 = texelFetch(atlas_bindlessUSampler2DNearest(pc.block_id_image), ivec2(gid.xy), 0);
     // Per-pixel channel dedupe
     if (ids4.g == ids4.r) ids4.g = 0u;
     if (ids4.b == ids4.r || ids4.b == ids4.g) ids4.b = 0u;

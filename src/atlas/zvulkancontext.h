@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zvulkan.h"
+#include <cstdint>
 #include <memory>
 #include <optional>
 
@@ -15,6 +16,30 @@ class ZVulkanDevice;
 class ZVulkanContext
 {
 public:
+  struct BindlessSampledImageCapacities
+  {
+    uint32_t texture2D = 0;
+    uint32_t texture2DArray = 0;
+    uint32_t texture3D = 0;
+    uint32_t uTexture2D = 0;
+    uint32_t uTexture3D = 0;
+
+    [[nodiscard]] uint32_t totalSampledImages() const
+    {
+      return texture2D + texture2DArray + texture3D + uTexture2D + uTexture3D;
+    }
+
+    [[nodiscard]] uint32_t fragmentVisibleSampledImages() const
+    {
+      return texture2D + texture2DArray + texture3D + uTexture3D;
+    }
+
+    [[nodiscard]] uint32_t computeVisibleSampledImages() const
+    {
+      return uTexture2D;
+    }
+  };
+
   ZVulkanContext();
   ~ZVulkanContext();
 
@@ -85,6 +110,37 @@ public:
     return m_supportsInlineAndSecondaryDynamicRendering;
   }
 
+  // True when the logical device enabled descriptor indexing update-after-bind
+  // for sampled images. Atlas does not rely on
+  // updating descriptors while in-flight, but enabling update-after-bind lets
+  // some drivers (notably MoltenVK) account large bindless descriptor arrays
+  // against the descriptor indexing limits rather than the much smaller legacy
+  // per-stage sampler limits.
+  [[nodiscard]] bool supportsDescriptorIndexingSampledImageUpdateAfterBind() const
+  {
+    return m_supportsDescriptorIndexingSampledImageUpdateAfterBind;
+  }
+
+  // Bindless sampled-image table capacity policy:
+  // - Requested capacities come from gflags (developer override).
+  // - Effective capacities are clamped once per logical device creation to fit
+  //   the selected physical device limits (legacy or update-after-bind) and are
+  //   treated as immutable for the device lifetime (pipeline layouts depend on them).
+  [[nodiscard]] const BindlessSampledImageCapacities& requestedBindlessSampledImageCapacities() const
+  {
+    return m_requestedBindlessSampledImageCapacities;
+  }
+
+  [[nodiscard]] const BindlessSampledImageCapacities& effectiveBindlessSampledImageCapacities() const
+  {
+    return m_effectiveBindlessSampledImageCapacities;
+  }
+
+  [[nodiscard]] bool bindlessSampledImageCapacitiesClamped() const
+  {
+    return m_bindlessSampledImageCapacitiesClamped;
+  }
+
   // Queue family indices for the selected physical device
   struct QueueFamilyIndices
   {
@@ -123,6 +179,7 @@ private:
   void pickPhysicalDevice();
   void createLogicalDevice();
   void createCommandPool();
+  void computeBindlessSampledImageCapacities();
 
   // Find queue families that support required operations
   QueueFamilyIndices findQueueFamilies(vk::raii::PhysicalDevice& physicalDevice) const;
@@ -140,6 +197,11 @@ private:
 
   QueueFamilyIndices m_queueFamilyIndices;
   bool m_supportsInlineAndSecondaryDynamicRendering = false;
+  bool m_supportsDescriptorIndexingSampledImageUpdateAfterBind = false;
+
+  BindlessSampledImageCapacities m_requestedBindlessSampledImageCapacities{};
+  BindlessSampledImageCapacities m_effectiveBindlessSampledImageCapacities{};
+  bool m_bindlessSampledImageCapacitiesClamped = false;
 };
 
 } // namespace nim

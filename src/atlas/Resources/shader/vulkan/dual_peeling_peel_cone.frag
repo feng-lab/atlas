@@ -1,8 +1,12 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-layout(set = 0, binding = 0) uniform sampler2D DepthBlenderTex;
-layout(set = 0, binding = 1) uniform sampler2D FrontBlenderTex;
+#include "include/bindless.glslinc"
+
+layout(push_constant) uniform DDPPeelPC {
+  uint ddpDepthBlender;
+  uint ddpFrontBlender;
+} ddppc;
 
 
 layout(location = 0) out vec4 FragData0;
@@ -37,8 +41,8 @@ void main()
   gl_FragDepth = fragDepth;
 
   ivec2 p = ivec2(gl_FragCoord.xy);
-  vec2 depthBlender = texelFetch(DepthBlenderTex, p, 0).xy;
-  vec4 forwardTemp = texelFetch(FrontBlenderTex, p, 0);
+  vec2 depthBlender = texelFetch(atlas_bindlessSampler2DNearest(ddppc.ddpDepthBlender), p, 0).xy;
+  vec4 forwardTemp = texelFetch(atlas_bindlessSampler2DNearest(ddppc.ddpFrontBlender), p, 0);
 
   FragData1 = forwardTemp; // pass-through by default with MAX blending
   FragData2 = vec4(0.0);

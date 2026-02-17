@@ -24,7 +24,6 @@ struct CompositingConfig
 
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
-class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
 class ZVulkanShader;
 class ZVulkanPipeline;
@@ -72,6 +71,26 @@ public:
               const vk::Rect2D& scissor,
               vk::raii::CommandBuffer& cmd);
 
+  // ---------------------------------------------------------------------------
+  // Pre-record priming (must run before command-buffer recording begins).
+  // These are invoked by ZVulkanLinearScript via backend preRecord actions so
+  // bindless descriptor mutations never happen while recording.
+  // ---------------------------------------------------------------------------
+
+  struct BindlessWarmupDesc
+  {
+    Z3DImg* image = nullptr;
+    const std::vector<Z3DTransferFunction*>* transferFunctions = nullptr;
+    std::vector<size_t> channels;
+    bool wants2D = false;
+    bool wantsVolume3D = true;
+    bool wantsPaging = false;
+  };
+
+  void preRecordBindlessWarmup(const BindlessWarmupDesc& desc);
+  void preRecordPrimeBlockIdCompaction(const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
+                                       uint32_t effectiveAttachmentCount);
+
 private:
   struct EntryVertex
   {
@@ -88,30 +107,7 @@ private:
     std::unique_ptr<ZVulkanTexture> transferTexture;
     uint64_t transferGeneration = 0;
     uint32_t transferWidth = 0;
-    ZVulkanDescriptorSet* fastDescriptor = nullptr; // per-draw override (backend-owned)
-    ZVulkanDescriptorSet* image2DDescriptor = nullptr; // per-draw override (backend-owned)
-    ZVulkanDescriptorSet* sliceDescriptor = nullptr; // per-draw override (backend-owned)
-    // Ray params via push constants; no descriptors or buffers needed
-    // Progressive (dynamic) textures (entry/exit, lastDepth, lastColor)
-    ZVulkanDescriptorSet* pagedDescriptor = nullptr; // per-draw override (backend-owned)
-    // Progressive static textures (page dir, table, cache, volume, transfer)
-    ZVulkanDescriptorSet* staticDescriptor = nullptr; // per-draw override (backend-owned)
-    std::unique_ptr<ZVulkanDescriptorSet> persistentStaticDescriptor; // cached across frames
-    // Page/params UBOs
-    ZVulkanDescriptorSet* pageDescriptor = nullptr; // per-draw override (backend-owned)
-    std::unique_ptr<ZVulkanDescriptorSet> persistentPageDescriptor; // cached across frames
-    std::shared_ptr<ZVulkanBuffer> pageDataBuffer;
-    size_t pageDataCapacity = 0;
-    std::shared_ptr<ZVulkanBuffer> boundPageDataBuffer; // last buffer bound in persistentPageDescriptor
-    // Tracking for persistent static set
-    class ZVulkanTexture* boundPageDirectoryTex = nullptr;
-    class ZVulkanTexture* boundPageTableTex = nullptr;
-    class ZVulkanTexture* boundImageCacheTex = nullptr;
-    class ZVulkanTexture* boundVolumeTex = nullptr;
-    class ZVulkanTexture* boundTransferTex = nullptr;
     uint32_t levelCount = 0;
-    std::unique_ptr<ZVulkanDescriptorSet> blockIdDescriptor;
-    std::vector<uint32_t> blockIdScratch;
   };
 
   struct PipelineInstance
@@ -255,20 +251,10 @@ private:
   std::unique_ptr<ZVulkanBuffer> m_quadVertexBuffer;
   size_t m_quadVertexCount = 0;
 
-  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
-  std::optional<vk::raii::DescriptorSetLayout> m_entrySetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_fastSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_image2DSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_sliceFastSetLayout;
-  // Progressive split: static (set=0) and dynamic (set=1)
-  std::optional<vk::raii::DescriptorSetLayout> m_progressiveStaticSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_progressiveDynamicSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_pageSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_transformSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_copySetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_mergeSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_emptySetLayout;
-  // Ray parameters use push constants; no descriptor set layout needed.
+  // Bindless + dynamic-UBO descriptor state.
+  // - set 0: backend bindless sampled-image tables (shared, per frame-slot)
+  // - set 1: small per-draw UBO for planar fast paths (texture indices)
+  // - set 2: paging PageData UBO for progressive raycasters
 
   PipelineInstance m_entryFrontPipeline;
   PipelineInstance m_entryBackPipeline;
@@ -284,14 +270,8 @@ private:
   PipelineInstance m_depthRampPipeline;
   std::optional<vk::Format> m_depthRampFormat;
 
-  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor; // frame-owned placeholder
-  ZVulkanDescriptorSet* m_entryTransformDescriptor = nullptr; // per-draw override (backend-owned)
-  ZVulkanDescriptorSet* m_copyDescriptor = nullptr; // per-draw override (backend-owned)
-  ZVulkanDescriptorSet* m_mergeDescriptor = nullptr; // per-draw override (backend-owned)
-  std::unique_ptr<ZVulkanBuffer> m_entryTransformBuffer;
-
   // Block-ID compaction (compute) resources
-  // Two read-source variants: 'sampled' (combined image sampler) and 'storage' (uimage2D)
+  // Two read-source variants: 'sampled(bindless)' (utexture2D via bindless set 0) and 'storage' (uimage2D)
   std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutSampled;
   std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutSampled;
   std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineSampled;
@@ -316,8 +296,17 @@ private:
   std::unordered_map<void*, BlockIdCompactionOutput> m_blockIdCompactOutputs;
   ZVulkanDevice* m_blockIdCompactDevice = nullptr; // non-owning; used to detect executor rebuilds
   uint32_t m_blockIdCompactMaxFramesInFlight = 0;
-  // Per-attachment snapshot of append counts (host-visible), used to detect
-  // whether an attachment contributed any IDs (delta == 0 => attachment all zeros).
+  // Pre-record prepared descriptor state for compaction.
+  // These descriptor sets are allocated from the per-frame descriptor arena and
+  // must be written only before command-buffer recording begins.
+  std::unique_ptr<ZVulkanDescriptorSet> m_blockIdCompactDescriptorBuffer; // set 1 (buffer variant)
+  std::unique_ptr<ZVulkanDescriptorSet> m_blockIdCompactDescriptorSampled; // set 1 (bindless sampled variant)
+  struct BlockIdStorageDescriptorPack
+  {
+    std::vector<std::unique_ptr<ZVulkanDescriptorSet>> perAttachment; // set 1 (storage variant)
+  };
+  std::unordered_map<const Z3DScratchResourcePool::RenderTargetLease*, BlockIdStorageDescriptorPack>
+    m_blockIdCompactDescriptorStorageByLease;
 
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
@@ -378,14 +367,22 @@ private:
     float zeToZW_a = 0.0f;
     float zeToZW_b = 0.0f;
     float zeToScreenPixelVoxelSize = 0.0f;
+    uint32_t levelCount = 1u;
+    uint32_t pageDataDynOffset = 0u;
     ZVulkanTexture* entryTexture = nullptr;
     ZVulkanTexture* lastColor = nullptr;
     ZVulkanTexture* lastDepth = nullptr;
     ZVulkanTexture* currentColor = nullptr;
     ZVulkanTexture* currentDepth = nullptr;
+    ZVulkanTexture* pageDirectory = nullptr;
+    ZVulkanTexture* pageTable = nullptr;
+    ZVulkanTexture* imageCache = nullptr;
+    ZVulkanTexture* volumeTexture = nullptr;
+    ZVulkanTexture* transferTexture = nullptr;
   };
 
   std::optional<ProgressivePrepState> m_progressivePrep;
+  std::optional<ProgressivePrepKey> m_lastDebugDumpBlockIdKey;
 
   // Track which depth images have been cleared this frame (for first-use clear on merge).
   std::unordered_set<VkImage> m_depthClearedThisFrame;
@@ -393,15 +390,11 @@ private:
   // No extra per-stream channel bookkeeping; pending finalization is set after
   // frame completion when compaction finds no missing blocks for the active channel.
 
-  void ensureDescriptorPool();
-  void resetDescriptors();
   void ensureEntryVertexCapacity(size_t vertexCount, size_t indexCount);
   void ensureQuadVertexBuffer();
 
-  void ensureDescriptorLayouts();
   void ensureEntryPipelines(vk::Format colorFormat);
   PipelineInstance& ensureFastPipeline(const FastPipelineKey& key);
-  void ensureEmptyDescriptor();
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
   // Lazily create the image block uploader when a Vulkan device is guaranteed
   // to be available (e.g., during recording after beginRender()).
@@ -412,11 +405,8 @@ private:
   PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
   void uploadEntryGeometry(const ImgRaycasterPayload& payload);
   void ensureEntryGeometryUploadedThisFrame(const ImgRaycasterPayload& payload);
-  void ensureEntryTransformResources(Z3DRendererBase& renderer,
-                                     const RenderBatch& batch,
-                                     const ImgRaycasterPayload& payload);
 
-  void ensureBlockIdCompactionPipeline(uint32_t attachmentCount, int mode);
+  void ensureBlockIdCompactionPipeline();
   BlockIdCompactionOutput& ensureBlockIdCompactOutput(size_t bytes);
   void recordBlockIdCompaction(Z3DRendererBase& renderer,
                                const RenderBatch& batch,
@@ -424,41 +414,6 @@ private:
                                vk::raii::CommandBuffer& cmd);
 
   ChannelResources& ensureChannelResources(size_t channelIndex);
-  void updateChannelFastDescriptors(ChannelResources& resources,
-                                    const ImgRaycasterPayload& payload,
-                                    size_t channelIndex,
-                                    ZVulkanTexture& entryExitTexture,
-                                    ZVulkanTexture& volumeTexture,
-                                    ZVulkanTexture& transferTexture,
-                                    float zeToZW_a,
-                                    float zeToZW_b,
-                                    const glm::vec3& volumeDimensions);
-  void updateChannelImage2DDescriptors(ChannelResources& resources,
-                                       ZVulkanTexture& imageTexture,
-                                       ZVulkanTexture& transferTexture);
-  void updateChannelSliceDescriptors(ChannelResources& resources,
-                                     ZVulkanTexture& volumeTexture,
-                                     ZVulkanTexture& transferTexture);
-
-  // If freshOverrideDescriptors is true, force allocation of new per-draw
-  // override descriptor sets to avoid updating sets already bound earlier in
-  // the same command buffer.
-  bool updatePageDescriptors(ChannelResources& resources,
-                             const ImgRaycasterPayload& payload,
-                             ZVulkanTexture& entryExit,
-                             ZVulkanTexture& lastDepth,
-                             ZVulkanTexture& lastColor,
-                             ZVulkanTexture& volume,
-                             ZVulkanTexture& transfer,
-                             const Z3DImg& image,
-                             size_t channelIndex,
-                             float zeToScreenPixelVoxelSize,
-                             bool freshOverrideDescriptors = false);
-
-  std::vector<vk::DescriptorSet> collectProgressiveDescriptorSets(ChannelResources& resources,
-                                                                  bool preferOverrideStatic = false);
-  // depthArray is optional
-  void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
 
   ZVulkanTexture&
   ensureVolumeTexture(ChannelResources& resources, const ZImg& image, size_t channelIndex, uint64_t generation);

@@ -1,7 +1,12 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
-layout(set = 0, binding = 0) uniform sampler2D ColorTex0; // accumulated color * weight
-layout(set = 0, binding = 1) uniform sampler2D ColorTex1; // transmittance
+#include "include/bindless.glslinc"
+
+layout(push_constant) uniform WBlendedFinalPC {
+  uint accum_tex;
+  uint transmittance_tex;
+} wpc;
 
 #include "include/lighting.glslinc"
 
@@ -16,8 +21,8 @@ const float kWeightEpsilon = 1e-5;
 void main()
 {
   ivec2 p = ivec2(gl_FragCoord.xy);
-  vec4 sumColor = texelFetch(ColorTex0, p, 0);
-  float transmittance = texelFetch(ColorTex1, p, 0).r;
+  vec4 sumColor = texelFetch(atlas_bindlessSampler2DNearest(wpc.accum_tex), p, 0);
+  float transmittance = texelFetch(atlas_bindlessSampler2DNearest(wpc.transmittance_tex), p, 0).r;
 
   float resolvedAlpha = clamp(1.0 - transmittance, 0.0, 1.0);
   if (resolvedAlpha <= kAlphaEpsilon) {

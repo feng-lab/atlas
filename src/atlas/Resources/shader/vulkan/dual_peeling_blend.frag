@@ -1,12 +1,16 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
-layout(set = 0, binding = 0) uniform sampler2D TempTex;
+#include "include/bindless.glslinc"
 
+layout(push_constant) uniform DDPBlendPC {
+  uint temp_tex;
+} ddppc;
 
 layout(location = 0) out vec4 FragData0;
 
 void main()
 {
-  FragData0 = texelFetch(TempTex, ivec2(gl_FragCoord.xy), 0);
+  FragData0 = texelFetch(atlas_bindlessSampler2DNearest(ddppc.temp_tex), ivec2(gl_FragCoord.xy), 0);
   if (FragData0.a == 0.0) discard; // for occlusion query
 }

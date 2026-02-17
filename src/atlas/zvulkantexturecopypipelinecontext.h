@@ -15,7 +15,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 
@@ -88,25 +87,24 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
+  // Matches layout(push_constant) CopyImagePC in
+  // Resources/shader/vulkan/include/copyimage_func.glslinc.
+  struct CopyImagePushConstants
+  {
+    uint32_t colorTex = 0;
+    uint32_t depthTex = 0;
+    uint32_t ddpDepthBlender = 0;
+    uint32_t ddpFrontBlender = 0;
+  };
+
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
-
-  std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
-  vk::DescriptorSetLayout m_setLighting{}; // set 1: lighting UBO (used by WB init image shader)
-  vk::DescriptorSetLayout m_setOIT{}; // set 3: OIT SSBOs (DDP flag / PPLL buffers)
-  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
   size_t m_vertexCount = 0;
 
-  void ensureDescriptorLayout();
-  void resetDescriptors();
-  void ensureDescriptorSet();
-  void ensureLightingResources();
-  void ensureOITResources();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
   void ensureVertexCapacity(size_t vertexCount);

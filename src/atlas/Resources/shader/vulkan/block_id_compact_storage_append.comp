@@ -11,10 +11,11 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 #define LOCAL_SIZE      (1u << LOCAL_BITS)
 #define LOCAL_MASK      (LOCAL_SIZE - 1u)
 
-layout(rgba32ui, set = 0, binding = 0) readonly uniform uimage2D uBlockIdImage;
+// Reserve set=0 for Atlas bindless tables (even though this shader does not use them).
+layout(rgba32ui, set = 1, binding = 1) readonly uniform uimage2D uBlockIdImage;
 
 // Unified output: header (count + counts[8]) + ids[]
-layout(std430, set = 0, binding = 1) buffer BlockList {
+layout(std430, set = 1, binding = 0) buffer BlockList {
     uint count;
     uint counts[8];
     uint ids[];

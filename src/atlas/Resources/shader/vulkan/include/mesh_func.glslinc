@@ -1,4 +1,5 @@
 #include "lighting.glslinc"
+#include "bindless.glslinc"
 
 // Specialization constants for mesh sources
 layout(constant_id = 40) const bool USE_MESH_COLOR     = true;
@@ -6,10 +7,15 @@ layout(constant_id = 41) const bool USE_MESH_1DTEXTURE = false;
 layout(constant_id = 42) const bool USE_MESH_2DTEXTURE = false;
 layout(constant_id = 43) const bool USE_MESH_3DTEXTURE = false;
 
-// Descriptor set for textures (mutually exclusive usage per pipeline)
-layout(set = 0, binding = 0) uniform sampler2D tex1D;
-layout(set = 0, binding = 1) uniform sampler2D tex2D;
-layout(set = 0, binding = 2) uniform sampler3D tex3D;
+// Bindless texture indices for mesh draws. Only the indices referenced by the
+// active specialization path are used.
+layout(push_constant) uniform MeshBindlessPC {
+  uint tex1D;
+  uint tex2D;
+  uint tex3D;
+  uint ddpDepthBlender;
+  uint ddpFrontBlender;
+} mbpc;
 
 // Shared UBOs for transforms and material
 #include "matrices_material.glslinc"
@@ -32,9 +38,9 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
     color = matu.custom_color;
   } else {
     if (USE_MESH_COLOR)      color = v_color;
-    else if (USE_MESH_2DTEXTURE) color = texture(tex2D, v_tc2d);
-    else if (USE_MESH_3DTEXTURE) color = texture(tex3D, v_tc3d);
-    else if (USE_MESH_1DTEXTURE) color = texture(tex1D, vec2(v_tc1d, 0.5));
+    else if (USE_MESH_2DTEXTURE) color = texture(atlas_bindlessSampler2DLinear(mbpc.tex2D), v_tc2d);
+    else if (USE_MESH_3DTEXTURE) color = texture(atlas_bindlessSampler3DLinear(mbpc.tex3D), v_tc3d);
+    else if (USE_MESH_1DTEXTURE) color = texture(atlas_bindlessSampler2DLinear(mbpc.tex1D), vec2(v_tc1d, 0.5));
     else color = vec4(1.0);
   }
 
