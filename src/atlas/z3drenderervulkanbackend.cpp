@@ -2561,8 +2561,8 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
       layoutFlags |= vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool;
     }
     vk::DescriptorSetLayoutCreateInfo info{
-      .flags = layoutFlags,
       .pNext = &flagsInfo,
+      .flags = layoutFlags,
       .bindingCount = static_cast<uint32_t>(bindings.size()),
       .pBindings = bindings.data(),
     };
