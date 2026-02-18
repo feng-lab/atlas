@@ -1931,7 +1931,7 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
                                                                     const CompositingConfig& composite)
 {
   const size_t channelCount = payload.visibleChannels.size();
-  CHECK_GT(channelCount, 1u) << "recordFastVolumeLayersOnly requires multi-channel payload";
+  CHECK_GT(channelCount, 0u) << "recordFastVolumeLayersOnly requires at least one visible channel";
   CHECK(payload.image) << "Vulkan img raycaster missing image context.";
   CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
     << "Raycaster fast layers stage missing entry/exit lease.";
@@ -2024,7 +2024,7 @@ void ZVulkanImgRaycasterPipelineContext::recordFastPlanarLayersOnly(Z3DRendererB
                                                                     const CompositingConfig& composite)
 {
   const size_t channelCount = payload.visibleChannels.size();
-  CHECK_GT(channelCount, 1u) << "recordFastPlanarLayersOnly requires multi-channel payload";
+  CHECK_GT(channelCount, 0u) << "recordFastPlanarLayersOnly requires at least one visible channel";
   CHECK(payload.image) << "Vulkan img raycaster missing image context.";
   CHECK(payload.transferFunctions != nullptr)
     << "Raycaster fast path: payload missing transferFunctions vector (fatal)";
