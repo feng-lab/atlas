@@ -25,6 +25,7 @@
 #include "zmesh.h"
 #include "zrenderthreadexecutor_tls.h"
 
+#include <folly/coro/Invoke.h>
 #include <folly/coro/Task.h>
 #include <folly/executors/GlobalExecutor.h>
 #include <gflags/gflags.h>
@@ -1220,60 +1221,62 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       struct SaveJob
       {
         QString filename;
-        Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket ticket;
+        Z3DRendererVulkanBackend::EndOfFrameHostImageReadbackTicket ticket;
       };
       std::vector<SaveJob> jobs;
 
+      const uint32_t colorLayers = tex ? std::min<uint32_t>(saveLayerCount, tex->arrayLayers()) : 0u;
+      const uint32_t depthLayers = dtex ? std::min<uint32_t>(saveLayerCount, dtex->arrayLayers()) : 0u;
+      jobs.reserve(static_cast<size_t>(colorLayers) + static_cast<size_t>(depthLayers));
+
       if (tex) {
-        const uint32_t layers = std::min<uint32_t>(saveLayerCount, tex->arrayLayers());
-        jobs.reserve(layers + (dtex ? layers : 0u));
-        for (uint32_t layer = 0; layer < layers; ++layer) {
+        for (uint32_t layer = 0; layer < colorLayers; ++layer) {
           const QString filename =
             dir + QString("slice_layer_%1_%2x%3.tif").arg(layer).arg(tex->width()).arg(tex->height());
           jobs.push_back(SaveJob{filename,
-                                 backend->requestEndOfFrameImageReadbackTicket(*tex,
-                                                                               batch.eye,
-                                                                               layer,
-                                                                               vk::ImageAspectFlagBits::eColor,
-                                                                               "VK debug save slice layers")});
+                                 backend->requestEndOfFrameImageReadbackToHostTicket(*tex,
+                                                                                     batch.eye,
+                                                                                     layer,
+                                                                                     vk::ImageAspectFlagBits::eColor,
+                                                                                     leaseRef,
+                                                                                     "VK debug save slice layers")});
         }
       }
 
       if (dtex) {
-        const uint32_t layers = std::min<uint32_t>(saveLayerCount, dtex->arrayLayers());
-        jobs.reserve(jobs.size() + layers);
-        for (uint32_t layer = 0; layer < layers; ++layer) {
+        for (uint32_t layer = 0; layer < depthLayers; ++layer) {
           const QString filename =
             dir + QString("slice_layer_depth_%1_%2x%3.tif").arg(layer).arg(dtex->width()).arg(dtex->height());
-          jobs.push_back(SaveJob{filename,
-                                 backend->requestEndOfFrameImageReadbackTicket(*dtex,
-                                                                               batch.eye,
-                                                                               layer,
-                                                                               vk::ImageAspectFlagBits::eDepth,
-                                                                               "VK debug save slice layers depth")});
+          jobs.push_back(
+            SaveJob{filename,
+                    backend->requestEndOfFrameImageReadbackToHostTicket(*dtex,
+                                                                        batch.eye,
+                                                                        layer,
+                                                                        vk::ImageAspectFlagBits::eDepth,
+                                                                        leaseRef,
+                                                                        "VK debug save slice layers depth")});
         }
       }
 
       if (!jobs.empty()) {
         backend->spawnDetachedTask(
           folly::getGlobalCPUExecutor(),
-          [jobs = std::move(jobs), leaseRef]() mutable -> folly::coro::Task<void> {
-            (void)leaseRef;
+          folly::coro::co_invoke([jobs = std::move(jobs)]() mutable -> folly::coro::Task<void> {
             for (auto& job : jobs) {
-              std::vector<uint8_t> owned = co_await job.ticket.awaitOwnedBytes();
+              co_await job.ticket.awaitReady();
 
               if (!ZVulkanTexture::saveReadbackToImage(job.filename,
                                                        job.ticket.format,
                                                        job.ticket.size.x,
                                                        job.ticket.size.y,
-                                                       owned.data(),
-                                                       owned.size(),
+                                                       job.ticket.data(),
+                                                       job.ticket.dataBytes(),
                                                        /*flipY=*/true)) {
                 LOG(ERROR) << "Slice layer debug save failed for " << job.filename.toStdString();
               }
             }
             co_return;
-          }(),
+          }),
           "VK debug save slice layers");
       }
     }
@@ -1325,52 +1328,51 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       struct SaveJob
       {
         QString filename;
-        Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket ticket;
+        Z3DRendererVulkanBackend::EndOfFrameHostImageReadbackTicket ticket;
       };
       std::vector<SaveJob> jobs;
       jobs.reserve(depthHandle ? 2u : 1u);
 
       auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "slice merge debug");
       jobs.push_back(SaveJob{dir + QString("slice_merge_%1x%2.tif").arg(tex.width()).arg(tex.height()),
-                             backend->requestEndOfFrameImageReadbackTicket(tex,
-                                                                           batch.eye,
-                                                                           /*arrayLayer=*/0u,
-                                                                           vk::ImageAspectFlagBits::eColor,
-                                                                           "VK debug save slice merge output")});
+                             backend->requestEndOfFrameImageReadbackToHostTicket(tex,
+                                                                                 batch.eye,
+                                                                                 /*arrayLayer=*/0u,
+                                                                                 vk::ImageAspectFlagBits::eColor,
+                                                                                 "VK debug save slice merge output")});
 
       if (depthHandle && depthHandle->valid() && depthHandle->backend == RenderBackend::Vulkan) {
         auto& dtex = vulkan::textureFromHandle(*depthHandle, m_backend.device(), "slice merge depth debug");
         jobs.push_back(
           SaveJob{dir + QString("slice_merge_depth_%1x%2.tif").arg(dtex.width()).arg(dtex.height()),
-                  backend->requestEndOfFrameImageReadbackTicket(dtex,
-                                                                batch.eye,
-                                                                /*arrayLayer=*/0u,
-                                                                vk::ImageAspectFlagBits::eDepth,
-                                                                "VK debug save slice merge output depth")});
+                  backend->requestEndOfFrameImageReadbackToHostTicket(dtex,
+                                                                      batch.eye,
+                                                                      /*arrayLayer=*/0u,
+                                                                      vk::ImageAspectFlagBits::eDepth,
+                                                                      "VK debug save slice merge output depth")});
       }
 
-      backend->spawnDetachedTask(
-        folly::getGlobalCPUExecutor(),
-        [jobs = std::move(jobs)]() mutable -> folly::coro::Task<void> {
-          if (jobs.empty()) {
-            co_return;
-          }
-          for (auto& job : jobs) {
-            std::vector<uint8_t> owned = co_await job.ticket.awaitOwnedBytes();
+      backend->spawnDetachedTask(folly::getGlobalCPUExecutor(),
+                                 folly::coro::co_invoke([jobs = std::move(jobs)]() mutable -> folly::coro::Task<void> {
+                                   if (jobs.empty()) {
+                                     co_return;
+                                   }
+                                   for (auto& job : jobs) {
+                                     co_await job.ticket.awaitReady();
 
-            if (!ZVulkanTexture::saveReadbackToImage(job.filename,
-                                                     job.ticket.format,
-                                                     job.ticket.size.x,
-                                                     job.ticket.size.y,
-                                                     owned.data(),
-                                                     owned.size(),
-                                                     /*flipY=*/true)) {
-              LOG(ERROR) << "Slice merge debug save failed for " << job.filename.toStdString();
-            }
-          }
-          co_return;
-        }(),
-        "VK debug save slice merge output");
+                                     if (!ZVulkanTexture::saveReadbackToImage(job.filename,
+                                                                              job.ticket.format,
+                                                                              job.ticket.size.x,
+                                                                              job.ticket.size.y,
+                                                                              job.ticket.data(),
+                                                                              job.ticket.dataBytes(),
+                                                                              /*flipY=*/true)) {
+                                       LOG(ERROR) << "Slice merge debug save failed for " << job.filename.toStdString();
+                                     }
+                                   }
+                                   co_return;
+                                 }),
+                                 "VK debug save slice merge output");
     }
   }
 }

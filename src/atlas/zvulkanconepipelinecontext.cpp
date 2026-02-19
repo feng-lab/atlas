@@ -29,6 +29,7 @@
 #include <cstring>
 #include <cstdint>
 
+#include <folly/coro/Invoke.h>
 #include <folly/coro/Task.h>
 
 DECLARE_bool(atlas_vk_cache_draw_secondaries);
@@ -174,13 +175,12 @@ void ZVulkanConePipelineContext::flushRetainedUbos()
   const auto fence = m_backend.awaitActiveSubmissionFence("VK cone retained UBO lifetime");
   auto keepAlive = currentRenderThreadExecutorKeepAlive("VK cone retained UBO lifetime");
   for (auto& sp : m_retainedUbos) {
-    m_backend.spawnDetachedTask(
-      keepAlive,
-      [fence, keep = sp]() mutable -> folly::coro::Task<void> {
-        co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(fence);
-        co_return;
-      }(),
-      "VK cone retained UBO lifetime");
+    m_backend.spawnDetachedTask(keepAlive,
+                                folly::coro::co_invoke([fence, keep = sp]() mutable -> folly::coro::Task<void> {
+                                  co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(fence);
+                                  co_return;
+                                }),
+                                "VK cone retained UBO lifetime");
   }
   m_retainedUbos.clear();
 }

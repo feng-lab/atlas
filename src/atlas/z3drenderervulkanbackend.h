@@ -602,6 +602,15 @@ public:
   //
   // Intended for post-fence work that is safe to run on another executor
   // (debug readback analysis, CPU-side decoding, file I/O, etc.).
+  //
+  // IMPORTANT (coroutine lambda lifetime):
+  // Do not pass tasks created by invoking a capturing coroutine lambda like
+  // `[...]() -> Task<void> { ... }()`. The coroutine's implicit `this` may point
+  // at the lambda closure object, which would be destroyed at the end of the
+  // full-expression, leading to a use-after-free on resume.
+  //
+  // Use `folly::coro::co_invoke()` instead so the callable outlives the task:
+  // `spawnDetachedTask(ex, folly::coro::co_invoke([captures...]() -> Task<void> { ... }), "label")`.
   void
   spawnDetachedTask(folly::Executor::KeepAlive<> ex, folly::coro::Task<void> task, std::string_view debugLabel = {});
   void
@@ -725,6 +734,52 @@ public:
     [[nodiscard]] folly::coro::Task<std::vector<uint8_t>> awaitOwnedBytes();
   };
 
+  // Stage 4b: Safe host-copy readback tickets (debug utilities)
+  //
+  // Some debug utilities want to run CPU work (decoding, file I/O) on detached
+  // background tasks, but must never touch backend-owned Vulkan staging buffers
+  // (mapped pointers / slot lifetimes) from those tasks.
+  //
+  // This ticket type copies the staging buffer into call-site owned host memory
+  // after the submission fence signals, releases the staging slot, and only
+  // then returns to awaiters.
+  class EndOfFrameHostImageReadbackTicket final
+  {
+  public:
+    EndOfFrameHostImageReadbackTicket() = default;
+    EndOfFrameHostImageReadbackTicket(const EndOfFrameHostImageReadbackTicket&) = delete;
+    EndOfFrameHostImageReadbackTicket& operator=(const EndOfFrameHostImageReadbackTicket&) = delete;
+    EndOfFrameHostImageReadbackTicket(EndOfFrameHostImageReadbackTicket&&) noexcept = default;
+    EndOfFrameHostImageReadbackTicket& operator=(EndOfFrameHostImageReadbackTicket&&) noexcept = default;
+    ~EndOfFrameHostImageReadbackTicket() = default;
+
+    // Await the submission fence, copy into hostBytes, and release the staging
+    // slot. After this resumes, data() and dataBytes() are ready to consume
+    // from any thread/executor.
+    [[nodiscard]] folly::coro::Task<void> awaitReady();
+
+    [[nodiscard]] const uint8_t* data() const
+    {
+      return m_hostBytes ? m_hostBytes->data() : nullptr;
+    }
+    [[nodiscard]] size_t dataBytes() const
+    {
+      return m_hostBytes ? m_hostBytes->size() : 0u;
+    }
+
+    vk::Format format = vk::Format::eUndefined;
+    glm::uvec2 size{0u, 0u};
+    vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor;
+    uint32_t arrayLayer = 0u;
+
+  private:
+    EndOfFrameColorReadbackTicket m_stagingTicket;
+    std::shared_ptr<std::vector<uint8_t>> m_hostBytes;
+    std::shared_ptr<void> m_keepAlive;
+    bool m_ready = false;
+    friend class Z3DRendererVulkanBackend;
+  };
+
   // Coroutine-friendly readback primitive.
   //
   // Contract:
@@ -749,6 +804,29 @@ public:
                                                                                    uint32_t arrayLayer,
                                                                                    vk::ImageAspectFlags aspectMask,
                                                                                    std::string_view debugLabel = {});
+
+  // Debug utility readback primitive: enqueue GPU->staging copy for src, then
+  // copy into ticket-owned host memory after the submission fence signals
+  // (awaitReady()), then release the staging slot.
+  //
+  // Contract:
+  // - Must be called on the rendering thread with an active frame.
+  // - keepAlive is an optional shared_ptr to keep arbitrary owner state alive
+  //   (e.g. scratch leases) until the fence signals and the host copy is complete.
+  [[nodiscard]] EndOfFrameHostImageReadbackTicket
+  requestEndOfFrameImageReadbackToHostTicket(class ZVulkanTexture& src,
+                                             Z3DEye eye,
+                                             uint32_t arrayLayer,
+                                             vk::ImageAspectFlags aspectMask,
+                                             std::string_view debugLabel = {});
+
+  [[nodiscard]] EndOfFrameHostImageReadbackTicket
+  requestEndOfFrameImageReadbackToHostTicket(class ZVulkanTexture& src,
+                                             Z3DEye eye,
+                                             uint32_t arrayLayer,
+                                             vk::ImageAspectFlags aspectMask,
+                                             std::shared_ptr<void> keepAlive,
+                                             std::string_view debugLabel = {});
 
   class EndOfFrameBufferReadbackTicket final
   {

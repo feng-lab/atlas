@@ -29,6 +29,8 @@
 #include "zcancellation.h"
 #include "zrenderthreadexecutor_tls.h"
 
+// Safe instantiation of capturing coroutine callables.
+#include <folly/coro/Invoke.h>
 #include <folly/executors/GlobalExecutor.h>
 
 #include <algorithm>
@@ -1028,19 +1030,20 @@ void ZVulkanImgRaycasterPipelineContext::recordStageEntryExit(Z3DRendererBase& r
       struct SaveJob
       {
         QString filename;
-        Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket ticket;
+        Z3DRendererVulkanBackend::EndOfFrameHostImageReadbackTicket ticket;
       };
       std::vector<SaveJob> jobs;
       jobs.reserve(2u);
 
-      auto enqueueLayer = [&](uint32_t layer, QString suffix) {
+      auto enqueueLayer = [&](uint32_t layer, const QString& suffix) {
         jobs.push_back(
           SaveJob{dir + QString("entry_exit_%1_%2x%3.tif").arg(suffix).arg(tex->width()).arg(tex->height()),
-                  backend->requestEndOfFrameImageReadbackTicket(*tex,
-                                                                batch.eye,
-                                                                layer,
-                                                                vk::ImageAspectFlagBits::eColor,
-                                                                "VK debug save entry/exit")});
+                  backend->requestEndOfFrameImageReadbackToHostTicket(*tex,
+                                                                      batch.eye,
+                                                                      layer,
+                                                                      vk::ImageAspectFlagBits::eColor,
+                                                                      leaseRef,
+                                                                      "VK debug save entry/exit")});
       };
 
       enqueueLayer(0u, QStringLiteral("front"));
@@ -1048,26 +1051,27 @@ void ZVulkanImgRaycasterPipelineContext::recordStageEntryExit(Z3DRendererBase& r
         enqueueLayer(1u, QStringLiteral("back"));
       }
 
-      backend->spawnDetachedTask(
-        folly::getGlobalCPUExecutor(),
-        [jobs = std::move(jobs), leaseRef]() mutable -> folly::coro::Task<void> {
-          (void)leaseRef;
-          for (auto& job : jobs) {
-            std::vector<uint8_t> owned = co_await job.ticket.awaitOwnedBytes();
+      if (!jobs.empty()) {
+        backend->spawnDetachedTask(
+          folly::getGlobalCPUExecutor(),
+          folly::coro::co_invoke([jobs = std::move(jobs)]() mutable -> folly::coro::Task<void> {
+            for (auto& job : jobs) {
+              co_await job.ticket.awaitReady();
 
-            if (!ZVulkanTexture::saveReadbackToImage(job.filename,
-                                                     job.ticket.format,
-                                                     job.ticket.size.x,
-                                                     job.ticket.size.y,
-                                                     owned.data(),
-                                                     owned.size(),
-                                                     /*flipY=*/true)) {
-              LOG(ERROR) << "Entry/exit debug save failed for " << job.filename.toStdString();
+              if (!ZVulkanTexture::saveReadbackToImage(job.filename,
+                                                       job.ticket.format,
+                                                       job.ticket.size.x,
+                                                       job.ticket.size.y,
+                                                       job.ticket.data(),
+                                                       job.ticket.dataBytes(),
+                                                       /*flipY=*/true)) {
+                LOG(ERROR) << "Entry/exit debug save failed for " << job.filename.toStdString();
+              }
             }
-          }
-          co_return;
-        }(),
-        "VK debug save entry/exit");
+            co_return;
+          }),
+          "VK debug save entry/exit");
+      }
     }
   }
 }

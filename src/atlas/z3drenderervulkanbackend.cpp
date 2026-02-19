@@ -63,6 +63,7 @@
 #include <folly/coro/Baton.h>
 #include <folly/coro/BlockingWait.h>
 #include <folly/coro/CurrentExecutor.h>
+#include <folly/coro/Invoke.h>
 #include <folly/coro/Task.h>
 
 DEFINE_bool(vk_reserve_upload_slices,
@@ -1005,6 +1006,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
         continue;
       }
       try {
+        CHECK(static_cast<size_t>(pr.slotIndex) < m_readbackSlots.size()) << "Readback slot index out of bounds";
         const auto originalLayout = pr.src->layout();
         const auto aspect = (pr.aspectMask == vk::ImageAspectFlags{}) ? vk::ImageAspectFlagBits::eColor : pr.aspectMask;
         pr.src->transitionLayout(cmd, originalLayout, vk::ImageLayout::eTransferSrcOptimal, aspect);
@@ -1019,6 +1021,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
         region.imageOffset = vk::Offset3D{0, 0, 0};
         region.imageExtent = vk::Extent3D{pr.size.x, pr.size.y, 1u};
         const auto& slot = m_readbackSlots[static_cast<size_t>(pr.slotIndex)];
+        CHECK(slot.mapped != nullptr) << "Readback slot missing mapped pointer";
         cmd.copyImageToBuffer(pr.src->image(), vk::ImageLayout::eTransferSrcOptimal, slot.buffer->buffer(), region);
         const vk::ImageLayout restore =
           (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
@@ -1060,6 +1063,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
         region.dstOffset = 0;
         region.size = pr.bytes;
         const auto& slot = m_readbackSlots[static_cast<size_t>(pr.slotIndex)];
+        CHECK(slot.mapped != nullptr) << "Buffer readback slot missing mapped pointer";
         cmd.copyBuffer(pr.src->buffer(), slot.buffer->buffer(), region);
         frame.readbackBytesCopied += pr.bytes;
         frame.readbackSlotsInFlight++;
@@ -4899,28 +4903,29 @@ void Z3DRendererVulkanBackend::spawnDetachedTask(folly::Executor::KeepAlive<> ex
                                     << (debugLabel.empty() ? "" : "'");
 
   std::string label(debugLabel);
-  auto wrapper = [label = std::move(label), task = std::move(task)]() mutable -> folly::coro::Task<void> {
-    try {
-      co_await std::move(task);
-    }
-    catch (const ZCancellationException&) {
+  auto wrapperTask =
+    folly::coro::co_invoke([label = std::move(label), task = std::move(task)]() mutable -> folly::coro::Task<void> {
+      try {
+        co_await std::move(task);
+      }
+      catch (const ZCancellationException&) {
+        co_return;
+      }
+      catch (const folly::OperationCancelled&) {
+        co_return;
+      }
+      catch (const std::exception& e) {
+        LOG(FATAL) << "Detached coroutine task failed" << (label.empty() ? "" : " label='")
+                   << (label.empty() ? "" : label) << (label.empty() ? "" : "'") << ": " << e.what();
+      }
+      catch (...) {
+        LOG(FATAL) << "Detached coroutine task failed" << (label.empty() ? "" : " label='")
+                   << (label.empty() ? "" : label) << (label.empty() ? "" : "'");
+      }
       co_return;
-    }
-    catch (const folly::OperationCancelled&) {
-      co_return;
-    }
-    catch (const std::exception& e) {
-      LOG(FATAL) << "Detached coroutine task failed" << (label.empty() ? "" : " label='")
-                 << (label.empty() ? "" : label) << (label.empty() ? "" : "'") << ": " << e.what();
-    }
-    catch (...) {
-      LOG(FATAL) << "Detached coroutine task failed" << (label.empty() ? "" : " label='")
-                 << (label.empty() ? "" : label) << (label.empty() ? "" : "'");
-    }
-    co_return;
-  };
+    });
 
-  m_detachedTaskScope.add(folly::coro::co_withExecutor(std::move(ex), wrapper()));
+  m_detachedTaskScope.add(folly::coro::co_withExecutor(std::move(ex), std::move(wrapperTask)));
 }
 
 void Z3DRendererVulkanBackend::pinTextureForActiveSubmission(ZVulkanTexture* texture)
@@ -5510,6 +5515,61 @@ void Z3DRendererVulkanBackend::releaseReadbackSlot(int index)
   m_readbackSlots[idx].inUse = false;
 }
 
+namespace {
+size_t bytesPerPixelForReadback(vk::Format f)
+{
+  switch (f) {
+    case vk::Format::eR8Unorm:
+    case vk::Format::eR8Snorm:
+      return 1u;
+    case vk::Format::eR8G8Unorm:
+    case vk::Format::eR8G8Snorm:
+    case vk::Format::eR16Unorm:
+    case vk::Format::eR16Snorm:
+    case vk::Format::eR16Sfloat:
+    case vk::Format::eD16Unorm:
+      return 2u;
+    case vk::Format::eR8G8B8Unorm:
+    case vk::Format::eR8G8B8Srgb:
+    case vk::Format::eR8G8B8Snorm:
+    case vk::Format::eB8G8R8Unorm:
+    case vk::Format::eB8G8R8Srgb:
+      return 3u;
+    case vk::Format::eR8G8B8A8Unorm:
+    case vk::Format::eR8G8B8A8Srgb:
+    case vk::Format::eR8G8B8A8Snorm:
+    case vk::Format::eB8G8R8A8Unorm:
+    case vk::Format::eB8G8R8A8Srgb:
+    case vk::Format::eR32Sfloat:
+    case vk::Format::eD32Sfloat:
+    case vk::Format::eD32SfloatS8Uint:
+    case vk::Format::eD24UnormS8Uint:
+    case vk::Format::eX8D24UnormPack32:
+      return 4u;
+    case vk::Format::eR16G16Unorm:
+    case vk::Format::eR16G16Snorm:
+    case vk::Format::eR16G16Sfloat:
+      return 4u;
+    case vk::Format::eR16G16B16Unorm:
+    case vk::Format::eR16G16B16Snorm:
+      return 6u;
+    case vk::Format::eR16G16B16A16Unorm:
+    case vk::Format::eR16G16B16A16Snorm:
+    case vk::Format::eR16G16B16A16Sfloat:
+    case vk::Format::eR32G32Sfloat:
+      return 8u;
+    case vk::Format::eR32G32B32Sfloat:
+      return 12u;
+    case vk::Format::eR32G32B32A32Sfloat:
+    case vk::Format::eR32G32B32A32Uint:
+      return 16u;
+    default:
+      CHECK(false) << "Unsupported Vulkan readback format: " << enumOrUnderlying(f, 16);
+      return 0u;
+  }
+}
+} // namespace
+
 Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket
 Z3DRendererVulkanBackend::requestEndOfFrameColorReadbackTicket(ZVulkanTexture& src,
                                                                Z3DEye eye,
@@ -5537,59 +5597,7 @@ Z3DRendererVulkanBackend::requestEndOfFrameImageReadbackTicket(ZVulkanTexture& s
 
   const glm::uvec2 size{src.width(), src.height()};
   const vk::Format fmt = src.format();
-  auto bytesPerPixel = [](vk::Format f) -> size_t {
-    switch (f) {
-      case vk::Format::eR8Unorm:
-      case vk::Format::eR8Snorm:
-        return 1u;
-      case vk::Format::eR8G8Unorm:
-      case vk::Format::eR8G8Snorm:
-      case vk::Format::eR16Unorm:
-      case vk::Format::eR16Snorm:
-      case vk::Format::eR16Sfloat:
-      case vk::Format::eD16Unorm:
-        return 2u;
-      case vk::Format::eR8G8B8Unorm:
-      case vk::Format::eR8G8B8Srgb:
-      case vk::Format::eR8G8B8Snorm:
-      case vk::Format::eB8G8R8Unorm:
-      case vk::Format::eB8G8R8Srgb:
-        return 3u;
-      case vk::Format::eR8G8B8A8Unorm:
-      case vk::Format::eR8G8B8A8Srgb:
-      case vk::Format::eR8G8B8A8Snorm:
-      case vk::Format::eB8G8R8A8Unorm:
-      case vk::Format::eB8G8R8A8Srgb:
-      case vk::Format::eR32Sfloat:
-      case vk::Format::eD32Sfloat:
-      case vk::Format::eD32SfloatS8Uint:
-      case vk::Format::eD24UnormS8Uint:
-      case vk::Format::eX8D24UnormPack32:
-        return 4u;
-      case vk::Format::eR16G16Unorm:
-      case vk::Format::eR16G16Snorm:
-      case vk::Format::eR16G16Sfloat:
-        return 4u;
-      case vk::Format::eR16G16B16Unorm:
-      case vk::Format::eR16G16B16Snorm:
-        return 6u;
-      case vk::Format::eR16G16B16A16Unorm:
-      case vk::Format::eR16G16B16A16Snorm:
-      case vk::Format::eR16G16B16A16Sfloat:
-      case vk::Format::eR32G32Sfloat:
-        return 8u;
-      case vk::Format::eR32G32B32Sfloat:
-        return 12u;
-      case vk::Format::eR32G32B32A32Sfloat:
-      case vk::Format::eR32G32B32A32Uint:
-        return 16u;
-      default:
-        // Conservative default for common uncompressed formats.
-        return 4u;
-    }
-  };
-
-  const size_t bytes = static_cast<size_t>(size.x) * size.y * bytesPerPixel(fmt);
+  const size_t bytes = static_cast<size_t>(size.x) * size.y * bytesPerPixelForReadback(fmt);
   const int slotIndex = acquireReadbackSlot(bytes);
   CHECK(slotIndex >= 0) << "VK readback slot unavailable (bytes=" << bytes << ")";
   CHECK(static_cast<size_t>(slotIndex) < m_readbackSlots.size());
@@ -5657,6 +5665,53 @@ Z3DRendererVulkanBackend::requestEndOfFrameImageReadbackTicket(ZVulkanTexture& s
   return ticket;
 }
 
+Z3DRendererVulkanBackend::EndOfFrameHostImageReadbackTicket
+Z3DRendererVulkanBackend::requestEndOfFrameImageReadbackToHostTicket(ZVulkanTexture& src,
+                                                                     Z3DEye eye,
+                                                                     uint32_t arrayLayer,
+                                                                     vk::ImageAspectFlags aspectMask,
+                                                                     std::string_view debugLabel)
+{
+  return requestEndOfFrameImageReadbackToHostTicket(src,
+                                                    eye,
+                                                    arrayLayer,
+                                                    aspectMask,
+                                                    std::shared_ptr<void>{},
+                                                    debugLabel);
+}
+
+Z3DRendererVulkanBackend::EndOfFrameHostImageReadbackTicket
+Z3DRendererVulkanBackend::requestEndOfFrameImageReadbackToHostTicket(ZVulkanTexture& src,
+                                                                     Z3DEye eye,
+                                                                     uint32_t arrayLayer,
+                                                                     vk::ImageAspectFlags aspectMask,
+                                                                     std::shared_ptr<void> keepAlive,
+                                                                     std::string_view debugLabel)
+{
+  CHECK(currentRenderThreadExecutorOrNull() != nullptr)
+    << "requestEndOfFrameImageReadbackToHostTicket must be called on the rendering thread"
+    << (debugLabel.empty() ? "" : " (") << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
+
+  // Reuse the core staging-slot machinery (image->buffer copy at endRender),
+  // but do not expose the mapped pointer to the call site.
+  auto stagingTicket = requestEndOfFrameImageReadbackTicket(src, eye, arrayLayer, aspectMask, debugLabel);
+
+  CHECK_GT(stagingTicket.bytes, 0u) << "requestEndOfFrameImageReadbackToHostTicket computed 0 bytes";
+  auto hostBytes = std::make_shared<std::vector<uint8_t>>();
+  hostBytes->resize(stagingTicket.bytes);
+
+  EndOfFrameHostImageReadbackTicket ticket{};
+  ticket.format = stagingTicket.format;
+  ticket.size = stagingTicket.size;
+  ticket.aspectMask = stagingTicket.aspectMask;
+  ticket.arrayLayer = stagingTicket.arrayLayer;
+  ticket.m_hostBytes = hostBytes;
+  ticket.m_keepAlive = std::move(keepAlive);
+  ticket.m_stagingTicket = std::move(stagingTicket);
+
+  return ticket;
+}
+
 Z3DRendererVulkanBackend::EndOfFrameBufferReadbackTicket
 Z3DRendererVulkanBackend::requestEndOfFrameBufferReadbackTicket(ZVulkanBuffer& src,
                                                                 vk::DeviceSize srcOffset,
@@ -5718,6 +5773,31 @@ Z3DRendererVulkanBackend::requestEndOfFrameBufferReadbackTicket(ZVulkanBuffer& s
   ticket.m_bytes = bytes;
   ticket.m_releaseSlot = std::move(releaseSlot);
   return ticket;
+}
+
+folly::coro::Task<void> Z3DRendererVulkanBackend::EndOfFrameHostImageReadbackTicket::awaitReady()
+{
+  CHECK(m_hostBytes != nullptr) << "EndOfFrameHostImageReadbackTicket used without host bytes";
+  if (m_ready) {
+    co_return;
+  }
+
+  CHECK(m_stagingTicket.mapped != nullptr) << "EndOfFrameHostImageReadbackTicket missing staging mapped pointer";
+  CHECK_GT(m_stagingTicket.bytes, 0u) << "EndOfFrameHostImageReadbackTicket used with 0 bytes";
+  CHECK(m_stagingTicket.releaseSlot) << "EndOfFrameHostImageReadbackTicket already consumed (release slot missing)";
+
+  co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(std::move(m_stagingTicket.fence));
+
+  m_hostBytes->resize(m_stagingTicket.bytes);
+  std::memcpy(m_hostBytes->data(), m_stagingTicket.mapped, m_stagingTicket.bytes);
+
+  m_stagingTicket.releaseSlot();
+  m_stagingTicket.releaseSlot = {};
+
+  // Drop the keep-alive once the GPU read and host copy are complete.
+  m_keepAlive.reset();
+  m_ready = true;
+  co_return;
 }
 
 folly::coro::Task<std::vector<uint8_t>> Z3DRendererVulkanBackend::EndOfFrameColorReadbackTicket::awaitOwnedBytes()
