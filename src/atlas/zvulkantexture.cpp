@@ -133,7 +133,10 @@ ZVulkanTexture::CreateInfo ZVulkanTexture::CreateInfo::make2DArray(uint32_t widt
   CreateInfo info;
   info.imageType = vk::ImageType::e2D;
   info.arrayLayers = std::max(1u, arrayLayers);
-  info.viewType = info.arrayLayers > 1u ? vk::ImageViewType::e2DArray : vk::ImageViewType::e2D;
+  // Always create a 2D-array view, even when arrayLayers==1. Many Vulkan shaders
+  // (e.g. raycaster layer compositing) unconditionally declare sampler2DArray and
+  // rely on consistent view types for correctness.
+  info.viewType = vk::ImageViewType::e2DArray;
   info.extent = vk::Extent3D{width, height, 1u};
   info.format = format;
   info.mipLevels = std::max(1u, mipLevels);
