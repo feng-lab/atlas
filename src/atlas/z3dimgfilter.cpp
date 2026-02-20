@@ -802,8 +802,13 @@ void Z3DImgFilter::changeCoordTransform()
   if (m_3dImg) {
     m_3dImg->setScale(m_rendererParameters.coordTransform.scale());
   }
-  m_imgRaycasterRenderer.compile();
-  m_imgSliceRenderer.compile();
+  // Coord transform changes do not affect shader headers for either the
+  // raycaster or slice renderers (their macro headers depend on channel
+  // visibility/count, compositing mode, and clip-plane presence/count).
+  //
+  // Rebuilding and relinking GLSL programs here is extremely expensive and can
+  // dominate initial timeline application (e.g. setCurrentTime(0) during 3D
+  // animation export), so keep this path side-effect-free.
 
 #ifdef ATLAS_DEBUG_VERSION
   // World AABB changed; invalidate cached effective cuts

@@ -24,24 +24,27 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_renderingPrimitive, &ZStringIntOptionParameter::valueChanged, this, &Z3DSwcFilter::updateBoundBox);
   addParameter(m_renderingPrimitive);
 
-  connect(&m_swcColorParameters.colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
+  connect(&m_swcColorParameters.colorMode,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &Z3DSwcFilter::markColorDirty);
   addParameter(m_swcColorParameters.colorMode);
 
-  connect(&m_swcColorParameters.swcTreeColor, &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
+  connect(&m_swcColorParameters.swcTreeColor, &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::markColorDirty);
   addParameter(m_swcColorParameters.swcTreeColor);
 
   for (const auto& color : m_swcColorParameters.colorsForDifferentType) {
-    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
+    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::markColorDirty);
     addParameter(*color);
   }
 
   for (const auto& color : m_swcColorParameters.colorsForDifferentTopology) {
-    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
+    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::markColorDirty);
     addParameter(*color);
   }
 
   for (const auto& color : m_swcColorParameters.colorsForSubclassType) {
-    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
+    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::markColorDirty);
     addParameter(*color);
   }
 
@@ -49,7 +52,7 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_swcColorParameters.colorMapBranchType,
           &ZColorMapParameter::valueChanged,
           this,
-          &Z3DSwcFilter::prepareColor);
+          &Z3DSwcFilter::markColorDirty);
 
   m_selectSwcEvent.listenTo("select swc", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
   m_selectSwcEvent.listenTo("select swc", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
@@ -101,8 +104,18 @@ double Z3DSwcFilter::process(Z3DEye)
 
   if (m_dataIsInvalid) {
     prepareData();
+  } else if (m_colorDirty) {
+    // Coalesce potentially many parameter changes (especially during animation
+    // timeline application) into a single color rebuild on-demand.
+    prepareColor();
+    m_colorDirty = false;
   }
   return 1.;
+}
+
+void Z3DSwcFilter::markColorDirty()
+{
+  m_colorDirty = true;
 }
 
 void Z3DSwcFilter::registerPickingObjects()
@@ -467,6 +480,7 @@ void Z3DSwcFilter::prepareData()
   m_sphereRenderer.setData(&m_pointAndRadius);
   m_sphereRendererForCone.setData(&m_pointAndRadius);
   prepareColor();
+  m_colorDirty = false;
   m_dataIsInvalid = false;
 }
 
@@ -483,6 +497,7 @@ void Z3DSwcFilter::treeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& res) const
 void Z3DSwcFilter::updateData()
 {
   m_dataIsInvalid = true;
+  m_colorDirty = true;
   invalidateResult();
 
   updateBoundBox();

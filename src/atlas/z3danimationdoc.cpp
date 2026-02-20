@@ -4,6 +4,7 @@
 #include "z3drenderingengine.h"
 #include "zcameraparameterkey.h"
 #include "zcameraparameteranimation.h"
+#include "zbenchtimer.h"
 #include "zexception.h"
 #include "zlog.h"
 #include "zmessageboxhelpers.h"
@@ -44,11 +45,20 @@ void Z3DAnimationDoc::bindView(Z3DRenderingEngine* v)
   if (!m_view) {
     return;
   }
+
+  ZBenchTimer bt(fmt::format("Z3DAnimationDoc::bindView ({} animations)", m_idToAnimationPacks.size()));
   connect(m_view, &Z3DRenderingEngine::destroyed, this, &Z3DAnimationDoc::releaseView, Qt::UniqueConnection);
+  bt.recordEvent("connected engine");
   for (const auto& idPack : m_idToAnimationPacks) {
     idPack.second->animation->bindView(m_view);
+  }
+  bt.recordEvent("animations bound");
+  for (const auto& idPack : m_idToAnimationPacks) {
     idPack.second->animation->setCurrentTime(0);
   }
+  bt.recordEvent("setCurrentTime(0)");
+  bt.stop();
+  VLOG(1) << bt;
   LOG(INFO) << "bind 3d view done";
 }
 

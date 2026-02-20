@@ -119,6 +119,8 @@ protected:
 private:
   static glm::dvec3 projectPointOnRay(const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2);
 
+  void markColorDirty();
+
   void addSelectionBox(const std::pair<ZSwc::ConstSwcTreeNode, ZSwc::ConstSwcTreeNode>& nodePair,
                        std::vector<glm::vec3>& lines);
 
@@ -157,6 +159,7 @@ private:
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid;
+  bool m_colorDirty = true;
 
   ZSwcPack* m_swcPack = nullptr;
   ZSwcPack* m_registeredSwcPack = nullptr;

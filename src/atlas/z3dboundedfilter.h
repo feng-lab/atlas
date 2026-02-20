@@ -352,6 +352,10 @@ private:
 
   void updateNotTransformedBoundBox();
 
+  void markClipPlanesDirty();
+
+  void updateClipPlanesIfDirty();
+
   void onBoundBoxModeChanged();
 
   void updateBoundBoxLineColors();
@@ -469,6 +473,7 @@ protected:
   std::vector<glm::vec4> m_handleArrowColors;
   std::vector<glm::vec4> m_handleArrowPickingColors;
 
+  bool m_clipPlanesDirty = true;
   bool m_canUpdateClipPlane;
 
   bool m_isSelected;

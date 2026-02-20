@@ -98,12 +98,28 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
     QStringLiteral("Local clipping interval along the Y axis in the object's pre-transform space."));
   m_zCut.setDescription(
     QStringLiteral("Local clipping interval along the Z axis in the object's pre-transform space."));
-  connect(&m_xCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
-  connect(&m_yCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
-  connect(&m_zCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
-  connect(&m_globalParameters.globalXCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
-  connect(&m_globalParameters.globalYCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
-  connect(&m_globalParameters.globalZCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  // XYZ cut parameters can be animated and often change in quick succession
+  // (e.g. when applying a timeline time). Recomputing clip planes (and thus
+  // recompiling GLSL shaders when the clip-plane count changes) on every
+  // intermediate step is extremely expensive.
+  //
+  // Instead, mark clip planes dirty and rebuild them once just before the next
+  // render in syncRendererState().
+  connect(&m_xCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::markClipPlanesDirty);
+  connect(&m_yCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::markClipPlanesDirty);
+  connect(&m_zCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::markClipPlanesDirty);
+  connect(&m_globalParameters.globalXCut,
+          &ZFloatSpanParameter::valueChanged,
+          this,
+          &Z3DBoundedFilter::markClipPlanesDirty);
+  connect(&m_globalParameters.globalYCut,
+          &ZFloatSpanParameter::valueChanged,
+          this,
+          &Z3DBoundedFilter::markClipPlanesDirty);
+  connect(&m_globalParameters.globalZCut,
+          &ZFloatSpanParameter::valueChanged,
+          this,
+          &Z3DBoundedFilter::markClipPlanesDirty);
   connect(&m_boundBoxMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBoundedFilter::onBoundBoxModeChanged);
   m_boundBoxMode.setDescription(QStringLiteral("Bounding box overlay mode (None / Object Box / Axis-Aligned Box)."));
   m_boundBoxLineColor.setStyle("COLOR");
@@ -145,7 +161,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
     // the previous world-space location and appear as a "stuck" axis cut that
     // slices through the moving object (Vulkan and OpenGL both consume the
     // stored world-space planes).
-    setClipPlanes();
+    markClipPlanesDirty();
     updateAxisAlignedBoundBox();
     Q_EMIT rendererCoordTransformChanged();
   });
@@ -411,6 +427,7 @@ void Z3DBoundedFilter::updateBoundBox()
 void Z3DBoundedFilter::setClipPlanes()
 {
   if (!m_canUpdateClipPlane) {
+    m_clipPlanesDirty = true;
     return;
   }
 
@@ -480,6 +497,7 @@ void Z3DBoundedFilter::setClipPlanes()
   }
 
   m_rendererBase.setClipPlanes(&clipPlanes);
+  m_clipPlanesDirty = false;
 }
 
 void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
@@ -677,9 +695,28 @@ void Z3DBoundedFilter::pushRendererParametersToBase()
 
 void Z3DBoundedFilter::syncRendererState()
 {
+  updateClipPlanesIfDirty();
+
   auto& globalState = Z3DRenderGlobalState::instance();
   globalState.ensureSceneState(m_globalParameters);
   globalState.ensureViewState(m_globalParameters.camera.get());
+}
+
+void Z3DBoundedFilter::markClipPlanesDirty()
+{
+  m_clipPlanesDirty = true;
+}
+
+void Z3DBoundedFilter::updateClipPlanesIfDirty()
+{
+  if (!m_clipPlanesDirty) {
+    return;
+  }
+  if (!m_canUpdateClipPlane) {
+    return;
+  }
+  setClipPlanes();
+  m_clipPlanesDirty = false;
 }
 
 void Z3DBoundedFilter::appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::vector<glm::vec3>& lines)

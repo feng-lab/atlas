@@ -30,10 +30,10 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_contextMenuEvent("Context Menu", false)
 {
   m_singleColorForAllPuncta.setStyle("COLOR");
-  connect(&m_singleColorForAllPuncta, &ZVec4Parameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
-  connect(&m_colorMapScore, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
-  connect(&m_colorMapMeanIntensity, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
-  connect(&m_colorMapMaxIntensity, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
+  connect(&m_singleColorForAllPuncta, &ZVec4Parameter::valueChanged, this, &Z3DPunctaFilter::markColorDirty);
+  connect(&m_colorMapScore, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::markColorDirty);
+  connect(&m_colorMapMeanIntensity, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::markColorDirty);
+  connect(&m_colorMapMaxIntensity, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::markColorDirty);
 
   // Color Mode
   m_colorMode.addOptions("Single Color", "Random Color", "Original Point Color", "Colormap Score");
@@ -45,7 +45,7 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
     "- 'Original Point Color' uses colors stored in the source file (if present).\n"
     "- 'Colormap Score' maps the 'score' attribute through the 'Score Color Map'."));
 
-  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
+  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DPunctaFilter::markColorDirty);
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DPunctaFilter::adjustWidgets);
 
   connect(&m_useSameSizeForAllPuncta, &ZBoolParameter::valueChanged, this, &Z3DPunctaFilter::changePunctaSize);
@@ -124,9 +124,19 @@ double Z3DPunctaFilter::process(Z3DEye)
 
   if (m_dataIsInvalid) {
     prepareData();
+  } else if (m_colorDirty) {
+    // Coalesce potentially many parameter changes (especially during animation
+    // timeline application) into a single color rebuild on-demand.
+    prepareColor();
+    m_colorDirty = false;
   }
 
   return 1.;
+}
+
+void Z3DPunctaFilter::markColorDirty()
+{
+  m_colorDirty = true;
 }
 
 void Z3DPunctaFilter::setData(ZPunctaPack& puncta)
@@ -374,6 +384,7 @@ void Z3DPunctaFilter::prepareData()
     m_sphereRenderer.setData(&m_pointAndRadius, &m_specularAndShininess);
   }
   prepareColor();
+  m_colorDirty = false;
   adjustWidgets();
   m_dataIsInvalid = false;
 }
@@ -404,6 +415,7 @@ void Z3DPunctaFilter::updateData()
   // todo: set correct range for colormap
 
   m_dataIsInvalid = true;
+  m_colorDirty = true;
   invalidateResult();
 
   updateBoundBox();

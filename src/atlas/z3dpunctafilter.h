@@ -77,6 +77,8 @@ protected:
 private:
   [[nodiscard]] bool usesEllipsoidRendering() const;
 
+  void markColorDirty();
+
   void deleteSelectedPuncta();
 
 private:
@@ -122,6 +124,7 @@ private:
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid = false;
+  bool m_colorDirty = true;
   bool m_useEllipsoidRenderer = false;
 
   ZPunctaPack* m_punctaPack = nullptr;

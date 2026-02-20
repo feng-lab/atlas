@@ -5,6 +5,7 @@
 #include "zobjdoc.h"
 #include "zparameteranimation.h"
 #include "zcameraparameterkey.h"
+#include "zbenchtimer.h"
 #include "zexception.h"
 #include "zserializationutils.h"
 #include "zview.h"
@@ -425,17 +426,79 @@ void ZAnimation::setCurrentTime(double time) const
   time = std::max(0.0, time);
   m_currentTime = time;
 
+  // Special-case: apply the render-backend track early (if present).
+  //
+  // 3D animations store the "Render Backend" parameter under the "Lighting"
+  // view-setting group (boundId=3) rather than as a global track. If this track
+  // is applied late, we can end up doing a large amount of OpenGL-only setup
+  // work (shader/program compilation, GL resource staging, etc.) only to switch
+  // to Vulkan afterwards during export. Applying it first ensures subsequent
+  // per-object updates observe the final backend.
+  ZParameterAnimation* renderBackendAnimation = nullptr;
   for (const auto& obj : m_objList) {
-    if (obj->boundId == 0) {
+    if (obj->boundId != 3) {
       continue;
     }
-    for (const auto& pa : obj->objParaAnimations) {
-      pa->setCurrentTime(time);
+    for (const auto& paPtr : obj->objParaAnimations) {
+      if (!paPtr) {
+        continue;
+      }
+      if (paPtr->name() == "Render Backend" && paPtr->type() == "StringIntOption") {
+        renderBackendAnimation = paPtr.get();
+        break;
+      }
+    }
+    if (renderBackendAnimation) {
+      break;
     }
   }
-  for (const auto& pa : m_globalParaAnimations) {
-    pa->setCurrentTime(time);
+
+  // Apply global parameters first so expensive object-side effects (e.g.
+  // renderer backend switch) happen before per-object track application.
+  //
+  // This reduces wasted work when the first time application (time=0) triggers
+  // a global backend change (OpenGL -> Vulkan) during headless export: object
+  // updates should observe the final backend and avoid doing OpenGL-only setup
+  // that will be immediately discarded.
+  const auto applyGlobals = [&]() {
+    for (const auto& pa : m_globalParaAnimations) {
+      pa->setCurrentTime(time);
+    }
+  };
+  const auto applyObjects = [&]() {
+    for (const auto& obj : m_objList) {
+      if (obj->boundId == 0) {
+        continue;
+      }
+      for (const auto& pa : obj->objParaAnimations) {
+        if (pa.get() == renderBackendAnimation) {
+          continue;
+        }
+        pa->setCurrentTime(time);
+      }
+    }
+  };
+
+  if (time == 0.0 && VLOG_IS_ON(1)) {
+    ZBenchTimer bt("ZAnimation::setCurrentTime(0)");
+    if (renderBackendAnimation) {
+      renderBackendAnimation->setCurrentTime(time);
+    }
+    bt.recordEvent("renderBackend");
+    applyGlobals();
+    bt.recordEvent("globals");
+    applyObjects();
+    bt.recordEvent("objects");
+    bt.stop();
+    VLOG(1) << bt;
+    return;
   }
+
+  if (renderBackendAnimation) {
+    renderBackendAnimation->setCurrentTime(time);
+  }
+  applyGlobals();
+  applyObjects();
 }
 
 void ZAnimation::cancelRenderingAndSetCurrentTime(double time) const
@@ -1108,7 +1171,9 @@ bool ZAnimation::bind(std::vector<std::unique_ptr<ZParameterAnimation>>& paraAni
 void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
 {
   try {
+    ZBenchTimer bt(fmt::format("ZAnimation::readContent('{}')", jsonKey.toStdString()));
     auto loadObj = loadJsonObject(fn);
+    bt.recordEvent("loadJsonObject");
     if (!loadObj.contains(jsonKey.toStdString()) || !loadObj.at(jsonKey.toStdString()).is_object()) {
       throw ZException(tr("File is not %1 format").arg(jsonKey));
     }
@@ -1142,6 +1207,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
       m_nextUniqueId = std::max(m_nextUniqueId, aniObj->uniqueId + 1);
       m_objList.push_back(std::move(aniObj));
     }
+    bt.recordEvent(fmt::format("parsed Doc keys={}", docObj.size()));
 
     std::vector<std::unique_ptr<ZParameterAnimation>> globalParaAnimations;
     for (const auto& [key, value] : animationObj) {
@@ -1197,6 +1263,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
         }
       }
     }
+    bt.recordEvent("parsed parameter tracks");
 
     // match global parameters
     for (auto& gp : globalParaAnimations) {
@@ -1210,6 +1277,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
 
     // read files
     std::map<size_t, size_t> idmap = m_doc.read(docObj, err);
+    bt.recordEvent("doc.read");
     if (idmap.empty()) {
       // An animation file can legitimately contain zero document objects (e.g. camera/global-only timelines).
       // Only report an error when the file declares document objects but none could be loaded.
@@ -1232,10 +1300,14 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     }
 
     updateObjAnimation();
+    bt.recordEvent("updateObjAnimation");
 
     // Reset undo state after loading: a loaded animation starts clean.
     m_undoStack.clear();
     m_undoStack.setClean();
+
+    bt.stop();
+    VLOG(1) << bt;
   }
   catch (const ZException& e) {
     throw ZException(QString("Can not load animation %1: %2").arg(fn, e.what()));

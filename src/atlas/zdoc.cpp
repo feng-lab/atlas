@@ -4,6 +4,7 @@
 #include "zobjmodel.h"
 #include "zitemselectionmodel.h"
 #include "zobjwidget.h"
+#include "zbenchtimer.h"
 #include "zlog.h"
 #include "zsaveobjsdialog.h"
 #include "zimgdoc.h"
@@ -492,6 +493,7 @@ std::map<size_t, size_t> ZDoc::read(const json::object& jo, QString& err)
 {
   std::map<size_t, size_t> res;
   if (!jo.empty()) {
+    ZBenchTimer bt("ZDoc::read");
     for (auto& docPack : m_docPacks) {
       std::vector<std::pair<QString, json::value>> docKeyValueList;
       for (const auto& [key, value] : jo) {
@@ -502,11 +504,15 @@ std::map<size_t, size_t> ZDoc::read(const json::object& jo, QString& err)
       }
       // VLOG(1) << json::value_from(docKeyValueList);
       if (!docKeyValueList.empty()) {
+        const size_t beforeSize = res.size();
         for (const auto& idid : docPack.doc->read(docKeyValueList, err)) {
           res[idid.first] = idid.second;
         }
+        bt.recordEvent(fmt::format("{} ids={}", docPack.doc->typeName().toStdString(), res.size() - beforeSize));
       }
     }
+    bt.stop();
+    VLOG(1) << bt;
   }
   return res;
 }
