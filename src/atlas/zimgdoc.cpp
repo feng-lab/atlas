@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <memory>
 #include <optional>
 #include <set>
 
@@ -207,6 +208,96 @@ size_t ZImgDoc::loadFile(const json::value& jValue, QString& errorMsg)
     return 0;
   }
   return loadImg(json::value_to<ZImgSource>(jValue), errorMsg);
+}
+
+bool ZImgDoc::canPrepareLoadAsync(const json::value& jValue) const
+{
+  if (!jValue.is_object()) {
+    return false;
+  }
+
+  // Keep Neuroglancer precomputed sources synchronous for now. They can involve
+  // network IO and shared caches, and are not part of the common local-file
+  // startup path for animation exports.
+  try {
+    if (neuroglancerPrecomputedUrlFromJson(jValue).has_value()) {
+      return false;
+    }
+  }
+  catch (const ZException&) {
+    // Invalid JSON; keep it synchronous so loadFile() can produce a consistent error.
+    return false;
+  }
+
+  return true;
+}
+
+folly::coro::Task<ZObjDoc::PreparedLoadResult> ZImgDoc::prepareLoadAsync(const json::value& jValue,
+                                                                         const ZObjDoc::AsyncLoadContext& ctx) const
+{
+  PreparedLoadResult out;
+  if (!jValue.is_object()) {
+    out.errorMsg = QString("Invalid image JSON: expected object");
+    co_return out;
+  }
+  if (!ctx.commitThread) {
+    out.errorMsg = QString("Internal error: missing commit thread for async image load");
+    co_return out;
+  }
+
+  ZImgSource imgSource;
+  try {
+    imgSource = json::value_to<ZImgSource>(jValue);
+  }
+  catch (const ZException& e) {
+    out.errorMsg = QString::fromUtf8(e.what());
+    co_return out;
+  }
+  catch (const std::exception& e) {
+    out.errorMsg = QString::fromUtf8(e.what());
+    co_return out;
+  }
+
+  if (imgSource.filenames.isEmpty()) {
+    out.errorMsg = QString("Invalid image JSON: filenames list is empty");
+    co_return out;
+  }
+
+  const QString recentPath = imgSource.filenames[0];
+
+  try {
+    auto pack = std::make_unique<ZImgPack>(std::move(imgSource));
+
+    // ZImgPack is a QObject; move thread affinity to the doc thread before returning.
+    // moveToThread() must be called from the object's current thread (this prepare task).
+    pack->moveToThread(ctx.commitThread);
+
+    ZImgDoc* self = const_cast<ZImgDoc*>(this);
+    out.commit = [self, this, recentPath, pack = std::move(pack)](QString& errorMsg) mutable -> size_t {
+      try {
+        CHECK(pack);
+        const size_t id = self->addImgPack(pack.release());
+        ZSystemInfo::instance().addFileToRecentFileList(recentPath);
+        setLastOpenedObjPath(recentPath);
+        return id;
+      }
+      catch (const ZException& e) {
+        errorMsg = QString("Can not read image source start from %1: %2").arg(recentPath).arg(e.what());
+        return 0;
+      }
+      catch (const std::exception& e) {
+        errorMsg = QString("Can not read image source start from %1: %2").arg(recentPath).arg(e.what());
+        return 0;
+      }
+    };
+  }
+  catch (const ZException& e) {
+    out.errorMsg = QString("Can not read image source start from %1: %2").arg(recentPath).arg(e.what());
+  }
+  catch (const std::exception& e) {
+    out.errorMsg = QString("Can not read image source start from %1: %2").arg(recentPath).arg(e.what());
+  }
+  co_return out;
 }
 
 std::vector<QAction*> ZImgDoc::loadFileActions() const

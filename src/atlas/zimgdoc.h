@@ -103,6 +103,11 @@ protected:
   // append another img into this doc
   size_t addImgPack(ZImgPack* imgPack);
 
+  [[nodiscard]] bool canPrepareLoadAsync(const json::value& jValue) const override;
+
+  [[nodiscard]] folly::coro::Task<ZObjDoc::PreparedLoadResult>
+  prepareLoadAsync(const json::value& jValue, const ZObjDoc::AsyncLoadContext& ctx) const override;
+
   //
   size_t loadImg(const QString& fileName, FileFormat format, QString& errorMsg);
 

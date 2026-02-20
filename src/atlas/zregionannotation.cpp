@@ -6,6 +6,7 @@
 #include "zcpuinfo.h"
 #include "zbenchtimer.h"
 #include "zioutils.h"
+#include "zhdf5globallock.h"
 #include <QFile>
 #include <QTemporaryDir>
 #include <QSvgGenerator>
@@ -633,6 +634,8 @@ void ZRegionAnnotation::load(const QString& filename)
   clear();
 
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     H5::Exception::dontPrint();
 
     H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_RDONLY);
@@ -737,6 +740,8 @@ void ZRegionAnnotation::save(const QString& filename) const
 
   try {
     {
+      std::scoped_lock lock(hdf5GlobalMutex());
+
       H5::Exception::dontPrint();
 
       H5::H5File file(QFile::encodeName(tfn).constData(), H5F_ACC_TRUNC);

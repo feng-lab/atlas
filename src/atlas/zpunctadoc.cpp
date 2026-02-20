@@ -527,6 +527,56 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
   }
 }
 
+bool ZPunctaDoc::canPrepareLoadAsync(const json::value& jValue) const
+{
+  // Only async-prepare local file loads. External-source puncta (e.g. Neuroglancer)
+  // may involve network IO and doc cross-references, and are kept synchronous.
+  if (!jValue.is_string()) {
+    return false;
+  }
+  return !asQString(jValue).trimmed().isEmpty();
+}
+
+folly::coro::Task<ZObjDoc::PreparedLoadResult> ZPunctaDoc::prepareLoadAsync(const json::value& jValue,
+                                                                            const ZObjDoc::AsyncLoadContext&) const
+{
+  PreparedLoadResult out;
+  const QString fileName = asQString(jValue);
+  if (fileName.trimmed().isEmpty()) {
+    out.errorMsg = QString("File path is not string or is empty");
+    co_return out;
+  }
+
+  try {
+    ZPuncta puncta(fileName);
+    ZPunctaDoc* self = const_cast<ZPunctaDoc*>(this);
+    out.commit = [self, this, fileName, puncta = std::move(puncta)](QString& errorMsg) mutable -> size_t {
+      try {
+        const size_t id = self->addPuncta(std::move(puncta), fileName);
+        ZSystemInfo::instance().addFileToRecentFileList(fileName);
+        setLastOpenedObjPath(fileName);
+        return id;
+      }
+      catch (const ZException& e) {
+        errorMsg = e.what();
+        return 0;
+      }
+      catch (const std::exception& e) {
+        errorMsg = e.what();
+        return 0;
+      }
+    };
+  }
+  catch (const ZException& e) {
+    out.errorMsg = e.what();
+  }
+  catch (const std::exception& e) {
+    out.errorMsg = e.what();
+  }
+
+  co_return out;
+}
+
 std::vector<QAction*> ZPunctaDoc::loadFileActions() const
 {
   std::vector<QAction*> res;

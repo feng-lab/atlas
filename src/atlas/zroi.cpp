@@ -8,6 +8,7 @@
 #include "zroimaskrasterizer.h"
 #include "zioutils.h"
 #include "zimginterpolate.h"
+#include "zhdf5globallock.h"
 #include <QFile>
 
 namespace nim {
@@ -373,6 +374,8 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
   m_idToPainterPath.clear();
 
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     H5::Exception::dontPrint();
 
     H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
@@ -590,6 +593,8 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
 void ZSliceROI::save(H5::Group& sliceGrp) const
 {
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     H5::Exception::dontPrint();
 
     H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
@@ -1462,6 +1467,8 @@ void ZROI::load(const QString& filename)
   clear();
 
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     H5::Exception::dontPrint();
 
     H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_RDONLY);
@@ -1480,6 +1487,8 @@ void ZROI::save(const QString& filename) const
   auto tfn = getTemporaryFilename(filename);
   try {
     {
+      std::scoped_lock lock(hdf5GlobalMutex());
+
       H5::Exception::dontPrint();
 
       H5::H5File file(QFile::encodeName(tfn).constData(), H5F_ACC_TRUNC);
@@ -1502,6 +1511,8 @@ void ZROI::load(H5::Group& allGrp)
   clear();
 
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     H5::Exception::dontPrint();
 
     H5::IntType intType(H5::PredType::STD_I32LE);
@@ -1534,6 +1545,8 @@ void ZROI::load(H5::Group& allGrp)
 void ZROI::save(H5::Group& allGrp) const
 {
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     H5::Exception::dontPrint();
 
     H5::IntType intType(H5::PredType::STD_I32LE);

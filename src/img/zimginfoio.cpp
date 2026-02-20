@@ -1,5 +1,6 @@
 #include "zimginfoio.h"
 
+#include "zhdf5globallock.h"
 #include "zlog.h"
 
 namespace nim {
@@ -7,6 +8,8 @@ namespace nim {
 ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
 {
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     ZImgInfo info;
 
     H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
@@ -200,6 +203,8 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
 void ZImgInfoIO::save(H5::Group& grp, const ZImgInfo& info)
 {
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
     H5::FloatType floatType(H5::PredType::IEEE_F32LE);
     H5::IntType uint64Type(H5::PredType::STD_U64LE);

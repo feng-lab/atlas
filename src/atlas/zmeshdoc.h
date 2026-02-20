@@ -91,7 +91,12 @@ protected:
   void loadMesh();
 
   // append another mesh into this doc
-  size_t addMesh(ZMesh& mesh, const QString& path);
+  size_t addMesh(ZMesh mesh, const QString& path);
+
+  [[nodiscard]] bool canPrepareLoadAsync(const json::value& jValue) const override;
+
+  [[nodiscard]] folly::coro::Task<ZObjDoc::PreparedLoadResult>
+  prepareLoadAsync(const json::value& jValue, const ZObjDoc::AsyncLoadContext& ctx) const override;
 
 private:
   struct MeshPack

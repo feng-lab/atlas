@@ -4,9 +4,12 @@
 #include "zdoc.h"
 #include "zjson.h"
 #include "zsysteminfo.h"
+#include <folly/Function.h>
+#include <folly/coro/Task.h>
 #include <QObject>
 #include <QMenu>
 #include <QAction>
+#include <QThread>
 #include <QUndoStack>
 #include <memory>
 
@@ -163,6 +166,32 @@ Q_SIGNALS:
   void selectionChangedFromDoc(const std::vector<size_t>& selected, const std::vector<size_t>& deselected);
 
 protected:
+  struct AsyncLoadContext
+  {
+    // Thread that will own any QObjects produced during asynchronous preparation.
+    // For render/doc loads, this is typically the thread that calls ZObjDoc::read().
+    QThread* commitThread = nullptr;
+  };
+
+  struct PreparedLoadResult
+  {
+    // If set, this callback commits the prepared data to the document and
+    // returns the loaded object id. It must be invoked on the doc thread.
+    folly::Function<size_t(QString& errorMsg)> commit;
+
+    // Non-empty indicates prepare-time failure (no commit should be attempted).
+    QString errorMsg;
+  };
+
+  // Optional async-preload hook for expensive file/network reads.
+  //
+  // ZObjDoc::read() may use this to move heavy parsing/IO off the main thread
+  // while keeping document mutation single-threaded.
+  [[nodiscard]] virtual bool canPrepareLoadAsync(const json::value& jValue) const;
+
+  [[nodiscard]] virtual folly::coro::Task<PreparedLoadResult> prepareLoadAsync(const json::value& jValue,
+                                                                               const AsyncLoadContext& ctx) const;
+
   // Internal hook invoked by ZDoc after it updates the global object model.
   // Callers should use ZDoc::removeObj(id) instead so the object list and selection stay consistent.
   virtual void removeObj(size_t id) = 0;

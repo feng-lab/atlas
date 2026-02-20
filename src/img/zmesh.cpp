@@ -4,6 +4,7 @@
 #include "zmeshutils.h"
 #include "zbbox.h"
 #include "zexception.h"
+#include "zhdf5globallock.h"
 #include "zswc.h"
 #include "zlog.h"
 #include "zpuncta.h"
@@ -217,6 +218,8 @@ void ZMesh::load(H5::Group& allGrp)
   clear();
 
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     H5::Exception::dontPrint();
 
     H5::FloatType floatType(H5::PredType::IEEE_F32LE);
@@ -286,6 +289,8 @@ void ZMesh::load(H5::Group& allGrp)
 void ZMesh::save(H5::Group& allGrp) const
 {
   try {
+    std::scoped_lock lock(hdf5GlobalMutex());
+
     H5::Exception::dontPrint();
 
     H5::FloatType floatType(H5::PredType::IEEE_F32LE);

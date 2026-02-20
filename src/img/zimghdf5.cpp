@@ -7,6 +7,7 @@
 #include "zlog.h"
 #include "zmemorymappedfilecache.h"
 #include "zbenchtimer.h"
+#include "zhdf5globallock.h"
 #include "zh5zjpegxr.h"
 #include "zimgjpegxr.h"
 #include <QFile>
@@ -702,8 +703,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
   }
 
   LOG(WARNING) << "fall back to single thread hdf5 image reading!";
-  static std::mutex mutex;
-  std::scoped_lock lock(mutex);
+  std::scoped_lock lock(hdf5GlobalMutex());
   try {
     res = std::make_shared<ZImg>(m_info);
 
@@ -798,8 +798,7 @@ void ZImgHDF5::readInfo(const QString& filename,
     size_t chunkHeight = chunkSize();
     size_t chunkWidth = chunkSize();
     {
-      static std::mutex mutex;
-      std::scoped_lock lock(mutex);
+      std::scoped_lock lock(hdf5GlobalMutex());
 
       H5::Exception::dontPrint();
 
@@ -929,8 +928,7 @@ void ZImgHDF5::readImg(const QString& filename,
   if (scene != 0) {
     throw ZException("invalid scene");
   }
-  static std::mutex mutex;
-  std::scoped_lock lock(mutex);
+  std::scoped_lock lock(hdf5GlobalMutex());
   try {
     H5::Exception::dontPrint();
 
@@ -1015,8 +1013,7 @@ void ZImgHDF5::readImg(const QString& filename,
 void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, img.info(), paras);
-  static std::mutex mutex;
-  std::scoped_lock lock(mutex);
+  std::scoped_lock lock(hdf5GlobalMutex());
   try {
     H5::Exception::dontPrint();
 
@@ -1081,8 +1078,7 @@ void ZImgHDF5::writeImg(const QString& filename,
                         const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
-  static std::mutex mutex;
-  std::scoped_lock lock(mutex);
+  std::scoped_lock lock(hdf5GlobalMutex());
   try {
     H5::Exception::dontPrint();
 
@@ -1153,8 +1149,7 @@ void ZImgHDF5::writeImg(const QString& filename,
                         const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, imgBlockrovider.imgInfo(), paras);
-  static std::mutex mutex;
-  std::scoped_lock lock(mutex);
+  std::scoped_lock lock(hdf5GlobalMutex());
   try {
     H5::Exception::dontPrint();
 

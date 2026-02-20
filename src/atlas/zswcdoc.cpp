@@ -74,7 +74,7 @@ size_t ZSwcDoc::loadFile(const QString& fileName, QString& errorMsg)
   }
   try {
     ZSwc tree(fileName);
-    size_t id = addSwc(tree, fileName);
+    size_t id = addSwc(std::move(tree), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
 
@@ -101,7 +101,7 @@ size_t ZSwcDoc::loadFile(const json::value& jValue, QString& errorMsg)
     QString fileName = asQString(jValue);
 
     ZSwc tree(fileName);
-    size_t id = addSwc(tree, fileName);
+    size_t id = addSwc(std::move(tree), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
@@ -110,6 +110,53 @@ size_t ZSwcDoc::loadFile(const json::value& jValue, QString& errorMsg)
     errorMsg = e.what();
     return 0;
   }
+}
+
+bool ZSwcDoc::canPrepareLoadAsync(const json::value& jValue) const
+{
+  if (!jValue.is_string()) {
+    return false;
+  }
+  return !asQString(jValue).trimmed().isEmpty();
+}
+
+folly::coro::Task<ZObjDoc::PreparedLoadResult> ZSwcDoc::prepareLoadAsync(const json::value& jValue,
+                                                                         const ZObjDoc::AsyncLoadContext&) const
+{
+  PreparedLoadResult out;
+  const QString fileName = asQString(jValue);
+  if (fileName.trimmed().isEmpty()) {
+    out.errorMsg = QString("File path is not string or is empty");
+    co_return out;
+  }
+
+  try {
+    ZSwc tree(fileName);
+    ZSwcDoc* self = const_cast<ZSwcDoc*>(this);
+    out.commit = [self, this, fileName, tree = std::move(tree)](QString& errorMsg) mutable -> size_t {
+      try {
+        const size_t id = self->addSwc(std::move(tree), fileName);
+        ZSystemInfo::instance().addFileToRecentFileList(fileName);
+        setLastOpenedObjPath(fileName);
+        return id;
+      }
+      catch (const ZException& e) {
+        errorMsg = e.what();
+        return 0;
+      }
+      catch (const std::exception& e) {
+        errorMsg = e.what();
+        return 0;
+      }
+    };
+  }
+  catch (const ZException& e) {
+    out.errorMsg = e.what();
+  }
+  catch (const std::exception& e) {
+    out.errorMsg = e.what();
+  }
+  co_return out;
 }
 
 std::vector<QAction*> ZSwcDoc::loadFileActions() const
@@ -223,10 +270,10 @@ void ZSwcDoc::loadSwc()
   }
 }
 
-size_t ZSwcDoc::addSwc(ZSwc& tree, const QString& path)
+size_t ZSwcDoc::addSwc(ZSwc tree, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToSwcPacks[id] = std::make_shared<ZSwcPack>(tree, path, id, *this);
+  m_idToSwcPacks[id] = std::make_shared<ZSwcPack>(std::move(tree), path, id, *this);
   m_doc.registerNewObj(m_idToSwcPacks[id]);
 
   Q_EMIT objAdded(id, this);

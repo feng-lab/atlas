@@ -71,9 +71,14 @@ protected:
   void loadSwc();
 
   // append another swc into this doc
-  size_t addSwc(ZSwc& tree, const QString& path);
+  size_t addSwc(ZSwc tree, const QString& path);
 
   void setModified(bool clean);
+
+  [[nodiscard]] bool canPrepareLoadAsync(const json::value& jValue) const override;
+
+  [[nodiscard]] folly::coro::Task<ZObjDoc::PreparedLoadResult>
+  prepareLoadAsync(const json::value& jValue, const ZObjDoc::AsyncLoadContext& ctx) const override;
 
 private:
   void createActions();

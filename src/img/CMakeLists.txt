@@ -115,6 +115,7 @@ set(IMG_SOURCES
         # zimgstackinterface.cpp
         zflags.h
         zimghdf5.cpp zimghdf5.h
+        zhdf5globallock.cpp zhdf5globallock.h
         zimginfoio.cpp zimginfoio.h
         zimgblockprovider.h
         zimgleica.cpp zimgleica.h

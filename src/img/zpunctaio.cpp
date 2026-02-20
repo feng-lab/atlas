@@ -4,6 +4,7 @@
 #include "zeigenutils.h"
 #include "zexception.h"
 #include "zioutils.h"
+#include "zhdf5globallock.h"
 #include "zlog.h"
 #include "zstringutils.h"
 #include <H5Cpp.h>
@@ -116,6 +117,10 @@ void ZPunctaIO::save(const ZPuncta& puncta, const QString& filename, QString for
 
 void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
 {
+  // HDF5 C++ API is not reliably thread-safe in our build configurations. Serialize
+  // access to prevent heap corruption when multiple .nimp files are loaded in
+  // parallel (e.g. async doc loading).
+  std::scoped_lock lock(hdf5GlobalMutex());
   try {
     H5::Exception::dontPrint();
 
@@ -226,6 +231,8 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
 
 void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename)
 {
+  // See readNimpFile(): serialize HDF5 access for correctness under parallel saves/loads.
+  std::scoped_lock lock(hdf5GlobalMutex());
   try {
     H5::Exception::dontPrint();
 

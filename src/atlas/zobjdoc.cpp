@@ -6,12 +6,17 @@
 #include "zfileutils.h"
 #include "zchooseobjdialog.h"
 #include "zsysteminfo.h"
+#include <folly/OperationCancelled.h>
+#include <folly/coro/BlockingWait.h>
+#include <folly/coro/Collect.h>
+#include <folly/executors/GlobalExecutor.h>
 #include <QMessageBox>
 #include <QApplication>
 #include <QFileInfo>
 #include <algorithm>
 #include <bit>
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <string_view>
 #include <vector>
@@ -93,6 +98,18 @@ static uint64_t hashJsonValue(const json::value& v)
 
 } // namespace
 
+bool ZObjDoc::canPrepareLoadAsync([[maybe_unused]] const json::value& jValue) const
+{
+  return false;
+}
+
+folly::coro::Task<ZObjDoc::PreparedLoadResult>
+ZObjDoc::prepareLoadAsync([[maybe_unused]] const json::value& jValue,
+                          [[maybe_unused]] const AsyncLoadContext& ctx) const
+{
+  co_return PreparedLoadResult{};
+}
+
 ZObjDoc::ZObjDoc(ZDoc& doc)
   : QObject(&doc)
   , m_doc(doc)
@@ -140,7 +157,6 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
 {
   ZBenchTimer bt(fmt::format("ZObjDoc::read('{}')", typeName().toStdString()));
   std::map<size_t, size_t> idmap;
-  auto allObjs = objs();
 
   std::map<size_t, json::value> idToJsonValue;
   for (const auto& keyValue : docKeyValueList) {
@@ -235,29 +251,238 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
     maxGroupSize = std::max(maxGroupSize, g.ids.size());
   }
 
-  for (const auto& group : groups) {
+  const QString docTypeName = typeName();
+  const auto makeLoadLabel = [](const QString& docType, const json::value& jv) -> QString {
+    auto firstStringFromArray = [](const json::value& v) -> QString {
+      if (v.is_string()) {
+        return json::value_to<QString>(v);
+      }
+      if (!v.is_array()) {
+        return QString{};
+      }
+      const auto& a = v.as_array();
+      if (a.empty() || !a.front().is_string()) {
+        return QString{};
+      }
+      return json::value_to<QString>(a.front());
+    };
+
+    QString summary;
+    if (jv.is_string()) {
+      summary = json::value_to<QString>(jv);
+    } else if (jv.is_object()) {
+      const auto& jo = jv.as_object();
+
+      // Prefer a path-like summary when available (common for image sources).
+      if (auto it = jo.find("filenames"); it != jo.end()) {
+        summary = firstStringFromArray(it->value());
+        if (!summary.isEmpty() && it->value().is_array() && it->value().as_array().size() > 1) {
+          summary = QString("%1 (x%2)").arg(summary).arg(static_cast<qulonglong>(it->value().as_array().size()));
+        }
+      }
+      if (summary.isEmpty()) {
+        if (auto it = jo.find("Path"); it != jo.end()) { // legacy key for persisted image sources
+          summary = firstStringFromArray(it->value());
+          if (!summary.isEmpty() && it->value().is_array() && it->value().as_array().size() > 1) {
+            summary = QString("%1 (x%2)").arg(summary).arg(static_cast<qulonglong>(it->value().as_array().size()));
+          }
+        }
+      }
+
+      // Otherwise, fall back to type information.
+      if (summary.isEmpty()) {
+        if (auto it = jo.find("type"); it != jo.end() && it->value().is_string()) {
+          const QString t = json::value_to<QString>(it->value()).trimmed();
+          if (!t.isEmpty()) {
+            summary = QString("type=%1").arg(t);
+          }
+        }
+      }
+
+      if (summary.isEmpty()) {
+        summary = QString::fromUtf8(jsonTypeName(jv).c_str());
+      }
+    } else {
+      summary = QString::fromUtf8(jsonTypeName(jv).c_str());
+    }
+
+    if (summary.trimmed().isEmpty()) {
+      if (docType.trimmed().isEmpty()) {
+        return QString::fromUtf8(jsonTypeName(jv).c_str());
+      }
+      return docType;
+    }
+    if (docType.trimmed().isEmpty()) {
+      return summary;
+    }
+    return QString("%1 (%2)").arg(docType).arg(summary);
+  };
+
+  struct PreparedGroup
+  {
+    size_t groupIndex = 0;
+    PreparedLoadResult prepared;
+  };
+
+  std::vector<std::optional<PreparedLoadResult>> prepared;
+  prepared.resize(groups.size());
+  std::vector<QString> groupLabels;
+  groupLabels.resize(groups.size());
+  for (size_t groupIndex = 0; groupIndex < groups.size(); ++groupIndex) {
+    const auto& group = groups[groupIndex];
+    CHECK(group.value != nullptr);
+    groupLabels[groupIndex] = makeLoadLabel(docTypeName, *group.value);
+  }
+
+  const std::vector<size_t> startingObjs = objs();
+  std::vector<bool> groupHasStartingMatch(groups.size(), false);
+  for (size_t groupIndex = 0; groupIndex < groups.size(); ++groupIndex) {
+    const auto& group = groups[groupIndex];
     CHECK(group.value != nullptr);
     const json::value& jv = *group.value;
+    for (const size_t obj : startingObjs) {
+      if (isSameObj(jv, jsonValue(obj))) {
+        groupHasStartingMatch[groupIndex] = true;
+        break;
+      }
+    }
+  }
+
+  // Prepare expensive loads in parallel (off the doc thread), then commit sequentially.
+  // - Preparation is optional and doc-specific via canPrepareLoadAsync()/prepareLoadAsync().
+  // - Committing remains single-threaded to preserve thread affinity and deterministic id allocation.
+  const AsyncLoadContext asyncCtx{.commitThread = QThread::currentThread()};
+  auto cpuExecutor = folly::getGlobalCPUExecutor();
+  std::vector<folly::coro::TaskWithExecutor<PreparedGroup>> tasks;
+  std::vector<size_t> taskGroupIndices;
+  for (size_t groupIndex = 0; groupIndex < groups.size(); ++groupIndex) {
+    if (groupHasStartingMatch[groupIndex]) {
+      continue;
+    }
+    const auto& group = groups[groupIndex];
+    CHECK(group.value != nullptr);
+    const json::value& jv = *group.value;
+    if (!canPrepareLoadAsync(jv)) {
+      continue;
+    }
+
+    const json::value* jvPtr = group.value;
+    const QString groupLabel = groupLabels[groupIndex];
+    taskGroupIndices.push_back(groupIndex);
+    tasks.push_back(folly::coro::co_withExecutor(
+      cpuExecutor,
+      folly::coro::co_invoke([this, groupIndex, jvPtr, asyncCtx, groupLabel]() -> folly::coro::Task<PreparedGroup> {
+        PreparedGroup out;
+        out.groupIndex = groupIndex;
+        try {
+          out.prepared = co_await prepareLoadAsync(*jvPtr, asyncCtx);
+        }
+        catch (const folly::OperationCancelled&) {
+          out.prepared.errorMsg = QString("%1: load cancelled").arg(groupLabel);
+        }
+        catch (const ZException& e) {
+          out.prepared.errorMsg = QString("%1: %2").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+        }
+        catch (const std::exception& e) {
+          out.prepared.errorMsg = QString("%1: %2").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+        }
+        catch (...) {
+          out.prepared.errorMsg = QString("%1: Unknown exception while preparing load").arg(groupLabel);
+        }
+        co_return out;
+      })));
+  }
+
+  if (!tasks.empty()) {
+    auto results = folly::coro::blockingWait(folly::coro::collectAllTryRange(std::move(tasks)));
+    CHECK(results.size() == taskGroupIndices.size());
+    for (size_t taskIndex = 0; taskIndex < results.size(); ++taskIndex) {
+      auto& r = results[taskIndex];
+      const size_t groupIndex = taskGroupIndices[taskIndex];
+      CHECK(groupIndex < groupLabels.size());
+      const QString& groupLabel = groupLabels[groupIndex];
+      if (r.hasException()) {
+        // We should never get here because tasks catch all exceptions, but be defensive.
+        try {
+          std::rethrow_exception(r.exception().to_exception_ptr());
+        }
+        catch (const std::exception& e) {
+          err += QString("%1: Async prepare task failed: %2\n").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+        }
+        catch (...) {
+          err += QString("%1: Async prepare task failed: unknown exception\n").arg(groupLabel);
+        }
+        continue;
+      }
+      PreparedGroup pg = std::move(r.value());
+      CHECK(pg.groupIndex == groupIndex) << "Async prepare returned wrong groupIndex";
+      CHECK(pg.groupIndex < prepared.size());
+      prepared[pg.groupIndex] = std::move(pg.prepared);
+    }
+  }
+
+  for (size_t groupIndex = 0; groupIndex < groups.size(); ++groupIndex) {
+    const auto& group = groups[groupIndex];
+    CHECK(group.value != nullptr);
+    const json::value& jv = *group.value;
+    CHECK(groupIndex < groupLabels.size());
+    const QString& groupLabel = groupLabels[groupIndex];
     const std::vector<size_t>& ids = group.ids;
 
-    // check existing objects that are pointing to jv
+    // Check existing objects, including those loaded earlier in this read() call.
     std::set<size_t> existingIds;
-    for (auto obj : allObjs) {
+    for (const size_t obj : objs()) {
       if (isSameObj(jv, jsonValue(obj))) {
         existingIds.insert(obj);
       }
     }
 
     if (existingIds.empty()) {
-      QString errMsg;
-      // VLOG(1) << jv;
-      size_t id = loadFile(jv, errMsg);
-      //VLOG(1) << jv << errMsg;
-      if (id == 0) {
-        err += QString("%1\n").arg(errMsg);
-        continue;
+      // Prefer prepared payload (if any), otherwise fall back to synchronous loadFile().
+      if (prepared[groupIndex].has_value()) {
+        PreparedLoadResult& pr = *prepared[groupIndex];
+        if (!pr.errorMsg.isEmpty()) {
+          err += QString("%1\n").arg(pr.errorMsg);
+          continue;
+        }
+        if (pr.commit) {
+          QString errMsg;
+          size_t id = 0;
+          try {
+            id = pr.commit(errMsg);
+          }
+          catch (const folly::OperationCancelled&) {
+            errMsg = QString("%1: load cancelled").arg(groupLabel);
+          }
+          catch (const ZException& e) {
+            errMsg = QString("%1: %2").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+          }
+          catch (const std::exception& e) {
+            errMsg = QString("%1: %2").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+          }
+          catch (...) {
+            errMsg = QString("%1: Unknown exception while committing load").arg(groupLabel);
+          }
+          if (id == 0) {
+            if (errMsg.trimmed().isEmpty()) {
+              errMsg = QString("%1: Failed to commit prepared load").arg(groupLabel);
+            }
+            err += QString("%1\n").arg(errMsg);
+            continue;
+          }
+          existingIds.insert(id);
+        }
       }
-      existingIds.insert(id);
+
+      if (existingIds.empty()) {
+        QString errMsg;
+        size_t id = loadFile(jv, errMsg);
+        if (id == 0) {
+          err += QString("%1\n").arg(errMsg);
+          continue;
+        }
+        existingIds.insert(id);
+      }
     }
 
     if (ids.size() > existingIds.size()) {
@@ -270,6 +495,7 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
     auto it1 = ids.begin();
     auto it2 = existingIds.begin();
     while (it2 != existingIds.end()) {
+      CHECK(it1 != ids.end()) << "ids/existingIds size mismatch";
       idmap[*it1] = *it2;
       ++it1;
       ++it2;

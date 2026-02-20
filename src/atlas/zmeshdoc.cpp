@@ -161,7 +161,7 @@ size_t ZMeshDoc::loadFile(const QString& fileName, QString& errorMsg)
   }
   try {
     ZMesh mesh(fileName);
-    size_t id = addMesh(mesh, fileName);
+    size_t id = addMesh(std::move(mesh), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
@@ -313,7 +313,7 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
     QString fileName = asQString(jValue);
 
     ZMesh mesh(fileName);
-    size_t id = addMesh(mesh, fileName);
+    size_t id = addMesh(std::move(mesh), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
@@ -322,6 +322,56 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
     errorMsg = e.what();
     return 0;
   }
+}
+
+bool ZMeshDoc::canPrepareLoadAsync(const json::value& jValue) const
+{
+  // Only async-prepare local file loads. External-source meshes (e.g. Neuroglancer)
+  // may involve network IO and cross-doc coordination (image doc reuse), so keep them synchronous.
+  if (!jValue.is_string()) {
+    return false;
+  }
+  return !asQString(jValue).trimmed().isEmpty();
+}
+
+folly::coro::Task<ZObjDoc::PreparedLoadResult> ZMeshDoc::prepareLoadAsync(const json::value& jValue,
+                                                                          const ZObjDoc::AsyncLoadContext&) const
+{
+  PreparedLoadResult out;
+  const QString fileName = asQString(jValue);
+  if (fileName.trimmed().isEmpty()) {
+    out.errorMsg = QString("File path is not string or is empty");
+    co_return out;
+  }
+
+  try {
+    ZMesh mesh(fileName);
+    ZMeshDoc* self = const_cast<ZMeshDoc*>(this);
+    out.commit = [self, this, fileName, mesh = std::move(mesh)](QString& errorMsg) mutable -> size_t {
+      try {
+        const size_t id = self->addMesh(std::move(mesh), fileName);
+        ZSystemInfo::instance().addFileToRecentFileList(fileName);
+        setLastOpenedObjPath(fileName);
+        return id;
+      }
+      catch (const ZException& e) {
+        errorMsg = e.what();
+        return 0;
+      }
+      catch (const std::exception& e) {
+        errorMsg = e.what();
+        return 0;
+      }
+    };
+  }
+  catch (const ZException& e) {
+    out.errorMsg = e.what();
+  }
+  catch (const std::exception& e) {
+    out.errorMsg = e.what();
+  }
+
+  co_return out;
 }
 
 std::vector<QAction*> ZMeshDoc::loadFileActions() const
@@ -485,7 +535,7 @@ void ZMeshDoc::loadMesh()
   }
 }
 
-size_t ZMeshDoc::addMesh(ZMesh& mesh, const QString& path)
+size_t ZMeshDoc::addMesh(ZMesh mesh, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
   m_idToMeshPacks[id] = std::make_shared<MeshPack>(mesh, path);
