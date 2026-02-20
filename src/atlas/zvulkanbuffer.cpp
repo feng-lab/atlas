@@ -165,24 +165,31 @@ void ZVulkanBuffer::copyData(const void* data, size_t size)
   if (size > m_size) {
     throw ZException("Data size exceeds buffer size");
   }
-  // Try to map directly; if not host visible, fall back to staging
-  void* mappedMemory = nullptr;
-  if (vmaMapMemory(m_device.allocator(), m_allocation, &mappedMemory) != VK_SUCCESS || mappedMemory == nullptr) {
-    auto stagingBuffer =
-      m_device.createBuffer(size,
-                            vk::BufferUsageFlagBits::eTransferSrc,
-                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    stagingBuffer->copyData(data, size);
-    m_device.frameExecutor().executeImmediate(
-      [&](vk::raii::CommandBuffer& cmdBuffer) {
-        const vk::BufferCopy copyRegion{.srcOffset = 0, .dstOffset = 0, .size = size};
-        cmdBuffer.copyBuffer(stagingBuffer->buffer(), m_buffer, copyRegion);
-      },
-      "buffer_copy");
-  } else {
-    std::memcpy(mappedMemory, data, size);
-    vmaUnmapMemory(m_device.allocator(), m_allocation);
+  // If the buffer isn't host-visible, skip mapping entirely and upload through
+  // a staging buffer. This avoids validation/driver errors on platforms where
+  // mapping device-local memory is illegal (e.g., MoltenVK/Metal).
+  const bool hostVisible = (m_memoryProperties & vk::MemoryPropertyFlagBits::eHostVisible) != vk::MemoryPropertyFlags{};
+  if (hostVisible) {
+    void* mappedMemory = nullptr;
+    if (vmaMapMemory(m_device.allocator(), m_allocation, &mappedMemory) == VK_SUCCESS && mappedMemory != nullptr) {
+      std::memcpy(mappedMemory, data, size);
+      vmaUnmapMemory(m_device.allocator(), m_allocation);
+      return;
+    }
+    // Fall back to staging on unexpected map failures.
   }
+
+  auto stagingBuffer =
+    m_device.createBuffer(size,
+                          vk::BufferUsageFlagBits::eTransferSrc,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  stagingBuffer->copyData(data, size);
+  m_device.frameExecutor().executeImmediate(
+    [&](vk::raii::CommandBuffer& cmdBuffer) {
+      const vk::BufferCopy copyRegion{.srcOffset = 0, .dstOffset = 0, .size = size};
+      cmdBuffer.copyBuffer(stagingBuffer->buffer(), m_buffer, copyRegion);
+    },
+    "buffer_copy");
 }
 
 void* ZVulkanBuffer::map(vk::DeviceSize offset, vk::DeviceSize size)
