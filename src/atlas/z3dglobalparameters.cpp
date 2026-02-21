@@ -75,7 +75,8 @@ Z3DGlobalParameters::Z3DGlobalParameters(RenderBackend backend)
   // Keep OpenGL UI clean (and avoid misleading selection of a Vulkan-only mode).
   const QString ddpLabel = QStringLiteral("Dual Depth Peeling");
   const QString ppllLabel = QStringLiteral("Per-Pixel Fragment List (PPLL Exact)");
-  auto updateTransparencyOptionsForBackend = [this, ddpLabel, ppllLabel]() {
+  RenderBackend lastBackendForTransparencyOptions = backend;
+  auto updateTransparencyOptionsForBackend = [this, ddpLabel, ppllLabel, lastBackendForTransparencyOptions]() mutable {
     const RenderBackend backend = static_cast<RenderBackend>(renderBackend.associatedData());
     const bool shouldExposePPLL = (backend == RenderBackend::Vulkan);
     const bool hasPPLL = transparencyMethod.hasOption(ppllLabel);
@@ -84,16 +85,29 @@ Z3DGlobalParameters::Z3DGlobalParameters(RenderBackend backend)
         transparencyMethod.addOptionWithData(
           std::make_pair(ppllLabel, static_cast<int>(TransparencyMode::PerPixelFragmentList)));
       }
+      // Temporary Vulkan performance workaround:
+      //
+      // If the user is switching from OpenGL->Vulkan while using Dual Depth Peeling,
+      // default to PPLL on Vulkan. Our current Vulkan DDP implementation performs a
+      // CPU readback for device-limit handling and is therefore much slower than
+      // PPLL in practice. Users can still manually re-select DDP in the UI if
+      // they need it.
+      if (lastBackendForTransparencyOptions == RenderBackend::OpenGL && transparencyMethod.isSelected(ddpLabel)) {
+        transparencyMethod.select(ppllLabel);
+      }
+      lastBackendForTransparencyOptions = backend;
       return;
     }
 
     if (!hasPPLL) {
+      lastBackendForTransparencyOptions = backend;
       return;
     }
     if (transparencyMethod.isSelected(ppllLabel)) {
       transparencyMethod.select(ddpLabel);
     }
     transparencyMethod.removeOption(ppllLabel);
+    lastBackendForTransparencyOptions = backend;
   };
 
   updateTransparencyOptionsForBackend();

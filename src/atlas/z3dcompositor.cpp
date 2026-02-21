@@ -1606,6 +1606,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   // writing to a different attachment set; Vulkan forbids read-while-write feedback.
   Z3DScratchResourcePool::RenderTargetLease sceneOverlayLease;
   Z3DScratchResourcePool::RenderTargetLease sceneCompositeLease; // supersampled composite target when needed
+  Z3DScratchResourcePool::RenderTargetLease
+    resolvedLease; // output-sized resolve target when SS + pixel-sized overlays need it
   const bool haveHandles = !showHandleFilters.empty();
   const bool haveOnTop = !onTopOpaqueFilters.empty() || !onTopTransparentFilters.empty();
   if (haveHandles || haveOnTop || needTempSceneForNonOITImages) {
@@ -1613,6 +1615,19 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     sceneOverlayLease =
       pool.acquireTempRenderTarget2D(sz, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
     sceneOutLease = &sceneOverlayLease;
+  }
+  // When supersampling is enabled, pixel-sized overlays (transform handles,
+  // selection boxes) must be rendered at the output resolution. To avoid Vulkan
+  // read-while-write feedback, resolve the supersampled scene into a temporary
+  // output-sized lease and composite overlays into the final outLease.
+  const bool needResolvedLeaseForHandles = (supersample2x2 && haveHandles);
+  if (needResolvedLeaseForHandles) {
+    resolvedLease = pool.acquireTempRenderTarget2D(outLease->descriptor.size,
+                                                   ScratchFormat::RGBA16,
+                                                   ScratchFormat::Depth32F,
+                                                   RenderBackend::Vulkan);
+    CHECK(resolvedLease && resolvedLease.backend == RenderBackend::Vulkan)
+      << "Failed to acquire Vulkan resolved scene lease for handle overlay";
   }
 
   // Declare the script after compositor scratch targets so its destructor flush
@@ -2523,8 +2538,50 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     }
   }
 
+  // Supersample resolve must happen before pixel-sized overlays (handles,
+  // selection boxes) so their "pixel" sizing is based on the output viewport
+  // (GL parity).
+  Z3DScratchResourcePool::RenderTargetLease* resolvedSceneLeaseForHandles = nullptr;
+  if (supersample2x2) {
+    // Restore viewport to the output size for the resolve + overlay passes.
+    m_rendererBase.frameState().updateViewportData(prevViewport);
+    Z3DScratchResourcePool::RenderTargetLease* resolveDst = nullptr;
+    if (needResolvedLeaseForHandles) {
+      resolveDst = &resolvedLease;
+      resolvedSceneLeaseForHandles = &resolvedLease;
+    } else {
+      resolveDst = outLease;
+    }
+    CHECK(resolveDst != nullptr) << "Vulkan supersample resolve missing destination lease";
+
+    script.raster("supersample_resolve", {}, [&]() {
+      m_rendererBase.setActiveSurfaceWithLoadStore(*resolveDst,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store);
+      // If we already composited into a supersampled composite lease, prefer that; otherwise use sceneOutLease.
+      Z3DScratchResourcePool::RenderTargetLease* copySrc = sceneOutLease;
+      AttachmentHandle srcColor{};
+      srcColor.backend = RenderBackend::Vulkan;
+      srcColor.index = 0;
+      srcColor.id = reinterpret_cast<uint64_t>(copySrc->colorAttachment(0));
+      AttachmentHandle srcDepth{};
+      srcDepth.backend = RenderBackend::Vulkan;
+      srcDepth.index = 0;
+      srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
+      // Internal resolve: no Y-flip
+      m_textureCopyRenderer.setFlipY(false);
+      m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
+      m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
+    });
+  }
+
   if (haveHandles) {
-    const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
+    // For supersampling, handles must render at output size; otherwise they
+    // appear half-size after the downsample.
+    const bool renderAtOutputSize = supersample2x2;
+    const glm::uvec2 targetSize = renderAtOutputSize ? outLease->descriptor.size : sceneOutLease->descriptor.size;
     auto handleLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
       pool.acquireTempRenderTarget2D(targetSize,
                                      ScratchFormat::RGBA16,
@@ -2560,62 +2617,56 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     handleDepth.id = reinterpret_cast<uint64_t>(handleLease->depthAttachmentTexture());
     CHECK(handleColor.id != 0 && handleDepth.id != 0) << "Handles overlay lease missing attachments";
 
-    // Sample the scene rendered into sceneOutLease (temp) and write to the
-    // final output surface (outLease), exactly like the GL path.
+    // Sample the rendered scene and composite handles over it into the final output.
+    Z3DScratchResourcePool::RenderTargetLease* sceneForHandles = sceneOutLease;
+    if (supersample2x2) {
+      CHECK(resolvedSceneLeaseForHandles != nullptr)
+        << "Supersampled handle overlay requires a resolved output-sized scene lease";
+      sceneForHandles = resolvedSceneLeaseForHandles;
+    }
+
     AttachmentHandle sceneColor{};
     sceneColor.backend = RenderBackend::Vulkan;
     sceneColor.index = 0;
-    sceneColor.id = reinterpret_cast<uint64_t>(sceneOutLease->colorAttachment(0));
+    sceneColor.id = reinterpret_cast<uint64_t>(sceneForHandles->colorAttachment(0));
     AttachmentHandle sceneDepth{};
     sceneDepth.backend = RenderBackend::Vulkan;
     sceneDepth.index = 0;
-    sceneDepth.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
-    CHECK(sceneColor.id != 0 && sceneDepth.id != 0) << "Scene temp lease missing attachments for handles overlay";
+    sceneDepth.id = reinterpret_cast<uint64_t>(sceneForHandles->depthAttachmentTexture());
+    CHECK(sceneColor.id != 0 && sceneDepth.id != 0) << "Scene lease missing attachments for handles overlay";
 
-    // Choose destination: final surface when not supersampling, otherwise a supersampled composite
-    if (supersample2x2) {
-      if (!sceneCompositeLease) {
-        const glm::uvec2 ssSize = sceneOutLease->descriptor.size;
-        sceneCompositeLease =
-          pool.acquireTempRenderTarget2D(ssSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
-      }
-    }
     // Handle overlay composes handle over scene in-shader; do not enable
     // fixed-function blending to avoid a second blend.
     script.raster("handles_composite", {}, [&]() {
-      if (supersample2x2) {
-        // Supersampled path always composites into a fresh intermediate
-        m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store);
-      } else {
-        const bool havePriorFinalContent = (!supersample2x2 && (haveOnTop || imagesCompositedToFinal));
-        m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
-                                                     havePriorFinalContent ? LoadOp::Load : LoadOp::Clear,
-                                                     StoreOp::Store,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store);
-      }
+      // Non-SS can preserve any prior final content by loading outLease first
+      // (even though the full-screen compositor shader overwrites the result).
+      const bool havePriorFinalContent = (!supersample2x2 && (haveOnTop || imagesCompositedToFinal));
+      m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
+                                                   havePriorFinalContent ? LoadOp::Load : LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store);
 
       m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
       m_firstOnTopBlendRenderer.setSourceAttachments0(handleColor, handleDepth);
       m_firstOnTopBlendRenderer.setSourceAttachments1(sceneColor, sceneDepth);
       m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
     });
-
-    if (supersample2x2) {
-      // Promote composite as the current scene for any follow-up overlays
-      sceneOutLease = &sceneCompositeLease;
-    }
   }
 
   if (!selectedFilters.empty()) {
-    // After overlay/handle composition, draw selection boxes onto the final output
-    // when either overlay path was engaged; otherwise keep using the current scene lease.
-    const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
-    Z3DScratchResourcePool::RenderTargetLease* selectionLease = compositedToFinal ? outLease : sceneOutLease;
+    // GL parity: selection boxes are output-sized overlays and should not be
+    // rendered in the supersampled scene.
+    Z3DScratchResourcePool::RenderTargetLease* selectionLease = nullptr;
+    if (supersample2x2) {
+      selectionLease = outLease;
+    } else {
+      // After overlay/handle composition, draw selection boxes onto the final output
+      // when either overlay path was engaged; otherwise keep using the current scene lease.
+      const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
+      selectionLease = compositedToFinal ? outLease : sceneOutLease;
+    }
+    CHECK(selectionLease != nullptr);
     const glm::uvec2 targetSize = selectionLease->descriptor.size;
     script.raster("selection_boxes", {}, [&]() {
       m_rendererBase.setActiveSurfaceWithLoadStore(*selectionLease,
@@ -2635,9 +2686,13 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   }
 
   if (m_showAxis.get()) {
-    // Axis should draw on the same surface as selection boxes
-    const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
-    renderAxisVulkan(eye, *(compositedToFinal ? outLease : sceneOutLease), script);
+    // Axis should draw on the same surface as selection boxes.
+    if (supersample2x2) {
+      renderAxisVulkan(eye, *outLease, script);
+    } else {
+      const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
+      renderAxisVulkan(eye, *(compositedToFinal ? outLease : sceneOutLease), script);
+    }
   }
 
   // Vulkan picking (render to RGBA8+Depth24 Vulkan scratch image)
@@ -2789,33 +2844,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         m_globalParameters.pickingManager.resetRenderTarget();
       }
     }
-  }
-
-  // Downsample supersampled scene into the compositor out surface
-  if (supersample2x2) {
-    // Restore viewport to the output size for the resolve/copy pass.
-    m_rendererBase.frameState().updateViewportData(prevViewport);
-    script.raster("supersample_resolve", {}, [&]() {
-      m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store);
-      // If we already composited into a supersampled composite lease, prefer that; otherwise use sceneOutLease.
-      Z3DScratchResourcePool::RenderTargetLease* copySrc = sceneOutLease;
-      AttachmentHandle srcColor{};
-      srcColor.backend = RenderBackend::Vulkan;
-      srcColor.index = 0;
-      srcColor.id = reinterpret_cast<uint64_t>(copySrc->colorAttachment(0));
-      AttachmentHandle srcDepth{};
-      srcDepth.backend = RenderBackend::Vulkan;
-      srcDepth.index = 0;
-      srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
-      // Internal resolve: no Y-flip
-      m_textureCopyRenderer.setFlipY(false);
-      m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
-      m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
-    });
   }
 
   // Per-pass recording ends any frame it began unless we kept a tail frame open.
@@ -3038,8 +3066,19 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                        StoreOp::Store);
           // GPU copy to RGBA8 first. If we composed overlays directly into the final surface
           // (non-SS path), read from outLease; otherwise read from the current scene lease.
-          const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
-          Z3DScratchResourcePool::RenderTargetLease* copySrc = compositedToFinal ? outLease : sceneOutLease;
+          //
+          // Supersampling note: in SS 2x2 we resolve into `outLease` before drawing
+          // pixel-sized overlays (handles/selection). Those overlays live on
+          // `outLease`, so the final copy must read from `outLease` (not from the
+          // supersampled sceneOutLease).
+          Z3DScratchResourcePool::RenderTargetLease* copySrc = nullptr;
+          if (supersample2x2) {
+            copySrc = outLease;
+          } else {
+            const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
+            copySrc = compositedToFinal ? outLease : sceneOutLease;
+          }
+          CHECK(copySrc != nullptr) << "final_rgba8_copy: missing copy source";
 
           AttachmentHandle srcColor{};
           srcColor.backend = RenderBackend::Vulkan;
