@@ -1,6 +1,10 @@
 #pragma once
 
 #include <QGraphicsScene>
+#include <QGraphicsItem>
+
+#include <memory>
+#include <vector>
 
 namespace nim {
 
