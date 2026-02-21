@@ -35,7 +35,7 @@ class Z3DGlobalParameters : public QObject
   Q_OBJECT
 
 public:
-  Z3DGlobalParameters();
+  explicit Z3DGlobalParameters(RenderBackend backend = RenderBackend::OpenGL);
 
   void setDevicePixelRatio(float f);
 

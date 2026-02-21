@@ -9,7 +9,7 @@
 
 namespace nim {
 
-Z3DGlobalParameters::Z3DGlobalParameters()
+Z3DGlobalParameters::Z3DGlobalParameters(RenderBackend backend)
   : renderBackend("Render Backend")
   , geometriesAAMode("Anti-Aliasing")
   , transparencyMethod("Transparency")
@@ -21,7 +21,7 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   , fogBottomColor("Fog Bottom Color", glm::vec3(.9f, .9f, .9f))
   , fogRange("Fog Range", glm::ivec2(100, 50000), 1, 1e5)
   , fogDensity("Fog Density", 1.f, 0.0001f, 10.f)
-  , camera("Camera", Z3DCamera())
+  , camera("Camera", Z3DCamera(backend))
   , pickingManager()
   , interactionHandler("Interaction Handler", &camera)
   , globalXCut("Global X Cut", glm::vec2(0, 0), 0, 0)
@@ -29,11 +29,14 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   , globalZCut("Global Z Cut", glm::vec2(0, 0), 0, 0)
   , devicePixelRatio("Device Pixel Ratio", 1.f, 1.f, 16.f)
 {
+  CHECK(backend == RenderBackend::OpenGL || backend == RenderBackend::Vulkan)
+    << "Z3DGlobalParameters constructed with invalid RenderBackend value";
+
   renderBackend.clearOptions();
   renderBackend.addOptionsWithData(
     std::make_pair(enumToQString(RenderBackend::OpenGL), static_cast<int>(RenderBackend::OpenGL)),
     std::make_pair(enumToQString(RenderBackend::Vulkan), static_cast<int>(RenderBackend::Vulkan)));
-  renderBackend.select(enumToQString(RenderBackend::OpenGL));
+  renderBackend.select(enumToQString(backend));
   renderBackend.setDescription(
     QStringLiteral("Rendering backend selection. OpenGL is the primary path today; Vulkan is experimental."));
   // addParameter(renderBackend);

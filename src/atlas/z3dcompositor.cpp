@@ -385,7 +385,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_axisFontOutlineColor("Font Outline Color", glm::vec4(1.f))
   , m_axisShowFontShadow("Show Font Shadow", false)
   , m_axisFontShadowColor("Font Shadow Color", glm::vec4(0.f, 0.f, 0.f, 1.f))
-  , m_screenQuadVAO(1)
   , m_region(0, 1, 0, 1)
 {
   ensureOutputTargets(m_outputSize);
@@ -454,19 +453,27 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
 
   // Glow renderer is compositor-owned; parameters are synced from filters per-draw
 
-  m_waFinalShader = std::make_unique<Z3DShaderProgram>();
-  m_waFinalShader->loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    // OpenGL-only resources. Vulkan startup intentionally avoids creating or
+    // binding a GL context, so any GL calls here must be gated.
+    m_screenQuadVAO = std::make_unique<Z3DVertexArrayObject>(1);
 
-  m_wbFinalShader = std::make_unique<Z3DShaderProgram>();
-  m_wbFinalShader->loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
+    m_waFinalShader = std::make_unique<Z3DShaderProgram>();
+    m_waFinalShader->loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
 
-  m_ddpBlendShader = std::make_unique<Z3DShaderProgram>();
-  m_ddpBlendShader->loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
+    m_wbFinalShader = std::make_unique<Z3DShaderProgram>();
+    m_wbFinalShader->loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
 
-  m_ddpFinalShader = std::make_unique<Z3DShaderProgram>();
-  m_ddpFinalShader->loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
+    m_ddpBlendShader = std::make_unique<Z3DShaderProgram>();
+    m_ddpBlendShader->loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
 
-  ensurePickingTarget(glm::uvec2(32u, 32u));
+    m_ddpFinalShader = std::make_unique<Z3DShaderProgram>();
+    m_ddpFinalShader->loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
+
+    ensurePickingTarget(glm::uvec2(32u, 32u));
+  } else {
+    ensurePickingTargetVulkan(glm::uvec2(32u, 32u));
+  }
   addInteractionHandler(globalParas.interactionHandler);
 
   m_XAxisColor.setStyle("COLOR");
@@ -3499,6 +3506,7 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
   // them later against a different or missing context.
   if (backendRequest == RenderBackend::Vulkan) {
     VLOG(1) << "Releasing compositor-owned GL shader programs before switching to Vulkan";
+    m_screenQuadVAO.reset();
     m_ddpBlendShader.reset();
     m_ddpFinalShader.reset();
     m_waFinalShader.reset();
@@ -3508,6 +3516,7 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
   if (backendRequest == RenderBackend::OpenGL) {
     // Rebuild compositor-owned GL shader programs in the new context.
     VLOG(1) << "Recreating compositor-owned GL shader programs after switching to OpenGL";
+    m_screenQuadVAO = std::make_unique<Z3DVertexArrayObject>(1);
     m_ddpBlendShader = std::make_unique<Z3DShaderProgram>();
     m_ddpBlendShader->loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
 
@@ -3995,7 +4004,9 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
                                          ddpBlendSize.y > 0u ? 1.f / static_cast<float>(ddpBlendSize.y) : 0.f);
     m_ddpBlendShader->setScreenDimRCPUniform(ddpBlendScreenDimRcp);
 
-    Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_ddpBlendShader);
+    CHECK(m_screenQuadVAO != nullptr);
+    CHECK(m_ddpBlendShader != nullptr);
+    Z3DPrimitiveRenderer::renderScreenQuad(*m_screenQuadVAO, *m_ddpBlendShader);
     m_ddpBlendShader->release();
 
     if (g_useOQ) {
@@ -4057,7 +4068,9 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
                                   ddpSize.y > 0u ? 1.f / static_cast<float>(ddpSize.y) : 0.f);
   m_ddpFinalShader->setScreenDimRCPUniform(ddpScreenDimRcp);
 
-  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_ddpFinalShader);
+  CHECK(m_screenQuadVAO != nullptr);
+  CHECK(m_ddpFinalShader != nullptr);
+  Z3DPrimitiveRenderer::renderScreenQuad(*m_screenQuadVAO, *m_ddpFinalShader);
   m_ddpFinalShader->release();
   glTarget->release();
 
@@ -4160,7 +4173,9 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
                                  waSize.y > 0u ? 1.f / static_cast<float>(waSize.y) : 0.f);
   m_waFinalShader->setScreenDimRCPUniform(waScreenDimRcp);
 
-  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_waFinalShader);
+  CHECK(m_screenQuadVAO != nullptr);
+  CHECK(m_waFinalShader != nullptr);
+  Z3DPrimitiveRenderer::renderScreenQuad(*m_screenQuadVAO, *m_waFinalShader);
   m_waFinalShader->release();
   glTarget->release();
 
@@ -4273,7 +4288,9 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   m_wbFinalShader->setUniform("ze_to_zw_b", b);
   m_wbFinalShader->setUniform("weighted_blended_depth_scale", m_rendererBase.sceneState().weightedBlendedDepthScale);
 
-  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_wbFinalShader);
+  CHECK(m_screenQuadVAO != nullptr);
+  CHECK(m_wbFinalShader != nullptr);
+  Z3DPrimitiveRenderer::renderScreenQuad(*m_screenQuadVAO, *m_wbFinalShader);
   m_wbFinalShader->release();
   glTarget->release();
 

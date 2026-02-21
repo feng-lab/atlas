@@ -682,6 +682,7 @@ Common examples in the template
 
 - `--atlas_image_cache_memory_proportion` and `--atlas_image_region_cache_memory_proportion` — tune memory usage.
 - `--atlas_debug_opengl` / `--atlas_debug_vulkan` — enable GL/Vulkan debugging aids.
+- `--atlas_default_render_backend` — choose the default 3D renderer backend at startup (`opengl` or `vulkan`).
 - `--atlas_volume_rendering_maximum_round` — raise/lower ray-march rounds.
 - `--v` — set global log verbosity.
 

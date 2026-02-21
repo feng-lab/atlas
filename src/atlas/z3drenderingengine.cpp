@@ -48,6 +48,11 @@ DEFINE_bool(atlas_debug_opengl,
 
 DEFINE_bool(atlas_log_glbinding_context_switch, false, "Whether to log openGL context switch event, default is false");
 
+DEFINE_string(atlas_default_render_backend,
+              "opengl",
+              "Default 3D rendering backend at startup. Values: opengl, vulkan. "
+              "This sets the initial value of the 'Render Backend' global parameter; it can be changed in the UI.");
+
 DECLARE_string(output_image_name_prefix);
 DECLARE_int32(output_image_name_field_width);
 DECLARE_int32(maximum_output_width);
@@ -189,6 +194,24 @@ int numDigits(int32_t x)
 namespace nim {
 
 namespace {
+
+[[nodiscard]] bool parseRenderBackendFlagValue(const std::string& raw, RenderBackend& outBackend)
+{
+  QString normalized = QString::fromStdString(raw).trimmed().toLower();
+  normalized.remove(u'-');
+  normalized.remove(u'_');
+  normalized.remove(u' ');
+
+  if (normalized == QStringLiteral("opengl") || normalized == QStringLiteral("gl")) {
+    outBackend = RenderBackend::OpenGL;
+    return true;
+  }
+  if (normalized == QStringLiteral("vulkan") || normalized == QStringLiteral("vk")) {
+    outBackend = RenderBackend::Vulkan;
+    return true;
+  }
+  return false;
+}
 
 bool shouldFlipYWhenSaving(RenderBackend backend)
 {
@@ -960,8 +983,97 @@ void Z3DRenderingEngine::init()
   setCurrentRenderThreadExecutor(m_renderThreadExecutor.get());
 
   Q_EMIT progressChanged(10);
-  initGL();
-  getGLFocus();
+
+  RenderBackend startupBackend = RenderBackend::OpenGL;
+  if (!parseRenderBackendFlagValue(FLAGS_atlas_default_render_backend, startupBackend)) {
+    LOG(ERROR) << fmt::format("Ignoring invalid --atlas_default_render_backend='{}' (expected 'opengl' or 'vulkan')",
+                              FLAGS_atlas_default_render_backend);
+    startupBackend = RenderBackend::OpenGL;
+  }
+
+  // Vulkan startup must create and inject a Vulkan device before any Vulkan
+  // scratch allocations (persistent output targets are acquired during
+  // compositor construction).
+  if (startupBackend == RenderBackend::Vulkan) {
+    VLOG(1) << "Initializing Vulkan backend for startup";
+    try {
+      m_vkContext = std::make_unique<ZVulkanContext>();
+      m_vkDevice = m_vkContext->createDevice();
+
+      auto& phys = m_vkContext->physicalDevice();
+      const auto props = phys.getProperties();
+      const auto features = phys.getFeatures();
+      const auto memProps = phys.getMemoryProperties();
+
+      uint64_t vramBytes = 0;
+      for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
+        if (memProps.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+          vramBytes += memProps.memoryHeaps[i].size;
+        }
+      }
+
+      Z3DGpuInfo::GenericCaps caps;
+      caps.maxTextureSize = props.limits.maxImageDimension2D;
+      caps.max3DTextureSize = props.limits.maxImageDimension3D;
+      caps.maxArrayTextureLayers = static_cast<int>(props.limits.maxImageArrayLayers);
+      caps.maxColorAttachments = static_cast<int>(props.limits.maxColorAttachments);
+      caps.maxTextureAnisotropy = (features.samplerAnisotropy ? props.limits.maxSamplerAnisotropy : 1.0f);
+      caps.dedicatedVideoMemoryMB = static_cast<uint64_t>(vramBytes / (1024ull * 1024ull));
+      caps.maxViewportDim =
+        static_cast<int>(std::min(props.limits.maxViewportDimensions[0], props.limits.maxViewportDimensions[1]));
+      // Reasonable defaults for GL-only caps when running under Vulkan
+      caps.maxCombinedTextureImageUnits = 48;
+      caps.maxTextureImageUnits = 16;
+      caps.maxVertexTextureImageUnits = 16;
+      caps.maxGeometryTextureImageUnits = 16;
+      caps.maxTextureBufferSize = static_cast<int>(props.limits.maxTexelBufferElements);
+      caps.maxDrawBuffer = static_cast<int>(props.limits.maxColorAttachments);
+
+      Z3DGpuInfo::instance().overrideGenericCaps(caps);
+      VLOG(1) << "Updated Z3DGpuInfo caps from Vulkan device";
+
+      m_vkContext->logGpuInfo();
+    }
+    catch (const std::exception& e) {
+      const auto errorMsg =
+        fmt::format("Failed to initialize Vulkan backend at startup: {}. Falling back to OpenGL.", e.what());
+      LOG(ERROR) << errorMsg;
+      reportRenderingError(errorMsg);
+
+      // Reset partially-initialized Vulkan state so a later backend switch can retry cleanly.
+      m_vkDevice.reset();
+      m_vkContext.reset();
+
+      startupBackend = RenderBackend::OpenGL;
+    }
+  }
+
+  // Scratch pool must be configured for the selected startup backend before any
+  // filters are constructed (compositor allocates persistent output targets).
+  if (!m_scratchPool) {
+    m_scratchPool.reset(new Z3DScratchResourcePool(startupBackend));
+    Z3DRenderGlobalState::instance().setScratchPool(m_scratchPool.get());
+  } else {
+    m_scratchPool->setDefaultBackend(startupBackend);
+  }
+
+  CHECK(m_scratchPool != nullptr);
+  if (startupBackend == RenderBackend::Vulkan) {
+    CHECK(m_vkDevice != nullptr) << "Vulkan device must be initialized before Vulkan scratch allocation";
+    m_scratchPool->setVulkanDevice(m_vkDevice.get());
+  } else {
+    // Ensure Vulkan scratch allocations fail fast in OpenGL startup mode until a
+    // Vulkan device is explicitly created (e.g., via a backend switch).
+    m_scratchPool->setVulkanDevice(nullptr);
+  }
+
+  // OpenGL startup needs a valid GL context before any GL-backed resources are
+  // created (RenderTargets, shader programs, etc.). Vulkan startup intentionally
+  // avoids creating a GL context.
+  if (startupBackend == RenderBackend::OpenGL) {
+    ensureGLContext();
+    getGLFocus();
+  }
 
   if (!m_vkCompletionPollTimer) {
     // Poll interval for Vulkan fence completion. This timer is only started
@@ -1019,10 +1131,8 @@ void Z3DRenderingEngine::init()
     });
   }
 
-  m_globalParas = std::make_unique<Z3DGlobalParameters>();
-  if (m_scratchPool) {
-    m_scratchPool->setDefaultBackend(static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()));
-  }
+  m_globalParas = std::make_unique<Z3DGlobalParameters>(startupBackend);
+
   connect(&m_globalParas->renderBackend, &ZParameter::valueChanged, this, [this]() {
     handleRenderBackendChanged();
   });
@@ -1494,16 +1604,6 @@ std::vector<ZParameter*> Z3DRenderingEngine::parametersOfViewSetting(size_t id)
 void Z3DRenderingEngine::onCanvasResized(size_t w, size_t h)
 {
   setOutputSize(glm::uvec2(w, h));
-}
-
-void Z3DRenderingEngine::initGL()
-{
-  if (!m_scratchPool) {
-    m_scratchPool.reset(new Z3DScratchResourcePool());
-    Z3DRenderGlobalState::instance().setScratchPool(m_scratchPool.get());
-  }
-
-  ensureGLContext();
 }
 
 void Z3DRenderingEngine::ensureGLContext()

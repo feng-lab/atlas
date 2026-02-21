@@ -76,6 +76,9 @@
 # Whether to check openGL error aggressively, default is false, can set to true for debugging
 --atlas_debug_opengl=false
 
+# Default 3D rendering backend at startup. Values: opengl, vulkan.
+--atlas_default_render_backend=opengl
+
 # Maximum number of rounds for volume rendering, default is 100
 --atlas_volume_rendering_maximum_round=100
 

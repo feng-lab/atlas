@@ -314,41 +314,41 @@ Steps to load and manage images via `ZImgDoc`:
    6. Current limitations: read-only dataset. Supported chunk encodings are `raw`, `jpeg` (uint8, 1 or 3 channels), `png` (unsigned 1–2 bytes/voxel, 1–4 channels), `compresso` (unsigned 1/2/4/8 bytes/voxel, 1 channel), and `compressed_segmentation` (uint32/uint64 segmentation). Sharded volumes require an HTTP server that supports `Range` requests.
    7. Segmentation datasets (`type=segmentation`) default to **Voxel Display → Segmentation Labels** (stable pseudo‑random colors per label ID). You can switch back to intensity rendering via the Object View Setting dock.
    8. For segmentation datasets, Atlas also supports optional Neuroglancer metadata and derived objects:
-	      - **Segment Properties**: if the dataset has a `segment_properties/` directory, Atlas can load and browse it from the 2D slice view (right‑click) via **Show Neuroglancer Segment Properties…**. Some public datasets do not provide this metadata.
-	        - When segment properties are loaded, Atlas augments hover readouts (status bar) with the segment’s **Label** and **Description** (when available).
-	      - **Meshes and Skeletons**: Atlas can import Neuroglancer segmentation-derived geometry as normal Atlas objects:
-	        - **Meshes** (`mesh/`) → `ZMeshDoc` (rendered in 3D like other meshes).
-	        - **Skeletons/Graphs** (`skeletons/`) → `ZSkeletonDoc` (rendered similar to SWC, with a line-style default).
-	        - **Source configuration (per dataset)**:
-	          - If the dataset’s `info` declares `mesh` and/or `skeletons`, Atlas uses those automatically.
-	          - If not, configure sources in **Object View Setting → Neuroglancer Sources** for that segmentation object:
-	            - **Set Mesh Source Override…**
-	            - **Set Skeleton Source Override…**
-	            - Values can be an absolute URL (e.g. `precomputed://…`, `gs://…`, `s3://…`, `https://…`) or a relative path resolved against the segmentation root.
-	          - These overrides are saved in `.scene` files and restored on load.
-	        - Once a source is configured, import from the **2D slice view** (right‑click) using:
-	        - **Copy Neuroglancer Segment ID Under Cursor**
-	        - **Load Neuroglancer Mesh for Segment Under Cursor**
-	        - **Load Neuroglancer Mesh for Segment ID…** (manual ID entry; clipboard auto‑prefill if it contains a single uint64)
-	        - **Load Neuroglancer Meshes for Segment IDs from Clipboard…** (extracts IDs, de‑duplicates, and loads them)
-	        - **Load Neuroglancer Meshes for Visible Segments (cached)…** (collects segment IDs from cached tiles in the current viewport *at the target LOD for the current zoom*; coarse fallback tiles are ignored. ID 0 is treated as background and ignored.)
-	        - **Load Neuroglancer Meshes for All Segments (segment_properties)…** (can be very slow and memory heavy)
-	        - **Load Neuroglancer Skeleton for Segment Under Cursor**
-	        - **Load Neuroglancer Skeleton for Segment ID…**
-	        - **Load Neuroglancer Skeletons for Segment IDs from Clipboard…**
-	        - **Load Neuroglancer Skeletons for Visible Segments (cached)…**
-	        - **Load Neuroglancer Skeletons for All Segments (segment_properties)…**
-	        Mesh import is progressive: Atlas loads a coarse mesh first, then refines to the finest available LOD by replacing mesh geometry in-place.
-	        Note: these actions only pick IDs from already visible/cached tiles and will not trigger additional chunk downloads just to resolve a segment ID. If multiple segmentation layers are visible, Atlas uses the top-most layer (highest view precedence) under the cursor (and for dataset‑scoped actions, the top-most visible segmentation layer).
-	      - **Annotations** (precomputed annotations collections) → either `ZPunctaDoc` (for `POINT` / `ELLIPSOID`) or `ZSkeletonDoc` (for `LINE` / `POLYLINE`):
-	        - Unlike meshes/skeletons, annotation datasets are separate roots and are not discoverable from the segmentation `info` by default.
-	        - Configure the dataset link in **Object View Setting → Neuroglancer Sources** on the segmentation object:
-	          - **Set Annotations Source Override…** (absolute URL or relative path resolved against the segmentation root).
-	        - Once configured, import from the **2D slice view** (right‑click) using:
-	          - **Load Neuroglancer Annotations for Segment Under Cursor** (uses the relationship index; requires a cached segment ID)
-	          - **Load Neuroglancer Annotations for Segment ID…** (manual segment/object ID entry)
-	          - **Load Neuroglancer Annotations in View (spatial index)…** (queries the current viewport region at the current slice; does not require a segment ID)
-	        - Ellipsoid annotations preserve anisotropic radii and render as true ellipsoids in 3D (via `Z3DEllipsoidRenderer`).
+      - **Segment Properties**: if the dataset has a `segment_properties/` directory, Atlas can load and browse it from the 2D slice view (right‑click) via **Show Neuroglancer Segment Properties…**. Some public datasets do not provide this metadata.
+        - When segment properties are loaded, Atlas augments hover readouts (status bar) with the segment’s **Label** and **Description** (when available).
+      - **Meshes and Skeletons**: Atlas can import Neuroglancer segmentation-derived geometry as normal Atlas objects:
+        - **Meshes** (`mesh/`) → `ZMeshDoc` (rendered in 3D like other meshes).
+        - **Skeletons/Graphs** (`skeletons/`) → `ZSkeletonDoc` (rendered similar to SWC, with a line-style default).
+        - **Source configuration (per dataset)**:
+          - If the dataset’s `info` declares `mesh` and/or `skeletons`, Atlas uses those automatically.
+          - If not, configure sources in **Object View Setting → Neuroglancer Sources** for that segmentation object:
+            - **Set Mesh Source Override…**
+            - **Set Skeleton Source Override…**
+            - Values can be an absolute URL (e.g. `precomputed://…`, `gs://…`, `s3://…`, `https://…`) or a relative path resolved against the segmentation root.
+          - These overrides are saved in `.scene` files and restored on load.
+        - Once a source is configured, import from the **2D slice view** (right‑click) using:
+          - **Copy Neuroglancer Segment ID Under Cursor**
+          - **Load Neuroglancer Mesh for Segment Under Cursor**
+          - **Load Neuroglancer Mesh for Segment ID…** (manual ID entry; clipboard auto‑prefill if it contains a single uint64)
+          - **Load Neuroglancer Meshes for Segment IDs from Clipboard…** (extracts IDs, de‑duplicates, and loads them)
+          - **Load Neuroglancer Meshes for Visible Segments (cached)…** (collects segment IDs from cached tiles in the current viewport *at the target LOD for the current zoom*; coarse fallback tiles are ignored. ID 0 is treated as background and ignored.)
+          - **Load Neuroglancer Meshes for All Segments (segment_properties)…** (can be very slow and memory heavy)
+          - **Load Neuroglancer Skeleton for Segment Under Cursor**
+          - **Load Neuroglancer Skeleton for Segment ID…**
+          - **Load Neuroglancer Skeletons for Segment IDs from Clipboard…**
+          - **Load Neuroglancer Skeletons for Visible Segments (cached)…**
+          - **Load Neuroglancer Skeletons for All Segments (segment_properties)…**
+        - Mesh import is progressive: Atlas loads a coarse mesh first, then refines to the finest available LOD by replacing mesh geometry in-place.
+        - Note: these actions only pick IDs from already visible/cached tiles and will not trigger additional chunk downloads just to resolve a segment ID. If multiple segmentation layers are visible, Atlas uses the top-most layer (highest view precedence) under the cursor (and for dataset‑scoped actions, the top-most visible segmentation layer).
+      - **Annotations** (precomputed annotations collections) → either `ZPunctaDoc` (for `POINT` / `ELLIPSOID`) or `ZSkeletonDoc` (for `LINE` / `POLYLINE`):
+        - Unlike meshes/skeletons, annotation datasets are separate roots and are not discoverable from the segmentation `info` by default.
+        - Configure the dataset link in **Object View Setting → Neuroglancer Sources** on the segmentation object:
+          - **Set Annotations Source Override…** (absolute URL or relative path resolved against the segmentation root).
+        - Once configured, import from the **2D slice view** (right‑click) using:
+          - **Load Neuroglancer Annotations for Segment Under Cursor** (uses the relationship index; requires a cached segment ID)
+          - **Load Neuroglancer Annotations for Segment ID…** (manual segment/object ID entry)
+          - **Load Neuroglancer Annotations in View (spatial index)…** (queries the current viewport region at the current slice; does not require a segment ID)
+        - Ellipsoid annotations preserve anisotropic radii and render as true ellipsoids in 3D (via `Z3DEllipsoidRenderer`).
    9. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
    10. Optional: enable the persistent HTTP disk cache to speed up repeated Neuroglancer sessions (and reduce duplicated downloads):
        - `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable; tune e.g. 10–50 GiB depending on disk space)
@@ -900,7 +900,10 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 
 ### 7.2 Loading Scenes Step by Step
 
-1. **Drag and drop** a `.scene` file into the 2D window or choose **File → Load Scene...**.
+1. Load a `.scene` file using one of:
+   - **Drag and drop** into the 2D window.
+   - **File → Load Scene...**
+   - **Command line**: pass the scene as a positional argument (e.g. `Atlas /path/to/example.scene`). This can be combined with flags such as `--atlas_default_render_backend=vulkan`.
 2. Atlas parses the JSON, restores documents, and updates the Objects Manager.
 3. If 3D state is present and the 3D window is not open, Atlas launches it and waits for `renderingEngineInitialized`.
 4. View settings are applied. Logs may contain “waiting for 3d window initialization” until the engine is ready.
@@ -1122,6 +1125,9 @@ Examples
 
 # Enable OpenGL debugging (slower; use when diagnosing issues)
 --atlas_debug_opengl=true
+
+# Choose default 3D renderer backend (OpenGL default; Vulkan is experimental)
+--atlas_default_render_backend=vulkan
 
 # Vulkan validation/diagnostics
 --atlas_debug_vulkan=true

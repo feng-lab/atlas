@@ -1909,14 +1909,20 @@ void Z3DImg::resetCacheSystem(size_t c)
                                                                                m_invalidKey);
   std::ranges::fill(m_channelPageDirectories[c], glm::uvec4(0));
   std::ranges::fill(m_channelPageTableCaches[c], glm::uvec4(0));
-  // When Vulkan uploader is active, avoid issuing any GL texture updates here.
-  // The caller (updateAndUploadPageDirectoryCaches) will upload page caches via
-  // the Vulkan path after rebuilding tasks, keeping GL/Vulkan separation intact.
-  if (!m_vulkanImageBlockUploader) {
-    ensureGLPagingTexturesForChannel(c);
-    m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
-    m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
+  // IMPORTANT:
+  // This function is called from backend-agnostic code paths (e.g. changing
+  // channel display ranges) and therefore must not unconditionally touch OpenGL.
+  // When Atlas starts in Vulkan mode, there may be no active GL context, and
+  // attempting to create/update GL textures here will crash (Apple GL driver can
+  // throw std::out_of_range from deep within GL entrypoints).
+  //
+  // Instead, mark the GL paging textures dirty and let OpenGL-only call sites
+  // (bind shaders / updateAndUploadPageDirectoryCaches) recreate+upload lazily
+  // under a valid GL context.
+  if (m_glPagingTexturesDirty.size() < m_nChannels) {
+    m_glPagingTexturesDirty.resize(m_nChannels, 1u);
   }
+  m_glPagingTexturesDirty[c] = 1u;
 }
 
 void Z3DImg::ensureGLPagingTexturesForChannel(size_t c)

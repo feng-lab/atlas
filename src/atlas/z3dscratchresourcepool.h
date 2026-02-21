@@ -105,7 +105,7 @@ struct ScratchImageDescriptor
 class Z3DScratchResourcePool
 {
 public:
-  Z3DScratchResourcePool();
+  explicit Z3DScratchResourcePool(RenderBackend defaultBackend = RenderBackend::OpenGL);
   ~Z3DScratchResourcePool();
 
   // RAII lease for a render target

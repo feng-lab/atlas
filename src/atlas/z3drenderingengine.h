@@ -334,7 +334,6 @@ private:
 
   void onCanvasResized(size_t w, size_t h);
 
-  void initGL();
   void ensureGLContext();
   // Vulkan init deferred
 

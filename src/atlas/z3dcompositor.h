@@ -336,7 +336,10 @@ private:
 
   Z3DCamera m_axisCamera;
 
-  Z3DVertexArrayObject m_screenQuadVAO;
+  // OpenGL-only: screen-quad VAO. Vulkan paths never touch this, and Vulkan
+  // startup intentionally avoids creating a GL context, so this must be created
+  // lazily when OpenGL is active.
+  std::unique_ptr<Z3DVertexArrayObject> m_screenQuadVAO;
 
   glm::uvec2 m_outputSize{32u, 32u};
 

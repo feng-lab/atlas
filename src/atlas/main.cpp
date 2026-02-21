@@ -19,6 +19,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QMessageBox>
+#include <QTimer>
+#include <QUrl>
 #include <folly/ScopeGuard.h>
 #include <gflags/gflags.h>
 
@@ -226,6 +228,33 @@ int main(int argc, char* argv[])
       sm.setMainWindow(mainWin);
       QObject::connect(&app, &ZApplication::fileOpenRequest, mainWin, &ZMainWindow::loadUrls);
       mainWin->show();
+
+      // Support launching Atlas with a scene file (or directory of files) as a positional argument.
+      // Example:
+      //   Atlas /path/to/example.scene --atlas_default_render_backend=vulkan
+      //
+      // We intentionally ignore any args that look like flags ("-" / "--") and only attempt to load
+      // paths that exist locally.
+      QList<QUrl> startupUrls;
+      const QStringList args = QCoreApplication::arguments();
+      for (int i = 1; i < args.size(); ++i) {
+        const QString& arg = args[i];
+        if (arg.startsWith(u'-')) {
+          continue;
+        }
+        QFileInfo pathInfo(arg);
+        if (!pathInfo.exists()) {
+          continue;
+        }
+        startupUrls.append(QUrl::fromLocalFile(pathInfo.absoluteFilePath()));
+      }
+      if (!startupUrls.isEmpty()) {
+        // Defer until the event loop starts so any deferred initialization signals/events work normally.
+        QTimer::singleShot(0, mainWin, [mainWin, startupUrls]() {
+          LOG(INFO) << "Loading startup URLs: " << startupUrls.size();
+          mainWin->loadUrls(startupUrls);
+        });
+      }
 
       return app.exec();
     }

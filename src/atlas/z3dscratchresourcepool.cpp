@@ -508,7 +508,12 @@ ZVulkanTexture* Z3DScratchResourcePool::RenderTargetLease::depthAttachmentTextur
   return vulkanImage->depthAttachment();
 }
 
-Z3DScratchResourcePool::Z3DScratchResourcePool() = default;
+Z3DScratchResourcePool::Z3DScratchResourcePool(RenderBackend defaultBackend)
+  : m_defaultBackend(defaultBackend)
+{
+  CHECK(defaultBackend == RenderBackend::OpenGL || defaultBackend == RenderBackend::Vulkan)
+    << "Z3DScratchResourcePool constructed with invalid RenderBackend value";
+}
 
 Z3DScratchResourcePool::~Z3DScratchResourcePool() = default;
 
