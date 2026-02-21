@@ -51,6 +51,10 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
 
   createContextMenu();
 
+  m_adaptColumnsTimer.setSingleShot(true);
+  m_adaptColumnsTimer.setInterval(0);
+  connect(&m_adaptColumnsTimer, &QTimer::timeout, this, &ZObjWidget::adaptColumnsIfPending);
+
 #if 0
   ZStyledItemDelegate *delegate = new ZStyledItemDelegate(this);
   setMouseTracking(true);
@@ -58,11 +62,49 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   connect(this, &ZObjWidget::entered, delegate, &ZStyledItemDelegate::cellEntered);
 #endif
 
-  connect(m_objProxyModel, &QSortFilterProxyModel::rowsInserted, this, &ZObjWidget::adaptColumns);
-  connect(m_objProxyModel, &QSortFilterProxyModel::rowsRemoved, this, &ZObjWidget::adaptColumns);
-  connect(m_objProxyModel, &QSortFilterProxyModel::modelReset, this, &ZObjWidget::adaptColumns);
-  connect(m_objProxyModel, &QSortFilterProxyModel::layoutChanged, this, &ZObjWidget::adaptColumns);
-  connect(m_objProxyModel, &QSortFilterProxyModel::dataChanged, this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::rowsInserted, this, &ZObjWidget::scheduleAdaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::rowsRemoved, this, &ZObjWidget::scheduleAdaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::modelReset, this, &ZObjWidget::scheduleAdaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::layoutChanged, this, &ZObjWidget::scheduleAdaptColumns);
+  connect(m_objProxyModel,
+          &QSortFilterProxyModel::dataChanged,
+          this,
+          [this](const QModelIndex&, const QModelIndex&, const QVector<int>& roles) {
+            // Column auto-sizing is O(numRows) and is not needed for show/hide toggles.
+            // Only re-size when text changes (or if the sender didn't provide roles).
+            if (roles.isEmpty() || roles.contains(Qt::DisplayRole)) {
+              scheduleAdaptColumns();
+            }
+          });
+  scheduleAdaptColumns();
+}
+
+void ZObjWidget::showEvent(QShowEvent* event)
+{
+  QTreeView::showEvent(event);
+  if (m_adaptColumnsPending) {
+    scheduleAdaptColumns();
+  }
+}
+
+void ZObjWidget::scheduleAdaptColumns()
+{
+  m_adaptColumnsPending = true;
+
+  if (!isVisible()) {
+    return;
+  }
+
+  m_adaptColumnsTimer.start();
+}
+
+void ZObjWidget::adaptColumnsIfPending()
+{
+  if (!m_adaptColumnsPending || !isVisible()) {
+    return;
+  }
+
+  m_adaptColumnsPending = false;
   adaptColumns();
 }
 

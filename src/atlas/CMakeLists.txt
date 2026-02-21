@@ -836,55 +836,151 @@ set(ATLAS_CORE_SOURCES ${ATLAS_SOURCES_NO_MAIN})
 list(FILTER ATLAS_CORE_SOURCES EXCLUDE REGEX "(^|/)zvulkan[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
 list(FILTER ATLAS_CORE_SOURCES EXCLUDE REGEX "(^|/)z3d[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
 
-# Core static library
-add_library(atlas_core STATIC
-            ${SYS_SOURCES}
-            ${QTCSV_SOURCES}
-            ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
-            ${ATLAS_CORE_SOURCES}
-            ${PROTO_SRCS} ${GRPC_SRCS})
+if (MSVC)
+  # MSVC (COFF) static libraries have a hard ~4GiB size limit. With /GL + /LTCG enabled,
+  # `atlas_core` can exceed that limit (LNK1248 from lib.exe). Split `atlas_core` into
+  # multiple implementation archives and expose a stable umbrella target name.
 
-target_include_directories(atlas_core
-  PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(atlas_core
-  SYSTEM PRIVATE
-    ${QTCSVDIR} ${QTCSVDIR}/include
-    ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
-# Vulkan headers are required transitively by some core sources/headers (e.g. zvulkan*.h
-# included from renderer base). Ensure the SDK include path is visible to atlas_core too.
-if (WIN32)
-  target_include_directories(atlas_core PUBLIC $ENV{VULKAN_SDK}/Include)
+  add_library(atlas_core_deps INTERFACE)
+  target_include_directories(atlas_core_deps
+    INTERFACE
+      ${CMAKE_CURRENT_SOURCE_DIR}
+      ${CMAKE_CURRENT_BINARY_DIR})
+  # Vulkan headers are required transitively by some core sources/headers (e.g. zvulkan*.h
+  # included from renderer base). Ensure the SDK include path is visible to consumers too.
+  if (WIN32)
+    target_include_directories(atlas_core_deps INTERFACE $ENV{VULKAN_SDK}/Include)
+  else ()
+    # Do not use Vulkan::Headers, which might point to /usr/include
+    target_include_directories(atlas_core_deps INTERFACE $ENV{VULKAN_SDK}/include)
+  endif ()
+  target_compile_definitions(atlas_core_deps INTERFACE
+    ATLAS_USE_CORE_PROFILE
+    ATLAS_ENABLE_CUSTOM_COMMAND=$<BOOL:${ATLAS_ENABLE_CUSTOM_COMMAND}>)
+
+  target_link_libraries(atlas_core_deps INTERFACE
+    img neutu
+    glbinding::glbinding-aux glbinding::glbinding
+    ${OpenCV_LIBS}
+    gflags::gflags
+    Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
+    Qt6::CorePrivate Qt6::Test
+    Brotli::brotlidec
+    proxygen::proxygen
+    VTK::sqlite
+    assimp::draco
+    gRPC::grpc++ protobuf::libprotobuf)
+  if (WIN32)
+    # Required for importing the Windows system certificate store for HTTPS.
+    target_link_libraries(atlas_core_deps INTERFACE crypt32)
+  endif ()
+  if (UNIX AND NOT APPLE)
+    target_link_libraries(atlas_core_deps INTERFACE OpenGL::OpenGL OpenGL::EGL)
+  endif ()
+  if (ATLAS_USE_OPENGLWIDGET)
+    target_link_libraries(atlas_core_deps INTERFACE Qt6::OpenGLWidgets)
+  endif ()
+
+  # Build-only include paths for bundled third-party sources (not part of the public interface).
+  add_library(atlas_core_private_includes INTERFACE)
+  target_include_directories(atlas_core_private_includes
+    SYSTEM INTERFACE
+      ${QTCSVDIR} ${QTCSVDIR}/include
+      ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
+
+  # Support code (generated RPC stubs + small bundled sources).
+  add_library(atlas_core_support STATIC
+              ${SYS_SOURCES}
+              ${QTCSV_SOURCES}
+              ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
+              ${PROTO_SRCS} ${GRPC_SRCS})
+  target_link_libraries(atlas_core_support PRIVATE atlas_core_deps atlas_core_private_includes)
+
+  # Partition internal core sources by the 2nd character of the basename (`z*`) to keep
+  # header/implementation pairs together while distributing object size across archives.
+  set(ATLAS_CORE_SOURCES_0_9_A_H ${ATLAS_CORE_SOURCES})
+  list(FILTER ATLAS_CORE_SOURCES_0_9_A_H INCLUDE REGEX "(^|/)z[0-9a-h][^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+  set(ATLAS_CORE_SOURCES_I_M ${ATLAS_CORE_SOURCES})
+  list(FILTER ATLAS_CORE_SOURCES_I_M INCLUDE REGEX "(^|/)z[i-m][^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+  set(ATLAS_CORE_SOURCES_N_P ${ATLAS_CORE_SOURCES})
+  list(FILTER ATLAS_CORE_SOURCES_N_P INCLUDE REGEX "(^|/)z[n-p][^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+  set(ATLAS_CORE_SOURCES_Q_R ${ATLAS_CORE_SOURCES})
+  list(FILTER ATLAS_CORE_SOURCES_Q_R INCLUDE REGEX "(^|/)z[q-r][^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+  set(ATLAS_CORE_SOURCES_S_Z ${ATLAS_CORE_SOURCES})
+  list(FILTER ATLAS_CORE_SOURCES_S_Z INCLUDE REGEX "(^|/)z[s-z][^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+
+  add_library(atlas_core_0_9_a_h STATIC ${ATLAS_CORE_SOURCES_0_9_A_H})
+  target_link_libraries(atlas_core_0_9_a_h PRIVATE atlas_core_deps atlas_core_private_includes)
+  add_library(atlas_core_i_m STATIC ${ATLAS_CORE_SOURCES_I_M})
+  target_link_libraries(atlas_core_i_m PRIVATE atlas_core_deps atlas_core_private_includes)
+  add_library(atlas_core_n_p STATIC ${ATLAS_CORE_SOURCES_N_P})
+  target_link_libraries(atlas_core_n_p PRIVATE atlas_core_deps atlas_core_private_includes)
+  add_library(atlas_core_q_r STATIC ${ATLAS_CORE_SOURCES_Q_R})
+  target_link_libraries(atlas_core_q_r PRIVATE atlas_core_deps atlas_core_private_includes)
+  add_library(atlas_core_s_z STATIC ${ATLAS_CORE_SOURCES_S_Z})
+  target_link_libraries(atlas_core_s_z PRIVATE atlas_core_deps atlas_core_private_includes)
+
+  # Umbrella target preserves the original consumer name without producing a huge .lib.
+  add_library(atlas_core INTERFACE)
+  target_link_libraries(atlas_core INTERFACE
+    atlas_core_deps
+    atlas_core_support
+    atlas_core_0_9_a_h
+    atlas_core_i_m
+    atlas_core_n_p
+    atlas_core_q_r
+    atlas_core_s_z)
 else ()
-  # Do not use Vulkan::Headers, which might point to /usr/include
-  target_include_directories(atlas_core PUBLIC $ENV{VULKAN_SDK}/include)
-endif ()
-target_compile_definitions(atlas_core PUBLIC
-  ATLAS_USE_CORE_PROFILE
-  ATLAS_ENABLE_CUSTOM_COMMAND=$<BOOL:${ATLAS_ENABLE_CUSTOM_COMMAND}>)
+  # Core static library (non-MSVC toolchains do not suffer from the COFF 4GiB archive limit).
+  add_library(atlas_core STATIC
+              ${SYS_SOURCES}
+              ${QTCSV_SOURCES}
+              ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
+              ${ATLAS_CORE_SOURCES}
+              ${PROTO_SRCS} ${GRPC_SRCS})
 
-target_link_libraries(atlas_core PUBLIC
-  img neutu
-  glbinding::glbinding-aux glbinding::glbinding
-  ${OpenCV_LIBS}
-  gflags::gflags
-  Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
-  Qt6::CorePrivate Qt6::Test
-  Brotli::brotlidec
-  proxygen::proxygen
-  VTK::sqlite
-  assimp::draco
-  gRPC::grpc++ protobuf::libprotobuf)
-if (WIN32)
-  # Required for importing the Windows system certificate store for HTTPS.
-  target_link_libraries(atlas_core PUBLIC crypt32)
-endif ()
-if (UNIX AND NOT APPLE)
-  target_link_libraries(atlas_core PUBLIC OpenGL::OpenGL OpenGL::EGL)
-endif ()
-if (ATLAS_USE_OPENGLWIDGET)
-  target_link_libraries(atlas_core PUBLIC Qt6::OpenGLWidgets)
+  target_include_directories(atlas_core
+    PUBLIC
+      ${CMAKE_CURRENT_SOURCE_DIR}
+      ${CMAKE_CURRENT_BINARY_DIR})
+  target_include_directories(atlas_core
+    SYSTEM PRIVATE
+      ${QTCSVDIR} ${QTCSVDIR}/include
+      ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
+  # Vulkan headers are required transitively by some core sources/headers (e.g. zvulkan*.h
+  # included from renderer base). Ensure the SDK include path is visible to atlas_core too.
+  if (WIN32)
+    target_include_directories(atlas_core PUBLIC $ENV{VULKAN_SDK}/Include)
+  else ()
+    # Do not use Vulkan::Headers, which might point to /usr/include
+    target_include_directories(atlas_core PUBLIC $ENV{VULKAN_SDK}/include)
+  endif ()
+  target_compile_definitions(atlas_core PUBLIC
+    ATLAS_USE_CORE_PROFILE
+    ATLAS_ENABLE_CUSTOM_COMMAND=$<BOOL:${ATLAS_ENABLE_CUSTOM_COMMAND}>)
+
+  target_link_libraries(atlas_core PUBLIC
+    img neutu
+    glbinding::glbinding-aux glbinding::glbinding
+    ${OpenCV_LIBS}
+    gflags::gflags
+    Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
+    Qt6::CorePrivate Qt6::Test
+    Brotli::brotlidec
+    proxygen::proxygen
+    VTK::sqlite
+    assimp::draco
+    gRPC::grpc++ protobuf::libprotobuf)
+  if (WIN32)
+    # Required for importing the Windows system certificate store for HTTPS.
+    target_link_libraries(atlas_core PUBLIC crypt32)
+  endif ()
+  if (UNIX AND NOT APPLE)
+    target_link_libraries(atlas_core PUBLIC OpenGL::OpenGL OpenGL::EGL)
+  endif ()
+  if (ATLAS_USE_OPENGLWIDGET)
+    target_link_libraries(atlas_core PUBLIC Qt6::OpenGLWidgets)
+  endif ()
 endif ()
 
 # Z3D static library (OpenGL/shared renderer code). Keep it simple: inherit everything from atlas_core.
@@ -901,7 +997,20 @@ add_dependencies(atlas_vulkan vulkan_shaders)
 target_link_libraries(atlas_vulkan PRIVATE atlas_core)
 
 # Enable IPO/LTCG for Release where supported
-set_property(TARGET atlas_core atlas_z3d atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+if (MSVC)
+  set_property(TARGET
+    atlas_core_support
+    atlas_core_0_9_a_h
+    atlas_core_i_m
+    atlas_core_n_p
+    atlas_core_q_r
+    atlas_core_s_z
+    atlas_z3d
+    atlas_vulkan
+    PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+else ()
+  set_property(TARGET atlas_core atlas_z3d atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif ()
 
 # Umbrella target preserves the original consumer name without producing a giant .lib
 add_library(atlas_lib INTERFACE)

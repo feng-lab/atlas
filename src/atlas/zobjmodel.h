@@ -6,6 +6,7 @@
 #include <QVariant>
 #include <QIcon>
 #include <memory>
+#include <unordered_map>
 
 #define CONFIG_OLD
 
@@ -109,6 +110,14 @@ public:
   void activated(const QModelIndex& idxIn);
 
 protected:
+  [[nodiscard]] ZObjPack* packForId(size_t id) const;
+
+  void indexPackTree(ZObjPack* pack);
+
+  void unindexPackTree(const ZObjPack* pack);
+
+  [[nodiscard]] QModelIndex indexForPack(const ZObjPack& pack, int col) const;
+
   void updateChildCheckState(const QModelIndex& parent, Qt::CheckState cs);
 
   void updateParentCheckState(const QModelIndex& child);
@@ -125,6 +134,7 @@ protected:
 
   std::unique_ptr<ZObjPack> m_rootItem;
   ZObjPack* m_viewSettingCurrentItem = nullptr;
+  std::unordered_map<size_t, ZObjPack*> m_idToPack;
 };
 
 } // namespace nim
