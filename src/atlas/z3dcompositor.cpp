@@ -2635,9 +2635,16 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
   // Vulkan picking (render to RGBA8+Depth24 Vulkan scratch image)
   {
-    const glm::uvec2 pickSize = sceneOutLease->descriptor.size;
-    ensurePickingTargetVulkan(pickSize);
+    // Match GL behavior: picking targets are always output-sized and must not
+    // depend on the supersampling mode. When supersampling is enabled, the
+    // compositor viewport is temporarily set to the supersampled size; Vulkan
+    // render passes use frameState().viewport as the render area, so restore
+    // the output-sized viewport for picking.
+    const glm::uvec2 pickSize = outLease->descriptor.size;
     const glm::uvec4 pickViewport(0u, 0u, pickSize.x, pickSize.y);
+    m_rendererBase.frameState().updateViewportData(pickViewport);
+
+    ensurePickingTargetVulkan(pickSize);
 
     if (gFilters.empty() && !showHandleFilters.empty()) {
       vlogVulkanLease("picking_handles", m_pickingTargetLease);

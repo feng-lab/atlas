@@ -2,6 +2,10 @@
 
 #include "z3dobjview.h"
 
+#include <QMetaObject>
+#include <QPointer>
+#include <QThread>
+
 namespace nim {
 
 template<class DocType, class FilterType>
@@ -123,7 +127,13 @@ protected:
     if (it == m_idToFilter.end()) {
       return;
     }
+    // Avoid feedback loops: Doc-driven visibility updates should not re-enter
+    // the view->doc synchronization path. Do not block signals here because
+    // setVisible() must still invalidate rendering.
+    const size_t prevSyncId = m_docDrivenVisibilitySyncId;
+    m_docDrivenVisibilitySyncId = id;
     it->second->setVisible(v);
+    m_docDrivenVisibilitySyncId = prevSyncId;
     updateBoundBox();
   }
 
@@ -151,10 +161,26 @@ protected:
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
-          if (append) {
-            m_doc.doc().appendSelectObj(idFilter.first);
+          // Selection changes originate from the 3D view on the rendering thread, but
+          // ZDoc + selection models live on the UI thread. Hop across threads via Qt.
+          ZDoc& doc = m_doc.doc();
+          const QPointer<ZDoc> docPtr(&doc);
+          const size_t id = idFilter.first;
+          auto applySelection = [docPtr, id, append]() {
+            if (!docPtr) {
+              return;
+            }
+            if (append) {
+              docPtr->appendSelectObj(id);
+            } else {
+              docPtr->clearAndSelectObj(id);
+            }
+          };
+
+          if (QThread::currentThread() == doc.thread()) {
+            applySelection();
           } else {
-            m_doc.doc().clearAndSelectObj(idFilter.first);
+            QMetaObject::invokeMethod(&doc, std::move(applySelection), Qt::QueuedConnection);
           }
           // updateBoundBox();
           return;
@@ -168,7 +194,21 @@ protected:
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
-          m_doc.doc().deselectObj(idFilter.first);
+          ZDoc& doc = m_doc.doc();
+          const QPointer<ZDoc> docPtr(&doc);
+          const size_t id = idFilter.first;
+          auto applyDeselection = [docPtr, id]() {
+            if (!docPtr) {
+              return;
+            }
+            docPtr->deselectObj(id);
+          };
+
+          if (QThread::currentThread() == doc.thread()) {
+            applyDeselection();
+          } else {
+            QMetaObject::invokeMethod(&doc, std::move(applyDeselection), Qt::QueuedConnection);
+          }
           // updateBoundBox();
           return;
         }
@@ -181,9 +221,25 @@ protected:
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
-          if (m_doc.doc().isObjVisible(idFilter.first) != v) {
-            m_doc.doc().setObjVisible(idFilter.first, v); // slow
-            // updateBoundBox();
+          if (m_docDrivenVisibilitySyncId == idFilter.first) {
+            return;
+          }
+          // View-driven visibility updates originate on the rendering thread, but
+          // ZDoc + the object model live on the UI thread.
+          ZDoc& doc = m_doc.doc();
+          const QPointer<ZDoc> docPtr(&doc);
+          const size_t id = idFilter.first;
+          auto applyVisibility = [docPtr, id, v]() {
+            if (!docPtr) {
+              return;
+            }
+            docPtr->setObjVisible(id, v);
+          };
+
+          if (QThread::currentThread() == doc.thread()) {
+            applyVisibility();
+          } else {
+            QMetaObject::invokeMethod(&doc, std::move(applyVisibility), Qt::QueuedConnection);
           }
           return;
         }
@@ -194,6 +250,7 @@ protected:
 protected:
   DocType& m_doc;
   std::map<size_t, std::unique_ptr<FilterType>> m_idToFilter;
+  size_t m_docDrivenVisibilitySyncId = 0;
 };
 
 } // namespace nim

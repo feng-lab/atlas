@@ -939,7 +939,17 @@ void ZVulkanContext::createLogicalDevice()
   enabledPhysicalDeviceFeatures2.features.shaderClipDistance = VK_TRUE;
 
   if (FLAGS_atlas_debug_vulkan) {
+#ifdef __APPLE__
+    // MoltenVK/Metal does not currently support Vulkan buffer robustness; requesting
+    // robustBufferAccess triggers noisy warnings like:
+    //   "VK_ERROR_FEATURE_NOT_PRESENT: Metal does not support buffer robustness."
+    //
+    // Keep this disabled on macOS even in debug mode (Atlas should not rely on
+    // robust buffer access semantics for correctness).
+    enabledPhysicalDeviceFeatures2.features.robustBufferAccess = VK_FALSE;
+#else
     enabledPhysicalDeviceFeatures2.features.robustBufferAccess = physicalDeviceFeatures.robustBufferAccess;
+#endif
   }
 
   // Enable required extensions

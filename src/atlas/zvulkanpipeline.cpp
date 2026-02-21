@@ -103,7 +103,26 @@ void ZVulkanPipeline::create()
     .pPushConstantRanges = m_pushConstantRanges.empty() ? nullptr : m_pushConstantRanges.data()};
   m_pipelineLayout.emplace(m_device.context().device(), pipelineLayoutInfo);
 
-  vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = m_topology, .primitiveRestartEnable = false};
+  // MoltenVK/Metal portability note:
+  // Metal does not support *disabling* primitive restart for strip/fan topologies, and MoltenVK emits:
+  //   VK_ERROR_FEATURE_NOT_PRESENT: Metal does not support disabling primitive restart.
+  //
+  // Align Vulkan pipeline state with the underlying platform behavior by enabling primitive restart
+  // for topologies where it is relevant. This removes noisy warnings during pipeline creation on macOS
+  // without changing semantics on Metal (primitive restart cannot be disabled there anyway).
+  const bool primitiveRestartEnable =
+#if defined(__APPLE__)
+    (m_topology == vk::PrimitiveTopology::eLineStrip) || (m_topology == vk::PrimitiveTopology::eTriangleStrip) ||
+    (m_topology == vk::PrimitiveTopology::eTriangleFan) ||
+    (m_topology == vk::PrimitiveTopology::eLineStripWithAdjacency) ||
+    (m_topology == vk::PrimitiveTopology::eTriangleStripWithAdjacency);
+#else
+    false;
+#endif
+
+  vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = m_topology,
+                                                         .primitiveRestartEnable =
+                                                           static_cast<vk::Bool32>(primitiveRestartEnable)};
 
   vk::PipelineViewportStateCreateInfo viewportState{.viewportCount = 1,
                                                     .pViewports = nullptr,

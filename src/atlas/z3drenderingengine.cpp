@@ -2345,9 +2345,27 @@ void Z3DRenderingEngine::maybeStartVulkanCompletionPolling()
 
 void Z3DRenderingEngine::stopVulkanCompletionPolling()
 {
-  if (m_vkCompletionPollTimer && m_vkCompletionPollTimer->isActive()) {
-    m_vkCompletionPollTimer->stop();
+  if (!m_vkCompletionPollTimer) {
+    return;
   }
+
+  // QTimer::stop() (QBasicTimer) must be called from the timer's owning thread.
+  // In rare teardown/cancellation sequences we may attempt to stop polling from
+  // a different thread, which causes:
+  //   "QBasicTimer::stop: Failed. Possibly trying to stop from a different thread"
+  QTimer* timer = m_vkCompletionPollTimer;
+  auto stopIfActive = [timer]() {
+    if (timer->isActive()) {
+      timer->stop();
+    }
+  };
+
+  if (QThread::currentThread() == timer->thread()) {
+    stopIfActive();
+    return;
+  }
+
+  QMetaObject::invokeMethod(timer, std::move(stopIfActive), Qt::QueuedConnection);
 }
 
 bool Z3DRenderingEngine::shouldDeferVulkanNetworkProcessing() const
