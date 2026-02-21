@@ -106,10 +106,13 @@ enum class TransparencyMode
   Unknown = 5
 };
 
-enum class GeometryMSAAMode
+// Anti-aliasing mode for geometry edges.
+// Current implementation uses supersampling (rendering at higher resolution and
+// resolving down) rather than hardware MSAA.
+enum class GeometryAAMode
 {
   None,
-  MSAA2x2
+  Supersample2x2
 };
 
 enum class FogMode
@@ -163,7 +166,7 @@ struct RendererSceneState
   float weightedBlendedDepthScale = 1.f;
   float devicePixelRatio = 1.f;
   TransparencyMode transparency = TransparencyMode::WeightedAverage;
-  GeometryMSAAMode multisample = GeometryMSAAMode::MSAA2x2;
+  GeometryAAMode geometryAAMode = GeometryAAMode::Supersample2x2;
 
   struct FogState
   {

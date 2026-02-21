@@ -843,7 +843,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
   std::vector<Z3DBoundedFilter*> showHandleFilters;
 
   const auto transparencyMode = m_rendererBase.sceneState().transparency;
-  const bool multisample2x2 = (m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2);
+  const bool supersample2x2 = (m_rendererBase.sceneState().geometryAAMode == GeometryAAMode::Supersample2x2);
   for (auto vFilter : vFilters) {
     if (vFilter->isReady(eye) && vFilter->hasOpaque(eye)) {
       normalOpaqueFilters.push_back(vFilter);
@@ -981,7 +981,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
         // Acquire temp for geometry-only path (optionally twice the size)
         Z3DScratchResourcePool::RenderTargetLease temp1Lease =
           Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(
-            multisample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
+            supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
         // VLOG(1) << "lease acquired";
 
         if (numOnTopFilters == 0) {
@@ -1012,7 +1012,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
 
         currentOutRenderTarget.release();
       } else {
-        auto tempSize = multisample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
+        auto tempSize = supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
         Z3DScratchResourcePool::RenderTargetLease temp1Lease =
           Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
         // VLOG(1) << "lease acquired";
@@ -1081,7 +1081,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
                  numOnTopFilters == 0) { // render geometries into one temp port then blend with volume
         Z3DScratchResourcePool::RenderTargetLease tempGeoLease =
           Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(
-            multisample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
+            supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
         // VLOG(1) << "lease acquired";
 
         // render geometries into one temp port
@@ -1129,7 +1129,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
       } else { // render normal geometries into tempport, then blend inport and tempport into tempport2, then render on
                // top geometries into tempport, then
         // blend into out
-        auto tempSize2 = multisample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
+        auto tempSize2 = supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
         Z3DScratchResourcePool::RenderTargetLease temp1LeaseA =
           Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize2);
         // VLOG(1) << "lease acquired";
@@ -1194,7 +1194,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
     if (numNormalFilters == 0 || numOnTopFilters == 0) {
       Z3DScratchResourcePool::RenderTargetLease temp1Lease =
         Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(
-          multisample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
+          supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
       // VLOG(1) << "lease acquired";
 
       if (numOnTopFilters == 0) {
@@ -1225,7 +1225,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
 
       currentOutRenderTarget.release();
     } else {
-      auto tempSize = multisample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
+      auto tempSize = supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
       Z3DScratchResourcePool::RenderTargetLease temp1Lease2 =
         Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
       // VLOG(1) << "lease acquired";
@@ -1560,7 +1560,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   // (background, geometry, OIT) covers the full attachment extent. Otherwise
   // only the lower-left quarter of the supersampled target would be written
   // and the final resolve would appear scaled down in the corner.
-  const bool supersample2x2 = (m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2);
+  const bool supersample2x2 = (m_rendererBase.sceneState().geometryAAMode == GeometryAAMode::Supersample2x2);
   const glm::uvec4 prevViewport = m_rendererBase.frameState().viewport;
 
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();

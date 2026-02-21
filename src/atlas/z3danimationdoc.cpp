@@ -500,7 +500,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::removeKey(size_t animationId,
     return out;
   }
 
-  auto* pa = anim->parameterAnimationForBoundId(targetId, jsonKeyTrim);
+  ZParameterAnimation* pa = anim->parameterAnimationForBoundId(targetId, jsonKeyTrim);
   if (!pa) {
     out.ok = false;
     out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
@@ -609,7 +609,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size
     return out;
   }
 
-  auto* pa = anim->parameterAnimationForBoundId(targetId, jsonKeyTrim);
+  ZParameterAnimation* pa = anim->parameterAnimationForBoundId(targetId, jsonKeyTrim);
   if (!pa) {
     // Preserve existing RPC behavior: clearing a missing track is a benign no-op.
     out.ok = true;
@@ -677,7 +677,7 @@ Z3DAnimationDoc::ListKeysResult Z3DAnimationDoc::listKeys(size_t animationId,
   }
 
   const QString jsonKeyTrim = jsonKey.trimmed();
-  auto* pa = anim->parameterAnimationForBoundId(targetId, jsonKeyTrim);
+  ZParameterAnimation* pa = anim->parameterAnimationForBoundId(targetId, jsonKeyTrim);
   if (!pa) {
     // Missing tracks are treated as empty (benign) to simplify client logic.
     out.ok = true;

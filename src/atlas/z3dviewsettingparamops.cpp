@@ -21,6 +21,8 @@ ZParameter* Z3DViewSettingParamOps::findTargetParam(const std::vector<ZParameter
     return nullptr;
   }
   for (auto* p : params) {
+    // RPC callers must use the canonical current jsonKey(). Legacy names are
+    // supported only for file deserialization (scene/animation load).
     if (p && p->jsonKey() == jsonKey) {
       return p;
     }

@@ -11,7 +11,7 @@ namespace nim {
 
 Z3DGlobalParameters::Z3DGlobalParameters()
   : renderBackend("Render Backend")
-  , geometriesMultisampleMode("Multisample Anti-Aliasing")
+  , geometriesAAMode("Anti-Aliasing")
   , transparencyMethod("Transparency")
   , weightedBlendedDepthScale("Weighted Blended Depth Scale", 1.f, 1e-3f, 1e3f)
   , lightCount("Light Count", 5, 1, 5)
@@ -38,14 +38,15 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     QStringLiteral("Rendering backend selection. OpenGL is the primary path today; Vulkan is experimental."));
   // addParameter(renderBackend);
 
-  geometriesMultisampleMode.clearOptions();
-  geometriesMultisampleMode.addOptionsWithData(
-    std::make_pair(QStringLiteral("None"), static_cast<int>(GeometryMSAAMode::None)),
-    std::make_pair(QStringLiteral("2x2"), static_cast<int>(GeometryMSAAMode::MSAA2x2)));
-  geometriesMultisampleMode.select(QStringLiteral("2x2"));
-  geometriesMultisampleMode.setDescription(QStringLiteral(
+  geometriesAAMode.addLegacyName(QStringLiteral("Multisample Anti-Aliasing"));
+  geometriesAAMode.clearOptions();
+  geometriesAAMode.addOptionsWithData(
+    std::make_pair(QStringLiteral("None"), static_cast<int>(GeometryAAMode::None)),
+    std::make_pair(QStringLiteral("2x2"), static_cast<int>(GeometryAAMode::Supersample2x2)));
+  geometriesAAMode.select(QStringLiteral("2x2"));
+  geometriesAAMode.setDescription(QStringLiteral(
     "Geometry supersampling for crisper edges. '2x2' improves quality at higher cost; 'None' is faster."));
-  addParameter(geometriesMultisampleMode);
+  addParameter(geometriesAAMode);
 
   transparencyMethod.clearOptions();
   transparencyMethod.addOptionsWithData(
@@ -126,7 +127,7 @@ Z3DGlobalParameters::Z3DGlobalParameters()
           &ZStringIntOptionParameter::valueChanged,
           this,
           &Z3DGlobalParameters::markGlobalSceneStateDirty);
-  connect(&geometriesMultisampleMode,
+  connect(&geometriesAAMode,
           &ZStringIntOptionParameter::valueChanged,
           this,
           &Z3DGlobalParameters::markGlobalSceneStateDirty);
@@ -355,17 +356,17 @@ void Z3DGlobalParameters::setDevicePixelRatio(float f)
   if (f != devicePixelRatio.get()) {
     devicePixelRatio.set(f);
     pickingManager.setDevicePixelRatio(f);
-    // Auto-tune geometry multisample mode based on display DPI.
+    // Auto-tune geometry anti-aliasing mode based on display DPI.
     // - On high-DPI (Retina) screens (DPR >= 2), disable 2x2 supersample to avoid redundant cost.
     // - On standard-DPI screens (DPR < 2), prefer 2x2 supersample for crisper edges when enabled.
-    const auto current = static_cast<GeometryMSAAMode>(geometriesMultisampleMode.associatedData());
+    const auto current = static_cast<GeometryAAMode>(geometriesAAMode.associatedData());
     if (f >= 2.0f) {
-      if (current != GeometryMSAAMode::None) {
-        geometriesMultisampleMode.select(QStringLiteral("None"));
+      if (current != GeometryAAMode::None) {
+        geometriesAAMode.select(QStringLiteral("None"));
       }
     } else { // f < 2.0f
-      if (current == GeometryMSAAMode::None) {
-        geometriesMultisampleMode.select(QStringLiteral("2x2"));
+      if (current == GeometryAAMode::None) {
+        geometriesAAMode.select(QStringLiteral("2x2"));
       }
     }
   }

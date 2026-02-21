@@ -52,7 +52,7 @@ RendererSceneState buildSceneState(const Z3DGlobalParameters& params)
     transparency = TransparencyMode::DualDepthPeeling;
   }
   state.transparency = transparency;
-  state.multisample = static_cast<GeometryMSAAMode>(params.geometriesMultisampleMode.associatedData());
+  state.geometryAAMode = static_cast<GeometryAAMode>(params.geometriesAAMode.associatedData());
 
   state.lighting = buildLightingState(params);
 

@@ -464,7 +464,7 @@ LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
   payload.screenAligned = m_screenAligned;
   payload.roundCap = m_roundCap;
   payload.isLineStrip = m_isLineStrip;
-  payload.enableMultisample = m_enableMultisample;
+  payload.followSupersampling = m_followSupersampling;
   payload.srcLineWidth = m_srcLineWidth;
   payload.resolvedLineWidth = m_lineWidth;
   payload.pickingPass = picking;

@@ -15,6 +15,15 @@ ZParameter::ZParameter(QString name, QObject* parent)
   addStyle("DEFAULT");
 }
 
+void ZParameter::addLegacyName(const QString& legacyName)
+{
+  const QString trimmed = legacyName.trimmed();
+  if (trimmed.isEmpty() || trimmed == m_name || m_legacyNames.contains(trimmed)) {
+    return;
+  }
+  m_legacyNames.push_back(trimmed);
+}
+
 void ZParameter::setName(const QString& name)
 {
   if (name != m_name) {
@@ -91,13 +100,48 @@ QString ZParameter::jsonKey() const
   return m_name + QString(" ") + type();
 }
 
+bool ZParameter::matchesJsonKey(const QString& requestedJsonKey) const
+{
+  const QString key = requestedJsonKey.trimmed();
+  if (key.isEmpty()) {
+    return false;
+  }
+  if (key == jsonKey()) {
+    return true;
+  }
+  if (m_legacyNames.empty()) {
+    return false;
+  }
+  const QString suffix = QString(" ") + type();
+  for (const auto& legacyName : m_legacyNames) {
+    if (key == legacyName + suffix) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void ZParameter::read(const json::object& json)
 {
-  if (json.contains(jsonKey().toStdString())) {
-    readValue(json.at(jsonKey().toStdString()));
-  } else {
-    LOG(WARNING) << "Parameter <" << jsonKey() << "> not found.";
+  const std::string curKey = jsonKey().toStdString();
+  if (auto it = json.find(curKey); it != json.end()) {
+    readValue(it->value());
+    return;
   }
+
+  if (!m_legacyNames.empty()) {
+    const QString suffix = QString(" ") + type();
+    for (const auto& legacyName : m_legacyNames) {
+      const QString legacyKeyQt = legacyName + suffix;
+      const std::string legacyKey = legacyKeyQt.toStdString();
+      if (auto it = json.find(legacyKey); it != json.end()) {
+        readValue(it->value());
+        return;
+      }
+    }
+  }
+
+  LOG(WARNING) << "Parameter <" << QString::fromStdString(curKey) << "> not found.";
 }
 
 void ZParameter::write(json::object& json) const
@@ -109,6 +153,7 @@ void ZParameter::setSameAs(const ZParameter& rhs)
 {
   m_allStyles = rhs.m_allStyles;
   setName(rhs.m_name);
+  m_legacyNames = rhs.m_legacyNames;
   m_description = rhs.m_description;
   setStyle(rhs.m_style);
   setEnabled(rhs.m_isWidgetsEnabled);

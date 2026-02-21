@@ -78,7 +78,7 @@ private:
 
 public:
   ZStringIntOptionParameter renderBackend;
-  ZStringIntOptionParameter geometriesMultisampleMode;
+  ZStringIntOptionParameter geometriesAAMode;
   ZStringIntOptionParameter transparencyMethod;
   ZFloatParameter weightedBlendedDepthScale;
   ZIntParameter lightCount;

@@ -35,6 +35,15 @@ public:
 
   void setName(const QString& name);
 
+  // Backward-compatibility helper: accept legacy parameter names in serialized
+  // JSON and external callers that address parameters by `jsonKey()`.
+  //
+  // NOTE: `jsonKey()` is derived from (name + type). When a parameter is renamed
+  // for UI clarity, older scene/animation files (and automation scripts) may
+  // still reference the previous name. Register old names here so `read()` and
+  // lookup helpers can still resolve them.
+  void addLegacyName(const QString& legacyName);
+
   [[nodiscard]] QString type() const;
 
   // Optional human-readable description for tooling/LLMs/UIs
@@ -71,6 +80,10 @@ public:
   }
 
   [[nodiscard]] QString jsonKey() const;
+
+  // True when `requestedJsonKey` equals either the current `jsonKey()` or one of
+  // the legacy jsonKeys derived from `addLegacyName()`.
+  [[nodiscard]] bool matchesJsonKey(const QString& requestedJsonKey) const;
 
   [[nodiscard]] virtual json::value jsonValue() const = 0;
 
@@ -165,6 +178,7 @@ protected:
   QString m_description;
   QString m_style{"DEFAULT"};
   QStringList m_allStyles;
+  QStringList m_legacyNames;
 
   // std::set<QWidget*> m_widgets;
   bool m_isWidgetsEnabled = true;

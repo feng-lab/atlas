@@ -55,9 +55,12 @@ public:
     updateLineWidth();
   }
 
-  void setEnableMultisample(bool v)
+  // When the global geometry anti-aliasing mode is supersampling (2x2), this
+  // flag controls whether line width is compensated to preserve apparent
+  // thickness after the resolve/downsample step.
+  void setFollowSupersampling(bool v)
   {
-    m_enableMultisample = v;
+    m_followSupersampling = v;
     updateLineWidth();
   }
 
@@ -93,7 +96,7 @@ protected:
 private:
   void updateLineWidth()
   {
-    if (m_enableMultisample && m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2) {
+    if (m_followSupersampling && m_rendererBase.sceneState().geometryAAMode == GeometryAAMode::Supersample2x2) {
       m_lineWidth = (m_srcLineWidth - 0.9f) * 2.f;
     } else {
       m_lineWidth = m_srcLineWidth - 0.9f;
@@ -130,7 +133,7 @@ protected:
   bool m_useSmoothLine = true;
   float m_srcLineWidth = 1.f;
   float m_lineWidth = 1.f;
-  bool m_enableMultisample = true;
+  bool m_followSupersampling = true;
   std::vector<float> m_lineWidthArray;
 
   Z3DTexture* m_texture = nullptr;

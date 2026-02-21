@@ -60,7 +60,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_leftMouseButtonPressEvent("Left Mouse Button Pressed", false)
   , m_contextMenuEvent("Context Menu", false)
 {
-  m_baseBoundBoxRenderer.setEnableMultisample(false);
+  m_baseBoundBoxRenderer.setFollowSupersampling(false);
   m_textureCopyRenderer.setDiscardTransparent(true);
 
   updateRaycasterSamplingRate();

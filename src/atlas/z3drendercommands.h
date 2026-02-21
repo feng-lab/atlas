@@ -539,7 +539,7 @@ struct LinePayload
   bool screenAligned = false;
   bool roundCap = true;
   bool isLineStrip = false;
-  bool enableMultisample = false;
+  bool followSupersampling = false;
 
   float srcLineWidth = 1.0f;
   float resolvedLineWidth = 1.0f;

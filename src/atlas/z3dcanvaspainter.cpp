@@ -86,7 +86,7 @@ void Z3DCanvasPainter::syncRendererState(const glm::uvec2& size)
   m_sceneState.weightedBlendedDepthScale = 1.f;
   m_sceneState.devicePixelRatio = static_cast<float>(m_canvas.devicePixelRatioF());
   m_sceneState.transparency = TransparencyMode::BlendDelayed;
-  m_sceneState.multisample = GeometryMSAAMode::None;
+  m_sceneState.geometryAAMode = GeometryAAMode::None;
   m_sceneState.lighting.lightCount = 0;
   m_sceneState.fog.mode = FogMode::None;
 }

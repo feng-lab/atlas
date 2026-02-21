@@ -1723,8 +1723,8 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
 
       const auto widths = payload.perSegmentWidths;
       const float dpr = renderer.sceneState().devicePixelRatio;
-      const bool msaa2x2 =
-        (renderer.sceneState().multisample == GeometryMSAAMode::MSAA2x2) && payload.enableMultisample;
+      const bool supersample2x2 =
+        (renderer.sceneState().geometryAAMode == GeometryAAMode::Supersample2x2) && payload.followSupersampling;
       const float sizeScale = pc.size_scale;
       const bool ddpPeelIndirect =
         (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
@@ -1739,10 +1739,10 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       }
       if (!widths.empty()) {
         VLOG(1) << fmt::format(
-          "VK wide line: segments={} dpr={:.3f} msaa2x2={} sizeScale={:.3f} resolvedLineWidth={:.3f}",
+          "VK wide line: segments={} dpr={:.3f} supersample2x2={} sizeScale={:.3f} resolvedLineWidth={:.3f}",
           m_wideUploadIndexCount / 6u,
           dpr,
-          msaa2x2,
+          supersample2x2,
           sizeScale,
           payload.resolvedLineWidth);
         const uint32_t segmentCount = m_wideUploadIndexCount / 6u;

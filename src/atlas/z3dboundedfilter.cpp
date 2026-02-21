@@ -212,7 +212,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_selectionBoundBoxRenderer.setFollowCoordTransform(false);
   m_selectionBoundBoxRenderer.setFollowSizeScale(false);
   m_selectionBoundBoxRenderer.setFollowOpacity(false);
-  m_selectionBoundBoxRenderer.setEnableMultisample(false);
+  m_selectionBoundBoxRenderer.setFollowSupersampling(false);
   m_selectionBoundBoxRenderer.setLineWidth(m_selectionLineWidth.get());
   connect(&m_selectionLineWidth,
           &ZIntParameter::valueChanged,

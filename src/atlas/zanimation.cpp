@@ -1150,22 +1150,35 @@ void ZAnimation::releaseParameters()
 bool ZAnimation::bind(std::vector<std::unique_ptr<ZParameterAnimation>>& paraAnimationList,
                       const std::vector<ZParameter*>& paraList)
 {
-  bool sorted = false;
+  bool changed = false;
   size_t foundNum = 0;
   for (auto para : paraList) {
+    if (!para) {
+      continue;
+    }
     for (size_t j = 0; j < paraAnimationList.size(); ++j) {
-      if (para->name() == paraAnimationList[j]->name() && para->type() == paraAnimationList[j]->type()) {
+      if (!paraAnimationList[j]) {
+        continue;
+      }
+      const QString trackJsonKey = paraAnimationList[j]->jsonKey();
+      if (para->matchesJsonKey(trackJsonKey)) {
         paraAnimationList[j]->bindParameter(*para);
+        if (paraAnimationList[j]->name() != para->name()) {
+          // Migrate legacy parameter names to the canonical current name so
+          // the UI and subsequent saves use the updated key.
+          paraAnimationList[j]->setName(para->name());
+          changed = true;
+        }
         if (j != foundNum) {
           std::swap(paraAnimationList[j], paraAnimationList[foundNum]);
-          sorted = true;
+          changed = true;
         }
         foundNum++;
         break;
       }
     }
   }
-  return sorted;
+  return changed;
 }
 
 void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
@@ -1366,7 +1379,7 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
           // NOTE: Loading remains backward-compatible: existing .animation3d
           // files that contain this track will still be parsed and can still
           // drive backend switches during playback. We only omit it on write.
-          if (pa && pa->jsonKey() == QStringLiteral("Render Backend ZStringIntOption")) {
+          if (pa && pa->jsonKey() == QStringLiteral("Render Backend StringIntOption")) {
             continue;
           }
           pa->write(jObj);
