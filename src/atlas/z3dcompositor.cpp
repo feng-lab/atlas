@@ -5619,31 +5619,48 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye,
 
 void Z3DCompositor::renderAxis(Z3DEye eye)
 {
+  ensureAxisCameraBackend(RenderBackend::OpenGL);
   prepareAxisData(eye);
   {
     const glm::mat4 axisTransform = glm::mat4(m_globalParameters.camera.get().rotateMatrix(eye));
-    const glm::uvec4& vp = viewport();
-
-    if (m_region[0] <= 0.f && m_region[2] <= 0.f) {
-      double startX = vp.x + vp.z / m_region[1] * m_region[0];
-      double startY = vp.y + vp.w / m_region[3] * m_region[2];
-
-      GLsizei size = std::min(vp.z, vp.w) * m_axisRegionRatio.get();
-      glViewport(vp.x - std::floor(startX), vp.y - std::floor(startY), size, size);
-      glScissor(vp.x - std::floor(startX), vp.y - std::floor(startY), size, size);
-      glEnable(GL_SCISSOR_TEST);
-      glClear(GL_DEPTH_BUFFER_BIT);
-
-      if (m_axisMode.get() == "Arrow") {
-        renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_arrowRenderer, m_fontRenderer);
-      } else {
-        renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_lineRenderer, m_fontRenderer);
-      }
-
-      glViewport(vp.x, vp.y, vp.z, vp.w);
-      glScissor(vp.x, vp.y, vp.z, vp.w);
-      glDisable(GL_SCISSOR_TEST);
+    const glm::uvec4 baseViewport = viewport();
+    const glm::uvec4 axisViewport = axisViewportFor(baseViewport);
+    if (axisViewport.z == 0u || axisViewport.w == 0u) {
+      return;
     }
+
+    const glm::uvec4 previousViewport = m_rendererBase.frameState().viewport;
+    auto viewportGuard = folly::makeGuard([&]() {
+      m_rendererBase.frameState().updateViewportData(previousViewport);
+    });
+    m_rendererBase.frameState().updateViewportData(axisViewport);
+
+    glViewport(static_cast<GLint>(axisViewport.x),
+               static_cast<GLint>(axisViewport.y),
+               static_cast<GLsizei>(axisViewport.z),
+               static_cast<GLsizei>(axisViewport.w));
+    glScissor(static_cast<GLint>(axisViewport.x),
+              static_cast<GLint>(axisViewport.y),
+              static_cast<GLsizei>(axisViewport.z),
+              static_cast<GLsizei>(axisViewport.w));
+    glEnable(GL_SCISSOR_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    if (m_axisMode.get() == "Arrow") {
+      renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_arrowRenderer, m_fontRenderer);
+    } else {
+      renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_lineRenderer, m_fontRenderer);
+    }
+
+    glViewport(static_cast<GLint>(baseViewport.x),
+               static_cast<GLint>(baseViewport.y),
+               static_cast<GLsizei>(baseViewport.z),
+               static_cast<GLsizei>(baseViewport.w));
+    glScissor(static_cast<GLint>(baseViewport.x),
+              static_cast<GLint>(baseViewport.y),
+              static_cast<GLsizei>(baseViewport.z),
+              static_cast<GLsizei>(baseViewport.w));
+    glDisable(GL_SCISSOR_TEST);
   }
 }
 
@@ -5729,6 +5746,10 @@ void Z3DCompositor::setupAxisCamera()
   m_lineRenderer.setData(std::move(m_lines));
   m_lineRenderer.setDataColors(std::move(m_lineColors));
   m_lineRenderer.setLineWidth(6.f);
+  // Axis overlay is an output-sized (post-resolve) UI element even when the
+  // main scene uses supersampling. Do not apply supersampling width
+  // compensation here, otherwise the lines appear too thick in 2x2 mode.
+  m_lineRenderer.setFollowSupersampling(false);
   m_arrowRenderer.setArrowData(&m_tailPosAndTailRadius, &m_headPosAndHeadRadius, .1f);
   m_arrowRenderer.setArrowColors(&m_textColors);
   m_fontRenderer.setDataColors(&m_textColors);
