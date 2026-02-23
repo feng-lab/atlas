@@ -1345,3 +1345,4 @@ endif (WIN32)
 
 # The app consumes the static library (keeps link dependencies centralized).
 target_link_libraries(${APP_NAME} PUBLIC atlas_lib)
+target_link_libraries(${APP_NAME} PRIVATE neutube)

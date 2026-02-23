@@ -12,6 +12,7 @@
 
 #include "zrunexport3danimation.h"
 #include "zrunneutucommand.h"
+#include "zrunneutucommand2.h"
 #include "zrundumpanimation3dschema.h"
 #include "zwindowsheader.h"
 
@@ -122,18 +123,23 @@ int main(int argc, char* argv[])
 #endif
   QCoreApplication::setApplicationName("Atlas");
 
-  if (argc > 1 && strcmp(argv[1], "--command") == 0) {
+  if (argc > 1 && (strcmp(argv[1], "--command") == 0 || strcmp(argv[1], "--command2") == 0)) {
     ZLogInit::instance("Atlas"s);
 
     LOG(INFO) << "Version: " << GIT_VERSION;
 
-    ZApplication app(argc, argv);
+    // CLI mode: prefer a Core-only application to allow headless execution on servers/CI.
+    // (QApplication requires a platform plugin and can abort in environments without a GUI.)
+    QCoreApplication app(argc, argv);
 
     ZImgInit::instance(ZSystemInfo::resourcesDirPath(),
                        ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
                        ZSystemInfo::jarsDirPath(),
                        true);
 
+    if (strcmp(argv[1], "--command2") == 0) {
+      return ZRunNeuTuCommand2().run(argc, argv, ZSystemInfo::jsonDirPath().toUtf8().toStdString());
+    }
     return ZRunNeuTuCommand().run(argc, argv);
   }
 

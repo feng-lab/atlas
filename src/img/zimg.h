@@ -1971,13 +1971,16 @@ public:
 
   [[nodiscard]] double sum() const;
 
-#ifdef _NEUTUBE_
-  // only for interface with zstack
+  // Transfer ownership of a timepoint's raw voxel buffer to an external owner.
+  //
+  // This is intended for bridging adapters (e.g. neutube) that must feed legacy, buffer-owning types such as ZStack.
+  // After calling, the released pointer will no longer be freed by this ZImg instance.
   void releaseTimeData(size_t t)
   {
+    CHECK(m_ownData);
+    CHECK(t < m_data.size());
     m_data[t] = nullptr;
   }
-#endif
 
 protected:
   // remove old data and allocate data space based on current info

@@ -112,6 +112,7 @@ export(TARGETS img FILE "${CMAKE_BINARY_DIR}/AtlasImgTargets.cmake")
 
 add_subdirectory(src/neurolabi/gui)
 # add_subdirectory(src/matlab)
+add_subdirectory(src/neutube)
 add_subdirectory(src/atlas)
 
 option(BUILD_TESTING "Enable tests" ON)

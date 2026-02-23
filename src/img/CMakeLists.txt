@@ -92,7 +92,6 @@ set(IMG_SOURCES
         zimgpng.h zimgpng.cpp
         zimgregion.h zimgregion.cpp
         zimgsliceprovider.h zimgsliceprovider.cpp
-        # zimgstackinterface.h
         zimgtiff.h zimgtiff.cpp
         zimgv3draw.h zimgv3draw.cpp
 	        zimgzeissczi.h zimgzeissczi.cpp
@@ -112,7 +111,6 @@ set(IMG_SOURCES
         zimgneighborhoodwithptriterator.h
         zlog.h zlog.cpp
         zwindowsheader.h
-        # zimgstackinterface.cpp
         zflags.h
         zimghdf5.cpp zimghdf5.h
         zhdf5globallock.cpp zhdf5globallock.h

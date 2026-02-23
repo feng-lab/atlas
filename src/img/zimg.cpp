@@ -2111,7 +2111,9 @@ void ZImg::clearData()
   }
 
   for (auto d : m_data) {
-    boost::alignment::aligned_free(d);
+    if (d != nullptr) {
+      boost::alignment::aligned_free(d);
+    }
   }
   m_data.clear();
 }
