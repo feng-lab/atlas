@@ -137,10 +137,11 @@ int main(int argc, char* argv[])
                        ZSystemInfo::jarsDirPath(),
                        true);
 
+    const std::string jsonDirPath = ZSystemInfo::jsonDirPath().toUtf8().toStdString();
     if (strcmp(argv[1], "--command2") == 0) {
-      return ZRunNeuTuCommand2().run(argc, argv, ZSystemInfo::jsonDirPath().toUtf8().toStdString());
+      return ZRunNeuTuCommand2().run(argc, argv, jsonDirPath);
     }
-    return ZRunNeuTuCommand().run(argc, argv);
+    return ZRunNeuTuCommand().run(argc, argv, jsonDirPath);
   }
 
   QSurfaceFormat format;

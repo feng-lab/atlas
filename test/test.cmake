@@ -92,6 +92,8 @@ add_gtest_executable(zstructutilstest)
 add_gtest_executable(zenumtest)
 add_gtest_executable(zstringutilstest)
 add_gtest_executable(ztupleliketest)
+add_gtest_executable(zneutubecommand2paritytest)
+target_link_libraries(zneutubecommand2paritytest neutube neutu)
 
 # Atlas-side tests
 
@@ -108,8 +110,6 @@ endif ()
 add_atlas_vulkan_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_core_gtest_executable(zneuroglanceruint64shardingtest)
 add_atlas_core_gtest_executable(zneuroglancerstatetest)
-add_atlas_core_gtest_executable(zneutubecommand2paritytest)
-target_link_libraries(zneutubecommand2paritytest PRIVATE neutube)
 
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
 # the large atlas_lib link cost multiple times. This currently includes:

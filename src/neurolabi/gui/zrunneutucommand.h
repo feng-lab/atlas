@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 class ZSwcTree;
@@ -26,6 +27,7 @@ public:
   };
 
   int run(int argc, char* argv[]);
+  int run(int argc, char* argv[], std::string_view jsonDirPath);
 
 private:
   static ECommand getCommand(const char* cmd);

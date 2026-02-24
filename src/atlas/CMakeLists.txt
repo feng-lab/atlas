@@ -185,6 +185,8 @@ print_target_properties(neurolabi NO_LOCATION)
 
 print_target_properties(neutu NO_LOCATION)
 
+print_target_properties(neutube NO_LOCATION)
+
 if (UNIX AND NOT APPLE)
   find_package(OpenGL REQUIRED COMPONENTS OpenGL EGL)
   print_target_properties(OpenGL::OpenGL)
@@ -725,7 +727,6 @@ set(SOURCES
     zcheckbox.cpp zcheckbox.h
     zrunexport3danimation.cpp zrunexport3danimation.h
     zrundumpanimation3dschema.cpp zrundumpanimation3dschema.h
-    zrunneutucommand.cpp zrunneutucommand.h
     zprocess.cpp zprocess.h
     zvulkan.h
     zvulkancontext.h
@@ -859,7 +860,7 @@ if (MSVC)
     ATLAS_ENABLE_CUSTOM_COMMAND=$<BOOL:${ATLAS_ENABLE_CUSTOM_COMMAND}>)
 
   target_link_libraries(atlas_core_deps INTERFACE
-    img neutu
+    img
     glbinding::glbinding-aux glbinding::glbinding
     ${OpenCV_LIBS}
     gflags::gflags
@@ -960,7 +961,7 @@ else ()
     ATLAS_ENABLE_CUSTOM_COMMAND=$<BOOL:${ATLAS_ENABLE_CUSTOM_COMMAND}>)
 
   target_link_libraries(atlas_core PUBLIC
-    img neutu
+    img
     glbinding::glbinding-aux glbinding::glbinding
     ${OpenCV_LIBS}
     gflags::gflags

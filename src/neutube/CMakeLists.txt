@@ -9,12 +9,18 @@ set(NEUTUBE_SOURCES
     zimgstackinterface.cpp zimgstackinterface.h
     zneutubedarrayqsort.cpp zneutubedarrayqsort.h
     zneutubedarraymath.cpp zneutubedarraymath.h
+    zneutubecontfun.h
+    zneutube3dgeom.cpp zneutube3dgeom.h
     zneutubecompareswc.cpp zneutubecompareswc.h
+    zneutubegeo3dpointarray.cpp zneutubegeo3dpointarray.h
     zneutubegeo3dscalarfield.cpp zneutubegeo3dscalarfield.h
     zneutubeimgbwmorph.cpp zneutubeimgbwmorph.h
     zneutubeimgsampling.cpp zneutubeimgsampling.h
     zneutubeneighborhood.cpp zneutubeneighborhood.h
+    zneutubeneuroseg.cpp zneutubeneuroseg.h
     zneutubeobjlabel.cpp zneutubeobjlabel.h
+    zneutubeoptimizeutils.cpp zneutubeoptimizeutils.h
+    zneutubeperceptor.cpp zneutubeperceptor.h
     zneutubeplanaredt.cpp zneutubeplanaredt.h
     zneutubespgrow.cpp zneutubespgrow.h
     zneutubespgrowparser.cpp zneutubespgrowparser.h
@@ -36,6 +42,7 @@ set(NEUTUBE_SOURCES
     zneutubeswcwriter.cpp zneutubeswcwriter.h
     zneutubevoxel.h
     zneutubevoxelarray.cpp zneutubevoxelarray.h
+    zneutubelocalneuroseg.cpp zneutubelocalneuroseg.h
     zneutubelegacy.cpp zneutubelegacy.h
     zrunneutucommand2.cpp zrunneutucommand2.h
 )

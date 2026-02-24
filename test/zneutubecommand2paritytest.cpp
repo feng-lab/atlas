@@ -23,18 +23,25 @@
 extern "C" {
 #include "tz_darray.h"
 #include "tz_geo3d_scalar_field.h"
+#include "tz_local_neuroseg.h"
+#include "tz_neuroseg.h"
+#include "tz_perceptor.h"
 #include "tz_stack_neighborhood.h"
 #include "tz_stack_objlabel.h"
 #include "tz_stack_sampling.h"
 #include "tz_trace_utils.h"
+#include "tz_workspace.h"
 }
 
 #include "zneutubecompareswc.h"
 #include "zneutubedarraymath.h"
 #include "zneutubegeo3dscalarfield.h"
 #include "zneutubeimgsampling.h"
+#include "zneutubelocalneuroseg.h"
 #include "zneutubeneighborhood.h"
+#include "zneutubeneuroseg.h"
 #include "zneutubeobjlabel.h"
+#include "zneutubeperceptor.h"
 #include "zneutubetraceworkspace.h"
 #include "zneutubetracerecord.h"
 #include "zneutubestackfitscore.h"
@@ -1035,6 +1042,234 @@ TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
 
   Kill_Stack(stackC);
   Kill_Stack(maskC);
+}
+
+TEST(NeutubeLegacyOptimizer, FitPerceptorMatchesLegacy)
+{
+  auto scoreFunc = +[](const double* var, const void* /*param*/) -> double {
+    const double dx = var[0] - 1.0;
+    const double dy = var[1] - 2.0;
+    return -(dx * dx + dy * dy);
+  };
+
+  auto validate = +[](double* var, const double* varMin, const double* varMax, const void* /*param*/) {
+    for (int i = 0; i < 2; ++i) {
+      if (var[i] < varMin[i]) {
+        var[i] = varMin[i];
+      } else if (var[i] > varMax[i]) {
+        var[i] = varMax[i];
+      }
+    }
+  };
+
+  double varMin[2] = {-10.0, -10.0};
+  double varMax[2] = {10.0, 10.0};
+
+  double delta[2] = {0.5, 0.5};
+  double weight[2] = {0.3, 1.7};
+
+  int varIndex[2] = {0, 1};
+
+  // Legacy C optimizer.
+  double legacyVar[2] = {0.0, 0.0};
+  ::Variable_Set vsC;
+  vsC.var = legacyVar;
+  vsC.var_index = varIndex;
+  vsC.link = nullptr;
+  vsC.nvar = 2;
+
+  ::Continuous_Function cfC;
+  cfC.f = scoreFunc;
+  cfC.v = validate;
+  cfC.var_min = varMin;
+  cfC.var_max = varMax;
+
+  ::Perceptor pC;
+  pC.vs = &vsC;
+  pC.arg = nullptr;
+  pC.s = &cfC;
+  pC.min_gradient = 1e-3;
+  pC.delta = delta;
+  pC.weight = weight;
+
+  const double legacyScore = ::Fit_Perceptor(&pC, nullptr);
+
+  // Ported C++ optimizer.
+  double portedVar[2] = {0.0, 0.0};
+  nim::neutube::VariableSet vsCpp;
+  vsCpp.var = portedVar;
+  vsCpp.varIndex = varIndex;
+  vsCpp.link = nullptr;
+  vsCpp.nvar = 2;
+
+  nim::neutube::ContinuousFunction cfCpp;
+  cfCpp.f = scoreFunc;
+  cfCpp.v = validate;
+  cfCpp.varMin = varMin;
+  cfCpp.varMax = varMax;
+
+  nim::neutube::Perceptor pCpp;
+  pCpp.vs = &vsCpp;
+  pCpp.arg = nullptr;
+  pCpp.s = &cfCpp;
+  pCpp.minGradient = 1e-3;
+  pCpp.delta = delta;
+  pCpp.weight = weight;
+
+  const double portedScore = nim::neutube::fitPerceptorLegacyLike(&pCpp, nullptr);
+
+  EXPECT_DOUBLE_EQ(portedScore, legacyScore);
+  EXPECT_DOUBLE_EQ(portedVar[0], legacyVar[0]);
+  EXPECT_DOUBLE_EQ(portedVar[1], legacyVar[1]);
+}
+
+TEST(NeutubeLegacyNeuroseg, FieldSFastMatchesLegacy)
+{
+  struct Case
+  {
+    double r1;
+    double c;
+    double h;
+    double theta;
+    double psi;
+    double curvature;
+    double alpha;
+    double scale;
+  };
+
+  const std::vector<Case> cases = {
+    {3.0, 0.0, 11.0, TZ_PI_4, 0.0, 0.0, 0.0, 1.0},
+    {2.5, 0.1, 7.0,  0.3,     1.1, 0.5, 0.2, 1.3},
+  };
+
+  for (const auto& c : cases) {
+    ::Neuroseg segC;
+    ::Set_Neuroseg(&segC, c.r1, c.c, c.h, c.theta, c.psi, c.curvature, c.alpha, c.scale);
+
+    ::Geo3d_Scalar_Field* fieldC = ::Neuroseg_Field_S_Fast(&segC, nullptr, nullptr);
+    ASSERT_NE(fieldC, nullptr);
+
+    nim::neutube::Neuroseg segCpp;
+    segCpp.r1 = c.r1;
+    segCpp.c = c.c;
+    segCpp.h = c.h;
+    segCpp.theta = c.theta;
+    segCpp.psi = c.psi;
+    segCpp.curvature = c.curvature;
+    segCpp.alpha = c.alpha;
+    segCpp.scale = c.scale;
+
+    const nim::neutube::Geo3dScalarField fieldCpp = nim::neutube::neurosegFieldSFastLegacyLike(segCpp, nullptr);
+
+    ASSERT_EQ(fieldCpp.points.size(), static_cast<size_t>(fieldC->size));
+    ASSERT_EQ(fieldCpp.values.size(), fieldCpp.points.size());
+
+    for (size_t i = 0; i < fieldCpp.points.size(); ++i) {
+      EXPECT_DOUBLE_EQ(fieldCpp.points[i][0], fieldC->points[i][0]) << "i=" << i;
+      EXPECT_DOUBLE_EQ(fieldCpp.points[i][1], fieldC->points[i][1]) << "i=" << i;
+      EXPECT_DOUBLE_EQ(fieldCpp.points[i][2], fieldC->points[i][2]) << "i=" << i;
+      EXPECT_DOUBLE_EQ(fieldCpp.values[i], fieldC->values[i]) << "i=" << i;
+    }
+
+    ::Kill_Geo3d_Scalar_Field(fieldC);
+  }
+}
+
+TEST(NeutubeLegacyLocalNeuroseg, FitWMatchesLegacy)
+{
+  constexpr int width = 48;
+  constexpr int height = 48;
+  constexpr int depth = 48;
+  constexpr double zScale = 1.0;
+
+  nim::ZImgInfo info(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg img(info);
+
+  const size_t voxelNumber = img.voxelNumber();
+  std::memset(img.timeData<uint8_t>(0), 0, voxelNumber);
+
+  const int cx = width / 2;
+  const int cy = height / 2;
+  const int cz = depth / 2;
+  for (int z = 0; z < depth; ++z) {
+    *img.data<uint8_t>(static_cast<size_t>(cx), static_cast<size_t>(cy), static_cast<size_t>(z)) = 255;
+  }
+
+  // Legacy C stack.
+  Stack* stackC = Make_Stack(GREY, width, height, depth);
+  ASSERT_NE(stackC, nullptr);
+  std::memcpy(stackC->array, img.timeData<uint8_t>(0), voxelNumber);
+
+  // Legacy C locseg + fit.
+  Local_Neuroseg* locsegC = New_Local_Neuroseg();
+  ASSERT_NE(locsegC, nullptr);
+  Set_Local_Neuroseg(locsegC,
+                     2.0,
+                     0.0,
+                     11.0,
+                     0.7,
+                     1.1,
+                     0.0,
+                     0.0,
+                     1.0,
+                     static_cast<double>(cx),
+                     static_cast<double>(cy),
+                     static_cast<double>(cz));
+
+  Locseg_Fit_Workspace* wsC = New_Locseg_Fit_Workspace();
+  ASSERT_NE(wsC, nullptr);
+  Default_Locseg_Fit_Workspace(wsC);
+
+  const double legacyInitialScore = Local_Neuroseg_Score_W(locsegC, stackC, zScale, wsC->sws);
+
+  const double legacyScore = Fit_Local_Neuroseg_W(locsegC, stackC, zScale, wsC);
+
+  // Ported C++ locseg + fit.
+  nim::neutube::LocalNeuroseg locsegCpp;
+  locsegCpp.seg.r1 = 2.0;
+  locsegCpp.seg.c = 0.0;
+  locsegCpp.seg.h = 11.0;
+  locsegCpp.seg.theta = 0.7;
+  locsegCpp.seg.psi = 1.1;
+  locsegCpp.seg.curvature = 0.0;
+  locsegCpp.seg.alpha = 0.0;
+  locsegCpp.seg.scale = 1.0;
+  locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), static_cast<double>(cz)};
+
+  nim::neutube::LocsegFitWorkspace wsCpp;
+  nim::neutube::defaultLocsegFitWorkspaceLegacyLike(&wsCpp);
+
+  const double portedInitialScore = nim::neutube::localNeurosegScoreWLegacyLike(locsegCpp, img, zScale, &wsCpp.sws);
+  EXPECT_DOUBLE_EQ(portedInitialScore, legacyInitialScore);
+
+  ASSERT_EQ(wsCpp.nvar, wsC->nvar);
+  for (int i = 0; i < wsCpp.nvar; ++i) {
+    EXPECT_EQ(wsCpp.varIndex[static_cast<size_t>(i)], wsC->var_index[i]) << "i=" << i;
+  }
+  for (int i = 0; i < 12; ++i) {
+    EXPECT_DOUBLE_EQ(wsCpp.varMin[static_cast<size_t>(i)], wsC->var_min[i]) << "i=" << i;
+    EXPECT_DOUBLE_EQ(wsCpp.varMax[static_cast<size_t>(i)], wsC->var_max[i]) << "i=" << i;
+  }
+
+  const double portedScore = nim::neutube::fitLocalNeurosegWLegacyLike(&locsegCpp, img, zScale, &wsCpp);
+
+  EXPECT_DOUBLE_EQ(portedScore, legacyScore);
+
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.r1, locsegC->seg.r1);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.c, locsegC->seg.c);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.h, locsegC->seg.h);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.theta, locsegC->seg.theta);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.psi, locsegC->seg.psi);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.curvature, locsegC->seg.curvature);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.alpha, locsegC->seg.alpha);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.scale, locsegC->seg.scale);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[0], locsegC->pos[0]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[1], locsegC->pos[1]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[2], locsegC->pos[2]);
+
+  Kill_Locseg_Fit_Workspace(wsC);
+  Kill_Local_Neuroseg(locsegC);
+  Kill_Stack(stackC);
 }
 
 TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)

@@ -7,7 +7,7 @@ Doc location: `src/neutube/NEUTUBE2_MIGRATION.md`
 ## Executive summary
 
 Atlas already vendors the legacy neuTube/NeuTu codebase under `src/neurolabi/` (C + C++/Qt) and has a CLI entrypoint
-via `nim::ZRunNeuTuCommand` (`src/atlas/zrunneutucommand.*`). This code works for small-ish stacks, but it inherits
+via `nim::ZRunNeuTuCommand` (`src/neurolabi/gui/zrunneutucommand.*`). This code works for small-ish stacks, but it inherits
 neuTube’s historical limitations:
 
 - Large-scale images are not first-class: many paths assume in-memory `Stack`/`ZStack` and 32-bit indexing.
@@ -65,7 +65,7 @@ UI thread owns widgets) and using structured signals (`QMetaObject::invokeMethod
 
 - Atlas `main` special-cases `--command` and directly invokes the legacy runner:
   - `src/atlas/main.cpp` (search for `--command`)
-  - `src/atlas/zrunneutucommand.*`
+  - `src/neurolabi/gui/zrunneutucommand.*`
 
 ### Legacy neuTube code location
 
@@ -169,12 +169,12 @@ interaction behaviors during Goal 2.
 
 ### What the legacy runner does today (baseline behavior)
 
-Legacy implementation: `src/atlas/zrunneutucommand.cpp`.
+Legacy implementation: `src/neurolabi/gui/zrunneutucommand.cpp`.
 
 Key behaviors to preserve (until we intentionally evolve them):
 
 - Command selection via flags (`--trace`, `--skeletonize`, `--compare_swc`, `--general <json|path>`)
-- Default config lookup under `Resources/json` via `nim::ZSystemInfo::jsonDirPath()`
+- Default config lookup under `Resources/json` (Atlas injects the json dir path via `nim::ZSystemInfo::jsonDirPath()`)
 - Optional “json input” mode: `input[0] == "json"` interprets `input[1]` as either a JSON string or a JSON file path
 - “general” command wrapper that currently only accepts `{"command":"trace_neuron", ...}`
 - Note: the legacy CLI spec string mentions `--compute_seed`, but the current Atlas-integrated runner does not implement
@@ -420,6 +420,10 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
   - ✅ Point sampling + mask hit (`Stack_Point_Sampling`, `Stack_Point_Hit_Mask`): `src/neutube/zneutubeimgsampling.*`
   - ✅ Geo3d scalar field sampling + scoring (`Geo3d_Scalar_Field_Stack_Sampling*`, `Geo3d_Scalar_Field_Stack_Score*`):
     `src/neutube/zneutubegeo3dscalarfield.*`, `src/neutube/zneutubestackfitscore.*`
+  - ✅ Legacy optimizer core (`Fit_Perceptor`, line search, conjugate updates):
+    `src/neutube/zneutubecontfun.h`, `src/neutube/zneutubeoptimizeutils.*`, `src/neutube/zneutubeperceptor.*`
+    - Note: Atlas already has Ceres-based optimizers (e.g. `src/img/zregistrationoptimizer.*`), but we intentionally keep
+      the legacy Perceptor algorithm here to preserve byte-identical tracing outputs for Goal 1.
   - ✅ Trace workspace mask/bounds helpers (`Trace_Workspace_Mask_Value`, `Trace_Workspace_Point_In_Bound`):
     `src/neutube/zneutubetraceworkspace.*`
   - ✅ Trace record + score containers (`Trace_Record`, `Stack_Fit_Score` structs + setters/getters):
@@ -429,6 +433,10 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
   - ✅ Large-object labeling (`Stack_Label_Large_Objects_*`): `src/neutube/zneutubeobjlabel.*` (parity-tested)
   - ✅ Planar squared EDT (`Stack_Bwdist_L_U16P`): `src/neutube/zneutubeplanaredt.*`
   - ✅ Sp-grow (`Stack_Sp_Grow` + parser): `src/neutube/zneutubespgrow.*`, `src/neutube/zneutubespgrowparser.*`
+  - ✅ Neuroseg field generation (`Neuroseg_Slice_Field`, `Neuroseg_Field_S_Fast`):
+    `src/neutube/zneutubeneuroseg.*`, `src/neutube/zneutube3dgeom.*`, `src/neutube/zneutubegeo3dpointarray.*`
+  - ✅ Local neuroseg scoring + fit (`Local_Neuroseg_Field_S`, `Local_Neuroseg_Score_W`, `Fit_Local_Neuroseg_W`):
+    `src/neutube/zneutubelocalneuroseg.*`
   - ✅ Legacy `darray_qsort(...)` parity helper: `src/neutube/zneutubedarrayqsort.*`
   - ✅ darray math helpers (`darray_dot_n`, `darray_dot_nw`, `darray_sum_n`, `darray_mean_n`, `darray_corrcoef_n`, `darray_max`):
     `src/neutube/zneutubedarraymath.*`

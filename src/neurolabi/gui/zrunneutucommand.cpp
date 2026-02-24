@@ -1,7 +1,9 @@
 #include "zrunneutucommand.h"
 
+#include <QDir>
+#include <QFileInfo>
+
 #include "zlog.h"
-#include "zsysteminfo.h"
 
 #include "filesystem/utilities.h"
 #include "zobject3dscan.h"
@@ -23,10 +25,6 @@
 #include "zstack.hxx"
 #include "zstring.h"
 
-#include <QFileInfoList>
-#include <QDir>
-#include <QFileInfo>
-
 #include <array>
 #include <charconv>
 #include <chrono>
@@ -45,6 +43,10 @@ struct CommandArgs
   std::string output;
   std::string configPath;
   std::string generalConfig;
+
+  // Default Resources/json directory injected by the host app (Atlas) or provided via --json_dir.
+  // Used only as a fallback when caller does not explicitly provide --config.
+  std::string jsonDirPath;
 
   std::optional<std::array<int, 3>> intv;
   std::optional<int> level;
@@ -71,6 +73,24 @@ struct CommandArgs
     return false;
   }
   return fileExists(QString::fromStdString(path));
+}
+
+[[nodiscard]] std::optional<std::string> defaultCommandConfigPathFromJsonDir(std::string_view jsonDirPath)
+{
+  if (jsonDirPath.empty()) {
+    return std::nullopt;
+  }
+  const QDir jsonDir(QString::fromUtf8(jsonDirPath.data(), static_cast<qsizetype>(jsonDirPath.size())));
+  return jsonDir.absoluteFilePath("command_config.json").toStdString();
+}
+
+[[nodiscard]] std::string absoluteDirPathForFile(const std::string& filePath)
+{
+  if (filePath.empty()) {
+    return {};
+  }
+  const QFileInfo fi(QString::fromStdString(filePath));
+  return fi.absoluteDir().absolutePath().toStdString();
 }
 
 [[nodiscard]] std::optional<int> parseInt(std::string_view s)
@@ -100,7 +120,7 @@ struct CommandArgs
   }
 }
 
-[[nodiscard]] bool parseArgs(int argc, char* argv[], CommandArgs* out)
+[[nodiscard]] bool parseArgs(int argc, char* argv[], std::string_view injectedJsonDirPath, CommandArgs* out)
 {
   CHECK(out != nullptr);
   CHECK(argc >= 2);
@@ -111,6 +131,13 @@ struct CommandArgs
   if (std::string_view(argv[1]) != "--command") {
     LOG(ERROR) << "ZRunNeuTuCommand must be invoked via '--command' as argv[1].";
     return false;
+  }
+
+  out->jsonDirPath = std::string(injectedJsonDirPath);
+
+  bool hasExplicitConfig = false;
+  if (auto defaultPath = defaultCommandConfigPathFromJsonDir(out->jsonDirPath)) {
+    out->configPath = *defaultPath;
   }
 
   for (int i = 2; i < argc; ++i) {
@@ -138,6 +165,23 @@ struct CommandArgs
         return false;
       }
       out->configPath = argv[++i];
+      hasExplicitConfig = true;
+      continue;
+    }
+
+    if (arg == "--json_dir") {
+      if (i + 1 >= argc) {
+        LOG(ERROR) << "Missing value for --json_dir";
+        return false;
+      }
+      out->jsonDirPath = argv[++i];
+      if (!hasExplicitConfig) {
+        if (auto defaultPath = defaultCommandConfigPathFromJsonDir(out->jsonDirPath)) {
+          out->configPath = *defaultPath;
+        } else {
+          out->configPath.clear();
+        }
+      }
       continue;
     }
 
@@ -232,27 +276,33 @@ struct CommandArgs
 
 int ZRunNeuTuCommand::run(int argc, char* argv[])
 {
+  return run(argc, argv, std::string_view{});
+}
+
+int ZRunNeuTuCommand::run(int argc, char* argv[], std::string_view jsonDirPath)
+{
   CommandArgs args;
-  if (!parseArgs(argc, argv, &args)) {
+  if (!parseArgs(argc, argv, jsonDirPath, &args)) {
     LOG(INFO) << "Usage (legacy): Atlas --command [<input> ...] [-o <output>] [--config <command_config.json>]"
+                 " [--json_dir <Resources/json>]"
                  " [--intv <int> <int> <int>] [--skeletonize] [--general <string>]"
                  " [--compare_swc --scale <double>] [--trace --level <int>] [--compute_seed] [--verbose]";
     return 1;
   }
   m_isVerbose = args.verbose;
 
+  if (args.configPath.empty()) {
+    LOG(ERROR) << "Missing command config: provide --config <command_config.json> or set a JSON dir (--json_dir) "
+                  "or invoke via Atlas (injects Resources/json).";
+    return 1;
+  }
+
   for (int i = 0; i < argc; ++i) {
     LOG(INFO) << argv[i];
   }
 
-  m_configDir = ZSystemInfo::jsonDirPath().toStdString();
-  // m_configDir = neutu::JoinPath(NeutubeConfig::getInstance().getPath(NeutubeConfig::EConfigItem::CONFIG_DIR),
-  // "json");
-  std::string configPath = neutu::JoinPath(m_configDir, "command_config.json");
-
-  if (!args.configPath.empty()) {
-    configPath = args.configPath;
-  }
+  std::string configPath = args.configPath;
+  m_configDir = !args.jsonDirPath.empty() ? args.jsonDirPath : absoluteDirPathForFile(configPath);
 
   auto configJson = loadConfig(configPath);
   // LOG(INFO) << configJson.dumpString(2);
@@ -359,7 +409,7 @@ ZRunNeuTuCommand::ECommand ZRunNeuTuCommand::getCommand(const char* cmd)
 void ZRunNeuTuCommand::loadTraceConfig(const ZJsonObject& configJson)
 {
   if (!ZNeuronTracerConfig::getInstance().loadJsonObject(configJson)) {
-    ZNeuronTracerConfig::getInstance().load(m_configDir + "/trace_config.json");
+    ZNeuronTracerConfig::getInstance().load(neutu::JoinPath(m_configDir, "trace_config.json"));
   }
 }
 
@@ -812,7 +862,7 @@ void ZRunNeuTuCommand::loadTraceConfigForTraceCommand(const ZJsonObject& config)
   if (config.hasKey("path")) {
     std::string path = ZJsonObjectParser::GetValue(config, "path", "");
     if (path.empty() || path == "default") {
-      path = ZSystemInfo::jsonDir().absoluteFilePath("trace_config.json").toStdString();
+      path = neutu::JoinPath(m_configDir, "trace_config.json");
     }
     actualConfig.load(path);
   }
