@@ -229,11 +229,18 @@ Status:
     - Algorithm: `nim::neutube::ZNeutubeSkeletonizer` (`src/neutube/zneutubeskeletonizer.*`).
     - Output: `nim::ZSwc` + legacy-format writer (`src/neutube/zneutubeswcwriter.*`) for byte-identical SWC files.
     - The skeletonize implementation path does not include or call into neurolabi C (`tz_*`) or genelib.
-  - `--command2 --trace` and `--command2 --general {"command":"trace_neuron", ...}` are still routed through the legacy
-    tracer (temporary scaffolding for parity).
-    - Dispatch: `src/neutube/zneutubetrace.*` (public entrypoint)
-    - Legacy adapter: `src/neutube/zneutubelegacy.*` (the only place that includes neurolabi headers)
-    - These paths still materialize a legacy `ZStack` via `src/neutube/zimgstackinterface.*` to feed NeuTu algorithms.
+  - `--command2 --trace` is now **partially ported** (strictly legacy-equivalent behavior):
+    - Seeded trace (`position` provided, no host SWC, diagnosis disabled) runs entirely in `src/neutube/`:
+      - Config parsing: `TraceConfig` (`src/neutube/zneutubetraceconfig.*`, Boost.JSON; legacy tag + per-level semantics)
+      - Tracing core: ported `Trace_Locseg` pipeline (`src/neutube/zneutubelocsegchaintrace.*`)
+      - Image access: `nim::ZImg` (no `ZStack` / no `Stack`)
+      - Output: `nim::ZSwc` + legacy-format writer (`src/neutube/zneutubeswcwriter.*`)
+    - Auto trace (no position), host-SWC attach (`input[1]`), and diagnosis output are still routed through the legacy
+      adapter (temporary scaffolding for parity).
+      - Legacy adapter: `src/neutube/zneutubelegacy.*` (the only place that includes neurolabi headers)
+      - Legacy-only modes still materialize a `ZStack` via `src/neutube/zimgstackinterface.*` to feed NeuTu algorithms.
+  - `--command2 --general {"command":"trace_neuron", ...}` is still routed through the legacy tracer today (until the auto
+    tracing pipeline is ported).
   - `src/neutube/zrunneutucommand2.cpp` remains orchestration-only (CLI + config parsing + dispatch); all remaining
     neurolabi dependencies are isolated to `src/neutube/zneutubelegacy.*`.
 
@@ -460,6 +467,8 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
   - Parity: `test/zneutubecommand2paritytest.cpp` (`NeutubeCommand2Parity.CompareSwc_MatchesLegacy`)
 - 🟨 Switch SWC I/O + processing to `nim::ZSwc`
   - ✅ Skeletonize output uses `nim::ZSwc` + a legacy-format writer for byte-identical SWC files
-  - ⬜ Trace path still uses legacy `ZSwcTree` via `neutube_legacy` (temporary scaffolding)
+  - 🟨 Trace output migration status
+    - ✅ Seeded trace (position provided, no host SWC, diagnosis disabled) uses `nim::ZSwc` + legacy-format writer
+    - ⬜ Auto trace and host-SWC attach still use legacy `ZSwcTree` via `neutube_legacy` (temporary scaffolding)
 - ⬜ Add parity tests and sample datasets for regression checking
 - ⬜ Document GUI parity targets and begin Atlas GUI integration (Goal 2)

@@ -1,6 +1,7 @@
 #include "zneutubeneuroseg.h"
 
 #include "zneutube3dgeom.h"
+#include "zneutubegeo3dutils.h"
 #include "zneutubegeo3dpointarray.h"
 #include "zneutubegeo3dscalarfield.h"
 
@@ -13,18 +14,9 @@ namespace nim::neutube {
 
 namespace {
 
-constexpr double NeurosegMinRLegacyLike = 0.5;
 constexpr int NeurosegDefaultHSlicesLegacyLike = 11;
 constexpr double NeurosegMinCurvatureLegacyLike = 0.2;
 constexpr double TzPiLegacyLike = 3.14159265358979323846264338328;
-
-[[nodiscard]] double neurosegCoefLegacyLike(const Neuroseg& seg)
-{
-  if (seg.h == 1.0) {
-    return seg.c;
-  }
-  return std::max(seg.c, (NeurosegMinRLegacyLike - seg.r1) / (seg.h - 1.0));
-}
 
 void neurosegScaleFieldSlice0LegacyLike(std::array<double, 3>* pt,
                                         double* value,
@@ -96,6 +88,193 @@ void neurosegScaleFieldConeSliceLegacyLike(std::array<double, 3>* pt,
 }
 
 } // namespace
+
+double neurosegCoefLegacyLike(const Neuroseg& seg)
+{
+  if (seg.h == 1.0) {
+    return seg.c;
+  }
+  return std::max(seg.c, (NeurosegMinRLegacyLike - seg.r1) / (seg.h - 1.0));
+}
+
+double neurosegRadiusLegacyLike(const Neuroseg& seg, double z)
+{
+  return seg.r1 + z * neurosegCoefLegacyLike(seg);
+}
+
+double neurosegR2LegacyLike(const Neuroseg& seg)
+{
+  return neurosegRadiusLegacyLike(seg, seg.h - 1.0);
+}
+
+double neurosegRCLegacyLike(const Neuroseg& seg)
+{
+  return seg.r1 + (seg.h - 1.0) * neurosegCoefLegacyLike(seg) / 2.0;
+}
+
+double neurosegRALegacyLike(const Neuroseg& seg)
+{
+  if (seg.c >= 0.0) {
+    return seg.r1;
+  }
+  return neurosegR2LegacyLike(seg);
+}
+
+double neurosegRBLegacyLike(const Neuroseg& seg)
+{
+  if (seg.c <= 0.0) {
+    return seg.r1;
+  }
+  return neurosegR2LegacyLike(seg);
+}
+
+double neurosegCRCLegacyLike(const Neuroseg& seg)
+{
+  return neurosegRCLegacyLike(seg) * std::sqrt(seg.scale);
+}
+
+namespace {
+
+[[nodiscard]] double geo3dVectorAngle2LegacyLike(double x1, double y1, double z1, double x2, double y2, double z2)
+{
+  // Port of tz_geo3d_vector.c::Geo3d_Vector_Angle2().
+  const double d1 = x1 * x1 + y1 * y1 + z1 * z1;
+  if (d1 == 0.0) {
+    return 0.0;
+  }
+
+  const double d2 = x2 * x2 + y2 * y2 + z2 * z2;
+  if (d2 == 0.0) {
+    return 0.0;
+  }
+
+  double d12 = (x1 * x2 + y1 * y2 + z1 * z2) / std::sqrt(d1 * d2);
+
+  // Legacy uses ASSERT(fabs(round(d12)) <= 1.0).
+  CHECK(std::fabs(std::round(d12)) <= 1.0) << "Invalid dot product: " << d12;
+
+  // To avoid invalid acos input caused by rounding error.
+  if (std::fabs(d12) > 1.0) {
+    d12 = std::round(d12);
+  }
+
+  return std::acos(d12);
+}
+
+} // namespace
+
+double neurosegAngleBetweenLegacyLike(const Neuroseg& seg1, const Neuroseg& seg2)
+{
+  double x1 = 0.0;
+  double y1 = 0.0;
+  double z1 = 0.0;
+  geo3dOrientationNormalLegacyLike(seg1.theta, seg1.psi, &x1, &y1, &z1);
+
+  double x2 = 0.0;
+  double y2 = 0.0;
+  double z2 = 0.0;
+  geo3dOrientationNormalLegacyLike(seg2.theta, seg2.psi, &x2, &y2, &z2);
+
+  return geo3dVectorAngle2LegacyLike(x1, y1, z1, x2, y2, z2);
+}
+
+bool neurosegHitTestLegacyLike(const Neuroseg& seg, double x, double y, double z)
+{
+  // Port of tz_neuroseg.c::Neuroseg_Hit_Test().
+  if (z >= -0.5 && z <= seg.h - 0.5) {
+    const double d2 = (x * x) / (seg.scale * seg.scale) + y * y;
+    const double r = neurosegRadiusLegacyLike(seg, z);
+    if (d2 <= r * r) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+double neurosegRxLegacyLike(const Neuroseg& seg, NeuroposReferenceLegacyLike ref)
+{
+  switch (ref) {
+    case NeuroposReferenceLegacyLike::Bottom:
+      return seg.r1 * seg.scale;
+    case NeuroposReferenceLegacyLike::Top:
+      return neurosegR2LegacyLike(seg) * seg.scale;
+    case NeuroposReferenceLegacyLike::Center:
+      return neurosegRCLegacyLike(seg) * seg.scale;
+    default:
+      CHECK(false) << "Invalid NeuroposReferenceLegacyLike value";
+      return 0.0;
+  }
+}
+
+double neurosegRyLegacyLike(const Neuroseg& seg, NeuroposReferenceLegacyLike ref)
+{
+  switch (ref) {
+    case NeuroposReferenceLegacyLike::Bottom:
+      return seg.r1;
+    case NeuroposReferenceLegacyLike::Top:
+      return neurosegR2LegacyLike(seg);
+    case NeuroposReferenceLegacyLike::Center:
+      return neurosegRCLegacyLike(seg);
+    default:
+      CHECK(false) << "Invalid NeuroposReferenceLegacyLike value";
+      return 0.0;
+  }
+}
+
+double
+neurosegRxPLegacyLike(const Neuroseg& seg, const std::array<double, 3>& resolution, NeuroposReferenceLegacyLike ref)
+{
+  // Port of tz_neuroseg.c::Neuroseg_Rx_P().
+  return neurosegRxLegacyLike(seg, ref) * resolution[0];
+}
+
+double
+neurosegRyPLegacyLike(const Neuroseg& seg, const std::array<double, 3>& resolution, NeuroposReferenceLegacyLike ref)
+{
+  // Port of tz_neuroseg.c::Neuroseg_Ry_P().
+  //
+  // Note: The legacy implementation uses `cos(theta)` / `sin(theta)` (not squared),
+  // which can yield a negative value under the sqrt for certain theta values.
+  const double sx = resolution[0] * resolution[0];
+  const double sy = resolution[1] * resolution[1];
+  const double factor = std::sqrt(sx * std::cos(seg.theta) + sy * std::sin(seg.theta));
+  return neurosegRyLegacyLike(seg, ref) * factor;
+}
+
+double neurosegRxZLegacyLike(const Neuroseg& seg, double z)
+{
+  return neurosegRadiusLegacyLike(seg, z) * seg.scale;
+}
+
+double neurosegRyZLegacyLike(const Neuroseg& seg, double z)
+{
+  return neurosegRadiusLegacyLike(seg, z);
+}
+
+double neurosegRxyZLegacyLike(const Neuroseg& seg, double z)
+{
+  return neurosegRadiusLegacyLike(seg, z) * std::sqrt(seg.scale);
+}
+
+Neuroseg nextNeurosegLegacyLike(const Neuroseg& seg1, double posStep)
+{
+  // Port of tz_neuroseg.c::Next_Neuroseg().
+  Neuroseg seg2 = seg1;
+  seg2.r1 = seg1.r1 + posStep * neurosegCoefLegacyLike(seg1) * (seg1.h - 1.0);
+
+  if (seg2.r1 < NeurosegMinRLegacyLike) {
+    seg2.r1 = NeurosegMinRLegacyLike;
+  }
+
+  if (NeurosegDefaultHLegacyLike > 1.0) {
+    seg2.h = NeurosegDefaultHLegacyLike;
+  }
+
+  seg2.c = neurosegCoefLegacyLike(seg2);
+
+  return seg2;
+}
 
 double neurofieldLegacyLike(double x, double y)
 {
@@ -196,6 +375,57 @@ NeurosegSliceField neurosegSliceFieldLegacyLike(NeurosegFieldFunctionLegacyLike 
   CHECK(out.points.size() == 213u) << "Neuroseg slice field size mismatch: " << out.points.size();
 
   return out;
+}
+
+Geo3dScalarField neurosegFieldZLegacyLike(const Neuroseg& seg, double z, double /*step*/)
+{
+  // Port of tz_neuroseg.c::Neuroseg_Field_Z().
+  if (seg.r1 == 0.0 || seg.scale == 0.0) {
+    return {};
+  }
+
+  const double coef = neurosegCoefLegacyLike(seg);
+  const double r = seg.r1 + coef * z;
+
+  const double rScale = r * seg.scale;
+  const double sqrtR = std::sqrt(r);
+  const double sqrtRScale = sqrtR * std::sqrt(std::sqrt(seg.scale));
+
+  NeurosegSliceField base = neurosegSliceFieldLegacyLike(nullptr);
+  Geo3dScalarField field;
+  field.points = std::move(base.points);
+  field.values = std::move(base.values);
+
+  CHECK(field.points.size() == field.values.size());
+
+  double weight = 0.0;
+  for (size_t i = 0; i < field.points.size(); ++i) {
+    neurosegScaleFieldSlice0LegacyLike(&field.points[i], &field.values[i], rScale, r, sqrtRScale);
+    field.points[i][2] = z;
+    weight += std::fabs(field.values[i]);
+  }
+
+  for (double& v : field.values) {
+    v /= weight;
+  }
+
+  if (seg.alpha != 0.0) {
+    rotateZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.alpha, 0);
+  }
+
+  if (seg.curvature >= NeurosegMinCurvatureLegacyLike) {
+    double curvature = seg.curvature;
+    if (curvature > TzPiLegacyLike) {
+      curvature = TzPiLegacyLike;
+    }
+    geo3dPointArrayBendLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.h / curvature);
+  }
+
+  if (seg.theta != 0.0 || seg.psi != 0.0) {
+    rotateXZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.theta, seg.psi, 0);
+  }
+
+  return field;
 }
 
 NeurosegSliceField neurosegSliceFieldPLegacyLike(NeurosegFieldFunctionLegacyLike fieldFunc)

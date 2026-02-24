@@ -13,6 +13,7 @@ set(NEUTUBE_SOURCES
     zneutube3dgeom.cpp zneutube3dgeom.h
     zneutubecompareswc.cpp zneutubecompareswc.h
     zneutubegeo3dpointarray.cpp zneutubegeo3dpointarray.h
+    zneutubegeo3dcircle.h
     zneutubegeo3dscalarfield.cpp zneutubegeo3dscalarfield.h
     zneutubegeo3dutils.cpp zneutubegeo3dutils.h
     zneutubeimgbwmorph.cpp zneutubeimgbwmorph.h
@@ -26,6 +27,7 @@ set(NEUTUBE_SOURCES
     zneutubespgrow.cpp zneutubespgrow.h
     zneutubespgrowparser.cpp zneutubespgrowparser.h
     zneutubetrace.cpp zneutubetrace.h
+    zneutubetraceconfig.cpp zneutubetraceconfig.h
     zneutubetracedefs.h
     zneutubetracerecord.cpp zneutubetracerecord.h
     zneutubestackfitoptions.h
@@ -44,6 +46,10 @@ set(NEUTUBE_SOURCES
     zneutubevoxel.h
     zneutubevoxelarray.cpp zneutubevoxelarray.h
     zneutubelocalneuroseg.cpp zneutubelocalneuroseg.h
+    zneutubelocsegchain.cpp zneutubelocsegchain.h
+    zneutubelocsegchaincircle.cpp zneutubelocsegchaincircle.h
+    zneutubelocsegchainknot.cpp zneutubelocsegchainknot.h
+    zneutubelocsegchaintrace.cpp zneutubelocsegchaintrace.h
     zneutubelegacy.cpp zneutubelegacy.h
     zrunneutucommand2.cpp zrunneutucommand2.h
 )

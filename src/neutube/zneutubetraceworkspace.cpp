@@ -1,6 +1,5 @@
 #include "zneutubetraceworkspace.h"
 
-#include "zimg.h"
 #include "zlog.h"
 
 #include <cmath>
@@ -15,6 +14,88 @@ namespace {
 }
 
 } // namespace
+
+void defaultTraceWorkspaceLegacyLike(TraceWorkspace* tw)
+{
+  // Port of tz_trace_utils.c::Default_Trace_Workspace().
+  CHECK(tw != nullptr);
+
+  tw->length = 5000;
+  tw->fitFirst = false;
+  tw->refit = true;
+  tw->breakRefit = false;
+  tw->tuneEnd = false;
+  tw->tscoreOption = static_cast<int>(StackFitOption::Corrcoef);
+  tw->traceStep = 0.5;
+  tw->segLength = NeurosegDefaultHLegacyLike;
+  tw->minScore = 0.3; // LOCAL_NEUROSEG_MIN_CORRCOEF
+  tw->traceStatus = {TraceStatus::Normal, TraceStatus::Normal};
+  tw->minChainLength = NeurosegDefaultHLegacyLike * 2.5;
+  tw->chainId = 0;
+
+  tw->traceRange = {-1.0, -1.0, -1.0, -1.0, -1.0, -1.0};
+  tw->dyvar = {-1.0, -1.0, -1.0, -1.0, -1.0};
+
+  tw->supStack = nullptr;
+  tw->traceMask.reset();
+  tw->swcMask = nullptr;
+  tw->traceMaskUpdating = true;
+
+  tw->resolution = {-1.0, -1.0, -1.0};
+
+  tw->addHit = true;
+
+  defaultLocsegFitWorkspaceLegacyLike(&tw->fitWorkspace);
+}
+
+void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace* tw, const ZImg* stack)
+{
+  // Port of tz_locseg_chain.c::Locseg_Chain_Default_Trace_Workspace().
+  CHECK(tw != nullptr);
+
+  defaultTraceWorkspaceLegacyLike(tw);
+
+  if (stack != nullptr) {
+    tw->traceRange[0] = 0.0;
+    tw->traceRange[1] = 0.0;
+    tw->traceRange[2] = 0.0;
+    tw->traceRange[3] = static_cast<double>(stack->width()) - 1.0;
+    tw->traceRange[4] = static_cast<double>(stack->height()) - 1.0;
+    tw->traceRange[5] = static_cast<double>(stack->depth()) - 1.0;
+  }
+
+  tw->dyvar[0] = 25.0; // max radius
+  tw->dyvar[2] = -1.0; // height-fit threshold
+}
+
+void traceWorkspaceSetTraceStatusLegacyLike(TraceWorkspace* tw, TraceStatus headStatus, TraceStatus tailStatus)
+{
+  // Port of tz_trace_utils.c::Trace_Workspace_Set_Trace_Status().
+  CHECK(tw != nullptr);
+  tw->traceStatus[0] = headStatus;
+  tw->traceStatus[1] = tailStatus;
+}
+
+void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace* tw, const ZImg& stack, bool clearing)
+{
+  // Port of `ZNeuronTracer::initTraceMask(bool clearing)`.
+  CHECK(tw != nullptr);
+
+  if (stack.isEmpty()) {
+    return;
+  }
+
+  if (!tw->traceMask) {
+    // Legacy trace_mask is GREY16 (uint16) regardless of input stack type.
+    const ZImgInfo info(stack.width(), stack.height(), stack.depth(), 1, 1, 2, VoxelFormat::Unsigned);
+    tw->traceMask = std::make_unique<ZImg>(info);
+    clearing = true;
+  }
+
+  if (clearing) {
+    tw->traceMask->fill(0);
+  }
+}
 
 int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array<double, 3>& pos)
 {
@@ -58,6 +139,13 @@ int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array
   return 0;
 }
 
+int traceWorkspaceMaskValueZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zScale)
+{
+  // Port of tz_trace_utils.c::Trace_Workspace_Mask_Value_Z().
+  pos[2] *= zScale;
+  return traceWorkspaceMaskValueLegacyLike(tw, pos);
+}
+
 bool traceWorkspacePointInBoundLegacyLike(const TraceWorkspace& tw, const std::array<double, 3>& pos)
 {
   if (pos[0] >= 0.0 && pos[1] >= 0.0 && pos[2] >= 0.0) {
@@ -72,6 +160,13 @@ bool traceWorkspacePointInBoundLegacyLike(const TraceWorkspace& tw, const std::a
   }
 
   return true;
+}
+
+bool traceWorkspacePointInBoundZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zScale)
+{
+  // Port of tz_trace_utils.c::Trace_Workspace_Point_In_Bound_Z().
+  pos[2] *= zScale;
+  return traceWorkspacePointInBoundLegacyLike(tw, pos);
 }
 
 } // namespace nim::neutube
