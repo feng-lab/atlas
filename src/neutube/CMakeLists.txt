@@ -8,13 +8,22 @@ print_target_properties(Qt6::Core)
 set(NEUTUBE_SOURCES
     zimgstackinterface.cpp zimgstackinterface.h
     zneutubedarrayqsort.cpp zneutubedarrayqsort.h
+    zneutubedarraymath.cpp zneutubedarraymath.h
     zneutubecompareswc.cpp zneutubecompareswc.h
+    zneutubegeo3dscalarfield.cpp zneutubegeo3dscalarfield.h
     zneutubeimgbwmorph.cpp zneutubeimgbwmorph.h
+    zneutubeimgsampling.cpp zneutubeimgsampling.h
     zneutubeneighborhood.cpp zneutubeneighborhood.h
     zneutubeobjlabel.cpp zneutubeobjlabel.h
     zneutubeplanaredt.cpp zneutubeplanaredt.h
     zneutubespgrow.cpp zneutubespgrow.h
     zneutubespgrowparser.cpp zneutubespgrowparser.h
+    zneutubetrace.cpp zneutubetrace.h
+    zneutubetracedefs.h
+    zneutubetracerecord.cpp zneutubetracerecord.h
+    zneutubestackfitoptions.h
+    zneutubestackfitscore.cpp zneutubestackfitscore.h
+    zneutubetraceworkspace.cpp zneutubetraceworkspace.h
     zneutubeskeletonize.cpp zneutubeskeletonize.h
     zneutubeskeletonizer.cpp zneutubeskeletonizer.h
     zneutubeswcgeom.cpp zneutubeswcgeom.h

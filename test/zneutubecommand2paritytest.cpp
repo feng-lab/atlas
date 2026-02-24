@@ -5,6 +5,7 @@
 #include <QString>
 
 #include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
@@ -12,19 +13,32 @@
 #include <sstream>
 #include <tuple>
 #include <memory>
+#include <limits>
+#include <random>
 #include <string>
 #include <vector>
 
 #include <fmt/format.h>
 
 extern "C" {
+#include "tz_darray.h"
+#include "tz_geo3d_scalar_field.h"
 #include "tz_stack_neighborhood.h"
 #include "tz_stack_objlabel.h"
+#include "tz_stack_sampling.h"
+#include "tz_trace_utils.h"
 }
 
 #include "zneutubecompareswc.h"
+#include "zneutubedarraymath.h"
+#include "zneutubegeo3dscalarfield.h"
+#include "zneutubeimgsampling.h"
 #include "zneutubeneighborhood.h"
 #include "zneutubeobjlabel.h"
+#include "zneutubetraceworkspace.h"
+#include "zneutubetracerecord.h"
+#include "zneutubestackfitscore.h"
+#include "zneutubestackfitoptions.h"
 
 #include "zimg.h"
 #include "zimgneighborhooditerator.h"
@@ -435,6 +449,592 @@ TEST(NeutubeObjLabel, PromotesToUint16LikeLegacy_WhenLabelsExceed255)
   const auto a = toU32Labels(ported.labels);
   ASSERT_EQ(a.size(), legacy.labels.size());
   EXPECT_EQ(a, legacy.labels);
+}
+
+TEST(NeutubeLegacySampling, PointSamplingMatchesLegacy)
+{
+  using namespace nim;
+
+  constexpr size_t W = 8;
+  constexpr size_t H = 9;
+  constexpr size_t D = 10;
+
+  ZImgInfo info(W, H, D, 1, 1, 1, VoxelFormat::Unsigned);
+  info.setVoxelFormat<uint8_t>();
+  info.createDefaultDescriptions();
+
+  ZImg img(info);
+  img.fill(0);
+
+  Stack* stack = Make_Stack(GREY, static_cast<int>(W), static_cast<int>(H), static_cast<int>(D));
+  ASSERT_NE(stack, nullptr);
+  ASSERT_EQ(stack->kind, GREY);
+
+  for (size_t z = 0; z < D; ++z) {
+    for (size_t y = 0; y < H; ++y) {
+      for (size_t x = 0; x < W; ++x) {
+        const uint8_t v = static_cast<uint8_t>((x * 3 + y * 5 + z * 7) & 0xFF);
+        *img.data<uint8_t>(x, y, z) = v;
+        stack->array[z * W * H + y * W + x] = v;
+      }
+    }
+  }
+
+  std::mt19937 rng(12345);
+  std::uniform_real_distribution<double> distX(-1.0, static_cast<double>(W) + 1.0);
+  std::uniform_real_distribution<double> distY(-1.0, static_cast<double>(H) + 1.0);
+  std::uniform_real_distribution<double> distZ(-1.0, static_cast<double>(D) + 1.0);
+
+  for (int i = 0; i < 5000; ++i) {
+    const double x = distX(rng);
+    const double y = distY(rng);
+    const double z = distZ(rng);
+
+    const double legacy = Stack_Point_Sampling(stack, x, y, z);
+    const double ported = neutube::pointSampleLegacyLike(img, x, y, z);
+
+    if (std::isnan(legacy)) {
+      EXPECT_TRUE(std::isnan(ported)) << "x=" << x << " y=" << y << " z=" << z;
+    } else {
+      EXPECT_DOUBLE_EQ(ported, legacy) << "x=" << x << " y=" << y << " z=" << z;
+    }
+  }
+
+  Kill_Stack(stack);
+}
+
+TEST(NeutubeLegacyTraceWorkspace, MaskValueMatchesLegacy)
+{
+  using namespace nim;
+
+  constexpr int W = 10;
+  constexpr int H = 12;
+  constexpr int D = 5;
+
+  Trace_Workspace* legacyTw = New_Trace_Workspace();
+  ASSERT_NE(legacyTw, nullptr);
+
+  legacyTw->trace_mask = Make_Stack(GREY16, W, H, D);
+  ASSERT_NE(legacyTw->trace_mask, nullptr);
+  ASSERT_EQ(legacyTw->trace_mask->kind, GREY16);
+
+  auto* legacyMask16 = reinterpret_cast<uint16_t*>(legacyTw->trace_mask->array);
+  std::memset(legacyMask16,
+              0,
+              static_cast<size_t>(W) * static_cast<size_t>(H) * static_cast<size_t>(D) * sizeof(uint16_t));
+  legacyMask16[static_cast<size_t>(2) * static_cast<size_t>(W) * static_cast<size_t>(H) +
+               static_cast<size_t>(4) * static_cast<size_t>(W) + static_cast<size_t>(3)] = 42;
+
+  double legacyPos[3] = {3.0, 4.0, 2.0};
+  const int legacyValue = Trace_Workspace_Mask_Value(legacyTw, legacyPos);
+
+  neutube::TraceWorkspace portedTw;
+  ZImgInfo info(static_cast<size_t>(W), static_cast<size_t>(H), static_cast<size_t>(D), 1, 1, 1, VoxelFormat::Unsigned);
+  info.setVoxelFormat<uint16_t>();
+  info.createDefaultDescriptions();
+
+  portedTw.traceMask = std::make_unique<ZImg>(info);
+  portedTw.traceMask->fill(0);
+  *portedTw.traceMask->data<uint16_t>(3, 4, 2) = 42;
+
+  const std::array<double, 3> portedPos = {3.0, 4.0, 2.0};
+  const int portedValue = neutube::traceWorkspaceMaskValueLegacyLike(portedTw, portedPos);
+
+  EXPECT_EQ(portedValue, legacyValue);
+
+  // Check rounding parity (legacy uses iround() which maps to round() in this build).
+  legacyPos[0] = 3.49;
+  legacyPos[1] = 4.51;
+  legacyPos[2] = 2.50;
+  const int legacyRounded = Trace_Workspace_Mask_Value(legacyTw, legacyPos);
+  const std::array<double, 3> portedRoundedPos = {3.49, 4.51, 2.50};
+  const int portedRounded = neutube::traceWorkspaceMaskValueLegacyLike(portedTw, portedRoundedPos);
+  EXPECT_EQ(portedRounded, legacyRounded);
+
+  // Out of bounds returns 0.
+  legacyPos[0] = -1.0;
+  legacyPos[1] = 4.0;
+  legacyPos[2] = 2.0;
+  EXPECT_EQ(Trace_Workspace_Mask_Value(legacyTw, legacyPos), 0);
+  EXPECT_EQ(neutube::traceWorkspaceMaskValueLegacyLike(portedTw, {-1.0, 4.0, 2.0}), 0);
+
+  Kill_Trace_Workspace(legacyTw);
+}
+
+TEST(NeutubeLegacyTraceRecord, SettersMatchLegacy)
+{
+  using namespace nim;
+
+  Trace_Record* legacy = New_Trace_Record();
+  ASSERT_NE(legacy, nullptr);
+
+  neutube::TraceRecord ported;
+  neutube::traceRecordReset(&ported);
+
+  EXPECT_EQ(ported.mask, legacy->mask);
+  EXPECT_EQ(ported.hitRegion, legacy->hit_region);
+  EXPECT_EQ(ported.index, legacy->index);
+  EXPECT_EQ(ported.refit, legacy->refit);
+  EXPECT_EQ(ported.fitHeight[0], legacy->fit_height[0]);
+  EXPECT_EQ(ported.fitHeight[1], legacy->fit_height[1]);
+  EXPECT_EQ(static_cast<int>(ported.direction), static_cast<int>(legacy->direction));
+  EXPECT_DOUBLE_EQ(ported.fixPoint, legacy->fix_point);
+
+  Trace_Record_Set_Fix_Point(legacy, 0.0);
+  Trace_Record_Set_Direction(legacy, DL_BOTHDIR);
+  neutube::traceRecordSetFixPoint(&ported, 0.0);
+  neutube::traceRecordSetDirection(&ported, neutube::TraceDirection::BothDir);
+
+  EXPECT_EQ(ported.mask, legacy->mask);
+  EXPECT_TRUE(neutube::traceRecordHasFixPoint(&ported));
+  EXPECT_TRUE(Trace_Record_Has_Fix_Point(legacy));
+  EXPECT_DOUBLE_EQ(neutube::traceRecordFixPoint(&ported), Trace_Record_Fix_Point(legacy));
+  EXPECT_EQ(static_cast<int>(neutube::traceRecordDirection(&ported)), static_cast<int>(Trace_Record_Direction(legacy)));
+
+  Trace_Record_Set_Index(legacy, 7);
+  neutube::traceRecordSetIndex(&ported, 7);
+  EXPECT_EQ(ported.mask, legacy->mask);
+  EXPECT_EQ(neutube::traceRecordIndex(&ported), Trace_Record_Index(legacy));
+
+  Trace_Record_Disable_Fix_Point(legacy);
+  neutube::traceRecordDisableFixPoint(&ported);
+  EXPECT_EQ(ported.mask, legacy->mask);
+  EXPECT_FALSE(neutube::traceRecordHasFixPoint(&ported));
+  EXPECT_FALSE(Trace_Record_Has_Fix_Point(legacy));
+  EXPECT_DOUBLE_EQ(neutube::traceRecordFixPoint(&ported), Trace_Record_Fix_Point(legacy));
+
+  Delete_Trace_Record(legacy);
+}
+
+TEST(NeutubeLegacyDarrayMath, DotSumMeanCorrcoefMatchLegacy)
+{
+  using namespace nim;
+
+  std::vector<double> a(64, 0.0);
+  std::vector<double> b(64, 0.0);
+
+  std::mt19937 rng(7);
+  std::uniform_real_distribution<double> dist(-10.0, 10.0);
+  for (size_t i = 0; i < a.size(); ++i) {
+    a[i] = dist(rng);
+    b[i] = dist(rng);
+  }
+
+  // Sprinkle NaNs to exercise legacy *_n semantics.
+  a[0] = std::numeric_limits<double>::quiet_NaN();
+  b[3] = std::numeric_limits<double>::quiet_NaN();
+  a[10] = std::numeric_limits<double>::quiet_NaN();
+  b[10] = std::numeric_limits<double>::quiet_NaN();
+
+  EXPECT_DOUBLE_EQ(neutube::darrayDotNLegacyLike(a.data(), b.data(), a.size()),
+                   darray_dot_n(a.data(), b.data(), a.size()));
+  {
+    const double legacy = darray_dot_nw(a.data(), b.data(), a.size());
+    const double ported = neutube::darrayDotNWLegacyLike(a.data(), b.data(), a.size());
+    if (std::isnan(legacy)) {
+      EXPECT_TRUE(std::isnan(ported));
+    } else {
+      EXPECT_DOUBLE_EQ(ported, legacy);
+    }
+  }
+  EXPECT_DOUBLE_EQ(neutube::darraySumNLegacyLike(a.data(), a.size()), darray_sum_n(a.data(), a.size()));
+  EXPECT_DOUBLE_EQ(neutube::darrayMeanNLegacyLike(a.data(), a.size()), darray_mean_n(a.data(), a.size()));
+  EXPECT_DOUBLE_EQ(neutube::darrayCorrcoefNLegacyLike(a.data(), b.data(), a.size()),
+                   darray_corrcoef_n(a.data(), b.data(), a.size()));
+
+  size_t legacyIdx = 0;
+  size_t portedIdx = 0;
+  const double legacyMax = darray_max(a.data(), a.size(), &legacyIdx);
+  const double portedMax = neutube::darrayMaxLegacyLike(a.data(), a.size(), &portedIdx);
+
+  if (std::isnan(legacyMax)) {
+    EXPECT_TRUE(std::isnan(portedMax));
+  } else {
+    EXPECT_DOUBLE_EQ(portedMax, legacyMax);
+  }
+  EXPECT_EQ(portedIdx, legacyIdx);
+}
+
+TEST(NeutubeLegacyStackFitScore, BasicOptionsMatchLegacy)
+{
+  using namespace nim;
+
+  std::vector<double> field(64, 0.0);
+  std::vector<double> signal(64, 0.0);
+
+  std::mt19937 rng(9);
+  std::uniform_real_distribution<double> dist(-5.0, 5.0);
+  for (size_t i = 0; i < field.size(); ++i) {
+    field[i] = dist(rng);
+    signal[i] = dist(rng);
+  }
+
+  // Force a few NaNs to exercise *_n semantics.
+  signal[1] = std::numeric_limits<double>::quiet_NaN();
+  field[2] = std::numeric_limits<double>::quiet_NaN();
+
+  neutube::StackFitScore fs;
+  fs.n = 1;
+
+  fs.options[0] = static_cast<int>(neutube::StackFitOption::Dot);
+  const double dotScore = neutube::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), &fs);
+  EXPECT_DOUBLE_EQ(dotScore, darray_dot_n(field.data(), signal.data(), field.size()));
+
+  fs.options[0] = static_cast<int>(neutube::StackFitOption::Corrcoef);
+  const double corrScore = neutube::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), &fs);
+  EXPECT_DOUBLE_EQ(corrScore, darray_corrcoef_n(field.data(), signal.data(), field.size()));
+
+  fs.options[0] = static_cast<int>(neutube::StackFitOption::Edot);
+  const double edotScore = neutube::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), &fs);
+  EXPECT_DOUBLE_EQ(edotScore,
+                   darray_dot_n(field.data(), signal.data(), field.size()) +
+                     darray_sum_n(signal.data(), signal.size()));
+
+  fs.options[0] = static_cast<int>(neutube::StackFitOption::CorrcoefSc);
+  const double corrScScore = neutube::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), &fs);
+  const double legacyCorrSc =
+    darray_corrcoef_n(field.data(), signal.data(), field.size()) * darray_max(signal.data(), signal.size(), nullptr);
+  if (std::isnan(legacyCorrSc)) {
+    EXPECT_TRUE(std::isnan(corrScScore));
+  } else {
+    EXPECT_DOUBLE_EQ(corrScScore, legacyCorrSc);
+  }
+
+  // nullptr fs behaves like legacy default: dot_n
+  EXPECT_DOUBLE_EQ(neutube::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), nullptr),
+                   darray_dot_n(field.data(), signal.data(), field.size()));
+}
+
+TEST(NeutubeLegacyStackFitScore, StatMatchesLegacyGeo3dScore)
+{
+  using namespace nim;
+
+  constexpr int Width = 16;
+  constexpr int Height = 12;
+  constexpr int Depth = 10;
+  constexpr size_t FieldSize = 200;
+
+  Stack* stack = Make_Stack(GREY, Width, Height, Depth);
+  CHECK(stack != nullptr);
+
+  std::mt19937 rng(12345);
+  std::uniform_int_distribution<int> distU8(0, 255);
+  std::uniform_int_distribution<int> distX(1, Width - 2);
+  std::uniform_int_distribution<int> distY(1, Height - 2);
+  std::uniform_int_distribution<int> distZ(1, Depth - 2);
+  std::uniform_real_distribution<double> distFilter(-1.0, 1.0);
+
+  for (size_t i = 0; i < static_cast<size_t>(Width * Height * Depth); ++i) {
+    stack->array[i] = static_cast<uint8_t>(distU8(rng));
+  }
+
+  auto pointsFlat = std::make_unique<double[]>(FieldSize * 3);
+  auto* points = reinterpret_cast<coordinate_3d_t*>(pointsFlat.get());
+
+  std::vector<double> filter(FieldSize, 0.0);
+  std::vector<double> signal(FieldSize, 0.0);
+
+  const size_t area = static_cast<size_t>(Width) * static_cast<size_t>(Height);
+  for (size_t i = 0; i < FieldSize; ++i) {
+    const int x = distX(rng);
+    const int y = distY(rng);
+    const int z = distZ(rng);
+
+    points[i][0] = static_cast<double>(x);
+    points[i][1] = static_cast<double>(y);
+    points[i][2] = static_cast<double>(z);
+
+    filter[i] = distFilter(rng);
+
+    const size_t offset =
+      static_cast<size_t>(z) * area + static_cast<size_t>(y) * static_cast<size_t>(Width) + static_cast<size_t>(x);
+    signal[i] = static_cast<double>(stack->array[offset]);
+  }
+
+  Geo3d_Scalar_Field fieldC;
+  fieldC.size = static_cast<int>(FieldSize);
+  fieldC.points = points;
+  fieldC.values = filter.data();
+
+  Stack_Fit_Score fsC;
+  fsC.n = 1;
+  fsC.options[0] = STACK_FIT_STAT;
+  const double legacyScore = Geo3d_Scalar_Field_Stack_Score(&fieldC, stack, 1.0, &fsC);
+
+  neutube::StackFitScore fsCpp;
+  fsCpp.n = 1;
+  fsCpp.options[0] = static_cast<int>(neutube::StackFitOption::Stat);
+  const double portedScore = neutube::computeStackFitScoresLegacyLike(filter.data(), signal.data(), FieldSize, &fsCpp);
+
+  if (std::isnan(legacyScore)) {
+    EXPECT_TRUE(std::isnan(portedScore));
+  } else {
+    EXPECT_DOUBLE_EQ(portedScore, legacyScore);
+  }
+
+  Kill_Stack(stack);
+}
+
+TEST(NeutubeLegacyStackFitScore, DotCenterMatchesLegacyGeo3dScore)
+{
+  using namespace nim;
+
+  constexpr int Width = 16;
+  constexpr int Height = 12;
+  constexpr int Depth = 10;
+  constexpr size_t FieldSize = 200;
+
+  Stack* stack = Make_Stack(GREY, Width, Height, Depth);
+  CHECK(stack != nullptr);
+
+  std::mt19937 rng(67890);
+  std::uniform_int_distribution<int> distU8(0, 255);
+  std::uniform_int_distribution<int> distX(1, Width - 2);
+  std::uniform_int_distribution<int> distY(1, Height - 2);
+  std::uniform_int_distribution<int> distZ(1, Depth - 2);
+  std::uniform_real_distribution<double> distFilter(-1.0, 1.0);
+
+  for (size_t i = 0; i < static_cast<size_t>(Width * Height * Depth); ++i) {
+    stack->array[i] = static_cast<uint8_t>(distU8(rng));
+  }
+
+  auto pointsFlat = std::make_unique<double[]>(FieldSize * 3);
+  auto* points = reinterpret_cast<coordinate_3d_t*>(pointsFlat.get());
+
+  std::vector<double> filter(FieldSize, 0.0);
+  std::vector<double> signal(FieldSize, 0.0);
+
+  const size_t area = static_cast<size_t>(Width) * static_cast<size_t>(Height);
+  for (size_t i = 0; i < FieldSize; ++i) {
+    const int x = distX(rng);
+    const int y = distY(rng);
+    const int z = distZ(rng);
+
+    points[i][0] = static_cast<double>(x);
+    points[i][1] = static_cast<double>(y);
+    points[i][2] = static_cast<double>(z);
+
+    filter[i] = distFilter(rng);
+
+    const size_t offset =
+      static_cast<size_t>(z) * area + static_cast<size_t>(y) * static_cast<size_t>(Width) + static_cast<size_t>(x);
+    signal[i] = static_cast<double>(stack->array[offset]);
+  }
+
+  Geo3d_Scalar_Field fieldC;
+  fieldC.size = static_cast<int>(FieldSize);
+  fieldC.points = points;
+  fieldC.values = filter.data();
+
+  Stack_Fit_Score fsC;
+  fsC.n = 1;
+  fsC.options[0] = STACK_FIT_DOT_CENTER;
+  const double legacyScore = Geo3d_Scalar_Field_Stack_Score(&fieldC, stack, 1.0, &fsC);
+
+  neutube::StackFitScore fsCpp;
+  fsCpp.n = 1;
+  fsCpp.options[0] = static_cast<int>(neutube::StackFitOption::DotCenter);
+  const double portedScore = neutube::computeStackFitScoresLegacyLike(filter.data(), signal.data(), FieldSize, &fsCpp);
+
+  if (std::isnan(legacyScore)) {
+    EXPECT_TRUE(std::isnan(portedScore));
+  } else {
+    EXPECT_DOUBLE_EQ(portedScore, legacyScore);
+  }
+
+  Kill_Stack(stack);
+}
+
+TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
+{
+  using namespace nim;
+
+  constexpr int Width = 32;
+  constexpr int Height = 24;
+  constexpr int Depth = 20;
+  constexpr size_t FieldSize = 500;
+
+  ZImgInfo info(static_cast<size_t>(Width),
+                static_cast<size_t>(Height),
+                static_cast<size_t>(Depth),
+                1,
+                1,
+                1,
+                nim::VoxelFormat::Unsigned);
+  ZImg stackImg(info);
+  ZImg maskImg(info);
+
+  std::mt19937 rng(24680);
+  std::uniform_int_distribution<int> distU8(0, 255);
+  std::uniform_int_distribution<int> distMask(0, 1);
+  std::uniform_real_distribution<double> distX(-2.0, static_cast<double>(Width) + 1.0);
+  std::uniform_real_distribution<double> distY(-2.0, static_cast<double>(Height) + 1.0);
+  std::uniform_real_distribution<double> distZ(-2.0, static_cast<double>(Depth) + 1.0);
+  std::uniform_real_distribution<double> distFilter(-1.0, 1.0);
+
+  const size_t voxelNumber = stackImg.voxelNumber();
+  {
+    auto* stack = stackImg.timeData<uint8_t>(0);
+    auto* mask = maskImg.timeData<uint8_t>(0);
+    for (size_t i = 0; i < voxelNumber; ++i) {
+      stack[i] = static_cast<uint8_t>(distU8(rng));
+      mask[i] = static_cast<uint8_t>(distMask(rng));
+    }
+  }
+
+  Stack* stackC = Make_Stack(GREY, Width, Height, Depth);
+  CHECK(stackC != nullptr);
+  std::memcpy(stackC->array, stackImg.timeData<uint8_t>(0), voxelNumber);
+
+  Stack* maskC = Make_Stack(GREY, Width, Height, Depth);
+  CHECK(maskC != nullptr);
+  std::memcpy(maskC->array, maskImg.timeData<uint8_t>(0), voxelNumber);
+
+  auto pointsFlat = std::make_unique<double[]>(FieldSize * 3);
+  auto* points = reinterpret_cast<coordinate_3d_t*>(pointsFlat.get());
+
+  neutube::Geo3dScalarField fieldCpp;
+  fieldCpp.points.resize(FieldSize);
+  fieldCpp.values.resize(FieldSize);
+
+  for (size_t i = 0; i < FieldSize; ++i) {
+    const double x = distX(rng);
+    const double y = distY(rng);
+    const double z = distZ(rng);
+
+    points[i][0] = x;
+    points[i][1] = y;
+    points[i][2] = z;
+
+    fieldCpp.points[i] = {x, y, z};
+    fieldCpp.values[i] = distFilter(rng);
+  }
+
+  Geo3d_Scalar_Field fieldC;
+  fieldC.size = static_cast<int>(FieldSize);
+  fieldC.points = points;
+  fieldC.values = fieldCpp.values.data();
+
+  const std::array<double, 2> zScales = {1.0, 2.0};
+  for (double zScale : zScales) {
+    auto expectSame = [&](const std::string& what, size_t i, double ported, double legacy) {
+      if (std::isnan(legacy)) {
+        EXPECT_TRUE(std::isnan(ported)) << what << " zScale=" << zScale << " i=" << i;
+      } else {
+        EXPECT_DOUBLE_EQ(ported, legacy) << what << " zScale=" << zScale << " i=" << i;
+      }
+    };
+
+    // ------------------------------------------------------------
+    // Sampling parity
+    // ------------------------------------------------------------
+    {
+      double* legacy = Geo3d_Scalar_Field_Stack_Sampling(&fieldC, stackC, zScale, nullptr);
+      CHECK(legacy != nullptr);
+      const std::vector<double> ported = neutube::geo3dScalarFieldStackSamplingLegacyLike(fieldCpp, stackImg, zScale);
+
+      ASSERT_EQ(ported.size(), FieldSize);
+      for (size_t i = 0; i < FieldSize; ++i) {
+        expectSame("Sampling", i, ported[i], legacy[i]);
+      }
+      free(legacy);
+    }
+
+    {
+      double* legacy = Geo3d_Scalar_Field_Stack_Sampling_W(&fieldC, stackC, zScale, nullptr);
+      CHECK(legacy != nullptr);
+      const std::vector<double> ported =
+        neutube::geo3dScalarFieldStackSamplingWeightedLegacyLike(fieldCpp, stackImg, zScale);
+
+      ASSERT_EQ(ported.size(), FieldSize);
+      for (size_t i = 0; i < FieldSize; ++i) {
+        expectSame("Sampling_W", i, ported[i], legacy[i]);
+      }
+      free(legacy);
+    }
+
+    {
+      double* legacy = Geo3d_Scalar_Field_Stack_Sampling_M(&fieldC, stackC, zScale, maskC, nullptr);
+      CHECK(legacy != nullptr);
+      const std::vector<double> ported =
+        neutube::geo3dScalarFieldStackSamplingMaskedLegacyLike(fieldCpp, stackImg, zScale, maskImg);
+
+      ASSERT_EQ(ported.size(), FieldSize);
+      for (size_t i = 0; i < FieldSize; ++i) {
+        expectSame("Sampling_M", i, ported[i], legacy[i]);
+      }
+      free(legacy);
+    }
+
+    // ------------------------------------------------------------
+    // Score parity
+    // ------------------------------------------------------------
+    Stack_Fit_Score fsLegacy;
+    fsLegacy.n = 10;
+    fsLegacy.options[0] = STACK_FIT_DOT;
+    fsLegacy.options[1] = STACK_FIT_CORRCOEF;
+    fsLegacy.options[2] = STACK_FIT_EDOT;
+    fsLegacy.options[3] = STACK_FIT_STAT;
+    fsLegacy.options[4] = STACK_FIT_PDOT;
+    fsLegacy.options[5] = STACK_FIT_MEAN_SIGNAL;
+    fsLegacy.options[6] = STACK_FIT_LOW_MEAN_SIGNAL;
+    fsLegacy.options[7] = STACK_FIT_CORRCOEF_SC;
+    fsLegacy.options[8] = STACK_FIT_OUTER_SIGNAL;
+    fsLegacy.options[9] = STACK_FIT_VALID_SIGNAL_RATIO;
+
+    const double legacyScore = Geo3d_Scalar_Field_Stack_Score(&fieldC, stackC, zScale, &fsLegacy);
+
+    neutube::StackFitScore fsPorted;
+    fsPorted.n = fsLegacy.n;
+    for (int j = 0; j < fsLegacy.n; ++j) {
+      fsPorted.options[static_cast<size_t>(j)] = fsLegacy.options[j];
+    }
+
+    const double portedScore = neutube::geo3dScalarFieldStackScoreLegacyLike(fieldCpp, stackImg, zScale, &fsPorted);
+    expectSame("Score", 0, portedScore, legacyScore);
+
+    for (int j = 0; j < fsLegacy.n; ++j) {
+      expectSame(fmt::format("Score[{}] opt={}", j, fsLegacy.options[j]),
+                 static_cast<size_t>(j),
+                 fsPorted.scores[static_cast<size_t>(j)],
+                 fsLegacy.scores[j]);
+    }
+
+    Stack_Fit_Score fsLegacyM;
+    fsLegacyM.n = 10;
+    fsLegacyM.options[0] = STACK_FIT_DOT;
+    fsLegacyM.options[1] = STACK_FIT_CORRCOEF;
+    fsLegacyM.options[2] = STACK_FIT_EDOT;
+    fsLegacyM.options[3] = STACK_FIT_STAT;
+    fsLegacyM.options[4] = STACK_FIT_PDOT;
+    fsLegacyM.options[5] = STACK_FIT_MEAN_SIGNAL;
+    fsLegacyM.options[6] = STACK_FIT_CORRCOEF_SC;
+    fsLegacyM.options[7] = STACK_FIT_DOT_CENTER;
+    fsLegacyM.options[8] = STACK_FIT_OUTER_SIGNAL;
+    fsLegacyM.options[9] = STACK_FIT_VALID_SIGNAL_RATIO;
+
+    const double legacyScoreM = Geo3d_Scalar_Field_Stack_Score_M(&fieldC, stackC, zScale, maskC, &fsLegacyM);
+
+    neutube::StackFitScore fsPortedM;
+    fsPortedM.n = fsLegacyM.n;
+    for (int j = 0; j < fsLegacyM.n; ++j) {
+      fsPortedM.options[static_cast<size_t>(j)] = fsLegacyM.options[j];
+    }
+
+    const double portedScoreM =
+      neutube::geo3dScalarFieldStackScoreMaskedLegacyLike(fieldCpp, stackImg, zScale, maskImg, &fsPortedM);
+    expectSame("Score_M", 0, portedScoreM, legacyScoreM);
+
+    for (int j = 0; j < fsLegacyM.n; ++j) {
+      expectSame(fmt::format("Score_M[{}] opt={}", j, fsLegacyM.options[j]),
+                 static_cast<size_t>(j),
+                 fsPortedM.scores[static_cast<size_t>(j)],
+                 fsLegacyM.scores[j]);
+    }
+  }
+
+  Kill_Stack(stackC);
+  Kill_Stack(maskC);
 }
 
 TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)

@@ -230,7 +230,9 @@ Status:
     - Output: `nim::ZSwc` + legacy-format writer (`src/neutube/zneutubeswcwriter.*`) for byte-identical SWC files.
     - The skeletonize implementation path does not include or call into neurolabi C (`tz_*`) or genelib.
   - `--command2 --trace` and `--command2 --general {"command":"trace_neuron", ...}` are still routed through the legacy
-    tracer via `src/neutube/zneutubelegacy.*` (temporary scaffolding for parity).
+    tracer (temporary scaffolding for parity).
+    - Dispatch: `src/neutube/zneutubetrace.*` (public entrypoint)
+    - Legacy adapter: `src/neutube/zneutubelegacy.*` (the only place that includes neurolabi headers)
     - These paths still materialize a legacy `ZStack` via `src/neutube/zimgstackinterface.*` to feed NeuTu algorithms.
   - `src/neutube/zrunneutucommand2.cpp` remains orchestration-only (CLI + config parsing + dispatch); all remaining
     neurolabi dependencies are isolated to `src/neutube/zneutubelegacy.*`.
@@ -277,7 +279,8 @@ Started (next step):
 
 #### Phase B dependency inventory (what we must port for Goal 1)
 
-The v2 runner currently calls legacy algorithms via `src/neutube/zneutubelegacy.*`, which in turn uses `neutu`
+The v2 runner currently calls the remaining legacy algorithms via `src/neutube/zneutubelegacy.*` (through small
+`src/neutube/` entrypoints like `src/neutube/zneutubetrace.*`), which in turn uses `neutu`
 (`src/neurolabi/gui/`). Those C++ algorithms depend on a subset of symbols from the legacy C library (`neurolabi`) and
 genelib.
 
@@ -414,10 +417,21 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
 - 🟨 Port neurolabi C algorithms to clean C++ (exact behavior, 64-bit-safe sizes)
   - ✅ Neighborhood/connectivity tables: `src/neutube/zneutubeneighborhood.*`
   - ✅ Binary morphology helpers (`Stack_Not`, `Stack_Majority_Filter`, `Stack_Fill_Hole_N`): `src/neutube/zneutubeimgbwmorph.*`
+  - ✅ Point sampling + mask hit (`Stack_Point_Sampling`, `Stack_Point_Hit_Mask`): `src/neutube/zneutubeimgsampling.*`
+  - ✅ Geo3d scalar field sampling + scoring (`Geo3d_Scalar_Field_Stack_Sampling*`, `Geo3d_Scalar_Field_Stack_Score*`):
+    `src/neutube/zneutubegeo3dscalarfield.*`, `src/neutube/zneutubestackfitscore.*`
+  - ✅ Trace workspace mask/bounds helpers (`Trace_Workspace_Mask_Value`, `Trace_Workspace_Point_In_Bound`):
+    `src/neutube/zneutubetraceworkspace.*`
+  - ✅ Trace record + score containers (`Trace_Record`, `Stack_Fit_Score` structs + setters/getters):
+    `src/neutube/zneutubetracerecord.*`
+  - ✅ Stack fit score switches (`STACK_FIT_*` option scoring on sampled arrays, including masked-score semantics):
+    `src/neutube/zneutubestackfitscore.*`, `src/neutube/zneutubestackfitoptions.h`
   - ✅ Large-object labeling (`Stack_Label_Large_Objects_*`): `src/neutube/zneutubeobjlabel.*` (parity-tested)
   - ✅ Planar squared EDT (`Stack_Bwdist_L_U16P`): `src/neutube/zneutubeplanaredt.*`
   - ✅ Sp-grow (`Stack_Sp_Grow` + parser): `src/neutube/zneutubespgrow.*`, `src/neutube/zneutubespgrowparser.*`
   - ✅ Legacy `darray_qsort(...)` parity helper: `src/neutube/zneutubedarrayqsort.*`
+  - ✅ darray math helpers (`darray_dot_n`, `darray_dot_nw`, `darray_sum_n`, `darray_mean_n`, `darray_corrcoef_n`, `darray_max`):
+    `src/neutube/zneutubedarraymath.*`
 - ⬜ Implement image-access abstraction on `ZImg`/`ZImgPack` (streaming for very large volumes)
 - ✅ Port/implement skeletonize on modern image types (exact behavior)
   - ✅ Port `ZStackSkeletonizer::makeSkeletonWithoutDs(Stack*, const int*)` behavior into

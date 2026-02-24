@@ -6,6 +6,7 @@
 #include "zneutubecompareswc.h"
 #include "zneutubelegacy.h"
 #include "zneutubeskeletonize.h"
+#include "zneutubetrace.h"
 
 #include "zlog.h"
 
@@ -486,14 +487,14 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
     }
 
     case Command::Trace: {
-      return neutube_legacy::runTrace(args.input,
-                                      args.output,
-                                      args.position,
-                                      args.level,
-                                      args.diagnosis,
-                                      traceInclude,
-                                      args.jsonDirPath,
-                                      args.isVerbose);
+      return neutube::runTrace(args.input,
+                               args.output,
+                               args.position,
+                               args.level,
+                               args.diagnosis,
+                               traceInclude,
+                               args.jsonDirPath,
+                               args.isVerbose);
     }
 
     case Command::General: {
