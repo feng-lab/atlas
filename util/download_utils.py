@@ -14,7 +14,7 @@ import common_dirs
 logger = logging.getLogger(__name__)
 
 # Progress reporting policy for non-interactive environments (e.g., CI)
-PROGRESS_LOG_INTERVAL_SEC = 5   # minimum seconds between progress log lines
+PROGRESS_LOG_INTERVAL_SEC = 5  # minimum seconds between progress log lines
 PROGRESS_LOG_PERCENT_STEP = 10  # log on each additional N% completion
 
 
@@ -41,8 +41,8 @@ def retry_with_backoff(retries=5, backoff_in_seconds=1):
 
 def get_system_proxy():
     proxy = urllib.request.getproxies()
-    http_proxy = proxy.get('http')
-    https_proxy = proxy.get('https')
+    http_proxy = proxy.get("http")
+    https_proxy = proxy.get("https")
     return http_proxy, https_proxy
 
 
@@ -66,13 +66,21 @@ def validate_checksum(file_path, expected_sha256):
 
 def is_correct_platform(filename):
     if common_dirs.is_linux():
-        return not ('win' in filename.lower() or '.exe' in filename.lower() or '.msi' in filename.lower()
-                    or 'mac' in filename.lower())
+        return not (
+            "win" in filename.lower()
+            or ".exe" in filename.lower()
+            or ".msi" in filename.lower()
+            or "mac" in filename.lower()
+        )
     elif common_dirs.is_windows():
-        return not ('linux' in filename.lower() or 'mac' in filename.lower())
+        return not ("linux" in filename.lower() or "mac" in filename.lower())
     elif common_dirs.is_mac():
-        return not ('linux' in filename.lower() or 'win' in filename.lower() or '.exe' in filename.lower()
-                    or '.msi' in filename.lower())
+        return not (
+            "linux" in filename.lower()
+            or "win" in filename.lower()
+            or ".exe" in filename.lower()
+            or ".msi" in filename.lower()
+        )
     return True
 
 
@@ -91,7 +99,9 @@ def download_file_with_resume(
     if os.path.exists(target_path):
         current_size = os.path.getsize(target_path)
         if has_expected_size and current_size == expected_size:
-            logger.info(f"File {target_path} already exists with correct size. Skipping download.")
+            logger.info(
+                f"File {target_path} already exists with correct size. Skipping download."
+            )
             if has_expected_sha256:
                 return validate_checksum(target_path, expected_sha256)
             return True
@@ -106,15 +116,15 @@ def download_file_with_resume(
                         f"File {target_path} already exists with matching checksum. Skipping download."
                     )
                     return True
-                logger.warning(
-                    f"File {target_path} checksum mismatch. Re-downloading."
-                )
+                logger.warning(f"File {target_path} checksum mismatch. Re-downloading.")
                 current_size = 0
             else:
                 logger.info(f"File {target_path} already exists. Skipping download.")
                 return True
         elif current_size > expected_size:
-            logger.warning(f"File {target_path} is larger than expected. Re-downloading.")
+            logger.warning(
+                f"File {target_path} is larger than expected. Re-downloading."
+            )
             current_size = 0
         else:
             logger.info(f"Resuming download for {target_path}")
@@ -163,24 +173,31 @@ def download_file_with_resume(
 
                 # Set up headers
                 headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
-                    'Accept': '*/*',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'Connection': 'keep-alive'
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+                    "Accept": "*/*",
+                    "Accept-Encoding": "gzip, deflate",
+                    "Connection": "keep-alive",
                 }
 
                 # Try to use range if file exists and we know the expected size.
                 if current_size > 0 and has_expected_size:
-                    headers['Range'] = f'bytes={current_size}-'
+                    headers["Range"] = f"bytes={current_size}-"
 
-                response = requests.get(current_url, stream=True, proxies=current_proxies, headers=headers)
+                response = requests.get(
+                    current_url, stream=True, proxies=current_proxies, headers=headers
+                )
 
-                if 'Range' in headers and response.status_code != 206:
+                if "Range" in headers and response.status_code != 206:
                     logger.info(
                         "Server ignored range request. Downloading entire file."
                     )
-                    headers.pop('Range', None)
-                    response = requests.get(current_url, stream=True, proxies=current_proxies, headers=headers)
+                    headers.pop("Range", None)
+                    response = requests.get(
+                        current_url,
+                        stream=True,
+                        proxies=current_proxies,
+                        headers=headers,
+                    )
                     current_size = 0
 
                 # If we get a 406 or 416 error, try again without range header
@@ -188,9 +205,16 @@ def download_file_with_resume(
                     logger.info(
                         "Range request not supported or invalid. Downloading entire file."
                     )
-                    headers.pop('Range', None)
-                    response = requests.get(current_url, stream=True, proxies=current_proxies, headers=headers)
-                    current_size = 0  # Reset current_size as we're downloading from the beginning
+                    headers.pop("Range", None)
+                    response = requests.get(
+                        current_url,
+                        stream=True,
+                        proxies=current_proxies,
+                        headers=headers,
+                    )
+                    current_size = (
+                        0  # Reset current_size as we're downloading from the beginning
+                    )
 
                 response.raise_for_status()
 
@@ -200,9 +224,11 @@ def download_file_with_resume(
                 # rate-limited logger updates in that case.
                 interactive = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
                 last_log_time = start_time
-                last_logged_pct = -1  # integer percent last logged in non-interactive mode
+                last_logged_pct = (
+                    -1
+                )  # integer percent last logged in non-interactive mode
                 # Append to file if resuming, otherwise write new file
-                mode = 'ab' if current_size > 0 else 'wb'
+                mode = "ab" if current_size > 0 else "wb"
                 with open(target_path, mode) as file:
                     downloaded_size = current_size
                     for chunk in response.iter_content(chunk_size=8192):
@@ -213,14 +239,20 @@ def download_file_with_resume(
                             # Avoid division by zero if the first chunk arrives too quickly or
                             # if the clock resolution reports a zero/negative elapsed time.
                             if elapsed_time > 0:
-                                speed = downloaded_size / (1024 * 1024 * elapsed_time)  # MB/s
+                                speed = downloaded_size / (
+                                    1024 * 1024 * elapsed_time
+                                )  # MB/s
                             else:
                                 speed = 0.0
-                            progress = (downloaded_size / expected_size) * 100 if has_expected_size else None
+                            progress = (
+                                (downloaded_size / expected_size) * 100
+                                if has_expected_size
+                                else None
+                            )
 
                             if interactive:
                                 # Update in-place on a single terminal line
-                                sys.stdout.write('\033[K')  # clear to end of line
+                                sys.stdout.write("\033[K")  # clear to end of line
                                 if progress is not None:
                                     sys.stdout.write(
                                         f"\rProgress: {progress:.2f}% | Speed: {speed:.2f} MB/s"
@@ -237,8 +269,10 @@ def download_file_with_resume(
                                 if progress is not None:
                                     pct_int = int(progress)
                                     should_log = (
-                                        (now - last_log_time) >= PROGRESS_LOG_INTERVAL_SEC
-                                        or pct_int >= last_logged_pct + PROGRESS_LOG_PERCENT_STEP
+                                        (now - last_log_time)
+                                        >= PROGRESS_LOG_INTERVAL_SEC
+                                        or pct_int
+                                        >= last_logged_pct + PROGRESS_LOG_PERCENT_STEP
                                         or pct_int == 100
                                     )
                                     if should_log:
@@ -248,7 +282,9 @@ def download_file_with_resume(
                                         last_log_time = now
                                         last_logged_pct = pct_int
                                 else:
-                                    should_log = (now - last_log_time) >= PROGRESS_LOG_INTERVAL_SEC
+                                    should_log = (
+                                        now - last_log_time
+                                    ) >= PROGRESS_LOG_INTERVAL_SEC
                                     if should_log:
                                         downloaded_mb = downloaded_size / (1024 * 1024)
                                         logger.info(
@@ -258,11 +294,11 @@ def download_file_with_resume(
 
                 if interactive:
                     # Ensure a newline after the in-place progress line
-                    sys.stdout.write('\n')
+                    sys.stdout.write("\n")
                     sys.stdout.flush()
                 else:
                     # Keep a blank line separation minimal in logs
-                    logger.info('')
+                    logger.info("")
 
                 if has_expected_size and os.path.getsize(target_path) != expected_size:
                     logger.warning(
@@ -291,12 +327,18 @@ def download_file_with_resume(
     return False
 
 
-def sync_files(files_to_download, target_directory: str, check_os: bool = True):
+def sync_files(
+    files_to_download,
+    target_directory: str,
+    check_os: bool = True,
+    preserve_relpaths: list[str] | None = None,
+):
     """
     Synchronize files in the target directory with the provided list of files to download.
 
     :param files_to_download: List of dictionaries containing file information
     :param target_directory: Directory to synchronize files to
+    :param preserve_relpaths: Relative file/dir paths (under target_directory) to preserve during cleanup
     """
     # Create target directory if it doesn't exist
     os.makedirs(target_directory, exist_ok=True)
@@ -308,14 +350,31 @@ def sync_files(files_to_download, target_directory: str, check_os: bool = True):
         np = os.path.normpath(p)
         return np.lower() if common_dirs.is_windows() else np
 
+    preserved_paths = set()
+    if preserve_relpaths:
+        for preserve_relpath in preserve_relpaths:
+            if not preserve_relpath:
+                continue
+            preserved_paths.add(_normalize_rel(preserve_relpath))
+
+    def _is_preserved(normalized_relative_path: str) -> bool:
+        for preserved_path in preserved_paths:
+            if normalized_relative_path == preserved_path:
+                return True
+            if preserved_path and normalized_relative_path.startswith(
+                preserved_path + os.sep
+            ):
+                return True
+        return False
+
     expected_files = set()
 
     # Download or update files
     for file_info in files_to_download:
-        if check_os and not is_correct_platform(file_info['filename']):
+        if check_os and not is_correct_platform(file_info["filename"]):
             continue
         # Store normalized relative path for comparison during cleanup
-        rel = file_info['filename']
+        rel = file_info["filename"]
         target_path = os.path.join(target_directory, rel)
         expected_files.add(_normalize_rel(rel))
 
@@ -323,24 +382,27 @@ def sync_files(files_to_download, target_directory: str, check_os: bool = True):
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
         success = download_file_with_resume(
-            file_info['url'],
-            file_info['backup_url'],
+            file_info["url"],
+            file_info["backup_url"],
             target_path,
-            file_info['expected_size'],
-            file_info['expected_sha256']
+            file_info["expected_size"],
+            file_info["expected_sha256"],
         )
 
         if not success:
             logger.critical(f"Failed to download {file_info['filename']}")
 
-        logger.info('')
+        logger.info("")
 
     # Remove files that are not in the download list
     for root, dirs, files in os.walk(target_directory):
         for file in files:
             file_path = os.path.join(root, file)
             relative_path = os.path.relpath(file_path, target_directory)
-            if _normalize_rel(relative_path) not in expected_files:
+            normalized_relative_path = _normalize_rel(relative_path)
+            if _is_preserved(normalized_relative_path):
+                continue
+            if normalized_relative_path not in expected_files:
                 logger.info(f"Removing file not in download list: {relative_path}")
                 os.remove(file_path)
 
@@ -348,6 +410,9 @@ def sync_files(files_to_download, target_directory: str, check_os: bool = True):
     for root, dirs, files in os.walk(target_directory, topdown=False):
         for dir in dirs:
             dir_path = os.path.join(root, dir)
+            relative_path = os.path.relpath(dir_path, target_directory)
+            if _is_preserved(_normalize_rel(relative_path)):
+                continue
             if not os.listdir(dir_path):
                 os.rmdir(dir_path)
                 logger.info(f"Removed empty directory: {dir_path}")
