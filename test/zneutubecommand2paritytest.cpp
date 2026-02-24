@@ -1668,6 +1668,182 @@ TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)
   fs::remove_all(dir, ec);
 }
 
+TEST(NeutubeCommand2Parity, Trace_WithHostSwc_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const fs::path dir = makeUniqueTempDir();
+  const fs::path commandConfig = dir / "command_config.json";
+  const fs::path traceCfg = dir / "trace_config.json";
+  const fs::path inputTraceTiff = dir / "signal_trace.tif";
+  const fs::path hostSwc = dir / "host.swc";
+  const fs::path legacyTraceSwc = dir / "legacy_trace_host.swc";
+  const fs::path v2TraceSwc = dir / "v2_trace_host.swc";
+
+  writeTextFile(commandConfig,
+                R"json({
+  "trace": {
+    "include": "trace_config.json"
+  }
+}
+)json");
+
+  writeTextFile(traceCfg,
+                R"json({
+  "tag": "trace config",
+  "default": {}
+}
+)json");
+
+  writeSimpleLineTiff(inputTraceTiff, 128, 32, 32, 255);
+
+  writeTextFile(hostSwc,
+                R"swc(
+1 0 64 16 10 1 -1
+2 0 64 16 14 1 1
+3 0 64 16 18 1 2
+)swc");
+
+  json::object in;
+  in["signal"] = inputTraceTiff.string();
+  in["swc"] = hostSwc.string();
+  json::array pos;
+  pos.emplace_back(64);
+  pos.emplace_back(16);
+  pos.emplace_back(16);
+  in["position"] = std::move(pos);
+  const std::string inputJson = json::serialize(in);
+
+  const int legacyRc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      "-o",
+      legacyTraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
+  }();
+
+  const int v2Rc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command2",
+      "--trace",
+      "-o",
+      v2TraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+  }();
+
+  EXPECT_EQ(legacyRc, v2Rc);
+  EXPECT_EQ(legacyRc, 0);
+
+  ASSERT_TRUE(fs::exists(legacyTraceSwc)) << legacyTraceSwc.string();
+  ASSERT_TRUE(fs::exists(v2TraceSwc)) << v2TraceSwc.string();
+  EXPECT_EQ(readTextFile(legacyTraceSwc), readTextFile(v2TraceSwc));
+
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+}
+
+TEST(NeutubeCommand2Parity, Trace_WithHostSwc_NoConnection_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const fs::path dir = makeUniqueTempDir();
+  const fs::path commandConfig = dir / "command_config.json";
+  const fs::path traceCfg = dir / "trace_config.json";
+  const fs::path inputTraceTiff = dir / "signal_trace.tif";
+  const fs::path hostSwc = dir / "host_far.swc";
+  const fs::path legacyTraceSwc = dir / "legacy_trace_host_far.swc";
+  const fs::path v2TraceSwc = dir / "v2_trace_host_far.swc";
+
+  writeTextFile(commandConfig,
+                R"json({
+  "trace": {
+    "include": "trace_config.json"
+  }
+}
+)json");
+
+  writeTextFile(traceCfg,
+                R"json({
+  "tag": "trace config",
+  "default": {}
+}
+)json");
+
+  writeSimpleLineTiff(inputTraceTiff, 128, 32, 32, 255);
+
+  writeTextFile(hostSwc,
+                R"swc(
+1 0 0 0 0 1 -1
+2 0 0 0 1 1 1
+3 0 0 0 2 1 2
+)swc");
+
+  json::object in;
+  in["signal"] = inputTraceTiff.string();
+  in["swc"] = hostSwc.string();
+  json::array pos;
+  pos.emplace_back(64);
+  pos.emplace_back(16);
+  pos.emplace_back(16);
+  in["position"] = std::move(pos);
+  const std::string inputJson = json::serialize(in);
+
+  const int legacyRc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      "-o",
+      legacyTraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
+  }();
+
+  const int v2Rc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command2",
+      "--trace",
+      "-o",
+      v2TraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+  }();
+
+  EXPECT_EQ(legacyRc, v2Rc);
+  EXPECT_EQ(legacyRc, 0);
+
+  ASSERT_TRUE(fs::exists(legacyTraceSwc)) << legacyTraceSwc.string();
+  ASSERT_TRUE(fs::exists(v2TraceSwc)) << v2TraceSwc.string();
+  EXPECT_EQ(readTextFile(legacyTraceSwc), readTextFile(v2TraceSwc));
+
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+}
+
 TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)
 {
   ScopedQtCoreApplication qtApp;

@@ -389,6 +389,8 @@ We need objective, automated checks to keep the migration safe:
 - **In-tree parity tests (current)**:
   - `zneutubecommand2paritytest`:
     - `NeutubeCommand2Parity.SkeletonizeAndTrace_TiffMatchesLegacy`
+    - `NeutubeCommand2Parity.Trace_WithHostSwc_MatchesLegacy`
+    - `NeutubeCommand2Parity.Trace_WithHostSwc_NoConnection_MatchesLegacy`
     - `NeutubeCommand2Parity.CompareSwc_MatchesLegacy`
     - Exercises `--command` vs `--command2` on synthetic TIFF inputs and asserts the produced SWC files are
       byte-identical (skeletonize + seeded trace in one consolidated test).
@@ -469,6 +471,8 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
   - ✅ Skeletonize output uses `nim::ZSwc` + a legacy-format writer for byte-identical SWC files
   - 🟨 Trace output migration status
     - ✅ Seeded trace (position provided, no host SWC, diagnosis disabled) uses `nim::ZSwc` + legacy-format writer
-    - ⬜ Auto trace and host-SWC attach still use legacy `ZSwcTree` via `neutube_legacy` (temporary scaffolding)
+    - ✅ Seeded trace with host SWC attach (position provided, host SWC provided, diagnosis disabled) uses `nim::ZSwc`
+      end-to-end (legacy SWC parse ordering, SWC->mask labeling, and branch attach/connector semantics)
+    - ⬜ Auto trace and diagnosis still use legacy `ZSwcTree` via `neutube_legacy` (temporary scaffolding)
 - ⬜ Add parity tests and sample datasets for regression checking
 - ⬜ Document GUI parity targets and begin Atlas GUI integration (Goal 2)

@@ -1,0 +1,21 @@
+#pragma once
+
+#include "zswc.h"
+
+#include <string>
+
+namespace nim::neutube {
+
+// Loads an SWC file into `out` matching legacy neuTube `Swc_Tree_Parse_String` child/root ordering:
+// - Nodes are connected by scanning IDs in increasing order.
+// - Each node is inserted as the *first* child of its parent (prepend), which yields descending-id sibling order.
+// - Missing/invalid parents are treated as -1 (root).
+//
+// This ordering is important for strict A/B parity when legacy code relies on:
+// - depth-first traversal order, and
+// - `firstChild()` selection (e.g., connect-branch heuristics).
+//
+// Returns false on failure and optionally populates `error`.
+[[nodiscard]] bool loadSwcLegacyOrder(const std::string& path, ZSwc* out, std::string* error = nullptr);
+
+} // namespace nim::neutube

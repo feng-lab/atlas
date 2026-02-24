@@ -43,6 +43,11 @@ set(NEUTUBE_SOURCES
     zneutubeswcregionsampling.cpp zneutubeswcregionsampling.h
     zneutubeswcresampler.cpp zneutubeswcresampler.h
     zneutubeswcwriter.cpp zneutubeswcwriter.h
+    zneutubeswcloaderlegacy.cpp zneutubeswcloaderlegacy.h
+    zneutubeswctreenodegeomlegacy.cpp zneutubeswctreenodegeomlegacy.h
+    zneutubetraceconnect.cpp zneutubetraceconnect.h
+    zneutubetraceswclocseg.cpp zneutubetraceswclocseg.h
+    zneutubetraceswclabelstack.cpp zneutubetraceswclabelstack.h
     zneutubevoxel.h
     zneutubevoxelarray.cpp zneutubevoxelarray.h
     zneutubelocalneuroseg.cpp zneutubelocalneuroseg.h
