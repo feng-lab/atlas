@@ -4,6 +4,7 @@
 #include <QFileInfo>
 
 #include "zneutubelegacy.h"
+#include "zneutubeskeletonize.h"
 
 #include "zlog.h"
 
@@ -472,11 +473,11 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
         LOG(ERROR) << "Skeletonize: missing input file.";
         return 1;
       }
-      return neutube_legacy::runSkeletonize(args.input[0],
-                                            args.output,
-                                            skeletonizeInclude,
-                                            args.downsampleInterval,
-                                            args.isVerbose);
+      return neutube::runSkeletonize(args.input[0],
+                                     args.output,
+                                     skeletonizeInclude,
+                                     args.downsampleInterval,
+                                     args.isVerbose);
     }
 
     case Command::CompareSwc: {

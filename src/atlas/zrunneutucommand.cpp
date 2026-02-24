@@ -3,7 +3,6 @@
 #include "zlog.h"
 #include "zsysteminfo.h"
 
-#include "tz_utilities.h"
 #include "filesystem/utilities.h"
 #include "zobject3dscan.h"
 #include "zjsonparser.h"
@@ -26,32 +25,221 @@
 
 #include <QFileInfoList>
 #include <QDir>
+#include <QFileInfo>
+
+#include <array>
+#include <charconv>
+#include <chrono>
+#include <optional>
+#include <string_view>
 
 DECLARE_int32(v);
 
 namespace nim {
 
+namespace {
+
+struct CommandArgs
+{
+  std::vector<std::string> input;
+  std::string output;
+  std::string configPath;
+  std::string generalConfig;
+
+  std::optional<std::array<int, 3>> intv;
+  std::optional<int> level;
+  std::optional<double> scale;
+
+  bool verbose = false;
+
+  bool runSkeletonize = false;
+  bool runTrace = false;
+  bool runCompareSwc = false;
+  bool runComputeSeed = false;
+  bool runGeneral = false;
+};
+
+[[nodiscard]] bool fileExists(const QString& path)
+{
+  const QFileInfo fi(path);
+  return fi.exists() && fi.isFile();
+}
+
+[[nodiscard]] bool fileExists(const std::string& path)
+{
+  if (path.empty()) {
+    return false;
+  }
+  return fileExists(QString::fromStdString(path));
+}
+
+[[nodiscard]] std::optional<int> parseInt(std::string_view s)
+{
+  int out = 0;
+  const auto* begin = s.data();
+  const auto* end = s.data() + s.size();
+  const auto [ptr, ec] = std::from_chars(begin, end, out);
+  if (ec != std::errc{} || ptr != end) {
+    return std::nullopt;
+  }
+  return out;
+}
+
+[[nodiscard]] std::optional<double> parseDouble(std::string_view s)
+{
+  try {
+    size_t idx = 0;
+    const double v = std::stod(std::string(s), &idx);
+    if (idx != s.size()) {
+      return std::nullopt;
+    }
+    return v;
+  }
+  catch (...) {
+    return std::nullopt;
+  }
+}
+
+[[nodiscard]] bool parseArgs(int argc, char* argv[], CommandArgs* out)
+{
+  CHECK(out != nullptr);
+  CHECK(argc >= 2);
+  CHECK(argv != nullptr);
+  CHECK(argv[0] != nullptr);
+  CHECK(argv[1] != nullptr);
+
+  if (std::string_view(argv[1]) != "--command") {
+    LOG(ERROR) << "ZRunNeuTuCommand must be invoked via '--command' as argv[1].";
+    return false;
+  }
+
+  for (int i = 2; i < argc; ++i) {
+    CHECK(argv[i] != nullptr);
+    const std::string_view arg(argv[i]);
+
+    if (arg == "--verbose") {
+      out->verbose = true;
+      FLAGS_v = 1;
+      continue;
+    }
+
+    if (arg == "-o") {
+      if (i + 1 >= argc) {
+        LOG(ERROR) << "Missing value for -o";
+        return false;
+      }
+      out->output = argv[++i];
+      continue;
+    }
+
+    if (arg == "--config") {
+      if (i + 1 >= argc) {
+        LOG(ERROR) << "Missing value for --config";
+        return false;
+      }
+      out->configPath = argv[++i];
+      continue;
+    }
+
+    if (arg == "--intv") {
+      if (i + 3 >= argc) {
+        LOG(ERROR) << "Missing values for --intv <int> <int> <int>";
+        return false;
+      }
+      std::array<int, 3> intv{};
+      for (int k = 0; k < 3; ++k) {
+        const std::string_view v(argv[i + 1 + k]);
+        const auto parsed = parseInt(v);
+        if (!parsed) {
+          LOG(ERROR) << "Invalid --intv value: " << std::string(v);
+          return false;
+        }
+        intv[static_cast<size_t>(k)] = *parsed;
+      }
+      out->intv = intv;
+      i += 3;
+      continue;
+    }
+
+    if (arg == "--level") {
+      if (i + 1 >= argc) {
+        LOG(ERROR) << "Missing value for --level";
+        return false;
+      }
+      const std::string_view v(argv[++i]);
+      const auto parsed = parseInt(v);
+      if (!parsed) {
+        LOG(ERROR) << "Invalid --level value: " << std::string(v);
+        return false;
+      }
+      out->level = *parsed;
+      continue;
+    }
+
+    if (arg == "--scale") {
+      if (i + 1 >= argc) {
+        LOG(ERROR) << "Missing value for --scale";
+        return false;
+      }
+      const std::string_view v(argv[++i]);
+      const auto parsed = parseDouble(v);
+      if (!parsed) {
+        LOG(ERROR) << "Invalid --scale value: " << std::string(v);
+        return false;
+      }
+      out->scale = *parsed;
+      continue;
+    }
+
+    if (arg == "--skeletonize") {
+      out->runSkeletonize = true;
+      continue;
+    }
+    if (arg == "--trace") {
+      out->runTrace = true;
+      continue;
+    }
+    if (arg == "--compare_swc") {
+      out->runCompareSwc = true;
+      continue;
+    }
+    if (arg == "--compute_seed") {
+      out->runComputeSeed = true;
+      continue;
+    }
+    if (arg == "--general") {
+      if (i + 1 >= argc) {
+        LOG(ERROR) << "Missing value for --general";
+        return false;
+      }
+      out->runGeneral = true;
+      out->generalConfig = argv[++i];
+      continue;
+    }
+
+    if (!arg.empty() && arg[0] == '-') {
+      LOG(ERROR) << "Unknown flag: " << std::string(arg);
+      return false;
+    }
+
+    out->input.emplace_back(arg);
+  }
+
+  return true;
+}
+
+} // namespace
+
 int ZRunNeuTuCommand::run(int argc, char* argv[])
 {
-  static const char* Spec[] = {"--command",
-                               "[<input:string> ...]",
-                               "[-o <string>]",
-                               "[--config <string>]",
-                               "[--intv <int> <int> <int>]",
-                               "[--skeletonize]",
-                               "[--general <string>]",
-                               "[--compare_swc] [--scale <double>]",
-                               "[--trace] [--level <int>]",
-                               "[--compute_seed]",
-                               "[--verbose]",
-                               nullptr};
-
-  Process_Arguments(argc, argv, const_cast<char**>(Spec), 1);
-
-  if (Is_Arg_Matched(const_cast<char*>("--verbose"))) {
-    m_isVerbose = true;
-    FLAGS_v = 1;
+  CommandArgs args;
+  if (!parseArgs(argc, argv, &args)) {
+    LOG(INFO) << "Usage (legacy): Atlas --command [<input> ...] [-o <output>] [--config <command_config.json>]"
+                 " [--intv <int> <int> <int>] [--skeletonize] [--general <string>]"
+                 " [--compare_swc --scale <double>] [--trace --level <int>] [--compute_seed] [--verbose]";
+    return 1;
   }
+  m_isVerbose = args.verbose;
 
   for (int i = 0; i < argc; ++i) {
     LOG(INFO) << argv[i];
@@ -62,8 +250,8 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
   // "json");
   std::string configPath = neutu::JoinPath(m_configDir, "command_config.json");
 
-  if (Is_Arg_Matched(const_cast<char*>("--config"))) {
-    configPath = Get_String_Arg(const_cast<char*>("--config"));
+  if (!args.configPath.empty()) {
+    configPath = args.configPath;
   }
 
   auto configJson = loadConfig(configPath);
@@ -79,54 +267,51 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
     // LOG(INFO) << ZJsonParser::stringValue(configJson["output"]);
   }
 
-  if (Is_Arg_Matched(const_cast<char*>("--scale"))) {
-    m_scale = Get_Double_Arg(const_cast<char*>("--scale"));
+  if (args.scale) {
+    m_scale = *args.scale;
   }
 
-  if (Is_Arg_Matched(const_cast<char*>("--level"))) {
-    m_level = Get_Int_Arg(const_cast<char*>("--level"));
+  if (args.level) {
+    m_level = *args.level;
   }
 
   //  ZArgumentProcessor::processArguments(argc, argv, Spec);
 
   m_input.clear();
-  int inputNumber = Get_Repeat_Count(const_cast<char*>("input"));
-  //  if (ZArgumentProcessor::isArgMatched("input")) {
-  //    int inputNumber = ZArgumentProcessor::getRepeatCount("input");
-  m_input.resize(inputNumber);
-  for (int i = 0; i < inputNumber; ++i) {
-    m_input[i] = Get_String_Arg(const_cast<char*>("input"), i);
-    //      m_input[i] = ZArgumentProcessor::getStringArg("input", i);
+  m_input = args.input;
+
+  if (!m_input.empty() && m_input[0] == "json" && m_input.size() < 2) {
+    LOG(ERROR) << "Invalid input: expected `json <jsonString|jsonFile>`";
+    return 1;
   }
 
   auto inputJson = loadInputJson();
 
-  if (Is_Arg_Matched(const_cast<char*>("-o"))) {
-    m_output = Get_String_Arg(const_cast<char*>("-o"));
+  if (!args.output.empty()) {
+    m_output = args.output;
   }
 
-  if (Is_Arg_Matched(const_cast<char*>("--intv"))) {
+  if (args.intv) {
     for (int i = 0; i < 3; ++i) {
-      m_intv[i] = Get_Int_Arg(const_cast<char*>("--intv"), i + 1);
+      m_intv[i] = (*args.intv)[static_cast<size_t>(i)];
     }
     m_intvSpecified = true;
   }
 
   if (command == UNKNOWN_COMMAND) {
-    if (Is_Arg_Matched(const_cast<char*>("--skeletonize"))) {
+    if (args.runSkeletonize) {
       command = SKELETONIZE;
       //    m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
-    } else if (Is_Arg_Matched(const_cast<char*>("--trace"))) {
+    } else if (args.runTrace) {
       //      m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
-      m_output = Get_String_Arg(const_cast<char*>("-o"));
       command = TRACE_NEURON;
-    } else if (Is_Arg_Matched(const_cast<char*>("--compare_swc"))) {
+    } else if (args.runCompareSwc) {
       command = COMPARE_SWC;
-    } else if (Is_Arg_Matched(const_cast<char*>("--compute_seed"))) {
+    } else if (args.runComputeSeed) {
       command = COMPUTE_SEED;
-    } else if (Is_Arg_Matched(const_cast<char*>("--general"))) {
+    } else if (args.runGeneral) {
       command = GENERAL_COMMAND;
-      m_generalConfig = Get_String_Arg(const_cast<char*>("--general"));
+      m_generalConfig = args.generalConfig;
       LOG(INFO) << "Config: " << m_generalConfig;
     }
   }
@@ -150,15 +335,21 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
 
 ZRunNeuTuCommand::ECommand ZRunNeuTuCommand::getCommand(const char* cmd)
 {
-  if (eqstr(cmd, "sobj_marker")) {
+  if (cmd == nullptr) {
+    return UNKNOWN_COMMAND;
+  }
+
+  const std::string_view s(cmd);
+
+  if (s == "sobj_marker") {
     return OBJECT_MARKER;
   }
 
-  if (eqstr(cmd, "boundary_orphan")) {
+  if (s == "boundary_orphan") {
     return BOUNDARY_ORPHAN;
   }
 
-  if (eqstr(cmd, "flyem_neuron_feature")) {
+  if (s == "flyem_neuron_feature") {
     return FLYEM_NEURON_FEATURE;
   }
 
@@ -426,21 +617,22 @@ int ZRunNeuTuCommand::runCompareSwc()
 
 int ZRunNeuTuCommand::runSkeletonize(ZJsonObject& configJson)
 {
-  int stat;
-
   if (m_input.empty()) {
     LOG(INFO) << "Please specify input.";
     return 1;
   }
 
+  std::optional<std::chrono::steady_clock::time_point> start;
   if (m_isVerbose) {
-    tic();
+    start = std::chrono::steady_clock::now();
   }
 
-  stat = skeletonizeFile(configJson);
+  const int stat = skeletonizeFile(configJson);
 
-  if (m_isVerbose) {
-    ptoc();
+  if (m_isVerbose && start) {
+    const auto end = std::chrono::steady_clock::now();
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - *start).count();
+    LOG(INFO) << "Skeletonize elapsed: " << ms << " ms";
   }
 
   return stat;
@@ -448,7 +640,7 @@ int ZRunNeuTuCommand::runSkeletonize(ZJsonObject& configJson)
 
 int ZRunNeuTuCommand::skeletonizeFile(ZJsonObject& configJson)
 {
-  if (!fexist(m_input[0].c_str())) {
+  if (!fileExists(m_input[0])) {
     LOG(ERROR) << "Skeletonization Failed: The input file " << m_input[0] << " seems not exist.";
     return 1;
   }
@@ -554,7 +746,7 @@ void ZRunNeuTuCommand::expandConfig(const std::string& configFilePath,
     std::string includeFilePath = extractIncludePath(configFilePath, objKey, configJson);
 
     if (!includeFilePath.empty()) {
-      if (fexist(includeFilePath.c_str())) {
+      if (fileExists(includeFilePath)) {
         ZJsonObject subJson(configJson.value(objKey.c_str()));
         ZJsonObject includeJson;
         includeJson.load(includeFilePath);

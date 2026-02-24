@@ -32,6 +32,7 @@ struct SwcNode
   double radius = -1;
   int64_t parentID = -2; // after tree change, parentID becomes invalid, use function parentID to get corrent parentID
   int64_t label = -1;
+  double weight = 0.0;
   bool selected = false;
 
   [[nodiscard]] std::string toString() const

@@ -2107,6 +2107,33 @@ public:
     return Iter(node);
   }
 
+  // Inserts a new child node as a sibling immediately before `beforeChild` in the parent's child list.
+  // `beforeChild` must be an existing child of `parent`.
+  template<typename Iter>
+  Iter insertChildBefore(Iter parent, Iter beforeChild, const T& v)
+  {
+    CHECK(isValid(parent));
+    CHECK(isValid(beforeChild));
+    CHECK(this->parent(beforeChild) == parent);
+
+    auto iterator = m_nodes.emplace(m_nodes.end(), v);
+    auto node = &*iterator;
+    node->iteratorOfContainer = iterator;
+    node->parent = parent.node;
+
+    node->nextSibling = beforeChild.node;
+    node->prevSibling = beforeChild.node->prevSibling;
+
+    if (beforeChild.node->prevSibling) {
+      beforeChild.node->prevSibling->nextSibling = node;
+    } else {
+      parent.node->firstChild = node;
+    }
+    beforeChild.node->prevSibling = node;
+
+    return Iter(node);
+  }
+
   // child will be detached from previous parent (if any)
   // parent and child should come from same tree
   template<typename Iter>
