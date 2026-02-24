@@ -226,7 +226,7 @@ int main(int argc, char* argv[])
       // Start RPC service manager only in GUI mode. Avoid spawning RPC threads
       // for console utilities (export/schema dump) to ensure deterministic
       // teardown without cross-thread shutdown requirements.
-      ZServiceManager sm;
+      ZServiceManager sm(GIT_VERSION);
       ZTheme::instance();
 
       // ZMainWindow has Qt::WA_DeleteOnClose attribute

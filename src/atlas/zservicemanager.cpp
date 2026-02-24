@@ -12,9 +12,11 @@ namespace nim {
 
 ZServiceManager* g_sm = nullptr;
 
-ZServiceManager::ZServiceManager(QObject* parent)
+ZServiceManager::ZServiceManager(std::string_view appVersion, QObject* parent)
   : QObject(parent)
+  , m_appVersion(appVersion)
 {
+  CHECK(!m_appVersion.empty());
   g_sm = this;
   init();
 }
@@ -51,7 +53,7 @@ void ZServiceManager::init()
   m_rpcThread->setObjectName("RPCThread");
   m_logicThread->setObjectName("LogicThread");
 
-  m_rpcService = new ZRPCService;
+  m_rpcService = new ZRPCService(m_appVersion);
   m_rpcService->setUiDispatcher(m_rpcUiDispatcher);
   m_rpcService->moveToThread(m_rpcThread);
 

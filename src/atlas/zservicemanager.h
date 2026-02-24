@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <string_view>
 
 class QThread;
 
@@ -15,7 +16,7 @@ class ZServiceManager : public QObject
   Q_OBJECT
 
 public:
-  explicit ZServiceManager(QObject* parent = nullptr);
+  explicit ZServiceManager(std::string_view appVersion, QObject* parent = nullptr);
 
   ~ZServiceManager() override;
 
@@ -85,6 +86,10 @@ private:
 
   ZRPCService* m_rpcService = nullptr;
   ZRpcUiDispatcher* m_rpcUiDispatcher = nullptr;
+
+  // Non-owning reference to the app's version string. Must outlive the service manager.
+  // We pass the build-stamped `GIT_VERSION` string literal from main.cpp, so lifetime is the entire process.
+  std::string_view m_appVersion;
 
   bool m_shutdown = false;
   bool m_init = false;

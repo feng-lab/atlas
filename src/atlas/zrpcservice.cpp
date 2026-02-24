@@ -10,11 +10,12 @@
 #include "zrpcuidispatcher.h"
 #include "zrpcsceneids.h"
 #include "zrpctaskmanager.h"
-#include "../version/version.h"
 #include <QThread>
 #include <algorithm>
 #include <chrono>
 #include <sstream>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <grpc/support/time.h>
 #include <grpcpp/grpcpp.h>
@@ -133,9 +134,12 @@ using atlas::rpc::KeyInfo;
 using atlas::rpc::TimeStatus;
 using atlas::rpc::GetTimeRequest;
 
-ZRPCService::ZRPCService(QObject* parent)
+ZRPCService::ZRPCService(std::string_view appVersion, QObject* parent)
   : QObject(parent)
-{}
+  , m_appVersion(appVersion)
+{
+  CHECK(!m_appVersion.empty());
+}
 
 ZRPCService::~ZRPCService() = default;
 
@@ -480,10 +484,13 @@ static google::protobuf::Value jsonToPb(const json::value& jv)
 class SceneServiceImpl final : public Scene::Service
 {
 public:
-  explicit SceneServiceImpl(ZRpcUiDispatcher* uiDispatcher)
-    : m_uiDispatcher(uiDispatcher)
+  explicit SceneServiceImpl(ZRpcUiDispatcher* uiDispatcher, std::string_view appVersion)
+    : m_appVersion(appVersion)
+    , m_uiDispatcher(uiDispatcher)
     , m_taskManager(uiDispatcher)
-  {}
+  {
+    CHECK(!m_appVersion.empty());
+  }
 
   Status Ping(ServerContext*, const PingRequest*, PingResponse* reply) override
   {
@@ -529,8 +536,10 @@ public:
                        const google::protobuf::Empty*,
                        google::protobuf::StringValue* reply) override
   {
+    CHECK(reply);
     // Build-time version string (git describe + build timestamp).
-    reply->set_value(std::string(GIT_VERSION));
+    // Provided by the app entry point to keep atlas_core independent of version.h.
+    reply->set_value(m_appVersion.data(), m_appVersion.size());
     return Status::OK;
   }
 
@@ -3564,6 +3573,7 @@ private:
     }
   }
 
+  std::string_view m_appVersion;
   ZRpcUiDispatcher* m_uiDispatcher = nullptr; // non-owning
   ZRpcTaskManager m_taskManager;
 };
@@ -3600,7 +3610,7 @@ void ZRPCService::onRPCThreadStarted()
 
   std::string server_address("0.0.0.0:50051");
   // Allocate services on the heap and keep them alive for the server lifetime.
-  m_sceneService = std::unique_ptr<grpc::Service>(new SceneServiceImpl(m_uiDispatcher));
+  m_sceneService = std::unique_ptr<grpc::Service>(new SceneServiceImpl(m_uiDispatcher, m_appVersion));
 
   grpc::ServerBuilder builder;
   // Set the default compression algorithm for the server.
