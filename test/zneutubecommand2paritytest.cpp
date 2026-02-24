@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 
 #include <QCoreApplication>
+#include <QFileInfo>
 #include <QString>
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <tuple>
 #include <memory>
 #include <string>
@@ -14,6 +17,12 @@
 
 #include <fmt/format.h>
 
+extern "C" {
+#include "tz_stack_neighborhood.h"
+#include "tz_stack_objlabel.h"
+}
+
+#include "zneutubecompareswc.h"
 #include "zneutubeneighborhood.h"
 #include "zneutubeobjlabel.h"
 
@@ -25,11 +34,12 @@
 #include "zlog.h"
 #include "zrunneutucommand.h"
 #include "zrunneutucommand2.h"
-
-extern "C" {
-#include "tz_stack_neighborhood.h"
-#include "tz_stack_objlabel.h"
-}
+#include "ztest.h"
+#include "zswclayertrunkanalyzer.h"
+#include "zswclayershollfeatureanalyzer.h"
+#include "zswcnodebufferfeatureanalyzer.h"
+#include "zswctree.h"
+#include "zswctreematcher.h"
 
 namespace fs = std::filesystem;
 
@@ -207,6 +217,72 @@ struct LegacyCLabeledStack
   Kill_Stack(stack);
 
   return res;
+}
+
+[[nodiscard]] double compareSwcLikeLegacy(ZSwcTree* tree1, ZSwcTree* tree2, ZSwcTreeMatcher& matcher)
+{
+  double score = 0.0;
+
+  if (tree1 != nullptr && tree2 != nullptr) {
+    constexpr double SampleStep = 200.0;
+    constexpr int MatchingLevel = 2;
+
+    std::unique_ptr<ZSwcTree> tree1ForMatch(tree1->clone());
+    tree1ForMatch->resample(SampleStep);
+
+    std::unique_ptr<ZSwcTree> tree2ForMatch(tree2->clone());
+    tree2ForMatch->resample(SampleStep);
+
+    matcher.matchAllG(*tree1ForMatch, *tree2ForMatch, MatchingLevel);
+    score = matcher.matchingScore();
+  }
+
+  return score;
+}
+
+[[nodiscard]] std::string legacyCompareSwcPairs(const std::vector<std::string>& inputPaths, double scale)
+{
+  std::vector<std::unique_ptr<ZSwcTree>> treeArray;
+  treeArray.reserve(inputPaths.size());
+
+  for (const auto& p : inputPaths) {
+    auto tree = std::make_unique<ZSwcTree>();
+    tree->load(p);
+    if (scale != 1.0) {
+      tree->rescale(scale, scale, scale);
+    }
+    treeArray.push_back(std::move(tree));
+  }
+
+  ZSwcTreeMatcher matcher;
+  ZSwcLayerTrunkAnalyzer trunkAnalyzer;
+  trunkAnalyzer.setStep(200.0);
+
+  ZSwcLayerShollFeatureAnalyzer helperAnalyzer;
+  helperAnalyzer.setLayerScale(4000.0);
+  helperAnalyzer.setLayerMargin(100.0);
+
+  ZSwcNodeBufferFeatureAnalyzer analyzer;
+  analyzer.setHelper(&helperAnalyzer);
+
+  matcher.setTrunkAnalyzer(&trunkAnalyzer);
+  matcher.setFeatureAnalyzer(&analyzer);
+
+  std::vector<double> selfScore(treeArray.size(), 0.0);
+  for (size_t i = 0; i < treeArray.size(); ++i) {
+    selfScore[i] = compareSwcLikeLegacy(treeArray[i].get(), treeArray[i].get(), matcher);
+  }
+
+  std::ostringstream stream;
+  for (size_t i = 0; i < treeArray.size(); ++i) {
+    for (size_t j = i + 1; j < treeArray.size(); ++j) {
+      double score = compareSwcLikeLegacy(treeArray[i].get(), treeArray[j].get(), matcher);
+      score /= std::max(selfScore[i], selfScore[j]);
+      stream << i << "-" << j << ": " << score << std::endl;
+    }
+  }
+
+  return stream.str();
 }
 
 } // namespace
@@ -504,4 +580,29 @@ TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)
 
   std::error_code ec;
   fs::remove_all(dir, ec);
+}
+
+TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+
+  const QDir compareDir(nim::getTestDataDir().filePath("benchmark/swc/compare"));
+  if (!compareDir.exists()) {
+    GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath().toStdString();
+  }
+
+  std::vector<std::string> inputs;
+  for (int i = 1; i <= 5; ++i) {
+    const QString name = QString("compare%1.swc").arg(i);
+    const QString swcPath = compareDir.filePath(name);
+    if (!QFileInfo::exists(swcPath)) {
+      GTEST_SKIP() << "Missing SWC compare file: " << swcPath.toStdString();
+    }
+    inputs.push_back(swcPath.toStdString());
+  }
+
+  const std::string legacy = legacyCompareSwcPairs(inputs, 1.0);
+  const std::string ported = nim::neutube::formatCompareSwcPairs(nim::neutube::computeCompareSwc(inputs, 1.0));
+
+  EXPECT_EQ(ported, legacy);
 }

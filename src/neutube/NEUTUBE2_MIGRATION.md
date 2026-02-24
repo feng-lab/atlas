@@ -1,6 +1,6 @@
 # neuTube 2.0 (“NeuTu”) → Atlas migration
 
-Last updated: 2026-02-23
+Last updated: 2026-02-24
 
 Doc location: `src/neutube/NEUTUBE2_MIGRATION.md`
 
@@ -379,8 +379,10 @@ We need objective, automated checks to keep the migration safe:
 - **In-tree parity tests (current)**:
   - `zneutubecommand2paritytest`:
     - `NeutubeCommand2Parity.SkeletonizeAndTrace_TiffMatchesLegacy`
+    - `NeutubeCommand2Parity.CompareSwc_MatchesLegacy`
     - Exercises `--command` vs `--command2` on synthetic TIFF inputs and asserts the produced SWC files are
       byte-identical (skeletonize + seeded trace in one consolidated test).
+    - Verifies the ported `--compare_swc` path matches the legacy `ZSwcTreeMatcher`-based implementation.
   - Note: the legacy Atlas runner no longer relies on the genelib `Process_Arguments(...)` helper, so it can be invoked
     multiple times within a single test process (required for consolidated A/B tests).
 - **Property tests / invariants**:
@@ -424,6 +426,11 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
   - ✅ Port SWC primitives used by skeletonize: `src/neutube/zneutubeswcops.*`, `src/neutube/zneutubeswcpointdist.*`,
     `src/neutube/zneutubeswcreconnect.*`, `src/neutube/zneutubeswcresampler.*`, `src/neutube/zneutubeswcregionsampling.*`,
     `src/neutube/zneutubeswcwriter.*`
+- ✅ Port `--compare_swc` to `nim::ZSwc` (exact legacy `ZSwcTreeMatcher::matchAllG` semantics)
+  - Implementation: `src/neutube/zneutubecompareswc.*`
+  - Note: legacy `ZSwcLayerTrunkAnalyzer::extractTrunk(...)` is a stub (returns an empty path). The port preserves this
+    behavior exactly, including the `-1.0` gap-penalty score contributions that fall out of matching empty branches.
+  - Parity: `test/zneutubecommand2paritytest.cpp` (`NeutubeCommand2Parity.CompareSwc_MatchesLegacy`)
 - 🟨 Switch SWC I/O + processing to `nim::ZSwc`
   - ✅ Skeletonize output uses `nim::ZSwc` + a legacy-format writer for byte-identical SWC files
   - ⬜ Trace path still uses legacy `ZSwcTree` via `neutube_legacy` (temporary scaffolding)

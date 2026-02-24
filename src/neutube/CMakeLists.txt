@@ -8,6 +8,7 @@ print_target_properties(Qt6::Core)
 set(NEUTUBE_SOURCES
     zimgstackinterface.cpp zimgstackinterface.h
     zneutubedarrayqsort.cpp zneutubedarrayqsort.h
+    zneutubecompareswc.cpp zneutubecompareswc.h
     zneutubeimgbwmorph.cpp zneutubeimgbwmorph.h
     zneutubeneighborhood.cpp zneutubeneighborhood.h
     zneutubeobjlabel.cpp zneutubeobjlabel.h

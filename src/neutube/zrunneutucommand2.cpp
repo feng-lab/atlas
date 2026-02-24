@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QFileInfo>
 
+#include "zneutubecompareswc.h"
 #include "zneutubelegacy.h"
 #include "zneutubeskeletonize.h"
 
@@ -481,7 +482,7 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
     }
 
     case Command::CompareSwc: {
-      return neutube_legacy::runCompareSwc(args.input, args.scale);
+      return neutube::runCompareSwc(args.input, args.scale);
     }
 
     case Command::Trace: {
