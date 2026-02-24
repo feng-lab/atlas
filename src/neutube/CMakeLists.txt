@@ -14,6 +14,7 @@ set(NEUTUBE_SOURCES
     zneutubecompareswc.cpp zneutubecompareswc.h
     zneutubegeo3dpointarray.cpp zneutubegeo3dpointarray.h
     zneutubegeo3dscalarfield.cpp zneutubegeo3dscalarfield.h
+    zneutubegeo3dutils.cpp zneutubegeo3dutils.h
     zneutubeimgbwmorph.cpp zneutubeimgbwmorph.h
     zneutubeimgsampling.cpp zneutubeimgsampling.h
     zneutubeneighborhood.cpp zneutubeneighborhood.h

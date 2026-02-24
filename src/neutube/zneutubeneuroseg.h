@@ -35,8 +35,15 @@ struct NeurosegSliceField
 // Port of tz_neuroseg.c::Neuroseg_Slice_Field().
 [[nodiscard]] NeurosegSliceField neurosegSliceFieldLegacyLike(NeurosegFieldFunctionLegacyLike fieldFunc);
 
+// Port of tz_neuroseg.c::Neuroseg_Slice_Field_P().
+[[nodiscard]] NeurosegSliceField neurosegSliceFieldPLegacyLike(NeurosegFieldFunctionLegacyLike fieldFunc);
+
 // Port of tz_neuroseg.c::Neuroseg_Field_S_Fast().
 [[nodiscard]] Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg,
                                                             NeurosegFieldFunctionLegacyLike fieldFunc);
+
+// Port of tz_neuroseg.c::Neuroseg_Field_Sp().
+[[nodiscard]] Geo3dScalarField neurosegFieldSpLegacyLike(const Neuroseg& seg,
+                                                         NeurosegFieldFunctionLegacyLike fieldFunc);
 
 } // namespace nim::neutube

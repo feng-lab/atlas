@@ -5,6 +5,7 @@
 
 #include "zlog.h"
 
+#include <cmath>
 #include <limits>
 
 namespace nim::neutube {
@@ -25,6 +26,53 @@ namespace {
 }
 
 } // namespace
+
+std::array<double, 3> geo3dScalarFieldCenterLegacyLike(const Geo3dScalarField& field)
+{
+  CHECK(field.points.size() == field.values.size());
+  CHECK(!field.points.empty());
+
+  std::array<double, 3> center = {0.0, 0.0, 0.0};
+  for (const auto& p : field.points) {
+    center[0] += p[0];
+    center[1] += p[1];
+    center[2] += p[2];
+  }
+
+  const double n = static_cast<double>(field.points.size());
+  center[0] /= n;
+  center[1] /= n;
+  center[2] /= n;
+  return center;
+}
+
+std::array<double, 3> geo3dScalarFieldCentroidLegacyLike(const Geo3dScalarField& field)
+{
+  CHECK(field.points.size() == field.values.size());
+  CHECK(!field.points.empty());
+
+  double weight = 0.0;
+  std::array<double, 3> centroid = {0.0, 0.0, 0.0};
+
+  for (size_t i = 0; i < field.points.size(); ++i) {
+    const double v = field.values[i];
+    if (!std::isnan(v)) {
+      weight += v;
+      centroid[0] += field.points[i][0] * v;
+      centroid[1] += field.points[i][1] * v;
+      centroid[2] += field.points[i][2] * v;
+    }
+  }
+
+  if (weight == 0.0) {
+    return geo3dScalarFieldCenterLegacyLike(field);
+  }
+
+  centroid[0] /= weight;
+  centroid[1] /= weight;
+  centroid[2] /= weight;
+  return centroid;
+}
 
 std::vector<double> geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field,
                                                             const ZImg& stack,

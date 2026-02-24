@@ -83,6 +83,47 @@ void setNeurosegPositionLegacyLike(LocalNeuroseg* locseg,
 [[nodiscard]] Geo3dScalarField localNeurosegFieldSLegacyLike(const LocalNeuroseg& locseg,
                                                              NeurosegFieldFunctionLegacyLike fieldFunc);
 
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Field_Sp().
+[[nodiscard]] Geo3dScalarField localNeurosegFieldSpLegacyLike(const LocalNeuroseg& locseg,
+                                                              NeurosegFieldFunctionLegacyLike fieldFunc);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Score_P().
+[[nodiscard]] double localNeurosegScorePLegacyLike(const LocalNeuroseg& locseg,
+                                                   const ZImg& stack,
+                                                   double zScale,
+                                                   StackFitScore* fs,
+                                                   size_t c = 0,
+                                                   size_t t = 0);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Position_Adjust().
+void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg* locseg,
+                                           const ZImg& stack,
+                                           double zScale,
+                                           size_t c = 0,
+                                           size_t t = 0);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Orientation_Search_C().
+[[nodiscard]] double localNeurosegOrientationSearchCLegacyLike(LocalNeuroseg* locseg,
+                                                               const ZImg& stack,
+                                                               double zScale,
+                                                               StackFitScore* fs,
+                                                               size_t c = 0,
+                                                               size_t t = 0);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_R_Scale_Search().
+[[nodiscard]] double localNeurosegRScaleSearchLegacyLike(LocalNeuroseg* locseg,
+                                                         const ZImg& stack,
+                                                         double zScale,
+                                                         double rStart,
+                                                         double rEnd,
+                                                         double rStep,
+                                                         double sStart,
+                                                         double sEnd,
+                                                         double sStep,
+                                                         StackFitScore* fs,
+                                                         size_t c = 0,
+                                                         size_t t = 0);
+
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Score_W().
 [[nodiscard]] double localNeurosegScoreWLegacyLike(const LocalNeuroseg& locseg,
                                                    const ZImg& stack,
@@ -98,5 +139,14 @@ void setNeurosegPositionLegacyLike(LocalNeuroseg* locseg,
                                                  LocsegFitWorkspace* ws,
                                                  size_t c = 0,
                                                  size_t t = 0);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Optimize_W().
+[[nodiscard]] double localNeurosegOptimizeWLegacyLike(LocalNeuroseg* locseg,
+                                                      const ZImg& stack,
+                                                      double zScale,
+                                                      int option,
+                                                      LocsegFitWorkspace* ws,
+                                                      size_t c = 0,
+                                                      size_t t = 0);
 
 } // namespace nim::neutube

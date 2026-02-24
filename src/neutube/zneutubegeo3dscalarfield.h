@@ -29,6 +29,12 @@ struct Geo3dScalarField
   }
 };
 
+// Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Center().
+[[nodiscard]] std::array<double, 3> geo3dScalarFieldCenterLegacyLike(const Geo3dScalarField& field);
+
+// Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Centroid().
+[[nodiscard]] std::array<double, 3> geo3dScalarFieldCentroidLegacyLike(const Geo3dScalarField& field);
+
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Sampling().
 [[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field,
                                                                           const ZImg& stack,

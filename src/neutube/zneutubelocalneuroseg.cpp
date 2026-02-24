@@ -2,7 +2,9 @@
 
 #include "zneutube3dgeom.h"
 #include "zneutubegeo3dscalarfield.h"
+#include "zneutubegeo3dutils.h"
 #include "zneutubeperceptor.h"
+#include "zneutubestackfitoptions.h"
 
 #include "zlog.h"
 
@@ -363,6 +365,172 @@ Geo3dScalarField localNeurosegFieldSLegacyLike(const LocalNeuroseg& locseg, Neur
   return field;
 }
 
+Geo3dScalarField localNeurosegFieldSpLegacyLike(const LocalNeuroseg& locseg, NeurosegFieldFunctionLegacyLike fieldFunc)
+{
+  Geo3dScalarField field = neurosegFieldSpLegacyLike(locseg.seg, fieldFunc);
+  if (field.points.empty()) {
+    return field;
+  }
+
+  std::array<double, 3> pos0{};
+  std::array<double, 3> pos1{};
+
+  switch (NeuroposReference) {
+    case NeuroposReferenceLegacyLike::Bottom:
+      pos0 = {0.0, 0.0, 0.0};
+      pos1 = localNeurosegBottomLegacyLike(locseg);
+      break;
+    case NeuroposReferenceLegacyLike::Center:
+      pos0 = neurosegAxisOffsetLegacyLike(locseg.seg, (locseg.seg.h - 1.0) / 2.0);
+      pos1 = localNeurosegCenterLegacyLike(locseg);
+      break;
+    case NeuroposReferenceLegacyLike::Top:
+      pos0 = neurosegAxisOffsetLegacyLike(locseg.seg, locseg.seg.h - 1.0);
+      pos1 = localNeurosegTopLegacyLike(locseg);
+      break;
+    case NeuroposReferenceLegacyLike::Undef:
+      CHECK(false) << "Invalid NeuroposReferenceLegacyLike::Undef";
+      break;
+  }
+
+  const double dx = pos1[0] - pos0[0];
+  const double dy = pos1[1] - pos0[1];
+  const double dz = pos1[2] - pos0[2];
+
+  for (auto& p : field.points) {
+    p[0] += dx;
+    p[1] += dy;
+    p[2] += dz;
+  }
+
+  return field;
+}
+
+double localNeurosegScorePLegacyLike(const LocalNeuroseg& locseg,
+                                     const ZImg& stack,
+                                     double zScale,
+                                     StackFitScore* fs,
+                                     size_t c,
+                                     size_t t)
+{
+  // Port of tz_local_neuroseg.c::Local_Neuroseg_Score_P().
+  double score = 0.0;
+
+  if (locseg.seg.r1 > 0.0 && locseg.seg.scale > 0.0) {
+    Geo3dScalarField field = localNeurosegFieldSLegacyLike(locseg, nullptr);
+    score = geo3dScalarFieldStackScoreLegacyLike(field, stack, zScale, fs, c, t);
+  }
+
+  return score;
+}
+
+void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg* locseg, const ZImg& stack, double zScale, size_t c, size_t t)
+{
+  CHECK(locseg != nullptr);
+
+  Geo3dScalarField field = localNeurosegFieldSLegacyLike(*locseg, nullptr);
+  CHECK(!field.points.empty());
+
+  field.values = geo3dScalarFieldStackSamplingLegacyLike(field, stack, zScale, c, t);
+
+  const std::array<double, 3> center = geo3dScalarFieldCentroidLegacyLike(field);
+  setNeurosegPositionLegacyLike(locseg, center, NeuroposReferenceLegacyLike::Center);
+}
+
+double localNeurosegOrientationSearchCLegacyLike(LocalNeuroseg* locseg,
+                                                 const ZImg& stack,
+                                                 double zScale,
+                                                 StackFitScore* fs,
+                                                 size_t c,
+                                                 size_t t)
+{
+  CHECK(locseg != nullptr);
+
+  double bestTheta = 0.0;
+  double bestPsi = 0.0;
+
+  const std::array<double, 3> center = localNeurosegCenterLegacyLike(*locseg);
+
+  Geo3dScalarField field = localNeurosegFieldSpLegacyLike(*locseg, nullptr);
+
+  double bestScore = geo3dScalarFieldStackScoreLegacyLike(field, stack, zScale, fs, c, t);
+  bestTheta = locseg->seg.theta;
+  bestPsi = locseg->seg.psi;
+
+  LocalNeuroseg tmpLocseg = *locseg;
+
+  const double thetaRange = TzPiLegacyLike * 0.75;
+
+  for (double theta = 0.1; theta <= thetaRange; theta += 0.2) {
+    const double step = 2.0 / locseg->seg.h / std::sin(theta);
+    for (double psi = 0.0; psi < Tz2PiLegacyLike; psi += step) {
+      tmpLocseg.seg.theta = theta;
+      tmpLocseg.seg.psi = psi;
+
+      geo3dRotateOrientationLegacyLike(locseg->seg.theta, locseg->seg.psi, &tmpLocseg.seg.theta, &tmpLocseg.seg.psi);
+
+      setNeurosegPositionLegacyLike(&tmpLocseg, center, NeuroposReferenceLegacyLike::Center);
+
+      field = localNeurosegFieldSpLegacyLike(tmpLocseg, nullptr);
+
+      const double score = geo3dScalarFieldStackScoreLegacyLike(field, stack, zScale, fs, c, t);
+
+      if (score > bestScore) {
+        bestTheta = tmpLocseg.seg.theta;
+        bestPsi = tmpLocseg.seg.psi;
+        bestScore = score;
+      }
+    }
+  }
+
+  locseg->seg.theta = bestTheta;
+  locseg->seg.psi = bestPsi;
+  setNeurosegPositionLegacyLike(locseg, center, NeuroposReferenceLegacyLike::Center);
+
+  return bestScore;
+}
+
+double localNeurosegRScaleSearchLegacyLike(LocalNeuroseg* locseg,
+                                           const ZImg& stack,
+                                           double zScale,
+                                           double rStart,
+                                           double rEnd,
+                                           double rStep,
+                                           double sStart,
+                                           double sEnd,
+                                           double sStep,
+                                           StackFitScore* fs,
+                                           size_t c,
+                                           size_t t)
+{
+  CHECK(locseg != nullptr);
+
+  double bestScore = localNeurosegScorePLegacyLike(*locseg, stack, zScale, fs, c, t);
+  double bestS = locseg->seg.scale;
+  double bestR = locseg->seg.r1;
+
+  for (double r = rStart; r <= rEnd; r += rStep) {
+    for (double s = sStart; s <= sEnd; s += sStep) {
+      if (r * s > NeurosegMinRLegacyLike && r * s < 30.0) {
+        locseg->seg.r1 = r;
+        locseg->seg.scale = s;
+
+        const double score = localNeurosegScorePLegacyLike(*locseg, stack, zScale, fs, c, t);
+        if (score > bestScore) {
+          bestScore = score;
+          bestS = s;
+          bestR = r;
+        }
+      }
+    }
+  }
+
+  locseg->seg.scale = bestS;
+  locseg->seg.r1 = bestR;
+
+  return bestScore;
+}
+
 double localNeurosegScoreWLegacyLike(const LocalNeuroseg& locseg,
                                      const ZImg& stack,
                                      double zScale,
@@ -472,6 +640,41 @@ double fitLocalNeurosegWLegacyLike(LocalNeuroseg* locseg,
   locseg->seg.psi = normalizeRadianLegacyLike(locseg->seg.psi);
 
   return localNeurosegScoreWLegacyLike(*locseg, stack, zScale, &ws->sws, c, t);
+}
+
+double localNeurosegOptimizeWLegacyLike(LocalNeuroseg* locseg,
+                                        const ZImg& stack,
+                                        double zScale,
+                                        int option,
+                                        LocsegFitWorkspace* ws,
+                                        size_t c,
+                                        size_t t)
+{
+  CHECK(locseg != nullptr);
+  CHECK(ws != nullptr);
+
+  StackFitScore fs{};
+  fs.n = 1;
+  fs.options[0] = static_cast<int>(StackFitOption::Corrcoef);
+
+  for (int i = 0; i < ws->posAdjust; ++i) {
+    localNeurosegPositionAdjustLegacyLike(locseg, stack, zScale, c, t);
+  }
+
+  localNeurosegOrientationSearchCLegacyLike(locseg, stack, zScale, &fs, c, t);
+
+  if (option <= 1) {
+    for (int i = 0; i < 3; ++i) {
+      localNeurosegPositionAdjustLegacyLike(locseg, stack, zScale, c, t);
+    }
+  }
+
+  if (option == 1 || option == 2) {
+    localNeurosegRScaleSearchLegacyLike(locseg, stack, zScale, 1.0, 10.0, 1.0, 0.5, 5.0, 0.5, nullptr, c, t);
+  }
+
+  const double score = fitLocalNeurosegWLegacyLike(locseg, stack, zScale, ws, c, t);
+  return score;
 }
 
 } // namespace nim::neutube

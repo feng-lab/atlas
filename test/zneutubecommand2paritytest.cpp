@@ -1272,6 +1272,257 @@ TEST(NeutubeLegacyLocalNeuroseg, FitWMatchesLegacy)
   Kill_Stack(stackC);
 }
 
+TEST(NeutubeLegacyLocalNeuroseg, PositionAdjustMatchesLegacy)
+{
+  constexpr int width = 64;
+  constexpr int height = 64;
+  constexpr int depth = 64;
+  constexpr double zScale = 1.0;
+
+  nim::ZImgInfo info(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg img(info);
+
+  for (int z = 0; z < depth; ++z) {
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const int v = x + 2 * y + 3 * z;
+        *img.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)) =
+          static_cast<uint8_t>(v & 0xFF);
+      }
+    }
+  }
+
+  Stack* stackC = Make_Stack(GREY, width, height, depth);
+  ASSERT_NE(stackC, nullptr);
+  std::memcpy(stackC->array, img.timeData<uint8_t>(0), img.voxelNumber());
+
+  const int cx = width / 2;
+  const int cy = height / 2;
+  const int cz = depth / 2;
+
+  Local_Neuroseg* locsegC = New_Local_Neuroseg();
+  ASSERT_NE(locsegC, nullptr);
+  Set_Local_Neuroseg(locsegC, 2.0, 0.0, 11.0, 0.7, 1.1, 0.0, 0.0, 1.0, cx, cy, cz);
+
+  nim::neutube::LocalNeuroseg locsegCpp;
+  locsegCpp.seg.r1 = 2.0;
+  locsegCpp.seg.c = 0.0;
+  locsegCpp.seg.h = 11.0;
+  locsegCpp.seg.theta = 0.7;
+  locsegCpp.seg.psi = 1.1;
+  locsegCpp.seg.curvature = 0.0;
+  locsegCpp.seg.alpha = 0.0;
+  locsegCpp.seg.scale = 1.0;
+  locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), static_cast<double>(cz)};
+
+  Local_Neuroseg_Position_Adjust(locsegC, stackC, zScale);
+  nim::neutube::localNeurosegPositionAdjustLegacyLike(&locsegCpp, img, zScale);
+
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[0], locsegC->pos[0]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[1], locsegC->pos[1]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[2], locsegC->pos[2]);
+
+  Kill_Local_Neuroseg(locsegC);
+  Kill_Stack(stackC);
+}
+
+TEST(NeutubeLegacyLocalNeuroseg, OrientationSearchCMatchesLegacy)
+{
+  constexpr int width = 64;
+  constexpr int height = 64;
+  constexpr int depth = 64;
+  constexpr double zScale = 1.0;
+
+  nim::ZImgInfo info(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg img(info);
+
+  for (int z = 0; z < depth; ++z) {
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const int v = x + 7 * y + 11 * z;
+        *img.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)) =
+          static_cast<uint8_t>(v & 0xFF);
+      }
+    }
+  }
+
+  Stack* stackC = Make_Stack(GREY, width, height, depth);
+  ASSERT_NE(stackC, nullptr);
+  std::memcpy(stackC->array, img.timeData<uint8_t>(0), img.voxelNumber());
+
+  const int cx = width / 2;
+  const int cy = height / 2;
+  const int cz = depth / 2;
+
+  Local_Neuroseg* locsegC = New_Local_Neuroseg();
+  ASSERT_NE(locsegC, nullptr);
+  Set_Local_Neuroseg(locsegC, 2.5, 0.0, 11.0, 0.4, 0.9, 0.0, 0.0, 1.0, cx, cy, cz);
+
+  nim::neutube::LocalNeuroseg locsegCpp;
+  locsegCpp.seg.r1 = 2.5;
+  locsegCpp.seg.c = 0.0;
+  locsegCpp.seg.h = 11.0;
+  locsegCpp.seg.theta = 0.4;
+  locsegCpp.seg.psi = 0.9;
+  locsegCpp.seg.curvature = 0.0;
+  locsegCpp.seg.alpha = 0.0;
+  locsegCpp.seg.scale = 1.0;
+  locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), static_cast<double>(cz)};
+
+  Stack_Fit_Score fsC;
+  fsC.n = 1;
+  fsC.options[0] = STACK_FIT_CORRCOEF;
+
+  nim::neutube::StackFitScore fsCpp;
+  fsCpp.n = 1;
+  fsCpp.options[0] = static_cast<int>(nim::neutube::StackFitOption::Corrcoef);
+
+  const double legacyScore = Local_Neuroseg_Orientation_Search_C(locsegC, stackC, zScale, &fsC);
+  const double portedScore = nim::neutube::localNeurosegOrientationSearchCLegacyLike(&locsegCpp, img, zScale, &fsCpp);
+
+  EXPECT_DOUBLE_EQ(portedScore, legacyScore);
+
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.theta, locsegC->seg.theta);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.psi, locsegC->seg.psi);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[0], locsegC->pos[0]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[1], locsegC->pos[1]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[2], locsegC->pos[2]);
+
+  Kill_Local_Neuroseg(locsegC);
+  Kill_Stack(stackC);
+}
+
+TEST(NeutubeLegacyLocalNeuroseg, RScaleSearchMatchesLegacy)
+{
+  constexpr int width = 64;
+  constexpr int height = 64;
+  constexpr int depth = 64;
+  constexpr double zScale = 1.0;
+
+  nim::ZImgInfo info(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg img(info);
+
+  for (int z = 0; z < depth; ++z) {
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const int v = 13 * x + 3 * y + 5 * z;
+        *img.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)) =
+          static_cast<uint8_t>(v & 0xFF);
+      }
+    }
+  }
+
+  Stack* stackC = Make_Stack(GREY, width, height, depth);
+  ASSERT_NE(stackC, nullptr);
+  std::memcpy(stackC->array, img.timeData<uint8_t>(0), img.voxelNumber());
+
+  const int cx = width / 2;
+  const int cy = height / 2;
+  const int cz = depth / 2;
+
+  Local_Neuroseg* locsegC = New_Local_Neuroseg();
+  ASSERT_NE(locsegC, nullptr);
+  Set_Local_Neuroseg(locsegC, 3.0, 0.0, 11.0, 0.6, 0.2, 0.0, 0.0, 1.2, cx, cy, cz);
+
+  nim::neutube::LocalNeuroseg locsegCpp;
+  locsegCpp.seg.r1 = 3.0;
+  locsegCpp.seg.c = 0.0;
+  locsegCpp.seg.h = 11.0;
+  locsegCpp.seg.theta = 0.6;
+  locsegCpp.seg.psi = 0.2;
+  locsegCpp.seg.curvature = 0.0;
+  locsegCpp.seg.alpha = 0.0;
+  locsegCpp.seg.scale = 1.2;
+  locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), static_cast<double>(cz)};
+
+  const double legacyScore =
+    Local_Neuroseg_R_Scale_Search(locsegC, stackC, zScale, 1.0, 10.0, 1.0, 0.5, 5.0, 0.5, nullptr);
+
+  const double portedScore =
+    nim::neutube::localNeurosegRScaleSearchLegacyLike(&locsegCpp, img, zScale, 1.0, 10.0, 1.0, 0.5, 5.0, 0.5, nullptr);
+
+  EXPECT_DOUBLE_EQ(portedScore, legacyScore);
+
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.r1, locsegC->seg.r1);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.scale, locsegC->seg.scale);
+
+  Kill_Local_Neuroseg(locsegC);
+  Kill_Stack(stackC);
+}
+
+TEST(NeutubeLegacyLocalNeuroseg, OptimizeWMatchesLegacy)
+{
+  constexpr int width = 64;
+  constexpr int height = 64;
+  constexpr int depth = 64;
+  constexpr double zScale = 1.0;
+
+  nim::ZImgInfo info(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg img(info);
+
+  for (int z = 0; z < depth; ++z) {
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const int v = 17 * x + 19 * y + 23 * z;
+        *img.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)) =
+          static_cast<uint8_t>(v & 0xFF);
+      }
+    }
+  }
+
+  Stack* stackC = Make_Stack(GREY, width, height, depth);
+  ASSERT_NE(stackC, nullptr);
+  std::memcpy(stackC->array, img.timeData<uint8_t>(0), img.voxelNumber());
+
+  const int cx = width / 2;
+  const int cy = height / 2;
+  const int cz = depth / 2;
+
+  Local_Neuroseg* locsegC = New_Local_Neuroseg();
+  ASSERT_NE(locsegC, nullptr);
+  Set_Local_Neuroseg(locsegC, 2.0, 0.0, 11.0, 0.7, 1.1, 0.0, 0.0, 1.0, cx, cy, cz);
+
+  Locseg_Fit_Workspace* wsC = New_Locseg_Fit_Workspace();
+  ASSERT_NE(wsC, nullptr);
+  Default_Locseg_Fit_Workspace(wsC);
+
+  const double legacyScore = Local_Neuroseg_Optimize_W(locsegC, stackC, zScale, 0, wsC);
+
+  nim::neutube::LocalNeuroseg locsegCpp;
+  locsegCpp.seg.r1 = 2.0;
+  locsegCpp.seg.c = 0.0;
+  locsegCpp.seg.h = 11.0;
+  locsegCpp.seg.theta = 0.7;
+  locsegCpp.seg.psi = 1.1;
+  locsegCpp.seg.curvature = 0.0;
+  locsegCpp.seg.alpha = 0.0;
+  locsegCpp.seg.scale = 1.0;
+  locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), static_cast<double>(cz)};
+
+  nim::neutube::LocsegFitWorkspace wsCpp;
+  nim::neutube::defaultLocsegFitWorkspaceLegacyLike(&wsCpp);
+
+  const double portedScore = nim::neutube::localNeurosegOptimizeWLegacyLike(&locsegCpp, img, zScale, 0, &wsCpp);
+
+  EXPECT_DOUBLE_EQ(portedScore, legacyScore);
+
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.r1, locsegC->seg.r1);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.c, locsegC->seg.c);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.h, locsegC->seg.h);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.theta, locsegC->seg.theta);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.psi, locsegC->seg.psi);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.curvature, locsegC->seg.curvature);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.alpha, locsegC->seg.alpha);
+  EXPECT_DOUBLE_EQ(locsegCpp.seg.scale, locsegC->seg.scale);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[0], locsegC->pos[0]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[1], locsegC->pos[1]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[2], locsegC->pos[2]);
+
+  Kill_Locseg_Fit_Workspace(wsC);
+  Kill_Local_Neuroseg(locsegC);
+  Kill_Stack(stackC);
+}
+
 TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)
 {
   ScopedQtCoreApplication qtApp;

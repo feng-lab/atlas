@@ -198,6 +198,79 @@ NeurosegSliceField neurosegSliceFieldLegacyLike(NeurosegFieldFunctionLegacyLike 
   return out;
 }
 
+NeurosegSliceField neurosegSliceFieldPLegacyLike(NeurosegFieldFunctionLegacyLike fieldFunc)
+{
+  if (fieldFunc == nullptr) {
+    fieldFunc = neurofieldLegacyLike;
+  }
+
+  NeurosegSliceField out;
+  // Matches tz_neuroseg.c::Neuroseg_Slice_Field_P() output length.
+  out.points.reserve(69);
+  out.values.reserve(69);
+
+  auto addPlaneFieldPoint = [&](double x, double y) {
+    const double v = fieldFunc(x, y);
+
+    out.points.push_back({x, y, 0.0});
+    out.values.push_back(v);
+
+    if (x != 0.0) {
+      out.points.push_back({-x, y, 0.0});
+      out.values.push_back(v);
+    }
+    if (y != 0.0) {
+      out.points.push_back({x, -y, 0.0});
+      out.values.push_back(v);
+      if (x != 0.0) {
+        out.points.push_back({-x, -y, 0.0});
+        out.values.push_back(v);
+      }
+    }
+  };
+
+  const double step = 0.2;
+  const double start = 0.2;
+  const double end = 0.85;
+
+  // (0, 0)
+  addPlaneFieldPoint(0.0, 0.0);
+
+  // y = 0.0, x = 0.2 : 0.8
+  for (double x = start; x < end; x += step) {
+    addPlaneFieldPoint(x, 0.0);
+  }
+
+  // x = 0.0, y = 0.2 : 0.8
+  for (double y = start; y < end; y += step) {
+    addPlaneFieldPoint(0.0, y);
+  }
+
+  double y = start;
+  for (; y < 0.45; y += step) {
+    for (double x = start; x < end; x += step) {
+      addPlaneFieldPoint(x, y);
+    }
+  }
+
+  if (y < 0.65) {
+    y = 0.6;
+    for (double x = start; x < 0.65; x += step) {
+      addPlaneFieldPoint(x, y);
+    }
+  }
+
+  y = 0.8;
+  for (double x = start; x < 0.45; x += step) {
+    addPlaneFieldPoint(x, y);
+  }
+
+  CHECK(out.points.size() == out.values.size());
+  CHECK(out.points.size() == 69u) << "Neuroseg slice field (P) size mismatch: " << out.points.size();
+
+  return out;
+}
+
 Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegFieldFunctionLegacyLike fieldFunc)
 {
   Geo3dScalarField field;
@@ -307,6 +380,70 @@ Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegField
         field.values[offset + static_cast<size_t>(i)] /= weight;
       }
     }
+  }
+
+  if (seg.alpha != 0.0) {
+    rotateZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.alpha, 0);
+  }
+
+  if (seg.curvature >= NeurosegMinCurvatureLegacyLike) {
+    double curvature = seg.curvature;
+    if (curvature > TzPiLegacyLike) {
+      curvature = TzPiLegacyLike;
+    }
+    geo3dPointArrayBendLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.h / curvature);
+  }
+
+  if (seg.theta != 0.0 || seg.psi != 0.0) {
+    rotateXZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.theta, seg.psi, 0);
+  }
+
+  return field;
+}
+
+Geo3dScalarField neurosegFieldSpLegacyLike(const Neuroseg& seg, NeurosegFieldFunctionLegacyLike fieldFunc)
+{
+  Geo3dScalarField field;
+
+  if (seg.r1 == 0.0 || seg.scale == 0.0) {
+    return field;
+  }
+
+  constexpr int nslice = NeurosegDefaultHSlicesLegacyLike;
+
+  NeurosegSliceField slice = neurosegSliceFieldPLegacyLike(fieldFunc);
+  const int length = static_cast<int>(slice.points.size());
+  CHECK(length == 69);
+
+  field.points.resize(static_cast<size_t>(length) * static_cast<size_t>(nslice));
+  field.values.resize(static_cast<size_t>(length) * static_cast<size_t>(nslice));
+
+  const double zStart = 0.0;
+  const double zStep = (seg.h - 1.0) / static_cast<double>(nslice - 1);
+
+  const double coef = neurosegCoefLegacyLike(seg) * zStep;
+  double r = seg.r1;
+  double z = zStart;
+
+  for (int j = 0; j < nslice; ++j) {
+    const size_t offset = static_cast<size_t>(j) * static_cast<size_t>(length);
+
+    double weight = 0.0;
+    for (int i = 0; i < length; ++i) {
+      const auto& p0 = slice.points[static_cast<size_t>(i)];
+      field.points[offset + static_cast<size_t>(i)] = {p0[0] * (r * seg.scale), p0[1] * r, z};
+
+      const double v = slice.values[static_cast<size_t>(i)];
+      field.values[offset + static_cast<size_t>(i)] = v;
+      weight += std::fabs(v);
+    }
+
+    for (int i = 0; i < length; ++i) {
+      field.values[offset + static_cast<size_t>(i)] /= weight;
+    }
+
+    z += zStep;
+    r += coef;
   }
 
   if (seg.alpha != 0.0) {

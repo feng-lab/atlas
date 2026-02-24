@@ -420,6 +420,9 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
   - ✅ Point sampling + mask hit (`Stack_Point_Sampling`, `Stack_Point_Hit_Mask`): `src/neutube/zneutubeimgsampling.*`
   - ✅ Geo3d scalar field sampling + scoring (`Geo3d_Scalar_Field_Stack_Sampling*`, `Geo3d_Scalar_Field_Stack_Score*`):
     `src/neutube/zneutubegeo3dscalarfield.*`, `src/neutube/zneutubestackfitscore.*`
+  - ✅ Geo3d scalar field centroid (`Geo3d_Scalar_Field_Centroid`): `src/neutube/zneutubegeo3dscalarfield.*`
+  - ✅ Geo3d orientation utilities (`Vector_Angle`, `Geo3d_*_Orientation`, `Geo3d_Rotate_Orientation`):
+    `src/neutube/zneutubegeo3dutils.*`, `src/neutube/zneutube3dgeom.*`
   - ✅ Legacy optimizer core (`Fit_Perceptor`, line search, conjugate updates):
     `src/neutube/zneutubecontfun.h`, `src/neutube/zneutubeoptimizeutils.*`, `src/neutube/zneutubeperceptor.*`
     - Note: Atlas already has Ceres-based optimizers (e.g. `src/img/zregistrationoptimizer.*`), but we intentionally keep
@@ -433,10 +436,12 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
   - ✅ Large-object labeling (`Stack_Label_Large_Objects_*`): `src/neutube/zneutubeobjlabel.*` (parity-tested)
   - ✅ Planar squared EDT (`Stack_Bwdist_L_U16P`): `src/neutube/zneutubeplanaredt.*`
   - ✅ Sp-grow (`Stack_Sp_Grow` + parser): `src/neutube/zneutubespgrow.*`, `src/neutube/zneutubespgrowparser.*`
-  - ✅ Neuroseg field generation (`Neuroseg_Slice_Field`, `Neuroseg_Field_S_Fast`):
+  - ✅ Neuroseg field generation (`Neuroseg_Slice_Field`, `Neuroseg_Slice_Field_P`, `Neuroseg_Field_S_Fast`, `Neuroseg_Field_Sp`):
     `src/neutube/zneutubeneuroseg.*`, `src/neutube/zneutube3dgeom.*`, `src/neutube/zneutubegeo3dpointarray.*`
-  - ✅ Local neuroseg scoring + fit (`Local_Neuroseg_Field_S`, `Local_Neuroseg_Score_W`, `Fit_Local_Neuroseg_W`):
+  - ✅ Local neuroseg scoring + fit (`Local_Neuroseg_Field_S*`, `Local_Neuroseg_Score_*`, `Fit_Local_Neuroseg_W`):
     `src/neutube/zneutubelocalneuroseg.*`
+  - ✅ Local neuroseg optimize loop (`Local_Neuroseg_Position_Adjust`, `Local_Neuroseg_Orientation_Search_C`,
+    `Local_Neuroseg_R_Scale_Search`, `Local_Neuroseg_Optimize_W`): `src/neutube/zneutubelocalneuroseg.*`
   - ✅ Legacy `darray_qsort(...)` parity helper: `src/neutube/zneutubedarrayqsort.*`
   - ✅ darray math helpers (`darray_dot_n`, `darray_dot_nw`, `darray_sum_n`, `darray_mean_n`, `darray_corrcoef_n`, `darray_max`):
     `src/neutube/zneutubedarraymath.*`
