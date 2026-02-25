@@ -15,6 +15,23 @@ namespace nim::neutube {
                                            const std::array<double, 3>& lineEnd,
                                            double* lambda);
 
+// Port of tz_geo3d_utils.c::Geo3d_Line_Line_Dist().
+[[nodiscard]] double geo3dLineLineDistLegacyLike(const std::array<double, 3>& line1Start,
+                                                 const std::array<double, 3>& line1End,
+                                                 const std::array<double, 3>& line2Start,
+                                                 const std::array<double, 3>& line2End);
+
+// Port of tz_geo3d_utils.c::Geo3d_Lineseg_Lineseg_Dist().
+// - `intersect1` / `intersect2` are the break parameters on segment1/segment2 (may be outside [0, 1]).
+// - `cond` matches the legacy condition codes.
+[[nodiscard]] double geo3dLineSegLineSegDistLegacyLike(const std::array<double, 3>& line1Start,
+                                                       const std::array<double, 3>& line1End,
+                                                       const std::array<double, 3>& line2Start,
+                                                       const std::array<double, 3>& line2End,
+                                                       double* intersect1,
+                                                       double* intersect2,
+                                                       int* cond);
+
 [[nodiscard]] std::array<double, 3>
 geo3dLineSegBreak(const std::array<double, 3>& lineStart, const std::array<double, 3>& lineEnd, double lambda);
 

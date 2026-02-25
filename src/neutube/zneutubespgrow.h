@@ -5,9 +5,12 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 namespace nim::neutube {
+
+struct SpGrowWorkspace;
 
 enum : uint8_t
 {
@@ -17,8 +20,18 @@ enum : uint8_t
   SP_GROW_CONDUCTOR = 4
 };
 
+// Port of legacy `Stack_Voxel_Weight_I` as a `WeightFunc` callback.
+// argv layout: [0]=d, [1]=v1, [2]=v2.
+[[nodiscard]] double stackVoxelWeightILegacyLike(double* argv);
+
+// Port of legacy `Stack_Sp_Grow_Infer_Parameter`.
+// Populates `sgw->argv[3]` and `sgw->argv[4]` when `sgw->weightFunc` is `stackVoxelWeightSLegacyLike`.
+void stackSpGrowInferParameterLegacyLike(SpGrowWorkspace* sgw, const ZImg& stack);
+
 struct SpGrowWorkspace
 {
+  using WeightFunc = double (*)(double* argv);
+
   size_t size = 0;
 
   // Buffers (size = number of voxels).
@@ -34,6 +47,21 @@ struct SpGrowWorkspace
 
   int conn = 26;
   std::array<double, 3> resolution = {1.0, 1.0, 1.0};
+
+  WeightFunc weightFunc = &stackVoxelWeightILegacyLike;
+  std::array<double, 10> argv = {std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::quiet_NaN()};
+
+  double value = 0.0;
+  double fgratio = 0.0;
 
   // 0 = normal (sum weights), 1 = maxmin (not used by skeletonize).
   int spOption = 0;
@@ -51,5 +79,11 @@ struct SpGrowWorkspace
 //
 // `stack` may be uint8 or uint16; values are interpreted as doubles for weight calculations.
 void stackSpGrow(const ZImg& stack, SpGrowWorkspace* sgw);
+
+// Port of legacy `Stack_Sp_Grow(..., sgw)` for mask-driven usage.
+//
+// Returns the voxel-index path from source to the first reached target (inclusive).
+// If no target is reachable, returns an empty vector.
+[[nodiscard]] std::vector<int64_t> stackSpGrowPathLegacyLike(const ZImg& stack, SpGrowWorkspace* sgw);
 
 } // namespace nim::neutube

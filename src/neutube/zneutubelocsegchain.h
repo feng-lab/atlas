@@ -50,6 +50,17 @@ public:
   [[nodiscard]] LocalNeuroseg* tailSeg();
   [[nodiscard]] const LocalNeuroseg* tailSeg() const;
 
+  [[nodiscard]] LocsegNode* nodeAt(int index);
+  [[nodiscard]] const LocsegNode* nodeAt(int index) const;
+
+  [[nodiscard]] LocalNeuroseg* segAt(int index);
+  [[nodiscard]] const LocalNeuroseg* segAt(int index) const;
+
+  // Inserts a node before the element at `index` (0-based). Out-of-range indices
+  // are clamped to the nearest end (front/back), matching legacy usage patterns.
+  // Returns a pointer to the inserted node.
+  LocsegNode* insertNodeAt(int index, LocsegNode node);
+
   // Adds a node at the given end and returns a pointer to the inserted node.
   LocsegNode* addNode(LocsegNode node, LocsegChainEndLegacyLike end);
 

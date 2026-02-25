@@ -4,7 +4,7 @@
 #include <QFileInfo>
 
 #include "zneutubecompareswc.h"
-#include "zneutubelegacy.h"
+#include "zneutubegeneral.h"
 #include "zneutubeskeletonize.h"
 #include "zneutubetrace.h"
 
@@ -192,9 +192,9 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
   CHECK(argv != nullptr);
   CHECK(argv[1] != nullptr);
 
-  // argv[1] must be "--command2" (Atlas main routes here only in that case).
-  if (std::string_view(argv[1]) != "--command2") {
-    LOG(ERROR) << "ZRunNeuTuCommand2 must be invoked via '--command2' as argv[1].";
+  // argv[1] must be "--command" (Atlas main routes here only in that case).
+  if (std::string_view(argv[1]) != "--command") {
+    LOG(ERROR) << "ZRunNeuTuCommand2 must be invoked via '--command' as argv[1].";
     return false;
   }
 
@@ -358,7 +358,7 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
 {
   Command2Args args;
   if (!parseArgs(argc, argv, jsonDirPath, &args)) {
-    LOG(INFO) << "Usage (v2): Atlas --command2 [<input> ...] [-o <output>] [--config <command_config.json>]"
+    LOG(INFO) << "Usage: Atlas --command [<input> ...] [-o <output>] [--config <command_config.json>]"
                  " [--json_dir <Resources/json>]"
                  " [--intv x y z] [--skeletonize] [--general <json|path>] [--compare_swc --scale <s>]"
                  " [--trace --level <n>] [--verbose]";
@@ -415,6 +415,30 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
   const auto skeletonizeInclude =
     extractIncludePath(commandConfig, commandConfigAbsPathQ, "skeletonize").value_or(std::string{});
   const auto traceInclude = extractIncludePath(commandConfig, commandConfigAbsPathQ, "trace").value_or(std::string{});
+
+  // Legacy: diagnosis is configured via the trace command config object (after include expansion).
+  // We support it from either:
+  //  - command_config.json: { "trace": { "diagnosis": true, ... } }, or
+  //  - the included JSON file (if it contains a top-level "diagnosis" bool).
+  if (command == Command::Trace) {
+    if (auto it = commandConfig.find("trace"); it != commandConfig.end() && it->value().is_object()) {
+      const json::object& traceObj = it->value().as_object();
+      if (auto diagIt = traceObj.find("diagnosis"); diagIt != traceObj.end() && diagIt->value().is_bool()) {
+        args.diagnosis = diagIt->value().as_bool();
+      }
+    }
+
+    if (!args.diagnosis && !traceInclude.empty()) {
+      try {
+        const json::object included = loadJsonObjectOrThrow(QString::fromStdString(traceInclude));
+        if (auto diagIt = included.find("diagnosis"); diagIt != included.end() && diagIt->value().is_bool()) {
+          args.diagnosis = diagIt->value().as_bool();
+        }
+      }
+      catch (...) {
+      }
+    }
+  }
 
   // Parse optional "json input" mode: `input[0] == "json"` and `input[1]` is JSON string or JSON file path.
   json::object inputJson;
@@ -511,16 +535,16 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
         LOG(ERROR) << e.what();
         return 1;
       }
-      return neutube_legacy::runGeneral(args.generalConfig,
-                                        generalCfg,
-                                        inputJson,
-                                        args.input,
-                                        args.output,
-                                        args.level,
-                                        args.diagnosis,
-                                        traceInclude,
-                                        args.jsonDirPath,
-                                        args.isVerbose);
+      return neutube::runGeneral(args.generalConfig,
+                                 generalCfg,
+                                 inputJson,
+                                 args.input,
+                                 args.output,
+                                 args.level,
+                                 args.diagnosis,
+                                 traceInclude,
+                                 args.jsonDirPath,
+                                 args.isVerbose);
     }
 
     case Command::ComputeSeed:

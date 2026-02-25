@@ -18,6 +18,40 @@ constexpr int NeurosegDefaultHSlicesLegacyLike = 11;
 constexpr double NeurosegMinCurvatureLegacyLike = 0.2;
 constexpr double TzPiLegacyLike = 3.14159265358979323846264338328;
 
+[[nodiscard]] int compareFloatLegacyLike(double a, double b, double eps)
+{
+  if (a < b - eps) {
+    return -1;
+  }
+  if (a > b + eps) {
+    return 1;
+  }
+  return 0;
+}
+
+[[nodiscard]] int testZScaleLegacyLike(double zScale)
+{
+  return compareFloatLegacyLike(zScale, 1.0, 1e-5);
+}
+
+void scaleXRotateZLegacyLike(std::array<double, 3>* p, double s, double alpha, int inverse)
+{
+  CHECK(p != nullptr);
+
+  const double cosA = std::cos(alpha);
+  const double sinA = std::sin(alpha);
+
+  if (inverse == 0) {
+    const double tmp = (*p)[0] * s * cosA - (*p)[1] * sinA;
+    (*p)[1] = (*p)[0] * s * sinA + (*p)[1] * cosA;
+    (*p)[0] = tmp;
+  } else {
+    const double tmp = ((*p)[0] * cosA + (*p)[1] * sinA) / s;
+    (*p)[1] = -(*p)[0] * sinA + (*p)[1] * cosA;
+    (*p)[0] = tmp;
+  }
+}
+
 void neurosegScaleFieldSlice0LegacyLike(std::array<double, 3>* pt,
                                         double* value,
                                         double rScale,
@@ -131,6 +165,99 @@ double neurosegRBLegacyLike(const Neuroseg& seg)
 double neurosegCRCLegacyLike(const Neuroseg& seg)
 {
   return neurosegRCLegacyLike(seg) * std::sqrt(seg.scale);
+}
+
+double neurosegBallRangeLegacyLike(const Neuroseg& seg)
+{
+  // Port of tz_neuroseg.c::Neuroseg_Ball_Range().
+  double r = neurosegRBLegacyLike(seg);
+  if (seg.scale > 1.0) {
+    r *= seg.scale;
+  }
+  return std::sqrt(seg.h * seg.h + r * r);
+}
+
+void neurosegSwellLegacyLike(Neuroseg* seg, double ratio, double diff, double maxDiff)
+{
+  // Port of tz_neuroseg.c::Neuroseg_Swell().
+  CHECK(seg != nullptr);
+
+  const double rby = neurosegRBLegacyLike(*seg);
+  const double rbx = rby * seg->scale;
+
+  double nrbx = rbx * ratio + diff;
+  double nrby = rby * ratio + diff;
+
+  if (maxDiff > 0.0) {
+    nrbx = std::min(nrbx, rbx + maxDiff);
+    nrby = std::min(nrby, rby + maxDiff);
+  }
+
+  seg->scale = nrbx / nrby;
+  seg->r1 = nrby;
+  if (seg->c > 0.0) {
+    seg->r1 -= (seg->h - 1.0) * seg->c;
+  }
+}
+
+std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
+                                                 const FieldRangeLegacyLike& range,
+                                                 const std::array<double, 3>* offpos,
+                                                 double zScale)
+{
+  // Port of tz_neuroseg.c::Neuroseg_Dist_Filter().
+  const int sizeX = range.size[0];
+  const int sizeY = range.size[1];
+  const int sizeZ = range.size[2];
+
+  CHECK(sizeX >= 0);
+  CHECK(sizeY >= 0);
+  CHECK(sizeZ >= 0);
+
+  const size_t n = static_cast<size_t>(sizeX) * static_cast<size_t>(sizeY) * static_cast<size_t>(sizeZ);
+  std::vector<double> filter(n);
+
+  const std::array<int, 3> coffset = range.firstCorner;
+  const double coef = seg.c;
+
+  size_t offset = 0;
+  for (int k = 0; k < sizeZ; ++k) {
+    for (int j = 0; j < sizeY; ++j) {
+      for (int i = 0; i < sizeX; ++i) {
+        std::array<double, 3> coord = {static_cast<double>(i + coffset[0]),
+                                       static_cast<double>(j + coffset[1]),
+                                       static_cast<double>(k + coffset[2])};
+
+        if (testZScaleLegacyLike(zScale) != 0) {
+          // image space -> physical space
+          coord[2] /= zScale;
+        }
+
+        if (offpos != nullptr) {
+          coord[0] -= (*offpos)[0];
+          coord[1] -= (*offpos)[1];
+          coord[2] -= (*offpos)[2];
+        }
+
+        rotateXZLegacyLike(&coord, 1, seg.theta, seg.psi, 1);
+        scaleXRotateZLegacyLike(&coord, seg.scale, seg.alpha, 1);
+
+        if (coord[2] < -0.5 || coord[2] > seg.h - 0.5) {
+          filter[offset++] = 2.0;
+          continue;
+        }
+
+        const double sigma = coef * coord[2] + seg.r1;
+        const double sigma2 = sigma * sigma;
+        const double d2 = coord[0] * coord[0] + coord[1] * coord[1];
+        const double t = d2 / sigma2;
+        filter[offset++] = std::sqrt(t);
+      }
+    }
+  }
+
+  CHECK(offset == n);
+  return filter;
 }
 
 namespace {

@@ -32,6 +32,13 @@ struct LocalNeuroseg
   std::array<double, 3> pos{};
 };
 
+// C++ port of tz_geo3d_ball.h::Geo3d_Ball (only fields used by tracing).
+struct Geo3dBallLegacyLike
+{
+  std::array<double, 3> center{};
+  double radius = 0.0;
+};
+
 // C++ port of tz_workspace.h::Locseg_Score_Workspace (alias of Receptor_Score_Workspace).
 struct LocsegScoreWorkspace
 {
@@ -59,6 +66,16 @@ void defaultLocsegFitWorkspaceLegacyLike(LocsegFitWorkspace* ws);
 void setNeurosegPositionLegacyLike(LocalNeuroseg* locseg,
                                    const std::array<double, 3>& pos,
                                    NeuroposReferenceLegacyLike ref);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Stack_Position().
+//
+// Converts a physical-space position into legacy "stack space" integer coordinates:
+// - `c`: rounded stack coordinates (with optional z scaling).
+// - `offpos`: fractional offset between the physical position and the rounded stack coord.
+void localNeurosegStackPositionLegacyLike(const std::array<double, 3>& position,
+                                          std::array<int, 3>* c,
+                                          std::array<double, 3>* offpos,
+                                          double zScale);
 
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Bottom().
 [[nodiscard]] std::array<double, 3> localNeurosegBottomLegacyLike(const LocalNeuroseg& locseg);
@@ -129,6 +146,12 @@ void localNeurosegScaleLegacyLike(LocalNeuroseg* locseg, double xyScale, double 
 
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Hit_Test().
 [[nodiscard]] bool localNeurosegHitTestLegacyLike(const LocalNeuroseg& locseg, double x, double y, double z);
+
+// Port of `ZLocalNeuroseg::hitMask(const Stack*)`:
+// - Samples points inside the local neuroseg volume at (xyStep=1, zStep=1),
+// - Transforms them into stack coordinates,
+// - Returns true if any sampled point hits a non-zero mask voxel.
+[[nodiscard]] bool localNeurosegHitMaskLegacyLike(const LocalNeuroseg& locseg, const ZImg& mask);
 
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Field_S().
 [[nodiscard]] Geo3dScalarField localNeurosegFieldSLegacyLike(const LocalNeuroseg& locseg,
@@ -213,5 +236,24 @@ void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg* locseg,
                                                       LocsegFitWorkspace* ws,
                                                       size_t c = 0,
                                                       size_t t = 0);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Ball_Bound().
+void localNeurosegBallBoundLegacyLike(const LocalNeuroseg& locseg, Geo3dBallLegacyLike* ball);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Planar_Dist_L().
+[[nodiscard]] double localNeurosegPlanarDistLLegacyLike(const LocalNeuroseg& locseg1, const LocalNeuroseg& locseg2);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Dist2().
+// Returns the minimal distance from `locseg2` surface to the axis segment of `locseg1`.
+// If `pos` is not null, it is set to the nearest point on `locseg2` in the current coordinate system.
+[[nodiscard]] double
+localNeurosegDist2LegacyLike(const LocalNeuroseg& locseg1, const LocalNeuroseg& locseg2, std::array<double, 3>* pos);
+
+// Port of tz_local_neuroseg.c::Local_Neuroseg_Chop().
+//
+// Notes:
+// - Positive `ratio`: keep the bottom part (height scaled by `ratio`).
+// - Negative `ratio`: keep the top part (height scaled by `-ratio`).
+void localNeurosegChopLegacyLike(LocalNeuroseg* locseg, double ratio);
 
 } // namespace nim::neutube

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "zneutubefieldrange.h"
+
 #include "zimg.h"
 #include "zswc.h"
 
@@ -13,12 +15,6 @@ struct LocalNeuroseg;
 // Port of tz_neurofield.c::Neurofield7().
 [[nodiscard]] double
 neurofield7LegacyLike(double coef, double base, double x, double y, double z, double zMin, double zMax);
-
-struct FieldRangeLegacyLike
-{
-  std::array<int, 3> firstCorner = {0, 0, 0};
-  std::array<int, 3> size = {0, 0, 0};
-};
 
 // Port of tz_neuroseg.c::Neuroseg_Field_Range() (for label-stack / mask generation).
 [[nodiscard]] FieldRangeLegacyLike neurosegFieldRangeLegacyLike(const Neuroseg& seg, double zScale);

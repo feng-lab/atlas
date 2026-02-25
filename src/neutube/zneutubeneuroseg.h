@@ -1,5 +1,7 @@
 #pragma once
 
+#include "zneutubefieldrange.h"
+
 #include <array>
 #include <vector>
 
@@ -42,6 +44,22 @@ using NeurosegFieldFunctionLegacyLike = double (*)(double x, double y);
 [[nodiscard]] double neurosegRALegacyLike(const Neuroseg& seg);
 [[nodiscard]] double neurosegRBLegacyLike(const Neuroseg& seg);
 [[nodiscard]] double neurosegCRCLegacyLike(const Neuroseg& seg);
+
+// Port of tz_neuroseg.c::Neuroseg_Ball_Range().
+[[nodiscard]] double neurosegBallRangeLegacyLike(const Neuroseg& seg);
+
+// Port of tz_neuroseg.c::Neuroseg_Swell().
+void neurosegSwellLegacyLike(Neuroseg* seg, double ratio, double diff, double maxDiff);
+
+// Port of tz_neuroseg.c::Neuroseg_Dist_Filter().
+//
+// Returns a 3D array in Z-major, then Y, then X order, matching the legacy C layout:
+//   offset = i + sizeX * (j + sizeY * k)
+// The caller is expected to interpret values <= 1 as "inside" the segment.
+[[nodiscard]] std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
+                                                               const FieldRangeLegacyLike& range,
+                                                               const std::array<double, 3>* offpos,
+                                                               double zScale);
 
 // Port of tz_neuroseg.c::Neuroseg_Angle_Between().
 [[nodiscard]] double neurosegAngleBetweenLegacyLike(const Neuroseg& seg1, const Neuroseg& seg2);

@@ -1,13 +1,16 @@
 #include "zneutubelocalneuroseg.h"
 
 #include "zneutube3dgeom.h"
+#include "zneutubegeo3dpointarray.h"
 #include "zneutubegeo3dscalarfield.h"
 #include "zneutubegeo3dutils.h"
 #include "zneutubeimgsampling.h"
 #include "zneutubeperceptor.h"
+#include "zneutubeswcgeom.h"
 #include "zneutubestackfitoptions.h"
 
 #include "zlog.h"
+#include "zimg.h"
 
 #include <algorithm>
 #include <cmath>
@@ -229,7 +232,353 @@ double localNeurosegScoreRLegacyLike(const double* var, const void* param)
   return localNeurosegScoreWLegacyLike(locseg, *stack, zScale, ws, 0, 0);
 }
 
+[[nodiscard]] int compareFloatLegacyLike(double a, double b, double eps)
+{
+  if (a < b - eps) {
+    return -1;
+  }
+  if (a > b + eps) {
+    return 1;
+  }
+  return 0;
+}
+
+[[nodiscard]] int testZScaleLegacyLike(double zScale)
+{
+  return compareFloatLegacyLike(zScale, 1.0, 1e-5);
+}
+
+[[nodiscard]] double distancePointEllipseSpecialLegacyLike(double u,
+                                                           double v,
+                                                           double a,
+                                                           double b,
+                                                           double epsilon,
+                                                           int maxIter,
+                                                           double* outX,
+                                                           double* outY)
+{
+  // Port of tz_geometry.c::DistancePointEllipseSpecial() (David Eberly).
+  double t = b * (v - b);
+
+  for (int i = 0; i < maxIter; ++i) {
+    const double tpASqr = t + a * a;
+    const double tpBSqr = t + b * b;
+    const double invTpASqr = 1.0 / tpASqr;
+    const double invTpBSqr = 1.0 / tpBSqr;
+
+    const double xDivA = a * u * invTpASqr;
+    const double yDivB = b * v * invTpBSqr;
+    const double xDivASqr = xDivA * xDivA;
+    const double yDivBSqr = yDivB * yDivB;
+
+    const double f = xDivASqr + yDivBSqr - 1.0;
+    if (f < epsilon) {
+      *outX = xDivA * a;
+      *outY = yDivB * b;
+      break;
+    }
+
+    const double fDer = 2.0 * (xDivASqr * invTpASqr + yDivBSqr * invTpBSqr);
+    const double ratio = f / fDer;
+    if (ratio < epsilon) {
+      *outX = xDivA * a;
+      *outY = yDivB * b;
+      break;
+    }
+
+    t += ratio;
+  }
+
+  const double dx = *outX - u;
+  const double dy = *outY - v;
+  return std::sqrt(dx * dx + dy * dy);
+}
+
+[[nodiscard]] double ellipsePointDistanceLegacyLike(double u, double v, double a, double b, double* outX, double* outY)
+{
+  // Port of tz_geometry.c::Ellipse_Point_Distance().
+  constexpr double epsilon = 1e-5;
+  constexpr int maxIter = 100;
+
+  double tmpX = 0.0;
+  double tmpY = 0.0;
+  if (outX == nullptr) {
+    outX = &tmpX;
+  }
+  if (outY == nullptr) {
+    outY = &tmpY;
+  }
+
+  if (std::fabs(a - b) < epsilon) {
+    const double length = std::sqrt(u * u + v * v);
+    *outX = a / length * u;
+    *outY = a / length * v;
+    return std::fabs(length - a);
+  }
+
+  bool xReflect = false;
+  if (u > epsilon) {
+    xReflect = false;
+  } else if (u < -epsilon) {
+    xReflect = true;
+    u = -u;
+  } else {
+    xReflect = false;
+    u = 0.0;
+  }
+
+  bool yReflect = false;
+  if (v > epsilon) {
+    yReflect = false;
+  } else if (v < -epsilon) {
+    yReflect = true;
+    v = -v;
+  } else {
+    yReflect = false;
+    v = 0.0;
+  }
+
+  bool transpose = false;
+  if (a < b) {
+    transpose = true;
+    std::swap(a, b);
+    std::swap(u, v);
+  }
+
+  double dist = 0.0;
+  if (u != 0.0) {
+    if (v != 0.0) {
+      dist = distancePointEllipseSpecialLegacyLike(u, v, a, b, epsilon, maxIter, outX, outY);
+    } else {
+      const double bSqr = b * b;
+      if (u < a - bSqr / a) {
+        const double aSqr = a * a;
+        *outX = aSqr * u / (aSqr - bSqr);
+        const double xDivA = *outX / a;
+        *outY = b * std::sqrt(std::fabs(1.0 - xDivA * xDivA));
+        const double dx = *outX - u;
+        dist = std::sqrt(dx * dx + (*outY) * (*outY));
+      } else {
+        dist = std::fabs(u - a);
+        *outX = a;
+        *outY = 0.0;
+      }
+    }
+  } else {
+    dist = std::fabs(v - b);
+    *outX = 0.0;
+    *outY = b;
+  }
+
+  if (transpose) {
+    std::swap(*outX, *outY);
+  }
+  if (yReflect) {
+    *outY = -(*outY);
+  }
+  if (xReflect) {
+    *outX = -(*outX);
+  }
+
+  return dist;
+}
+
+[[nodiscard]] bool pointInEllipseLegacyLike(double x, double y, double a, double b)
+{
+  x /= a;
+  y /= b;
+  return (x * x + y * y) <= 1.0;
+}
+
+[[nodiscard]] double
+localNeurosegPointDistSLegacyLike(const LocalNeuroseg& locseg, double x, double y, double z, std::array<double, 3>* pt)
+{
+  // Port of tz_local_neuroseg.c::Local_Neuroseg_Point_Dist_S().
+  std::array<double, 3> tmpPos = localNeurosegBottomLegacyLike(locseg);
+  tmpPos[0] = x - tmpPos[0];
+  tmpPos[1] = y - tmpPos[1];
+  tmpPos[2] = z - tmpPos[2];
+
+  rotateXZLegacyLike(&tmpPos, 1, locseg.seg.theta, locseg.seg.psi, 1);
+  rotateZLegacyLike(&tmpPos, 1, locseg.seg.alpha, 1);
+
+  double minDist = 0.0;
+  const double coef = neurosegCoefLegacyLike(locseg.seg);
+
+  if (!neurosegHitTestLegacyLike(locseg.seg, tmpPos[0], tmpPos[1], tmpPos[2])) {
+    double rx = 0.0;
+    double ry = locseg.seg.r1;
+    rx = ry * locseg.seg.scale;
+
+    double tmpTx = 0.0;
+    double tmpTy = 0.0;
+    double tmpTz = 0.0;
+
+    if (tmpPos[2] <= 0.0) {
+      if (pointInEllipseLegacyLike(tmpPos[0], tmpPos[1], rx, ry)) {
+        minDist = -tmpPos[2];
+        tmpTx = 0.0;
+        tmpTy = 0.0;
+        tmpTz = 0.0;
+      } else {
+        const double d = ellipsePointDistanceLegacyLike(tmpPos[0], tmpPos[1], rx, ry, &tmpTx, &tmpTy);
+        minDist = std::sqrt(tmpPos[2] * tmpPos[2] + d * d);
+        tmpTz = 0.0;
+      }
+
+      if (pt != nullptr) {
+        (*pt)[0] = tmpTx;
+        (*pt)[1] = tmpTy;
+        (*pt)[2] = tmpTz;
+      }
+    } else if (tmpPos[2] >= locseg.seg.h - 1.0) {
+      ry = locseg.seg.r1 + (locseg.seg.h - 1.0) * coef;
+      rx = ry * locseg.seg.scale;
+      tmpTz = locseg.seg.h - 1.0;
+
+      if (pointInEllipseLegacyLike(tmpPos[0], tmpPos[1], rx, ry)) {
+        tmpTx = 0.0;
+        tmpTy = 0.0;
+        minDist = tmpPos[2] - tmpTz;
+        if (pt != nullptr) {
+          (*pt)[0] = tmpTx;
+          (*pt)[1] = tmpTy;
+          (*pt)[2] = tmpTz;
+        }
+      } else {
+        const double d = ellipsePointDistanceLegacyLike(tmpPos[0], tmpPos[1], rx, ry, &tmpTx, &tmpTy);
+        const double dz = tmpPos[2] - tmpTz;
+        minDist = std::sqrt(dz * dz + d * d);
+        if (pt != nullptr) {
+          (*pt)[0] = tmpTx;
+          (*pt)[1] = tmpTy;
+          (*pt)[2] = tmpTz;
+        }
+      }
+    } else {
+      if (coef != 0.0) {
+        ry += coef * tmpPos[2];
+        rx = ry * locseg.seg.scale;
+      }
+
+      minDist = ellipsePointDistanceLegacyLike(tmpPos[0], tmpPos[1], rx, ry, &tmpTx, &tmpTy);
+      tmpTz = tmpPos[2];
+      if (pt != nullptr) {
+        (*pt)[0] = tmpTx;
+        (*pt)[1] = tmpTy;
+        (*pt)[2] = tmpTz;
+      }
+
+      if (coef != 0.0) {
+        ry = locseg.seg.r1;
+        for (double h = 0.5; h < locseg.seg.h - 1.0; h += 0.5) {
+          ry += coef * 0.5;
+          rx = ry * locseg.seg.scale;
+          const double d = ellipsePointDistanceLegacyLike(tmpPos[0], tmpPos[1], rx, ry, &tmpTx, &tmpTy);
+          const double dz = tmpPos[2] - h;
+          const double dd = std::sqrt(d * d + dz * dz);
+          if (minDist > dd) {
+            minDist = dd;
+            if (pt != nullptr) {
+              (*pt)[0] = tmpTx;
+              (*pt)[1] = tmpTy;
+              (*pt)[2] = h;
+            }
+          }
+        }
+      }
+    }
+
+    if (pt != nullptr) {
+      rotateZLegacyLike(pt, 1, locseg.seg.alpha, 0);
+      rotateXZLegacyLike(pt, 1, locseg.seg.theta, locseg.seg.psi, 0);
+      (*pt)[0] += locseg.pos[0];
+      (*pt)[1] += locseg.pos[1];
+      (*pt)[2] += locseg.pos[2];
+    }
+  } else {
+    if (pt != nullptr) {
+      (*pt)[0] = x;
+      (*pt)[1] = y;
+      (*pt)[2] = z;
+    }
+  }
+
+  return minDist;
+}
+
+[[nodiscard]] double localNeurosegLineSegDistSLegacyLike(const LocalNeuroseg& locseg,
+                                                         const std::array<double, 3>& start,
+                                                         const std::array<double, 3>& end,
+                                                         std::array<double, 3>* pos)
+{
+  // Port of tz_local_neuroseg.c::Local_Neuroseg_Lineseg_Dist_S().
+  constexpr double res = 1.0;
+  double d = geo3dDist(start[0], start[1], start[2], end[0], end[1], end[2]);
+
+  if (d < res) {
+    return localNeurosegPointDistSLegacyLike(locseg, start[0], start[1], start[2], pos);
+  }
+
+  const std::array<double, 3> step = {(end[0] - start[0]) / d * res,
+                                      (end[1] - start[1]) / d * res,
+                                      (end[2] - start[2]) / d * res};
+
+  double x = start[0];
+  double y = start[1];
+  double z = start[2];
+
+  std::array<double, 3> bestPos{};
+  double minDist = localNeurosegPointDistSLegacyLike(locseg, x, y, z, pos ? &bestPos : nullptr);
+  if (pos != nullptr) {
+    *pos = bestPos;
+  }
+
+  std::array<double, 3> tmpPos{};
+
+  while ((d > 0.0) && (minDist > 0.0)) {
+    d -= res;
+    x += step[0];
+    y += step[1];
+    z += step[2];
+
+    const double dist = localNeurosegPointDistSLegacyLike(locseg, x, y, z, &tmpPos);
+    if (dist < minDist) {
+      minDist = dist;
+      if (pos != nullptr) {
+        *pos = tmpPos;
+      }
+    }
+  }
+
+  return minDist;
+}
+
 } // namespace
+
+void localNeurosegStackPositionLegacyLike(const std::array<double, 3>& position,
+                                          std::array<int, 3>* c,
+                                          std::array<double, 3>* offpos,
+                                          double zScale)
+{
+  // Port of tz_local_neuroseg.c::Local_Neuroseg_Stack_Position() and its
+  // helper local_neuroseg_stack_position() in private/tzp_local_neuroseg.c.
+  CHECK(c != nullptr);
+  CHECK(offpos != nullptr);
+
+  (*c)[0] = static_cast<int>(std::lround(position[0]));
+  (*c)[1] = static_cast<int>(std::lround(position[1]));
+  (*offpos)[0] = position[0] - static_cast<double>((*c)[0]);
+  (*offpos)[1] = position[1] - static_cast<double>((*c)[1]);
+
+  if (testZScaleLegacyLike(zScale) != 0) {
+    (*c)[2] = static_cast<int>(std::lround(position[2] * zScale));
+    (*offpos)[2] = position[2] * zScale - static_cast<double>((*c)[2]);
+  } else {
+    (*c)[2] = static_cast<int>(std::lround(position[2]));
+    (*offpos)[2] = position[2] - static_cast<double>((*c)[2]);
+  }
+}
 
 void setNeurosegPositionLegacyLike(LocalNeuroseg* locseg,
                                    const std::array<double, 3>& pos,
@@ -353,6 +702,29 @@ void flipLocalNeurosegLegacyLike(LocalNeuroseg* locseg)
   locseg->seg.theta += TzPiLegacyLike;
   locseg->seg.r1 = neurosegR2LegacyLike(locseg->seg);
   locseg->seg.c = -locseg->seg.c;
+}
+
+void localNeurosegChopLegacyLike(LocalNeuroseg* locseg, double ratio)
+{
+  // Port of tz_local_neuroseg.c::Local_Neuroseg_Chop().
+  CHECK(locseg != nullptr);
+
+  if (ratio > 0.0) { // bottom half
+    const std::array<double, 3> pos = localNeurosegBottomLegacyLike(*locseg);
+    locseg->seg.h = (locseg->seg.h - 1.0) * ratio + 1.0;
+
+    if (NeuroposReference != NeuroposReferenceLegacyLike::Bottom) {
+      setNeurosegPositionLegacyLike(locseg, pos, NeuroposReferenceLegacyLike::Bottom);
+    }
+  } else { // top half
+    const std::array<double, 3> pos = localNeurosegTopLegacyLike(*locseg);
+    locseg->seg.h = -(locseg->seg.h - 1.0) * ratio + 1.0;
+    locseg->seg.r1 = neurosegRadiusLegacyLike(locseg->seg, locseg->seg.h - 1.0);
+
+    if (NeuroposReference != NeuroposReferenceLegacyLike::Top) {
+      setNeurosegPositionLegacyLike(locseg, pos, NeuroposReferenceLegacyLike::Top);
+    }
+  }
 }
 
 void nextLocalNeurosegLegacyLike(const LocalNeuroseg& locseg1, LocalNeuroseg* locseg2, double posStep)
@@ -607,6 +979,95 @@ bool localNeurosegHitTestLegacyLike(const LocalNeuroseg& locseg, double x, doubl
   rotateZLegacyLike(&tmpPos, 1, locseg.seg.alpha, 1);
 
   return neurosegHitTestLegacyLike(locseg.seg, tmpPos[0], tmpPos[1], tmpPos[2]);
+}
+
+bool localNeurosegHitMaskLegacyLike(const LocalNeuroseg& locseg, const ZImg& mask)
+{
+  // Port of `ZLocalNeuroseg::hitMask(const Stack*)` via its `sample(1.0, 1.0)` + transform pipeline.
+  if (mask.isEmpty()) {
+    return false;
+  }
+
+  CHECK(mask.numChannels() == 1);
+  CHECK(mask.numTimes() == 1);
+
+  const int width = static_cast<int>(mask.width());
+  const int height = static_cast<int>(mask.height());
+  const int depth = static_cast<int>(mask.depth());
+
+  auto maskValue = [&](int x, int y, int z) -> int {
+    if (x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= depth) {
+      return 0;
+    }
+    if (mask.isType<uint8_t>()) {
+      return static_cast<int>(
+        *mask.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
+    }
+    if (mask.isType<uint16_t>()) {
+      return static_cast<int>(
+        *mask.data<uint16_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
+    }
+    CHECK(false) << "localNeurosegHitMaskLegacyLike: unsupported mask type " << mask.info();
+    return 0;
+  };
+
+  constexpr double xyStep = 1.0;
+  constexpr double zStep = 1.0;
+
+  constexpr double eps = 1.001;
+  constexpr double minCurvature = 0.2; // NEUROSEG_MIN_CURVATURE
+  constexpr double maxCurvature = TzPiLegacyLike; // NEUROSEG_MAX_CURVATURE
+
+  const double heightSeg = locseg.seg.h;
+  const std::array<double, 3> bottom = localNeurosegBottomLegacyLike(locseg);
+
+  for (double z = 0.0; z <= heightSeg; z += zStep) {
+    const double radius = neurosegRadiusLegacyLike(locseg.seg, z);
+    if (radius <= xyStep * 0.1) {
+      continue;
+    }
+
+    const double rr = radius * radius;
+
+    for (double y = -radius; y <= radius; y += xyStep) {
+      for (double x = -radius; x <= radius; x += xyStep) {
+        if ((x * x + y * y) / rr >= eps) {
+          continue;
+        }
+
+        std::array<double, 3> p = {x, y, z};
+
+        if (locseg.seg.alpha != 0.0) {
+          rotateZLegacyLike(&p, 1, locseg.seg.alpha, 0);
+        }
+
+        if (locseg.seg.curvature >= minCurvature) {
+          double curvature = locseg.seg.curvature;
+          if (curvature > maxCurvature) {
+            curvature = maxCurvature;
+          }
+          geo3dPointArrayBendLegacyLike(&p, 1, heightSeg / curvature);
+        }
+
+        if (locseg.seg.theta != 0.0 || locseg.seg.psi != 0.0) {
+          rotateXZLegacyLike(&p, 1, locseg.seg.theta, locseg.seg.psi, 0);
+        }
+
+        p[0] += bottom[0];
+        p[1] += bottom[1];
+        p[2] += bottom[2];
+
+        const int ix = static_cast<int>(std::lround(p[0]));
+        const int iy = static_cast<int>(std::lround(p[1]));
+        const int iz = static_cast<int>(std::lround(p[2]));
+        if (maskValue(ix, iy, iz) > 0) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 Geo3dScalarField localNeurosegFieldSLegacyLike(const LocalNeuroseg& locseg, NeurosegFieldFunctionLegacyLike fieldFunc)
@@ -1053,6 +1514,30 @@ double localNeurosegOptimizeWLegacyLike(LocalNeuroseg* locseg,
 
   const double score = fitLocalNeurosegWLegacyLike(locseg, stack, zScale, ws, c, t);
   return score;
+}
+
+void localNeurosegBallBoundLegacyLike(const LocalNeuroseg& locseg, Geo3dBallLegacyLike* ball)
+{
+  CHECK(ball != nullptr);
+  ball->center = localNeurosegCenterLegacyLike(locseg);
+  ball->radius = neurosegBallRangeLegacyLike(locseg.seg) / 2.0;
+}
+
+double localNeurosegPlanarDistLLegacyLike(const LocalNeuroseg& locseg1, const LocalNeuroseg& locseg2)
+{
+  const std::array<double, 3> bottom1 = localNeurosegBottomLegacyLike(locseg1);
+  const std::array<double, 3> top1 = localNeurosegTopLegacyLike(locseg1);
+  const std::array<double, 3> bottom2 = localNeurosegBottomLegacyLike(locseg2);
+  const std::array<double, 3> top2 = localNeurosegTopLegacyLike(locseg2);
+  return geo3dLineLineDistLegacyLike(bottom1, top1, bottom2, top2);
+}
+
+double
+localNeurosegDist2LegacyLike(const LocalNeuroseg& locseg1, const LocalNeuroseg& locseg2, std::array<double, 3>* pos)
+{
+  const std::array<double, 3> bottom = localNeurosegBottomLegacyLike(locseg1);
+  const std::array<double, 3> top = localNeurosegTopLegacyLike(locseg1);
+  return localNeurosegLineSegDistSLegacyLike(locseg2, bottom, top, pos);
 }
 
 } // namespace nim::neutube

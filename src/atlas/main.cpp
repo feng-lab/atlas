@@ -11,7 +11,6 @@
 #include "ztheme.h"
 
 #include "zrunexport3danimation.h"
-#include "zrunneutucommand.h"
 #include "zrunneutucommand2.h"
 #include "zrundumpanimation3dschema.h"
 #include "zwindowsheader.h"
@@ -123,7 +122,7 @@ int main(int argc, char* argv[])
 #endif
   QCoreApplication::setApplicationName("Atlas");
 
-  if (argc > 1 && (strcmp(argv[1], "--command") == 0 || strcmp(argv[1], "--command2") == 0)) {
+  if (argc > 1 && strcmp(argv[1], "--command") == 0) {
     ZLogInit::instance("Atlas"s);
 
     LOG(INFO) << "Version: " << GIT_VERSION;
@@ -138,10 +137,8 @@ int main(int argc, char* argv[])
                        true);
 
     const std::string jsonDirPath = ZSystemInfo::jsonDirPath().toUtf8().toStdString();
-    if (strcmp(argv[1], "--command2") == 0) {
-      return ZRunNeuTuCommand2().run(argc, argv, jsonDirPath);
-    }
-    return ZRunNeuTuCommand().run(argc, argv, jsonDirPath);
+    // neuTube CLI runner (modernized, src/neutube).
+    return ZRunNeuTuCommand2().run(argc, argv, jsonDirPath);
   }
 
   QSurfaceFormat format;

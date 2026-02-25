@@ -26,16 +26,22 @@ extern "C" {
 #include "tz_local_neuroseg.h"
 #include "tz_neuroseg.h"
 #include "tz_perceptor.h"
+#include "tz_stack_bwmorph.h"
+#include "tz_stack_lib.h"
 #include "tz_stack_neighborhood.h"
 #include "tz_stack_objlabel.h"
 #include "tz_stack_sampling.h"
 #include "tz_trace_utils.h"
+#include "tz_voxel_graphics.h"
 #include "tz_workspace.h"
 }
 
 #include "zneutubecompareswc.h"
 #include "zneutubedarraymath.h"
 #include "zneutubegeo3dscalarfield.h"
+#include "zneutubeedt3d.h"
+#include "zneutubeimgbwmorph.h"
+#include "zneutubeimglocmax.h"
 #include "zneutubeimgsampling.h"
 #include "zneutubelocalneuroseg.h"
 #include "zneutubeneighborhood.h"
@@ -44,8 +50,10 @@ extern "C" {
 #include "zneutubeperceptor.h"
 #include "zneutubetraceworkspace.h"
 #include "zneutubetracerecord.h"
+#include "zneutubetracelocseglabel.h"
 #include "zneutubestackfitscore.h"
 #include "zneutubestackfitoptions.h"
+#include "zneutubetraceseed.h"
 
 #include "zimg.h"
 #include "zimgneighborhooditerator.h"
@@ -84,6 +92,245 @@ public:
 private:
   std::unique_ptr<QCoreApplication> _app;
 };
+
+TEST(NeutubeImagePortsParity, Bwdist3dSquaredU16_MatchesLegacyC)
+{
+  const size_t width = 33;
+  const size_t height = 19;
+  const size_t depth = 7;
+
+  nim::ZImgInfo maskInfo(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg mask(maskInfo);
+  mask.fill(0);
+
+  std::mt19937 rng(12345);
+  std::bernoulli_distribution bern(0.15);
+  const size_t voxelNumber = mask.voxelNumber();
+  auto* maskData = mask.timeData<uint8_t>(0);
+  for (size_t i = 0; i < voxelNumber; ++i) {
+    maskData[i] = bern(rng) ? uint8_t{1} : uint8_t{0};
+  }
+
+  const nim::ZImg dist = nim::neutube::bwdistSquaredU16LegacyLike(mask, /*pad*/ 0);
+  ASSERT_TRUE(dist.isType<uint16_t>()) << dist.info();
+  ASSERT_EQ(dist.voxelNumber(), voxelNumber);
+
+  Stack* maskC = Make_Stack(GREY, static_cast<int>(width), static_cast<int>(height), static_cast<int>(depth));
+  ASSERT_NE(maskC, nullptr);
+  std::memcpy(maskC->array, maskData, voxelNumber * sizeof(uint8_t));
+
+  Stack* distC = Stack_Bwdist_L_U16(maskC, nullptr, 0);
+  ASSERT_NE(distC, nullptr);
+  ASSERT_EQ(distC->kind, GREY16);
+
+  const auto* legacy = reinterpret_cast<const uint16_t*>(distC->array);
+  const auto* ported = dist.timeData<uint16_t>(0);
+  for (size_t i = 0; i < voxelNumber; ++i) {
+    ASSERT_EQ(ported[i], legacy[i]) << "i=" << i;
+  }
+
+  Kill_Stack(distC);
+  Kill_Stack(maskC);
+}
+
+TEST(NeutubeImagePortsParity, StackLocalMax_MatchesLegacyC)
+{
+  const size_t width = 33;
+  const size_t height = 19;
+  const size_t depth = 7;
+
+  nim::ZImgInfo maskInfo(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg mask(maskInfo);
+  mask.fill(0);
+
+  std::mt19937 rng(12345);
+  std::bernoulli_distribution bern(0.15);
+  const size_t voxelNumber = mask.voxelNumber();
+  auto* maskData = mask.timeData<uint8_t>(0);
+  for (size_t i = 0; i < voxelNumber; ++i) {
+    maskData[i] = bern(rng) ? uint8_t{1} : uint8_t{0};
+  }
+
+  const nim::ZImg dist = nim::neutube::bwdistSquaredU16LegacyLike(mask, /*pad*/ 0);
+  ASSERT_TRUE(dist.isType<uint16_t>()) << dist.info();
+  ASSERT_EQ(dist.voxelNumber(), voxelNumber);
+
+  const nim::ZImg portedLocmax =
+    nim::neutube::stackLocalMaxMaskLegacyLike(dist, nim::neutube::StackLocmaxOptionLegacyLike::Center);
+  ASSERT_TRUE(portedLocmax.isType<uint8_t>()) << portedLocmax.info();
+  ASSERT_EQ(portedLocmax.voxelNumber(), voxelNumber);
+
+  Stack* distC = Make_Stack(GREY16, static_cast<int>(width), static_cast<int>(height), static_cast<int>(depth));
+  ASSERT_NE(distC, nullptr);
+  std::memcpy(distC->array, dist.timeData<uint16_t>(0), voxelNumber * sizeof(uint16_t));
+
+  Stack* locmaxC = Stack_Local_Max(distC, nullptr, STACK_LOCMAX_CENTER);
+  ASSERT_NE(locmaxC, nullptr);
+  ASSERT_EQ(locmaxC->kind, GREY);
+
+  const auto* legacy = locmaxC->array;
+  const auto* ported = portedLocmax.timeData<uint8_t>(0);
+  for (size_t i = 0; i < voxelNumber; ++i) {
+    ASSERT_EQ(ported[i], legacy[i]) << "i=" << i;
+  }
+
+  Kill_Stack(locmaxC);
+  Kill_Stack(distC);
+}
+
+TEST(NeutubeImagePortsParity, MajorityFilterR_MatchesLegacyC)
+{
+  const size_t width = 21;
+  const size_t height = 17;
+  const size_t depth = 9;
+
+  nim::ZImgInfo maskInfo(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg mask(maskInfo);
+  mask.fill(0);
+
+  std::mt19937 rng(12345);
+  std::bernoulli_distribution bern(0.15);
+  const size_t voxelNumber = mask.voxelNumber();
+  auto* maskData = mask.timeData<uint8_t>(0);
+  for (size_t i = 0; i < voxelNumber; ++i) {
+    maskData[i] = bern(rng) ? uint8_t{1} : uint8_t{0};
+  }
+
+  const nim::ZImg ported = nim::neutube::majorityFilterBinaryU8RLegacyLike(mask, /*connectivity*/ 26, /*mnbr*/ 4);
+  ASSERT_TRUE(ported.isType<uint8_t>()) << ported.info();
+  ASSERT_EQ(ported.voxelNumber(), voxelNumber);
+
+  Stack* maskC = Make_Stack(GREY, static_cast<int>(width), static_cast<int>(height), static_cast<int>(depth));
+  ASSERT_NE(maskC, nullptr);
+  std::memcpy(maskC->array, maskData, voxelNumber * sizeof(uint8_t));
+
+  Stack* outC = Stack_Majority_Filter_R(maskC, nullptr, /*conn*/ 26, /*mnbr*/ 4);
+  ASSERT_NE(outC, nullptr);
+  ASSERT_EQ(outC->kind, GREY);
+
+  const auto* legacy = outC->array;
+  const auto* outPorted = ported.timeData<uint8_t>(0);
+  for (size_t i = 0; i < voxelNumber; ++i) {
+    ASSERT_EQ(outPorted[i], legacy[i]) << "i=" << i;
+  }
+
+  Kill_Stack(outC);
+  Kill_Stack(maskC);
+}
+
+TEST(NeutubeImagePortsParity, ExtractSeedOriginal_MatchesLegacyC)
+{
+  const size_t width = 33;
+  const size_t height = 19;
+  const size_t depth = 11;
+
+  nim::ZImgInfo maskInfo(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg mask(maskInfo);
+  mask.fill(0);
+
+  std::mt19937 rng(12345);
+  std::bernoulli_distribution bern(0.12);
+  const size_t voxelNumber = mask.voxelNumber();
+  auto* maskData = mask.timeData<uint8_t>(0);
+  for (size_t i = 0; i < voxelNumber; ++i) {
+    maskData[i] = bern(rng) ? uint8_t{1} : uint8_t{0};
+  }
+
+  const nim::neutube::Geo3dScalarField ported = nim::neutube::extractSeedOriginalLegacyLike(mask);
+
+  Stack* maskC = Make_Stack(GREY, static_cast<int>(width), static_cast<int>(height), static_cast<int>(depth));
+  ASSERT_NE(maskC, nullptr);
+  std::memcpy(maskC->array, maskData, voxelNumber * sizeof(uint8_t));
+
+  Stack* distC = Stack_Bwdist_L_U16(maskC, nullptr, 0);
+  ASSERT_NE(distC, nullptr);
+  ASSERT_EQ(distC->kind, GREY16);
+
+  Stack* seedsC = Stack_Local_Max(distC, nullptr, STACK_LOCMAX_CENTER);
+  ASSERT_NE(seedsC, nullptr);
+  ASSERT_EQ(seedsC->kind, GREY);
+
+  Voxel_List* list = Stack_To_Voxel_List(seedsC);
+  Pixel_Array* pa = Voxel_List_Sampling(distC, list);
+  ASSERT_NE(pa, nullptr);
+
+  Voxel_P* voxel_array = Voxel_List_To_Array(list, 1, nullptr, nullptr);
+  ASSERT_NE(voxel_array, nullptr);
+
+  const uint16_t* pa_array = reinterpret_cast<const uint16_t*>(pa->array);
+
+  std::vector<std::array<double, 3>> legacyPoints;
+  std::vector<double> legacyValues;
+  legacyPoints.reserve(static_cast<size_t>(pa->size));
+  legacyValues.reserve(static_cast<size_t>(pa->size));
+
+  for (int i = 0; i < pa->size; ++i) {
+    const int x = voxel_array[i]->x;
+    const int y = voxel_array[i]->y;
+    const int z = voxel_array[i]->z;
+    if (IS_IN_OPEN_RANGE3(x, y, z, 0, seedsC->width - 1, 0, seedsC->height - 1, 0, seedsC->depth - 1)) {
+      legacyPoints.push_back({static_cast<double>(x), static_cast<double>(y), static_cast<double>(z)});
+      legacyValues.push_back(std::sqrt(static_cast<double>(pa_array[i])));
+    }
+  }
+
+  EXPECT_EQ(ported.points, legacyPoints);
+  ASSERT_EQ(ported.values.size(), legacyValues.size());
+  for (size_t i = 0; i < legacyValues.size(); ++i) {
+    EXPECT_DOUBLE_EQ(ported.values[i], legacyValues[i]) << "i=" << i;
+  }
+
+  Kill_Voxel_List(list);
+  Kill_Pixel_Array(pa);
+  free(voxel_array);
+  Kill_Stack(seedsC);
+  Kill_Stack(distC);
+  Kill_Stack(maskC);
+}
+
+TEST(NeutubeTracePortsParity, LocalNeurosegLabelG_MatchesLegacyC)
+{
+  const size_t width = 64;
+  const size_t height = 64;
+  const size_t depth = 32;
+
+  nim::ZImgInfo info(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg ported(info);
+  ported.fill(0);
+
+  nim::neutube::LocalNeuroseg seg;
+  seg.seg.r1 = 3.0;
+  seg.seg.c = 0.0;
+  seg.seg.h = 11.0;
+  seg.seg.theta = 0.0;
+  seg.seg.psi = 0.0;
+  seg.seg.curvature = 0.0;
+  seg.seg.alpha = 0.0;
+  seg.seg.scale = 1.0;
+
+  const std::array<double, 3> pos = {30.0, 31.0, 15.0};
+  nim::neutube::setNeurosegPositionLegacyLike(&seg, pos, nim::neutube::NeuroposReferenceLegacyLike::Center);
+
+  nim::neutube::localNeurosegLabelGLegacyLike(seg, &ported, /*flag*/ -1, /*value*/ 2, /*zScale*/ 1.0);
+
+  Stack* legacy = Make_Stack(GREY, static_cast<int>(width), static_cast<int>(height), static_cast<int>(depth));
+  ASSERT_NE(legacy, nullptr);
+  Zero_Stack(legacy);
+
+  Local_Neuroseg segC;
+  Set_Neuroseg(&(segC.seg), 3.0, 0.0, NEUROSEG_DEFAULT_H, 0.0, 0.0, 0.0, 0.0, 1.0);
+  double cpos[3] = {pos[0], pos[1], pos[2]};
+  Set_Neuroseg_Position(&segC, cpos, NEUROSEG_CENTER);
+
+  Local_Neuroseg_Label_G(&segC, legacy, /*flag*/ -1, /*value*/ 2, /*zScale*/ 1.0);
+
+  const auto* portedData = ported.timeData<uint8_t>(0);
+  for (size_t i = 0; i < ported.voxelNumber(); ++i) {
+    ASSERT_EQ(portedData[i], legacy->array[i]) << "i=" << i;
+  }
+
+  Kill_Stack(legacy);
+}
 
 class ArgvBuilder
 {
@@ -1592,11 +1839,11 @@ TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)
     EXPECT_EQ(rc, 0);
   }
 
-  // V2 runner: Atlas --command2 --skeletonize <input> -o <out> --config <command_config.json>
+  // V2 runner: Atlas --command --skeletonize <input> -o <out> --config <command_config.json>
   {
     ArgvBuilder argv({
       "Atlas",
-      "--command2",
+      "--command",
       "--skeletonize",
       inputSkelTiff.string(),
       "-o",
@@ -1644,7 +1891,7 @@ TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)
   const int v2Rc = [&]() {
     ArgvBuilder argv({
       "Atlas",
-      "--command2",
+      "--command",
       "--trace",
       "-o",
       v2TraceSwc.string(),
@@ -1733,7 +1980,7 @@ TEST(NeutubeCommand2Parity, Trace_WithHostSwc_MatchesLegacy)
   const int v2Rc = [&]() {
     ArgvBuilder argv({
       "Atlas",
-      "--command2",
+      "--command",
       "--trace",
       "-o",
       v2TraceSwc.string(),
@@ -1821,7 +2068,7 @@ TEST(NeutubeCommand2Parity, Trace_WithHostSwc_NoConnection_MatchesLegacy)
   const int v2Rc = [&]() {
     ArgvBuilder argv({
       "Atlas",
-      "--command2",
+      "--command",
       "--trace",
       "-o",
       v2TraceSwc.string(),
@@ -1839,6 +2086,248 @@ TEST(NeutubeCommand2Parity, Trace_WithHostSwc_NoConnection_MatchesLegacy)
   ASSERT_TRUE(fs::exists(legacyTraceSwc)) << legacyTraceSwc.string();
   ASSERT_TRUE(fs::exists(v2TraceSwc)) << v2TraceSwc.string();
   EXPECT_EQ(readTextFile(legacyTraceSwc), readTextFile(v2TraceSwc));
+
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+}
+
+TEST(NeutubeCommand2Parity, Trace_DiagnosisSeeded_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const fs::path dir = makeUniqueTempDir();
+  const fs::path commandConfig = dir / "command_config.json";
+  const fs::path traceCfg = dir / "trace_config.json";
+  const fs::path inputTraceTiff = dir / "signal_trace.tif";
+  const fs::path legacyTraceSwc = dir / "legacy_trace_diag.swc";
+  const fs::path v2TraceSwc = dir / "v2_trace_diag.swc";
+
+  writeTextFile(commandConfig,
+                R"json({
+  "trace": {
+    "include": "trace_config.json",
+    "diagnosis": true
+  }
+}
+)json");
+
+  writeTextFile(traceCfg,
+                R"json({
+  "tag": "trace config",
+  "default": {}
+}
+)json");
+
+  writeSimpleLineTiff(inputTraceTiff, 32, 32, 128, 255);
+
+  json::object in;
+  in["signal"] = inputTraceTiff.string();
+  json::array pos;
+  pos.emplace_back(16);
+  pos.emplace_back(16);
+  pos.emplace_back(64);
+  in["position"] = std::move(pos);
+  const std::string inputJson = json::serialize(in);
+
+  const int legacyRc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      "-o",
+      legacyTraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
+  }();
+
+  const int v2Rc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      "-o",
+      v2TraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+  }();
+
+  EXPECT_EQ(legacyRc, v2Rc);
+
+  if (legacyRc == 0) {
+    ASSERT_TRUE(fs::exists(legacyTraceSwc)) << legacyTraceSwc.string();
+    ASSERT_TRUE(fs::exists(v2TraceSwc)) << v2TraceSwc.string();
+    EXPECT_EQ(readTextFile(legacyTraceSwc), readTextFile(v2TraceSwc));
+  }
+
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+}
+
+TEST(NeutubeCommand2Parity, Trace_DiagnosisWithHostSwc_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const fs::path dir = makeUniqueTempDir();
+  const fs::path commandConfig = dir / "command_config.json";
+  const fs::path traceCfg = dir / "trace_config.json";
+  const fs::path inputTraceTiff = dir / "signal_trace.tif";
+  const fs::path hostSwc = dir / "host.swc";
+  const fs::path legacyTraceSwc = dir / "legacy_trace_host_diag.swc";
+  const fs::path v2TraceSwc = dir / "v2_trace_host_diag.swc";
+
+  writeTextFile(commandConfig,
+                R"json({
+  "trace": {
+    "include": "trace_config.json",
+    "diagnosis": true
+  }
+}
+)json");
+
+  writeTextFile(traceCfg,
+                R"json({
+  "tag": "trace config",
+  "default": {}
+}
+)json");
+
+  writeSimpleLineTiff(inputTraceTiff, 128, 32, 32, 255);
+
+  writeTextFile(hostSwc,
+                R"swc(
+1 0 64 16 10 1 -1
+2 0 64 16 14 1 1
+3 0 64 16 18 1 2
+)swc");
+
+  json::object in;
+  in["signal"] = inputTraceTiff.string();
+  in["swc"] = hostSwc.string();
+  json::array pos;
+  pos.emplace_back(64);
+  pos.emplace_back(16);
+  pos.emplace_back(16);
+  in["position"] = std::move(pos);
+  const std::string inputJson = json::serialize(in);
+
+  const int legacyRc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      "-o",
+      legacyTraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
+  }();
+
+  const int v2Rc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      "-o",
+      v2TraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+  }();
+
+  EXPECT_EQ(legacyRc, v2Rc);
+
+  if (legacyRc == 0) {
+    ASSERT_TRUE(fs::exists(legacyTraceSwc)) << legacyTraceSwc.string();
+    ASSERT_TRUE(fs::exists(v2TraceSwc)) << v2TraceSwc.string();
+    EXPECT_EQ(readTextFile(legacyTraceSwc), readTextFile(v2TraceSwc));
+  }
+
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+}
+
+TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const QString inputPath = nim::getTestDataDir().filePath("benchmark/fake_neuron.tif");
+  if (!QFileInfo::exists(inputPath)) {
+    GTEST_SKIP() << "Missing auto-trace test input at: " << inputPath.toStdString();
+  }
+
+  const fs::path dir = makeUniqueTempDir();
+  const fs::path commandConfig = dir / "command_config.json";
+  const fs::path traceCfg = dir / "trace_config.json";
+  const fs::path legacyTraceSwc = dir / "legacy_trace_auto.swc";
+  const fs::path v2TraceSwc = dir / "v2_trace_auto.swc";
+
+  writeTextFile(commandConfig,
+                R"json({
+  "trace": {
+    "include": "trace_config.json"
+  }
+}
+)json");
+
+  writeTextFile(traceCfg,
+                R"json({
+  "tag": "trace config",
+  "default": {}
+}
+)json");
+
+  const int legacyRc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      inputPath.toStdString(),
+      "-o",
+      legacyTraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+    });
+    return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
+  }();
+
+  const int v2Rc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      inputPath.toStdString(),
+      "-o",
+      v2TraceSwc.string(),
+      "--config",
+      commandConfig.string(),
+    });
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+  }();
+
+  EXPECT_EQ(legacyRc, v2Rc);
+
+  if (legacyRc == 0) {
+    ASSERT_TRUE(fs::exists(legacyTraceSwc)) << legacyTraceSwc.string();
+    ASSERT_TRUE(fs::exists(v2TraceSwc)) << v2TraceSwc.string();
+    EXPECT_EQ(readTextFile(legacyTraceSwc), readTextFile(v2TraceSwc));
+  }
 
   std::error_code ec;
   fs::remove_all(dir, ec);

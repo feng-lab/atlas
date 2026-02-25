@@ -120,6 +120,105 @@ ZImg majorityFilterBinaryU8(const ZImg& in, int connectivity)
   return out;
 }
 
+ZImg majorityFilterBinaryU8RLegacyLike(const ZImg& in, int connectivity, int mnbr)
+{
+  if (in.isEmpty()) {
+    return {};
+  }
+  CHECK(in.numChannels() == 1);
+  CHECK(in.numTimes() == 1);
+  CHECK(in.isType<uint8_t>()) << "Expected uint8 input, got " << in.info();
+
+  if (connectivity != 4 && connectivity != 8 && connectivity != 6 && connectivity != 18 && connectivity != 26 &&
+      connectivity != 10) {
+    throw ZException(fmt::format("Unsupported connectivity: {}", connectivity));
+  }
+
+  if (mnbr <= 0) {
+    // Legacy Stack_Majority_Filter_R returns a copy.
+    return in;
+  }
+
+  if (mnbr > connectivity) {
+    throw ZException(fmt::format("majorityFilterBinaryU8RLegacyLike: invalid mnbr={} for conn={}", mnbr, connectivity));
+  }
+
+  const bool is2dConn = (connectivity == 4 || connectivity == 8);
+  const ZNeighborhood& nb = neighborhoodLegacyOrder(connectivity);
+
+  ZImg out = in;
+
+  const size_t width = out.width();
+  const size_t height = out.height();
+  const size_t depth = out.depth();
+
+  const int conn = static_cast<int>(nb.size());
+  CHECK(conn == connectivity) << "Unexpected neighborhood size: " << conn << " for connectivity " << connectivity;
+
+  const auto* inData = in.timeData<uint8_t>(0);
+  auto* outData = out.timeData<uint8_t>(0);
+
+  auto inBound2d = [width, height](int x, int y) -> bool {
+    return x >= 0 && y >= 0 && x < static_cast<int>(width) && y < static_cast<int>(height);
+  };
+
+  auto inBound3d = [width, height, depth](int x, int y, int z) -> bool {
+    return x >= 0 && y >= 0 && z >= 0 && x < static_cast<int>(width) && y < static_cast<int>(height) &&
+           z < static_cast<int>(depth);
+  };
+
+  size_t offset = 0;
+  for (size_t z = 0; z < depth; ++z) {
+    for (size_t y = 0; y < height; ++y) {
+      for (size_t x = 0; x < width; ++x, ++offset) {
+        if (inData[offset] == 0) {
+          continue;
+        }
+
+        int n = 0;
+        int nbound = 0;
+
+        for (size_t b = 0; b < nb.size(); ++b) {
+          const ZVoxelCoordinate& o = nb.offset(b);
+          const int nx = static_cast<int>(x) + o.x;
+          const int ny = static_cast<int>(y) + o.y;
+          const int nz = static_cast<int>(z) + o.z;
+
+          bool ok = false;
+          if (is2dConn) {
+            ok = inBound2d(nx, ny);
+          } else {
+            ok = inBound3d(nx, ny, nz);
+          }
+
+          if (!ok) {
+            continue;
+          }
+
+          ++nbound;
+          const size_t nidx =
+            static_cast<size_t>(nx) + static_cast<size_t>(ny) * width + static_cast<size_t>(nz) * width * height;
+          if (inData[nidx] > 0) {
+            ++n;
+          }
+        }
+
+        if (nbound == conn) {
+          if (n < mnbr) {
+            outData[offset] = 0;
+          }
+        } else {
+          if (n * conn < mnbr * nbound) {
+            outData[offset] = 0;
+          }
+        }
+      }
+    }
+  }
+
+  return out;
+}
+
 ZImg fillHolesBinaryU8(const ZImg& in, int connectivity)
 {
   if (in.isEmpty()) {

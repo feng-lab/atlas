@@ -181,10 +181,6 @@ endif ()
 
 print_target_properties(img NO_LOCATION)
 
-print_target_properties(neurolabi NO_LOCATION)
-
-print_target_properties(neutu NO_LOCATION)
-
 print_target_properties(neutube NO_LOCATION)
 
 if (UNIX AND NOT APPLE)

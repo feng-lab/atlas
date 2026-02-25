@@ -48,6 +48,61 @@ const LocalNeuroseg* LocsegChain::tailSeg() const
   return node ? &node->locseg : nullptr;
 }
 
+LocsegNode* LocsegChain::nodeAt(int index)
+{
+  if (index < 0 || index >= length()) {
+    return nullptr;
+  }
+  auto it = _nodes.begin();
+  std::advance(it, index);
+  return &*it;
+}
+
+const LocsegNode* LocsegChain::nodeAt(int index) const
+{
+  if (index < 0 || index >= length()) {
+    return nullptr;
+  }
+  auto it = _nodes.begin();
+  std::advance(it, index);
+  return &*it;
+}
+
+LocalNeuroseg* LocsegChain::segAt(int index)
+{
+  auto* node = nodeAt(index);
+  return node ? &node->locseg : nullptr;
+}
+
+const LocalNeuroseg* LocsegChain::segAt(int index) const
+{
+  auto* node = nodeAt(index);
+  return node ? &node->locseg : nullptr;
+}
+
+LocsegNode* LocsegChain::insertNodeAt(int index, LocsegNode node)
+{
+  if (_nodes.empty()) {
+    _nodes.push_back(std::move(node));
+    return &*_nodes.begin();
+  }
+
+  if (index <= 0) {
+    _nodes.push_front(std::move(node));
+    return &*_nodes.begin();
+  }
+
+  if (index >= length()) {
+    _nodes.push_back(std::move(node));
+    return &*_nodes.rbegin();
+  }
+
+  auto it = _nodes.begin();
+  std::advance(it, index);
+  const auto inserted = _nodes.insert(it, std::move(node));
+  return &*inserted;
+}
+
 LocsegNode* LocsegChain::addNode(LocsegNode node, LocsegChainEndLegacyLike end)
 {
   if (end == LocsegChainEndLegacyLike::Head) {

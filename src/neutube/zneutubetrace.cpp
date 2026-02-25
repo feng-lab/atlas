@@ -3,8 +3,8 @@
 #include "zneutubelocsegchain.h"
 #include "zneutubelocsegchaincircle.h"
 #include "zneutubelocsegchaintrace.h"
-#include "zneutubelegacy.h"
 #include "zneutubeswcloaderlegacy.h"
+#include "zneutubetraceauto.h"
 #include "zneutubetraceconfig.h"
 #include "zneutubetraceconnect.h"
 #include "zneutubetraceworkspace.h"
@@ -404,25 +404,48 @@ int runTrace(const std::vector<std::string>& input,
   }
 
   if (!position.has_value()) {
-    return neutube_legacy::runTrace(input,
-                                    outputPath,
-                                    position,
-                                    level,
-                                    diagnosis,
-                                    traceConfigPath,
-                                    jsonDirPath,
-                                    verbose);
-  }
+    nim::ZImg signal;
+    try {
+      signal.load(QString::fromStdString(input[0]));
+    }
+    catch (const std::exception& e) {
+      LOG(ERROR) << "Failed to read input image: " << input[0] << " (" << e.what() << ")";
+      return 1;
+    }
 
-  if (diagnosis) {
-    return neutube_legacy::runTrace(input,
-                                    outputPath,
-                                    position,
-                                    level,
-                                    diagnosis,
-                                    traceConfigPath,
-                                    jsonDirPath,
-                                    verbose);
+    if (signal.isEmpty()) {
+      LOG(ERROR) << "Failed to read input image (empty): " << input[0];
+      return 1;
+    }
+
+    const std::string resolvedConfigPath = resolveTraceConfigPathLegacyLike(traceConfigPath, jsonDirPath);
+
+    TraceConfig baseCfg;
+    if (!resolvedConfigPath.empty()) {
+      const bool ok = loadTraceConfigLegacyLike(resolvedConfigPath, &baseCfg);
+      if (!ok) {
+        LOG(WARNING) << "Tracing configuration failed: failed to load " << resolvedConfigPath;
+      }
+    } else {
+      LOG(WARNING) << "Tracing configuration skipped: no trace config path and no json dir available.";
+      baseCfg = TraceConfig{};
+    }
+
+    TraceConfig cfg = baseCfg;
+    if (level > 0) {
+      if (const json::object* levelOverride = selectTraceLevelOverrideLegacyLike(baseCfg, level)) {
+        applyTraceConfigOverridesLegacyLike(*levelOverride, &cfg);
+      }
+    }
+
+    std::unique_ptr<ZSwc> tree = traceNeuronAutoLegacyLike(std::move(signal), cfg, diagnosis, verbose, nullptr);
+    if (tree) {
+      writeSwcLegacyNeuTu(tree.get(), outputPath);
+      return 0;
+    }
+
+    LOG(WARNING) << "WARNING: No result generated.";
+    return 1;
   }
 
   const std::string resolvedConfig = resolveTraceConfigPathLegacyLike(traceConfigPath, jsonDirPath);
