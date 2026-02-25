@@ -12,7 +12,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -236,4 +236,4 @@ LabelLargeObjectsResult labelLargeObjectsLegacy(const ZImg& img, const LabelLarg
   return res;
 }
 
-} // namespace nim::neutube
+} // namespace nim

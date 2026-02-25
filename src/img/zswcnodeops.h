@@ -2,7 +2,7 @@
 
 #include "zswc.h"
 
-namespace nim::neutube {
+namespace nim {
 
 template<typename Iter>
 [[nodiscard]] bool isRegular(const Iter& pos)
@@ -37,4 +37,4 @@ template<typename Iter>
   return !ZSwc::isRoot(pos) && !ZSwc::isLeaf(pos) && !ZSwc::isBranchNode(pos);
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -2,7 +2,7 @@
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 void defaultNeurocompConnLegacyLike(NeurocompConnLegacyLike& conn)
 {
@@ -31,4 +31,4 @@ void neurocompConnTranslateModeLegacyLike(int len2, NeurocompConnLegacyLike& con
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

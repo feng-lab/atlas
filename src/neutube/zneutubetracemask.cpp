@@ -5,7 +5,7 @@
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 std::optional<ZImg> makeMaskLegacyLike(const ZImg& stack, const TraceConfig& cfg, MakeMaskDiagnosticsLegacyLike* diag)
 {
@@ -40,4 +40,4 @@ std::optional<ZImg> makeMaskLegacyLike(const ZImg& stack, const TraceConfig& cfg
   return mask;
 }
 
-} // namespace nim::neutube
+} // namespace nim

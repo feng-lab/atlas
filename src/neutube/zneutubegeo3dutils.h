@@ -1,6 +1,6 @@
 #pragma once
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of tz_geometry.c::Vector_Angle().
 [[nodiscard]] double vectorAngleLegacyLike(double x, double y);
@@ -14,4 +14,4 @@ void geo3dNormalOrientationLegacyLike(double x, double y, double z, double& thet
 // Port of tz_geo3d_utils.c::Geo3d_Rotate_Orientation().
 void geo3dRotateOrientationLegacyLike(double rtheta, double rpsi, double& theta, double& psi);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Ported helpers matching legacy `SwcTreeNode` geometric predicates used by NeuTu tracing.
 
@@ -31,6 +31,9 @@ namespace nim::neutube {
                                                  const ZSwc::ConstSwcTreeNode& tn2,
                                                  const ZSwc::ConstSwcTreeNode& tn3);
 
+// Returns parent + children of `node` as mutable node handles.
+// Note: this helper does not modify `swc`, but it takes `ZSwc&` because it returns `ZSwc::SwcTreeNode`
+// (a mutable iterator type) which is commonly used by callers that later mutate/reconnect the tree.
 [[nodiscard]] std::vector<ZSwc::SwcTreeNode> swcNeighborArrayLegacyLike(ZSwc& swc, const ZSwc::SwcTreeNode& node);
 
 void swcNodeAverageLegacyLike(const ZSwc::ConstSwcTreeNode& a, const ZSwc::ConstSwcTreeNode& b, ZSwc::SwcTreeNode out);
@@ -40,4 +43,4 @@ void swcNodeInterpolateLegacyLike(const ZSwc::ConstSwcTreeNode& a,
                                   double lambda,
                                   ZSwc::SwcTreeNode out);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -2,7 +2,7 @@
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 void defaultConnectionTestWorkspaceLegacyLike(ConnectionTestWorkspaceLegacyLike& ctw)
 {
@@ -22,4 +22,4 @@ void defaultConnectionTestWorkspaceLegacyLike(ConnectionTestWorkspaceLegacyLike&
   ctw.mask = nullptr;
 }
 
-} // namespace nim::neutube
+} // namespace nim

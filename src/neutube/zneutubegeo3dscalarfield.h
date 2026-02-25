@@ -12,7 +12,7 @@ class ZImg;
 
 }
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of tz_geo3d_scalar_field.h::Geo3d_Scalar_Field.
 //
@@ -80,4 +80,4 @@ struct Geo3dScalarField
                                                                 size_t c = 0,
                                                                 size_t t = 0);
 
-} // namespace nim::neutube
+} // namespace nim

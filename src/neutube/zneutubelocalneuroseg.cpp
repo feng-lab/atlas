@@ -6,7 +6,7 @@
 #include "zneutubegeo3dutils.h"
 #include "zneutubeimgsampling.h"
 #include "zneutubeperceptor.h"
-#include "zneutubeswcgeom.h"
+#include "zswcgeom.h"
 #include "zneutubestackfitoptions.h"
 
 #include "zlog.h"
@@ -17,7 +17,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -1503,4 +1503,4 @@ localNeurosegDist2LegacyLike(const LocalNeuroseg& locseg1, const LocalNeuroseg& 
   return localNeurosegLineSegDistSLegacyLike(locseg2, bottom, top, pos);
 }
 
-} // namespace nim::neutube
+} // namespace nim

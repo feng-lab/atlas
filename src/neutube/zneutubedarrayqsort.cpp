@@ -2,7 +2,7 @@
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 void darrayQsortLegacy(std::vector<double>& values, std::vector<int>* outIndices)
 {
@@ -82,4 +82,4 @@ void darrayQsortLegacy(std::vector<double>& values, std::vector<int>* outIndices
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

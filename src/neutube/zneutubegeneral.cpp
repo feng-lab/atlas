@@ -6,7 +6,7 @@
 #include "zneutubetraceconfig.h"
 #include "zneutubetraceauto.h"
 #include "zneutubetracemask.h"
-#include "zneutubeswcwriter.h"
+#include "zswcwriter.h"
 
 #include "zimg.h"
 #include "zlog.h"
@@ -39,7 +39,7 @@ struct MaskOverrideResult
 }
 
 [[nodiscard]] MaskOverrideResult parseMaskOverrideLegacyLike(const json::object& inputJson,
-                                                             const nim::neutube::TraceConfig& traceCfg)
+                                                             const nim::TraceConfig& traceCfg)
 {
   MaskOverrideResult res;
 
@@ -87,8 +87,8 @@ struct MaskOverrideResult
   }
 
   if (threshold < 0) {
-    nim::neutube::MakeMaskDiagnosticsLegacyLike diag;
-    std::optional<nim::ZImg> mask = nim::neutube::makeMaskLegacyLike(maskImg, traceCfg, &diag);
+    nim::MakeMaskDiagnosticsLegacyLike diag;
+    std::optional<nim::ZImg> mask = nim::makeMaskLegacyLike(maskImg, traceCfg, &diag);
     if (!mask) {
       res.decision = MaskOverrideDecision::AbortTrace;
       return res;
@@ -136,7 +136,7 @@ namespace {
 
 } // namespace
 
-namespace nim::neutube {
+namespace nim {
 
 int runGeneral(const std::string& generalConfigTextOrPath,
                const json::object& generalCfg,
@@ -263,4 +263,4 @@ int runGeneral(const std::string& generalConfigTextOrPath,
   return 0;
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -6,7 +6,7 @@
 
 #include "zimg.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `tz_locseg_chain.c::Locseg_Chain_Connection_Test()`.
 //
@@ -22,4 +22,4 @@ namespace nim::neutube {
                                                        NeurocompConnLegacyLike& conn,
                                                        const ConnectionTestWorkspaceLegacyLike& ctw);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -2,7 +2,7 @@
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 LocsegNode* LocsegChain::head()
 {
@@ -320,4 +320,4 @@ void locsegChainRemoveTurnEndsLegacyLike(LocsegChain& chain, double maxAngle)
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

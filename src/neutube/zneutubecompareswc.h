@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 struct CompareSwcPairScore
 {
@@ -25,4 +25,4 @@ struct CompareSwcResult
 
 int runCompareSwc(const std::vector<std::string>& inputPaths, double scale);
 
-} // namespace nim::neutube
+} // namespace nim

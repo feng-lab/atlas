@@ -3,7 +3,7 @@
 #include "zneutubelocsegchainknot.h"
 #include "zneutubeneuroseg.h"
 #include "zneutubetracerecord.h"
-#include "zneutubeswcgeom.h"
+#include "zswcgeom.h"
 
 #include "zlog.h"
 
@@ -11,7 +11,7 @@
 #include <limits>
 #include <optional>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -216,4 +216,4 @@ int locsegChainInterpolateLLegacyLike(LocsegChain& chain,
   return index;
 }
 
-} // namespace nim::neutube
+} // namespace nim

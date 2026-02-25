@@ -1,7 +1,7 @@
 #include "zneutubetraceconnect.h"
 
 #include "zneutubeimgsampling.h"
-#include "zneutubeswctreenodegeomlegacy.h"
+#include "zswctreenodegeomlegacy.h"
 
 #include "zimg.h"
 #include "zlog.h"
@@ -10,7 +10,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -259,4 +259,4 @@ void connectBranchToHostLegacyLike(ZSwc& swc,
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

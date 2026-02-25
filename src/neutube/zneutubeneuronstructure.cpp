@@ -13,7 +13,7 @@
 #include <limits>
 #include <optional>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -388,4 +388,4 @@ std::unique_ptr<ZSwc> neuronStructureToSwcTreeCircleZLegacyLike(const NeuronStru
   return tree;
 }
 
-} // namespace nim::neutube
+} // namespace nim

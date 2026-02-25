@@ -15,7 +15,7 @@ class ZImg;
 
 }
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of the legacy `Trace_Workspace` fields used by the tracer.
 // This is intentionally minimal at first and expanded incrementally as the trace
@@ -99,4 +99,4 @@ traceWorkspaceMaskValueZLegacyLike(const TraceWorkspace& tw, std::array<double, 
 [[nodiscard]] bool
 traceWorkspacePointInBoundZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zScale);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -8,7 +8,7 @@
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -193,4 +193,4 @@ Geo3dScalarField removeNoisySeedLegacyLike(Geo3dScalarField seeds,
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

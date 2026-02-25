@@ -3,7 +3,7 @@
 #include "zneutubelocsegchain.h"
 #include "zneutubetraceworkspace.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Trace_Test().
 //
@@ -26,4 +26,4 @@ namespace nim::neutube {
 // Port of tz_locseg_chain.c::Trace_Locseg().
 void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain, TraceWorkspace& tw);
 
-} // namespace nim::neutube
+} // namespace nim

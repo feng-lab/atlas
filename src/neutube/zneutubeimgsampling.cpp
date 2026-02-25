@@ -5,7 +5,7 @@
 
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -145,4 +145,4 @@ bool pointHitMaskLegacyLike(const ZImg& img, double x, double y, double z, size_
   return false;
 }
 
-} // namespace nim::neutube
+} // namespace nim

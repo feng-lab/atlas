@@ -6,7 +6,7 @@
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 void localNeurosegChangeTopLegacyLike(LocalNeuroseg& locseg, const std::array<double, 3>& newTop)
 {
@@ -68,4 +68,4 @@ std::optional<LocalNeuroseg> swcNodeToLocsegLegacyLike(const ZSwc::ConstSwcTreeN
   return locseg;
 }
 
-} // namespace nim::neutube
+} // namespace nim

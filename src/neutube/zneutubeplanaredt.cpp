@@ -9,7 +9,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -250,4 +250,4 @@ ZImg planarBwdistSquaredU16P(const ZImg& binaryMask)
   return out;
 }
 
-} // namespace nim::neutube
+} // namespace nim

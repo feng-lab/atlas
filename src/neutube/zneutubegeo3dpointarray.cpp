@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 void geo3dPointArrayTranslateLegacyLike(std::array<double, 3>* points, int n, double dx, double dy, double dz)
 {
@@ -38,4 +38,4 @@ void geo3dPointArrayBendLegacyLike(std::array<double, 3>* points, int n, double 
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

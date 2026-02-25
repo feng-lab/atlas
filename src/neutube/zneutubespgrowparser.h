@@ -9,7 +9,7 @@
 #include <optional>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 class ZNeutubeSpGrowParser
 {
@@ -40,4 +40,4 @@ private:
   ZImg m_pathMask;
 };
 
-} // namespace nim::neutube
+} // namespace nim

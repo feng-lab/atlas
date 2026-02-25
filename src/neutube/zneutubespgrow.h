@@ -8,7 +8,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 struct SpGrowWorkspace;
 
@@ -90,4 +90,4 @@ void stackSpGrow(const ZImg& stack, SpGrowWorkspace& sgw);
 // If no target is reachable, returns an empty vector.
 [[nodiscard]] std::vector<int64_t> stackSpGrowPathLegacyLike(const ZImg& stack, SpGrowWorkspace& sgw);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -12,7 +12,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -290,4 +290,4 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
   return out;
 }
 
-} // namespace nim::neutube
+} // namespace nim

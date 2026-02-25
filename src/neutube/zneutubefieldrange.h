@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace nim::neutube {
+namespace nim {
 
 struct FieldRangeLegacyLike
 {
@@ -10,4 +10,4 @@ struct FieldRangeLegacyLike
   std::array<int, 3> size = {0, 0, 0};
 };
 
-} // namespace nim::neutube
+} // namespace nim

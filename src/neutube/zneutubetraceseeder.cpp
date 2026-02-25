@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -131,4 +131,4 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
   return out;
 }
 
-} // namespace nim::neutube
+} // namespace nim

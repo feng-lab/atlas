@@ -19,7 +19,7 @@
 #include <limits>
 #include <optional>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -712,4 +712,4 @@ std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source
   return locsegChainShortestPathPtLegacyLike(pos, target, startIndex, endIndex, signal, zScale, sgw);
 }
 
-} // namespace nim::neutube
+} // namespace nim

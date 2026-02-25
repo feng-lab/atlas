@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Point_Dist().
 //
@@ -63,4 +63,4 @@ void locsegChainUpdateStackGraphWorkspaceLegacyLike(const LocalNeuroseg& source,
                                                                      double zScale,
                                                                      StackGraphWorkspaceLegacyLike& sgw);
 
-} // namespace nim::neutube
+} // namespace nim

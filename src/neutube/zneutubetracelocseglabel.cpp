@@ -12,7 +12,7 @@
 #include <cmath>
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -643,4 +643,4 @@ void locsegChainLabelWLegacyLike(const LocsegChain& chain,
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

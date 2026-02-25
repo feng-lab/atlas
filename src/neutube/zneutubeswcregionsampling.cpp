@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 std::unique_ptr<ZSwc> createSwcByRegionSampling(const ZNeutubeVoxelArray& voxelArray, double radiusAdjustment)
 {
@@ -69,4 +69,4 @@ std::unique_ptr<ZSwc> createSwcByRegionSampling(const ZNeutubeVoxelArray& voxelA
   return swc;
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -2,7 +2,7 @@
 
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Legacy-compatible port of neuTube's `darray_qsort(...)` (tz_darray.c).
 //
@@ -10,4 +10,4 @@ namespace nim::neutube {
 // The algorithm is intentionally identical to the legacy iterative quicksort to preserve tie behavior.
 void darrayQsortLegacy(std::vector<double>& values, /*nullable*/ std::vector<int>* outIndices);
 
-} // namespace nim::neutube
+} // namespace nim

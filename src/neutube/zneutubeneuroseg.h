@@ -5,7 +5,7 @@
 #include <array>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 struct Geo3dScalarField;
 
@@ -112,4 +112,4 @@ struct NeurosegSliceField
 [[nodiscard]] Geo3dScalarField neurosegFieldSpLegacyLike(const Neuroseg& seg,
                                                          NeurosegFieldFunctionLegacyLike fieldFunc);
 
-} // namespace nim::neutube
+} // namespace nim

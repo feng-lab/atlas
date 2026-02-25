@@ -2,7 +2,7 @@
 
 #include "zimg.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of legacy `Stack_Bwdist_L_U16P` (planar/2D-per-slice squared Euclidean distance transform).
 //
@@ -18,4 +18,4 @@ namespace nim::neutube {
 // - This matches legacy `dt3d_binary_mu16_p(..., pad=1)` behavior: out-of-bounds are treated as background.
 [[nodiscard]] ZImg planarBwdistSquaredU16P(const ZImg& binaryMask);
 
-} // namespace nim::neutube
+} // namespace nim

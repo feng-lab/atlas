@@ -2,11 +2,11 @@
 
 #include "zneutubegraph.h"
 
-#include "zneutubeswcnodeops.h"
+#include "zswcnodeops.h"
 
-#include "zneutubeswcops.h"
+#include "zswcops.h"
 
-#include "zneutubeswcgeom.h"
+#include "zswcgeom.h"
 
 #include "zlog.h"
 
@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 int labelForest(ZSwc& tree)
 {
@@ -244,4 +244,4 @@ void reconnectSwc(ZSwc& tree, double zScale, double distThre)
   resortId(tree);
 }
 
-} // namespace nim::neutube
+} // namespace nim

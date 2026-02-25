@@ -1,6 +1,6 @@
 #pragma once
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of tz_geo3d_scalar_field.h STACK_FIT_* option values.
 enum class StackFitOption : int
@@ -18,4 +18,4 @@ enum class StackFitOption : int
   LowMeanSignal = 10
 };
 
-} // namespace nim::neutube
+} // namespace nim

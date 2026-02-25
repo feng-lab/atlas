@@ -13,7 +13,7 @@ class ZImg;
 
 }
 
-namespace nim::neutube {
+namespace nim {
 
 struct Geo3dScalarField;
 
@@ -265,4 +265,4 @@ void localNeurosegBallBoundLegacyLike(const LocalNeuroseg& locseg, Geo3dBallLega
 // - Negative `ratio`: keep the top part (height scaled by `-ratio`).
 void localNeurosegChopLegacyLike(LocalNeuroseg& locseg, double ratio);
 
-} // namespace nim::neutube
+} // namespace nim

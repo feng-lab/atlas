@@ -7,7 +7,7 @@
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -274,4 +274,4 @@ double computeStackFitScoresMaskedLegacyLike(const double* fieldValues,
   return fs->scores[0];
 }
 
-} // namespace nim::neutube
+} // namespace nim

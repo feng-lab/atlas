@@ -7,7 +7,7 @@
 #include <array>
 #include <memory>
 
-namespace nim::neutube {
+namespace nim {
 
 class LocsegChain;
 
@@ -51,4 +51,4 @@ void locsegChainLabelWLegacyLike(const LocsegChain& chain,
                                  int end,
                                  LocsegLabelWorkspaceLegacyLike& ws);
 
-} // namespace nim::neutube
+} // namespace nim

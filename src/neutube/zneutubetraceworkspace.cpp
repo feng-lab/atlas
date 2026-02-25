@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -165,4 +165,4 @@ bool traceWorkspacePointInBoundZLegacyLike(const TraceWorkspace& tw, std::array<
   return traceWorkspacePointInBoundLegacyLike(tw, pos);
 }
 
-} // namespace nim::neutube
+} // namespace nim

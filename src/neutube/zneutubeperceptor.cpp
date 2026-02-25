@@ -8,7 +8,7 @@
 #include <cmath>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -187,4 +187,4 @@ double fitPerceptorLegacyLike(Perceptor& perceptor, const void* stack)
   return lsw.score;
 }
 
-} // namespace nim::neutube
+} // namespace nim

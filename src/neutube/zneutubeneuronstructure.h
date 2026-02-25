@@ -11,7 +11,7 @@
 #include <memory>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 class LocsegChain;
 
@@ -57,4 +57,4 @@ void neuronStructureToTreeLegacyLike(NeuronStructureCirclesLegacyLike& ns);
 [[nodiscard]] std::unique_ptr<ZSwc>
 neuronStructureToSwcTreeCircleZLegacyLike(const NeuronStructureCirclesLegacyLike& ns, double zScale);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -14,7 +14,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -352,4 +352,4 @@ BinarizeResultLegacyLike binarizeLocmaxLegacyLike(const ZImg& stack, int retryCo
   return res;
 }
 
-} // namespace nim::neutube
+} // namespace nim

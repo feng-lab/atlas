@@ -2,7 +2,7 @@
 
 #include "zneutubecontfun.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of tz_perceptor.h::Perceptor.
 struct Perceptor
@@ -26,4 +26,4 @@ void perceptorGradientLegacyLike(const Perceptor& perceptor, const void* stack, 
 // `stack` is forwarded as an opaque context pointer to the score function (legacy API).
 double fitPerceptorLegacyLike(Perceptor& perceptor, const void* stack);
 
-} // namespace nim::neutube
+} // namespace nim

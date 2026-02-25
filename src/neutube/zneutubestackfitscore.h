@@ -4,7 +4,7 @@
 
 #include <cstddef>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of the `Stack_Fit_Score` switch logic used by legacy
 // `Geo3d_Scalar_Field_Stack_Score*()` functions, but operating directly on
@@ -33,4 +33,4 @@ namespace nim::neutube {
                                                            size_t length,
                                                            /*nullable*/ StackFitScore* fs);
 
-} // namespace nim::neutube
+} // namespace nim

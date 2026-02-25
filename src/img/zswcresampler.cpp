@@ -1,14 +1,14 @@
-#include "zneutubeswcresampler.h"
+#include "zswcresampler.h"
 
-#include "zneutubeswcnodeops.h"
-#include "zneutubeswcops.h"
+#include "zswcnodeops.h"
+#include "zswcops.h"
 
 #include "zlog.h"
 
 #include <cmath>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -164,4 +164,4 @@ bool ZNeutubeSwcResampler::isInterRedundant(const ZSwc::SwcTreeNode& tn, const Z
   return redundant;
 }
 
-} // namespace nim::neutube
+} // namespace nim

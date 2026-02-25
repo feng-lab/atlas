@@ -7,7 +7,7 @@
 #include <optional>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of tz_locseg_chain_knot.h::Locseg_Chain_Knot.
 struct LocsegChainKnotLegacyLike
@@ -44,4 +44,4 @@ void locsegChainKnotArrayAppendUniqueLegacyLike(LocsegChainKnotArrayLegacyLike& 
 // Port of tz_locseg_chain_knot.c::Locseg_Chain_Knot_Pos().
 [[nodiscard]] std::array<double, 3> locsegChainKnotPosLegacyLike(const LocsegChainKnotArrayLegacyLike& ka, int index);
 
-} // namespace nim::neutube
+} // namespace nim

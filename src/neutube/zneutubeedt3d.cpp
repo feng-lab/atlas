@@ -9,7 +9,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -272,4 +272,4 @@ ZImg bwdistSquaredU16LegacyLike(const ZImg& binaryMask, int pad)
   return out;
 }
 
-} // namespace nim::neutube
+} // namespace nim

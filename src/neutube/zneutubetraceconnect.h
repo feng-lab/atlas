@@ -11,7 +11,7 @@ class ZImg;
 
 }
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `ZNeuronTracer::findBestTerminalBreak`.
 //
@@ -32,4 +32,4 @@ void connectBranchToHostLegacyLike(ZSwc& swc,
                                    ZSwc::SwcTreeNode branchRoot,
                                    const ZImg& stack);
 
-} // namespace nim::neutube
+} // namespace nim

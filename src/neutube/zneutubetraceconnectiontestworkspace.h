@@ -10,7 +10,7 @@ class ZImg;
 
 }
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of `tz_trace_defs.h::Connection_Test_Workspace`.
 //
@@ -42,4 +42,4 @@ struct ConnectionTestWorkspaceLegacyLike
 // Port of `tz_trace_utils.c::Default_Connection_Test_Workspace()`.
 void defaultConnectionTestWorkspaceLegacyLike(ConnectionTestWorkspaceLegacyLike& ctw);
 
-} // namespace nim::neutube
+} // namespace nim

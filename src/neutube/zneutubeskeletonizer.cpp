@@ -7,8 +7,8 @@
 #include "zneutubespgrowparser.h"
 #include "zneutubeswcreconnect.h"
 #include "zneutubeswcregionsampling.h"
-#include "zneutubeswcops.h"
-#include "zneutubeswcresampler.h"
+#include "zswcops.h"
+#include "zswcresampler.h"
 
 #include "zexception.h"
 #include "zlog.h"
@@ -20,7 +20,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -548,4 +548,4 @@ void ZNeutubeSkeletonizer::print() const
             << m_downsampleInterval[2] << ")";
 }
 
-} // namespace nim::neutube
+} // namespace nim

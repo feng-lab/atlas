@@ -2,7 +2,7 @@
 
 #include "zimg.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Legacy STACK_LOCMAX_* option values (tz_image_lib_defs.h).
 enum class StackLocmaxOptionLegacyLike : int
@@ -30,4 +30,4 @@ enum class StackLocmaxOptionLegacyLike : int
 // - 0 otherwise
 [[nodiscard]] ZImg stackLocmaxRegionMaskLegacyLike(const ZImg& stack, int connectivity);
 
-} // namespace nim::neutube
+} // namespace nim

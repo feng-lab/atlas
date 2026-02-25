@@ -1,13 +1,13 @@
 #include "zneutubelocsegchaincircle.h"
 
 #include "zneutubelocsegchainknot.h"
-#include "zneutubeswcgeom.h"
+#include "zswcgeom.h"
 
 #include "zlog.h"
 
 #include <optional>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -67,4 +67,4 @@ std::vector<Geo3dCircle> locsegChainToGeo3dCircleArrayLegacyLike(const LocsegCha
   return locsegChainToGeo3dCircleArrayZLegacyLike(chain, 1.0);
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace nim::neutube {
+namespace nim {
 
 // Loads an SWC file into `out` matching legacy neuTube `Swc_Tree_Parse_String` child/root ordering:
 // - Nodes are connected by scanning IDs in increasing order.
@@ -20,4 +20,4 @@ namespace nim::neutube {
 // `error` is optional; pass a non-null pointer to receive a human-readable error message.
 [[nodiscard]] bool loadSwcLegacyOrder(const std::string& path, ZSwc& out, /*nullable*/ std::string* error = nullptr);
 
-} // namespace nim::neutube
+} // namespace nim

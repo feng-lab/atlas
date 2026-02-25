@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 struct ZNeutubeVoxel
 {
@@ -62,4 +62,4 @@ struct ZNeutubeVoxel
   }
 };
 
-} // namespace nim::neutube
+} // namespace nim

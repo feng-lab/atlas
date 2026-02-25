@@ -1,12 +1,12 @@
-#include "zneutubeswcwriter.h"
+#include "zswcwriter.h"
 
-#include "zneutubeswcops.h"
+#include "zswcops.h"
 
 #include "zlog.h"
 
 #include <cstdio>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -48,4 +48,4 @@ void writeSwcLegacyNeuTu(ZSwc& tree, const std::string& filePath, const std::vec
   std::fclose(fp);
 }
 
-} // namespace nim::neutube
+} // namespace nim

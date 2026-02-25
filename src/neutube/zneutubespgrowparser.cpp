@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -266,4 +266,4 @@ std::vector<ZNeutubeVoxelArray> ZNeutubeSpGrowParser::extractAllPath(double minL
   return pathArray;
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -135,4 +135,4 @@ void ZNeutubeVoxelArray::labelImgWithBall(ZImg& img, uint8_t label) const
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

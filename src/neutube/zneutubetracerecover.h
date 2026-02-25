@@ -11,7 +11,7 @@
 #include <optional>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 struct RecoverResultLegacyLike
 {
@@ -34,4 +34,4 @@ struct RecoverResultLegacyLike
                                                         std::optional<ZImg> baseMask,
                                                         TraceWorkspace& tw);
 
-} // namespace nim::neutube
+} // namespace nim

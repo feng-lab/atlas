@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of legacy `ZRunNeuTuCommand::runGeneral` / `runTraceCommand` for the
 // `"command":"trace_neuron"` module.
@@ -25,4 +25,4 @@ int runGeneral(const std::string& generalConfigTextOrPath,
                const std::string& jsonDirPath,
                bool verbose);
 
-} // namespace nim::neutube
+} // namespace nim

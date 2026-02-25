@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 void rotateXZLegacyLike(std::array<double, 3>* points, int n, double theta, double psi, int inverse)
 {
@@ -82,4 +82,4 @@ void rotateZLegacyLike(std::array<double, 3>* points, int n, double alpha, int i
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

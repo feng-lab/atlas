@@ -5,7 +5,7 @@
 
 #include "zimg.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `tz_locseg_chain.c::Locseg_Chain_Geolen()`.
 [[nodiscard]] double locsegChainGeolenLegacyLike(const LocsegChain& chain);
@@ -28,4 +28,4 @@ locsegChainMinSegScoreLegacyLike(const LocsegChain& chain, const ZImg& stack, do
 [[nodiscard]] double
 locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zScale, const LocalNeuroseg& testseg);
 
-} // namespace nim::neutube
+} // namespace nim

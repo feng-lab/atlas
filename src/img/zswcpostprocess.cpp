@@ -1,6 +1,6 @@
-#include "zneutubeswcpostprocess.h"
+#include "zswcpostprocess.h"
 
-#include "zneutubeswcops.h"
+#include "zswcops.h"
 
 #include "zlog.h"
 
@@ -10,7 +10,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -56,7 +56,7 @@ template<typename Iter>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isBranchPointLegacyLike(const Iter& tn, ZSwc& tree)
+[[nodiscard]] bool isBranchPointLegacyLike(const Iter& tn, const ZSwc& tree)
 {
   if (!isRegularLegacyLike(tn)) {
     return false;
@@ -92,7 +92,7 @@ template<typename Iter>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isContinuationLegacyLike(const Iter& tn, ZSwc& tree)
+[[nodiscard]] bool isContinuationLegacyLike(const Iter& tn, const ZSwc& tree)
 {
   if (!isRegularLegacyLike(tn)) {
     return false;
@@ -181,7 +181,7 @@ template<typename Iter1, typename Iter2, typename Iter3>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isTurnLegacyLike(const Iter& tn, ZSwc& tree)
+[[nodiscard]] bool isTurnLegacyLike(const Iter& tn, const ZSwc& tree)
 {
   // Port of `Swc_Tree_Node_Is_Turn`.
   if (!isContinuationLegacyLike(tn, tree)) {
@@ -198,7 +198,7 @@ template<typename Iter>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isOvershootLegacyLike(const Iter& tn, ZSwc& tree)
+[[nodiscard]] bool isOvershootLegacyLike(const Iter& tn, const ZSwc& tree)
 {
   // Port of `Swc_Tree_Node_Is_Overshoot`.
   if (!isTurnLegacyLike(tn, tree)) {
@@ -225,9 +225,8 @@ template<typename Iter>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isSpurLegacyLike(const Iter& tn, ZSwc& tree)
+[[nodiscard]] bool isSpurLegacyLike(const Iter& tn, const ZSwc& tree)
 {
-  (void)tree;
   if (!isLeafLegacyLike(tn)) {
     return false;
   }
@@ -293,7 +292,7 @@ void detachParentRawLegacyLike(Iter pos)
 }
 
 template<typename Iter>
-void replaceChildLegacyLike(ZSwc& tree, Iter oldChild, Iter newChild)
+void replaceChildLegacyLike(Iter oldChild, Iter newChild)
 {
   // Port of `Swc_Tree_Node_Replace_Child`.
   CHECK(!ZSwc::isNull(newChild));
@@ -412,7 +411,7 @@ void tuneBranchNodeLegacyLike(ZSwc& tree, Iter tn)
         }
 
         if (newTn != child) {
-          replaceChildLegacyLike(tree, child, newTn);
+          replaceChildLegacyLike(child, newTn);
           setParentLegacyLike(tree, child, newTn);
           child = newTn;
         }
@@ -683,4 +682,4 @@ void swcTreeRemoveOrphanBlobLegacyLike(ZSwc& tree, double minLength, int minOrph
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

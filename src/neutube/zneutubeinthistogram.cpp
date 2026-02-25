@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -432,4 +432,4 @@ int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, dou
   return thre;
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -197,11 +197,13 @@ Key behaviors to preserve (until we intentionally evolve them):
 
 `ZRunNeuTuCommand2` should be a thin orchestration layer that delegates to small, testable modules:
 
-- `neutube::CommandLine` (parsing + validation; no neurolabi C dependency)
-- `neutube::Config` (boost::json parsing, include-expansion, schema validation)
-- `neutube::Trace` (core tracing invocation; image access via `ZImg`/`ZImgPack`)
-- `neutube::Skeletonize` (binary/object skeletonization on `ZImg` / `ZSkeleton` / `ZSwc`)
-- `neutube::CompareSwc` (similarity; should migrate off `ZSwcTreeMatcher` when ready)
+- `nim::ZRunNeuTuCommand2` (parsing + validation + dispatch; no neurolabi C dependency)
+- Config helpers:
+  - `command_config.json` include resolution in `src/neutube/zrunneutucommand2.cpp`
+  - tracing config parsing: `nim::TraceConfig` (`src/neutube/zneutubetraceconfig.*`)
+- Tracing: `nim::runTrace(...)` (`src/neutube/zneutubetrace.*`, `src/neutube/zneutubetraceauto.*`)
+- Skeletonize: `nim::runSkeletonize(...)` (`src/neutube/zneutubeskeletonize.*`, `src/neutube/zneutubeskeletonizer.*`)
+- Compare SWC: `nim::runCompareSwc(...)` (`src/neutube/zneutubecompareswc.*`)
 
 ### Compatibility strategy
 
@@ -228,13 +230,13 @@ Status (Goal 1 / CLI):
     - For standalone testing, v2 runner also accepts `--json_dir <Resources/json>` and/or `--config <command_config.json>`.
   - `--command --skeletonize` is implemented in `src/neutube/` using Atlas-native image/SWC types:
     - Image I/O: `nim::ZImg` (no `ZStack` / no `Stack`).
-    - Algorithm: `nim::neutube::ZNeutubeSkeletonizer` (`src/neutube/zneutubeskeletonizer.*`).
-    - Output: `nim::ZSwc` + legacy-format writer (`src/neutube/zneutubeswcwriter.*`) for byte-identical SWC files.
+    - Algorithm: `nim::ZNeutubeSkeletonizer` (`src/neutube/zneutubeskeletonizer.*`).
+    - Output: `nim::ZSwc` + legacy-format writer (`src/img/zswcwriter.*`) for byte-identical SWC files.
     - The skeletonize implementation path does not include or call into neurolabi C (`tz_*`) or genelib.
   - `--command --trace` is fully ported in `src/neutube/` (strictly legacy-equivalent behavior):
     - Config parsing: `TraceConfig` (`src/neutube/zneutubetraceconfig.*`, Boost.JSON; legacy tag + per-level semantics)
     - Image access: `nim::ZImg` (no `ZStack` / no `Stack`)
-    - Output: `nim::ZSwc` + legacy-format writer (`src/neutube/zneutubeswcwriter.*`) for byte-identical SWC files
+    - Output: `nim::ZSwc` + legacy-format writer (`src/img/zswcwriter.*`) for byte-identical SWC files
     - Supports the legacy feature set for the CLI entrypoint (seeded trace, host-SWC attach, diagnosis mode, auto trace).
   - `--command --general {"command":"trace_neuron", ...}` is implemented in `src/neutube/` and runs the ported auto-trace
     pipeline (including legacy return-code semantics and optional predefined mask handling).
@@ -276,7 +278,7 @@ Completed steps in this phase:
    and remove neurolabi dependencies from the `neutube` target.
 
 7. Port CLI-used neurolabi C algorithm utilities into clean C++ under `src/neutube/`/`src/img/`:
-   - Add `nim::neutube::neighborhoodLegacyOrder(int)` (`src/neutube/zneutubeneighborhood.*`) to represent legacy
+   - Add `nim::neighborhoodLegacyOrder(int)` (`src/neutube/zneutubeneighborhood.*`) to represent legacy
      connectivity tables using Atlas' `ZNeighborhood` offsets (in the exact legacy order).
    - This unlocks reusing existing `ZImgNeighborhood*Iterator` helpers (`src/img/zimgneighborhood*iterator.h`) for
      neighbor traversal in the forthcoming C→C++ algorithm ports, avoiding hand-written bound tests while preserving
@@ -454,11 +456,11 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
 - ⬜ Implement image-access abstraction on `ZImg`/`ZImgPack` (streaming for very large volumes)
 - ✅ Port/implement skeletonize on modern image types (exact behavior)
   - ✅ Port `ZStackSkeletonizer::makeSkeletonWithoutDs(Stack*, const int*)` behavior into
-    `nim::neutube::ZNeutubeSkeletonizer` (`src/neutube/zneutubeskeletonizer.*`) using only `ZImg` + `ZSwc`.
+    `nim::ZNeutubeSkeletonizer` (`src/neutube/zneutubeskeletonizer.*`) using only `ZImg` + `ZSwc`.
   - ✅ Switch `--command --skeletonize` dispatch to the neutube-owned runner (`src/neutube/zneutubeskeletonize.*`).
-  - ✅ Port SWC primitives used by skeletonize: `src/neutube/zneutubeswcops.*`, `src/neutube/zneutubeswcpointdist.*`,
-    `src/neutube/zneutubeswcreconnect.*`, `src/neutube/zneutubeswcresampler.*`, `src/neutube/zneutubeswcregionsampling.*`,
-    `src/neutube/zneutubeswcwriter.*`
+  - ✅ Port SWC primitives used by skeletonize:
+    `src/img/zswcops.*`, `src/img/zswcpointdist.*`, `src/neutube/zneutubeswcreconnect.*`,
+    `src/img/zswcresampler.*`, `src/neutube/zneutubeswcregionsampling.*`, `src/img/zswcwriter.*`
 - ✅ Port `--compare_swc` to `nim::ZSwc` (exact legacy `ZSwcTreeMatcher::matchAllG` semantics)
   - Implementation: `src/neutube/zneutubecompareswc.*`
   - Note: legacy `ZSwcLayerTrunkAnalyzer::extractTrunk(...)` is a stub (returns an empty path). The port preserves this

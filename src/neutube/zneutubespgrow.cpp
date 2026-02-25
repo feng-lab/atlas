@@ -13,7 +13,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 double stackVoxelWeightILegacyLike(double* argv)
 {
@@ -429,4 +429,4 @@ std::vector<int64_t> stackSpGrowPathLegacyLike(const ZImg& stack, SpGrowWorkspac
   return path;
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -2,7 +2,7 @@
 
 #include "zswc.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Ports of the SWC postprocess passes applied by legacy `ZNeuronTracer::trace(Stack*, ...)`:
 // - Swc_Tree_Remove_Zigzag
@@ -24,4 +24,4 @@ void swcTreeRemoveOvershootLegacyLike(ZSwc& tree);
 // For parity with the legacy tracer, callers should pass `minLength=0.0`.
 void swcTreeRemoveOrphanBlobLegacyLike(ZSwc& tree, double minLength, int minOrphanCount);
 
-} // namespace nim::neutube
+} // namespace nim

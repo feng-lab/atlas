@@ -11,7 +11,7 @@
 #include <cmath>
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -265,4 +265,4 @@ void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZImg& mask, double zScale, int 
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

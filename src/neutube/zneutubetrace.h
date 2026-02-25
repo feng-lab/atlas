@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Trace a neuron from either a seed position (interactive-like) or automatically
 // (when no position is provided), matching NeuTu behavior.
@@ -22,4 +22,4 @@ int runTrace(const std::vector<std::string>& input,
              const std::string& jsonDirPath,
              bool verbose);
 
-} // namespace nim::neutube
+} // namespace nim

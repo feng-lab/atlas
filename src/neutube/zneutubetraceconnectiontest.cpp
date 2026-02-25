@@ -6,7 +6,7 @@
 #include "zneutubelocalneuroseg.h"
 #include "zneutubeneuroseg.h"
 #include "zneutubestackgraph.h"
-#include "zneutubeswcgeom.h"
+#include "zswcgeom.h"
 
 #include "zlog.h"
 
@@ -15,7 +15,7 @@
 #include <cstdint>
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -377,4 +377,4 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
   return true;
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -2,7 +2,7 @@
 
 #include "zneighborhood.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Returns a neighborhood definition whose offset ordering matches the legacy neuTube/NeuTu
 // connectivity tables (tz_stack_neighborhood.*).
@@ -11,4 +11,4 @@ namespace nim::neutube {
 // Offsets never include the center voxel.
 [[nodiscard]] const ZNeighborhood& neighborhoodLegacyOrder(int connectivity);
 
-} // namespace nim::neutube
+} // namespace nim

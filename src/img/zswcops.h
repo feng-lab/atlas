@@ -2,7 +2,7 @@
 
 #include "zswc.h"
 
-namespace nim::neutube {
+namespace nim {
 
 enum class SwcMergeOption
 {
@@ -43,4 +43,4 @@ void connectNode(ZSwc& tree, ZSwc::SwcTreeNode node);
 // Returns the number of regular nodes assigned.
 int resortId(ZSwc& tree);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -4,7 +4,7 @@
 
 #include <array>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Interpolate_L().
 //
@@ -20,4 +20,4 @@ namespace nim::neutube {
                                                     /*nullable*/ const std::array<double, 3>* ort,
                                                     /*nullable*/ std::array<double, 3>* newPos);
 
-} // namespace nim::neutube
+} // namespace nim

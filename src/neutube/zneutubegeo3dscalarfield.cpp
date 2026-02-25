@@ -8,7 +8,7 @@
 #include <cmath>
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -173,4 +173,4 @@ double geo3dScalarFieldStackScoreMaskedLegacyLike(const Geo3dScalarField& field,
   return computeStackFitScoresMaskedLegacyLike(field.values.data(), signal.data(), field.size(), fs);
 }
 
-} // namespace nim::neutube
+} // namespace nim

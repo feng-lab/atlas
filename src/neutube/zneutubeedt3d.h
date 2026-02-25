@@ -2,7 +2,7 @@
 
 #include "zimg.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of `Stack_Bwdist_L_U16()` / `dt3d_binary_mu16()` (3D squared Euclidean distance transform).
 //
@@ -16,4 +16,4 @@ namespace nim::neutube {
 //   public `Stack_Bwdist_L_U16()` signature (i.e. it is inverted when passed to the internal dt3d routine).
 [[nodiscard]] ZImg bwdistSquaredU16LegacyLike(const ZImg& binaryMask, int pad);
 
-} // namespace nim::neutube
+} // namespace nim

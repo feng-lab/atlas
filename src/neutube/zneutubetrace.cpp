@@ -3,13 +3,13 @@
 #include "zneutubelocsegchain.h"
 #include "zneutubelocsegchaincircle.h"
 #include "zneutubelocsegchaintrace.h"
-#include "zneutubeswcloaderlegacy.h"
+#include "zswcloaderlegacy.h"
 #include "zneutubetraceauto.h"
 #include "zneutubetraceconfig.h"
 #include "zneutubetraceconnect.h"
 #include "zneutubetraceworkspace.h"
 #include "zneutubetraceswclabelstack.h"
-#include "zneutubeswcwriter.h"
+#include "zswcwriter.h"
 
 #include "zimg.h"
 #include "zlog.h"
@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -469,4 +469,4 @@ int runTrace(const std::vector<std::string>& input,
   return rc;
 }
 
-} // namespace nim::neutube
+} // namespace nim

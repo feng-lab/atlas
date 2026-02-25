@@ -2,7 +2,7 @@
 
 #include "zswc.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of neuTube `ZSwcResampler` used by skeletonize (`optimalDownsample`).
 class ZNeutubeSwcResampler
@@ -23,4 +23,4 @@ private:
   bool m_ignoringInterRedundant = false;
 };
 
-} // namespace nim::neutube
+} // namespace nim

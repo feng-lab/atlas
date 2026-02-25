@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 void defaultStackGraphWorkspaceLegacyLike(StackGraphWorkspaceLegacyLike& sgw)
 {
@@ -141,4 +141,4 @@ double stackVoxelWeightSLegacyLike(double* argv)
   return w;
 }
 
-} // namespace nim::neutube
+} // namespace nim

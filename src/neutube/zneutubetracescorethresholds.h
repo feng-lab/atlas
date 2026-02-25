@@ -5,7 +5,7 @@
 
 #include "zimg.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `ZNeuronTracer::prepareTraceScoreThreshold(...)`.
 enum class TracingModeLegacyLike
@@ -21,4 +21,4 @@ void prepareTraceScoreThresholdLegacyLike(const ZImg& signal,
                                           TracingModeLegacyLike mode,
                                           TraceWorkspace& tw);
 
-} // namespace nim::neutube
+} // namespace nim

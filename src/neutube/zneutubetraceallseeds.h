@@ -9,7 +9,7 @@
 #include <memory>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `tz_locseg_chain.c::Trace_Locseg_S(...)` (multi-seed tracing).
 //
@@ -22,4 +22,4 @@ namespace nim::neutube {
                                                                                 std::vector<double>& scores,
                                                                                 TraceWorkspace& tw);
 
-} // namespace nim::neutube
+} // namespace nim

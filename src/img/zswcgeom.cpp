@@ -1,11 +1,11 @@
-#include "zneutubeswcgeom.h"
+#include "zswcgeom.h"
 
 #include "zlog.h"
 
 #include <algorithm>
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -348,4 +348,4 @@ geo3dLineSegBreak(const std::array<double, 3>& lineStart, const std::array<doubl
           lambda * lineEnd[2] + (1.0 - lambda) * lineStart[2]};
 }
 
-} // namespace nim::neutube
+} // namespace nim

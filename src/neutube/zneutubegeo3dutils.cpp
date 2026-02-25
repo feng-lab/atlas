@@ -7,7 +7,7 @@
 #include <array>
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -80,4 +80,4 @@ void geo3dRotateOrientationLegacyLike(double rtheta, double rpsi, double& theta,
   geo3dNormalOrientationLegacyLike(coord[0], coord[1], coord[2], theta, psi);
 }
 
-} // namespace nim::neutube
+} // namespace nim

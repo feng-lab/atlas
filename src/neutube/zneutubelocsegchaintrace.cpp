@@ -8,7 +8,7 @@
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -564,4 +564,4 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain,
   --fitWsH.sws.fs.n;
 }
 
-} // namespace nim::neutube
+} // namespace nim

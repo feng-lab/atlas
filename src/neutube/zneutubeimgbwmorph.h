@@ -2,7 +2,7 @@
 
 #include "zimg.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Logical NOT for a GREY (uint8) binary image, matching legacy Stack_Not():
 // out[x] = (in[x] == 0) ? 1 : 0.
@@ -23,4 +23,4 @@ namespace nim::neutube {
 // - Inverts and ORs with the original to fill enclosed holes.
 [[nodiscard]] ZImg fillHolesBinaryU8(const ZImg& in, int connectivity);
 
-} // namespace nim::neutube
+} // namespace nim

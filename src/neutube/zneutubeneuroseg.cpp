@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -820,4 +820,4 @@ Geo3dScalarField neurosegFieldSpLegacyLike(const Neuroseg& seg, NeurosegFieldFun
   return field;
 }
 
-} // namespace nim::neutube
+} // namespace nim

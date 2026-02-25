@@ -6,7 +6,7 @@
 
 #include <memory>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `ZSwcGenerator::createSwcByRegionSampling(const ZVoxelArray&, ...)`.
 //
@@ -15,4 +15,4 @@ namespace nim::neutube {
 [[nodiscard]] std::unique_ptr<ZSwc> createSwcByRegionSampling(const ZNeutubeVoxelArray& voxelArray,
                                                               double radiusAdjustment = 0.0);
 
-} // namespace nim::neutube
+} // namespace nim

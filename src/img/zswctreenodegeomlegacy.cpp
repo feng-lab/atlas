@@ -1,10 +1,10 @@
-#include "zneutubeswctreenodegeomlegacy.h"
+#include "zswctreenodegeomlegacy.h"
 
 #include "zlog.h"
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 double swcNodeDistanceLegacyLike(const ZSwc::ConstSwcTreeNode& a,
                                  const ZSwc::ConstSwcTreeNode& b,
@@ -140,4 +140,4 @@ void swcNodeInterpolateLegacyLike(const ZSwc::ConstSwcTreeNode& a,
   out->z = a->z * lambda + b->z * (1.0 - lambda);
 }
 
-} // namespace nim::neutube
+} // namespace nim

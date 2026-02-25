@@ -10,7 +10,7 @@ namespace nim {
 class ZImg;
 }
 
-namespace nim::neutube {
+namespace nim {
 
 class ZNeutubeVoxelArray
 {
@@ -73,4 +73,4 @@ private:
   TVector m_voxels;
 };
 
-} // namespace nim::neutube
+} // namespace nim

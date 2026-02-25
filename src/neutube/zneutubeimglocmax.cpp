@@ -12,7 +12,7 @@
 #include <deque>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -590,4 +590,4 @@ ZImg stackLocmaxRegionMaskLegacyLike(const ZImg& stack, int connectivity)
   return out;
 }
 
-} // namespace nim::neutube
+} // namespace nim

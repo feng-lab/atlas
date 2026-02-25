@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of tz_stack_graph.c::Stack_Route().
 //
@@ -21,4 +21,4 @@ namespace nim::neutube {
                                                         const std::array<int, 3>& endPos,
                                                         StackGraphWorkspaceLegacyLike& sgw);
 
-} // namespace nim::neutube
+} // namespace nim

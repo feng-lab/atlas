@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of tz_geo3d_point_array.c::Geo3d_Point_Array_Translate().
 //
@@ -17,4 +17,4 @@ void geo3dPointArrayTranslateLegacyLike(std::array<double, 3>* points, int n, do
 // - `points` must be a valid contiguous array of at least `n` points (in/out).
 void geo3dPointArrayBendLegacyLike(std::array<double, 3>* points, int n, double c);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -94,13 +94,13 @@ set(IMG_SOURCES
         zimgsliceprovider.h zimgsliceprovider.cpp
         zimgtiff.h zimgtiff.cpp
         zimgv3draw.h zimgv3draw.cpp
-	        zimgzeissczi.h zimgzeissczi.cpp
-	        zimgzeisslsm.h zimgzeisslsm.cpp
-	        zioutils.h zioutils.cpp
-	        zioreadstats.h zioreadstats.cpp
-	        zrandom.h zrandom.cpp
-	        zsaturateoperation.h
-	        zstatisticsutils.h
+        zimgzeissczi.h zimgzeissczi.cpp
+        zimgzeisslsm.h zimgzeisslsm.cpp
+        zioutils.h zioutils.cpp
+        zioreadstats.h zioreadstats.cpp
+        zrandom.h zrandom.cpp
+        zsaturateoperation.h
+        zstatisticsutils.h
         zstringutils.h zstringutils.cpp
         ztiff.h ztiff.cpp
         zvoxelcoordinate.h
@@ -124,6 +124,15 @@ set(IMG_SOURCES
         zpunctaio.cpp zpunctaio.h
         zpunctum.cpp zpunctum.h
         zswc.h zswc.cpp
+        zswcgeom.cpp zswcgeom.h
+        zswcloaderlegacy.cpp zswcloaderlegacy.h
+        zswcnodeops.h
+        zswcops.cpp zswcops.h
+        zswcpointdist.cpp zswcpointdist.h
+        zswcpostprocess.cpp zswcpostprocess.h
+        zswcresampler.cpp zswcresampler.h
+        zswctreenodegeomlegacy.cpp zswctreenodegeomlegacy.h
+        zswcwriter.cpp zswcwriter.h
         zskeleton.h zskeleton.cpp
         ztree.hpp
         zvoxelregion.h zvoxelregion.cpp

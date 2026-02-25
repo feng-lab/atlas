@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 double darrayMaxLegacyLike(const double* data, size_t length, size_t* idx)
 {
@@ -136,4 +136,4 @@ double darrayCorrcoefNLegacyLike(const double* a, const double* b, size_t length
   return r / std::sqrt(v1 * v2);
 }
 
-} // namespace nim::neutube
+} // namespace nim

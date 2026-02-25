@@ -5,7 +5,7 @@
 
 #include <list>
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of tz_doubly_linked_list_defs.h::Dlist_End_e.
 enum class LocsegChainEndLegacyLike : int
@@ -101,4 +101,4 @@ locsegChainFormLoopLegacyLike(const LocsegChain& chain, const LocalNeuroseg& loc
 // Port of tz_locseg_chain.c::Locseg_Chain_Remove_Turn_Ends().
 void locsegChainRemoveTurnEndsLegacyLike(LocsegChain& chain, double maxAngle);
 
-} // namespace nim::neutube
+} // namespace nim

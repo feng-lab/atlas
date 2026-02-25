@@ -5,7 +5,7 @@
 #include <array>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -76,4 +76,4 @@ const ZNeighborhood& neighborhoodLegacyOrder(int connectivity)
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

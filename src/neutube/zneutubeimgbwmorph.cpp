@@ -7,7 +7,7 @@
 
 #include <algorithm>
 
-namespace nim::neutube {
+namespace nim {
 
 ZImg stackNotBinaryU8(const ZImg& in)
 {
@@ -350,4 +350,4 @@ ZImg fillHolesBinaryU8(const ZImg& in, int connectivity)
   return filled;
 }
 
-} // namespace nim::neutube
+} // namespace nim

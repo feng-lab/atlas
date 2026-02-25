@@ -6,7 +6,7 @@
 
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 void screenChainsLegacyLike(const ZImg& signal, std::vector<std::unique_ptr<LocsegChain>>& chains)
 {
@@ -46,4 +46,4 @@ void screenChainsLegacyLike(const ZImg& signal, std::vector<std::unique_ptr<Locs
   chains = std::move(good);
 }
 
-} // namespace nim::neutube
+} // namespace nim

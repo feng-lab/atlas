@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `ZNeuronTracerConfig` (src/neurolabi/gui/zneurontracerconfig.*) as a
 // pure Boost.JSON-backed configuration object.
@@ -58,4 +58,4 @@ void applyTraceConfigOverridesLegacyLike(const json::object& obj, TraceConfig& c
 // Returns nullptr if no level overrides are available.
 [[nodiscard]] const json::object* selectTraceLevelOverrideLegacyLike(const TraceConfig& cfg, int level);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -1,13 +1,13 @@
 #include "zneutubelocsegchainmetrics.h"
 
 #include "zneutubelocsegchaincircle.h"
-#include "zneutubeswcgeom.h"
+#include "zswcgeom.h"
 
 #include "zlog.h"
 
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 double locsegChainGeolenLegacyLike(const LocsegChain& chain)
 {
@@ -109,4 +109,4 @@ double locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zSca
   return minDist;
 }
 
-} // namespace nim::neutube
+} // namespace nim

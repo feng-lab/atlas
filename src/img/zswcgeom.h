@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace nim::neutube {
+namespace nim {
 
 [[nodiscard]] double geo3dDistSqr(double x1, double y1, double z1, double x2, double y2, double z2);
 
@@ -35,4 +35,4 @@ namespace nim::neutube {
 [[nodiscard]] std::array<double, 3>
 geo3dLineSegBreak(const std::array<double, 3>& lineStart, const std::array<double, 3>& lineEnd, double lambda);
 
-} // namespace nim::neutube
+} // namespace nim

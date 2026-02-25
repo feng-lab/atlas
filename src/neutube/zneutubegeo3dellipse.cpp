@@ -9,7 +9,7 @@
 #include <cmath>
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -242,4 +242,4 @@ geo3dEllipseInterpolateLegacyLike(const Geo3dEllipseLegacyLike& start, const Geo
   return out;
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -6,7 +6,7 @@
 
 #include <string_view>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -192,4 +192,4 @@ const json::object* selectTraceLevelOverrideLegacyLike(const TraceConfig& cfg, i
   return nullptr;
 }
 
-} // namespace nim::neutube
+} // namespace nim

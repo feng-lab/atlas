@@ -1,11 +1,11 @@
-#include "zneutubeswcpointdist.h"
+#include "zswcpointdist.h"
 
 #include "zlog.h"
 
 #include <algorithm>
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -181,4 +181,4 @@ SwcPointDistResult swcTreePointDist(ZSwc& tree, double x, double y, double z, co
   return out;
 }
 
-} // namespace nim::neutube
+} // namespace nim

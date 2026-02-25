@@ -6,7 +6,7 @@
 #include <array>
 #include <memory>
 
-namespace nim::neutube {
+namespace nim {
 
 // ZImg/ZSwc-native skeletonization algorithm (neuTube legacy port).
 //
@@ -127,4 +127,4 @@ private:
   int m_grayOp = 0;
 };
 
-} // namespace nim::neutube
+} // namespace nim

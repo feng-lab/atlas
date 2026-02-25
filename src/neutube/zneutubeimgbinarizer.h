@@ -4,7 +4,7 @@
 
 #include <optional>
 
-namespace nim::neutube {
+namespace nim {
 
 struct BinarizeResultLegacyLike
 {
@@ -23,4 +23,4 @@ int subtractBackgroundLegacyLike(ZImg& stack, double minFr, int maxIter);
 // Returns a GREY (uint8) binary stack (values 0/1) on success.
 BinarizeResultLegacyLike binarizeLocmaxLegacyLike(const ZImg& stack, int retryCount);
 
-} // namespace nim::neutube
+} // namespace nim

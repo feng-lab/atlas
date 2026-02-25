@@ -4,7 +4,7 @@
 
 #include <cstddef>
 
-namespace nim::neutube {
+namespace nim {
 
 struct LabelLargeObjectsParams
 {
@@ -53,4 +53,4 @@ struct LabelLargeObjectsResult
 // - This function does not mutate the input image.
 [[nodiscard]] LabelLargeObjectsResult labelLargeObjectsLegacy(const ZImg& img, const LabelLargeObjectsParams& params);
 
-} // namespace nim::neutube
+} // namespace nim

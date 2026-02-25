@@ -4,12 +4,13 @@
 
 #include <array>
 
-namespace nim::neutube {
+namespace nim {
 
 struct SwcPointDistResult
 {
   double dist = -1.0;
   std::array<double, 3> closestPoint = {0.0, 0.0, 0.0};
+  // Mutable handle into the queried tree (used by callers to reconnect/insert nodes).
   ZSwc::SwcTreeNode closestNode;
 };
 
@@ -18,6 +19,9 @@ struct SwcPointDistResult
 // Returns:
 // - dist == -1 and closestNode == null when the tree has no segments.
 // - dist == 0 when the point is inside any segment volume.
+//
+// Note: This function does not mutate `tree`, but it takes `ZSwc&` because the legacy algorithm returns a
+// mutable node handle (`closestNode`) which is typically used immediately for tree mutations (e.g. addBreak/connect).
 [[nodiscard]] SwcPointDistResult swcTreePointDist(ZSwc& tree, double x, double y, double z);
 
 // Variant that ignores segments belonging to `excludeRoot` (used to match legacy connect-branch behavior,
@@ -25,4 +29,4 @@ struct SwcPointDistResult
 [[nodiscard]] SwcPointDistResult
 swcTreePointDist(ZSwc& tree, double x, double y, double z, const ZSwc::SwcTreeNode& excludeRoot);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -5,7 +5,7 @@
 #include <array>
 #include <cstdint>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of tz_geo3d_scalar_field.h::Stack_Fit_Score.
 struct StackFitScore
@@ -46,4 +46,4 @@ void traceRecordDisableFixPoint(TraceRecord& tr);
 [[nodiscard]] double traceRecordFixPoint(const TraceRecord& tr);
 [[nodiscard]] bool traceRecordHasFixPoint(const TraceRecord& tr);
 
-} // namespace nim::neutube
+} // namespace nim

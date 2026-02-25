@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <limits>
 
-namespace nim::neutube {
+namespace nim {
 
 int graphEdgeIndexLegacyLike(const GraphLegacyLike& graph, int v1, int v2)
 {
@@ -111,4 +111,4 @@ GraphMst2ResultLegacyLike graphToMst2LegacyLike(GraphLegacyLike& graph)
   return res;
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -1,10 +1,10 @@
 #include "zneutubelocsegchainknot.h"
 
-#include "zneutubeswcgeom.h"
+#include "zswcgeom.h"
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -146,4 +146,4 @@ std::array<double, 3> locsegChainKnotPosLegacyLike(const LocsegChainKnotArrayLeg
   return localNeurosegAxisCoordNLegacyLike(node->locseg, knot->offset);
 }
 
-} // namespace nim::neutube
+} // namespace nim

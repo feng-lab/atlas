@@ -7,7 +7,7 @@
 
 #include <memory>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `ZNeuronTracer::trace(Stack *stack, bool doResampleAfterTracing=true)`
 // when called without a seed position (fully automatic tracing).
@@ -23,4 +23,4 @@ namespace nim::neutube {
                                                               bool verbose,
                                                               /*nullable*/ const ZImg* predefinedMask = nullptr);
 
-} // namespace nim::neutube
+} // namespace nim

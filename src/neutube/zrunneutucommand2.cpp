@@ -499,26 +499,22 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
         LOG(ERROR) << "Skeletonize: missing input file.";
         return 1;
       }
-      return neutube::runSkeletonize(args.input[0],
-                                     args.output,
-                                     skeletonizeInclude,
-                                     args.downsampleInterval,
-                                     args.isVerbose);
+      return runSkeletonize(args.input[0], args.output, skeletonizeInclude, args.downsampleInterval, args.isVerbose);
     }
 
     case Command::CompareSwc: {
-      return neutube::runCompareSwc(args.input, args.scale);
+      return runCompareSwc(args.input, args.scale);
     }
 
     case Command::Trace: {
-      return neutube::runTrace(args.input,
-                               args.output,
-                               args.position,
-                               args.level,
-                               args.diagnosis,
-                               traceInclude,
-                               args.jsonDirPath,
-                               args.isVerbose);
+      return runTrace(args.input,
+                      args.output,
+                      args.position,
+                      args.level,
+                      args.diagnosis,
+                      traceInclude,
+                      args.jsonDirPath,
+                      args.isVerbose);
     }
 
     case Command::General: {
@@ -535,16 +531,16 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
         LOG(ERROR) << e.what();
         return 1;
       }
-      return neutube::runGeneral(args.generalConfig,
-                                 generalCfg,
-                                 inputJson,
-                                 args.input,
-                                 args.output,
-                                 args.level,
-                                 args.diagnosis,
-                                 traceInclude,
-                                 args.jsonDirPath,
-                                 args.isVerbose);
+      return runGeneral(args.generalConfig,
+                        generalCfg,
+                        inputJson,
+                        args.input,
+                        args.output,
+                        args.level,
+                        args.diagnosis,
+                        traceInclude,
+                        args.jsonDirPath,
+                        args.isVerbose);
     }
 
     case Command::ComputeSeed:

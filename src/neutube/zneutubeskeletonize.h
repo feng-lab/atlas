@@ -4,7 +4,7 @@
 #include <optional>
 #include <string>
 
-namespace nim::neutube {
+namespace nim {
 
 int runSkeletonize(const std::string& inputPath,
                    const std::string& outputPath,
@@ -12,4 +12,4 @@ int runSkeletonize(const std::string& inputPath,
                    const std::optional<std::array<int, 3>>& downsampleIntervalOverride,
                    bool verbose);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of tz_doubly_linked_list_defs.h::Dlist_Direction_e.
 //
@@ -36,4 +36,4 @@ enum class TraceStatus : int
   NotAssigned = 15
 };
 
-} // namespace nim::neutube
+} // namespace nim

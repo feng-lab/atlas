@@ -1,7 +1,7 @@
 #include "zneutubeskeletonize.h"
 
 #include "zneutubeskeletonizer.h"
-#include "zneutubeswcwriter.h"
+#include "zswcwriter.h"
 
 #include "zjson.h"
 #include "zlog.h"
@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -152,4 +152,4 @@ int runSkeletonize(const std::string& inputPath,
   return 0;
 }
 
-} // namespace nim::neutube
+} // namespace nim

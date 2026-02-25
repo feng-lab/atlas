@@ -6,7 +6,7 @@
 
 #include <optional>
 
-namespace nim::neutube {
+namespace nim {
 
 struct MakeMaskDiagnosticsLegacyLike
 {
@@ -23,4 +23,4 @@ struct MakeMaskDiagnosticsLegacyLike
 [[nodiscard]] std::optional<ZImg>
 makeMaskLegacyLike(const ZImg& stack, const TraceConfig& cfg, /*nullable*/ MakeMaskDiagnosticsLegacyLike* diag);
 
-} // namespace nim::neutube
+} // namespace nim

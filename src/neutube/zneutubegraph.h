@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Minimal C++ graph container matching the legacy `tz_graph.h` usage patterns
 // required by neuron reconstruction.
@@ -38,4 +38,4 @@ struct GraphMst2ResultLegacyLike
 // - Compacts `graph.edges` and `graph.weights` in-place to only the selected MST edges.
 [[nodiscard]] GraphMst2ResultLegacyLike graphToMst2LegacyLike(GraphLegacyLike& graph);
 
-} // namespace nim::neutube
+} // namespace nim

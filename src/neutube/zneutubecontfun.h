@@ -2,7 +2,7 @@
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 using ScoreFunctionLegacyLike = double (*)(const double* var, const void* param);
 using ValidatorFunctionLegacyLike = void (*)(double* var,
@@ -60,4 +60,4 @@ struct ContinuousFunction
   const double* varMax = nullptr;
 };
 
-} // namespace nim::neutube
+} // namespace nim

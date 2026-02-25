@@ -9,7 +9,7 @@
 
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -151,4 +151,4 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
   return chains;
 }
 
-} // namespace nim::neutube
+} // namespace nim

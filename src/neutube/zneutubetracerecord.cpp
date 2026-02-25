@@ -2,7 +2,7 @@
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -147,4 +147,4 @@ bool traceRecordHasFixPoint(const TraceRecord& tr)
   return getBit(tr.mask, TraceRecordFixPointBit);
 }
 
-} // namespace nim::neutube
+} // namespace nim

@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of tz_geo3d_ellipse.h::Geo3d_Ellipse (minimal fields used by tracing).
 struct Geo3dEllipseLegacyLike
@@ -23,4 +23,4 @@ struct Geo3dEllipseLegacyLike
                                                                        const Geo3dEllipseLegacyLike& end,
                                                                        double lambda);
 
-} // namespace nim::neutube
+} // namespace nim

@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `tz_neurocomp_conn.h` connection modes.
 enum class NeurocompConnModeLegacyLike : int
@@ -32,4 +32,4 @@ void defaultNeurocompConnLegacyLike(NeurocompConnLegacyLike& conn);
 // is at an endpoint of the second component.
 void neurocompConnTranslateModeLegacyLike(int len2, NeurocompConnLegacyLike& conn);
 
-} // namespace nim::neutube
+} // namespace nim

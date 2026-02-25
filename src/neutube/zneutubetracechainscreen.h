@@ -7,7 +7,7 @@
 #include <memory>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `ZNeuronTracer::screenChain(...)`.
 //
@@ -16,4 +16,4 @@ namespace nim::neutube {
 // - and an adaptive intensity threshold based on the minimum average signal among high-score chains.
 void screenChainsLegacyLike(const ZImg& signal, std::vector<std::unique_ptr<LocsegChain>>& chains);
 
-} // namespace nim::neutube
+} // namespace nim

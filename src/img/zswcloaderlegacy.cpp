@@ -1,4 +1,4 @@
-#include "zneutubeswcloaderlegacy.h"
+#include "zswcloaderlegacy.h"
 
 #include "zlog.h"
 #include "zstringutils.h"
@@ -17,7 +17,7 @@
 #include <string_view>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -179,4 +179,4 @@ bool loadSwcLegacyOrder(const std::string& path, ZSwc& out, std::string* error)
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

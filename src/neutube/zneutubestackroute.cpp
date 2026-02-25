@@ -1,7 +1,7 @@
 #include "zneutubestackroute.h"
 
 #include "zneutubeneighborhood.h"
-#include "zneutubeswcgeom.h"
+#include "zswcgeom.h"
 
 #include "zlog.h"
 
@@ -12,7 +12,7 @@
 #include <limits>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -578,4 +578,4 @@ std::vector<int64_t> stackRouteLegacyLike(const ZImg& stack,
   return offsetPath;
 }
 
-} // namespace nim::neutube
+} // namespace nim

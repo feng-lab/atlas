@@ -56,17 +56,8 @@ set(NEUTUBE_SOURCES
     zneutubetraceworkspace.cpp zneutubetraceworkspace.h
     zneutubeskeletonize.cpp zneutubeskeletonize.h
     zneutubeskeletonizer.cpp zneutubeskeletonizer.h
-    zneutubeswcgeom.cpp zneutubeswcgeom.h
-    zneutubeswcnodeops.h
-    zneutubeswcops.cpp zneutubeswcops.h
-    zneutubeswcpostprocess.cpp zneutubeswcpostprocess.h
-    zneutubeswcpointdist.cpp zneutubeswcpointdist.h
     zneutubeswcreconnect.cpp zneutubeswcreconnect.h
     zneutubeswcregionsampling.cpp zneutubeswcregionsampling.h
-    zneutubeswcresampler.cpp zneutubeswcresampler.h
-    zneutubeswcwriter.cpp zneutubeswcwriter.h
-    zneutubeswcloaderlegacy.cpp zneutubeswcloaderlegacy.h
-    zneutubeswctreenodegeomlegacy.cpp zneutubeswctreenodegeomlegacy.h
     zneutubetraceconnect.cpp zneutubetraceconnect.h
     zneutubetraceswclocseg.cpp zneutubetraceswclocseg.h
     zneutubetraceswclabelstack.cpp zneutubetraceswclabelstack.h

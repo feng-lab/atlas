@@ -7,7 +7,7 @@
 #include <limits>
 #include <optional>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of tz_stack_graph.h::Stack_Graph_Workspace, restricted to fields used by tracing.
 //
@@ -84,4 +84,4 @@ void stackGraphWorkspaceValidateRangeLegacyLike(StackGraphWorkspaceLegacyLike& s
 // `argv` must be non-null and point to at least 5 doubles (see layout above).
 [[nodiscard]] double stackVoxelWeightSLegacyLike(double* argv);
 
-} // namespace nim::neutube
+} // namespace nim

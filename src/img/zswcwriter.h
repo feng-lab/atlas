@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `ZSwcTree::save` SWC formatting used by neuTube.
 //
@@ -17,4 +17,4 @@ namespace nim::neutube {
 // This function resorts IDs before writing (matching legacy behavior).
 void writeSwcLegacyNeuTu(ZSwc& tree, const std::string& filePath, const std::vector<std::string>& comments = {});
 
-} // namespace nim::neutube
+} // namespace nim

@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of legacy tz_darray.c math helpers used by tracing/scoring.
 // - `idx` is optional; pass nullptr when the max index is not needed (legacy callers do this in score paths).
@@ -13,4 +13,4 @@ namespace nim::neutube {
 [[nodiscard]] double darrayMeanNLegacyLike(const double* a, size_t length);
 [[nodiscard]] double darrayCorrcoefNLegacyLike(const double* a, const double* b, size_t length);
 
-} // namespace nim::neutube
+} // namespace nim

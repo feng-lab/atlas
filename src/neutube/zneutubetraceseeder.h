@@ -8,7 +8,7 @@
 
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 struct SeedSortResultLegacyLike
 {
@@ -27,4 +27,4 @@ struct SeedSortResultLegacyLike
 [[nodiscard]] SeedSortResultLegacyLike
 sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw);
 
-} // namespace nim::neutube
+} // namespace nim

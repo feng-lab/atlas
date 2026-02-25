@@ -7,7 +7,7 @@
 
 #include <array>
 
-namespace nim::neutube {
+namespace nim {
 
 struct Neuroseg;
 struct LocalNeuroseg;
@@ -28,4 +28,4 @@ void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center, double r
 // Port of neuTube's SWC->mask labeling used by `ZSwcTree::labelStack(Stack*)`.
 void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZImg& mask, double zScale, int value);
 
-} // namespace nim::neutube
+} // namespace nim

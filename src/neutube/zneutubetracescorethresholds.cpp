@@ -2,7 +2,7 @@
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -38,4 +38,4 @@ void prepareTraceScoreThresholdLegacyLike(const ZImg& signal,
   CHECK(false) << "Unhandled tracing mode";
 }
 
-} // namespace nim::neutube
+} // namespace nim

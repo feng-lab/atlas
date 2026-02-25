@@ -1,6 +1,6 @@
 #include "zneutubecompareswc.h"
 
-#include "zneutubeswcops.h"
+#include "zswcops.h"
 
 #include "zexception.h"
 #include "zlog.h"
@@ -21,7 +21,7 @@
 #include <utility>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -858,4 +858,4 @@ int runCompareSwc(const std::vector<std::string>& inputPaths, double scale)
   return 1;
 }
 
-} // namespace nim::neutube
+} // namespace nim

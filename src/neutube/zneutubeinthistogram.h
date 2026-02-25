@@ -5,7 +5,7 @@
 #include <optional>
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 inline constexpr int IntHistogramMaxCountLegacyLike = 2147483647;
 
@@ -65,4 +65,4 @@ private:
 // effective histogram minimum after clamping to [low, high]), matching legacy behavior.
 [[nodiscard]] int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, double& c1, double& c2);
 
-} // namespace nim::neutube
+} // namespace nim

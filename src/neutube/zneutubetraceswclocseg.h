@@ -6,7 +6,7 @@
 
 #include <optional>
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `Local_Neuroseg_Change_Top`.
 void localNeurosegChangeTopLegacyLike(LocalNeuroseg& locseg, const std::array<double, 3>& newTop);
@@ -14,4 +14,4 @@ void localNeurosegChangeTopLegacyLike(LocalNeuroseg& locseg, const std::array<do
 // Port of `Swc_Tree_Node_To_Locseg` (restricted to the regular-node case).
 [[nodiscard]] std::optional<LocalNeuroseg> swcNodeToLocsegLegacyLike(const ZSwc::ConstSwcTreeNode& node);
 
-} // namespace nim::neutube
+} // namespace nim

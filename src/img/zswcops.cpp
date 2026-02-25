@@ -1,11 +1,11 @@
-#include "zneutubeswcops.h"
+#include "zswcops.h"
 
-#include "zneutubeswcgeom.h"
-#include "zneutubeswcpointdist.h"
+#include "zswcgeom.h"
+#include "zswcpointdist.h"
 
 #include "zlog.h"
 
-namespace nim::neutube {
+namespace nim {
 
 void mergeToParent(ZSwc& swc, ZSwc::SwcTreeNode node)
 {
@@ -224,4 +224,4 @@ int resortId(ZSwc& tree)
   return id - 1;
 }
 
-} // namespace nim::neutube
+} // namespace nim

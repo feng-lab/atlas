@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nim::neutube {
+namespace nim {
 
 namespace {
 
@@ -141,4 +141,4 @@ void conjugateUpdateDirectionLegacyLike(int nvar, const double* grad, const doub
   }
 }
 
-} // namespace nim::neutube
+} // namespace nim

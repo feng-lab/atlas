@@ -8,7 +8,7 @@ class ZImg;
 
 }
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of legacy tz_stack_sampling.c::Stack_Point_Sampling().
 //
@@ -26,4 +26,4 @@ namespace nim::neutube {
 // - Returns true if the rounded voxel value is non-zero.
 [[nodiscard]] bool pointHitMaskLegacyLike(const ZImg& img, double x, double y, double z, size_t c = 0, size_t t = 0);
 
-} // namespace nim::neutube
+} // namespace nim

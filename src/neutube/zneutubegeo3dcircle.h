@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ representation of tz_geo3d_circle.h::Geo3d_Circle used by neuTube tracing.
 struct Geo3dCircle
@@ -12,4 +12,4 @@ struct Geo3dCircle
   std::array<double, 2> orientation{}; // (theta, psi)
 };
 
-} // namespace nim::neutube
+} // namespace nim

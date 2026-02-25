@@ -4,7 +4,7 @@
 #include "zneutubetraceworkspace.h"
 #include "zimg.h"
 
-namespace nim::neutube {
+namespace nim {
 
 // Port of `ZNeuronTracer::extractSeedOriginal`.
 //
@@ -33,4 +33,4 @@ struct RemoveNoisySeedDiagnosticsLegacyLike
                                                          bool screeningSeed,
                                                          /*nullable*/ RemoveNoisySeedDiagnosticsLegacyLike* diag);
 
-} // namespace nim::neutube
+} // namespace nim

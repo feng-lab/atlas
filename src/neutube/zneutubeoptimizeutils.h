@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace nim::neutube {
+namespace nim {
 
 // C++ port of tz_optimize_utils.h::Line_Search_Workspace.
 struct LineSearchWorkspace
@@ -55,4 +55,4 @@ void setLineSearchWorkspaceLegacyLike(LineSearchWorkspace& lsw,
 // Port of tz_optimize_utils.c::Conjugate_Update_Direction() (Polak-Ribiere+).
 void conjugateUpdateDirectionLegacyLike(int nvar, const double* grad, const double* prevGrad, double* direction);
 
-} // namespace nim::neutube
+} // namespace nim
