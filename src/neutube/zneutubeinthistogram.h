@@ -51,7 +51,9 @@ private:
 //
 // - Returns nullopt if the mask is present and has no voxels with value == 1.
 // - If mask is present, only voxels with mask==1 are counted (matches legacy equality check).
-[[nodiscard]] std::optional<IntHistogramLegacyLike> imageHistogramLegacyLike(const ZImg& img, const ZImg* mask);
+// - `mask` is optional; callers pass nullptr to histogram the full image.
+[[nodiscard]] std::optional<IntHistogramLegacyLike> imageHistogramLegacyLike(const ZImg& img,
+                                                                             /*nullable*/ const ZImg* mask);
 
 // Port of tz_int_histogram.c::Int_Histogram_Triangle_Threshold().
 [[nodiscard]] int triangleThresholdLegacyLike(const IntHistogramLegacyLike& hist, int low, int high);
@@ -61,6 +63,6 @@ private:
 // Returns a threshold value in the same intensity units as the histogram.
 // Outputs `c1` and `c2` (centroids) in histogram-bin coordinates (relative to the
 // effective histogram minimum after clamping to [low, high]), matching legacy behavior.
-[[nodiscard]] int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, double* c1, double* c2);
+[[nodiscard]] int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, double& c1, double& c2);
 
 } // namespace nim::neutube

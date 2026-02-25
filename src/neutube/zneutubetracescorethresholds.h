@@ -19,6 +19,6 @@ enum class TracingModeLegacyLike
 void prepareTraceScoreThresholdLegacyLike(const ZImg& signal,
                                           const TraceConfig& cfg,
                                           TracingModeLegacyLike mode,
-                                          TraceWorkspace* tw);
+                                          TraceWorkspace& tw);
 
 } // namespace nim::neutube

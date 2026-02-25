@@ -23,7 +23,7 @@ std::unique_ptr<ZSwc> createSwcByRegionSampling(const ZNeutubeVoxelArray& voxelA
   }
 
   std::vector<int> indexArray;
-  darrayQsortLegacy(&voxelSizeArray, &indexArray);
+  darrayQsortLegacy(voxelSizeArray, &indexArray);
 
   std::vector<bool> sampled(voxels.size(), true);
   for (size_t i = 1; i < voxels.size(); ++i) {

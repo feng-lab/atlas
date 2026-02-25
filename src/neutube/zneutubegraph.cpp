@@ -21,24 +21,22 @@ int graphEdgeIndexLegacyLike(const GraphLegacyLike& graph, int v1, int v2)
   return -1;
 }
 
-void graphAddEdgeLegacyLike(GraphLegacyLike* graph, int v1, int v2, double weight)
+void graphAddEdgeLegacyLike(GraphLegacyLike& graph, int v1, int v2, double weight)
 {
-  CHECK(graph != nullptr);
   CHECK(v1 >= 0);
   CHECK(v2 >= 0);
-  CHECK(v1 < graph->nvertex);
-  CHECK(v2 < graph->nvertex);
+  CHECK(v1 < graph.nvertex);
+  CHECK(v2 < graph.nvertex);
 
-  graph->edges.push_back({v1, v2});
-  graph->weights.push_back(weight);
+  graph.edges.push_back({v1, v2});
+  graph.weights.push_back(weight);
 }
 
-GraphMst2ResultLegacyLike graphToMst2LegacyLike(GraphLegacyLike* graph)
+GraphMst2ResultLegacyLike graphToMst2LegacyLike(GraphLegacyLike& graph)
 {
   // Port of tz_graph.c::Graph_To_Mst2().
-  CHECK(graph != nullptr);
 
-  const int nedge = static_cast<int>(graph->edges.size());
+  const int nedge = static_cast<int>(graph.edges.size());
   GraphMst2ResultLegacyLike res;
   res.edgeIn.assign(static_cast<size_t>(nedge), 0u);
 
@@ -46,9 +44,9 @@ GraphMst2ResultLegacyLike graphToMst2LegacyLike(GraphLegacyLike* graph)
     return res;
   }
 
-  CHECK(static_cast<int>(graph->weights.size()) == nedge) << "Graph_To_Mst2 requires a weighted graph";
+  CHECK(static_cast<int>(graph.weights.size()) == nedge) << "Graph_To_Mst2 requires a weighted graph";
 
-  const int nvertex = graph->nvertex;
+  const int nvertex = graph.nvertex;
   CHECK(nvertex >= 0);
 
   std::vector<int> treeId(static_cast<size_t>(nvertex), 0);
@@ -57,17 +55,17 @@ GraphMst2ResultLegacyLike graphToMst2LegacyLike(GraphLegacyLike* graph)
     treeId[static_cast<size_t>(i)] = i;
   }
 
-  std::vector<double> weights = graph->weights;
+  std::vector<double> weights = graph.weights;
   std::vector<int> sortedEdgeIdx;
-  darrayQsortLegacy(&weights, &sortedEdgeIdx);
+  darrayQsortLegacy(weights, &sortedEdgeIdx);
   CHECK(static_cast<int>(sortedEdgeIdx.size()) == nedge);
 
   for (int i = 0; i < nedge; ++i) {
     const int edgeIndex = sortedEdgeIdx[static_cast<size_t>(i)];
     CHECK(edgeIndex >= 0 && edgeIndex < nedge);
 
-    const int v1 = graph->edges[static_cast<size_t>(edgeIndex)][0];
-    const int v2 = graph->edges[static_cast<size_t>(edgeIndex)][1];
+    const int v1 = graph.edges[static_cast<size_t>(edgeIndex)][0];
+    const int v2 = graph.edges[static_cast<size_t>(edgeIndex)][1];
 
     CHECK(v1 >= 0 && v1 < nvertex);
     CHECK(v2 >= 0 && v2 < nvertex);
@@ -100,15 +98,15 @@ GraphMst2ResultLegacyLike graphToMst2LegacyLike(GraphLegacyLike* graph)
   for (int i = 0; i < nedge; ++i) {
     if (res.edgeIn[static_cast<size_t>(i)] == 1u) {
       if (i != j) {
-        graph->edges[static_cast<size_t>(j)] = graph->edges[static_cast<size_t>(i)];
-        graph->weights[static_cast<size_t>(j)] = graph->weights[static_cast<size_t>(i)];
+        graph.edges[static_cast<size_t>(j)] = graph.edges[static_cast<size_t>(i)];
+        graph.weights[static_cast<size_t>(j)] = graph.weights[static_cast<size_t>(i)];
       }
       ++j;
     }
   }
 
-  graph->edges.resize(static_cast<size_t>(j));
-  graph->weights.resize(static_cast<size_t>(j));
+  graph.edges.resize(static_cast<size_t>(j));
+  graph.weights.resize(static_cast<size_t>(j));
 
   return res;
 }

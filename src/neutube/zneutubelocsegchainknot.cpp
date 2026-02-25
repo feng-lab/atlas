@@ -32,19 +32,16 @@ const LocsegChainKnotLegacyLike* locsegChainKnotArrayLastLegacyLike(const Locseg
   return locsegChainKnotArrayAtLegacyLike(ka, static_cast<int>(ka.knots.size()) - 1);
 }
 
-void locsegChainKnotArrayAppendLegacyLike(LocsegChainKnotArrayLegacyLike* ka, LocsegChainKnotLegacyLike knot)
+void locsegChainKnotArrayAppendLegacyLike(LocsegChainKnotArrayLegacyLike& ka, LocsegChainKnotLegacyLike knot)
 {
-  CHECK(ka != nullptr);
-  ka->knots.push_back(knot);
+  ka.knots.push_back(knot);
 }
 
-void locsegChainKnotArrayAppendUniqueLegacyLike(LocsegChainKnotArrayLegacyLike* ka, LocsegChainKnotLegacyLike knot)
+void locsegChainKnotArrayAppendUniqueLegacyLike(LocsegChainKnotArrayLegacyLike& ka, LocsegChainKnotLegacyLike knot)
 {
-  CHECK(ka != nullptr);
-
-  const auto* last = locsegChainKnotArrayLastLegacyLike(*ka);
+  const auto* last = locsegChainKnotArrayLastLegacyLike(ka);
   if (last == nullptr || !locsegChainKnotIsEqualLegacyLike(*last, knot)) {
-    ka->knots.push_back(knot);
+    ka.knots.push_back(knot);
   }
 }
 
@@ -59,10 +56,10 @@ std::optional<LocsegChainKnotArrayLegacyLike> locsegChainToKnotArrayLegacyLike(c
   LocsegChainKnotArrayLegacyLike ka;
   ka.chain = &chain;
 
-  locsegChainKnotArrayAppendLegacyLike(&ka, LocsegChainKnotLegacyLike{0, 0.0});
+  locsegChainKnotArrayAppendLegacyLike(ka, LocsegChainKnotLegacyLike{0, 0.0});
 
   if (length == 1) {
-    locsegChainKnotArrayAppendLegacyLike(&ka, LocsegChainKnotLegacyLike{0, 1.0});
+    locsegChainKnotArrayAppendLegacyLike(ka, LocsegChainKnotLegacyLike{0, 1.0});
     return ka;
   }
 
@@ -73,17 +70,17 @@ std::optional<LocsegChainKnotArrayLegacyLike> locsegChainToKnotArrayLegacyLike(c
   for (const auto& node : chain) {
     double offset = -1.0;
 
-    if (traceRecordDirection(&node.tr) != TraceDirection::BothDir) {
+    if (traceRecordDirection(node.tr) != TraceDirection::BothDir) {
       TraceDirection traceDirection = TraceDirection::Forward;
-      offset = traceRecordFixPoint(&node.tr);
-      traceDirection = traceRecordDirection(&node.tr);
+      offset = traceRecordFixPoint(node.tr);
+      traceDirection = traceRecordDirection(node.tr);
 
       if (offset < 0.0) {
         switch (traceDirection) {
           case TraceDirection::Forward:
             offset = 0.0;
             if (prevNode != nullptr) {
-              if (traceRecordDirection(&prevNode->tr) == TraceDirection::Backward) {
+              if (traceRecordDirection(prevNode->tr) == TraceDirection::Backward) {
                 offset = -1.0;
               }
             }
@@ -111,7 +108,7 @@ std::optional<LocsegChainKnotArrayLegacyLike> locsegChainToKnotArrayLegacyLike(c
       }
 
       if (dist > LocsegChainToKnotArrayEpsLegacyLike) {
-        locsegChainKnotArrayAppendUniqueLegacyLike(&ka, LocsegChainKnotLegacyLike{index, offset});
+        locsegChainKnotArrayAppendUniqueLegacyLike(ka, LocsegChainKnotLegacyLike{index, offset});
         lastNode = &node;
       }
     }
@@ -120,7 +117,7 @@ std::optional<LocsegChainKnotArrayLegacyLike> locsegChainToKnotArrayLegacyLike(c
     ++index;
   }
 
-  locsegChainKnotArrayAppendUniqueLegacyLike(&ka, LocsegChainKnotLegacyLike{length - 1, 1.0});
+  locsegChainKnotArrayAppendUniqueLegacyLike(ka, LocsegChainKnotLegacyLike{length - 1, 1.0});
   return ka;
 }
 

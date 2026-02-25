@@ -40,6 +40,6 @@ struct ConnectionTestWorkspaceLegacyLike
 };
 
 // Port of `tz_trace_utils.c::Default_Connection_Test_Workspace()`.
-void defaultConnectionTestWorkspaceLegacyLike(ConnectionTestWorkspaceLegacyLike* ctw);
+void defaultConnectionTestWorkspaceLegacyLike(ConnectionTestWorkspaceLegacyLike& ctw);
 
 } // namespace nim::neutube

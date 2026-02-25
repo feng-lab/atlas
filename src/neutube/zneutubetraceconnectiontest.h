@@ -16,10 +16,10 @@ namespace nim::neutube {
 // - `signal` may be null; shortest-path test is skipped when null.
 // - `conn` is always written (mode set to None on failure).
 [[nodiscard]] bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
-                                                       LocsegChain* chain2,
-                                                       const ZImg* signal,
+                                                       LocsegChain& chain2,
+                                                       /*nullable*/ const ZImg* signal,
                                                        double zScale,
-                                                       NeurocompConnLegacyLike* conn,
+                                                       NeurocompConnLegacyLike& conn,
                                                        const ConnectionTestWorkspaceLegacyLike& ctw);
 
 } // namespace nim::neutube

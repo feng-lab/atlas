@@ -15,6 +15,6 @@ namespace nim::neutube {
 // - node lines in depth-first order: "%d %d %g %g %g %g %d\n"
 //
 // This function resorts IDs before writing (matching legacy behavior).
-void writeSwcLegacyNeuTu(ZSwc* tree, const std::string& filePath, const std::vector<std::string>& comments = {});
+void writeSwcLegacyNeuTu(ZSwc& tree, const std::string& filePath, const std::vector<std::string>& comments = {});
 
 } // namespace nim::neutube

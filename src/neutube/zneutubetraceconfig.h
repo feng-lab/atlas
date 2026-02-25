@@ -46,13 +46,13 @@ struct TraceConfig
 //
 // This is equivalent to legacy `ZNeuronTracerConfig::loadJsonObject()` field
 // updates, but operates on the already-parsed Boost.JSON object.
-void applyTraceConfigOverridesLegacyLike(const json::object& obj, TraceConfig* cfg);
+void applyTraceConfigOverridesLegacyLike(const json::object& obj, TraceConfig& cfg);
 
 // Loads a legacy trace config file (trace_config.json) into `out`.
 //
 // Returns true if the file parsed and had a legacy-accepted `"tag"` value.
 // On false, `out` is still populated with legacy defaults.
-[[nodiscard]] bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig* out);
+[[nodiscard]] bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig& out);
 
 // Selects the per-level override JSON object using the legacy `getLevelJson()` semantics.
 // Returns nullptr if no level overrides are available.

@@ -44,16 +44,13 @@ namespace {
 
 std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& signal,
                                                                   double zScale,
-                                                                  std::vector<LocalNeuroseg>* locsegArray,
-                                                                  std::vector<double>* scores,
-                                                                  TraceWorkspace* tw)
+                                                                  std::vector<LocalNeuroseg>& locsegArray,
+                                                                  std::vector<double>& scores,
+                                                                  TraceWorkspace& tw)
 {
-  CHECK(locsegArray != nullptr);
-  CHECK(scores != nullptr);
-  CHECK(tw != nullptr);
-  CHECK(scores->size() == locsegArray->size());
+  CHECK(scores.size() == locsegArray.size());
 
-  const int nseed = static_cast<int>(locsegArray->size());
+  const int nseed = static_cast<int>(locsegArray.size());
   if (nseed <= 0) {
     return {};
   }
@@ -63,7 +60,7 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
   CHECK(static_cast<int>(indices.size()) == nseed);
 
   // Ensure trace mask exists if we're updating it (legacy allocates it lazily here).
-  if (tw->traceMaskUpdating) {
+  if (tw.traceMaskUpdating) {
     traceWorkspaceInitTraceMaskLegacyLike(tw, signal, /*clearing*/ false);
   }
 
@@ -77,45 +74,45 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
     const int seedIndex = indices[static_cast<size_t>(i)];
     CHECK(seedIndex >= 0 && seedIndex < nseed);
 
-    const LocalNeuroseg& seedLocseg = (*locsegArray)[static_cast<size_t>(seedIndex)];
-    const double seedScore = (*scores)[static_cast<size_t>(i)];
+    const LocalNeuroseg& seedLocseg = locsegArray[static_cast<size_t>(seedIndex)];
+    const double seedScore = scores[static_cast<size_t>(i)];
 
-    if (!localNeurosegGoodScoreLegacyLike(seedLocseg, seedScore, tw->minScore)) {
+    if (!localNeurosegGoodScoreLegacyLike(seedLocseg, seedScore, tw.minScore)) {
       continue;
     }
 
     const double width = neurosegRBLegacyLike(seedLocseg.seg);
-    if (width > tw->dyvar[0]) {
+    if (width > tw.dyvar[0]) {
       continue;
     }
 
     traceWorkspaceSetTraceStatusLegacyLike(tw, TraceStatus::Normal, TraceStatus::Normal);
 
-    if (tw->traceMask) {
+    if (tw.traceMask) {
       std::array<double, 3> pt = localNeurosegAxisPositionLegacyLike(seedLocseg, seedLocseg.seg.h / 3.0);
       int tmpx = iroundLegacyLike(pt[0]);
       int tmpy = iroundLegacyLike(pt[1]);
       int tmpz = iroundLegacyLike(pt[2] * zScale);
-      if (maskValueAt(*tw->traceMask, tmpx, tmpy, tmpz) > 0) {
-        tw->traceStatus[0] = TraceStatus::HitMark;
+      if (maskValueAt(*tw.traceMask, tmpx, tmpy, tmpz) > 0) {
+        tw.traceStatus[0] = TraceStatus::HitMark;
       }
 
       pt = localNeurosegAxisPositionLegacyLike(seedLocseg, seedLocseg.seg.h * 2.0 / 3.0);
       tmpx = iroundLegacyLike(pt[0]);
       tmpy = iroundLegacyLike(pt[1]);
       tmpz = iroundLegacyLike(pt[2] * zScale);
-      if (maskValueAt(*tw->traceMask, tmpx, tmpy, tmpz) > 0) {
-        tw->traceStatus[1] = TraceStatus::HitMark;
+      if (maskValueAt(*tw.traceMask, tmpx, tmpy, tmpz) > 0) {
+        tw.traceStatus[1] = TraceStatus::HitMark;
       }
     }
 
-    if (tw->traceStatus[0] != TraceStatus::Normal && tw->traceStatus[1] != TraceStatus::Normal) {
+    if (tw.traceStatus[0] != TraceStatus::Normal && tw.traceStatus[1] != TraceStatus::Normal) {
       continue;
     }
 
     TraceRecord tr;
-    traceRecordReset(&tr);
-    traceRecordSetDirection(&tr, TraceDirection::BothDir);
+    traceRecordReset(tr);
+    traceRecordSetDirection(tr, TraceDirection::BothDir);
 
     auto chain = std::make_unique<LocsegChain>();
     LocsegNode node;
@@ -123,31 +120,31 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
     node.tr = tr;
     (void)chain->addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
 
-    traceLocsegLegacyLike(signal, zScale, chain.get(), tw);
-    (void)locsegChainRemoveOverlapEndsLegacyLike(chain.get());
-    locsegChainRemoveTurnEndsLegacyLike(chain.get(), 1.0);
+    traceLocsegLegacyLike(signal, zScale, *chain, tw);
+    (void)locsegChainRemoveOverlapEndsLegacyLike(*chain);
+    locsegChainRemoveTurnEndsLegacyLike(*chain, 1.0);
 
-    const bool keep = (locsegChainGeolenLegacyLike(*chain) >= tw->minChainLength) ||
-                      (tw->traceStatus[0] == TraceStatus::HitMark) || (tw->traceStatus[1] == TraceStatus::HitMark);
+    const bool keep = (locsegChainGeolenLegacyLike(*chain) >= tw.minChainLength) ||
+                      (tw.traceStatus[0] == TraceStatus::HitMark) || (tw.traceStatus[1] == TraceStatus::HitMark);
     if (!keep) {
       continue;
     }
 
-    if (tw->traceMaskUpdating && tw->traceMask) {
+    if (tw.traceMaskUpdating && tw.traceMask) {
       labelWs.sratio = 1.5;
       labelWs.sdiff = 0.0;
       labelWs.option = 1;
-      labelWs.value = tw->chainId + 1;
+      labelWs.value = tw.chainId + 1;
       labelWs.flag = 0;
       locsegChainLabelWLegacyLike(*chain,
-                                  tw->traceMask.get(),
+                                  *tw.traceMask,
                                   zScale,
                                   /*begin*/ 0,
                                   /*end*/ chain->length() - 1,
-                                  &labelWs);
+                                  labelWs);
     }
 
-    ++tw->chainId;
+    ++tw.chainId;
     chains.push_back(std::move(chain));
   }
 

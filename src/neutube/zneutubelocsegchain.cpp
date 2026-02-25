@@ -219,22 +219,20 @@ bool locsegChainFormLoopLegacyLike(const LocsegChain& chain, const LocalNeuroseg
   return false;
 }
 
-int locsegChainRemoveOverlapEndsLegacyLike(LocsegChain* chain)
+int locsegChainRemoveOverlapEndsLegacyLike(LocsegChain& chain)
 {
   // Port of tz_locseg_chain.c::Locseg_Chain_Remove_Overlap_Ends().
-  CHECK(chain != nullptr);
-
   int nremove = 0;
 
-  if (chain->length() < 2) {
+  if (chain.length() < 2) {
     return nremove;
   }
 
   {
-    auto itHead = chain->begin();
+    auto itHead = chain.begin();
     auto itRunnerUp = itHead;
     ++itRunnerUp;
-    CHECK(itRunnerUp != chain->end());
+    CHECK(itRunnerUp != chain.end());
 
     const LocalNeuroseg& head = itHead->locseg;
     const LocalNeuroseg& runnerUp = itRunnerUp->locseg;
@@ -244,17 +242,17 @@ int locsegChainRemoveOverlapEndsLegacyLike(LocsegChain* chain)
 
     if (localNeurosegHitTestLegacyLike(runnerUp, top[0], top[1], top[2]) &&
         localNeurosegHitTestLegacyLike(runnerUp, bottom[0], bottom[1], bottom[2])) {
-      chain->removeEnd(LocsegChainEndLegacyLike::Head);
+      chain.removeEnd(LocsegChainEndLegacyLike::Head);
       ++nremove;
     }
   }
 
-  if (chain->length() < 2) {
+  if (chain.length() < 2) {
     return nremove;
   }
 
   {
-    auto itTail = chain->end();
+    auto itTail = chain.end();
     --itTail;
 
     auto itRunnerUp = itTail;
@@ -268,7 +266,7 @@ int locsegChainRemoveOverlapEndsLegacyLike(LocsegChain* chain)
 
     if (localNeurosegHitTestLegacyLike(runnerUp, top[0], top[1], top[2]) &&
         localNeurosegHitTestLegacyLike(runnerUp, bottom[0], bottom[1], bottom[2])) {
-      chain->removeEnd(LocsegChainEndLegacyLike::Tail);
+      chain.removeEnd(LocsegChainEndLegacyLike::Tail);
       ++nremove;
     }
   }
@@ -276,39 +274,37 @@ int locsegChainRemoveOverlapEndsLegacyLike(LocsegChain* chain)
   return nremove;
 }
 
-void locsegChainRemoveTurnEndsLegacyLike(LocsegChain* chain, double maxAngle)
+void locsegChainRemoveTurnEndsLegacyLike(LocsegChain& chain, double maxAngle)
 {
   // Port of tz_locseg_chain.c::Locseg_Chain_Remove_Turn_Ends().
-  CHECK(chain != nullptr);
-
   constexpr double TzPiLegacyLike = 3.14159265358979323846264338328;
   constexpr double Tz2PiLegacyLike = 2.0 * TzPiLegacyLike;
 
-  if (chain->length() < 2) {
+  if (chain.length() < 2) {
     return;
   }
 
   {
-    auto itHead = chain->begin();
+    auto itHead = chain.begin();
     auto itRunnerUp = itHead;
     ++itRunnerUp;
-    CHECK(itRunnerUp != chain->end());
+    CHECK(itRunnerUp != chain.end());
 
     double angle = neurosegAngleBetweenLegacyLike(itHead->locseg.seg, itRunnerUp->locseg.seg);
     if (angle > TzPiLegacyLike) {
       angle = Tz2PiLegacyLike - angle;
     }
     if (angle > maxAngle) {
-      chain->removeEnd(LocsegChainEndLegacyLike::Head);
+      chain.removeEnd(LocsegChainEndLegacyLike::Head);
     }
   }
 
-  if (chain->length() < 2) {
+  if (chain.length() < 2) {
     return;
   }
 
   {
-    auto itTail = chain->end();
+    auto itTail = chain.end();
     --itTail;
 
     auto itRunnerUp = itTail;
@@ -319,7 +315,7 @@ void locsegChainRemoveTurnEndsLegacyLike(LocsegChain* chain, double maxAngle)
       angle = Tz2PiLegacyLike - angle;
     }
     if (angle > maxAngle) {
-      chain->removeEnd(LocsegChainEndLegacyLike::Tail);
+      chain.removeEnd(LocsegChainEndLegacyLike::Tail);
     }
   }
 }

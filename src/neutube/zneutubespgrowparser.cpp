@@ -37,19 +37,16 @@ namespace {
 
 } // namespace
 
-ZNeutubeSpGrowParser::ZNeutubeSpGrowParser(SpGrowWorkspace* workspace)
+ZNeutubeSpGrowParser::ZNeutubeSpGrowParser(SpGrowWorkspace& workspace)
   : m_workspace(workspace)
 {}
 
 ZNeutubeVoxelArray ZNeutubeSpGrowParser::extractPath(int64_t index) const
 {
   ZNeutubeVoxelArray path;
-  if (m_workspace == nullptr) {
-    return path;
-  }
 
-  const int width = m_workspace->width;
-  const int height = m_workspace->height;
+  const int width = m_workspace.width;
+  const int height = m_workspace.height;
 
   while (index >= 0) {
     ZNeutubeVoxel voxel;
@@ -63,7 +60,7 @@ ZNeutubeVoxelArray ZNeutubeSpGrowParser::extractPath(int64_t index) const
       }
     }
 
-    const int64_t next = static_cast<int64_t>(m_workspace->path[static_cast<size_t>(index)]);
+    const int64_t next = static_cast<int64_t>(m_workspace.path[static_cast<size_t>(index)]);
     CHECK(index != next);
     index = next;
   }
@@ -73,14 +70,12 @@ ZNeutubeVoxelArray ZNeutubeSpGrowParser::extractPath(int64_t index) const
 
 double ZNeutubeSpGrowParser::pathLength(int64_t index, bool masked) const
 {
-  CHECK(m_workspace != nullptr);
-
-  if (!m_workspace->length.empty()) {
+  if (!m_workspace.length.empty()) {
     const int64_t originalIndex = index;
     if (masked) {
       if (!m_checkedMask.isEmpty()) {
         const uint8_t* maskArray = m_checkedMask.timeData<uint8_t>(0);
-        const int* pathArray = m_workspace->path.data();
+        const int* pathArray = m_workspace.path.data();
         while (index >= 0) {
           if (maskArray[static_cast<size_t>(index)] == 1) {
             break;
@@ -94,9 +89,9 @@ double ZNeutubeSpGrowParser::pathLength(int64_t index, bool masked) const
       index = -1;
     }
 
-    double len = m_workspace->length[static_cast<size_t>(originalIndex)];
+    double len = m_workspace.length[static_cast<size_t>(originalIndex)];
     if (index >= 0) {
-      len -= m_workspace->length[static_cast<size_t>(index)];
+      len -= m_workspace.length[static_cast<size_t>(index)];
     } else {
       len += 1.0;
     }
@@ -106,13 +101,13 @@ double ZNeutubeSpGrowParser::pathLength(int64_t index, bool masked) const
   // Fallback path length computation (rare for skeletonize; kept for parity).
   double len = 0.0;
   if (index >= 0) {
-    if (m_workspace->mask[static_cast<size_t>(index)] == SP_GROW_SOURCE) {
+    if (m_workspace.mask[static_cast<size_t>(index)] == SP_GROW_SOURCE) {
       return 0.0;
     }
 
     len = 1.0;
     int64_t secondIndex = index;
-    index = static_cast<int64_t>(m_workspace->path[static_cast<size_t>(index)]);
+    index = static_cast<int64_t>(m_workspace.path[static_cast<size_t>(index)]);
 
     while (index >= 0) {
       if (!m_checkedMask.isEmpty()) {
@@ -123,10 +118,10 @@ double ZNeutubeSpGrowParser::pathLength(int64_t index, bool masked) const
 
       const int64_t firstIndex = secondIndex;
       secondIndex = index;
-      const int area = m_workspace->width * m_workspace->height;
-      len += indexDistance(firstIndex, secondIndex, m_workspace->width, area);
+      const int area = m_workspace.width * m_workspace.height;
+      len += indexDistance(firstIndex, secondIndex, m_workspace.width, area);
 
-      index = static_cast<int64_t>(m_workspace->path[static_cast<size_t>(index)]);
+      index = static_cast<int64_t>(m_workspace.path[static_cast<size_t>(index)]);
     }
   }
 
@@ -135,16 +130,14 @@ double ZNeutubeSpGrowParser::pathLength(int64_t index, bool masked) const
 
 ZNeutubeVoxelArray ZNeutubeSpGrowParser::extractLongestPath(double* length, bool masked)
 {
-  CHECK(m_workspace != nullptr);
-
   int64_t idx = -1;
   double maxLength = 0.0;
 
   if (m_fgArray.empty()) {
     const int conn = 6;
-    const int width = m_workspace->width;
-    const int height = m_workspace->height;
-    const int depth = m_workspace->depth;
+    const int width = m_workspace.width;
+    const int height = m_workspace.height;
+    const int depth = m_workspace.depth;
     const int area = width * height;
 
     const ZNeighborhood& nb = neighborhoodLegacyOrder(conn);
@@ -156,8 +149,8 @@ ZNeutubeVoxelArray ZNeutubeSpGrowParser::extractLongestPath(double* length, bool
     }
 
     int fgCount = 0;
-    for (size_t i = 0; i < m_workspace->size; ++i) {
-      if (m_workspace->mask[i] == SP_GROW_BARRIER) {
+    for (size_t i = 0; i < m_workspace.size; ++i) {
+      if (m_workspace.mask[i] == SP_GROW_BARRIER) {
         continue;
       }
 
@@ -179,7 +172,7 @@ ZNeutubeVoxelArray ZNeutubeSpGrowParser::extractLongestPath(double* length, bool
           break;
         }
         const size_t ni = static_cast<size_t>(static_cast<int64_t>(i) + neighborOff[n]);
-        if (m_workspace->mask[ni] == SP_GROW_BARRIER) {
+        if (m_workspace.mask[ni] == SP_GROW_BARRIER) {
           isBoundary = true;
           break;
         }
@@ -194,7 +187,7 @@ ZNeutubeVoxelArray ZNeutubeSpGrowParser::extractLongestPath(double* length, bool
   }
 
   if (m_fgArray.empty()) {
-    for (size_t i = 0; i < m_workspace->size; ++i) {
+    for (size_t i = 0; i < m_workspace.size; ++i) {
       const double len = pathLength(static_cast<int64_t>(i), masked);
       if (len > maxLength) {
         maxLength = len;
@@ -220,8 +213,6 @@ ZNeutubeVoxelArray ZNeutubeSpGrowParser::extractLongestPath(double* length, bool
 
 std::vector<ZNeutubeVoxelArray> ZNeutubeSpGrowParser::extractAllPath(double minLength, const ZImg& ballImg)
 {
-  CHECK(m_workspace != nullptr);
-
   bool isPathAvailable = true;
   const double maskExpansionRadius = 2.0;
   const double skeletonRadius = 3.0;
@@ -242,9 +233,9 @@ std::vector<ZNeutubeVoxelArray> ZNeutubeSpGrowParser::extractAllPath(double minL
       pathArray.push_back(path);
 
       if (m_checkedMask.isEmpty()) {
-        ZImgInfo info(static_cast<size_t>(m_workspace->width),
-                      static_cast<size_t>(m_workspace->height),
-                      static_cast<size_t>(m_workspace->depth),
+        ZImgInfo info(static_cast<size_t>(m_workspace.width),
+                      static_cast<size_t>(m_workspace.height),
+                      static_cast<size_t>(m_workspace.depth),
                       1,
                       1,
                       1,
@@ -264,11 +255,11 @@ std::vector<ZNeutubeVoxelArray> ZNeutubeSpGrowParser::extractAllPath(double minL
       path.sample(ballImg, distanceWeight);
       path.addValue(1.0);
       path.minimizeValue(skeletonRadius);
-      path.labelImgWithBall(&m_pathMask, 1);
+      path.labelImgWithBall(m_pathMask, 1);
 
       path.sample(ballImg, distanceWeight);
       path.addValue(maskExpansionRadius);
-      path.labelImgWithBall(&m_checkedMask, 1);
+      path.labelImgWithBall(m_checkedMask, 1);
     }
   }
 

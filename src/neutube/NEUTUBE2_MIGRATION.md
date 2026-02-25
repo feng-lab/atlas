@@ -240,6 +240,10 @@ Status (Goal 1 / CLI):
     pipeline (including legacy return-code semantics and optional predefined mask handling).
   - `src/neutube/zrunneutucommand2.cpp` remains orchestration-only (CLI + config parsing + dispatch) and the `neutube`
     target has no dependency on neurolabi headers or libraries.
+  - API hygiene (non-null parameters):
+    - Migrated many legacy-style `T*` parameters to C++ references for required inputs/outputs across `src/neutube/`.
+    - Remaining pointer parameters are kept only where they are semantically required (nullable optional inputs/outputs,
+      C-style arrays, legacy callback signatures) and are annotated/documented (e.g., `/*nullable*/`).
 
 ## Detailed plan (step-by-step)
 

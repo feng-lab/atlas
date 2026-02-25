@@ -60,10 +60,11 @@ struct TraceWorkspace
 };
 
 // Port of tz_trace_utils.c::Default_Trace_Workspace().
-void defaultTraceWorkspaceLegacyLike(TraceWorkspace* tw);
+void defaultTraceWorkspaceLegacyLike(TraceWorkspace& tw);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Default_Trace_Workspace().
-void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace* tw, const ZImg* stack);
+void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace& tw);
+void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace& tw, const ZImg& stack);
 
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Set_Trace_Status().
 //
@@ -72,12 +73,12 @@ void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace* tw, const ZImg* 
 //   - index 0: head/backward end
 //   - index 1: tail/forward end
 //   (despite historical comments that describe the opposite).
-void traceWorkspaceSetTraceStatusLegacyLike(TraceWorkspace* tw, TraceStatus headStatus, TraceStatus tailStatus);
+void traceWorkspaceSetTraceStatusLegacyLike(TraceWorkspace& tw, TraceStatus headStatus, TraceStatus tailStatus);
 
 // Port of `ZNeuronTracer::initTraceMask(bool clearing)`:
 // - Ensures `tw->traceMask` exists (allocates GREY16-equivalent mask on demand).
 // - Zeros the mask if `clearing` is true, or if the mask had to be allocated.
-void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace* tw, const ZImg& stack, bool clearing);
+void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace& tw, const ZImg& stack, bool clearing);
 
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Mask_Value().
 //

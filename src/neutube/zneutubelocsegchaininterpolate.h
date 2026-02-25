@@ -15,9 +15,9 @@ namespace nim::neutube {
 // Returns:
 // - >=0: the index at which a new segment was inserted, matching legacy semantics.
 // - -1 : no insertion happened (break fell on an existing knot).
-[[nodiscard]] int locsegChainInterpolateLLegacyLike(LocsegChain* chain,
+[[nodiscard]] int locsegChainInterpolateLLegacyLike(LocsegChain& chain,
                                                     const std::array<double, 3>& pt,
-                                                    const std::array<double, 3>* ort,
-                                                    std::array<double, 3>* newPos);
+                                                    /*nullable*/ const std::array<double, 3>* ort,
+                                                    /*nullable*/ std::array<double, 3>* newPos);
 
 } // namespace nim::neutube

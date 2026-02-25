@@ -18,11 +18,11 @@ struct SwcPointDistResult
 // Returns:
 // - dist == -1 and closestNode == null when the tree has no segments.
 // - dist == 0 when the point is inside any segment volume.
-[[nodiscard]] SwcPointDistResult swcTreePointDist(ZSwc* tree, double x, double y, double z);
+[[nodiscard]] SwcPointDistResult swcTreePointDist(ZSwc& tree, double x, double y, double z);
 
 // Variant that ignores segments belonging to `excludeRoot` (used to match legacy connect-branch behavior,
 // where the new branch is not part of the destination tree during distance queries).
 [[nodiscard]] SwcPointDistResult
-swcTreePointDist(ZSwc* tree, double x, double y, double z, const ZSwc::SwcTreeNode& excludeRoot);
+swcTreePointDist(ZSwc& tree, double x, double y, double z, const ZSwc::SwcTreeNode& excludeRoot);
 
 } // namespace nim::neutube

@@ -29,21 +29,21 @@ struct TraceRecord
 };
 
 // Port of legacy setter/getter helpers from tz_trace_utils.c.
-void traceRecordReset(TraceRecord* tr);
-void traceRecordSetScore(TraceRecord* tr, const StackFitScore& fs);
-void traceRecordSetHitRegion(TraceRecord* tr, int hitRegion);
-void traceRecordSetIndex(TraceRecord* tr, int index);
-void traceRecordSetRefit(TraceRecord* tr, int refit);
-void traceRecordSetFitHeight(TraceRecord* tr, int which, int value);
-void traceRecordSetDirection(TraceRecord* tr, TraceDirection direction);
-void traceRecordSetFixPoint(TraceRecord* tr, double value);
-void traceRecordDisableFixPoint(TraceRecord* tr);
+void traceRecordReset(TraceRecord& tr);
+void traceRecordSetScore(TraceRecord& tr, const StackFitScore& fs);
+void traceRecordSetHitRegion(TraceRecord& tr, int hitRegion);
+void traceRecordSetIndex(TraceRecord& tr, int index);
+void traceRecordSetRefit(TraceRecord& tr, int refit);
+void traceRecordSetFitHeight(TraceRecord& tr, int which, int value);
+void traceRecordSetDirection(TraceRecord& tr, TraceDirection direction);
+void traceRecordSetFixPoint(TraceRecord& tr, double value);
+void traceRecordDisableFixPoint(TraceRecord& tr);
 
-[[nodiscard]] int traceRecordIndex(const TraceRecord* tr);
-[[nodiscard]] int traceRecordRefit(const TraceRecord* tr);
-[[nodiscard]] int traceRecordFitHeight(const TraceRecord* tr, int which);
-[[nodiscard]] TraceDirection traceRecordDirection(const TraceRecord* tr);
-[[nodiscard]] double traceRecordFixPoint(const TraceRecord* tr);
-[[nodiscard]] bool traceRecordHasFixPoint(const TraceRecord* tr);
+[[nodiscard]] int traceRecordIndex(const TraceRecord& tr);
+[[nodiscard]] int traceRecordRefit(const TraceRecord& tr);
+[[nodiscard]] int traceRecordFitHeight(const TraceRecord& tr, int which);
+[[nodiscard]] TraceDirection traceRecordDirection(const TraceRecord& tr);
+[[nodiscard]] double traceRecordFixPoint(const TraceRecord& tr);
+[[nodiscard]] bool traceRecordHasFixPoint(const TraceRecord& tr);
 
 } // namespace nim::neutube

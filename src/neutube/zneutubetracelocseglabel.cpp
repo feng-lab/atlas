@@ -71,22 +71,21 @@ void scaleXRotateZLegacyLike(std::array<double, 3>* p, double s, double alpha, i
   return 0;
 }
 
-void writeVoxelFromIntLegacyLike(ZImg* stack, size_t x, size_t y, size_t z, int value)
+void writeVoxelFromIntLegacyLike(ZImg& stack, size_t x, size_t y, size_t z, int value)
 {
-  CHECK(stack != nullptr);
-  CHECK(stack->numChannels() == 1);
-  CHECK(stack->numTimes() == 1);
+  CHECK(stack.numChannels() == 1);
+  CHECK(stack.numTimes() == 1);
 
-  if (stack->isType<uint8_t>()) {
-    *stack->data<uint8_t>(x, y, z) = static_cast<uint8_t>(value);
+  if (stack.isType<uint8_t>()) {
+    *stack.data<uint8_t>(x, y, z) = static_cast<uint8_t>(value);
     return;
   }
-  if (stack->isType<uint16_t>()) {
-    *stack->data<uint16_t>(x, y, z) = static_cast<uint16_t>(value);
+  if (stack.isType<uint16_t>()) {
+    *stack.data<uint16_t>(x, y, z) = static_cast<uint16_t>(value);
     return;
   }
 
-  CHECK(false) << "Unsupported stack voxel type: " << stack->info();
+  CHECK(false) << "Unsupported stack voxel type: " << stack.info();
 }
 
 [[nodiscard]] int clampToStackTypeLegacyLike(const ZImg& stack, int value)
@@ -105,14 +104,13 @@ void writeVoxelFromIntLegacyLike(ZImg* stack, size_t x, size_t y, size_t z, int 
   return 0;
 }
 
-void stackAddRLegacyLike(const ZImg& stack1, const ZImg& stack2, const std::array<int, 6>& range, ZImg* out)
+void stackAddRLegacyLike(const ZImg& stack1, const ZImg& stack2, const std::array<int, 6>& range, ZImg& out)
 {
-  CHECK(out != nullptr);
   CHECK(stack1.numChannels() == 1 && stack1.numTimes() == 1);
   CHECK(stack2.numChannels() == 1 && stack2.numTimes() == 1);
-  CHECK(out->numChannels() == 1 && out->numTimes() == 1);
+  CHECK(out.numChannels() == 1 && out.numTimes() == 1);
   CHECK(stack1.width() == stack2.width() && stack1.height() == stack2.height() && stack1.depth() == stack2.depth());
-  CHECK(stack1.width() == out->width() && stack1.height() == out->height() && stack1.depth() == out->depth());
+  CHECK(stack1.width() == out.width() && stack1.height() == out.height() && stack1.depth() == out.depth());
 
   for (int k = range[2]; k <= range[5]; ++k) {
     for (int j = range[1]; j <= range[4]; ++j) {
@@ -121,21 +119,20 @@ void stackAddRLegacyLike(const ZImg& stack1, const ZImg& stack2, const std::arra
           readVoxelAsIntLegacyLike(stack1, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k));
         const int v2 =
           readVoxelAsIntLegacyLike(stack2, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k));
-        const int res = clampToStackTypeLegacyLike(*out, v1 + v2);
+        const int res = clampToStackTypeLegacyLike(out, v1 + v2);
         writeVoxelFromIntLegacyLike(out, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k), res);
       }
     }
   }
 }
 
-void stackSubRLegacyLike(const ZImg& stack1, const ZImg& stack2, const std::array<int, 6>& range, ZImg* out)
+void stackSubRLegacyLike(const ZImg& stack1, const ZImg& stack2, const std::array<int, 6>& range, ZImg& out)
 {
-  CHECK(out != nullptr);
   CHECK(stack1.numChannels() == 1 && stack1.numTimes() == 1);
   CHECK(stack2.numChannels() == 1 && stack2.numTimes() == 1);
-  CHECK(out->numChannels() == 1 && out->numTimes() == 1);
+  CHECK(out.numChannels() == 1 && out.numTimes() == 1);
   CHECK(stack1.width() == stack2.width() && stack1.height() == stack2.height() && stack1.depth() == stack2.depth());
-  CHECK(stack1.width() == out->width() && stack1.height() == out->height() && stack1.depth() == out->depth());
+  CHECK(stack1.width() == out.width() && stack1.height() == out.height() && stack1.depth() == out.depth());
 
   for (int k = range[2]; k <= range[5]; ++k) {
     for (int j = range[1]; j <= range[4]; ++j) {
@@ -144,7 +141,7 @@ void stackSubRLegacyLike(const ZImg& stack1, const ZImg& stack2, const std::arra
           readVoxelAsIntLegacyLike(stack1, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k));
         const int v2 =
           readVoxelAsIntLegacyLike(stack2, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k));
-        const int res = clampToStackTypeLegacyLike(*out, v1 - v2);
+        const int res = clampToStackTypeLegacyLike(out, v1 - v2);
         writeVoxelFromIntLegacyLike(out, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k), res);
       }
     }
@@ -255,13 +252,12 @@ void stackSubRLegacyLike(const ZImg& stack1, const ZImg& stack2, const std::arra
 
 } // namespace
 
-void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg* stack, int flag, int value, double zScale)
+void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int flag, int value, double zScale)
 {
-  CHECK(stack != nullptr);
-  CHECK(stack->numChannels() == 1);
-  CHECK(stack->numTimes() == 1);
+  CHECK(stack.numChannels() == 1);
+  CHECK(stack.numTimes() == 1);
 
-  if (stack->isEmpty()) {
+  if (stack.isEmpty()) {
     return;
   }
 
@@ -269,9 +265,9 @@ void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg* stack, int fl
     return;
   }
 
-  const size_t width = stack->width();
-  const size_t height = stack->height();
-  const size_t depth = stack->depth();
+  const size_t width = stack.width();
+  const size_t height = stack.height();
+  const size_t depth = stack.depth();
 
   const std::array<double, 3> bottom = localNeurosegBottomLegacyLike(seg);
 
@@ -338,7 +334,7 @@ void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg* stack, int fl
         }
 
         if (flag >= 0) {
-          if (readVoxelAsIntLegacyLike(*stack,
+          if (readVoxelAsIntLegacyLike(stack,
                                        static_cast<size_t>(px),
                                        static_cast<size_t>(py),
                                        static_cast<size_t>(pz)) != flag) {
@@ -357,55 +353,52 @@ void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg* stack, int fl
 }
 
 void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
-                                   ZImg* stack,
+                                   ZImg& stack,
                                    double zScale,
-                                   LocsegLabelWorkspaceLegacyLike* ws)
+                                   LocsegLabelWorkspaceLegacyLike& ws)
 {
   // Port of tz_local_neuroseg.c::Local_Neuroseg_Label_W().
-  CHECK(stack != nullptr);
-  CHECK(ws != nullptr);
-
-  if (stack->isEmpty()) {
+  if (stack.isEmpty()) {
     return;
   }
 
-  CHECK(stack->numChannels() == 1);
-  CHECK(stack->numTimes() == 1);
+  CHECK(stack.numChannels() == 1);
+  CHECK(stack.numTimes() == 1);
 
   const std::array<double, 3> bottom = localNeurosegBottomLegacyLike(seg);
 
   std::array<int, 3> c = {0, 0, 0};
   std::array<double, 3> offpos = {0.0, 0.0, 0.0};
-  localNeurosegStackPositionLegacyLike(bottom, &c, &offpos, zScale);
+  localNeurosegStackPositionLegacyLike(bottom, c, offpos, zScale);
 
   LocalNeuroseg labelLocseg = seg;
-  if (ws->option == 10) {
+  if (ws.option == 10) {
     labelLocseg.seg.r1 = 0.75;
     labelLocseg.seg.scale = 1.0;
     labelLocseg.seg.c = 0.0;
   } else {
-    neurosegSwellLegacyLike(&labelLocseg.seg, ws->sratio, ws->sdiff, ws->slimit);
+    neurosegSwellLegacyLike(labelLocseg.seg, ws.sratio, ws.sdiff, ws.slimit);
   }
 
   const FieldRangeLegacyLike range = neurosegFieldRangeLegacyLike(labelLocseg.seg, zScale);
 
   std::vector<double> filter;
-  if (ws->option > 10) {
-    CHECK(false) << "localNeurosegLabelWLegacyLike: option > 10 is not supported yet: " << ws->option;
+  if (ws.option > 10) {
+    CHECK(false) << "localNeurosegLabelWLegacyLike: option > 10 is not supported yet: " << ws.option;
   } else {
     filter = neurosegDistFilterLegacyLike(labelLocseg.seg, range, &offpos, zScale);
   }
 
   std::vector<double> filter2;
   double threshold = 0.0;
-  if (ws->option >= 2 && ws->option <= 4) {
-    CHECK(ws->signal != nullptr) << "localNeurosegLabelWLegacyLike: option " << ws->option
-                                 << " requires ws->signal (input stack)";
+  if (ws.option >= 2 && ws.option <= 4) {
+    CHECK(ws.signal != nullptr) << "localNeurosegLabelWLegacyLike: option " << ws.option
+                                << " requires ws.signal (input stack)";
 
     StackFitScore fs{};
     fs.n = 1;
     fs.options[0] = static_cast<int>(StackFitOption::LowMeanSignal);
-    (void)localNeurosegScorePLegacyLike(seg, *ws->signal, zScale, &fs);
+    (void)localNeurosegScorePLegacyLike(seg, *ws.signal, zScale, &fs);
     threshold = fs.scores[0];
 
     filter2 = neurosegDistFilterLegacyLike(seg.seg, range, &offpos, zScale);
@@ -417,52 +410,52 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
                                            range.firstCorner[2] + c[2]};
 
   for (int i = 0; i < 3; ++i) {
-    if (ws->range[static_cast<size_t>(i)] < 0) {
-      ws->range[static_cast<size_t>(i)] = regionCorner[static_cast<size_t>(i)];
-    } else if (ws->range[static_cast<size_t>(i)] > regionCorner[static_cast<size_t>(i)]) {
-      ws->range[static_cast<size_t>(i)] = regionCorner[static_cast<size_t>(i)];
+    if (ws.range[static_cast<size_t>(i)] < 0) {
+      ws.range[static_cast<size_t>(i)] = regionCorner[static_cast<size_t>(i)];
+    } else if (ws.range[static_cast<size_t>(i)] > regionCorner[static_cast<size_t>(i)]) {
+      ws.range[static_cast<size_t>(i)] = regionCorner[static_cast<size_t>(i)];
     }
   }
 
   for (int i = 0; i < 3; ++i) {
     const int end = regionCorner[static_cast<size_t>(i)] + range.size[static_cast<size_t>(i)] - 1;
-    if (ws->range[static_cast<size_t>(i) + 3] < 0) {
-      ws->range[static_cast<size_t>(i) + 3] = end;
-    } else if (ws->range[static_cast<size_t>(i) + 3] < end) {
-      ws->range[static_cast<size_t>(i) + 3] = end;
+    if (ws.range[static_cast<size_t>(i) + 3] < 0) {
+      ws.range[static_cast<size_t>(i) + 3] = end;
+    } else if (ws.range[static_cast<size_t>(i) + 3] < end) {
+      ws.range[static_cast<size_t>(i) + 3] = end;
     }
   }
 
-  for (size_t i = 0; i < ws->range.size(); ++i) {
-    if (ws->range[i] < 0) {
-      ws->range[i] = 0;
+  for (size_t i = 0; i < ws.range.size(); ++i) {
+    if (ws.range[i] < 0) {
+      ws.range[i] = 0;
     }
   }
 
   // Legacy clamping (note the "== width/height/depth" behavior).
-  const int width = static_cast<int>(stack->width());
-  const int height = static_cast<int>(stack->height());
-  const int depth = static_cast<int>(stack->depth());
+  const int width = static_cast<int>(stack.width());
+  const int height = static_cast<int>(stack.height());
+  const int depth = static_cast<int>(stack.depth());
 
-  if (ws->range[0] >= width) {
-    ws->range[0] = width;
+  if (ws.range[0] >= width) {
+    ws.range[0] = width;
   }
-  if (ws->range[3] >= width) {
-    ws->range[3] = width;
-  }
-
-  if (ws->range[1] >= height) {
-    ws->range[1] = height;
-  }
-  if (ws->range[4] >= height) {
-    ws->range[4] = height;
+  if (ws.range[3] >= width) {
+    ws.range[3] = width;
   }
 
-  if (ws->range[2] >= depth) {
-    ws->range[2] = depth;
+  if (ws.range[1] >= height) {
+    ws.range[1] = height;
   }
-  if (ws->range[5] >= depth) {
-    ws->range[5] = depth;
+  if (ws.range[4] >= height) {
+    ws.range[4] = height;
+  }
+
+  if (ws.range[2] >= depth) {
+    ws.range[2] = depth;
+  }
+  if (ws.range[5] >= depth) {
+    ws.range[5] = depth;
   }
 
   size_t offset = 0;
@@ -475,18 +468,18 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
 
         if (px >= 0 && py >= 0 && pz >= 0 && px < width && py < height && pz < depth) {
           bool label = true;
-          if (ws->flag >= 0) {
-            const int current = readVoxelAsIntLegacyLike(*stack,
+          if (ws.flag >= 0) {
+            const int current = readVoxelAsIntLegacyLike(stack,
                                                          static_cast<size_t>(px),
                                                          static_cast<size_t>(py),
                                                          static_cast<size_t>(pz));
-            if (iroundLegacyLike(static_cast<double>(current)) != ws->flag) {
+            if (iroundLegacyLike(static_cast<double>(current)) != ws.flag) {
               label = false;
             }
           }
 
           if (label) {
-            switch (ws->option) {
+            switch (ws.option) {
               case 1:
               case 10:
                 if (filter[offset] <= 1.0) {
@@ -494,7 +487,7 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
                                               static_cast<size_t>(px),
                                               static_cast<size_t>(py),
                                               static_cast<size_t>(pz),
-                                              ws->value);
+                                              ws.value);
                 }
                 break;
               case 2:
@@ -503,9 +496,9 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
                                               static_cast<size_t>(px),
                                               static_cast<size_t>(py),
                                               static_cast<size_t>(pz),
-                                              ws->value);
+                                              ws.value);
                 } else if (filter[offset] <= 1.0) {
-                  if (readVoxelAsDoubleLegacyLike(*ws->signal,
+                  if (readVoxelAsDoubleLegacyLike(*ws.signal,
                                                   static_cast<size_t>(px),
                                                   static_cast<size_t>(py),
                                                   static_cast<size_t>(pz)) < threshold) {
@@ -513,7 +506,7 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
                                                 static_cast<size_t>(px),
                                                 static_cast<size_t>(py),
                                                 static_cast<size_t>(pz),
-                                                ws->value);
+                                                ws.value);
                   }
                 }
                 break;
@@ -523,14 +516,14 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
                                               static_cast<size_t>(px),
                                               static_cast<size_t>(py),
                                               static_cast<size_t>(pz),
-                                              ws->value);
+                                              ws.value);
                 } else if (filter[offset] <= 1.0) {
-                  if (stackNeighborMeanLegacyLike(*ws->signal, /*connectivity*/ 18, px, py, pz) < threshold) {
+                  if (stackNeighborMeanLegacyLike(*ws.signal, /*connectivity*/ 18, px, py, pz) < threshold) {
                     writeVoxelFromIntLegacyLike(stack,
                                                 static_cast<size_t>(px),
                                                 static_cast<size_t>(py),
                                                 static_cast<size_t>(pz),
-                                                ws->value);
+                                                ws.value);
                   }
                 }
                 break;
@@ -540,19 +533,19 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
                                               static_cast<size_t>(px),
                                               static_cast<size_t>(py),
                                               static_cast<size_t>(pz),
-                                              ws->value);
+                                              ws.value);
                 } else if (filter[offset] <= 1.0) {
-                  if (stackNeighborMinLegacyLike(*ws->signal, /*connectivity*/ 18, px, py, pz) < threshold) {
+                  if (stackNeighborMinLegacyLike(*ws.signal, /*connectivity*/ 18, px, py, pz) < threshold) {
                     writeVoxelFromIntLegacyLike(stack,
                                                 static_cast<size_t>(px),
                                                 static_cast<size_t>(py),
                                                 static_cast<size_t>(pz),
-                                                ws->value);
+                                                ws.value);
                   }
                 }
                 break;
               default:
-                CHECK(false) << "localNeurosegLabelWLegacyLike: unsupported option: " << ws->option;
+                CHECK(false) << "localNeurosegLabelWLegacyLike: unsupported option: " << ws.option;
                 break;
             }
           }
@@ -567,48 +560,45 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
 }
 
 void locsegChainLabelWLegacyLike(const LocsegChain& chain,
-                                 ZImg* stack,
+                                 ZImg& stack,
                                  double zScale,
                                  int begin,
                                  int end,
-                                 LocsegLabelWorkspaceLegacyLike* ws)
+                                 LocsegLabelWorkspaceLegacyLike& ws)
 {
-  CHECK(stack != nullptr);
-  CHECK(ws != nullptr);
-
   if (end < 0) {
     end += chain.length();
   }
 
-  if (ws->option == 6 || ws->option == 7) {
+  if (ws.option == 6 || ws.option == 7) {
     // Port of tz_locseg_chain.c::Locseg_Chain_Label_W() option 6/7 path.
-    if (ws->bufferMask) {
-      if (ws->bufferMask->voxelNumber() != stack->voxelNumber() || ws->bufferMask->width() != stack->width() ||
-          ws->bufferMask->height() != stack->height() || ws->bufferMask->depth() != stack->depth()) {
-        ws->bufferMask.reset();
+    if (ws.bufferMask) {
+      if (ws.bufferMask->voxelNumber() != stack.voxelNumber() || ws.bufferMask->width() != stack.width() ||
+          ws.bufferMask->height() != stack.height() || ws.bufferMask->depth() != stack.depth()) {
+        ws.bufferMask.reset();
       }
     }
 
-    if (!ws->bufferMask) {
-      ZImgInfo info = stack->info();
+    if (!ws.bufferMask) {
+      ZImgInfo info = stack.info();
       info.setVoxelFormat<uint8_t>();
       info.createDefaultDescriptions();
-      ws->bufferMask = std::make_unique<ZImg>(info);
+      ws.bufferMask = std::make_unique<ZImg>(info);
     }
 
-    ws->bufferMask->fill(0);
+    ws.bufferMask->fill(0);
 
     LocsegLabelWorkspaceLegacyLike tmpWs;
-    tmpWs.signal = ws->signal;
+    tmpWs.signal = ws.signal;
     tmpWs.option = 1;
     tmpWs.value = 1;
     tmpWs.flag = 0;
-    tmpWs.sratio = ws->sratio;
-    tmpWs.sdiff = ws->sdiff;
-    tmpWs.slimit = ws->slimit;
+    tmpWs.sratio = ws.sratio;
+    tmpWs.sdiff = ws.sdiff;
+    tmpWs.slimit = ws.slimit;
     tmpWs.range = {-1, -1, -1, -1, -1, -1};
 
-    locsegChainLabelWLegacyLike(chain, ws->bufferMask.get(), zScale, begin, end, &tmpWs);
+    locsegChainLabelWLegacyLike(chain, *ws.bufferMask, zScale, begin, end, tmpWs);
 
     for (int i = 0; i < 3; ++i) {
       if (tmpWs.range[static_cast<size_t>(i)] < 0) {
@@ -616,9 +606,9 @@ void locsegChainLabelWLegacyLike(const LocsegChain& chain,
       }
     }
 
-    const int width = static_cast<int>(stack->width());
-    const int height = static_cast<int>(stack->height());
-    const int depth = static_cast<int>(stack->depth());
+    const int width = static_cast<int>(stack.width());
+    const int height = static_cast<int>(stack.height());
+    const int depth = static_cast<int>(stack.depth());
 
     if (tmpWs.range[3] < 0 || tmpWs.range[3] >= width) {
       tmpWs.range[3] = width - 1;
@@ -630,17 +620,17 @@ void locsegChainLabelWLegacyLike(const LocsegChain& chain,
       tmpWs.range[5] = depth - 1;
     }
 
-    if (ws->option == 6) {
-      stackAddRLegacyLike(*stack, *ws->bufferMask, tmpWs.range, stack);
+    if (ws.option == 6) {
+      stackAddRLegacyLike(stack, *ws.bufferMask, tmpWs.range, stack);
     } else {
-      stackSubRLegacyLike(*stack, *ws->bufferMask, tmpWs.range, stack);
+      stackSubRLegacyLike(stack, *ws.bufferMask, tmpWs.range, stack);
     }
 
     // Clean the buffer mask.
     tmpWs.option = 1;
     tmpWs.value = 0;
     tmpWs.flag = 1;
-    locsegChainLabelWLegacyLike(chain, ws->bufferMask.get(), zScale, begin, end, &tmpWs);
+    locsegChainLabelWLegacyLike(chain, *ws.bufferMask, zScale, begin, end, tmpWs);
     return;
   }
 

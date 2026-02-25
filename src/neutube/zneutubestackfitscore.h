@@ -18,7 +18,7 @@ namespace nim::neutube {
 [[nodiscard]] double computeStackFitScoresLegacyLike(const double* fieldValues,
                                                      const double* signalValues,
                                                      size_t length,
-                                                     StackFitScore* fs);
+                                                     /*nullable*/ StackFitScore* fs);
 
 // Port of the `Stack_Fit_Score` switch logic used by legacy
 // `Geo3d_Scalar_Field_Stack_Score_M()` (masked sampling variant).
@@ -31,6 +31,6 @@ namespace nim::neutube {
 [[nodiscard]] double computeStackFitScoresMaskedLegacyLike(const double* fieldValues,
                                                            const double* signalValues,
                                                            size_t length,
-                                                           StackFitScore* fs);
+                                                           /*nullable*/ StackFitScore* fs);
 
 } // namespace nim::neutube

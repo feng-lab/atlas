@@ -67,7 +67,7 @@ public:
 
   void sample(const ZImg& img, double (*f)(double));
 
-  void labelImgWithBall(ZImg* img, uint8_t label) const;
+  void labelImgWithBall(ZImg& img, uint8_t label) const;
 
 private:
   TVector m_voxels;

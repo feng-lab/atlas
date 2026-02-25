@@ -16,7 +16,7 @@ struct BinarizeResultLegacyLike
 // Port of ZStackProcessor::SubtractBackground(Stack*, double, int).
 //
 // Returns the subtracted background intensity (0 means no-op), matching legacy.
-int subtractBackgroundLegacyLike(ZImg* stack, double minFr, int maxIter);
+int subtractBackgroundLegacyLike(ZImg& stack, double minFr, int maxIter);
 
 // Port of ZNeuronTracer::binarize(const Stack*, Stack*).
 //

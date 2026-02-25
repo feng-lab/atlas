@@ -4,33 +4,30 @@
 
 namespace nim::neutube {
 
-void defaultNeurocompConnLegacyLike(NeurocompConnLegacyLike* conn)
+void defaultNeurocompConnLegacyLike(NeurocompConnLegacyLike& conn)
 {
-  CHECK(conn != nullptr);
-  conn->mode = NeurocompConnModeLegacyLike::None;
-  conn->info[0] = 0;
-  conn->info[1] = 0;
-  conn->pos = {0.0, 0.0, 0.0};
-  conn->ort = {0.0, 0.0, 0.0};
-  conn->cost = 0.0;
-  conn->pdist = -1.0;
-  conn->sdist = -1.0;
+  conn.mode = NeurocompConnModeLegacyLike::None;
+  conn.info[0] = 0;
+  conn.info[1] = 0;
+  conn.pos = {0.0, 0.0, 0.0};
+  conn.ort = {0.0, 0.0, 0.0};
+  conn.cost = 0.0;
+  conn.pdist = -1.0;
+  conn.sdist = -1.0;
 }
 
-void neurocompConnTranslateModeLegacyLike(int len2, NeurocompConnLegacyLike* conn)
+void neurocompConnTranslateModeLegacyLike(int len2, NeurocompConnLegacyLike& conn)
 {
-  CHECK(conn != nullptr);
-
-  if (conn->mode != NeurocompConnModeLegacyLike::HookLoop) {
+  if (conn.mode != NeurocompConnModeLegacyLike::HookLoop) {
     return;
   }
 
-  if (conn->info[1] <= 0) {
-    conn->mode = NeurocompConnModeLegacyLike::Link;
-    conn->info[1] = 0;
-  } else if (conn->info[1] >= len2 - 1) {
-    conn->mode = NeurocompConnModeLegacyLike::Link;
-    conn->info[1] = 1;
+  if (conn.info[1] <= 0) {
+    conn.mode = NeurocompConnModeLegacyLike::Link;
+    conn.info[1] = 0;
+  } else if (conn.info[1] >= len2 - 1) {
+    conn.mode = NeurocompConnModeLegacyLike::Link;
+    conn.info[1] = 1;
   }
 }
 

@@ -58,19 +58,25 @@ struct Geo3dScalarField
                                                                                 size_t t = 0);
 
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Score().
+//
+// Notes:
+// - `fs` is optional; pass nullptr to compute only the legacy default dot score.
 [[nodiscard]] double geo3dScalarFieldStackScoreLegacyLike(const Geo3dScalarField& field,
                                                           const ZImg& stack,
                                                           double zScale,
-                                                          StackFitScore* fs,
+                                                          /*nullable*/ StackFitScore* fs,
                                                           size_t c = 0,
                                                           size_t t = 0);
 
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Score_M().
+//
+// Notes:
+// - `fs` is optional; pass nullptr to compute only the legacy default dot-nw score.
 [[nodiscard]] double geo3dScalarFieldStackScoreMaskedLegacyLike(const Geo3dScalarField& field,
                                                                 const ZImg& stack,
                                                                 double zScale,
                                                                 const ZImg& mask,
-                                                                StackFitScore* fs,
+                                                                /*nullable*/ StackFitScore* fs,
                                                                 size_t c = 0,
                                                                 size_t t = 0);
 

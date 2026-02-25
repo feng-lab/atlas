@@ -25,6 +25,6 @@ struct SeedSortResultLegacyLike
 //   - 2 when its score exceeds `tw->minScore`,
 //   - 1 otherwise.
 [[nodiscard]] SeedSortResultLegacyLike
-sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace* tw);
+sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw);
 
 } // namespace nim::neutube

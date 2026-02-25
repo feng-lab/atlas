@@ -85,18 +85,17 @@ void ZNeutubeVoxelArray::sample(const ZImg& img, double (*f)(double))
   }
 }
 
-void ZNeutubeVoxelArray::labelImgWithBall(ZImg* img, uint8_t label) const
+void ZNeutubeVoxelArray::labelImgWithBall(ZImg& img, uint8_t label) const
 {
-  CHECK(img != nullptr);
-  CHECK(img->numChannels() == 1);
-  CHECK(img->numTimes() == 1);
-  CHECK(img->isType<uint8_t>()) << img->info();
+  CHECK(img.numChannels() == 1);
+  CHECK(img.numTimes() == 1);
+  CHECK(img.isType<uint8_t>()) << img.info();
 
-  const int width = static_cast<int>(img->width());
-  const int height = static_cast<int>(img->height());
-  const int depth = static_cast<int>(img->depth());
+  const int width = static_cast<int>(img.width());
+  const int height = static_cast<int>(img.height());
+  const int depth = static_cast<int>(img.depth());
 
-  uint8_t* out = img->timeData<uint8_t>(0);
+  uint8_t* out = img.timeData<uint8_t>(0);
   const int area = width * height;
 
   for (const auto& center : m_voxels) {

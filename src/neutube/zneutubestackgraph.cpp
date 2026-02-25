@@ -7,26 +7,24 @@
 
 namespace nim::neutube {
 
-void defaultStackGraphWorkspaceLegacyLike(StackGraphWorkspaceLegacyLike* sgw)
+void defaultStackGraphWorkspaceLegacyLike(StackGraphWorkspaceLegacyLike& sgw)
 {
-  CHECK(sgw != nullptr);
-
-  sgw->conn = 26;
-  sgw->range.reset();
-  sgw->weightFunc = &stackVoxelWeightSLegacyLike;
-  sgw->spOption = 0;
-  sgw->resolution = {1.0, 1.0, 1.0};
-  sgw->argv.fill(std::numeric_limits<double>::quiet_NaN());
-  sgw->groupMask.reset();
-  sgw->signalMask = nullptr;
-  sgw->value = 0.0;
-  sgw->virtualVertex = -1;
-  sgw->includingSignalBorder = false;
-  sgw->greyFactor = 1.0;
-  sgw->greyOffset = 0.0;
+  sgw.conn = 26;
+  sgw.range.reset();
+  sgw.weightFunc = &stackVoxelWeightSLegacyLike;
+  sgw.spOption = 0;
+  sgw.resolution = {1.0, 1.0, 1.0};
+  sgw.argv.fill(std::numeric_limits<double>::quiet_NaN());
+  sgw.groupMask.reset();
+  sgw.signalMask = nullptr;
+  sgw.value = 0.0;
+  sgw.virtualVertex = -1;
+  sgw.includingSignalBorder = false;
+  sgw.greyFactor = 1.0;
+  sgw.greyOffset = 0.0;
 }
 
-void stackGraphWorkspaceSetRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw,
+void stackGraphWorkspaceSetRangeLegacyLike(StackGraphWorkspaceLegacyLike& sgw,
                                            int x0,
                                            int x1,
                                            int y0,
@@ -34,8 +32,6 @@ void stackGraphWorkspaceSetRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw,
                                            int z0,
                                            int z1)
 {
-  CHECK(sgw != nullptr);
-
   std::array<int, 6> r = {x0, x1, y0, y1, z0, z1};
   if (r[0] > r[1]) {
     std::swap(r[0], r[1]);
@@ -47,15 +43,14 @@ void stackGraphWorkspaceSetRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw,
     std::swap(r[4], r[5]);
   }
 
-  sgw->range = r;
+  sgw.range = r;
 }
 
-void stackGraphWorkspaceUpdateRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw, int x, int y, int z)
+void stackGraphWorkspaceUpdateRangeLegacyLike(StackGraphWorkspaceLegacyLike& sgw, int x, int y, int z)
 {
-  CHECK(sgw != nullptr);
-  CHECK(sgw->range.has_value());
+  CHECK(sgw.range.has_value());
 
-  std::array<int, 6>& r = *sgw->range;
+  std::array<int, 6>& r = *sgw.range;
 
   if (x < r[0]) {
     r[0] = x;
@@ -76,7 +71,7 @@ void stackGraphWorkspaceUpdateRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw
   }
 }
 
-void stackGraphWorkspaceExpandRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw,
+void stackGraphWorkspaceExpandRangeLegacyLike(StackGraphWorkspaceLegacyLike& sgw,
                                               int mx0,
                                               int mx1,
                                               int my0,
@@ -84,10 +79,9 @@ void stackGraphWorkspaceExpandRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw
                                               int mz0,
                                               int mz1)
 {
-  CHECK(sgw != nullptr);
-  CHECK(sgw->range.has_value());
+  CHECK(sgw.range.has_value());
 
-  std::array<int, 6>& r = *sgw->range;
+  std::array<int, 6>& r = *sgw.range;
   r[0] -= mx0;
   r[1] += mx1;
   r[2] -= my0;
@@ -96,12 +90,11 @@ void stackGraphWorkspaceExpandRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw
   r[5] += mz1;
 }
 
-void stackGraphWorkspaceValidateRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw, int width, int height, int depth)
+void stackGraphWorkspaceValidateRangeLegacyLike(StackGraphWorkspaceLegacyLike& sgw, int width, int height, int depth)
 {
-  CHECK(sgw != nullptr);
-  CHECK(sgw->range.has_value());
+  CHECK(sgw.range.has_value());
 
-  std::array<int, 6>& r = *sgw->range;
+  std::array<int, 6>& r = *sgw.range;
 
   if (r[0] < 0) {
     r[0] = 0;

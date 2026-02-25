@@ -24,12 +24,12 @@ struct NeurocompConnLegacyLike
   double sdist = -1.0;
 };
 
-void defaultNeurocompConnLegacyLike(NeurocompConnLegacyLike* conn);
+void defaultNeurocompConnLegacyLike(NeurocompConnLegacyLike& conn);
 
 // Port of `tz_neurocomp_conn.c::Neurocomp_Conn_Translate_Mode()`.
 //
 // The legacy helper translates HookLoop into Link mode when the loop position
 // is at an endpoint of the second component.
-void neurocompConnTranslateModeLegacyLike(int len2, NeurocompConnLegacyLike* conn);
+void neurocompConnTranslateModeLegacyLike(int len2, NeurocompConnLegacyLike& conn);
 
 } // namespace nim::neutube

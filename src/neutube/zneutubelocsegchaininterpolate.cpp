@@ -28,15 +28,13 @@ namespace {
 
 } // namespace
 
-int locsegChainInterpolateLLegacyLike(LocsegChain* chain,
+int locsegChainInterpolateLLegacyLike(LocsegChain& chain,
                                       const std::array<double, 3>& pt,
                                       const std::array<double, 3>* ort,
                                       std::array<double, 3>* newPos)
 {
   // Port of tz_locseg_chain.c::Locseg_Chain_Interpolate_L().
-  CHECK(chain != nullptr);
-
-  const auto kaOpt = locsegChainToKnotArrayLegacyLike(*chain);
+  const auto kaOpt = locsegChainToKnotArrayLegacyLike(chain);
   CHECK(kaOpt.has_value()) << "locsegChainInterpolateLLegacyLike requires a non-empty chain";
 
   const LocsegChainKnotArrayLegacyLike& ka = *kaOpt;
@@ -60,13 +58,13 @@ int locsegChainInterpolateLLegacyLike(LocsegChain* chain,
     startPos = locsegChainKnotPosLegacyLike(ka, 0);
     endPos = locsegChainKnotPosLegacyLike(ka, 1);
 
-    minDist = geo3dPointLineSegDist(pt, startPos, endPos, &lambda1);
+    minDist = geo3dPointLineSegDist(pt, startPos, endPos, lambda1);
     lambda = lambda1;
 
     for (int i = 2; i < n; ++i) {
       startPos = endPos;
       endPos = locsegChainKnotPosLegacyLike(ka, i);
-      const double dist = geo3dPointLineSegDist(pt, startPos, endPos, &lambda1);
+      const double dist = geo3dPointLineSegDist(pt, startPos, endPos, lambda1);
       if (dist < minDist) {
         minDist = dist;
         minIndex = i - 1;
@@ -86,14 +84,13 @@ int locsegChainInterpolateLLegacyLike(LocsegChain* chain,
     endPos = locsegChainKnotPosLegacyLike(ka, 1);
 
     int cond = 0;
-    minDist = geo3dLineSegLineSegDistLegacyLike(startPos, endPos, segStart, segEnd, &lambda1, &lambda2, &cond);
+    minDist = geo3dLineSegLineSegDistLegacyLike(startPos, endPos, segStart, segEnd, lambda1, lambda2, cond);
     lambda = lambda1;
 
     for (int i = 2; i < n; ++i) {
       startPos = endPos;
       endPos = locsegChainKnotPosLegacyLike(ka, i);
-      const double dist =
-        geo3dLineSegLineSegDistLegacyLike(startPos, endPos, segStart, segEnd, &lambda1, &lambda2, &cond);
+      const double dist = geo3dLineSegLineSegDistLegacyLike(startPos, endPos, segStart, segEnd, lambda1, lambda2, cond);
       if (dist < minDist) {
         minDist = dist;
         minIndex = i - 1;
@@ -136,31 +133,31 @@ int locsegChainInterpolateLLegacyLike(LocsegChain* chain,
 
     std::optional<LocalNeuroseg> insertedSeg;
     TraceRecord insertedTr{};
-    traceRecordReset(&insertedTr);
+    traceRecordReset(insertedTr);
 
     if (nextKnot->id == knot->id) {
       // break in the same locseg
       CHECK((knot->offset == 0.0) || (nextKnot->offset == 1.0)) << "Invalid knots";
 
-      LocalNeuroseg* prevLocseg = chain->segAt(knot->id);
+      LocalNeuroseg* prevLocseg = chain.segAt(knot->id);
       CHECK(prevLocseg != nullptr);
 
       if (prevLocseg->seg.h > 1.0) {
         const double alpha = knot->offset * (1.0 - lambda) + nextKnot->offset * lambda;
 
         insertedSeg = *prevLocseg;
-        localNeurosegChopLegacyLike(prevLocseg, alpha);
-        localNeurosegChopLegacyLike(&(*insertedSeg), -alpha);
+        localNeurosegChopLegacyLike(*prevLocseg, alpha);
+        localNeurosegChopLegacyLike(*insertedSeg, -alpha);
 
-        LocsegNode* node = chain->nodeAt(knot->id);
+        LocsegNode* node = chain.nodeAt(knot->id);
         CHECK(node != nullptr);
 
         if (knot->offset == 0.0) {
-          traceRecordSetFixPoint(&node->tr, 1.0);
-          traceRecordSetFixPoint(&insertedTr, nextKnot->offset * (1.0 - alpha) / (1.0 - alpha * nextKnot->offset));
+          traceRecordSetFixPoint(node->tr, 1.0);
+          traceRecordSetFixPoint(insertedTr, nextKnot->offset * (1.0 - alpha) / (1.0 - alpha * nextKnot->offset));
         } else if (nextKnot->offset == 1.0) {
-          traceRecordSetFixPoint(&node->tr, knot->offset / (knot->offset + alpha * (1.0 - knot->offset)));
-          traceRecordSetFixPoint(&insertedTr, 0.0);
+          traceRecordSetFixPoint(node->tr, knot->offset / (knot->offset + alpha * (1.0 - knot->offset)));
+          traceRecordSetFixPoint(insertedTr, 0.0);
         } else {
           CHECK(false) << "Invalid knots for same-id interpolation";
         }
@@ -168,13 +165,13 @@ int locsegChainInterpolateLLegacyLike(LocsegChain* chain,
         LocsegNode newNode;
         newNode.locseg = *insertedSeg;
         newNode.tr = insertedTr;
-        (void)chain->insertNodeAt(knot->id + 1, std::move(newNode));
+        (void)chain.insertNodeAt(knot->id + 1, std::move(newNode));
         index = knot->id + 1;
       }
     } else {
       // break in different segments
-      LocsegNode* node1 = chain->nodeAt(knot->id);
-      LocsegNode* node2 = chain->nodeAt(nextKnot->id);
+      LocsegNode* node1 = chain.nodeAt(knot->id);
+      LocsegNode* node2 = chain.nodeAt(nextKnot->id);
       CHECK(node1 != nullptr);
       CHECK(node2 != nullptr);
 
@@ -182,20 +179,20 @@ int locsegChainInterpolateLLegacyLike(LocsegChain* chain,
       const double r2 = neurosegRyTLegacyLike(node2->locseg.seg, nextKnot->offset);
 
       LocalNeuroseg locseg = node1->locseg;
-      setNeurosegPositionLegacyLike(&locseg, insertion, NeuroposReferenceLegacyLike::Bottom);
+      setNeurosegPositionLegacyLike(locseg, insertion, NeuroposReferenceLegacyLike::Bottom);
       locseg.seg.h = 1.0;
       if (r1 != r2) {
         locseg.seg.r1 = r1 * (1.0 - lambda) + r2 * lambda;
       }
 
-      traceRecordSetFixPoint(&node2->tr, nextKnot->offset);
+      traceRecordSetFixPoint(node2->tr, nextKnot->offset);
 
-      traceRecordSetFixPoint(&insertedTr, 0.0);
+      traceRecordSetFixPoint(insertedTr, 0.0);
 
       LocsegNode newNode;
       newNode.locseg = locseg;
       newNode.tr = insertedTr;
-      (void)chain->insertNodeAt(nextKnot->id, std::move(newNode));
+      (void)chain.insertNodeAt(nextKnot->id, std::move(newNode));
       index = nextKnot->id;
 
       insertedSeg = locseg;

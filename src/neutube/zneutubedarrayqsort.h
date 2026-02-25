@@ -8,6 +8,6 @@ namespace nim::neutube {
 //
 // Sorts `values` in-place (ascending) and optionally returns the permutation indices in `outIndices`.
 // The algorithm is intentionally identical to the legacy iterative quicksort to preserve tie behavior.
-void darrayQsortLegacy(std::vector<double>* values, std::vector<int>* outIndices);
+void darrayQsortLegacy(std::vector<double>& values, /*nullable*/ std::vector<int>* outIndices);
 
 } // namespace nim::neutube

@@ -27,7 +27,7 @@ struct LineSearchWorkspace
 };
 
 // Port of tz_optimize_utils.c::Set_Line_Search_Workspace().
-void setLineSearchWorkspaceLegacyLike(LineSearchWorkspace* lsw,
+void setLineSearchWorkspaceLegacyLike(LineSearchWorkspace& lsw,
                                       double alpha,
                                       double ro,
                                       double c1,
@@ -38,13 +38,19 @@ void setLineSearchWorkspaceLegacyLike(LineSearchWorkspace* lsw,
 //
 // Notes:
 // - Preserves the legacy in-place scaling of `direction` when `weight != nullptr`.
-[[nodiscard]] bool lineSearchVarBacktrackLegacyLike(VariableSet* vs,
+//
+// Pointer-parameter semantics:
+// - `param` is forwarded as an opaque context pointer to `cf.f(...)` (legacy API).
+// - `delta` is currently unused by the legacy backtracking routine but preserved for signature parity.
+// - `weight` is optional; when non-null it scales `direction[i]` in-place before the line-search.
+// - `direction` is an in/out array of length `vs.nvar`.
+[[nodiscard]] bool lineSearchVarBacktrackLegacyLike(VariableSet& vs,
                                                     const void* param,
-                                                    const ContinuousFunction* cf,
+                                                    const ContinuousFunction& cf,
                                                     const double* delta,
-                                                    const double* weight,
+                                                    /*nullable*/ const double* weight,
                                                     double* direction,
-                                                    LineSearchWorkspace* lsw);
+                                                    LineSearchWorkspace& lsw);
 
 // Port of tz_optimize_utils.c::Conjugate_Update_Direction() (Polak-Ribiere+).
 void conjugateUpdateDirectionLegacyLike(int nvar, const double* grad, const double* prevGrad, double* direction);

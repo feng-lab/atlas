@@ -49,22 +49,21 @@ void scaleXRotateZLegacyLike(std::array<double, 3>* p, double s, double alpha, i
   }
 }
 
-[[nodiscard]] bool writeMaskVoxel(ZImg* mask, size_t x, size_t y, size_t z, int value)
+[[nodiscard]] bool writeMaskVoxel(ZImg& mask, size_t x, size_t y, size_t z, int value)
 {
-  CHECK(mask != nullptr);
-  CHECK(mask->numChannels() == 1);
-  CHECK(mask->numTimes() == 1);
+  CHECK(mask.numChannels() == 1);
+  CHECK(mask.numTimes() == 1);
 
-  if (mask->isType<uint8_t>()) {
-    *mask->data<uint8_t>(x, y, z) = static_cast<uint8_t>(value);
+  if (mask.isType<uint8_t>()) {
+    *mask.data<uint8_t>(x, y, z) = static_cast<uint8_t>(value);
     return true;
   }
-  if (mask->isType<uint16_t>()) {
-    *mask->data<uint16_t>(x, y, z) = static_cast<uint16_t>(value);
+  if (mask.isType<uint16_t>()) {
+    *mask.data<uint16_t>(x, y, z) = static_cast<uint16_t>(value);
     return true;
   }
 
-  CHECK(false) << "Unsupported mask voxel type: " << mask->info();
+  CHECK(false) << "Unsupported mask voxel type: " << mask.info();
   return false;
 }
 
@@ -128,20 +127,19 @@ FieldRangeLegacyLike neurosegFieldRangeLegacyLike(const Neuroseg& seg, double zS
   return out;
 }
 
-void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZImg* mask, double zScale, int value)
+void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZImg& mask, double zScale, int value)
 {
   // Port of tz_local_neuroseg.c::Local_Neuroseg_Label_C().
-  CHECK(mask != nullptr);
-  CHECK(mask->numChannels() == 1);
-  CHECK(mask->numTimes() == 1);
+  CHECK(mask.numChannels() == 1);
+  CHECK(mask.numTimes() == 1);
 
-  if (mask->isEmpty()) {
+  if (mask.isEmpty()) {
     return;
   }
 
-  const size_t width = mask->width();
-  const size_t height = mask->height();
-  const size_t depth = mask->depth();
+  const size_t width = mask.width();
+  const size_t height = mask.height();
+  const size_t depth = mask.depth();
 
   const std::array<double, 3> bottom = localNeurosegBottomLegacyLike(locseg);
 
@@ -208,20 +206,19 @@ void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZImg* mask, doub
   }
 }
 
-void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center, double radius, ZImg* mask, int value)
+void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center, double radius, ZImg& mask, int value)
 {
   // Port of tz_geo3d_ball.c::Geo3d_Ball_Label_Stack().
-  CHECK(mask != nullptr);
-  CHECK(mask->numChannels() == 1);
-  CHECK(mask->numTimes() == 1);
+  CHECK(mask.numChannels() == 1);
+  CHECK(mask.numTimes() == 1);
 
-  if (mask->isEmpty()) {
+  if (mask.isEmpty()) {
     return;
   }
 
-  const int width = static_cast<int>(mask->width());
-  const int height = static_cast<int>(mask->height());
-  const int depth = static_cast<int>(mask->depth());
+  const int width = static_cast<int>(mask.width());
+  const int height = static_cast<int>(mask.height());
+  const int depth = static_cast<int>(mask.depth());
 
   std::array<int, 3> cb{};
   std::array<int, 3> ce{};
@@ -249,11 +246,9 @@ void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center, double r
   }
 }
 
-void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZImg* mask, double zScale, int value)
+void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZImg& mask, double zScale, int value)
 {
   // Port of ZSwcTree::labelStack(Stack*) -> Swc_Tree_Node_Label_Stack().
-  CHECK(mask != nullptr);
-
   for (auto it = swc.cbeginBreadthFirst(); it != swc.cendBreadthFirst(); ++it) {
     if (ZSwc::isNull(it)) {
       continue;

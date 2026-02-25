@@ -213,19 +213,15 @@ geo3dEllipseInterpolateLegacyLike(const Geo3dEllipseLegacyLike& start, const Geo
     double endNormal[3];
     geo3dOrientationNormalLegacyLike(start.orientation[0],
                                      start.orientation[1],
-                                     &startNormal[0],
-                                     &startNormal[1],
-                                     &startNormal[2]);
-    geo3dOrientationNormalLegacyLike(end.orientation[0],
-                                     end.orientation[1],
-                                     &endNormal[0],
-                                     &endNormal[1],
-                                     &endNormal[2]);
+                                     startNormal[0],
+                                     startNormal[1],
+                                     startNormal[2]);
+    geo3dOrientationNormalLegacyLike(end.orientation[0], end.orientation[1], endNormal[0], endNormal[1], endNormal[2]);
 
     const double normal[3] = {alpha * startNormal[0] + lambda * endNormal[0],
                               alpha * startNormal[1] + lambda * endNormal[1],
                               alpha * startNormal[2] + lambda * endNormal[2]};
-    geo3dNormalOrientationLegacyLike(normal[0], normal[1], normal[2], &out.orientation[0], &out.orientation[1]);
+    geo3dNormalOrientationLegacyLike(normal[0], normal[1], normal[2], out.orientation[0], out.orientation[1]);
   }
 
   if (start.alpha != 0.0 || end.alpha != 0.0) {

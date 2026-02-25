@@ -28,12 +28,10 @@ double stackVoxelWeightILegacyLike(double* argv)
   return d / (1.0 + v1) + d / (1.0 + v2);
 }
 
-void stackSpGrowInferParameterLegacyLike(SpGrowWorkspace* sgw, const ZImg& stack)
+void stackSpGrowInferParameterLegacyLike(SpGrowWorkspace& sgw, const ZImg& stack)
 {
-  CHECK(sgw != nullptr);
-
   // Port of tz_sp_grow.c::Stack_Sp_Grow_Infer_Parameter().
-  if (sgw->weightFunc != &stackVoxelWeightSLegacyLike) {
+  if (sgw.weightFunc != &stackVoxelWeightSLegacyLike) {
     return;
   }
 
@@ -46,14 +44,14 @@ void stackSpGrowInferParameterLegacyLike(SpGrowWorkspace* sgw, const ZImg& stack
 
   double c1 = 0.0;
   double c2 = 0.0;
-  const int thre = rcthreRLegacyLike(hist, hist.minValue(), hist.maxValue(), &c1, &c2);
+  const int thre = rcthreRLegacyLike(hist, hist.minValue(), hist.maxValue(), c1, c2);
 
-  sgw->argv[3] = static_cast<double>(thre);
-  sgw->argv[4] = c2 - c1;
-  if (sgw->argv[4] < 1.0) {
-    sgw->argv[4] = 1.0;
+  sgw.argv[3] = static_cast<double>(thre);
+  sgw.argv[4] = c2 - c1;
+  if (sgw.argv[4] < 1.0) {
+    sgw.argv[4] = 1.0;
   }
-  sgw->argv[4] /= 9.2;
+  sgw.argv[4] /= 9.2;
 }
 
 namespace {
@@ -398,33 +396,31 @@ void updateWaiting(const ZImg& stack,
 
 } // namespace
 
-void stackSpGrow(const ZImg& stack, SpGrowWorkspace* sgw)
+void stackSpGrow(const ZImg& stack, SpGrowWorkspace& sgw)
 {
-  CHECK(sgw != nullptr);
   CHECK(stack.numChannels() == 1);
   CHECK(stack.numTimes() == 1);
 
-  (void)stackSpGrowInternalLegacyLike(stack, *sgw);
+  (void)stackSpGrowInternalLegacyLike(stack, sgw);
 }
 
-std::vector<int64_t> stackSpGrowPathLegacyLike(const ZImg& stack, SpGrowWorkspace* sgw)
+std::vector<int64_t> stackSpGrowPathLegacyLike(const ZImg& stack, SpGrowWorkspace& sgw)
 {
-  CHECK(sgw != nullptr);
   CHECK(stack.numChannels() == 1);
   CHECK(stack.numTimes() == 1);
 
-  const int lastR = stackSpGrowInternalLegacyLike(stack, *sgw);
+  const int lastR = stackSpGrowInternalLegacyLike(stack, sgw);
   if (lastR < 0) {
     return {};
   }
 
-  sgw->value = sgw->dist[static_cast<size_t>(lastR)];
+  sgw.value = sgw.dist[static_cast<size_t>(lastR)];
 
   std::vector<int64_t> path;
   int idx = lastR;
   while (idx >= 0) {
     path.push_back(static_cast<int64_t>(idx));
-    const int next = sgw->path[static_cast<size_t>(idx)];
+    const int next = sgw.path[static_cast<size_t>(idx)];
     CHECK(next != idx);
     idx = next;
   }

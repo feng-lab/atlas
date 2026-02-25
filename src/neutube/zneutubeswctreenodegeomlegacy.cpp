@@ -92,9 +92,8 @@ bool swcNodesFormingTurnLegacyLike(const ZSwc::ConstSwcTreeNode& tn1,
   return !(dot > 0.0);
 }
 
-std::vector<ZSwc::SwcTreeNode> swcNeighborArrayLegacyLike(ZSwc* swc, const ZSwc::SwcTreeNode& node)
+std::vector<ZSwc::SwcTreeNode> swcNeighborArrayLegacyLike(ZSwc& swc, const ZSwc::SwcTreeNode& node)
 {
-  CHECK(swc != nullptr);
   if (ZSwc::isNull(node)) {
     return {};
   }
@@ -107,7 +106,7 @@ std::vector<ZSwc::SwcTreeNode> swcNeighborArrayLegacyLike(ZSwc* swc, const ZSwc:
     out.push_back(p);
   }
 
-  for (auto child = swc->beginChild(node); child != swc->endChild(node); ++child) {
+  for (auto child = swc.beginChild(node); child != swc.endChild(node); ++child) {
     out.push_back(child);
   }
 

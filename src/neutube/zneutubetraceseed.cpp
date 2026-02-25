@@ -151,21 +151,19 @@ Geo3dScalarField removeTracedSeedLegacyLike(const Geo3dScalarField& seeds, const
 }
 
 Geo3dScalarField removeNoisySeedLegacyLike(Geo3dScalarField seeds,
-                                           ZImg* mask,
+                                           ZImg& mask,
                                            int seedMethod,
                                            bool screeningSeed,
                                            RemoveNoisySeedDiagnosticsLegacyLike* diag)
 {
-  CHECK(mask != nullptr);
-
-  if (mask->isEmpty()) {
+  if (mask.isEmpty()) {
     seeds.points.clear();
     seeds.values.clear();
     return seeds;
   }
 
   const double seedDensity =
-    (mask->voxelNumber() == 0) ? 0.0 : static_cast<double>(seeds.size()) / static_cast<double>(mask->voxelNumber());
+    (mask.voxelNumber() == 0) ? 0.0 : static_cast<double>(seeds.size()) / static_cast<double>(mask.voxelNumber());
   const int minSeedSize = minSeedObjSizeLegacyLike(seedDensity, screeningSeed);
 
   if (diag != nullptr) {
@@ -177,11 +175,11 @@ Geo3dScalarField removeNoisySeedLegacyLike(Geo3dScalarField seeds,
     return seeds;
   }
 
-  *mask = removeSmallObjectsLegacyLike(*mask, minSeedSize, /*connectivity*/ 26);
+  mask = removeSmallObjectsLegacyLike(mask, minSeedSize, /*connectivity*/ 26);
 
   switch (seedMethod) {
     case 1:
-      return extractSeedOriginalLegacyLike(*mask);
+      return extractSeedOriginalLegacyLike(mask);
     case 2:
       LOG(ERROR) << "removeNoisySeedLegacyLike: seedMethod=2 (skeleton seeding) not supported yet.";
       seeds.points.clear();

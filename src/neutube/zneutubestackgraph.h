@@ -17,6 +17,9 @@ namespace nim::neutube {
 // - `groupMask` is owned by the workspace and allocated lazily by the shortest-path helpers.
 struct StackGraphWorkspaceLegacyLike
 {
+  // Legacy callback signature: `argv` points to a small fixed-layout array.
+  // It is treated as read-only by our ports, but must remain a pointer to match
+  // the legacy function-pointer type.
   using WeightFunc = double (*)(double* argv);
 
   int conn = 26;
@@ -54,9 +57,9 @@ struct StackGraphWorkspaceLegacyLike
   double greyOffset = 0.0;
 };
 
-void defaultStackGraphWorkspaceLegacyLike(StackGraphWorkspaceLegacyLike* sgw);
+void defaultStackGraphWorkspaceLegacyLike(StackGraphWorkspaceLegacyLike& sgw);
 
-void stackGraphWorkspaceSetRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw,
+void stackGraphWorkspaceSetRangeLegacyLike(StackGraphWorkspaceLegacyLike& sgw,
                                            int x0,
                                            int x1,
                                            int y0,
@@ -64,9 +67,9 @@ void stackGraphWorkspaceSetRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw,
                                            int z0,
                                            int z1);
 
-void stackGraphWorkspaceUpdateRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw, int x, int y, int z);
+void stackGraphWorkspaceUpdateRangeLegacyLike(StackGraphWorkspaceLegacyLike& sgw, int x, int y, int z);
 
-void stackGraphWorkspaceExpandRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw,
+void stackGraphWorkspaceExpandRangeLegacyLike(StackGraphWorkspaceLegacyLike& sgw,
                                               int mx0,
                                               int mx1,
                                               int my0,
@@ -74,10 +77,11 @@ void stackGraphWorkspaceExpandRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw
                                               int mz0,
                                               int mz1);
 
-void stackGraphWorkspaceValidateRangeLegacyLike(StackGraphWorkspaceLegacyLike* sgw, int width, int height, int depth);
+void stackGraphWorkspaceValidateRangeLegacyLike(StackGraphWorkspaceLegacyLike& sgw, int width, int height, int depth);
 
 // Port of tz_stack_graph.c::Stack_Voxel_Weight_S().
 // argv layout: [0]=d, [1]=v1, [2]=v2, [3]=thre, [4]=scale.
+// `argv` must be non-null and point to at least 5 doubles (see layout above).
 [[nodiscard]] double stackVoxelWeightSLegacyLike(double* argv);
 
 } // namespace nim::neutube

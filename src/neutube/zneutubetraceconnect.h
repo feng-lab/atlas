@@ -27,7 +27,7 @@ namespace nim::neutube {
 //
 // `hostRoots` must contain only the host SWC roots (excluding the just-added traced branch root),
 // to match legacy `identifyConnection(branch, host)` behavior.
-void connectBranchToHostLegacyLike(ZSwc* swc,
+void connectBranchToHostLegacyLike(ZSwc& swc,
                                    const std::vector<ZSwc::SwcTreeNode>& hostRoots,
                                    ZSwc::SwcTreeNode branchRoot,
                                    const ZImg& stack);

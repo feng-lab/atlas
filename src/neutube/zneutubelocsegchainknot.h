@@ -32,9 +32,9 @@ locsegChainKnotArrayAtLegacyLike(const LocsegChainKnotArrayLegacyLike& ka, int i
 [[nodiscard]] const LocsegChainKnotLegacyLike*
 locsegChainKnotArrayLastLegacyLike(const LocsegChainKnotArrayLegacyLike& ka);
 
-void locsegChainKnotArrayAppendLegacyLike(LocsegChainKnotArrayLegacyLike* ka, LocsegChainKnotLegacyLike knot);
+void locsegChainKnotArrayAppendLegacyLike(LocsegChainKnotArrayLegacyLike& ka, LocsegChainKnotLegacyLike knot);
 
-void locsegChainKnotArrayAppendUniqueLegacyLike(LocsegChainKnotArrayLegacyLike* ka, LocsegChainKnotLegacyLike knot);
+void locsegChainKnotArrayAppendUniqueLegacyLike(LocsegChainKnotArrayLegacyLike& ka, LocsegChainKnotLegacyLike knot);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_To_Knot_Array().
 //

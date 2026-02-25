@@ -29,7 +29,7 @@ constexpr int NeurosegCircleRxLegacyLike = 0;
   for (const auto& node : *ka.chain) {
     LocalNeuroseg locseg2 = node.locseg;
     if (zScale != 1.0) {
-      localNeurosegScaleZLegacyLike(&locseg2, zScale);
+      localNeurosegScaleZLegacyLike(locseg2, zScale);
     }
 
     const LocsegChainKnotLegacyLike* knot = locsegChainKnotArrayAtLegacyLike(ka, knotIndex);

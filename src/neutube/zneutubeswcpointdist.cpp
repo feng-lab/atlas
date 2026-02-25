@@ -138,19 +138,17 @@ struct SegmentDistResult
 
 } // namespace
 
-SwcPointDistResult swcTreePointDist(ZSwc* tree, double x, double y, double z)
+SwcPointDistResult swcTreePointDist(ZSwc& tree, double x, double y, double z)
 {
   return swcTreePointDist(tree, x, y, z, ZSwc::SwcTreeNode{});
 }
 
-SwcPointDistResult swcTreePointDist(ZSwc* tree, double x, double y, double z, const ZSwc::SwcTreeNode& excludeRoot)
+SwcPointDistResult swcTreePointDist(ZSwc& tree, double x, double y, double z, const ZSwc::SwcTreeNode& excludeRoot)
 {
-  CHECK(tree != nullptr);
-
   SwcPointDistResult out;
   const std::array<double, 3> point = {x, y, z};
 
-  for (auto it = tree->begin(); it != tree->end(); ++it) {
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
     if (ZSwc::isRoot(it)) {
       continue;
     }

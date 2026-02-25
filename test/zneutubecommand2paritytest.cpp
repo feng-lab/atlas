@@ -309,9 +309,9 @@ TEST(NeutubeTracePortsParity, LocalNeurosegLabelG_MatchesLegacyC)
   seg.seg.scale = 1.0;
 
   const std::array<double, 3> pos = {30.0, 31.0, 15.0};
-  nim::neutube::setNeurosegPositionLegacyLike(&seg, pos, nim::neutube::NeuroposReferenceLegacyLike::Center);
+  nim::neutube::setNeurosegPositionLegacyLike(seg, pos, nim::neutube::NeuroposReferenceLegacyLike::Center);
 
-  nim::neutube::localNeurosegLabelGLegacyLike(seg, &ported, /*flag*/ -1, /*value*/ 2, /*zScale*/ 1.0);
+  nim::neutube::localNeurosegLabelGLegacyLike(seg, ported, /*flag*/ -1, /*value*/ 2, /*zScale*/ 1.0);
 
   Stack* legacy = Make_Stack(GREY, static_cast<int>(width), static_cast<int>(height), static_cast<int>(depth));
   ASSERT_NE(legacy, nullptr);
@@ -823,7 +823,7 @@ TEST(NeutubeLegacyTraceRecord, SettersMatchLegacy)
   ASSERT_NE(legacy, nullptr);
 
   neutube::TraceRecord ported;
-  neutube::traceRecordReset(&ported);
+  neutube::traceRecordReset(ported);
 
   EXPECT_EQ(ported.mask, legacy->mask);
   EXPECT_EQ(ported.hitRegion, legacy->hit_region);
@@ -836,26 +836,26 @@ TEST(NeutubeLegacyTraceRecord, SettersMatchLegacy)
 
   Trace_Record_Set_Fix_Point(legacy, 0.0);
   Trace_Record_Set_Direction(legacy, DL_BOTHDIR);
-  neutube::traceRecordSetFixPoint(&ported, 0.0);
-  neutube::traceRecordSetDirection(&ported, neutube::TraceDirection::BothDir);
+  neutube::traceRecordSetFixPoint(ported, 0.0);
+  neutube::traceRecordSetDirection(ported, neutube::TraceDirection::BothDir);
 
   EXPECT_EQ(ported.mask, legacy->mask);
-  EXPECT_TRUE(neutube::traceRecordHasFixPoint(&ported));
+  EXPECT_TRUE(neutube::traceRecordHasFixPoint(ported));
   EXPECT_TRUE(Trace_Record_Has_Fix_Point(legacy));
-  EXPECT_DOUBLE_EQ(neutube::traceRecordFixPoint(&ported), Trace_Record_Fix_Point(legacy));
-  EXPECT_EQ(static_cast<int>(neutube::traceRecordDirection(&ported)), static_cast<int>(Trace_Record_Direction(legacy)));
+  EXPECT_DOUBLE_EQ(neutube::traceRecordFixPoint(ported), Trace_Record_Fix_Point(legacy));
+  EXPECT_EQ(static_cast<int>(neutube::traceRecordDirection(ported)), static_cast<int>(Trace_Record_Direction(legacy)));
 
   Trace_Record_Set_Index(legacy, 7);
-  neutube::traceRecordSetIndex(&ported, 7);
+  neutube::traceRecordSetIndex(ported, 7);
   EXPECT_EQ(ported.mask, legacy->mask);
-  EXPECT_EQ(neutube::traceRecordIndex(&ported), Trace_Record_Index(legacy));
+  EXPECT_EQ(neutube::traceRecordIndex(ported), Trace_Record_Index(legacy));
 
   Trace_Record_Disable_Fix_Point(legacy);
-  neutube::traceRecordDisableFixPoint(&ported);
+  neutube::traceRecordDisableFixPoint(ported);
   EXPECT_EQ(ported.mask, legacy->mask);
-  EXPECT_FALSE(neutube::traceRecordHasFixPoint(&ported));
+  EXPECT_FALSE(neutube::traceRecordHasFixPoint(ported));
   EXPECT_FALSE(Trace_Record_Has_Fix_Point(legacy));
-  EXPECT_DOUBLE_EQ(neutube::traceRecordFixPoint(&ported), Trace_Record_Fix_Point(legacy));
+  EXPECT_DOUBLE_EQ(neutube::traceRecordFixPoint(ported), Trace_Record_Fix_Point(legacy));
 
   Delete_Trace_Record(legacy);
 }
@@ -1363,7 +1363,7 @@ TEST(NeutubeLegacyOptimizer, FitPerceptorMatchesLegacy)
   pCpp.delta = delta;
   pCpp.weight = weight;
 
-  const double portedScore = nim::neutube::fitPerceptorLegacyLike(&pCpp, nullptr);
+  const double portedScore = nim::neutube::fitPerceptorLegacyLike(pCpp, nullptr);
 
   EXPECT_DOUBLE_EQ(portedScore, legacyScore);
   EXPECT_DOUBLE_EQ(portedVar[0], legacyVar[0]);
@@ -1484,9 +1484,9 @@ TEST(NeutubeLegacyLocalNeuroseg, FitWMatchesLegacy)
   locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), static_cast<double>(cz)};
 
   nim::neutube::LocsegFitWorkspace wsCpp;
-  nim::neutube::defaultLocsegFitWorkspaceLegacyLike(&wsCpp);
+  nim::neutube::defaultLocsegFitWorkspaceLegacyLike(wsCpp);
 
-  const double portedInitialScore = nim::neutube::localNeurosegScoreWLegacyLike(locsegCpp, img, zScale, &wsCpp.sws);
+  const double portedInitialScore = nim::neutube::localNeurosegScoreWLegacyLike(locsegCpp, img, zScale, wsCpp.sws);
   EXPECT_DOUBLE_EQ(portedInitialScore, legacyInitialScore);
 
   ASSERT_EQ(wsCpp.nvar, wsC->nvar);
@@ -1498,7 +1498,7 @@ TEST(NeutubeLegacyLocalNeuroseg, FitWMatchesLegacy)
     EXPECT_DOUBLE_EQ(wsCpp.varMax[static_cast<size_t>(i)], wsC->var_max[i]) << "i=" << i;
   }
 
-  const double portedScore = nim::neutube::fitLocalNeurosegWLegacyLike(&locsegCpp, img, zScale, &wsCpp);
+  const double portedScore = nim::neutube::fitLocalNeurosegWLegacyLike(locsegCpp, img, zScale, wsCpp);
 
   EXPECT_DOUBLE_EQ(portedScore, legacyScore);
 
@@ -1563,7 +1563,7 @@ TEST(NeutubeLegacyLocalNeuroseg, PositionAdjustMatchesLegacy)
   locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), static_cast<double>(cz)};
 
   Local_Neuroseg_Position_Adjust(locsegC, stackC, zScale);
-  nim::neutube::localNeurosegPositionAdjustLegacyLike(&locsegCpp, img, zScale);
+  nim::neutube::localNeurosegPositionAdjustLegacyLike(locsegCpp, img, zScale);
 
   EXPECT_DOUBLE_EQ(locsegCpp.pos[0], locsegC->pos[0]);
   EXPECT_DOUBLE_EQ(locsegCpp.pos[1], locsegC->pos[1]);
@@ -1625,7 +1625,7 @@ TEST(NeutubeLegacyLocalNeuroseg, OrientationSearchCMatchesLegacy)
   fsCpp.options[0] = static_cast<int>(nim::neutube::StackFitOption::Corrcoef);
 
   const double legacyScore = Local_Neuroseg_Orientation_Search_C(locsegC, stackC, zScale, &fsC);
-  const double portedScore = nim::neutube::localNeurosegOrientationSearchCLegacyLike(&locsegCpp, img, zScale, &fsCpp);
+  const double portedScore = nim::neutube::localNeurosegOrientationSearchCLegacyLike(locsegCpp, img, zScale, fsCpp);
 
   EXPECT_DOUBLE_EQ(portedScore, legacyScore);
 
@@ -1686,7 +1686,7 @@ TEST(NeutubeLegacyLocalNeuroseg, RScaleSearchMatchesLegacy)
     Local_Neuroseg_R_Scale_Search(locsegC, stackC, zScale, 1.0, 10.0, 1.0, 0.5, 5.0, 0.5, nullptr);
 
   const double portedScore =
-    nim::neutube::localNeurosegRScaleSearchLegacyLike(&locsegCpp, img, zScale, 1.0, 10.0, 1.0, 0.5, 5.0, 0.5, nullptr);
+    nim::neutube::localNeurosegRScaleSearchLegacyLike(locsegCpp, img, zScale, 1.0, 10.0, 1.0, 0.5, 5.0, 0.5, nullptr);
 
   EXPECT_DOUBLE_EQ(portedScore, legacyScore);
 
@@ -1747,9 +1747,9 @@ TEST(NeutubeLegacyLocalNeuroseg, OptimizeWMatchesLegacy)
   locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), static_cast<double>(cz)};
 
   nim::neutube::LocsegFitWorkspace wsCpp;
-  nim::neutube::defaultLocsegFitWorkspaceLegacyLike(&wsCpp);
+  nim::neutube::defaultLocsegFitWorkspaceLegacyLike(wsCpp);
 
-  const double portedScore = nim::neutube::localNeurosegOptimizeWLegacyLike(&locsegCpp, img, zScale, 0, &wsCpp);
+  const double portedScore = nim::neutube::localNeurosegOptimizeWLegacyLike(locsegCpp, img, zScale, 0, wsCpp);
 
   EXPECT_DOUBLE_EQ(portedScore, legacyScore);
 

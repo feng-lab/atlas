@@ -13,7 +13,7 @@ namespace nim::neutube {
 [[nodiscard]] double geo3dPointLineSegDist(const std::array<double, 3>& point,
                                            const std::array<double, 3>& lineStart,
                                            const std::array<double, 3>& lineEnd,
-                                           double* lambda);
+                                           double& lambda);
 
 // Port of tz_geo3d_utils.c::Geo3d_Line_Line_Dist().
 [[nodiscard]] double geo3dLineLineDistLegacyLike(const std::array<double, 3>& line1Start,
@@ -28,9 +28,9 @@ namespace nim::neutube {
                                                        const std::array<double, 3>& line1End,
                                                        const std::array<double, 3>& line2Start,
                                                        const std::array<double, 3>& line2End,
-                                                       double* intersect1,
-                                                       double* intersect2,
-                                                       int* cond);
+                                                       double& intersect1,
+                                                       double& intersect2,
+                                                       int& cond);
 
 [[nodiscard]] std::array<double, 3>
 geo3dLineSegBreak(const std::array<double, 3>& lineStart, const std::array<double, 3>& lineEnd, double lambda);

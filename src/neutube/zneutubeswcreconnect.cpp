@@ -17,14 +17,12 @@
 
 namespace nim::neutube {
 
-int labelForest(ZSwc* tree)
+int labelForest(ZSwc& tree)
 {
-  CHECK(tree != nullptr);
-
   int treeNumber = 0;
-  for (auto root = tree->beginRoot(); root != tree->endRoot(); ++root) {
+  for (auto root = tree.beginRoot(); root != tree.endRoot(); ++root) {
     ++treeNumber;
-    for (auto it = tree->beginBreadthFirst(root); it != tree->endBreadthFirst(root); ++it) {
+    for (auto it = tree.beginBreadthFirst(root); it != tree.endBreadthFirst(root); ++it) {
       it->label = treeNumber;
     }
   }
@@ -32,11 +30,9 @@ int labelForest(ZSwc* tree)
   return treeNumber;
 }
 
-void reconnectSwc(ZSwc* tree, double zScale, double distThre)
+void reconnectSwc(ZSwc& tree, double zScale, double distThre)
 {
-  CHECK(tree != nullptr);
-
-  if (tree->numRoots() < 2) {
+  if (tree.numRoots() < 2) {
     return;
   }
 
@@ -57,8 +53,8 @@ void reconnectSwc(ZSwc* tree, double zScale, double distThre)
   };
 
   std::vector<ZSwc::SwcTreeNode> nodeArray;
-  nodeArray.reserve(tree->size());
-  for (auto it = tree->begin(); it != tree->end(); ++it) {
+  nodeArray.reserve(tree.size());
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
     nodeArray.push_back(it);
   }
 
@@ -137,7 +133,7 @@ void reconnectSwc(ZSwc* tree, double zScale, double distThre)
         w = 0.0;
       }
 
-      graphAddEdgeLegacyLike(&graph, i, closestIndex, w);
+      graphAddEdgeLegacyLike(graph, i, closestIndex, w);
     }
   }
 
@@ -193,8 +189,8 @@ void reconnectSwc(ZSwc* tree, double zScale, double distThre)
     const std::uint64_t key = packUnorderedPair(label1, label2);
     auto it = labelEdgeIndex.find(key);
     if (it == labelEdgeIndex.end()) {
-      graphAddEdgeLegacyLike(&labelGraph, label1, label2, w);
-      graphAddEdgeLegacyLike(&subgraph, v1, v2, w);
+      graphAddEdgeLegacyLike(labelGraph, label1, label2, w);
+      graphAddEdgeLegacyLike(subgraph, v1, v2, w);
       labelEdgeIndex.emplace(key, static_cast<int>(labelGraph.edges.size()) - 1);
     } else {
       const int edgeIndex = it->second;
@@ -208,7 +204,7 @@ void reconnectSwc(ZSwc* tree, double zScale, double distThre)
   }
 
   // Kruskal MST over labels with legacy `darray_qsort` tie behavior.
-  const GraphMst2ResultLegacyLike mst = graphToMst2LegacyLike(&labelGraph);
+  const GraphMst2ResultLegacyLike mst = graphToMst2LegacyLike(labelGraph);
   CHECK(mst.edgeIn.size() == subgraph.edges.size());
 
   // Compact subgraph edges/weights in original order.
@@ -241,8 +237,8 @@ void reconnectSwc(ZSwc* tree, double zScale, double distThre)
     ZSwc::SwcTreeNode tn1 = nodeArray[static_cast<size_t>(v1)];
     ZSwc::SwcTreeNode tn2 = nodeArray[static_cast<size_t>(v2)];
 
-    tree->setAsRoot(tn1);
-    tree->appendChild(tn2, tn1);
+    tree.setAsRoot(tn1);
+    tree.appendChild(tn2, tn1);
   }
 
   resortId(tree);

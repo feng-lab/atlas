@@ -16,6 +16,8 @@ namespace nim::neutube {
 // - `firstChild()` selection (e.g., connect-branch heuristics).
 //
 // Returns false on failure and optionally populates `error`.
-[[nodiscard]] bool loadSwcLegacyOrder(const std::string& path, ZSwc* out, std::string* error = nullptr);
+//
+// `error` is optional; pass a non-null pointer to receive a human-readable error message.
+[[nodiscard]] bool loadSwcLegacyOrder(const std::string& path, ZSwc& out, /*nullable*/ std::string* error = nullptr);
 
 } // namespace nim::neutube

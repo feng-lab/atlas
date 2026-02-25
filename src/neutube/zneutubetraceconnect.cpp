@@ -50,7 +50,7 @@ swcConnectorDistanceLegacyLike(const ZSwc::ConstSwcTreeNode& a, const ZSwc::Cons
 
 [[nodiscard]] SwcNodeConnectionLegacyLike identifyConnectionLegacyLike(const ZSwc::SwcTreeNode& head,
                                                                        const ZSwc::SwcTreeNode& tail,
-                                                                       ZSwc* swc,
+                                                                       ZSwc& swc,
                                                                        const std::vector<ZSwc::SwcTreeNode>& loopRoots,
                                                                        double minDist,
                                                                        bool surfaceDist)
@@ -59,7 +59,7 @@ swcConnectorDistanceLegacyLike(const ZSwc::ConstSwcTreeNode& a, const ZSwc::Cons
   // - ZSwcConnector::identifyConnection(const ZSwcPath&, const ZSwcTree&)
   // - ZSwcConnector::identifyConnection(const ZSwcPath&, const vector<ZSwcTree*>&)
   SwcNodeConnectionLegacyLike best;
-  if (ZSwc::isNull(head) || swc == nullptr || loopRoots.empty()) {
+  if (ZSwc::isNull(head) || loopRoots.empty()) {
     return best;
   }
 
@@ -70,7 +70,7 @@ swcConnectorDistanceLegacyLike(const ZSwc::ConstSwcTreeNode& a, const ZSwc::Cons
       continue;
     }
 
-    for (auto it = swc->begin(root); it != swc->end(root); ++it) {
+    for (auto it = swc.begin(root); it != swc.end(root); ++it) {
       if (!isRegularNodeLegacyLike(it)) {
         continue;
       }
@@ -147,13 +147,12 @@ double findBestTerminalBreakLegacyLike(const std::array<double, 3>& terminalCent
   return lambda;
 }
 
-void connectBranchToHostLegacyLike(ZSwc* swc,
+void connectBranchToHostLegacyLike(ZSwc& swc,
                                    const std::vector<ZSwc::SwcTreeNode>& hostRoots,
                                    ZSwc::SwcTreeNode branchRoot,
                                    const ZImg& stack)
 {
   // Port of ZNeuronTracer::connectBranch(const ZSwcPath&, ZSwcTree*).
-  CHECK(swc != nullptr);
   if (ZSwc::isNull(branchRoot)) {
     return;
   }
@@ -187,7 +186,7 @@ void connectBranchToHostLegacyLike(ZSwc* swc,
     bool needAdjust = false;
 
     if (!ZSwc::isRoot(hook)) {
-      swc->setAsRoot(hook);
+      swc.setAsRoot(hook);
       branchRoot = hook;
     }
 
@@ -231,7 +230,7 @@ void connectBranchToHostLegacyLike(ZSwc* swc,
         loop = tn;
         const auto newHook = ZSwc::firstChild(hook);
         if (!ZSwc::isNull(newHook)) {
-          swc->erase(hook);
+          swc.erase(hook);
           hook = newHook;
           branchRoot = hook;
         }
@@ -256,7 +255,7 @@ void connectBranchToHostLegacyLike(ZSwc* swc,
 
   if (!ZSwc::isNull(hook)) {
     CHECK(!ZSwc::isNull(loop));
-    swc->appendChild(loop, hook);
+    swc.appendChild(loop, hook);
   }
 }
 

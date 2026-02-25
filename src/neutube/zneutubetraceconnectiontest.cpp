@@ -82,7 +82,7 @@ locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zScale, con
   double minDist = std::numeric_limits<double>::infinity();
   for (const auto& node : chain) {
     LocalNeuroseg locseg2 = node.locseg;
-    localNeurosegScaleZLegacyLike(&locseg2, zScale);
+    localNeurosegScaleZLegacyLike(locseg2, zScale);
     const std::array<double, 3> target = localNeurosegCenterLegacyLike(locseg2);
     const double dist = geo3dDist(source[0], source[1], source[2], target[0], target[1], target[2]);
     if (dist < minDist) {
@@ -96,18 +96,15 @@ locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zScale, con
 } // namespace
 
 bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
-                                         LocsegChain* chain2,
+                                         LocsegChain& chain2,
                                          const ZImg* signal,
                                          double zScale,
-                                         NeurocompConnLegacyLike* conn,
+                                         NeurocompConnLegacyLike& conn,
                                          const ConnectionTestWorkspaceLegacyLike& ctw)
 {
-  CHECK(chain2 != nullptr);
-  CHECK(conn != nullptr);
-
   // No connection if either of the chains is empty.
-  if (chain1.empty() || chain2->empty()) {
-    conn->mode = NeurocompConnModeLegacyLike::None;
+  if (chain1.empty() || chain2.empty()) {
+    conn.mode = NeurocompConnModeLegacyLike::None;
     return false;
   }
 
@@ -129,29 +126,29 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
   LocalNeuroseg tail = *stail;
 
   // Adjust head and tail.
-  flipLocalNeurosegLegacyLike(&tail);
+  flipLocalNeurosegLegacyLike(tail);
 
   if (chain1.length() >= 1) {
     head.seg.h = 2.0;
     tail.seg.h = 2.0;
   }
 
-  localNeurosegScaleZLegacyLike(&head, xzRatio);
-  localNeurosegScaleZLegacyLike(&tail, xzRatio);
+  localNeurosegScaleZLegacyLike(head, xzRatio);
+  localNeurosegScaleZLegacyLike(tail, xzRatio);
 
   double mindist = 0.0;
   if (ctw.hookSpot == 0) {
-    mindist = locsegChainDistUpperBoundLegacyLike(*chain2, xzRatio, head);
+    mindist = locsegChainDistUpperBoundLegacyLike(chain2, xzRatio, head);
   } else if (ctw.hookSpot == 1) {
-    mindist = locsegChainDistUpperBoundLegacyLike(*chain2, xzRatio, tail);
+    mindist = locsegChainDistUpperBoundLegacyLike(chain2, xzRatio, tail);
   } else {
     CHECK(ctw.hookSpot == -1);
-    mindist = std::min(locsegChainDistUpperBoundLegacyLike(*chain2, xzRatio, head),
-                       locsegChainDistUpperBoundLegacyLike(*chain2, xzRatio, tail));
+    mindist = std::min(locsegChainDistUpperBoundLegacyLike(chain2, xzRatio, head),
+                       locsegChainDistUpperBoundLegacyLike(chain2, xzRatio, tail));
   }
 
-  conn->mode = NeurocompConnModeLegacyLike::HookLoop;
-  conn->pdist = 0.0;
+  conn.mode = NeurocompConnModeLegacyLike::HookLoop;
+  conn.pdist = 0.0;
 
   int index = 0;
   Geo3dBallLegacyLike range1{};
@@ -159,14 +156,14 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
   std::array<double, 3> tmpPos{};
 
   // Calculate the distance from the hook end(s) to the loop chain surface.
-  for (const auto& node : *chain2) {
+  for (const auto& node : chain2) {
     LocalNeuroseg locseg2 = node.locseg;
-    localNeurosegScaleZLegacyLike(&locseg2, xzRatio);
-    localNeurosegBallBoundLegacyLike(locseg2, &range1);
+    localNeurosegScaleZLegacyLike(locseg2, xzRatio);
+    localNeurosegBallBoundLegacyLike(locseg2, range1);
 
     // head test
     if (ctw.hookSpot == 0 || ctw.hookSpot == -1) {
-      localNeurosegBallBoundLegacyLike(head, &range2);
+      localNeurosegBallBoundLegacyLike(head, range2);
       const double minPossible = geo3dDist(range1.center[0],
                                            range1.center[1],
                                            range1.center[2],
@@ -179,27 +176,27 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
         bool update = false;
         if (dist < mindist) {
           mindist = dist;
-          conn->pdist = localNeurosegPlanarDistLLegacyLike(head, locseg2);
+          conn.pdist = localNeurosegPlanarDistLLegacyLike(head, locseg2);
           update = true;
         } else if (dist == mindist) {
           const double pdist = localNeurosegPlanarDistLLegacyLike(head, locseg2);
-          if (conn->pdist > pdist) {
-            conn->pdist = pdist;
+          if (conn.pdist > pdist) {
+            conn.pdist = pdist;
             update = true;
           }
         }
 
         if (update) {
-          conn->info[0] = 0;
-          conn->info[1] = index;
-          conn->pos = tmpPos;
+          conn.info[0] = 0;
+          conn.info[1] = index;
+          conn.pos = tmpPos;
         }
       }
     }
 
     // tail test
     if (ctw.hookSpot == 1 || ctw.hookSpot == -1) {
-      localNeurosegBallBoundLegacyLike(tail, &range2);
+      localNeurosegBallBoundLegacyLike(tail, range2);
       const double minPossible = geo3dDist(range1.center[0],
                                            range1.center[1],
                                            range1.center[2],
@@ -211,17 +208,17 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
         const double dist = localNeurosegDist2LegacyLike(tail, locseg2, &tmpPos);
         if (dist < mindist) {
           mindist = dist;
-          conn->info[0] = 1;
-          conn->info[1] = index;
-          conn->pos = tmpPos;
-          conn->pdist = localNeurosegPlanarDistLLegacyLike(tail, locseg2);
+          conn.info[0] = 1;
+          conn.info[1] = index;
+          conn.pos = tmpPos;
+          conn.pdist = localNeurosegPlanarDistLLegacyLike(tail, locseg2);
         } else if (dist == mindist) {
           const double pdist = localNeurosegPlanarDistLLegacyLike(tail, locseg2);
-          if (conn->pdist > pdist) {
-            conn->info[0] = 1;
-            conn->info[1] = index;
-            conn->pos = tmpPos;
-            conn->pdist = pdist;
+          if (conn.pdist > pdist) {
+            conn.info[0] = 1;
+            conn.info[1] = index;
+            conn.pos = tmpPos;
+            conn.pdist = pdist;
           }
         }
       }
@@ -231,20 +228,20 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
   }
 
   // scale position back to the chain space
-  conn->pos[2] *= xzRatio;
+  conn.pos[2] *= xzRatio;
 
-  conn->sdist = mindist;
+  conn.sdist = mindist;
 
-  if (conn->sdist > ctw.distThre) {
-    conn->mode = NeurocompConnModeLegacyLike::None;
-    conn->cost = 10.0;
+  if (conn.sdist > ctw.distThre) {
+    conn.mode = NeurocompConnModeLegacyLike::None;
+    conn.cost = 10.0;
     return false;
   }
 
   // Compute default orientation from the hook end.
   {
     const LocalNeuroseg* locseg1 = nullptr;
-    if (conn->info[0] == 0) {
+    if (conn.info[0] == 0) {
       locseg1 = chain1.headSeg();
     } else {
       locseg1 = chain1.tailSeg();
@@ -254,22 +251,22 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
     double nx = 0.0;
     double ny = 0.0;
     double nz = 0.0;
-    geo3dOrientationNormalLegacyLike(locseg1->seg.theta, locseg1->seg.psi, &nx, &ny, &nz);
-    conn->ort = {nx, ny, nz};
+    geo3dOrientationNormalLegacyLike(locseg1->seg.theta, locseg1->seg.psi, nx, ny, nz);
+    conn.ort = {nx, ny, nz};
   }
 
-  if (conn->sdist > 2.0 && ctw.spTest && signal != nullptr) {
+  if (conn.sdist > 2.0 && ctw.spTest && signal != nullptr) {
     double gdist = 0.0;
 
     StackGraphWorkspaceLegacyLike sgw;
-    defaultStackGraphWorkspaceLegacyLike(&sgw);
+    defaultStackGraphWorkspaceLegacyLike(sgw);
     sgw.conn = 26;
     sgw.weightFunc = &stackVoxelWeightSLegacyLike;
     sgw.resolution = ctw.resolution;
     sgw.signalMask = ctw.mask;
     sgw.includingSignalBorder = true;
 
-    const std::vector<int64_t> path = locsegChainShortestPathLegacyLike(chain1, *chain2, *signal, zScale, &sgw);
+    const std::vector<int64_t> path = locsegChainShortestPathLegacyLike(chain1, chain2, *signal, zScale, sgw);
     sgw.signalMask = nullptr;
 
     if (!path.empty()) {
@@ -288,7 +285,7 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
 
         if (hitIndex < 3) {
           stackUtilCoordLegacyLike(off, width, height, &coord[0], &coord[1], &coord[2]);
-          if (conn->info[0] == 0) {
+          if (conn.info[0] == 0) {
             hitIndex = locsegChainHitTestLegacyLike(chain1, TraceDirection::Forward, coord[0], coord[1], coord[2]);
           } else {
             hitIndex = locsegChainHitTestLegacyLike(chain1, TraceDirection::Backward, coord[0], coord[1], coord[2]);
@@ -313,20 +310,20 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
       }
 
       if (((darkCount >= 2) && (darkCount >= brightCount)) || (darkCount >= 5) || (hitIndex >= 3)) {
-        conn->mode = NeurocompConnModeLegacyLike::None;
+        conn.mode = NeurocompConnModeLegacyLike::None;
       } else {
         if (darkCount + brightCount >= 2 && path.size() >= 3) {
           int prevPos[3] = {0, 0, 0};
           int curPos[3] = {0, 0, 0};
           stackUtilCoordLegacyLike(path[path.size() - 2], width, height, &prevPos[0], &prevPos[1], &prevPos[2]);
 
-          conn->ort = {0.0, 0.0, 0.0};
+          conn.ort = {0.0, 0.0, 0.0};
           int countSteps = 0;
           for (int i = static_cast<int>(path.size()) - 3; i >= 0; --i) {
             stackUtilCoordLegacyLike(path[static_cast<size_t>(i)], width, height, &curPos[0], &curPos[1], &curPos[2]);
-            conn->ort[0] += static_cast<double>(prevPos[0] - curPos[0]);
-            conn->ort[1] += static_cast<double>(prevPos[1] - curPos[1]);
-            conn->ort[2] += static_cast<double>(prevPos[2] - curPos[2]);
+            conn.ort[0] += static_cast<double>(prevPos[0] - curPos[0]);
+            conn.ort[1] += static_cast<double>(prevPos[1] - curPos[1]);
+            conn.ort[2] += static_cast<double>(prevPos[2] - curPos[2]);
             prevPos[0] = curPos[0];
             prevPos[1] = curPos[1];
             prevPos[2] = curPos[2];
@@ -336,42 +333,42 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
             }
           }
 
-          coordinate3dUnitizeLegacyLike(&conn->ort);
+          coordinate3dUnitizeLegacyLike(&conn.ort);
         }
       }
 
       gdist /= sgw.resolution[0];
     } else {
-      conn->mode = NeurocompConnModeLegacyLike::None;
+      conn.mode = NeurocompConnModeLegacyLike::None;
       gdist = 0.0;
     }
 
-    if (conn->mode != NeurocompConnModeLegacyLike::None) {
-      conn->cost = logisticLegacyLike((conn->sdist + gdist) / 100.0);
+    if (conn.mode != NeurocompConnModeLegacyLike::None) {
+      conn.cost = logisticLegacyLike((conn.sdist + gdist) / 100.0);
     }
   } else {
-    conn->cost = logisticLegacyLike(conn->sdist / 100.0);
+    conn.cost = logisticLegacyLike(conn.sdist / 100.0);
   }
 
-  if (conn->mode == NeurocompConnModeLegacyLike::None) {
+  if (conn.mode == NeurocompConnModeLegacyLike::None) {
     return false;
   }
 
   if (ctw.interpolate) {
-    if (conn->mode == NeurocompConnModeLegacyLike::HookLoop) {
-      std::array<double, 3> pos = conn->pos;
-      const int insertedIndex = locsegChainInterpolateLLegacyLike(chain2, pos, &conn->ort, &pos);
-      conn->pos = pos;
+    if (conn.mode == NeurocompConnModeLegacyLike::HookLoop) {
+      std::array<double, 3> pos = conn.pos;
+      const int insertedIndex = locsegChainInterpolateLLegacyLike(chain2, pos, &conn.ort, &pos);
+      conn.pos = pos;
 
       if (insertedIndex >= 0) {
-        conn->info[1] = insertedIndex;
+        conn.info[1] = insertedIndex;
       } else {
-        if (conn->info[1] == 0) {
-          conn->mode = NeurocompConnModeLegacyLike::Link;
-          conn->info[1] = 0;
-        } else if (conn->info[1] == chain2->length() - 1) {
-          conn->mode = NeurocompConnModeLegacyLike::Link;
-          conn->info[1] = 1;
+        if (conn.info[1] == 0) {
+          conn.mode = NeurocompConnModeLegacyLike::Link;
+          conn.info[1] = 0;
+        } else if (conn.info[1] == chain2.length() - 1) {
+          conn.mode = NeurocompConnModeLegacyLike::Link;
+          conn.info[1] = 1;
         }
       }
     }

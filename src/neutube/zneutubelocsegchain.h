@@ -96,9 +96,9 @@ locsegChainHitTestLegacyLike(const LocsegChain& chain, TraceDirection direction,
 locsegChainFormLoopLegacyLike(const LocsegChain& chain, const LocalNeuroseg& locseg, TraceDirection direction);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Remove_Overlap_Ends().
-[[nodiscard]] int locsegChainRemoveOverlapEndsLegacyLike(LocsegChain* chain);
+[[nodiscard]] int locsegChainRemoveOverlapEndsLegacyLike(LocsegChain& chain);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Remove_Turn_Ends().
-void locsegChainRemoveTurnEndsLegacyLike(LocsegChain* chain, double maxAngle);
+void locsegChainRemoveTurnEndsLegacyLike(LocsegChain& chain, double maxAngle);
 
 } // namespace nim::neutube

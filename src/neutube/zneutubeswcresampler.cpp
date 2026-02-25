@@ -42,13 +42,13 @@ namespace {
 
 ZNeutubeSwcResampler::ZNeutubeSwcResampler() = default;
 
-int ZNeutubeSwcResampler::optimalDownsample(ZSwc* tree) const
+int ZNeutubeSwcResampler::optimalDownsample(ZSwc& tree) const
 {
-  if (tree == nullptr || tree->empty()) {
+  if (tree.empty()) {
     return 0;
   }
 
-  for (auto it = tree->begin(); it != tree->end(); ++it) {
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
     it->weight = 1.0;
   }
 
@@ -64,13 +64,11 @@ int ZNeutubeSwcResampler::optimalDownsample(ZSwc* tree) const
   return total;
 }
 
-int ZNeutubeSwcResampler::suboptimalDownsample(ZSwc* tree) const
+int ZNeutubeSwcResampler::suboptimalDownsample(ZSwc& tree) const
 {
-  CHECK(tree != nullptr);
-
   std::vector<ZSwc::SwcTreeNode> order;
-  order.reserve(tree->size());
-  for (auto it = tree->begin(); it != tree->end(); ++it) {
+  order.reserve(tree.size());
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
     order.push_back(it);
   }
 

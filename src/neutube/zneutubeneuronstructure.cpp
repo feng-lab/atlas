@@ -35,7 +35,7 @@ locsegChainToCirclesScaledLegacyLike(const LocsegChain& chain, double xyScale, d
 
   for (const auto& node : chain) {
     LocalNeuroseg locseg2 = node.locseg;
-    localNeurosegScaleLegacyLike(&locseg2, xyScale, zScale);
+    localNeurosegScaleLegacyLike(locseg2, xyScale, zScale);
 
     const LocsegChainKnotLegacyLike* knot = locsegChainKnotArrayAtLegacyLike(ka, knotIndex);
     while (knot != nullptr) {
@@ -83,16 +83,14 @@ closestCircleLegacyLike(const std::vector<Geo3dCircle>& circles, int start, int 
 
 } // namespace
 
-NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector<std::unique_ptr<LocsegChain>>* chains,
+NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector<std::unique_ptr<LocsegChain>>& chains,
                                                                      const ZImg* signal,
                                                                      double zScale,
                                                                      const ConnectionTestWorkspaceLegacyLike& ctw)
 {
-  CHECK(chains != nullptr);
-
   NeuronStructureChainsLegacyLike ns;
-  ns.chains.reserve(chains->size());
-  for (auto& p : *chains) {
+  ns.chains.reserve(chains.size());
+  for (auto& p : chains) {
     ns.chains.push_back(p.get());
   }
 
@@ -110,7 +108,7 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
       }
 
       NeurocompConnLegacyLike conn;
-      defaultNeurocompConnLegacyLike(&conn);
+      defaultNeurocompConnLegacyLike(conn);
       conn.mode = NeurocompConnModeLegacyLike::HookLoop;
 
       LocsegChain* chainI = ns.chains[static_cast<size_t>(i)];
@@ -118,11 +116,11 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
       CHECK(chainI != nullptr);
       CHECK(chainJ != nullptr);
 
-      if (!locsegChainConnectionTestLegacyLike(*chainI, chainJ, signal, zScale, &conn, ctw)) {
+      if (!locsegChainConnectionTestLegacyLike(*chainI, *chainJ, signal, zScale, conn, ctw)) {
         continue;
       }
 
-      neurocompConnTranslateModeLegacyLike(chainJ->length(), &conn);
+      neurocompConnTranslateModeLegacyLike(chainJ->length(), conn);
 
       bool connExisted = false;
       if (i > j) {
@@ -157,17 +155,16 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
   return ns;
 }
 
-void processNeuronStructureLegacyLike(NeuronStructureChainsLegacyLike* ns)
+void processNeuronStructureLegacyLike(NeuronStructureChainsLegacyLike& ns)
 {
   // Port of tz_neuron_structure.c::Process_Neuron_Structure().
-  CHECK(ns != nullptr);
-  CHECK(ns->graph.edges.size() == ns->conn.size());
+  CHECK(ns.graph.edges.size() == ns.conn.size());
 
-  const int nedge = static_cast<int>(ns->graph.edges.size());
+  const int nedge = static_cast<int>(ns.graph.edges.size());
   std::vector<std::uint8_t> edgeMask(static_cast<size_t>(nedge), 0u);
 
   for (int i = 0; i < nedge; ++i) {
-    const auto mode = ns->conn[static_cast<size_t>(i)].mode;
+    const auto mode = ns.conn[static_cast<size_t>(i)].mode;
     if (mode == NeurocompConnModeLegacyLike::Link) {
       edgeMask[static_cast<size_t>(i)] = 2u;
     } else if (mode == NeurocompConnModeLegacyLike::HookLoop) {
@@ -186,9 +183,9 @@ void processNeuronStructureLegacyLike(NeuronStructureChainsLegacyLike* ns)
       if (edgeMask[static_cast<size_t>(j)] != 1u) {
         continue;
       }
-      if (ns->graph.edges[static_cast<size_t>(i)][0] == ns->graph.edges[static_cast<size_t>(j)][1] &&
-          ns->graph.edges[static_cast<size_t>(i)][1] == ns->graph.edges[static_cast<size_t>(j)][0]) {
-        if (ns->conn[static_cast<size_t>(i)].cost < ns->conn[static_cast<size_t>(j)].cost) {
+      if (ns.graph.edges[static_cast<size_t>(i)][0] == ns.graph.edges[static_cast<size_t>(j)][1] &&
+          ns.graph.edges[static_cast<size_t>(i)][1] == ns.graph.edges[static_cast<size_t>(j)][0]) {
+        if (ns.conn[static_cast<size_t>(i)].cost < ns.conn[static_cast<size_t>(j)].cost) {
           edgeMask[static_cast<size_t>(j)] = 0u;
         } else {
           edgeMask[static_cast<size_t>(i)] = 0u;
@@ -206,9 +203,9 @@ void processNeuronStructureLegacyLike(NeuronStructureChainsLegacyLike* ns)
       if (edgeMask[static_cast<size_t>(j)] != 1u) {
         continue;
       }
-      if (ns->graph.edges[static_cast<size_t>(i)][0] == ns->graph.edges[static_cast<size_t>(j)][0] &&
-          ns->conn[static_cast<size_t>(i)].info[0] == ns->conn[static_cast<size_t>(j)].info[0]) {
-        if (ns->conn[static_cast<size_t>(i)].cost < ns->conn[static_cast<size_t>(j)].cost) {
+      if (ns.graph.edges[static_cast<size_t>(i)][0] == ns.graph.edges[static_cast<size_t>(j)][0] &&
+          ns.conn[static_cast<size_t>(i)].info[0] == ns.conn[static_cast<size_t>(j)].info[0]) {
+        if (ns.conn[static_cast<size_t>(i)].cost < ns.conn[static_cast<size_t>(j)].cost) {
           edgeMask[static_cast<size_t>(j)] = 0u;
         } else {
           edgeMask[static_cast<size_t>(i)] = 0u;
@@ -222,15 +219,15 @@ void processNeuronStructureLegacyLike(NeuronStructureChainsLegacyLike* ns)
   for (int i = 0; i < nedge; ++i) {
     if (edgeMask[static_cast<size_t>(i)] > 0u) {
       if (i != out) {
-        ns->graph.edges[static_cast<size_t>(out)] = ns->graph.edges[static_cast<size_t>(i)];
-        ns->conn[static_cast<size_t>(out)] = ns->conn[static_cast<size_t>(i)];
+        ns.graph.edges[static_cast<size_t>(out)] = ns.graph.edges[static_cast<size_t>(i)];
+        ns.conn[static_cast<size_t>(out)] = ns.conn[static_cast<size_t>(i)];
       }
       ++out;
     }
   }
 
-  ns->graph.edges.resize(static_cast<size_t>(out));
-  ns->conn.resize(static_cast<size_t>(out));
+  ns.graph.edges.resize(static_cast<size_t>(out));
+  ns.conn.resize(static_cast<size_t>(out));
 }
 
 NeuronStructureCirclesLegacyLike
@@ -310,28 +307,27 @@ neuronStructureLocsegChainToCircleSLegacyLike(const NeuronStructureChainsLegacyL
   return out;
 }
 
-void neuronStructureToTreeLegacyLike(NeuronStructureCirclesLegacyLike* ns)
+void neuronStructureToTreeLegacyLike(NeuronStructureCirclesLegacyLike& ns)
 {
   // Port of tz_neuron_structure.c::Neuron_Structure_To_Tree().
-  CHECK(ns != nullptr);
-  CHECK(ns->graph.edges.size() == ns->connCost.size());
+  CHECK(ns.graph.edges.size() == ns.connCost.size());
 
-  const std::vector<double> oldConn = ns->connCost;
+  const std::vector<double> oldConn = ns.connCost;
 
-  ns->graph.weights = oldConn;
-  const GraphMst2ResultLegacyLike mst = graphToMst2LegacyLike(&ns->graph);
+  ns.graph.weights = oldConn;
+  const GraphMst2ResultLegacyLike mst = graphToMst2LegacyLike(ns.graph);
 
   std::vector<double> newConn;
-  newConn.reserve(ns->graph.edges.size());
+  newConn.reserve(ns.graph.edges.size());
   for (size_t i = 0; i < mst.edgeIn.size(); ++i) {
     if (mst.edgeIn[i] == 1u) {
       newConn.push_back(oldConn[i]);
     }
   }
-  ns->connCost = std::move(newConn);
+  ns.connCost = std::move(newConn);
 
-  CHECK(ns->graph.edges.size() == ns->connCost.size());
-  CHECK(ns->graph.weights.size() == ns->graph.edges.size());
+  CHECK(ns.graph.edges.size() == ns.connCost.size());
+  CHECK(ns.graph.weights.size() == ns.graph.edges.size());
 }
 
 std::unique_ptr<ZSwc> neuronStructureToSwcTreeCircleZLegacyLike(const NeuronStructureCirclesLegacyLike& ns,

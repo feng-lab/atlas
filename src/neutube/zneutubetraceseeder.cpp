@@ -46,9 +46,8 @@ namespace {
 
 } // namespace
 
-SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace* tw)
+SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw)
 {
-  CHECK(tw != nullptr);
   CHECK(signal.numChannels() == 1);
   CHECK(signal.numTimes() == 1);
 
@@ -58,10 +57,10 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
   out.baseMask = makeBaseMaskLike(signal);
 
   // Configure fit workspace like legacy ZNeuronTraceSeeder::sortSeed.
-  tw->fitWorkspace.sws.fs.n = 2;
-  tw->fitWorkspace.sws.fs.options[0] = static_cast<int>(StackFitOption::Dot);
-  tw->fitWorkspace.sws.fs.options[1] = static_cast<int>(StackFitOption::Corrcoef);
-  tw->fitWorkspace.posAdjust = 1;
+  tw.fitWorkspace.sws.fs.n = 2;
+  tw.fitWorkspace.sws.fs.options[0] = static_cast<int>(StackFitOption::Dot);
+  tw.fitWorkspace.sws.fs.options[1] = static_cast<int>(StackFitOption::Corrcoef);
+  tw.fitWorkspace.posAdjust = 1;
 
   const size_t width = out.baseMask.width();
   const size_t height = out.baseMask.height();
@@ -75,8 +74,8 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
     const int y = static_cast<int>(seeds.points[i][1]);
     const int z = static_cast<int>(seeds.points[i][2]);
 
-    if (tw->traceMask) {
-      const int v = maskValueAt(*tw->traceMask, x, y, z);
+    if (tw.traceMask) {
+      const int v = maskValueAt(*tw.traceMask, x, y, z);
       if (v > 0) {
         out.scoreArray[i] = 0.0;
         continue;
@@ -111,22 +110,22 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
     seed.seg.scale = 1.0;
 
     const std::array<double, 3> cpos = {static_cast<double>(x), static_cast<double>(y), static_cast<double>(z)};
-    setNeurosegPositionLegacyLike(&seed, cpos, NeuroposReferenceLegacyLike::Center);
+    setNeurosegPositionLegacyLike(seed, cpos, NeuroposReferenceLegacyLike::Center);
 
     constexpr double zScale = 1.0;
-    (void)localNeurosegOptimizeWLegacyLike(&seed, signal, zScale, /*option*/ 0, &tw->fitWorkspace);
+    (void)localNeurosegOptimizeWLegacyLike(seed, signal, zScale, /*option*/ 0, tw.fitWorkspace);
 
-    if (tw->traceMask) {
-      if (localNeurosegHitMaskLegacyLike(seed, *tw->traceMask)) {
+    if (tw.traceMask) {
+      if (localNeurosegHitMaskLegacyLike(seed, *tw.traceMask)) {
         out.scoreArray[i] = 0.0;
         continue;
       }
     }
 
-    out.scoreArray[i] = tw->fitWorkspace.sws.fs.scores[1];
+    out.scoreArray[i] = tw.fitWorkspace.sws.fs.scores[1];
 
-    const int labelValue = (out.scoreArray[i] > tw->minScore) ? 2 : 1;
-    localNeurosegLabelGLegacyLike(seed, &out.baseMask, /*flag*/ -1, labelValue, zScale);
+    const int labelValue = (out.scoreArray[i] > tw.minScore) ? 2 : 1;
+    localNeurosegLabelGLegacyLike(seed, out.baseMask, /*flag*/ -1, labelValue, zScale);
   }
 
   return out;

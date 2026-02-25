@@ -19,8 +19,8 @@ namespace nim::neutube {
 // receives the center of the closest ellipse (legacy skeleton position).
 [[nodiscard]] double locsegChainPointDistLegacyLike(const LocsegChain& chain,
                                                     const std::array<double, 3>& pos,
-                                                    int* segIndex,
-                                                    std::array<double, 3>* skelPos);
+                                                    /*nullable*/ int* segIndex,
+                                                    /*nullable*/ std::array<double, 3>* skelPos);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Bright_End().
 //
@@ -30,7 +30,7 @@ void locsegChainBrightEndLegacyLike(const LocsegChain& chain,
                                     LocsegChainEndLegacyLike end,
                                     const ZImg& signal,
                                     double zScale,
-                                    std::array<double, 3>* pos);
+                                    std::array<double, 3>& pos);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Update_Stack_Graph_Workspace().
 //
@@ -40,7 +40,7 @@ void locsegChainUpdateStackGraphWorkspaceLegacyLike(const LocalNeuroseg& source,
                                                     const LocsegChain& target,
                                                     const ZImg& signal,
                                                     double zScale,
-                                                    StackGraphWorkspaceLegacyLike* sgw);
+                                                    StackGraphWorkspaceLegacyLike& sgw);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Shortest_Path_Pt().
 //
@@ -54,13 +54,13 @@ void locsegChainUpdateStackGraphWorkspaceLegacyLike(const LocalNeuroseg& source,
                                                                        int endIndex,
                                                                        const ZImg& signal,
                                                                        double zScale,
-                                                                       StackGraphWorkspaceLegacyLike* sgw);
+                                                                       StackGraphWorkspaceLegacyLike& sgw);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Shortest_Path().
 [[nodiscard]] std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source,
                                                                      const LocsegChain& target,
                                                                      const ZImg& signal,
                                                                      double zScale,
-                                                                     StackGraphWorkspaceLegacyLike* sgw);
+                                                                     StackGraphWorkspaceLegacyLike& sgw);
 
 } // namespace nim::neutube

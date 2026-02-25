@@ -188,7 +188,7 @@ int runGeneral(const std::string& generalConfigTextOrPath,
 
   TraceConfig baseTraceCfg;
   if (!configPath.empty()) {
-    if (!loadTraceConfigLegacyLike(configPath, &baseTraceCfg)) {
+    if (!loadTraceConfigLegacyLike(configPath, baseTraceCfg)) {
       LOG(WARNING) << "Configuration failed: failed to load " << configPath;
       baseTraceCfg = TraceConfig{};
     }
@@ -200,7 +200,7 @@ int runGeneral(const std::string& generalConfigTextOrPath,
   TraceConfig traceCfg = baseTraceCfg;
   if (level > 0) {
     if (const json::object* levelOverride = selectTraceLevelOverrideLegacyLike(baseTraceCfg, level)) {
-      applyTraceConfigOverridesLegacyLike(*levelOverride, &traceCfg);
+      applyTraceConfigOverridesLegacyLike(*levelOverride, traceCfg);
     }
   }
 
@@ -255,7 +255,7 @@ int runGeneral(const std::string& generalConfigTextOrPath,
 
   if (tree) {
     LOG(INFO) << "Saving " << outputPath << "...";
-    writeSwcLegacyNeuTu(tree.get(), outputPath);
+    writeSwcLegacyNeuTu(*tree, outputPath);
   } else {
     LOG(WARNING) << "WARNING: No result generated.";
   }

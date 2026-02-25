@@ -32,6 +32,6 @@ struct RecoverResultLegacyLike
                                                         const TraceConfig& cfg,
                                                         const ZImg& mask,
                                                         std::optional<ZImg> baseMask,
-                                                        TraceWorkspace* tw);
+                                                        TraceWorkspace& tw);
 
 } // namespace nim::neutube

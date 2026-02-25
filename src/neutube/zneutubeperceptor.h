@@ -16,9 +16,14 @@ struct Perceptor
 };
 
 // Port of tz_perceptor.c::Perceptor_Gradient().
-void perceptorGradientLegacyLike(const Perceptor* perceptor, const void* stack, double* gradient);
+//
+// Pointer-parameter semantics:
+// - `stack` is forwarded as an opaque context pointer to the score function (legacy API).
+// - `gradient` is an output array of length `perceptor.vs->nvar`.
+void perceptorGradientLegacyLike(const Perceptor& perceptor, const void* stack, double* gradient);
 
 // Port of tz_perceptor.c::Fit_Perceptor() (modified nonlinear conjugate gradient).
-double fitPerceptorLegacyLike(Perceptor* perceptor, const void* stack);
+// `stack` is forwarded as an opaque context pointer to the score function (legacy API).
+double fitPerceptorLegacyLike(Perceptor& perceptor, const void* stack);
 
 } // namespace nim::neutube

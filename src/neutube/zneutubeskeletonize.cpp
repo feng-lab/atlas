@@ -137,7 +137,7 @@ int runSkeletonize(const std::string& inputPath,
   }
 
   if (tree && !tree->empty()) {
-    writeSwcLegacyNeuTu(tree.get(), outputPath, {});
+    writeSwcLegacyNeuTu(*tree, outputPath, {});
     LOG(INFO) << "SWC saved in " << outputPath;
   } else {
     LOG(INFO) << "No SWC generated.";

@@ -190,10 +190,8 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
                                           const TraceConfig& cfg,
                                           const ZImg& mask,
                                           std::optional<ZImg> baseMask,
-                                          TraceWorkspace* tw)
+                                          TraceWorkspace& tw)
 {
-  CHECK(tw != nullptr);
-
   RecoverResultLegacyLike out;
 
   if (mask.isEmpty()) {
@@ -222,8 +220,8 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
     auto* traceBin = traceMaskBinary.timeData<uint8_t>(0);
     const auto* base = baseMask->timeData<uint8_t>(0);
 
-    const bool haveTraceMask = static_cast<bool>(tw->traceMask);
-    const auto* traceMask16 = haveTraceMask ? tw->traceMask->timeData<uint16_t>(0) : nullptr;
+    const bool haveTraceMask = static_cast<bool>(tw.traceMask);
+    const auto* traceMask16 = haveTraceMask ? tw.traceMask->timeData<uint16_t>(0) : nullptr;
 
     for (size_t i = 0; i < n; ++i) {
       const bool traced = haveTraceMask && (traceMask16[i] > 0);
@@ -254,11 +252,11 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
     return out;
   }
 
-  const double originalMinLength = tw->minChainLength;
-  if (!tw->refit) {
-    tw->minChainLength = (NeurosegDefaultHLegacyLike - 1.0) * 2.0 - 1.0;
+  const double originalMinLength = tw.minChainLength;
+  if (!tw.refit) {
+    tw.minChainLength = (NeurosegDefaultHLegacyLike - 1.0) * 2.0 - 1.0;
   } else {
-    tw->minChainLength = (NeurosegDefaultHLegacyLike - 1.0) * 1.5 - 1.0;
+    tw.minChainLength = (NeurosegDefaultHLegacyLike - 1.0) * 1.5 - 1.0;
   }
 
   // Extract seeds from leftover and trace them.
@@ -269,12 +267,12 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
       break;
     case 2:
       LOG(ERROR) << "recoverLegacyLike: seedMethod=2 (skeleton seeding) is not supported yet.";
-      tw->minChainLength = originalMinLength;
+      tw.minChainLength = originalMinLength;
       out.baseMask = std::move(baseMask);
       return out;
     default:
       LOG(ERROR) << "recoverLegacyLike: unsupported seedMethod=" << cfg.seedMethod;
-      tw->minChainLength = originalMinLength;
+      tw.minChainLength = originalMinLength;
       out.baseMask = std::move(baseMask);
       return out;
   }
@@ -286,8 +284,8 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
 
   // Legacy traces with TRACING_AUTO thresholds after sorting seeds.
   prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Auto, tw);
-  out.chains = traceAllSeedsLegacyLike(signal, /*zScale*/ 1.0, &sorted.locsegArray, &sorted.scoreArray, tw);
-  tw->minChainLength = originalMinLength;
+  out.chains = traceAllSeedsLegacyLike(signal, /*zScale*/ 1.0, sorted.locsegArray, sorted.scoreArray, tw);
+  tw.minChainLength = originalMinLength;
 
   return out;
 }

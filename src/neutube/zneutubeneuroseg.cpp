@@ -177,13 +177,11 @@ double neurosegBallRangeLegacyLike(const Neuroseg& seg)
   return std::sqrt(seg.h * seg.h + r * r);
 }
 
-void neurosegSwellLegacyLike(Neuroseg* seg, double ratio, double diff, double maxDiff)
+void neurosegSwellLegacyLike(Neuroseg& seg, double ratio, double diff, double maxDiff)
 {
   // Port of tz_neuroseg.c::Neuroseg_Swell().
-  CHECK(seg != nullptr);
-
-  const double rby = neurosegRBLegacyLike(*seg);
-  const double rbx = rby * seg->scale;
+  const double rby = neurosegRBLegacyLike(seg);
+  const double rbx = rby * seg.scale;
 
   double nrbx = rbx * ratio + diff;
   double nrby = rby * ratio + diff;
@@ -193,10 +191,10 @@ void neurosegSwellLegacyLike(Neuroseg* seg, double ratio, double diff, double ma
     nrby = std::min(nrby, rby + maxDiff);
   }
 
-  seg->scale = nrbx / nrby;
-  seg->r1 = nrby;
-  if (seg->c > 0.0) {
-    seg->r1 -= (seg->h - 1.0) * seg->c;
+  seg.scale = nrbx / nrby;
+  seg.r1 = nrby;
+  if (seg.c > 0.0) {
+    seg.r1 -= (seg.h - 1.0) * seg.c;
   }
 }
 
@@ -295,12 +293,12 @@ double neurosegAngleBetweenLegacyLike(const Neuroseg& seg1, const Neuroseg& seg2
   double x1 = 0.0;
   double y1 = 0.0;
   double z1 = 0.0;
-  geo3dOrientationNormalLegacyLike(seg1.theta, seg1.psi, &x1, &y1, &z1);
+  geo3dOrientationNormalLegacyLike(seg1.theta, seg1.psi, x1, y1, z1);
 
   double x2 = 0.0;
   double y2 = 0.0;
   double z2 = 0.0;
-  geo3dOrientationNormalLegacyLike(seg2.theta, seg2.psi, &x2, &y2, &z2);
+  geo3dOrientationNormalLegacyLike(seg2.theta, seg2.psi, x2, y2, z2);
 
   return geo3dVectorAngle2LegacyLike(x1, y1, z1, x2, y2, z2);
 }

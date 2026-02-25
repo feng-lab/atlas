@@ -14,11 +14,10 @@ namespace nim::neutube {
 class ZNeutubeSpGrowParser
 {
 public:
-  ZNeutubeSpGrowParser() = default;
+  explicit ZNeutubeSpGrowParser(SpGrowWorkspace& workspace);
 
-  explicit ZNeutubeSpGrowParser(SpGrowWorkspace* workspace);
-
-  [[nodiscard]] ZNeutubeVoxelArray extractLongestPath(double* length, bool masked);
+  // `length` is optional; pass nullptr when only the path geometry is needed (see skeletonizer).
+  [[nodiscard]] ZNeutubeVoxelArray extractLongestPath(/*nullable*/ double* length, bool masked);
 
   [[nodiscard]] std::vector<ZNeutubeVoxelArray> extractAllPath(double minLength, const ZImg& ballImg);
 
@@ -33,7 +32,7 @@ private:
   }
 
 private:
-  SpGrowWorkspace* m_workspace = nullptr;
+  SpGrowWorkspace& m_workspace;
 
   std::vector<int64_t> m_fgArray;
 

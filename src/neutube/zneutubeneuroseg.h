@@ -49,16 +49,20 @@ using NeurosegFieldFunctionLegacyLike = double (*)(double x, double y);
 [[nodiscard]] double neurosegBallRangeLegacyLike(const Neuroseg& seg);
 
 // Port of tz_neuroseg.c::Neuroseg_Swell().
-void neurosegSwellLegacyLike(Neuroseg* seg, double ratio, double diff, double maxDiff);
+void neurosegSwellLegacyLike(Neuroseg& seg, double ratio, double diff, double maxDiff);
 
 // Port of tz_neuroseg.c::Neuroseg_Dist_Filter().
 //
 // Returns a 3D array in Z-major, then Y, then X order, matching the legacy C layout:
 //   offset = i + sizeX * (j + sizeY * k)
 // The caller is expected to interpret values <= 1 as "inside" the segment.
+//
+// Notes:
+// - `offpos` is optional; when provided it shifts the sampling coordinate system
+//   (used by `localNeurosegLabelWLegacyLike` which computes an offset-position).
 [[nodiscard]] std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
                                                                const FieldRangeLegacyLike& range,
-                                                               const std::array<double, 3>* offpos,
+                                                               /*nullable*/ const std::array<double, 3>* offpos,
                                                                double zScale);
 
 // Port of tz_neuroseg.c::Neuroseg_Angle_Between().

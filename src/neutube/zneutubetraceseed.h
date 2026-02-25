@@ -28,9 +28,9 @@ struct RemoveNoisySeedDiagnosticsLegacyLike
 // - May mutate `mask` by removing objects smaller than a derived size threshold.
 // - If mutation occurs, seeds are re-extracted from the updated mask using the given seed method.
 [[nodiscard]] Geo3dScalarField removeNoisySeedLegacyLike(Geo3dScalarField seeds,
-                                                         ZImg* mask,
+                                                         ZImg& mask,
                                                          int seedMethod,
                                                          bool screeningSeed,
-                                                         RemoveNoisySeedDiagnosticsLegacyLike* diag);
+                                                         /*nullable*/ RemoveNoisySeedDiagnosticsLegacyLike* diag);
 
 } // namespace nim::neutube

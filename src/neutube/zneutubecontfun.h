@@ -31,22 +31,21 @@ inline void variableSetAddLinkLegacyLike(int* link, int master, int slave)
 }
 
 // Port of tz_cont_fun.c::Variable_Set_Update_Link().
-inline void variableSetUpdateLinkLegacyLike(VariableSet* vs)
+inline void variableSetUpdateLinkLegacyLike(VariableSet& vs)
 {
-  CHECK(vs != nullptr);
-  if (vs->link == nullptr) {
+  if (vs.link == nullptr) {
     return;
   }
 
-  CHECK(vs->var != nullptr);
-  CHECK(vs->varIndex != nullptr);
+  CHECK(vs.var != nullptr);
+  CHECK(vs.varIndex != nullptr);
 
-  for (int i = 0; i < vs->nvar; ++i) {
-    int remain = vs->link[i];
+  for (int i = 0; i < vs.nvar; ++i) {
+    int remain = vs.link[i];
     while (remain > 0) {
       const int slaveIndex = remain % 100 - 1;
       CHECK(slaveIndex >= 0);
-      vs->var[slaveIndex] = vs->var[vs->varIndex[i]];
+      vs.var[slaveIndex] = vs.var[vs.varIndex[i]];
       remain /= 100;
     }
   }

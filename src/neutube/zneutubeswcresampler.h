@@ -10,10 +10,10 @@ class ZNeutubeSwcResampler
 public:
   ZNeutubeSwcResampler();
 
-  int optimalDownsample(ZSwc* tree) const;
+  int optimalDownsample(ZSwc& tree) const;
 
 private:
-  int suboptimalDownsample(ZSwc* tree) const;
+  int suboptimalDownsample(ZSwc& tree) const;
 
   [[nodiscard]] bool isInterRedundant(const ZSwc::SwcTreeNode& tn, const ZSwc::SwcTreeNode& master) const;
 

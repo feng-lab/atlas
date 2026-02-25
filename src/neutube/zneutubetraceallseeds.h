@@ -18,8 +18,8 @@ namespace nim::neutube {
 // - Returns the traced chains (each owned by a unique_ptr).
 [[nodiscard]] std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& signal,
                                                                                 double zScale,
-                                                                                std::vector<LocalNeuroseg>* locsegArray,
-                                                                                std::vector<double>* scores,
-                                                                                TraceWorkspace* tw);
+                                                                                std::vector<LocalNeuroseg>& locsegArray,
+                                                                                std::vector<double>& scores,
+                                                                                TraceWorkspace& tw);
 
 } // namespace nim::neutube

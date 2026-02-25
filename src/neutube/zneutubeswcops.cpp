@@ -7,14 +7,13 @@
 
 namespace nim::neutube {
 
-void mergeToParent(ZSwc* swc, ZSwc::SwcTreeNode node)
+void mergeToParent(ZSwc& swc, ZSwc::SwcTreeNode node)
 {
   mergeToParent(swc, node, SwcMergeOption::MergeWithParent);
 }
 
-void mergeToParent(ZSwc* swc, ZSwc::SwcTreeNode node, SwcMergeOption option)
+void mergeToParent(ZSwc& swc, ZSwc::SwcTreeNode node, SwcMergeOption option)
 {
-  CHECK(swc != nullptr);
   CHECK(!ZSwc::isNull(node));
   CHECK(!ZSwc::isRoot(node)) << "mergeToParent expects a non-root node";
 
@@ -54,12 +53,11 @@ void mergeToParent(ZSwc* swc, ZSwc::SwcTreeNode node, SwcMergeOption option)
       break;
   }
 
-  swc->erase(node);
+  swc.erase(node);
 }
 
-ZSwc::SwcTreeNode addBreak(ZSwc* swc, ZSwc::SwcTreeNode node, double lambda)
+ZSwc::SwcTreeNode addBreak(ZSwc& swc, ZSwc::SwcTreeNode node, double lambda)
 {
-  CHECK(swc != nullptr);
   CHECK(!ZSwc::isNull(node));
 
   if (ZSwc::isRoot(node)) {
@@ -88,17 +86,16 @@ ZSwc::SwcTreeNode addBreak(ZSwc* swc, ZSwc::SwcTreeNode node, double lambda)
   newNode.radius = lambda * node->radius + (1.0 - lambda) * parent->radius;
   newNode.parentID = -1;
 
-  ZSwc::SwcTreeNode inserted = swc->insertChildBefore(parent, node, newNode);
+  ZSwc::SwcTreeNode inserted = swc.insertChildBefore(parent, node, newNode);
 
   // Make `node` the only child of the inserted break node.
-  swc->appendChild(inserted, node);
+  swc.appendChild(inserted, node);
 
   return inserted;
 }
 
-void connectNode(ZSwc* tree, ZSwc::SwcTreeNode node)
+void connectNode(ZSwc& tree, ZSwc::SwcTreeNode node)
 {
-  CHECK(tree != nullptr);
   CHECK(!ZSwc::isNull(node));
 
   constexpr double Eps = 0.05;
@@ -123,21 +120,20 @@ void connectNode(ZSwc* tree, ZSwc::SwcTreeNode node)
   const std::array<double, 3> end = {tmpNode->x, tmpNode->y, tmpNode->z};
 
   double lambda = 0.0;
-  (void)geo3dPointLineSegDist(tmpPos, start, end, &lambda);
+  (void)geo3dPointLineSegDist(tmpPos, start, end, lambda);
 
   if (lambda - Eps < 0.0) {
-    tree->appendChild(tmpParent, node);
+    tree.appendChild(tmpParent, node);
   } else if (lambda + Eps > 1.0) {
-    tree->appendChild(tmpNode, node);
+    tree.appendChild(tmpNode, node);
   } else {
     const auto breakNode = addBreak(tree, tmpNode, lambda);
-    tree->appendChild(breakNode, node);
+    tree.appendChild(breakNode, node);
   }
 }
 
-ZSwc::SwcTreeNode connectBranch(ZSwc* tree, ZSwc::SwcTreeNode startNode)
+ZSwc::SwcTreeNode connectBranch(ZSwc& tree, ZSwc::SwcTreeNode startNode)
 {
-  CHECK(tree != nullptr);
   CHECK(!ZSwc::isNull(startNode));
 
   ZSwc::SwcTreeNode endNode = startNode;
@@ -168,7 +164,7 @@ ZSwc::SwcTreeNode connectBranch(ZSwc* tree, ZSwc::SwcTreeNode startNode)
   if (d2.dist < d1.dist) {
     tmpNode = d2.closestNode;
     tn = endNode;
-    tree->setAsRoot(tn);
+    tree.setAsRoot(tn);
     dist = d2.dist;
     pt = d2.closestPoint;
   }
@@ -178,7 +174,7 @@ ZSwc::SwcTreeNode connectBranch(ZSwc* tree, ZSwc::SwcTreeNode startNode)
   }
 
   if (ZSwc::isRoot(tmpNode)) {
-    tree->appendChild(tmpNode, tn);
+    tree.appendChild(tmpNode, tn);
     return tn;
   }
 
@@ -194,26 +190,24 @@ ZSwc::SwcTreeNode connectBranch(ZSwc* tree, ZSwc::SwcTreeNode startNode)
   const std::array<double, 3> end = {tmpNode->x, tmpNode->y, tmpNode->z};
 
   double lambda = 0.0;
-  (void)geo3dPointLineSegDist(tmpPos, start, end, &lambda);
+  (void)geo3dPointLineSegDist(tmpPos, start, end, lambda);
 
   if (lambda - Eps < 0.0) {
-    tree->appendChild(tmpParent, tn);
+    tree.appendChild(tmpParent, tn);
   } else if (lambda + Eps > 1.0) {
-    tree->appendChild(tmpNode, tn);
+    tree.appendChild(tmpNode, tn);
   } else {
     const auto breakNode = addBreak(tree, tmpNode, lambda);
-    tree->appendChild(breakNode, tn);
+    tree.appendChild(breakNode, tn);
   }
 
   return tn;
 }
 
-int resortId(ZSwc* tree)
+int resortId(ZSwc& tree)
 {
-  CHECK(tree != nullptr);
-
   int id = 1;
-  for (auto it = tree->begin(); it != tree->end(); ++it) {
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
     if (it->id >= 0) {
       it->id = id;
       ++id;

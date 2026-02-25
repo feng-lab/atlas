@@ -28,10 +28,9 @@ namespace {
   return out;
 }
 
-void stackSubcLegacyLike(ZImg* stack, int subtr)
+void stackSubcLegacyLike(ZImg& stack, int subtr)
 {
-  CHECK(stack != nullptr);
-  if (stack->isEmpty()) {
+  if (stack.isEmpty()) {
     return;
   }
   if (subtr <= 0) {
@@ -41,10 +40,10 @@ void stackSubcLegacyLike(ZImg* stack, int subtr)
   // Use ZImg's saturating arithmetic implementation (same semantics as the legacy Stack_Subc path).
   //
   // Keep the same short-circuit behavior for unsupported types.
-  if (!stack->isType<uint8_t>() && !stack->isType<uint16_t>()) {
-    throw ZException(fmt::format("stackSubcLegacyLike: unsupported voxel type {}", stack->info()));
+  if (!stack.isType<uint8_t>() && !stack.isType<uint16_t>()) {
+    throw ZException(fmt::format("stackSubcLegacyLike: unsupported voxel type {}", stack.info()));
   }
-  *stack -= subtr;
+  stack -= subtr;
 }
 
 [[nodiscard]] size_t fgAreaAboveThresholdLegacyLike(const ZImg& stack, int thre)
@@ -80,28 +79,27 @@ void stackSubcLegacyLike(ZImg* stack, int subtr)
   throw ZException(fmt::format("fgAreaAboveThresholdLegacyLike: unsupported voxel type {}", stack.info()));
 }
 
-void thresholdBinarizeToUint8LegacyLike(const ZImg& in, int thre, ZImg* out)
+void thresholdBinarizeToUint8LegacyLike(const ZImg& in, int thre, ZImg& out)
 {
-  CHECK(out != nullptr);
   CHECK(in.numChannels() == 1);
   CHECK(in.numTimes() == 1);
 
   if (in.isEmpty()) {
-    out->clear();
+    out.clear();
     return;
   }
 
-  if (out->isEmpty()) {
-    *out = makeUint8VolumeLike(in);
+  if (out.isEmpty()) {
+    out = makeUint8VolumeLike(in);
   } else {
-    CHECK(out->width() == in.width() && out->height() == in.height() && out->depth() == in.depth());
-    CHECK(out->numChannels() == 1);
-    CHECK(out->numTimes() == 1);
-    CHECK(out->isType<uint8_t>());
+    CHECK(out.width() == in.width() && out.height() == in.height() && out.depth() == in.depth());
+    CHECK(out.numChannels() == 1);
+    CHECK(out.numTimes() == 1);
+    CHECK(out.isType<uint8_t>());
   }
 
   const size_t n = in.voxelNumber();
-  auto* dst = out->timeData<uint8_t>(0);
+  auto* dst = out.timeData<uint8_t>(0);
 
   if (in.isType<uint8_t>()) {
     const auto* src = in.timeData<uint8_t>(0);
@@ -240,20 +238,16 @@ void thresholdBinarizeToUint8LegacyLike(const ZImg& in, int thre, ZImg* out)
 
 } // namespace
 
-int subtractBackgroundLegacyLike(ZImg* stack, double minFr, int maxIter)
+int subtractBackgroundLegacyLike(ZImg& stack, double minFr, int maxIter)
 {
-  if (stack == nullptr) {
-    throw ZException("subtractBackgroundLegacyLike: null stack.");
-  }
-
-  if (stack->isEmpty()) {
+  if (stack.isEmpty()) {
     return 0;
   }
 
-  CHECK(stack->numChannels() == 1);
-  CHECK(stack->numTimes() == 1);
+  CHECK(stack.numChannels() == 1);
+  CHECK(stack.numTimes() == 1);
 
-  const auto histOpt = imageHistogramLegacyLike(*stack, nullptr);
+  const auto histOpt = imageHistogramLegacyLike(stack, nullptr);
   if (!histOpt) {
     return 0;
   }
@@ -324,7 +318,7 @@ BinarizeResultLegacyLike binarizeLocmaxLegacyLike(const ZImg& stack, int retryCo
   if (hist.count(minV) + hist.count(maxV) == static_cast<int>(voxelNumber)) {
     // Only two values: legacy short-circuit.
     res.actualThreshold = minV;
-    thresholdBinarizeToUint8LegacyLike(stack, minV, &res.binary);
+    thresholdBinarizeToUint8LegacyLike(stack, minV, res.binary);
     res.success = true;
     return res;
   }
@@ -353,7 +347,7 @@ BinarizeResultLegacyLike binarizeLocmaxLegacyLike(const ZImg& stack, int retryCo
   }
 
   res.actualThreshold = threshold;
-  thresholdBinarizeToUint8LegacyLike(stack, threshold, &res.binary);
+  thresholdBinarizeToUint8LegacyLike(stack, threshold, res.binary);
   res.success = true;
   return res;
 }

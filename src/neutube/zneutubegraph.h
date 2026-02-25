@@ -23,7 +23,7 @@ struct GraphLegacyLike
 // Port of `Graph_Edge_Index(v1, v2)` semantics (orientation-sensitive).
 [[nodiscard]] int graphEdgeIndexLegacyLike(const GraphLegacyLike& graph, int v1, int v2);
 
-void graphAddEdgeLegacyLike(GraphLegacyLike* graph, int v1, int v2, double weight);
+void graphAddEdgeLegacyLike(GraphLegacyLike& graph, int v1, int v2, double weight);
 
 // Result bundle for the `Graph_To_Mst2` port.
 struct GraphMst2ResultLegacyLike
@@ -35,7 +35,7 @@ struct GraphMst2ResultLegacyLike
 // Port of `tz_graph.c::Graph_To_Mst2()`.
 //
 // - Uses legacy `darray_qsort` ordering to preserve tie behavior.
-// - Compacts `graph->edges` and `graph->weights` in-place to only the selected MST edges.
-[[nodiscard]] GraphMst2ResultLegacyLike graphToMst2LegacyLike(GraphLegacyLike* graph);
+// - Compacts `graph.edges` and `graph.weights` in-place to only the selected MST edges.
+[[nodiscard]] GraphMst2ResultLegacyLike graphToMst2LegacyLike(GraphLegacyLike& graph);
 
 } // namespace nim::neutube

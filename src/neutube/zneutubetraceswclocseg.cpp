@@ -8,27 +8,25 @@
 
 namespace nim::neutube {
 
-void localNeurosegChangeTopLegacyLike(LocalNeuroseg* locseg, const std::array<double, 3>& newTop)
+void localNeurosegChangeTopLegacyLike(LocalNeuroseg& locseg, const std::array<double, 3>& newTop)
 {
   // Port of tz_local_neuroseg.c::Local_Neuroseg_Change_Top().
-  CHECK(locseg != nullptr);
-
-  const std::array<double, 3> bottom = localNeurosegBottomLegacyLike(*locseg);
+  const std::array<double, 3> bottom = localNeurosegBottomLegacyLike(locseg);
   std::array<double, 3> axisVector = {newTop[0] - bottom[0], newTop[1] - bottom[1], newTop[2] - bottom[2]};
 
   const double h =
     std::sqrt(axisVector[0] * axisVector[0] + axisVector[1] * axisVector[1] + axisVector[2] * axisVector[2]);
   if (h < 0.1) {
-    locseg->seg.h = 1.0;
+    locseg.seg.h = 1.0;
     return;
   }
 
   axisVector[0] /= h;
   axisVector[1] /= h;
   axisVector[2] /= h;
-  locseg->seg.h = h + 1.0;
+  locseg.seg.h = h + 1.0;
 
-  geo3dNormalOrientationLegacyLike(axisVector[0], axisVector[1], axisVector[2], &locseg->seg.theta, &locseg->seg.psi);
+  geo3dNormalOrientationLegacyLike(axisVector[0], axisVector[1], axisVector[2], locseg.seg.theta, locseg.seg.psi);
 
   setNeurosegPositionLegacyLike(locseg, newTop, NeuroposReferenceLegacyLike::Top);
 }
@@ -52,7 +50,7 @@ std::optional<LocalNeuroseg> swcNodeToLocsegLegacyLike(const ZSwc::ConstSwcTreeN
   locseg.pos = {parent->x, parent->y, parent->z};
 
   const std::array<double, 3> top = {node->x, node->y, node->z};
-  localNeurosegChangeTopLegacyLike(&locseg, top);
+  localNeurosegChangeTopLegacyLike(locseg, top);
 
   locseg.seg.r1 = parent->radius;
   locseg.seg.scale = 1.0;

@@ -64,17 +64,10 @@ namespace {
 
 } // namespace
 
-bool loadSwcLegacyOrder(const std::string& path, ZSwc* out, std::string* error)
+bool loadSwcLegacyOrder(const std::string& path, ZSwc& out, std::string* error)
 {
-  if (out == nullptr) {
-    if (error != nullptr) {
-      *error = "loadSwcLegacyOrder: null output pointer";
-    }
-    return false;
-  }
-
   try {
-    out->clear();
+    out.clear();
 
     std::ifstream file(path, std::ios_base::in);
     if (!file.is_open()) {
@@ -122,7 +115,7 @@ bool loadSwcLegacyOrder(const std::string& path, ZSwc* out, std::string* error)
       byId[idx] = node;
     }
 
-    std::vector<ZSwc::SwcTreeNode> itMap(mapSize, out->end());
+    std::vector<ZSwc::SwcTreeNode> itMap(mapSize, out.end());
 
     // Create all nodes as roots first (in descending ID order), then attach children
     // using prepend semantics to match legacy `first_child` linkage behavior.
@@ -131,7 +124,7 @@ bool loadSwcLegacyOrder(const std::string& path, ZSwc* out, std::string* error)
       if (!byId[idx].has_value()) {
         continue;
       }
-      itMap[idx] = out->appendRoot(*byId[idx]);
+      itMap[idx] = out.appendRoot(*byId[idx]);
     }
 
     auto isParentValid = [&](int64_t nodeId, int64_t parentId) -> bool {
@@ -171,7 +164,7 @@ bool loadSwcLegacyOrder(const std::string& path, ZSwc* out, std::string* error)
       auto parent = itMap[pidx];
       CHECK(!ZSwc::isNull(parent));
 
-      out->prependChild(parent, child);
+      out.prependChild(parent, child);
     }
 
     return true;

@@ -407,9 +407,9 @@ std::unique_ptr<ZSwc> ZNeutubeSkeletonizer::makeSkeletonWithoutDs(ZImg img, cons
       }
       sgw.mask[maxIndex] = SP_GROW_SOURCE;
 
-      stackSpGrow(tmpdist, &sgw);
+      stackSpGrow(tmpdist, sgw);
 
-      ZNeutubeSpGrowParser parser(&sgw);
+      ZNeutubeSpGrowParser parser(sgw);
 
       if (m_rebase) {
         LOG(INFO) << "Replacing start point ...";
@@ -431,7 +431,7 @@ std::unique_ptr<ZSwc> ZNeutubeSkeletonizer::makeSkeletonWithoutDs(ZImg img, cons
           }
         }
 
-        stackSpGrow(tmpdist, &sgw);
+        stackSpGrow(tmpdist, sgw);
       }
 
       std::vector<ZNeutubeVoxelArray> pathArray = parser.extractAllPath(lengthThreshold, tmpdist);
@@ -488,10 +488,10 @@ std::unique_ptr<ZSwc> ZNeutubeSkeletonizer::makeSkeletonWithoutDs(ZImg img, cons
         auto branchRootInSubtree = subtree.appendRoot(*branch->beginRoot());
         subtree.copy(branchRootInSubtree, *branch, branch->beginRoot());
 
-        const auto tn = connectBranch(&subtree, branchRootInSubtree);
+        const auto tn = connectBranch(subtree, branchRootInSubtree);
         const auto parent = ZSwc::parent(tn);
         if (!ZSwc::isNull(parent) && hasOverlapCenters(tn, parent)) {
-          mergeToParent(&subtree, tn);
+          mergeToParent(subtree, tn);
         }
       }
     }
@@ -517,12 +517,12 @@ std::unique_ptr<ZSwc> ZNeutubeSkeletonizer::makeSkeletonWithoutDs(ZImg img, cons
     if (m_resolution[0] != 1.0) {
       zScale /= m_resolution[0];
     }
-    reconnectSwc(&wholeTree, zScale, m_distanceThreshold / m_resolution[0]);
+    reconnectSwc(wholeTree, zScale, m_distanceThreshold / m_resolution[0]);
   }
 
   if (m_resampleSwc) {
     ZNeutubeSwcResampler resampler;
-    resampler.optimalDownsample(&wholeTree);
+    resampler.optimalDownsample(wholeTree);
   }
 
   wholeTree.resortID();

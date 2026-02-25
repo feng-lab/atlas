@@ -379,12 +379,9 @@ int triangleThresholdLegacyLike(const IntHistogramLegacyLike& hist, int low, int
   return thre;
 }
 
-int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, double* c1, double* c2)
+int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, double& c1, double& c2)
 {
   // Port of tz_stack_threshold.c::Hist_Rcthre_R().
-  CHECK(c1 != nullptr);
-  CHECK(c2 != nullptr);
-
   if (hist.empty()) {
     throw ZException("rcthreRLegacyLike: empty histogram.");
   }
@@ -413,8 +410,8 @@ int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, dou
 
   int thre = static_cast<int>((static_cast<double>(minGrey + maxGrey) / 2.0) - static_cast<double>(minGrey));
 
-  *c1 = 0.0;
-  *c2 = 0.0;
+  c1 = 0.0;
+  c2 = 0.0;
 
   int prevThre = -1;
   do {
@@ -424,11 +421,11 @@ int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, dou
 
     prevThre = thre;
 
-    *c1 = iarrayCentroidD(hist2, static_cast<size_t>(thre) + 1);
-    *c2 = iarrayCentroidD(hist2 + thre + 1, static_cast<size_t>(length - thre - 1));
+    c1 = iarrayCentroidD(hist2, static_cast<size_t>(thre) + 1);
+    c2 = iarrayCentroidD(hist2 + thre + 1, static_cast<size_t>(length - thre - 1));
 
-    *c2 += static_cast<double>(thre + 1);
-    thre = static_cast<int>((*c1 + *c2) / 2.0);
+    c2 += static_cast<double>(thre + 1);
+    thre = static_cast<int>((c1 + c2) / 2.0);
   } while (thre != prevThre);
 
   thre += minGrey;

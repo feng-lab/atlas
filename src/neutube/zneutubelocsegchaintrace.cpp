@@ -17,60 +17,52 @@ namespace {
   return (a > b) ? a : b;
 }
 
-void recordTraceScoreLegacyLike(TraceRecord* record, const LocsegFitWorkspace& fitWorkspace)
+void recordTraceScoreLegacyLike(TraceRecord& record, const LocsegFitWorkspace& fitWorkspace)
 {
   // Port of `RECORD_TRACE_SCORE(record, fit_workspace)` macro.
-  CHECK(record != nullptr);
   const int n = fitWorkspace.sws.fs.n;
   CHECK(n > 0);
-  record->fs.scores[0] = fitWorkspace.sws.fs.scores[0];
-  record->fs.scores[1] = fitWorkspace.sws.fs.scores[static_cast<size_t>(n - 1)];
+  record.fs.scores[0] = fitWorkspace.sws.fs.scores[0];
+  record.fs.scores[1] = fitWorkspace.sws.fs.scores[static_cast<size_t>(n - 1)];
 }
 
-void locsegChainBeginFitLegacyLike(LocalNeuroseg* locseg,
+void locsegChainBeginFitLegacyLike(LocalNeuroseg& locseg,
                                    LocsegChainEndLegacyLike listEnd,
-                                   TraceDirection* traceDirection)
+                                   TraceDirection& traceDirection)
 {
   // Port of `LOCSEG_CHAIN_BEGIN_FIT(locseg, list_end)` macro.
-  CHECK(locseg != nullptr);
-  CHECK(traceDirection != nullptr);
-
   if (listEnd == LocsegChainEndLegacyLike::Head) {
-    *traceDirection = TraceDirection::Backward;
+    traceDirection = TraceDirection::Backward;
     flipLocalNeurosegLegacyLike(locseg);
   } else {
-    *traceDirection = TraceDirection::Forward;
+    traceDirection = TraceDirection::Forward;
   }
 }
 
-void locsegChainEndFitLegacyLike(LocalNeuroseg* locseg, LocsegChainEndLegacyLike listEnd)
+void locsegChainEndFitLegacyLike(LocalNeuroseg& locseg, LocsegChainEndLegacyLike listEnd)
 {
   // Port of `LOCSEG_CHAIN_END_FIT(locseg, list_end)` macro.
-  CHECK(locseg != nullptr);
   if (listEnd == LocsegChainEndLegacyLike::Head) {
     flipLocalNeurosegLegacyLike(locseg);
   }
 }
 
-void locsegChainFitLegacyLike(LocalNeuroseg* locseg,
+void locsegChainFitLegacyLike(LocalNeuroseg& locseg,
                               const ZImg& stack,
                               double zScale,
-                              LocsegFitWorkspace* fitWs,
-                              TraceRecord* tr)
+                              LocsegFitWorkspace& fitWs,
+                              TraceRecord& tr)
 {
   // Port of `LOCSEG_CHAIN_FIT(locseg)` macro.
-  CHECK(locseg != nullptr);
-  CHECK(fitWs != nullptr);
-  CHECK(tr != nullptr);
   (void)fitLocalNeurosegWLegacyLike(locseg, stack, zScale, fitWs);
-  recordTraceScoreLegacyLike(tr, *fitWs);
+  recordTraceScoreLegacyLike(tr, fitWs);
 }
 
 } // namespace
 
 TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
                                            const LocsegChain* chain,
-                                           const TraceWorkspace* tw,
+                                           const TraceWorkspace& tw,
                                            TraceRecord* tr,
                                            double zScale,
                                            double maxR,
@@ -79,8 +71,6 @@ TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
                                            const LocalNeuroseg* prevLocseg,
                                            const ZImg& stack)
 {
-  CHECK(tw != nullptr);
-
   std::array<double, 3> pos = {-1.0, -1.0, -1.0};
   double segr1 = 1.0;
   double segr2 = 1.0;
@@ -94,11 +84,11 @@ TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
       pos[0] = -1.0;
     }
 
-    if (tw->resolution[0] > 0.0) {
-      segr1 = std::sqrt(neurosegRxPLegacyLike(locseg->seg, tw->resolution, NeuroposReferenceLegacyLike::Bottom) *
-                        neurosegRyPLegacyLike(locseg->seg, tw->resolution, NeuroposReferenceLegacyLike::Bottom));
-      segr2 = std::sqrt(neurosegRxPLegacyLike(locseg->seg, tw->resolution, NeuroposReferenceLegacyLike::Top) *
-                        neurosegRyPLegacyLike(locseg->seg, tw->resolution, NeuroposReferenceLegacyLike::Top));
+    if (tw.resolution[0] > 0.0) {
+      segr1 = std::sqrt(neurosegRxPLegacyLike(locseg->seg, tw.resolution, NeuroposReferenceLegacyLike::Bottom) *
+                        neurosegRyPLegacyLike(locseg->seg, tw.resolution, NeuroposReferenceLegacyLike::Bottom));
+      segr2 = std::sqrt(neurosegRxPLegacyLike(locseg->seg, tw.resolution, NeuroposReferenceLegacyLike::Top) *
+                        neurosegRyPLegacyLike(locseg->seg, tw.resolution, NeuroposReferenceLegacyLike::Top));
     } else {
       segr1 = std::sqrt(neurosegRxLegacyLike(locseg->seg, NeuroposReferenceLegacyLike::Bottom) *
                         neurosegRyLegacyLike(locseg->seg, NeuroposReferenceLegacyLike::Bottom));
@@ -111,18 +101,16 @@ TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
   ipos[2] *= zScale;
 
   if (tr != nullptr && locseg != nullptr) {
-    if (!localNeurosegGoodScoreLegacyLike(*locseg,
-                                          tr->fs.scores[static_cast<size_t>(tw->tscoreOption)],
-                                          tw->minScore)) {
+    if (!localNeurosegGoodScoreLegacyLike(*locseg, tr->fs.scores[static_cast<size_t>(tw.tscoreOption)], tw.minScore)) {
       return TraceStatus::LowScore;
     }
 
-    if (tw->supStack != nullptr) {
+    if (tw.supStack != nullptr) {
       StackFitScore fs{};
       fs.n = 1;
-      fs.options[0] = tw->tscoreOption;
-      const double supScore = localNeurosegScorePLegacyLike(*locseg, *tw->supStack, zScale, &fs);
-      if (!localNeurosegGoodScoreLegacyLike(*locseg, supScore, tw->minScore)) {
+      fs.options[0] = tw.tscoreOption;
+      const double supScore = localNeurosegScorePLegacyLike(*locseg, *tw.supStack, zScale, &fs);
+      if (!localNeurosegGoodScoreLegacyLike(*locseg, supScore, tw.minScore)) {
         return TraceStatus::LowScore;
       }
     }
@@ -174,11 +162,11 @@ TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
   }
 
   if (locseg != nullptr) {
-    if (!traceWorkspacePointInBoundLegacyLike(*tw, ipos)) {
+    if (!traceWorkspacePointInBoundLegacyLike(tw, ipos)) {
       return TraceStatus::OutOfBound;
     }
 
-    const int hitLabel = traceWorkspaceMaskValueLegacyLike(*tw, ipos);
+    const int hitLabel = traceWorkspaceMaskValueLegacyLike(tw, ipos);
     if (hitLabel > 0) {
       if (tr != nullptr) {
         // Legacy writes directly without setting the record bitmask.
@@ -191,21 +179,18 @@ TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
   return TraceStatus::Normal;
 }
 
-void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain, TraceWorkspace* tw)
+void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain, TraceWorkspace& tw)
 {
   // Port of tz_locseg_chain.c::Trace_Locseg().
-  if (chain == nullptr || tw == nullptr) {
-    return;
-  }
-  if (chain->empty()) {
+  if (chain.empty()) {
     return;
   }
   if (stack.isEmpty()) {
     return;
   }
 
-  LocsegFitWorkspace fitWs = tw->fitWorkspace;
-  LocsegFitWorkspace fitWsH = tw->fitWorkspace;
+  LocsegFitWorkspace fitWs = tw.fitWorkspace;
+  LocsegFitWorkspace fitWsH = tw.fitWorkspace;
 
   // Height-only variable set (NEUROSEG_VAR_MASK_HEIGHT).
   fitWsH.nvar = 1;
@@ -215,65 +200,65 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
   tr.mask = 0;
   tr.fs.n = 2;
   tr.fs.options[0] = 0;
-  tr.fs.options[1] = tw->tscoreOption;
+  tr.fs.options[1] = tw.tscoreOption;
 
   // Append thresholding score option to the fit workspaces.
   CHECK(fitWs.sws.fs.n >= 0);
   CHECK(fitWs.sws.fs.n < static_cast<int>(fitWs.sws.fs.options.size()));
-  fitWs.sws.fs.options[static_cast<size_t>(fitWs.sws.fs.n)] = tw->tscoreOption;
+  fitWs.sws.fs.options[static_cast<size_t>(fitWs.sws.fs.n)] = tw.tscoreOption;
   ++fitWs.sws.fs.n;
 
   CHECK(fitWsH.sws.fs.n >= 0);
   CHECK(fitWsH.sws.fs.n < static_cast<int>(fitWsH.sws.fs.options.size()));
-  fitWsH.sws.fs.options[static_cast<size_t>(fitWsH.sws.fs.n)] = tw->tscoreOption;
+  fitWsH.sws.fs.options[static_cast<size_t>(fitWsH.sws.fs.n)] = tw.tscoreOption;
   ++fitWsH.sws.fs.n;
 
   TraceDirection traceDirection = TraceDirection::Unknown;
 
   // Score threshold for height fit.
-  const double fitHeightThreshold = tw->dyvar[2];
+  const double fitHeightThreshold = tw.dyvar[2];
 
-  LocsegNode* currentEnds[2] = {chain->head(), chain->tail()};
+  LocsegNode* currentEnds[2] = {chain.head(), chain.tail()};
   if (currentEnds[0] == nullptr || currentEnds[1] == nullptr) {
     return;
   }
 
   if (currentEnds[0] == currentEnds[1]) {
-    traceRecordSetDirection(&currentEnds[0]->tr, TraceDirection::BothDir);
+    traceRecordSetDirection(currentEnds[0]->tr, TraceDirection::BothDir);
   }
 
   int nrefit = 0;
 
-  if (tw->fitFirst) {
-    if (tw->traceStatus[1] == TraceStatus::Normal) {
-      locsegChainFitLegacyLike(&currentEnds[1]->locseg, stack, zScale, &fitWs, &tr);
-      tw->traceStatus[1] = locsegChainTraceTestLegacyLike(&currentEnds[1]->locseg,
-                                                          chain,
-                                                          tw,
-                                                          &tr,
-                                                          zScale,
-                                                          tw->dyvar[0],
-                                                          TraceDirection::Forward,
-                                                          tw->dyvar[1],
-                                                          nullptr,
-                                                          stack);
+  if (tw.fitFirst) {
+    if (tw.traceStatus[1] == TraceStatus::Normal) {
+      locsegChainFitLegacyLike(currentEnds[1]->locseg, stack, zScale, fitWs, tr);
+      tw.traceStatus[1] = locsegChainTraceTestLegacyLike(&currentEnds[1]->locseg,
+                                                         &chain,
+                                                         tw,
+                                                         &tr,
+                                                         zScale,
+                                                         tw.dyvar[0],
+                                                         TraceDirection::Forward,
+                                                         tw.dyvar[1],
+                                                         nullptr,
+                                                         stack);
     }
 
-    if (tw->traceStatus[0] == TraceStatus::Normal) {
-      flipLocalNeurosegLegacyLike(&currentEnds[0]->locseg);
-      locsegChainFitLegacyLike(&currentEnds[0]->locseg, stack, zScale, &fitWs, &tr);
-      flipLocalNeurosegLegacyLike(&currentEnds[0]->locseg);
+    if (tw.traceStatus[0] == TraceStatus::Normal) {
+      flipLocalNeurosegLegacyLike(currentEnds[0]->locseg);
+      locsegChainFitLegacyLike(currentEnds[0]->locseg, stack, zScale, fitWs, tr);
+      flipLocalNeurosegLegacyLike(currentEnds[0]->locseg);
 
-      tw->traceStatus[0] = locsegChainTraceTestLegacyLike(&currentEnds[0]->locseg,
-                                                          chain,
-                                                          tw,
-                                                          &tr,
-                                                          zScale,
-                                                          tw->dyvar[0],
-                                                          TraceDirection::Backward,
-                                                          tw->dyvar[1],
-                                                          nullptr,
-                                                          stack);
+      tw.traceStatus[0] = locsegChainTraceTestLegacyLike(&currentEnds[0]->locseg,
+                                                         &chain,
+                                                         tw,
+                                                         &tr,
+                                                         zScale,
+                                                         tw.dyvar[0],
+                                                         TraceDirection::Backward,
+                                                         tw.dyvar[1],
+                                                         nullptr,
+                                                         stack);
     }
   }
 
@@ -281,29 +266,29 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
   ortFs.n = 1;
   ortFs.options[0] = static_cast<int>(StackFitOption::Corrcoef);
 
-  const double defaultStep = tw->traceStep;
+  const double defaultStep = tw.traceStep;
   double step[2] = {defaultStep, defaultStep};
 
   int hitCount[2] = {0, 0};
 
-  const int chainLength = chain->length();
+  const int chainLength = chain.length();
   if (chainLength > 1) {
     std::array<double, 3> pos{};
-    if (tw->traceStatus[0] == TraceStatus::Normal || tw->traceStatus[0] == TraceStatus::Refit) {
+    if (tw.traceStatus[0] == TraceStatus::Normal || tw.traceStatus[0] == TraceStatus::Refit) {
       pos = localNeurosegBottomLegacyLike(currentEnds[0]->locseg);
-      if (!traceWorkspacePointInBoundZLegacyLike(*tw, pos, zScale)) {
-        tw->traceStatus[0] = TraceStatus::OutOfBound;
-      } else if (traceWorkspaceMaskValueZLegacyLike(*tw, pos, zScale) > 0) {
-        tw->traceStatus[0] = TraceStatus::HitMark;
+      if (!traceWorkspacePointInBoundZLegacyLike(tw, pos, zScale)) {
+        tw.traceStatus[0] = TraceStatus::OutOfBound;
+      } else if (traceWorkspaceMaskValueZLegacyLike(tw, pos, zScale) > 0) {
+        tw.traceStatus[0] = TraceStatus::HitMark;
       }
     }
 
-    if (tw->traceStatus[1] == TraceStatus::Normal || tw->traceStatus[1] == TraceStatus::Refit) {
+    if (tw.traceStatus[1] == TraceStatus::Normal || tw.traceStatus[1] == TraceStatus::Refit) {
       pos = localNeurosegTopLegacyLike(currentEnds[1]->locseg);
-      if (!traceWorkspacePointInBoundZLegacyLike(*tw, pos, zScale)) {
-        tw->traceStatus[1] = TraceStatus::OutOfBound;
-      } else if (traceWorkspaceMaskValueZLegacyLike(*tw, pos, zScale) > 0) {
-        tw->traceStatus[1] = TraceStatus::HitMark;
+      if (!traceWorkspacePointInBoundZLegacyLike(tw, pos, zScale)) {
+        tw.traceStatus[1] = TraceStatus::OutOfBound;
+      } else if (traceWorkspaceMaskValueZLegacyLike(tw, pos, zScale) > 0) {
+        tw.traceStatus[1] = TraceStatus::HitMark;
       }
     }
   }
@@ -312,33 +297,31 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
   int i = chainLength;
 
   auto tracingBackwardPossible = [&]() {
-    return tw->traceStatus[0] == TraceStatus::Normal || tw->traceStatus[0] == TraceStatus::Refit;
+    return tw.traceStatus[0] == TraceStatus::Normal || tw.traceStatus[0] == TraceStatus::Refit;
   };
 
   auto tracingForwardPossible = [&]() {
-    return tw->traceStatus[1] == TraceStatus::Normal || tw->traceStatus[1] == TraceStatus::Refit;
+    return tw.traceStatus[1] == TraceStatus::Normal || tw.traceStatus[1] == TraceStatus::Refit;
   };
 
-  auto locsegChainRefit = [&](LocalNeuroseg* refitLocseg, LocsegChainEndLegacyLike listEnd, int endIndex) {
-    CHECK(refitLocseg != nullptr);
-
+  auto locsegChainRefit = [&](LocalNeuroseg& refitLocseg, LocsegChainEndLegacyLike listEnd, int endIndex) {
     ++nrefit;
     LocsegNode* p = currentEnds[endIndex];
     CHECK(p != nullptr);
 
-    CHECK(traceRecordFitHeight(&p->tr, endIndex) != 1) << "Legacy invariant violated: fit_height already set";
+    CHECK(traceRecordFitHeight(p->tr, endIndex) != 1) << "Legacy invariant violated: fit_height already set";
 
-    locsegChainBeginFitLegacyLike(&p->locseg, listEnd, &traceDirection);
-    (void)localNeurosegHeightSearchWLegacyLike(&p->locseg, stack, zScale, &fitWs.sws);
-    traceRecordSetFitHeight(&p->tr, endIndex, 1);
-    locsegChainEndFitLegacyLike(&p->locseg, listEnd);
+    locsegChainBeginFitLegacyLike(p->locseg, listEnd, traceDirection);
+    (void)localNeurosegHeightSearchWLegacyLike(p->locseg, stack, zScale, fitWs.sws);
+    traceRecordSetFitHeight(p->tr, endIndex, 1);
+    locsegChainEndFitLegacyLike(p->locseg, listEnd);
 
     curEndStatus = TraceStatus::Normal;
     while ((p->locseg.seg.h < NeurosegDefaultHLegacyLike / 3.0) && (i > 1)) {
-      chain->removeEnd(listEnd);
+      chain.removeEnd(listEnd);
       --i;
 
-      currentEnds[endIndex] = (listEnd == LocsegChainEndLegacyLike::Head) ? chain->head() : chain->tail();
+      currentEnds[endIndex] = (listEnd == LocsegChainEndLegacyLike::Head) ? chain.head() : chain.tail();
       p = currentEnds[endIndex];
       CHECK(p != nullptr);
 
@@ -347,11 +330,11 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
           NeurosegDefaultHLegacyLike / 2.0) {
         curEndStatus = TraceStatus::TooLarge;
       } else {
-        if (traceRecordFitHeight(&p->tr, endIndex) == 0) {
-          locsegChainBeginFitLegacyLike(&p->locseg, listEnd, &traceDirection);
-          (void)localNeurosegHeightSearchWLegacyLike(&p->locseg, stack, zScale, &fitWs.sws);
-          traceRecordSetFitHeight(&p->tr, endIndex, 1);
-          locsegChainEndFitLegacyLike(&p->locseg, listEnd);
+        if (traceRecordFitHeight(p->tr, endIndex) == 0) {
+          locsegChainBeginFitLegacyLike(p->locseg, listEnd, traceDirection);
+          (void)localNeurosegHeightSearchWLegacyLike(p->locseg, stack, zScale, fitWs.sws);
+          traceRecordSetFitHeight(p->tr, endIndex, 1);
+          locsegChainEndFitLegacyLike(p->locseg, listEnd);
         } else {
           curEndStatus = TraceStatus::Repeated;
         }
@@ -364,13 +347,13 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
       curEndStatus = TraceStatus::TooLarge;
     }
 
-    locsegChainBeginFitLegacyLike(&p->locseg, listEnd, &traceDirection);
-    if (tw->traceMask) {
-      if (localNeurosegTopSampleLegacyLike(p->locseg, *tw->traceMask, zScale) > 0.0) {
+    locsegChainBeginFitLegacyLike(p->locseg, listEnd, traceDirection);
+    if (tw.traceMask) {
+      if (localNeurosegTopSampleLegacyLike(p->locseg, *tw.traceMask, zScale) > 0.0) {
         curEndStatus = TraceStatus::NotAssigned;
       }
     }
-    locsegChainEndFitLegacyLike(&p->locseg, listEnd);
+    locsegChainEndFitLegacyLike(p->locseg, listEnd);
 
     if (curEndStatus == TraceStatus::Normal) {
       std::array<double, 3> boundPos{};
@@ -389,33 +372,33 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
           posStep = 0.75;
         }
 
-        locsegChainBeginFitLegacyLike(&p->locseg, listEnd, &traceDirection);
+        locsegChainBeginFitLegacyLike(p->locseg, listEnd, traceDirection);
         nextLocalNeurosegLegacyLike(p->locseg, refitLocseg, posStep);
-        locsegChainEndFitLegacyLike(&p->locseg, listEnd);
+        locsegChainEndFitLegacyLike(p->locseg, listEnd);
 
-        (void)localNeurosegOrientationSearchBLegacyLike(refitLocseg, stack, zScale, &ortFs);
+        (void)localNeurosegOrientationSearchBLegacyLike(refitLocseg, stack, zScale, ortFs);
 
         if (NeuroposReference == NeuroposReferenceLegacyLike::Center) {
           localNeurosegPositionAdjustLegacyLike(refitLocseg, stack, zScale);
         }
 
-        locsegChainFitLegacyLike(refitLocseg, stack, zScale, &fitWs, &tr);
+        locsegChainFitLegacyLike(refitLocseg, stack, zScale, fitWs, tr);
 
-        if (!localNeurosegGoodScoreLegacyLike(*refitLocseg, tr.fs.scores[1], tw->minScore)) {
-          (void)localNeurosegHeightSearchWLegacyLike(&p->locseg, stack, zScale, &fitWs.sws);
-          locsegChainFitLegacyLike(refitLocseg, stack, zScale, &fitWs, &tr);
+        if (!localNeurosegGoodScoreLegacyLike(refitLocseg, tr.fs.scores[1], tw.minScore)) {
+          (void)localNeurosegHeightSearchWLegacyLike(p->locseg, stack, zScale, fitWs.sws);
+          locsegChainFitLegacyLike(refitLocseg, stack, zScale, fitWs, tr);
         }
 
         locsegChainEndFitLegacyLike(refitLocseg, listEnd);
 
-        curEndStatus = locsegChainTraceTestLegacyLike(refitLocseg,
-                                                      chain,
+        curEndStatus = locsegChainTraceTestLegacyLike(&refitLocseg,
+                                                      &chain,
                                                       tw,
                                                       &tr,
                                                       zScale,
-                                                      tw->dyvar[0],
+                                                      tw.dyvar[0],
                                                       traceDirection,
-                                                      tw->dyvar[1],
+                                                      tw.dyvar[1],
                                                       &p->locseg,
                                                       stack);
       } else {
@@ -430,54 +413,54 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
       return;
     }
 
-    curEndStatus = tw->traceStatus[endIndex];
+    curEndStatus = tw.traceStatus[endIndex];
     std::optional<LocalNeuroseg> currentLocseg;
 
     if (curEndStatus == TraceStatus::Normal) {
       LocalNeuroseg* prevLocseg = &endNode->locseg;
 
-      locsegChainBeginFitLegacyLike(prevLocseg, listEnd, &traceDirection);
+      locsegChainBeginFitLegacyLike(*prevLocseg, listEnd, traceDirection);
 
       currentLocseg = nextLocalNeurosegLegacyLike(*prevLocseg, traceStep);
 
       if (NeuroposReference == NeuroposReferenceLegacyLike::Center) {
-        localNeurosegPositionAdjustLegacyLike(&(*currentLocseg), stack, zScale);
+        localNeurosegPositionAdjustLegacyLike(*currentLocseg, stack, zScale);
       }
 
-      locsegChainFitLegacyLike(&(*currentLocseg), stack, zScale, &fitWs, &tr);
+      locsegChainFitLegacyLike(*currentLocseg, stack, zScale, fitWs, tr);
 
       if (tr.fs.scores[1] < fitHeightThreshold) {
-        nextLocalNeurosegLegacyLike(*prevLocseg, &(*currentLocseg), traceStep);
-        locsegChainFitLegacyLike(&(*currentLocseg), stack, zScale, &fitWsH, &tr);
-        locsegChainFitLegacyLike(&(*currentLocseg), stack, zScale, &fitWs, &tr);
+        nextLocalNeurosegLegacyLike(*prevLocseg, *currentLocseg, traceStep);
+        locsegChainFitLegacyLike(*currentLocseg, stack, zScale, fitWsH, tr);
+        locsegChainFitLegacyLike(*currentLocseg, stack, zScale, fitWs, tr);
         prevLocseg->seg.h *= traceStep;
       }
 
-      locsegChainEndFitLegacyLike(prevLocseg, listEnd);
-      locsegChainEndFitLegacyLike(&(*currentLocseg), listEnd);
+      locsegChainEndFitLegacyLike(*prevLocseg, listEnd);
+      locsegChainEndFitLegacyLike(*currentLocseg, listEnd);
 
       curEndStatus = locsegChainTraceTestLegacyLike(&(*currentLocseg),
-                                                    chain,
+                                                    &chain,
                                                     tw,
                                                     &tr,
                                                     zScale,
-                                                    tw->dyvar[0],
+                                                    tw.dyvar[0],
                                                     traceDirection,
-                                                    tw->dyvar[1],
+                                                    tw.dyvar[1],
                                                     prevLocseg,
                                                     stack);
     }
 
-    if ((curEndStatus != TraceStatus::Normal) && tw->refit && (curEndStatus != TraceStatus::HitMark) &&
+    if ((curEndStatus != TraceStatus::Normal) && tw.refit && (curEndStatus != TraceStatus::HitMark) &&
         (curEndStatus != TraceStatus::OutOfBound) && (curEndStatus != TraceStatus::NotAssigned) && (i > 1)) {
       curEndStatus = TraceStatus::Refit;
     }
 
     if (curEndStatus == TraceStatus::Refit) {
       CHECK(currentLocseg.has_value());
-      locsegChainRefit(&(*currentLocseg), listEnd, endIndex);
+      locsegChainRefit(*currentLocseg, listEnd, endIndex);
 
-      traceRecordSetRefit(&tr, 1);
+      traceRecordSetRefit(tr, 1);
 
       if (nrefit > i + 1) {
         curEndStatus = TraceStatus::OverRefit;
@@ -491,7 +474,7 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
         LocsegNode node;
         node.locseg = *currentLocseg;
         node.tr = tr;
-        currentNode = chain->addNode(std::move(node), listEnd);
+        currentNode = chain.addNode(std::move(node), listEnd);
         ++i;
         currentEnds[endIndex] = currentNode;
         hitCount[endIndex] = 0;
@@ -504,21 +487,21 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
           LocsegNode node;
           node.locseg = *currentLocseg;
           node.tr = tr;
-          currentNode = chain->addNode(std::move(node), listEnd);
+          currentNode = chain.addNode(std::move(node), listEnd);
           ++i;
           currentEnds[endIndex] = currentNode;
           ++hitCount[endIndex];
         } else {
-          if (hitCount[endIndex] <= 0 && tw->addHit) {
+          if (hitCount[endIndex] <= 0 && tw.addHit) {
             LocsegNode node;
             node.locseg = *currentLocseg;
             node.tr = tr;
-            currentNode = chain->addNode(std::move(node), listEnd);
+            currentNode = chain.addNode(std::move(node), listEnd);
             ++i;
             currentEnds[endIndex] = currentNode;
           }
 
-          tw->traceStatus[endIndex] = curEndStatus;
+          tw.traceStatus[endIndex] = curEndStatus;
         }
         break;
       }
@@ -528,49 +511,49 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain* chain,
         LocsegNode node;
         node.locseg = *currentLocseg;
         node.tr = tr;
-        currentNode = chain->addNode(std::move(node), listEnd);
+        currentNode = chain.addNode(std::move(node), listEnd);
         ++i;
         currentEnds[endIndex] = currentNode;
-        tw->traceStatus[endIndex] = curEndStatus;
+        tw.traceStatus[endIndex] = curEndStatus;
         break;
       }
 
       default:
-        tw->traceStatus[endIndex] = curEndStatus;
+        tw.traceStatus[endIndex] = curEndStatus;
         break;
     }
   };
 
-  while ((i < tw->length) && (tracingBackwardPossible() || tracingForwardPossible())) {
+  while ((i < tw.length) && (tracingBackwardPossible() || tracingForwardPossible())) {
     if (tracingBackwardPossible()) {
-      traceRecordReset(&tr);
-      traceRecordSetDirection(&tr, TraceDirection::Backward);
-      traceRecordSetFixPoint(&tr, 1.0);
+      traceRecordReset(tr);
+      traceRecordSetDirection(tr, TraceDirection::Backward);
+      traceRecordSetFixPoint(tr, 1.0);
       traceOneDirection(LocsegChainEndLegacyLike::Head, 0, step[0]);
     }
 
     if (tracingForwardPossible()) {
-      traceRecordReset(&tr);
-      traceRecordSetDirection(&tr, TraceDirection::Forward);
-      traceRecordSetFixPoint(&tr, 0.0);
+      traceRecordReset(tr);
+      traceRecordSetDirection(tr, TraceDirection::Forward);
+      traceRecordSetFixPoint(tr, 0.0);
       traceOneDirection(LocsegChainEndLegacyLike::Tail, 1, step[1]);
     }
   }
 
-  if (tw->tuneEnd) {
-    if (chain->length() >= 2) {
-      if ((tw->traceStatus[0] != TraceStatus::HitMark) && (tw->traceStatus[0] != TraceStatus::NotAssigned)) {
-        auto* locseg = chain->headSeg();
+  if (tw.tuneEnd) {
+    if (chain.length() >= 2) {
+      if ((tw.traceStatus[0] != TraceStatus::HitMark) && (tw.traceStatus[0] != TraceStatus::NotAssigned)) {
+        auto* locseg = chain.headSeg();
         CHECK(locseg != nullptr);
-        flipLocalNeurosegLegacyLike(locseg);
-        (void)localNeurosegHeightSearchWLegacyLike(locseg, stack, zScale, &fitWs.sws);
-        flipLocalNeurosegLegacyLike(locseg);
+        flipLocalNeurosegLegacyLike(*locseg);
+        (void)localNeurosegHeightSearchWLegacyLike(*locseg, stack, zScale, fitWs.sws);
+        flipLocalNeurosegLegacyLike(*locseg);
       }
 
-      if ((tw->traceStatus[1] != TraceStatus::HitMark) && (tw->traceStatus[1] != TraceStatus::NotAssigned)) {
-        auto* locseg = chain->tailSeg();
+      if ((tw.traceStatus[1] != TraceStatus::HitMark) && (tw.traceStatus[1] != TraceStatus::NotAssigned)) {
+        auto* locseg = chain.tailSeg();
         CHECK(locseg != nullptr);
-        (void)localNeurosegHeightSearchWLegacyLike(locseg, stack, zScale, &fitWs.sws);
+        (void)localNeurosegHeightSearchWLegacyLike(*locseg, stack, zScale, fitWs.sws);
       }
 
       (void)locsegChainRemoveOverlapEndsLegacyLike(chain);

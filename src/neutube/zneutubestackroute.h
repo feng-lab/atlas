@@ -19,6 +19,6 @@ namespace nim::neutube {
 [[nodiscard]] std::vector<int64_t> stackRouteLegacyLike(const ZImg& stack,
                                                         const std::array<int, 3>& startPos,
                                                         const std::array<int, 3>& endPos,
-                                                        StackGraphWorkspaceLegacyLike* sgw);
+                                                        StackGraphWorkspaceLegacyLike& sgw);
 
 } // namespace nim::neutube

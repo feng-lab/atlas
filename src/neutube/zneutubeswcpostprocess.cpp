@@ -56,11 +56,8 @@ template<typename Iter>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isBranchPointLegacyLike(const Iter& tn, const ZSwc* tree)
+[[nodiscard]] bool isBranchPointLegacyLike(const Iter& tn, ZSwc& tree)
 {
-  if (tree == nullptr) {
-    return false;
-  }
   if (!isRegularLegacyLike(tn)) {
     return false;
   }
@@ -71,12 +68,12 @@ template<typename Iter>
     return false;
   }
 
-  auto it = tree->beginChild(tn);
-  if (it == tree->endChild(tn)) {
+  auto it = tree.beginChild(tn);
+  if (it == tree.endChild(tn)) {
     return false;
   }
   ++it;
-  return it != tree->endChild(tn);
+  return it != tree.endChild(tn);
 }
 
 template<typename Iter>
@@ -95,7 +92,7 @@ template<typename Iter>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isContinuationLegacyLike(const Iter& tn, const ZSwc* tree)
+[[nodiscard]] bool isContinuationLegacyLike(const Iter& tn, ZSwc& tree)
 {
   if (!isRegularLegacyLike(tn)) {
     return false;
@@ -184,7 +181,7 @@ template<typename Iter1, typename Iter2, typename Iter3>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isTurnLegacyLike(const Iter& tn, const ZSwc* tree)
+[[nodiscard]] bool isTurnLegacyLike(const Iter& tn, ZSwc& tree)
 {
   // Port of `Swc_Tree_Node_Is_Turn`.
   if (!isContinuationLegacyLike(tn, tree)) {
@@ -201,7 +198,7 @@ template<typename Iter>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isOvershootLegacyLike(const Iter& tn, const ZSwc* tree)
+[[nodiscard]] bool isOvershootLegacyLike(const Iter& tn, ZSwc& tree)
 {
   // Port of `Swc_Tree_Node_Is_Overshoot`.
   if (!isTurnLegacyLike(tn, tree)) {
@@ -228,7 +225,7 @@ template<typename Iter>
 }
 
 template<typename Iter>
-[[nodiscard]] bool isSpurLegacyLike(const Iter& tn, const ZSwc* tree)
+[[nodiscard]] bool isSpurLegacyLike(const Iter& tn, ZSwc& tree)
 {
   (void)tree;
   if (!isLeafLegacyLike(tn)) {
@@ -256,18 +253,18 @@ template<typename Iter>
 }
 
 template<typename Iter>
-void setParentLegacyLike(ZSwc* tree, Iter tn, Iter parent)
+void setParentLegacyLike(ZSwc& tree, Iter tn, Iter parent)
 {
-  if (tree == nullptr || ZSwc::isNull(tn)) {
+  if (ZSwc::isNull(tn)) {
     return;
   }
 
   if (ZSwc::isNull(parent)) {
-    tree->appendRoot(tn);
+    tree.appendRoot(tn);
     return;
   }
 
-  tree->appendChild(parent, tn);
+  tree.appendChild(parent, tn);
 }
 
 template<typename Iter>
@@ -296,10 +293,9 @@ void detachParentRawLegacyLike(Iter pos)
 }
 
 template<typename Iter>
-void replaceChildLegacyLike(ZSwc* tree, Iter oldChild, Iter newChild)
+void replaceChildLegacyLike(ZSwc& tree, Iter oldChild, Iter newChild)
 {
   // Port of `Swc_Tree_Node_Replace_Child`.
-  CHECK(tree != nullptr);
   CHECK(!ZSwc::isNull(newChild));
 
   const auto parent = ZSwc::parent(oldChild);
@@ -344,7 +340,7 @@ void replaceChildLegacyLike(ZSwc* tree, Iter oldChild, Iter newChild)
 }
 
 template<typename Iter>
-void tuneBranchNodeLegacyLike(ZSwc* tree, Iter tn)
+void tuneBranchNodeLegacyLike(ZSwc& tree, Iter tn)
 {
   // Port of `Swc_Tree_Node_Tune_Branch`.
   double dist = 0.0;
@@ -373,7 +369,7 @@ void tuneBranchNodeLegacyLike(ZSwc* tree, Iter tn)
         }
       }
 
-      for (auto it = tree->beginChild(parent); it != tree->endChild(parent); ++it) {
+      for (auto it = tree.beginChild(parent); it != tree.endChild(parent); ++it) {
         if (it == tn) {
           continue;
         }
@@ -527,15 +523,13 @@ void tuneBranchNodeLegacyLike(ZSwc* tree, Iter tn)
 
 } // namespace
 
-void swcTreeRemoveZigzagLegacyLike(ZSwc* tree)
+void swcTreeRemoveZigzagLegacyLike(ZSwc& tree)
 {
-  CHECK(tree != nullptr);
-
   bool zigzagFound = true;
   while (zigzagFound) {
     zigzagFound = false;
 
-    for (auto it = tree->begin(); it != tree->end();) {
+    for (auto it = tree.begin(); it != tree.end();) {
       const auto tn = it;
       auto next = it;
       ++next;
@@ -555,11 +549,9 @@ void swcTreeRemoveZigzagLegacyLike(ZSwc* tree)
   }
 }
 
-void swcTreeRemoveOvershootLegacyLike(ZSwc* tree)
+void swcTreeRemoveOvershootLegacyLike(ZSwc& tree)
 {
-  CHECK(tree != nullptr);
-
-  for (auto it = tree->begin(); it != tree->end();) {
+  for (auto it = tree.begin(); it != tree.end();) {
     const auto tn = it;
     ++it;
     if (isOvershootLegacyLike(tn, tree)) {
@@ -568,13 +560,11 @@ void swcTreeRemoveOvershootLegacyLike(ZSwc* tree)
   }
 }
 
-void swcTreeRemoveSpurLegacyLike(ZSwc* tree)
+void swcTreeRemoveSpurLegacyLike(ZSwc& tree)
 {
-  CHECK(tree != nullptr);
-
   std::vector<ZSwc::SwcTreeNode> order;
-  order.reserve(tree->size());
-  for (auto it = tree->beginBreadthFirst(); it != tree->endBreadthFirst(); ++it) {
+  order.reserve(tree.size());
+  for (auto it = tree.beginBreadthFirst(); it != tree.endBreadthFirst(); ++it) {
     order.push_back(it);
   }
 
@@ -586,13 +576,11 @@ void swcTreeRemoveSpurLegacyLike(ZSwc* tree)
   }
 }
 
-void swcTreeMergeCloseNodeLegacyLike(ZSwc* tree, double threshold)
+void swcTreeMergeCloseNodeLegacyLike(ZSwc& tree, double threshold)
 {
-  CHECK(tree != nullptr);
-
   std::vector<ZSwc::SwcTreeNode> order;
-  order.reserve(tree->size());
-  for (auto it = tree->beginBreadthFirst(); it != tree->endBreadthFirst(); ++it) {
+  order.reserve(tree.size());
+  for (auto it = tree.beginBreadthFirst(); it != tree.endBreadthFirst(); ++it) {
     order.push_back(it);
   }
 
@@ -620,7 +608,7 @@ void swcTreeMergeCloseNodeLegacyLike(ZSwc* tree, double threshold)
           }
 
           if (nodeDistLegacyLike(nextChild, sibling) < threshold) {
-            tree->appendChild(nextChild, sibling);
+            tree.appendChild(nextChild, sibling);
             mergeToParent(tree, sibling);
           } else {
             nextChild = sibling;
@@ -643,13 +631,11 @@ void swcTreeMergeCloseNodeLegacyLike(ZSwc* tree, double threshold)
   return out;
 }
 
-void swcTreeTuneBranchLegacyLike(ZSwc* tree)
+void swcTreeTuneBranchLegacyLike(ZSwc& tree)
 {
-  CHECK(tree != nullptr);
-
   std::vector<ZSwc::SwcTreeNode> order;
-  order.reserve(tree->size());
-  for (auto it = tree->beginBreadthFirst(); it != tree->endBreadthFirst(); ++it) {
+  order.reserve(tree.size());
+  for (auto it = tree.beginBreadthFirst(); it != tree.endBreadthFirst(); ++it) {
     order.push_back(it);
   }
 
@@ -661,12 +647,10 @@ void swcTreeTuneBranchLegacyLike(ZSwc* tree)
   }
 }
 
-void swcTreeRemoveOrphanBlobLegacyLike(ZSwc* tree, double minLength, int minOrphanCount)
+void swcTreeRemoveOrphanBlobLegacyLike(ZSwc& tree, double minLength, int minOrphanCount)
 {
-  CHECK(tree != nullptr);
-
   std::vector<ZSwc::SwcTreeNode> roots;
-  for (auto it = tree->beginRoot(); it != tree->endRoot(); ++it) {
+  for (auto it = tree.beginRoot(); it != tree.endRoot(); ++it) {
     roots.push_back(it);
   }
 
@@ -677,7 +661,7 @@ void swcTreeRemoveOrphanBlobLegacyLike(ZSwc* tree, double minLength, int minOrph
   if (minLength == 0.0 && static_cast<int>(roots.size()) >= minOrphanCount) {
     double sum = 0.0;
     for (const auto& root : roots) {
-      const ZSwc subtree = copySubtreeLegacyLike(*tree, root);
+      const ZSwc subtree = copySubtreeLegacyLike(tree, root);
       sum += mainTrunkLengthLegacyLike(subtree);
     }
     minLength = sum / static_cast<double>(roots.size());
@@ -686,7 +670,7 @@ void swcTreeRemoveOrphanBlobLegacyLike(ZSwc* tree, double minLength, int minOrph
   std::vector<ZSwc::SwcTreeNode> keep;
   keep.reserve(roots.size());
   for (const auto& root : roots) {
-    const ZSwc subtree = copySubtreeLegacyLike(*tree, root);
+    const ZSwc subtree = copySubtreeLegacyLike(tree, root);
     if (mainTrunkLengthLegacyLike(subtree) >= minLength) {
       keep.push_back(root);
     }
@@ -694,7 +678,7 @@ void swcTreeRemoveOrphanBlobLegacyLike(ZSwc* tree, double minLength, int minOrph
 
   for (const auto& root : roots) {
     if (std::find(keep.begin(), keep.end(), root) == keep.end()) {
-      tree->eraseSubtree(root);
+      tree.eraseSubtree(root);
     }
   }
 }

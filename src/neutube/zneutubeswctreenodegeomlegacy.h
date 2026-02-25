@@ -31,7 +31,7 @@ namespace nim::neutube {
                                                  const ZSwc::ConstSwcTreeNode& tn2,
                                                  const ZSwc::ConstSwcTreeNode& tn3);
 
-[[nodiscard]] std::vector<ZSwc::SwcTreeNode> swcNeighborArrayLegacyLike(ZSwc* swc, const ZSwc::SwcTreeNode& node);
+[[nodiscard]] std::vector<ZSwc::SwcTreeNode> swcNeighborArrayLegacyLike(ZSwc& swc, const ZSwc::SwcTreeNode& node);
 
 void swcNodeAverageLegacyLike(const ZSwc::ConstSwcTreeNode& a, const ZSwc::ConstSwcTreeNode& b, ZSwc::SwcTreeNode out);
 

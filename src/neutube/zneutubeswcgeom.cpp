@@ -27,26 +27,21 @@ constexpr double TzDist3dEpsLegacyLike = 1e-13;
                                                       const std::array<double, 3>& line1End,
                                                       const std::array<double, 3>& line2Start,
                                                       const std::array<double, 3>& line2End,
-                                                      std::array<double, 3>* dc1,
-                                                      std::array<double, 3>* dc2,
-                                                      double* intersect1,
-                                                      double* intersect2,
+                                                      std::array<double, 3>& dc1,
+                                                      std::array<double, 3>& dc2,
+                                                      double& intersect1,
+                                                      double& intersect2,
                                                       double eps)
 {
-  CHECK(dc1 != nullptr);
-  CHECK(dc2 != nullptr);
-  CHECK(intersect1 != nullptr);
-  CHECK(intersect2 != nullptr);
-
   std::array<double, 3> ds{};
   for (int i = 0; i < 3; ++i) {
-    (*dc1)[i] = line1End[i] - line1Start[i];
-    (*dc2)[i] = line2End[i] - line2Start[i];
+    dc1[i] = line1End[i] - line1Start[i];
+    dc2[i] = line2End[i] - line2Start[i];
     ds[i] = line1Start[i] - line2Start[i];
   }
 
-  const double d2121 = geo3dOrgDistSqr(*dc1);
-  const double d4343 = geo3dOrgDistSqr(*dc2);
+  const double d2121 = geo3dOrgDistSqr(dc1);
+  const double d4343 = geo3dOrgDistSqr(dc2);
 
   if (d2121 < eps) {
     if (d4343 < eps) {
@@ -59,11 +54,11 @@ constexpr double TzDist3dEpsLegacyLike = 1e-13;
     return -2;
   }
 
-  const double d4321 = (*dc2)[0] * (*dc1)[0] + (*dc2)[1] * (*dc1)[1] + (*dc2)[2] * (*dc1)[2];
+  const double d4321 = dc2[0] * dc1[0] + dc2[1] * dc1[1] + dc2[2] * dc1[2];
   const double denom = d2121 * d4343 - d4321 * d4321;
 
-  const double d1343 = ds[0] * (*dc2)[0] + ds[1] * (*dc2)[1] + ds[2] * (*dc2)[2];
-  const double d1321 = ds[0] * (*dc1)[0] + ds[1] * (*dc1)[1] + ds[2] * (*dc1)[2];
+  const double d1343 = ds[0] * dc2[0] + ds[1] * dc2[1] + ds[2] * dc2[2];
+  const double d1321 = ds[0] * dc1[0] + ds[1] * dc1[1] + ds[2] * dc1[2];
 
   const double numer = d1343 * d4321 - d1321 * d4343;
 
@@ -72,8 +67,8 @@ constexpr double TzDist3dEpsLegacyLike = 1e-13;
     return 0;
   }
 
-  *intersect1 = numer / denom;
-  *intersect2 = (d1343 + d4321 * (*intersect1)) / d4343;
+  intersect1 = numer / denom;
+  intersect2 = (d1343 + d4321 * intersect1) / d4343;
   return 1;
 }
 
@@ -81,11 +76,9 @@ constexpr double TzDist3dEpsLegacyLike = 1e-13;
 [[nodiscard]] bool geo3dPointLineDistInternalLegacyLike(const std::array<double, 3>& point,
                                                         const std::array<double, 3>& lineStart,
                                                         const std::array<double, 3>& lineEnd,
-                                                        double* lambda,
+                                                        double& lambda,
                                                         double eps)
 {
-  CHECK(lambda != nullptr);
-
   const std::array<double, 3> lineVec = {lineEnd[0] - lineStart[0],
                                          lineEnd[1] - lineStart[1],
                                          lineEnd[2] - lineStart[2]};
@@ -97,7 +90,7 @@ constexpr double TzDist3dEpsLegacyLike = 1e-13;
   }
 
   const double dot = pointVec[0] * lineVec[0] + pointVec[1] * lineVec[1] + pointVec[2] * lineVec[2];
-  *lambda = dot / lengthSqr;
+  lambda = dot / lengthSqr;
   return true;
 }
 
@@ -119,7 +112,7 @@ double geo3dDist(double x1, double y1, double z1, double x2, double y2, double z
 double geo3dPointLineSegDist(const std::array<double, 3>& point,
                              const std::array<double, 3>& lineStart,
                              const std::array<double, 3>& lineEnd,
-                             double* lambda)
+                             double& lambda)
 {
   constexpr double Eps = 1e-9;
 
@@ -143,9 +136,7 @@ double geo3dPointLineSegDist(const std::array<double, 3>& point,
     t = 1.0;
   }
 
-  if (lambda != nullptr) {
-    *lambda = t;
-  }
+  lambda = t;
 
   const double cx = (1.0 - t) * lineStart[0] + t * lineEnd[0];
   const double cy = (1.0 - t) * lineStart[1] + t * lineEnd[1];
@@ -170,15 +161,15 @@ double geo3dLineLineDistLegacyLike(const std::array<double, 3>& line1Start,
                                               line1End,
                                               line2Start,
                                               line2End,
-                                              &dc1,
-                                              &dc2,
-                                              &intersect1,
-                                              &intersect2,
+                                              dc1,
+                                              dc2,
+                                              intersect1,
+                                              intersect2,
                                               TzDist3dEpsLegacyLike)) {
     case -3: // point to point
       return geo3dDist(line1Start[0], line1Start[1], line1Start[2], line2Start[0], line2Start[1], line2Start[2]);
     case -1: // point to line2
-      (void)geo3dPointLineDistInternalLegacyLike(line1Start, line2Start, line2End, &lambda, TzDist3dEpsLegacyLike);
+      (void)geo3dPointLineDistInternalLegacyLike(line1Start, line2Start, line2End, lambda, TzDist3dEpsLegacyLike);
       return geo3dDist(line1Start[0],
                        line1Start[1],
                        line1Start[2],
@@ -186,7 +177,7 @@ double geo3dLineLineDistLegacyLike(const std::array<double, 3>& line1Start,
                        line2Start[1] + lambda * dc2[1],
                        line2Start[2] + lambda * dc2[2]);
     case -2: // point to line1
-      (void)geo3dPointLineDistInternalLegacyLike(line2Start, line1Start, line1End, &lambda, TzDist3dEpsLegacyLike);
+      (void)geo3dPointLineDistInternalLegacyLike(line2Start, line1Start, line1End, lambda, TzDist3dEpsLegacyLike);
       return geo3dDist(line2Start[0],
                        line2Start[1],
                        line2Start[2],
@@ -194,7 +185,7 @@ double geo3dLineLineDistLegacyLike(const std::array<double, 3>& line1Start,
                        line1Start[1] + lambda * dc1[1],
                        line1Start[2] + lambda * dc1[2]);
     case 0: // parallel
-      (void)geo3dPointLineDistInternalLegacyLike(line1Start, line2Start, line2End, &lambda, TzDist3dEpsLegacyLike);
+      (void)geo3dPointLineDistInternalLegacyLike(line1Start, line2Start, line2End, lambda, TzDist3dEpsLegacyLike);
       return geo3dDist(line1Start[0],
                        line1Start[1],
                        line1Start[2],
@@ -217,15 +208,11 @@ double geo3dLineSegLineSegDistLegacyLike(const std::array<double, 3>& line1Start
                                          const std::array<double, 3>& line1End,
                                          const std::array<double, 3>& line2Start,
                                          const std::array<double, 3>& line2End,
-                                         double* intersect1,
-                                         double* intersect2,
-                                         int* cond)
+                                         double& intersect1,
+                                         double& intersect2,
+                                         int& cond)
 {
   // Port of tz_geo3d_utils.c::Geo3d_Lineseg_Lineseg_Dist().
-  CHECK(intersect1 != nullptr);
-  CHECK(intersect2 != nullptr);
-  CHECK(cond != nullptr);
-
   std::array<double, 3> dc1{};
   std::array<double, 3> dc2{};
 
@@ -236,36 +223,36 @@ double geo3dLineSegLineSegDistLegacyLike(const std::array<double, 3>& line1Start
                                                        line1End,
                                                        line2Start,
                                                        line2End,
-                                                       &dc1,
-                                                       &dc2,
+                                                       dc1,
+                                                       dc2,
                                                        intersect1,
                                                        intersect2,
                                                        TzDist3dEpsLegacyLike);
 
   switch (code) {
     case 0: // parallel
-      *cond = 9;
+      cond = 9;
       d1 = geo3dPointLineSegDist(line1End, line2Start, line2End, intersect1);
       d2 = geo3dPointLineSegDist(line1Start, line2Start, line2End, intersect2);
       if (d1 <= d2) {
-        *intersect2 = *intersect1;
-        *intersect1 = 1.0;
+        intersect2 = intersect1;
+        intersect1 = 1.0;
         return d1;
       }
-      *intersect1 = 0.0;
+      intersect1 = 0.0;
       return d2;
     case -1:
-      *intersect1 = 0.0;
-      *cond = 10;
+      intersect1 = 0.0;
+      cond = 10;
       return geo3dPointLineSegDist(line1Start, line2Start, line2End, intersect2);
     case -2:
-      *intersect2 = 0.0;
-      *cond = 10;
+      intersect2 = 0.0;
+      cond = 10;
       return geo3dPointLineSegDist(line2Start, line1Start, line1End, intersect1);
     case -3:
-      *cond = 10;
-      *intersect1 = 0.0;
-      *intersect2 = 0.0;
+      cond = 10;
+      intersect1 = 0.0;
+      intersect2 = 0.0;
       return geo3dDist(line1Start[0], line1Start[1], line1Start[2], line2Start[0], line2Start[1], line2Start[2]);
     default:
       break;
@@ -275,78 +262,78 @@ double geo3dLineSegLineSegDistLegacyLike(const std::array<double, 3>& line1Start
     return (mu >= 0.0) && (mu <= 1.0);
   };
 
-  if (breakIsInRange(*intersect1) && breakIsInRange(*intersect2)) {
-    *cond = 0;
-    const double x1 = line1Start[0] + (*intersect1) * dc1[0];
-    const double y1 = line1Start[1] + (*intersect1) * dc1[1];
-    const double z1 = line1Start[2] + (*intersect1) * dc1[2];
-    const double x2 = line2Start[0] + (*intersect2) * dc2[0];
-    const double y2 = line2Start[1] + (*intersect2) * dc2[1];
-    const double z2 = line2Start[2] + (*intersect2) * dc2[2];
+  if (breakIsInRange(intersect1) && breakIsInRange(intersect2)) {
+    cond = 0;
+    const double x1 = line1Start[0] + intersect1 * dc1[0];
+    const double y1 = line1Start[1] + intersect1 * dc1[1];
+    const double z1 = line1Start[2] + intersect1 * dc1[2];
+    const double x2 = line2Start[0] + intersect2 * dc2[0];
+    const double y2 = line2Start[1] + intersect2 * dc2[1];
+    const double z2 = line2Start[2] + intersect2 * dc2[2];
     return std::sqrt(geo3dDistSqr(x1, y1, z1, x2, y2, z2));
   }
-  if ((*intersect1 < 0.0) && breakIsInRange(*intersect2)) {
-    *cond = 1;
-    *intersect1 = 0.0;
+  if ((intersect1 < 0.0) && breakIsInRange(intersect2)) {
+    cond = 1;
+    intersect1 = 0.0;
     return geo3dPointLineSegDist(line1Start, line2Start, line2End, intersect2);
   }
-  if ((*intersect1 > 0.0) && breakIsInRange(*intersect2)) {
-    *cond = 2;
-    *intersect1 = 1.0;
+  if ((intersect1 > 0.0) && breakIsInRange(intersect2)) {
+    cond = 2;
+    intersect1 = 1.0;
     return geo3dPointLineSegDist(line1End, line2Start, line2End, intersect2);
   }
-  if ((*intersect2 < 0.0) && breakIsInRange(*intersect1)) {
-    *cond = 3;
-    *intersect2 = 0.0;
+  if ((intersect2 < 0.0) && breakIsInRange(intersect1)) {
+    cond = 3;
+    intersect2 = 0.0;
     return geo3dPointLineSegDist(line2Start, line1Start, line1End, intersect1);
   }
-  if ((*intersect2 > 1.0) && breakIsInRange(*intersect1)) {
-    *cond = 4;
-    *intersect2 = 1.0;
+  if ((intersect2 > 1.0) && breakIsInRange(intersect1)) {
+    cond = 4;
+    intersect2 = 1.0;
     return geo3dPointLineSegDist(line2End, line1Start, line1End, intersect1);
   }
-  if ((*intersect1 < 0.0) && (*intersect2 < 0.0)) {
-    *cond = 5;
+  if ((intersect1 < 0.0) && (intersect2 < 0.0)) {
+    cond = 5;
     d1 = geo3dPointLineSegDist(line1Start, line2Start, line2End, intersect2);
     d2 = geo3dPointLineSegDist(line2Start, line1Start, line1End, intersect1);
     if (d1 <= d2) {
-      *intersect1 = 0.0;
+      intersect1 = 0.0;
       return d1;
     }
-    *intersect2 = 0.0;
+    intersect2 = 0.0;
     return d2;
   }
-  if ((*intersect1 > 1.0) && (*intersect2 < 0.0)) {
-    *cond = 6;
+  if ((intersect1 > 1.0) && (intersect2 < 0.0)) {
+    cond = 6;
     d1 = geo3dPointLineSegDist(line1End, line2Start, line2End, intersect2);
     d2 = geo3dPointLineSegDist(line2Start, line1Start, line1End, intersect1);
     if (d1 <= d2) {
-      *intersect1 = 1.0;
+      intersect1 = 1.0;
       return d1;
     }
-    *intersect2 = 0.0;
+    intersect2 = 0.0;
     return d2;
   }
-  if ((*intersect1 < 0.0) && (*intersect2 > 1.0)) {
-    *cond = 7;
+  if ((intersect1 < 0.0) && (intersect2 > 1.0)) {
+    cond = 7;
     d1 = geo3dPointLineSegDist(line1Start, line2Start, line2End, intersect2);
     d2 = geo3dPointLineSegDist(line2End, line1Start, line1End, intersect1);
     if (d1 <= d2) {
-      *intersect1 = 0.0;
+      intersect1 = 0.0;
       return d1;
     }
-    *intersect2 = 1.0;
+    intersect2 = 1.0;
     return d2;
   }
-  if ((*intersect1 > 1.0) && (*intersect2 > 1.0)) {
-    *cond = 8;
+  if ((intersect1 > 1.0) && (intersect2 > 1.0)) {
+    cond = 8;
     d1 = geo3dPointLineSegDist(line1End, line2Start, line2End, intersect2);
     d2 = geo3dPointLineSegDist(line2End, line1Start, line1End, intersect1);
     if (d1 <= d2) {
-      *intersect1 = 1.0;
+      intersect1 = 1.0;
       return d1;
     }
-    *intersect2 = 1.0;
+    intersect2 = 1.0;
     return d2;
   }
 

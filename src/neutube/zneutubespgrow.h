@@ -22,14 +22,18 @@ enum : uint8_t
 
 // Port of legacy `Stack_Voxel_Weight_I` as a `WeightFunc` callback.
 // argv layout: [0]=d, [1]=v1, [2]=v2.
+// `argv` must be non-null and point to at least 3 doubles (see layout above).
 [[nodiscard]] double stackVoxelWeightILegacyLike(double* argv);
 
 // Port of legacy `Stack_Sp_Grow_Infer_Parameter`.
 // Populates `sgw->argv[3]` and `sgw->argv[4]` when `sgw->weightFunc` is `stackVoxelWeightSLegacyLike`.
-void stackSpGrowInferParameterLegacyLike(SpGrowWorkspace* sgw, const ZImg& stack);
+void stackSpGrowInferParameterLegacyLike(SpGrowWorkspace& sgw, const ZImg& stack);
 
 struct SpGrowWorkspace
 {
+  // Legacy callback signature: `argv` points to a small fixed-layout array.
+  // It is treated as read-only by our ports, but must remain a pointer to match
+  // the legacy function-pointer type.
   using WeightFunc = double (*)(double* argv);
 
   size_t size = 0;
@@ -78,12 +82,12 @@ struct SpGrowWorkspace
 // - No explicit seed/target arrays are supported (matching skeletonize usage).
 //
 // `stack` may be uint8 or uint16; values are interpreted as doubles for weight calculations.
-void stackSpGrow(const ZImg& stack, SpGrowWorkspace* sgw);
+void stackSpGrow(const ZImg& stack, SpGrowWorkspace& sgw);
 
 // Port of legacy `Stack_Sp_Grow(..., sgw)` for mask-driven usage.
 //
 // Returns the voxel-index path from source to the first reached target (inclusive).
 // If no target is reachable, returns an empty vector.
-[[nodiscard]] std::vector<int64_t> stackSpGrowPathLegacyLike(const ZImg& stack, SpGrowWorkspace* sgw);
+[[nodiscard]] std::vector<int64_t> stackSpGrowPathLegacyLike(const ZImg& stack, SpGrowWorkspace& sgw);
 
 } // namespace nim::neutube

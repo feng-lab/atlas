@@ -16,24 +16,22 @@ namespace {
 void prepareTraceScoreThresholdLegacyLike(const ZImg& signal,
                                           const TraceConfig& cfg,
                                           TracingModeLegacyLike mode,
-                                          TraceWorkspace* tw)
+                                          TraceWorkspace& tw)
 {
-  CHECK(tw != nullptr);
-
   if (is2dTraceLegacyLike(signal)) {
-    tw->minScore = cfg.min2dScore;
+    tw.minScore = cfg.min2dScore;
     return;
   }
 
   switch (mode) {
     case TracingModeLegacyLike::Auto:
-      tw->minScore = cfg.minAutoScore;
+      tw.minScore = cfg.minAutoScore;
       return;
     case TracingModeLegacyLike::Interactive:
-      tw->minScore = cfg.minManualScore;
+      tw.minScore = cfg.minManualScore;
       return;
     case TracingModeLegacyLike::Seed:
-      tw->minScore = cfg.minSeedScore;
+      tw.minScore = cfg.minSeedScore;
       return;
   }
 

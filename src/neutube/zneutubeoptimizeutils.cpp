@@ -38,83 +38,79 @@ constexpr double StopGradientLegacyLike = 1e-1;
 
 } // namespace
 
-void setLineSearchWorkspaceLegacyLike(LineSearchWorkspace* lsw,
+void setLineSearchWorkspaceLegacyLike(LineSearchWorkspace& lsw,
                                       double alpha,
                                       double ro,
                                       double c1,
                                       double c2,
                                       double minDirection)
 {
-  CHECK(lsw != nullptr);
-  lsw->alpha = alpha;
-  lsw->ro = ro;
-  lsw->c1 = c1;
-  lsw->c2 = c2;
-  lsw->minDirection = minDirection;
+  lsw.alpha = alpha;
+  lsw.ro = ro;
+  lsw.c1 = c1;
+  lsw.c2 = c2;
+  lsw.minDirection = minDirection;
 }
 
-bool lineSearchVarBacktrackLegacyLike(VariableSet* vs,
+bool lineSearchVarBacktrackLegacyLike(VariableSet& vs,
                                       const void* param,
-                                      const ContinuousFunction* cf,
+                                      const ContinuousFunction& cf,
                                       const double* /*delta*/,
                                       const double* weight,
                                       double* direction,
-                                      LineSearchWorkspace* lsw)
+                                      LineSearchWorkspace& lsw)
 {
-  CHECK(vs != nullptr);
-  CHECK(cf != nullptr);
   CHECK(direction != nullptr);
-  CHECK(lsw != nullptr);
-  CHECK(cf->f != nullptr);
-  CHECK(cf->v != nullptr);
-  CHECK(cf->varMin != nullptr);
-  CHECK(cf->varMax != nullptr);
+  CHECK(cf.f != nullptr);
+  CHECK(cf.v != nullptr);
+  CHECK(cf.varMin != nullptr);
+  CHECK(cf.varMax != nullptr);
 
   if (weight != nullptr) {
-    for (int i = 0; i < vs->nvar; ++i) {
+    for (int i = 0; i < vs.nvar; ++i) {
       direction[i] *= weight[i];
     }
   }
 
-  const double directionLength = std::sqrt(sqsumLegacyLike(direction, vs->nvar));
+  const double directionLength = std::sqrt(sqsumLegacyLike(direction, vs.nvar));
 
   bool improved = true;
-  if (directionLength > lsw->minDirection) {
-    std::vector<double> orgVar(static_cast<size_t>(vs->nvar));
-    for (int i = 0; i < vs->nvar; ++i) {
-      orgVar[static_cast<size_t>(i)] = vs->var[vs->varIndex[i]];
+  if (directionLength > lsw.minDirection) {
+    std::vector<double> orgVar(static_cast<size_t>(vs.nvar));
+    for (int i = 0; i < vs.nvar; ++i) {
+      orgVar[static_cast<size_t>(i)] = vs.var[vs.varIndex[i]];
     }
 
-    const double startScore = lsw->score;
-    double alpha = lsw->alpha / directionLength;
+    const double startScore = lsw.score;
+    double alpha = lsw.alpha / directionLength;
 
-    const double gdDot = dotLegacyLike(lsw->startGrad.data(), direction, vs->nvar);
-    const double gdDotC1 = gdDot * lsw->c1;
+    const double gdDot = dotLegacyLike(lsw.startGrad.data(), direction, vs.nvar);
+    const double gdDotC1 = gdDot * lsw.c1;
 
     double wolfe1 = 0.0;
     do {
-      for (int i = 0; i < vs->nvar; ++i) {
-        vs->var[vs->varIndex[i]] = alpha * direction[i];
-        vs->var[vs->varIndex[i]] += orgVar[static_cast<size_t>(i)];
+      for (int i = 0; i < vs.nvar; ++i) {
+        vs.var[vs.varIndex[i]] = alpha * direction[i];
+        vs.var[vs.varIndex[i]] += orgVar[static_cast<size_t>(i)];
       }
 
-      cf->v(vs->var, cf->varMin, cf->varMax, nullptr);
+      cf.v(vs.var, cf.varMin, cf.varMax, nullptr);
       variableSetUpdateLinkLegacyLike(vs);
-      lsw->score = cf->f(vs->var, param);
+      lsw.score = cf.f(vs.var, param);
 
-      alpha *= lsw->ro;
+      alpha *= lsw.ro;
       if (alpha * directionLength < StopGradientLegacyLike) {
-        for (int i = 0; i < vs->nvar; ++i) {
-          vs->var[vs->varIndex[i]] = orgVar[static_cast<size_t>(i)];
+        for (int i = 0; i < vs.nvar; ++i) {
+          vs.var[vs.varIndex[i]] = orgVar[static_cast<size_t>(i)];
         }
         variableSetUpdateLinkLegacyLike(vs);
-        lsw->score = startScore;
+        lsw.score = startScore;
         improved = false;
         break;
       }
 
-      wolfe1 = std::max(alpha / lsw->ro * gdDotC1, 0.0);
-    } while (lsw->score < startScore + wolfe1);
+      wolfe1 = std::max(alpha / lsw.ro * gdDotC1, 0.0);
+    } while (lsw.score < startScore + wolfe1);
   } else {
     improved = false;
   }

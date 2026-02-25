@@ -83,7 +83,7 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
 
   TraceConfig baseCfg;
   if (!resolvedConfigPath.empty()) {
-    const bool ok = loadTraceConfigLegacyLike(resolvedConfigPath, &baseCfg);
+    const bool ok = loadTraceConfigLegacyLike(resolvedConfigPath, baseCfg);
     if (!ok) {
       LOG(WARNING) << "Tracing configuration failed: failed to load " << resolvedConfigPath;
     }
@@ -95,13 +95,13 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
   TraceConfig cfg = baseCfg;
   if (level > 0) {
     if (const json::object* levelOverride = selectTraceLevelOverrideLegacyLike(baseCfg, level)) {
-      applyTraceConfigOverridesLegacyLike(*levelOverride, &cfg);
+      applyTraceConfigOverridesLegacyLike(*levelOverride, cfg);
     }
   }
 
   // Port of ZNeuronTracer::trace(double x, double y, double z).
   TraceWorkspace tw;
-  locsegChainDefaultTraceWorkspaceLegacyLike(&tw, &signal);
+  locsegChainDefaultTraceWorkspaceLegacyLike(tw, signal);
 
   // Port of ZNeuronTracer::configure() effects on the trace workspace.
   tw.refit = cfg.refit;
@@ -114,7 +114,7 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
     tw.minScore = cfg.minManualScore;
   }
 
-  traceWorkspaceInitTraceMaskLegacyLike(&tw, signal, false);
+  traceWorkspaceInitTraceMaskLegacyLike(tw, signal, false);
 
   std::array<double, 3> pos{};
   pos[0] = static_cast<double>(position[0]);
@@ -130,14 +130,14 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
   seedLocseg.seg.curvature = 0.0;
   seedLocseg.seg.alpha = 0.0;
   seedLocseg.seg.scale = 1.0;
-  setNeurosegPositionLegacyLike(&seedLocseg, pos, NeuroposReferenceLegacyLike::Center);
+  setNeurosegPositionLegacyLike(seedLocseg, pos, NeuroposReferenceLegacyLike::Center);
 
-  (void)localNeurosegOptimizeWLegacyLike(&seedLocseg, signal, 1.0, 1, &tw.fitWorkspace);
+  (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signal, 1.0, 1, tw.fitWorkspace);
 
   TraceRecord seedTr;
-  traceRecordReset(&seedTr);
-  traceRecordSetFixPoint(&seedTr, 0.0);
-  traceRecordSetDirection(&seedTr, TraceDirection::BothDir);
+  traceRecordReset(seedTr);
+  traceRecordSetFixPoint(seedTr, 0.0);
+  traceRecordSetDirection(seedTr, TraceDirection::BothDir);
 
   LocsegChain chain;
   LocsegNode node;
@@ -145,10 +145,10 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
   node.tr = seedTr;
   (void)chain.addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
 
-  traceWorkspaceSetTraceStatusLegacyLike(&tw, TraceStatus::Normal, TraceStatus::Normal);
-  traceLocsegLegacyLike(signal, 1.0, &chain, &tw);
-  (void)locsegChainRemoveOverlapEndsLegacyLike(&chain);
-  locsegChainRemoveTurnEndsLegacyLike(&chain, 1.0);
+  traceWorkspaceSetTraceStatusLegacyLike(tw, TraceStatus::Normal, TraceStatus::Normal);
+  traceLocsegLegacyLike(signal, 1.0, chain, tw);
+  (void)locsegChainRemoveOverlapEndsLegacyLike(chain);
+  locsegChainRemoveTurnEndsLegacyLike(chain, 1.0);
 
   const std::vector<Geo3dCircle> circles = locsegChainToGeo3dCircleArrayLegacyLike(chain);
 
@@ -203,7 +203,7 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
     }
   }
 
-  writeSwcLegacyNeuTu(&swc, outputPath);
+  writeSwcLegacyNeuTu(swc, outputPath);
   return 0;
 }
 
@@ -237,7 +237,7 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
 
   TraceConfig baseCfg;
   if (!resolvedConfigPath.empty()) {
-    const bool ok = loadTraceConfigLegacyLike(resolvedConfigPath, &baseCfg);
+    const bool ok = loadTraceConfigLegacyLike(resolvedConfigPath, baseCfg);
     if (!ok) {
       LOG(WARNING) << "Tracing configuration failed: failed to load " << resolvedConfigPath;
     }
@@ -249,13 +249,13 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
   TraceConfig cfg = baseCfg;
   if (level > 0) {
     if (const json::object* levelOverride = selectTraceLevelOverrideLegacyLike(baseCfg, level)) {
-      applyTraceConfigOverridesLegacyLike(*levelOverride, &cfg);
+      applyTraceConfigOverridesLegacyLike(*levelOverride, cfg);
     }
   }
 
   nim::ZSwc hostSwc;
   std::string swcError;
-  if (!loadSwcLegacyOrder(hostSwcPath, &hostSwc, &swcError)) {
+  if (!loadSwcLegacyOrder(hostSwcPath, hostSwc, &swcError)) {
     LOG(ERROR) << "Failed to read host SWC: " << hostSwcPath << " (" << swcError << ")";
     return 1;
   }
@@ -266,7 +266,7 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
   }
 
   TraceWorkspace tw;
-  locsegChainDefaultTraceWorkspaceLegacyLike(&tw, &signal);
+  locsegChainDefaultTraceWorkspaceLegacyLike(tw, signal);
 
   tw.refit = cfg.refit;
   tw.tuneEnd = cfg.tuneEnd;
@@ -280,7 +280,7 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
   const ZImgInfo maskInfo(signal.width(), signal.height(), signal.depth(), 1, 1, 1, VoxelFormat::Unsigned);
   tw.traceMask = std::make_unique<ZImg>(maskInfo);
   tw.traceMask->fill(0);
-  labelSwcIntoMaskLegacyLike(hostSwc, tw.traceMask.get(), /*zScale*/ 1.0, /*value*/ 255);
+  labelSwcIntoMaskLegacyLike(hostSwc, *tw.traceMask, /*zScale*/ 1.0, /*value*/ 255);
 
   std::array<double, 3> pos{};
   pos[0] = static_cast<double>(position[0]);
@@ -296,14 +296,14 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
   seedLocseg.seg.curvature = 0.0;
   seedLocseg.seg.alpha = 0.0;
   seedLocseg.seg.scale = 1.0;
-  setNeurosegPositionLegacyLike(&seedLocseg, pos, NeuroposReferenceLegacyLike::Center);
+  setNeurosegPositionLegacyLike(seedLocseg, pos, NeuroposReferenceLegacyLike::Center);
 
-  (void)localNeurosegOptimizeWLegacyLike(&seedLocseg, signal, 1.0, 1, &tw.fitWorkspace);
+  (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signal, 1.0, 1, tw.fitWorkspace);
 
   TraceRecord seedTr;
-  traceRecordReset(&seedTr);
-  traceRecordSetFixPoint(&seedTr, 0.0);
-  traceRecordSetDirection(&seedTr, TraceDirection::BothDir);
+  traceRecordReset(seedTr);
+  traceRecordSetFixPoint(seedTr, 0.0);
+  traceRecordSetDirection(seedTr, TraceDirection::BothDir);
 
   LocsegChain chain;
   LocsegNode node;
@@ -311,14 +311,14 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
   node.tr = seedTr;
   (void)chain.addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
 
-  traceWorkspaceSetTraceStatusLegacyLike(&tw, TraceStatus::Normal, TraceStatus::Normal);
-  traceLocsegLegacyLike(signal, 1.0, &chain, &tw);
-  (void)locsegChainRemoveOverlapEndsLegacyLike(&chain);
-  locsegChainRemoveTurnEndsLegacyLike(&chain, 1.0);
+  traceWorkspaceSetTraceStatusLegacyLike(tw, TraceStatus::Normal, TraceStatus::Normal);
+  traceLocsegLegacyLike(signal, 1.0, chain, tw);
+  (void)locsegChainRemoveOverlapEndsLegacyLike(chain);
+  locsegChainRemoveTurnEndsLegacyLike(chain, 1.0);
 
   const std::vector<Geo3dCircle> circles = locsegChainToGeo3dCircleArrayLegacyLike(chain);
   if (circles.empty()) {
-    writeSwcLegacyNeuTu(&hostSwc, outputPath);
+    writeSwcLegacyNeuTu(hostSwc, outputPath);
     return 0;
   }
 
@@ -346,7 +346,7 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
   }
 
   if (start >= end || (end - start) <= 1) {
-    writeSwcLegacyNeuTu(&hostSwc, outputPath);
+    writeSwcLegacyNeuTu(hostSwc, outputPath);
     return 0;
   }
 
@@ -371,9 +371,9 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
     }
   }
 
-  connectBranchToHostLegacyLike(&hostSwc, hostRoots, branchRoot, signal);
+  connectBranchToHostLegacyLike(hostSwc, hostRoots, branchRoot, signal);
 
-  writeSwcLegacyNeuTu(&hostSwc, outputPath);
+  writeSwcLegacyNeuTu(hostSwc, outputPath);
   return 0;
 }
 
@@ -422,7 +422,7 @@ int runTrace(const std::vector<std::string>& input,
 
     TraceConfig baseCfg;
     if (!resolvedConfigPath.empty()) {
-      const bool ok = loadTraceConfigLegacyLike(resolvedConfigPath, &baseCfg);
+      const bool ok = loadTraceConfigLegacyLike(resolvedConfigPath, baseCfg);
       if (!ok) {
         LOG(WARNING) << "Tracing configuration failed: failed to load " << resolvedConfigPath;
       }
@@ -434,13 +434,13 @@ int runTrace(const std::vector<std::string>& input,
     TraceConfig cfg = baseCfg;
     if (level > 0) {
       if (const json::object* levelOverride = selectTraceLevelOverrideLegacyLike(baseCfg, level)) {
-        applyTraceConfigOverridesLegacyLike(*levelOverride, &cfg);
+        applyTraceConfigOverridesLegacyLike(*levelOverride, cfg);
       }
     }
 
     std::unique_ptr<ZSwc> tree = traceNeuronAutoLegacyLike(std::move(signal), cfg, diagnosis, verbose, nullptr);
     if (tree) {
-      writeSwcLegacyNeuTu(tree.get(), outputPath);
+      writeSwcLegacyNeuTu(*tree, outputPath);
       return 0;
     }
 

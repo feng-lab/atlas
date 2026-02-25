@@ -52,12 +52,10 @@ struct Point3d
   return dist3d(a.x, a.y, a.z, b.x, b.y, b.z);
 }
 
-void rescaleSwc(ZSwc* tree, double scaleX, double scaleY, double scaleZ, bool changingRadius)
+void rescaleSwc(ZSwc& tree, double scaleX, double scaleY, double scaleZ, bool changingRadius)
 {
-  CHECK(tree != nullptr);
-
   const double dScale = std::sqrt(scaleX * scaleY);
-  for (auto it = tree->begin(); it != tree->end(); ++it) {
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
     it->x *= scaleX;
     it->y *= scaleY;
     it->z *= scaleZ;
@@ -67,10 +65,9 @@ void rescaleSwc(ZSwc* tree, double scaleX, double scaleY, double scaleZ, bool ch
   }
 }
 
-void setNodeLabel(ZSwc* tree, int64_t label)
+void setNodeLabel(ZSwc& tree, int64_t label)
 {
-  CHECK(tree != nullptr);
-  for (auto it = tree->begin(); it != tree->end(); ++it) {
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
     it->label = label;
   }
 }
@@ -136,14 +133,12 @@ struct SwcPath
   }
 };
 
-[[nodiscard]] std::vector<ZSwc::SwcTreeNode> zSortedNodesLegacy(ZSwc* tree)
+[[nodiscard]] std::vector<ZSwc::SwcTreeNode> zSortedNodesLegacy(ZSwc& tree)
 {
-  CHECK(tree != nullptr);
-
   std::vector<ZSwc::SwcTreeNode> nodes;
-  nodes.reserve(tree->size());
+  nodes.reserve(tree.size());
 
-  for (auto it = tree->begin(); it != tree->end(); ++it) {
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
     nodes.push_back(it);
   }
 
@@ -154,12 +149,12 @@ struct SwcPath
   return nodes;
 }
 
-[[nodiscard]] SwcPath extractMainTrunkLayerLegacy(ZSwc* tree, double step)
+[[nodiscard]] SwcPath extractMainTrunkLayerLegacy(ZSwc& tree, double step)
 {
   SwcPath path;
-  path.host = tree;
+  path.host = &tree;
 
-  if (tree == nullptr || tree->empty()) {
+  if (tree.empty()) {
     return path;
   }
 
@@ -570,9 +565,8 @@ void updateMatchingSourceLegacy(std::queue<MatchingSource>* sourceQueue,
   return sampleArray;
 }
 
-void resampleBranchLegacy(ZSwc* tree, const ZSwc::SwcTreeNode& begin, const ZSwc::SwcTreeNode& end, double step)
+void resampleBranchLegacy(ZSwc& tree, const ZSwc::SwcTreeNode& begin, const ZSwc::SwcTreeNode& end, double step)
 {
-  CHECK(tree != nullptr);
   CHECK(!ZSwc::isNull(begin));
   CHECK(!ZSwc::isNull(end));
 
@@ -626,23 +620,21 @@ void resampleBranchLegacy(ZSwc* tree, const ZSwc::SwcTreeNode& begin, const ZSwc
   }
 }
 
-[[nodiscard]] int labelBranchesLegacy(ZSwc* tree)
+[[nodiscard]] int labelBranchesLegacy(ZSwc& tree)
 {
-  CHECK(tree != nullptr);
-
   int label = 0;
 
-  for (auto rootIt = tree->beginRoot(); rootIt != tree->endRoot(); ++rootIt) {
+  for (auto rootIt = tree.beginRoot(); rootIt != tree.endRoot(); ++rootIt) {
     rootIt->label = ++label;
     bool first = true;
-    for (auto it = tree->begin(rootIt); it != tree->end(rootIt); ++it) {
+    for (auto it = tree.begin(rootIt); it != tree.end(rootIt); ++it) {
       if (first) {
         first = false;
         continue;
       }
       const auto parent = ZSwc::parent(it);
       CHECK(!ZSwc::isNull(parent));
-      if (tree->numChildren(parent) > 1) {
+      if (tree.numChildren(parent) > 1) {
         it->label = ++label;
       } else {
         it->label = parent->label;
@@ -653,14 +645,12 @@ void resampleBranchLegacy(ZSwc* tree, const ZSwc::SwcTreeNode& begin, const ZSwc
   return label;
 }
 
-[[nodiscard]] std::optional<std::pair<ZSwc::SwcTreeNode, ZSwc::SwcTreeNode>> extractBranchByLabelLegacy(ZSwc* tree,
+[[nodiscard]] std::optional<std::pair<ZSwc::SwcTreeNode, ZSwc::SwcTreeNode>> extractBranchByLabelLegacy(ZSwc& tree,
                                                                                                         int label)
 {
-  CHECK(tree != nullptr);
-
   std::vector<ZSwc::SwcTreeNode> nodes;
-  nodes.reserve(tree->size());
-  for (auto it = tree->begin(); it != tree->end(); ++it) {
+  nodes.reserve(tree.size());
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
     nodes.push_back(it);
   }
   std::reverse(nodes.begin(), nodes.end());
@@ -690,10 +680,8 @@ void resampleBranchLegacy(ZSwc* tree, const ZSwc::SwcTreeNode& begin, const ZSwc
   return std::make_pair(upperEnd, lowerEnd);
 }
 
-void resampleSwcLegacy(ZSwc* tree, double step)
+void resampleSwcLegacy(ZSwc& tree, double step)
 {
-  CHECK(tree != nullptr);
-
   const int n = labelBranchesLegacy(tree);
   for (int i = 1; i <= n; ++i) {
     const auto br = extractBranchByLabelLegacy(tree, i);
@@ -713,8 +701,8 @@ void resampleSwcLegacy(ZSwc* tree, double step)
   ZSwc tree1ForMatch = a;
   ZSwc tree2ForMatch = b;
 
-  resampleSwcLegacy(&tree1ForMatch, cfg.sampleStep);
-  resampleSwcLegacy(&tree2ForMatch, cfg.sampleStep);
+  resampleSwcLegacy(tree1ForMatch, cfg.sampleStep);
+  resampleSwcLegacy(tree2ForMatch, cfg.sampleStep);
 
   if (tree1ForMatch.empty() || tree2ForMatch.empty()) {
     return 0.0;
@@ -722,8 +710,8 @@ void resampleSwcLegacy(ZSwc* tree, double step)
 
   std::queue<MatchingSource> sourceQueue;
 
-  SwcPath branch1 = extractMainTrunkLayerLegacy(&tree1ForMatch, cfg.trunkStep);
-  SwcPath branch2 = extractMainTrunkLayerLegacy(&tree2ForMatch, cfg.trunkStep);
+  SwcPath branch1 = extractMainTrunkLayerLegacy(tree1ForMatch, cfg.trunkStep);
+  SwcPath branch2 = extractMainTrunkLayerLegacy(tree2ForMatch, cfg.trunkStep);
 
   if (branch1.empty() || branch2.empty()) {
     return 0.0;
@@ -744,8 +732,8 @@ void resampleSwcLegacy(ZSwc* tree, double step)
 
   tree2ForMatch.setAsRoot(branch2[0]);
 
-  setNodeLabel(&tree1ForMatch, 0);
-  setNodeLabel(&tree2ForMatch, 0);
+  setNodeLabel(tree1ForMatch, 0);
+  setNodeLabel(tree2ForMatch, 0);
 
   double currentScore = 0.0;
 
@@ -802,7 +790,7 @@ CompareSwcResult computeCompareSwc(const std::vector<std::string>& inputPaths, d
     ZSwc tree;
     tree.load(QString::fromStdString(p));
     if (scale != 1.0) {
-      rescaleSwc(&tree, scale, scale, scale, true);
+      rescaleSwc(tree, scale, scale, scale, true);
     }
     trees.push_back(std::move(tree));
   }

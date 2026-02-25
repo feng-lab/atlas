@@ -17,11 +17,9 @@ namespace {
 
 } // namespace
 
-void writeSwcLegacyNeuTu(ZSwc* tree, const std::string& filePath, const std::vector<std::string>& comments)
+void writeSwcLegacyNeuTu(ZSwc& tree, const std::string& filePath, const std::vector<std::string>& comments)
 {
-  CHECK(tree != nullptr);
-
-  if (tree->empty()) {
+  if (tree.empty()) {
     LOG(WARNING) << "Empty tree. No file saved.";
     return;
   }
@@ -40,7 +38,7 @@ void writeSwcLegacyNeuTu(ZSwc* tree, const std::string& filePath, const std::vec
     std::fprintf(fp, "#%s\n", c.c_str());
   }
 
-  for (auto it = tree->cbegin(); it != tree->cend(); ++it) {
+  for (auto it = tree.cbegin(); it != tree.cend(); ++it) {
     const int id = static_cast<int>(it->id);
     const int type = static_cast<int>(it->type);
     const int parentId = static_cast<int>(ZSwc::parentID(it));

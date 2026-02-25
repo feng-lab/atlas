@@ -25,79 +25,75 @@ namespace {
   return std::string_view(s.data(), s.size());
 }
 
-void applyConfigOverridesLegacyLike(const json::object& obj, TraceConfig* cfg)
+void applyConfigOverridesLegacyLike(const json::object& obj, TraceConfig& cfg)
 {
-  CHECK(cfg != nullptr);
-
   if (auto it = obj.find("minimalScoreAuto"); it != obj.end() && it->value().is_number()) {
-    cfg->minAutoScore = it->value().to_number<double>();
+    cfg.minAutoScore = it->value().to_number<double>();
   }
 
   if (auto it = obj.find("minimalScoreManual"); it != obj.end() && it->value().is_number()) {
-    cfg->minManualScore = it->value().to_number<double>();
+    cfg.minManualScore = it->value().to_number<double>();
   }
 
   if (auto it = obj.find("minimalScoreSeed"); it != obj.end() && it->value().is_number()) {
-    cfg->minSeedScore = it->value().to_number<double>();
+    cfg.minSeedScore = it->value().to_number<double>();
   }
 
   if (auto it = obj.find("minimalScore2d"); it != obj.end() && it->value().is_number()) {
-    cfg->min2dScore = it->value().to_number<double>();
+    cfg.min2dScore = it->value().to_number<double>();
   }
 
   if (auto it = obj.find("maxEucDist"); it != obj.end() && it->value().is_number()) {
-    cfg->maxEucDist = it->value().to_number<double>();
+    cfg.maxEucDist = it->value().to_number<double>();
   }
 
   if (auto it = obj.find("refit"); it != obj.end() && it->value().is_bool()) {
-    cfg->refit = it->value().as_bool();
+    cfg.refit = it->value().as_bool();
   }
 
   if (auto it = obj.find("spTest"); it != obj.end() && it->value().is_bool()) {
-    cfg->spTest = it->value().as_bool();
+    cfg.spTest = it->value().as_bool();
   }
 
   if (auto it = obj.find("crossoverTest"); it != obj.end() && it->value().is_bool()) {
-    cfg->crossoverTest = it->value().as_bool();
+    cfg.crossoverTest = it->value().as_bool();
   }
 
   if (auto it = obj.find("tuneEnd"); it != obj.end() && it->value().is_bool()) {
-    cfg->tuneEnd = it->value().as_bool();
+    cfg.tuneEnd = it->value().as_bool();
   }
 
   if (auto it = obj.find("edgePath"); it != obj.end() && it->value().is_bool()) {
-    cfg->edgePath = it->value().as_bool();
+    cfg.edgePath = it->value().as_bool();
   }
 
   if (auto it = obj.find("seedMethod"); it != obj.end() && it->value().is_int64()) {
-    cfg->seedMethod = static_cast<int>(it->value().as_int64());
+    cfg.seedMethod = static_cast<int>(it->value().as_int64());
   }
 
   if (auto it = obj.find("recover"); it != obj.end() && it->value().is_int64()) {
-    cfg->recover = static_cast<int>(it->value().as_int64());
+    cfg.recover = static_cast<int>(it->value().as_int64());
   }
 
   if (auto it = obj.find("enhanceMask"); it != obj.end() && it->value().is_bool()) {
-    cfg->enhanceMask = it->value().as_bool();
+    cfg.enhanceMask = it->value().as_bool();
   }
 
   if (auto it = obj.find("chainScreenCount"); it != obj.end() && it->value().is_int64()) {
-    cfg->chainScreenCount = static_cast<int>(it->value().as_int64());
+    cfg.chainScreenCount = static_cast<int>(it->value().as_int64());
   }
 }
 
 } // namespace
 
-void applyTraceConfigOverridesLegacyLike(const json::object& obj, TraceConfig* cfg)
+void applyTraceConfigOverridesLegacyLike(const json::object& obj, TraceConfig& cfg)
 {
   applyConfigOverridesLegacyLike(obj, cfg);
 }
 
-bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig* out)
+bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig& out)
 {
-  CHECK(out != nullptr);
-
-  *out = TraceConfig{};
+  out = TraceConfig{};
 
   if (traceConfigPath.empty()) {
     return false;
@@ -156,7 +152,7 @@ bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig* 
       if (!kv.value().is_object()) {
         continue;
       }
-      out->levelOverrides[static_cast<size_t>(level)] = kv.value().as_object();
+      out.levelOverrides[static_cast<size_t>(level)] = kv.value().as_object();
     }
   }
 

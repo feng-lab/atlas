@@ -95,7 +95,7 @@ double locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zSca
 
   for (const auto& node : chain) {
     locseg2 = node.locseg;
-    localNeurosegScaleZLegacyLike(&locseg2, zScale);
+    localNeurosegScaleZLegacyLike(locseg2, zScale);
     const std::array<double, 3> target = localNeurosegCenterLegacyLike(locseg2);
     const double dist = geo3dDist(source[0], source[1], source[2], target[0], target[1], target[2]);
     if (dist < minDist) {
