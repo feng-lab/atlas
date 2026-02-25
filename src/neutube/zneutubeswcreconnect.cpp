@@ -1,5 +1,7 @@
 #include "zneutubeswcreconnect.h"
 
+#include "zneutubegraph.h"
+
 #include "zneutubeswcnodeops.h"
 
 #include "zneutubeswcops.h"
@@ -8,11 +10,9 @@
 
 #include "zlog.h"
 
-#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 namespace nim::neutube {
@@ -45,6 +45,17 @@ void reconnectSwc(ZSwc* tree, double zScale, double distThre)
     return;
   }
 
+  auto packOrderedPair = [](int a, int b) -> std::uint64_t {
+    CHECK(a >= 0);
+    CHECK(b >= 0);
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(a)) << 32) |
+           static_cast<std::uint64_t>(static_cast<std::uint32_t>(b));
+  };
+
+  auto packUnorderedPair = [&](int a, int b) -> std::uint64_t {
+    return (a <= b) ? packOrderedPair(a, b) : packOrderedPair(b, a);
+  };
+
   std::vector<ZSwc::SwcTreeNode> nodeArray;
   nodeArray.reserve(tree->size());
   for (auto it = tree->begin(); it != tree->end(); ++it) {
@@ -54,19 +65,12 @@ void reconnectSwc(ZSwc* tree, double zScale, double distThre)
   const int nodeNumber = static_cast<int>(nodeArray.size());
 
   std::vector<std::vector<int>> nodesByLabel(static_cast<size_t>(treeNumber + 1));
-  nodesByLabel.shrink_to_fit();
   for (int i = 0; i < nodeNumber; ++i) {
     const int label = static_cast<int>(nodeArray[static_cast<size_t>(i)]->label);
-    CHECK(label >= 1 && label <= treeNumber);
-    nodesByLabel[static_cast<size_t>(label)].push_back(i);
+    if (label >= 1 && label <= treeNumber) {
+      nodesByLabel[static_cast<size_t>(label)].push_back(i);
+    }
   }
-
-  struct Edge
-  {
-    int v1 = -1;
-    int v2 = -1;
-    double w = 0.0;
-  };
 
   auto pointDistNodeZ = [&](const std::vector<int>& candidates,
                             const std::array<double, 3>& pos) -> std::pair<double, int> {
@@ -95,16 +99,23 @@ void reconnectSwc(ZSwc* tree, double zScale, double distThre)
     return {mindist, best};
   };
 
-  std::vector<Edge> edges;
-  edges.reserve(static_cast<size_t>(nodeNumber));
+  // Build the candidate edge list, matching tz_swc_tree.c::Swc_Tree_Reconnect.
+  GraphLegacyLike graph;
+  graph.nvertex = nodeNumber;
+  graph.edges.reserve(static_cast<size_t>(nodeNumber));
+  graph.weights.reserve(static_cast<size_t>(nodeNumber));
 
   for (int i = 0; i < nodeNumber; ++i) {
     const auto tn = nodeArray[static_cast<size_t>(i)];
+    if (tn->id < 0) { // virtual node (legacy Swc_Tree_Node_Is_Regular check)
+      continue;
+    }
     if (isContinuation(tn)) {
       continue;
     }
 
     const int label1 = static_cast<int>(tn->label);
+    CHECK(label1 >= 1 && label1 <= treeNumber);
     const std::array<double, 3> pos = {tn->x, tn->y, tn->z};
 
     for (int label2 = 1; label2 <= treeNumber; ++label2) {
@@ -126,144 +137,115 @@ void reconnectSwc(ZSwc* tree, double zScale, double distThre)
         w = 0.0;
       }
 
-      edges.push_back({i, closestIndex, w});
+      graphAddEdgeLegacyLike(&graph, i, closestIndex, w);
     }
   }
 
-  struct PairHash
+  // Port of tz_graph.c::Graph_Remove_Duplicated_Edge (orientation-sensitive, keeps first occurrence).
   {
-    size_t operator()(const std::pair<int, int>& p) const noexcept
-    {
-      return (static_cast<size_t>(p.first) << 32) ^ static_cast<size_t>(p.second);
+    std::unordered_map<std::uint64_t, int> seen;
+    seen.reserve(graph.edges.size());
+
+    GraphLegacyLike deduped;
+    deduped.nvertex = graph.nvertex;
+    deduped.edges.reserve(graph.edges.size());
+    deduped.weights.reserve(graph.weights.size());
+
+    for (size_t i = 0; i < graph.edges.size(); ++i) {
+      const int v1 = graph.edges[i][0];
+      const int v2 = graph.edges[i][1];
+      const std::uint64_t key = packOrderedPair(v1, v2);
+      if (seen.find(key) != seen.end()) {
+        continue;
+      }
+      seen.emplace(key, static_cast<int>(i));
+      deduped.edges.push_back(graph.edges[i]);
+      deduped.weights.push_back(graph.weights[i]);
     }
-  };
 
-  std::unordered_map<std::pair<int, int>, Edge, PairHash> uniqueEdges;
-  uniqueEdges.reserve(edges.size());
-
-  for (const auto& e : edges) {
-    const int a = std::min(e.v1, e.v2);
-    const int b = std::max(e.v1, e.v2);
-    const std::pair<int, int> key = {a, b};
-    auto it = uniqueEdges.find(key);
-    if (it == uniqueEdges.end() || it->second.w > e.w) {
-      uniqueEdges[key] = {a, b, e.w};
-    }
-  }
-
-  edges.clear();
-  edges.reserve(uniqueEdges.size());
-  for (const auto& kv : uniqueEdges) {
-    edges.push_back(kv.second);
+    graph = std::move(deduped);
   }
 
   // Build a label graph: for each pair of labels, keep the minimum-weight edge between the two trees.
-  std::vector<Edge> labelEdges;
-  std::vector<Edge> subgraphEdges;
+  GraphLegacyLike subgraph;
+  subgraph.nvertex = nodeNumber;
 
-  std::unordered_map<std::pair<int, int>, size_t, PairHash> labelEdgeIndex;
-  labelEdgeIndex.reserve(edges.size());
+  GraphLegacyLike labelGraph;
+  labelGraph.nvertex = treeNumber + 1;
 
-  for (const auto& e : edges) {
-    const int label1 = static_cast<int>(nodeArray[static_cast<size_t>(e.v1)]->label);
-    const int label2 = static_cast<int>(nodeArray[static_cast<size_t>(e.v2)]->label);
+  std::unordered_map<std::uint64_t, int> labelEdgeIndex;
+  labelEdgeIndex.reserve(graph.edges.size());
+
+  for (size_t i = 0; i < graph.edges.size(); ++i) {
+    const int v1 = graph.edges[i][0];
+    const int v2 = graph.edges[i][1];
+    const double w = graph.weights[i];
+
+    const int label1 = static_cast<int>(nodeArray[static_cast<size_t>(v1)]->label);
+    const int label2 = static_cast<int>(nodeArray[static_cast<size_t>(v2)]->label);
     if (label1 == label2) {
       continue;
     }
 
-    const int a = std::min(label1, label2);
-    const int b = std::max(label1, label2);
-    const std::pair<int, int> key = {a, b};
+    CHECK(label1 >= 1 && label1 <= treeNumber);
+    CHECK(label2 >= 1 && label2 <= treeNumber);
 
+    const std::uint64_t key = packUnorderedPair(label1, label2);
     auto it = labelEdgeIndex.find(key);
     if (it == labelEdgeIndex.end()) {
-      const size_t idx = labelEdges.size();
-      labelEdgeIndex[key] = idx;
-      labelEdges.push_back({a, b, e.w});
-      subgraphEdges.push_back(e);
+      graphAddEdgeLegacyLike(&labelGraph, label1, label2, w);
+      graphAddEdgeLegacyLike(&subgraph, v1, v2, w);
+      labelEdgeIndex.emplace(key, static_cast<int>(labelGraph.edges.size()) - 1);
     } else {
-      const size_t idx = it->second;
-      if (labelEdges[idx].w > e.w) {
-        labelEdges[idx].w = e.w;
-        subgraphEdges[idx] = e;
+      const int edgeIndex = it->second;
+      CHECK(edgeIndex >= 0 && edgeIndex < static_cast<int>(labelGraph.weights.size()));
+      if (labelGraph.weights[static_cast<size_t>(edgeIndex)] > w) {
+        labelGraph.weights[static_cast<size_t>(edgeIndex)] = w;
+        subgraph.edges[static_cast<size_t>(edgeIndex)] = {v1, v2};
+        subgraph.weights[static_cast<size_t>(edgeIndex)] = w;
       }
     }
   }
 
-  // Kruskal MST over labels.
-  struct DSU
-  {
-    std::vector<int> parent;
-    explicit DSU(int n)
-      : parent(static_cast<size_t>(n))
-    {
-      for (int i = 0; i < n; ++i) {
-        parent[static_cast<size_t>(i)] = i;
+  // Kruskal MST over labels with legacy `darray_qsort` tie behavior.
+  const GraphMst2ResultLegacyLike mst = graphToMst2LegacyLike(&labelGraph);
+  CHECK(mst.edgeIn.size() == subgraph.edges.size());
+
+  // Compact subgraph edges/weights in original order.
+  int j = 0;
+  const int nedge = static_cast<int>(subgraph.edges.size());
+  for (int i = 0; i < nedge; ++i) {
+    if (mst.edgeIn[static_cast<size_t>(i)] == 1u) {
+      if (i != j) {
+        subgraph.edges[static_cast<size_t>(j)] = subgraph.edges[static_cast<size_t>(i)];
+        subgraph.weights[static_cast<size_t>(j)] = subgraph.weights[static_cast<size_t>(i)];
       }
-    }
-
-    int find(int x)
-    {
-      int r = x;
-      while (parent[static_cast<size_t>(r)] != r) {
-        r = parent[static_cast<size_t>(r)];
-      }
-      while (parent[static_cast<size_t>(x)] != x) {
-        const int p = parent[static_cast<size_t>(x)];
-        parent[static_cast<size_t>(x)] = r;
-        x = p;
-      }
-      return r;
-    }
-
-    bool unite(int a, int b)
-    {
-      a = find(a);
-      b = find(b);
-      if (a == b) {
-        return false;
-      }
-      parent[static_cast<size_t>(b)] = a;
-      return true;
-    }
-  };
-
-  std::vector<size_t> edgeOrder(labelEdges.size());
-  for (size_t i = 0; i < edgeOrder.size(); ++i) {
-    edgeOrder[i] = i;
-  }
-  std::sort(edgeOrder.begin(), edgeOrder.end(), [&](size_t a, size_t b) {
-    return labelEdges[a].w < labelEdges[b].w;
-  });
-
-  DSU dsu(treeNumber + 1);
-  std::vector<bool> inMst(labelEdges.size(), false);
-
-  for (const size_t ei : edgeOrder) {
-    const int a = labelEdges[ei].v1;
-    const int b = labelEdges[ei].v2;
-    if (dsu.unite(a, b)) {
-      inMst[ei] = true;
+      ++j;
     }
   }
 
-  // Apply MST edges to connect trees.
-  for (size_t i = 0; i < subgraphEdges.size(); ++i) {
-    if (!inMst[i]) {
+  subgraph.edges.resize(static_cast<size_t>(j));
+  subgraph.weights.resize(static_cast<size_t>(j));
+
+  // Apply MST edges to connect trees (order matters for root selection).
+  for (size_t i = 0; i < subgraph.edges.size(); ++i) {
+    if (distThre >= 0.0 && subgraph.weights[i] > distThre) {
       continue;
     }
 
-    const Edge& e = subgraphEdges[i];
-    if (distThre >= 0.0 && e.w > distThre) {
-      continue;
-    }
+    const int v1 = subgraph.edges[i][0];
+    const int v2 = subgraph.edges[i][1];
+    CHECK(v1 >= 0 && v1 < nodeNumber);
+    CHECK(v2 >= 0 && v2 < nodeNumber);
 
-    ZSwc::SwcTreeNode tn1 = nodeArray[static_cast<size_t>(e.v1)];
-    ZSwc::SwcTreeNode tn2 = nodeArray[static_cast<size_t>(e.v2)];
+    ZSwc::SwcTreeNode tn1 = nodeArray[static_cast<size_t>(v1)];
+    ZSwc::SwcTreeNode tn2 = nodeArray[static_cast<size_t>(v2)];
 
     tree->setAsRoot(tn1);
     tree->appendChild(tn2, tn1);
   }
+
+  resortId(tree);
 }
 
 } // namespace nim::neutube

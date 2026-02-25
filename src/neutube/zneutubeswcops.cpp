@@ -77,8 +77,11 @@ ZSwc::SwcTreeNode addBreak(ZSwc* swc, ZSwc::SwcTreeNode node, double lambda)
   }
 
   SwcNode newNode;
-  newNode.id = 1;
-  newNode.type = node->type;
+  // Legacy `Swc_Tree_Node_Add_Break` creates a new node via `New_Swc_Tree_Node()`,
+  // which defaults `Swc_Node.type` to 2 (see tz_swc_cell.c::Default_Swc_Node).
+  // Preserve this exact behavior for byte-identical SWC outputs.
+  newNode.id = 0;
+  newNode.type = 2;
   newNode.x = lambda * node->x + (1.0 - lambda) * parent->x;
   newNode.y = lambda * node->y + (1.0 - lambda) * parent->y;
   newNode.z = lambda * node->z + (1.0 - lambda) * parent->z;

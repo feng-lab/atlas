@@ -38,35 +38,13 @@ void stackSubcLegacyLike(ZImg* stack, int subtr)
     return;
   }
 
-  const size_t n = stack->voxelNumber();
-
-  if (stack->isType<uint8_t>()) {
-    auto* a = stack->timeData<uint8_t>(0);
-    if (subtr >= std::numeric_limits<uint8_t>::max()) {
-      std::fill(a, a + n, uint8_t{0});
-      return;
-    }
-    for (size_t i = 0; i < n; ++i) {
-      const int v = static_cast<int>(a[i]);
-      a[i] = (v <= subtr) ? uint8_t{0} : static_cast<uint8_t>(v - subtr);
-    }
-    return;
+  // Use ZImg's saturating arithmetic implementation (same semantics as the legacy Stack_Subc path).
+  //
+  // Keep the same short-circuit behavior for unsupported types.
+  if (!stack->isType<uint8_t>() && !stack->isType<uint16_t>()) {
+    throw ZException(fmt::format("stackSubcLegacyLike: unsupported voxel type {}", stack->info()));
   }
-
-  if (stack->isType<uint16_t>()) {
-    auto* a = stack->timeData<uint16_t>(0);
-    if (subtr >= std::numeric_limits<uint16_t>::max()) {
-      std::fill(a, a + n, uint16_t{0});
-      return;
-    }
-    for (size_t i = 0; i < n; ++i) {
-      const int v = static_cast<int>(a[i]);
-      a[i] = (v <= subtr) ? uint16_t{0} : static_cast<uint16_t>(v - subtr);
-    }
-    return;
-  }
-
-  throw ZException(fmt::format("stackSubcLegacyLike: unsupported voxel type {}", stack->info()));
+  *stack -= subtr;
 }
 
 [[nodiscard]] size_t fgAreaAboveThresholdLegacyLike(const ZImg& stack, int thre)

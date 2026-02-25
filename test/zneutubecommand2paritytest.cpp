@@ -2267,16 +2267,35 @@ TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
   ScopedQtCoreApplication qtApp;
   std::ignore = nim::ZImgInit::instance("", "", "", false);
 
-  const QString inputPath = nim::getTestDataDir().filePath("benchmark/fake_neuron.tif");
-  if (!QFileInfo::exists(inputPath)) {
-    GTEST_SKIP() << "Missing auto-trace test input at: " << inputPath.toStdString();
+  const std::vector<QString> candidateRelativePaths = {
+    "benchmark/fake_neuron.tif",
+    "benchmark/fake_neuron2.tif",
+    "benchmark/fake_neuron3.tif",
+    "benchmark/fake_neuron4.tif",
+    "benchmark/fake_spine.tif",
+    "benchmark/faint_fiber.tif",
+    "benchmark/sharp_turn.tif",
+    // 2D edge cases (depth==1) exercise local-max / neighborhood guards.
+    "benchmark/bline_2d.tif",
+    "benchmark/bfork_2d.tif",
+  };
+
+  std::vector<QString> inputPaths;
+  inputPaths.reserve(candidateRelativePaths.size());
+  for (const QString& rel : candidateRelativePaths) {
+    const QString path = nim::getTestDataDir().filePath(rel);
+    if (QFileInfo::exists(path)) {
+      inputPaths.push_back(path);
+    }
+  }
+
+  if (inputPaths.empty()) {
+    GTEST_SKIP() << "Missing auto-trace benchmark inputs under: " << nim::getTestDataDir().absolutePath().toStdString();
   }
 
   const fs::path dir = makeUniqueTempDir();
   const fs::path commandConfig = dir / "command_config.json";
   const fs::path traceCfg = dir / "trace_config.json";
-  const fs::path legacyTraceSwc = dir / "legacy_trace_auto.swc";
-  const fs::path v2TraceSwc = dir / "v2_trace_auto.swc";
 
   writeTextFile(commandConfig,
                 R"json({
@@ -2290,43 +2309,159 @@ TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
                 R"json({
   "tag": "trace config",
   "default": {}
+  }
+)json");
+
+  for (const QString& inputPath : inputPaths) {
+    SCOPED_TRACE(inputPath.toStdString());
+
+    const std::string stem = QFileInfo(inputPath).completeBaseName().toStdString();
+    const fs::path legacyTraceSwc = dir / fmt::format("legacy_trace_auto_{}.swc", stem);
+    const fs::path v2TraceSwc = dir / fmt::format("v2_trace_auto_{}.swc", stem);
+
+    std::error_code ec;
+    fs::remove(legacyTraceSwc, ec);
+    fs::remove(v2TraceSwc, ec);
+
+    const int legacyRc = [&]() {
+      ArgvBuilder argv({
+        "Atlas",
+        "--command",
+        "--trace",
+        inputPath.toStdString(),
+        "-o",
+        legacyTraceSwc.string(),
+        "--config",
+        commandConfig.string(),
+      });
+      return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
+    }();
+
+    const int v2Rc = [&]() {
+      ArgvBuilder argv({
+        "Atlas",
+        "--command",
+        "--trace",
+        inputPath.toStdString(),
+        "-o",
+        v2TraceSwc.string(),
+        "--config",
+        commandConfig.string(),
+      });
+      return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+    }();
+
+    EXPECT_EQ(legacyRc, v2Rc);
+
+    if (legacyRc == 0) {
+      ASSERT_TRUE(fs::exists(legacyTraceSwc)) << legacyTraceSwc.string();
+      ASSERT_TRUE(fs::exists(v2TraceSwc)) << v2TraceSwc.string();
+      EXPECT_EQ(readTextFile(legacyTraceSwc), readTextFile(v2TraceSwc));
+    } else {
+      EXPECT_FALSE(fs::exists(legacyTraceSwc));
+      EXPECT_FALSE(fs::exists(v2TraceSwc));
+    }
+  }
+
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+}
+
+TEST(NeutubeCommand2Parity, Skeletonize_FromTestDataBinary_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const std::vector<QString> candidateRelativePaths = {
+    "benchmark/sphere_bw.tif",
+    "benchmark/sphere_bw_crop.tif",
+    "benchmark/isolated_objects.tif",
+    "benchmark/btrig2_2d_bw.tif",
+    "benchmark/crossover_2d.tif",
+    "benchmark/binary/2d/disk_n1.tif",
+    "benchmark/binary/3d/diadem_e1.tif",
+  };
+
+  std::vector<QString> inputPaths;
+  inputPaths.reserve(candidateRelativePaths.size());
+  for (const QString& rel : candidateRelativePaths) {
+    const QString path = nim::getTestDataDir().filePath(rel);
+    if (QFileInfo::exists(path)) {
+      inputPaths.push_back(path);
+    }
+  }
+
+  if (inputPaths.empty()) {
+    GTEST_SKIP() << "Missing skeletonize benchmark inputs under: "
+                 << nim::getTestDataDir().absolutePath().toStdString();
+  }
+
+  const fs::path dir = makeUniqueTempDir();
+  const fs::path commandConfig = dir / "command_config.json";
+  const fs::path skeletonizeCfg = dir / "skeletonize.json";
+
+  writeTextFile(commandConfig,
+                R"json({
+  "skeletonize": {
+    "include": "skeletonize.json"
+  }
 }
 )json");
 
-  const int legacyRc = [&]() {
-    ArgvBuilder argv({
-      "Atlas",
-      "--command",
-      "--trace",
-      inputPath.toStdString(),
-      "-o",
-      legacyTraceSwc.string(),
-      "--config",
-      commandConfig.string(),
-    });
-    return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
-  }();
+  // Use defaults (legacy-equivalent) for this parity suite; do not tune thresholds.
+  writeTextFile(skeletonizeCfg,
+                R"json({
+  "downsampleInterval": [0, 0, 0]
+}
+)json");
 
-  const int v2Rc = [&]() {
-    ArgvBuilder argv({
-      "Atlas",
-      "--command",
-      "--trace",
-      inputPath.toStdString(),
-      "-o",
-      v2TraceSwc.string(),
-      "--config",
-      commandConfig.string(),
-    });
-    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
-  }();
+  for (const QString& inputPath : inputPaths) {
+    SCOPED_TRACE(inputPath.toStdString());
 
-  EXPECT_EQ(legacyRc, v2Rc);
+    const std::string stem = QFileInfo(inputPath).completeBaseName().toStdString();
+    const fs::path legacyOut = dir / fmt::format("legacy_skeletonize_{}.swc", stem);
+    const fs::path v2Out = dir / fmt::format("v2_skeletonize_{}.swc", stem);
 
-  if (legacyRc == 0) {
-    ASSERT_TRUE(fs::exists(legacyTraceSwc)) << legacyTraceSwc.string();
-    ASSERT_TRUE(fs::exists(v2TraceSwc)) << v2TraceSwc.string();
-    EXPECT_EQ(readTextFile(legacyTraceSwc), readTextFile(v2TraceSwc));
+    std::error_code ec;
+    fs::remove(legacyOut, ec);
+    fs::remove(v2Out, ec);
+
+    const int legacyRc = [&]() {
+      ArgvBuilder argv({
+        "Atlas",
+        "--command",
+        "--skeletonize",
+        inputPath.toStdString(),
+        "-o",
+        legacyOut.string(),
+        "--config",
+        commandConfig.string(),
+      });
+      return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
+    }();
+
+    const int v2Rc = [&]() {
+      ArgvBuilder argv({
+        "Atlas",
+        "--command",
+        "--skeletonize",
+        inputPath.toStdString(),
+        "-o",
+        v2Out.string(),
+        "--config",
+        commandConfig.string(),
+      });
+      return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+    }();
+
+    EXPECT_EQ(legacyRc, v2Rc);
+
+    const bool legacyExists = fs::exists(legacyOut);
+    const bool v2Exists = fs::exists(v2Out);
+    EXPECT_EQ(legacyExists, v2Exists);
+    if (legacyExists && v2Exists) {
+      EXPECT_EQ(readTextFile(legacyOut), readTextFile(v2Out));
+    }
   }
 
   std::error_code ec;
@@ -2354,6 +2489,32 @@ TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)
 
   const std::string legacy = legacyCompareSwcPairs(inputs, 1.0);
   const std::string ported = nim::neutube::formatCompareSwcPairs(nim::neutube::computeCompareSwc(inputs, 1.0));
+
+  EXPECT_EQ(ported, legacy);
+}
+
+TEST(NeutubeCommand2Parity, CompareSwc_Scale2_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+
+  const QDir compareDir(nim::getTestDataDir().filePath("benchmark/swc/compare"));
+  if (!compareDir.exists()) {
+    GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath().toStdString();
+  }
+
+  std::vector<std::string> inputs;
+  for (int i = 1; i <= 5; ++i) {
+    const QString name = QString("compare%1.swc").arg(i);
+    const QString swcPath = compareDir.filePath(name);
+    if (!QFileInfo::exists(swcPath)) {
+      GTEST_SKIP() << "Missing SWC compare file: " << swcPath.toStdString();
+    }
+    inputs.push_back(swcPath.toStdString());
+  }
+
+  constexpr double Scale = 2.0;
+  const std::string legacy = legacyCompareSwcPairs(inputs, Scale);
+  const std::string ported = nim::neutube::formatCompareSwcPairs(nim::neutube::computeCompareSwc(inputs, Scale));
 
   EXPECT_EQ(ported, legacy);
 }
