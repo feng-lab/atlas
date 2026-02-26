@@ -18,6 +18,11 @@ ZSwcDoc::ZSwcDoc(ZDoc& doc)
   createActions();
 }
 
+size_t ZSwcDoc::addSwcFromMemory(ZSwc tree, const QString& path)
+{
+  return addSwc(std::move(tree), path);
+}
+
 bool ZSwcDoc::save(size_t id)
 {
   if (!objHasUnsavedChange(id)) {

@@ -47,6 +47,8 @@ class ZSkeletonDoc;
 
 class ZObjPack;
 
+class ZTraceSettings;
+
 class ZDoc : public QObject
 {
   Q_OBJECT
@@ -243,6 +245,16 @@ public:
     return *m_regionAnnotationDoc;
   }
 
+  ZTraceSettings& traceSettings()
+  {
+    return *m_traceSettings;
+  }
+
+  [[nodiscard]] const ZTraceSettings& traceSettings() const
+  {
+    return *m_traceSettings;
+  }
+
   void hideAnimation3DView();
 
   void deselectAllObjs();
@@ -355,6 +367,8 @@ private:
   ZMeshDoc* m_meshDoc = nullptr;
   ZSkeletonDoc* m_skeletonDoc = nullptr;
   ZRegionAnnotationDoc* m_regionAnnotationDoc = nullptr;
+
+  ZTraceSettings* m_traceSettings = nullptr;
 };
 
 } // namespace nim

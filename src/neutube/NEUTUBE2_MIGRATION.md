@@ -60,6 +60,222 @@ neuTube’s manual documents a workflow centered around:
 We will migrate these behaviors into Atlas’ GUI stack, respecting Atlas threading invariants (rendering-thread-only GL,
 UI thread owns widgets) and using structured signals (`QMetaObject::invokeMethod`, queued connections) to cross threads.
 
+Acceptance criteria for Goal 2 (first interactive milestone):
+
+- In Atlas GUI, users can run seeded tracing from both:
+  - 2D view (context menu first; optional trace tool mode later)
+  - 3D view (left-click trace menu, gated behind an explicit “Trace” tool mode to avoid always-on behavior)
+- Tracing runs the already-migrated “legacy-like” algorithm (no new heuristics) and applies results as a single undoable
+  operation in `ZSwcDoc`/`ZSwcPack`.
+- Tracing respects multi-image scenes:
+  - trace actions do **not** rely on active/selected object state (too implicit and unstable).
+  - instead, tracing prompts the user to explicitly choose:
+    - source image (among visible traceable images under the cursor)
+    - source channel (for multi-channel images)
+    - SWC destination (new SWC vs attach to an existing SWC)
+  - the chosen settings are persisted in `ZDoc::traceSettings()` so 2D/3D windows stay in sync.
+
+#### Goal 2 research notes (legacy neuTube → Atlas mapping)
+
+Key legacy reference points in `src/neurolabi/gui/`:
+
+- Context menu plumbing:
+  - `ZStackPresenter::traceTube()` (`src/neurolabi/gui/mvc/zstackpresenter.cpp`)
+    - Uses the mouse stack position as the seed.
+    - Special-cases Z-projection mode (picks `z = maxIntensityDepth(x, y)`).
+    - Calls `ZStackDoc::executeTraceSwcBranchCommand(...)`.
+  - `ZStackDoc::executeTraceSwcBranchCommand(...)` (`src/neurolabi/gui/mvc/zstackdoc.cpp`)
+    - Runs seeded tracing (`ZNeuronTracer::trace(x, y, z)`) to produce a branch.
+    - Optionally auto-connects the branch to the existing SWC set via `ZSwcConnector`.
+    - Resamples (`ZSwcResampler`) and pushes a composite undo command (add branch, set parent connection, label trace mask).
+  - SWC editing context menu composition:
+    - `ZStackDocMenuFactory::makeSwcNodeContextMenu(...)` (`src/neurolabi/gui/zstackdocmenufactory.cpp`)
+      lists the full editing action set (delete/break/connect/merge/insert, interpolation, selection helpers,
+      “advanced” fixes like remove-turn/resolve-crossover, property changes, measurements).
+
+Existing Atlas integration points we can build on immediately:
+
+- 2D view context menus:
+  - `ZGraphicsScene::contextMenuEvent(...)` builds the menu and then calls `ZView::appendContextMenuActions(...)`
+    (`src/atlas/zgraphicsscene.cpp`, `src/atlas/zview.cpp`).
+  - `ZImgView::appendContextMenuActions(...)` is the natural place to add image-specific actions (currently mostly used
+    for Neuroglancer segmentation utilities): `src/atlas/zimgview.cpp`.
+- 3D view context menus + left-click listener:
+  - `Z3DImgFilter` already registers a left-click event listener named `"trace"` but the handler is currently empty:
+    `src/atlas/z3dimgfilter.cpp` (`leftMouseButtonPressed`).
+  - `Z3DImgFilter::contextMenuEvent(...)` already computes an image-space hit position (`get3DPosition(...)`).
+  - Note: the existing 3D image right-click menu is currently implemented by connecting
+    `Z3DImgFilter::showImgContextMenu` to `ZImgPack::show3DImgContextMenu`. For the first trace integration we should
+    follow the existing ownership model (signals out of the filter), and then decide whether to centralize menu building
+    in view/controller code as a later refactor.
+- SWC rendering + selection + undo are already present in Atlas:
+  - `ZSwcDoc` owns SWC objects (`ZSwcPack`) and integrates with `QUndoStack`: `src/atlas/zswcdoc.*`
+  - `ZSwcPack::contextMenu()` already provides a basic right-click SWC editing menu: `src/atlas/zswcpack.*`
+  - 2D + 3D SWC selection is implemented (`ZSwcFilter`, `Z3DSwcFilter`) and stays in sync through the shared doc model.
+- Image sources (including large/paged datasets) already have a canonical abstraction in Atlas:
+  - `ZImgPack` supports both in-memory and disk-cached/paged reads, and supports region reads (`readRegionToImgAsync(...)`)
+    and point sampling (`value(...)` / `displayValue(...)`): `src/atlas/zimgpack.*`
+
+Algorithm-side readiness:
+
+- The CLI migration already contains a faithful port of the seeded trace behavior (“interactive-like”) in C++ on `ZImg`
+  + `ZSwc`:
+  - `src/neutube/zneutubetrace.cpp` contains `runSeededTraceLegacyLike(...)` and `runSeededTraceWithHostSwcLegacyLike(...)`
+    which are ports of `ZNeuronTracer::trace(x, y, z)` and the “attach-to-host-SWC” logic.
+- For GUI integration, we should refactor these into in-memory APIs (no file I/O) that operate on `ZImgPack`/`ZImg` and
+  return `ZSwc` deltas suitable for undoable edits.
+
+#### Goal 2 plan (step-by-step, migration-first)
+
+The plan below intentionally prioritizes:
+
+- Minimal new UI surface at first (start from context menus / a trace tool toggle).
+- Reuse of existing Atlas doc/undo/view plumbing.
+- Strict algorithm reuse (call the already-ported C++ tracing code; do not re-invent heuristics).
+- Clear UX rules for multi-image scenes (Atlas can show multiple volumes simultaneously).
+
+Goal 2 implementation status (as of 2026-02-25):
+
+- Phase 2A (in-memory seeded tracing API): implemented
+  - `nim::traceSeedNewSwcLegacyLike` and `nim::traceSeedIntoHostSwcLegacyLike`:
+    - `src/neutube/zneutubetraceinteractive.*`
+  - Seeded CLI tracing was refactored to call the same in-memory API (keeps behavior centralized):
+    - `src/neutube/zneutubetrace.cpp`
+- Phase 2B (2D integration): initial context-menu integration implemented
+  - `ZImgView::appendContextMenuActions` now adds a `Trace` submenu in Normal view for traceable images:
+    - `src/atlas/zimgview.cpp`
+  - Action:
+    - `Trace Here...` (opens an explicit seed-trace dialog, then runs tracing asynchronously)
+  - Optional “trace tool” UX (neuTube-like left-click):
+    - A checkable `Trace` toolbar action (2D + 3D windows; synced through `ZDoc::traceSettings()`) enables a left-click
+      trace menu in the 2D scene. This menu reuses the same `Trace` submenu logic as right-click:
+      - `src/atlas/zmainwindow.cpp`
+      - `src/atlas/z3dmainwindow.cpp`
+      - `src/atlas/zgraphicsscene.cpp`
+      - `src/atlas/ztracesettings.h` (`traceToolEnabled`)
+  - Shared trace selection UI + state (designed to be reused by 2D and 3D):
+    - `src/atlas/zseedtracedialog.*` (dialog that chooses image/channel + SWC target)
+    - `src/atlas/ztracesettings.*` (stored in `ZDoc::traceSettings()` so 2D/3D stay in sync)
+    - `src/atlas/ztracesettingswidget.*` (persistent dock widget; edits `ZDoc::traceSettings()`; available in both 2D and 3D windows)
+  - Current restrictions (intentional for the first milestone):
+    - Only Normal view (not MIP, not Montage)
+    - The user must right-click within a visible traceable image volume
+    - Multi-channel images are supported via an explicit channel picker (no channel-extraction workflow)
+
+Phase 2A: define the GUI-facing tracing API (no UI yet)
+
+1. Add a small in-memory tracing API in `src/neutube/` (or `src/img/` if it becomes generally useful) that exposes:
+   - `traceSeedNewSwcLegacyLike(signal, position, cfg, c, t) -> std::unique_ptr<ZSwc>`
+   - `traceSeedIntoHostSwcLegacyLike(signal, hostSwc, position, cfg, c, t) -> TraceMergeResult`
+2. Keep these APIs file-free:
+   - Accept `const ZImg&` or `const ZImgPack&` (plus voxel coordinate).
+   - Accept `TraceConfig` (already in `src/neutube/zneutubetraceconfig.*`).
+3. Make the API explicit about coordinate frames:
+   - Inputs are always in image voxel coordinates (x,y,z in the image’s native index space).
+   - If any cropping/region-reading is used, the API must define the mapping unambiguously and must not silently change
+     behavior.
+4. Define a “destination SWC” policy for GUI:
+   - Always ask explicitly: new SWC vs attach to an existing SWC.
+   - Persist the choice (and the chosen SWC id, when applicable) in `ZDoc::traceSettings()`.
+5. Define a “trace source image” policy for GUI:
+   - Always ask explicitly: choose among visible traceable images under the cursor.
+   - Persist the last choice in `ZDoc::traceSettings()` (used as a default when still applicable).
+6. Implement `maxIntensityDepth(x, y)` utility for MIP/2D projection trace seeds (legacy behavior) using `ZImgPack::value`
+   or a region read to avoid loading the full volume when possible.
+7. Ensure all public APIs follow Atlas pointer-nullability rules (prefer refs; only use `/*nullable*/` pointers where
+   semantically required).
+
+Phase 2B: integrate “Trace here” in Atlas 2D view (context menu first)
+
+8. Add a “Trace” submenu to the 2D context menu through `ZImgView::appendContextMenuActions(...)` (`src/atlas/zimgview.cpp`).
+9. The action is enabled only when:
+   - View is in Normal slice mode (not MIP/Montage for the initial version), and
+   - The clicked point is within at least one visible traceable image’s bounds.
+   - Source image/channel and SWC target are chosen explicitly via the seed-trace dialog.
+10. On trigger:
+   - Convert `scenePos` → image voxel coordinate using the owning `ZImgFilter` (use the same mapping approach as
+     `cachedNeuroglancerSegmentationIdAtScenePos`, but for grayscale images).
+   - For Normal view: seed z = current slice in image space.
+11. Use a background worker to run tracing (QtConcurrent or folly executor), then apply results on the UI thread by
+    mutating `ZSwcDoc`/`ZSwcPack` with an undo command.
+12. Create/extend `ZSwcEditCommand` usage patterns so that tracing is undoable as a single operation.
+13. Auto-select the newly added branch nodes so users can immediately edit them (mirrors neuTube’s “trace then edit” flow).
+14. Status bar feedback:
+    - “Tracing…” while running, “N nodes added” on success, and a clear error on failure.
+14a. Optional (to match neuTube UX more closely): add a dedicated “Trace” tool mode in the 2D toolbar.
+    - Add `ZView::State::Trace` and a checkable action next to the ROI tool button (`src/atlas/zview.*`,
+      `src/atlas/zmainwindow.cpp`).
+    - In `ZGraphicsScene::mousePressEvent(...)`, when in Trace mode and the click is not on an SWC node/ROI control point,
+      pop the trace menu at the mouse position (or directly run “Trace (new SWC)”).
+    - This keeps tracing from being “always on” while still supporting neuTube’s left-click flow.
+
+Phase 2C: integrate the left-click trace menu in Atlas 3D view
+
+15. Use the existing `Z3DImgFilter` left-click listener (`leftMouseButtonPressed`) as the entrypoint for a neuTube-like
+    “left click pops trace menu” behavior:
+    - Only when Trace mode is enabled (Atlas should not be “always on” like legacy neuTube).
+    - Only when at least one visible traceable image can be mapped at the click location (explicit source selection).
+    - Only when camera movement is not occurring (check small mouse delta between press/release).
+16. Do not build the QMenu inside `ZImgPack` (data object); instead:
+    - Add a `Z3DImgFilter` signal like `requestTraceMenu(QPoint globalPos, float x, float y, float z)`.
+    - Connect it in the owning 3D view/controller with the corresponding image object id captured.
+17. The menu should include at least:
+    - “Trace Here...” (opens the shared seed-trace dialog and runs tracing with the chosen source image/channel + SWC target)
+    - Optional later: “Trace Settings...” (persistent dock/panel, if we choose to add one)
+18. Invoke the same in-memory tracing API as Phase 2B and apply results to `ZSwcDoc`/`ZSwcPack` on completion.
+
+Phase 2D: multi-image UX (Atlas-specific)
+
+19. Add a clear “trace target” indicator in the UI:
+    - 2D/3D: display the current `ZDoc::traceSettings()` selection somewhere discoverable (status bar or a future panel).
+20. When multiple images are visible:
+    - Do not guess a “current” image based on active/selected state.
+    - Use the shared seed-trace dialog (`src/atlas/zseedtracedialog.*`) to choose explicitly among candidates.
+21. Multi-channel policy:
+    - Multi-channel images are supported by selecting a channel in the dialog.
+    - No channel-extraction workflow is required.
+
+Phase 2E: SWC editing menu parity expansion (Atlas `ZSwcPack` context menu)
+
+22. Compare neuTube’s SWC node context menu (`src/neurolabi/gui/zstackdocmenufactory.cpp`) to Atlas’ `ZSwcPack` menu and
+    port actions incrementally.
+23. Add missing “basic editing” actions first:
+    - Merge selected nodes
+    - Insert node (break edge and insert at interpolated location)
+24. Add interpolation actions next (use `ZSwc` geometry utilities, keeping semantics consistent with neuTube):
+    - interpolate positions along a branch
+    - interpolate radii
+    - z-only interpolation
+25. Add “advanced editing” actions:
+    - remove turn artifacts
+    - resolve crossover (if feasible with current `ZSwc` ops; otherwise document as deferred)
+    - connect isolated components (Atlas already has MST in `connectSelectedNodes`; can be generalized)
+26. Add information/measurement actions:
+    - measure path length between selected nodes
+    - summarize tree stats
+27. Ensure each action is undoable and does not mutate view/render state from the wrong thread.
+
+Phase 2F: large-image readiness (Atlas advantage, but staged)
+
+28. Initial interactive tracing can operate on in-memory `ZImg` (small/medium stacks).
+29. Add a staged path for disk-cached/paged images:
+    - Use `ZImgPack::readRegionToImgAsync(...)` to fetch a conservative region around the seed.
+    - Document clearly if this is an approximation relative to full-volume tracing and guard it behind a preference.
+30. Longer-term (post parity): refactor algorithms that fundamentally assume full-volume array access so they can run on
+    region readers without changing semantics (this is a separate milestone and may require algorithm-aware paging).
+
+Phase 2G: validation + documentation
+
+31. Add non-GUI tests for the GUI-facing in-memory APIs (seed trace returns deterministic SWC for a fixed `ZImg` fixture).
+32. Add a small integration test that simulates the “seed trace” path without GUI by calling the service and checking that
+    the resulting SWC matches the legacy in-process baseline for a known test image.
+33. Update `docs/USER_GUIDE.md` with the new workflow:
+    - selecting a trace target image
+    - tracing from 2D/3D
+    - editing SWC via context menus
+34. Update `docs/DEVELOPER_GUIDE.md` with threading notes for tracing (where the compute runs, how results are applied, how
+    undo is recorded).
+
 ## Where we are today (repository facts)
 
 ### Existing CLI entrypoint

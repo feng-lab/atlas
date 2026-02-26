@@ -1,14 +1,9 @@
 #include "zneutubetrace.h"
 
-#include "zneutubelocsegchain.h"
-#include "zneutubelocsegchaincircle.h"
-#include "zneutubelocsegchaintrace.h"
 #include "zswcloaderlegacy.h"
+#include "zneutubetraceinteractive.h"
 #include "zneutubetraceauto.h"
 #include "zneutubetraceconfig.h"
-#include "zneutubetraceconnect.h"
-#include "zneutubetraceworkspace.h"
-#include "zneutubetraceswclabelstack.h"
 #include "zswcwriter.h"
 
 #include "zimg.h"
@@ -25,8 +20,6 @@
 namespace nim {
 
 namespace {
-
-constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
 
 [[nodiscard]] std::string resolveTraceConfigPathLegacyLike(const std::string& traceConfigPath,
                                                            const std::string& jsonDirPath)
@@ -99,111 +92,16 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
     }
   }
 
-  // Port of ZNeuronTracer::trace(double x, double y, double z).
-  TraceWorkspace tw;
-  locsegChainDefaultTraceWorkspaceLegacyLike(tw, signal);
+  const std::array<double, 3> seed = {static_cast<double>(position[0]),
+                                      static_cast<double>(position[1]),
+                                      static_cast<double>(position[2])};
 
-  // Port of ZNeuronTracer::configure() effects on the trace workspace.
-  tw.refit = cfg.refit;
-  tw.tuneEnd = cfg.tuneEnd;
-
-  // Port of ZNeuronTracer::prepareTraceScoreThreshold(TRACING_INTERACTIVE).
-  if (signal.depth() == 1) {
-    tw.minScore = cfg.min2dScore;
-  } else {
-    tw.minScore = cfg.minManualScore;
-  }
-
-  traceWorkspaceInitTraceMaskLegacyLike(tw, signal, false);
-
-  std::array<double, 3> pos{};
-  pos[0] = static_cast<double>(position[0]);
-  pos[1] = static_cast<double>(position[1]);
-  pos[2] = static_cast<double>(position[2]);
-
-  LocalNeuroseg seedLocseg;
-  seedLocseg.seg.r1 = 3.0;
-  seedLocseg.seg.c = 0.0;
-  seedLocseg.seg.h = 11.0;
-  seedLocseg.seg.theta = TzPiOver4LegacyLike;
-  seedLocseg.seg.psi = 0.0;
-  seedLocseg.seg.curvature = 0.0;
-  seedLocseg.seg.alpha = 0.0;
-  seedLocseg.seg.scale = 1.0;
-  setNeurosegPositionLegacyLike(seedLocseg, pos, NeuroposReferenceLegacyLike::Center);
-
-  (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signal, 1.0, 1, tw.fitWorkspace);
-
-  TraceRecord seedTr;
-  traceRecordReset(seedTr);
-  traceRecordSetFixPoint(seedTr, 0.0);
-  traceRecordSetDirection(seedTr, TraceDirection::BothDir);
-
-  LocsegChain chain;
-  LocsegNode node;
-  node.locseg = seedLocseg;
-  node.tr = seedTr;
-  (void)chain.addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
-
-  traceWorkspaceSetTraceStatusLegacyLike(tw, TraceStatus::Normal, TraceStatus::Normal);
-  traceLocsegLegacyLike(signal, 1.0, chain, tw);
-  (void)locsegChainRemoveOverlapEndsLegacyLike(chain);
-  locsegChainRemoveTurnEndsLegacyLike(chain, 1.0);
-
-  const std::vector<Geo3dCircle> circles = locsegChainToGeo3dCircleArrayLegacyLike(chain);
-
-  if (circles.empty()) {
+  const SeedTraceResult traceRes = traceSeedNewSwcLegacyLike(signal, seed, cfg);
+  if (!traceRes.swc) {
     return 1;
   }
 
-  int start = 0;
-  int end = static_cast<int>(circles.size());
-
-  if (traceWorkspaceMaskValueLegacyLike(tw, circles.front().center) > 0) {
-    for (int i = 1; i < static_cast<int>(circles.size()); ++i) {
-      start = i - 1;
-      if (traceWorkspaceMaskValueLegacyLike(tw, circles[static_cast<size_t>(i)].center) == 0) {
-        break;
-      }
-    }
-  }
-
-  if (circles.size() > 1) {
-    if (traceWorkspaceMaskValueLegacyLike(tw, circles.back().center) > 0) {
-      for (int i = static_cast<int>(circles.size()) - 2; i >= 0; --i) {
-        end = i + 2;
-        if (traceWorkspaceMaskValueLegacyLike(tw, circles[static_cast<size_t>(i)].center) == 0) {
-          break;
-        }
-      }
-    }
-  }
-
-  if (start >= end) {
-    return 1;
-  }
-
-  nim::ZSwc swc;
-  nim::ZSwc::SwcTreeNode parent = swc.end();
-
-  for (int i = start; i < end; ++i) {
-    const Geo3dCircle& circle = circles[static_cast<size_t>(i)];
-    nim::SwcNode swcNode(/*id*/ 1,
-                         /*type*/ 0,
-                         circle.center[0],
-                         circle.center[1],
-                         circle.center[2],
-                         circle.radius,
-                         /*parentID*/ -1);
-
-    if (i == start) {
-      parent = swc.appendRoot(swcNode);
-    } else {
-      parent = swc.appendChild(parent, swcNode);
-    }
-  }
-
-  writeSwcLegacyNeuTu(swc, outputPath);
+  writeSwcLegacyNeuTu(*traceRes.swc, outputPath);
   return 0;
 }
 
@@ -260,120 +158,13 @@ constexpr double TzPiOver4LegacyLike = 0.78539816339744830961566084582;
     return 1;
   }
 
-  std::vector<nim::ZSwc::SwcTreeNode> hostRoots;
-  for (auto it = hostSwc.beginRoot(); it != hostSwc.endRoot(); ++it) {
-    hostRoots.emplace_back(nim::ZSwc::SwcTreeNode(it));
-  }
+  const std::array<double, 3> seed = {static_cast<double>(position[0]),
+                                      static_cast<double>(position[1]),
+                                      static_cast<double>(position[2])};
 
-  TraceWorkspace tw;
-  locsegChainDefaultTraceWorkspaceLegacyLike(tw, signal);
-
-  tw.refit = cfg.refit;
-  tw.tuneEnd = cfg.tuneEnd;
-
-  if (signal.depth() == 1) {
-    tw.minScore = cfg.min2dScore;
-  } else {
-    tw.minScore = cfg.minManualScore;
-  }
-
-  const ZImgInfo maskInfo(signal.width(), signal.height(), signal.depth(), 1, 1, 1, VoxelFormat::Unsigned);
-  tw.traceMask = std::make_unique<ZImg>(maskInfo);
-  tw.traceMask->fill(0);
-  labelSwcIntoMaskLegacyLike(hostSwc, *tw.traceMask, /*zScale*/ 1.0, /*value*/ 255);
-
-  std::array<double, 3> pos{};
-  pos[0] = static_cast<double>(position[0]);
-  pos[1] = static_cast<double>(position[1]);
-  pos[2] = static_cast<double>(position[2]);
-
-  LocalNeuroseg seedLocseg;
-  seedLocseg.seg.r1 = 3.0;
-  seedLocseg.seg.c = 0.0;
-  seedLocseg.seg.h = 11.0;
-  seedLocseg.seg.theta = TzPiOver4LegacyLike;
-  seedLocseg.seg.psi = 0.0;
-  seedLocseg.seg.curvature = 0.0;
-  seedLocseg.seg.alpha = 0.0;
-  seedLocseg.seg.scale = 1.0;
-  setNeurosegPositionLegacyLike(seedLocseg, pos, NeuroposReferenceLegacyLike::Center);
-
-  (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signal, 1.0, 1, tw.fitWorkspace);
-
-  TraceRecord seedTr;
-  traceRecordReset(seedTr);
-  traceRecordSetFixPoint(seedTr, 0.0);
-  traceRecordSetDirection(seedTr, TraceDirection::BothDir);
-
-  LocsegChain chain;
-  LocsegNode node;
-  node.locseg = seedLocseg;
-  node.tr = seedTr;
-  (void)chain.addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
-
-  traceWorkspaceSetTraceStatusLegacyLike(tw, TraceStatus::Normal, TraceStatus::Normal);
-  traceLocsegLegacyLike(signal, 1.0, chain, tw);
-  (void)locsegChainRemoveOverlapEndsLegacyLike(chain);
-  locsegChainRemoveTurnEndsLegacyLike(chain, 1.0);
-
-  const std::vector<Geo3dCircle> circles = locsegChainToGeo3dCircleArrayLegacyLike(chain);
-  if (circles.empty()) {
-    writeSwcLegacyNeuTu(hostSwc, outputPath);
-    return 0;
-  }
-
-  int start = 0;
-  int end = static_cast<int>(circles.size());
-
-  if (traceWorkspaceMaskValueLegacyLike(tw, circles.front().center) > 0) {
-    for (int i = 1; i < static_cast<int>(circles.size()); ++i) {
-      start = i - 1;
-      if (traceWorkspaceMaskValueLegacyLike(tw, circles[static_cast<size_t>(i)].center) == 0) {
-        break;
-      }
-    }
-  }
-
-  if (circles.size() > 1) {
-    if (traceWorkspaceMaskValueLegacyLike(tw, circles.back().center) > 0) {
-      for (int i = static_cast<int>(circles.size()) - 2; i >= 0; --i) {
-        end = i + 2;
-        if (traceWorkspaceMaskValueLegacyLike(tw, circles[static_cast<size_t>(i)].center) == 0) {
-          break;
-        }
-      }
-    }
-  }
-
-  if (start >= end || (end - start) <= 1) {
-    writeSwcLegacyNeuTu(hostSwc, outputPath);
-    return 0;
-  }
-
-  nim::ZSwc::SwcTreeNode parent = hostSwc.end();
-  nim::ZSwc::SwcTreeNode branchRoot = hostSwc.end();
-
-  for (int i = start; i < end; ++i) {
-    const Geo3dCircle& circle = circles[static_cast<size_t>(i)];
-    nim::SwcNode swcNode(/*id*/ 1,
-                         /*type*/ 0,
-                         circle.center[0],
-                         circle.center[1],
-                         circle.center[2],
-                         circle.radius,
-                         /*parentID*/ -1);
-
-    if (i == start) {
-      parent = hostSwc.appendRoot(swcNode);
-      branchRoot = parent;
-    } else {
-      parent = hostSwc.appendChild(parent, swcNode);
-    }
-  }
-
-  connectBranchToHostLegacyLike(hostSwc, hostRoots, branchRoot, signal);
-
-  writeSwcLegacyNeuTu(hostSwc, outputPath);
+  const SeedTraceResult traceRes = traceSeedIntoHostSwcLegacyLike(signal, hostSwc, seed, cfg);
+  CHECK(traceRes.swc);
+  writeSwcLegacyNeuTu(*traceRes.swc, outputPath);
   return 0;
 }
 

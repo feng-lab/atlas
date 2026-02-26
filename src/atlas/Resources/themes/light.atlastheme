@@ -26,6 +26,7 @@
             "PolygonIcon": ":/icons/polygon.svg",
             "EllipseIcon": ":/icons/ellipse.svg",
             "RectangleIcon": ":/icons/rectangle.svg",
+            "TraceIcon": ":/icons/trace.svg",
             "RunCommandIcon": ":/icons/run-command.svg",
             "RunTestIcon": ":/icons/run-test.svg",
             "PlayIcon": ":/icons/play.svg",

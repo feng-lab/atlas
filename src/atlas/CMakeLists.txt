@@ -486,6 +486,8 @@ set(SOURCES
     zgraphicsview.h zgraphicsview.cpp
     zview.h zview.cpp
     zdoc.h zdoc.cpp
+    ztracesettings.h ztracesettings.cpp
+    ztracesettingswidget.h ztracesettingswidget.cpp
     zobjdoc.h zobjdoc.cpp
     zobjview.h zobjview.cpp
     zimgfilter.h zimgfilter.cpp
@@ -842,6 +844,7 @@ if (MSVC)
   target_include_directories(atlas_core_deps
     INTERFACE
       ${CMAKE_CURRENT_SOURCE_DIR}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../neutube
       ${CMAKE_CURRENT_BINARY_DIR})
   # Vulkan headers are required transitively by some core sources/headers (e.g. zvulkan*.h
   # included from renderer base). Ensure the SDK include path is visible to consumers too.
@@ -940,6 +943,9 @@ else ()
     PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR}
       ${CMAKE_CURRENT_BINARY_DIR})
+  # Some Atlas GUI code calls into the in-repo neuTube implementation (Goal 2 migration).
+  # Keep the algorithm code in `src/neutube`, but make its headers available to core translation units.
+  target_include_directories(atlas_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../neutube)
   target_include_directories(atlas_core
     SYSTEM PRIVATE
       ${QTCSVDIR} ${QTCSVDIR}/include

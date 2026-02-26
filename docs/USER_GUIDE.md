@@ -44,6 +44,7 @@ Atlas User Manual
   - [5.4 Selection, Copy, and Paste](#54-selection-copy-and-paste)
   - [5.5 The Edit and Output Dock](#55-the-edit-and-output-dock)
   - [5.6 Logging View Changes](#56-logging-view-changes)
+  - [5.7 Interactive Tracing](#57-interactive-tracing)
 - [6. 3D Workspace Skills](#6-3d-workspace-skills)
   - [6.1 Opening and Reusing the 3D Window](#61-opening-and-reusing-the-3d-window)
   - [6.2 Camera Navigation](#62-camera-navigation)
@@ -430,6 +431,7 @@ Steps to load and manage images via `ZImgDoc`:
 2. **Edit** – open the SWC editor to adjust node positions, prune branches, annotate attributes.
 3. **View settings** – adjust line thickness, color schemes in Object View Setting.
 4. **Save** – Save writes to the source path if the format supports writing; otherwise Save As prompts for a new file.
+5. **Trace (interactive)** – use the **Trace** tool to create or extend SWC trees from an image (section 5.7).
 
 ### 4.7 Meshes
 
@@ -738,6 +740,66 @@ All drawing happens directly in the 2D view.
 
 - Watch the status bar for quick updates.
 - Open the log tab to see details (e.g., ROI operations, animation binding, 3D engine events). Each log entry helps correlate actions with underlying system behavior.
+
+### 5.7 Interactive Tracing
+
+Atlas includes an interactive neuron tracing workflow (ported from neuTube) that generates or extends SWC trees from 3D image data.
+
+Before you trace, use **Trace Settings** to explicitly select:
+
+- The **source Image + Channel** to trace from
+- The **SWC Target** to trace into (create new or attach to an existing SWC)
+
+Trace tool state and Trace Settings are shared between the 2D and 3D windows, so changes in one window apply to the other.
+
+#### Step 1: enable the Trace tool
+
+1. In the 2D or 3D window toolbar, toggle **Trace** (the trace icon).
+2. Atlas enables “trace tool” mode and automatically shows the **Trace Settings** dock (right side, tabbed with other view settings).
+
+Notes:
+
+- Tracing is currently available only in **Normal View** (not Max Z Projection or Montage).
+- While tracing is running, Atlas blocks starting a second trace until the first finishes.
+
+#### Step 2: choose the source image and channel
+
+In **Trace Settings → Source**:
+
+1. **Image:** choose which image object you want to trace from.
+2. **Channel:** choose which channel within that image to use.
+   - Channel entries use the image’s display names (when available) and are colorized to match the channel color parameters.
+
+If you have multiple images loaded:
+
+- The trace seed must be placed **within the selected source image**. If your cursor is over a different image (or outside any image), the Trace action will be disabled with a tooltip explaining why.
+
+#### Step 3: choose the SWC target (create new vs attach)
+
+In **Trace Settings → SWC Target**:
+
+- **Create new SWC**: the first trace creates a new SWC object; after it is created, Atlas automatically reuses that SWC for subsequent traces for the same `(image, channel)` so repeated traces extend the same tree instead of creating a new file each time.
+- **Attach to existing**: choose an existing SWC from the dropdown. New branches are appended to that SWC (the result is merged, not overwritten).
+
+The mapping from `(image, channel)` to SWC target is stored **in memory for the current session** (it is not currently a durable scene setting).
+
+#### Step 4: trace from a seed point (left-click)
+
+With the Trace tool enabled and Trace Settings configured:
+
+1. Move the cursor to the desired seed point in the 2D view (within the chosen image).
+2. **Left-click** on the image background to open a small **Trace** menu.
+3. Click **Trace** to start tracing from that seed.
+
+Selection behavior:
+
+- Clicking on selectable objects (for example SWC nodes) prioritizes selection/editing. Tracing is intended for clicks on the image/background, not on already-selectable overlays.
+
+#### Step 5: adjust tracing parameters (optional)
+
+In **Trace Settings → Tracing Config**, you can adjust key neuTube tracing parameters (score thresholds, fitting/refit options, crossover tests, etc.).
+
+These settings are applied to subsequent traces and are intended to match the legacy neuTube semantics.
 
 ---
 

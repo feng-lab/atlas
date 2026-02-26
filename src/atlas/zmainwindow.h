@@ -233,6 +233,7 @@ private:
   QAction* m_open3DViewAction = nullptr;
   QAction* m_screenShotAction = nullptr;
   QAction* m_helpAction = nullptr;
+  QAction* m_traceToolAction = nullptr;
 
   QAction* m_userGuideAction = nullptr;
   QAction* m_devGuideAction = nullptr;
@@ -247,6 +248,7 @@ private:
   QDockWidget* m_captureDockWidget = nullptr;
   QDockWidget* m_helpDockWidget = nullptr;
   QDockWidget* m_editObjDockWidget = nullptr;
+  QDockWidget* m_traceDockWidget = nullptr;
   ZObjEditWidget* m_objEditWidget = nullptr;
 
   //

@@ -8,7 +8,13 @@
 #include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancerprecomputedsegmentproperties.h"
 #include "zneuroglancersegmentpropertiesdialog.h"
+#include "zswcdoc.h"
+#include "zswcpack.h"
+#include "zsysteminfo.h"
+#include "zneutubetraceinteractive.h"
+#include "ztracesettings.h"
 
+#include <QDir>
 #include <QMessageBox>
 #include <QApplication>
 #include <QClipboard>
@@ -18,6 +24,7 @@
 #include <QMenu>
 #include <QPointer>
 #include <QRegularExpression>
+#include <QUuid>
 #include <QtConcurrent/QtConcurrentRun>
 
 #include <algorithm>
@@ -71,6 +78,13 @@ struct NeuroglancerMeshSourceKey
   QString rootUrl;
   QString meshSourceDirUrl;
   uint64_t segmentId = 0;
+};
+
+struct SeededTraceAsyncResult
+{
+  QString error;
+  std::shared_ptr<ZSwc> swc;
+  size_t newNodes = 0;
 };
 
 struct NeuroglancerSkeletonSourceKey
@@ -418,6 +432,352 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     return;
   }
 
+  bool hasTraceActions = false;
+  {
+    struct TraceCandidate
+    {
+      size_t imgObjId = 0;
+      ZImgFilter* filter = nullptr;
+      std::shared_ptr<ZImgPack> imgPack;
+      std::array<double, 3> seed{};
+      size_t t = 0;
+    };
+
+    std::vector<TraceCandidate> traceCandidates;
+    traceCandidates.reserve(m_idToFilter.size());
+    for (const auto& idFilter : m_idToFilter) {
+      const size_t imgObjId = idFilter.first;
+      ZImgFilter* filter = idFilter.second.get();
+      if (!filter || !filter->isVisible()) {
+        continue;
+      }
+
+      std::shared_ptr<ZImgPack> imgPack = m_doc.imgPackShared(imgObjId);
+      if (!imgPack) {
+        continue;
+      }
+
+      // Skip segmentation datasets (not traceable).
+      if (imgPack->isNeuroglancerPrecomputed()) {
+        const std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol = imgPack->neuroglancerVolumeShared();
+        if (vol && vol->isSegmentation()) {
+          continue;
+        }
+      }
+
+      traceCandidates.push_back(
+        {.imgObjId = imgObjId, .filter = filter, .imgPack = std::move(imgPack), .seed = {}, .t = 0});
+    }
+
+    const bool inTraceableView = m_view.viewStylePara().isSelected(QStringLiteral("Normal"));
+
+    std::vector<TraceCandidate> cursorCandidates;
+    cursorCandidates.reserve(traceCandidates.size());
+    if (inTraceableView) {
+      for (auto& c : traceCandidates) {
+        CHECK(c.filter);
+        CHECK(c.imgPack);
+
+        const QPointF p = c.filter->mapFromScene(scenePos);
+        const int64_t lx = static_cast<int64_t>(std::floor(p.x()));
+        const int64_t ly = static_cast<int64_t>(std::floor(p.y()));
+        const int64_t lz = static_cast<int64_t>(c.filter->imgSlice());
+        const int64_t lt = static_cast<int64_t>(c.filter->imgTime());
+
+        const ZImgInfo info = c.imgPack->imgInfo();
+        const bool inBounds = (lx >= 0 && ly >= 0 && lz >= 0 && lt >= 0) && (static_cast<size_t>(lx) < info.width) &&
+                              (static_cast<size_t>(ly) < info.height) && (static_cast<size_t>(lz) < info.depth) &&
+                              (static_cast<size_t>(lt) < info.numTimes);
+        if (!inBounds) {
+          continue;
+        }
+
+        c.seed = std::array<double, 3>{p.x(), p.y(), static_cast<double>(lz)};
+        c.t = static_cast<size_t>(lt);
+        cursorCandidates.push_back(c);
+      }
+    }
+
+    if (!traceCandidates.empty()) {
+      auto* traceMenu = menu.addMenu("Trace");
+      hasTraceActions = true;
+
+      if (!inTraceableView) {
+        auto* act = traceMenu->addAction("Trace is available only in Normal view.");
+        act->setEnabled(false);
+      } else {
+        if (cursorCandidates.empty()) {
+          auto* act = traceMenu->addAction("Click within an image to trace.");
+          act->setEnabled(false);
+          return;
+        }
+
+        const QString traceCfgPath = QDir(ZSystemInfo::jsonDirPath()).absoluteFilePath("trace_config.json");
+
+        auto startTrace = [this](const QString& actionName,
+                                 size_t sourceImgObjId,
+                                 const std::shared_ptr<ZImgPack>& imgPack,
+                                 size_t sc,
+                                 size_t t,
+                                 std::array<double, 3> seed,
+                                 const QString& traceConfigPath,
+                                 std::optional<std::pair<size_t, ZSwc>> hostSwcOpt,
+                                 bool promoteNewSwcToExistingTarget) {
+          CHECK(imgPack);
+
+          ZDoc* doc = &m_doc.doc();
+          CHECK(doc != nullptr);
+
+          ZTraceSettings* traceSettings = &doc->traceSettings();
+          CHECK(traceSettings != nullptr);
+          if (traceSettings->traceInProgress()) {
+            QMessageBox::information(QApplication::activeWindow(),
+                                     QApplication::applicationName(),
+                                     QStringLiteral("A trace is already running. Please wait for it to finish."));
+            return;
+          }
+          traceSettings->setTraceInProgress(true);
+
+          const bool haveAlgoConfig = traceSettings->algoConfigInitialized();
+          const ZTraceSettings::AlgoConfig algoCfg = traceSettings->algoConfig();
+
+          auto* watcher = new QFutureWatcher<SeededTraceAsyncResult>(doc);
+          connect(watcher,
+                  &QFutureWatcher<SeededTraceAsyncResult>::finished,
+                  doc,
+                  [doc,
+                   traceSettings,
+                   watcher,
+                   actionName,
+                   sourceImgObjId,
+                   sc,
+                   promoteNewSwcToExistingTarget,
+                   hostSwcId = hostSwcOpt.has_value() ? std::optional<size_t>(hostSwcOpt->first)
+                                                      : std::optional<size_t>()]() mutable {
+                    CHECK(doc != nullptr);
+                    CHECK(traceSettings != nullptr);
+
+                    traceSettings->setTraceInProgress(false);
+
+                    const SeededTraceAsyncResult r = watcher->result();
+                    watcher->deleteLater();
+
+                    if (!r.error.isEmpty()) {
+                      QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), r.error);
+                      return;
+                    }
+
+                    if (!r.swc) {
+                      QMessageBox::information(QApplication::activeWindow(),
+                                               QApplication::applicationName(),
+                                               QStringLiteral("No trace result was produced."));
+                      return;
+                    }
+
+                    if (hostSwcId.has_value()) {
+                      const size_t swcId = *hostSwcId;
+                      ZSwcDoc& swcDoc = doc->swcDoc();
+                      if (!swcDoc.hasObjWithID(swcId)) {
+                        return;
+                      }
+                      if (r.newNodes == 0) {
+                        QMessageBox::information(QApplication::activeWindow(),
+                                                 QApplication::applicationName(),
+                                                 QStringLiteral("No branch was traced at this seed location."));
+                        return;
+                      }
+                      ZSwcPack& pack = swcDoc.swcPack(swcId);
+                      pack.replaceSwcWithUndo(actionName, std::move(*r.swc));
+                      return;
+                    }
+
+                    if (r.newNodes == 0) {
+                      QMessageBox::information(QApplication::activeWindow(),
+                                               QApplication::applicationName(),
+                                               QStringLiteral("No branch was traced at this seed location."));
+                      return;
+                    }
+
+                    ZSwcDoc& swcDoc = doc->swcDoc();
+                    const QString displayPath = QDir::temp().absoluteFilePath(
+                      QString("AtlasTrace_%1.swc").arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+                    const size_t newSwcId = swcDoc.addSwcFromMemory(std::move(*r.swc), displayPath);
+
+                    // UX policy:
+                    // - If the user traced with "New SWC", treat it as "create a new SWC once, then keep tracing into
+                    // it".
+                    // - This avoids creating a brand new SWC on every click when the intent is to continue a tracing
+                    // session.
+                    // - The mapping is persisted per (image, channel) for the session, and the UI is updated if the
+                    //   user is still viewing that same source selection.
+                    if (newSwcId != 0 && promoteNewSwcToExistingTarget) {
+                      traceSettings->promoteNewSwcTargetToExistingIfStillNew(sourceImgObjId, sc, newSwcId);
+                    }
+                  });
+
+          watcher->setFuture(QtConcurrent::run(
+            [imgPack, sc, t, seed, traceConfigPath, haveAlgoConfig, algoCfg, hostSwcOpt = std::move(hostSwcOpt)]() {
+              SeededTraceAsyncResult res;
+
+              try {
+                const ZImgInfo info = imgPack->imgInfo();
+                if (sc >= info.numChannels || t >= info.numTimes) {
+                  res.error = QStringLiteral("Trace failed: invalid channel/time selection (c=%1, t=%2).")
+                                .arg(static_cast<qulonglong>(sc))
+                                .arg(static_cast<qulonglong>(t));
+                  return res;
+                }
+
+                const ZImg* signalPtr = nullptr;
+                ZImg ownedSignal;
+                if (imgPack->isDiskCached()) {
+                  ownedSignal = imgPack->wholeImg();
+                  signalPtr = &ownedSignal;
+                } else {
+                  signalPtr = &imgPack->img();
+                }
+                CHECK(signalPtr != nullptr);
+                const ZImg& signal = *signalPtr;
+
+                if (signal.isEmpty()) {
+                  res.error = QStringLiteral("Trace failed: the image is empty.");
+                  return res;
+                }
+
+                TraceConfig cfg;
+                if (!traceConfigPath.isEmpty()) {
+                  const bool ok = loadTraceConfigLegacyLike(traceConfigPath.toStdString(), cfg);
+                  if (!ok) {
+                    cfg = TraceConfig{};
+                  }
+                } else {
+                  cfg = TraceConfig{};
+                }
+
+                if (haveAlgoConfig) {
+                  cfg.minAutoScore = algoCfg.minAutoScore;
+                  cfg.minManualScore = algoCfg.minManualScore;
+                  cfg.minSeedScore = algoCfg.minSeedScore;
+                  cfg.min2dScore = algoCfg.min2dScore;
+                  cfg.refit = algoCfg.refit;
+                  cfg.spTest = algoCfg.spTest;
+                  cfg.crossoverTest = algoCfg.crossoverTest;
+                  cfg.tuneEnd = algoCfg.tuneEnd;
+                  cfg.edgePath = algoCfg.edgePath;
+                  cfg.enhanceMask = algoCfg.enhanceMask;
+                  cfg.seedMethod = algoCfg.seedMethod;
+                  cfg.recover = algoCfg.recover;
+                  cfg.chainScreenCount = algoCfg.chainScreenCount;
+                  cfg.maxEucDist = algoCfg.maxEucDist;
+                }
+
+                if (hostSwcOpt.has_value()) {
+                  SeedTraceResult tr = traceSeedIntoHostSwcLegacyLike(signal, hostSwcOpt->second, seed, cfg, sc, t);
+                  if (tr.swc) {
+                    res.swc = std::shared_ptr<ZSwc>(tr.swc.release());
+                    res.newNodes = tr.newNodes;
+                  }
+                } else {
+                  SeedTraceResult tr = traceSeedNewSwcLegacyLike(signal, seed, cfg, sc, t);
+                  if (tr.swc) {
+                    res.swc = std::shared_ptr<ZSwc>(tr.swc.release());
+                    res.newNodes = tr.newNodes;
+                  }
+                }
+              }
+              catch (const std::exception& e) {
+                res.error = QString("Trace failed: %1").arg(QString::fromUtf8(e.what()));
+              }
+              return res;
+            }));
+        };
+
+        QAction* traceStoredAct = traceMenu->addAction("Trace");
+        traceStoredAct->setEnabled(false);
+
+        {
+          const ZTraceSettings& settings = m_doc.doc().traceSettings();
+          const std::optional<size_t> storedImgId = settings.sourceImageId();
+          if (settings.traceInProgress()) {
+            traceStoredAct->setToolTip(QStringLiteral("A trace is already running. Please wait for it to finish."));
+          } else if (!storedImgId.has_value()) {
+            traceStoredAct->setToolTip(QStringLiteral("Select a source image and channel in Trace Settings first."));
+          } else {
+            const auto it =
+              std::find_if(cursorCandidates.begin(), cursorCandidates.end(), [&](const TraceCandidate& c) {
+                return c.imgObjId == *storedImgId;
+              });
+            if (it == cursorCandidates.end()) {
+              traceStoredAct->setToolTip(QStringLiteral(
+                "Trace Settings source image is not under the cursor. Move the cursor over that image, or change the source image in Trace Settings."));
+            } else {
+              const ZImgInfo info = it->imgPack->imgInfo();
+              const size_t sc = settings.sourceChannel();
+              if (sc >= info.numChannels) {
+                traceStoredAct->setToolTip(QStringLiteral("Trace Settings channel is out of range for this image."));
+              } else {
+                std::optional<std::pair<size_t, ZSwc>> hostSwcOpt;
+                QString actionName = QStringLiteral("Trace");
+
+                if (settings.swcTargetMode() == ZTraceSettings::SwcTargetMode::ExistingSwc) {
+                  const std::optional<size_t> storedSwcId = settings.targetSwcId();
+                  if (!storedSwcId.has_value()) {
+                    traceStoredAct->setToolTip(
+                      QStringLiteral("Trace Settings expects an existing SWC, but none is selected."));
+                  } else {
+                    ZSwcDoc& swcDoc = m_doc.doc().swcDoc();
+                    if (!swcDoc.hasObjWithID(*storedSwcId)) {
+                      traceStoredAct->setToolTip(
+                        QStringLiteral("The SWC selected in Trace Settings no longer exists."));
+                    } else {
+                      hostSwcOpt =
+                        std::make_optional<std::pair<size_t, ZSwc>>(*storedSwcId, swcDoc.swcPack(*storedSwcId).swc());
+                      actionName = QStringLiteral("Trace (attach)");
+                    }
+                  }
+                }
+
+                if (settings.swcTargetMode() == ZTraceSettings::SwcTargetMode::NewSwc || hostSwcOpt.has_value()) {
+                  traceStoredAct->setEnabled(true);
+                  traceStoredAct->setToolTip(QStringLiteral("Trace using Trace Settings."));
+                  const std::shared_ptr<ZImgPack> imgPack = it->imgPack;
+                  const size_t t = it->t;
+                  const std::array<double, 3> seed = it->seed;
+                  const bool promoteNewSwcToExistingTarget =
+                    (settings.swcTargetMode() == ZTraceSettings::SwcTargetMode::NewSwc);
+
+                  connect(traceStoredAct,
+                          &QAction::triggered,
+                          this,
+                          [startTrace,
+                           actionName,
+                           sourceImgObjId = it->imgObjId,
+                           imgPack,
+                           sc,
+                           t,
+                           seed,
+                           traceCfgPath,
+                           promoteNewSwcToExistingTarget,
+                           hostSwcOpt = std::move(hostSwcOpt)]() mutable {
+                            startTrace(actionName,
+                                       sourceImgObjId,
+                                       imgPack,
+                                       sc,
+                                       t,
+                                       seed,
+                                       traceCfgPath,
+                                       std::move(hostSwcOpt),
+                                       promoteNewSwcToExistingTarget);
+                          });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   struct Candidate
   {
     size_t imgObjId = 0;
@@ -474,6 +834,9 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     candidates.push_back(std::move(c));
   }
   if (candidates.empty()) {
+    if (hasTraceActions) {
+      return;
+    }
     return;
   }
 

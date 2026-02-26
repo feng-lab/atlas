@@ -114,6 +114,7 @@ public:
     PolygonIcon,
     EllipseIcon,
     RectangleIcon,
+    TraceIcon,
     RunCommandIcon,
     RunTestIcon,
     PlayIcon,

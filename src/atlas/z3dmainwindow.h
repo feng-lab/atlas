@@ -160,6 +160,7 @@ private:
   QDockWidget* m_helpDockWidget = nullptr;
   QDockWidget* m_backgroundDockWidget = nullptr;
   QDockWidget* m_axisDockWidget = nullptr;
+  QDockWidget* m_traceDockWidget = nullptr;
   ZViewSettingWidget* m_viewSettingWidget = nullptr;
   ZObjDetailedInfoWidget* m_objDetailedInfoWidget = nullptr;
   QDockWidget* m_editObjDockWidget = nullptr;
@@ -169,6 +170,7 @@ private:
   QAction* m_changeAxisAction = nullptr;
   QAction* m_screenShotAction = nullptr;
   QAction* m_helpAction = nullptr;
+  QAction* m_traceToolAction = nullptr;
   QProgressBar* m_progressBarWidget = nullptr;
   QAction* m_progressBarAction = nullptr;
   QAction* m_cancelAction = nullptr;

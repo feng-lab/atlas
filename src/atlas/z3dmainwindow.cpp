@@ -15,6 +15,8 @@
 #include "zsysteminfo.h"
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
+#include "ztracesettings.h"
+#include "ztracesettingswidget.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -30,6 +32,8 @@
 #include <QDesktopServices>
 #include <QFile>
 #include <QMetaObject>
+#include <QScrollArea>
+#include <QSignalBlocker>
 #include "zservicemanager.h"
 
 namespace nim {
@@ -316,6 +320,29 @@ void Z3DMainWindow::createActions()
   m_helpAction->setStatusTip(tr("Help"));
   connect(m_helpAction, &QAction::triggered, this, &Z3DMainWindow::openHelpPanel);
 
+  m_traceToolAction = new QAction(ZTheme::instance().icon(ZTheme::TraceIcon), tr("Trace"), this);
+  m_traceToolAction->setStatusTip(tr("Enable trace tool (left-click to trace)"));
+  m_traceToolAction->setCheckable(true);
+  m_traceToolAction->setChecked(m_doc.traceSettings().traceToolEnabled());
+  connect(m_traceToolAction, &QAction::toggled, this, [this](bool on) {
+    m_doc.traceSettings().setTraceToolEnabled(on);
+    if (on && m_traceDockWidget != nullptr) {
+      m_traceDockWidget->setVisible(true);
+      m_traceDockWidget->raise();
+    }
+  });
+  connect(&m_doc.traceSettings(), &ZTraceSettings::changed, this, [this]() {
+    if (m_traceToolAction == nullptr) {
+      return;
+    }
+    const bool on = m_doc.traceSettings().traceToolEnabled();
+    if (m_traceToolAction->isChecked() == on) {
+      return;
+    }
+    const QSignalBlocker blocker(*m_traceToolAction);
+    m_traceToolAction->setChecked(on);
+  });
+
   m_cancelAction = new QAction(ZTheme::instance().icon(ZTheme::CancelIcon), tr("&Cancel Rendering"), this);
   m_cancelAction->setStatusTip(tr("Cancel Rendering"));
   connect(m_cancelAction, &QAction::triggered, this, &Z3DMainWindow::cancelRendering);
@@ -401,6 +428,7 @@ void Z3DMainWindow::createToolBars()
   m_viewToolBar->addAction(m_resetCameraAction);
   m_viewToolBar->addAction(m_changeBackgroundAction);
   m_viewToolBar->addAction(m_changeAxisAction);
+  m_viewToolBar->addAction(m_traceToolAction);
   m_viewToolBar->addAction(m_screenShotAction);
   m_viewToolBar->setIconSize(iconSize);
 
@@ -457,6 +485,23 @@ void Z3DMainWindow::createDockWindows()
   addDockWidget(Qt::RightDockWidgetArea, m_globalSettingDockWidget);
   m_windowMenu->addAction(m_globalSettingDockWidget->toggleViewAction());
   tabifyDockWidget(m_viewSettingDockWidget, m_globalSettingDockWidget);
+
+  m_traceDockWidget = new QDockWidget(tr("Trace Settings"), this);
+  m_traceDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
+                                 QDockWidget::DockWidgetFloatable);
+  m_traceDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
+  auto* traceWidget = new ZTraceSettingsWidget(m_doc, m_traceDockWidget);
+  auto* traceScroll = new QScrollArea(m_traceDockWidget);
+  traceScroll->setWidgetResizable(true);
+  traceScroll->setFrameShape(QFrame::NoFrame);
+  traceScroll->setWidget(traceWidget);
+  m_traceDockWidget->setWidget(traceScroll);
+  addDockWidget(Qt::RightDockWidgetArea, m_traceDockWidget);
+  tabifyDockWidget(m_globalSettingDockWidget, m_traceDockWidget);
+  auto* traceToggle = m_traceDockWidget->toggleViewAction();
+  traceToggle->setIcon(ZTheme::instance().icon(ZTheme::TraceIcon));
+  m_windowMenu->addAction(traceToggle);
+  m_traceDockWidget->setVisible(false);
 
   m_captureDockWidget = new QDockWidget(tr("Capture"), this);
   m_captureDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |

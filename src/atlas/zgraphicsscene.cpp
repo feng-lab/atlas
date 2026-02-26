@@ -4,6 +4,7 @@
 #include "zlog.h"
 #include "zroi.h"
 #include "zroifilter.h"
+#include "zgraphicsitemtype.h"
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsRectItem>
 #include <QApplication>
@@ -90,6 +91,18 @@ void ZGraphicsScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* contextMen
     QAction* pasteHFlipAction = menu.addAction("Paste Horizonally Flipped");
     QAction* pasteVFlipAction = menu.addAction("Paste Vertically Flipped");
     m_view->appendContextMenuActions(menu, contextMenuEvent->scenePos(), contextMenuEvent->modifiers());
+
+    // Right-click context menus are for editing/IO. Tracing is driven by the explicit Trace tool
+    // (left-click) and Trace Settings panel, so avoid duplicating trace actions here.
+    for (QAction* act : menu.actions()) {
+      if (act == nullptr) {
+        continue;
+      }
+      if (act->menu() != nullptr && act->text() == QStringLiteral("Trace")) {
+        menu.removeAction(act);
+      }
+    }
+
     QAction* selectedAction = menu.exec(contextMenuEvent->screenPos());
     if (selectedAction == pasteAction) {
       m_view->pasteHere(m_view->currentSlice(), contextMenuEvent->scenePos());
@@ -114,6 +127,54 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
   auto roiCtrlPtItem = qgraphicsitem_cast<ROICtrlPtGraphicsItem*>(item);
   bool canUpdateROI = (!roiItem && !roiCtrlPtItem) || event->modifiers() == Qt::ControlModifier ||
                       event->modifiers() == Qt::AltModifier || m_view->isRegionAnnotationMode();
+
+  if (m_view->isTraceToolEnabled() && m_view->state() == ZView::State::Normal) {
+    const bool clickOnRoi = (roiItem != nullptr) || (roiCtrlPtItem != nullptr);
+    bool clickOnSelectableItem = false;
+    for (QGraphicsItem* probe = item; probe != nullptr; probe = probe->parentItem()) {
+      if (probe->flags().testFlag(QGraphicsItem::ItemIsSelectable)) {
+        clickOnSelectableItem = true;
+        break;
+      }
+    }
+
+    // Selection/editing should always come first when the user clicks on selectable items.
+    // Only show the trace menu when clicking on the image/background (and not on ROI handles).
+    if (!clickOnRoi && !clickOnSelectableItem) {
+      QMenu root;
+      m_view->appendContextMenuActions(root, event->scenePos(), event->modifiers());
+
+      QMenu* traceMenu = nullptr;
+      for (QAction* act : root.actions()) {
+        if (act == nullptr) {
+          continue;
+        }
+        if (act->menu() != nullptr && act->text() == QStringLiteral("Trace")) {
+          traceMenu = act->menu();
+          break;
+        }
+      }
+
+      if (traceMenu != nullptr) {
+        bool hasEnabledAction = false;
+        for (QAction* act : traceMenu->actions()) {
+          if (act == nullptr || act->isSeparator()) {
+            continue;
+          }
+          if (act->isEnabled()) {
+            hasEnabledAction = true;
+            break;
+          }
+        }
+
+        if (hasEnabledAction) {
+          traceMenu->exec(event->screenPos());
+          event->accept();
+          return;
+        }
+      }
+    }
+  }
 
   CHECK(!m_rectItem);
   CHECK(!m_ellipseItem);

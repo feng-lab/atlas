@@ -114,6 +114,8 @@
         <file>icons/flip-vertical-dark.svg</file>
         <file>icons/rectangle.svg</file>
         <file>icons/rectangle-dark.svg</file>
+        <file>icons/trace.svg</file>
+        <file>icons/trace-dark.svg</file>
         <file>icons/ellipse.svg</file>
         <file>icons/ellipse-dark.svg</file>
         <file>Resources/shader/lighting2.frag</file>

@@ -35,6 +35,7 @@ set(NEUTUBE_SOURCES
     zneutubespgrow.cpp zneutubespgrow.h
     zneutubespgrowparser.cpp zneutubespgrowparser.h
     zneutubetrace.cpp zneutubetrace.h
+    zneutubetraceinteractive.cpp zneutubetraceinteractive.h
     zneutubetraceauto.cpp zneutubetraceauto.h
     zneutubetraceconfig.cpp zneutubetraceconfig.h
     zneutubetraceconnectiontestworkspace.cpp zneutubetraceconnectiontestworkspace.h

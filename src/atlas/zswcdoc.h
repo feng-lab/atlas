@@ -18,6 +18,11 @@ public:
     return *m_idToSwcPacks.at(id);
   }
 
+  // Add an SWC that is created in-memory (e.g. tracing output).
+  //
+  // Note: `path` is used for display/tooltip and as a default Save-As target; it does not need to exist.
+  size_t addSwcFromMemory(ZSwc tree, const QString& path);
+
   // ZObjDoc interface
 
 public:

@@ -21,6 +21,7 @@
 #include "ztheme.h"
 #include "zchooseobjdialog.h"
 #include "zmessageboxhelpers.h"
+#include "ztracesettings.h"
 #include <QUndoGroup>
 #include <QAction>
 #include <QApplication>
@@ -86,6 +87,8 @@ ZDoc::ZDoc(QObject* parent)
 
   m_regionAnnotationDoc = new ZRegionAnnotationDoc(*this);
   registerObjDoc(m_regionAnnotationDoc);
+
+  m_traceSettings = new ZTraceSettings(this);
 }
 
 std::vector<size_t> ZDoc::chooseObjsWithWidget(const QString& title, QWidget* parent) const

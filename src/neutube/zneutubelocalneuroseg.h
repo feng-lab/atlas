@@ -5,6 +5,7 @@
 #include "zneutubetracerecord.h"
 
 #include <array>
+#include <cstddef>
 #include <vector>
 
 namespace nim {

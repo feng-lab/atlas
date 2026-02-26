@@ -11,9 +11,13 @@ namespace nim {
 ZSwcPack::ZSwcPack(ZSwc swc, const QString& path, size_t id, ZSwcDoc& doc, QObject* parent)
   : ZObjPack(id, &doc, parent)
   , m_swc(std::move(swc))
-  , m_path(QFileInfo(path).canonicalFilePath())
+  , m_path()
   , m_doc(doc)
 {
+  if (!path.isEmpty()) {
+    const QFileInfo fi(path);
+    m_path = fi.exists() ? fi.canonicalFilePath() : fi.absoluteFilePath();
+  }
   updateDerivedData();
   updateViewRelatedData();
   createContextMenu();
@@ -55,6 +59,13 @@ void ZSwcPack::save(const QString& fileName)
   m_path = QFileInfo(fileName).canonicalFilePath();
   m_undoStack.setClean();
   updateDerivedData();
+}
+
+void ZSwcPack::replaceSwcWithUndo(const QString& undoText, ZSwc newSwc)
+{
+  ZSwc swcBeforeChange = m_swc;
+  m_swc = std::move(newSwc);
+  m_undoStack.push(new ZSwcEditCommand(undoText, *this, swcBeforeChange));
 }
 
 ZBBox<glm::ivec4> ZSwcPack::boundBox() const

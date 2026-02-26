@@ -242,6 +242,8 @@ public:
 
   bool isROIMode() const;
 
+  [[nodiscard]] bool isTraceToolEnabled() const;
+
   void estimateMontageColumns() const;
 
   void takeFixedSizeScreenShot(const QString& filename, int width, int height);

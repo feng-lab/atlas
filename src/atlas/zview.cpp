@@ -12,6 +12,7 @@
 #include "zlog.h"
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
+#include "ztracesettings.h"
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QKeyEvent>
@@ -423,6 +424,11 @@ bool ZView::isRegionAnnotationMode() const
 bool ZView::isROIMode() const
 {
   return m_roiMode->isSelected("ROI");
+}
+
+bool ZView::isTraceToolEnabled() const
+{
+  return m_doc.traceSettings().traceToolEnabled();
 }
 
 void ZView::estimateMontageColumns() const

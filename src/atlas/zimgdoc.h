@@ -27,6 +27,12 @@ public:
     return *m_idToImgPacks.at(id);
   }
 
+  [[nodiscard]] std::shared_ptr<ZImgPack> imgPackShared(size_t id) const
+  {
+    CHECK(m_idToImgPacks.contains(id));
+    return m_idToImgPacks.at(id);
+  }
+
   void setImgChannelColor(size_t id, size_t c, col4 col);
 
   // ZObjDoc interface

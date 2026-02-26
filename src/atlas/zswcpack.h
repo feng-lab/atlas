@@ -59,6 +59,12 @@ public:
     return m_swc;
   }
 
+  // Replace the underlying SWC tree as a single undoable edit.
+  //
+  // This is intended for operations (like tracing) that compute a new tree state off the UI thread and then apply it to
+  // the document model in one step.
+  void replaceSwcWithUndo(const QString& undoText, ZSwc newSwc);
+
   ZBBox<glm::ivec4> boundBox() const;
 
   const std::vector<ZSwc::SwcTreeNode>& rootNodes() const

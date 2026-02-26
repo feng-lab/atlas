@@ -20,7 +20,12 @@
 
 #include <fmt/format.h>
 
+#if !defined(_MSC_VER)
+// neurolabi's legacy tz_* code is built as C++ on MSVC (see `tz_cdefs.h`), so
+// wrapping these headers in `extern "C"` would force C linkage and break
+// linking (unresolved externals for the unmangled symbol names).
 extern "C" {
+#endif
 #include "tz_darray.h"
 #include "tz_geo3d_scalar_field.h"
 #include "tz_local_neuroseg.h"
@@ -34,7 +39,9 @@ extern "C" {
 #include "tz_trace_utils.h"
 #include "tz_voxel_graphics.h"
 #include "tz_workspace.h"
+#if !defined(_MSC_VER)
 }
+#endif
 
 #include "zneutubecompareswc.h"
 #include "zneutubedarraymath.h"
