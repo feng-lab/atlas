@@ -1452,7 +1452,11 @@ std::vector<ZWeightedPoint> ZNeuronTracer::computeSeedPosition(
     startProgress();
     Stack *bw = C_Stack::clone(stack);
     ZStackProcessor::SubtractBackground(bw, 0.5, 3);
-    binarize(bw, bw);
+    bw = binarize(bw, bw);
+    if (bw == NULL) {
+      endProgress();
+      return result;
+    }
     C_Stack::translate(bw, GREY, 1);
 
     advanceProgress(0.05);
@@ -1573,6 +1577,9 @@ Stack* ZNeuronTracer::computeSeedMask(Stack *stack)
 
   /* <bw> allocated */
   Stack *bw = binarize(stack);
+  if (bw == NULL) {
+    return NULL;
+  }
   C_Stack::translate(bw, GREY, 1);
 
   log("Removing noise ...");
@@ -1684,6 +1691,9 @@ Stack* ZNeuronTracer::makeMask(const Stack *stack)
 {
   /* <bw> allocated */
   Stack *bw = binarize(stack);
+  if (bw == NULL) {
+    return NULL;
+  }
   C_Stack::translate(bw, GREY, 1);
 
   m_diag.save(bw, "thre1");
@@ -1824,6 +1834,12 @@ ZSwcTree* ZNeuronTracer::trace(Stack *stack, bool doResampleAfterTracing)
     mask = makeMask(stack);
   }
 
+  if (mask == nullptr) {
+    endProgress();
+    m_diag.reset();
+    return tree;
+  }
+
   advanceProgress(0.05);
 
   //Trace each seed
@@ -1840,6 +1856,8 @@ ZSwcTree* ZNeuronTracer::trace(Stack *stack, bool doResampleAfterTracing)
   ZNeuronTraceSeeder seeder;
   prepareTraceScoreThreshold(TRACING_SEED);
   if (seedPointArray == NULL) {
+    endProgress();
+    m_diag.reset();
     return tree;
   }
   m_baseMask = seeder.sortSeed(seedPointArray, stack, m_traceWorkspace);
