@@ -7,6 +7,7 @@
 #include "zimg.h"
 
 #include <array>
+#include <folly/CancellationToken.h>
 #include <memory>
 
 namespace nim {
@@ -36,6 +37,8 @@ struct TraceWorkspace
   double segLength = NeurosegDefaultHLegacyLike;
 
   int chainId = 0;
+
+  folly::CancellationToken cancellationToken{};
 
   // End statuses: [0]=head/backward, [1]=tail/forward (matches Trace_Locseg usage).
   std::array<TraceStatus, 2> traceStatus = {TraceStatus::Normal, TraceStatus::Normal};

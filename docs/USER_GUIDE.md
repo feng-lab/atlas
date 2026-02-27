@@ -45,6 +45,7 @@ Atlas User Manual
   - [5.5 The Edit and Output Dock](#55-the-edit-and-output-dock)
   - [5.6 Logging View Changes](#56-logging-view-changes)
   - [5.7 Interactive Tracing](#57-interactive-tracing)
+  - [5.8 Automatic Tracing and Background Tasks](#58-automatic-tracing-and-background-tasks)
 - [6. 3D Workspace Skills](#6-3d-workspace-skills)
   - [6.1 Opening and Reusing the 3D Window](#61-opening-and-reusing-the-3d-window)
   - [6.2 Camera Navigation](#62-camera-navigation)
@@ -802,6 +803,51 @@ In **Trace Settings → Tracing Config**, you can adjust key neuTube tracing par
 These settings are applied to subsequent traces and are intended to match the legacy neuTube semantics.
 
 ---
+
+### 5.8 Automatic Tracing and Background Tasks
+
+Atlas also supports **automatic tracing** (ported from neuTube) which traces an entire neuron structure from an image channel without requiring an explicit seed click.
+
+Automatic tracing runs as a **background task** so the UI stays responsive.
+
+#### Step 1: open the Auto Trace dialog
+
+1. Use either:
+   - the **Auto Trace** toolbar button (in the View toolbar), or
+   - **Image → Auto Trace...**
+2. In the dialog, explicitly choose the source to trace from:
+   - **Image**
+   - **Channel**
+   - **Time** (for time-series images)
+
+#### Step 2: choose output files and Auto Trace options
+
+In the Auto Trace dialog, choose where results should be written:
+
+- **Output SWC**: the SWC file path to write (Atlas will write the file, then optionally load it back into the scene).
+- **Output Log File**: a text log containing the full parameter set and major processing steps (useful for debugging and reproducibility).
+- **Load result SWC into the scene when finished** (recommended): when enabled, Atlas loads the generated SWC as a new SWC object when the task finishes successfully.
+
+Output paths are auto-suggested based on the selected image/channel/time, but you can override them.
+
+In the Auto Trace dialog:
+
+- **Computational budget**
+  - **Default** (recommended): uses the default tracing configuration.
+  - Or uncheck Default and pick a budget level (1–6). Higher levels can take longer and sometimes improve results.
+- **Optimal Node Resampling** (recommended): produces a less redundant SWC by resampling after tracing.
+
+#### Step 3: start and monitor the task
+
+1. Click **Start**.
+2. Atlas opens the **Tasks** dock (right side) and shows the running background task with:
+   - A progress bar (estimated for tracing tasks)
+   - A **Cancel** button (Auto Trace cancellation is supported; it stops at safe points in the algorithm)
+
+When the task finishes:
+
+- If a trace result is produced, Atlas writes the **output SWC file** and (if enabled) loads it as a **new SWC object**.
+- If no result is produced, the task completes with a “no trace result” message.
 
 ## 6. 3D Workspace Skills
 

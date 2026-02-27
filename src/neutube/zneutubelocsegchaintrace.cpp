@@ -4,6 +4,7 @@
 #include "zneutubestackfitoptions.h"
 #include "zneutubeneuroseg.h"
 
+#include "zcancellation.h"
 #include "zlog.h"
 
 #include <cmath>
@@ -189,6 +190,8 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain,
     return;
   }
 
+  maybeCancel(tw.cancellationToken);
+
   LocsegFitWorkspace fitWs = tw.fitWorkspace;
   LocsegFitWorkspace fitWsH = tw.fitWorkspace;
 
@@ -305,6 +308,8 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain,
   };
 
   auto locsegChainRefit = [&](LocalNeuroseg& refitLocseg, LocsegChainEndLegacyLike listEnd, int endIndex) {
+    maybeCancel(tw.cancellationToken);
+
     ++nrefit;
     LocsegNode* p = currentEnds[endIndex];
     CHECK(p != nullptr);
@@ -318,6 +323,8 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain,
 
     curEndStatus = TraceStatus::Normal;
     while ((p->locseg.seg.h < NeurosegDefaultHLegacyLike / 3.0) && (i > 1)) {
+      maybeCancel(tw.cancellationToken);
+
       chain.removeEnd(listEnd);
       --i;
 
@@ -408,6 +415,8 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain,
   };
 
   auto traceOneDirection = [&](LocsegChainEndLegacyLike listEnd, int endIndex, double traceStep) {
+    maybeCancel(tw.cancellationToken);
+
     LocsegNode* endNode = currentEnds[endIndex];
     if (endNode == nullptr) {
       return;
@@ -525,6 +534,8 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain,
   };
 
   while ((i < tw.length) && (tracingBackwardPossible() || tracingForwardPossible())) {
+    maybeCancel(tw.cancellationToken);
+
     if (tracingBackwardPossible()) {
       traceRecordReset(tr);
       traceRecordSetDirection(tr, TraceDirection::Backward);

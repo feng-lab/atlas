@@ -31,6 +31,7 @@
 #include "ztheme.h"
 #include "ztracesettings.h"
 #include "ztracesettingswidget.h"
+#include "zbackgroundtaskmanagerwidget.h"
 #include "zdiskcacheutils.h"
 
 #include <gflags/gflags.h>
@@ -229,6 +230,9 @@ void ZMainWindow::closeEvent(QCloseEvent* event)
   m_3dWindow.clear();
 
   if (maybeSave()) {
+    if (m_doc) {
+      m_doc->cancelAllBackgroundTasksAndWait();
+    }
     delete m_editObjDockWidget;
     writeSettings();
     event->accept();
@@ -867,6 +871,7 @@ void ZMainWindow::createToolBars()
   m_viewToolBar->addAction(m_view->maxZProjViewAction());
   m_viewToolBar->addAction(m_view->montageViewAction());
   m_viewToolBar->addAction(m_traceToolAction);
+  m_viewToolBar->addAction(m_doc->imgDoc().autoTraceAction());
   m_viewToolBar->addAction(m_open3DViewAction);
   m_viewToolBar->addAction(m_screenShotAction);
   m_viewToolBar->setIconSize(iconSize);
@@ -945,6 +950,31 @@ void ZMainWindow::createDockWindows()
   traceToggle->setIcon(ZTheme::instance().icon(ZTheme::TraceIcon));
   m_windowMenu->addAction(traceToggle);
   m_traceDockWidget->setVisible(false);
+
+  m_tasksDockWidget = new QDockWidget(tr("Tasks"), this);
+  m_tasksDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
+                                 QDockWidget::DockWidgetFloatable);
+  m_tasksDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
+  auto* tasksWidget = new ZBackgroundTaskManagerWidget(m_doc->backgroundTaskManager(), m_tasksDockWidget);
+  auto* tasksScroll = new QScrollArea(m_tasksDockWidget);
+  tasksScroll->setWidgetResizable(true);
+  tasksScroll->setFrameShape(QFrame::NoFrame);
+  tasksScroll->setWidget(tasksWidget);
+  m_tasksDockWidget->setWidget(tasksScroll);
+  addDockWidget(Qt::RightDockWidgetArea, m_tasksDockWidget);
+  tabifyDockWidget(m_traceDockWidget, m_tasksDockWidget);
+  m_windowMenu->addAction(m_tasksDockWidget->toggleViewAction());
+  m_tasksDockWidget->setVisible(false);
+
+  connect(m_doc.get(), &ZDoc::showBackgroundTasksPanel, this, [this]() {
+    if (m_tasksDockWidget == nullptr) {
+      return;
+    }
+    if (m_tasksDockWidget->isHidden()) {
+      m_tasksDockWidget->show();
+    }
+    m_tasksDockWidget->raise();
+  });
 
   m_captureDockWidget = new QDockWidget(tr("Capture"), this);
   m_captureDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |

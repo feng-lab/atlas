@@ -5,6 +5,7 @@
 #include "zneutubelocsegchaintrace.h"
 #include "zneutubetracelocseglabel.h"
 
+#include "zcancellation.h"
 #include "zlog.h"
 
 #include <cmath>
@@ -71,6 +72,8 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
   chains.reserve(static_cast<size_t>(nseed));
 
   for (int i = nseed - 1; i >= 0; --i) {
+    maybeCancel(tw.cancellationToken);
+
     const int seedIndex = indices[static_cast<size_t>(i)];
     CHECK(seedIndex >= 0 && seedIndex < nseed);
 

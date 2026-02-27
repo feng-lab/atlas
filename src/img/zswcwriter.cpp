@@ -1,9 +1,11 @@
 #include "zswcwriter.h"
 
+#include "zexception.h"
 #include "zswcops.h"
 
 #include "zlog.h"
 
+#include <cerrno>
 #include <cstdio>
 
 namespace nim {
@@ -46,6 +48,41 @@ void writeSwcLegacyNeuTu(ZSwc& tree, const std::string& filePath, const std::vec
   }
 
   std::fclose(fp);
+}
+
+void writeSwcLegacyNeuTuOrThrow(ZSwc& tree, const std::string& filePath, const std::vector<std::string>& comments)
+{
+  if (tree.empty()) {
+    throw ZException("writeSwcLegacyNeuTuOrThrow: Empty tree. No file saved.");
+  }
+
+  resortId(tree);
+
+  errno = 0;
+  std::FILE* fp = std::fopen(filePath.c_str(), "w");
+  if (fp == nullptr) {
+    throw ZException("writeSwcLegacyNeuTuOrThrow: Failed to open SWC file for writing: " + filePath,
+                     ZException::Option::CheckErrno);
+  }
+
+  std::fprintf(fp, "%s", commentHeader());
+
+  for (const auto& c : comments) {
+    std::fprintf(fp, "#%s\n", c.c_str());
+  }
+
+  for (auto it = tree.cbegin(); it != tree.cend(); ++it) {
+    const int id = static_cast<int>(it->id);
+    const int type = static_cast<int>(it->type);
+    const int parentId = static_cast<int>(ZSwc::parentID(it));
+    std::fprintf(fp, "%d %d %g %g %g %g %d\n", id, type, it->x, it->y, it->z, it->radius, parentId);
+  }
+
+  errno = 0;
+  if (std::fclose(fp) != 0) {
+    throw ZException("writeSwcLegacyNeuTuOrThrow: Failed to close SWC file: " + filePath,
+                     ZException::Option::CheckErrno);
+  }
 }
 
 } // namespace nim

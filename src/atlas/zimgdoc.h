@@ -66,6 +66,11 @@ public:
 
   [[nodiscard]] QMenu* processObjMenu() const override;
 
+  [[nodiscard]] QAction* autoTraceAction() const
+  {
+    return m_autoTraceAction;
+  }
+
   [[nodiscard]] QString objName(size_t id) const override;
 
   [[nodiscard]] QString objPath(size_t id) const override;
@@ -105,6 +110,8 @@ protected:
   void alignSections();
 
   void correctChromaticShift();
+
+  void autoTrace();
 
   // append another img into this doc
   size_t addImgPack(ZImgPack* imgPack);
@@ -164,6 +171,7 @@ private:
   QAction* m_stitchImageAction = nullptr;
   QAction* m_alignSectionsAction = nullptr;
   QAction* m_correctChromaticShiftAction = nullptr;
+  QAction* m_autoTraceAction = nullptr;
 };
 
 } // namespace nim

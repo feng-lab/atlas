@@ -6,6 +6,7 @@
 #include "zneutubetraceseeder.h"
 #include "zneutubetracescorethresholds.h"
 
+#include "zcancellation.h"
 #include "zlog.h"
 
 #include <algorithm>
@@ -67,7 +68,10 @@ namespace {
 
 // Port of `Stack_Z_Dilate` including its legacy signal-type bug:
 // it indexes the signal's raw byte array by voxel index regardless of actual voxel size.
-[[nodiscard]] ZImg stackZDilateLegacyLike(const ZImg& stack, int size, const ZImg& signal)
+[[nodiscard]] ZImg stackZDilateLegacyLike(const ZImg& stack,
+                                          int size,
+                                          const ZImg& signal,
+                                          const folly::CancellationToken& cancellationToken)
 {
   CHECK(!stack.isEmpty());
   CHECK(stack.isSameSize(signal));
@@ -97,6 +101,7 @@ namespace {
 
   // downward
   for (int k = supportSize - 1; k < depth - size - 1; ++k) {
+    maybeCancel(cancellationToken);
     for (int j = 0; j < height; ++j) {
       for (int i = 0; i < width; ++i) {
         if ((inData[offset] == 1) && (inData[offset + area] == 0)) {
@@ -120,6 +125,7 @@ namespace {
 
   // upward
   for (int k = size; k < depth - supportSize; ++k) {
+    maybeCancel(cancellationToken);
     for (int j = 0; j < height; ++j) {
       for (int i = 0; i < width; ++i) {
         if ((inData[offset] == 1) && (inData[offset - area] == 0)) {
@@ -194,6 +200,8 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
 {
   RecoverResultLegacyLike out;
 
+  maybeCancel(tw.cancellationToken);
+
   if (mask.isEmpty()) {
     out.baseMask = std::move(baseMask);
     return out;
@@ -217,6 +225,7 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
   ZImg traceMaskBinary = makeBinaryU8Like(mask);
   {
     const size_t n = traceMaskBinary.voxelNumber();
+    const size_t plane = mask.width() * mask.height();
     auto* traceBin = traceMaskBinary.timeData<uint8_t>(0);
     const auto* base = baseMask->timeData<uint8_t>(0);
 
@@ -224,6 +233,9 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
     const auto* traceMask16 = haveTraceMask ? tw.traceMask->timeData<uint16_t>(0) : nullptr;
 
     for (size_t i = 0; i < n; ++i) {
+      if (plane > 0 && (i % plane) == 0) {
+        maybeCancel(tw.cancellationToken);
+      }
       const bool traced = haveTraceMask && (traceMask16[i] > 0);
       const bool baseOne = (base[i] == 1);
       traceBin[i] = static_cast<uint8_t>(traced || baseOne);
@@ -233,16 +245,22 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
   // Legacy frees baseMask here.
   baseMask.reset();
 
-  const ZImg submask = stackZDilateLegacyLike(traceMaskBinary, /*size*/ 5, signal);
+  maybeCancel(tw.cancellationToken);
+  const ZImg submask = stackZDilateLegacyLike(traceMaskBinary, /*size*/ 5, signal, tw.cancellationToken);
   traceMaskBinary = stackBsubLegacyLike(leftover, submask);
 
+  maybeCancel(tw.cancellationToken);
   leftover = removeSmallObjectsBinaryU8LegacyLike(traceMaskBinary, /*minSize*/ 27, /*connectivity*/ 26);
 
   // Legacy translate(leftover, GREY, 1) effectively normalizes to 0/1.
   {
     const size_t n = leftover.voxelNumber();
+    const size_t plane = leftover.width() * leftover.height();
     auto* a = leftover.timeData<uint8_t>(0);
     for (size_t i = 0; i < n; ++i) {
+      if (plane > 0 && (i % plane) == 0) {
+        maybeCancel(tw.cancellationToken);
+      }
       a[i] = static_cast<uint8_t>(a[i] > 0);
     }
   }

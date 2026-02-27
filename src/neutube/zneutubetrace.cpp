@@ -229,7 +229,8 @@ int runTrace(const std::vector<std::string>& input,
       }
     }
 
-    std::unique_ptr<ZSwc> tree = traceNeuronAutoLegacyLike(std::move(signal), cfg, diagnosis, verbose, nullptr);
+    std::unique_ptr<ZSwc> tree =
+      traceNeuronAutoLegacyLike(std::move(signal), cfg, diagnosis, verbose, /*doResampleAfterTracing=*/true, nullptr);
     if (tree) {
       writeSwcLegacyNeuTu(*tree, outputPath);
       return 0;

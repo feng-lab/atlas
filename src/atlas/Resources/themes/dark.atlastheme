@@ -71,6 +71,7 @@
             "EllipseIcon": ":/icons/ellipse-dark.svg",
             "RectangleIcon": ":/icons/rectangle-dark.svg",
             "TraceIcon": ":/icons/trace-dark.svg",
+            "AutoTraceIcon": ":/icons/auto-trace-dark.svg",
             "RunCommandIcon": ":/icons/run-command-dark.svg",
             "RunTestIcon": ":/icons/run-test-dark.svg",
             "PlayIcon": ":/icons/play-dark.svg",

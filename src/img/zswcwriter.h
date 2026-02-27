@@ -17,4 +17,11 @@ namespace nim {
 // This function resorts IDs before writing (matching legacy behavior).
 void writeSwcLegacyNeuTu(ZSwc& tree, const std::string& filePath, const std::vector<std::string>& comments = {});
 
+// Same formatting as writeSwcLegacyNeuTu(), but throws ZException on failure.
+//
+// Notes:
+// - Still resorts IDs before writing (legacy behavior).
+// - Throws on empty trees and I/O failures instead of logging and silently returning.
+void writeSwcLegacyNeuTuOrThrow(ZSwc& tree, const std::string& filePath, const std::vector<std::string>& comments = {});
+
 } // namespace nim

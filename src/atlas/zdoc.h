@@ -49,6 +49,8 @@ class ZObjPack;
 
 class ZTraceSettings;
 
+class ZBackgroundTaskManager;
+
 class ZDoc : public QObject
 {
   Q_OBJECT
@@ -255,6 +257,20 @@ public:
     return *m_traceSettings;
   }
 
+  ZBackgroundTaskManager& backgroundTaskManager()
+  {
+    return *m_backgroundTaskManager;
+  }
+
+  [[nodiscard]] const ZBackgroundTaskManager& backgroundTaskManager() const
+  {
+    return *m_backgroundTaskManager;
+  }
+
+  // Called during application shutdown: request cancellation for all tracked background tasks and
+  // wait for their work to finish before tearing down core objects.
+  void cancelAllBackgroundTasksAndWait();
+
   void hideAnimation3DView();
 
   void deselectAllObjs();
@@ -289,6 +305,8 @@ Q_SIGNALS:
   void hideViewSetting();
 
   void openEditWidget(size_t id);
+
+  void showBackgroundTasksPanel();
 
   void objAboutToBeRemoved(size_t id, ZObjDoc* doc);
 
@@ -369,6 +387,7 @@ private:
   ZRegionAnnotationDoc* m_regionAnnotationDoc = nullptr;
 
   ZTraceSettings* m_traceSettings = nullptr;
+  ZBackgroundTaskManager* m_backgroundTaskManager = nullptr;
 };
 
 } // namespace nim

@@ -115,6 +115,7 @@ public:
     EllipseIcon,
     RectangleIcon,
     TraceIcon,
+    AutoTraceIcon,
     RunCommandIcon,
     RunTestIcon,
     PlayIcon,

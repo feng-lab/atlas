@@ -250,8 +250,12 @@ int runGeneral(const std::string& generalConfigTextOrPath,
   }
 
   const ZImg* predefinedMask = maskOverride.mask ? &(*maskOverride.mask) : nullptr;
-  std::unique_ptr<ZSwc> tree =
-    traceNeuronAutoLegacyLike(std::move(signal), traceCfg, diagnosis, verbose, predefinedMask);
+  std::unique_ptr<ZSwc> tree = traceNeuronAutoLegacyLike(std::move(signal),
+                                                         traceCfg,
+                                                         diagnosis,
+                                                         verbose,
+                                                         /*doResampleAfterTracing=*/true,
+                                                         predefinedMask);
 
   if (tree) {
     LOG(INFO) << "Saving " << outputPath << "...";

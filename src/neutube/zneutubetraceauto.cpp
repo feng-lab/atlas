@@ -13,6 +13,7 @@
 #include "zswcops.h"
 #include "zswcpostprocess.h"
 #include "zswcresampler.h"
+#include "zcancellation.h"
 
 #include "zlog.h"
 
@@ -84,7 +85,9 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
                                                 const TraceConfig& cfg,
                                                 bool /*diagnosis*/,
                                                 bool /*verbose*/,
-                                                const ZImg* predefinedMask)
+                                                bool doResampleAfterTracing,
+                                                const ZImg* predefinedMask,
+                                                folly::CancellationToken cancellationToken)
 {
   if (signal.isEmpty()) {
     return nullptr;
@@ -97,15 +100,20 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   ctx.cfg = &cfg;
 
   locsegChainDefaultTraceWorkspaceLegacyLike(ctx.tw, ctx.signal);
+  ctx.tw.cancellationToken = std::move(cancellationToken);
+  maybeCancel(ctx.tw.cancellationToken);
+
   ctx.tw.refit = cfg.refit;
   ctx.tw.tuneEnd = cfg.tuneEnd;
   ctx.tw.traceMaskUpdating = ctx.maskTracing;
 
   traceWorkspaceInitTraceMaskLegacyLike(ctx.tw, ctx.signal, /*clearing*/ false);
+  maybeCancel(ctx.tw.cancellationToken);
 
   // Legacy default preprocess: subtract background and optionally invert bright-background images.
   // Bright-background handling is not yet ported (Atlas currently assumes dark background).
   (void)subtractBackgroundLegacyLike(ctx.signal, /*minFr*/ 0.5, /*maxIter*/ 3);
+  maybeCancel(ctx.tw.cancellationToken);
 
   // Mask + seeds.
   MakeMaskDiagnosticsLegacyLike maskDiag;
@@ -117,6 +125,7 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   if (!ctx.mask) {
     return nullptr;
   }
+  maybeCancel(ctx.tw.cancellationToken);
 
   Geo3dScalarField seeds = extractSeedOriginalLegacyLike(*ctx.mask);
 
@@ -132,6 +141,7 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   prepareTraceScoreThresholdLegacyLike(ctx.signal, cfg, TracingModeLegacyLike::Auto, ctx.tw);
   std::vector<std::unique_ptr<LocsegChain>> chains =
     traceAllSeedsLegacyLike(ctx.signal, /*zScale*/ 1.0, sorted.locsegArray, sorted.scoreArray, ctx.tw);
+  maybeCancel(ctx.tw.cancellationToken);
 
   if (cfg.recover > 0) {
     RecoverResultLegacyLike recovered = recoverLegacyLike(ctx.signal, cfg, *ctx.mask, std::move(ctx.baseMask), ctx.tw);
@@ -140,10 +150,12 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
       chains.push_back(std::move(c));
     }
   }
+  maybeCancel(ctx.tw.cancellationToken);
 
   if (cfg.chainScreenCount > 0 && static_cast<int>(chains.size()) > cfg.chainScreenCount) {
     screenChainsLegacyLike(ctx.signal, chains);
   }
+  maybeCancel(ctx.tw.cancellationToken);
 
   ConnectionTestWorkspaceLegacyLike ctw;
   defaultConnectionTestWorkspaceLegacyLike(ctw);
@@ -181,9 +193,11 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   swcTreeMergeCloseNodeLegacyLike(*tree, /*threshold*/ 0.01);
   swcTreeRemoveOvershootLegacyLike(*tree);
 
-  // `ZNeuronTracer::trace` always resamples for the CLI auto-trace path.
-  ZNeutubeSwcResampler resampler;
-  resampler.optimalDownsample(*tree);
+  if (doResampleAfterTracing) {
+    ZNeutubeSwcResampler resampler;
+    resampler.optimalDownsample(*tree);
+  }
+  maybeCancel(ctx.tw.cancellationToken);
 
   // `ZNeuronTracer::trace` calls `ZSwcPruner::removeOrphanBlob` with minLength=0.
   swcTreeRemoveOrphanBlobLegacyLike(*tree, /*minLength*/ 0.0, /*minOrphanCount*/ 10);

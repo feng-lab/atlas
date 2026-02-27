@@ -116,6 +116,8 @@
         <file>icons/rectangle-dark.svg</file>
         <file>icons/trace.svg</file>
         <file>icons/trace-dark.svg</file>
+        <file>icons/auto-trace.svg</file>
+        <file>icons/auto-trace-dark.svg</file>
         <file>icons/ellipse.svg</file>
         <file>icons/ellipse-dark.svg</file>
         <file>Resources/shader/lighting2.frag</file>

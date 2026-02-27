@@ -22,6 +22,7 @@
 #include "zchooseobjdialog.h"
 #include "zmessageboxhelpers.h"
 #include "ztracesettings.h"
+#include "zbackgroundtaskmanager.h"
 #include <QUndoGroup>
 #include <QAction>
 #include <QApplication>
@@ -89,6 +90,13 @@ ZDoc::ZDoc(QObject* parent)
   registerObjDoc(m_regionAnnotationDoc);
 
   m_traceSettings = new ZTraceSettings(this);
+  m_backgroundTaskManager = new ZBackgroundTaskManager(this);
+}
+
+void ZDoc::cancelAllBackgroundTasksAndWait()
+{
+  CHECK(m_backgroundTaskManager != nullptr);
+  m_backgroundTaskManager->cancelAllTasksAndWait();
 }
 
 std::vector<size_t> ZDoc::chooseObjsWithWidget(const QString& title, QWidget* parent) const

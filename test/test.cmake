@@ -92,8 +92,6 @@ add_gtest_executable(zstructutilstest)
 add_gtest_executable(zenumtest)
 add_gtest_executable(zstringutilstest)
 add_gtest_executable(ztupleliketest)
-add_gtest_executable(zneutubecommand2paritytest)
-target_link_libraries(zneutubecommand2paritytest neutube neutu)
 
 # Atlas-side tests
 
@@ -122,6 +120,8 @@ add_atlas_core_gtest_executable(zneuroglancerstatetest)
 if (_atlas_is_windows_ci)
   message(STATUS "Skipping zatlasheavytest on Windows CI (heavy link against atlas_lib).")
 else ()
+  add_gtest_executable(zneutubecommand2paritytest)
+  target_link_libraries(zneutubecommand2paritytest neutube neutu)
   add_executable(
     zatlasheavytest
     ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp

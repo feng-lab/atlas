@@ -161,6 +161,7 @@ private:
   QDockWidget* m_backgroundDockWidget = nullptr;
   QDockWidget* m_axisDockWidget = nullptr;
   QDockWidget* m_traceDockWidget = nullptr;
+  QDockWidget* m_tasksDockWidget = nullptr;
   ZViewSettingWidget* m_viewSettingWidget = nullptr;
   ZObjDetailedInfoWidget* m_objDetailedInfoWidget = nullptr;
   QDockWidget* m_editObjDockWidget = nullptr;

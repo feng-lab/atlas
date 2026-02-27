@@ -249,6 +249,7 @@ private:
   QDockWidget* m_helpDockWidget = nullptr;
   QDockWidget* m_editObjDockWidget = nullptr;
   QDockWidget* m_traceDockWidget = nullptr;
+  QDockWidget* m_tasksDockWidget = nullptr;
   ZObjEditWidget* m_objEditWidget = nullptr;
 
   //

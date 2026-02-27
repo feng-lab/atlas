@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;">
+    <path d="M22,24L9,15" style="fill:none;fill-rule:nonzero;stroke:rgb(74,124,158);stroke-width:1.5px;"/>
+    <path d="M9,15L5,8" style="fill:none;fill-rule:nonzero;stroke:rgb(74,124,158);stroke-opacity:0.7;stroke-width:1.2px;"/>
+    <path d="M9,15L4,17" style="fill:none;fill-rule:nonzero;stroke:rgb(74,124,158);stroke-opacity:0.7;stroke-width:1.2px;"/>
+    <path d="M22,24L13,33" style="fill:none;fill-rule:nonzero;stroke:rgb(74,124,158);stroke-width:1.5px;"/>
+    <path d="M13,33L8,38" style="fill:none;fill-rule:nonzero;stroke:rgb(74,124,158);stroke-opacity:0.7;stroke-width:1.2px;"/>
+    <path d="M13,33L10,41" style="fill:none;fill-rule:nonzero;stroke:rgb(74,124,158);stroke-opacity:0.7;stroke-width:1.2px;"/>
+    <path d="M22,24L17,11" style="fill:none;fill-rule:nonzero;stroke:rgb(74,124,158);stroke-width:1.5px;"/>
+    <path d="M17,11L13,5" style="fill:none;fill-rule:nonzero;stroke:rgb(74,124,158);stroke-opacity:0.7;stroke-width:1.2px;"/>
+    <path d="M17,11L21,5" style="fill:none;fill-rule:nonzero;stroke:rgb(74,124,158);stroke-opacity:0.7;stroke-width:1.2px;"/>
+    <path d="M22,24L35,28" style="fill:none;fill-rule:nonzero;stroke:rgb(45,95,122);stroke-width:2px;"/>
+    <path d="M35,28L41,25" style="fill:none;fill-rule:nonzero;stroke:rgb(45,95,122);stroke-width:1.5px;"/>
+    <circle cx="22" cy="24" r="4.5" style="fill:rgb(74,124,158);fill-opacity:0.12;"/>
+    <circle cx="22" cy="24" r="4.5" style="fill:none;stroke:rgb(45,95,122);stroke-width:1.5px;stroke-linecap:butt;"/>
+    <circle cx="22" cy="24" r="2" style="fill:rgb(45,95,122);"/>
+    <path d="M5,8L9,15L22,24L35,28L41,25" style="fill:none;fill-rule:nonzero;stroke:rgb(91,168,90);stroke-opacity:0.9;stroke-width:2px;stroke-linejoin:round;"/>
+    <circle cx="5" cy="8" r="2" style="fill:rgb(91,168,90);"/>
+    <circle cx="9" cy="15" r="2" style="fill:rgb(91,168,90);"/>
+    <circle cx="35" cy="28" r="2" style="fill:rgb(91,168,90);"/>
+    <circle cx="41" cy="25" r="2" style="fill:rgb(91,168,90);"/>
+    <g transform="matrix(1.621963,0,0,1.931332,-22.542215,-1.820373)">
+        <text x="31.438px" y="11.618px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:12px;">A</text>
+        <g transform="matrix(1.035555,0,0,1.035555,40.881264,11.618164)">
+        </g>
+        <text x="39.442px" y="11.618px" style="font-family:'ArialMT', 'Arial', sans-serif;font-size:1.036px;">uto</text>
+    </g>
+</svg>

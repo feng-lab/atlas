@@ -5,6 +5,7 @@
 #include "zimg.h"
 #include "zswc.h"
 
+#include <folly/CancellationToken.h>
 #include <memory>
 
 namespace nim {
@@ -17,10 +18,13 @@ namespace nim {
 // - `predefinedMask` is optional; when provided it replaces the legacy auto-generated
 //   trace mask (useful for A/B tests or callers that already computed a mask).
 // - Returns nullptr on legacy "no result generated" paths.
-[[nodiscard]] std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
-                                                              const TraceConfig& cfg,
-                                                              bool diagnosis,
-                                                              bool verbose,
-                                                              /*nullable*/ const ZImg* predefinedMask = nullptr);
+[[nodiscard]] std::unique_ptr<ZSwc>
+traceNeuronAutoLegacyLike(ZImg signal,
+                          const TraceConfig& cfg,
+                          bool diagnosis,
+                          bool verbose,
+                          bool doResampleAfterTracing,
+                          /*nullable*/ const ZImg* predefinedMask = nullptr,
+                          folly::CancellationToken cancellationToken = folly::CancellationToken());
 
 } // namespace nim
