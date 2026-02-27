@@ -1,8 +1,14 @@
 #include "zbackgroundtaskmanager.h"
 
+#include "zexception.h"
 #include "zlog.h"
 
+#include <folly/OperationCancelled.h>
+#include <folly/coro/BlockingWait.h>
+#include <folly/coro/Invoke.h>
+
 #include <algorithm>
+#include <string>
 #include <utility>
 
 namespace nim {
@@ -101,21 +107,6 @@ void ZBackgroundTask::setCancelCallback(std::function<void()> cb)
   m_cancelCallback = std::move(cb);
 }
 
-void ZBackgroundTask::setWaitForFinishedCallback(std::function<void()> cb)
-{
-  m_waitForFinishedCallback = std::move(cb);
-}
-
-void ZBackgroundTask::waitForFinished() const
-{
-  if (!m_waitForFinishedCallback) {
-    LOG(WARNING) << "Background task has no wait callback; shutdown may race with task teardown: "
-                 << m_title.toStdString();
-    return;
-  }
-  m_waitForFinishedCallback();
-}
-
 void ZBackgroundTask::setUseFakeProgress(bool enabled)
 {
   if (m_useFakeProgress == enabled) {
@@ -168,6 +159,58 @@ void ZBackgroundTask::stopFakeProgressTimer()
 ZBackgroundTaskManager::ZBackgroundTaskManager(QObject* parent)
   : QObject(parent)
 {}
+
+ZBackgroundTaskManager::~ZBackgroundTaskManager()
+{
+  cancelAllTasksAndWait();
+}
+
+void ZBackgroundTaskManager::spawnDetachedTask(folly::Executor::KeepAlive<> executor,
+                                               folly::coro::Task<void> task,
+                                               std::string_view debugLabel)
+{
+  CHECK(executor) << "spawnDetachedTask requires a valid executor" << (debugLabel.empty() ? "" : " (")
+                  << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
+  CHECK(!m_taskScopeJoined) << "spawnDetachedTask called after cancelAllTasksAndWait drained the task scope"
+                            << (debugLabel.empty() ? "" : " label='") << (debugLabel.empty() ? "" : debugLabel)
+                            << (debugLabel.empty() ? "" : "'");
+
+  std::string label(debugLabel);
+  auto wrapperTask =
+    folly::coro::co_invoke([label = std::move(label), task = std::move(task)]() mutable -> folly::coro::Task<void> {
+      try {
+        co_await std::move(task);
+      }
+      catch (const ZCancellationException&) {
+        co_return;
+      }
+      catch (const folly::OperationCancelled&) {
+        co_return;
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR) << "Detached background coroutine failed" << (label.empty() ? "" : " label='")
+                   << (label.empty() ? "" : label) << (label.empty() ? "" : "'") << ": " << e.what();
+        co_return;
+      }
+      catch (...) {
+        LOG(ERROR) << "Detached background coroutine failed" << (label.empty() ? "" : " label='")
+                   << (label.empty() ? "" : label) << (label.empty() ? "" : "'");
+        co_return;
+      }
+      co_return;
+    });
+
+  m_taskScope.add(folly::coro::co_withExecutor(std::move(executor), std::move(wrapperTask)));
+}
+
+void ZBackgroundTaskManager::joinDetachedTasksForShutdown()
+{
+  if (m_taskScopeJoined) {
+    return;
+  }
+  folly::coro::blockingWait(m_taskScope.joinAsync());
+  m_taskScopeJoined = true;
+}
 
 ZBackgroundTask* ZBackgroundTaskManager::createTask(QString title)
 {
@@ -257,14 +300,7 @@ void ZBackgroundTaskManager::cancelAllTasksAndWait()
     }
   }
 
-  for (ZBackgroundTask* task : m_tasks) {
-    if (task == nullptr) {
-      continue;
-    }
-    if (!task->isTerminal()) {
-      task->waitForFinished();
-    }
-  }
+  joinDetachedTasksForShutdown();
 }
 
 } // namespace nim

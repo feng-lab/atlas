@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstddef>
+#include <folly/CancellationToken.h>
 #include <memory>
 
 namespace nim {
@@ -35,17 +36,21 @@ struct SeedTraceResult
 // Output:
 // - `SeedTraceResult::swc` is null when no branch was produced.
 // - For the host-SWC variant, `SeedTraceResult::swc` is always non-null (returns a copy of `hostSwc` when no-op).
-[[nodiscard]] SeedTraceResult traceSeedNewSwcLegacyLike(const ZImg& signal,
-                                                        const std::array<double, 3>& position,
-                                                        const TraceConfig& cfg,
-                                                        size_t c = 0,
-                                                        size_t t = 0);
+[[nodiscard]] SeedTraceResult
+traceSeedNewSwcLegacyLike(const ZImg& signal,
+                          const std::array<double, 3>& position,
+                          const TraceConfig& cfg,
+                          size_t c = 0,
+                          size_t t = 0,
+                          folly::CancellationToken cancellationToken = folly::CancellationToken());
 
-[[nodiscard]] SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
-                                                             const ZSwc& hostSwc,
-                                                             const std::array<double, 3>& position,
-                                                             const TraceConfig& cfg,
-                                                             size_t c = 0,
-                                                             size_t t = 0);
+[[nodiscard]] SeedTraceResult
+traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
+                               const ZSwc& hostSwc,
+                               const std::array<double, 3>& position,
+                               const TraceConfig& cfg,
+                               size_t c = 0,
+                               size_t t = 0,
+                               folly::CancellationToken cancellationToken = folly::CancellationToken());
 
 } // namespace nim

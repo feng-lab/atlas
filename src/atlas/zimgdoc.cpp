@@ -31,15 +31,17 @@
 #include <QFileInfo>
 #include <QInputDialog>
 #include <QMessageBox>
+#include <QMetaObject>
+#include <QPointer>
 #include <QSettings>
 #include <QUrl>
 #include <QUuid>
-#include <QFutureWatcher>
-#include <QtConcurrent/QtConcurrentRun>
 #include <boost/json.hpp>
 #include <folly/CancellationToken.h>
 #include <folly/ScopeGuard.h>
 #include <folly/coro/BlockingWait.h>
+#include <folly/coro/Invoke.h>
+#include <folly/executors/GlobalExecutor.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -57,6 +59,192 @@ struct AutoTraceAsyncResult
   bool cancelled = false;
   bool hasResult = false;
 };
+
+[[nodiscard]] AutoTraceAsyncResult runAutoTraceLegacyLike(const std::shared_ptr<ZImgPack>& imgPack,
+                                                          size_t sc,
+                                                          size_t t,
+                                                          int traceLevel,
+                                                          const QString& traceCfgPath,
+                                                          bool haveAlgoConfig,
+                                                          const ZTraceSettings::AlgoConfig& algoCfg,
+                                                          bool doResample,
+                                                          bool docHasAnySwc,
+                                                          const QString& outputSwcPath,
+                                                          const QString& outputLogPath,
+                                                          folly::CancellationToken cancellationToken)
+{
+  AutoTraceAsyncResult res;
+
+  try {
+    maybeCancel(cancellationToken);
+
+    {
+      const QDir dir = QFileInfo(outputLogPath).dir();
+      if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
+        res.error = QStringLiteral("Auto Trace failed: can not create log directory: %1").arg(dir.absolutePath());
+        return res;
+      }
+    }
+
+    auto fileSink = createFileLogSink(outputLogPath);
+    if (!fileSink) {
+      res.error = QStringLiteral("Auto Trace failed: can not open log file for writing: %1").arg(outputLogPath);
+      return res;
+    }
+
+    addLogSink(fileSink);
+    auto sinkGuard = folly::makeGuard([&fileSink]() {
+      removeLogSink(fileSink);
+    });
+
+    LOG(INFO) << "Atlas Auto Trace";
+    LOG(INFO) << "Output SWC: " << outputSwcPath;
+    LOG(INFO) << "Trace config path: " << traceCfgPath;
+    LOG(INFO) << "Output log file: " << outputLogPath;
+    LOG(INFO) << "Selected channel (0-based): " << static_cast<qulonglong>(sc);
+    LOG(INFO) << "Selected time (0-based): " << static_cast<qulonglong>(t);
+    LOG(INFO) << "Budget level override (0=default): " << traceLevel;
+    LOG(INFO) << "Optimal node resampling: " << (doResample ? "enabled" : "disabled");
+
+    const ZImgInfo info = imgPack->imgInfo();
+    if (sc >= info.numChannels || t >= info.numTimes) {
+      res.error = QStringLiteral("Auto Trace failed: invalid channel/time selection (c=%1, t=%2).")
+                    .arg(static_cast<qulonglong>(sc))
+                    .arg(static_cast<qulonglong>(t));
+      return res;
+    }
+
+    LOG(INFO) << "Signal info: " << info;
+
+    const ZImg* fullSignalPtr = nullptr;
+    ZImg ownedSignal;
+    if (imgPack->isDiskCached()) {
+      LOG(INFO) << "Loading whole image (disk cached)...";
+      ownedSignal = imgPack->wholeImg();
+      fullSignalPtr = &ownedSignal;
+    } else {
+      LOG(INFO) << "Using in-memory image...";
+      fullSignalPtr = &imgPack->img();
+    }
+    CHECK(fullSignalPtr != nullptr);
+    const ZImg& fullSignal = *fullSignalPtr;
+
+    if (fullSignal.isEmpty()) {
+      res.error = QStringLiteral("Auto Trace failed: the image is empty.");
+      return res;
+    }
+
+    maybeCancel(cancellationToken);
+    LOG(INFO) << "Extracting selected channel/time...";
+    ZImg signal = fullSignal.extractChannel(sc, static_cast<index_t>(t));
+
+    TraceConfig cfg;
+    if (!traceCfgPath.isEmpty()) {
+      const bool ok = loadTraceConfigLegacyLike(traceCfgPath.toStdString(), cfg);
+      if (!ok) {
+        cfg = TraceConfig{};
+      }
+    } else {
+      cfg = TraceConfig{};
+    }
+
+    if (traceLevel > 0) {
+      if (const json::object* levelOverride = selectTraceLevelOverrideLegacyLike(cfg, traceLevel)) {
+        applyTraceConfigOverridesLegacyLike(*levelOverride, cfg);
+      }
+    }
+
+    if (haveAlgoConfig) {
+      cfg.minAutoScore = algoCfg.minAutoScore;
+      cfg.minManualScore = algoCfg.minManualScore;
+      cfg.minSeedScore = algoCfg.minSeedScore;
+      cfg.min2dScore = algoCfg.min2dScore;
+      cfg.refit = algoCfg.refit;
+      cfg.spTest = algoCfg.spTest;
+      cfg.crossoverTest = algoCfg.crossoverTest;
+      cfg.tuneEnd = algoCfg.tuneEnd;
+      cfg.edgePath = algoCfg.edgePath;
+      cfg.enhanceMask = algoCfg.enhanceMask;
+      cfg.seedMethod = algoCfg.seedMethod;
+      cfg.recover = algoCfg.recover;
+      cfg.chainScreenCount = algoCfg.chainScreenCount;
+      cfg.maxEucDist = algoCfg.maxEucDist;
+    }
+
+    if (docHasAnySwc) {
+      cfg.recover = 0;
+    }
+
+    LOG(INFO) << "Final TraceConfig:";
+    LOG(INFO) << "  minAutoScore=" << cfg.minAutoScore;
+    LOG(INFO) << "  minManualScore=" << cfg.minManualScore;
+    LOG(INFO) << "  minSeedScore=" << cfg.minSeedScore;
+    LOG(INFO) << "  min2dScore=" << cfg.min2dScore;
+    LOG(INFO) << "  refit=" << (cfg.refit ? "true" : "false");
+    LOG(INFO) << "  spTest=" << (cfg.spTest ? "true" : "false");
+    LOG(INFO) << "  crossoverTest=" << (cfg.crossoverTest ? "true" : "false");
+    LOG(INFO) << "  tuneEnd=" << (cfg.tuneEnd ? "true" : "false");
+    LOG(INFO) << "  edgePath=" << (cfg.edgePath ? "true" : "false");
+    LOG(INFO) << "  enhanceMask=" << (cfg.enhanceMask ? "true" : "false");
+    LOG(INFO) << "  seedMethod=" << cfg.seedMethod;
+    LOG(INFO) << "  recover=" << cfg.recover;
+    LOG(INFO) << "  chainScreenCount=" << cfg.chainScreenCount;
+    LOG(INFO) << "  maxEucDist=" << cfg.maxEucDist;
+
+    maybeCancel(cancellationToken);
+    LOG(INFO) << "Tracing...";
+    std::unique_ptr<ZSwc> swc = traceNeuronAutoLegacyLike(std::move(signal),
+                                                          cfg,
+                                                          /*diagnosis=*/false,
+                                                          /*verbose=*/false,
+                                                          /*doResampleAfterTracing=*/doResample,
+                                                          /*predefinedMask=*/nullptr,
+                                                          cancellationToken);
+    maybeCancel(cancellationToken);
+
+    if (!swc) {
+      LOG(INFO) << "No SWC generated.";
+      res.hasResult = false;
+      return res;
+    }
+
+    {
+      const QDir dir = QFileInfo(outputSwcPath).dir();
+      if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
+        res.error = QStringLiteral("Auto Trace failed: can not create output directory: %1").arg(dir.absolutePath());
+        return res;
+      }
+    }
+
+    const QString tmpSwcPath =
+      outputSwcPath + QStringLiteral(".tmp_") + QUuid::createUuid().toString(QUuid::WithoutBraces);
+
+    LOG(INFO) << "Writing SWC...";
+    writeSwcLegacyNeuTuOrThrow(*swc, tmpSwcPath.toStdString(), {});
+    if (QFile::exists(outputSwcPath) && !QFile::remove(outputSwcPath)) {
+      res.error = QStringLiteral("Auto Trace failed: can not overwrite output SWC: %1").arg(outputSwcPath);
+      (void)QFile::remove(tmpSwcPath);
+      return res;
+    }
+    if (!QFile::rename(tmpSwcPath, outputSwcPath)) {
+      res.error = QStringLiteral("Auto Trace failed: can not move temp SWC into place.\nTemp: %1\nFinal: %2")
+                    .arg(tmpSwcPath, outputSwcPath);
+      (void)QFile::remove(tmpSwcPath);
+      return res;
+    }
+
+    res.hasResult = true;
+    LOG(INFO) << "Finished.";
+  }
+  catch (const ZCancellationException&) {
+    res.cancelled = true;
+  }
+  catch (const std::exception& e) {
+    res.error = QString("Auto Trace failed: %1").arg(QString::fromUtf8(e.what()));
+  }
+
+  return res;
+}
 
 std::optional<QString> neuroglancerPrecomputedUrlFromJson(const json::value& jValue)
 {
@@ -1058,6 +1246,7 @@ void ZImgDoc::autoTrace()
 
   ZBackgroundTaskManager& tm = m_doc.backgroundTaskManager();
   auto cancellationSource = std::make_shared<folly::CancellationSource>();
+  const folly::CancellationToken cancellationToken = cancellationSource->getToken();
   ZBackgroundTaskManager::TaskOptions taskOptions;
   taskOptions.useFakeProgress = true;
   taskOptions.cancelCallback = [cancellationSource]() {
@@ -1074,248 +1263,91 @@ void ZImgDoc::autoTrace()
   tm.startTask(task, QStringLiteral("running"));
   m_doc.showBackgroundTasksPanel();
 
-  auto* watcher = new QFutureWatcher<AutoTraceAsyncResult>(&m_doc);
-  connect(watcher,
-          &QFutureWatcher<AutoTraceAsyncResult>::finished,
-          &m_doc,
-          [this, watcher, task, imgId, sc, outputSwcPath, outputLogPath, loadResult]() {
-            CHECK(watcher != nullptr);
-            AutoTraceAsyncResult r = watcher->result();
-            watcher->deleteLater();
+  const QString traceCfgPath = QDir(ZSystemInfo::jsonDirPath()).absoluteFilePath("trace_config.json");
 
-            ZBackgroundTaskManager& tm = m_doc.backgroundTaskManager();
+  QPointer<ZDoc> docPtr(&m_doc);
+  QPointer<ZBackgroundTask> taskPtr(task);
 
-            if (r.cancelled) {
-              tm.cancelTask(task, QStringLiteral("cancelled"));
+  tm.spawnDetachedTask(
+    folly::getGlobalCPUExecutor(),
+    folly::coro::co_invoke([docPtr,
+                            taskPtr,
+                            imgPack,
+                            imgId,
+                            sc,
+                            t,
+                            traceLevel,
+                            traceCfgPath,
+                            haveAlgoConfig,
+                            algoCfg,
+                            doResample,
+                            docHasAnySwc,
+                            outputSwcPath,
+                            outputLogPath,
+                            loadResult,
+                            cancellationToken]() mutable -> folly::coro::Task<void> {
+      const AutoTraceAsyncResult res = runAutoTraceLegacyLike(imgPack,
+                                                              sc,
+                                                              t,
+                                                              traceLevel,
+                                                              traceCfgPath,
+                                                              haveAlgoConfig,
+                                                              algoCfg,
+                                                              doResample,
+                                                              docHasAnySwc,
+                                                              outputSwcPath,
+                                                              outputLogPath,
+                                                              cancellationToken);
+
+      if (docPtr != nullptr && taskPtr != nullptr) {
+        QMetaObject::invokeMethod(
+          docPtr,
+          [docPtr, taskPtr, imgId, sc, outputSwcPath, outputLogPath, loadResult, res]() mutable {
+            if (docPtr == nullptr || taskPtr == nullptr) {
               return;
             }
 
-            if (!r.error.isEmpty()) {
-              tm.failTask(task, r.error);
+            ZBackgroundTaskManager& tm = docPtr->backgroundTaskManager();
+            if (res.cancelled) {
+              tm.cancelTask(taskPtr, QStringLiteral("cancelled"));
               return;
             }
-
-            if (!r.hasResult) {
-              tm.succeedTask(task, QStringLiteral("no trace result"));
+            if (!res.error.isEmpty()) {
+              tm.failTask(taskPtr, res.error);
               return;
             }
-
+            if (!res.hasResult) {
+              tm.succeedTask(taskPtr, QStringLiteral("no trace result"));
+              return;
+            }
             if (!loadResult) {
-              tm.succeedTask(task, QStringLiteral("wrote %1").arg(QFileInfo(outputSwcPath).fileName()));
+              tm.succeedTask(taskPtr, QStringLiteral("wrote %1").arg(QFileInfo(outputSwcPath).fileName()));
               return;
             }
 
-            ZSwcDoc& swcDoc = m_doc.swcDoc();
+            ZSwcDoc& swcDoc = docPtr->swcDoc();
             QString loadError;
             const size_t newSwcId = swcDoc.loadFile(outputSwcPath, loadError);
             if (newSwcId == 0) {
-              tm.failTask(task,
+              tm.failTask(taskPtr,
                           QStringLiteral("Auto Trace finished but failed to load output SWC.\nSWC: %1\nLog: %2\n\n%3")
                             .arg(outputSwcPath, outputLogPath, loadError));
               return;
             }
 
-            tm.succeedTask(task, QStringLiteral("created SWC #%1").arg(static_cast<qulonglong>(newSwcId)));
+            tm.succeedTask(taskPtr, QStringLiteral("created SWC #%1").arg(static_cast<qulonglong>(newSwcId)));
 
             // UX policy: if the user had not explicitly mapped this source to an existing SWC, promote
             // the (image, channel) pair to target the freshly created SWC so follow-up seed traces
             // naturally continue on the auto-trace result.
-            m_doc.traceSettings().promoteNewSwcTargetToExistingIfStillNew(imgId, sc, newSwcId);
-          });
-
-  const QString traceCfgPath = QDir(ZSystemInfo::jsonDirPath()).absoluteFilePath("trace_config.json");
-
-  QFuture<AutoTraceAsyncResult> future = QtConcurrent::run([imgPack,
-                                                            sc,
-                                                            t,
-                                                            traceLevel,
-                                                            traceCfgPath,
-                                                            haveAlgoConfig,
-                                                            algoCfg,
-                                                            doResample,
-                                                            docHasAnySwc,
-                                                            outputSwcPath,
-                                                            outputLogPath,
-                                                            cancellationSource]() {
-    AutoTraceAsyncResult res;
-
-    try {
-      const folly::CancellationToken cancellationToken = cancellationSource->getToken();
-      maybeCancel(cancellationToken);
-
-      {
-        const QDir dir = QFileInfo(outputLogPath).dir();
-        if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
-          res.error = QStringLiteral("Auto Trace failed: can not create log directory: %1").arg(dir.absolutePath());
-          return res;
-        }
+            docPtr->traceSettings().promoteNewSwcTargetToExistingIfStillNew(imgId, sc, newSwcId);
+          },
+          Qt::QueuedConnection);
       }
 
-      auto fileSink = createFileLogSink(outputLogPath);
-      if (!fileSink) {
-        res.error = QStringLiteral("Auto Trace failed: can not open log file for writing: %1").arg(outputLogPath);
-        return res;
-      }
-
-      addLogSink(fileSink);
-      auto sinkGuard = folly::makeGuard([&fileSink]() {
-        removeLogSink(fileSink);
-      });
-
-      LOG(INFO) << "Atlas Auto Trace";
-      LOG(INFO) << "Output SWC: " << outputSwcPath;
-      LOG(INFO) << "Trace config path: " << traceCfgPath;
-      LOG(INFO) << "Output log file: " << outputLogPath;
-      LOG(INFO) << "Selected channel (0-based): " << static_cast<qulonglong>(sc);
-      LOG(INFO) << "Selected time (0-based): " << static_cast<qulonglong>(t);
-      LOG(INFO) << "Budget level override (0=default): " << traceLevel;
-      LOG(INFO) << "Optimal node resampling: " << (doResample ? "enabled" : "disabled");
-
-      const ZImgInfo info = imgPack->imgInfo();
-      if (sc >= info.numChannels || t >= info.numTimes) {
-        res.error = QStringLiteral("Auto Trace failed: invalid channel/time selection (c=%1, t=%2).")
-                      .arg(static_cast<qulonglong>(sc))
-                      .arg(static_cast<qulonglong>(t));
-        return res;
-      }
-
-      LOG(INFO) << "Signal info: " << info;
-
-      const ZImg* fullSignalPtr = nullptr;
-      ZImg ownedSignal;
-      if (imgPack->isDiskCached()) {
-        LOG(INFO) << "Loading whole image (disk cached)...";
-        ownedSignal = imgPack->wholeImg();
-        fullSignalPtr = &ownedSignal;
-      } else {
-        LOG(INFO) << "Using in-memory image...";
-        fullSignalPtr = &imgPack->img();
-      }
-      CHECK(fullSignalPtr != nullptr);
-      const ZImg& fullSignal = *fullSignalPtr;
-
-      if (fullSignal.isEmpty()) {
-        res.error = QStringLiteral("Auto Trace failed: the image is empty.");
-        return res;
-      }
-
-      maybeCancel(cancellationToken);
-      LOG(INFO) << "Extracting selected channel/time...";
-      ZImg signal = fullSignal.extractChannel(sc, static_cast<index_t>(t));
-
-      TraceConfig cfg;
-      if (!traceCfgPath.isEmpty()) {
-        const bool ok = loadTraceConfigLegacyLike(traceCfgPath.toStdString(), cfg);
-        if (!ok) {
-          cfg = TraceConfig{};
-        }
-      } else {
-        cfg = TraceConfig{};
-      }
-
-      if (traceLevel > 0) {
-        if (const json::object* levelOverride = selectTraceLevelOverrideLegacyLike(cfg, traceLevel)) {
-          applyTraceConfigOverridesLegacyLike(*levelOverride, cfg);
-        }
-      }
-
-      if (haveAlgoConfig) {
-        cfg.minAutoScore = algoCfg.minAutoScore;
-        cfg.minManualScore = algoCfg.minManualScore;
-        cfg.minSeedScore = algoCfg.minSeedScore;
-        cfg.min2dScore = algoCfg.min2dScore;
-        cfg.refit = algoCfg.refit;
-        cfg.spTest = algoCfg.spTest;
-        cfg.crossoverTest = algoCfg.crossoverTest;
-        cfg.tuneEnd = algoCfg.tuneEnd;
-        cfg.edgePath = algoCfg.edgePath;
-        cfg.enhanceMask = algoCfg.enhanceMask;
-        cfg.seedMethod = algoCfg.seedMethod;
-        cfg.recover = algoCfg.recover;
-        cfg.chainScreenCount = algoCfg.chainScreenCount;
-        cfg.maxEucDist = algoCfg.maxEucDist;
-      }
-
-      if (docHasAnySwc) {
-        cfg.recover = 0;
-      }
-
-      LOG(INFO) << "Final TraceConfig:";
-      LOG(INFO) << "  minAutoScore=" << cfg.minAutoScore;
-      LOG(INFO) << "  minManualScore=" << cfg.minManualScore;
-      LOG(INFO) << "  minSeedScore=" << cfg.minSeedScore;
-      LOG(INFO) << "  min2dScore=" << cfg.min2dScore;
-      LOG(INFO) << "  refit=" << (cfg.refit ? "true" : "false");
-      LOG(INFO) << "  spTest=" << (cfg.spTest ? "true" : "false");
-      LOG(INFO) << "  crossoverTest=" << (cfg.crossoverTest ? "true" : "false");
-      LOG(INFO) << "  tuneEnd=" << (cfg.tuneEnd ? "true" : "false");
-      LOG(INFO) << "  edgePath=" << (cfg.edgePath ? "true" : "false");
-      LOG(INFO) << "  enhanceMask=" << (cfg.enhanceMask ? "true" : "false");
-      LOG(INFO) << "  seedMethod=" << cfg.seedMethod;
-      LOG(INFO) << "  recover=" << cfg.recover;
-      LOG(INFO) << "  chainScreenCount=" << cfg.chainScreenCount;
-      LOG(INFO) << "  maxEucDist=" << cfg.maxEucDist;
-
-      maybeCancel(cancellationToken);
-      LOG(INFO) << "Tracing...";
-      std::unique_ptr<ZSwc> swc = traceNeuronAutoLegacyLike(std::move(signal),
-                                                            cfg,
-                                                            /*diagnosis=*/false,
-                                                            /*verbose=*/false,
-                                                            /*doResampleAfterTracing=*/doResample,
-                                                            /*predefinedMask=*/nullptr,
-                                                            cancellationToken);
-      maybeCancel(cancellationToken);
-
-      if (!swc) {
-        LOG(INFO) << "No SWC generated.";
-        res.hasResult = false;
-        return res;
-      }
-
-      {
-        const QDir dir = QFileInfo(outputSwcPath).dir();
-        if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
-          res.error = QStringLiteral("Auto Trace failed: can not create output directory: %1").arg(dir.absolutePath());
-          return res;
-        }
-      }
-
-      const QString tmpSwcPath =
-        outputSwcPath + QStringLiteral(".tmp_") + QUuid::createUuid().toString(QUuid::WithoutBraces);
-
-      LOG(INFO) << "Writing SWC...";
-      writeSwcLegacyNeuTuOrThrow(*swc, tmpSwcPath.toStdString(), {});
-      if (QFile::exists(outputSwcPath) && !QFile::remove(outputSwcPath)) {
-        res.error = QStringLiteral("Auto Trace failed: can not overwrite output SWC: %1").arg(outputSwcPath);
-        (void)QFile::remove(tmpSwcPath);
-        return res;
-      }
-      if (!QFile::rename(tmpSwcPath, outputSwcPath)) {
-        res.error = QStringLiteral("Auto Trace failed: can not move temp SWC into place.\nTemp: %1\nFinal: %2")
-                      .arg(tmpSwcPath, outputSwcPath);
-        (void)QFile::remove(tmpSwcPath);
-        return res;
-      }
-
-      res.hasResult = true;
-      LOG(INFO) << "Finished.";
-    }
-    catch (const ZCancellationException&) {
-      res.cancelled = true;
-    }
-    catch (const std::exception& e) {
-      res.error = QString("Auto Trace failed: %1").arg(QString::fromUtf8(e.what()));
-    }
-
-    return res;
-  });
-
-  task->setWaitForFinishedCallback([future]() mutable {
-    future.waitForFinished();
-  });
-
-  watcher->setFuture(future);
+      co_return;
+    }),
+    "Auto Trace");
 }
 
 size_t ZImgDoc::addImgPack(ZImgPack* imgPack)

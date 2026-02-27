@@ -7,6 +7,7 @@
 #include "zneutubetraceworkspace.h"
 #include "zneutubetraceswclabelstack.h"
 
+#include "zcancellation.h"
 #include "zlog.h"
 
 #include <array>
@@ -40,12 +41,15 @@ struct TraceCirclesResult
   return signal.createView(static_cast<index_t>(c), static_cast<index_t>(t));
 }
 
-[[nodiscard]] TraceCirclesResult
-traceSeedToCirclesLegacyLike(const ZImg& signal, const std::array<double, 3>& position, const TraceConfig& cfg)
+[[nodiscard]] TraceCirclesResult traceSeedToCirclesLegacyLike(const ZImg& signal,
+                                                              const std::array<double, 3>& position,
+                                                              const TraceConfig& cfg,
+                                                              const folly::CancellationToken& cancellationToken)
 {
   TraceCirclesResult res;
 
   locsegChainDefaultTraceWorkspaceLegacyLike(res.tw, signal);
+  res.tw.cancellationToken = cancellationToken;
   res.tw.refit = cfg.refit;
   res.tw.tuneEnd = cfg.tuneEnd;
 
@@ -69,7 +73,9 @@ traceSeedToCirclesLegacyLike(const ZImg& signal, const std::array<double, 3>& po
   seedLocseg.seg.scale = 1.0;
   setNeurosegPositionLegacyLike(seedLocseg, position, NeuroposReferenceLegacyLike::Center);
 
+  maybeCancel(res.tw.cancellationToken);
   (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signal, 1.0, 1, res.tw.fitWorkspace);
+  maybeCancel(res.tw.cancellationToken);
 
   TraceRecord seedTr;
   traceRecordReset(seedTr);
@@ -84,6 +90,7 @@ traceSeedToCirclesLegacyLike(const ZImg& signal, const std::array<double, 3>& po
 
   traceWorkspaceSetTraceStatusLegacyLike(res.tw, TraceStatus::Normal, TraceStatus::Normal);
   traceLocsegLegacyLike(signal, 1.0, chain, res.tw);
+  maybeCancel(res.tw.cancellationToken);
   (void)locsegChainRemoveOverlapEndsLegacyLike(chain);
   locsegChainRemoveTurnEndsLegacyLike(chain, 1.0);
 
@@ -132,18 +139,20 @@ SeedTraceResult traceSeedNewSwcLegacyLike(const ZImg& signal,
                                           const std::array<double, 3>& position,
                                           const TraceConfig& cfg,
                                           size_t c,
-                                          size_t t)
+                                          size_t t,
+                                          folly::CancellationToken cancellationToken)
 {
   if (signal.isEmpty()) {
     return {};
   }
 
   const ZImg signalView = traceSignalViewLegacyLike(signal, c, t);
-  TraceCirclesResult tr = traceSeedToCirclesLegacyLike(signalView, position, cfg);
+  TraceCirclesResult tr = traceSeedToCirclesLegacyLike(signalView, position, cfg, cancellationToken);
   if (tr.circles.empty()) {
     return {};
   }
 
+  maybeCancel(cancellationToken);
   const auto [start, end] = trimmedCircleIndexRangeLegacyLike(tr.tw, tr.circles);
   if (start >= end) {
     return {};
@@ -181,7 +190,8 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
                                                const std::array<double, 3>& position,
                                                const TraceConfig& cfg,
                                                size_t c,
-                                               size_t t)
+                                               size_t t,
+                                               folly::CancellationToken cancellationToken)
 {
   auto outSwc = std::make_unique<ZSwc>(hostSwc);
   for (auto& tn : *outSwc) {
@@ -198,12 +208,14 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
     return {.swc = std::move(outSwc), .newNodes = 0};
   }
 
+  maybeCancel(cancellationToken);
   const ZImg signalView = traceSignalViewLegacyLike(signal, c, t);
 
   // This variant follows the CLI "host SWC provided" behavior: the host is labeled into a mask so that the traced
   // branch can be trimmed and then connected to the host structure.
   TraceCirclesResult tr;
   locsegChainDefaultTraceWorkspaceLegacyLike(tr.tw, signalView);
+  tr.tw.cancellationToken = cancellationToken;
   tr.tw.refit = cfg.refit;
   tr.tw.tuneEnd = cfg.tuneEnd;
 
@@ -218,6 +230,7 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
   tr.tw.traceMask->fill(0);
   labelSwcIntoMaskLegacyLike(*outSwc, *tr.tw.traceMask, /*zScale*/ 1.0, /*value*/ 255);
 
+  maybeCancel(tr.tw.cancellationToken);
   LocalNeuroseg seedLocseg;
   seedLocseg.seg.r1 = 3.0;
   seedLocseg.seg.c = 0.0;
@@ -230,6 +243,7 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
   setNeurosegPositionLegacyLike(seedLocseg, position, NeuroposReferenceLegacyLike::Center);
 
   (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signalView, 1.0, 1, tr.tw.fitWorkspace);
+  maybeCancel(tr.tw.cancellationToken);
 
   TraceRecord seedTr;
   traceRecordReset(seedTr);
@@ -244,6 +258,7 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
 
   traceWorkspaceSetTraceStatusLegacyLike(tr.tw, TraceStatus::Normal, TraceStatus::Normal);
   traceLocsegLegacyLike(signalView, 1.0, chain, tr.tw);
+  maybeCancel(tr.tw.cancellationToken);
   (void)locsegChainRemoveOverlapEndsLegacyLike(chain);
   locsegChainRemoveTurnEndsLegacyLike(chain, 1.0);
 

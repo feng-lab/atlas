@@ -5,8 +5,14 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
+#include <string_view>
 #include <vector>
+
+#include <folly/Executor.h>
+#include <folly/coro/AsyncScope.h>
+#include <folly/coro/Task.h>
 
 namespace nim {
 
@@ -68,10 +74,10 @@ public:
   }
 
   // Optional wait hook used during application shutdown to ensure background work is complete before
-  // core objects are torn down. Callers running tasks on thread pools should set this to a blocking
-  // wait (e.g. QFuture::waitForFinished()).
-  void setWaitForFinishedCallback(std::function<void()> cb);
-  void waitForFinished() const;
+  // core objects are torn down.
+  //
+  // Note: Background tasks are now tracked by ZBackgroundTaskManager's coroutine AsyncScope, so
+  // shutdown waiting is handled centrally (cancelAllTasksAndWait).
 
   void requestCancel();
 
@@ -105,7 +111,6 @@ private:
   bool m_useFakeProgress = false;
 
   std::function<void()> m_cancelCallback;
-  std::function<void()> m_waitForFinishedCallback;
   QTimer* m_fakeProgressTimer = nullptr;
 };
 
@@ -122,6 +127,16 @@ public:
   };
 
   explicit ZBackgroundTaskManager(QObject* parent = nullptr);
+  ~ZBackgroundTaskManager() override;
+
+  // Start a fire-and-forget coroutine task, tracked so cancelAllTasksAndWait() can drain it during shutdown.
+  //
+  // Contract:
+  // - Tasks must not throw (catch exceptions inside the task body, or use co_awaitTry).
+  // - It is invalid to call this after cancelAllTasksAndWait() has drained the scope.
+  void spawnDetachedTask(folly::Executor::KeepAlive<> executor,
+                         folly::coro::Task<void> task,
+                         std::string_view debugLabel = {});
 
   [[nodiscard]] const std::vector<ZBackgroundTask*>& tasks() const
   {
@@ -142,8 +157,12 @@ Q_SIGNALS:
   void taskAdded(ZBackgroundTask* task);
 
 private:
+  void joinDetachedTasksForShutdown();
+
   uint64_t m_nextId = 1;
   std::vector<ZBackgroundTask*> m_tasks;
+  folly::coro::AsyncScope m_taskScope;
+  bool m_taskScopeJoined = false;
 };
 
 } // namespace nim
