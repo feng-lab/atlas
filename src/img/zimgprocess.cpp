@@ -1,9 +1,9 @@
 #include "zimgprocess.h"
 
+#include "zexception.h"
 #include "zlog.h"
 #include <itkMacro.h>
 #include <itkProcessObject.h>
-#include <QThread>
 #include <folly/ScopeGuard.h>
 
 namespace nim {
@@ -21,101 +21,27 @@ void ZImgProcess::run()
   });
 
   try {
-    LOG(INFO) << "run " << QThread::currentThreadId();
     doWork();
-    Q_EMIT finished();
   }
   catch (const itk::ProcessAborted& e) {
-    QString errMsg = QString("Cancelled by user: %1").arg(e.what());
-    LOG(ERROR) << errMsg;
-    Q_EMIT processError(errMsg);
-    if (hasParent()) {
-      LOG(ERROR) << "notifying parent operation..";
-      throw; // notify parent
-    }
+    LOG(ERROR) << "Cancelled by user: " << e.what();
+    throw ZCancellationException(QString("Cancelled by user: %1").arg(e.what()));
   }
   catch (const itk::ExceptionObject& e) {
-    QString errMsg = QString("Caught itk exception: %1").arg(e.what());
-    LOG(ERROR) << errMsg;
-    Q_EMIT processError(errMsg);
-    if (hasParent()) {
-      LOG(ERROR) << "notifying parent operation..";
-      throw; // notify parent
-    }
+    LOG(ERROR) << "Caught itk exception: " << e.what();
+    throw ZException(QString("Caught itk exception: %1").arg(e.what()));
   }
   catch (const ZCancellationException&) {
-    QString errMsg = "Cancelled by user";
-    LOG(ERROR) << errMsg;
-    Q_EMIT processError(errMsg);
-    if (hasParent()) {
-      LOG(ERROR) << "notifying parent operation..";
-      throw; // notify parent
-    }
-  }
-  catch (const ZException& e) {
-    QString errMsg = QString("Caught ZException: %1").arg(e.what());
-    LOG(ERROR) << errMsg;
-    Q_EMIT processError(errMsg);
-    if (hasParent()) {
-      LOG(ERROR) << "notifying parent operation..";
-      throw; // notify parent
-    }
-  }
-  catch (const std::exception& e) {
-    QString errMsg = QString("Caught std exception: %1").arg(e.what());
-    LOG(ERROR) << errMsg;
-    Q_EMIT processError(errMsg);
-    if (hasParent()) {
-      LOG(ERROR) << "notifying parent operation..";
-      throw; // notify parent
-    }
-  }
-}
-
-void ZImgProcess::runInPython()
-{
-  auto fileDestination = createFileLogSink(m_logFile);
-  if (fileDestination) {
-    addLogSink(fileDestination);
-  }
-  auto guard1 = folly::makeGuard([&fileDestination]() {
-    if (fileDestination) {
-      removeLogSink(fileDestination);
-    }
-  });
-
-  try {
-    LOG(INFO) << "run " << QThread::currentThreadId();
-    doWork();
-    Q_EMIT finished();
-  }
-  catch (const itk::ProcessAborted& e) {
-    LOG(ERROR) << "Process Aborted by User. " << e.what();
-    if (hasParent()) {
-      LOG(ERROR) << "notifying parent operation..";
-    }
-    throw ZException(e.what());
-  }
-  catch (const itk::ExceptionObject& excp) {
-    LOG(ERROR) << "Caught itk exception: " << excp.what();
-    if (hasParent()) {
-      LOG(ERROR) << "notifying parent operation..";
-    }
-    throw ZException(excp.what());
+    LOG(ERROR) << "Cancelled by user";
+    throw;
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Caught ZException: " << e.what();
-    if (hasParent()) {
-      LOG(ERROR) << "notifying parent operation..";
-    }
     throw;
   }
   catch (const std::exception& e) {
     LOG(ERROR) << "Caught std exception: " << e.what();
-    if (hasParent()) {
-      LOG(ERROR) << "notifying parent operation..";
-    }
-    throw;
+    throw ZException(QString("Caught std exception: %1").arg(e.what()));
   }
 }
 

@@ -461,7 +461,7 @@ void stnTrajectory()
 
       ZImgGraph imgGraph(projection);
       imgGraph.setConnectivity(26);
-      ZImgAutoThreshold<> imgAutoThre;
+      ZImgAutoThreshold imgAutoThre;
       double cent1 = 0;
       double cent2 = 0;
       auto thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, projection);

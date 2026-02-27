@@ -5,8 +5,7 @@
 
 namespace nim {
 
-template<bool ReportProgress>
-ZImg ZImgFillHole<ReportProgress>::run(const ZImg& img)
+ZImg ZImgFillHole::run(const ZImg& img)
 {
   ZImg res = img;
 
@@ -20,9 +19,8 @@ ZImg ZImgFillHole<ReportProgress>::run(const ZImg& img)
   return res;
 }
 
-template<bool ReportProgress>
 template<typename TITKImg>
-void ZImgFillHole<ReportProgress>::run_Impl(TITKImg* itkimg, ZImg& res, size_t c, size_t t)
+void ZImgFillHole::run_Impl(TITKImg* itkimg, ZImg& res, size_t c, size_t t)
 {
   using BinaryFillHoleFilterType = itk::BinaryFillholeImageFilter<TITKImg>;
   typename BinaryFillHoleFilterType::Pointer bfhFilter = BinaryFillHoleFilterType::New();
@@ -35,9 +33,5 @@ void ZImgFillHole<ReportProgress>::run_Impl(TITKImg* itkimg, ZImg& res, size_t c
   bfhFilter->Update();
   copyITKImgToMemory(bfhFilter->GetOutput(), res.channelData<typename TITKImg::PixelType>(c, t));
 }
-
-template class ZImgFillHole<true>;
-
-template class ZImgFillHole<false>;
 
 } // namespace nim

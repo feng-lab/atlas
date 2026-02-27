@@ -1,29 +1,27 @@
 #pragma once
 
-// base class for all img process, template parameter ReportProgress are used to
-// control whether progress will be reported in compile-time
-// By default progress report are turned off
-// There should be no overhead because compiler should optimize
-// all those empty functions call out
-
 #include "zcpuinfo.h"
 #include "zglobal.h"
-#include <QObject>
+
+#include <cstddef>
 #include <folly/CancellationToken.h>
-#include <memory>
-#include <map>
-#include <set>
 #include <functional>
+#include <map>
+#include <memory>
 
 namespace nim {
 
-class ZImgAlgorithmBaseWithProgressReporter : public QObject
+// Base class for image algorithms that may report progress and support cancellation.
+//
+// Design goals:
+// - Keep the algorithm-facing API small (reportProgress + optional sub-operation tracking).
+// - Keep overhead low when neither progress nor cancellation is used.
+// - Avoid QObject coupling so algorithms can run on any executor/thread.
+class ZImgAlgorithm
 {
-  Q_OBJECT
-
 public:
-  ZImgAlgorithmBaseWithProgressReporter();
-  ~ZImgAlgorithmBaseWithProgressReporter() override;
+  ZImgAlgorithm();
+  virtual ~ZImgAlgorithm();
 
   // default report 1 percent change
   // larger value can reduce the number of signals
@@ -46,21 +44,19 @@ public:
     m_cancellationToken = token;
   }
 
-Q_SIGNALS:
-  // progress from 1 to 100, used for QProgressbar
-  void progressChanged(int);
-
-  // progress from 0.0 to 1.0
-  void progressChanged(double, void* sender);
+  // Progress callback from 0.0 to 1.0. This is invoked only for the top-level operation.
+  // Sub-operations report progress through their parent via registerSubOperation().
+  void setProgressCallback(std::function<void(double)> cb)
+  {
+    m_progressCallback = std::move(cb);
+  }
 
 protected:
-  void subOperationProgressChanged(double p, void* sender);
-
   // progress from 0.0 to 1.0
   void reportProgress(double progress);
 
   // will change the progress interval of internal operation
-  void registerSubOperation(ZImgAlgorithmBaseWithProgressReporter* sender, double weight);
+  void registerSubOperation(ZImgAlgorithm* sender, double weight);
 
   // Register an external operation that reports progress via callbacks (e.g. a third-party filter).
   // `sender` must remain alive for the duration of the operation.
@@ -70,19 +66,22 @@ protected:
 
   [[nodiscard]] bool hasParent() const
   {
-    return m_parent;
+    return m_parent != nullptr;
   }
 
  private:
   class ExternalProgressCommand;
   struct ExternalProgressObserverState;
 
+  void subOperationProgressChanged(double p, ZImgAlgorithm* sender);
+  void externalOperationProgressChanged(double p, void* sender);
+
   // calculate and send signal
   void sendProgressSignal();
 
   std::unique_ptr<ExternalProgressObserverState> m_externalProgressObserver;
 
-  void setParent(ZImgAlgorithmBaseWithProgressReporter* p)
+  void setParent(ZImgAlgorithm* p)
   {
     m_parent = p;
   }
@@ -99,59 +98,17 @@ protected:
     double progress;
   };
 
-  std::map<void*, WeightProgress> m_subOperationsWeightProgress;
+  std::map<ZImgAlgorithm*, WeightProgress> m_subOperationsWeightProgress;
+  std::map<void*, WeightProgress> m_externalOperationsWeightProgress;
   double m_weight = 1;
   double m_progress = 0;
   double m_reportInterval = 0.01;
-  ZImgAlgorithmBaseWithProgressReporter* m_parent = nullptr;
+  ZImgAlgorithm* m_parent = nullptr;
 
   size_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
 
   folly::CancellationToken m_cancellationToken;
+  std::function<void(double)> m_progressCallback;
 };
-
-class ZImgAlgorithmBase
-{
-public:
-  ZImgAlgorithmBase() = default;
-  ZImgAlgorithmBase(const ZImgAlgorithmBase&) = delete;
-  ZImgAlgorithmBase& operator=(const ZImgAlgorithmBase&) = delete;
-  ZImgAlgorithmBase(ZImgAlgorithmBase&&) = default;
-  ZImgAlgorithmBase& operator=(ZImgAlgorithmBase&&) = default;
-
-protected:
-  virtual ~ZImgAlgorithmBase() = default;
-
-  void setCancelFlag(bool*) {}
-
-  void setProgressReportInterval(double) {}
-
-  void setTotalSubOperationWeight(double) {}
-
-  void reportProgress(double) {}
-
-  // will change the progress interval of internal operation
-  void registerSubOperation(void*, double) {}
-
-  void registerSubOperationExternal(void*, double) {}
-
-  void clearRegisteredSubOperations() {}
-
-  void setNumberOfThreads(size_t n)
-  {
-    m_numThreads = n;
-  }
-
-protected:
-  size_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
-};
-
-template<bool ReportProgress = false>
-class ZImgAlgorithm : public ZImgAlgorithmBase
-{};
-
-template<>
-class ZImgAlgorithm<true> : public ZImgAlgorithmBaseWithProgressReporter
-{};
 
 } // namespace nim

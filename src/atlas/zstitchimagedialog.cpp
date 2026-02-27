@@ -8,6 +8,7 @@
 #include "zfileutils.h"
 #include "zlogwidget.h"
 #include "ztheme.h"
+#include "zdoc.h"
 #include <QtWidgets>
 
 namespace nim {
@@ -214,8 +215,8 @@ void ZTileImageWidget::zoomOut()
   }
 }
 
-ZStitchImageDialog::ZStitchImageDialog(QWidget* parent)
-  : ZImgProcessDialog(parent)
+ZStitchImageDialog::ZStitchImageDialog(ZDoc& doc, QWidget* parent)
+  : ZImgProcessDialog(doc, parent)
 {
   m_nSel = -100;
 
@@ -243,191 +244,86 @@ ZStitchImageDialog::~ZStitchImageDialog()
   m_tileList.clear();
 }
 
-void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
+ZImgProcessDialog::WorkerSpec ZStitchImageDialog::createWorkerSpec()
 {
-  focusNextChild();
-
   QString resFilename = m_outputFileEdit->text();
 
+  const QStringList inputStack1Filenames = m_inputStack1Filenames;
+  const QStringList inputStack2Filenames = m_inputStack2Filenames;
+
   bool hasStack2 = false;
-  if (m_inputStack1Filenames.isEmpty()) {
+  if (inputStack1Filenames.isEmpty()) {
     throw ZException("no input");
   } else if (m_hasTwoInputStackSetCheckBox->isChecked()) {
-    if (m_inputStack2Filenames.size() != m_inputStack1Filenames.size()) {
+    if (inputStack2Filenames.size() != inputStack1Filenames.size()) {
       throw ZException("input 2 has different number of files than input 1");
     }
     hasStack2 = true;
   }
 
-  auto info = ZImg::readImgInfo(ZImgSource(m_inputStack1Filenames[0], ZImgRegion(), 0));
+  const ZImgInfo info = ZImg::readImgInfo(ZImgSource(inputStack1Filenames[0], ZImgRegion(), 0));
   ZImgInfo info2;
   if (hasStack2) {
-    info2 = ZImg::readImgInfo(ZImgSource(m_inputStack2Filenames[0], ZImgRegion(), 0));
+    info2 = ZImg::readImgInfo(ZImgSource(inputStack2Filenames[0], ZImgRegion(), 0));
   }
 
-  auto* workertmp = new ZStitchImage();
-  workertmp->setInputFilenames(m_inputStack1Filenames, m_scene1ComboBox->currentIndex());
-  workertmp->setResultFilename(resFilename);
+  const int scene1 = m_scene1ComboBox->currentIndex();
+  const int scene2 = m_scene2ComboBox->currentIndex();
 
-  if (m_channel1ComboBox->currentIndex() == 1) { // use ch0 and ch1
-    std::vector<size_t> chs;
-    chs.push_back(0);
-    chs.push_back(1);
-    workertmp->setUseChannels(chs);
-  } else if (m_channel1ComboBox->currentIndex() > 1) {
-    std::vector<size_t> chs;
-    chs.push_back(m_channel1ComboBox->currentIndex() - 2);
-    workertmp->setUseChannels(chs);
-  }
+  const int channel1Index = m_channel1ComboBox->currentIndex();
+  const int bgsub1Index = m_bgsub1ComboBox->currentIndex();
 
-  if (m_bgsub1ComboBox->currentIndex() == 1) {
-    std::vector<size_t> chs;
-    for (size_t c = 0; c < info.numChannels; ++c) {
-      chs.push_back(c);
-    }
-    workertmp->setRemoveBackgroundForChannels(chs);
-  } else if (m_bgsub1ComboBox->currentIndex() > 1) {
-    std::vector<size_t> chs;
-    chs.push_back(m_bgsub1ComboBox->currentIndex() - 2);
-    workertmp->setRemoveBackgroundForChannels(chs);
-  }
+  const int channel2Index = m_channel2ComboBox->currentIndex();
+  const int bgsub2Index = m_bgsub2ComboBox->currentIndex();
 
-  if (hasStack2) {
-    std::vector<size_t> chsToUse;
-    std::vector<size_t> chsToRB;
+  const int commonChannel1 = m_commonChannel1SpinBox->value() - 1;
+  const int commonChannel2 = m_commonChannel2SpinBox->value() - 1;
 
-    if (m_channel2ComboBox->currentIndex() == 1) { // use ch0 and ch1
-      chsToUse.push_back(0);
-      chsToUse.push_back(1);
-    } else if (m_channel2ComboBox->currentIndex() > 1) {
-      chsToUse.push_back(m_channel2ComboBox->currentIndex() - 2);
-    }
+  const bool downsampleBeforeStitching = m_dsCheckBox->isChecked();
+  const int dsX = m_dsXSpinBox->value();
+  const int dsY = m_dsYSpinBox->value();
+  const int dsZ = m_dsZSpinBox->value();
 
-    if (m_bgsub2ComboBox->currentIndex() == 1) {
-      for (size_t c = 0; c < info2.numChannels; ++c) {
-        chsToRB.push_back(c);
-      }
-    } else if (m_bgsub2ComboBox->currentIndex() > 1) {
-      chsToRB.push_back(m_bgsub2ComboBox->currentIndex() - 2);
-    }
+  const int mergeModeIndex = m_mergeModeComboBox->currentIndex();
+  const bool concatOnly = m_concatOnlyCheckBox->isChecked();
 
-    workertmp->set2ndInput(m_inputStack2Filenames,
-                           m_scene2ComboBox->currentIndex(),
-                           chsToUse,
-                           chsToRB,
-                           m_commonChannel1SpinBox->value() - 1,
-                           m_commonChannel2SpinBox->value() - 1);
-  }
+  const int startResX = m_intvXSpinBox->value();
+  const int startResY = m_intvYSpinBox->value();
+  const int startResZ = m_intvZSpinBox->value();
 
-  if (m_dsCheckBox->isChecked()) {
-    workertmp->setDownsampleBeforeStitching(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value());
-  }
+  const QString logFile = resFilename + "_stitching_log.txt";
+  const double maxOverlapRate = m_overlapRateSpinBox->value() / 100.0;
 
-  ImgMergeMode mergeMode;
-  if (m_mergeModeComboBox->currentIndex() == 0) {
-    mergeMode = ImgMergeMode::Max;
-  } else if (m_mergeModeComboBox->currentIndex() == 1) {
-    mergeMode = ImgMergeMode::Min;
-  } else if (m_mergeModeComboBox->currentIndex() == 2) {
-    mergeMode = ImgMergeMode::Mean;
-  } else if (m_mergeModeComboBox->currentIndex() == 3) {
-    mergeMode = ImgMergeMode::Median;
-  } else {
-    mergeMode = ImgMergeMode::First;
-  }
-  workertmp->setMergeMode(mergeMode);
+  const bool useConfig = m_useConfigRadioButton->isChecked();
+  const bool useTileImage = m_useTileImageRadioButton->isChecked();
+  const bool useConnFile = m_useConnFileRadioButton->isChecked();
+  const bool useFullConnection = m_useFullConnectionRadioButton->isChecked();
+  const bool useLayout = m_useLayoutRadioButton->isChecked();
+  const bool restitchCzi = m_restitchCZIRadioButton->isChecked();
 
-  if (m_concatOnlyCheckBox->isChecked()) {
-    workertmp->setConcatenateOnly();
-  }
+  const int configDim1Index = m_configDim1ComboBox->currentIndex();
+  const int configDim2Index = m_configDim2ComboBox->currentIndex();
+  const int configDim3Index = m_configDim3ComboBox->currentIndex();
 
-  workertmp->setStartResolution(m_intvXSpinBox->value(), m_intvYSpinBox->value(), m_intvZSpinBox->value());
+  const QString connFilePath = m_connFileEdit->text();
+  const int layoutRows = m_layout1SpinBox->value();
+  const int layoutCols = m_layout2SpinBox->value();
 
-  workertmp->setLogFile(resFilename + "_stitching_log.txt");
+  const std::vector<std::vector<size_t>> tileMatrix = m_tileMatrix;
+  const std::vector<ZTile> tileList = m_tileList;
 
-  workertmp->setMaxOverlapRate(m_overlapRateSpinBox->value() / 100.0);
-
-  if (m_useConfigRadioButton->isChecked()) {
-    ZImg tileGrid(ZImgInfo(3, 3, 3, 1, 1, 4, VoxelFormat::Signed));
-    tileGrid.fill(0);
-    tileGrid.setValue(1, ZVoxelCoordinate(1, 1, 1)); // set first tile into middle of 3x3x3 grid
-    ZVoxelCoordinate coord2(1, 1, 1);
-
-    if (m_configDim1ComboBox->currentIndex() == 0) {
-      coord2.x -= 1;
-    } else if (m_configDim1ComboBox->currentIndex() == 2) {
-      coord2.x += 1;
-    }
-
-    if (m_configDim2ComboBox->currentIndex() == 0) {
-      coord2.y -= 1;
-    } else if (m_configDim2ComboBox->currentIndex() == 2) {
-      coord2.y += 1;
-    }
-
-    if (m_configDim3ComboBox->currentIndex() == 0) {
-      coord2.z -= 1;
-    } else if (m_configDim3ComboBox->currentIndex() == 2) {
-      coord2.z += 1;
-    }
-
-    if (coord2.x == 1 && coord2.y == 1 && coord2.z == 1) {
-      workertmp->setBlindStitching();
-    } else {
-      tileGrid.setValue(2, coord2);
-      workertmp->setTileGrid(tileGrid);
-    }
-  } else if (m_useTileImageRadioButton->isChecked()) {
-    if (m_tileMatrix.empty() || m_tileList.empty()) {
-      throw ZException("no tile selection image");
-    }
-    size_t numCols = m_tileMatrix[0].size();
-    size_t numRows = m_tileMatrix.size();
-    ZImg tileGrid(ZImgInfo(numCols, numRows, 1, 1, 1, 4, VoxelFormat::Signed));
-    tileGrid.fill(0);
-
-    for (size_t r = 0; r < numRows; ++r) {
-      for (size_t c = 0; c < numCols; ++c) {
-        if (m_tileMatrix[r][c] > 0 && m_tileList[m_tileMatrix[r][c] - 1].bIsSelected) {
-          tileGrid.setValue(m_tileMatrix[r][c], ZVoxelCoordinate(c, r));
-        }
-      }
-    }
-
-    workertmp->setTileGrid(tileGrid);
-  } else if (m_useConnFileRadioButton->isChecked()) {
-    if (m_connFileEdit->text().isEmpty()) {
-      throw ZException("no conn text file");
-    }
-    workertmp->setConnInfoFromConnTextFile(m_connFileEdit->text());
-  } else if (m_useFullConnectionRadioButton->isChecked()) {
-    workertmp->setBlindStitching();
-  } else if (m_useLayoutRadioButton->isChecked()) {
-    int row = m_layout1SpinBox->value();
-    int col = m_layout2SpinBox->value();
-    workertmp->setTileGridFromLayout(row, col);
-  } else if (m_restitchCZIRadioButton->isChecked()) {
-    workertmp->setRestitch();
-  }
-
-  connect(workertmp, &ZStitchImage::resultReady, this, &ZStitchImageDialog::resultReady);
-
-  worker = workertmp;
-  workerName = "Stitching";
-
-  if (m_useTileImageRadioButton->isChecked() && !m_tileImage.isNull()) {
-    QString selectionImageOutputName = m_outputFileEdit->text();
+  if (useTileImage && !m_tileImage.isNull()) {
+    QString selectionImageOutputName = resFilename;
     selectionImageOutputName.append("_TileSelectionInfo.tif");
     QImage image(m_tileImage);
 
     QPainter painter(&image);
-    for (size_t i = 0; i < m_tileList.size(); ++i) {
-      QRect rect = QRect(m_tileList.at(i).region.topLeft(), m_tileList.at(i).region.bottomRight());
-      if (m_tileList.at(i).bIsSelected) {
-        // painter.fillRect(rect, QColor(255, 255, 0, 128));
+    for (size_t i = 0; i < tileList.size(); ++i) {
+      QRect rect = QRect(tileList.at(i).region.topLeft(), tileList.at(i).region.bottomRight());
+      if (tileList.at(i).bIsSelected) {
         painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
-        auto tl = rect.topLeft();
-        auto br = rect.bottomRight();
+        const auto tl = rect.topLeft();
+        const auto br = rect.bottomRight();
         painter.drawRect(QRectF(tl.x() - 4, tl.y() - 4, br.x() - tl.x() + 5, br.y() - tl.y() + 1 + 4));
       }
       QString str = QString("Image %1").arg(i + 1);
@@ -436,6 +332,204 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
     ZImgQtUtils::fromQImage(image).save(selectionImageOutputName);
     LOG(INFO) << QString("%1 saved.").arg(selectionImageOutputName);
   }
+
+  WorkerSpec spec;
+  spec.workerName = QStringLiteral("Stitching");
+  spec.taskTitle = QStringLiteral("%1 -> %2").arg(spec.workerName, QFileInfo(resFilename).fileName());
+  spec.successMessage = QStringLiteral("wrote %1").arg(QFileInfo(resFilename).fileName());
+
+  spec.makeWorker = [inputStack1Filenames,
+                     inputStack2Filenames,
+                     hasStack2,
+                     scene1,
+                     scene2,
+                     resFilename,
+                     channel1Index,
+                     bgsub1Index,
+                     channel2Index,
+                     bgsub2Index,
+                     info,
+                     info2,
+                     commonChannel1,
+                     commonChannel2,
+                     downsampleBeforeStitching,
+                     dsX,
+                     dsY,
+                     dsZ,
+                     mergeModeIndex,
+                     concatOnly,
+                     startResX,
+                     startResY,
+                     startResZ,
+                     logFile,
+                     maxOverlapRate,
+                     useConfig,
+                     useTileImage,
+                     useConnFile,
+                     useFullConnection,
+                     useLayout,
+                     restitchCzi,
+                     configDim1Index,
+                     configDim2Index,
+                     configDim3Index,
+                     connFilePath,
+                     layoutRows,
+                     layoutCols,
+                     tileMatrix,
+                     tileList]() mutable -> std::unique_ptr<ZImgProcess> {
+    auto worker = std::make_unique<ZStitchImage>();
+    worker->setInputFilenames(inputStack1Filenames, scene1);
+    worker->setResultFilename(resFilename);
+
+    if (channel1Index == 1) {
+      std::vector<size_t> chs;
+      chs.push_back(0);
+      chs.push_back(1);
+      worker->setUseChannels(chs);
+    } else if (channel1Index > 1) {
+      std::vector<size_t> chs;
+      chs.push_back(static_cast<size_t>(channel1Index - 2));
+      worker->setUseChannels(chs);
+    }
+
+    if (bgsub1Index == 1) {
+      std::vector<size_t> chs;
+      for (size_t c = 0; c < info.numChannels; ++c) {
+        chs.push_back(c);
+      }
+      worker->setRemoveBackgroundForChannels(chs);
+    } else if (bgsub1Index > 1) {
+      std::vector<size_t> chs;
+      chs.push_back(static_cast<size_t>(bgsub1Index - 2));
+      worker->setRemoveBackgroundForChannels(chs);
+    }
+
+    if (hasStack2) {
+      std::vector<size_t> chsToUse;
+      std::vector<size_t> chsToRB;
+
+      if (channel2Index == 1) {
+        chsToUse.push_back(0);
+        chsToUse.push_back(1);
+      } else if (channel2Index > 1) {
+        chsToUse.push_back(static_cast<size_t>(channel2Index - 2));
+      }
+
+      if (bgsub2Index == 1) {
+        for (size_t c = 0; c < info2.numChannels; ++c) {
+          chsToRB.push_back(c);
+        }
+      } else if (bgsub2Index > 1) {
+        chsToRB.push_back(static_cast<size_t>(bgsub2Index - 2));
+      }
+
+      worker->set2ndInput(inputStack2Filenames,
+                          scene2,
+                          chsToUse,
+                          chsToRB,
+                          static_cast<size_t>(commonChannel1),
+                          static_cast<size_t>(commonChannel2));
+    }
+
+    if (downsampleBeforeStitching) {
+      worker->setDownsampleBeforeStitching(static_cast<size_t>(dsX),
+                                           static_cast<size_t>(dsY),
+                                           static_cast<size_t>(dsZ));
+    }
+
+    ImgMergeMode mergeMode;
+    if (mergeModeIndex == 0) {
+      mergeMode = ImgMergeMode::Max;
+    } else if (mergeModeIndex == 1) {
+      mergeMode = ImgMergeMode::Min;
+    } else if (mergeModeIndex == 2) {
+      mergeMode = ImgMergeMode::Mean;
+    } else if (mergeModeIndex == 3) {
+      mergeMode = ImgMergeMode::Median;
+    } else {
+      mergeMode = ImgMergeMode::First;
+    }
+    worker->setMergeMode(mergeMode);
+
+    if (concatOnly) {
+      worker->setConcatenateOnly();
+    }
+
+    worker->setStartResolution(static_cast<size_t>(startResX),
+                               static_cast<size_t>(startResY),
+                               static_cast<size_t>(startResZ));
+    worker->setLogFile(logFile);
+    worker->setMaxOverlapRate(maxOverlapRate);
+
+    if (useConfig) {
+      ZImg tileGrid(ZImgInfo(3, 3, 3, 1, 1, 4, VoxelFormat::Signed));
+      tileGrid.fill(0);
+      tileGrid.setValue(1, ZVoxelCoordinate(1, 1, 1));
+      ZVoxelCoordinate coord2(1, 1, 1);
+
+      if (configDim1Index == 0) {
+        coord2.x -= 1;
+      } else if (configDim1Index == 2) {
+        coord2.x += 1;
+      }
+
+      if (configDim2Index == 0) {
+        coord2.y -= 1;
+      } else if (configDim2Index == 2) {
+        coord2.y += 1;
+      }
+
+      if (configDim3Index == 0) {
+        coord2.z -= 1;
+      } else if (configDim3Index == 2) {
+        coord2.z += 1;
+      }
+
+      if (coord2.x == 1 && coord2.y == 1 && coord2.z == 1) {
+        worker->setBlindStitching();
+      } else {
+        tileGrid.setValue(2, coord2);
+        worker->setTileGrid(tileGrid);
+      }
+    } else if (useTileImage) {
+      if (tileMatrix.empty() || tileList.empty()) {
+        throw ZException("no tile selection image");
+      }
+      const size_t numCols = tileMatrix[0].size();
+      const size_t numRows = tileMatrix.size();
+      ZImg tileGrid(ZImgInfo(numCols, numRows, 1, 1, 1, 4, VoxelFormat::Signed));
+      tileGrid.fill(0);
+
+      for (size_t r = 0; r < numRows; ++r) {
+        for (size_t c = 0; c < numCols; ++c) {
+          if (tileMatrix[r][c] > 0 && tileList[tileMatrix[r][c] - 1].bIsSelected) {
+            tileGrid.setValue(static_cast<int64_t>(tileMatrix[r][c]), ZVoxelCoordinate(c, r));
+          }
+        }
+      }
+
+      worker->setTileGrid(tileGrid);
+    } else if (useConnFile) {
+      if (connFilePath.isEmpty()) {
+        throw ZException("no conn text file");
+      }
+      worker->setConnInfoFromConnTextFile(connFilePath);
+    } else if (useFullConnection) {
+      worker->setBlindStitching();
+    } else if (useLayout) {
+      worker->setTileGridFromLayout(layoutRows, layoutCols);
+    } else if (restitchCzi) {
+      worker->setRestitch();
+    }
+
+    return worker;
+  };
+
+  spec.onSuccessUi = [resFilename](ZDoc& doc, ZBackgroundTask&) {
+    doc.loadFile(resFilename);
+  };
+
+  return spec;
 }
 
 QLayout* ZStitchImageDialog::createIOLayout()

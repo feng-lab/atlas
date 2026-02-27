@@ -6,8 +6,7 @@
 
 namespace nim {
 
-template<bool ReportProgress = false>
-class ZImgFillHole : public ZImgAlgorithm<ReportProgress>
+class ZImgFillHole : public ZImgAlgorithm
 {
 public:
   // default true

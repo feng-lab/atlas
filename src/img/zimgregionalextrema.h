@@ -6,8 +6,7 @@
 
 namespace nim {
 
-template<bool ReportProgress = false>
-class ZImgRegionalExtrema : public ZImgAlgorithm<ReportProgress>
+class ZImgRegionalExtrema : public ZImgAlgorithm
 {
 public:
   // regional min max

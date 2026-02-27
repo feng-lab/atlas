@@ -5,10 +5,8 @@
 
 namespace nim {
 
-class ZImgProcess : public ZImgAlgorithmBaseWithProgressReporter
+class ZImgProcess : public ZImgAlgorithm
 {
-  Q_OBJECT
-
 public:
   // log output
   void setLogFile(const QString& logFile)
@@ -16,9 +14,8 @@ public:
     m_logFile = logFile;
   }
 
+  // Runs the algorithm synchronously. On error, throws ZException. On cancellation, throws ZCancellationException.
   void run();
-
-  void runInPython();
 
   void loadTask(const QString& file)
   {
@@ -42,11 +39,6 @@ public:
     write(jo);
     return jsonToFormattedString(jo);
   }
-
-Q_SIGNALS:
-  void processError(QString);
-
-  void finished();
 
 protected:
   virtual void doWork() = 0;

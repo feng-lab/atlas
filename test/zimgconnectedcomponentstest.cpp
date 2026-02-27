@@ -9,7 +9,7 @@ TEST(ZImgConnectedComponents, text)
     ZImg img(getTestDataDir().filePath("img/text.tif"));
 
     ZBenchTimer bt;
-    ZImgConnectedComponents<> conncomp;
+    ZImgConnectedComponents conncomp;
     ConnComp CC = conncomp.run(img);
     STOP_AND_LOG(bt)
 
@@ -37,9 +37,18 @@ TEST(ZImgConnectedComponents, text)
     ASSERT_EQ(size_t(61096), CC.voxelIdxList[85][8]);
 
     bt.resetAndStart();
-    ZImgConnectedComponents<true> conncomp1;
-    CC = conncomp1.run(img);
+    ZImgConnectedComponents conncompWithProgress;
+    double lastProgress = 0.0;
+    size_t progressCalls = 0;
+    conncompWithProgress.setProgressCallback([&lastProgress, &progressCalls](double p) {
+      lastProgress = p;
+      ++progressCalls;
+    });
+    CC = conncompWithProgress.run(img);
     STOP_AND_LOG(bt)
+
+    EXPECT_DOUBLE_EQ(lastProgress, 1.0);
+    EXPECT_GT(progressCalls, 0_uz);
 
     ASSERT_EQ(size_t(8), CC.connectivity);
     ASSERT_EQ(size_t(88), CC.voxelIdxList.size());

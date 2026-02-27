@@ -490,6 +490,7 @@ set(SOURCES
     ztracesettingswidget.h ztracesettingswidget.cpp
     zbackgroundtaskmanager.h zbackgroundtaskmanager.cpp
     zbackgroundtaskmanagerwidget.h zbackgroundtaskmanagerwidget.cpp
+    zbackgroundjob.h zbackgroundjob.cpp
     zautotracedialog.h zautotracedialog.cpp
     zobjdoc.h zobjdoc.cpp
     zobjview.h zobjview.cpp

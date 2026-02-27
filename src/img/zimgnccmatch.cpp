@@ -708,7 +708,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
 void ZImgNCCMatch::removeBackground(ZImg& img)
 {
   imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
-    ZImgAutoThreshold<> autoThre;
+    ZImgAutoThreshold autoThre;
     img -= autoThre.typedMaxHistThre<TVoxel>(img);
   });
 }

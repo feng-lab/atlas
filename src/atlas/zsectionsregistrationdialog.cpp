@@ -4,17 +4,17 @@
 #include "zsectionsregistration.h"
 #include "zstringutils.h"
 #include "zsysteminfo.h"
+#include "zdoc.h"
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QMessageBox>
-#include <QThread>
 
 namespace nim {
 
-ZSectionsRegistrationDialog::ZSectionsRegistrationDialog(QWidget* parent)
-  : ZImgProcessDialog(parent)
+ZSectionsRegistrationDialog::ZSectionsRegistrationDialog(ZDoc& doc, QWidget* parent)
+  : ZImgProcessDialog(doc, parent)
   , m_useCurrentActiveImage("Use Current Active Image", false)
   , m_openLoadedStack("Open Original Image Sequence", true)
   , m_openStackAfterRegistering("Open Result Image After Registering", true)
@@ -36,10 +36,8 @@ ZSectionsRegistrationDialog::ZSectionsRegistrationDialog(QWidget* parent)
   init();
 }
 
-void ZSectionsRegistrationDialog::createWorker(ZImgProcess*& worker, QString& workerName)
+ZImgProcessDialog::WorkerSpec ZSectionsRegistrationDialog::createWorkerSpec()
 {
-  focusNextChild();
-
   if (m_inputImagesFileWidget->getSelectedMultipleOpenFiles().isEmpty()) {
     throw ZException(QString("No input images. Abort."));
   }
@@ -52,28 +50,62 @@ void ZSectionsRegistrationDialog::createWorker(ZImgProcess*& worker, QString& wo
 
   int refChannel = m_referenceChannel.associatedData() - 1;
 
-  auto workertmp = new ZSectionsRegistration(m_inputImagesFileWidget->getSelectedMultipleOpenFiles(),
-                                             m_outputStackWidget->getSelectedSaveFile(),
-                                             m_referenceImageIndex.get());
-  if (refChannel >= 0) {
-    workertmp->setReferenceChannel(refChannel);
-  }
-  workertmp->setRemoveBackground(m_removeBackground.get());
-  workertmp->setRemoveHighForeground(m_removeHighForeground.get());
-  workertmp->setAllowFlip(m_allowFlip.get());
-  workertmp->setBrightBackground(m_brightBackground.get());
-  workertmp->setMetric(m_metric.get());
-  workertmp->setTransform(m_transform.get());
-  workertmp->setOptimizer(m_optimizer.get());
-  workertmp->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
-  workertmp->setNumScales(m_numScales.get());
-  workertmp->setNumNeighbors(m_numNeighbors.get());
-  if (m_openStackAfterRegistering.get()) {
-    connect(workertmp, &ZSectionsRegistration::resultReady, this, &ZSectionsRegistrationDialog::resultReady);
-  }
+  const QStringList inputPaths = m_inputImagesFileWidget->getSelectedMultipleOpenFiles();
+  const QString outputPath = m_outputStackWidget->getSelectedSaveFile();
+  const QString logPath = m_outputLogFileWidget->getSelectedSaveFile();
 
-  worker = workertmp;
-  workerName = "Sections Registration";
+  const int referenceImageIndex = m_referenceImageIndex.get();
+  const bool removeBackground = m_removeBackground.get();
+  const bool removeHighForeground = m_removeHighForeground.get();
+  const bool allowFlip = m_allowFlip.get();
+  const bool brightBackground = m_brightBackground.get();
+  const QString metric = m_metric.get();
+  const QString transform = m_transform.get();
+  const QString optimizer = m_optimizer.get();
+  const size_t numScales = static_cast<size_t>(m_numScales.get());
+  const int numNeighbors = m_numNeighbors.get();
+  const bool openResult = m_openStackAfterRegistering.get();
+
+  WorkerSpec spec;
+  spec.workerName = QStringLiteral("Sections Registration");
+  spec.taskTitle = QStringLiteral("%1 -> %2").arg(spec.workerName, QFileInfo(outputPath).fileName());
+  spec.successMessage = QStringLiteral("wrote %1").arg(QFileInfo(outputPath).fileName());
+  spec.makeWorker = [inputPaths,
+                     outputPath,
+                     referenceImageIndex,
+                     refChannel,
+                     removeBackground,
+                     removeHighForeground,
+                     allowFlip,
+                     brightBackground,
+                     metric,
+                     transform,
+                     optimizer,
+                     logPath,
+                     numScales,
+                     numNeighbors]() -> std::unique_ptr<ZImgProcess> {
+    auto worker = std::make_unique<ZSectionsRegistration>(inputPaths, outputPath, referenceImageIndex);
+    if (refChannel >= 0) {
+      worker->setReferenceChannel(refChannel);
+    }
+    worker->setRemoveBackground(removeBackground);
+    worker->setRemoveHighForeground(removeHighForeground);
+    worker->setAllowFlip(allowFlip);
+    worker->setBrightBackground(brightBackground);
+    worker->setMetric(metric);
+    worker->setTransform(transform);
+    worker->setOptimizer(optimizer);
+    worker->setLogFile(logPath);
+    worker->setNumScales(numScales);
+    worker->setNumNeighbors(numNeighbors);
+    return worker;
+  };
+  if (openResult) {
+    spec.onSuccessUi = [outputPath](ZDoc& doc, ZBackgroundTask&) {
+      doc.loadFile(outputPath);
+    };
+  }
+  return spec;
 }
 
 void ZSectionsRegistrationDialog::adjustInputImageWidget()

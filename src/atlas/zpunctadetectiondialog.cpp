@@ -12,12 +12,11 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QPushButton>
-#include <QThread>
 
 namespace nim {
 
-ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget* parent)
-  : ZImgProcessDialog(parent)
+ZPunctaDetectionDialog::ZPunctaDetectionDialog(ZDoc& doc, QWidget* parent)
+  : ZImgProcessDialog(doc, parent)
   , m_useCurrentActiveImage("Use Current Active Image", false)
   , m_voxelSize("Voxel Size (um)", glm::dvec3(.0, .0, .0), glm::dvec3(.0, .0, .0), glm::dvec3(1e6, 1e6, 1e6))
   , m_punctaChannel("Puncta Channel", nullptr, "Ch")
@@ -31,23 +30,26 @@ ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget* parent)
   init();
 }
 
-void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerName)
+ZImgProcessDialog::WorkerSpec ZPunctaDetectionDialog::createWorkerSpec()
 {
   focusNextChild();
   ZImgInfo imgInfo;
 
-  if (!m_useCurrentActiveImage.get() && QFile::exists(m_inputImageFileWidget->getSelectedOpenFile())) {
-    imgInfo = ZImg::readImgInfos(m_inputImageFileWidget->getSelectedOpenFile()).at(0);
+  const QString inputImagePath = m_inputImageFileWidget->getSelectedOpenFile();
+  if (!m_useCurrentActiveImage.get() && QFile::exists(inputImagePath)) {
+    imgInfo = ZImg::readImgInfos(inputImagePath).at(0);
   } else {
     throw ZException(QString("No Image to detect."));
   }
   if (imgInfo.numTimes != 1) {
     throw ZException(QString("Can not detect puncta from time sequence image."));
   }
-  if (m_outputPunctaFileWidget->getSelectedSaveFile().isEmpty()) {
+  const QString outPunctaPath = m_outputPunctaFileWidget->getSelectedSaveFile();
+  if (outPunctaPath.isEmpty()) {
     throw ZException(QString("Result puncta file must be specified."));
   }
-  if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
+  const QString outLogPath = m_outputLogFileWidget->getSelectedSaveFile();
+  if (outLogPath.isEmpty()) {
     throw ZException(QString("Detection log file must be specified."));
   }
   int punctaChannel = m_punctaChannel.get() - 1;
@@ -55,6 +57,10 @@ void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerN
   if (punctaChannel == dendriteChannel) {
     throw ZException(QString("Puncta and dendrite channels are not correct."));
   }
+
+  const bool haveDendriteChannel = dendriteChannel >= 0;
+  const QString outSomaPunctaPath = m_outputSomaPunctaFileWidget->getSelectedSaveFile();
+
   if (dendriteChannel >= 0) {
     if (m_voxelSize.get().x == 0.0 || m_voxelSize.get().y == 0.0 || m_voxelSize.get().z == 0.0) {
       throw ZException(QString("Image Resolution is not correct."));
@@ -65,30 +71,56 @@ void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerN
     imgInfo.voxelSizeZ = m_voxelSize.get().z;
   }
 
-  auto workertmp = new ZPunctaDetection(m_inputImageFileWidget->getSelectedOpenFile(), imgInfo, punctaChannel);
-  workertmp->setAmbiguousFactor(m_ambiguousFactor.get());
-  if (dendriteChannel >= 0) {
-    workertmp->setDendriteChannel(dendriteChannel);
-  }
-  workertmp->setSwcFiles(m_inputSwcFilesWidget->getSelectedMultipleOpenFiles());
-  workertmp->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
-  workertmp->setResultPunctaFilename(m_outputPunctaFileWidget->getSelectedSaveFile());
-  if (dendriteChannel >= 0) {
-    workertmp->setResultSomaPunctaFilename(m_outputSomaPunctaFileWidget->getSelectedSaveFile());
-  }
-  if (m_punctaThreshold.get() != -1) {
-    workertmp->setPunctaThreshold(m_punctaThreshold.get());
-  }
-  if (m_somaPunctaThreshold.get() != -1) {
-    workertmp->setSomaPunctaThreshold(m_somaPunctaThreshold.get());
-  }
-  if (dendriteChannel >= 0) {
-    workertmp->setDendriteThreshold(m_tubeThreshold.get());
-  }
-  workertmp->setMaxDistToBranchInUm(m_maxDistToBranchInUm.get());
+  const QStringList inputSwcPaths = m_inputSwcFilesWidget->getSelectedMultipleOpenFiles();
+  const double ambiguousFactor = m_ambiguousFactor.get();
+  const int punctaThreshold = m_punctaThreshold.get();
+  const int somaPunctaThreshold = m_somaPunctaThreshold.get();
+  const int tubeThreshold = m_tubeThreshold.get();
+  const double maxDistToBranchInUm = m_maxDistToBranchInUm.get();
 
-  worker = workertmp;
-  workerName = "Puncta Detection";
+  WorkerSpec spec;
+  spec.workerName = QStringLiteral("Puncta Detection");
+  spec.taskTitle = QStringLiteral("%1 -> %2").arg(spec.workerName, QFileInfo(outPunctaPath).fileName());
+  spec.successMessage = QStringLiteral("wrote %1").arg(QFileInfo(outPunctaPath).fileName());
+  spec.makeWorker = [inputImagePath,
+                     imgInfo,
+                     punctaChannel,
+                     ambiguousFactor,
+                     haveDendriteChannel,
+                     dendriteChannel,
+                     inputSwcPaths,
+                     outLogPath,
+                     outPunctaPath,
+                     outSomaPunctaPath,
+                     punctaThreshold,
+                     somaPunctaThreshold,
+                     tubeThreshold,
+                     maxDistToBranchInUm]() mutable -> std::unique_ptr<ZImgProcess> {
+    auto worker = std::make_unique<ZPunctaDetection>(inputImagePath, imgInfo, punctaChannel);
+    worker->setAmbiguousFactor(ambiguousFactor);
+    if (haveDendriteChannel) {
+      worker->setDendriteChannel(dendriteChannel);
+    }
+    worker->setSwcFiles(inputSwcPaths);
+    worker->setLogFile(outLogPath);
+    worker->setResultPunctaFilename(outPunctaPath);
+    if (haveDendriteChannel) {
+      worker->setResultSomaPunctaFilename(outSomaPunctaPath);
+    }
+    if (punctaThreshold != -1) {
+      worker->setPunctaThreshold(punctaThreshold);
+    }
+    if (somaPunctaThreshold != -1) {
+      worker->setSomaPunctaThreshold(somaPunctaThreshold);
+    }
+    if (haveDendriteChannel) {
+      worker->setDendriteThreshold(tubeThreshold);
+    }
+    worker->setMaxDistToBranchInUm(maxDistToBranchInUm);
+    return worker;
+  };
+
+  return spec;
 }
 
 void ZPunctaDetectionDialog::adjustInputImageWidget()

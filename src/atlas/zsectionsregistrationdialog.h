@@ -16,13 +16,10 @@ class ZSectionsRegistrationDialog : public ZImgProcessDialog
   Q_OBJECT
 
 public:
-  explicit ZSectionsRegistrationDialog(QWidget* parent = nullptr);
-
-Q_SIGNALS:
-  void resultReady(QString path);
+  explicit ZSectionsRegistrationDialog(ZDoc& doc, QWidget* parent = nullptr);
 
 protected:
-  void createWorker(ZImgProcess*& worker, QString& workerName) override;
+  WorkerSpec createWorkerSpec() override;
 
 private:
   void adjustInputImageWidget();

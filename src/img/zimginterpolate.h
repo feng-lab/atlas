@@ -6,8 +6,7 @@
 
 namespace nim {
 
-template<bool ReportProgress = false>
-class ZImgInterpolate : public ZImgAlgorithm<ReportProgress>
+class ZImgInterpolate : public ZImgAlgorithm
 {
 public:
   ZImg run(const ZImg& img);

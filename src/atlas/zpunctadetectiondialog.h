@@ -10,16 +10,17 @@
 namespace nim {
 
 class ZImg;
+class ZDoc;
 
 class ZPunctaDetectionDialog : public ZImgProcessDialog
 {
   Q_OBJECT
 
 public:
-  explicit ZPunctaDetectionDialog(QWidget* parent = nullptr);
+  explicit ZPunctaDetectionDialog(ZDoc& doc, QWidget* parent = nullptr);
 
 protected:
-  void createWorker(ZImgProcess*& worker, QString& workerName) override;
+  WorkerSpec createWorkerSpec() override;
 
 private:
   void adjustInputImageWidget();

@@ -1,15 +1,20 @@
 #include "zautotracedialog.h"
 
 #include "zdoc.h"
+#include "zbackgroundtaskmanager.h"
+#include "zexception.h"
 #include "zimgdoc.h"
 #include "zlog.h"
 #include "zselectfilewidget.h"
 #include "zsysteminfo.h"
 #include "ztracesettings.h"
+#include "zswcdoc.h"
+
+#include "zneutubeautotraceprocess.h"
+#include "zcancellation.h"
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -23,6 +28,7 @@
 #include <QVBoxLayout>
 #include <QDir>
 #include <QFileInfo>
+#include <QFile>
 #include <QRegularExpression>
 
 #include <algorithm>
@@ -102,7 +108,7 @@ void disableFirstComboRow(QComboBox* combo)
 } // namespace
 
 ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
-  : QDialog(parent)
+  : ZImgProcessDialog(doc, parent)
   , m_doc(doc)
 {
   setWindowTitle(tr("Automatic Tracing"));
@@ -206,13 +212,7 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
 
   layout->addWidget(outputGroup);
 
-  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-  if (auto* ok = buttons->button(QDialogButtonBox::Ok)) {
-    ok->setText(tr("Start"));
-  }
-  connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
-  connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-  layout->addWidget(buttons);
+  layout->addWidget(createButtonBox(tr("Start"), tr("Cancel")));
 
   rebuildImageCombo();
   rebuildChannelAndTimeCombos();
@@ -268,6 +268,162 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
   connect(m_levelSlider, &QSlider::valueChanged, this, [this](int) {
     updateBudgetUi();
   });
+}
+
+ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
+{
+  const std::optional<size_t> imgIdOpt = selectedImageId();
+  if (!imgIdOpt.has_value()) {
+    throw ZException("Please select an image to trace.");
+  }
+  const size_t imgId = *imgIdOpt;
+
+  if (!m_doc.imgDoc().hasObjWithID(imgId)) {
+    throw ZException("The selected image no longer exists.");
+  }
+
+  const size_t sc = selectedChannel();
+  const size_t t = selectedTime();
+  const int traceLevelValue = traceLevel();
+  const bool doResample = optimalResamplingEnabled();
+  const QString outputSwc = outputSwcPath();
+  const QString outputLog = outputLogPath();
+  const bool loadResult = loadResultEnabled();
+
+  if (outputSwc.isEmpty()) {
+    throw ZException("Please select an output SWC file.");
+  }
+  if (outputLog.isEmpty()) {
+    throw ZException("Please select an output log file.");
+  }
+
+  // Keep selection explicit and shared across 2D/3D trace UIs: the dialog is just another view
+  // of the shared trace settings state.
+  m_doc.traceSettings().setSourceSelection(imgId, sc);
+
+  const bool haveAlgoConfig = m_doc.traceSettings().algoConfigInitialized();
+  TraceConfig algoOverrides;
+  if (haveAlgoConfig) {
+    const ZTraceSettings::AlgoConfig cfg = m_doc.traceSettings().algoConfig();
+    algoOverrides.minAutoScore = cfg.minAutoScore;
+    algoOverrides.minManualScore = cfg.minManualScore;
+    algoOverrides.minSeedScore = cfg.minSeedScore;
+    algoOverrides.min2dScore = cfg.min2dScore;
+    algoOverrides.refit = cfg.refit;
+    algoOverrides.spTest = cfg.spTest;
+    algoOverrides.crossoverTest = cfg.crossoverTest;
+    algoOverrides.tuneEnd = cfg.tuneEnd;
+    algoOverrides.edgePath = cfg.edgePath;
+    algoOverrides.enhanceMask = cfg.enhanceMask;
+    algoOverrides.seedMethod = cfg.seedMethod;
+    algoOverrides.recover = cfg.recover;
+    algoOverrides.chainScreenCount = cfg.chainScreenCount;
+    algoOverrides.maxEucDist = cfg.maxEucDist;
+  }
+
+  const bool docHasAnySwc = !m_doc.swcDoc().objs().empty();
+
+  const std::shared_ptr<ZImgPack> imgPack = m_doc.imgDoc().imgPackShared(imgId);
+  CHECK(imgPack != nullptr);
+
+  const ZImgInfo info = imgPack->imgInfo();
+  const QString channelLabel = (sc < info.channelNames.size())
+                                 ? info.displayChannelName(sc)
+                                 : QStringLiteral("Ch%1").arg(static_cast<qulonglong>(sc + 1));
+  const QString timeLabel = QStringLiteral("T%1").arg(static_cast<qulonglong>(t + 1));
+  const QString outputSwcLabel = QFileInfo(outputSwc).fileName();
+  const QString outputLabel = outputSwcLabel.isEmpty() ? outputSwc : outputSwcLabel;
+
+  const QString traceCfgPath = QDir(ZSystemInfo::jsonDirPath()).absoluteFilePath("trace_config.json");
+
+  WorkerSpec spec;
+  spec.workerName = QStringLiteral("Auto Trace");
+  spec.taskTitle = QStringLiteral("Auto Trace: %1, %2, %3 -> %4")
+                     .arg(m_doc.objNameWithModifiedMarkerAndID(imgId))
+                     .arg(channelLabel)
+                     .arg(timeLabel)
+                     .arg(outputLabel);
+  spec.successMessage = QStringLiteral("wrote %1").arg(outputLabel);
+  spec.makeWorker = [imgPack,
+                     sc,
+                     t,
+                     traceCfgPath,
+                     traceLevelValue,
+                     haveAlgoConfig,
+                     algoOverrides,
+                     doResample,
+                     docHasAnySwc,
+                     outputSwc,
+                     outputLog]() -> std::unique_ptr<ZImgProcess> {
+    auto worker = std::make_unique<ZNeutubeAutoTraceProcess>();
+    worker->setLogFile(outputLog);
+    worker->setSelectedChannelTime(sc, t);
+    worker->setTraceConfigPath(traceCfgPath);
+    worker->setTraceLevel(traceLevelValue);
+    if (haveAlgoConfig) {
+      worker->setAlgoConfigOverrides(algoOverrides);
+    } else {
+      worker->clearAlgoConfigOverrides();
+    }
+    worker->setDoResampleAfterTracing(doResample);
+    worker->setDocHasAnySwc(docHasAnySwc);
+    worker->setOutputSwcPath(outputSwc);
+    worker->setSignalProvider([imgPack, sc, t](folly::CancellationToken token) -> ZImg {
+      maybeCancel(token);
+
+      const ZImgInfo info = imgPack->imgInfo();
+      if (sc >= info.numChannels || t >= info.numTimes) {
+        throw ZException(QStringLiteral("Auto Trace failed: invalid channel/time selection (c=%1, t=%2).")
+                           .arg(static_cast<qulonglong>(sc))
+                           .arg(static_cast<qulonglong>(t)));
+      }
+
+      const ZImg* fullSignalPtr = nullptr;
+      ZImg ownedSignal;
+      if (imgPack->isDiskCached()) {
+        ownedSignal = imgPack->wholeImg();
+        fullSignalPtr = &ownedSignal;
+      } else {
+        fullSignalPtr = &imgPack->img();
+      }
+      CHECK(fullSignalPtr != nullptr);
+      const ZImg& fullSignal = *fullSignalPtr;
+      if (fullSignal.isEmpty()) {
+        return {};
+      }
+
+      maybeCancel(token);
+      return fullSignal.extractChannel(sc, static_cast<index_t>(t));
+    });
+    return worker;
+  };
+
+  spec.onSuccessUi = [imgId, sc, outputSwc, outputLog, loadResult](ZDoc& doc, ZBackgroundTask& task) {
+    ZBackgroundTaskManager& tm = doc.backgroundTaskManager();
+    if (!QFile::exists(outputSwc)) {
+      tm.setTaskMessage(&task, QStringLiteral("no trace result"));
+      return;
+    }
+
+    if (!loadResult) {
+      return;
+    }
+
+    ZSwcDoc& swcDoc = doc.swcDoc();
+    QString loadError;
+    const size_t newSwcId = swcDoc.loadFile(outputSwc, loadError);
+    if (newSwcId == 0) {
+      tm.failTask(&task,
+                  QStringLiteral("Auto Trace finished but failed to load output SWC.\nSWC: %1\nLog: %2\n\n%3")
+                    .arg(outputSwc, outputLog, loadError));
+      return;
+    }
+
+    tm.setTaskMessage(&task, QStringLiteral("created SWC #%1").arg(static_cast<qulonglong>(newSwcId)));
+    doc.traceSettings().promoteNewSwcTargetToExistingIfStillNew(imgId, sc, newSwcId);
+  };
+
+  return spec;
 }
 
 std::optional<size_t> ZAutoTraceDialog::selectedImageId() const

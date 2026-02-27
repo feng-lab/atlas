@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QDialog>
+#include "zimgprocessdialog.h"
 
 #include <cstddef>
 #include <optional>
@@ -15,27 +15,26 @@ namespace nim {
 class ZDoc;
 class ZSelectFileWidget;
 
-class ZAutoTraceDialog final : public QDialog
+class ZAutoTraceDialog final : public ZImgProcessDialog
 {
   Q_OBJECT
 
 public:
   explicit ZAutoTraceDialog(ZDoc& doc, QWidget* parent = nullptr);
 
+protected:
+  WorkerSpec createWorkerSpec() override;
+
+private:
   [[nodiscard]] std::optional<size_t> selectedImageId() const;
   [[nodiscard]] size_t selectedChannel() const;
   [[nodiscard]] size_t selectedTime() const;
-
   [[nodiscard]] QString outputSwcPath() const;
   [[nodiscard]] QString outputLogPath() const;
   [[nodiscard]] bool loadResultEnabled() const;
-
-  // 0 means "default" (no per-level override), matching NeuTu semantics.
   [[nodiscard]] int traceLevel() const;
-
   [[nodiscard]] bool optimalResamplingEnabled() const;
 
-private:
   void rebuildImageCombo();
   void rebuildChannelAndTimeCombos();
   void rebuildSuggestedOutputs();

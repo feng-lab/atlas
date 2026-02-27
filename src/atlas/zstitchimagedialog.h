@@ -114,15 +114,12 @@ class ZStitchImageDialog : public ZImgProcessDialog
   Q_OBJECT
 
 public:
-  explicit ZStitchImageDialog(QWidget* parent = nullptr);
+  explicit ZStitchImageDialog(ZDoc& doc, QWidget* parent = nullptr);
 
   ~ZStitchImageDialog() override;
 
-Q_SIGNALS:
-  void resultReady(QString path);
-
 protected:
-  void createWorker(ZImgProcess*& worker, QString& workerName) override;
+  WorkerSpec createWorkerSpec() override;
 
 private:
   void selectInputStacks1();

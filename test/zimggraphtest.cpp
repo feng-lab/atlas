@@ -58,7 +58,7 @@ TEST(ImgGraph, shortestPath)
   ZImgGraph imgGraph(img);
   imgGraph.setConnectivity(26);
   imgGraph.setUseVoxelSize(false);
-  ZImgAutoThreshold<> imgAutoThre;
+  ZImgAutoThreshold imgAutoThre;
   int thre1 = imgAutoThre.centroidThre<int>(c1, c2, img);
   double scale1 = c2 - c1;
   if (scale1 < 1.0)
@@ -81,4 +81,3 @@ TEST(ImgGraph, shortestPath)
 }
 
 #endif
-

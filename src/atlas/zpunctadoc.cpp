@@ -786,7 +786,7 @@ void ZPunctaDoc::loadPuncta()
 
 void ZPunctaDoc::detectPuncta()
 {
-  ZPunctaDetectionDialog dlg(QApplication::activeWindow());
+  ZPunctaDetectionDialog dlg(m_doc, QApplication::activeWindow());
   dlg.exec();
 }
 

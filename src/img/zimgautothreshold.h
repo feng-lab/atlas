@@ -5,8 +5,7 @@
 
 namespace nim {
 
-template<bool ReportProgress = false>
-class ZImgAutoThreshold : public ZImgAlgorithm<ReportProgress>
+class ZImgAutoThreshold : public ZImgAlgorithm
 {
 public:
   // ting's triangle auto threshold

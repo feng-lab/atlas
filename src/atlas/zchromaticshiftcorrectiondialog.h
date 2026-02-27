@@ -16,13 +16,10 @@ class ZChromaticShiftCorrectionDialog : public ZImgProcessDialog
   Q_OBJECT
 
 public:
-  explicit ZChromaticShiftCorrectionDialog(QWidget* parent = nullptr);
-
-Q_SIGNALS:
-  void resultReady(QString path);
+  explicit ZChromaticShiftCorrectionDialog(ZDoc& doc, QWidget* parent = nullptr);
 
 protected:
-  void createWorker(ZImgProcess*& worker, QString& workerName) override;
+  WorkerSpec createWorkerSpec() override;
 
 private:
   void adjustWidget();

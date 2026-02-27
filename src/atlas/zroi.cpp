@@ -762,9 +762,9 @@ ZImg ZROI::toMaskImg(int outWidth,
     img = ZImg(ZImgInfo(bBox.maxCorner.x * scaleX + 3, bBox.maxCorner.y * scaleY + 3, bBox.maxCorner.z + 3));
     std::map<size_t, ZImg> distMapImgs;
     std::vector<size_t> srcSlices;
-    ZImgSignedDistanceMap<> distMap;
+    ZImgSignedDistanceMap distMap;
     distMap.setInsideIsPositive(false);
-    ZImgInterpolate<> interpolator;
+    ZImgInterpolate interpolator;
     for (const auto& [slice, ROI] : m_sliceROIs) {
       if (slice < 0) {
         continue;

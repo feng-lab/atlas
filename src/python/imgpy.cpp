@@ -1242,7 +1242,7 @@ See also
     .def("setLogFile", &ZStitchImage::setLogFile, "logfilename"_a)
     .def("loadTask", &ZStitchImage::loadTask, "filename"_a)
     .def("saveTask", &ZStitchImage::saveTask, "filename"_a)
-    .def("run", &ZStitchImage::runInPython)
+    .def("run", &ZStitchImage::run)
     .def("__repr__", [](const ZStitchImage& v) {
       return fmt::format("<_imgpy.ZStitchImage {}>", v.toString());
     });
@@ -1290,7 +1290,7 @@ See also
     .def("setLogFile", &ZPunctaDetection::setLogFile, "logfilename"_a)
     .def("loadTask", &ZPunctaDetection::loadTask, "filename"_a)
     .def("saveTask", &ZPunctaDetection::saveTask, "filename"_a)
-    .def("run", &ZPunctaDetection::runInPython)
+    .def("run", &ZPunctaDetection::run)
     .def("__repr__", [](const ZPunctaDetection& v) {
       return fmt::format("<_imgpy.ZPunctaDetection {}>", v.toString());
     });
@@ -1312,7 +1312,7 @@ See also
     .def("setLogFile", &ZSectionsRegistration::setLogFile, "logfilename"_a)
     .def("loadTask", &ZSectionsRegistration::loadTask, "filename"_a)
     .def("saveTask", &ZSectionsRegistration::saveTask, "filename"_a)
-    .def("run", &ZSectionsRegistration::runInPython)
+    .def("run", &ZSectionsRegistration::run)
     .def("__repr__", [](const ZSectionsRegistration& v) {
       return fmt::format("<_imgpy.ZSectionsRegistration {}>", v.toString());
     });
@@ -1334,7 +1334,7 @@ See also
     .def("setLogFile", &ZChromaticShiftCorrection::setLogFile, "logfilename"_a)
     .def("loadTask", &ZChromaticShiftCorrection::loadTask, "filename"_a)
     .def("saveTask", &ZChromaticShiftCorrection::saveTask, "filename"_a)
-    .def("run", &ZChromaticShiftCorrection::runInPython)
+    .def("run", &ZChromaticShiftCorrection::run)
     .def("__repr__", [](const ZChromaticShiftCorrection& v) {
       return fmt::format("<_imgpy.ZChromaticShiftCorrection {}>", v.toString());
     });
@@ -1528,10 +1528,10 @@ See also
       return fmt::format("<_imgpy.ZImgMerge>");
     });
 
-  nb::class_<ZImgAutoThreshold<false>>(m, "ZImgAutoThreshold")
+  nb::class_<ZImgAutoThreshold>(m, "ZImgAutoThreshold")
     .def(nb::init<>())
     .def("u8TriangleThre",
-         &ZImgAutoThreshold<false>::u8TriangleThre,
+         &ZImgAutoThreshold::u8TriangleThre,
          "filename"_a,
          "minValue"_a,
          "maxValue"_a,
@@ -1539,7 +1539,7 @@ See also
          "t"_a = 0,
          "scene"_a = 0,
          "mask"_a = std::vector<ZVoxelCoordinate>())
-    .def("__repr__", [](const ZImgAutoThreshold<false>&) {
+    .def("__repr__", [](const ZImgAutoThreshold&) {
       return fmt::format("<_imgpy.ZImgAutoThreshold>");
     });
 

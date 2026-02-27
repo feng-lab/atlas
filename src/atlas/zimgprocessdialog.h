@@ -1,31 +1,52 @@
 #pragma once
 
 #include <QDialog>
-#include <QProgressDialog>
 #include <QDialogButtonBox>
 #include <folly/CancellationToken.h>
+#include <folly/Function.h>
+#include <functional>
+#include <memory>
+
+class QPushButton;
 
 namespace nim {
 
+class ZDoc;
+
 class ZImgProcess;
+
+class ZBackgroundTask;
 
 class ZImgProcessDialog : public QDialog
 {
   Q_OBJECT
 
 public:
-  explicit ZImgProcessDialog(QWidget* parent = nullptr);
+  struct WorkerSpec
+  {
+    // Human-readable operation label (shown in Tasks UI).
+    QString workerName;
+
+    // Optional override for the Tasks UI title.
+    QString taskTitle;
+
+    // Optional success message for the Tasks UI.
+    QString successMessage;
+
+    // Create the worker on the background thread that will execute it.
+    // This must not capture any Qt UI objects.
+    folly::Function<std::unique_ptr<ZImgProcess>()> makeWorker;
+
+    // Optional UI-thread callback to run after a successful completion.
+    // Intended for things like loading the output object into the document.
+    std::function<void(ZDoc& doc, ZBackgroundTask& task)> onSuccessUi;
+  };
+
+  explicit ZImgProcessDialog(ZDoc& doc, QWidget* parent = nullptr);
 
 protected:
-  // subclass create worker, throw ZException if error
-  // worker and workerName must be assigned to valid value if no exception was thrown
-  virtual void createWorker(ZImgProcess*& worker, QString& workerName) = 0;
-
-  void processFinished();
-
-  void processError(const QString& e);
-
-  void cancelButtonPressed();
+  // Subclass fills the WorkerSpec, throwing ZException on validation failures.
+  virtual WorkerSpec createWorkerSpec() = 0;
 
   void keyPressEvent(QKeyEvent* e) override;
 
@@ -36,12 +57,9 @@ private:
   void runWorker();
 
 private:
-  QString m_workerName;
-  std::unique_ptr<folly::CancellationSource> m_cancellationSource;
-  bool m_hasError = false;
+  ZDoc* m_doc = nullptr;
 
-  QProgressDialog* m_progressDialog = nullptr;
-  ZImgProcess* m_worker = nullptr;
+  QPushButton* m_runButton = nullptr;
 };
 
 } // namespace nim

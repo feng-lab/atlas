@@ -1,6 +1,5 @@
 #pragma once
 
-#include <zcpuinfo.h>
 #include "zbenchtimer.h"
 #include "zimg.h"
 #include "zimgalgorithm.h"
@@ -8,8 +7,7 @@
 
 namespace nim {
 
-template<bool ReportProgress = false>
-class ZImgSignedDistanceMap : public ZImgAlgorithm<ReportProgress>
+class ZImgSignedDistanceMap : public ZImgAlgorithm
 {
 public:
   // default false

@@ -125,8 +125,7 @@ template ZImg ConnComp::createTypedLabelImg<float>() const;
 
 template ZImg ConnComp::createTypedLabelImg<double>() const;
 
-template<bool ReportProgress>
-ConnComp ZImgConnectedComponents<ReportProgress>::run(const ZImg& img, size_t conn, size_t c, size_t t)
+ConnComp ZImgConnectedComponents::run(const ZImg& img, size_t conn, size_t c, size_t t)
 {
   ConnComp res = createRes(img, conn, c, t);
   ZImg bimg = img.createView(c, t).binarized();
@@ -136,9 +135,7 @@ ConnComp ZImgConnectedComponents<ReportProgress>::run(const ZImg& img, size_t co
   return res;
 }
 
-template<bool ReportProgress>
-ConnComp
-ZImgConnectedComponents<ReportProgress>::runLabel(const ZImg& img, size_t conn, size_t label, size_t c, size_t t)
+ConnComp ZImgConnectedComponents::runLabel(const ZImg& img, size_t conn, size_t label, size_t c, size_t t)
 {
   if (img.isType<uint8_t>()) {
     ConnComp res = createRes(img, conn, c, t);
@@ -149,9 +146,7 @@ ZImgConnectedComponents<ReportProgress>::runLabel(const ZImg& img, size_t conn, 
   return run(img, conn, c, t, impl::EqualToLabel(label));
 }
 
-template<bool ReportProgress>
-ConnComp
-ZImgConnectedComponents<ReportProgress>::runLabelModifyInput(ZImg& img, size_t conn, size_t label, size_t c, size_t t)
+ConnComp ZImgConnectedComponents::runLabelModifyInput(ZImg& img, size_t conn, size_t label, size_t c, size_t t)
 {
   if (img.isType<uint8_t>()) {
     ConnComp res = createRes(img, conn, c, t);
@@ -162,8 +157,7 @@ ZImgConnectedComponents<ReportProgress>::runLabelModifyInput(ZImg& img, size_t c
   return run(img, conn, c, t, impl::EqualToLabel(label));
 }
 
-template<bool ReportProgress>
-ConnComp ZImgConnectedComponents<ReportProgress>::createRes(const ZImg& img, size_t conn, size_t c, size_t t) const
+ConnComp ZImgConnectedComponents::createRes(const ZImg& img, size_t conn, size_t c, size_t t) const
 {
   if (conn == 0) {
     conn = img.is2DImg() ? 8 : 26;
@@ -187,8 +181,7 @@ ConnComp ZImgConnectedComponents<ReportProgress>::createRes(const ZImg& img, siz
   return res;
 }
 
-template<bool ReportProgress>
-void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& markerImg, ConnComp& res, size_t label)
+void ZImgConnectedComponents::getConnectedComponents_Impl(ZImg& markerImg, ConnComp& res, size_t label)
 {
   if (label > 255) {
     return;
@@ -246,9 +239,5 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
   }
   this->reportProgress(1.0);
 }
-
-template class ZImgConnectedComponents<true>;
-
-template class ZImgConnectedComponents<false>;
 
 } // namespace nim

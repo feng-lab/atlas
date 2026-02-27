@@ -9,8 +9,6 @@ namespace nim {
 
 class ZStitchImage : public ZImgProcess
 {
-  Q_OBJECT
-
 public:
   ZStitchImage();
 
@@ -122,9 +120,6 @@ public:
   {
     m_useMultithreading = v;
   }
-
-Q_SIGNALS:
-  void resultReady(QString path);
 
 protected:
   void doWork() override;

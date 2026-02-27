@@ -38,6 +38,7 @@ set(NEUTUBE_SOURCES
     zneutubetraceinteractive.cpp zneutubetraceinteractive.h
     zneutubetraceauto.cpp zneutubetraceauto.h
     zneutubetraceconfig.cpp zneutubetraceconfig.h
+    zneutubeautotraceprocess.cpp zneutubeautotraceprocess.h
     zneutubetraceconnectiontestworkspace.cpp zneutubetraceconnectiontestworkspace.h
     zneutubetraceconnectiontest.cpp zneutubetraceconnectiontest.h
     zneutubetracedefs.h

@@ -87,9 +87,9 @@ protected:
 
   void loadPuncta();
 
-  static void detectPuncta();
+  void detectPuncta();
 
-  static void generateAnalysisTextFiles();
+  void generateAnalysisTextFiles();
 
   // append another puncta into this doc
   size_t addPuncta(ZPuncta puncta, const QString& path);

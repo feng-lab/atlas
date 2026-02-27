@@ -1,39 +1,27 @@
 #include "zimgprocessdialog.h"
 
+#include "zbackgroundjob.h"
+#include "zbackgroundtaskmanager.h"
+#include "zdoc.h"
 #include "zimgprocess.h"
 #include "zlog.h"
 #include "zmessageboxhelpers.h"
+
 #include <QKeyEvent>
-#include <QMessageBox>
-#include <QThread>
 #include <QApplication>
 #include <QPushButton>
 
+#include <folly/executors/GlobalExecutor.h>
+
+#include <utility>
+
 namespace nim {
 
-ZImgProcessDialog::ZImgProcessDialog(QWidget* parent)
+ZImgProcessDialog::ZImgProcessDialog(ZDoc& doc, QWidget* parent)
   : QDialog(parent)
-{}
-
-void ZImgProcessDialog::processFinished()
+  , m_doc(&doc)
 {
-  if (!m_hasError) {
-    QMessageBox::information(this, QApplication::applicationName(), QString("%1 Finished.").arg(m_workerName));
-  }
-}
-
-void ZImgProcessDialog::processError(const QString& e)
-{
-  m_hasError = true;
-  showCriticalWithDetails(this, tr("Error during %1").arg(m_workerName), e);
-}
-
-void ZImgProcessDialog::cancelButtonPressed()
-{
-  m_progressDialog->setLabelText(QString("%1 Canceling...").arg(m_workerName));
-  if (m_cancellationSource) {
-    m_cancellationSource->requestCancellation();
-  }
+  CHECK(m_doc != nullptr);
 }
 
 void ZImgProcessDialog::keyPressEvent(QKeyEvent* e)
@@ -49,55 +37,101 @@ void ZImgProcessDialog::keyPressEvent(QKeyEvent* e)
 
 QDialogButtonBox* ZImgProcessDialog::createButtonBox(const QString& runButtonName, const QString& exitButtonName)
 {
-  auto runButton = new QPushButton(runButtonName, this);
+  m_runButton = new QPushButton(runButtonName, this);
   auto exitButton = new QPushButton(exitButtonName, this);
   auto buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
   buttonBox->addButton(exitButton, QDialogButtonBox::RejectRole);
-  buttonBox->addButton(runButton, QDialogButtonBox::ActionRole);
+  buttonBox->addButton(m_runButton, QDialogButtonBox::ActionRole);
   connect(exitButton, &QPushButton::clicked, this, &ZImgProcessDialog::reject);
-  connect(runButton, &QPushButton::clicked, this, &ZImgProcessDialog::runWorker);
+  connect(m_runButton, &QPushButton::clicked, this, &ZImgProcessDialog::runWorker);
 
   return buttonBox;
 }
 
 void ZImgProcessDialog::runWorker()
 {
+  CHECK(m_doc != nullptr);
+
   try {
-    m_cancellationSource = std::make_unique<folly::CancellationSource>();
-    m_hasError = false;
+    focusNextChild();
 
-    m_worker = nullptr;
-    m_workerName.clear();
-    createWorker(m_worker, m_workerName);
-    CHECK(m_worker);
-    CHECK(!m_workerName.isEmpty());
+    WorkerSpec spec = createWorkerSpec();
+    CHECK(!spec.workerName.isEmpty());
+    CHECK(spec.makeWorker);
 
-    m_worker->setCancellationToken(m_cancellationSource->getToken());
+    if (m_runButton != nullptr) {
+      m_runButton->setEnabled(false);
+    }
 
-    m_progressDialog = new QProgressDialog(this);
-    m_progressDialog->setLabelText(QString("%1 Running...").arg(m_workerName));
-    m_progressDialog->setAutoReset(false);
-    m_progressDialog->setAttribute(Qt::WA_DeleteOnClose);
-    QObject::disconnect(m_progressDialog, &QProgressDialog::canceled, m_progressDialog, &QProgressDialog::cancel);
-    connect(m_worker, qOverload<int>(&ZImgProcess::progressChanged), m_progressDialog, &QProgressDialog::setValue);
-    connect(m_worker, &ZImgProcess::processError, this, &ZImgProcessDialog::processError);
-    connect(m_progressDialog, &QProgressDialog::canceled, this, &ZImgProcessDialog::cancelButtonPressed);
+    const QString workerName = std::move(spec.workerName);
+    const QString taskTitle = spec.taskTitle.isEmpty() ? workerName : std::move(spec.taskTitle);
+    const QString successMessage = std::move(spec.successMessage);
+    auto onSuccessUi = std::move(spec.onSuccessUi);
+    auto makeWorker = std::move(spec.makeWorker);
 
-    auto thread = new QThread(this);
-    connect(thread, &QThread::started, m_worker, &ZImgProcess::run);
-    connect(m_worker, &ZImgProcess::finished, thread, &QThread::quit);
-    connect(m_worker, &ZImgProcess::processError, thread, &QThread::quit);
-    connect(thread, &QThread::finished, m_worker, &ZImgProcess::deleteLater);
-    connect(thread, &QThread::finished, m_progressDialog, &QProgressDialog::reset);
-    connect(thread, &QThread::finished, this, &ZImgProcessDialog::processFinished);
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
-    m_worker->moveToThread(thread);
+    ZBackgroundJobSpec job;
+    job.title = taskTitle;
+    job.runningMessage = QStringLiteral("running");
+    job.useFakeProgress = true;
+    job.executor = folly::getGlobalCPUExecutor();
+    job.debugLabel = workerName.toStdString();
+    job.work = [workerName, successMessage, onSuccessUi = std::move(onSuccessUi), makeWorker = std::move(makeWorker)](
+                 ZBackgroundJobContext ctx) mutable -> folly::coro::Task<ZBackgroundJobOutcome> {
+      ZBackgroundJobOutcome outcome;
 
-    thread->start();
-    m_progressDialog->exec();
+      try {
+        std::unique_ptr<ZImgProcess> worker = makeWorker();
+        if (!worker) {
+          throw ZException(QStringLiteral("Failed to start %1: worker creation returned null.").arg(workerName));
+        }
+
+        const folly::CancellationToken token = ctx.cancellationToken();
+        worker->setCancellationToken(token);
+        worker->setProgressCallback([ctx](double p01) mutable {
+          ctx.setProgress01(p01);
+        });
+        worker->run();
+
+        outcome.state = ZBackgroundJobOutcome::State::Succeeded;
+        outcome.message = successMessage;
+        if (onSuccessUi) {
+          outcome.uiCallback = [onSuccessUi = std::move(onSuccessUi)](ZDoc& doc, ZBackgroundTask& task) {
+            onSuccessUi(doc, task);
+          };
+        }
+      }
+      catch (const ZCancellationException&) {
+        outcome.state = ZBackgroundJobOutcome::State::Cancelled;
+        outcome.message = QStringLiteral("cancelled");
+      }
+      catch (const std::exception& e) {
+        const QString err = QString::fromUtf8(e.what());
+        outcome.state = ZBackgroundJobOutcome::State::Failed;
+        outcome.message = err;
+        outcome.uiCallback = [workerName, err](ZDoc&, ZBackgroundTask&) {
+          showCriticalWithDetails(QApplication::activeWindow(), QObject::tr("Error during %1").arg(workerName), err);
+        };
+      }
+      catch (...) {
+        const QString err = QStringLiteral("unknown error");
+        outcome.state = ZBackgroundJobOutcome::State::Failed;
+        outcome.message = err;
+        outcome.uiCallback = [workerName, err](ZDoc&, ZBackgroundTask&) {
+          showCriticalWithDetails(QApplication::activeWindow(), QObject::tr("Error during %1").arg(workerName), err);
+        };
+      }
+
+      co_return outcome;
+    };
+
+    (void)startBackgroundJob(*m_doc, std::move(job));
+    accept();
   }
   catch (const ZException& e) {
-    showCriticalWithDetails(this, tr("Error during %1").arg(m_workerName), e.what());
+    showCriticalWithDetails(this, tr("Error"), e.what());
+    if (m_runButton != nullptr) {
+      m_runButton->setEnabled(true);
+    }
   }
 }
 

@@ -6,16 +6,16 @@
 #include "zlog.h"
 #include "zsysteminfo.h"
 #include "zlogwidget.h"
+#include "zdoc.h"
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QFileInfo>
 #include <QMessageBox>
-#include <QThread>
 
 namespace nim {
 
-ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(QWidget* parent)
-  : ZImgProcessDialog(parent)
+ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(ZDoc& doc, QWidget* parent)
+  : ZImgProcessDialog(doc, parent)
   , m_openStackAfterRegistering("Open Result Image After Registering", true)
   , m_referenceChannel("Reference Channel:")
   , m_targetChannel("Far-red Channel:")
@@ -39,10 +39,8 @@ ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(QWidget* parent
   logUsageInfo();
 }
 
-void ZChromaticShiftCorrectionDialog::createWorker(ZImgProcess*& worker, QString& workerName)
+ZImgProcessDialog::WorkerSpec ZChromaticShiftCorrectionDialog::createWorkerSpec()
 {
-  focusNextChild();
-
   if (m_inputImagesFileWidget->getSelectedOpenFile().isEmpty()) {
     throw ZException(QString("No input image. Abort."));
   }
@@ -56,29 +54,61 @@ void ZChromaticShiftCorrectionDialog::createWorker(ZImgProcess*& worker, QString
   auto refChannel = m_referenceChannel.associatedData() - 1;
   auto targetChannel = m_targetChannel.associatedData() - 1;
 
-  auto* workertmp = new ZChromaticShiftCorrection(m_inputImagesFileWidget->getSelectedOpenFile(),
-                                                  m_outputStackWidget->getSelectedSaveFile());
-  if (refChannel >= 0) {
-    workertmp->setReferenceChannel(refChannel);
-  }
-  if (targetChannel >= 0) {
-    workertmp->setTargetChannel(targetChannel);
-  }
-  workertmp->setMethod(m_method.associatedData());
-  workertmp->setRemoveBackground(m_removeBackground.get());
-  workertmp->setRemoveHighForeground(m_removeHighForeground.get());
-  workertmp->setBrightBackground(m_brightBackground.get());
-  workertmp->setMetric(m_metric.get());
-  workertmp->setTransform(m_transform.get());
-  workertmp->setOptimizer(m_optimizer.get());
-  workertmp->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
-  workertmp->setNumScales(m_numScales.get());
-  if (m_openStackAfterRegistering.get()) {
-    connect(workertmp, &ZChromaticShiftCorrection::resultReady, this, &ZChromaticShiftCorrectionDialog::resultReady);
-  }
+  const QString inputPath = m_inputImagesFileWidget->getSelectedOpenFile();
+  const QString outputPath = m_outputStackWidget->getSelectedSaveFile();
+  const QString logPath = m_outputLogFileWidget->getSelectedSaveFile();
 
-  worker = workertmp;
-  workerName = "Chromatic Shift Correction";
+  const QString method = m_method.associatedData();
+  const bool removeBackground = m_removeBackground.get();
+  const bool removeHighForeground = m_removeHighForeground.get();
+  const bool brightBackground = m_brightBackground.get();
+  const QString metric = m_metric.get();
+  const QString transform = m_transform.get();
+  const QString optimizer = m_optimizer.get();
+  const size_t numScales = static_cast<size_t>(m_numScales.get());
+  const bool openResult = m_openStackAfterRegistering.get();
+
+  WorkerSpec spec;
+  spec.workerName = QStringLiteral("Chromatic Shift Correction");
+  spec.taskTitle = QStringLiteral("%1 -> %2").arg(spec.workerName, QFileInfo(outputPath).fileName());
+  spec.successMessage = QStringLiteral("wrote %1").arg(QFileInfo(outputPath).fileName());
+  spec.makeWorker = [inputPath,
+                     outputPath,
+                     logPath,
+                     refChannel,
+                     targetChannel,
+                     method,
+                     removeBackground,
+                     removeHighForeground,
+                     brightBackground,
+                     metric,
+                     transform,
+                     optimizer,
+                     numScales]() -> std::unique_ptr<ZImgProcess> {
+    auto worker = std::make_unique<ZChromaticShiftCorrection>(inputPath, outputPath);
+    if (refChannel >= 0) {
+      worker->setReferenceChannel(refChannel);
+    }
+    if (targetChannel >= 0) {
+      worker->setTargetChannel(targetChannel);
+    }
+    worker->setMethod(method);
+    worker->setRemoveBackground(removeBackground);
+    worker->setRemoveHighForeground(removeHighForeground);
+    worker->setBrightBackground(brightBackground);
+    worker->setMetric(metric);
+    worker->setTransform(transform);
+    worker->setOptimizer(optimizer);
+    worker->setLogFile(logPath);
+    worker->setNumScales(numScales);
+    return worker;
+  };
+  if (openResult) {
+    spec.onSuccessUi = [outputPath](ZDoc& doc, ZBackgroundTask&) {
+      doc.loadFile(outputPath);
+    };
+  }
+  return spec;
 }
 
 void ZChromaticShiftCorrectionDialog::adjustWidget()

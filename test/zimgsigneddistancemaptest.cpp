@@ -43,7 +43,7 @@ TEST(ZImgSignedDistanceMap, test1)
   *resImgDouble.data<double>(2,2) = -1.0;
   *resImgDouble.data<double>(6,6) = -1.0;
 
-  ZImgSignedDistanceMap<> signedDM;
+  ZImgSignedDistanceMap signedDM;
   ZImg dm = signedDM.run<double>(img);
   double* expDData = resImgDouble.timeData<double>(0);
   double* dData = dm.timeData<double>(0);
@@ -89,4 +89,3 @@ TEST(ZImgSignedDistanceMap, test1)
   }
   //LOG(INFO) << dm.showContentAsQString();
 }
-

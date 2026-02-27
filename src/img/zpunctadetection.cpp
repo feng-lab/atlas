@@ -376,7 +376,7 @@ void ZPunctaDetection::doWork()
   // get puncta threshold
   if (m_punctaThreshold == -1) {
     LOG(INFO) << "Determining Puncta Threshold";
-    ZImgAutoThreshold<true> imgAutoThre;
+    ZImgAutoThreshold imgAutoThre;
     registerSubOperation(&imgAutoThre, .1);
     if (imageTooBig) {
       m_punctaThreshold = imgAutoThre.u8TriangleThre(m_filename,
@@ -400,10 +400,10 @@ void ZPunctaDetection::doWork()
       getVoxelRange(somaMaskVoxelList, minLoc, size);
       ZImg somaPunctaImg = cropZImg(somaMaskVoxelList, punctaImg, 0, 0, minLoc, size);
 
-      ZImgAutoThreshold<> imgAutoThre;
+      ZImgAutoThreshold imgAutoThre;
       m_somaPunctaThreshold = imgAutoThre.triangleThre<uint8_t>(somaPunctaImg, 0, 0);
     } else {
-      ZImgAutoThreshold<> imgAutoThre;
+      ZImgAutoThreshold imgAutoThre;
       std::vector<ZVoxelCoordinate> mask;
       for (Eigen::Index r = 0; r < somaMaskVoxelList.rows(); ++r) {
         mask.emplace_back(somaMaskVoxelList(r, 0), somaMaskVoxelList(r, 1), somaMaskVoxelList(r, 2));
@@ -853,11 +853,11 @@ void ZPunctaDetection::detectImpl(const ZImg& rawimg,
 
   img.thresholdBelow(thre, ZImg::ThresholdMode::IncludeThreshold, 0_z);
 
-  ZImgConnectedComponents<true> imgConnComp;
+  ZImgConnectedComponents imgConnComp;
   registerSubOperation(&imgConnComp, .5 * totalSubOpsWeight);
   ConnComp CC = imgConnComp.run(img);
 
-  ZImgRegionalExtrema<true> imgRegionalExtrema;
+  ZImgRegionalExtrema imgRegionalExtrema;
   registerSubOperation(&imgRegionalExtrema, .5 * totalSubOpsWeight);
   ZImg locmax = imgRegionalExtrema.regionalMax(img);
 
@@ -1258,7 +1258,7 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
   for (auto level = m_startLevel; level >= m_stopLevel; level -= m_floodStep) {
     ZImg bim = img.binarized(level, ZImg::ThresholdMode::IncludeThreshold);
 
-    ZImgConnectedComponents<> connComp;
+    ZImgConnectedComponents connComp;
     CC = connComp.runLabelModifyInput(bim);
 
     CC.removeSmallObject(m_seedSizeThreshold, true);
@@ -1454,15 +1454,15 @@ size_t ZPunctaDetection::getNumCenters(const ZImg& rawimg,
     cropCenter = cropCenter.binarized(saturatedIntensity, ZImg::ThresholdMode::IncludeThreshold);
     cropCenter = cropCenter.projectAlongDim(Dimension::Z, ImgMergeMode::Max);
 
-    ZImgSignedDistanceMap<> signedDM;
+    ZImgSignedDistanceMap signedDM;
     signedDM.setInsideIsPositive(true);
     signedDM.setUseSquaredDistance(true);
     ZImg dmim = signedDM.run<float>(cropCenter, false);
 
-    ZImgRegionalExtrema<> regionalExtrema;
+    ZImgRegionalExtrema regionalExtrema;
     dmim = regionalExtrema.regionalMax(dmim);
 
-    ZImgConnectedComponents<> connComp;
+    ZImgConnectedComponents connComp;
     ConnComp CC = connComp.runLabelModifyInput(dmim);
     size_t numDistCenter = CC.voxelIdxList.size();
 

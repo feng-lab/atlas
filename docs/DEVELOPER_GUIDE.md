@@ -203,6 +203,30 @@ Threading Model
     - Pipeline contexts and Vulkan backend code should use `currentRenderThreadExecutorKeepAlive(...)` at call sites that need a keep-alive token for `co_withExecutor(...)`.
     - Teardown: `Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()` must run on the engine thread before quitting it so fence-gated continuations can complete deterministically.
 
+Background Tasks (UI)
+
+- Long-running CPU/network/file work must not block the UI thread.
+- Atlas tracks background work via `ZBackgroundTaskManager` (the Tasks panel) and runs work on folly executors.
+
+Preferred “Process + Dialog” pattern (used by puncta detection, stitching, registration, chromatic correction, and auto trace):
+
+1. Implement a `ZImgProcess` worker (usually in `src/img/`, or in `src/neutube/` when the algorithm is part of the tracing stack):
+  - Implement `doWork()` (synchronous body; runs on a background thread).
+  - Honor cancellation: check `m_cancellationToken` at safe points (e.g. `maybeCancel(m_cancellationToken)`).
+  - Report progress when possible via `reportProgress(...)` (wired to Tasks UI through `setProgressCallback(...)`).
+  - Use `setLogFile(...)` and `LOG(...)` for per-run logs.
+
+2. Implement a `ZImgProcessDialog` (in `src/atlas/`) that configures the worker:
+  - Implement `createWorkerSpec()` to validate UI state and return a `WorkerSpec`.
+  - `WorkerSpec::makeWorker` must not capture UI widgets.
+  - Optional `WorkerSpec::onSuccessUi(doc, task)` loads output objects (e.g. load output image/SWC) and updates the task message/state.
+  - The base `ZImgProcessDialog` starts the worker via `startBackgroundJob(...)`, so it is cancellable and visible in Tasks.
+
+3. Wire the action entry point to `dialog.exec()` (no custom threading glue in docs).
+
+Lower-level usage:
+- If an operation is not naturally expressed as a `ZImgProcess`, call `startBackgroundJob(ZDoc&, ZBackgroundJobSpec)` directly.
+
 Pointer Nullability Contract
 
 - Default non-null: treat all pointer and smart-pointer parameters as required (non-null) unless explicitly marked as nullable.

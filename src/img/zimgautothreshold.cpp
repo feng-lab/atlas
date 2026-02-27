@@ -6,9 +6,8 @@
 
 namespace nim {
 
-template<bool ReportProgress>
 template<typename TVoxel>
-TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, size_t c, size_t t)
+TVoxel ZImgAutoThreshold::typedTriangleThre(const ZImg& imgIn, size_t c, size_t t)
 {
   if (!imgIn.isType<TVoxel>()) {
     throw ZException("input img voxel type doesnot match provided type");
@@ -22,7 +21,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, s
 
   // ZBenchTimer bt;
   // bt.start();
-  ZImgRegionalExtrema<ReportProgress> regionalExtrema;
+  ZImgRegionalExtrema regionalExtrema;
   this->registerSubOperation(&regionalExtrema, .4);
   ZImg locmaxMask = regionalExtrema.regionalMax(img, conn);
   // bt.stop();
@@ -30,7 +29,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, s
 
   // bt.reset();
   // bt.start();
-  ZImgConnectedComponents<ReportProgress> conncomp;
+  ZImgConnectedComponents conncomp;
   this->registerSubOperation(&conncomp, .4);
   ConnComp CC = conncomp.runLabelModifyInput(locmaxMask, conn);
   // bt.stop();
@@ -106,13 +105,12 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, s
   return saturate_cast<TVoxel>(img.binRange(threBin, hist.size()).first);
 }
 
-template<bool ReportProgress>
 template<typename TVoxel>
-TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const QString& filename,
-                                                            size_t c,
-                                                            size_t t,
-                                                            size_t scene,
-                                                            const std::vector<ZVoxelCoordinate>& mask)
+TVoxel ZImgAutoThreshold::typedTriangleThre(const QString& filename,
+                                            size_t c,
+                                            size_t t,
+                                            size_t scene,
+                                            const std::vector<ZVoxelCoordinate>& mask)
 {
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
   if (scene >= infos.size()) {
@@ -147,14 +145,14 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const QString& filen
 
     // ZBenchTimer bt;
     // bt.start();
-    ZImgRegionalExtrema<> regionalExtrema;
+    ZImgRegionalExtrema regionalExtrema;
     ZImg locmaxMask = regionalExtrema.regionalMax(img, conn);
     // bt.stop();
     // LOG(INFO) << bt;
 
     // bt.reset();
     // bt.start();
-    ZImgConnectedComponents<> conncomp;
+    ZImgConnectedComponents conncomp;
     ConnComp CC = conncomp.runLabelModifyInput(locmaxMask, conn);
     // bt.stop();
     // LOG(INFO) << bt;
@@ -243,14 +241,13 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const QString& filen
   return saturate_cast<TVoxel>(infos[scene].binRange(threBin, hist.size()).first);
 }
 
-template<bool ReportProgress>
-uint8_t ZImgAutoThreshold<ReportProgress>::u8TriangleThre(const QString& filename,
-                                                          double minValue,
-                                                          double maxValue,
-                                                          size_t c,
-                                                          size_t t,
-                                                          size_t scene,
-                                                          const std::vector<ZVoxelCoordinate>& mask)
+uint8_t ZImgAutoThreshold::u8TriangleThre(const QString& filename,
+                                          double minValue,
+                                          double maxValue,
+                                          size_t c,
+                                          size_t t,
+                                          size_t scene,
+                                          const std::vector<ZVoxelCoordinate>& mask)
 {
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
   if (scene >= infos.size()) {
@@ -288,14 +285,14 @@ uint8_t ZImgAutoThreshold<ReportProgress>::u8TriangleThre(const QString& filenam
 
     // ZBenchTimer bt;
     // bt.start();
-    ZImgRegionalExtrema<> regionalExtrema;
+    ZImgRegionalExtrema regionalExtrema;
     ZImg locmaxMask = regionalExtrema.regionalMax(img, conn);
     // bt.stop();
     // LOG(INFO) << bt;
 
     // bt.reset();
     // bt.start();
-    ZImgConnectedComponents<> conncomp;
+    ZImgConnectedComponents conncomp;
     ConnComp CC = conncomp.runLabelModifyInput(locmaxMask, conn);
     // bt.stop();
     // LOG(INFO) << bt;
@@ -384,13 +381,8 @@ uint8_t ZImgAutoThreshold<ReportProgress>::u8TriangleThre(const QString& filenam
   return saturate_cast<uint8_t>(infos[scene].binRange(threBin, hist.size()).first);
 }
 
-template<bool ReportProgress>
 template<typename TVoxel>
-TVoxel ZImgAutoThreshold<ReportProgress>::typedCentroidThre(double& cent1,
-                                                            double& cent2,
-                                                            const ZImg& imgIn,
-                                                            size_t c,
-                                                            size_t t)
+TVoxel ZImgAutoThreshold::typedCentroidThre(double& cent1, double& cent2, const ZImg& imgIn, size_t c, size_t t)
 {
   if (!imgIn.isType<TVoxel>()) {
     throw ZException("input img voxel type doesnot match provided type");
@@ -457,9 +449,8 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedCentroidThre(double& cent1,
   return saturate_cast<TVoxel>(img.binRange(threBin, hist.size()).first);
 }
 
-template<bool ReportProgress>
 template<typename TVoxel>
-TVoxel ZImgAutoThreshold<ReportProgress>::typedMaxHistThre(const ZImg& imgIn, size_t c, size_t t)
+TVoxel ZImgAutoThreshold::typedMaxHistThre(const ZImg& imgIn, size_t c, size_t t)
 {
   if (!imgIn.isType<TVoxel>()) {
     throw ZException("input img voxel type doesnot match provided type");
@@ -487,8 +478,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedMaxHistThre(const ZImg& imgIn, si
 }
 
 // assume hist is not empty
-template<bool ReportProgress>
-void ZImgAutoThreshold<ReportProgress>::histNonZeroRange(std::vector<size_t>& hist, size_t& low, size_t& high)
+void ZImgAutoThreshold::histNonZeroRange(std::vector<size_t>& hist, size_t& low, size_t& high)
 {
   low = 0;
   while (low < hist.size() - 1 && hist[low] == 0) {
@@ -501,248 +491,88 @@ void ZImgAutoThreshold<ReportProgress>::histNonZeroRange(std::vector<size_t>& hi
   }
 }
 
-template class ZImgAutoThreshold<true>;
+template uint8_t ZImgAutoThreshold::typedTriangleThre<uint8_t>(const ZImg&, size_t, size_t);
+template uint16_t ZImgAutoThreshold::typedTriangleThre<uint16_t>(const ZImg&, size_t, size_t);
+template uint32_t ZImgAutoThreshold::typedTriangleThre<uint32_t>(const ZImg&, size_t, size_t);
+template uint64_t ZImgAutoThreshold::typedTriangleThre<uint64_t>(const ZImg&, size_t, size_t);
+template int8_t ZImgAutoThreshold::typedTriangleThre<int8_t>(const ZImg&, size_t, size_t);
+template int16_t ZImgAutoThreshold::typedTriangleThre<int16_t>(const ZImg&, size_t, size_t);
+template int32_t ZImgAutoThreshold::typedTriangleThre<int32_t>(const ZImg&, size_t, size_t);
+template int64_t ZImgAutoThreshold::typedTriangleThre<int64_t>(const ZImg&, size_t, size_t);
+template float ZImgAutoThreshold::typedTriangleThre<float>(const ZImg&, size_t, size_t);
+template double ZImgAutoThreshold::typedTriangleThre<double>(const ZImg&, size_t, size_t);
 
-template class ZImgAutoThreshold<false>;
-
-template uint8_t ZImgAutoThreshold<true>::typedTriangleThre<uint8_t>(const ZImg&, size_t, size_t);
-
-template uint16_t ZImgAutoThreshold<true>::typedTriangleThre<uint16_t>(const ZImg&, size_t, size_t);
-
-template uint32_t ZImgAutoThreshold<true>::typedTriangleThre<uint32_t>(const ZImg&, size_t, size_t);
-
-template uint64_t ZImgAutoThreshold<true>::typedTriangleThre<uint64_t>(const ZImg&, size_t, size_t);
-
-template int8_t ZImgAutoThreshold<true>::typedTriangleThre<int8_t>(const ZImg&, size_t, size_t);
-
-template int16_t ZImgAutoThreshold<true>::typedTriangleThre<int16_t>(const ZImg&, size_t, size_t);
-
-template int32_t ZImgAutoThreshold<true>::typedTriangleThre<int32_t>(const ZImg&, size_t, size_t);
-
-template int64_t ZImgAutoThreshold<true>::typedTriangleThre<int64_t>(const ZImg&, size_t, size_t);
-
-template float ZImgAutoThreshold<true>::typedTriangleThre<float>(const ZImg&, size_t, size_t);
-
-template double ZImgAutoThreshold<true>::typedTriangleThre<double>(const ZImg&, size_t, size_t);
-
-template uint8_t ZImgAutoThreshold<false>::typedTriangleThre<uint8_t>(const ZImg&, size_t, size_t);
-
-template uint16_t ZImgAutoThreshold<false>::typedTriangleThre<uint16_t>(const ZImg&, size_t, size_t);
-
-template uint32_t ZImgAutoThreshold<false>::typedTriangleThre<uint32_t>(const ZImg&, size_t, size_t);
-
-template uint64_t ZImgAutoThreshold<false>::typedTriangleThre<uint64_t>(const ZImg&, size_t, size_t);
-
-template int8_t ZImgAutoThreshold<false>::typedTriangleThre<int8_t>(const ZImg&, size_t, size_t);
-
-template int16_t ZImgAutoThreshold<false>::typedTriangleThre<int16_t>(const ZImg&, size_t, size_t);
-
-template int32_t ZImgAutoThreshold<false>::typedTriangleThre<int32_t>(const ZImg&, size_t, size_t);
-
-template int64_t ZImgAutoThreshold<false>::typedTriangleThre<int64_t>(const ZImg&, size_t, size_t);
-
-template float ZImgAutoThreshold<false>::typedTriangleThre<float>(const ZImg&, size_t, size_t);
-
-template double ZImgAutoThreshold<false>::typedTriangleThre<double>(const ZImg&, size_t, size_t);
-
-template uint8_t ZImgAutoThreshold<true>::typedTriangleThre<uint8_t>(const QString&,
-                                                                     size_t,
-                                                                     size_t,
-                                                                     size_t,
-                                                                     const std::vector<ZVoxelCoordinate>&);
-
-template uint16_t ZImgAutoThreshold<true>::typedTriangleThre<uint16_t>(const QString&,
-                                                                       size_t,
-                                                                       size_t,
-                                                                       size_t,
-                                                                       const std::vector<ZVoxelCoordinate>&);
-
-template uint32_t ZImgAutoThreshold<true>::typedTriangleThre<uint32_t>(const QString&,
-                                                                       size_t,
-                                                                       size_t,
-                                                                       size_t,
-                                                                       const std::vector<ZVoxelCoordinate>&);
-
-template uint64_t ZImgAutoThreshold<true>::typedTriangleThre<uint64_t>(const QString&,
-                                                                       size_t,
-                                                                       size_t,
-                                                                       size_t,
-                                                                       const std::vector<ZVoxelCoordinate>&);
-
-template int8_t ZImgAutoThreshold<true>::typedTriangleThre<int8_t>(const QString&,
-                                                                   size_t,
-                                                                   size_t,
-                                                                   size_t,
-                                                                   const std::vector<ZVoxelCoordinate>&);
-
-template int16_t ZImgAutoThreshold<true>::typedTriangleThre<int16_t>(const QString&,
-                                                                     size_t,
-                                                                     size_t,
-                                                                     size_t,
-                                                                     const std::vector<ZVoxelCoordinate>&);
-
-template int32_t ZImgAutoThreshold<true>::typedTriangleThre<int32_t>(const QString&,
-                                                                     size_t,
-                                                                     size_t,
-                                                                     size_t,
-                                                                     const std::vector<ZVoxelCoordinate>&);
-
-template int64_t ZImgAutoThreshold<true>::typedTriangleThre<int64_t>(const QString&,
-                                                                     size_t,
-                                                                     size_t,
-                                                                     size_t,
-                                                                     const std::vector<ZVoxelCoordinate>&);
-
-template float ZImgAutoThreshold<true>::typedTriangleThre<float>(const QString&,
+template uint8_t ZImgAutoThreshold::typedTriangleThre<uint8_t>(const QString&,
+                                                               size_t,
+                                                               size_t,
+                                                               size_t,
+                                                               const std::vector<ZVoxelCoordinate>&);
+template uint16_t ZImgAutoThreshold::typedTriangleThre<uint16_t>(const QString&,
                                                                  size_t,
                                                                  size_t,
                                                                  size_t,
                                                                  const std::vector<ZVoxelCoordinate>&);
+template uint32_t ZImgAutoThreshold::typedTriangleThre<uint32_t>(const QString&,
+                                                                 size_t,
+                                                                 size_t,
+                                                                 size_t,
+                                                                 const std::vector<ZVoxelCoordinate>&);
+template uint64_t ZImgAutoThreshold::typedTriangleThre<uint64_t>(const QString&,
+                                                                 size_t,
+                                                                 size_t,
+                                                                 size_t,
+                                                                 const std::vector<ZVoxelCoordinate>&);
+template int8_t ZImgAutoThreshold::typedTriangleThre<int8_t>(const QString&,
+                                                             size_t,
+                                                             size_t,
+                                                             size_t,
+                                                             const std::vector<ZVoxelCoordinate>&);
+template int16_t ZImgAutoThreshold::typedTriangleThre<int16_t>(const QString&,
+                                                               size_t,
+                                                               size_t,
+                                                               size_t,
+                                                               const std::vector<ZVoxelCoordinate>&);
+template int32_t ZImgAutoThreshold::typedTriangleThre<int32_t>(const QString&,
+                                                               size_t,
+                                                               size_t,
+                                                               size_t,
+                                                               const std::vector<ZVoxelCoordinate>&);
+template int64_t ZImgAutoThreshold::typedTriangleThre<int64_t>(const QString&,
+                                                               size_t,
+                                                               size_t,
+                                                               size_t,
+                                                               const std::vector<ZVoxelCoordinate>&);
+template float ZImgAutoThreshold::typedTriangleThre<float>(const QString&,
+                                                           size_t,
+                                                           size_t,
+                                                           size_t,
+                                                           const std::vector<ZVoxelCoordinate>&);
+template double ZImgAutoThreshold::typedTriangleThre<double>(const QString&,
+                                                             size_t,
+                                                             size_t,
+                                                             size_t,
+                                                             const std::vector<ZVoxelCoordinate>&);
 
-template double ZImgAutoThreshold<true>::typedTriangleThre<double>(const QString&,
-                                                                   size_t,
-                                                                   size_t,
-                                                                   size_t,
-                                                                   const std::vector<ZVoxelCoordinate>&);
+template uint8_t ZImgAutoThreshold::typedCentroidThre<uint8_t>(double&, double&, const ZImg&, size_t, size_t);
+template uint16_t ZImgAutoThreshold::typedCentroidThre<uint16_t>(double&, double&, const ZImg&, size_t, size_t);
+template uint32_t ZImgAutoThreshold::typedCentroidThre<uint32_t>(double&, double&, const ZImg&, size_t, size_t);
+template uint64_t ZImgAutoThreshold::typedCentroidThre<uint64_t>(double&, double&, const ZImg&, size_t, size_t);
+template int8_t ZImgAutoThreshold::typedCentroidThre<int8_t>(double&, double&, const ZImg&, size_t, size_t);
+template int16_t ZImgAutoThreshold::typedCentroidThre<int16_t>(double&, double&, const ZImg&, size_t, size_t);
+template int32_t ZImgAutoThreshold::typedCentroidThre<int32_t>(double&, double&, const ZImg&, size_t, size_t);
+template int64_t ZImgAutoThreshold::typedCentroidThre<int64_t>(double&, double&, const ZImg&, size_t, size_t);
+template float ZImgAutoThreshold::typedCentroidThre<float>(double&, double&, const ZImg&, size_t, size_t);
+template double ZImgAutoThreshold::typedCentroidThre<double>(double&, double&, const ZImg&, size_t, size_t);
 
-template uint8_t ZImgAutoThreshold<false>::typedTriangleThre<uint8_t>(const QString&,
-                                                                      size_t,
-                                                                      size_t,
-                                                                      size_t,
-                                                                      const std::vector<ZVoxelCoordinate>&);
-
-template uint16_t ZImgAutoThreshold<false>::typedTriangleThre<uint16_t>(const QString&,
-                                                                        size_t,
-                                                                        size_t,
-                                                                        size_t,
-                                                                        const std::vector<ZVoxelCoordinate>&);
-
-template uint32_t ZImgAutoThreshold<false>::typedTriangleThre<uint32_t>(const QString&,
-                                                                        size_t,
-                                                                        size_t,
-                                                                        size_t,
-                                                                        const std::vector<ZVoxelCoordinate>&);
-
-template uint64_t ZImgAutoThreshold<false>::typedTriangleThre<uint64_t>(const QString&,
-                                                                        size_t,
-                                                                        size_t,
-                                                                        size_t,
-                                                                        const std::vector<ZVoxelCoordinate>&);
-
-template int8_t ZImgAutoThreshold<false>::typedTriangleThre<int8_t>(const QString&,
-                                                                    size_t,
-                                                                    size_t,
-                                                                    size_t,
-                                                                    const std::vector<ZVoxelCoordinate>&);
-
-template int16_t ZImgAutoThreshold<false>::typedTriangleThre<int16_t>(const QString&,
-                                                                      size_t,
-                                                                      size_t,
-                                                                      size_t,
-                                                                      const std::vector<ZVoxelCoordinate>&);
-
-template int32_t ZImgAutoThreshold<false>::typedTriangleThre<int32_t>(const QString&,
-                                                                      size_t,
-                                                                      size_t,
-                                                                      size_t,
-                                                                      const std::vector<ZVoxelCoordinate>&);
-
-template int64_t ZImgAutoThreshold<false>::typedTriangleThre<int64_t>(const QString&,
-                                                                      size_t,
-                                                                      size_t,
-                                                                      size_t,
-                                                                      const std::vector<ZVoxelCoordinate>&);
-
-template float ZImgAutoThreshold<false>::typedTriangleThre<float>(const QString&,
-                                                                  size_t,
-                                                                  size_t,
-                                                                  size_t,
-                                                                  const std::vector<ZVoxelCoordinate>&);
-
-template double ZImgAutoThreshold<false>::typedTriangleThre<double>(const QString&,
-                                                                    size_t,
-                                                                    size_t,
-                                                                    size_t,
-                                                                    const std::vector<ZVoxelCoordinate>&);
-
-template uint8_t ZImgAutoThreshold<true>::typedCentroidThre<uint8_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template uint16_t ZImgAutoThreshold<true>::typedCentroidThre<uint16_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template uint32_t ZImgAutoThreshold<true>::typedCentroidThre<uint32_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template uint64_t ZImgAutoThreshold<true>::typedCentroidThre<uint64_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template int8_t ZImgAutoThreshold<true>::typedCentroidThre<int8_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template int16_t ZImgAutoThreshold<true>::typedCentroidThre<int16_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template int32_t ZImgAutoThreshold<true>::typedCentroidThre<int32_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template int64_t ZImgAutoThreshold<true>::typedCentroidThre<int64_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template float ZImgAutoThreshold<true>::typedCentroidThre<float>(double&, double&, const ZImg&, size_t, size_t);
-
-template double ZImgAutoThreshold<true>::typedCentroidThre<double>(double&, double&, const ZImg&, size_t, size_t);
-
-template uint8_t ZImgAutoThreshold<false>::typedCentroidThre<uint8_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template uint16_t ZImgAutoThreshold<false>::typedCentroidThre<uint16_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template uint32_t ZImgAutoThreshold<false>::typedCentroidThre<uint32_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template uint64_t ZImgAutoThreshold<false>::typedCentroidThre<uint64_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template int8_t ZImgAutoThreshold<false>::typedCentroidThre<int8_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template int16_t ZImgAutoThreshold<false>::typedCentroidThre<int16_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template int32_t ZImgAutoThreshold<false>::typedCentroidThre<int32_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template int64_t ZImgAutoThreshold<false>::typedCentroidThre<int64_t>(double&, double&, const ZImg&, size_t, size_t);
-
-template float ZImgAutoThreshold<false>::typedCentroidThre<float>(double&, double&, const ZImg&, size_t, size_t);
-
-template double ZImgAutoThreshold<false>::typedCentroidThre<double>(double&, double&, const ZImg&, size_t, size_t);
-
-template uint8_t ZImgAutoThreshold<true>::typedMaxHistThre<uint8_t>(const ZImg&, size_t, size_t);
-
-template uint16_t ZImgAutoThreshold<true>::typedMaxHistThre<uint16_t>(const ZImg&, size_t, size_t);
-
-template uint32_t ZImgAutoThreshold<true>::typedMaxHistThre<uint32_t>(const ZImg&, size_t, size_t);
-
-template uint64_t ZImgAutoThreshold<true>::typedMaxHistThre<uint64_t>(const ZImg&, size_t, size_t);
-
-template int8_t ZImgAutoThreshold<true>::typedMaxHistThre<int8_t>(const ZImg&, size_t, size_t);
-
-template int16_t ZImgAutoThreshold<true>::typedMaxHistThre<int16_t>(const ZImg&, size_t, size_t);
-
-template int32_t ZImgAutoThreshold<true>::typedMaxHistThre<int32_t>(const ZImg&, size_t, size_t);
-
-template int64_t ZImgAutoThreshold<true>::typedMaxHistThre<int64_t>(const ZImg&, size_t, size_t);
-
-template float ZImgAutoThreshold<true>::typedMaxHistThre<float>(const ZImg&, size_t, size_t);
-
-template double ZImgAutoThreshold<true>::typedMaxHistThre<double>(const ZImg&, size_t, size_t);
-
-template uint8_t ZImgAutoThreshold<false>::typedMaxHistThre<uint8_t>(const ZImg&, size_t, size_t);
-
-template uint16_t ZImgAutoThreshold<false>::typedMaxHistThre<uint16_t>(const ZImg&, size_t, size_t);
-
-template uint32_t ZImgAutoThreshold<false>::typedMaxHistThre<uint32_t>(const ZImg&, size_t, size_t);
-
-template uint64_t ZImgAutoThreshold<false>::typedMaxHistThre<uint64_t>(const ZImg&, size_t, size_t);
-
-template int8_t ZImgAutoThreshold<false>::typedMaxHistThre<int8_t>(const ZImg&, size_t, size_t);
-
-template int16_t ZImgAutoThreshold<false>::typedMaxHistThre<int16_t>(const ZImg&, size_t, size_t);
-
-template int32_t ZImgAutoThreshold<false>::typedMaxHistThre<int32_t>(const ZImg&, size_t, size_t);
-
-template int64_t ZImgAutoThreshold<false>::typedMaxHistThre<int64_t>(const ZImg&, size_t, size_t);
-
-template float ZImgAutoThreshold<false>::typedMaxHistThre<float>(const ZImg&, size_t, size_t);
-
-template double ZImgAutoThreshold<false>::typedMaxHistThre<double>(const ZImg&, size_t, size_t);
+template uint8_t ZImgAutoThreshold::typedMaxHistThre<uint8_t>(const ZImg&, size_t, size_t);
+template uint16_t ZImgAutoThreshold::typedMaxHistThre<uint16_t>(const ZImg&, size_t, size_t);
+template uint32_t ZImgAutoThreshold::typedMaxHistThre<uint32_t>(const ZImg&, size_t, size_t);
+template uint64_t ZImgAutoThreshold::typedMaxHistThre<uint64_t>(const ZImg&, size_t, size_t);
+template int8_t ZImgAutoThreshold::typedMaxHistThre<int8_t>(const ZImg&, size_t, size_t);
+template int16_t ZImgAutoThreshold::typedMaxHistThre<int16_t>(const ZImg&, size_t, size_t);
+template int32_t ZImgAutoThreshold::typedMaxHistThre<int32_t>(const ZImg&, size_t, size_t);
+template int64_t ZImgAutoThreshold::typedMaxHistThre<int64_t>(const ZImg&, size_t, size_t);
+template float ZImgAutoThreshold::typedMaxHistThre<float>(const ZImg&, size_t, size_t);
+template double ZImgAutoThreshold::typedMaxHistThre<double>(const ZImg&, size_t, size_t);
 
 } // namespace nim

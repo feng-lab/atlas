@@ -38,8 +38,7 @@ struct ConnComp
   [[nodiscard]] ZImg createTypedLabelImg() const;
 };
 
-template<bool ReportProgress = false>
-class ZImgConnectedComponents : public ZImgAlgorithm<ReportProgress>
+class ZImgConnectedComponents : public ZImgAlgorithm
 {
 public:
   // input can be any type of img, all > 0 voxel are foreground

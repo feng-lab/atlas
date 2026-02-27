@@ -67,7 +67,6 @@ void ZChromaticShiftCorrection::doWork()
       this->alignChannelWithPresetTransform<TVoxel>(srcImg, m_targetChannel, m_method);
     });
   }
-  Q_EMIT resultReady(m_resultFilename);
   reportProgress(1.0);
 }
 

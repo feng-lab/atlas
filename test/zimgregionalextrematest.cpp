@@ -22,7 +22,7 @@ TEST(ZImgRegionalExtrema, max)
   img.setValue(45, ZVoxelCoordinate(2, 7));
   img.setValue(44, ZVoxelCoordinate(3, 8));
 
-  ZImgRegionalExtrema<> regionalExtrema;
+  ZImgRegionalExtrema regionalExtrema;
   ZImg mask = regionalExtrema.regionalMax(img);
   for (ZImgRegionConstIterator<uint8_t> it = ZImgRegionConstIterator<uint8_t>(mask); !it.isAtEnd(); ++it) {
     ZVoxelCoordinate coord = it.coord();
@@ -51,7 +51,7 @@ TEST(ZImgRegionalExtrema, min)
     *it = 7;
   }
 
-  ZImgRegionalExtrema<> regionalExtrema;
+  ZImgRegionalExtrema regionalExtrema;
   ZImg mask = regionalExtrema.regionalMin(img);
   for (ZImgRegionConstIterator<uint8_t> it = ZImgRegionConstIterator<uint8_t>(mask); !it.isAtEnd(); ++it) {
     ZVoxelCoordinate coord = it.coord();
@@ -72,16 +72,25 @@ TEST(ZImgRegionalExtrema, max2d1)
     ZImg res(getTestDataDir().filePath("img/im2d1maxres.tif"));
 
     ZBenchTimer bt;
-    ZImgRegionalExtrema<> regionalExtrema;
+    ZImgRegionalExtrema regionalExtrema;
     ZImg mask = regionalExtrema.regionalMax(img);
     STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
 
     bt.resetAndStart();
-    ZImgRegionalExtrema<true> regionalExtrema1;
-    mask = regionalExtrema1.regionalMax(img);
+    ZImgRegionalExtrema regionalExtremaWithProgress;
+    double lastProgress = 0.0;
+    size_t progressCalls = 0;
+    regionalExtremaWithProgress.setProgressCallback([&lastProgress, &progressCalls](double p) {
+      lastProgress = p;
+      ++progressCalls;
+    });
+    mask = regionalExtremaWithProgress.regionalMax(img);
     STOP_AND_LOG(bt)
+
+    EXPECT_DOUBLE_EQ(lastProgress, 1.0);
+    EXPECT_GT(progressCalls, 0_uz);
 
     ASSERT_TRUE(res == mask);
   }
@@ -99,16 +108,25 @@ TEST(ZImgRegionalExtrema, min2d1)
     ZImg res(getTestDataDir().filePath("img/im2d1minres.tif"));
 
     ZBenchTimer bt;
-    ZImgRegionalExtrema<> regionalExtrema;
+    ZImgRegionalExtrema regionalExtrema;
     ZImg mask = regionalExtrema.regionalMin(img);
     STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
 
     bt.resetAndStart();
-    ZImgRegionalExtrema<true> regionalExtrema1;
-    mask = regionalExtrema1.regionalMin(img);
+    ZImgRegionalExtrema regionalExtremaWithProgress;
+    double lastProgress = 0.0;
+    size_t progressCalls = 0;
+    regionalExtremaWithProgress.setProgressCallback([&lastProgress, &progressCalls](double p) {
+      lastProgress = p;
+      ++progressCalls;
+    });
+    mask = regionalExtremaWithProgress.regionalMin(img);
     STOP_AND_LOG(bt)
+
+    EXPECT_DOUBLE_EQ(lastProgress, 1.0);
+    EXPECT_GT(progressCalls, 0_uz);
 
     ASSERT_TRUE(res == mask);
   }
@@ -126,16 +144,25 @@ TEST(ZImgRegionalExtrema, max3d1)
     ZImg res(getTestDataDir().filePath("img/im3d1maxres.tif"));
 
     ZBenchTimer bt;
-    ZImgRegionalExtrema<> regionalExtrema;
+    ZImgRegionalExtrema regionalExtrema;
     ZImg mask = regionalExtrema.regionalMax(img);
     STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
 
     bt.resetAndStart();
-    ZImgRegionalExtrema<true> regionalExtrema1;
-    mask = regionalExtrema1.regionalMax(img);
+    ZImgRegionalExtrema regionalExtremaWithProgress;
+    double lastProgress = 0.0;
+    size_t progressCalls = 0;
+    regionalExtremaWithProgress.setProgressCallback([&lastProgress, &progressCalls](double p) {
+      lastProgress = p;
+      ++progressCalls;
+    });
+    mask = regionalExtremaWithProgress.regionalMax(img);
     STOP_AND_LOG(bt)
+
+    EXPECT_DOUBLE_EQ(lastProgress, 1.0);
+    EXPECT_GT(progressCalls, 0_uz);
 
     ASSERT_TRUE(res == mask);
   }
@@ -153,16 +180,25 @@ TEST(ZImgRegionalExtrema, min3d1)
     ZImg res(getTestDataDir().filePath("img/im3d1minres.tif"));
 
     ZBenchTimer bt;
-    ZImgRegionalExtrema<> regionalExtrema;
+    ZImgRegionalExtrema regionalExtrema;
     ZImg mask = regionalExtrema.regionalMin(img);
     STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
 
     bt.resetAndStart();
-    ZImgRegionalExtrema<true> regionalExtrema1;
-    mask = regionalExtrema1.regionalMin(img);
+    ZImgRegionalExtrema regionalExtremaWithProgress;
+    double lastProgress = 0.0;
+    size_t progressCalls = 0;
+    regionalExtremaWithProgress.setProgressCallback([&lastProgress, &progressCalls](double p) {
+      lastProgress = p;
+      ++progressCalls;
+    });
+    mask = regionalExtremaWithProgress.regionalMin(img);
     STOP_AND_LOG(bt)
+
+    EXPECT_DOUBLE_EQ(lastProgress, 1.0);
+    EXPECT_GT(progressCalls, 0_uz);
 
     ASSERT_TRUE(res == mask);
   }

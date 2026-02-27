@@ -282,9 +282,9 @@ void binaryImgToMesh1(const ZImg &img, ZMesh &msh)
   std::vector<glm::dvec3> centers;
   std::vector<double> squaredRadius;
 
-  ZImgConnectedComponents<> connComp;
+  ZImgConnectedComponents connComp;
   ConnComp CC = connComp.runLabel(img, 0, 1);
-  ZImgSignedDistanceMap<> distMap;
+  ZImgSignedDistanceMap distMap;
   distMap.setUseSquaredDistance(true);
   ZImg distImg = distMap.run<float>(img, false);
 

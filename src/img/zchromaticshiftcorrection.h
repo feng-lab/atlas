@@ -12,8 +12,6 @@ class ZImageTransform;
 
 class ZChromaticShiftCorrection : public ZImgProcess
 {
-  Q_OBJECT
-
 public:
   ZChromaticShiftCorrection() = default;
 
@@ -93,9 +91,6 @@ public:
   {
     m_numScales = i;
   }
-
-Q_SIGNALS:
-  void resultReady(QString path);
 
 protected:
   void doWork() override;

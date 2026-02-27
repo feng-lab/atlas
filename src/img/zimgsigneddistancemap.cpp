@@ -5,9 +5,8 @@
 
 namespace nim {
 
-template<bool ReportProgress>
 template<typename TVoxelOut>
-ZImg ZImgSignedDistanceMap<ReportProgress>::run(const ZImg& img, bool useVoxelSize)
+ZImg ZImgSignedDistanceMap::run(const ZImg& img, bool useVoxelSize)
 {
   static_assert(std::is_floating_point_v<TVoxelOut>);
   ZImgInfo info = img.info();
@@ -24,9 +23,8 @@ ZImg ZImgSignedDistanceMap<ReportProgress>::run(const ZImg& img, bool useVoxelSi
   return res;
 }
 
-template<bool ReportProgress>
 template<typename TITKImg, typename TVoxelOut>
-void ZImgSignedDistanceMap<ReportProgress>::run_Impl(TITKImg* itkimg, bool useVoxelSize, ZImg& res, size_t c, size_t t)
+void ZImgSignedDistanceMap::run_Impl(TITKImg* itkimg, bool useVoxelSize, ZImg& res, size_t c, size_t t)
 {
   using TOutputITKImg = itk::Image<TVoxelOut, TITKImg::ImageDimension>;
   using DistanceMapFilterType = itk::SignedMaurerDistanceMapImageFilter<TITKImg, TOutputITKImg>;
@@ -39,30 +37,8 @@ void ZImgSignedDistanceMap<ReportProgress>::run_Impl(TITKImg* itkimg, bool useVo
   dmFilter->Update();
   copyITKImgToMemory(dmFilter->GetOutput(), res.channelData<TVoxelOut>(c, t));
 }
+template ZImg ZImgSignedDistanceMap::run<float>(const ZImg&, bool);
 
-template class ZImgSignedDistanceMap<true>;
-
-template class ZImgSignedDistanceMap<false>;
-
-// template ZImg ZImgSignedDistanceMap<true>::run<int8_t>(const ZImg&, bool);
-// template ZImg ZImgSignedDistanceMap<true>::run<int16_t>(const ZImg&, bool);
-//  integer output not supported by ITK
-//  template ZImg ZImgSignedDistanceMap<true>::run<int32_t>(const ZImg&, bool);
-
-// template ZImg ZImgSignedDistanceMap<true>::run<int64_t>(const ZImg&, bool);
-
-template ZImg ZImgSignedDistanceMap<true>::run<float>(const ZImg&, bool);
-
-template ZImg ZImgSignedDistanceMap<true>::run<double>(const ZImg&, bool);
-
-// template ZImg ZImgSignedDistanceMap<false>::run<int8_t>(const ZImg&, bool);
-// template ZImg ZImgSignedDistanceMap<false>::run<int16_t>(const ZImg&, bool);
-//  template ZImg ZImgSignedDistanceMap<false>::run<int32_t>(const ZImg&, bool);
-
-// template ZImg ZImgSignedDistanceMap<false>::run<int64_t>(const ZImg&, bool);
-
-template ZImg ZImgSignedDistanceMap<false>::run<float>(const ZImg&, bool);
-
-template ZImg ZImgSignedDistanceMap<false>::run<double>(const ZImg&, bool);
+template ZImg ZImgSignedDistanceMap::run<double>(const ZImg&, bool);
 
 } // namespace nim

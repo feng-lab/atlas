@@ -5,8 +5,7 @@
 
 namespace nim {
 
-template<bool ReportProgress>
-ZImg ZImgInterpolate<ReportProgress>::run(const ZImg& img)
+ZImg ZImgInterpolate::run(const ZImg& img)
 {
   ZImg res = img;
 
@@ -20,9 +19,8 @@ ZImg ZImgInterpolate<ReportProgress>::run(const ZImg& img)
   return res;
 }
 
-template<bool ReportProgress>
 template<typename TITKImg>
-void ZImgInterpolate<ReportProgress>::run_Impl(TITKImg* itkimg, ZImg& res, size_t c, size_t t)
+void ZImgInterpolate::run_Impl(TITKImg* itkimg, ZImg& res, size_t c, size_t t)
 {
   using MorphologicalContourInterpolatorFilterType = itk::MorphologicalContourInterpolator<TITKImg>;
   typename MorphologicalContourInterpolatorFilterType::Pointer iFilter =
@@ -33,9 +31,5 @@ void ZImgInterpolate<ReportProgress>::run_Impl(TITKImg* itkimg, ZImg& res, size_
   iFilter->Update();
   copyITKImgToMemory(iFilter->GetOutput(), res.channelData<typename TITKImg::PixelType>(c, t));
 }
-
-template class ZImgInterpolate<true>;
-
-template class ZImgInterpolate<false>;
 
 } // namespace nim

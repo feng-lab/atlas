@@ -784,7 +784,6 @@ void ZStitchImage::doWork()
   }
 
   LOG(INFO) << fmt::format("{} saved.", m_resFileName);
-  Q_EMIT resultReady(m_resFileName);
 }
 
 void ZStitchImage::read(const json::object& jo)
@@ -1139,7 +1138,6 @@ void ZStitchImage::doRestitch()
   }
 
   LOG(INFO) << fmt::format("{} saved.", m_resFileName);
-  Q_EMIT resultReady(m_resFileName);
 }
 
 } // namespace nim

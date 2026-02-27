@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zimgprocess.h"
+#include <QStringList>
 #include <map>
 #include <memory>
 
@@ -14,8 +15,6 @@ class ZImageCompositeTransform;
 
 class ZSectionsRegistration : public ZImgProcess
 {
-  Q_OBJECT
-
 public:
   ZSectionsRegistration() = default;
 
@@ -99,9 +98,6 @@ public:
   {
     m_numNeighbors = i;
   }
-
-Q_SIGNALS:
-  void resultReady(QString path);
 
 protected:
   void doWork() override;

@@ -5,9 +5,8 @@
 
 namespace nim {
 
-template<bool ReportProgress>
 template<template<typename> class Compare>
-ZImg ZImgRegionalExtrema<ReportProgress>::regionalExtrema(const ZImg& img, size_t conn)
+ZImg ZImgRegionalExtrema::regionalExtrema(const ZImg& img, size_t conn)
 {
   if (conn == 0) {
     conn = img.is2DImg() ? 8 : 26;
@@ -98,16 +97,8 @@ ZImg ZImgRegionalExtrema<ReportProgress>::regionalExtrema(const ZImg& img, size_
   return res;
 }
 
-template class ZImgRegionalExtrema<true>;
+template ZImg ZImgRegionalExtrema::regionalExtrema<std::greater>(const ZImg&, size_t);
 
-template class ZImgRegionalExtrema<false>;
-
-template ZImg ZImgRegionalExtrema<true>::regionalExtrema<std::greater>(const ZImg&, size_t);
-
-template ZImg ZImgRegionalExtrema<true>::regionalExtrema<std::less>(const ZImg&, size_t);
-
-template ZImg ZImgRegionalExtrema<false>::regionalExtrema<std::greater>(const ZImg&, size_t);
-
-template ZImg ZImgRegionalExtrema<false>::regionalExtrema<std::less>(const ZImg&, size_t);
+template ZImg ZImgRegionalExtrema::regionalExtrema<std::less>(const ZImg&, size_t);
 
 } // namespace nim
