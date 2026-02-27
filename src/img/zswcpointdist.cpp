@@ -138,6 +138,43 @@ struct SegmentDistResult
 
 } // namespace
 
+bool swcTreeHitTest(const ZSwc& tree, double x, double y, double z)
+{
+  const std::array<double, 3> point = {x, y, z};
+
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
+    if (it->id < 0) {
+      continue;
+    }
+
+    const double dx = x - it->x;
+    const double dy = y - it->y;
+    const double dz = z - it->z;
+    const double r = it->radius;
+    if ((dx * dx + dy * dy + dz * dz) <= (r * r)) {
+      return true;
+    }
+
+    if (ZSwc::isRoot(it)) {
+      continue;
+    }
+
+    const auto parent = ZSwc::parent(it);
+    if (ZSwc::isNull(parent) || parent->id < 0) {
+      continue;
+    }
+
+    const std::array<double, 3> bottom = {parent->x, parent->y, parent->z};
+    const std::array<double, 3> top = {it->x, it->y, it->z};
+    const SegmentDistResult rSeg = frustumPointDist(bottom, top, parent->radius, it->radius, point);
+    if (rSeg.dist == 0.0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 SwcPointDistResult swcTreePointDist(ZSwc& tree, double x, double y, double z)
 {
   return swcTreePointDist(tree, x, y, z, ZSwc::SwcTreeNode{});

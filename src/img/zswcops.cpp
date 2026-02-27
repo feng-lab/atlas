@@ -7,6 +7,26 @@
 
 namespace nim {
 
+namespace {
+
+void cutNodeLikeLegacySubtract(ZSwc& swc, ZSwc::SwcTreeNode node)
+{
+  CHECK(!ZSwc::isNull(node));
+
+  std::vector<ZSwc::SwcTreeNode> children;
+  for (auto it = swc.beginChild(node); it != swc.endChild(node); ++it) {
+    children.push_back(it);
+  }
+
+  for (auto& child : children) {
+    swc.appendRoot(child);
+  }
+
+  swc.erase(node);
+}
+
+} // namespace
+
 void mergeToParent(ZSwc& swc, ZSwc::SwcTreeNode node)
 {
   mergeToParent(swc, node, SwcMergeOption::MergeWithParent);
@@ -222,6 +242,20 @@ int resortId(ZSwc& tree)
   }
 
   return id - 1;
+}
+
+void subtractSwcTrees(ZSwc& tree1, const ZSwc& tree2)
+{
+  for (auto it = tree1.begin(); it != tree1.end();) {
+    auto next = it;
+    ++next;
+
+    if (it->id >= 0 && swcTreeHitTest(tree2, it->x, it->y, it->z)) {
+      cutNodeLikeLegacySubtract(tree1, it);
+    }
+
+    it = next;
+  }
 }
 
 } // namespace nim

@@ -43,4 +43,9 @@ void connectNode(ZSwc& tree, ZSwc::SwcTreeNode node);
 // Returns the number of regular nodes assigned.
 int resortId(ZSwc& tree);
 
+// Port of `Swc_Tree_Subtract(tree1, tree2)`:
+// Removes any node in `tree1` whose position hits `tree2` (node sphere OR segment volume),
+// and detaches the cut node's descendants as new roots (matching `Swc_Tree_Cut_Node` behavior).
+void subtractSwcTrees(ZSwc& tree1, const ZSwc& tree2);
+
 } // namespace nim

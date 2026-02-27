@@ -98,9 +98,11 @@ add_gtest_executable(ztupleliketest)
 # Policy for heavy Atlas-linked tests:
 # - Enabled on developer machines.
 # - Disabled on Windows CI runners where link time/memory can be a bottleneck.
-set(_atlas_is_windows_ci OFF)
-if (WIN32 AND (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI}))
-  set(_atlas_is_windows_ci ON)
+if (NOT DEFINED _atlas_is_windows_ci)
+  set(_atlas_is_windows_ci OFF)
+  if (WIN32 AND (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI}))
+    set(_atlas_is_windows_ci ON)
+  endif ()
 endif ()
 
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)

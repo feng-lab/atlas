@@ -48,6 +48,8 @@ public:
 
   [[nodiscard]] std::vector<QAction*> loadFileActions() const override;
 
+  [[nodiscard]] QMenu* processObjMenu() const override;
+
   [[nodiscard]] QString objName(size_t id) const override;
 
   [[nodiscard]] QString objPath(size_t id) const override;
@@ -88,6 +90,10 @@ protected:
 private:
   void createActions();
 
+  void editSwc();
+
+  void subtractSwcs();
+
   bool saveSwc(ZSwcPack* pack, const QString& fileName, QString& errorMsg);
 
   // notify obj manager about the update
@@ -97,6 +103,8 @@ private:
   std::map<size_t, std::shared_ptr<ZSwcPack>> m_idToSwcPacks;
 
   QAction* m_loadSwcAction = nullptr;
+  QAction* m_editSwcAction = nullptr;
+  QAction* m_subtractSwcsAction = nullptr;
 };
 
 } // namespace nim

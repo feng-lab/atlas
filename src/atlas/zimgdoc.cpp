@@ -13,6 +13,7 @@
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
 #include "zautotracedialog.h"
+#include "zbinarytoswcdialog.h"
 #include "zsysteminfo.h"
 
 #include <QApplication>
@@ -320,6 +321,7 @@ QMenu* ZImgDoc::processObjMenu() const
 {
   auto res = new QMenu(typeName());
   res->addAction(m_autoTraceAction);
+  res->addAction(m_binaryToSwcAction);
   res->addSeparator();
   res->addAction(m_stitchImageAction);
   res->addAction(m_alignSectionsAction);
@@ -970,6 +972,12 @@ void ZImgDoc::autoTrace()
   dlg.exec();
 }
 
+void ZImgDoc::binaryToSwc()
+{
+  ZBinaryToSwcDialog dlg(m_doc, QApplication::activeWindow());
+  dlg.exec();
+}
+
 size_t ZImgDoc::addImgPack(ZImgPack* imgPack)
 {
   CHECK(imgPack);
@@ -1188,6 +1196,10 @@ void ZImgDoc::createActions()
   m_autoTraceAction = new QAction(ZTheme::instance().icon(ZTheme::AutoTraceIcon), tr("&Auto Trace..."), this);
   m_autoTraceAction->setStatusTip(tr("Automatically trace neurons in a selected image/channel"));
   connect(m_autoTraceAction, &QAction::triggered, this, &ZImgDoc::autoTrace);
+
+  m_binaryToSwcAction = new QAction(tr("&Binary -> SWC..."), this);
+  m_binaryToSwcAction->setStatusTip(tr("Convert a binary image to an SWC skeleton"));
+  connect(m_binaryToSwcAction, &QAction::triggered, this, &ZImgDoc::binaryToSwc);
 }
 
 bool ZImgDoc::saveImg(ZImgPack* pack,

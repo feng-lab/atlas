@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
 #include <vector>
 
 namespace nim {
@@ -265,8 +266,48 @@ std::unique_ptr<ZSwc> ZNeutubeSkeletonizer::makeSkeletonWithoutDs(ZImg img, cons
     return {};
   }
 
-  // Legacy code expects a GREY binary stack at this stage (0/1 uint8).
-  ZImg stackData = img.binarized();
+  // Legacy allows optional grey-to-binary thresholding via (level, grayOp).
+  // When no explicit level is provided (level < 0), the effective mask defaults to (voxel > 0).
+  ZImg stackData;
+  if (m_grayOp >= 0) {
+    const int grayOp = m_grayOp;
+    const int level = m_level;
+    stackData = img.binarized([grayOp, level](auto voxel) -> bool {
+      using TVoxel = decltype(voxel);
+      if constexpr (std::is_integral_v<TVoxel>) {
+        const int64_t v = static_cast<int64_t>(voxel);
+        switch (grayOp) {
+          case 0: { // >=
+            const int64_t threshold = static_cast<int64_t>(std::max(level, 0));
+            return v > threshold;
+          }
+          case 1: // <=
+            return (v > 0) && (v < static_cast<int64_t>(level));
+          case 2: // ==
+            return v == static_cast<int64_t>(level);
+          default:
+            return v > 0;
+        }
+      } else {
+        const double v = static_cast<double>(voxel);
+        switch (grayOp) {
+          case 0: { // >=
+            const double threshold = static_cast<double>(std::max(level, 0));
+            return v > threshold;
+          }
+          case 1: // <=
+            return (v > 0.0) && (v < static_cast<double>(level));
+          case 2: // ==
+            return v == static_cast<double>(level);
+          default:
+            return v > 0.0;
+        }
+      }
+    });
+  } else {
+    stackData = img.binarized();
+  }
+
   if (!hasAnyForegroundVoxel(stackData)) {
     return {};
   }

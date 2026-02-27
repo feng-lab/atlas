@@ -130,6 +130,7 @@ set(IMG_SOURCES
         zswcops.cpp zswcops.h
         zswcpointdist.cpp zswcpointdist.h
         zswcpostprocess.cpp zswcpostprocess.h
+        zswcsubtract.cpp zswcsubtract.h
         zswcresampler.cpp zswcresampler.h
         zswctreenodegeomlegacy.cpp zswctreenodegeomlegacy.h
         zswcwriter.cpp zswcwriter.h

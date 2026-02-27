@@ -693,6 +693,11 @@ void ZDoc::copySelectedObjsPathToClipboard()
   }
 }
 
+void ZDoc::requestOpenEditWidget(size_t id)
+{
+  sendOpenEditWidgetSignal(id);
+}
+
 void ZDoc::onObjAboutToBeRemoved(size_t id, ZObjDoc* doc)
 {
   if (auto us = doc->objUndoStack(id); us) {

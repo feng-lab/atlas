@@ -14,6 +14,11 @@ struct SwcPointDistResult
   ZSwc::SwcTreeNode closestNode;
 };
 
+// Port of `Swc_Tree_Hit_Test`:
+// - Hits when the point is inside any node sphere (radius) OR any segment frustum volume.
+// - Ignores virtual nodes (legacy semantics: node.id < 0).
+[[nodiscard]] bool swcTreeHitTest(const ZSwc& tree, double x, double y, double z);
+
 // Port of `Swc_Tree_Point_Dist` using a straight frustum segment model per edge.
 //
 // Returns:

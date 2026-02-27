@@ -40,10 +40,19 @@ void applySkeletonizeConfig(const json::object& cfg,
   if (auto it = cfg.find("minimalLength"); it != cfg.end() && it->value().is_number()) {
     skeletonizer->setLengthThreshold(it->value().to_number<double>());
   }
+  if (auto it = cfg.find("lengthThreshold"); it != cfg.end() && it->value().is_number()) {
+    skeletonizer->setLengthThreshold(it->value().to_number<double>());
+  }
   if (auto it = cfg.find("finalMinimalLength"); it != cfg.end() && it->value().is_number()) {
     skeletonizer->setFinalLengthThreshold(it->value().to_number<double>());
   }
+  if (auto it = cfg.find("finalLengthThreshold"); it != cfg.end() && it->value().is_number()) {
+    skeletonizer->setFinalLengthThreshold(it->value().to_number<double>());
+  }
   if (auto it = cfg.find("maximalDistance"); it != cfg.end() && it->value().is_number()) {
+    skeletonizer->setDistanceThreshold(it->value().to_number<double>());
+  }
+  if (auto it = cfg.find("distanceThreshold"); it != cfg.end() && it->value().is_number()) {
     skeletonizer->setDistanceThreshold(it->value().to_number<double>());
   }
   if (auto it = cfg.find("keepingSingleObject"); it != cfg.end() && it->value().is_bool()) {
@@ -57,6 +66,43 @@ void applySkeletonizeConfig(const json::object& cfg,
   }
   if (auto it = cfg.find("minimalObjectSize"); it != cfg.end() && it->value().is_int64()) {
     skeletonizer->setMinObjSize(static_cast<int>(it->value().as_int64()));
+  }
+  if (auto it = cfg.find("level"); it != cfg.end() && it->value().is_int64()) {
+    skeletonizer->setLevel(static_cast<int>(it->value().as_int64()));
+  }
+  if (auto it = cfg.find("grayOp"); it != cfg.end() && it->value().is_int64()) {
+    skeletonizer->setLevelOp(static_cast<int>(it->value().as_int64()));
+  }
+  if (auto it = cfg.find("levelOp"); it != cfg.end() && it->value().is_int64()) {
+    skeletonizer->setLevelOp(static_cast<int>(it->value().as_int64()));
+  }
+  if (auto it = cfg.find("interpolating"); it != cfg.end() && it->value().is_bool()) {
+    skeletonizer->setInterpolating(it->value().as_bool());
+  }
+  if (auto it = cfg.find("removingBorder"); it != cfg.end() && it->value().is_bool()) {
+    skeletonizer->setRemovingBorder(it->value().as_bool());
+  }
+  if (auto it = cfg.find("connectingBranch"); it != cfg.end() && it->value().is_bool()) {
+    skeletonizer->setConnectingBranch(it->value().as_bool());
+  }
+  if (auto it = cfg.find("usingOriginalSignal"); it != cfg.end() && it->value().is_bool()) {
+    skeletonizer->useOriginalSignal(it->value().as_bool());
+  }
+  if (auto it = cfg.find("resampleSwc"); it != cfg.end() && it->value().is_bool()) {
+    skeletonizer->setResampleSwc(it->value().as_bool());
+  }
+  if (auto it = cfg.find("autoGrayThreshold"); it != cfg.end() && it->value().is_bool()) {
+    skeletonizer->setAutoGrayThreshold(it->value().as_bool());
+  }
+  if (auto it = cfg.find("resolution"); it != cfg.end() && it->value().is_array()) {
+    const auto& arr = it->value().as_array();
+    if (arr.size() == 2 && arr[0].is_number() && arr[1].is_number()) {
+      skeletonizer->setResolution(arr[0].to_number<double>(), arr[1].to_number<double>());
+    } else if (arr.size() == 3 && arr[0].is_number() && arr[2].is_number()) {
+      skeletonizer->setResolution(arr[0].to_number<double>(), arr[2].to_number<double>());
+    } else {
+      LOG(WARNING) << "Invalid skeletonize.resolution; expected array[2] or array[3] of numbers";
+    }
   }
 
   std::optional<std::array<int, 3>> cfgIntv;

@@ -4,10 +4,12 @@
 #include "zlog.h"
 #include "ztheme.h"
 #include "zswcwidget.h"
+#include "zsubtractswcsdialog.h"
 #include "zmessageboxhelpers.h"
 #include <QFileDialog>
 #include <QSettings>
 #include <QApplication>
+#include <QMenu>
 #include <set>
 
 namespace nim {
@@ -171,6 +173,14 @@ std::vector<QAction*> ZSwcDoc::loadFileActions() const
   return res;
 }
 
+QMenu* ZSwcDoc::processObjMenu() const
+{
+  auto* res = new QMenu(typeName());
+  res->addAction(m_editSwcAction);
+  res->addAction(m_subtractSwcsAction);
+  return res;
+}
+
 void ZSwcDoc::removeObj(size_t id)
 {
   auto it = m_idToSwcPacks.find(id);
@@ -304,6 +314,30 @@ void ZSwcDoc::createActions()
   m_loadSwcAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Swc..."), this);
   m_loadSwcAction->setStatusTip(tr("Load an existing Swc file"));
   connect(m_loadSwcAction, &QAction::triggered, this, &ZSwcDoc::loadSwc);
+
+  m_editSwcAction = new QAction(tr("&Edit SWC..."), this);
+  m_editSwcAction->setStatusTip(tr("Open SWC editor"));
+  connect(m_editSwcAction, &QAction::triggered, this, &ZSwcDoc::editSwc);
+
+  m_subtractSwcsAction = new QAction(tr("&Subtract SWCs..."), this);
+  m_subtractSwcsAction->setStatusTip(tr("Subtract SWC trees from an input SWC"));
+  connect(m_subtractSwcsAction, &QAction::triggered, this, &ZSwcDoc::subtractSwcs);
+}
+
+void ZSwcDoc::editSwc()
+{
+  const size_t id = chooseOneObjWithWidget(tr("Edit SWC"), QApplication::activeWindow());
+  if (id == 0) {
+    return;
+  }
+
+  m_doc.requestOpenEditWidget(id);
+}
+
+void ZSwcDoc::subtractSwcs()
+{
+  ZSubtractSwcsDialog dlg(m_doc, QApplication::activeWindow());
+  dlg.exec();
 }
 
 bool ZSwcDoc::saveSwc(ZSwcPack* pack, const QString& fileName, QString& errorMsg)

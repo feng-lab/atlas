@@ -492,6 +492,8 @@ set(SOURCES
     zbackgroundtaskmanagerwidget.h zbackgroundtaskmanagerwidget.cpp
     zbackgroundjob.h zbackgroundjob.cpp
     zautotracedialog.h zautotracedialog.cpp
+    zbinarytoswcdialog.h zbinarytoswcdialog.cpp
+    zsubtractswcsdialog.h zsubtractswcsdialog.cpp
     zobjdoc.h zobjdoc.cpp
     zobjview.h zobjview.cpp
     zimgfilter.h zimgfilter.cpp

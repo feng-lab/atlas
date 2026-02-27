@@ -113,6 +113,8 @@ protected:
 
   void autoTrace();
 
+  void binaryToSwc();
+
   // append another img into this doc
   size_t addImgPack(ZImgPack* imgPack);
 
@@ -172,6 +174,7 @@ private:
   QAction* m_alignSectionsAction = nullptr;
   QAction* m_correctChromaticShiftAction = nullptr;
   QAction* m_autoTraceAction = nullptr;
+  QAction* m_binaryToSwcAction = nullptr;
 };
 
 } // namespace nim

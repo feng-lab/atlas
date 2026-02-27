@@ -101,7 +101,16 @@ include(PrintCMakeTargetInfo)
 
 
 # subprojects
-add_subdirectory(src/neurolabi/c)
+set(_atlas_is_windows_ci OFF)
+if (WIN32 AND (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI}))
+  set(_atlas_is_windows_ci ON)
+endif ()
+
+if (_atlas_is_windows_ci)
+  message(STATUS "Skipping legacy neurolabi/neutu targets on Windows CI.")
+else ()
+  add_subdirectory(src/neurolabi/c)
+endif ()
 
 include(LibsForImg)
 add_subdirectory(src/img)
@@ -110,7 +119,9 @@ add_subdirectory(src/img)
 # (e.g. the standalone zimg Python wheel build) can reuse it without rebuilding.
 export(TARGETS img FILE "${CMAKE_BINARY_DIR}/AtlasImgTargets.cmake")
 
-add_subdirectory(src/neurolabi/gui)
+if (NOT _atlas_is_windows_ci)
+  add_subdirectory(src/neurolabi/gui)
+endif ()
 # add_subdirectory(src/matlab)
 add_subdirectory(src/neutube)
 add_subdirectory(src/atlas)

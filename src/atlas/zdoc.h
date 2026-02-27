@@ -299,6 +299,10 @@ public:
 
   void copySelectedObjsPathToClipboard();
 
+  // Request the main window to open the object edit panel for a specific object id.
+  // This emits the `openEditWidget` signal.
+  void requestOpenEditWidget(size_t id);
+
 Q_SIGNALS:
   void showViewSetting(size_t id);
 
