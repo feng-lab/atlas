@@ -89,7 +89,7 @@ ZDoc::ZDoc(QObject* parent)
   m_regionAnnotationDoc = new ZRegionAnnotationDoc(*this);
   registerObjDoc(m_regionAnnotationDoc);
 
-  m_traceSettings = new ZTraceSettings(this);
+  m_traceSettings = new ZTraceSettings(*this, this);
   m_backgroundTaskManager = new ZBackgroundTaskManager(this);
 }
 

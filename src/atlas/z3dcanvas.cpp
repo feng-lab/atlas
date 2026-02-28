@@ -1,12 +1,23 @@
 #include "z3dcanvas.h"
 
+#include "zdoc.h"
+#include "zimgdoc.h"
 #include "zlog.h"
 #include "z3drenderingengine.h"
+#include "zneuroglancerprecomputed.h"
+#include "zseedtrace.h"
+#include "zswcdoc.h"
+#include "zswcpack.h"
+#include "zsysteminfo.h"
+#include "ztracesettings.h"
 #if defined(ATLAS_USE_OPENGLWIDGET)
 #include "z3dscene.h"
 #include "z3dopenglwidget.h"
 #endif
 #include <QCoreApplication>
+#include <QDir>
+#include <QMenu>
+#include <QPointer>
 #include <algorithm>
 
 DECLARE_bool(atlas_vk_copy_yflip_in_shader);
@@ -165,6 +176,140 @@ void Z3DCanvas::contextMenuEvent(QContextMenuEvent* e)
   if (m_engine) {
     QCoreApplication::postEvent(m_engine, e->clone());
   }
+}
+
+void Z3DCanvas::showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size_t sc, float x, float y, float z)
+{
+  if (m_doc == nullptr) {
+    return;
+  }
+
+  const ZTraceSettings& settings = m_doc->traceSettings();
+  if (!settings.traceToolEnabled()) {
+    return;
+  }
+
+  if (settings.traceInProgress()) {
+    return;
+  }
+
+  const std::optional<size_t> storedImgId = settings.sourceImageId();
+  if (!storedImgId.has_value() || *storedImgId != imgObjId) {
+    return;
+  }
+
+  ZImgDoc& imgDoc = m_doc->imgDoc();
+  if (!imgDoc.hasObjWithID(imgObjId)) {
+    return;
+  }
+
+  std::shared_ptr<ZImgPack> imgPack = imgDoc.imgPackShared(imgObjId);
+  if (!imgPack) {
+    return;
+  }
+
+  // Skip segmentation datasets (not traceable).
+  if (imgPack->isNeuroglancerPrecomputed()) {
+    const std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol = imgPack->neuroglancerVolumeShared();
+    if (vol && vol->isSegmentation()) {
+      return;
+    }
+  }
+
+  const ZImgInfo info = imgPack->imgInfo();
+  if (settings.sourceChannel() != sc) {
+    return;
+  }
+  if (sc >= info.numChannels) {
+    return;
+  }
+
+  std::optional<std::pair<size_t, ZSwc>> hostSwcOpt;
+  QString actionName = QStringLiteral("Trace");
+
+  if (settings.swcTargetMode() == ZTraceSettings::SwcTargetMode::ExistingSwc) {
+    const std::optional<size_t> storedSwcId = settings.targetSwcId();
+    if (!storedSwcId.has_value()) {
+      return;
+    }
+
+    ZSwcDoc& swcDoc = m_doc->swcDoc();
+    if (!swcDoc.hasObjWithID(*storedSwcId)) {
+      return;
+    }
+
+    hostSwcOpt = std::make_optional<std::pair<size_t, ZSwc>>(*storedSwcId, swcDoc.swcPack(*storedSwcId).swc());
+    actionName = QStringLiteral("Trace (attach)");
+  }
+
+  if (settings.swcTargetMode() != ZTraceSettings::SwcTargetMode::NewSwc && !hostSwcOpt.has_value()) {
+    return;
+  }
+
+  const bool promoteNewSwcToExistingTarget = (settings.swcTargetMode() == ZTraceSettings::SwcTargetMode::NewSwc);
+  const std::array<double, 3> seed = {static_cast<double>(x), static_cast<double>(y), static_cast<double>(z)};
+  const QString traceCfgPath = QDir(ZSystemInfo::jsonDirPath()).absoluteFilePath("trace_config.json");
+
+  QMenu traceMenu(this);
+  QAction* traceAct = traceMenu.addAction(QStringLiteral("Trace"));
+  connect(traceAct,
+          &QAction::triggered,
+          this,
+          [docPtr = m_doc,
+           actionName,
+           imgObjId,
+           imgPack,
+           sc,
+           seed,
+           traceCfgPath,
+           promoteNewSwcToExistingTarget,
+           hostSwcOpt = std::move(hostSwcOpt),
+           enginePtr = QPointer<Z3DRenderingEngine>(m_engine),
+           swcDocTypeName = (m_doc != nullptr) ? m_doc->swcDoc().typeName() : QString()]() mutable {
+            if (docPtr == nullptr) {
+              return;
+            }
+            std::function<void(size_t)> onNewSwcCreated = [enginePtr, imgObjId, swcDocTypeName](size_t newSwcId) {
+              if (!enginePtr) {
+                return;
+              }
+
+              QMetaObject::invokeMethod(
+                enginePtr,
+                [enginePtr, imgObjId, newSwcId, swcDocTypeName]() {
+                  if (!enginePtr) {
+                    return;
+                  }
+
+                  json::object srcViewJson;
+                  enginePtr->write(imgObjId, srcViewJson);
+                  const std::string coordKey = "Coord Transform 3DTransform";
+                  const auto it = srcViewJson.find(coordKey);
+                  if (it == srcViewJson.end()) {
+                    return;
+                  }
+
+                  json::object dstViewJson;
+                  dstViewJson["ViewObjType"] = json::value_from(swcDocTypeName);
+                  dstViewJson["ViewVersion"] = 1.0;
+                  dstViewJson[coordKey] = it->value();
+                  enginePtr->applyView3DForId(newSwcId, dstViewJson);
+                },
+                Qt::QueuedConnection);
+            };
+            startSeedTraceInteractive(*docPtr,
+                                      actionName,
+                                      imgObjId,
+                                      imgPack,
+                                      sc,
+                                      /*t=*/0,
+                                      seed,
+                                      traceCfgPath,
+                                      std::move(hostSwcOpt),
+                                      promoteNewSwcToExistingTarget,
+                                      std::move(onNewSwcCreated));
+          });
+  traceMenu.exec(globalPos);
 }
 
 // void Z3DCanvas::enterEvent(QEnterEvent* e)

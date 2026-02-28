@@ -2224,7 +2224,6 @@ void ZVulkanImgRaycasterPipelineContext::recordMergeFromLayers(const RenderBatch
   MergePipelineKey mergeKey{};
   mergeKey.numVolumes = static_cast<int>(channelCount);
   mergeKey.maxProjectionMerge = composite.maxProjectionMerge;
-  mergeKey.resultOpaque = composite.resultOpaque;
   mergeKey.colorFormats = finalFormats.colorFormats;
   mergeKey.depthFormat = finalFormats.depthFormat;
 
@@ -3429,15 +3428,12 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
   instance.pipeline->setColorBlendAttachments(std::move(blends));
 
   // Match constant IDs with image2d_array_compositor.frag
-  // 70: NUM_VOLUMES, 71: MAX_PROJ_MERGE, 51: RESULT_OPAQUE
-  std::array<vk::SpecializationMapEntry, 3> entries{
+  // 70: NUM_VOLUMES, 71: MAX_PROJ_MERGE
+  std::array<vk::SpecializationMapEntry, 2> entries{
     vk::SpecializationMapEntry{.constantID = 70, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 71, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 51, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+    vk::SpecializationMapEntry{.constantID = 71, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)}
   };
-  std::array<uint32_t, 3> values{static_cast<uint32_t>(std::max(1, key.numVolumes)),
-                                 key.maxProjectionMerge ? 1u : 0u,
-                                 key.resultOpaque ? 1u : 0u};
+  std::array<uint32_t, 2> values{static_cast<uint32_t>(std::max(1, key.numVolumes)), key.maxProjectionMerge ? 1u : 0u};
   std::vector<uint8_t> data(sizeof(values));
   std::memcpy(data.data(), values.data(), sizeof(values));
   instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
@@ -3451,18 +3447,16 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
 
   instance.pipeline->create();
   VLOG(2) << fmt::format(
-    "Raycaster Merge Pipeline: depthTest=0 depthWrite=0 colorFmt0={} depthFmt={} volumes={} maxProj={} opaque={}",
+    "Raycaster Merge Pipeline: depthTest=0 depthWrite=0 colorFmt0={} depthFmt={} volumes={} maxProj={}",
     formats.colorFormats.empty() ? -1 : static_cast<int>(formats.colorFormats.front()),
     formats.depthFormat ? static_cast<int>(*formats.depthFormat) : -1,
     key.numVolumes,
-    key.maxProjectionMerge,
-    key.resultOpaque);
+    key.maxProjectionMerge);
   VLOG(1) << "Merge pipeline created: depthTest=1 depthWrite=1 compareOp="
           << static_cast<int>(vk::CompareOp::eLessOrEqual)
           << " depthFmt=" << (formats.depthFormat ? static_cast<int>(*formats.depthFormat) : -1)
           << " color0Fmt=" << (formats.colorFormats.empty() ? -1 : static_cast<int>(formats.colorFormats.front()))
-          << " [spec] volumes=" << key.numVolumes << " maxProj=" << (key.maxProjectionMerge ? 1 : 0)
-          << " opaque=" << (key.resultOpaque ? 1 : 0);
+          << " [spec] volumes=" << key.numVolumes << " maxProj=" << (key.maxProjectionMerge ? 1 : 0);
 
   auto [inserted, _] = m_mergePipelines.emplace(key, std::move(instance));
   return inserted->second;

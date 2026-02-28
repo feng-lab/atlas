@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QObject>
 #include <QEvent>
+#include <QPoint>
 #include <QPointer>
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <mutex>
@@ -162,6 +163,32 @@ public:
 
   void detachCanvas();
 
+  // Seed-trace UI state is owned by ZDoc/Trace Settings on the UI thread. The
+  // rendering engine keeps a small snapshot so Z3DImgFilter can decide whether
+  // to emit trace-menu requests without reading UI-thread state directly.
+  void setSeedTraceUiState(bool enabled, bool inProgress, std::optional<size_t> sourceImgObjId);
+  void setSeedTraceUiState(bool enabled, bool inProgress, std::optional<size_t> sourceImgObjId, size_t sourceChannel);
+
+  [[nodiscard]] bool seedTraceToolEnabled() const
+  {
+    return m_seedTraceToolEnabled;
+  }
+
+  [[nodiscard]] bool seedTraceInProgress() const
+  {
+    return m_seedTraceInProgress;
+  }
+
+  [[nodiscard]] std::optional<size_t> seedTraceSourceImgObjId() const
+  {
+    return m_seedTraceSourceImgObjId;
+  }
+
+  [[nodiscard]] size_t seedTraceSourceChannel() const
+  {
+    return m_seedTraceSourceChannel;
+  }
+
   glm::uvec2 outputSize() const;
 
   void setOutputSize(const glm::uvec2& size);
@@ -304,6 +331,9 @@ Q_SIGNALS:
   // Emitted when a view setting widgets group changes (any id)
   void viewSettingWidgetsGroupChanged(size_t id);
 
+  // Emitted on the UI thread to show the seed-trace context menu for 3D tracing.
+  void showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size_t sc, float x, float y, float z);
+
 protected:
   bool event(QEvent* e) override;
 
@@ -414,6 +444,10 @@ private:
   ZDoc& m_doc;
 
   QPointer<Z3DCanvas> m_canvas;
+  bool m_seedTraceToolEnabled = false;
+  bool m_seedTraceInProgress = false;
+  std::optional<size_t> m_seedTraceSourceImgObjId;
+  size_t m_seedTraceSourceChannel = 0;
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
   std::unique_ptr<Z3DScratchResourcePool, ScratchPoolDeleter> m_scratchPool;
   std::unique_ptr<Z3DCompositor> m_compositor;

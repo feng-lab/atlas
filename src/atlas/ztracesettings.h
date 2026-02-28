@@ -7,6 +7,8 @@
 
 namespace nim {
 
+class ZDoc;
+
 class ZTraceSettings : public QObject
 {
   Q_OBJECT
@@ -42,7 +44,7 @@ public:
   };
   Q_ENUM(SwcTargetMode)
 
-  explicit ZTraceSettings(QObject* parent = nullptr);
+  explicit ZTraceSettings(ZDoc& doc, QObject* parent = nullptr);
 
   [[nodiscard]] std::optional<size_t> sourceImageId() const
   {
@@ -122,6 +124,9 @@ Q_SIGNALS:
   void changed();
 
 private:
+  void onImageRemoved(size_t imageId);
+  void onSwcRemoved(size_t swcId);
+
   struct SourceKey
   {
     size_t imageId = 0;

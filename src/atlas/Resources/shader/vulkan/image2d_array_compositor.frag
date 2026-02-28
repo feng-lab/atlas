@@ -11,7 +11,6 @@ layout(push_constant) uniform Image2DArrayCompositorPC {
 // Controls
 layout(constant_id = 70) const int  NUM_VOLUMES = 1;   // actual layer count
 layout(constant_id = 71) const bool MAX_PROJ_MERGE = false;
-layout(constant_id = 51) const bool RESULT_OPAQUE = false;
 
 layout(location = 0) out vec4 FragData0;
 
@@ -35,7 +34,9 @@ void main()
 
   if (MAX_PROJ_MERGE) {
     vec4 color = vec4(0.0);
-    float depth = RESULT_OPAQUE ? 0.0 : 1.0;
+    // Use nearest depth (min). RESULT_OPAQUE no-hit pixels are encoded as exit depth
+    // in the raycaster shaders, so silhouette fill does not override real hits.
+    float depth = 1.0;
     int n = min(NUM_VOLUMES, MAX_VOLUMES);
     for (int i = 0; i < n; ++i) {
       vec4 tmpColor =
@@ -43,7 +44,7 @@ void main()
       if (tmpColor.a <= 0.0) continue;
       color = max(color, tmpColor);
       float d = texelFetch(atlas_bindlessSampler2DArrayNearest(pc.depth_texture), ivec3(ivec2(gl_FragCoord.xy), i), 0).r;
-      depth = RESULT_OPAQUE ? max(depth, d) : min(depth, d);
+      depth = min(depth, d);
     }
     if (color.a <= 0.0) discard;
     FragData0 = color;

@@ -777,7 +777,8 @@ In **Trace Settings → Source**:
 
 If you have multiple images loaded:
 
-- The trace seed must be placed **within the selected source image**. If your cursor is over a different image (or outside any image), the Trace action will be disabled with a tooltip explaining why.
+- In the **2D view**, the trace seed must be placed **within the selected source image**. Clicking outside the selected image does nothing.
+- In the **3D view**, the trace seed must be placed on the selected source image volume, and the selected **trace channel must be visible** in that 3D image’s view settings. If the channel is hidden, Atlas will not show the Trace menu (because the pick would not be meaningful for an invisible channel).
 
 #### Step 3: choose the SWC target (create new vs attach)
 
@@ -788,13 +789,22 @@ In **Trace Settings → SWC Target**:
 
 The mapping from `(image, channel)` to SWC target is stored **in memory for the current session** (it is not currently a durable scene setting).
 
+Transform note:
+
+- When tracing creates a **new** SWC, Atlas initializes that SWC’s view transform to match the source image so the SWC overlays the image in 2D/3D. This is a one-time initialization; if you later change the image transform, Atlas does not automatically keep the SWC transform in sync.
+
 #### Step 4: trace from a seed point (left-click)
 
 With the Trace tool enabled and Trace Settings configured:
 
-1. Move the cursor to the desired seed point in the 2D view (within the chosen image).
-2. **Left-click** on the image background to open a small **Trace** menu.
+1. Move the cursor to the desired seed point.
+2. **Left-click** on the image/volume background to open a small **Trace** menu.
 3. Click **Trace** to start tracing from that seed.
+
+In the **3D view** specifically:
+
+- The Trace menu is only shown if the configured trace channel is currently visible for that volume (for example, the channel’s “Show Channel N” toggle is enabled). If the channel is hidden, Atlas does nothing on click.
+- Atlas chooses a seed location near your click using the configured channel’s signal along the view ray.
 
 Selection behavior:
 

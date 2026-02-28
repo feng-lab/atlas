@@ -1,5 +1,6 @@
 #include "ztracesettingswidget.h"
 
+#include "zcombobox.h"
 #include "zdoc.h"
 #include "zimgdoc.h"
 #include "zimgpack.h"
@@ -124,31 +125,40 @@ void disableFirstComboRow(QComboBox* combo)
 }
 
 ZTraceSettingsWidget::ZTraceSettingsWidget(ZDoc& doc, QWidget* parent)
-  : QWidget(parent)
+  : QScrollArea(parent)
   , m_doc(doc)
 {
-  auto* layout = new QVBoxLayout(this);
+  setWidgetResizable(true);
+  setFrameShape(QFrame::NoFrame);
+  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
+  setMinimumWidth(0);
+
+  auto* content = new QWidget(this);
+  content->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
+  content->setMinimumWidth(0);
+  setWidget(content);
+
+  auto* layout = new QVBoxLayout(content);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(10);
 
-  auto* sourceGroup = new QGroupBox(tr("Source"), this);
+  auto* sourceGroup = new QGroupBox(tr("Source"), content);
   auto* sourceForm = new QFormLayout(sourceGroup);
   sourceForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
   sourceForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
 
-  m_sourceImageCombo = new QComboBox(sourceGroup);
-  m_sourceImageCombo->setSizeAdjustPolicy(QComboBox::AdjustToContentsOnFirstShow);
+  m_sourceImageCombo = new ZComboBox(sourceGroup);
   m_sourceImageCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   sourceForm->addRow(tr("Image:"), m_sourceImageCombo);
 
-  m_channelCombo = new QComboBox(sourceGroup);
-  m_channelCombo->setSizeAdjustPolicy(QComboBox::AdjustToContentsOnFirstShow);
+  m_channelCombo = new ZComboBox(sourceGroup);
   m_channelCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   sourceForm->addRow(tr("Channel:"), m_channelCombo);
 
   layout->addWidget(sourceGroup);
 
-  auto* targetGroup = new QGroupBox(tr("SWC Target"), this);
+  auto* targetGroup = new QGroupBox(tr("SWC Target"), content);
   auto* targetLayout = new QVBoxLayout(targetGroup);
   targetLayout->setContentsMargins(8, 8, 8, 8);
 
@@ -161,8 +171,7 @@ ZTraceSettingsWidget::ZTraceSettingsWidget(ZDoc& doc, QWidget* parent)
   existingLayout->setSpacing(8);
 
   m_existingSwcRadio = new QRadioButton(tr("Attach to existing:"), existingRow);
-  m_existingSwcCombo = new QComboBox(existingRow);
-  m_existingSwcCombo->setSizeAdjustPolicy(QComboBox::AdjustToContentsOnFirstShow);
+  m_existingSwcCombo = new ZComboBox(existingRow);
   m_existingSwcCombo->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   existingLayout->addWidget(m_existingSwcRadio);
   existingLayout->addWidget(m_existingSwcCombo, 1);
@@ -175,7 +184,7 @@ ZTraceSettingsWidget::ZTraceSettingsWidget(ZDoc& doc, QWidget* parent)
 
   layout->addWidget(targetGroup);
 
-  auto* algoGroup = new QGroupBox(tr("Tracing Config"), this);
+  auto* algoGroup = new QGroupBox(tr("Tracing Config"), content);
   auto* algoForm = new QFormLayout(algoGroup);
   algoForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
   algoForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
@@ -248,7 +257,7 @@ ZTraceSettingsWidget::ZTraceSettingsWidget(ZDoc& doc, QWidget* parent)
 
   layout->addWidget(algoGroup);
 
-  auto* mappingGroup = new QGroupBox(tr("Trace Mapping"), this);
+  auto* mappingGroup = new QGroupBox(tr("Trace Mapping"), content);
   auto* mappingLayout = new QVBoxLayout(mappingGroup);
   mappingLayout->setContentsMargins(8, 8, 8, 8);
   mappingLayout->setSpacing(6);
@@ -575,12 +584,17 @@ void ZTraceSettingsWidget::applySettingsToUi()
   }
 
   if (const std::optional<size_t> storedSwcId = settings.targetSwcId(); storedSwcId.has_value()) {
+    bool found = false;
     for (int i = 1; i < m_existingSwcCombo->count(); ++i) {
       const QVariant data = m_existingSwcCombo->itemData(i);
       if (data.isValid() && static_cast<size_t>(data.toULongLong()) == *storedSwcId) {
         m_existingSwcCombo->setCurrentIndex(i);
+        found = true;
         break;
       }
+    }
+    if (!found) {
+      m_existingSwcCombo->setCurrentIndex(0);
     }
   } else {
     m_existingSwcCombo->setCurrentIndex(0);
@@ -631,9 +645,11 @@ void ZTraceSettingsWidget::updateMappingLabel()
   }
 
   const size_t imgId = *imgIdOpt;
-  QString sourceName = m_doc.objNameWithModifiedMarkerAndID(imgId);
-  if (!m_doc.imgDoc().hasObjWithID(imgId)) {
-    sourceName = tr("%1 (missing)").arg(sourceName);
+  QString sourceName;
+  if (m_doc.imgDoc().hasObjWithID(imgId)) {
+    sourceName = m_doc.objNameWithModifiedMarkerAndID(imgId);
+  } else {
+    sourceName = tr("Image #%1 (missing)").arg(static_cast<qulonglong>(imgId));
   }
 
   const size_t sc = settings.sourceChannel();
@@ -649,7 +665,7 @@ void ZTraceSettingsWidget::updateMappingLabel()
       const size_t swcId = *swcIdOpt;
       ZSwcDoc& swcDoc = m_doc.swcDoc();
       if (!swcDoc.hasObjWithID(swcId)) {
-        targetText = tr("%1 (missing)").arg(m_doc.objNameWithModifiedMarkerAndID(swcId));
+        targetText = tr("SWC #%1 (missing)").arg(static_cast<qulonglong>(swcId));
       } else {
         targetText = swcDoc.objNameWithModifiedMarkerAndID(swcId);
       }

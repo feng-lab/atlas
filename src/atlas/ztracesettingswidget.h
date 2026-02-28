@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QWidget>
+#include <QScrollArea>
 
 #include <cstddef>
 #include <optional>
@@ -22,7 +22,7 @@ class ZDoc;
 //
 // This widget edits `ZDoc::traceSettings()` and intentionally avoids heuristics:
 // it does not infer defaults from active/selected objects.
-class ZTraceSettingsWidget : public QWidget
+class ZTraceSettingsWidget : public QScrollArea
 {
   Q_OBJECT
 

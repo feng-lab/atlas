@@ -1210,7 +1210,12 @@ void Z3DRenderingEngine::init()
   connect(this, &Z3DRenderingEngine::objViewReady, this, [this](size_t id) {
     auto it = m_pendingObjViewJson.find(id);
     if (it != m_pendingObjViewJson.end()) {
-      this->read(id, it->second);
+      json::object merged;
+      this->write(id, merged);
+      for (auto& [k, v] : it->second) {
+        merged[k] = std::move(v);
+      }
+      this->read(id, merged);
       m_pendingObjViewJson.erase(it);
       if (m_sceneApplyOutstanding > 0) {
         --m_sceneApplyOutstanding;
@@ -1241,6 +1246,7 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
   connect(m_canvas, &Z3DCanvas::rotateZM, this, &Z3DRenderingEngine::rotateZM);
   connect(this, &Z3DRenderingEngine::sceneParaUpdated, m_canvas, &Z3DCanvas::sceneParaUpdated);
   connect(this, &Z3DRenderingEngine::renderingFinished, m_canvas, &Z3DCanvas::renderingFinished);
+  connect(this, &Z3DRenderingEngine::showSeedTraceContextMenu, m_canvas, &Z3DCanvas::showSeedTraceContextMenu);
   m_canvas->setRenderingEngine(this);
 }
 
@@ -1301,6 +1307,38 @@ void Z3DRenderingEngine::detachCanvas()
   // Now safe to update DPI etc. without waking the canvas
   if (m_globalParas) {
     m_globalParas->setDevicePixelRatio(1);
+  }
+}
+
+void Z3DRenderingEngine::setSeedTraceUiState(bool enabled, bool inProgress, std::optional<size_t> sourceImgObjId)
+{
+  setSeedTraceUiState(enabled, inProgress, sourceImgObjId, m_seedTraceSourceChannel);
+}
+
+void Z3DRenderingEngine::setSeedTraceUiState(bool enabled,
+                                             bool inProgress,
+                                             std::optional<size_t> sourceImgObjId,
+                                             size_t sourceChannel)
+{
+  m_seedTraceToolEnabled = enabled;
+  m_seedTraceInProgress = inProgress;
+  m_seedTraceSourceImgObjId = sourceImgObjId;
+  m_seedTraceSourceChannel = sourceChannel;
+
+  for (auto& objView : m_3dObjViews) {
+    auto* imgView = dynamic_cast<Z3DImgView*>(objView.get());
+    if (imgView == nullptr) {
+      continue;
+    }
+    for (const auto& idFilter : imgView->idToFilter()) {
+      if (idFilter.second == nullptr) {
+        continue;
+      }
+      idFilter.second->setSeedTraceUiState(m_seedTraceToolEnabled,
+                                           m_seedTraceInProgress,
+                                           m_seedTraceSourceImgObjId,
+                                           m_seedTraceSourceChannel);
+    }
   }
 }
 
@@ -1539,7 +1577,15 @@ void Z3DRenderingEngine::applyView3DForId(size_t id, json::object json)
     }
   }
   if (found) {
-    this->read(id, json);
+    // applyView3DForId() is used both for full scene loads and for partial updates.
+    // Merge the provided json into the current per-object view state so parameter
+    // reads don't emit warnings for missing keys.
+    json::object merged;
+    this->write(id, merged);
+    for (auto& [k, v] : json) {
+      merged[k] = std::move(v);
+    }
+    this->read(id, merged);
     --m_sceneApplyOutstanding;
     if (m_sceneApplyOutstanding == 0) {
       LOG(INFO) << "3D scene parameters applied";

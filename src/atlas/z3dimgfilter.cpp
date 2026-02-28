@@ -11,11 +11,15 @@
 #include "zneuroglancerprecomputed.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanlinearscript.h"
+#include "zvulkantexture.h"
 #include <folly/OperationCancelled.h>
 #include <folly/ScopeGuard.h>
+#include <glm/ext/matrix_projection.hpp>
 #include <QMenu>
+#include <algorithm>
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <utility>
 
 namespace nim {
@@ -837,22 +841,73 @@ void Z3DImgFilter::fullResolutionRenderingToggled()
   // m_smoothInteraction.setVisible(m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get());
 }
 
-void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* /*e*/, int /*w*/, int /*h*/)
+void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
 {
-  //  e->ignore();
-  //  if (!m_imgRaycasterRenderer.hasVisibleRendering())
-  //    return;
-  //  // Mouse button pressed
-  //  if (e->type() == QEvent::MouseButtonPress) {
-  //    m_startCoord.x = e->x();
-  //    m_startCoord.y = e->y();
-  //    toggleInteractionMode(true, this);
-  //    return;
-  //  }
+  CHECK(e);
+  if (!isVisible() || !m_3dImg) {
+    return;
+  }
 
-  //  if (e->type() == QEvent::MouseButtonRelease) {
-  //    toggleInteractionMode(false, this);
-  //  }
+  if (m_imgObjId == 0) {
+    return;
+  }
+
+  if (e->type() == QEvent::MouseButtonPress) {
+    m_startCoord.x = static_cast<int>(e->position().x());
+    m_startCoord.y = static_cast<int>(e->position().y());
+    return;
+  }
+
+  if (e->type() != QEvent::MouseButtonRelease) {
+    return;
+  }
+
+  const int dx = std::abs(static_cast<int>(e->position().x()) - m_startCoord.x);
+  const int dy = std::abs(static_cast<int>(e->position().y()) - m_startCoord.y);
+  if (dx >= 2 || dy >= 2) {
+    return;
+  }
+
+  if (!m_seedTraceToolEnabled || m_seedTraceInProgress) {
+    return;
+  }
+
+  if (!m_seedTraceSourceImgObjId.has_value() || *m_seedTraceSourceImgObjId != m_imgObjId) {
+    return;
+  }
+
+  if (m_seedTraceSourceChannel >= m_channelVisibleParas.size()) {
+    return;
+  }
+  const auto& channelVisiblePara = m_channelVisibleParas[m_seedTraceSourceChannel];
+  if (!channelVisiblePara || !channelVisiblePara->get()) {
+    return;
+  }
+
+  const glm::ivec2 widgetPos(e->position().toPoint().x(), e->position().toPoint().y());
+  const void* hitObj = m_globalParameters.pickingManager.objectAtWidgetPos(widgetPos);
+  if (hitObj != nullptr) {
+    return;
+  }
+
+  const float dpr = m_globalParameters.devicePixelRatio.get();
+  bool success = false;
+  const glm::vec3 pos3D = getMaxInten3DPositionUnderScreenPoint(static_cast<int>(e->position().x() * dpr),
+                                                                static_cast<int>(e->position().y() * dpr),
+                                                                static_cast<int>(static_cast<float>(w) * dpr),
+                                                                static_cast<int>(static_cast<float>(h) * dpr),
+                                                                success);
+  if (!success) {
+    return;
+  }
+
+  e->accept();
+  Q_EMIT showSeedTraceContextMenu(e->globalPosition().toPoint(),
+                                  m_imgObjId,
+                                  m_seedTraceSourceChannel,
+                                  pos3D.x,
+                                  pos3D.y,
+                                  pos3D.z);
 }
 
 void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
@@ -1534,23 +1589,96 @@ void Z3DImgFilter::channelRangeChanged()
   m_channelRangeChanged = true;
 }
 
+bool Z3DImgFilter::depthPickAtScreenPoint(int x,
+                                          int y,
+                                          int width,
+                                          int height,
+                                          glm::ivec2& outPos2D,
+                                          int& outTargetWidth,
+                                          int& outTargetHeight,
+                                          float& outDepth) const
+{
+  if (!m_imgRaycasterRenderer.hasVisibleRendering() || !m_3dImg) {
+    return false;
+  }
+
+  const bool monoValid = m_transparentValid[MonoEye] && static_cast<bool>(m_transparentTargets[MonoEye]);
+  const bool rightValid = m_transparentValid[RightEye] && static_cast<bool>(m_transparentTargets[RightEye]);
+  if (!monoValid && !rightValid) {
+    return false;
+  }
+
+  const Z3DScratchResourcePool::RenderTargetLease& lease =
+    monoValid ? m_transparentTargets[MonoEye] : m_transparentTargets[RightEye];
+  const glm::uvec2 targetSize =
+    (lease.descriptor.size.x > 0u && lease.descriptor.size.y > 0u)
+      ? lease.descriptor.size
+      : glm::uvec2(static_cast<uint32_t>(std::max(1, width)), static_cast<uint32_t>(std::max(1, height)));
+  outTargetWidth = static_cast<int>(targetSize.x);
+  outTargetHeight = static_cast<int>(targetSize.y);
+
+  outPos2D = glm::ivec2(x, outTargetHeight - y);
+  outPos2D.x = std::clamp(outPos2D.x, 0, outTargetWidth - 1);
+  outPos2D.y = std::clamp(outPos2D.y, 0, outTargetHeight - 1);
+
+  if (lease.hasGLRenderTarget()) {
+    outDepth = lease.glRenderTarget().depthAtPos(outPos2D);
+    return true;
+  }
+
+  if (!lease.hasVulkanImage()) {
+    return false;
+  }
+
+  ZVulkanTexture* depthTex = lease.depthAttachmentTexture();
+  if (depthTex == nullptr) {
+    return false;
+  }
+
+  float depth = 1.0f;
+  try {
+    depthTex->downloadSubImage(&depth,
+                               sizeof(depth),
+                               vk::Offset3D{outPos2D.x, outPos2D.y, 0},
+                               vk::Extent3D{1u, 1u, 1u},
+                               vk::ImageAspectFlagBits::eDepth);
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "Vulkan depth download failed: " << e.what();
+    return false;
+  }
+
+  outDepth = depth;
+  return true;
+}
+
+bool Z3DImgFilter::unprojectDepthToImageCoordRounded(const glm::ivec2& pos2D,
+                                                     double depth,
+                                                     int targetWidth,
+                                                     int targetHeight,
+                                                     glm::vec3& outCoord)
+{
+  CHECK(m_3dImg);
+  const glm::vec3 fpos3D = get3DPosition(pos2D, depth, targetWidth, targetHeight);
+  outCoord = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
+  return glm::all(glm::greaterThanEqual(outCoord, glm::vec3(0.f))) &&
+         glm::all(glm::lessThan(outCoord, glm::vec3(m_3dImg->dimensions())));
+}
+
 glm::vec3 Z3DImgFilter::getFirstHit3DPosition(int x, int y, int width, int height, bool& success)
 {
   glm::vec3 res(-1);
   success = false;
-  const bool monoValid = m_transparentValid[MonoEye];
-  const bool rightValid = m_transparentValid[RightEye];
-  if (m_imgRaycasterRenderer.hasVisibleRendering() && (monoValid || rightValid)) {
-    glm::ivec2 pos2D = glm::ivec2(x, height - y);
-    Z3DRenderTarget& target = monoValid ? transparentTarget(MonoEye) : transparentTarget(RightEye);
 
-    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, target);
-    res = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
-    if (glm::all(glm::greaterThanEqual(res, glm::vec3(0.f))) &&
-        glm::all(glm::lessThan(res, glm::vec3(m_3dImg->dimensions())))) {
-      success = true;
-    }
+  glm::ivec2 pos2D(0, 0);
+  int targetWidth = 0;
+  int targetHeight = 0;
+  float depth = 1.0f;
+  if (!depthPickAtScreenPoint(x, y, width, height, pos2D, targetWidth, targetHeight, depth)) {
+    return res;
   }
+
+  success = unprojectDepthToImageCoordRounded(pos2D, static_cast<double>(depth), targetWidth, targetHeight, res);
   return res;
 }
 
@@ -1559,31 +1687,36 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
   glm::vec3 res(-1);
   glm::vec3 des(-1);
   success = false;
-  const bool monoValid = m_transparentValid[MonoEye];
-  const bool rightValid = m_transparentValid[RightEye];
-  if (m_imgRaycasterRenderer.hasVisibleRendering() && m_3dImg && (monoValid || rightValid)) {
-    glm::ivec2 pos2D = glm::ivec2(x, height - y);
-    Z3DRenderTarget& target = monoValid ? transparentTarget(MonoEye) : transparentTarget(RightEye);
 
-    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, target);
-    res = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
-    if (glm::all(glm::greaterThanEqual(res, glm::vec3(0.f))) &&
-        glm::all(glm::lessThan(res, glm::vec3(m_3dImg->dimensions())))) {
-      success = true;
-    }
+  if (!m_3dImg) {
+    return res;
+  }
 
-    if (success) {
-      fpos3D = get3DPosition(pos2D, 1.0, width, height);
-      des = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
-      if (glm::length(des - res) <= 1.f) { // res is last pixel along current ray direction
-        return res;
-      }
+  const ZImgInfo info = m_3dImg->imgPack().imgInfo();
+  if (m_seedTraceSourceChannel >= info.numChannels) {
+    return glm::vec3(-1);
+  }
+
+  glm::ivec2 pos2D(0, 0);
+  int targetWidth = 0;
+  int targetHeight = 0;
+  float depth = 1.0f;
+  if (!depthPickAtScreenPoint(x, y, width, height, pos2D, targetWidth, targetHeight, depth)) {
+    return res;
+  }
+
+  success = unprojectDepthToImageCoordRounded(pos2D, static_cast<double>(depth), targetWidth, targetHeight, res);
+
+  if (success) {
+    (void)unprojectDepthToImageCoordRounded(pos2D, 1.0, targetWidth, targetHeight, des);
+    if (glm::length(des - res) <= 1.f) { // res is last pixel along current ray direction
+      return res;
     }
   }
 
-  // find maximum intensity voxel start from res along des direction
+  // Find maximum intensity voxel start from res along des direction.
   if (success) {
-    double maxInten = m_3dImg->imgPack().value(res.x, res.y, res.z);
+    double maxInten = m_3dImg->imgPack().value(res.x, res.y, res.z, m_seedTraceSourceChannel, 0);
     glm::vec3 p = res;
     glm::vec3 d = des - res;
     float N = std::max(std::max(std::abs(d.x), std::abs(d.y)), std::abs(d.z));
@@ -1596,7 +1729,7 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
           roundP.z >= m_3dImg->imgPack().imgInfo().depth) {
         break;
       }
-      double inten = m_3dImg->imgPack().value(roundP.x, roundP.y, roundP.z);
+      double inten = m_3dImg->imgPack().value(roundP.x, roundP.y, roundP.z, m_seedTraceSourceChannel, 0);
       if (inten > maxInten) {
         maxInten = inten;
         res = roundP;
@@ -1618,7 +1751,13 @@ glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z
   viewport[3] = height;
 
   GLfloat WindowPosZ = target.depthAtPos(pos2D);
-  glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, WindowPosZ), modelview, projection, viewport);
+  const glm::vec3 win(pos2D.x, pos2D.y, WindowPosZ);
+  glm::vec3 pos;
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    pos = glm::unProjectZO(win, modelview, projection, viewport);
+  } else {
+    pos = glm::unProjectNO(win, modelview, projection, viewport);
+  }
 
   return pos;
 }
@@ -1634,7 +1773,13 @@ glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, double depth, int width,
   viewport[2] = width;
   viewport[3] = height;
 
-  glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, depth), modelview, projection, viewport);
+  const glm::vec3 win(pos2D.x, pos2D.y, depth);
+  glm::vec3 pos;
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    pos = glm::unProjectZO(win, modelview, projection, viewport);
+  } else {
+    pos = glm::unProjectNO(win, modelview, projection, viewport);
+  }
 
   return pos;
 }

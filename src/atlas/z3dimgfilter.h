@@ -14,6 +14,7 @@
 #include "z3dscratchresourcepool.h"
 
 #include <array>
+#include <optional>
 #include <vector>
 
 namespace nim {
@@ -29,6 +30,27 @@ class Z3DImgFilter : public Z3DBoundedFilter
 public:
   explicit Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
   ~Z3DImgFilter() override;
+
+  void setImgObjId(size_t id)
+  {
+    m_imgObjId = id;
+  }
+
+  void setSeedTraceUiState(bool enabled, bool inProgress, std::optional<size_t> sourceImgObjId)
+  {
+    m_seedTraceToolEnabled = enabled;
+    m_seedTraceInProgress = inProgress;
+    m_seedTraceSourceImgObjId = sourceImgObjId;
+    m_seedTraceSourceChannel = 0;
+  }
+
+  void setSeedTraceUiState(bool enabled, bool inProgress, std::optional<size_t> sourceImgObjId, size_t sourceChannel)
+  {
+    m_seedTraceToolEnabled = enabled;
+    m_seedTraceInProgress = inProgress;
+    m_seedTraceSourceImgObjId = sourceImgObjId;
+    m_seedTraceSourceChannel = sourceChannel;
+  }
 
   void setData(const ZImgPack& imgPack);
 
@@ -70,6 +92,7 @@ public:
 
 Q_SIGNALS:
   void showImgContextMenu(QPoint globalPos, float x, float y, float z, bool enter, bool exit);
+  void showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size_t sc, float x, float y, float z);
 
 protected:
   void switchRendererBackend(RenderBackend backend) override
@@ -164,6 +187,20 @@ private:
   void releaseAllRenderTargets();
   void markTargetsInvalid();
 
+  [[nodiscard]] bool depthPickAtScreenPoint(int x,
+                                            int y,
+                                            int width,
+                                            int height,
+                                            glm::ivec2& outPos2D,
+                                            int& outTargetWidth,
+                                            int& outTargetHeight,
+                                            float& outDepth) const;
+  [[nodiscard]] bool unprojectDepthToImageCoordRounded(const glm::ivec2& pos2D,
+                                                       double depth,
+                                                       int targetWidth,
+                                                       int targetHeight,
+                                                       glm::vec3& outCoord);
+
   // check success before using the returned value
   // if first hit 3d position is in volume, success will be true,
   // otherwise don't use the returned value
@@ -241,6 +278,12 @@ private:
   ZEventListenerParameter m_leftMouseButtonPressEvent;
   ZEventListenerParameter m_contextMenuEvent;
   glm::ivec2 m_startCoord{};
+
+  size_t m_imgObjId = 0;
+  bool m_seedTraceToolEnabled = false;
+  bool m_seedTraceInProgress = false;
+  std::optional<size_t> m_seedTraceSourceImgObjId;
+  size_t m_seedTraceSourceChannel = 0;
 
   bool m_channelRangeChanged = false;
 

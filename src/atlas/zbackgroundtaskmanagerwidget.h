@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QWidget>
+#include <QScrollArea>
 
 #include <cstdint>
 #include <map>
@@ -13,7 +13,7 @@ namespace nim {
 class ZBackgroundTask;
 class ZBackgroundTaskManager;
 
-class ZBackgroundTaskManagerWidget final : public QWidget
+class ZBackgroundTaskManagerWidget final : public QScrollArea
 {
   Q_OBJECT
 

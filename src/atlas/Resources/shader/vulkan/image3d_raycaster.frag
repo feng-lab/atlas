@@ -125,7 +125,9 @@ void main()
 
   float fragDepth;
   if (rayDepth >= 0.0) fragDepth = rp.ze_to_zw_a / mix(zeFront, zeBack, rayDepth) + rp.ze_to_zw_b;
-  else fragDepth = RESULT_OPAQUE ? (rp.ze_to_zw_a / zeFront + rp.ze_to_zw_b) : 1.0;
+  // No-hit silhouette (RESULT_OPAQUE): use exit depth so it occludes objects behind the
+  // volume but does not hide geometry inside the volume footprint.
+  else fragDepth = RESULT_OPAQUE ? (rp.ze_to_zw_a / zeBack + rp.ze_to_zw_b) : 1.0;
 
   FragData0 = result;
   // Mark fully completed ray (length=1) and export resolved depth (match GL write width)

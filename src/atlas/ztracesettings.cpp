@@ -1,10 +1,22 @@
 #include "ztracesettings.h"
 
+#include "zdoc.h"
+#include "zimgdoc.h"
+#include "zobjdoc.h"
+#include "zswcdoc.h"
+
 namespace nim {
 
-ZTraceSettings::ZTraceSettings(QObject* parent)
+ZTraceSettings::ZTraceSettings(ZDoc& doc, QObject* parent)
   : QObject(parent)
-{}
+{
+  connect(&doc.swcDoc(), &ZObjDoc::objAboutToBeRemoved, this, [this](size_t id, ZObjDoc*) {
+    onSwcRemoved(id);
+  });
+  connect(&doc.imgDoc(), &ZObjDoc::objAboutToBeRemoved, this, [this](size_t id, ZObjDoc*) {
+    onImageRemoved(id);
+  });
+}
 
 ZTraceSettings::SwcTargetSelection ZTraceSettings::mappedSwcTargetSelection(std::optional<size_t> sourceImageId,
                                                                             size_t sourceChannel) const
@@ -182,6 +194,64 @@ void ZTraceSettings::promoteNewSwcTargetToExistingIfStillNew(size_t sourceImageI
   if (m_targetSwcId != swcIdOpt) {
     m_targetSwcId = swcIdOpt;
     anyChanged = true;
+  }
+
+  if (anyChanged) {
+    Q_EMIT changed();
+  }
+}
+
+void ZTraceSettings::onSwcRemoved(size_t swcId)
+{
+  bool anyChanged = false;
+
+  for (auto it = m_swcTargetBySource.begin(); it != m_swcTargetBySource.end();) {
+    if (it->second.mode == SwcTargetMode::ExistingSwc && it->second.swcId == swcId) {
+      it = m_swcTargetBySource.erase(it);
+      anyChanged = true;
+      continue;
+    }
+    ++it;
+  }
+
+  if (m_swcTargetMode == SwcTargetMode::ExistingSwc && m_targetSwcId == std::optional<size_t>(swcId)) {
+    m_swcTargetMode = SwcTargetMode::NewSwc;
+    m_targetSwcId = std::nullopt;
+    anyChanged = true;
+  }
+
+  if (anyChanged) {
+    Q_EMIT changed();
+  }
+}
+
+void ZTraceSettings::onImageRemoved(size_t imageId)
+{
+  bool anyChanged = false;
+
+  for (auto it = m_swcTargetBySource.begin(); it != m_swcTargetBySource.end();) {
+    if (it->first.imageId == imageId) {
+      it = m_swcTargetBySource.erase(it);
+      anyChanged = true;
+      continue;
+    }
+    ++it;
+  }
+
+  if (m_sourceImageId == std::optional<size_t>(imageId)) {
+    m_sourceImageId = std::nullopt;
+    anyChanged = true;
+  }
+
+  if (!m_sourceImageId.has_value()) {
+    if (m_swcTargetMode != SwcTargetMode::NewSwc) {
+      m_swcTargetMode = SwcTargetMode::NewSwc;
+      anyChanged = true;
+    }
+    if (m_targetSwcId.has_value()) {
+      m_targetSwcId = std::nullopt;
+      anyChanged = true;
+    }
   }
 
   if (anyChanged) {

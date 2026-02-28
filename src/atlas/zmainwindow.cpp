@@ -52,7 +52,6 @@
 #include <QDesktopServices>
 #include <QDialog>
 #include <QVBoxLayout>
-#include <QScrollArea>
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
@@ -938,12 +937,7 @@ void ZMainWindow::createDockWindows()
   m_traceDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                  QDockWidget::DockWidgetFloatable);
   m_traceDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  auto* traceWidget = new ZTraceSettingsWidget(*m_doc, m_traceDockWidget);
-  auto* traceScroll = new QScrollArea(m_traceDockWidget);
-  traceScroll->setWidgetResizable(true);
-  traceScroll->setFrameShape(QFrame::NoFrame);
-  traceScroll->setWidget(traceWidget);
-  m_traceDockWidget->setWidget(traceScroll);
+  m_traceDockWidget->setWidget(new ZTraceSettingsWidget(*m_doc, m_traceDockWidget));
   addDockWidget(Qt::RightDockWidgetArea, m_traceDockWidget);
   tabifyDockWidget(m_globalSettingDockWidget, m_traceDockWidget);
   auto* traceToggle = m_traceDockWidget->toggleViewAction();
@@ -955,12 +949,7 @@ void ZMainWindow::createDockWindows()
   m_tasksDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                  QDockWidget::DockWidgetFloatable);
   m_tasksDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  auto* tasksWidget = new ZBackgroundTaskManagerWidget(m_doc->backgroundTaskManager(), m_tasksDockWidget);
-  auto* tasksScroll = new QScrollArea(m_tasksDockWidget);
-  tasksScroll->setWidgetResizable(true);
-  tasksScroll->setFrameShape(QFrame::NoFrame);
-  tasksScroll->setWidget(tasksWidget);
-  m_tasksDockWidget->setWidget(tasksScroll);
+  m_tasksDockWidget->setWidget(new ZBackgroundTaskManagerWidget(m_doc->backgroundTaskManager(), m_tasksDockWidget));
   addDockWidget(Qt::RightDockWidgetArea, m_tasksDockWidget);
   tabifyDockWidget(m_traceDockWidget, m_tasksDockWidget);
   m_windowMenu->addAction(m_tasksDockWidget->toggleViewAction());

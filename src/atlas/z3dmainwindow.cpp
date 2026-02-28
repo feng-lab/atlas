@@ -34,7 +34,6 @@
 #include <QDesktopServices>
 #include <QFile>
 #include <QMetaObject>
-#include <QScrollArea>
 #include <QSignalBlocker>
 #include "zservicemanager.h"
 
@@ -53,6 +52,7 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
   m_renderingThread.start();
 
   m_canvas = new Z3DCanvas("", 512, 512, this);
+  m_canvas->setDoc(&m_doc);
 
   connect(m_engine, &Z3DRenderingEngine::initialized, this, &Z3DMainWindow::renderingEngineInitialized);
 
@@ -66,6 +66,37 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
 
   connect(m_engine, &Z3DRenderingEngine::renderingError, this, &Z3DMainWindow::onRenderingError);
   connect(m_engine, &Z3DRenderingEngine::progressChanged, this, &Z3DMainWindow::onProgressChanged);
+
+  // Keep a thread-safe snapshot of Trace Settings on the rendering thread so
+  // Z3DImgFilter can decide whether to emit seed-trace menu requests.
+  connect(&m_doc.traceSettings(), &ZTraceSettings::changed, this, [this]() {
+    const bool enabled = m_doc.traceSettings().traceToolEnabled();
+    const bool inProgress = m_doc.traceSettings().traceInProgress();
+    const std::optional<size_t> sourceImgId = m_doc.traceSettings().sourceImageId();
+    const size_t sourceChannel = m_doc.traceSettings().sourceChannel();
+
+    Z3DRenderingEngine* engine = m_engine;
+    QMetaObject::invokeMethod(
+      engine,
+      [engine, enabled, inProgress, sourceImgId, sourceChannel]() {
+        engine->setSeedTraceUiState(enabled, inProgress, sourceImgId, sourceChannel);
+      },
+      Qt::QueuedConnection);
+  });
+  {
+    const bool enabled = m_doc.traceSettings().traceToolEnabled();
+    const bool inProgress = m_doc.traceSettings().traceInProgress();
+    const std::optional<size_t> sourceImgId = m_doc.traceSettings().sourceImageId();
+    const size_t sourceChannel = m_doc.traceSettings().sourceChannel();
+
+    Z3DRenderingEngine* engine = m_engine;
+    QMetaObject::invokeMethod(
+      engine,
+      [engine, enabled, inProgress, sourceImgId, sourceChannel]() {
+        engine->setSeedTraceUiState(enabled, inProgress, sourceImgId, sourceChannel);
+      },
+      Qt::QueuedConnection);
+  }
 
 #if !defined(ATLAS_USE_OPENGLWIDGET)
   // Without QOpenGLWidget, the rendering thread can initialize very quickly. If we start initialization
@@ -493,12 +524,7 @@ void Z3DMainWindow::createDockWindows()
   m_traceDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                  QDockWidget::DockWidgetFloatable);
   m_traceDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  auto* traceWidget = new ZTraceSettingsWidget(m_doc, m_traceDockWidget);
-  auto* traceScroll = new QScrollArea(m_traceDockWidget);
-  traceScroll->setWidgetResizable(true);
-  traceScroll->setFrameShape(QFrame::NoFrame);
-  traceScroll->setWidget(traceWidget);
-  m_traceDockWidget->setWidget(traceScroll);
+  m_traceDockWidget->setWidget(new ZTraceSettingsWidget(m_doc, m_traceDockWidget));
   addDockWidget(Qt::RightDockWidgetArea, m_traceDockWidget);
   tabifyDockWidget(m_globalSettingDockWidget, m_traceDockWidget);
   auto* traceToggle = m_traceDockWidget->toggleViewAction();
@@ -510,12 +536,7 @@ void Z3DMainWindow::createDockWindows()
   m_tasksDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                  QDockWidget::DockWidgetFloatable);
   m_tasksDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  auto* tasksWidget = new ZBackgroundTaskManagerWidget(m_doc.backgroundTaskManager(), m_tasksDockWidget);
-  auto* tasksScroll = new QScrollArea(m_tasksDockWidget);
-  tasksScroll->setWidgetResizable(true);
-  tasksScroll->setFrameShape(QFrame::NoFrame);
-  tasksScroll->setWidget(tasksWidget);
-  m_tasksDockWidget->setWidget(tasksScroll);
+  m_tasksDockWidget->setWidget(new ZBackgroundTaskManagerWidget(m_doc.backgroundTaskManager(), m_tasksDockWidget));
   addDockWidget(Qt::RightDockWidgetArea, m_tasksDockWidget);
   tabifyDockWidget(m_traceDockWidget, m_tasksDockWidget);
   m_windowMenu->addAction(m_tasksDockWidget->toggleViewAction());

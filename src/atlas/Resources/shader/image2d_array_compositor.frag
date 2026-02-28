@@ -30,11 +30,9 @@ void main()
   FragData0 = color;
 #elif defined(MAX_PROJ_MERGE)
   vec4 color = vec4(0, 0, 0, 0);
-#ifdef RESULT_OPAQUE
-  float depth = 0;
-#else
+  // Use nearest depth (min). RESULT_OPAQUE no-hit pixels are encoded as exit depth
+  // in the raycaster shaders, so silhouette fill does not override real hits.
   float depth = 1;
-#endif
 #if GLSL_VERSION < 130
   for (int i = 0; i < NUM_VOLUMES; ++i) {
     vec4 tmpColor = texelFetch2DArray(color_texture, ivec3(gl_FragCoord.xy, i), 0);
@@ -42,11 +40,7 @@ void main()
       continue;
     }
     color = max(color, tmpColor);
-#ifdef RESULT_OPAQUE
-    depth = max(depth, texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
-#else
     depth = min(depth, texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
-#endif
 #else
   for (int i = 0; i < NUM_VOLUMES; ++i) {
     vec4 tmpColor = texelFetch(color_texture, ivec3(gl_FragCoord.xy, i), 0);
@@ -54,11 +48,7 @@ void main()
       continue;
     }
     color = max(color, tmpColor);
-#ifdef RESULT_OPAQUE
-    depth = max(depth, texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
-#else
     depth = min(depth, texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
-#endif
 #endif
   }
   if (color.a <= 0) {

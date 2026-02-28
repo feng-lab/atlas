@@ -112,13 +112,12 @@ private:
   {
     int numVolumes = 1;
     bool maxProjectionMerge = true;
-    bool resultOpaque = false;
     std::vector<vk::Format> colorFormats;
     std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(numVolumes, maxProjectionMerge, resultOpaque, colorFormats, depthFormat);
+      return std::tuple(numVolumes, maxProjectionMerge, colorFormats, depthFormat);
     }
 
     bool operator<(const MergePipelineKey& rhs) const

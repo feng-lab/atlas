@@ -431,7 +431,7 @@ Fast Raycaster (downsampled, single‑channel shader)
   - ISO: first sample near iso_value becomes a hard hit; resolves depth at that t.
   - XRay: additive accumulation.
   - MIP/LOCAL_MIP: track max scalar (optional local threshold early‑finish); TF applied to the max at the end.
-- Depth: derived from entry/exit ze at the resolved hit; else opaque uses entry depth, transparent uses far (1.0).
+- Depth: derived from entry/exit ze at the resolved hit; else opaque uses exit depth, transparent uses far (1.0).
 - Binding: src/atlas/z3dimgraycasterrenderer.cpp:1486, 1626
 
 Full‑Resolution Progressive Raycaster (paged bricks)
@@ -519,7 +519,7 @@ Numerical Details and Invariants
 - Step size stability: DVR alpha scaled by 1/sampling_rate to keep integration stable across sample counts.
 - LOD choice: per‑fragment level by on‑screen voxel footprint to minimize overdraw while preserving detail.
 - Early exit: terminate on alpha saturation (DVR), threshold (LOCAL_MIP), or UNMAPPED (progressive resume).
-- Depth resolution: interpolate between entry/exit ze at first hit; otherwise opaque uses entry depth, transparent uses far.
+- Depth resolution: interpolate between entry/exit ze at first hit; otherwise opaque uses exit depth, transparent uses far.
 - Premultiplication: all color outputs premultiply rgb by alpha; compositors assume this.
 - Safety: clamp voxel coords at brick edges; skip EMPTY regions; treat UNMAPPED as “request and resume later”.
 

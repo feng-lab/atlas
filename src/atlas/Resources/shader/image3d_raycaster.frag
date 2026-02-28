@@ -307,7 +307,9 @@ void main()
       fragDepth = ze_to_zw_a / mix(zeFront, zeBack, rayDepth) + ze_to_zw_b;
     } else {
 #ifdef RESULT_OPAQUE
-      fragDepth = ze_to_zw_a / zeFront + ze_to_zw_b;
+      // No-hit silhouette (RESULT_OPAQUE): use exit depth so it occludes objects behind the
+      // volume but does not hide geometry inside the volume footprint.
+      fragDepth = ze_to_zw_a / zeBack + ze_to_zw_b;
 #else
       fragDepth = 1.0;
 #endif

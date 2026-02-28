@@ -114,7 +114,9 @@ void main()
     float zeBack  = exitTexCoordAndZ.w;
     gl_FragDepth = rp.ze_to_zw_a / mix(zeFront, zeBack, rayDepth) + rp.ze_to_zw_b;
   } else {
-    gl_FragDepth = RESULT_OPAQUE ? (rp.ze_to_zw_a / entryTexCoordAndZ.w + rp.ze_to_zw_b) : 1.0;
+    // No-hit silhouette (RESULT_OPAQUE): use exit depth so it occludes objects behind the
+    // volume but does not hide geometry inside the volume footprint.
+    gl_FragDepth = RESULT_OPAQUE ? (rp.ze_to_zw_a / exitTexCoordAndZ.w + rp.ze_to_zw_b) : 1.0;
   }
 
   result.rgb *= result.a;

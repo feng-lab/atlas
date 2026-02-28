@@ -1173,7 +1173,6 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   MergePipelineKey mergeKey;
   mergeKey.numVolumes = static_cast<int>(channelCount);
   mergeKey.maxProjectionMerge = payload.maxProjectionMerge;
-  mergeKey.resultOpaque = false;
   mergeKey.colorFormats = formats.colorFormats;
   mergeKey.depthFormat = formats.depthFormat;
   auto& mergePipeline = ensureMergePipeline(mergeKey, formats);
@@ -1731,15 +1730,12 @@ ZVulkanImgSlicePipelineContext::ensureMergePipeline(const MergePipelineKey& key,
                                 .size = static_cast<uint32_t>(sizeof(Image2DArrayCompositorPushConstants))};
   instance.pipeline->setPushConstantRanges({pcRange});
 
-  std::array<vk::SpecializationMapEntry, 3> entries{
+  std::array<vk::SpecializationMapEntry, 2> entries{
     vk::SpecializationMapEntry{.constantID = 70, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 71, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 51, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+    vk::SpecializationMapEntry{.constantID = 71, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)}
   };
   std::vector<vk::SpecializationMapEntry> entryVec(entries.begin(), entries.end());
-  std::array<uint32_t, 3> values{static_cast<uint32_t>(std::max(1, key.numVolumes)),
-                                 key.maxProjectionMerge ? 1u : 0u,
-                                 key.resultOpaque ? 1u : 0u};
+  std::array<uint32_t, 2> values{static_cast<uint32_t>(std::max(1, key.numVolumes)), key.maxProjectionMerge ? 1u : 0u};
   std::vector<uint8_t> data(sizeof(values));
   std::memcpy(data.data(), values.data(), sizeof(values));
   instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment, entryVec, data);

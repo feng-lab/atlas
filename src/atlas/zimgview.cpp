@@ -11,9 +11,7 @@
 #include "zswcdoc.h"
 #include "zswcpack.h"
 #include "zsysteminfo.h"
-#include "zneutubetraceinteractive.h"
-#include "zbackgroundtaskmanager.h"
-#include "zcancellation.h"
+#include "zseedtrace.h"
 #include "ztracesettings.h"
 
 #include <QDir>
@@ -27,11 +25,7 @@
 #include <QMetaObject>
 #include <QPointer>
 #include <QRegularExpression>
-#include <QUuid>
 #include <QtConcurrent/QtConcurrentRun>
-
-#include <folly/coro/Invoke.h>
-#include <folly/executors/GlobalExecutor.h>
 
 #include <algorithm>
 #include <limits>
@@ -85,106 +79,6 @@ struct NeuroglancerMeshSourceKey
   QString meshSourceDirUrl;
   uint64_t segmentId = 0;
 };
-
-struct SeededTraceAsyncResult
-{
-  QString error;
-  bool cancelled = false;
-  std::shared_ptr<ZSwc> swc;
-  size_t newNodes = 0;
-};
-
-[[nodiscard]] SeededTraceAsyncResult runSeedTraceLegacyLike(const std::shared_ptr<ZImgPack>& imgPack,
-                                                            size_t sc,
-                                                            size_t t,
-                                                            const std::array<double, 3>& seed,
-                                                            const QString& traceConfigPath,
-                                                            bool haveAlgoConfig,
-                                                            const ZTraceSettings::AlgoConfig& algoCfg,
-                                                            std::optional<std::pair<size_t, ZSwc>> hostSwcOpt,
-                                                            folly::CancellationToken cancellationToken)
-{
-  SeededTraceAsyncResult res;
-
-  try {
-    maybeCancel(cancellationToken);
-
-    const ZImgInfo info = imgPack->imgInfo();
-    if (sc >= info.numChannels || t >= info.numTimes) {
-      res.error = QStringLiteral("Trace failed: invalid channel/time selection (c=%1, t=%2).")
-                    .arg(static_cast<qulonglong>(sc))
-                    .arg(static_cast<qulonglong>(t));
-      return res;
-    }
-
-    const ZImg* signalPtr = nullptr;
-    ZImg ownedSignal;
-    if (imgPack->isDiskCached()) {
-      ownedSignal = imgPack->wholeImg();
-      signalPtr = &ownedSignal;
-    } else {
-      signalPtr = &imgPack->img();
-    }
-    CHECK(signalPtr != nullptr);
-    const ZImg& signal = *signalPtr;
-
-    if (signal.isEmpty()) {
-      res.error = QStringLiteral("Trace failed: the image is empty.");
-      return res;
-    }
-
-    TraceConfig cfg;
-    if (!traceConfigPath.isEmpty()) {
-      const bool ok = loadTraceConfigLegacyLike(traceConfigPath.toStdString(), cfg);
-      if (!ok) {
-        cfg = TraceConfig{};
-      }
-    } else {
-      cfg = TraceConfig{};
-    }
-
-    if (haveAlgoConfig) {
-      cfg.minAutoScore = algoCfg.minAutoScore;
-      cfg.minManualScore = algoCfg.minManualScore;
-      cfg.minSeedScore = algoCfg.minSeedScore;
-      cfg.min2dScore = algoCfg.min2dScore;
-      cfg.refit = algoCfg.refit;
-      cfg.spTest = algoCfg.spTest;
-      cfg.crossoverTest = algoCfg.crossoverTest;
-      cfg.tuneEnd = algoCfg.tuneEnd;
-      cfg.edgePath = algoCfg.edgePath;
-      cfg.enhanceMask = algoCfg.enhanceMask;
-      cfg.seedMethod = algoCfg.seedMethod;
-      cfg.recover = algoCfg.recover;
-      cfg.chainScreenCount = algoCfg.chainScreenCount;
-      cfg.maxEucDist = algoCfg.maxEucDist;
-    }
-
-    maybeCancel(cancellationToken);
-    if (hostSwcOpt.has_value()) {
-      SeedTraceResult tr =
-        traceSeedIntoHostSwcLegacyLike(signal, hostSwcOpt->second, seed, cfg, sc, t, cancellationToken);
-      if (tr.swc) {
-        res.swc = std::shared_ptr<ZSwc>(tr.swc.release());
-        res.newNodes = tr.newNodes;
-      }
-    } else {
-      SeedTraceResult tr = traceSeedNewSwcLegacyLike(signal, seed, cfg, sc, t, cancellationToken);
-      if (tr.swc) {
-        res.swc = std::shared_ptr<ZSwc>(tr.swc.release());
-        res.newNodes = tr.newNodes;
-      }
-    }
-  }
-  catch (const ZCancellationException&) {
-    res.cancelled = true;
-  }
-  catch (const std::exception& e) {
-    res.error = QString("Trace failed: %1").arg(QString::fromUtf8(e.what()));
-  }
-
-  return res;
-}
 
 struct NeuroglancerSkeletonSourceKey
 {
@@ -621,179 +515,19 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                                  std::array<double, 3> seed,
                                  const QString& traceConfigPath,
                                  std::optional<std::pair<size_t, ZSwc>> hostSwcOpt,
-                                 bool promoteNewSwcToExistingTarget) {
-          CHECK(imgPack);
-
-          ZDoc& doc = m_doc.doc();
-
-          ZTraceSettings& traceSettings = doc.traceSettings();
-          if (traceSettings.traceInProgress()) {
-            QMessageBox::information(QApplication::activeWindow(),
-                                     QApplication::applicationName(),
-                                     QStringLiteral("A trace is already running. Please wait for it to finish."));
-            return;
-          }
-          traceSettings.setTraceInProgress(true);
-
-          const bool haveAlgoConfig = traceSettings.algoConfigInitialized();
-          const ZTraceSettings::AlgoConfig algoCfg = traceSettings.algoConfig();
-
-          const ZImgInfo info = imgPack->imgInfo();
-          const QString channelLabel = (sc < info.channelNames.size())
-                                         ? info.displayChannelName(sc)
-                                         : QStringLiteral("Ch%1").arg(static_cast<qulonglong>(sc + 1));
-          const QString timeLabel = QStringLiteral("T%1").arg(static_cast<qulonglong>(t + 1));
-
-          const QString swcTargetLabel =
-            hostSwcOpt.has_value() ? doc.objNameWithModifiedMarkerAndID(hostSwcOpt->first) : QStringLiteral("new SWC");
-
-          ZBackgroundTaskManager& tm = doc.backgroundTaskManager();
-          auto cancellationSource = std::make_shared<folly::CancellationSource>();
-          const folly::CancellationToken cancellationToken = cancellationSource->getToken();
-          ZBackgroundTaskManager::TaskOptions taskOptions;
-          taskOptions.useFakeProgress = true;
-          taskOptions.cancelCallback = [cancellationSource]() {
-            cancellationSource->requestCancellation();
-          };
-
-          const QString taskTitle = QStringLiteral("Seed Trace: %1, %2, %3 -> %4")
-                                      .arg(doc.objNameWithModifiedMarkerAndID(sourceImgObjId))
-                                      .arg(channelLabel)
-                                      .arg(timeLabel)
-                                      .arg(swcTargetLabel);
-
-          auto* task = tm.createTask(taskTitle, std::move(taskOptions));
-          tm.startTask(task, QStringLiteral("running"));
-          doc.showBackgroundTasksPanel();
-
-          const std::optional<size_t> hostSwcId =
-            hostSwcOpt.has_value() ? std::optional<size_t>(hostSwcOpt->first) : std::optional<size_t>();
-
-          QPointer<ZDoc> docPtr(&doc);
-          QPointer<ZBackgroundTask> taskPtr(task);
-
-          tm.spawnDetachedTask(
-            folly::getGlobalCPUExecutor(),
-            folly::coro::co_invoke([docPtr,
-                                    taskPtr,
-                                    imgPack,
+                                 bool promoteNewSwcToExistingTarget,
+                                 std::function<void(size_t newSwcId)> onNewSwcCreated) {
+          startSeedTraceInteractive(m_doc.doc(),
                                     actionName,
                                     sourceImgObjId,
+                                    imgPack,
                                     sc,
                                     t,
                                     seed,
                                     traceConfigPath,
-                                    haveAlgoConfig,
-                                    algoCfg,
-                                    hostSwcOpt = std::move(hostSwcOpt),
+                                    std::move(hostSwcOpt),
                                     promoteNewSwcToExistingTarget,
-                                    hostSwcId,
-                                    cancellationToken]() mutable -> folly::coro::Task<void> {
-              const SeededTraceAsyncResult res = runSeedTraceLegacyLike(imgPack,
-                                                                        sc,
-                                                                        t,
-                                                                        seed,
-                                                                        traceConfigPath,
-                                                                        haveAlgoConfig,
-                                                                        algoCfg,
-                                                                        std::move(hostSwcOpt),
-                                                                        cancellationToken);
-
-              if (docPtr == nullptr) {
-                co_return;
-              }
-
-              QMetaObject::invokeMethod(
-                docPtr,
-                [docPtr,
-                 taskPtr,
-                 actionName,
-                 sourceImgObjId,
-                 sc,
-                 promoteNewSwcToExistingTarget,
-                 hostSwcId,
-                 res]() mutable {
-                  if (docPtr == nullptr) {
-                    return;
-                  }
-
-                  ZDoc& doc = *docPtr;
-                  ZTraceSettings& traceSettings = doc.traceSettings();
-                  traceSettings.setTraceInProgress(false);
-
-                  if (taskPtr == nullptr) {
-                    return;
-                  }
-
-                  ZBackgroundTaskManager& tm = doc.backgroundTaskManager();
-
-                  if (res.cancelled) {
-                    tm.cancelTask(taskPtr, QStringLiteral("cancelled"));
-                    return;
-                  }
-
-                  if (!res.error.isEmpty()) {
-                    tm.failTask(taskPtr, res.error);
-                    QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), res.error);
-                    return;
-                  }
-
-                  if (!res.swc) {
-                    tm.succeedTask(taskPtr, QStringLiteral("no trace result"));
-                    QMessageBox::information(QApplication::activeWindow(),
-                                             QApplication::applicationName(),
-                                             QStringLiteral("No trace result was produced."));
-                    return;
-                  }
-
-                  if (hostSwcId.has_value()) {
-                    const size_t swcId = *hostSwcId;
-                    ZSwcDoc& swcDoc = doc.swcDoc();
-                    if (!swcDoc.hasObjWithID(swcId)) {
-                      tm.cancelTask(taskPtr, QStringLiteral("target SWC no longer exists"));
-                      return;
-                    }
-                    if (res.newNodes == 0) {
-                      tm.succeedTask(taskPtr, QStringLiteral("no branch traced"));
-                      QMessageBox::information(QApplication::activeWindow(),
-                                               QApplication::applicationName(),
-                                               QStringLiteral("No branch was traced at this seed location."));
-                      return;
-                    }
-                    ZSwcPack& pack = swcDoc.swcPack(swcId);
-                    pack.replaceSwcWithUndo(actionName, std::move(*res.swc));
-                    tm.succeedTask(taskPtr, QStringLiteral("updated SWC #%1").arg(static_cast<qulonglong>(swcId)));
-                    return;
-                  }
-
-                  if (res.newNodes == 0) {
-                    tm.succeedTask(taskPtr, QStringLiteral("no branch traced"));
-                    QMessageBox::information(QApplication::activeWindow(),
-                                             QApplication::applicationName(),
-                                             QStringLiteral("No branch was traced at this seed location."));
-                    return;
-                  }
-
-                  ZSwcDoc& swcDoc = doc.swcDoc();
-                  const QString displayPath = QDir::temp().absoluteFilePath(
-                    QString("AtlasTrace_%1.swc").arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
-                  const size_t newSwcId = swcDoc.addSwcFromMemory(std::move(*res.swc), displayPath);
-                  if (newSwcId == 0) {
-                    tm.failTask(taskPtr, QStringLiteral("Failed to create new SWC."));
-                    return;
-                  }
-
-                  tm.succeedTask(taskPtr, QStringLiteral("created SWC #%1").arg(static_cast<qulonglong>(newSwcId)));
-
-                  if (promoteNewSwcToExistingTarget) {
-                    traceSettings.promoteNewSwcTargetToExistingIfStillNew(sourceImgObjId, sc, newSwcId);
-                  }
-                },
-                Qt::QueuedConnection);
-
-              co_return;
-            }),
-            "Seed Trace");
+                                    std::move(onNewSwcCreated));
         };
 
         QAction* traceStoredAct = traceMenu->addAction("Trace");
@@ -862,7 +596,36 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                            seed,
                            traceCfgPath,
                            promoteNewSwcToExistingTarget,
-                           hostSwcOpt = std::move(hostSwcOpt)]() mutable {
+                           hostSwcOpt = std::move(hostSwcOpt),
+                           viewPtr = QPointer<ZView>(&m_view),
+                           swcDocTypeName = m_doc.doc().swcDoc().typeName()]() mutable {
+                            std::function<void(size_t)> onNewSwcCreated =
+                              [viewPtr, sourceImgObjId, swcDocTypeName](size_t newSwcId) {
+                                if (!viewPtr) {
+                                  return;
+                                }
+
+                                try {
+                                  json::object srcViewJson;
+                                  viewPtr->write(sourceImgObjId, srcViewJson);
+
+                                  const std::string transformKey = "Transform 2DTransform";
+                                  auto it = srcViewJson.find(transformKey);
+                                  if (it == srcViewJson.end()) {
+                                    return;
+                                  }
+
+                                  json::object dstViewJson;
+                                  viewPtr->write(newSwcId, dstViewJson);
+                                  dstViewJson["ViewObjType"] = json::value_from(swcDocTypeName);
+                                  dstViewJson["ViewVersion"] = 1.0;
+                                  dstViewJson[transformKey] = it->value();
+                                  viewPtr->read(newSwcId, dstViewJson);
+                                }
+                                catch (const std::exception& e) {
+                                  LOG(WARNING) << "Seed trace: failed to copy 2D transform onto new SWC: " << e.what();
+                                }
+                              };
                             startTrace(actionName,
                                        sourceImgObjId,
                                        imgPack,
@@ -871,7 +634,8 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                                        seed,
                                        traceCfgPath,
                                        std::move(hostSwcOpt),
-                                       promoteNewSwcToExistingTarget);
+                                       promoteNewSwcToExistingTarget,
+                                       std::move(onNewSwcCreated));
                           });
                 }
               }

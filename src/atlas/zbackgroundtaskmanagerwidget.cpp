@@ -134,23 +134,32 @@ private:
 } // namespace
 
 ZBackgroundTaskManagerWidget::ZBackgroundTaskManagerWidget(ZBackgroundTaskManager& manager, QWidget* parent)
-  : QWidget(parent)
+  : QScrollArea(parent)
   , m_manager(manager)
 {
-  setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
   setMinimumWidth(0);
 
-  m_layout = new QVBoxLayout(this);
+  setWidgetResizable(true);
+  setFrameShape(QFrame::NoFrame);
+  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+  auto* content = new QWidget(this);
+  content->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
+  content->setMinimumWidth(0);
+  setWidget(content);
+
+  m_layout = new QVBoxLayout(content);
   m_layout->setContentsMargins(0, 0, 0, 0);
   m_layout->setSpacing(6);
 
-  m_emptyLabel = new QLabel(tr("No background tasks."), this);
+  m_emptyLabel = new QLabel(tr("No background tasks."), content);
   m_emptyLabel->setAlignment(Qt::AlignHCenter);
   m_emptyLabel->setWordWrap(true);
   m_emptyLabel->setMinimumWidth(0);
   m_layout->addWidget(m_emptyLabel);
 
-  m_tasksContainer = new QWidget(this);
+  m_tasksContainer = new QWidget(content);
   m_tasksContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   m_tasksContainer->setMinimumWidth(0);
   m_tasksLayout = new QVBoxLayout(m_tasksContainer);

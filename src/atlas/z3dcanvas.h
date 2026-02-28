@@ -6,6 +6,7 @@
 #include <QGraphicsPixmapItem>
 #include <QInputEvent>
 #include <QShortcut>
+#include <QPoint>
 
 #include <memory>
 
@@ -16,6 +17,7 @@ class QOpenGLContext;
 namespace nim {
 
 class Z3DRenderingEngine;
+class ZDoc;
 
 #ifdef ATLAS_USE_OPENGLWIDGET
 class ZOpenGLWidget;
@@ -43,6 +45,13 @@ public:
 #endif
 
   void setRenderingEngine(Z3DRenderingEngine* engine);
+
+  void setDoc(ZDoc* doc)
+  {
+    m_doc = doc;
+  }
+
+  void showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size_t sc, float x, float y, float z);
 
   void toggleFullScreen();
 
@@ -134,6 +143,7 @@ private:
   QShortcut* m_rotateYMShortCut = nullptr;
   QShortcut* m_rotateZMShortCut = nullptr;
 
+  ZDoc* m_doc = nullptr;
   Z3DRenderingEngine* m_engine = nullptr;
 };
 

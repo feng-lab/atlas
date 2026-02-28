@@ -14,6 +14,11 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
   try {
     for (auto id : objs) {
       auto viewControl = new Z3DImgFilter(m_engine.globalParas(), this);
+      viewControl->setImgObjId(id);
+      viewControl->setSeedTraceUiState(m_engine.seedTraceToolEnabled(),
+                                       m_engine.seedTraceInProgress(),
+                                       m_engine.seedTraceSourceImgObjId(),
+                                       m_engine.seedTraceSourceChannel());
       viewControl->setData(m_doc.imgPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -25,6 +30,10 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
       connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
       connect(viewControl, &Z3DImgFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
+      connect(viewControl,
+              &Z3DImgFilter::showSeedTraceContextMenu,
+              &m_engine,
+              &Z3DRenderingEngine::showSeedTraceContextMenu);
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
@@ -47,6 +56,11 @@ void Z3DImgView::docImgAdded(size_t id)
 {
   try {
     auto viewControl = new Z3DImgFilter(m_engine.globalParas(), this);
+    viewControl->setImgObjId(id);
+    viewControl->setSeedTraceUiState(m_engine.seedTraceToolEnabled(),
+                                     m_engine.seedTraceInProgress(),
+                                     m_engine.seedTraceSourceImgObjId(),
+                                     m_engine.seedTraceSourceChannel());
     viewControl->setData(m_doc.imgPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -58,6 +72,10 @@ void Z3DImgView::docImgAdded(size_t id)
     connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
     connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
     connect(viewControl, &Z3DImgFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
+    connect(viewControl,
+            &Z3DImgFilter::showSeedTraceContextMenu,
+            &m_engine,
+            &Z3DRenderingEngine::showSeedTraceContextMenu);
     m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.updatePipeline();

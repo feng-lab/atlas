@@ -486,6 +486,7 @@ set(SOURCES
     zneuroglancerprecomputeddatasetlist.h zneuroglancerprecomputeddatasetlist.cpp
     zloadneuroglancerprecomputeddialog.h zloadneuroglancerprecomputeddialog.cpp
     zimgview.h zimgview.cpp
+    zseedtrace.h zseedtrace.cpp
     zspinboxwithscrollbar.h zspinboxwithscrollbar.cpp
     zgraphicsview.h zgraphicsview.cpp
     zview.h zview.cpp
