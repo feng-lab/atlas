@@ -293,6 +293,7 @@ void Z3DCanvas::showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size
                   dstViewJson["ViewObjType"] = json::value_from(swcDocTypeName);
                   dstViewJson["ViewVersion"] = 1.0;
                   dstViewJson[coordKey] = it->value();
+                  dstViewJson["Rendering Mode StringIntOption"] = "Sphere";
                   enginePtr->applyView3DForId(newSwcId, dstViewJson);
                 },
                 Qt::QueuedConnection);

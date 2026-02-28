@@ -7,7 +7,9 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QProgressBar>
+#include <QScrollBar>
 #include <QToolButton>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -191,6 +193,14 @@ void ZBackgroundTaskManagerWidget::addTaskRow(ZBackgroundTask* task)
   m_tasksLayout->addWidget(row);
   m_rows.emplace(id, row);
   updateEmptyState();
+
+  QTimer::singleShot(0, this, [this]() {
+    QScrollBar* sb = verticalScrollBar();
+    if (sb == nullptr) {
+      return;
+    }
+    sb->setValue(sb->maximum());
+  });
 }
 
 void ZBackgroundTaskManagerWidget::updateEmptyState()

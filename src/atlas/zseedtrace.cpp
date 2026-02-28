@@ -272,6 +272,11 @@ void startSeedTraceInteractive(ZDoc& doc,
   const QString swcTargetLabel =
     hostSwcOpt.has_value() ? doc.objNameWithModifiedMarkerAndID(hostSwcOpt->first) : QStringLiteral("new SWC");
 
+  const QString seedLabel = QStringLiteral("(%1, %2, %3)")
+                              .arg(QString::number(seed[0], 'f', 1))
+                              .arg(QString::number(seed[1], 'f', 1))
+                              .arg(QString::number(seed[2], 'f', 1));
+
   ZBackgroundTaskManager& tm = doc.backgroundTaskManager();
   auto cancellationSource = std::make_shared<folly::CancellationSource>();
   const folly::CancellationToken cancellationToken = cancellationSource->getToken();
@@ -281,10 +286,11 @@ void startSeedTraceInteractive(ZDoc& doc,
     cancellationSource->requestCancellation();
   };
 
-  const QString taskTitle = QStringLiteral("Seed Trace: %1, %2, %3 -> %4")
+  const QString taskTitle = QStringLiteral("Seed Trace: %1, %2, %3, seed=%4 -> %5")
                               .arg(doc.objNameWithModifiedMarkerAndID(sourceImgObjId))
                               .arg(channelLabel)
                               .arg(timeLabel)
+                              .arg(seedLabel)
                               .arg(swcTargetLabel);
 
   auto* task = tm.createTask(taskTitle, std::move(taskOptions));
