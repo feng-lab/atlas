@@ -471,6 +471,10 @@ set(SOURCES
     zsectionsregistrationdialog.h zsectionsregistrationdialog.cpp
     zstitchimagedialog.h zstitchimagedialog.cpp
     zpunctadetectiondialog.h zpunctadetectiondialog.cpp
+    zbinarizeimagedialog.h zbinarizeimagedialog.cpp
+    zsubtractbackgrounddialog.h zsubtractbackgrounddialog.cpp
+    zsubtractbackgroundadaptivedialog.h zsubtractbackgroundadaptivedialog.cpp
+    zenhancelinedialog.h zenhancelinedialog.cpp
     zgenerateanalysistextfile.h zgenerateanalysistextfile.cpp
     zanalysisworklistdialog.h zanalysisworklistdialog.cpp
     zanalysisworklistmodel.h zanalysisworklistmodel.cpp

@@ -115,6 +115,14 @@ protected:
 
   void binaryToSwc();
 
+  void binarizeImage();
+
+  void subtractBackground();
+
+  void subtractBackgroundAdaptive();
+
+  void enhanceLine();
+
   // append another img into this doc
   size_t addImgPack(ZImgPack* imgPack);
 
@@ -175,6 +183,10 @@ private:
   QAction* m_correctChromaticShiftAction = nullptr;
   QAction* m_autoTraceAction = nullptr;
   QAction* m_binaryToSwcAction = nullptr;
+  QAction* m_binarizeImageAction = nullptr;
+  QAction* m_subtractBackgroundAction = nullptr;
+  QAction* m_subtractBackgroundAdaptiveAction = nullptr;
+  QAction* m_enhanceLineAction = nullptr;
 };
 
 } // namespace nim

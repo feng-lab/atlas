@@ -13,7 +13,11 @@
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
 #include "zautotracedialog.h"
+#include "zbinarizeimagedialog.h"
 #include "zbinarytoswcdialog.h"
+#include "zenhancelinedialog.h"
+#include "zsubtractbackgroundadaptivedialog.h"
+#include "zsubtractbackgrounddialog.h"
 #include "zsysteminfo.h"
 
 #include <QApplication>
@@ -322,6 +326,11 @@ QMenu* ZImgDoc::processObjMenu() const
   auto res = new QMenu(typeName());
   res->addAction(m_autoTraceAction);
   res->addAction(m_binaryToSwcAction);
+  res->addSeparator();
+  res->addAction(m_binarizeImageAction);
+  res->addAction(m_subtractBackgroundAction);
+  res->addAction(m_subtractBackgroundAdaptiveAction);
+  res->addAction(m_enhanceLineAction);
   res->addSeparator();
   res->addAction(m_stitchImageAction);
   res->addAction(m_alignSectionsAction);
@@ -978,6 +987,30 @@ void ZImgDoc::binaryToSwc()
   dlg.exec();
 }
 
+void ZImgDoc::binarizeImage()
+{
+  ZBinarizeImageDialog dlg(m_doc, QApplication::activeWindow());
+  dlg.exec();
+}
+
+void ZImgDoc::subtractBackground()
+{
+  ZSubtractBackgroundDialog dlg(m_doc, QApplication::activeWindow());
+  dlg.exec();
+}
+
+void ZImgDoc::subtractBackgroundAdaptive()
+{
+  ZSubtractBackgroundAdaptiveDialog dlg(m_doc, QApplication::activeWindow());
+  dlg.exec();
+}
+
+void ZImgDoc::enhanceLine()
+{
+  ZEnhanceLineDialog dlg(m_doc, QApplication::activeWindow());
+  dlg.exec();
+}
+
 size_t ZImgDoc::addImgPack(ZImgPack* imgPack)
 {
   CHECK(imgPack);
@@ -1200,6 +1233,23 @@ void ZImgDoc::createActions()
   m_binaryToSwcAction = new QAction(tr("&Binary -> SWC..."), this);
   m_binaryToSwcAction->setStatusTip(tr("Convert a binary image to an SWC skeleton"));
   connect(m_binaryToSwcAction, &QAction::triggered, this, &ZImgDoc::binaryToSwc);
+
+  m_binarizeImageAction = new QAction(tr("&Binarize..."), this);
+  m_binarizeImageAction->setStatusTip(tr("Binarize an image channel by a threshold"));
+  connect(m_binarizeImageAction, &QAction::triggered, this, &ZImgDoc::binarizeImage);
+
+  m_subtractBackgroundAction = new QAction(tr("Subtract &Background..."), this);
+  m_subtractBackgroundAction->setStatusTip(tr("Subtract background from an image channel (neuTube-style)"));
+  connect(m_subtractBackgroundAction, &QAction::triggered, this, &ZImgDoc::subtractBackground);
+
+  m_subtractBackgroundAdaptiveAction = new QAction(tr("Subtract Background (&Adaptive)..."), this);
+  m_subtractBackgroundAdaptiveAction->setStatusTip(
+    tr("Subtract background from an image channel using adaptive sampling (neuTube-style)"));
+  connect(m_subtractBackgroundAdaptiveAction, &QAction::triggered, this, &ZImgDoc::subtractBackgroundAdaptive);
+
+  m_enhanceLineAction = new QAction(tr("&Enhance Line..."), this);
+  m_enhanceLineAction->setStatusTip(tr("Enhance line-like structures in an image channel (neuTube-style)"));
+  connect(m_enhanceLineAction, &QAction::triggered, this, &ZImgDoc::enhanceLine);
 }
 
 bool ZImgDoc::saveImg(ZImgPack* pack,

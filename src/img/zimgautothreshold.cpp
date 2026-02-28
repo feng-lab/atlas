@@ -1,10 +1,460 @@
 #include "zimgautothreshold.h"
 
+#include "zcancellation.h"
 #include "zimgconnectedcomponents.h"
 #include "zimgregionalextrema.h"
 #include "zbenchtimer.h"
 
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <optional>
+#include <utility>
+#include <vector>
+
 namespace nim {
+
+namespace {
+
+struct IntHistogram
+{
+  int minValue = 0;
+  std::vector<int> counts;
+
+  [[nodiscard]] bool empty() const
+  {
+    return counts.empty();
+  }
+
+  [[nodiscard]] int maxValue() const
+  {
+    CHECK(!counts.empty());
+    return minValue + static_cast<int>(counts.size()) - 1;
+  }
+
+  [[nodiscard]] int sum() const
+  {
+    int total = 0;
+    for (const int c : counts) {
+      total += c;
+    }
+    return total;
+  }
+
+  [[nodiscard]] int count(int v) const
+  {
+    if (counts.empty()) {
+      return 0;
+    }
+    if (v < minValue || v > maxValue()) {
+      return 0;
+    }
+    return counts[static_cast<size_t>(v - minValue)];
+  }
+
+  [[nodiscard]] int mode(int minV, int maxV) const
+  {
+    CHECK(!counts.empty());
+
+    minV = std::max(minV, minValue);
+    maxV = std::min(maxV, maxValue());
+
+    int m = minV;
+    int maxCount = count(m);
+    for (int v = minV; v <= maxV; ++v) {
+      const int c = count(v);
+      if (c > maxCount) {
+        maxCount = c;
+        m = v;
+      }
+    }
+    return m;
+  }
+
+  [[nodiscard]] int upperCount(int v) const
+  {
+    CHECK(!counts.empty());
+
+    int c = 0;
+    const int minV = std::max(v, minValue);
+    const int maxV = maxValue();
+    for (int i = minV; i <= maxV; ++i) {
+      c += count(i);
+    }
+    return c;
+  }
+};
+
+template<typename TVoxel>
+[[nodiscard]] std::optional<std::pair<int, int>> maskedMinMax(const TVoxel* a, const uint8_t* mask, size_t length)
+{
+  CHECK(a != nullptr);
+  CHECK(length > 0);
+
+  size_t minIdx = length;
+  size_t maxIdx = length;
+
+  if (mask == nullptr) {
+    minIdx = 0;
+    maxIdx = 0;
+    for (size_t i = 1; i < length; ++i) {
+      if (a[i] < a[minIdx]) {
+        minIdx = i;
+      }
+      if (a[i] > a[maxIdx]) {
+        maxIdx = i;
+      }
+    }
+  } else {
+    for (size_t i = 0; i < length; ++i) {
+      if (mask[i] == 1) {
+        minIdx = i;
+        maxIdx = i;
+        break;
+      }
+    }
+    if (minIdx == length) {
+      return std::nullopt;
+    }
+
+    for (size_t i = minIdx + 1; i < length; ++i) {
+      if (mask[i] != 1) {
+        continue;
+      }
+      if (a[i] < a[minIdx]) {
+        minIdx = i;
+      }
+      if (a[i] > a[maxIdx]) {
+        maxIdx = i;
+      }
+    }
+  }
+
+  return std::pair<int, int>(static_cast<int>(a[minIdx]), static_cast<int>(a[maxIdx]));
+}
+
+[[nodiscard]] std::optional<IntHistogram>
+imageHistogramUintNeuTube(const ZImg& img, const ZImg* mask, const folly::CancellationToken& cancellationToken)
+{
+  if (img.isEmpty()) {
+    throw ZException("imageHistogramUintNeuTube: empty image.");
+  }
+
+  CHECK(img.numChannels() == 1);
+  CHECK(img.numTimes() == 1);
+
+  const uint8_t* maskData = nullptr;
+  if (mask != nullptr) {
+    if (mask->isEmpty()) {
+      return std::nullopt;
+    }
+    CHECK(mask->numChannels() == 1);
+    CHECK(mask->numTimes() == 1);
+    CHECK(mask->width() == img.width() && mask->height() == img.height() && mask->depth() == img.depth());
+    CHECK(mask->isType<uint8_t>());
+    maskData = mask->timeData<uint8_t>(0);
+  }
+
+  maybeCancel(cancellationToken);
+
+  const size_t n = img.voxelNumber();
+  if (n == 0) {
+    return std::nullopt;
+  }
+
+  std::optional<std::pair<int, int>> minMax;
+
+  if (img.isType<uint8_t>()) {
+    minMax = maskedMinMax<uint8_t>(img.timeData<uint8_t>(0), maskData, n);
+  } else if (img.isType<uint16_t>()) {
+    minMax = maskedMinMax<uint16_t>(img.timeData<uint16_t>(0), maskData, n);
+  } else {
+    throw ZException(fmt::format("imageHistogramUintNeuTube: unsupported voxel type {}", img.info()));
+  }
+
+  if (!minMax) {
+    return std::nullopt;
+  }
+
+  const int minV = minMax->first;
+  const int maxV = minMax->second;
+  CHECK(minV <= maxV);
+
+  IntHistogram hist;
+  hist.minValue = minV;
+  hist.counts.assign(static_cast<size_t>(maxV - minV + 1), 0);
+
+  auto addValue = [&](int v) {
+    hist.counts[static_cast<size_t>(v - minV)] += 1;
+  };
+
+  if (img.isType<uint8_t>()) {
+    const auto* a = img.timeData<uint8_t>(0);
+    if (maskData == nullptr) {
+      for (size_t i = 0; i < n; ++i) {
+        if ((i % 4096) == 0) {
+          maybeCancel(cancellationToken);
+        }
+        addValue(static_cast<int>(a[i]));
+      }
+    } else {
+      for (size_t i = 0; i < n; ++i) {
+        if ((i % 4096) == 0) {
+          maybeCancel(cancellationToken);
+        }
+        if (maskData[i] == 1) {
+          addValue(static_cast<int>(a[i]));
+        }
+      }
+    }
+  } else {
+    const auto* a = img.timeData<uint16_t>(0);
+    if (maskData == nullptr) {
+      for (size_t i = 0; i < n; ++i) {
+        if ((i % 4096) == 0) {
+          maybeCancel(cancellationToken);
+        }
+        addValue(static_cast<int>(a[i]));
+      }
+    } else {
+      for (size_t i = 0; i < n; ++i) {
+        if ((i % 4096) == 0) {
+          maybeCancel(cancellationToken);
+        }
+        if (maskData[i] == 1) {
+          addValue(static_cast<int>(a[i]));
+        }
+      }
+    }
+  }
+
+  return hist;
+}
+
+[[nodiscard]] int iarrayMaxFirst(const int* a, size_t length, size_t* idx)
+{
+  CHECK(a != nullptr);
+  CHECK(length > 0);
+
+  size_t maxIdx = 0;
+  for (size_t i = 1; i < length; ++i) {
+    if (a[i] > a[maxIdx]) {
+      maxIdx = i;
+    }
+  }
+  if (idx != nullptr) {
+    *idx = maxIdx;
+  }
+  return a[maxIdx];
+}
+
+[[nodiscard]] int iarrayMinMaskedLastTies(const int* a, size_t length, const int* mask, size_t* idx)
+{
+  CHECK(a != nullptr);
+  CHECK(mask != nullptr);
+
+  size_t minIdx = length;
+  for (size_t i = length; i > 0; --i) {
+    if (mask[i - 1] != 0) {
+      minIdx = i - 1;
+      break;
+    }
+  }
+
+  if (minIdx < length) {
+    for (size_t i = minIdx + 1; i > 0; --i) {
+      if (mask[i - 1] != 0) {
+        if (a[i - 1] < a[minIdx]) {
+          minIdx = i - 1;
+        }
+      }
+    }
+  }
+
+  if (idx != nullptr) {
+    *idx = minIdx;
+  }
+
+  if (minIdx >= length) {
+    return 0;
+  }
+  return a[minIdx];
+}
+
+[[nodiscard]] int triangleThresholdNeuTube(const IntHistogram& hist, int low, int high)
+{
+  if (hist.empty()) {
+    throw ZException("triangleThresholdNeuTube: empty histogram.");
+  }
+
+  int minGrey = hist.minValue;
+  int maxGrey = hist.maxValue();
+
+  const int* hist2 = hist.counts.data();
+  CHECK(hist2 != nullptr);
+
+  if (minGrey < low) {
+    hist2 += low - minGrey;
+    minGrey = low;
+  }
+
+  if (maxGrey > high) {
+    maxGrey = high;
+  }
+
+  int length = maxGrey - minGrey + 1;
+  CHECK(length >= 1);
+
+  size_t maxIndex = 0;
+  (void)iarrayMaxFirst(hist2, static_cast<size_t>(length), &maxIndex);
+
+  size_t minIndex = 0;
+  (void)iarrayMinMaskedLastTies(hist2 + maxIndex, static_cast<size_t>(length) - maxIndex, hist2 + maxIndex, &minIndex);
+  minIndex += maxIndex;
+
+  if (maxIndex == minIndex) {
+    return minGrey - 1;
+  }
+
+  length = static_cast<int>(minIndex - maxIndex + 1);
+  hist2 += maxIndex;
+
+  std::vector<double> dhist(static_cast<size_t>(length));
+  const double denom = static_cast<double>(hist2[0] - hist2[static_cast<size_t>(length) - 1]);
+  CHECK(denom != 0.0);
+  const double normFactor = static_cast<double>(length - 1) / denom;
+  for (int i = 0; i < length; ++i) {
+    dhist[static_cast<size_t>(i)] = static_cast<double>(hist2[i] - hist2[static_cast<size_t>(length) - 1]) * normFactor;
+  }
+
+  int thre = 0;
+  double bestScore = dhist[0];
+
+  for (int i = 1; i < length; ++i) {
+    if (hist2[i] > 0) {
+      const double score = dhist[static_cast<size_t>(i)] + static_cast<double>(i);
+      if (score < bestScore) {
+        bestScore = score;
+        thre = i;
+      }
+    }
+  }
+
+  thre += static_cast<int>(maxIndex) + minGrey;
+  return thre;
+}
+
+[[nodiscard]] size_t fgAreaAboveThresholdNeuTube(const ZImg& stack, int thre)
+{
+  CHECK(stack.numChannels() == 1);
+  CHECK(stack.numTimes() == 1);
+
+  const size_t n = stack.voxelNumber();
+  size_t count = 0;
+
+  if (stack.isType<uint8_t>()) {
+    const auto* a = stack.timeData<uint8_t>(0);
+    const uint8_t t = static_cast<uint8_t>(std::clamp(thre, 0, 255));
+    for (size_t i = 0; i < n; ++i) {
+      if (a[i] > t) {
+        ++count;
+      }
+    }
+    return count;
+  }
+
+  if (stack.isType<uint16_t>()) {
+    const auto* a = stack.timeData<uint16_t>(0);
+    const uint16_t t = static_cast<uint16_t>(std::clamp(thre, 0, 65535));
+    for (size_t i = 0; i < n; ++i) {
+      if (a[i] > t) {
+        ++count;
+      }
+    }
+    return count;
+  }
+
+  throw ZException(fmt::format("fgAreaAboveThresholdNeuTube: unsupported voxel type {}", stack.info()));
+}
+
+[[nodiscard]] int refineLocmaxThresholdNeuTube(const ZImg& stack,
+                                               int thre,
+                                               const IntHistogram& hist,
+                                               int upperBound,
+                                               int retryCount,
+                                               const folly::CancellationToken& cancellationToken)
+{
+  constexpr double ratioLowThre = 0.015;
+  constexpr double ratioThre = 0.05;
+
+  maybeCancel(cancellationToken);
+
+  const double voxelNumber = static_cast<double>(stack.voxelNumber());
+  const double fgratio = static_cast<double>(fgAreaAboveThresholdNeuTube(stack, thre)) / voxelNumber;
+
+  double fgratio2 = fgratio;
+  double prevFgratio = fgratio;
+
+  if ((fgratio > ratioLowThre) && (fgratio <= ratioThre)) {
+    const int thre2 = triangleThresholdNeuTube(hist, thre + 1, upperBound - 1);
+    fgratio2 = static_cast<double>(fgAreaAboveThresholdNeuTube(stack, thre2)) / voxelNumber;
+    if (fgratio2 / fgratio <= 0.3) {
+      thre = thre2;
+    }
+  } else {
+    int nretry = retryCount;
+    int thre2 = thre;
+    while (fgratio2 > ratioThre) {
+      maybeCancel(cancellationToken);
+
+      thre2 = triangleThresholdNeuTube(hist, thre2 + 1, upperBound - 1);
+      fgratio2 = static_cast<double>(fgAreaAboveThresholdNeuTube(stack, thre2)) / voxelNumber;
+      if (fgratio2 / prevFgratio <= 0.5) {
+        thre = thre2;
+      }
+      prevFgratio = fgratio2;
+
+      --nretry;
+      if (nretry == 0) {
+        break;
+      }
+    }
+  }
+
+  return thre;
+}
+
+[[nodiscard]] std::optional<IntHistogram> computeLocmaxHistNeuTube(const ZImg& stack,
+                                                                   const folly::CancellationToken& cancellationToken)
+{
+  constexpr size_t conn = 18;
+
+  ZImgRegionalExtrema regionalExtrema;
+  regionalExtrema.setCancellationToken(cancellationToken);
+  ZImg locmaxMask = regionalExtrema.regionalMax(stack, conn);
+  if (locmaxMask.isEmpty()) {
+    return std::nullopt;
+  }
+  CHECK(locmaxMask.isType<uint8_t>());
+
+  ZImgConnectedComponents conncomp;
+  conncomp.setCancellationToken(cancellationToken);
+  ConnComp cc = conncomp.runLabelModifyInput(locmaxMask, conn);
+
+  locmaxMask.fill(0);
+  auto* locmaxMaskData = locmaxMask.timeData<uint8_t>(0);
+  for (const auto& vidx : cc.voxelIdxList) {
+    if (!vidx.empty()) {
+      locmaxMaskData[vidx[0]] = 1;
+    }
+  }
+
+  return imageHistogramUintNeuTube(stack, &locmaxMask, cancellationToken);
+}
+
+} // namespace
 
 template<typename TVoxel>
 TVoxel ZImgAutoThreshold::typedTriangleThre(const ZImg& imgIn, size_t c, size_t t)
@@ -103,6 +553,68 @@ TVoxel ZImgAutoThreshold::typedTriangleThre(const ZImg& imgIn, size_t c, size_t 
 
   this->reportProgress(1.0);
   return saturate_cast<TVoxel>(img.binRange(threBin, hist.size()).first);
+}
+
+std::optional<int> ZImgAutoThreshold::locmaxThreNeuTube(const ZImg& img, size_t c, size_t t, int retryCount)
+{
+  if (img.isEmpty()) {
+    return std::nullopt;
+  }
+  if (retryCount <= 0) {
+    throw ZException("locmaxThreNeuTube: retryCount must be positive.");
+  }
+
+  ZImg stack = img.createView(static_cast<index_t>(c), static_cast<index_t>(t));
+  CHECK(stack.numChannels() == 1);
+  CHECK(stack.numTimes() == 1);
+
+  if (!stack.isType<uint8_t>() && !stack.isType<uint16_t>()) {
+    throw ZException(fmt::format("locmaxThreNeuTube: unsupported voxel type {}", stack.info()));
+  }
+
+  maybeCancel(m_cancellationToken);
+
+  const size_t voxelNumber = stack.voxelNumber();
+
+  const auto histOpt = imageHistogramUintNeuTube(stack, nullptr, m_cancellationToken);
+  if (!histOpt) {
+    return std::nullopt;
+  }
+  const IntHistogram& hist = *histOpt;
+
+  const int minV = hist.minValue;
+  const int maxV = hist.maxValue();
+
+  if (minV == maxV) {
+    return std::nullopt;
+  }
+
+  if (hist.count(minV) + hist.count(maxV) == static_cast<int>(voxelNumber)) {
+    return minV;
+  }
+
+  const auto locHistOpt = computeLocmaxHistNeuTube(stack, m_cancellationToken);
+  if (!locHistOpt) {
+    return std::nullopt;
+  }
+  const IntHistogram& locHist = *locHistOpt;
+
+  const int low = locHist.minValue;
+  const int high = locHist.maxValue();
+  if (low == high) {
+    return std::nullopt;
+  }
+
+  int threshold = 0;
+
+  if (static_cast<double>(locHist.sum()) / static_cast<double>(voxelNumber) <= 1e-5) {
+    threshold = hist.mode(0, high);
+  } else {
+    threshold = triangleThresholdNeuTube(locHist, low, high - 1);
+    threshold = refineLocmaxThresholdNeuTube(stack, threshold, locHist, high, retryCount, m_cancellationToken);
+  }
+
+  return threshold;
 }
 
 template<typename TVoxel>

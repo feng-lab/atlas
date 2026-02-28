@@ -3,6 +3,8 @@
 #include "zimg.h"
 #include "zimgalgorithm.h"
 
+#include <optional>
+
 namespace nim {
 
 class ZImgAutoThreshold : public ZImgAlgorithm
@@ -81,6 +83,17 @@ public:
 
   template<typename TVoxel = double>
   TVoxel typedMaxHistThre(const ZImg& imgIn, size_t c = 0, size_t t = 0);
+
+  // neuTube-style LOCMAX auto-threshold (used by neuTube/NeuTu binarize).
+  //
+  // Key differences vs triangleThre():
+  // - Uses the LOCMAX plateau/region mask and a seed-per-component histogram (like triangleThre()) *plus* the
+  //   neuTube refinement heuristics based on foreground ratio.
+  // - Restricts to uint8/uint16 inputs (matching the original algorithm's intended usage).
+  // - Returns std::nullopt when the threshold is undefined (e.g. flat image), instead of forcing a threshold.
+  //
+  // Cancellation: honors this object's cancellation token and will throw ZCancellationException when cancelled.
+  [[nodiscard]] std::optional<int> locmaxThreNeuTube(const ZImg& img, size_t c = 0, size_t t = 0, int retryCount = 3);
 
 private:
   // assume hist is not empty

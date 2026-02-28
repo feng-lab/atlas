@@ -165,6 +165,10 @@ set(IMG_SOURCES
         zregistrationcostfunction.h zregistrationcostfunction.cpp
         zregistrationnumericdiffcostfunction.h zregistrationnumericdiffcostfunction.cpp
         zimgprocess.h zimgprocess.cpp
+        zbinarizeimage.h zbinarizeimage.cpp
+        zsubtractbackground.h zsubtractbackground.cpp
+        zsubtractbackgroundadaptive.h zsubtractbackgroundadaptive.cpp
+        zenhanceline.h zenhanceline.cpp
         zassignpuncta.h zassignpuncta.cpp
         zchromaticshiftcorrection.cpp zchromaticshiftcorrection.h
         zpunctadetection.h zpunctadetection.cpp

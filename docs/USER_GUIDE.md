@@ -387,6 +387,10 @@ Steps to load and manage images via `ZImgDoc`:
    - **Stitch Images...** – run the image stitching dialog for tiled data.
    - **Align Sections...** – align serial sections.
    - **Correct Chromatic Shift...** – adjust channel misalignment.
+   - **Binarize...** – threshold-binarize a selected channel into a binary (0/1) mask image.
+   - **Subtract Background...** – subtract background intensity from a selected channel (neuTube-style).
+   - **Subtract Background (Adaptive)...** – subtract background using adaptive neighborhood sampling (neuTube-style).
+   - **Enhance Line...** – enhance line-like structures in a selected channel (neuTube-style).
 
 <!-- > 📸 **Screenshot to add:** Object View Setting dock for an image showing channel controls.-->
 <p align="center">

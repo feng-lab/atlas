@@ -136,7 +136,7 @@ find_package(zstd REQUIRED
 print_target_properties(zstd::libzstd_static)
 
 find_package(ITK REQUIRED
-             COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology
+             COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology ITKSmoothing
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "ITK_DIR: ${ITK_DIR}")
 message(STATUS "ITK_USE_FILE: ${ITK_USE_FILE}")
@@ -148,6 +148,7 @@ print_target_properties(ITKIONIFTI)
 print_target_properties(ITKIONRRD)
 print_target_properties(ITKIOGDCM)
 print_target_properties(ITKBinaryMathematicalMorphology)
+print_target_properties(ITKSmoothing)
 
 # Config with namespace available since gflags 2.2.2
 option(GFLAGS_USE_TARGET_NAMESPACE "Use gflags import target with namespace." ON)
