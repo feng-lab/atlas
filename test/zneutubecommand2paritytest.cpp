@@ -2385,6 +2385,218 @@ TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
   fs::remove_all(dir, ec);
 }
 
+TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const QString forkTiff = nim::getTestDataDir().filePath("benchmark/stack_graph/fork/fork.tif");
+  if (!QFileInfo::exists(forkTiff)) {
+    GTEST_SKIP() << "Missing fork trace benchmark input: " << forkTiff.toStdString();
+  }
+
+  const std::vector<std::array<int, 3>> seeds = {
+    {63, 64, 51},
+    {31, 69, 51},
+    {31, 45, 49},
+  };
+
+  const fs::path dir = makeUniqueTempDir();
+  const fs::path commandConfig = dir / "command_config.json";
+  const fs::path traceCfg = dir / "trace_config.json";
+
+  writeTextFile(commandConfig,
+                R"json({
+  "trace": {
+    "include": "trace_config.json"
+  }
+}
+)json");
+
+  writeTextFile(traceCfg,
+                R"json({
+  "tag": "trace config",
+  "default": {}
+}
+)json");
+
+  auto runTraceStep = [&](auto&& runner,
+                          const std::optional<fs::path>& hostSwcPath,
+                          const fs::path& outSwcPath,
+                          const std::array<int, 3>& seed) -> int {
+    json::object in;
+    in["signal"] = forkTiff.toStdString();
+    if (hostSwcPath.has_value()) {
+      in["swc"] = hostSwcPath->string();
+    }
+    json::array pos;
+    pos.emplace_back(seed[0]);
+    pos.emplace_back(seed[1]);
+    pos.emplace_back(seed[2]);
+    in["position"] = std::move(pos);
+    const std::string inputJson = json::serialize(in);
+
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      "-o",
+      outSwcPath.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return runner(argv.argc(), argv.argv());
+  };
+
+  std::optional<fs::path> legacyHost;
+  std::optional<fs::path> v2Host;
+
+  for (size_t i = 0; i < seeds.size(); ++i) {
+    SCOPED_TRACE(fmt::format("step={} seed=({}, {}, {})", i + 1, seeds[i][0], seeds[i][1], seeds[i][2]));
+
+    const fs::path legacyOut = dir / fmt::format("legacy_fork_step{}.swc", i + 1);
+    const fs::path v2Out = dir / fmt::format("v2_fork_step{}.swc", i + 1);
+
+    const int legacyRc = runTraceStep(
+      [&](int argc, char** argv) {
+        return nim::ZRunNeuTuCommand().run(argc, argv);
+      },
+      legacyHost,
+      legacyOut,
+      seeds[i]);
+
+    const int v2Rc = runTraceStep(
+      [&](int argc, char** argv) {
+        return nim::ZRunNeuTuCommand2().run(argc, argv, std::string_view{});
+      },
+      v2Host,
+      v2Out,
+      seeds[i]);
+
+    ASSERT_EQ(legacyRc, v2Rc);
+    ASSERT_EQ(legacyRc, 0);
+
+    ASSERT_TRUE(fs::exists(legacyOut)) << legacyOut.string();
+    ASSERT_TRUE(fs::exists(v2Out)) << v2Out.string();
+    EXPECT_EQ(readTextFile(legacyOut), readTextFile(v2Out));
+
+    legacyHost = legacyOut;
+    v2Host = v2Out;
+  }
+
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+}
+
+TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork2_MatchesLegacy)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const QString fork2Tiff = nim::getTestDataDir().filePath("benchmark/fork2/fork2.tif");
+  if (!QFileInfo::exists(fork2Tiff)) {
+    GTEST_SKIP() << "Missing fork2 trace benchmark input: " << fork2Tiff.toStdString();
+  }
+
+  const std::vector<std::array<int, 3>> seeds = {
+    {50, 40, 37},
+    {27, 73, 40},
+    {70, 70, 61},
+    {39, 62, 57},
+    {28, 52, 60},
+  };
+
+  const fs::path dir = makeUniqueTempDir();
+  const fs::path commandConfig = dir / "command_config.json";
+  const fs::path traceCfg = dir / "trace_config.json";
+
+  writeTextFile(commandConfig,
+                R"json({
+  "trace": {
+    "include": "trace_config.json"
+  }
+}
+)json");
+
+  writeTextFile(traceCfg,
+                R"json({
+  "tag": "trace config",
+  "default": {}
+}
+)json");
+
+  auto runTraceStep = [&](auto&& runner,
+                          const std::optional<fs::path>& hostSwcPath,
+                          const fs::path& outSwcPath,
+                          const std::array<int, 3>& seed) -> int {
+    json::object in;
+    in["signal"] = fork2Tiff.toStdString();
+    if (hostSwcPath.has_value()) {
+      in["swc"] = hostSwcPath->string();
+    }
+    json::array pos;
+    pos.emplace_back(seed[0]);
+    pos.emplace_back(seed[1]);
+    pos.emplace_back(seed[2]);
+    in["position"] = std::move(pos);
+    const std::string inputJson = json::serialize(in);
+
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      "-o",
+      outSwcPath.string(),
+      "--config",
+      commandConfig.string(),
+      "json",
+      inputJson,
+    });
+    return runner(argv.argc(), argv.argv());
+  };
+
+  std::optional<fs::path> legacyHost;
+  std::optional<fs::path> v2Host;
+
+  for (size_t i = 0; i < seeds.size(); ++i) {
+    SCOPED_TRACE(fmt::format("step={} seed=({}, {}, {})", i + 1, seeds[i][0], seeds[i][1], seeds[i][2]));
+
+    const fs::path legacyOut = dir / fmt::format("legacy_fork2_step{}.swc", i + 1);
+    const fs::path v2Out = dir / fmt::format("v2_fork2_step{}.swc", i + 1);
+
+    const int legacyRc = runTraceStep(
+      [&](int argc, char** argv) {
+        return nim::ZRunNeuTuCommand().run(argc, argv);
+      },
+      legacyHost,
+      legacyOut,
+      seeds[i]);
+
+    const int v2Rc = runTraceStep(
+      [&](int argc, char** argv) {
+        return nim::ZRunNeuTuCommand2().run(argc, argv, std::string_view{});
+      },
+      v2Host,
+      v2Out,
+      seeds[i]);
+
+    ASSERT_EQ(legacyRc, v2Rc);
+    ASSERT_EQ(legacyRc, 0);
+
+    ASSERT_TRUE(fs::exists(legacyOut)) << legacyOut.string();
+    ASSERT_TRUE(fs::exists(v2Out)) << v2Out.string();
+    EXPECT_EQ(readTextFile(legacyOut), readTextFile(v2Out));
+
+    legacyHost = legacyOut;
+    v2Host = v2Out;
+  }
+
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+}
+
 TEST(NeutubeCommand2Parity, Skeletonize_FromTestDataBinary_MatchesLegacy)
 {
   ScopedQtCoreApplication qtApp;

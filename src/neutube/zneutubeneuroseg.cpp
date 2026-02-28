@@ -635,6 +635,7 @@ Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegField
   }
 
   constexpr int nslice = NeurosegDefaultHSlicesLegacyLike;
+  static_assert(nslice > 1, "neurosegFieldSFastLegacyLike expects nslice > 1.");
 
   NeurosegSliceField slice = neurosegSliceFieldLegacyLike(fieldFunc);
   const int length = static_cast<int>(slice.points.size());
@@ -657,7 +658,7 @@ Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegField
 
   const double sqrtSqrtScale = std::sqrt(std::sqrt(seg.scale));
 
-  if (coef != 0.0 && nslice > 1) {
+  if (coef != 0.0) {
     for (int i = 0; i < length; ++i) {
       field.values[static_cast<size_t>(length + i)] = field.values[static_cast<size_t>(i)];
     }
@@ -684,7 +685,7 @@ Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegField
     }
   }
 
-  if (coef == 0.0 && nslice > 1) {
+  if (coef == 0.0) {
     for (int i = 0; i < length; ++i) {
       field.values[static_cast<size_t>(length + i)] = field.values[static_cast<size_t>(i)];
     }
