@@ -59,11 +59,13 @@ set(NEUTUBE_SOURCES
     zneutubetraceworkspace.cpp zneutubetraceworkspace.h
     zneutubeskeletonize.cpp zneutubeskeletonize.h
     zneutubeskeletonizer.cpp zneutubeskeletonizer.h
+    zneutubeswcsignalfitter.cpp zneutubeswcsignalfitter.h
     zneutubeswcreconnect.cpp zneutubeswcreconnect.h
     zneutubeswcregionsampling.cpp zneutubeswcregionsampling.h
     zneutubetraceconnect.cpp zneutubetraceconnect.h
     zneutubetraceswclocseg.cpp zneutubetraceswclocseg.h
     zneutubetraceswclabelstack.cpp zneutubetraceswclabelstack.h
+    zneutubetracep2p.cpp zneutubetracep2p.h
     zneutubevoxel.h
     zneutubevoxelarray.cpp zneutubevoxelarray.h
     zneutubelocalneuroseg.cpp zneutubelocalneuroseg.h

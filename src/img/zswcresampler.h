@@ -10,6 +10,11 @@ class ZNeutubeSwcResampler
 public:
   ZNeutubeSwcResampler();
 
+  void ignoreInterRedundant(bool on)
+  {
+    m_ignoringInterRedundant = on;
+  }
+
   int optimalDownsample(ZSwc& tree) const;
 
 private:

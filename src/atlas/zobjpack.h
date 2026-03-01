@@ -15,6 +15,11 @@ class ZObjPack : public QObject
 public:
   ZObjPack(size_t id, ZObjDoc* objDoc, QObject* parent = nullptr);
 
+  [[nodiscard]] size_t id() const
+  {
+    return m_id;
+  }
+
   void setVisible(bool v);
 
   void setLocked(bool v);

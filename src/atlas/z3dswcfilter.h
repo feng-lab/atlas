@@ -10,7 +10,9 @@
 #include "z3dsphererenderer.h"
 #include "zeventlistenerparameter.h"
 #include "zswccolorparameters.h"
+#include <QPoint>
 #include <QObject>
+#include <cstdint>
 #include <map>
 #include <utility>
 #include <vector>
@@ -27,6 +29,7 @@ public:
     Select,
     AddSwcNode,
     ConnectSwcNode,
+    PlainExtendSwcNode,
     SmartExtendSwcNode
   };
 
@@ -78,7 +81,13 @@ Q_SIGNALS:
 
   void extendSwcTreeNode(double x, double y, double z);
 
-  void showSwcContextMenu(QPoint globalPos);
+  void request3dSwcAddNeuronNode(ZSwcPack* swcPack, double x, double y, double z, double r);
+
+  void request3dSwcPlainExtend(ZSwcPack* swcPack, double x, double y, double z, double r);
+
+  void request3dSwcConnectToTarget(ZSwcPack* swcPack, int64_t targetNodeId);
+
+  void showSwcNodeContextMenu(QPoint globalPos, ZSwcPack* swcPack, int64_t clickedNodeId);
 
 protected:
   void prepareColor();

@@ -34,6 +34,10 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
               &Z3DImgFilter::showSeedTraceContextMenu,
               &m_engine,
               &Z3DRenderingEngine::showSeedTraceContextMenu);
+      connect(viewControl,
+              &Z3DImgFilter::pointInVolumeLeftClicked,
+              &m_engine,
+              &Z3DRenderingEngine::pointInVolumeLeftClicked);
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
@@ -76,6 +80,10 @@ void Z3DImgView::docImgAdded(size_t id)
             &Z3DImgFilter::showSeedTraceContextMenu,
             &m_engine,
             &Z3DRenderingEngine::showSeedTraceContextMenu);
+    connect(viewControl,
+            &Z3DImgFilter::pointInVolumeLeftClicked,
+            &m_engine,
+            &Z3DRenderingEngine::pointInVolumeLeftClicked);
     m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.updatePipeline();

@@ -868,6 +868,40 @@ void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
     return;
   }
 
+  // neuTube parity hook: expose the clicked 3D voxel (first-hit depth) to the UI thread.
+  //
+  // This is used by 3D SWC edit modes (Extend/Add-node/Connect-to) to match neuTube's
+  // `Z3DVolumeFilter::pointInVolumeLeftClicked(...)` → `Z3DWindow::pointInVolumeLeftClicked(...)`
+  // behavior. We intentionally do not gate this on the Trace tool toggle so SWC editing works
+  // even when tracing is off.
+  if (m_seedTraceSourceImgObjId.has_value() && *m_seedTraceSourceImgObjId == m_imgObjId) {
+    if (m_seedTraceSourceChannel < m_channelVisibleParas.size()) {
+      const auto& channelVisiblePara = m_channelVisibleParas[m_seedTraceSourceChannel];
+      if (channelVisiblePara && channelVisiblePara->get()) {
+        const glm::ivec2 widgetPos(e->position().toPoint().x(), e->position().toPoint().y());
+        const void* hitObj = m_globalParameters.pickingManager.objectAtWidgetPos(widgetPos);
+        if (hitObj == nullptr) {
+          const float dpr = m_globalParameters.devicePixelRatio.get();
+          bool success = false;
+          const glm::vec3 pos3D = getFirstHit3DPosition(static_cast<int>(e->position().x() * dpr),
+                                                        static_cast<int>(e->position().y() * dpr),
+                                                        static_cast<int>(static_cast<float>(w) * dpr),
+                                                        static_cast<int>(static_cast<float>(h) * dpr),
+                                                        success);
+          if (success) {
+            Q_EMIT pointInVolumeLeftClicked(e->globalPosition().toPoint(),
+                                            m_imgObjId,
+                                            m_seedTraceSourceChannel,
+                                            pos3D.x,
+                                            pos3D.y,
+                                            pos3D.z,
+                                            e->modifiers());
+          }
+        }
+      }
+    }
+  }
+
   if (!m_seedTraceToolEnabled || m_seedTraceInProgress) {
     return;
   }

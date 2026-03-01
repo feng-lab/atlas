@@ -8,21 +8,104 @@
 #include "zseedtrace.h"
 #include "zswcdoc.h"
 #include "zswcpack.h"
+#include "zswctypedialog.h"
 #include "zsysteminfo.h"
 #include "ztracesettings.h"
+#include "z3dmainwindow.h"
+#include "zmainwindow.h"
+#include "zview.h"
+#include "zgraphicsview.h"
+#include "z3dswcview.h"
+#include "z3dswcfilter.h"
 #if defined(ATLAS_USE_OPENGLWIDGET)
 #include "z3dscene.h"
 #include "z3dopenglwidget.h"
 #endif
 #include <QCoreApplication>
+#include <QAction>
 #include <QDir>
 #include <QMenu>
 #include <QPointer>
+#include <QSignalBlocker>
 #include <algorithm>
+#include <cmath>
+#include <limits>
+#include <unordered_map>
 
 DECLARE_bool(atlas_vk_copy_yflip_in_shader);
 
 namespace nim {
+
+namespace {
+
+[[nodiscard]] std::optional<glm::dmat3> tryExtractCoordLinearInvFromView3DJson(const json::object& view3dJson)
+{
+  const std::string coordKey = "Coord Transform 3DTransform";
+  const auto it = view3dJson.find(coordKey);
+  if (it == view3dJson.end() || !it->value().is_object()) {
+    return {};
+  }
+
+  const json::object& transformObj = it->value().as_object();
+
+  glm::dvec3 scale(1.0, 1.0, 1.0);
+  if (const auto sIt = transformObj.find("Scale Vec3"); sIt != transformObj.end()) {
+    scale = json::value_to<glm::dvec3>(sIt->value());
+  }
+
+  // Stored as axis-angle: (angle_degrees, axis_x, axis_y, axis_z)
+  glm::dvec4 rot(0.0, 0.0, 1.0, 0.0);
+  if (const auto rIt = transformObj.find("Rotation Vec4"); rIt != transformObj.end()) {
+    rot = json::value_to<glm::dvec4>(rIt->value());
+  }
+
+  glm::dvec3 axis(rot.y, rot.z, rot.w);
+  const double angleDeg = rot.x;
+  glm::dmat3 rotMat(1.0);
+  if (angleDeg != 0.0) {
+    const double axisLen = glm::length(axis);
+    if (axisLen > 0.0) {
+      rotMat = glm::mat3_cast(glm::angleAxis(glm::radians(angleDeg), axis / axisLen));
+    }
+  }
+
+  glm::dmat3 scaleMat(1.0);
+  scaleMat[0][0] = scale.x;
+  scaleMat[1][1] = scale.y;
+  scaleMat[2][2] = scale.z;
+
+  const glm::dmat3 linear = rotMat * scaleMat;
+  return glm::inverse(linear);
+}
+
+[[nodiscard]] Z3DSwcFilter* findSwcFilterForObjId(Z3DRenderingEngine& engine, size_t swcObjId)
+{
+  for (const auto& viewPtr : engine.objViews()) {
+    auto* swcView = dynamic_cast<Z3DSwcView*>(viewPtr.get());
+    if (!swcView) {
+      continue;
+    }
+
+    auto& idToFilter = swcView->idToFilter();
+    auto it = idToFilter.find(swcObjId);
+    if (it == idToFilter.end()) {
+      continue;
+    }
+    return it->second.get();
+  }
+  return nullptr;
+}
+
+void setSwcFilterInteractionMode(Z3DRenderingEngine& engine, size_t swcObjId, Z3DSwcFilter::InteractionMode mode)
+{
+  Z3DSwcFilter* filter = findSwcFilterForObjId(engine, swcObjId);
+  if (!filter) {
+    return;
+  }
+  filter->setInteractionMode(mode);
+}
+
+} // namespace
 
 Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* parent, Qt::WindowFlags f)
   : QGraphicsView(parent)
@@ -173,6 +256,29 @@ void Z3DCanvas::renderingFinished()
 
 void Z3DCanvas::contextMenuEvent(QContextMenuEvent* e)
 {
+  // neuTube parity: in interactive connect-to mode, right click exits the mode (and does not show menus).
+  if (m_connectTo3dSwcModeActive) {
+    m_connectTo3dSwcModeActive = false;
+    const std::optional<size_t> swcObjIdOpt = m_connectTo3dSwcObjId;
+    m_connectTo3dSwcObjId.reset();
+
+    if (m_engine && swcObjIdOpt.has_value()) {
+      const size_t swcObjId = *swcObjIdOpt;
+      QMetaObject::invokeMethod(
+        m_engine,
+        [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), swcObjId]() {
+          if (!enginePtr) {
+            return;
+          }
+          setSwcFilterInteractionMode(*enginePtr, swcObjId, Z3DSwcFilter::InteractionMode::Select);
+        },
+        Qt::QueuedConnection);
+    }
+
+    e->accept();
+    return;
+  }
+
   if (m_engine) {
     QCoreApplication::postEvent(m_engine, e->clone());
   }
@@ -190,6 +296,13 @@ void Z3DCanvas::showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size
   }
 
   if (settings.traceInProgress()) {
+    return;
+  }
+
+  // neuTube parity: do not show the trace menu while SWC node edit modes are active.
+  if ((m_toggle3dAddNeuronNodeAction && m_toggle3dAddNeuronNodeAction->isChecked()) ||
+      (m_toggle3dMoveSelectedAction && m_toggle3dMoveSelectedAction->isChecked()) ||
+      (m_toggle3dExtendAction && m_toggle3dExtendAction->isChecked()) || m_connectTo3dSwcModeActive) {
     return;
   }
 
@@ -311,6 +424,643 @@ void Z3DCanvas::showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size
                                       std::move(onNewSwcCreated));
           });
   traceMenu.exec(globalPos);
+}
+
+void Z3DCanvas::ensure3dSwcNodeActions()
+{
+  if (m_toggle3dExtendAction != nullptr) {
+    return;
+  }
+
+  m_toggle3dExtendAction = new QAction(tr("Extend"), this);
+  m_toggle3dExtendAction->setCheckable(true);
+  m_toggle3dExtendAction->setShortcut(Qt::Key_Space);
+  connect(m_toggle3dExtendAction, &QAction::toggled, this, &Z3DCanvas::toggle3dSwcExtendMode);
+
+  m_connectTo3dSwcNodeAction = new QAction(tr("Connect to"), this);
+  m_connectTo3dSwcNodeAction->setShortcut(Qt::Key_C);
+  connect(m_connectTo3dSwcNodeAction, &QAction::triggered, this, &Z3DCanvas::start3dSwcConnectToMode);
+
+  m_toggle3dMoveSelectedAction = new QAction(tr("Move Selected (Shift+Mouse)"), this);
+  m_toggle3dMoveSelectedAction->setCheckable(true);
+  m_toggle3dMoveSelectedAction->setShortcut(Qt::Key_V);
+  connect(m_toggle3dMoveSelectedAction, &QAction::toggled, this, &Z3DCanvas::toggle3dSwcMoveSelectedMode);
+
+  m_locate3dNodesIn2DAction = new QAction(tr("Locate node(s) in 2D"), this);
+  connect(m_locate3dNodesIn2DAction, &QAction::triggered, this, &Z3DCanvas::locate3dSwcNodesIn2D);
+
+  m_change3dSwcNodeTypeAction = new QAction(tr("Change type"), this);
+  connect(m_change3dSwcNodeTypeAction, &QAction::triggered, this, &Z3DCanvas::change3dSwcNodeType);
+
+  m_toggle3dAddNeuronNodeAction = new QAction(tr("Add neuron node"), this);
+  m_toggle3dAddNeuronNodeAction->setCheckable(true);
+  connect(m_toggle3dAddNeuronNodeAction, &QAction::toggled, this, &Z3DCanvas::toggle3dAddNeuronNodeMode);
+}
+
+void Z3DCanvas::setActive3dSwcPackForEditing(ZSwcPack* swcPack, int64_t clickedNodeId)
+{
+  if (swcPack == nullptr) {
+    m_active3dSwcPack = nullptr;
+    m_active3dClickedNodeId = -1;
+    return;
+  }
+
+  m_active3dSwcPack = swcPack;
+  m_active3dClickedNodeId = clickedNodeId;
+}
+
+void Z3DCanvas::update3dSwcNodeActionEnabledState()
+{
+  const bool havePack = (m_active3dSwcPack != nullptr);
+  const bool haveSelection = havePack && !m_active3dSwcPack->selectedNodes().empty();
+  const bool haveSingleNode = havePack && (m_active3dSwcPack->selectedNodes().size() == 1);
+
+  if (m_toggle3dExtendAction) {
+    m_toggle3dExtendAction->setEnabled(haveSingleNode);
+  }
+  if (m_connectTo3dSwcNodeAction) {
+    m_connectTo3dSwcNodeAction->setEnabled(haveSingleNode);
+  }
+  if (m_toggle3dMoveSelectedAction) {
+    m_toggle3dMoveSelectedAction->setEnabled(haveSelection);
+  }
+  if (m_locate3dNodesIn2DAction) {
+    m_locate3dNodesIn2DAction->setEnabled(haveSelection);
+  }
+  if (m_change3dSwcNodeTypeAction) {
+    m_change3dSwcNodeTypeAction->setEnabled(haveSelection);
+  }
+  if (m_toggle3dAddNeuronNodeAction) {
+    m_toggle3dAddNeuronNodeAction->setEnabled(havePack);
+  }
+}
+
+void Z3DCanvas::toggle3dSwcExtendMode(bool)
+{
+  if (m_active3dSwcPack == nullptr) {
+    if (m_toggle3dExtendAction) {
+      const QSignalBlocker blocker(*m_toggle3dExtendAction);
+      m_toggle3dExtendAction->setChecked(false);
+    }
+    return;
+  }
+
+  const bool on = m_toggle3dExtendAction && m_toggle3dExtendAction->isChecked();
+  if (on && m_toggle3dAddNeuronNodeAction && m_toggle3dAddNeuronNodeAction->isChecked()) {
+    const QSignalBlocker blocker(*m_toggle3dAddNeuronNodeAction);
+    m_toggle3dAddNeuronNodeAction->setChecked(false);
+  }
+
+  if (m_engine == nullptr) {
+    return;
+  }
+
+  const ZTraceSettings& settings = m_doc->traceSettings();
+  const std::optional<size_t> imgIdOpt = settings.sourceImageId();
+  const bool haveStackData = imgIdOpt.has_value() && m_doc->imgDoc().hasObjWithID(*imgIdOpt);
+
+  const Z3DSwcFilter::InteractionMode mode = on ? (haveStackData ? Z3DSwcFilter::InteractionMode::SmartExtendSwcNode
+                                                                 : Z3DSwcFilter::InteractionMode::PlainExtendSwcNode)
+                                                : Z3DSwcFilter::InteractionMode::Select;
+
+  const size_t swcObjId = m_active3dSwcPack->id();
+  QMetaObject::invokeMethod(
+    m_engine,
+    [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), swcObjId, mode]() {
+      if (!enginePtr) {
+        return;
+      }
+      setSwcFilterInteractionMode(*enginePtr, swcObjId, mode);
+    },
+    Qt::QueuedConnection);
+}
+
+void Z3DCanvas::start3dSwcConnectToMode()
+{
+  if (m_active3dSwcPack == nullptr || m_engine == nullptr) {
+    return;
+  }
+  if (m_active3dSwcPack->selectedNodes().size() != 1) {
+    return;
+  }
+
+  m_connectTo3dSwcModeActive = true;
+  m_connectTo3dSwcObjId = m_active3dSwcPack->id();
+
+  const size_t swcObjId = m_active3dSwcPack->id();
+  QMetaObject::invokeMethod(
+    m_engine,
+    [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), swcObjId]() {
+      if (!enginePtr) {
+        return;
+      }
+      setSwcFilterInteractionMode(*enginePtr, swcObjId, Z3DSwcFilter::InteractionMode::ConnectSwcNode);
+    },
+    Qt::QueuedConnection);
+}
+
+void Z3DCanvas::toggle3dSwcMoveSelectedMode(bool)
+{
+  const bool on = m_toggle3dMoveSelectedAction && m_toggle3dMoveSelectedAction->isChecked();
+
+  m_active3dSwcLinearInv.reset();
+  if (on && m_active3dSwcPack != nullptr && m_engine != nullptr) {
+    json::object viewJson;
+    const size_t swcObjId = m_active3dSwcPack->id();
+
+    QMetaObject::invokeMethod(
+      m_engine,
+      [&viewJson, enginePtr = QPointer<Z3DRenderingEngine>(m_engine), swcObjId]() {
+        if (!enginePtr) {
+          return;
+        }
+        enginePtr->write(swcObjId, viewJson);
+      },
+      Qt::BlockingQueuedConnection);
+
+    m_active3dSwcLinearInv = tryExtractCoordLinearInvFromView3DJson(viewJson);
+  }
+
+  if (m_engine == nullptr) {
+    return;
+  }
+  QMetaObject::invokeMethod(
+    m_engine,
+    [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), on]() {
+      if (!enginePtr) {
+        return;
+      }
+      enginePtr->globalParas().interactionHandler.setMoveObjects(on);
+    },
+    Qt::QueuedConnection);
+}
+
+void Z3DCanvas::locate3dSwcNodesIn2D()
+{
+  if (m_active3dSwcPack == nullptr) {
+    return;
+  }
+  if (m_active3dSwcPack->isLocked()) {
+    return;
+  }
+  if (m_active3dSwcPack->selectedNodes().empty()) {
+    return;
+  }
+
+  double minX = std::numeric_limits<double>::infinity();
+  double minY = std::numeric_limits<double>::infinity();
+  double minZ = std::numeric_limits<double>::infinity();
+  double maxX = -std::numeric_limits<double>::infinity();
+  double maxY = -std::numeric_limits<double>::infinity();
+  double maxZ = -std::numeric_limits<double>::infinity();
+
+  for (const auto& n : m_active3dSwcPack->selectedNodes()) {
+    minX = std::min(minX, n->x);
+    minY = std::min(minY, n->y);
+    minZ = std::min(minZ, n->z);
+    maxX = std::max(maxX, n->x);
+    maxY = std::max(maxY, n->y);
+    maxZ = std::max(maxZ, n->z);
+  }
+
+  const double cx = (minX + maxX) * 0.5;
+  const double cy = (minY + maxY) * 0.5;
+  const double cz = (minZ + maxZ) * 0.5;
+
+  double width = std::max(maxX - minX, maxY - minY);
+  width = width + 1.0;
+  const double kMinWidth = 800.0;
+  if (width < kMinWidth) {
+    width = kMinWidth;
+  }
+
+  auto* win3d = qobject_cast<Z3DMainWindow*>(window());
+  if (win3d == nullptr) {
+    return;
+  }
+
+  ZMainWindow& win2d = win3d->window2d();
+  win2d.raise();
+  win2d.activateWindow();
+
+  ZView* view = win2d.view();
+  if (view == nullptr) {
+    return;
+  }
+
+  view->slicePara().set(static_cast<int>(std::llround(cz)));
+  view->graphicsView().fitRect(QRectF(cx - width * 0.5, cy - width * 0.5, width, width));
+}
+
+void Z3DCanvas::change3dSwcNodeType()
+{
+  if (m_active3dSwcPack == nullptr) {
+    return;
+  }
+  if (m_active3dSwcPack->isLocked()) {
+    return;
+  }
+  if (m_active3dSwcPack->selectedNodes().empty()) {
+    return;
+  }
+
+  ZSwcTypeDialog dlg(ZSwcTypeDialog::SelectionMode::SwcNode, this);
+  if (dlg.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  // Apply semantics match neuTube `Z3DWindow::changeSelectedSwcNodeType()`:
+  // - Individual: selected nodes
+  // - Downstream: subtree of each selected node
+  // - Connection: upstream until common ancestor across the selection
+  // - Longest leaf: path from the first selected node to its furthest leaf (geodesic)
+  const int newType = dlg.type();
+
+  std::vector<int64_t> selectedIds;
+  selectedIds.reserve(m_active3dSwcPack->selectedNodes().size());
+  for (const auto& n : m_active3dSwcPack->selectedNodes()) {
+    selectedIds.push_back(n->id);
+  }
+
+  ZSwc newSwc = m_active3dSwcPack->swc();
+  bool anyChange = false;
+
+  std::unordered_map<int64_t, ZSwc::SwcTreeNode> idToNode;
+  idToNode.reserve(newSwc.size());
+  for (auto it = newSwc.begin(); it != newSwc.end(); ++it) {
+    idToNode[it->id] = it;
+  }
+
+  const auto setTypeIfDiff = [&](const ZSwc::SwcTreeNode& n) {
+    if (ZSwc::isNull(n)) {
+      return;
+    }
+    if (n->type != newType) {
+      n->type = newType;
+      anyChange = true;
+    }
+  };
+
+  switch (dlg.pickingMode()) {
+    case ZSwcTypeDialog::PickingMode::Individual: {
+      for (const int64_t id : selectedIds) {
+        const auto it = idToNode.find(id);
+        if (it != idToNode.end()) {
+          setTypeIfDiff(it->second);
+        }
+      }
+      break;
+    }
+    case ZSwcTypeDialog::PickingMode::Downstream: {
+      for (const int64_t id : selectedIds) {
+        const auto rootIt = idToNode.find(id);
+        if (rootIt == idToNode.end()) {
+          continue;
+        }
+        for (auto it = newSwc.begin(rootIt->second); it != newSwc.end(rootIt->second); ++it) {
+          setTypeIfDiff(it);
+        }
+      }
+      break;
+    }
+    case ZSwcTypeDialog::PickingMode::Connection: {
+      if (selectedIds.empty()) {
+        break;
+      }
+
+      // Find common ancestor across the entire selection (neuTube: SwcTreeNode::commonAncestor).
+      ZSwc::SwcTreeNode ancestor;
+      {
+        const auto firstIt = idToNode.find(selectedIds.front());
+        if (firstIt == idToNode.end()) {
+          break;
+        }
+        ancestor = firstIt->second;
+      }
+
+      for (size_t i = 1; i < selectedIds.size(); ++i) {
+        const auto it = idToNode.find(selectedIds[i]);
+        if (it == idToNode.end()) {
+          ancestor = ZSwc::SwcTreeNode{};
+          break;
+        }
+        ancestor = newSwc.lowestCommonAncestor(ancestor, it->second);
+        if (ZSwc::isNull(ancestor)) {
+          break;
+        }
+      }
+
+      if (ZSwc::isNull(ancestor)) {
+        break;
+      }
+
+      for (const int64_t id : selectedIds) {
+        const auto it = idToNode.find(id);
+        if (it == idToNode.end()) {
+          continue;
+        }
+        for (auto up = newSwc.beginAncestor(it->second); up != newSwc.endAncestor(it->second); ++up) {
+          setTypeIfDiff(up);
+          if (up == ancestor) {
+            break;
+          }
+        }
+      }
+      break;
+    }
+    case ZSwcTypeDialog::PickingMode::LongestLeaf: {
+      if (selectedIds.empty()) {
+        break;
+      }
+
+      // neuTube uses only the first selected node for LONGEST_LEAF.
+      const auto startIt = idToNode.find(selectedIds.front());
+      if (startIt == idToNode.end()) {
+        break;
+      }
+      const ZSwc::SwcTreeNode start = startIt->second;
+
+      // Find furthest downstream node by geodesic distance.
+      double bestDist = -1.0;
+      ZSwc::SwcTreeNode bestNode;
+      for (auto it = newSwc.begin(start); it != newSwc.end(start); ++it) {
+        double dist = 0.0;
+        auto cur = it;
+        while (!ZSwc::isNull(cur) && cur != start) {
+          const auto par = ZSwc::parent(cur);
+          if (ZSwc::isNull(par)) {
+            break;
+          }
+          dist += glm::length(glm::dvec3(cur->x - par->x, cur->y - par->y, cur->z - par->z));
+          cur = par;
+        }
+        if (dist > bestDist) {
+          bestDist = dist;
+          bestNode = it;
+        }
+      }
+
+      if (!ZSwc::isNull(bestNode)) {
+        // Mark the path start -> bestNode.
+        auto cur = bestNode;
+        while (!ZSwc::isNull(cur)) {
+          setTypeIfDiff(cur);
+          if (cur == start) {
+            break;
+          }
+          cur = ZSwc::parent(cur);
+        }
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  if (!anyChange) {
+    return;
+  }
+
+  m_active3dSwcPack->replaceSwcWithUndo(QStringLiteral("Change SWC Node Type"), std::move(newSwc));
+
+  std::set<ZSwc::SwcTreeNode> restored;
+  for (const int64_t id : selectedIds) {
+    const ZSwc::SwcTreeNode it = m_active3dSwcPack->findNodeByIdOrNull(id);
+    if (!ZSwc::isNull(it)) {
+      restored.insert(it);
+    }
+  }
+  if (!restored.empty()) {
+    m_active3dSwcPack->setSelectedNodes(restored);
+  }
+}
+
+void Z3DCanvas::toggle3dAddNeuronNodeMode(bool)
+{
+  if (m_active3dSwcPack == nullptr) {
+    if (m_toggle3dAddNeuronNodeAction) {
+      const QSignalBlocker blocker(*m_toggle3dAddNeuronNodeAction);
+      m_toggle3dAddNeuronNodeAction->setChecked(false);
+    }
+    return;
+  }
+
+  const bool on = m_toggle3dAddNeuronNodeAction && m_toggle3dAddNeuronNodeAction->isChecked();
+  if (on && m_toggle3dExtendAction && m_toggle3dExtendAction->isChecked()) {
+    const QSignalBlocker blocker(*m_toggle3dExtendAction);
+    m_toggle3dExtendAction->setChecked(false);
+  }
+
+  if (m_engine == nullptr) {
+    return;
+  }
+  const size_t swcObjId = m_active3dSwcPack->id();
+  const Z3DSwcFilter::InteractionMode mode =
+    on ? Z3DSwcFilter::InteractionMode::AddSwcNode : Z3DSwcFilter::InteractionMode::Select;
+
+  QMetaObject::invokeMethod(
+    m_engine,
+    [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), swcObjId, mode]() {
+      if (!enginePtr) {
+        return;
+      }
+      setSwcFilterInteractionMode(*enginePtr, swcObjId, mode);
+    },
+    Qt::QueuedConnection);
+}
+
+namespace {
+
+void appendClonedMenuActions3dSwcDocParity(QMenu& dst, const QMenu& src)
+{
+  for (QAction* action : src.actions()) {
+    if (action == nullptr) {
+      continue;
+    }
+    if (action->isSeparator()) {
+      dst.addSeparator();
+      continue;
+    }
+
+    if (const QMenu* sub = action->menu()) {
+      const QString title =
+        (sub->title() == QStringLiteral("Interpolate")) ? QStringLiteral("Intepolate") : sub->title();
+      auto* newSub = dst.addMenu(title);
+      appendClonedMenuActions3dSwcDocParity(*newSub, *sub);
+      continue;
+    }
+
+    dst.addAction(action);
+  }
+}
+
+} // namespace
+
+void Z3DCanvas::showSwcNodeContextMenu(QPoint globalPos, ZSwcPack* swcPack, int64_t clickedNodeId)
+{
+  if (swcPack == nullptr || swcPack->isLocked()) {
+    return;
+  }
+  if (m_doc == nullptr) {
+    return;
+  }
+
+  ensure3dSwcNodeActions();
+  setActive3dSwcPackForEditing(swcPack, clickedNodeId);
+
+  // neuTube selection semantics: right-clicking an unselected node should make it the active selection
+  // so actions apply to that node.
+  const ZSwc::SwcTreeNode clickedNodeIt = swcPack->findNodeByIdOrNull(clickedNodeId);
+  const bool clickedNodeFound = !ZSwc::isNull(clickedNodeIt);
+  const bool clickedNodeIsSelected = clickedNodeFound && swcPack->selectedNodes().contains(clickedNodeIt);
+
+  if (clickedNodeFound && !clickedNodeIsSelected) {
+    std::set<ZSwc::SwcTreeNode> selection;
+    selection.insert(clickedNodeIt);
+    swcPack->setSelectedNodes(selection);
+  }
+
+  update3dSwcNodeActionEnabledState();
+
+  auto* menu = new QMenu(this);
+  menu->setAttribute(Qt::WA_DeleteOnClose);
+
+  menu->addAction(m_toggle3dExtendAction);
+  menu->addAction(m_connectTo3dSwcNodeAction);
+  menu->addAction(m_toggle3dMoveSelectedAction);
+
+  appendClonedMenuActions3dSwcDocParity(*menu, swcPack->contextMenu());
+
+  menu->addSeparator();
+  menu->addAction(m_locate3dNodesIn2DAction);
+  menu->addAction(m_change3dSwcNodeTypeAction);
+  menu->addAction(m_toggle3dAddNeuronNodeAction);
+
+  menu->popup(globalPos);
+}
+
+void Z3DCanvas::request3dSwcAddNeuronNode(ZSwcPack* swcPack, double x, double y, double z, double r)
+{
+  if (swcPack == nullptr || swcPack->isLocked()) {
+    return;
+  }
+  swcPack->addIsolatedNodeLegacyLike(glm::dvec3(x, y, z), r);
+}
+
+void Z3DCanvas::request3dSwcPlainExtend(ZSwcPack* swcPack, double x, double y, double z, double r)
+{
+  if (swcPack == nullptr || swcPack->isLocked()) {
+    return;
+  }
+  swcPack->extendSelectedNodePlain(glm::dvec3(x, y, z), r);
+}
+
+void Z3DCanvas::request3dSwcConnectToTarget(ZSwcPack* swcPack, int64_t targetNodeId)
+{
+  if (swcPack == nullptr || swcPack->isLocked()) {
+    return;
+  }
+
+  if (!m_connectTo3dSwcModeActive) {
+    return;
+  }
+
+  const ZSwc::SwcTreeNode target = swcPack->findNodeByIdOrNull(targetNodeId);
+  if (!ZSwc::isNull(target)) {
+    const bool connected = swcPack->connectSelectedNodeToLegacyLike(target);
+    (void)connected;
+  }
+
+  m_connectTo3dSwcModeActive = false;
+  m_connectTo3dSwcObjId.reset();
+  if (m_engine) {
+    const size_t swcObjId = swcPack->id();
+    QMetaObject::invokeMethod(
+      m_engine,
+      [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), swcObjId]() {
+        if (!enginePtr) {
+          return;
+        }
+        setSwcFilterInteractionMode(*enginePtr, swcObjId, Z3DSwcFilter::InteractionMode::Select);
+      },
+      Qt::QueuedConnection);
+  }
+}
+
+void Z3DCanvas::on3dObjectsMoved(double x, double y, double z)
+{
+  if (!m_toggle3dMoveSelectedAction || !m_toggle3dMoveSelectedAction->isChecked()) {
+    return;
+  }
+  if (m_active3dSwcPack == nullptr || m_active3dSwcPack->isLocked()) {
+    return;
+  }
+  if (m_active3dSwcPack->selectedNodes().empty()) {
+    return;
+  }
+
+  glm::dvec3 delta(x, y, z);
+  if (m_active3dSwcLinearInv.has_value()) {
+    delta = (*m_active3dSwcLinearInv) * delta;
+  }
+  m_active3dSwcPack->translateSelectedNodesLegacyLike(delta.x, delta.y, delta.z);
+}
+
+void Z3DCanvas::pointInVolumeLeftClicked(QPoint,
+                                         size_t imgObjId,
+                                         size_t sc,
+                                         float x,
+                                         float y,
+                                         float z,
+                                         Qt::KeyboardModifiers modifiers)
+{
+  if (!m_toggle3dExtendAction || !m_toggle3dExtendAction->isChecked()) {
+    return;
+  }
+  if (m_doc == nullptr) {
+    return;
+  }
+
+  const ZTraceSettings& settings = m_doc->traceSettings();
+  const std::optional<size_t> srcImgId = settings.sourceImageId();
+  if (!srcImgId.has_value() || *srcImgId != imgObjId) {
+    return;
+  }
+  if (settings.sourceChannel() != sc) {
+    return;
+  }
+
+  // neuTube parity: extend is enabled when there is exactly one SWC node selected globally.
+  // In Atlas we may have multiple SWC objects, so resolve the selected node by scanning all SWC packs.
+  ZSwcPack* pack = nullptr;
+  ZSwc::SwcTreeNode parentNode;
+  size_t numSelected = 0;
+  for (const size_t swcId : m_doc->swcDoc().objs()) {
+    ZSwcPack& sp = m_doc->swcDoc().swcPack(swcId);
+    numSelected += sp.selectedNodes().size();
+    if (sp.selectedNodes().size() == 1) {
+      pack = &sp;
+      parentNode = *sp.selectedNodes().begin();
+    }
+    if (numSelected > 1) {
+      break;
+    }
+  }
+  if (numSelected != 1 || pack == nullptr || ZSwc::isNull(parentNode)) {
+    return;
+  }
+  if (pack->isLocked()) {
+    return;
+  }
+
+  const glm::dvec3 center(static_cast<double>(x), static_cast<double>(y), static_cast<double>(z));
+  const double radius = parentNode->radius;
+
+  if (modifiers == Qt::ControlModifier) {
+    pack->extendSelectedNodePlain(center, radius);
+  } else {
+    pack->extendSelectedNodeSmartLegacyLike(center, radius, /*t=*/0);
+  }
 }
 
 // void Z3DCanvas::enterEvent(QEnterEvent* e)

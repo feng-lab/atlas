@@ -507,6 +507,11 @@ set(SOURCES
     zshareitemselectionmodel.h zshareitemselectionmodel.cpp
     zitemselectionmodel.h zitemselectionmodel.cpp
     zmessageboxhelpers.h zmessageboxhelpers.cpp
+    zinformationdialog.h zinformationdialog.cpp
+    zresolutiondialog.h zresolutiondialog.cpp
+    zswcskeletontransformdialog.h zswcskeletontransformdialog.cpp
+    zswcsizedialog.h zswcsizedialog.cpp
+    zswctypedialog.h zswctypedialog.cpp
     zviewsettingwidget.h zviewsettingwidget.cpp
     z3dmainwindow.h z3dmainwindow.cpp
     z3drenderingengine.h z3drenderingengine.cpp

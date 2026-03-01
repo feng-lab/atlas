@@ -43,4 +43,13 @@ void swcNodeInterpolateLegacyLike(const ZSwc::ConstSwcTreeNode& a,
                                   double lambda,
                                   ZSwc::SwcTreeNode out);
 
+// Port of `SwcTreeNode::correctTurn(tn)`.
+// If `tn` forms a turn between its parent/child neighbor pair, this moves `tn` onto the
+// interpolated segment position (and radius) between the two neighbors.
+void swcNodeCorrectTurnLegacyLike(ZSwc& swc, const ZSwc::SwcTreeNode& tn);
+
+// Port of `SwcTreeNode::maxBendingEnergy(tn)`.
+// This measures local curvature around `tn` using up to 5 consecutive points on the chain.
+[[nodiscard]] double swcNodeMaxBendingEnergyLegacyLike(const ZSwc& swc, const ZSwc::ConstSwcTreeNode& tn);
+
 } // namespace nim

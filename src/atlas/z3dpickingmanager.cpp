@@ -208,31 +208,110 @@ GLfloat Z3DPickingManager::depthAtWidgetPos(glm::ivec2 pos)
 
 std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm::ivec2& pos, int radius, bool ascend)
 {
-  if (!m_renderTarget) {
+  if (!m_renderTarget && !m_vkColor) {
     return {};
   }
-  boost::unordered_flat_map<glm::col4, int> col2dist;
-  const Z3DTexture* tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
-  GLenum dataFormat = GL_BGRA;
-  GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-  auto buf =
-    std::make_unique_for_overwrite<glm::col4[]>(Z3DTexture::bypePerPixel(dataFormat, dataType) * tex->numPixels() / 4);
-  tex->downloadTextureToBuffer(dataFormat, dataType, buf.get());
-  auto texSize = glm::ivec2(m_renderTarget->size());
-  if (radius < 0) {
-    radius = std::max(texSize.x, texSize.y);
+
+  // Convert widget-space logical pixels to physical picking pixels.
+  glm::ivec2 physPos = pos;
+  physPos.x = static_cast<int>(physPos.x * m_devicePixelRatio);
+  physPos.y = static_cast<int>(physPos.y * m_devicePixelRatio);
+
+  int physRadius = radius;
+  if (physRadius >= 0) {
+    physRadius = static_cast<int>(std::ceil(static_cast<double>(physRadius) * m_devicePixelRatio));
   }
-  for (auto y = std::max(0, pos.y - radius); y <= std::min(texSize.y - 1, pos.y + radius); ++y) {
-    for (auto x = std::max(0, pos.x - radius); x <= std::min(texSize.x - 1, pos.x + radius); ++x) {
-      auto col = buf[(y * texSize.x) + x];
-      std::swap(col.r, col.b);
-      if (col2dist[col] == 0) {
-        col2dist[col] = (x - pos.x) * (x - pos.x) + (y - pos.y) * (y - pos.y);
-      } else {
-        col2dist[col] = std::min(col2dist[col], (x - pos.x) * (x - pos.x) + (y - pos.y) * (y - pos.y));
+
+  boost::unordered_flat_map<glm::col4, int> col2dist;
+
+  auto recordColor = [&](int x, int y, int dx, int dy, const glm::col4& col) {
+    if (col.a == 0) {
+      return;
+    }
+    const int dist = dx * dx + dy * dy;
+    auto it = col2dist.find(col);
+    if (it == col2dist.end()) {
+      col2dist.emplace(col, dist);
+    } else {
+      it->second = std::min(it->second, dist);
+    }
+  };
+
+  int w = 0;
+  int h = 0;
+  int baseY = 0;
+
+  std::vector<uint8_t> rgba;
+  std::unique_ptr<glm::col4[]> glBuf;
+
+  if (m_vkColor) {
+    w = static_cast<int>(m_vkSize.x);
+    h = static_cast<int>(m_vkSize.y);
+    if (w <= 0 || h <= 0) {
+      return {};
+    }
+    // Clamp inside bounds (widget->physical coordinates).
+    physPos.x = std::clamp(physPos.x, 0, w - 1);
+    physPos.y = std::clamp(physPos.y, 0, h - 1);
+
+    // Vulkan path uses a bottom-left origin in objectAtWidgetPos (via yFlip = h-1-y).
+    baseY = (h - 1) - physPos.y;
+
+    if (physRadius < 0) {
+      physRadius = std::max(w, h);
+    }
+
+    rgba.resize(static_cast<size_t>(w) * static_cast<size_t>(h) * 4u);
+    try {
+      m_vkColor->downloadData(rgba.data(), rgba.size());
+    }
+    catch (const std::exception& e) {
+      LOG(ERROR) << "Vulkan picking color download failed: " << e.what();
+      return {};
+    }
+
+    for (int yy = std::max(0, baseY - physRadius); yy <= std::min(h - 1, baseY + physRadius); ++yy) {
+      for (int xx = std::max(0, physPos.x - physRadius); xx <= std::min(w - 1, physPos.x + physRadius); ++xx) {
+        const size_t idx = static_cast<size_t>(yy) * static_cast<size_t>(w) + static_cast<size_t>(xx);
+        const uint8_t* px = &rgba[4u * idx];
+        const glm::col4 col{px[0], px[1], px[2], px[3]};
+        recordColor(xx, yy, xx - physPos.x, yy - baseY, col);
+      }
+    }
+  } else {
+    CHECK(m_renderTarget);
+    const Z3DTexture* tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
+    w = static_cast<int>(m_renderTarget->size().x);
+    h = static_cast<int>(m_renderTarget->size().y);
+    if (w <= 0 || h <= 0) {
+      return {};
+    }
+
+    physPos.x = std::clamp(physPos.x, 0, w - 1);
+    physPos.y = std::clamp(physPos.y, 0, h - 1);
+
+    // GL path: match objectAtWidgetPos's y-flip convention.
+    baseY = h - physPos.y;
+
+    if (physRadius < 0) {
+      physRadius = std::max(w, h);
+    }
+
+    const GLenum dataFormat = GL_BGRA;
+    const GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
+    glBuf = std::make_unique_for_overwrite<glm::col4[]>(Z3DTexture::bypePerPixel(dataFormat, dataType) *
+                                                        tex->numPixels() / 4);
+    tex->downloadTextureToBuffer(dataFormat, dataType, glBuf.get());
+
+    for (int yy = std::max(0, baseY - physRadius); yy <= std::min(h - 1, baseY + physRadius); ++yy) {
+      for (int xx = std::max(0, physPos.x - physRadius); xx <= std::min(w - 1, physPos.x + physRadius); ++xx) {
+        glm::col4 col = glBuf[(yy * w) + xx];
+        std::swap(col.r, col.b);
+        recordColor(xx, yy, xx - physPos.x, yy - baseY, col);
       }
     }
   }
+
   std::vector<const void*> res;
   if (ascend) {
     std::multimap<int, const void*> dist2obj;

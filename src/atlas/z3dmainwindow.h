@@ -30,6 +30,11 @@ public:
 
   ~Z3DMainWindow() override;
 
+  [[nodiscard]] ZMainWindow& window2d() const
+  {
+    return m_2dWindow;
+  }
+
   Z3DRenderingEngine* engine()
   {
     return m_engine;

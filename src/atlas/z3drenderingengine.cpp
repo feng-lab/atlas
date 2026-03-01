@@ -1247,6 +1247,15 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
   connect(this, &Z3DRenderingEngine::sceneParaUpdated, m_canvas, &Z3DCanvas::sceneParaUpdated);
   connect(this, &Z3DRenderingEngine::renderingFinished, m_canvas, &Z3DCanvas::renderingFinished);
   connect(this, &Z3DRenderingEngine::showSeedTraceContextMenu, m_canvas, &Z3DCanvas::showSeedTraceContextMenu);
+  connect(this, &Z3DRenderingEngine::pointInVolumeLeftClicked, m_canvas, &Z3DCanvas::pointInVolumeLeftClicked);
+  connect(this, &Z3DRenderingEngine::showSwcNodeContextMenu, m_canvas, &Z3DCanvas::showSwcNodeContextMenu);
+  connect(this, &Z3DRenderingEngine::request3dSwcAddNeuronNode, m_canvas, &Z3DCanvas::request3dSwcAddNeuronNode);
+  connect(this, &Z3DRenderingEngine::request3dSwcPlainExtend, m_canvas, &Z3DCanvas::request3dSwcPlainExtend);
+  connect(this, &Z3DRenderingEngine::request3dSwcConnectToTarget, m_canvas, &Z3DCanvas::request3dSwcConnectToTarget);
+  connect(&m_globalParas->interactionHandler,
+          &Z3DTrackballInteractionHandler::objectsMoved,
+          m_canvas,
+          &Z3DCanvas::on3dObjectsMoved);
   m_canvas->setRenderingEngine(this);
 }
 

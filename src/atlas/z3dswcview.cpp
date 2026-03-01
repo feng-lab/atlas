@@ -27,6 +27,22 @@ void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
       connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
       connect(viewControl, &Z3DSwcFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
+      connect(viewControl,
+              &Z3DSwcFilter::showSwcNodeContextMenu,
+              &m_engine,
+              &Z3DRenderingEngine::showSwcNodeContextMenu);
+      connect(viewControl,
+              &Z3DSwcFilter::request3dSwcAddNeuronNode,
+              &m_engine,
+              &Z3DRenderingEngine::request3dSwcAddNeuronNode);
+      connect(viewControl,
+              &Z3DSwcFilter::request3dSwcPlainExtend,
+              &m_engine,
+              &Z3DRenderingEngine::request3dSwcPlainExtend);
+      connect(viewControl,
+              &Z3DSwcFilter::request3dSwcConnectToTarget,
+              &m_engine,
+              &Z3DRenderingEngine::request3dSwcConnectToTarget);
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
@@ -60,6 +76,19 @@ void Z3DSwcView::docSwcAdded(size_t id)
     connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
     connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
     connect(viewControl, &Z3DSwcFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
+    connect(viewControl, &Z3DSwcFilter::showSwcNodeContextMenu, &m_engine, &Z3DRenderingEngine::showSwcNodeContextMenu);
+    connect(viewControl,
+            &Z3DSwcFilter::request3dSwcAddNeuronNode,
+            &m_engine,
+            &Z3DRenderingEngine::request3dSwcAddNeuronNode);
+    connect(viewControl,
+            &Z3DSwcFilter::request3dSwcPlainExtend,
+            &m_engine,
+            &Z3DRenderingEngine::request3dSwcPlainExtend);
+    connect(viewControl,
+            &Z3DSwcFilter::request3dSwcConnectToTarget,
+            &m_engine,
+            &Z3DRenderingEngine::request3dSwcConnectToTarget);
     m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.updatePipeline();

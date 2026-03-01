@@ -65,4 +65,7 @@ private:
 // effective histogram minimum after clamping to [low, high]), matching legacy behavior.
 [[nodiscard]] int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, double& c1, double& c2);
 
+// Port of tz_stack_threshold.c::Hist_Rcthre() (RC thresholding).
+[[nodiscard]] int rcthreLegacyLike(const IntHistogramLegacyLike& hist, int low, int high);
+
 } // namespace nim

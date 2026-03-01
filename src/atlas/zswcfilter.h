@@ -13,6 +13,8 @@
 
 namespace nim {
 
+class ZSwcFilter;
+
 #if 0
 class ZSwcGraphicsItem : public QGraphicsItem
 {
@@ -184,7 +186,8 @@ public:
     return Type;
   }
 
-  ZSwcNodeGraphicsItem(ZSwcPack& swcPack,
+  ZSwcNodeGraphicsItem(ZSwcFilter& filter,
+                       ZSwcPack& swcPack,
                        const ZSwc::SwcTreeNode& swcNode,
                        const QTransform& tfm,
                        QGraphicsItem* parent = nullptr);
@@ -209,12 +212,23 @@ public:
 
   void setLocked(bool l);
 
+  [[nodiscard]] const ZSwc::SwcTreeNode& swcNode() const
+  {
+    return m_swcNode;
+  }
+
+  [[nodiscard]] ZSwcPack& swcPack() const
+  {
+    return m_swcPack;
+  }
+
   // void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
 protected:
   void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
 private:
+  ZSwcFilter& m_filter;
   ZSwcPack& m_swcPack;
   ZSwc::SwcTreeNode m_swcNode;
 
@@ -253,6 +267,23 @@ public:
 
   void deleteKeyPressed() override;
 
+  void popupSwcNodeContextMenu(const ZSwc::SwcTreeNode& clickedNode, QPoint globalPos);
+
+  [[nodiscard]] ZSwcPack* swcPack() const
+  {
+    return m_swcPack;
+  }
+
+  [[nodiscard]] int currentRealZ() const
+  {
+    return realZ();
+  }
+
+  [[nodiscard]] int currentRealT() const
+  {
+    return realT();
+  }
+
 protected:
   void viewPrecedenceChanged() override;
 
@@ -285,6 +316,20 @@ private:
 
   void opacityChanged();
 
+  void extendSwcNode();
+
+  void connectToSwcNode();
+
+  void moveSelectedSwcNodes();
+
+  void moveSelectedSwcNodesToCurrentPlane();
+
+  void estimateSwcNodeRadius();
+
+  void addNeuronNode();
+
+  void locateSelectedNodesIn3D();
+
 private:
   ZSwcPack* m_swcPack = nullptr;
   std::unique_ptr<ZSwcSkeletonGraphicsItem> m_item;
@@ -302,6 +347,15 @@ private:
 
   bool m_ignoreSelectionChangedSignal = false;
   bool m_skipSelectionChangedProcessing = false;
+
+  ZSwc::SwcTreeNode m_contextMenuNode;
+  QAction* m_extendSwcNodeAction = nullptr;
+  QAction* m_connectToSwcNodeAction = nullptr;
+  QAction* m_moveToCurrentPlaneAction = nullptr;
+  QAction* m_moveSelectedNodesAction = nullptr;
+  QAction* m_estimateRadiusAction = nullptr;
+  QAction* m_addNeuronNodeAction = nullptr;
+  QAction* m_locateNodesIn3DAction = nullptr;
 };
 
 } // namespace nim

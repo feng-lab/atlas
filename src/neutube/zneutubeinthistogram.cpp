@@ -432,4 +432,53 @@ int rcthreRLegacyLike(const IntHistogramLegacyLike& hist, int low, int high, dou
   return thre;
 }
 
+int rcthreLegacyLike(const IntHistogramLegacyLike& hist, int low, int high)
+{
+  // Port of tz_stack_threshold.c::Hist_Rcthre().
+  if (hist.empty()) {
+    throw ZException("rcthreLegacyLike: empty histogram.");
+  }
+
+  const std::vector<int>& h = hist.data();
+  CHECK(h.size() >= 2);
+  CHECK(h[0] >= 1);
+  CHECK(static_cast<size_t>(h[0] + 2) == h.size());
+
+  const int* hist2 = h.data() + 2;
+  int length = h[0];
+  int minGrey = h[1];
+  int maxGrey = h[0] + h[1] - 1;
+
+  if (low > minGrey) {
+    hist2 += low - minGrey;
+    minGrey = low;
+  }
+
+  if (high < maxGrey) {
+    maxGrey = high;
+  }
+
+  length = maxGrey - minGrey + 1;
+  CHECK(length >= 1);
+
+  int thre = 0;
+  int prevThre = -1;
+  do {
+    if (thre == length - 1) {
+      break;
+    }
+
+    prevThre = thre;
+
+    const double c1 = iarrayCentroidD(hist2, static_cast<size_t>(thre) + 1);
+    double c2 = iarrayCentroidD(hist2 + thre + 1, static_cast<size_t>(length - thre - 1));
+
+    c2 += static_cast<double>(thre + 1);
+    thre = static_cast<int>((c1 + c2) / 2.0);
+  } while (thre != prevThre);
+
+  thre += minGrey;
+  return thre;
+}
+
 } // namespace nim

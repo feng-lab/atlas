@@ -7,8 +7,11 @@
 #include <QInputEvent>
 #include <QShortcut>
 #include <QPoint>
+#include <QPointer>
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 
 #ifdef ATLAS_USE_OPENGLWIDGET
 class QOpenGLContext;
@@ -18,6 +21,8 @@ namespace nim {
 
 class Z3DRenderingEngine;
 class ZDoc;
+class ZSwcPack;
+class ZSwcTypeDialog;
 
 #ifdef ATLAS_USE_OPENGLWIDGET
 class ZOpenGLWidget;
@@ -52,6 +57,22 @@ public:
   }
 
   void showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size_t sc, float x, float y, float z);
+
+  void pointInVolumeLeftClicked(QPoint globalPos,
+                                size_t imgObjId,
+                                size_t sc,
+                                float x,
+                                float y,
+                                float z,
+                                Qt::KeyboardModifiers modifiers);
+
+  void showSwcNodeContextMenu(QPoint globalPos, ZSwcPack* swcPack, int64_t clickedNodeId);
+
+  void request3dSwcAddNeuronNode(ZSwcPack* swcPack, double x, double y, double z, double r);
+  void request3dSwcPlainExtend(ZSwcPack* swcPack, double x, double y, double z, double r);
+  void request3dSwcConnectToTarget(ZSwcPack* swcPack, int64_t targetNodeId);
+
+  void on3dObjectsMoved(double x, double y, double z);
 
   void toggleFullScreen();
 
@@ -125,6 +146,19 @@ protected:
 private:
   // double devicePixelRatio();
 
+  void ensure3dSwcNodeActions();
+
+  void setActive3dSwcPackForEditing(ZSwcPack* swcPack, int64_t clickedNodeId);
+
+  void update3dSwcNodeActionEnabledState();
+
+  void toggle3dSwcExtendMode(bool on);
+  void start3dSwcConnectToMode();
+  void toggle3dSwcMoveSelectedMode(bool on);
+  void locate3dSwcNodesIn2D();
+  void change3dSwcNodeType();
+  void toggle3dAddNeuronNodeMode(bool on);
+
 private:
   bool m_fullscreen = false;
 
@@ -145,6 +179,24 @@ private:
 
   ZDoc* m_doc = nullptr;
   Z3DRenderingEngine* m_engine = nullptr;
+
+  // 3D SWC-node context menu (UI thread ownership).
+  QPointer<ZSwcPack> m_active3dSwcPack;
+  int64_t m_active3dClickedNodeId = -1;
+
+  QAction* m_toggle3dExtendAction = nullptr;
+  QAction* m_connectTo3dSwcNodeAction = nullptr;
+  QAction* m_toggle3dMoveSelectedAction = nullptr;
+  QAction* m_locate3dNodesIn2DAction = nullptr;
+  QAction* m_change3dSwcNodeTypeAction = nullptr;
+  QAction* m_toggle3dAddNeuronNodeAction = nullptr;
+
+  bool m_connectTo3dSwcModeActive = false;
+  std::optional<size_t> m_connectTo3dSwcObjId;
+
+  // For 3D move-selected: cache inverse linear transform (rotation * scale) so we can
+  // convert world-space deltas from the interaction handler into SWC-local deltas.
+  std::optional<glm::dmat3> m_active3dSwcLinearInv;
 };
 
 } // namespace nim

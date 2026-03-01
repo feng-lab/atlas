@@ -141,4 +141,29 @@ double stackVoxelWeightSLegacyLike(double* argv)
   return w;
 }
 
+double stackVoxelWeightSrLegacyLike(double* argv)
+{
+  CHECK(argv != nullptr);
+
+  const double v1 = argv[1];
+  const double v2 = argv[2];
+  const double d = argv[0];
+
+  double thre = argv[3];
+  if (std::isnan(thre)) {
+    thre = 60.0;
+  }
+
+  double scale = argv[4];
+  if (std::isnan(scale)) {
+    scale = 5.0;
+  }
+
+  // Legacy Stack_Voxel_Weight_Sr:
+  // d * (1/(1+exp((thre-v1)/scale)) + 1/(1+exp((thre-v2)/scale)) + 0.00001)
+  const double w =
+    d * (1.0 / (1.0 + std::exp((thre - v1) / scale)) + 1.0 / (1.0 + std::exp((thre - v2) / scale)) + 0.00001);
+  return w;
+}
+
 } // namespace nim

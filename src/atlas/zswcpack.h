@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 #include <set>
+#include <cstdint>
 
 namespace nim {
 
@@ -58,6 +59,8 @@ public:
   {
     return m_swc;
   }
+
+  [[nodiscard]] ZSwc::SwcTreeNode findNodeByIdOrNull(int64_t id);
 
   // Replace the underlying SWC tree as a single undoable edit.
   //
@@ -110,7 +113,51 @@ public:
 
   void onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool extend);
 
+  // neuTube context menu (2D/3D): extend from the single selected node by adding a new child at `center`.
+  // Selection behavior matches neuTube: the newly created node becomes the only selected node.
+  void extendSelectedNodePlain(const glm::dvec3& center, double radius);
+
+  // neuTube context menu (2D/3D): smart extend from the single selected node by computing a path to `center`
+  // using the configured source image/channel. This matches `ZStackDoc::executeSwcNodeSmartExtendCommand(...)`.
+  void extendSelectedNodeSmartLegacyLike(const glm::dvec3& center, double radius, size_t t);
+
+  // neuTube: Add an isolated neuron node (as a new root) at `center`.
+  void addIsolatedNodeLegacyLike(const glm::dvec3& center, double radius);
+
+  // neuTube: "Move to Current Plane" (2D) sets Z of all selected nodes to the current slice.
+  void setSelectedNodesZLegacyLike(double z);
+
+  // neuTube: Move selected SWC nodes by an offset (used by the 2D/3D move modes).
+  void translateSelectedNodesLegacyLike(double dx, double dy, double dz);
+
+  // neuTube context menu (2D/3D): connect the single selected node (anchor) to `target`.
+  // This matches legacy `ZStackDoc::executeConnectSwcNodeCommand(anchor, target)` semantics:
+  // - Re-roots the target tree at `target`, then attaches it as a child of the anchor.
+  // - Does nothing when the nodes are already connected (same tree).
+  // - Does not change the current selection.
+  [[nodiscard]] bool connectSelectedNodeToLegacyLike(const ZSwc::SwcTreeNode& target);
+
   void deleteSelectedNodes();
+
+  void deleteUnselectedNodes();
+
+  void mergeSelectedNodes();
+
+  void insertNodesBetweenSelectedPairs();
+
+  void interpolateSelectedNodes();
+
+  void interpolateSelectedNodesZ();
+
+  void interpolateSelectedNodesPosition();
+
+  void interpolateSelectedNodesRadius();
+
+  void showSwcSummary();
+
+  void showSelectedBranchLength();
+
+  void showSelectedBranchScaledLength();
 
   void showSwcContextMenu(QPoint globalPos);
 
@@ -119,19 +166,35 @@ protected:
 
   void createContextMenu();
 
-  void selectCurrentBranch();
+  void selectDownstreamNodes();
 
-  void selectBranchUpstream();
+  void selectUpstreamNodes();
 
-  void selectBranchDownstream();
+  void selectNeighborNodes();
 
-  void selectUpstream();
+  void selectHostBranchNodes();
 
-  void selectSubtree();
+  void selectConnectedNodes();
 
-  void selectEntireTree();
+  void selectAllNodes();
 
   void setSelectedNodeAsRoot();
+
+  void changeSelectedNodeType();
+
+  void translateSelectedNodes();
+
+  void changeSelectedNodeSize();
+
+  void removeTurn();
+
+  void resolveCrossover();
+
+  void joinIsolatedBranch();
+
+  void joinIsolatedBranchAcrossTrees();
+
+  void resetBranchPoint();
 
   void breakSelectedNodes();
 
@@ -150,16 +213,34 @@ protected:
   ZSwcDoc& m_doc;
   QUndoStack m_undoStack;
 
-  QAction* m_selectCurrentBranchAction = nullptr;
-  QAction* m_selectBranchUpstreamAction = nullptr;
-  QAction* m_selectBranchDownstreamAction = nullptr;
-  QAction* m_selectUpstreamAction = nullptr;
   QAction* m_selectDownstreamAction = nullptr;
-  QAction* m_selectEntireTreeAction = nullptr;
+  QAction* m_selectUpstreamAction = nullptr;
+  QAction* m_selectNeighborAction = nullptr;
+  QAction* m_selectHostBranchAction = nullptr;
+  QAction* m_selectConnectedAction = nullptr;
+  QAction* m_selectAllAction = nullptr;
   QAction* m_deleteSelectedNodesAction = nullptr;
+  QAction* m_deleteUnselectedNodesAction = nullptr;
   QAction* m_setSelectedNodeAsRootAction = nullptr;
+  QAction* m_changeSelectedNodeTypeAction = nullptr;
+  QAction* m_translateSelectedNodesAction = nullptr;
+  QAction* m_changeSelectedNodeSizeAction = nullptr;
   QAction* m_breakSelectedNodesAction = nullptr;
   QAction* m_connectSelectedNodesAction = nullptr;
+  QAction* m_mergeSelectedNodesAction = nullptr;
+  QAction* m_insertNodeAction = nullptr;
+  QAction* m_interpolateAction = nullptr;
+  QAction* m_interpolateZAction = nullptr;
+  QAction* m_interpolatePositionAction = nullptr;
+  QAction* m_interpolateRadiusAction = nullptr;
+  QAction* m_showSummaryAction = nullptr;
+  QAction* m_showSelectedBranchLengthAction = nullptr;
+  QAction* m_showSelectedBranchScaledLengthAction = nullptr;
+  QAction* m_removeTurnAction = nullptr;
+  QAction* m_resolveCrossoverAction = nullptr;
+  QAction* m_joinIsolatedBranchAction = nullptr;
+  QAction* m_joinIsolatedBranchAcrossTreesAction = nullptr;
+  QAction* m_resetBranchPointAction = nullptr;
   QMenu m_contextMenu;
 
   // derived data
@@ -184,9 +265,25 @@ private:
 class ZSwcEditCommand : public QUndoCommand
 {
 public:
+  enum class Kind
+  {
+    Generic = 0,
+    MoveSelectedNodes = 1,
+  };
+
   explicit ZSwcEditCommand(const QString& text, ZSwcPack& sp, ZSwc& swcBeforeChange)
+    : ZSwcEditCommand(text, Kind::Generic, {}, sp, swcBeforeChange)
+  {}
+
+  ZSwcEditCommand(const QString& text,
+                  Kind kind,
+                  std::vector<int64_t> selectionIds,
+                  ZSwcPack& sp,
+                  ZSwc& swcBeforeChange)
     : QUndoCommand(text)
     , m_swcPack(sp)
+    , m_kind(kind)
+    , m_selectionIds(std::move(selectionIds))
   {
     m_swcBeforeChange.swap(swcBeforeChange);
   }
@@ -209,10 +306,41 @@ public:
     Q_EMIT m_swcPack.swcChanged();
   }
 
+  int id() const override
+  {
+    if (m_kind == Kind::MoveSelectedNodes) {
+      return 1;
+    }
+    return -1;
+  }
+
+  bool mergeWith(const QUndoCommand* other) override
+  {
+    if (other == nullptr) {
+      return false;
+    }
+    if (other->id() != id() || id() < 0) {
+      return false;
+    }
+    const auto* oth = dynamic_cast<const ZSwcEditCommand*>(other);
+    if (oth == nullptr) {
+      return false;
+    }
+    if (m_kind != oth->m_kind) {
+      return false;
+    }
+    if (m_selectionIds != oth->m_selectionIds) {
+      return false;
+    }
+    return true;
+  }
+
 protected:
   ZSwcPack& m_swcPack;
   ZSwc m_swcBeforeChange;
   bool m_firstTimeRedo = true;
+  Kind m_kind = Kind::Generic;
+  std::vector<int64_t> m_selectionIds;
 };
 
 } // namespace nim

@@ -128,6 +128,8 @@ set(IMG_SOURCES
         zswcloaderlegacy.cpp zswcloaderlegacy.h
         zswcnodeops.h
         zswcops.cpp zswcops.h
+        zswceditlegacy.cpp zswceditlegacy.h
+        zarrayfilters.cpp zarrayfilters.h
         zswcpointdist.cpp zswcpointdist.h
         zswcpostprocess.cpp zswcpostprocess.h
         zswcsubtract.cpp zswcsubtract.h
@@ -156,6 +158,9 @@ set(IMG_SOURCES
         zimgconnectedcomponents.h zimgconnectedcomponents.cpp
         zimgregionalextrema.h zimgregionalextrema.cpp
         zimgautothreshold.h zimgautothreshold.cpp
+        zimgbinaryopslegacy.h zimgbinaryopslegacy.cpp
+        zimgbwthinlegacy.h zimgbwthinlegacy.cpp
+        zimgmedianfilterlegacy.h zimgmedianfilterlegacy.cpp
         zimgsigneddistancemap.h zimgsigneddistancemap.cpp
         zimggraph.h zimggraph.cpp
         zimgnccmatch.h zimgnccmatch.cpp

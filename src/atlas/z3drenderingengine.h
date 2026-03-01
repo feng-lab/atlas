@@ -12,6 +12,7 @@
 #include <QPoint>
 #include <QPointer>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <cstdint>
 #include <mutex>
 #include <optional>
 #include <unordered_map>
@@ -45,6 +46,7 @@ class Z3DScratchResourcePool;
 class ZVulkanContext;
 class ZVulkanDevice;
 class ZQtExecutor;
+class ZSwcPack;
 
 // Vulkan compositor forward decl removed (classification phase)
 
@@ -333,6 +335,24 @@ Q_SIGNALS:
 
   // Emitted on the UI thread to show the seed-trace context menu for 3D tracing.
   void showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size_t sc, float x, float y, float z);
+
+  // Emitted on the UI thread when a background click resolves to a 3D voxel position in the source image.
+  // This mirrors neuTube's `pointInVolumeLeftClicked` hook and is used to drive 3D SWC edit modes.
+  void pointInVolumeLeftClicked(QPoint globalPos,
+                                size_t imgObjId,
+                                size_t sc,
+                                float x,
+                                float y,
+                                float z,
+                                Qt::KeyboardModifiers modifiers);
+
+  // Emitted on the UI thread to show the SWC-node context menu for 3D editing.
+  void showSwcNodeContextMenu(QPoint globalPos, ZSwcPack* swcPack, int64_t clickedNodeId);
+
+  // Emitted on the UI thread to apply SWC-node edit operations driven by 3D interaction modes.
+  void request3dSwcAddNeuronNode(ZSwcPack* swcPack, double x, double y, double z, double r);
+  void request3dSwcPlainExtend(ZSwcPack* swcPack, double x, double y, double z, double r);
+  void request3dSwcConnectToTarget(ZSwcPack* swcPack, int64_t targetNodeId);
 
 protected:
   bool event(QEvent* e) override;

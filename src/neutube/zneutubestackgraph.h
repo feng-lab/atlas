@@ -84,4 +84,9 @@ void stackGraphWorkspaceValidateRangeLegacyLike(StackGraphWorkspaceLegacyLike& s
 // `argv` must be non-null and point to at least 5 doubles (see layout above).
 [[nodiscard]] double stackVoxelWeightSLegacyLike(double* argv);
 
+// Port of tz_stack_graph.c::Stack_Voxel_Weight_Sr() (for bright-background images).
+// argv layout: [0]=d, [1]=v1, [2]=v2, [3]=thre, [4]=scale.
+// `argv` must be non-null and point to at least 5 doubles (see layout above).
+[[nodiscard]] double stackVoxelWeightSrLegacyLike(double* argv);
+
 } // namespace nim

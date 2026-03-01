@@ -4,6 +4,8 @@
 #include "zlog.h"
 #include "zroi.h"
 #include "zroifilter.h"
+#include "zswcfilter.h"
+#include "zswcpack.h"
 #include "zgraphicsitemtype.h"
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsRectItem>
@@ -12,6 +14,25 @@
 
 namespace nim {
 
+namespace {
+
+[[nodiscard]] const ZSwcNodeGraphicsItem* findSwcNodeGraphicsItemOrChild(const QGraphicsItem* item)
+{
+  for (auto* probe = item; probe != nullptr; probe = probe->parentItem()) {
+    if (probe->type() == GraphicsItemType::ZSwcNodeGraphicsItem) {
+      return static_cast<const ZSwcNodeGraphicsItem*>(probe);
+    }
+  }
+  return nullptr;
+}
+
+[[nodiscard]] bool isSwcNodeGraphicsItemOrChild(const QGraphicsItem* item)
+{
+  return findSwcNodeGraphicsItemOrChild(item) != nullptr;
+}
+
+} // namespace
+
 ZGraphicsScene::ZGraphicsScene(ZView* view)
   : QGraphicsScene(view)
   , m_view(view)
@@ -19,6 +40,89 @@ ZGraphicsScene::ZGraphicsScene(ZView* view)
 {
   setSceneRect(QRectF(0, 0, 200, 200));
   setItemIndexMethod(NoIndex);
+}
+
+void ZGraphicsScene::enterSwcExtendModeImpl(ZSwcPack& pack)
+{
+  if (pack.selectedNodes().size() != 1) {
+    return;
+  }
+
+  m_swcEditMode = SwcEditMode::Extend;
+  m_swcEditPack = &pack;
+  m_swcEditAnchorNode = *pack.selectedNodes().begin();
+
+  LOG(INFO) << "SWC Extend mode: left click to extend; Ctrl disables path computation; right click to exit.";
+}
+
+void ZGraphicsScene::enterSwcExtendMode(ZSwcFilter& filter)
+{
+  CHECK(filter.swcPack() != nullptr);
+  m_swcEditFilter = &filter;
+  enterSwcExtendModeImpl(*filter.swcPack());
+}
+
+void ZGraphicsScene::enterSwcConnectToModeImpl(ZSwcPack& pack)
+{
+  if (pack.selectedNodes().size() != 1) {
+    return;
+  }
+
+  m_swcEditMode = SwcEditMode::ConnectTo;
+  m_swcEditPack = &pack;
+  m_swcEditAnchorNode = *pack.selectedNodes().begin();
+
+  LOG(INFO) << "SWC Connect-to mode: left click target node to connect; right click to exit.";
+}
+
+void ZGraphicsScene::enterSwcConnectToMode(ZSwcFilter& filter)
+{
+  CHECK(filter.swcPack() != nullptr);
+  m_swcEditFilter = &filter;
+  enterSwcConnectToModeImpl(*filter.swcPack());
+}
+
+void ZGraphicsScene::enterSwcMoveSelectedModeImpl(ZSwcPack& pack)
+{
+  if (pack.selectedNodes().empty()) {
+    return;
+  }
+
+  m_swcEditMode = SwcEditMode::MoveSelected;
+  m_swcEditPack = &pack;
+  m_swcEditAnchorNode = ZSwc::SwcTreeNode{};
+
+  LOG(INFO) << "SWC Move mode: Shift+Mouse to move selected nodes; right click to exit.";
+}
+
+void ZGraphicsScene::enterSwcMoveSelectedMode(ZSwcFilter& filter)
+{
+  CHECK(filter.swcPack() != nullptr);
+  m_swcEditFilter = &filter;
+  enterSwcMoveSelectedModeImpl(*filter.swcPack());
+}
+
+void ZGraphicsScene::enterSwcAddNodeMode(ZSwcFilter& filter)
+{
+  CHECK(filter.swcPack() != nullptr);
+  m_swcEditMode = SwcEditMode::AddNode;
+  m_swcEditFilter = &filter;
+  m_swcEditPack = filter.swcPack();
+  m_swcEditAnchorNode = ZSwc::SwcTreeNode{};
+
+  LOG(INFO) << "SWC Add-node mode: left click to add a node; right click to exit.";
+}
+
+void ZGraphicsScene::exitSwcEditMode()
+{
+  m_swcEditMode = SwcEditMode::Off;
+  m_swcEditPack = nullptr;
+  m_swcEditFilter = nullptr;
+  m_swcEditAnchorNode = ZSwc::SwcTreeNode{};
+  m_swcMoveDragging = false;
+  m_swcMoveStartScenePt = {};
+  m_swcMoveStartSwcPt = {};
+  m_swcMoveLastScenePt = {};
 }
 
 void ZGraphicsScene::registerROIForSubtraction(ZROI* roi, int slice, size_t shapeID)
@@ -79,6 +183,13 @@ void ZGraphicsScene::escKeyPressed()
 
 void ZGraphicsScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* contextMenuEvent)
 {
+  // neuTube behavior: right click exits SWC edit modes (Extend/Connect/Move).
+  if (m_swcEditMode != SwcEditMode::Off) {
+    exitSwcEditMode();
+    contextMenuEvent->accept();
+    return;
+  }
+
   if (m_splineItem || m_polygonItem || m_rectItem || m_ellipseItem) {
     return;
   }
@@ -121,6 +232,45 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
     return;
   }
   m_lastPressedPt = event->scenePos();
+
+  // When editing SWC nodes, SWC interaction takes priority over trace/ROI editing.
+  // Match neuTube behavior: background clicks should NOT clear the current SWC node selection
+  // while in SWC edit modes.
+  if (m_swcEditMode == SwcEditMode::Extend || m_swcEditMode == SwcEditMode::ConnectTo) {
+    QGraphicsItem* swcProbe = itemAt(event->scenePos(), QTransform());
+    if (isSwcNodeGraphicsItemOrChild(swcProbe)) {
+      QGraphicsScene::mousePressEvent(event);
+    } else {
+      event->accept();
+    }
+    return;
+  }
+
+  if (m_swcEditMode == SwcEditMode::MoveSelected) {
+    if (event->modifiers().testFlag(Qt::ShiftModifier)) {
+      if (m_swcEditPack != nullptr && m_swcEditFilter != nullptr && !m_swcEditPack->selectedNodes().empty()) {
+        m_swcMoveDragging = true;
+        m_swcMoveStartScenePt = event->scenePos();
+        m_swcMoveLastScenePt = event->scenePos();
+        m_swcMoveStartSwcPt = m_swcEditFilter->mapFromScene(event->scenePos());
+      }
+      event->accept();
+      return;
+    }
+
+    QGraphicsItem* swcProbe = itemAt(event->scenePos(), QTransform());
+    if (isSwcNodeGraphicsItemOrChild(swcProbe)) {
+      QGraphicsScene::mousePressEvent(event);
+    } else {
+      event->accept();
+    }
+    return;
+  }
+
+  if (m_swcEditMode == SwcEditMode::AddNode) {
+    event->accept();
+    return;
+  }
 
   QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
   auto roiItem = qgraphicsitem_cast<ROIGraphicsItem*>(item);
@@ -528,6 +678,118 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 
 void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
+  if (event->button() == Qt::LeftButton) {
+    if (m_swcEditMode == SwcEditMode::Extend) {
+      QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
+      if (isSwcNodeGraphicsItemOrChild(item)) {
+        QGraphicsScene::mouseReleaseEvent(event);
+        return;
+      }
+
+      if (!isScenePtOverlap(m_lastPressedPt, event->scenePos())) {
+        event->accept();
+        return;
+      }
+
+      if (m_swcEditPack == nullptr || m_swcEditFilter == nullptr) {
+        event->accept();
+        return;
+      }
+
+      if (m_swcEditPack->selectedNodes().size() != 1) {
+        event->accept();
+        return;
+      }
+
+      const ZSwc::SwcTreeNode parentNode = *m_swcEditPack->selectedNodes().begin();
+      CHECK(!ZSwc::isNull(parentNode));
+
+      const QPointF swcPos2D = m_swcEditFilter->mapFromScene(event->scenePos());
+      const glm::dvec3 center(swcPos2D.x(), swcPos2D.y(), static_cast<double>(m_swcEditFilter->currentRealZ()));
+      const double radius = parentNode->radius;
+
+      if (event->modifiers().testFlag(Qt::ControlModifier)) {
+        m_swcEditPack->extendSelectedNodePlain(center, radius);
+      } else {
+        const int tInt = m_swcEditFilter->currentRealT();
+        if (tInt < 0) {
+          LOG(WARNING) << "SWC Extend mode: invalid time index " << tInt << ".";
+          event->accept();
+          return;
+        }
+        m_swcEditPack->extendSelectedNodeSmartLegacyLike(center, radius, static_cast<size_t>(tInt));
+      }
+
+      event->accept();
+      return;
+    }
+
+    if (m_swcEditMode == SwcEditMode::ConnectTo) {
+      if (!isScenePtOverlap(m_lastPressedPt, event->scenePos())) {
+        event->accept();
+        return;
+      }
+
+      if (m_swcEditPack == nullptr) {
+        event->accept();
+        return;
+      }
+
+      const ZSwcNodeGraphicsItem* nodeItem = findSwcNodeGraphicsItemOrChild(itemAt(event->scenePos(), QTransform()));
+      if (nodeItem == nullptr) {
+        event->accept();
+        return;
+      }
+
+      const bool connected = m_swcEditPack->connectSelectedNodeToLegacyLike(nodeItem->swcNode());
+      (void)connected;
+      exitSwcEditMode();
+
+      event->accept();
+      return;
+    }
+
+    if (m_swcEditMode == SwcEditMode::AddNode) {
+      if (!isScenePtOverlap(m_lastPressedPt, event->scenePos())) {
+        event->accept();
+        return;
+      }
+
+      if (m_swcEditPack == nullptr || m_swcEditFilter == nullptr) {
+        event->accept();
+        return;
+      }
+
+      const QPointF swcPos2D = m_swcEditFilter->mapFromScene(event->scenePos());
+      const glm::dvec3 center(swcPos2D.x(), swcPos2D.y(), static_cast<double>(m_swcEditFilter->currentRealZ()));
+
+      // Legacy neuTube cursor glyph default for SWC add-node is 5.0.
+      constexpr double kDefaultNodeRadiusLegacyLike = 5.0;
+      m_swcEditPack->addIsolatedNodeLegacyLike(center, kDefaultNodeRadiusLegacyLike);
+
+      event->accept();
+      return;
+    }
+
+    if (m_swcEditMode == SwcEditMode::MoveSelected) {
+      if (m_swcMoveDragging) {
+        m_swcMoveDragging = false;
+
+        if (m_swcEditPack == nullptr || m_swcEditFilter == nullptr) {
+          event->accept();
+          return;
+        }
+
+        const QPointF endSwcPt = m_swcEditFilter->mapFromScene(event->scenePos());
+        const QPointF dSwc = endSwcPt - m_swcMoveStartSwcPt;
+        m_swcEditPack->translateSelectedNodesLegacyLike(dSwc.x(), dSwc.y(), 0.0);
+
+        event->accept();
+        return;
+      }
+    }
+  }
+
   if (m_rectItem) {
     QRectF rect = m_rectItem->rect();
     if (rect.width() >= 1. && rect.height() >= 1.) {
@@ -593,6 +855,29 @@ void ZGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
   scenePt.setY(glm::clamp(scenePt.y(), sceneRect().top(), sceneRect().bottom()));
   m_view->setInfo(scenePt.x(), scenePt.y());
   m_view->checkViewport();
+
+  if (m_swcEditMode == SwcEditMode::MoveSelected && m_swcMoveDragging && (event->buttons().testFlag(Qt::LeftButton)) &&
+      event->modifiers().testFlag(Qt::ShiftModifier)) {
+    const QPointF deltaScene = scenePt - m_swcMoveLastScenePt;
+    if (!deltaScene.isNull() && m_swcEditPack != nullptr) {
+      for (QGraphicsItem* item : selectedItems()) {
+        if (item == nullptr) {
+          continue;
+        }
+        if (item->type() != GraphicsItemType::ZSwcNodeGraphicsItem) {
+          continue;
+        }
+        auto* nodeItem = static_cast<ZSwcNodeGraphicsItem*>(item);
+        if (&nodeItem->swcPack() != m_swcEditPack) {
+          continue;
+        }
+        nodeItem->setPos(nodeItem->pos() + deltaScene);
+      }
+      m_swcMoveLastScenePt = scenePt;
+    }
+    event->accept();
+    return;
+  }
 
   if (m_splineItem) {
     if (event->buttons() == Qt::LeftButton) {

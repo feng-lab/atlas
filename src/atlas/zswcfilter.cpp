@@ -2,12 +2,24 @@
 
 #include "zgraphicsview.h"
 #include "znumericparameter.h"
+#include "zmenuutils.h"
 #include "zwidgetsgroup.h"
 #include "zgraphicsscene.h"
+#include "zmainwindow.h"
+#include "z3dmainwindow.h"
+#include "z3drenderingengine.h"
+#include "zneutubeswcsignalfitter.h"
+#include "zdoc.h"
+#include "zimgdoc.h"
+#include "zimgpack.h"
+#include "zlog.h"
+#include "ztracesettings.h"
 #include <QWindow>
 #include <QStyleOption>
 #include <QPushButton>
 #include <QGraphicsSceneMouseEvent>
+#include <QMenu>
+#include <cmath>
 #include <memory>
 
 namespace nim {
@@ -247,11 +259,13 @@ void ZSwcSkeletonGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphi
   }
 }
 
-ZSwcNodeGraphicsItem::ZSwcNodeGraphicsItem(ZSwcPack& swcPack,
+ZSwcNodeGraphicsItem::ZSwcNodeGraphicsItem(ZSwcFilter& filter,
+                                           ZSwcPack& swcPack,
                                            const ZSwc::SwcTreeNode& swcNode,
                                            const QTransform& tfm,
                                            QGraphicsItem* parent)
   : QGraphicsEllipseItem(parent)
+  , m_filter(filter)
   , m_swcPack(swcPack)
   , m_swcNode(swcNode)
   , m_transform(tfm)
@@ -298,10 +312,18 @@ void ZSwcNodeGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* even
   if (m_swcPack.isLocked()) {
     return;
   }
-  if (!isSelected() || !isVisible() || m_swcPack.selectedNodes().empty()) { // feels weird
+  if (!isVisible()) {
     return;
   }
-  m_swcPack.contextMenu().popup(event->screenPos());
+
+  // neuTube's node context menu acts on the current SWC node selection.
+  // Make right-click behavior explicit by selecting the clicked node first.
+  if (!m_swcNode->selected) {
+    m_swcPack.onTreeNodeSelected(&m_swcNode, /*append*/ false, /*extend*/ false);
+  }
+
+  m_filter.popupSwcNodeContextMenu(m_swcNode, event->screenPos());
+  event->accept();
 }
 
 ZSwcFilter::ZSwcFilter(ZView& view)
@@ -463,6 +485,293 @@ void ZSwcFilter::deleteKeyPressed()
   m_swcPack->deleteSelectedNodes();
 }
 
+void ZSwcFilter::popupSwcNodeContextMenu(const ZSwc::SwcTreeNode& clickedNode, QPoint globalPos)
+{
+  if (m_swcPack == nullptr || m_swcPack->isLocked()) {
+    return;
+  }
+
+  m_contextMenuNode = clickedNode;
+
+  if (m_extendSwcNodeAction == nullptr) {
+    m_extendSwcNodeAction = new QAction(tr("Extend"), this);
+    m_extendSwcNodeAction->setShortcut(Qt::Key_Space);
+    connect(m_extendSwcNodeAction, &QAction::triggered, this, &ZSwcFilter::extendSwcNode);
+  }
+
+  if (m_connectToSwcNodeAction == nullptr) {
+    m_connectToSwcNodeAction = new QAction(tr("Connect to"), this);
+    m_connectToSwcNodeAction->setShortcut(Qt::Key_C);
+    connect(m_connectToSwcNodeAction, &QAction::triggered, this, &ZSwcFilter::connectToSwcNode);
+  }
+
+  if (m_moveToCurrentPlaneAction == nullptr) {
+    m_moveToCurrentPlaneAction = new QAction(tr("Move to Current Plane"), this);
+    m_moveToCurrentPlaneAction->setShortcut(Qt::Key_F);
+    connect(m_moveToCurrentPlaneAction, &QAction::triggered, this, &ZSwcFilter::moveSelectedSwcNodesToCurrentPlane);
+  }
+
+  if (m_moveSelectedNodesAction == nullptr) {
+    m_moveSelectedNodesAction = new QAction(tr("Move Selected (Shift+Mouse)"), this);
+    m_moveSelectedNodesAction->setShortcut(Qt::Key_V);
+    connect(m_moveSelectedNodesAction, &QAction::triggered, this, &ZSwcFilter::moveSelectedSwcNodes);
+  }
+
+  if (m_estimateRadiusAction == nullptr) {
+    m_estimateRadiusAction = new QAction(tr("Estimate Radius"), this);
+    connect(m_estimateRadiusAction, &QAction::triggered, this, &ZSwcFilter::estimateSwcNodeRadius);
+  }
+
+  if (m_addNeuronNodeAction == nullptr) {
+    m_addNeuronNodeAction = new QAction(tr("Add Neuron Node"), this);
+    m_addNeuronNodeAction->setShortcut(Qt::Key_G);
+    connect(m_addNeuronNodeAction, &QAction::triggered, this, &ZSwcFilter::addNeuronNode);
+  }
+
+  if (m_locateNodesIn3DAction == nullptr) {
+    m_locateNodesIn3DAction = new QAction(tr("Locate node(s) in 3D"), this);
+    connect(m_locateNodesIn3DAction, &QAction::triggered, this, &ZSwcFilter::locateSelectedNodesIn3D);
+  }
+
+  const bool haveSelection = !m_swcPack->selectedNodes().empty();
+  const bool haveSingleNode = m_swcPack->selectedNodes().size() == 1;
+  m_extendSwcNodeAction->setEnabled(haveSingleNode);
+  m_connectToSwcNodeAction->setEnabled(haveSingleNode);
+  m_moveToCurrentPlaneAction->setEnabled(haveSelection);
+  m_moveSelectedNodesAction->setEnabled(haveSelection);
+  m_estimateRadiusAction->setEnabled(haveSelection);
+  m_locateNodesIn3DAction->setEnabled(haveSelection);
+
+  // Compose a view-specific menu (neuTube-style): view actions + doc actions + view tail actions.
+  auto* menu = new QMenu(m_view.captureWidget());
+  menu->setAttribute(Qt::WA_DeleteOnClose);
+  menu->addAction(m_extendSwcNodeAction);
+  menu->addAction(m_connectToSwcNodeAction);
+  menu->addAction(m_moveToCurrentPlaneAction);
+  menu->addAction(m_moveSelectedNodesAction);
+  menu->addAction(m_estimateRadiusAction);
+
+  appendClonedMenuActions(*menu, m_swcPack->contextMenu());
+
+  menu->addSeparator();
+  menu->addAction(m_addNeuronNodeAction);
+  menu->addAction(m_locateNodesIn3DAction);
+
+  menu->popup(globalPos);
+}
+
+void ZSwcFilter::extendSwcNode()
+{
+  if (m_swcPack == nullptr || m_swcPack->isLocked()) {
+    return;
+  }
+  m_view.scene().enterSwcExtendMode(*this);
+}
+
+void ZSwcFilter::connectToSwcNode()
+{
+  if (m_swcPack == nullptr || m_swcPack->isLocked()) {
+    return;
+  }
+  m_view.scene().enterSwcConnectToMode(*this);
+}
+
+void ZSwcFilter::moveSelectedSwcNodes()
+{
+  if (m_swcPack == nullptr || m_swcPack->isLocked()) {
+    return;
+  }
+  m_view.scene().enterSwcMoveSelectedMode(*this);
+}
+
+void ZSwcFilter::moveSelectedSwcNodesToCurrentPlane()
+{
+  if (m_swcPack == nullptr || m_swcPack->isLocked()) {
+    return;
+  }
+  m_swcPack->setSelectedNodesZLegacyLike(static_cast<double>(currentRealZ()));
+}
+
+void ZSwcFilter::estimateSwcNodeRadius()
+{
+  if (m_swcPack == nullptr || m_swcPack->isLocked()) {
+    return;
+  }
+  if (m_swcPack->selectedNodes().empty()) {
+    return;
+  }
+
+  auto* win2d = qobject_cast<ZMainWindow*>(m_view.window());
+  if (win2d == nullptr || win2d->doc() == nullptr) {
+    LOG(WARNING) << "Estimate Radius: could not find ZDoc from 2D window.";
+    return;
+  }
+
+  ZDoc& doc = *win2d->doc();
+  const ZTraceSettings& settings = doc.traceSettings();
+  const std::optional<size_t> imgIdOpt = settings.sourceImageId();
+  if (!imgIdOpt.has_value()) {
+    LOG(WARNING) << "Estimate Radius: no source image selected in Trace Settings.";
+    return;
+  }
+
+  ZImgDoc& imgDoc = doc.imgDoc();
+  if (!imgDoc.hasObjWithID(*imgIdOpt)) {
+    LOG(WARNING) << "Estimate Radius: source image id " << static_cast<qulonglong>(*imgIdOpt) << " is not loaded.";
+    return;
+  }
+
+  const std::shared_ptr<ZImgPack> imgPack = imgDoc.imgPackShared(*imgIdOpt);
+  if (!imgPack) {
+    LOG(WARNING) << "Estimate Radius: source image pack is not available.";
+    return;
+  }
+
+  const ZImgInfo imgInfo = imgPack->imgInfo();
+  const size_t sc = settings.sourceChannel();
+  const int currentT = m_view.currentTime();
+  if (currentT < 0) {
+    LOG(WARNING) << "Estimate Radius: invalid current time index " << currentT << ".";
+    return;
+  }
+  const size_t t = static_cast<size_t>(currentT);
+
+  if (sc >= imgInfo.numChannels || t >= imgInfo.numTimes) {
+    LOG(WARNING) << "Estimate Radius: invalid channel/time selection (c=" << sc << ", t=" << t << ") for image <"
+                 << imgInfo << ">.";
+    return;
+  }
+
+  // Copy-and-edit to preserve existing selection set and undo behavior.
+  ZSwc newSwc = m_swcPack->swc();
+  bool anyChange = false;
+
+  auto iroundLegacyLike = [](double v) -> int {
+    return static_cast<int>(std::lround(v));
+  };
+
+  for (auto it = newSwc.begin(); it != newSwc.end(); ++it) {
+    if (!it->selected) {
+      continue;
+    }
+    if (it->radius <= 0.0) {
+      continue;
+    }
+
+    const double expandScale = 2.0;
+    const double expandRadius = it->radius * expandScale + 3.0;
+
+    int x1 = iroundLegacyLike(it->x - expandRadius);
+    int y1 = iroundLegacyLike(it->y - expandRadius);
+    int x2 = iroundLegacyLike(it->x + expandRadius);
+    int y2 = iroundLegacyLike(it->y + expandRadius);
+
+    x1 = std::max(x1, 0);
+    y1 = std::max(y1, 0);
+    x2 = std::min(x2, static_cast<int>(imgInfo.width) - 1);
+    y2 = std::min(y2, static_cast<int>(imgInfo.height) - 1);
+
+    const int cz = iroundLegacyLike(it->z);
+    if (cz < 0 || cz >= static_cast<int>(imgInfo.depth)) {
+      continue;
+    }
+
+    ZImg slice;
+    try {
+      const ZVoxelCoordinate start(static_cast<index_t>(x1),
+                                   static_cast<index_t>(y1),
+                                   static_cast<index_t>(cz),
+                                   static_cast<index_t>(sc),
+                                   static_cast<index_t>(t));
+      const ZVoxelCoordinate end(static_cast<index_t>(x2 + 1),
+                                 static_cast<index_t>(y2 + 1),
+                                 static_cast<index_t>(cz + 1),
+                                 static_cast<index_t>(sc + 1),
+                                 static_cast<index_t>(t + 1));
+      slice = imgPack->crop(ZImgRegion(start, end));
+    }
+    catch (const std::exception& ex) {
+      LOG(WARNING) << "Estimate Radius: failed to crop source image for node at (" << it->x << ", " << it->y << ", "
+                   << it->z << "): " << ex.what();
+      continue;
+    }
+
+    if (slice.isEmpty()) {
+      continue;
+    }
+
+    SwcNode updated = *it;
+    const bool succ = fitSwcNodeSignalWithFallbackInCroppedSliceLegacyLike(updated,
+                                                                           slice,
+                                                                           x1,
+                                                                           y1,
+                                                                           ZNeutubeImageBackgroundLegacyLike::Dark);
+    if (!succ) {
+      continue;
+    }
+
+    if (updated.x != it->x || updated.y != it->y || updated.radius != it->radius) {
+      anyChange = true;
+      it->x = updated.x;
+      it->y = updated.y;
+      it->radius = updated.radius;
+    }
+  }
+
+  if (!anyChange) {
+    return;
+  }
+
+  m_swcPack->replaceSwcWithUndo(QStringLiteral("Node - Estimate Radius"), std::move(newSwc));
+}
+
+void ZSwcFilter::addNeuronNode()
+{
+  if (m_swcPack == nullptr || m_swcPack->isLocked()) {
+    return;
+  }
+  m_view.scene().enterSwcAddNodeMode(*this);
+}
+
+void ZSwcFilter::locateSelectedNodesIn3D()
+{
+  if (m_swcPack == nullptr || m_swcPack->isLocked()) {
+    return;
+  }
+  if (m_swcPack->selectedNodes().empty()) {
+    return;
+  }
+
+  ZBBox<glm::dvec3> bound;
+  for (const auto& n : m_swcPack->selectedNodes()) {
+    bound.expand(glm::dvec3(n->x, n->y, n->z));
+  }
+
+  auto* win2d = qobject_cast<ZMainWindow*>(m_view.window());
+  if (win2d == nullptr) {
+    LOG(WARNING) << "Locate node(s) in 3D: could not find parent ZMainWindow.";
+    return;
+  }
+
+  win2d->ensure3DWindow();
+  Z3DMainWindow* win3d = win2d->get3DWindow();
+  if (win3d == nullptr || win3d->engine() == nullptr) {
+    LOG(WARNING) << "Locate node(s) in 3D: 3D window/engine is not available.";
+    return;
+  }
+
+  win3d->activateWindow();
+  win3d->raise();
+
+  Z3DRenderingEngine* engine = win3d->engine();
+  QMetaObject::invokeMethod(
+    engine,
+    [engine, bound]() {
+      engine->cameraFocusesOn(bound);
+    },
+    Qt::QueuedConnection);
+}
+
 void ZSwcFilter::viewPrecedenceChanged()
 {
   m_item->setZValue(m_viewPrecedencePara.get());
@@ -526,7 +835,7 @@ void ZSwcFilter::createSwcNodeItems()
     if (!m_view.isMaxZProjView() && std::abs(realZ() - std::round(p->z)) > 1.0) {
       continue;
     }
-    auto item = new ZSwcNodeGraphicsItem(*m_swcPack, p, trans);
+    auto item = new ZSwcNodeGraphicsItem(*this, *m_swcPack, p, trans);
     item->setZValue(m_viewPrecedencePara.get());
     auto color = m_swcColorParameters.colorOfNode(p);
     QPen pen(QColor(color.x * 255, color.y * 255, color.z * 255), 2);

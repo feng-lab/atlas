@@ -46,7 +46,12 @@ void ZTheme::updateTheme()
   QApplication::setStyle(QStyleFactory::create("Fusion"));
 #endif
   LOG(INFO) << "Current Theme: " << m_currentTheme;
-  loadTheme(QString(":Resources/themes/%1.atlastheme").arg(m_currentTheme));
+  const QString themePath = QString(":Resources/themes/%1.atlastheme").arg(m_currentTheme);
+  if (!QFile::exists(themePath)) {
+    LOG(WARNING) << "Theme file not found: " << themePath << ". Falling back to Qt defaults.";
+    return;
+  }
+  loadTheme(themePath);
 }
 
 bool ZTheme::event(QEvent* event)

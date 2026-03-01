@@ -437,6 +437,14 @@ Steps to load and manage images via `ZImgDoc`:
 3. **View settings** – adjust line thickness, color schemes in Object View Setting.
 4. **Save** – Save writes to the source path if the format supports writing; otherwise Save As prompts for a new file.
 5. **Trace (interactive)** – use the **Trace** tool to create or extend SWC trees from an image (section 5.7).
+6. **Node context menu (2D/3D)** – right-click on SWC nodes to access neuTube-style editing and inspection actions, including:
+   - **Extend / Connect to / Move selected** (interactive modes; right-click again to exit the mode)
+   - **Delete / Break / Connect / Merge / Insert**
+   - **Interpolate** (position/radius/Z)
+   - **Select** (downstream/upstream/branch/connected)
+   - **Advanced editing** (remove turn, resolve crossover, join isolated branch, reset branch point)
+   - **Change property** (translate, change size, set as root)
+   - **Information** (summary, path length, scaled path length)
 
 ### 4.7 Meshes
 

@@ -93,6 +93,13 @@ public:
 Q_SIGNALS:
   void showImgContextMenu(QPoint globalPos, float x, float y, float z, bool enter, bool exit);
   void showSeedTraceContextMenu(QPoint globalPos, size_t imgObjId, size_t sc, float x, float y, float z);
+  void pointInVolumeLeftClicked(QPoint globalPos,
+                                size_t imgObjId,
+                                size_t sc,
+                                float x,
+                                float y,
+                                float z,
+                                Qt::KeyboardModifiers modifiers);
 
 protected:
   void switchRendererBackend(RenderBackend backend) override

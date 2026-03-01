@@ -1,5 +1,7 @@
 #pragma once
 
+#include "zswc.h"
+
 #include <QGraphicsScene>
 #include <QGraphicsItem>
 
@@ -11,6 +13,10 @@ namespace nim {
 class ZView;
 
 class ZROI;
+
+class ZSwcPack;
+
+class ZSwcFilter;
 
 class ZGraphicsScene : public QGraphicsScene
 {
@@ -24,6 +30,15 @@ public:
     Subtract
   };
 
+  enum class SwcEditMode
+  {
+    Off,
+    Extend,
+    ConnectTo,
+    MoveSelected,
+    AddNode
+  };
+
   explicit ZGraphicsScene(ZView* view);
 
   void registerROIForSubtraction(ZROI* roi, int slice, size_t shapeID);
@@ -31,6 +46,36 @@ public:
   void removeROIForSubtraction();
 
   void performROISubtraction(const ZROI* roi, int slice, size_t shapeID);
+
+  void enterSwcExtendMode(ZSwcFilter& filter);
+
+  void enterSwcConnectToMode(ZSwcFilter& filter);
+
+  void enterSwcMoveSelectedMode(ZSwcFilter& filter);
+
+  void enterSwcAddNodeMode(ZSwcFilter& filter);
+
+  void exitSwcEditMode();
+
+  [[nodiscard]] SwcEditMode swcEditMode() const
+  {
+    return m_swcEditMode;
+  }
+
+  [[nodiscard]] ZSwcPack* swcEditPack() const
+  {
+    return m_swcEditPack;
+  }
+
+  [[nodiscard]] ZSwcFilter* swcEditFilter() const
+  {
+    return m_swcEditFilter;
+  }
+
+  [[nodiscard]] const ZSwc::SwcTreeNode& swcEditAnchorNode() const
+  {
+    return m_swcEditAnchorNode;
+  }
 
   QPointF lastPressedPoint()
   {
@@ -63,6 +108,12 @@ protected:
   }
 
 private:
+  void enterSwcExtendModeImpl(ZSwcPack& pack);
+
+  void enterSwcConnectToModeImpl(ZSwcPack& pack);
+
+  void enterSwcMoveSelectedModeImpl(ZSwcPack& pack);
+
   ZView* m_view;
 
   ZROI* m_roi = nullptr;
@@ -81,6 +132,16 @@ private:
   std::unique_ptr<QGraphicsPathItem> m_splineItem;
 
   QPointF m_lastPressedPt;
+
+  SwcEditMode m_swcEditMode = SwcEditMode::Off;
+  ZSwcPack* m_swcEditPack = nullptr;
+  ZSwcFilter* m_swcEditFilter = nullptr;
+  ZSwc::SwcTreeNode m_swcEditAnchorNode{};
+
+  bool m_swcMoveDragging = false;
+  QPointF m_swcMoveStartScenePt;
+  QPointF m_swcMoveStartSwcPt;
+  QPointF m_swcMoveLastScenePt;
 
   double m_zValue = 60000;
 };

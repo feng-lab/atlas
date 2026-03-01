@@ -183,7 +183,6 @@ void Z3DSwcFilter::setData(ZSwcPack& swcPack)
   connect(this, &Z3DSwcFilter::treeNodeSelected, m_swcPack, &ZSwcPack::onTreeNodeSelected);
   connect(m_swcPack, &ZSwcPack::swcChanged, this, &Z3DSwcFilter::updateData);
   connect(m_swcPack, &ZSwcPack::lockedStateChanged, this, &Z3DSwcFilter::invalidateResult);
-  connect(this, &Z3DSwcFilter::showSwcContextMenu, m_swcPack, &ZSwcPack::showSwcContextMenu);
 }
 
 bool Z3DSwcFilter::isReady(Z3DEye eye) const
@@ -665,7 +664,7 @@ void Z3DSwcFilter::prepareColor()
   m_sphereRendererForCone.setDataColors(&m_pointColors);
 }
 
-void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
+void Z3DSwcFilter::selectSwc(QMouseEvent* e, int w, int h)
 {
   if (!m_swcPack) {
     return;
@@ -713,11 +712,75 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
 
   if (e->type() == QEvent::MouseButtonRelease) {
     if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
-      Q_EMIT treeNodeSelected(m_pressedSwcTreeNode,
-                              e->modifiers() == Qt::ControlModifier,
-                              e->modifiers() == Qt::ShiftModifier);
-      if (m_pressedSwcTreeNode) {
+      if (m_interactionMode == InteractionMode::ConnectSwcNode && m_pressedSwcTreeNode) {
+        Q_EMIT request3dSwcConnectToTarget(m_swcPack, (*m_pressedSwcTreeNode)->id);
         e->accept();
+      } else if ((m_interactionMode == InteractionMode::AddSwcNode ||
+                  m_interactionMode == InteractionMode::PlainExtendSwcNode) &&
+                 isNodeRendering() && !m_pressedSwcTreeNode) {
+        const glm::ivec2 widgetPos(static_cast<int>(e->position().x()), static_cast<int>(e->position().y()));
+
+        const ZSwc::SwcTreeNode* anchorNodePtr = nullptr;
+        if (m_interactionMode == InteractionMode::AddSwcNode) {
+          // Find the nearest SWC node in screen space to define a depth on the click ray.
+          const std::vector<const void*> objsNear = pickingManager().sortObjectsByDistanceToPos(widgetPos, 100);
+          for (const void* obj : objsNear) {
+            const auto* nodePtr = static_cast<const ZSwc::SwcTreeNode*>(obj);
+            if (m_swcPack->allNodesSet().contains(nodePtr)) {
+              anchorNodePtr = nodePtr;
+              break;
+            }
+          }
+
+          if (anchorNodePtr == nullptr) {
+            const std::vector<const void*> objsAll = pickingManager().sortObjectsByDistanceToPos(widgetPos, -1);
+            for (const void* obj : objsAll) {
+              const auto* nodePtr = static_cast<const ZSwc::SwcTreeNode*>(obj);
+              if (m_swcPack->allNodesSet().contains(nodePtr)) {
+                anchorNodePtr = nodePtr;
+                break;
+              }
+            }
+          }
+        } else {
+          // Plain extend uses the single selected node as the anchor.
+          if (m_swcPack->selectedNodes().size() == 1) {
+            const ZSwc::SwcTreeNode selected = *m_swcPack->selectedNodes().begin();
+            for (const auto* nodePtr : m_swcPack->allNodesSet()) {
+              if (*nodePtr == selected) {
+                anchorNodePtr = nodePtr;
+                break;
+              }
+            }
+          }
+        }
+
+        if (anchorNodePtr != nullptr) {
+          glm::dvec3 v1;
+          glm::dvec3 v2;
+          rayUnderScreenPoint(v1, v2, widgetPos.x, widgetPos.y, w, h);
+
+          const glm::dvec3 nodeLocal((*anchorNodePtr)->x, (*anchorNodePtr)->y, (*anchorNodePtr)->z);
+          const glm::dmat4 xform = glm::dmat4(coordTransform());
+          const glm::dvec3 nodeWorld = glm::dvec3(xform * glm::dvec4(nodeLocal, 1.0));
+          const glm::dvec3 projWorld = projectPointOnRay(nodeWorld, v1, v2);
+          const glm::dvec3 projLocal = glm::dvec3(glm::inverse(xform) * glm::dvec4(projWorld, 1.0));
+          const double r = (*anchorNodePtr)->radius;
+
+          if (m_interactionMode == InteractionMode::AddSwcNode) {
+            Q_EMIT request3dSwcAddNeuronNode(m_swcPack, projLocal.x, projLocal.y, projLocal.z, r);
+          } else {
+            Q_EMIT request3dSwcPlainExtend(m_swcPack, projLocal.x, projLocal.y, projLocal.z, r);
+          }
+          e->accept();
+        }
+      } else {
+        Q_EMIT treeNodeSelected(m_pressedSwcTreeNode,
+                                e->modifiers() == Qt::ControlModifier,
+                                e->modifiers() == Qt::ShiftModifier);
+        if (m_pressedSwcTreeNode) {
+          e->accept();
+        }
       }
     }
     m_pressedSwcTreeNode = nullptr;
@@ -726,30 +789,25 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
 
 void Z3DSwcFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
 {
-  if (m_swcPack->isLocked()) {
+  if (m_swcPack == nullptr || m_swcPack->isLocked()) {
+    return;
+  }
+  if (!isVisible()) {
     return;
   }
 
-  if (isVisible() && !isSelected() && m_swcPack && !m_swcPack->selectedNodes().empty()) {
-    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->x(), e->y()));
-    if (!obj) {
-      return;
-    }
-    auto nodeObj = *static_cast<const ZSwc::SwcTreeNode*>(obj);
-
-    bool hasSelectedNodesMouse = false;
-    for (auto p : m_swcPack->selectedNodes()) {
-      if (p == nodeObj) {
-        hasSelectedNodesMouse = true;
-        break;
-      }
-    }
-    if (!hasSelectedNodesMouse) {
-      return;
-    }
-
-    Q_EMIT showSwcContextMenu(e->globalPos());
+  const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->x(), e->y()));
+  if (!obj) {
+    return;
   }
+
+  const auto* nodePtr = static_cast<const ZSwc::SwcTreeNode*>(obj);
+  if (!m_swcPack->allNodesSet().contains(nodePtr)) {
+    return;
+  }
+
+  Q_EMIT showSwcNodeContextMenu(e->globalPos(), m_swcPack, (*nodePtr)->id);
+  e->accept();
 }
 
 glm::dvec3 Z3DSwcFilter::projectPointOnRay(const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2)
