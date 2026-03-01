@@ -416,6 +416,9 @@ void startSeedTraceInteractive(ZDoc& doc,
             return;
           }
 
+          // neuTube UX parity: newly traced SWCs should not start with every node selected.
+          swcDoc.swcPack(newSwcId).setSelectedNodes({});
+
           tm.succeedTask(taskPtr, QStringLiteral("created SWC #%1").arg(static_cast<qulonglong>(newSwcId)));
 
           if (onNewSwcCreated) {

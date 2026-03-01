@@ -224,7 +224,7 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
 
   boost::unordered_flat_map<glm::col4, int> col2dist;
 
-  auto recordColor = [&](int x, int y, int dx, int dy, const glm::col4& col) {
+  auto recordColor = [&](int dx, int dy, const glm::col4& col) {
     if (col.a == 0) {
       return;
     }
@@ -275,7 +275,7 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
         const size_t idx = static_cast<size_t>(yy) * static_cast<size_t>(w) + static_cast<size_t>(xx);
         const uint8_t* px = &rgba[4u * idx];
         const glm::col4 col{px[0], px[1], px[2], px[3]};
-        recordColor(xx, yy, xx - physPos.x, yy - baseY, col);
+        recordColor(xx - physPos.x, yy - baseY, col);
       }
     }
   } else {
@@ -307,7 +307,7 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
       for (int xx = std::max(0, physPos.x - physRadius); xx <= std::min(w - 1, physPos.x + physRadius); ++xx) {
         glm::col4 col = glBuf[(yy * w) + xx];
         std::swap(col.r, col.b);
-        recordColor(xx, yy, xx - physPos.x, yy - baseY, col);
+        recordColor(xx - physPos.x, yy - baseY, col);
       }
     }
   }

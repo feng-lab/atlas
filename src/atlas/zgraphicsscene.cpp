@@ -272,6 +272,31 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
     return;
   }
 
+  // neuTube-style SWC node selection:
+  // In 2D, Qt's built-in selection handling would override our SWC-path range selection after the
+  // press event. Intercept Shift/Ctrl/Cmd clicks on SWC nodes and delegate to ZSwcPack so selection
+  // semantics match the 3D implementation.
+  {
+    QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
+    const ZSwcNodeGraphicsItem* swcNodeItem = findSwcNodeGraphicsItemOrChild(item);
+    if (swcNodeItem != nullptr) {
+      ZSwcPack& pack = swcNodeItem->swcPack();
+      if (!pack.isLocked() && swcNodeItem->isVisible()) {
+        const Qt::KeyboardModifiers mods = event->modifiers();
+        const bool extend = mods.testFlag(Qt::ShiftModifier);
+        const bool append = !extend && (mods.testFlag(Qt::ControlModifier) || mods.testFlag(Qt::MetaModifier));
+        if (extend || append) {
+          pack.onTreeNodeSelected(&swcNodeItem->swcNode(), append, extend);
+          if (!selectedItems().empty()) {
+            Q_EMIT mousePressed(event->scenePos(), event->modifiers());
+          }
+          event->accept();
+          return;
+        }
+      }
+    }
+  }
+
   QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
   auto roiItem = qgraphicsitem_cast<ROIGraphicsItem*>(item);
   auto roiCtrlPtItem = qgraphicsitem_cast<ROICtrlPtGraphicsItem*>(item);

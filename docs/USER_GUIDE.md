@@ -437,14 +437,88 @@ Steps to load and manage images via `ZImgDoc`:
 3. **View settings** – adjust line thickness, color schemes in Object View Setting.
 4. **Save** – Save writes to the source path if the format supports writing; otherwise Save As prompts for a new file.
 5. **Trace (interactive)** – use the **Trace** tool to create or extend SWC trees from an image (section 5.7).
-6. **Node context menu (2D/3D)** – right-click on SWC nodes to access neuTube-style editing and inspection actions, including:
-   - **Extend / Connect to / Move selected** (interactive modes; right-click again to exit the mode)
-   - **Delete / Break / Connect / Merge / Insert**
-   - **Interpolate** (position/radius/Z)
-   - **Select** (downstream/upstream/branch/connected)
-   - **Advanced editing** (remove turn, resolve crossover, join isolated branch, reset branch point)
-   - **Change property** (translate, change size, set as root)
-   - **Information** (summary, path length, scaled path length)
+
+#### SWC node selection (2D + 3D)
+
+Atlas uses neuTube-style SWC node selection semantics:
+
+- **Click**: select one node.
+- **Ctrl/Cmd + click**: append/toggle nodes in the selection.
+- **Shift + click**: range-select nodes along the SWC tree between the selection anchor and the clicked node.
+
+The SWC node **context menu** operates on the *current node selection*.
+
+#### SWC node context menu (2D)
+
+Right-click an SWC node in the 2D view to open the node context menu.
+
+**Top-level interaction actions (2D)**
+
+- **Extend** (`Space`): enters extend mode.
+  - **Left-click** on the image/background to extend from the single selected node.
+  - Hold **Ctrl** while clicking to disable path computation (plain extend).
+  - **Right-click** to exit extend mode.
+- **Connect to** (`C`): enters connect-to mode.
+  - **Left-click** a target SWC node to connect; then the mode exits.
+  - **Right-click** to exit connect-to mode without connecting.
+- **Move to Current Plane** (`F`): sets the **Z** of all selected nodes to the current slice.
+- **Move Selected (Shift+Mouse)** (`V`): enters move mode.
+  - Hold **Shift** and drag with the mouse to move selected nodes in XY.
+  - **Right-click** to exit move mode.
+- **Estimate Radius**: refits radius (and may refine XY) for the selected nodes using the currently configured Trace Settings source image/channel.
+
+**Editing / inspection submenus (shared with 3D)**
+
+- **Delete** (`X`): deletes selected nodes (legacy behavior: descendants become new roots).
+- **Delete Unselected**: deletes all unselected nodes (legacy behavior: descendants become new roots).
+- **Break** (`B`): breaks parent-child links between selected nodes.
+- **Connect** (`C`): connects selected nodes into one tree (legacy connector semantics).
+- **Merge**: merges selected nodes into one node (legacy semantics).
+- **Insert** (`I`): inserts nodes between adjacent selected nodes.
+- **Interpolate**:
+  - **Position and Radius**
+  - **Z**
+  - **Position**
+  - **Radius**
+- **Select**:
+  - **Downstream**, **Upstream**, **Neighbors**, **Host branch**, **All connected nodes**, **All nodes** (`Ctrl/Cmd+A`)
+- **Advanced Editing**:
+  - **Remove turn**, **Resolve crossover**, **Join isolated branch**, **Join isolated brach (across trees)**, **Reset branch point**
+- **Change Property**:
+  - **Translate**, **Change size**, **Set as a root**
+- **Information**:
+  - **Summary**, **Path length**, **Scaled path length**
+
+**Bottom actions (2D)**
+
+- **Add Neuron Node** (`G`): enters add-node mode.
+  - **Left-click** on the image/background to add an isolated SWC node at that location.
+  - **Right-click** to exit add-node mode.
+- **Locate node(s) in 3D**: opens/centers the 3D view around the selected node(s).
+
+#### SWC node context menu (3D)
+
+Right-click an SWC node in the 3D view to open the node context menu.
+
+The 3D menu includes the same shared editing/inspection submenus as 2D, plus 3D-specific actions:
+
+- **Extend** (`Space`, toggle): enables 3D extend mode (click in the volume to extend from the single selected node).
+- **Connect to** (`C`): connects the single selected node to a clicked target node.
+- **Move Selected (Shift+Mouse)** (`V`, toggle): enables 3D move mode (drag to move selected nodes).
+- **Locate node(s) in 2D**: centers the 2D view on the selected node(s).
+- **Change type**: changes SWC node type using neuTube-style type picking options.
+- **Add neuron node** (toggle): adds a new SWC node at the clicked 3D position (depth is inferred from nearby nodes).
+
+#### SWC document menu actions (file-based)
+
+Atlas also exposes SWC-wide utilities in the menu bar:
+
+- **Swc → Edit SWC...**: opens the SWC editor for a chosen SWC object.
+- **Swc → Subtract SWCs...**: subtracts one or more SWCs from an input SWC and writes an output SWC file.
+
+Related image → SWC utilities:
+
+- **Image → Binary -> SWC...**: skeletonizes a binary mask image into an SWC file (neuTube-style binary-to-SWC).
 
 ### 4.7 Meshes
 

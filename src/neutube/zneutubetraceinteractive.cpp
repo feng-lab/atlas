@@ -9,6 +9,7 @@
 
 #include "zcancellation.h"
 #include "zlog.h"
+#include "zswcops.h"
 
 #include <array>
 #include <utility>
@@ -179,6 +180,9 @@ SeedTraceResult traceSeedNewSwcLegacyLike(const ZImg& signal,
     }
   }
 
+  // `ZNeuronConstructor::reconstruct` resorts IDs before returning its ZSwcTree.
+  resortId(*swc);
+
   SeedTraceResult res;
   res.newNodes = static_cast<size_t>(end - start);
   res.swc = std::move(swc);
@@ -302,6 +306,9 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
   } else {
     LOG(ERROR) << "traceSeedIntoHostSwcLegacyLike: internal error (null branch root after append).";
   }
+
+  // `ZNeuronConstructor::reconstruct` resorts IDs before returning its ZSwcTree.
+  resortId(*outSwc);
 
   return {.swc = std::move(outSwc), .newNodes = added};
 }

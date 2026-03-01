@@ -78,6 +78,44 @@ public:
   return swc;
 }
 
+[[nodiscard]] nim::ZSwc makeSimpleThreeNodeChainSwc()
+{
+  nim::ZSwc swc;
+
+  nim::SwcNode root;
+  root.id = 1;
+  root.type = 0;
+  root.x = 0.0;
+  root.y = 0.0;
+  root.z = 0.0;
+  root.radius = 1.0;
+  root.parentID = -1;
+  swc.appendRoot(root);
+
+  nim::SwcNode child;
+  child.id = 2;
+  child.type = 0;
+  child.x = 1.0;
+  child.y = 0.0;
+  child.z = 0.0;
+  child.radius = 1.0;
+  child.parentID = 1;
+  const auto rootIt = swc.begin();
+  const auto childIt = swc.appendChild(rootIt, child);
+
+  nim::SwcNode grandchild;
+  grandchild.id = 3;
+  grandchild.type = 0;
+  grandchild.x = 2.0;
+  grandchild.y = 0.0;
+  grandchild.z = 0.0;
+  grandchild.radius = 1.0;
+  grandchild.parentID = 2;
+  swc.appendChild(childIt, grandchild);
+
+  return swc;
+}
+
 [[nodiscard]] nim::ZSwc::SwcTreeNode findNodeById(nim::ZSwc& swc, int64_t id)
 {
   for (auto it = swc.begin(); it != swc.end(); ++it) {
@@ -89,6 +127,41 @@ public:
 }
 
 } // namespace
+
+TEST(ZSwcPackSelection, ShiftExtendSelectsPathBetweenAnchorAndClicked)
+{
+  ScopedQtWidgetsApplication qtApp;
+
+  nim::ZDoc doc;
+  nim::ZSwcDoc swcDoc(doc);
+
+  TestableSwcPack pack(makeSimpleThreeNodeChainSwc(), QString(), /*id=*/1, swcDoc);
+
+  auto root = findNodeById(pack.swcMutable(), 1);
+  auto child = findNodeById(pack.swcMutable(), 2);
+  auto grandchild = findNodeById(pack.swcMutable(), 3);
+  ASSERT_FALSE(nim::ZSwc::isNull(root));
+  ASSERT_FALSE(nim::ZSwc::isNull(child));
+  ASSERT_FALSE(nim::ZSwc::isNull(grandchild));
+
+  // Click-select the middle node (anchor).
+  pack.onTreeNodeSelected(&child, /*append*/ false, /*extend*/ false);
+  ASSERT_EQ(pack.selectedNodes().size(), 1u);
+  EXPECT_TRUE(pack.selectedNodes().contains(child));
+
+  // Ctrl/Cmd-click the root: append and make it the new anchor (matches 3D semantics).
+  pack.onTreeNodeSelected(&root, /*append*/ true, /*extend*/ false);
+  ASSERT_EQ(pack.selectedNodes().size(), 2u);
+  EXPECT_TRUE(pack.selectedNodes().contains(child));
+  EXPECT_TRUE(pack.selectedNodes().contains(root));
+
+  // Shift-click the leaf: extend selection from the anchor to the clicked node.
+  pack.onTreeNodeSelected(&grandchild, /*append*/ false, /*extend*/ true);
+  EXPECT_EQ(pack.selectedNodes().size(), 3u);
+  EXPECT_TRUE(pack.selectedNodes().contains(root));
+  EXPECT_TRUE(pack.selectedNodes().contains(child));
+  EXPECT_TRUE(pack.selectedNodes().contains(grandchild));
+}
 
 TEST(ZSwcPackUndoMerge, MoveSelectedNodes_MergesWithSameSelection)
 {
