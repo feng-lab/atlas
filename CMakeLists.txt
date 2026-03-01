@@ -123,7 +123,6 @@ if (NOT _atlas_is_windows_ci)
   add_subdirectory(src/neurolabi/gui)
 endif ()
 # add_subdirectory(src/matlab)
-add_subdirectory(src/neutube)
 add_subdirectory(src/atlas)
 
 option(BUILD_TESTING "Enable tests" ON)

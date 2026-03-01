@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
                        true);
 
     const std::string jsonDirPath = ZSystemInfo::jsonDirPath().toUtf8().toStdString();
-    // neuTube CLI runner (modernized, src/neutube).
+    // neuTube CLI runner (modernized, src/img).
     return ZRunNeuTuCommand2().run(argc, argv, jsonDirPath);
   }
 

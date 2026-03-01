@@ -181,7 +181,6 @@ endif ()
 
 print_target_properties(img NO_LOCATION)
 
-print_target_properties(neutube NO_LOCATION)
 
 if (UNIX AND NOT APPLE)
   find_package(OpenGL REQUIRED COMPONENTS OpenGL EGL)
@@ -499,6 +498,7 @@ set(SOURCES
     zautotracedialog.h zautotracedialog.cpp
     zbinarytoswcdialog.h zbinarytoswcdialog.cpp
     zsubtractswcsdialog.h zsubtractswcsdialog.cpp
+    zrescaleswcdialog.h zrescaleswcdialog.cpp
     zobjdoc.h zobjdoc.cpp
     zobjview.h zobjview.cpp
     zimgfilter.h zimgfilter.cpp
@@ -860,7 +860,6 @@ if (MSVC)
   target_include_directories(atlas_core_deps
     INTERFACE
       ${CMAKE_CURRENT_SOURCE_DIR}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../neutube
       ${CMAKE_CURRENT_BINARY_DIR})
   # Vulkan headers are required transitively by some core sources/headers (e.g. zvulkan*.h
   # included from renderer base). Ensure the SDK include path is visible to consumers too.
@@ -959,9 +958,7 @@ else ()
     PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR}
       ${CMAKE_CURRENT_BINARY_DIR})
-  # Some Atlas GUI code calls into the in-repo neuTube implementation (Goal 2 migration).
-  # Keep the algorithm code in `src/neutube`, but make its headers available to core translation units.
-  target_include_directories(atlas_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../neutube)
+
   target_include_directories(atlas_core
     SYSTEM PRIVATE
       ${QTCSVDIR} ${QTCSVDIR}/include
@@ -1364,4 +1361,3 @@ endif (WIN32)
 
 # The app consumes the static library (keeps link dependencies centralized).
 target_link_libraries(${APP_NAME} PUBLIC atlas_lib)
-target_link_libraries(${APP_NAME} PRIVATE neutube)

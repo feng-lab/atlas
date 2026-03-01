@@ -5,6 +5,7 @@
 #include "ztheme.h"
 #include "zswcwidget.h"
 #include "zsubtractswcsdialog.h"
+#include "zrescaleswcdialog.h"
 #include "zmessageboxhelpers.h"
 #include <QFileDialog>
 #include <QSettings>
@@ -178,6 +179,7 @@ QMenu* ZSwcDoc::processObjMenu() const
   auto* res = new QMenu(typeName());
   res->addAction(m_editSwcAction);
   res->addAction(m_subtractSwcsAction);
+  res->addAction(m_rescaleSwcAction);
   return res;
 }
 
@@ -322,6 +324,10 @@ void ZSwcDoc::createActions()
   m_subtractSwcsAction = new QAction(tr("&Subtract SWCs..."), this);
   m_subtractSwcsAction->setStatusTip(tr("Subtract SWC trees from an input SWC"));
   connect(m_subtractSwcsAction, &QAction::triggered, this, &ZSwcDoc::subtractSwcs);
+
+  m_rescaleSwcAction = new QAction(tr("&Rescale SWC..."), this);
+  m_rescaleSwcAction->setStatusTip(tr("Rescale an SWC file and save the result"));
+  connect(m_rescaleSwcAction, &QAction::triggered, this, &ZSwcDoc::rescaleSwc);
 }
 
 void ZSwcDoc::editSwc()
@@ -337,6 +343,12 @@ void ZSwcDoc::editSwc()
 void ZSwcDoc::subtractSwcs()
 {
   ZSubtractSwcsDialog dlg(m_doc, QApplication::activeWindow());
+  dlg.exec();
+}
+
+void ZSwcDoc::rescaleSwc()
+{
+  ZRescaleSwcDialog dlg(m_doc, QApplication::activeWindow());
   dlg.exec();
 }
 

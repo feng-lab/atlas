@@ -515,6 +515,7 @@ Atlas also exposes SWC-wide utilities in the menu bar:
 
 - **Swc → Edit SWC...**: opens the SWC editor for a chosen SWC object.
 - **Swc → Subtract SWCs...**: subtracts one or more SWCs from an input SWC and writes an output SWC file.
+- **Swc → Rescale SWC...**: applies pre-scale translation, scaling, and post-scale translation to an input SWC and writes an output SWC file (resolution fields are in **μm/pixel**).
 
 Related image → SWC utilities:
 

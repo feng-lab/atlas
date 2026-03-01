@@ -109,7 +109,6 @@ endif ()
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
 add_atlas_vulkan_gtest_executable(zvulkanpipelinecontexttest)
-target_link_libraries(zvulkanpipelinecontexttest PRIVATE neutube)
 add_atlas_core_gtest_executable(zneuroglanceruint64shardingtest)
 add_atlas_core_gtest_executable(zneuroglancerstatetest)
 
@@ -125,11 +124,9 @@ if (_atlas_is_windows_ci)
   message(STATUS "Skipping zatlasheavytest on Windows CI (heavy link against atlas_lib).")
 else ()
   add_gtest_executable(zneutubeswcsignalfittertest)
-  target_link_libraries(zneutubeswcsignalfittertest neutube) 
   add_gtest_executable(zneutubecommand2paritytest)
-  target_link_libraries(zneutubecommand2paritytest neutube neutu)
-  add_atlas_z3d_gtest_executable(zswcpackundomergetest)
-  target_link_libraries(zswcpackundomergetest PRIVATE neutube atlas_vulkan)
+  target_link_libraries(zneutubecommand2paritytest neutu)
+  add_atlas_vulkan_gtest_executable(zswcpackundomergetest)
   add_executable(
     zatlasheavytest
     ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp

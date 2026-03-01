@@ -2,7 +2,7 @@
 
 Last updated: 2026-03-01
 
-Doc location: `src/neutube/NEUTUBE2_MIGRATION.md`
+Doc location: `src/img/NEUTUBE2_MIGRATION.md`
 
 ## Executive summary
 
@@ -19,8 +19,9 @@ neuTube’s historical limitations:
 - SWC I/O/processing in neurolabi uses legacy `ZSwcTree`; Atlas has a newer, 64-bit-friendly SWC model in `nim::ZSwc`
   (`src/img/zswc.*`).
 
-**Goal:** incrementally migrate neuTube functionality into Atlas as “neuTube 2.0” by building a new implementation under
-`src/neutube/`, while keeping the legacy code available for comparison and regression-checking until parity is reached.
+**Goal:** incrementally migrate neuTube functionality into Atlas as “neuTube 2.0” by building a modern, Atlas-native
+implementation in `src/img/`, while keeping the legacy code available for comparison and regression-checking until parity
+is reached.
 
 ## Current status (as of 2026-03-01)
 
@@ -32,13 +33,17 @@ neuTube’s historical limitations:
   - **Seed tracing** is integrated in both **2D** and **3D** views via the shared **Trace Settings** state.
   - **Auto Trace** is integrated as a **background task** with progress + cancel in the shared **Tasks** dock.
   - **SWC node context menu parity** (neuTube-style 2D + 3D) is migrated, including the key interactive edit modes.
+- **Code consolidation:** the ported neuTube v2 implementation (previously in `src/neutube/`) now lives in `src/img/`
+  (no separate `neutube` target).
+- **SWC file tools:** `Swc → Rescale SWC...` is migrated as a file-based operation (similar to `Swc → Subtract SWCs...`).
 
 ⬜ Next (near-term)
 
-- Port remaining neuTube GUI functionality beyond SWC-node editing parity (menus, workflows, and advanced tools that are not
-  yet exposed in Atlas).
-- Continue consolidating algorithm-side SWC utilities into `src/img/` where they become general-purpose (while keeping
-  strict A/B parity for the neuTube algorithms).
+- Large-image readiness (separate milestone):
+  - implement an image-access abstraction on `ZImgPack` for tracing/skeletonize so very large volumes can be processed
+    without requiring full in-RAM materialization (while preserving strict parity).
+- Optional cleanups once parity is stable:
+  - Rename/refactor `zneutube*` “ported legacy” files into first-class `z*` APIs (keeping A/B tests intact).
 
 ## Primary goals (phased)
 
@@ -47,7 +52,7 @@ neuTube’s historical limitations:
 Deliver a drop-in replacement for the existing CLI entrypoint:
 
 - Keep the existing `nim::ZRunNeuTuCommand` intact for A/B comparison.
-- Introduce `nim::ZRunNeuTuCommand2` with implementation in `src/neutube/`.
+- Introduce `nim::ZRunNeuTuCommand2` with implementation in `src/img/`.
 - Remove dependencies on neurolabi C libraries along the `ZRunNeuTuCommand2` codepath.
 - Switch JSON/config to `boost::json` (Atlas standard).
 - Switch image I/O and processing to Atlas’ `zimg` / `ZImgPack` stack (large-image capable, better format support).
@@ -62,8 +67,8 @@ Acceptance criteria for Goal 1:
 - No silent truncation or hard-coded size caps.
 - Large images that fit in RAM must work reliably (no 32-bit overflow on voxel counts / byte sizes). Streaming/paging is
   a later milestone; it is *not required* to reach Goal 1.
-- Zero dependency on `src/neurolabi/` (including `src/neurolabi/c` and `src/neurolabi/lib/genelib`) for the `neutube`
-  target and the `Atlas --command` runtime path.
+- Zero dependency on `src/neurolabi/` (including `src/neurolabi/c` and `src/neurolabi/lib/genelib`) for the
+  `Atlas --command` runtime path.
   - The legacy code is kept intact under `src/neurolabi/` and is used only for in-process A/B parity tests and as the
     reference baseline until we are ready to remove it.
 
@@ -138,7 +143,7 @@ Algorithm-side readiness:
 
 - The CLI migration already contains a faithful port of the seeded trace behavior (“interactive-like”) in C++ on `ZImg`
   + `ZSwc`:
-  - `src/neutube/zneutubetrace.cpp` contains `runSeededTraceLegacyLike(...)` and `runSeededTraceWithHostSwcLegacyLike(...)`
+  - `src/img/zneutubetrace.cpp` contains `runSeededTraceLegacyLike(...)` and `runSeededTraceWithHostSwcLegacyLike(...)`
     which are ports of `ZNeuronTracer::trace(x, y, z)` and the “attach-to-host-SWC” logic.
 - For GUI integration, we should refactor these into in-memory APIs (no file I/O) that operate on `ZImgPack`/`ZImg` and
   return `ZSwc` deltas suitable for undoable edits.
@@ -156,9 +161,9 @@ Goal 2 implementation status (as of 2026-03-01):
 
 - ✅ Phase 2A (in-memory tracing APIs): implemented
   - `nim::traceSeedNewSwcLegacyLike` and `nim::traceSeedIntoHostSwcLegacyLike`:
-    - `src/neutube/zneutubetraceinteractive.*`
+    - `src/img/zneutubetraceinteractive.*`
   - Seeded CLI tracing calls the same in-memory API (keeps behavior centralized):
-    - `src/neutube/zneutubetrace.cpp`
+    - `src/img/zneutubetrace.cpp`
 - ✅ Phase 2B (2D seeded tracing UX): implemented
   - Shared trace state is persisted in `ZDoc::traceSettings()` so 2D/3D windows stay in sync:
     - `src/atlas/ztracesettings.*`
@@ -183,17 +188,17 @@ Goal 2 implementation status (as of 2026-03-01):
     - `src/atlas/zbackgroundtaskmanager.*`
     - `src/atlas/zbackgroundtaskmanagerwidget.*`
   - Auto Trace pipeline integrated as a background task with cancellation checks:
-    - `src/neutube/zneutubetraceauto.*`
-    - `src/neutube/zneutubeautotraceprocess.*`
+    - `src/img/zneutubetraceauto.*`
+    - `src/img/zneutubeautotraceprocess.*`
 
 Phase 2A: define the GUI-facing tracing API (no UI yet)
 
-1. Add a small in-memory tracing API in `src/neutube/` (or `src/img/` if it becomes generally useful) that exposes:
+1. Add a small in-memory tracing API in `src/img/` that exposes:
    - `traceSeedNewSwcLegacyLike(signal, position, cfg, c, t) -> std::unique_ptr<ZSwc>`
    - `traceSeedIntoHostSwcLegacyLike(signal, hostSwc, position, cfg, c, t) -> TraceMergeResult`
 2. Keep these APIs file-free:
    - Accept `const ZImg&` or `const ZImgPack&` (plus voxel coordinate).
-   - Accept `TraceConfig` (already in `src/neutube/zneutubetraceconfig.*`).
+   - Accept `TraceConfig` (already in `src/img/zneutubetraceconfig.*`).
 3. Make the API explicit about coordinate frames:
    - Inputs are always in image voxel coordinates (x,y,z in the image’s native index space).
    - If any cropping/region-reading is used, the API must define the mapping unambiguously and must not silently change
@@ -306,7 +311,7 @@ Phase 2G: validation + documentation
 
 - Atlas `main` special-cases `--command` and invokes the migrated runner:
   - `src/atlas/main.cpp` (search for `--command`)
-  - `src/neutube/zrunneutucommand2.*`
+  - `src/img/zrunneutucommand2.*`
 - The legacy runner remains for A/B tests and reference:
   - `src/neurolabi/gui/zrunneutucommand.*`
 
@@ -439,11 +444,11 @@ Key behaviors to preserve (until we intentionally evolve them):
 
 - `nim::ZRunNeuTuCommand2` (parsing + validation + dispatch; no neurolabi C dependency)
 - Config helpers:
-  - `command_config.json` include resolution in `src/neutube/zrunneutucommand2.cpp`
-  - tracing config parsing: `nim::TraceConfig` (`src/neutube/zneutubetraceconfig.*`)
-- Tracing: `nim::runTrace(...)` (`src/neutube/zneutubetrace.*`, `src/neutube/zneutubetraceauto.*`)
-- Skeletonize: `nim::runSkeletonize(...)` (`src/neutube/zneutubeskeletonize.*`, `src/neutube/zneutubeskeletonizer.*`)
-- Compare SWC: `nim::runCompareSwc(...)` (`src/neutube/zneutubecompareswc.*`)
+  - `command_config.json` include resolution in `src/img/zrunneutucommand2.cpp`
+  - tracing config parsing: `nim::TraceConfig` (`src/img/zneutubetraceconfig.*`)
+- Tracing: `nim::runTrace(...)` (`src/img/zneutubetrace.*`, `src/img/zneutubetraceauto.*`)
+- Skeletonize: `nim::runSkeletonize(...)` (`src/img/zneutubeskeletonize.*`, `src/img/zneutubeskeletonizer.*`)
+- Compare SWC: `nim::runCompareSwc(...)` (`src/img/zneutubecompareswc.*`)
 
 ### Compatibility strategy
 
@@ -468,22 +473,22 @@ Status (Goal 1 / CLI):
   - Config search path is injected by the host app:
     - `src/atlas/main.cpp` passes `ZSystemInfo::jsonDirPath()` into `ZRunNeuTuCommand2::run(...)`.
     - For standalone testing, v2 runner also accepts `--json_dir <Resources/json>` and/or `--config <command_config.json>`.
-  - `--command --skeletonize` is implemented in `src/neutube/` using Atlas-native image/SWC types:
+  - `--command --skeletonize` is implemented in `src/img/` using Atlas-native image/SWC types:
     - Image I/O: `nim::ZImg` (no `ZStack` / no `Stack`).
-    - Algorithm: `nim::ZNeutubeSkeletonizer` (`src/neutube/zneutubeskeletonizer.*`).
+    - Algorithm: `nim::ZNeutubeSkeletonizer` (`src/img/zneutubeskeletonizer.*`).
     - Output: `nim::ZSwc` + legacy-format writer (`src/img/zswcwriter.*`) for byte-identical SWC files.
     - The skeletonize implementation path does not include or call into neurolabi C (`tz_*`) or genelib.
-  - `--command --trace` is fully ported in `src/neutube/` (strictly legacy-equivalent behavior):
-    - Config parsing: `TraceConfig` (`src/neutube/zneutubetraceconfig.*`, Boost.JSON; legacy tag + per-level semantics)
+  - `--command --trace` is fully ported in `src/img/` (strictly legacy-equivalent behavior):
+    - Config parsing: `TraceConfig` (`src/img/zneutubetraceconfig.*`, Boost.JSON; legacy tag + per-level semantics)
     - Image access: `nim::ZImg` (no `ZStack` / no `Stack`)
     - Output: `nim::ZSwc` + legacy-format writer (`src/img/zswcwriter.*`) for byte-identical SWC files
     - Supports the legacy feature set for the CLI entrypoint (seeded trace, host-SWC attach, diagnosis mode, auto trace).
-  - `--command --general {"command":"trace_neuron", ...}` is implemented in `src/neutube/` and runs the ported auto-trace
+  - `--command --general {"command":"trace_neuron", ...}` is implemented in `src/img/` and runs the ported auto-trace
     pipeline (including legacy return-code semantics and optional predefined mask handling).
-  - `src/neutube/zrunneutucommand2.cpp` remains orchestration-only (CLI + config parsing + dispatch) and the `neutube`
-    target has no dependency on neurolabi headers or libraries.
+  - `src/img/zrunneutucommand2.cpp` remains orchestration-only (CLI + config parsing + dispatch) and the production
+    `Atlas --command` codepath has no dependency on neurolabi headers or libraries.
   - API hygiene (non-null parameters):
-    - Migrated many legacy-style `T*` parameters to C++ references for required inputs/outputs across `src/neutube/`.
+    - Migrated many legacy-style `T*` parameters to C++ references for required inputs/outputs across the ported code.
     - Remaining pointer parameters are kept only where they are semantically required (nullable optional inputs/outputs,
       C-style arrays, legacy callback signatures) and are annotated/documented (e.g., `/*nullable*/`).
 
@@ -493,7 +498,7 @@ This plan is intentionally incremental; each step should keep the build green an
 
 ### Phase A: scaffolding and “no behavior change” plumbing
 
-1. Add `src/neutube/` directory structure and CMake target(s) (library + small unit tests).
+1. Add tracing-module structure and CMake wiring under `src/img/` (library sources + small unit tests).
 2. Implement `nim::ZRunNeuTuCommand2` that:
    - parses CLI arguments without `tz_utilities.h`
    - loads/merges config using `boost::json` (`src/img/zjson.*`)
@@ -508,17 +513,17 @@ Deliverable: new runner exists and can execute end-to-end on the migrated `--com
 We will **not** modify `src/neurolabi/` during this migration. The legacy `neutu` + `neurolabi` codebase remains the
 baseline for strict A/B comparisons.
 
-Instead, we progressively **port** the required algorithm code into `src/neutube/` (and shared pieces into `src/img/`)
-and then switch `--command` to use the new implementation module-by-module.
+Instead, we progressively **port** the required algorithm code into `src/img/` and then switch `--command` to use the new
+implementation module-by-module.
 
 Completed steps in this phase:
 
 5. Remove `tz_utilities.h` usage entirely (arg parsing, file existence, string utilities).
-6. Port the required neurolabi C/C++ algorithm code into clean C++ in `src/neutube/` (and shared pieces into `src/img/`)
-   and remove neurolabi dependencies from the `neutube` target.
+6. Port the required neurolabi C/C++ algorithm code into clean C++ in `src/img/` (and shared pieces into `src/img/`)
+   and remove neurolabi dependencies from the production `--command` codepath.
 
-7. Port CLI-used neurolabi C algorithm utilities into clean C++ under `src/neutube/`/`src/img/`:
-   - Add `nim::neighborhoodLegacyOrder(int)` (`src/neutube/zneutubeneighborhood.*`) to represent legacy
+7. Port CLI-used neurolabi C algorithm utilities into clean C++ under `src/img/`:
+   - Add `nim::neighborhoodLegacyOrder(int)` (`src/img/zneutubeneighborhood.*`) to represent legacy
      connectivity tables using Atlas' `ZNeighborhood` offsets (in the exact legacy order).
    - This unlocks reusing existing `ZImgNeighborhood*Iterator` helpers (`src/img/zimgneighborhood*iterator.h`) for
      neighbor traversal in the forthcoming C→C++ algorithm ports, avoiding hand-written bound tests while preserving
@@ -529,8 +534,9 @@ Completed steps in this phase:
 During the migration, we tracked which legacy neurolabi C surfaces were being pulled in by the tracing/skeletonize CLI
 path so we could port them incrementally and verify strict A/B parity as we went.
 
-As of 2026-02-25, `neutube` is fully self-contained: it does not link against `neutu` and does not include any headers
-from `src/neurolabi/` in the production `--command` path. The inventory below is kept as a record of what was ported.
+As of 2026-03-01, the ported neuTube v2 implementation is fully self-contained within `src/img/`: it does not link
+against `neutu` and does not include any headers from `src/neurolabi/` in the production `--command` path. The inventory
+below is kept as a record of what was ported.
 
 The list below identifies the **minimum** legacy C object-file surfaces that were pulled in by the legacy CLI-used code
 path before the port. This served as a practical “what to port first” inventory.
@@ -596,14 +602,14 @@ Deliverable: tracing no longer requires reading the full volume into RAM; large 
 11. Switch outputs to `nim::ZSwc` (`src/img/zswc.h`) for:
    - SWC read/write
    - node/edge editing operations used by tracing
-12. Port any missing SWC processing/analysis utilities from neurolabi into `src/img/` (or `src/neutube/` if tracer-only),
+12. Port any missing SWC processing/analysis utilities from neurolabi into `src/img/` (or keep tracer-only pieces local),
     keeping `src/img/` as the shared/common layer.
 
 Deliverable: the new CLI produces modern SWC outputs without `ZSwcTree`.
 
 ### Phase E: algorithms (tracing + skeletonization)
 
-13. Replace legacy tracer internals with a new tracer implemented in `src/neutube/` on top of the new image/SWC APIs.
+13. Replace legacy tracer internals with a new tracer implemented in `src/img/` on top of the new image/SWC APIs.
 14. Replace skeletonize with a new implementation that:
    - handles binary volumes (including large datasets via tiling)
    - supports similar configuration knobs to legacy (downsample intervals, length thresholds, etc.)
@@ -650,59 +656,59 @@ We need objective, automated checks to keep the migration safe:
 
 Legend: ⬜ not started, 🟨 in progress, ✅ done
 
-- ✅ Create `src/neutube/` module structure and targets
+- ✅ Create tracing module structure in `src/img/` (consolidated; no separate `neutube` target)
 - ✅ Add `nim::ZRunNeuTuCommand2` entrypoint + `--command` dispatch
 - ✅ Migrate JSON parsing to `boost::json` for v2 runner
 - ✅ Remove `tz_utilities.h` from v2 runner
 - ✅ Use `ZImg` for image I/O in v2 runner
 - ✅ No stack adapters: tracing/skeletonize operate directly on `ZImg`/`ZSwc` (production `--command` path).
 - ✅ Remove `ZSystemInfo` dependency from v2 runner (json dir injected by host / `--json_dir`)
-- ✅ Remove neurolabi dependency from the `neutube` target (no `src/neurolabi/` headers/libraries in production codepath)
+- ✅ Remove neurolabi dependency from the production `--command` codepath (no `src/neurolabi/` headers/libraries)
 - ✅ Add in-process A/B parity tests for `--command` (skeletonize + trace + compare_swc)
 - ✅ Consolidate A/B tests by invoking both runners in-process (legacy + v2)
 - ✅ Port the CLI-used neurolabi C algorithms to clean C++ (exact behavior, 64-bit-safe sizes)
-  - ✅ Neighborhood/connectivity tables: `src/neutube/zneutubeneighborhood.*`
-  - ✅ Binary morphology helpers (`Stack_Not`, `Stack_Majority_Filter`, `Stack_Fill_Hole_N`): `src/neutube/zneutubeimgbwmorph.*`
-  - ✅ Point sampling + mask hit (`Stack_Point_Sampling`, `Stack_Point_Hit_Mask`): `src/neutube/zneutubeimgsampling.*`
+  - ✅ Neighborhood/connectivity tables: `src/img/zneutubeneighborhood.*`
+  - ✅ Binary morphology helpers (`Stack_Not`, `Stack_Majority_Filter`, `Stack_Fill_Hole_N`): `src/img/zneutubeimgbwmorph.*`
+  - ✅ Point sampling + mask hit (`Stack_Point_Sampling`, `Stack_Point_Hit_Mask`): `src/img/zneutubeimgsampling.*`
   - ✅ Geo3d scalar field sampling + scoring (`Geo3d_Scalar_Field_Stack_Sampling*`, `Geo3d_Scalar_Field_Stack_Score*`):
-    `src/neutube/zneutubegeo3dscalarfield.*`, `src/neutube/zneutubestackfitscore.*`
-  - ✅ Geo3d scalar field centroid (`Geo3d_Scalar_Field_Centroid`): `src/neutube/zneutubegeo3dscalarfield.*`
+    `src/img/zneutubegeo3dscalarfield.*`, `src/img/zneutubestackfitscore.*`
+  - ✅ Geo3d scalar field centroid (`Geo3d_Scalar_Field_Centroid`): `src/img/zneutubegeo3dscalarfield.*`
   - ✅ Geo3d orientation utilities (`Vector_Angle`, `Geo3d_*_Orientation`, `Geo3d_Rotate_Orientation`):
-    `src/neutube/zneutubegeo3dutils.*`, `src/neutube/zneutube3dgeom.*`
+    `src/img/zneutubegeo3dutils.*`, `src/img/zneutube3dgeom.*`
   - ✅ Legacy optimizer core (`Fit_Perceptor`, line search, conjugate updates):
-    `src/neutube/zneutubecontfun.h`, `src/neutube/zneutubeoptimizeutils.*`, `src/neutube/zneutubeperceptor.*`
+    `src/img/zneutubecontfun.h`, `src/img/zneutubeoptimizeutils.*`, `src/img/zneutubeperceptor.*`
     - Note: Atlas already has Ceres-based optimizers (e.g. `src/img/zregistrationoptimizer.*`), but we intentionally keep
       the legacy Perceptor algorithm here to preserve byte-identical tracing outputs for Goal 1.
   - ✅ Trace workspace mask/bounds helpers (`Trace_Workspace_Mask_Value`, `Trace_Workspace_Point_In_Bound`):
-    `src/neutube/zneutubetraceworkspace.*`
+    `src/img/zneutubetraceworkspace.*`
   - ✅ Trace record + score containers (`Trace_Record`, `Stack_Fit_Score` structs + setters/getters):
-    `src/neutube/zneutubetracerecord.*`
+    `src/img/zneutubetracerecord.*`
   - ✅ Stack fit score switches (`STACK_FIT_*` option scoring on sampled arrays, including masked-score semantics):
-    `src/neutube/zneutubestackfitscore.*`, `src/neutube/zneutubestackfitoptions.h`
-  - ✅ Large-object labeling (`Stack_Label_Large_Objects_*`): `src/neutube/zneutubeobjlabel.*` (parity-tested)
-  - ✅ 3D squared EDT (`Stack_Bwdist_L_U16` / `dt3d_binary_mu16`): `src/neutube/zneutubeedt3d.*` (parity-tested)
-  - ✅ Planar squared EDT (`Stack_Bwdist_L_U16P`): `src/neutube/zneutubeplanaredt.*`
-  - ✅ Local maxima (`Stack_Local_Max`, `Stack_Locmax_Region`): `src/neutube/zneutubeimglocmax.*` (parity-tested)
-  - ✅ Sp-grow (`Stack_Sp_Grow` + parser): `src/neutube/zneutubespgrow.*`, `src/neutube/zneutubespgrowparser.*`
+    `src/img/zneutubestackfitscore.*`, `src/img/zneutubestackfitoptions.h`
+  - ✅ Large-object labeling (`Stack_Label_Large_Objects_*`): `src/img/zneutubeobjlabel.*` (parity-tested)
+  - ✅ 3D squared EDT (`Stack_Bwdist_L_U16` / `dt3d_binary_mu16`): `src/img/zneutubeedt3d.*` (parity-tested)
+  - ✅ Planar squared EDT (`Stack_Bwdist_L_U16P`): `src/img/zneutubeplanaredt.*`
+  - ✅ Local maxima (`Stack_Local_Max`, `Stack_Locmax_Region`): `src/img/zneutubeimglocmax.*` (parity-tested)
+  - ✅ Sp-grow (`Stack_Sp_Grow` + parser): `src/img/zneutubespgrow.*`, `src/img/zneutubespgrowparser.*`
   - ✅ Neuroseg field generation (`Neuroseg_Slice_Field`, `Neuroseg_Slice_Field_P`, `Neuroseg_Field_S_Fast`, `Neuroseg_Field_Sp`):
-    `src/neutube/zneutubeneuroseg.*`, `src/neutube/zneutube3dgeom.*`, `src/neutube/zneutubegeo3dpointarray.*`
+    `src/img/zneutubeneuroseg.*`, `src/img/zneutube3dgeom.*`, `src/img/zneutubegeo3dpointarray.*`
   - ✅ Local neuroseg scoring + fit (`Local_Neuroseg_Field_S*`, `Local_Neuroseg_Score_*`, `Fit_Local_Neuroseg_W`):
-    `src/neutube/zneutubelocalneuroseg.*`
+    `src/img/zneutubelocalneuroseg.*`
   - ✅ Local neuroseg optimize loop (`Local_Neuroseg_Position_Adjust`, `Local_Neuroseg_Orientation_Search_C`,
-    `Local_Neuroseg_R_Scale_Search`, `Local_Neuroseg_Optimize_W`): `src/neutube/zneutubelocalneuroseg.*`
-  - ✅ Legacy `darray_qsort(...)` parity helper: `src/neutube/zneutubedarrayqsort.*`
+    `Local_Neuroseg_R_Scale_Search`, `Local_Neuroseg_Optimize_W`): `src/img/zneutubelocalneuroseg.*`
+  - ✅ Legacy `darray_qsort(...)` parity helper: `src/img/zneutubedarrayqsort.*`
   - ✅ darray math helpers (`darray_dot_n`, `darray_dot_nw`, `darray_sum_n`, `darray_mean_n`, `darray_corrcoef_n`, `darray_max`):
-    `src/neutube/zneutubedarraymath.*`
+    `src/img/zneutubedarraymath.*`
 - ⬜ Implement image-access abstraction on `ZImg`/`ZImgPack` (streaming for very large volumes)
 - ✅ Port/implement skeletonize on modern image types (exact behavior)
   - ✅ Port `ZStackSkeletonizer::makeSkeletonWithoutDs(Stack*, const int*)` behavior into
-    `nim::ZNeutubeSkeletonizer` (`src/neutube/zneutubeskeletonizer.*`) using only `ZImg` + `ZSwc`.
-  - ✅ Switch `--command --skeletonize` dispatch to the neutube-owned runner (`src/neutube/zneutubeskeletonize.*`).
+    `nim::ZNeutubeSkeletonizer` (`src/img/zneutubeskeletonizer.*`) using only `ZImg` + `ZSwc`.
+  - ✅ Switch `--command --skeletonize` dispatch to the v2 runner implementation (`src/img/zneutubeskeletonize.*`).
   - ✅ Port SWC primitives used by skeletonize:
-    `src/img/zswcops.*`, `src/img/zswcpointdist.*`, `src/neutube/zneutubeswcreconnect.*`,
-    `src/img/zswcresampler.*`, `src/neutube/zneutubeswcregionsampling.*`, `src/img/zswcwriter.*`
+    `src/img/zswcops.*`, `src/img/zswcpointdist.*`, `src/img/zneutubeswcreconnect.*`,
+    `src/img/zswcresampler.*`, `src/img/zneutubeswcregionsampling.*`, `src/img/zswcwriter.*`
 - ✅ Port `--compare_swc` to `nim::ZSwc` (exact legacy `ZSwcTreeMatcher::matchAllG` semantics)
-  - Implementation: `src/neutube/zneutubecompareswc.*`
+  - Implementation: `src/img/zneutubecompareswc.*`
   - Note: legacy `ZSwcLayerTrunkAnalyzer::extractTrunk(...)` is a stub (returns an empty path). The port preserves this
     behavior exactly, including the `-1.0` gap-penalty score contributions that fall out of matching empty branches.
   - Parity: `test/zneutubecommand2paritytest.cpp` (`NeutubeCommand2Parity.CompareSwc_MatchesLegacy`)
@@ -712,13 +718,14 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
     - ✅ Seeded trace (position provided, no host SWC) uses `nim::ZSwc` + legacy-format writer
     - ✅ Seeded trace with host SWC attach (position provided, host SWC provided) uses `nim::ZSwc`
       end-to-end (legacy SWC parse ordering, SWC->mask labeling, and branch attach/connector semantics)
-    - ✅ Auto trace and diagnosis use the ported `src/neutube/` tracer on `ZImg` + `ZSwc`
+    - ✅ Auto trace and diagnosis use the ported tracer on `ZImg` + `ZSwc` (`src/img/zneutubetraceauto.*`)
 - ✅ Add parity tests and sample datasets for regression checking (in-tree A/B parity + `atlas_test_data`)
 - ✅ Document GUI parity targets and migrate the initial Atlas GUI integration (Goal 2 baseline)
   - ✅ Trace Settings + seeded tracing in 2D and 3D views
   - ✅ Background Tasks dock + Auto Trace integration
   - ✅ SWC node context menu parity (2D + 3D)
-- ⬜ Continue migrating remaining neuTube GUI menus/workflows beyond SWC-node editing parity
+- ✅ Consolidate former `src/neutube/` implementation into `src/img/` and remove the `neutube` target
+- ✅ Add `Swc → Rescale SWC...` (file-based) to match neuTube's SWC-wide utilities
 
 ## Appendix: neuTube → Atlas SWC Node Context Menu Parity
 

@@ -210,7 +210,7 @@ Background Tasks (UI)
 
 Preferred “Process + Dialog” pattern (used by puncta detection, stitching, registration, chromatic correction, and auto trace):
 
-1. Implement a `ZImgProcess` worker (usually in `src/img/`, or in `src/neutube/` when the algorithm is part of the tracing stack):
+1. Implement a `ZImgProcess` worker (in `src/img/`):
   - Implement `doWork()` (synchronous body; runs on a background thread).
   - Honor cancellation: check `m_cancellationToken` at safe points (e.g. `maybeCancel(m_cancellationToken)`).
   - Report progress when possible via `reportProgress(...)` (wired to Tasks UI through `setProgressCallback(...)`).

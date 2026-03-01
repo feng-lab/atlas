@@ -10,7 +10,7 @@ namespace nim {
 // Notes:
 // - Nullable pointer parameters preserve legacy call patterns:
 //   - `prevLocseg` is passed as nullptr by the trace loop when there is no prior segment yet
-//     (see `src/neutube/zneutubelocsegchaintrace.cpp`).
+//     (see `src/img/zneutubelocsegchaintrace.cpp`).
 //   - `tr` may be null to skip trace-record score gating (legacy supports this).
 [[nodiscard]] TraceStatus locsegChainTraceTestLegacyLike(/*nullable*/ const LocalNeuroseg* locseg,
                                                          /*nullable*/ const LocsegChain* chain,

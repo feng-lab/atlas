@@ -94,6 +94,8 @@ private:
 
   void subtractSwcs();
 
+  void rescaleSwc();
+
   bool saveSwc(ZSwcPack* pack, const QString& fileName, QString& errorMsg);
 
   // notify obj manager about the update
@@ -105,6 +107,7 @@ private:
   QAction* m_loadSwcAction = nullptr;
   QAction* m_editSwcAction = nullptr;
   QAction* m_subtractSwcsAction = nullptr;
+  QAction* m_rescaleSwcAction = nullptr;
 };
 
 } // namespace nim
