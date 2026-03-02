@@ -5,6 +5,8 @@
 #include "zneutubelocsegchainknot.h"
 #include "zneutubetraceconnectiontest.h"
 
+#include "zswcops.h"
+
 #include "zlog.h"
 
 #include <algorithm>
@@ -350,7 +352,10 @@ std::unique_ptr<ZSwc> neuronStructureToSwcTreeCircleZLegacyLike(const NeuronStru
     const Geo3dCircle& circle = ns.circles[static_cast<size_t>(i)];
 
     SwcNode swcNode;
-    swcNode.id = (circle.radius <= 0.0) ? -1 : 1;
+    // Match tz_neuron_structure.c::Neuron_Structure_To_Swc_Tree_Circle_Z():
+    // nodes are created as regular nodes (id=1) and only later (after the connection
+    // pass) d==0 nodes are marked virtual and regularized.
+    swcNode.id = 1;
     swcNode.type = 2;
     swcNode.x = circle.center[0];
     swcNode.y = circle.center[1];
@@ -373,17 +378,19 @@ std::unique_ptr<ZSwc> neuronStructureToSwcTreeCircleZLegacyLike(const NeuronStru
     CHECK(parent >= 0 && parent < ncomp);
     CHECK(child >= 0 && child < ncomp);
 
-    tree->setAsRoot(tnArray[static_cast<size_t>(child)]);
+    swcTreeNodeSetRootLegacyLike(*tree, tnArray[static_cast<size_t>(child)]);
     tree->appendChild(tnArray[static_cast<size_t>(parent)], tnArray[static_cast<size_t>(child)]);
     tnArray[static_cast<size_t>(child)]->weight = ns.connCost[static_cast<size_t>(i)];
   }
 
-  // Legacy marks nodes with d==0 as virtual. Mirror on ZSwc.
+  // Legacy marks nodes with d==0 as virtual and then calls Swc_Tree_Regularize().
   for (auto it = tree->begin(); it != tree->end(); ++it) {
     if (it->radius == 0.0) {
       it->id = -1;
     }
   }
+
+  swcTreeRegularizeLegacyLike(*tree);
 
   return tree;
 }

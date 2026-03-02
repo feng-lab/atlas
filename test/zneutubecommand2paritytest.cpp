@@ -45,6 +45,7 @@ extern "C" {
 #include "tz_stack_neighborhood.h"
 #include "tz_stack_objlabel.h"
 #include "tz_stack_sampling.h"
+#include "tz_swc_tree.h"
 #include "tz_trace_utils.h"
 #include "tz_voxel_graphics.h"
 #include "tz_workspace.h"
@@ -54,6 +55,8 @@ extern "C" {
 
 #include "zstack.hxx"
 #include "zneurontracer.h"
+#include "swc/zswcpruner.h"
+#include "swc/zswcresampler.h"
 
 #include "zneutubecompareswc.h"
 #include "zneutubedarraymath.h"
@@ -78,6 +81,11 @@ extern "C" {
 #include "zneutubetracerecover.h"
 #include "zneutubeimgbinarizer.h"
 #include "zneutubelocsegchainmetrics.h"
+#include "zneutubeneuronstructure.h"
+#include "zswcops.h"
+#include "zswcpostprocess.h"
+#include "zswcresampler.h"
+#include "zswcwriter.h"
 #include "zneutubestackfitscore.h"
 #include "zneutubestackfitoptions.h"
 #include "zneutubetraceseed.h"
@@ -1249,35 +1257,53 @@ TEST(NeutubeLegacyTraceWorkspace, MaskValueMatchesLegacy)
   double legacyPos[3] = {3.0, 4.0, 2.0};
   const int legacyValue = Trace_Workspace_Mask_Value(legacyTw, legacyPos);
 
-  nim::TraceWorkspace portedTw;
-  ZImgInfo info(static_cast<size_t>(W), static_cast<size_t>(H), static_cast<size_t>(D), 1, 1, 1, VoxelFormat::Unsigned);
-  info.setVoxelFormat<uint16_t>();
-  info.createDefaultDescriptions();
-
-  portedTw.traceMask = std::make_unique<ZImg>(info);
-  portedTw.traceMask->fill(0);
-  *portedTw.traceMask->data<uint16_t>(3, 4, 2) = 42;
-
   const std::array<double, 3> portedPos = {3.0, 4.0, 2.0};
-  const int portedValue = nim::traceWorkspaceMaskValueLegacyLike(portedTw, portedPos);
+  {
+    nim::TraceWorkspace portedTw;
+    ZImgInfo
+      info(static_cast<size_t>(W), static_cast<size_t>(H), static_cast<size_t>(D), 1, 1, 1, VoxelFormat::Unsigned);
+    info.setVoxelFormat<uint8_t>();
+    info.createDefaultDescriptions();
 
-  EXPECT_EQ(portedValue, legacyValue);
+    portedTw.traceMask = std::make_unique<ZImg>(info);
+    portedTw.traceMask->fill(0);
+    *portedTw.traceMask->data<uint8_t>(3, 4, 2) = 42;
 
-  // Check rounding parity (legacy uses iround() which maps to round() in this build).
-  legacyPos[0] = 3.49;
-  legacyPos[1] = 4.51;
-  legacyPos[2] = 2.50;
-  const int legacyRounded = Trace_Workspace_Mask_Value(legacyTw, legacyPos);
-  const std::array<double, 3> portedRoundedPos = {3.49, 4.51, 2.50};
-  const int portedRounded = nim::traceWorkspaceMaskValueLegacyLike(portedTw, portedRoundedPos);
-  EXPECT_EQ(portedRounded, legacyRounded);
+    const int portedValue = nim::traceWorkspaceMaskValueLegacyLike(portedTw, portedPos);
+    EXPECT_EQ(portedValue, legacyValue);
 
-  // Out of bounds returns 0.
-  legacyPos[0] = -1.0;
-  legacyPos[1] = 4.0;
-  legacyPos[2] = 2.0;
-  EXPECT_EQ(Trace_Workspace_Mask_Value(legacyTw, legacyPos), 0);
-  EXPECT_EQ(nim::traceWorkspaceMaskValueLegacyLike(portedTw, {-1.0, 4.0, 2.0}), 0);
+    // Check rounding parity (legacy uses iround() which maps to round() in this build).
+    legacyPos[0] = 3.49;
+    legacyPos[1] = 4.51;
+    legacyPos[2] = 2.50;
+    const int legacyRounded = Trace_Workspace_Mask_Value(legacyTw, legacyPos);
+    const std::array<double, 3> portedRoundedPos = {3.49, 4.51, 2.50};
+    const int portedRounded = nim::traceWorkspaceMaskValueLegacyLike(portedTw, portedRoundedPos);
+    EXPECT_EQ(portedRounded, legacyRounded);
+
+    // Out of bounds returns 0.
+    legacyPos[0] = -1.0;
+    legacyPos[1] = 4.0;
+    legacyPos[2] = 2.0;
+    EXPECT_EQ(Trace_Workspace_Mask_Value(legacyTw, legacyPos), 0);
+    EXPECT_EQ(nim::traceWorkspaceMaskValueLegacyLike(portedTw, {-1.0, 4.0, 2.0}), 0);
+  }
+
+  {
+    // We still support uint16 masks in the ported implementation because some callers may
+    // choose to store non-binary labels.
+    nim::TraceWorkspace portedTw;
+    ZImgInfo
+      info(static_cast<size_t>(W), static_cast<size_t>(H), static_cast<size_t>(D), 1, 1, 1, VoxelFormat::Unsigned);
+    info.setVoxelFormat<uint16_t>();
+    info.createDefaultDescriptions();
+
+    portedTw.traceMask = std::make_unique<ZImg>(info);
+    portedTw.traceMask->fill(0);
+    *portedTw.traceMask->data<uint16_t>(3, 4, 2) = 42;
+
+    EXPECT_EQ(nim::traceWorkspaceMaskValueLegacyLike(portedTw, portedPos), legacyValue);
+  }
 
   Kill_Trace_Workspace(legacyTw);
 }
@@ -3484,9 +3510,9 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
     }
   }
 
-  for (Locseg_Chain* c : legacyChains) {
-    Kill_Locseg_Chain(c);
-  }
+  std::vector<Locseg_Chain*> legacyRecoveredChains;
+  Stack* legacyRecoverBaseMask = nullptr;
+  nim::RecoverResultLegacyLike portedRecover;
 
   // Recover stage and compare recovered chain counts/lengths.
   if (portedCfg.recover > 0) {
@@ -3520,8 +3546,6 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
     Kill_Stack(legacyTraceMaskBinary);
     legacyTraceMaskBinary = nullptr;
 
-    std::vector<Locseg_Chain*> legacyRecoveredChains;
-    Stack* legacyRecoverBaseMask = nullptr;
     if (!Stack_Is_Dark(legacyLeftover)) {
       const double originalMinChainLength = legacyTracer.getTraceWorkspace()->min_chain_length;
       if (legacyTracer.getTraceWorkspace()->refit == _FALSE_) {
@@ -3575,7 +3599,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
     }
 
     std::optional<nim::ZImg> portedBaseMaskForRecover = portedSorted.baseMask;
-    nim::RecoverResultLegacyLike portedRecover =
+    portedRecover =
       nim::recoverLegacyLike(portedSignal, portedCfg, portedMask, std::move(portedBaseMaskForRecover), portedTw);
 
     ASSERT_EQ(legacyRecoveredChains.size(), portedRecover.chains.size());
@@ -3588,21 +3612,161 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
         break;
       }
     }
-
-    for (Locseg_Chain* c : legacyRecoveredChains) {
-      Kill_Locseg_Chain(c);
-    }
     if (legacyRecoverBaseMask != nullptr) {
       Kill_Stack(legacyRecoverBaseMask);
     }
   }
 
+  // Combine recovered chains so the reconstruction+SWC postprocessing stages can be compared.
+  legacyChains.insert(legacyChains.end(), legacyRecoveredChains.begin(), legacyRecoveredChains.end());
+  legacyRecoveredChains.clear();
+  for (auto& c : portedRecover.chains) {
+    portedChains.push_back(std::move(c));
+  }
+  portedRecover.chains.clear();
+
+  ZSwcTree* legacyReconTree = nullptr;
+  {
+    legacyTracer.initConnectionTestWorkspace();
+    Connection_Test_Workspace* legacyCtw = legacyTracer.getConnectionTestWorkspace();
+    ASSERT_NE(legacyCtw, nullptr);
+
+    legacyCtw->sp_test = portedCfg.spTest ? _TRUE_ : _FALSE_;
+    legacyCtw->crossover_test = portedCfg.crossoverTest ? _TRUE_ : _FALSE_;
+    legacyCtw->dist_thre = portedCfg.maxEucDist;
+    if (legacyChains.size() > 500) {
+      legacyCtw->sp_test = _FALSE_;
+    }
+
+    ZNeuronConstructor constructor;
+    constructor.setWorkspace(legacyCtw);
+    constructor.setSignal(legacySignal);
+    legacyReconTree = constructor.reconstruct(legacyChains);
+
+    // Legacy reconstruction frees the Locseg_Chain objects via Clean_Neuron_Component_Array().
+    legacyChains.clear();
+  }
+
+  ASSERT_NE(legacyReconTree, nullptr);
+  ASSERT_FALSE(legacyReconTree->isEmpty());
+
+  nim::ConnectionTestWorkspaceLegacyLike portedCtw;
+  nim::defaultConnectionTestWorkspaceLegacyLike(portedCtw);
+  portedCtw.spTest = portedCfg.spTest;
+  portedCtw.crossoverTest = portedCfg.crossoverTest;
+  portedCtw.distThre = portedCfg.maxEucDist;
+  if (portedChains.size() > 500) {
+    portedCtw.spTest = false;
+  }
+
+  nim::NeuronStructureChainsLegacyLike ns = nim::locsegChainCompNeurostructLegacyLike(portedChains,
+                                                                                      &portedSignal,
+                                                                                      /*zScale*/ 1.0,
+                                                                                      portedCtw);
+  nim::processNeuronStructureLegacyLike(ns);
+  nim::NeuronStructureCirclesLegacyLike ns2 =
+    nim::neuronStructureLocsegChainToCircleSLegacyLike(ns, /*xyScale*/ 1.0, /*zScale*/ 1.0);
+  nim::neuronStructureToTreeLegacyLike(ns2);
+
+  std::unique_ptr<nim::ZSwc> portedReconTree = nim::neuronStructureToSwcTreeCircleZLegacyLike(ns2, /*zScale*/ 1.0);
+  ASSERT_TRUE(portedReconTree != nullptr);
+  ASSERT_FALSE(portedReconTree->empty());
+
+  // Match `ZNeuronConstructor::reconstruct`: IDs are resorted before SWC post-processing.
+  nim::resortId(*portedReconTree);
+
+  bool allStagesMatch = true;
+  auto compareStage = [&](std::string_view stageLabel, const ZSwcTree& legacyTree, const nim::ZSwc& portedTree) {
+    const fs::path legacyPath = dir / fmt::format("legacy_{}.swc", stageLabel);
+    const fs::path portedPath = dir / fmt::format("ported_{}.swc", stageLabel);
+
+    std::unique_ptr<ZSwcTree> legacyCopy(legacyTree.clone());
+    legacyCopy->save(legacyPath.string());
+
+    nim::ZSwc portedCopy = portedTree;
+    nim::writeSwcLegacyNeuTu(portedCopy, portedPath.string(), {});
+
+    const std::string legacyText = readTextFile(legacyPath);
+    const std::string portedText = readTextFile(portedPath);
+    if (legacyText != portedText) {
+      const size_t i = firstDiffIndex(legacyText, portedText);
+      const auto [line, col] = lineColFromIndex(legacyText, i);
+      const std::string legacyLine = lineAt(legacyText, i);
+      const std::string portedLine = lineAt(portedText, i);
+      ADD_FAILURE() << fmt::format("[{}] SWC mismatch at byte {} (line {}, col {}).\nLegacy: {}\nPorted: {}\n"
+                                   "Keeping outputs for inspection under: {}",
+                                   stageLabel,
+                                   i,
+                                   line,
+                                   col,
+                                   legacyLine,
+                                   portedLine,
+                                   dir.string());
+      allStagesMatch = false;
+    }
+  };
+
+  compareStage("reconstruct", *legacyReconTree, *portedReconTree);
+
+  if (allStagesMatch) {
+    Swc_Tree_Remove_Zigzag(legacyReconTree->data());
+    nim::swcTreeRemoveZigzagLegacyLike(*portedReconTree);
+    compareStage("remove_zigzag", *legacyReconTree, *portedReconTree);
+  }
+
+  if (allStagesMatch) {
+    Swc_Tree_Tune_Branch(legacyReconTree->data());
+    nim::swcTreeTuneBranchLegacyLike(*portedReconTree);
+    compareStage("tune_branch", *legacyReconTree, *portedReconTree);
+  }
+
+  if (allStagesMatch) {
+    Swc_Tree_Remove_Spur(legacyReconTree->data());
+    nim::swcTreeRemoveSpurLegacyLike(*portedReconTree);
+    compareStage("remove_spur", *legacyReconTree, *portedReconTree);
+  }
+
+  if (allStagesMatch) {
+    Swc_Tree_Merge_Close_Node(legacyReconTree->data(), 0.01);
+    nim::swcTreeMergeCloseNodeLegacyLike(*portedReconTree, 0.01);
+    compareStage("merge_close_node", *legacyReconTree, *portedReconTree);
+  }
+
+  if (allStagesMatch) {
+    Swc_Tree_Remove_Overshoot(legacyReconTree->data());
+    nim::swcTreeRemoveOvershootLegacyLike(*portedReconTree);
+    compareStage("remove_overshoot", *legacyReconTree, *portedReconTree);
+  }
+
+  if (allStagesMatch) {
+    // Match zneurontracer: doResampleAfterTracing=true for auto-trace.
+    ZSwcResampler legacyResampler;
+    legacyResampler.optimalDownsample(legacyReconTree);
+
+    nim::ZNeutubeSwcResampler portedResampler;
+    portedResampler.optimalDownsample(*portedReconTree);
+    compareStage("resample", *legacyReconTree, *portedReconTree);
+  }
+
+  if (allStagesMatch) {
+    ZSwcPruner legacyPruner;
+    legacyPruner.setMinLength(0);
+    legacyPruner.removeOrphanBlob(legacyReconTree);
+
+    nim::swcTreeRemoveOrphanBlobLegacyLike(*portedReconTree, /*minLength*/ 0.0, /*minOrphanCount*/ 10);
+    compareStage("remove_orphan_blob", *legacyReconTree, *portedReconTree);
+  }
+
+  delete legacyReconTree;
+
   Kill_Stack(legacyBaseMask);
   Kill_Geo3d_Scalar_Field(legacyNoisy.seeds);
   Kill_Stack(legacyMask);
 
-  std::error_code ec;
-  fs::remove_all(dir, ec);
+  if (allStagesMatch) {
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+  }
 }
 
 TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
@@ -3621,6 +3785,7 @@ TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
   const fs::path legacyOut = dir / "legacy_autotrace.swc";
   const fs::path v2Out = dir / "v2_autotrace.swc";
 
+  const auto legacyStart = std::chrono::steady_clock::now();
   const int legacyRc = [&]() {
     ArgvBuilder argv({
       "Atlas",
@@ -3634,7 +3799,10 @@ TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
     });
     return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
   }();
+  const auto legacyMs =
+    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - legacyStart).count();
 
+  const auto v2Start = std::chrono::steady_clock::now();
   const int v2Rc = [&]() {
     ArgvBuilder argv({
       "Atlas",
@@ -3648,6 +3816,13 @@ TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
     });
     return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
   }();
+  const auto v2Ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - v2Start).count();
+
+  LOG(INFO) << fmt::format("Slice15 auto-trace runtime: legacy={} ms, v2={} ms (ratio={:.3f}x)",
+                           legacyMs,
+                           v2Ms,
+                           legacyMs > 0 ? static_cast<double>(v2Ms) / static_cast<double>(legacyMs) : 0.0);
 
   EXPECT_EQ(legacyRc, v2Rc);
   EXPECT_EQ(legacyRc, 0);

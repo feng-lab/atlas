@@ -26,44 +26,6 @@ namespace nim {
 
 namespace {
 
-void reorderRootListByZDescendingInPlaceLegacyLike(ZSwc& tree)
-{
-  if (tree.numRoots() <= 1) {
-    return;
-  }
-
-  std::vector<ZSwc::SwcTreeNode> roots;
-  roots.reserve(tree.numRoots());
-  for (auto it = tree.beginRoot(); it != tree.endRoot(); ++it) {
-    roots.emplace_back(it);
-  }
-
-  auto* head = roots.front().node->prevSibling;
-  auto* tail = roots.back().node->nextSibling;
-
-  // Match the legacy forest write order observed in NeuTu auto-trace outputs, where disconnected components
-  // are emitted in descending z of their root node. This is an ordering-only normalization; it does not
-  // change geometry/topology inside each component, but it makes depth-first ID resorting deterministic
-  // for A/B parity.
-  std::stable_sort(roots.begin(), roots.end(), [](const ZSwc::SwcTreeNode& a, const ZSwc::SwcTreeNode& b) {
-    return a->z > b->z;
-  });
-
-  CHECK(head != nullptr);
-  CHECK(tail != nullptr);
-
-  head->nextSibling = roots.front().node;
-  roots.front().node->prevSibling = head;
-
-  for (size_t i = 1; i < roots.size(); ++i) {
-    roots[i - 1].node->nextSibling = roots[i].node;
-    roots[i].node->prevSibling = roots[i - 1].node;
-  }
-
-  roots.back().node->nextSibling = tail;
-  tail->prevSibling = roots.back().node;
-}
-
 struct AutoTraceContextLegacyLike
 {
   ZImg signal;
@@ -184,7 +146,6 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   }
 
   // `ZNeuronConstructor::reconstruct` resorts IDs before returning its ZSwcTree.
-  reorderRootListByZDescendingInPlaceLegacyLike(*tree);
   resortId(*tree);
 
   swcTreeRemoveZigzagLegacyLike(*tree);

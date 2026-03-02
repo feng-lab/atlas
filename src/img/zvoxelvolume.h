@@ -40,14 +40,19 @@ public:
   [[nodiscard]] virtual double valueAsDouble(int x, int y, int z) const = 0;
 };
 
-class ZVoxelVolumeMutable : public ZVoxelVolume
+// Minimal writeable mask interface used by tracing codepaths.
+//
+// Values are interpreted as uint8 (e.g. binary occupancy). This intentionally avoids
+// uint16 "label image" semantics; if we ever need large label maps in the future,
+// they should use a separate data structure rather than an object named "*Mask".
+class ZVoxelMaskMutable : public ZVoxelVolume
 {
 public:
-  // Sets a voxel value (uint16 semantics). Out-of-bounds writes are ignored.
-  virtual void setValueU16(int x, int y, int z, std::uint16_t value) = 0;
+  // Sets a voxel value (uint8 semantics). Out-of-bounds writes are ignored.
+  virtual void setValueU8(int x, int y, int z, std::uint8_t value) = 0;
 
   // Clears the entire volume to `value` (typically 0). Implementations may drop internal storage.
-  virtual void clearU16(std::uint16_t value) = 0;
+  virtual void clearU8(std::uint8_t value) = 0;
 };
 
 } // namespace nim

@@ -258,8 +258,8 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZVoxelVolume& signal,
     tr.tw.minScore = cfg.minManualScore;
   }
 
-  auto swcMask = std::make_unique<ZSparseVoxelMaskU8>(signal.width(), signal.height(), signal.depth());
-  swcMask->clearU16(0);
+  auto swcMask = std::make_unique<ZSparseVoxelMask>(signal.width(), signal.height(), signal.depth());
+  swcMask->clearU8(0);
   labelSwcIntoMaskLegacyLike(*outSwc, *swcMask, /*zScale*/ 1.0, /*value*/ 255);
   tr.tw.traceMaskVolume = std::move(swcMask);
 

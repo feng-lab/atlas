@@ -31,8 +31,6 @@ struct TraceWorkspace
   double traceStep = 0.5;
   double segLength = NeurosegDefaultHLegacyLike;
 
-  int chainId = 0;
-
   folly::CancellationToken cancellationToken{};
 
   // End statuses: [0]=head/backward, [1]=tail/forward (matches Trace_Locseg usage).
@@ -44,7 +42,7 @@ struct TraceWorkspace
   const ZImg* swcMask = nullptr;
 
   std::unique_ptr<ZImg> traceMask;
-  std::unique_ptr<ZVoxelVolumeMutable> traceMaskVolume;
+  std::unique_ptr<ZVoxelMaskMutable> traceMaskVolume;
   bool traceMaskUpdating = true;
 
   // Reserved/dynamic variables (legacy behavior depends on routine).
@@ -76,13 +74,12 @@ void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace& tw, const ZVoxel
 void traceWorkspaceSetTraceStatusLegacyLike(TraceWorkspace& tw, TraceStatus headStatus, TraceStatus tailStatus);
 
 // Port of `ZNeuronTracer::initTraceMask(bool clearing)`:
-// - Ensures `tw->traceMask` exists (allocates GREY16/uint16 mask on demand).
+// - Ensures `tw->traceMask` exists (allocates a uint8 binary mask on demand).
 // - Zeros the mask if `clearing` is true, or if the mask had to be allocated.
 //
 // Notes:
-// - This mask stores legacy per-chain region IDs (`chainId+1`) just like NeuTu's `Trace_Workspace::trace_mask`.
-//   Even though Atlas does not expose chain IDs as a user-facing concept, the algorithm relies on these IDs
-//   (e.g., recording `Trace_Record::hit_region`) to reproduce legacy trace/merge behavior.
+// - Atlas treats this as a binary "already traced" mask (0/1). The current migrated algorithm only queries
+//   the mask as a boolean (>0), so we do not carry the legacy per-chain region IDs.
 void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace& tw, const ZImg& stack, bool clearing);
 
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Mask_Value().

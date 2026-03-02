@@ -31,7 +31,6 @@ void defaultTraceWorkspaceLegacyLike(TraceWorkspace& tw)
   tw.minScore = 0.3; // LOCAL_NEUROSEG_MIN_CORRCOEF
   tw.traceStatus = {TraceStatus::Normal, TraceStatus::Normal};
   tw.minChainLength = NeurosegDefaultHLegacyLike * 2.5;
-  tw.chainId = 0;
 
   tw.traceRange = {-1.0, -1.0, -1.0, -1.0, -1.0, -1.0};
   tw.dyvar = {-1.0, -1.0, -1.0, -1.0, -1.0};
@@ -97,11 +96,13 @@ void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace& tw, const ZImg& stack
   }
 
   if (!tw.traceMask) {
-    // Match NeuTu's Trace_Workspace::trace_mask semantics: a GREY16 label image storing
-    // per-chain region IDs (`chainId+1`). This is required for hit-region bookkeeping
-    // and for A/B parity with the legacy tracer.
+    // Allocate an "already traced" mask for the tracing workspace.
+    //
+    // Legacy NeuTu stores per-chain region IDs in a GREY16 label image. Atlas does not
+    // support chain-ID semantics, and the migrated algorithm only queries mask voxels
+    // as a boolean (>0). Use uint8 to save memory on large datasets.
     ZImgInfo info(stack.width(), stack.height(), stack.depth(), 1, 1, 1, VoxelFormat::Unsigned);
-    info.setVoxelFormat<uint16_t>();
+    info.setVoxelFormat<uint8_t>();
     info.createDefaultDescriptions();
     tw.traceMask = std::make_unique<ZImg>(info);
     clearing = true;

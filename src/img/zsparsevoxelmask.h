@@ -6,43 +6,18 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <memory>
-#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 namespace nim {
 
-namespace detail {
-
-template<typename StorageT>
-struct SparseVoxelMaskTraits;
-
-template<>
-struct SparseVoxelMaskTraits<std::uint8_t>
-{
-  static constexpr ZVoxelValueType kValueType = ZVoxelValueType::Uint8;
-};
-
-template<>
-struct SparseVoxelMaskTraits<std::uint16_t>
-{
-  static constexpr ZVoxelValueType kValueType = ZVoxelValueType::Uint16;
-};
-
-} // namespace detail
-
-// Sparse uint8/uint16 3D mask used for tracing workspaces on large datasets.
+// Sparse uint8 3D mask used for tracing workspaces on large datasets.
 //
 // Storage is block-backed and allocated on demand. Unallocated voxels read as `m_defaultValue`.
-template<typename StorageT>
-class ZSparseVoxelMask final : public ZVoxelVolumeMutable
+class ZSparseVoxelMask final : public ZVoxelMaskMutable
 {
 public:
-  static_assert(std::is_same_v<StorageT, std::uint8_t> || std::is_same_v<StorageT, std::uint16_t>,
-                "ZSparseVoxelMask only supports uint8/uint16 storage");
-
   explicit ZSparseVoxelMask(size_t width, size_t height, size_t depth, size_t blockEdge = 64)
     : m_width(width)
     , m_height(height)
@@ -91,7 +66,7 @@ public:
 
   [[nodiscard]] ZVoxelValueType valueType() const override
   {
-    return detail::SparseVoxelMaskTraits<StorageT>::kValueType;
+    return ZVoxelValueType::Uint8;
   }
 
   [[nodiscard]] double valueAsDouble(int x, int y, int z) const override
@@ -99,14 +74,11 @@ public:
     return static_cast<double>(valueAt(x, y, z));
   }
 
-  void setValueU16(int x, int y, int z, std::uint16_t value) override
+  void setValueU8(int x, int y, int z, std::uint8_t value) override
   {
     if (!inBounds(x, y, z)) {
       return;
     }
-
-    CHECK(value <= std::numeric_limits<StorageT>::max())
-      << "ZSparseVoxelMask::setValueU16 value " << value << " does not fit mask storage type.";
 
     const BlockKey key = blockKey(x, y, z);
     auto it = m_blocks.find(key);
@@ -118,27 +90,24 @@ public:
 
     const size_t localIndex = blockLocalIndex(x, y, z);
     CHECK(localIndex < it->second->voxels.size());
-    it->second->voxels[localIndex] = static_cast<StorageT>(value);
+    it->second->voxels[localIndex] = value;
   }
 
-  void clearU16(std::uint16_t value) override
+  void clearU8(std::uint8_t value) override
   {
-    CHECK(value <= std::numeric_limits<StorageT>::max())
-      << "ZSparseVoxelMask::clearU16 value " << value << " does not fit mask storage type.";
-
-    m_defaultValue = static_cast<StorageT>(value);
+    m_defaultValue = value;
     m_blocks.clear();
   }
 
-  [[nodiscard]] std::uint16_t valueU16(int x, int y, int z) const
+  [[nodiscard]] std::uint8_t valueU8(int x, int y, int z) const
   {
-    return static_cast<std::uint16_t>(valueAt(x, y, z));
+    return valueAt(x, y, z);
   }
 
 private:
   struct Block
   {
-    std::vector<StorageT> voxels;
+    std::vector<std::uint8_t> voxels;
   };
 
   struct BlockKey
@@ -193,10 +162,10 @@ private:
     return lx + ly * m_blockEdge + lz * m_blockArea;
   }
 
-  [[nodiscard]] StorageT valueAt(int x, int y, int z) const
+  [[nodiscard]] std::uint8_t valueAt(int x, int y, int z) const
   {
     if (!inBounds(x, y, z)) {
-      return static_cast<StorageT>(0);
+      return static_cast<std::uint8_t>(0);
     }
 
     const BlockKey key = blockKey(x, y, z);
@@ -218,11 +187,9 @@ private:
   size_t m_blockArea = 0;
   size_t m_blockVolume = 0;
 
-  StorageT m_defaultValue = 0;
+  std::uint8_t m_defaultValue = 0;
 
   std::unordered_map<BlockKey, std::unique_ptr<Block>, BlockKeyHash> m_blocks;
 };
-
-using ZSparseVoxelMaskU8 = ZSparseVoxelMask<std::uint8_t>;
 
 } // namespace nim

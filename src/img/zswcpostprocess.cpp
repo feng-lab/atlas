@@ -349,7 +349,7 @@ void tuneBranchNodeLegacyLike(ZSwc& tree, Iter tn)
     return;
   }
 
-  const auto parent = ZSwc::parent(tn);
+  auto parent = ZSwc::parent(tn);
   if (isBranchPointLegacyLike(parent, tree)) {
     if (tn->weight > 0.0) {
       double minDist = -1.0;
@@ -384,6 +384,7 @@ void tuneBranchNodeLegacyLike(ZSwc& tree, Iter tn)
 
       if (newTn != parent) {
         setParentLegacyLike(tree, tn, newTn);
+        parent = ZSwc::parent(tn);
       }
     }
   }
@@ -701,6 +702,36 @@ void swcTreeRemoveOrphanBlobLegacyLike(ZSwc& tree, double minLength, int minOrph
     if (std::find(keep.begin(), keep.end(), root) == keep.end()) {
       tree.eraseSubtree(root);
     }
+  }
+
+  // Match legacy ZSwcPruner::removeOrphanBlob():
+  // it rebuilds the forest via `tree->merge(subtree)`, and `addRoot()` inserts at
+  // the front of the root list, effectively reversing root order.
+  if (tree.numRoots() > 1) {
+    std::vector<ZSwc::SwcTreeNode> newRoots;
+    newRoots.reserve(tree.numRoots());
+    for (auto it = tree.beginRoot(); it != tree.endRoot(); ++it) {
+      newRoots.emplace_back(it);
+    }
+
+    auto* head = newRoots.front().node->prevSibling;
+    auto* tail = newRoots.back().node->nextSibling;
+
+    std::reverse(newRoots.begin(), newRoots.end());
+
+    CHECK(head != nullptr);
+    CHECK(tail != nullptr);
+
+    head->nextSibling = newRoots.front().node;
+    newRoots.front().node->prevSibling = head;
+
+    for (size_t i = 1; i < newRoots.size(); ++i) {
+      newRoots[i - 1].node->nextSibling = newRoots[i].node;
+      newRoots[i].node->prevSibling = newRoots[i - 1].node;
+    }
+
+    newRoots.back().node->nextSibling = tail;
+    tail->prevSibling = newRoots.back().node;
   }
 }
 

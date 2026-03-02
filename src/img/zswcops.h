@@ -43,6 +43,21 @@ void connectNode(ZSwc& tree, ZSwc::SwcTreeNode node);
 // Returns the number of regular nodes assigned.
 int resortId(ZSwc& tree);
 
+// Port of `Swc_Tree_Node_Set_Root(tn)`.
+//
+// Notes:
+// - Matches NeuTu's definition of "root": a node with no *regular* parent above it.
+//   (Virtual ancestors are allowed.)
+// - Preserves legacy weight-shifting semantics while reversing parent links.
+void swcTreeNodeSetRootLegacyLike(ZSwc& tree, ZSwc::SwcTreeNode node);
+
+// Port of `Swc_Tree_Regularize(tree)` as used by the neuTube reconstruction path.
+//
+// Removes all virtual nodes (id < 0) by merging them into their parent. In Atlas' ZSwc
+// representation there is no explicit virtual root node; so virtual roots are removed
+// by promoting their children to roots.
+void swcTreeRegularizeLegacyLike(ZSwc& tree);
+
 // Port of `Swc_Tree_Subtract(tree1, tree2)`:
 // Removes any node in `tree1` whose position hits `tree2` (node sphere OR segment volume),
 // and detaches the cut node's descendants as new roots (matching `Swc_Tree_Cut_Node` behavior).

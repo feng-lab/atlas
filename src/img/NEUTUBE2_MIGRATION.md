@@ -293,7 +293,7 @@ Phase 2F: large-image readiness (Atlas advantage, but staged)
     - Provide:
       - `nim::ZDenseVoxelVolume` (wraps a single-channel/time `ZImg` view)
       - `nim::ZImgPackVoxelVolume` (wraps a disk-cached `ZImgPack` with a 1-tile read cache)
-      - `nim::ZSparseVoxelMaskU8` (sparse occupancy mask used when attaching to an existing host SWC)
+      - `nim::ZSparseVoxelMask` (sparse occupancy mask used when attaching to an existing host SWC)
     - Update seeded trace + SWC smart-extend to operate on `ZVoxelVolume` so they can run on disk-cached volumes without
       materializing `wholeImg()`.
 30. Auto Trace still requires a dense volume today:

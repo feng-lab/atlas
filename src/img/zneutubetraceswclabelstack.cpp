@@ -68,11 +68,11 @@ void scaleXRotateZLegacyLike(std::array<double, 3>* p, double s, double alpha, i
   return false;
 }
 
-void writeMaskVoxel(ZVoxelVolumeMutable& mask, int x, int y, int z, int value)
+void writeMaskVoxel(ZVoxelMaskMutable& mask, int x, int y, int z, int value)
 {
   CHECK(value >= 0);
-  CHECK(value <= static_cast<int>(std::numeric_limits<std::uint16_t>::max()));
-  mask.setValueU16(x, y, z, static_cast<std::uint16_t>(value));
+  CHECK(value <= static_cast<int>(std::numeric_limits<std::uint8_t>::max()));
+  mask.setValueU8(x, y, z, static_cast<std::uint8_t>(value));
 }
 
 } // namespace
@@ -214,7 +214,7 @@ void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZImg& mask, doub
   }
 }
 
-void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZVoxelVolumeMutable& mask, double zScale, int value)
+void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZVoxelMaskMutable& mask, double zScale, int value)
 {
   // Port of tz_local_neuroseg.c::Local_Neuroseg_Label_C().
   if (mask.isEmpty()) {
@@ -332,7 +332,7 @@ void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center, double r
 
 void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center,
                                    double radius,
-                                   ZVoxelVolumeMutable& mask,
+                                   ZVoxelMaskMutable& mask,
                                    int value)
 {
   // Port of tz_geo3d_ball.c::Geo3d_Ball_Label_Stack().
@@ -389,7 +389,7 @@ void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZImg& mask, double zScale, int 
   }
 }
 
-void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZVoxelVolumeMutable& mask, double zScale, int value)
+void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZVoxelMaskMutable& mask, double zScale, int value)
 {
   for (auto it = swc.cbeginBreadthFirst(); it != swc.cendBreadthFirst(); ++it) {
     if (ZSwc::isNull(it)) {

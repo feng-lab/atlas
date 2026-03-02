@@ -9,6 +9,33 @@ namespace nim {
 
 namespace {
 
+[[nodiscard]] bool isRegularNodeLegacyLike(const ZSwc::SwcTreeNode& node)
+{
+  return !ZSwc::isNull(node) && node->id >= 0;
+}
+
+[[nodiscard]] bool isRootNodeLegacyLike(const ZSwc::SwcTreeNode& node)
+{
+  // Port of tz_swc_tree.c::Swc_Tree_Node_Is_Root().
+  if (ZSwc::isNull(node)) {
+    return false;
+  }
+
+  auto cursor = node;
+  while (true) {
+    const auto parent = ZSwc::parent(cursor);
+    if (ZSwc::isNull(parent)) {
+      break;
+    }
+    if (isRegularNodeLegacyLike(parent)) {
+      return false;
+    }
+    cursor = parent;
+  }
+
+  return true;
+}
+
 void cutNodeLikeLegacySubtract(ZSwc& swc, ZSwc::SwcTreeNode node)
 {
   CHECK(!ZSwc::isNull(node));
@@ -242,6 +269,52 @@ int resortId(ZSwc& tree)
   }
 
   return id - 1;
+}
+
+void swcTreeNodeSetRootLegacyLike(ZSwc& tree, ZSwc::SwcTreeNode node)
+{
+  // Port of tz_swc_tree.c::Swc_Tree_Node_Set_Root().
+  if (ZSwc::isNull(node) || isRootNodeLegacyLike(node)) {
+    return;
+  }
+
+  // buffer1 = tn, buffer2 = tn->parent, detach buffer1.
+  auto buffer1 = node;
+  auto buffer2 = ZSwc::parent(buffer1);
+  ZSwc::SwcTreeNode buffer3;
+
+  tree.appendRoot(buffer1);
+
+  double weight0 = buffer1->weight;
+  while (isRegularNodeLegacyLike(buffer1)) {
+    if (isRegularNodeLegacyLike(buffer2)) {
+      const double weight1 = buffer2->weight;
+      buffer3 = ZSwc::parent(buffer2);
+      buffer2->weight = weight0;
+      weight0 = weight1;
+      tree.appendChild(buffer1, buffer2);
+    }
+
+    buffer1 = buffer2;
+    buffer2 = buffer3;
+  }
+
+  if (!ZSwc::isNull(buffer1)) {
+    tree.appendChild(buffer1, node);
+  }
+}
+
+void swcTreeRegularizeLegacyLike(ZSwc& tree)
+{
+  // Port of tz_swc_tree.c::Swc_Tree_Regularize(), adapted to ZSwc's forest representation.
+  for (auto it = tree.begin(); it != tree.end();) {
+    auto current = it;
+    ++it;
+
+    if (current->id < 0) {
+      tree.erase(current);
+    }
+  }
 }
 
 void subtractSwcTrees(ZSwc& tree1, const ZSwc& tree2)

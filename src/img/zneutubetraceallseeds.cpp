@@ -137,10 +137,9 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
       labelWs.sratio = 1.5;
       labelWs.sdiff = 0.0;
       labelWs.option = 1;
-      // Match legacy semantics: traceMask is a GREY16 label image where each traced chain occupies a unique
-      // region ID (chainId+1). The tracing algorithm records this ID as `hit_region` and uses it to
-      // reproduce legacy merge/connect behavior.
-      labelWs.value = tw.chainId + 1;
+      // Atlas uses a binary "already traced" mask (0/1). The migrated algorithm only checks mask voxels as
+      // a boolean (>0), so a constant value is sufficient and avoids uint8 overflow edge cases.
+      labelWs.value = 1;
       labelWs.flag = 0;
       locsegChainLabelWLegacyLike(*chain,
                                   *tw.traceMask,
@@ -150,7 +149,6 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
                                   labelWs);
     }
 
-    ++tw.chainId;
     chains.push_back(std::move(chain));
   }
 
