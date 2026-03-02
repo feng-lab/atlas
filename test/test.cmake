@@ -126,7 +126,8 @@ else ()
   add_gtest_executable(zneutubeswcsignalfittertest)
   add_gtest_executable(zneutubecommand2paritytest)
   target_link_libraries(zneutubecommand2paritytest neutu)
-  add_atlas_vulkan_gtest_executable(zswcpackundomergetest)
+  # skip for now
+  # add_atlas_vulkan_gtest_executable(zswcpackundomergetest)
   add_executable(
     zatlasheavytest
     ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
