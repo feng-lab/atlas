@@ -316,7 +316,7 @@ struct ShardedShardIndexEntry
 
 QString shardHexString(uint64_t shard, int digits)
 {
-  QString s = QString::number(static_cast<qulonglong>(shard), 16);
+  QString s = QString::number(shard, 16);
   if (digits > 0) {
     s = s.rightJustified(digits, QChar('0'));
   }

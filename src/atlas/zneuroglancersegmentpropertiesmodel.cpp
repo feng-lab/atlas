@@ -114,7 +114,7 @@ QVariant ZNeuroglancerSegmentPropertiesModel::data(const QModelIndex& index, int
   if (role == Qt::DisplayRole || role == Qt::ToolTipRole) {
     const ColumnSpec& c = m_columns.at(static_cast<size_t>(col));
     if (c.kind == ColumnSpec::Kind::Id) {
-      return QString::number(static_cast<qulonglong>(id));
+      return QString::number(id);
     }
     CHECK(c.prop);
 

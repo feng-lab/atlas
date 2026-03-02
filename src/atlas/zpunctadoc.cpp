@@ -38,9 +38,9 @@ namespace {
       } else if constexpr (std::is_same_v<T, float>) {
         return QString::number(static_cast<double>(value), 'g', 8);
       } else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>) {
-        return QString::number(static_cast<qlonglong>(value));
+        return QString::number(static_cast<long long>(value));
       } else if constexpr (std::is_integral_v<T> && !std::is_signed_v<T>) {
-        return QString::number(static_cast<qulonglong>(value));
+        return QString::number(static_cast<unsigned long long>(value));
       } else {
         static_assert(std::is_same_v<T, void>, "Unhandled annotation property value type");
         return {};
@@ -260,12 +260,11 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
         }
         const QString objStr = json::value_to<QString>(objIt->value()).trimmed();
         bool ok = false;
-        const qulonglong objIdQt = objStr.toULongLong(&ok, 10);
+        const uint64_t objectId = objStr.toULongLong(&ok, 10);
         if (!ok) {
           errorMsg = QString("Invalid neuroglancer annotations JSON: object_id must be base-10 uint64");
           return 0;
         }
-        const uint64_t objectId = static_cast<uint64_t>(objIdQt);
 
         // Normalize persisted JSON to keep it stable across save/load cycles.
         json::object normalized;
@@ -273,7 +272,7 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
         normalized["segmentation_root_url"] = json::value_from(normalizedSegRootUrl);
         normalized["annotation_root_url"] = json::value_from(normalizedAnnRootUrl);
         normalized["relationship_id"] = json::value_from(relationshipId);
-        normalized["object_id"] = json::value_from(QString::number(static_cast<qulonglong>(objectId)));
+        normalized["object_id"] = json::value_from(QString::number(objectId));
         const json::value sourceJson = normalized;
 
         if (const auto existing = findPunctaByExternalSource(sourceJson)) {
@@ -299,9 +298,8 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
 
         const auto anns = source->loadAnnotationsForRelatedObjectBlocking(relationshipId, objectId);
         if (anns.empty()) {
-          errorMsg = QString("No annotations found for object %1 (relationship '%2')")
-                       .arg(static_cast<qulonglong>(objectId))
-                       .arg(relationshipId);
+          errorMsg =
+            QString("No annotations found for object %1 (relationship '%2')").arg(objectId).arg(relationshipId);
           return 0;
         }
 
@@ -344,21 +342,20 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
         }
         if (pts.empty()) {
           errorMsg = QString("No POINT/ELLIPSOID annotations decoded for object %1 (relationship '%2')")
-                       .arg(static_cast<qulonglong>(objectId))
+                       .arg(objectId)
                        .arg(relationshipId);
           return 0;
         }
 
-        const QString displayName =
-          QString("NG Annotations %1 (%2)").arg(static_cast<qulonglong>(objectId)).arg(relationshipId);
+        const QString displayName = QString("NG Annotations %1 (%2)").arg(objectId).arg(relationshipId);
         const QString tooltip =
           QString(
             "Neuroglancer precomputed annotations\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nCount: %5")
             .arg(normalizedSegRootUrl)
             .arg(normalizedAnnRootUrl)
             .arg(relationshipId)
-            .arg(static_cast<qulonglong>(objectId))
-            .arg(static_cast<qulonglong>(pts.size()));
+            .arg(objectId)
+            .arg(pts.size());
 
         ZPuncta puncta;
         puncta.data = std::move(pts);
@@ -497,7 +494,7 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
                                 .arg(qMax.x, 0, 'g', 8)
                                 .arg(qMax.y, 0, 'g', 8)
                                 .arg(qMax.z, 0, 'g', 8)
-                                .arg(static_cast<qulonglong>(pts.size()));
+                                .arg(pts.size());
 
       ZPuncta puncta;
       puncta.data = std::move(pts);

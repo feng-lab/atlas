@@ -203,7 +203,7 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
       }
       const QString segStr = json::value_to<QString>(segIt->value()).trimmed();
       bool ok = false;
-      const qulonglong segId = segStr.toULongLong(&ok, 10);
+      const uint64_t segId = segStr.toULongLong(&ok, 10);
       if (!ok) {
         errorMsg = QString("Invalid neuroglancer mesh JSON: segment_id must be base-10 uint64");
         return 0;
@@ -278,7 +278,7 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
       }
 
       CHECK(source);
-      std::shared_ptr<ZMesh> mesh = source->loadMeshBlocking(static_cast<uint64_t>(segId), lodPolicy);
+      std::shared_ptr<ZMesh> mesh = source->loadMeshBlocking(segId, lodPolicy);
       if (!mesh || mesh->empty()) {
         errorMsg = QString("Loaded neuroglancer mesh is empty");
         return 0;

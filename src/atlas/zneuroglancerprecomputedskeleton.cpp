@@ -253,7 +253,7 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpRangeBytesAsync(co
 
 QString shardHexString(uint64_t shard, int digits)
 {
-  QString s = QString::number(static_cast<qulonglong>(shard), 16);
+  QString s = QString::number(shard, 16);
   if (digits > 0) {
     s = s.rightJustified(digits, QChar('0'));
   }
@@ -620,7 +620,7 @@ std::shared_ptr<ZSkeleton> ZNeuroglancerPrecomputedSkeletonSource::loadSkeletonB
   std::optional<std::vector<uint8_t>> bytesOpt;
 
   if (!m_sharding) {
-    const QUrl url = m_skeletonDirUrl.resolved(QUrl(QString::number(static_cast<qulonglong>(segmentId))));
+    const QUrl url = m_skeletonDirUrl.resolved(QUrl(QString::number(segmentId)));
     const std::string urlStr = toStdString(url.toString());
     auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(urlStr, m_timeout));
     if (!resOpt) {

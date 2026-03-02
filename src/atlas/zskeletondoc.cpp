@@ -22,11 +22,11 @@ namespace {
     return std::nullopt;
   }
   bool ok = false;
-  const qulonglong v = trimmed.toULongLong(&ok, 10);
+  const uint64_t v = trimmed.toULongLong(&ok, 10);
   if (!ok) {
     return std::nullopt;
   }
-  return static_cast<uint64_t>(v);
+  return v;
 }
 
 [[nodiscard]] std::optional<double> jsonNumberAsDouble(const json::value& v)
@@ -248,9 +248,8 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
 
         const auto anns = source->loadAnnotationsForRelatedObjectBlocking(relationshipId, objectId);
         if (anns.empty()) {
-          errorMsg = QString("No annotations found for object %1 (relationship '%2')")
-                       .arg(static_cast<qulonglong>(objectId))
-                       .arg(relationshipId);
+          errorMsg =
+            QString("No annotations found for object %1 (relationship '%2')").arg(objectId).arg(relationshipId);
           return 0;
         }
 
@@ -271,7 +270,7 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
         }
         if (vertices.empty() || edges.empty()) {
           errorMsg = QString("No LINE/POLYLINE segments decoded for object %1 (relationship '%2')")
-                       .arg(static_cast<qulonglong>(objectId))
+                       .arg(objectId)
                        .arg(relationshipId);
           return 0;
         }
@@ -285,17 +284,17 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
         normalized["segmentation_root_url"] = json::value_from(normalizedSegRootUrl);
         normalized["annotation_root_url"] = json::value_from(normalizedAnnRootUrl);
         normalized["relationship_id"] = json::value_from(relationshipId);
-        normalized["object_id"] = json::value_from(QString::number(static_cast<qulonglong>(objectId)));
+        normalized["object_id"] = json::value_from(QString::number(objectId));
 
-        const QString displayName =
-          QString("NG Annotations %1 (%2)").arg(static_cast<qulonglong>(objectId)).arg(relationshipId);
+        const QString displayName = QString("NG Annotations %1 (%2)").arg(objectId).arg(relationshipId);
         const QString tooltip =
-          QString("Neuroglancer precomputed annotations (lines)\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nSegments: %5")
+          QString(
+            "Neuroglancer precomputed annotations (lines)\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nSegments: %5")
             .arg(normalizedSegRootUrl)
             .arg(normalizedAnnRootUrl)
             .arg(relationshipId)
-            .arg(static_cast<qulonglong>(objectId))
-            .arg(static_cast<qulonglong>(numSegments));
+            .arg(objectId)
+            .arg(numSegments);
 
         return addSkeletonFromExternalSource(*skel, displayName, tooltip, normalized);
       }
@@ -448,7 +447,7 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
                                   .arg(qMax.x, 0, 'g', 8)
                                   .arg(qMax.y, 0, 'g', 8)
                                   .arg(qMax.z, 0, 'g', 8)
-                                  .arg(static_cast<qulonglong>(numSegments));
+                                  .arg(numSegments);
 
         return addSkeletonFromExternalSource(*skel, displayName, tooltip, normalized);
       }
@@ -564,12 +563,11 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
         }
       }
 
-      const QString displayName = label.isEmpty() ? QString("NG Skeleton %1").arg(static_cast<qulonglong>(segId))
-                                                  : QString("NG Skeleton %1 (%2)").arg(static_cast<qulonglong>(segId)).arg(label);
+      const QString displayName =
+        label.isEmpty() ? QString("NG Skeleton %1").arg(segId) : QString("NG Skeleton %1 (%2)").arg(segId).arg(label);
 
-      QString tooltip = QString("Neuroglancer precomputed skeleton\nSegmentation: %1\nSegment: %2")
-                          .arg(normalizedRootUrl)
-                          .arg(static_cast<qulonglong>(segId));
+      QString tooltip =
+        QString("Neuroglancer precomputed skeleton\nSegmentation: %1\nSegment: %2").arg(normalizedRootUrl).arg(segId);
       if (!label.isEmpty()) {
         tooltip += QString("\nLabel: %1").arg(label);
       }
@@ -581,7 +579,7 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
       json::object normalized;
       normalized["type"] = "neuroglancer_precomputed_skeleton";
       normalized["segmentation_root_url"] = json::value_from(normalizedRootUrl);
-      normalized["segment_id"] = json::value_from(QString::number(static_cast<qulonglong>(segId)));
+      normalized["segment_id"] = json::value_from(QString::number(segId));
       if (!skeletonSourceDirUrlForJson.isEmpty()) {
         normalized["skeleton_source_url"] = json::value_from(skeletonSourceDirUrlForJson);
       }

@@ -435,7 +435,7 @@ void ZSwcPack::extendSelectedNodeSmartLegacyLike(const glm::dvec3& center, doubl
 
   ZImgDoc& imgDoc = doc.imgDoc();
   if (!imgDoc.hasObjWithID(*imgIdOpt)) {
-    LOG(WARNING) << "SWC smart-extend: source image id " << static_cast<qulonglong>(*imgIdOpt) << " is not loaded.";
+    LOG(WARNING) << "SWC smart-extend: source image id " << *imgIdOpt << " is not loaded.";
     return;
   }
 

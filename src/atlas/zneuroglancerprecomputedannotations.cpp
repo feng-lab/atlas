@@ -387,7 +387,7 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpRangeBytesAsync(co
 
 QString shardHexString(uint64_t shard, int digits)
 {
-  QString s = QString::number(static_cast<qulonglong>(shard), 16);
+  QString s = QString::number(shard, 16);
   if (digits > 0) {
     s = s.rightJustified(digits, QChar('0'));
   }
@@ -734,7 +734,7 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryBl
 {
   std::optional<std::vector<uint8_t>> bytesOpt;
   if (!shardingOpt) {
-    const QUrl url = dirUrl.resolved(QUrl(QString::number(static_cast<qulonglong>(key))));
+    const QUrl url = dirUrl.resolved(QUrl(QString::number(key)));
     const std::string urlStr = toStdString(url.toString());
     auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(urlStr, m_timeout));
     if (!resOpt) {
@@ -837,10 +837,7 @@ std::optional<std::vector<uint8_t>> ZNeuroglancerPrecomputedAnnotationsSource::l
   const std::array<uint64_t, 3>& cell) const
 {
   if (!level.sharding) {
-    const QString filename = QString("%1_%2_%3")
-                               .arg(static_cast<qulonglong>(cell[0]))
-                               .arg(static_cast<qulonglong>(cell[1]))
-                               .arg(static_cast<qulonglong>(cell[2]));
+    const QString filename = QString("%1_%2_%3").arg(cell[0]).arg(cell[1]).arg(cell[2]);
     const QUrl url = level.indexDirUrl.resolved(QUrl(filename));
     const std::string urlStr = toStdString(url.toString());
     auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(urlStr, m_timeout));

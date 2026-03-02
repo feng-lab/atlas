@@ -229,8 +229,8 @@ void ZNeuroglancerSegmentPropertiesDialog::updateCounts()
     m_countLabel->setText(QString());
     return;
   }
-  const qulonglong total = static_cast<qulonglong>(m_props->numIds());
-  const qulonglong shown = m_proxy ? static_cast<qulonglong>(m_proxy->rowCount()) : total;
+  const size_t total = m_props->numIds();
+  const size_t shown = m_proxy ? static_cast<size_t>(m_proxy->rowCount()) : total;
   m_countLabel->setText(QString("Segments: %1 (matched: %2)").arg(total).arg(shown));
 }
 
@@ -252,7 +252,7 @@ void ZNeuroglancerSegmentPropertiesDialog::copySelectedIdsToClipboard()
     if (!idOpt) {
       continue;
     }
-    lines << QString::number(static_cast<qulonglong>(*idOpt));
+    lines << QString::number(*idOpt);
   }
   QApplication::clipboard()->setText(lines.join('\n'));
 }

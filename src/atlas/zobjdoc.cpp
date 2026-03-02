@@ -277,14 +277,14 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
       if (auto it = jo.find("filenames"); it != jo.end()) {
         summary = firstStringFromArray(it->value());
         if (!summary.isEmpty() && it->value().is_array() && it->value().as_array().size() > 1) {
-          summary = QString("%1 (x%2)").arg(summary).arg(static_cast<qulonglong>(it->value().as_array().size()));
+          summary = QString("%1 (x%2)").arg(summary).arg(it->value().as_array().size());
         }
       }
       if (summary.isEmpty()) {
         if (auto it = jo.find("Path"); it != jo.end()) { // legacy key for persisted image sources
           summary = firstStringFromArray(it->value());
           if (!summary.isEmpty() && it->value().is_array() && it->value().as_array().size() > 1) {
-            summary = QString("%1 (x%2)").arg(summary).arg(static_cast<qulonglong>(it->value().as_array().size()));
+            summary = QString("%1 (x%2)").arg(summary).arg(it->value().as_array().size());
           }
         }
       }

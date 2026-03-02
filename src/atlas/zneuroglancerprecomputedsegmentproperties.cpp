@@ -103,11 +103,11 @@ uint64_t parseUint64Base10(QString s)
     throw ZException("Invalid segment_properties id: empty string");
   }
   bool ok = false;
-  const qulonglong v = s.toULongLong(&ok, 10);
+  const uint64_t v = s.toULongLong(&ok, 10);
   if (!ok) {
     throw ZException(fmt::format("Invalid segment_properties id '{}': expected base-10 uint64 string", toStdString(s)));
   }
-  return static_cast<uint64_t>(v);
+  return v;
 }
 
 std::vector<QString> requireStringArray(const json::object& obj, const char* key)

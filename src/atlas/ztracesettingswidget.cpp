@@ -74,11 +74,11 @@ void disableFirstComboRow(QComboBox* combo)
   const ZImgInfo info = imgDoc.imgPackShared(imgObjId)->imgInfo();
   return QStringLiteral("%1\n%2×%3×%4, c=%5, t=%6, %7")
     .arg(doc.objNameWithModifiedMarkerAndID(imgObjId))
-    .arg(static_cast<qulonglong>(info.width))
-    .arg(static_cast<qulonglong>(info.height))
-    .arg(static_cast<qulonglong>(info.depth))
-    .arg(static_cast<qulonglong>(info.numChannels))
-    .arg(static_cast<qulonglong>(info.numTimes))
+    .arg(info.width)
+    .arg(info.height)
+    .arg(info.depth)
+    .arg(info.numChannels)
+    .arg(info.numTimes)
     .arg(info.typeAsQString());
 }
 
@@ -436,7 +436,7 @@ void ZTraceSettingsWidget::rebuildSourceImageCombo()
   const ZImgDoc& imgDoc = m_doc.imgDoc();
   const std::vector<size_t> imgIds = imgDoc.objs();
   for (size_t id : imgIds) {
-    m_sourceImageCombo->addItem(imageLabel(m_doc, id), QVariant::fromValue(static_cast<qulonglong>(id)));
+    m_sourceImageCombo->addItem(imageLabel(m_doc, id), QVariant::fromValue(id));
     m_sourceImageCombo->setItemData(m_sourceImageCombo->count() - 1, imageToolTip(m_doc, id), Qt::ToolTipRole);
   }
 
@@ -456,8 +456,7 @@ void ZTraceSettingsWidget::rebuildTargetSwcCombo()
   ZSwcDoc& swcDoc = m_doc.swcDoc();
   const std::vector<size_t> swcIds = swcDoc.objs();
   for (size_t id : swcIds) {
-    m_existingSwcCombo->addItem(swcDoc.objNameWithModifiedMarkerAndID(id),
-                                QVariant::fromValue(static_cast<qulonglong>(id)));
+    m_existingSwcCombo->addItem(swcDoc.objNameWithModifiedMarkerAndID(id), QVariant::fromValue(id));
   }
   disableFirstComboRow(m_existingSwcCombo);
 
@@ -519,9 +518,9 @@ void ZTraceSettingsWidget::updateChannelComboForCurrentSource()
 
   const ZImgInfo info = imgDoc.imgPackShared(*imgId)->imgInfo();
   for (size_t sc = 0; sc < info.numChannels; ++sc) {
-    const QString label = (sc < info.channelNames.size()) ? info.displayChannelName(sc)
-                                                          : QStringLiteral("Ch%1").arg(static_cast<qulonglong>(sc + 1));
-    m_channelCombo->addItem(label, QVariant::fromValue(static_cast<qulonglong>(sc)));
+    const QString label =
+      (sc < info.channelNames.size()) ? info.displayChannelName(sc) : QStringLiteral("Ch%1").arg(sc + 1);
+    m_channelCombo->addItem(label, QVariant::fromValue(sc));
 
     if (sc < info.channelColors.size()) {
       const col4 col = info.channelColors[sc];
@@ -649,7 +648,7 @@ void ZTraceSettingsWidget::updateMappingLabel()
   if (m_doc.imgDoc().hasObjWithID(imgId)) {
     sourceName = m_doc.objNameWithModifiedMarkerAndID(imgId);
   } else {
-    sourceName = tr("Image #%1 (missing)").arg(static_cast<qulonglong>(imgId));
+    sourceName = tr("Image #%1 (missing)").arg(imgId);
   }
 
   const size_t sc = settings.sourceChannel();
@@ -665,7 +664,7 @@ void ZTraceSettingsWidget::updateMappingLabel()
       const size_t swcId = *swcIdOpt;
       ZSwcDoc& swcDoc = m_doc.swcDoc();
       if (!swcDoc.hasObjWithID(swcId)) {
-        targetText = tr("SWC #%1 (missing)").arg(static_cast<qulonglong>(swcId));
+        targetText = tr("SWC #%1 (missing)").arg(swcId);
       } else {
         targetText = swcDoc.objNameWithModifiedMarkerAndID(swcId);
       }
@@ -675,7 +674,7 @@ void ZTraceSettingsWidget::updateMappingLabel()
   QStringList lines;
   lines << tr("Status: %1").arg(settings.traceInProgress() ? tr("Tracing...") : tr("Idle"));
   lines << tr("Source: %1").arg(sourceName);
-  lines << tr("Channel: %1").arg(static_cast<qulonglong>(sc));
+  lines << tr("Channel: %1").arg(sc);
   lines << tr("Target SWC: %1").arg(targetText);
   if (settings.swcTargetMode() == ZTraceSettings::SwcTargetMode::NewSwc) {
     lines << tr("Note: after the first successful trace, Atlas auto-selects the created SWC here.");

@@ -89,12 +89,12 @@ struct NeuroglancerSkeletonSourceKey
 
 [[nodiscard]] QString neuroglancerMeshKeyString(const QString& rootUrl, const QString& meshSourceDirUrl, uint64_t segmentId)
 {
-  return QString("%1|%2|%3").arg(rootUrl).arg(meshSourceDirUrl).arg(static_cast<qulonglong>(segmentId));
+  return QString("%1|%2|%3").arg(rootUrl).arg(meshSourceDirUrl).arg(segmentId);
 }
 
 [[nodiscard]] QString neuroglancerSkeletonKeyString(const QString& rootUrl, const QString& skeletonSourceDirUrl, uint64_t segmentId)
 {
-  return QString("%1|%2|%3").arg(rootUrl).arg(skeletonSourceDirUrl).arg(static_cast<qulonglong>(segmentId));
+  return QString("%1|%2|%3").arg(rootUrl).arg(skeletonSourceDirUrl).arg(segmentId);
 }
 
 [[nodiscard]] std::optional<uint64_t> parseUint64Base10(const QString& s)
@@ -104,11 +104,11 @@ struct NeuroglancerSkeletonSourceKey
     return std::nullopt;
   }
   bool ok = false;
-  const qulonglong v = trimmed.toULongLong(&ok, 10);
+  const uint64_t v = trimmed.toULongLong(&ok, 10);
   if (!ok) {
     return std::nullopt;
   }
-  return static_cast<uint64_t>(v);
+  return v;
 }
 
 [[nodiscard]] QString formatAnnotationPropertyValue(
@@ -128,9 +128,9 @@ struct NeuroglancerSkeletonSourceKey
       } else if constexpr (std::is_same_v<T, float>) {
         return QString::number(static_cast<double>(value), 'g', 8);
       } else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>) {
-        return QString::number(static_cast<qlonglong>(value));
+        return QString::number(static_cast<long long>(value));
       } else if constexpr (std::is_integral_v<T> && !std::is_signed_v<T>) {
-        return QString::number(static_cast<qulonglong>(value));
+        return QString::number(static_cast<unsigned long long>(value));
       } else {
         static_assert(std::is_same_v<T, void>, "Unhandled annotation property value type");
         return {};
@@ -370,23 +370,22 @@ void ZImgView::cancelNeuroglancerAnnotationsSpatialLoad(bool markCancelledToolti
     const uint64_t count = static_cast<uint64_t>(m_doc.doc().punctaDoc().punctaPack(id).puncta().data.size());
     const auto& qMin = m_ngAnnotationsSpatialQMin;
     const auto& qMax = m_ngAnnotationsSpatialQMax;
-    const QString tooltip = QString(
-                              "Neuroglancer precomputed annotations (spatial)\n"
-                              "Segmentation: %1\n"
-                              "Annotations: %2\n"
-                              "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
-                              "Status: %9\n"
-                              "Count: %10")
-                            .arg(m_ngAnnotationsSpatialSegRootUrl)
-                            .arg(m_ngAnnotationsSpatialAnnRootUrl)
-                            .arg(qMin[0], 0, 'g', 8)
-                            .arg(qMin[1], 0, 'g', 8)
-                            .arg(qMin[2], 0, 'g', 8)
-                            .arg(qMax[0], 0, 'g', 8)
-                            .arg(qMax[1], 0, 'g', 8)
-                            .arg(qMax[2], 0, 'g', 8)
-                            .arg(status)
-                            .arg(static_cast<qulonglong>(count));
+    const QString tooltip = QString("Neuroglancer precomputed annotations (spatial)\n"
+                                    "Segmentation: %1\n"
+                                    "Annotations: %2\n"
+                                    "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                    "Status: %9\n"
+                                    "Count: %10")
+                              .arg(m_ngAnnotationsSpatialSegRootUrl)
+                              .arg(m_ngAnnotationsSpatialAnnRootUrl)
+                              .arg(qMin[0], 0, 'g', 8)
+                              .arg(qMin[1], 0, 'g', 8)
+                              .arg(qMin[2], 0, 'g', 8)
+                              .arg(qMax[0], 0, 'g', 8)
+                              .arg(qMax[1], 0, 'g', 8)
+                              .arg(qMax[2], 0, 'g', 8)
+                              .arg(status)
+                              .arg(count);
     m_doc.doc().punctaDoc().updateExternalPunctaMetadata(id, m_ngAnnotationsSpatialDisplayName, tooltip);
   }
 
@@ -395,23 +394,22 @@ void ZImgView::cancelNeuroglancerAnnotationsSpatialLoad(bool markCancelledToolti
     const uint64_t segCount = static_cast<uint64_t>(m_doc.doc().skeletonDoc().skeleton(id).numEdges());
     const auto& qMin = m_ngAnnotationsSpatialQMin;
     const auto& qMax = m_ngAnnotationsSpatialQMax;
-    const QString tooltip = QString(
-                              "Neuroglancer precomputed annotations (spatial lines)\n"
-                              "Segmentation: %1\n"
-                              "Annotations: %2\n"
-                              "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
-                              "Status: %9\n"
-                              "Segments: %10")
-                            .arg(m_ngAnnotationsSpatialSegRootUrl)
-                            .arg(m_ngAnnotationsSpatialAnnRootUrl)
-                            .arg(qMin[0], 0, 'g', 8)
-                            .arg(qMin[1], 0, 'g', 8)
-                            .arg(qMin[2], 0, 'g', 8)
-                            .arg(qMax[0], 0, 'g', 8)
-                            .arg(qMax[1], 0, 'g', 8)
-                            .arg(qMax[2], 0, 'g', 8)
-                            .arg(status)
-                            .arg(static_cast<qulonglong>(segCount));
+    const QString tooltip = QString("Neuroglancer precomputed annotations (spatial lines)\n"
+                                    "Segmentation: %1\n"
+                                    "Annotations: %2\n"
+                                    "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                    "Status: %9\n"
+                                    "Segments: %10")
+                              .arg(m_ngAnnotationsSpatialSegRootUrl)
+                              .arg(m_ngAnnotationsSpatialAnnRootUrl)
+                              .arg(qMin[0], 0, 'g', 8)
+                              .arg(qMin[1], 0, 'g', 8)
+                              .arg(qMin[2], 0, 'g', 8)
+                              .arg(qMax[0], 0, 'g', 8)
+                              .arg(qMax[1], 0, 'g', 8)
+                              .arg(qMax[2], 0, 'g', 8)
+                              .arg(status)
+                              .arg(segCount);
     m_doc.doc().skeletonDoc().updateExternalSkeletonMetadata(id, m_ngAnnotationsSpatialDisplayName, tooltip);
   }
 }
@@ -776,7 +774,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
               sourceObj["segmentation_root_url"] = json::value_from(vol->rootUrl());
               sourceObj["annotation_root_url"] = json::value_from(annRootUrl);
               sourceObj["relationship_id"] = json::value_from(relationshipId);
-              sourceObj["object_id"] = json::value_from(QString::number(static_cast<qulonglong>(segmentId)));
+              sourceObj["object_id"] = json::value_from(QString::number(segmentId));
               const json::value sourceJson = sourceObj;
 
               if (auto existing = m_doc.doc().punctaDoc().findPunctaByExternalSource(sourceJson)) {
@@ -836,7 +834,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                   const auto anns = source->loadAnnotationsForRelatedObjectBlocking(relationshipId, segmentId);
                   if (anns.empty()) {
                     out.error = QString("No annotations found for segment %1 (relationship '%2')")
-                                  .arg(static_cast<qulonglong>(segmentId))
+                                  .arg(segmentId)
                                   .arg(relationshipId);
                     return out;
                   }
@@ -882,7 +880,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                     }
                     if (pts.empty()) {
                       out.error = QString("No POINT/ELLIPSOID annotations decoded for segment %1 (relationship '%2')")
-                                    .arg(static_cast<qulonglong>(segmentId))
+                                    .arg(segmentId)
                                     .arg(relationshipId);
                       return out;
                     }
@@ -891,15 +889,15 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                       p->data = std::move(pts);
                       out.puncta = std::move(p);
                     }
-                    out.displayName =
-                      QString("NG Annotations %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(relationshipId);
+                    out.displayName = QString("NG Annotations %1 (%2)").arg(segmentId).arg(relationshipId);
                     out.tooltip =
-                      QString("Neuroglancer precomputed annotations\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nCount: %5")
+                      QString(
+                        "Neuroglancer precomputed annotations\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nCount: %5")
                         .arg(vol->rootUrl())
                         .arg(annRootUrl)
                         .arg(relationshipId)
-                        .arg(static_cast<qulonglong>(segmentId))
-                        .arg(static_cast<qulonglong>(out.puncta->data.size()));
+                        .arg(segmentId)
+                        .arg(out.puncta->data.size());
                     return out;
                   }
 
@@ -921,7 +919,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                     }
                     if (vertices.empty() || edges.empty()) {
                       out.error = QString("No LINE/POLYLINE annotations decoded for segment %1 (relationship '%2')")
-                                    .arg(static_cast<qulonglong>(segmentId))
+                                    .arg(segmentId)
                                     .arg(relationshipId);
                       return out;
                     }
@@ -929,15 +927,15 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                     skel->setVertices(std::move(vertices));
                     skel->setEdges(std::move(edges));
                     out.skeleton = std::move(skel);
-                    out.displayName =
-                      QString("NG Annotations %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(relationshipId);
+                    out.displayName = QString("NG Annotations %1 (%2)").arg(segmentId).arg(relationshipId);
                     out.tooltip =
-                      QString("Neuroglancer precomputed annotations (lines)\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nSegments: %5")
+                      QString(
+                        "Neuroglancer precomputed annotations (lines)\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nSegments: %5")
                         .arg(vol->rootUrl())
                         .arg(annRootUrl)
                         .arg(relationshipId)
-                        .arg(static_cast<qulonglong>(segmentId))
-                        .arg(static_cast<qulonglong>(numSegments));
+                        .arg(segmentId)
+                        .arg(numSegments);
                     return out;
                   }
 
@@ -946,7 +944,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                 }
                 catch (const ZNotFoundException&) {
                   out.error = QString("No annotations found for segment %1 (relationship '%2')")
-                                .arg(static_cast<qulonglong>(segmentId))
+                                .arg(segmentId)
                                 .arg(relationshipId);
                   return out;
                 }
@@ -1242,27 +1240,26 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                               viewPtr->m_ngAnnotationsSpatialCompleted = done;
                               const QString status = done ? QStringLiteral("done")
                                                           : QString("loading… %1/%2 cells (level %3/%4)")
-                                                              .arg(static_cast<qulonglong>(progress.visitedCells))
-                                                              .arg(static_cast<qulonglong>(progress.totalCells))
-                                                              .arg(static_cast<qulonglong>(progress.levelIndex + 1))
-                                                              .arg(static_cast<qulonglong>(progress.levelsTotal));
-                              const QString tooltip = QString(
-                                                        "Neuroglancer precomputed annotations (spatial)\n"
-                                                        "Segmentation: %1\n"
-                                                        "Annotations: %2\n"
-                                                        "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
-                                                        "Status: %9\n"
-                                                        "Count: %10")
-                                                      .arg(vol->rootUrl())
-                                                      .arg(annRootUrl)
-                                                      .arg(qMin.x, 0, 'g', 8)
-                                                      .arg(qMin.y, 0, 'g', 8)
-                                                      .arg(qMin.z, 0, 'g', 8)
-                                                      .arg(qMax.x, 0, 'g', 8)
-                                                      .arg(qMax.y, 0, 'g', 8)
-                                                      .arg(qMax.z, 0, 'g', 8)
-                                                      .arg(status)
-                                                      .arg(static_cast<qulonglong>(count));
+                                                              .arg(progress.visitedCells)
+                                                              .arg(progress.totalCells)
+                                                              .arg(progress.levelIndex + 1)
+                                                              .arg(progress.levelsTotal);
+                              const QString tooltip = QString("Neuroglancer precomputed annotations (spatial)\n"
+                                                              "Segmentation: %1\n"
+                                                              "Annotations: %2\n"
+                                                              "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                                              "Status: %9\n"
+                                                              "Count: %10")
+                                                        .arg(vol->rootUrl())
+                                                        .arg(annRootUrl)
+                                                        .arg(qMin.x, 0, 'g', 8)
+                                                        .arg(qMin.y, 0, 'g', 8)
+                                                        .arg(qMin.z, 0, 'g', 8)
+                                                        .arg(qMax.x, 0, 'g', 8)
+                                                        .arg(qMax.y, 0, 'g', 8)
+                                                        .arg(qMax.z, 0, 'g', 8)
+                                                        .arg(status)
+                                                        .arg(count);
 
                               doc.updateExternalPunctaMetadata(id, displayName, tooltip);
 
@@ -1324,27 +1321,26 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                               viewPtr->m_ngAnnotationsSpatialCompleted = done;
                               const QString status = done ? QStringLiteral("done")
                                                           : QString("loading… %1/%2 cells (level %3/%4)")
-                                                              .arg(static_cast<qulonglong>(progress.visitedCells))
-                                                              .arg(static_cast<qulonglong>(progress.totalCells))
-                                                              .arg(static_cast<qulonglong>(progress.levelIndex + 1))
-                                                              .arg(static_cast<qulonglong>(progress.levelsTotal));
-                              const QString tooltip = QString(
-                                                        "Neuroglancer precomputed annotations (spatial lines)\n"
-                                                        "Segmentation: %1\n"
-                                                        "Annotations: %2\n"
-                                                        "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
-                                                        "Status: %9\n"
-                                                        "Segments: %10")
-                                                      .arg(vol->rootUrl())
-                                                      .arg(annRootUrl)
-                                                      .arg(qMin.x, 0, 'g', 8)
-                                                      .arg(qMin.y, 0, 'g', 8)
-                                                      .arg(qMin.z, 0, 'g', 8)
-                                                      .arg(qMax.x, 0, 'g', 8)
-                                                      .arg(qMax.y, 0, 'g', 8)
-                                                      .arg(qMax.z, 0, 'g', 8)
-                                                      .arg(status)
-                                                      .arg(static_cast<qulonglong>(segCount));
+                                                              .arg(progress.visitedCells)
+                                                              .arg(progress.totalCells)
+                                                              .arg(progress.levelIndex + 1)
+                                                              .arg(progress.levelsTotal);
+                              const QString tooltip = QString("Neuroglancer precomputed annotations (spatial lines)\n"
+                                                              "Segmentation: %1\n"
+                                                              "Annotations: %2\n"
+                                                              "Voxel box: [%3,%4,%5] - [%6,%7,%8]\n"
+                                                              "Status: %9\n"
+                                                              "Segments: %10")
+                                                        .arg(vol->rootUrl())
+                                                        .arg(annRootUrl)
+                                                        .arg(qMin.x, 0, 'g', 8)
+                                                        .arg(qMin.y, 0, 'g', 8)
+                                                        .arg(qMin.z, 0, 'g', 8)
+                                                        .arg(qMax.x, 0, 'g', 8)
+                                                        .arg(qMax.y, 0, 'g', 8)
+                                                        .arg(qMax.z, 0, 'g', 8)
+                                                        .arg(status)
+                                                        .arg(segCount);
 
                               doc.updateExternalSkeletonMetadata(id, displayName, tooltip);
 
@@ -1442,7 +1438,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     json::object sourceObj;
     sourceObj["type"] = "neuroglancer_precomputed_mesh";
     sourceObj["segmentation_root_url"] = json::value_from(vol->rootUrl());
-    sourceObj["segment_id"] = json::value_from(QString::number(static_cast<qulonglong>(segmentId)));
+    sourceObj["segment_id"] = json::value_from(QString::number(segmentId));
     sourceObj["mesh_source_url"] = json::value_from(meshSourceDirUrl);
     const json::value sourceJson = sourceObj;
 
@@ -1464,10 +1460,10 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                 return;
               }
               if (!coarse.mesh || coarse.mesh->empty()) {
-                QMessageBox::information(QApplication::activeWindow(),
-                                         QApplication::applicationName(),
-                                         QString("Neuroglancer mesh load returned an empty mesh for segment %1")
-                                           .arg(static_cast<qulonglong>(segmentId)));
+                QMessageBox::information(
+                  QApplication::activeWindow(),
+                  QApplication::applicationName(),
+                  QString("Neuroglancer mesh load returned an empty mesh for segment %1").arg(segmentId));
                 return;
               }
 
@@ -1514,8 +1510,8 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                   CHECK(source);
                   out.mesh = source->loadMeshBlocking(segmentId, ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest);
                   if (!out.mesh || out.mesh->empty()) {
-                    out.error = QString("Neuroglancer mesh refinement returned an empty mesh for segment %1")
-                                  .arg(static_cast<qulonglong>(segmentId));
+                    out.error =
+                      QString("Neuroglancer mesh refinement returned an empty mesh for segment %1").arg(segmentId);
                   }
                 }
                 catch (const ZNotFoundException&) {
@@ -1544,8 +1540,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         CHECK(source);
         out.mesh = source->loadMeshBlocking(segmentId, ZNeuroglancerPrecomputedMeshSource::LodPolicy::Coarsest);
         if (!out.mesh || out.mesh->empty()) {
-          out.error = QString("Neuroglancer mesh load returned an empty mesh for segment %1")
-                        .arg(static_cast<qulonglong>(segmentId));
+          out.error = QString("Neuroglancer mesh load returned an empty mesh for segment %1").arg(segmentId);
           return out;
         }
 
@@ -1560,12 +1555,11 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
           }
         }
 
-        out.displayName = label.isEmpty() ? QString("NG Mesh %1").arg(static_cast<qulonglong>(segmentId))
-                                          : QString("NG Mesh %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(label);
+        out.displayName =
+          label.isEmpty() ? QString("NG Mesh %1").arg(segmentId) : QString("NG Mesh %1 (%2)").arg(segmentId).arg(label);
 
-        out.tooltip = QString("Neuroglancer precomputed mesh\nSegmentation: %1\nSegment: %2")
-                        .arg(vol->rootUrl())
-                        .arg(static_cast<qulonglong>(segmentId));
+        out.tooltip =
+          QString("Neuroglancer precomputed mesh\nSegmentation: %1\nSegment: %2").arg(vol->rootUrl()).arg(segmentId);
         if (!label.isEmpty()) {
           out.tooltip += QString("\nLabel: %1").arg(label);
         }
@@ -1574,7 +1568,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         }
       }
       catch (const ZNotFoundException&) {
-        out.error = QString("No neuroglancer mesh found for segment %1").arg(static_cast<qulonglong>(segmentId));
+        out.error = QString("No neuroglancer mesh found for segment %1").arg(segmentId);
       }
       catch (const ZException& e) {
         out.error = QString::fromUtf8(e.what());
@@ -1705,13 +1699,11 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
           }
         }
 
-        const QString displayName = label.isEmpty()
-                                      ? QString("NG Mesh %1").arg(static_cast<qulonglong>(segmentId))
-                                      : QString("NG Mesh %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(label);
+        const QString displayName =
+          label.isEmpty() ? QString("NG Mesh %1").arg(segmentId) : QString("NG Mesh %1 (%2)").arg(segmentId).arg(label);
 
-        QString tooltip = QString("Neuroglancer precomputed mesh\nSegmentation: %1\nSegment: %2")
-                            .arg(rootUrl)
-                            .arg(static_cast<qulonglong>(segmentId));
+        QString tooltip =
+          QString("Neuroglancer precomputed mesh\nSegmentation: %1\nSegment: %2").arg(rootUrl).arg(segmentId);
         if (!label.isEmpty()) {
           tooltip += QString("\nLabel: %1").arg(label);
         }
@@ -1722,7 +1714,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         json::object sourceObj;
         sourceObj["type"] = "neuroglancer_precomputed_mesh";
         sourceObj["segmentation_root_url"] = json::value_from(rootUrl);
-        sourceObj["segment_id"] = json::value_from(QString::number(static_cast<qulonglong>(segmentId)));
+        sourceObj["segment_id"] = json::value_from(QString::number(segmentId));
         sourceObj["mesh_source_url"] = json::value_from(meshSourceDirUrl);
         const json::value sourceJson = sourceObj;
 
@@ -1771,11 +1763,12 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
       if (loaded == 0 && missing == 0 && skipped == 0 && errors == 0) {
         return QString{};
       }
-      return QString("Neuroglancer mesh batch load finished.\n\nLoaded: %1\nMissing mesh: %2\nSkipped (already loaded): %3\nErrors: %4")
-        .arg(static_cast<qulonglong>(loaded))
-        .arg(static_cast<qulonglong>(missing))
-        .arg(static_cast<qulonglong>(skipped))
-        .arg(static_cast<qulonglong>(errors));
+      return QString(
+               "Neuroglancer mesh batch load finished.\n\nLoaded: %1\nMissing mesh: %2\nSkipped (already loaded): %3\nErrors: %4")
+        .arg(loaded)
+        .arg(missing)
+        .arg(skipped)
+        .arg(errors);
     }));
   };
 
@@ -1788,7 +1781,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     json::object sourceObj;
     sourceObj["type"] = "neuroglancer_precomputed_skeleton";
     sourceObj["segmentation_root_url"] = json::value_from(vol->rootUrl());
-    sourceObj["segment_id"] = json::value_from(QString::number(static_cast<qulonglong>(segmentId)));
+    sourceObj["segment_id"] = json::value_from(QString::number(segmentId));
     sourceObj["skeleton_source_url"] = json::value_from(skeletonSourceDirUrl);
     const json::value sourceJson = sourceObj;
 
@@ -1807,10 +1800,10 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         return;
       }
       if (!r.skeleton || r.skeleton->empty()) {
-        QMessageBox::information(QApplication::activeWindow(),
-                                 QApplication::applicationName(),
-                                 QString("Neuroglancer skeleton load returned an empty skeleton for segment %1")
-                                   .arg(static_cast<qulonglong>(segmentId)));
+        QMessageBox::information(
+          QApplication::activeWindow(),
+          QApplication::applicationName(),
+          QString("Neuroglancer skeleton load returned an empty skeleton for segment %1").arg(segmentId));
         return;
       }
 
@@ -1834,8 +1827,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         CHECK(source);
         out.skeleton = source->loadSkeletonBlocking(segmentId);
         if (!out.skeleton || out.skeleton->empty()) {
-          out.error = QString("Neuroglancer skeleton load returned an empty skeleton for segment %1")
-                        .arg(static_cast<qulonglong>(segmentId));
+          out.error = QString("Neuroglancer skeleton load returned an empty skeleton for segment %1").arg(segmentId);
           return out;
         }
 
@@ -1850,12 +1842,12 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
           }
         }
 
-        out.displayName = label.isEmpty() ? QString("NG Skeleton %1").arg(static_cast<qulonglong>(segmentId))
-                                          : QString("NG Skeleton %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(label);
+        out.displayName = label.isEmpty() ? QString("NG Skeleton %1").arg(segmentId)
+                                          : QString("NG Skeleton %1 (%2)").arg(segmentId).arg(label);
 
         out.tooltip = QString("Neuroglancer precomputed skeleton\nSegmentation: %1\nSegment: %2")
                         .arg(vol->rootUrl())
-                        .arg(static_cast<qulonglong>(segmentId));
+                        .arg(segmentId);
         if (!label.isEmpty()) {
           out.tooltip += QString("\nLabel: %1").arg(label);
         }
@@ -1864,7 +1856,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         }
       }
       catch (const ZNotFoundException&) {
-        out.error = QString("No neuroglancer skeleton found for segment %1").arg(static_cast<qulonglong>(segmentId));
+        out.error = QString("No neuroglancer skeleton found for segment %1").arg(segmentId);
       }
       catch (const ZException& e) {
         out.error = QString::fromUtf8(e.what());
@@ -1998,13 +1990,11 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
           }
         }
 
-        const QString displayName = label.isEmpty()
-                                      ? QString("NG Skeleton %1").arg(static_cast<qulonglong>(segmentId))
-                                      : QString("NG Skeleton %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(label);
+        const QString displayName = label.isEmpty() ? QString("NG Skeleton %1").arg(segmentId)
+                                                    : QString("NG Skeleton %1 (%2)").arg(segmentId).arg(label);
 
-        QString tooltip = QString("Neuroglancer precomputed skeleton\nSegmentation: %1\nSegment: %2")
-                            .arg(rootUrl)
-                            .arg(static_cast<qulonglong>(segmentId));
+        QString tooltip =
+          QString("Neuroglancer precomputed skeleton\nSegmentation: %1\nSegment: %2").arg(rootUrl).arg(segmentId);
         if (!label.isEmpty()) {
           tooltip += QString("\nLabel: %1").arg(label);
         }
@@ -2015,7 +2005,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         json::object sourceObj;
         sourceObj["type"] = "neuroglancer_precomputed_skeleton";
         sourceObj["segmentation_root_url"] = json::value_from(rootUrl);
-        sourceObj["segment_id"] = json::value_from(QString::number(static_cast<qulonglong>(segmentId)));
+        sourceObj["segment_id"] = json::value_from(QString::number(segmentId));
         sourceObj["skeleton_source_url"] = json::value_from(skeletonSourceDirUrl);
         const json::value sourceJson = sourceObj;
 
@@ -2036,11 +2026,12 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
       if (loaded == 0 && missing == 0 && skipped == 0 && errors == 0) {
         return QString{};
       }
-      return QString("Neuroglancer skeleton batch load finished.\n\nLoaded: %1\nMissing skeleton: %2\nSkipped (already loaded): %3\nErrors: %4")
-        .arg(static_cast<qulonglong>(loaded))
-        .arg(static_cast<qulonglong>(missing))
-        .arg(static_cast<qulonglong>(skipped))
-        .arg(static_cast<qulonglong>(errors));
+      return QString(
+               "Neuroglancer skeleton batch load finished.\n\nLoaded: %1\nMissing skeleton: %2\nSkipped (already loaded): %3\nErrors: %4")
+        .arg(loaded)
+        .arg(missing)
+        .arg(skipped)
+        .arg(errors);
     }));
   };
 
@@ -2069,7 +2060,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                                               "Wait for the visible tiles to finish loading, then try again."));
       return;
     }
-    QApplication::clipboard()->setText(QString::number(static_cast<qulonglong>(*bestSeg)));
+    QApplication::clipboard()->setText(QString::number(*bestSeg));
   });
 
   if (!hasAnySkeleton) {
@@ -2266,7 +2257,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
       connect(loadAnnByIdAct, &QAction::triggered, this, [topVol, annotationsRootUrl, startAnnotationsLoad]() {
         QString prefill;
         if (const auto clipOpt = parseUint64Base10(QApplication::clipboard()->text())) {
-          prefill = QString::number(static_cast<qulonglong>(*clipOpt));
+          prefill = QString::number(*clipOpt);
         }
         const QString s = QInputDialog::getText(QApplication::activeWindow(),
                                                 QApplication::applicationName(),
@@ -2322,7 +2313,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     connect(loadMeshByIdAct, &QAction::triggered, this, [topVol, meshSourceDirUrl, startMeshLoad]() {
       QString prefill;
       if (const auto clipOpt = parseUint64Base10(QApplication::clipboard()->text())) {
-        prefill = QString::number(static_cast<qulonglong>(*clipOpt));
+        prefill = QString::number(*clipOpt);
       }
       const QString s = QInputDialog::getText(QApplication::activeWindow(),
                                               QApplication::applicationName(),
@@ -2363,7 +2354,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         QApplication::activeWindow(),
         QApplication::applicationName(),
         QString("Load meshes for %1 segment IDs from clipboard?\n\nThis will download mesh data and may take time.")
-          .arg(static_cast<qulonglong>(unique.size())),
+          .arg(unique.size()),
         QMessageBox::Ok | QMessageBox::Cancel,
         QMessageBox::Cancel);
       if (response != QMessageBox::Ok) {
@@ -2411,11 +2402,10 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         const int response = QMessageBox::question(
           QApplication::activeWindow(),
           QApplication::applicationName(),
-          QString(
-            "Load meshes for %1 segments visible in the current viewport (cached tiles only)?\n\n"
-            "This will download mesh data and may take time.\n"
-            "Note: segment ID 0 is treated as background and will be ignored.")
-            .arg(static_cast<qulonglong>(r.ids.size())),
+          QString("Load meshes for %1 segments visible in the current viewport (cached tiles only)?\n\n"
+                  "This will download mesh data and may take time.\n"
+                  "Note: segment ID 0 is treated as background and will be ignored.")
+            .arg(r.ids.size()),
           QMessageBox::Ok | QMessageBox::Cancel,
           QMessageBox::Cancel);
         if (response != QMessageBox::Ok) {
@@ -2524,7 +2514,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
               [topVol, skeletonSourceDirUrl, startSkeletonLoad]() {
         QString prefill;
         if (const auto clipOpt = parseUint64Base10(QApplication::clipboard()->text())) {
-          prefill = QString::number(static_cast<qulonglong>(*clipOpt));
+          prefill = QString::number(*clipOpt);
         }
         const QString s = QInputDialog::getText(QApplication::activeWindow(),
                                                 QApplication::applicationName(),
@@ -2564,8 +2554,9 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         const int response = QMessageBox::question(
           QApplication::activeWindow(),
           QApplication::applicationName(),
-          QString("Load skeletons for %1 segment IDs from clipboard?\n\nThis will download skeleton data and may take time.")
-            .arg(static_cast<qulonglong>(unique.size())),
+          QString(
+            "Load skeletons for %1 segment IDs from clipboard?\n\nThis will download skeleton data and may take time.")
+            .arg(unique.size()),
           QMessageBox::Ok | QMessageBox::Cancel,
           QMessageBox::Cancel);
         if (response != QMessageBox::Ok) {
@@ -2614,11 +2605,10 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
             const int response = QMessageBox::question(
               QApplication::activeWindow(),
               QApplication::applicationName(),
-              QString(
-                "Load skeletons for %1 segments visible in the current viewport (cached tiles only)?\n\n"
-                "This will download skeleton data and may take time.\n"
-                "Note: segment ID 0 is treated as background and will be ignored.")
-                .arg(static_cast<qulonglong>(r.ids.size())),
+              QString("Load skeletons for %1 segments visible in the current viewport (cached tiles only)?\n\n"
+                      "This will download skeleton data and may take time.\n"
+                      "Note: segment ID 0 is treated as background and will be ignored.")
+                .arg(r.ids.size()),
               QMessageBox::Ok | QMessageBox::Cancel,
               QMessageBox::Cancel);
             if (response != QMessageBox::Ok) {
@@ -2800,13 +2790,11 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
             const QString label = labelOpt ? *labelOpt : QString{};
             const QString description = descOpt ? *descOpt : QString{};
 
-            const QString displayName = label.isEmpty()
-                                          ? QString("NG Mesh %1").arg(static_cast<qulonglong>(segmentId))
-                                          : QString("NG Mesh %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(label);
+            const QString displayName = label.isEmpty() ? QString("NG Mesh %1").arg(segmentId)
+                                                        : QString("NG Mesh %1 (%2)").arg(segmentId).arg(label);
 
-            QString tooltip = QString("Neuroglancer precomputed mesh\nSegmentation: %1\nSegment: %2")
-                                .arg(propsRootUrl)
-                                .arg(static_cast<qulonglong>(segmentId));
+            QString tooltip =
+              QString("Neuroglancer precomputed mesh\nSegmentation: %1\nSegment: %2").arg(propsRootUrl).arg(segmentId);
             if (!label.isEmpty()) {
               tooltip += QString("\nLabel: %1").arg(label);
             }
@@ -2838,13 +2826,12 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
             const QString label = labelOpt ? *labelOpt : QString{};
             const QString description = descOpt ? *descOpt : QString{};
 
-            const QString displayName =
-              label.isEmpty() ? QString("NG Skeleton %1").arg(static_cast<qulonglong>(segmentId))
-                              : QString("NG Skeleton %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(label);
+            const QString displayName = label.isEmpty() ? QString("NG Skeleton %1").arg(segmentId)
+                                                        : QString("NG Skeleton %1 (%2)").arg(segmentId).arg(label);
 
             QString tooltip = QString("Neuroglancer precomputed skeleton\nSegmentation: %1\nSegment: %2")
                                 .arg(propsRootUrl)
-                                .arg(static_cast<qulonglong>(segmentId));
+                                .arg(segmentId);
             if (!label.isEmpty()) {
               tooltip += QString("\nLabel: %1").arg(label);
             }

@@ -198,7 +198,7 @@ ZNeuroglancerPrecomputedVolume::Scale::Sharding parseShardingSpec(const json::ob
 
 QString shardHexString(uint64_t shard, int digits)
 {
-  QString s = QString::number(static_cast<qulonglong>(shard), 16);
+  QString s = QString::number(shard, 16);
   if (digits > 0) {
     s = s.rightJustified(digits, QChar('0'));
   }
@@ -503,7 +503,7 @@ folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::lo
   CHECK(m_meshType == MeshType::Legacy);
 
   const QString base = m_meshDirUrl.toString();
-  const QString metaRel = QString::number(static_cast<qulonglong>(segmentId)) + ":0";
+  const QString metaRel = QString::number(segmentId) + ":0";
   const std::string metaUrl = toStdString(base + metaRel);
 
   auto metaBytesOpt = co_await getHttpBytesAsync(metaUrl);
@@ -848,7 +848,7 @@ folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::lo
   const MultiLodInfo& info = *m_multiLodInfo;
 
   const QString base = m_meshDirUrl.toString();
-  const QString segStr = QString::number(static_cast<qulonglong>(segmentId));
+  const QString segStr = QString::number(segmentId);
 
   uint64_t manifestStart = 0;
   std::vector<uint8_t> manifestBytes;

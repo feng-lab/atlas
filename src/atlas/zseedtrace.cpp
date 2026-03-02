@@ -154,9 +154,7 @@ struct SeededTraceAsyncResult
 
     const ZImgInfo info = imgPack->imgInfo();
     if (sc >= info.numChannels || t >= info.numTimes) {
-      res.error = QStringLiteral("Trace failed: invalid channel/time selection (c=%1, t=%2).")
-                    .arg(static_cast<qulonglong>(sc))
-                    .arg(static_cast<qulonglong>(t));
+      res.error = QStringLiteral("Trace failed: invalid channel/time selection (c=%1, t=%2).").arg(sc).arg(t);
       return res;
     }
 
@@ -270,10 +268,9 @@ void startSeedTraceInteractive(ZDoc& doc,
   const ZTraceSettings::AlgoConfig algoCfg = traceSettings.algoConfig();
 
   const ZImgInfo info = imgPack->imgInfo();
-  const QString channelLabel = (sc < info.channelNames.size())
-                                 ? info.displayChannelName(sc)
-                                 : QStringLiteral("Ch%1").arg(static_cast<qulonglong>(sc + 1));
-  const QString timeLabel = QStringLiteral("T%1").arg(static_cast<qulonglong>(t + 1));
+  const QString channelLabel =
+    (sc < info.channelNames.size()) ? info.displayChannelName(sc) : QStringLiteral("Ch%1").arg(sc + 1);
+  const QString timeLabel = QStringLiteral("T%1").arg(t + 1);
 
   const QString swcTargetLabel =
     hostSwcOpt.has_value() ? doc.objNameWithModifiedMarkerAndID(hostSwcOpt->first) : QStringLiteral("new SWC");
@@ -401,7 +398,7 @@ void startSeedTraceInteractive(ZDoc& doc,
             }
             ZSwcPack& pack = swcDoc.swcPack(swcId);
             pack.replaceSwcWithUndo(actionName, std::move(*res.swc));
-            tm.succeedTask(taskPtr, QStringLiteral("updated SWC #%1").arg(static_cast<qulonglong>(swcId)));
+            tm.succeedTask(taskPtr, QStringLiteral("updated SWC #%1").arg(swcId));
             return;
           }
 
@@ -425,7 +422,7 @@ void startSeedTraceInteractive(ZDoc& doc,
           // neuTube UX parity: newly traced SWCs should not start with every node selected.
           swcDoc.swcPack(newSwcId).setSelectedNodes({});
 
-          tm.succeedTask(taskPtr, QStringLiteral("created SWC #%1").arg(static_cast<qulonglong>(newSwcId)));
+          tm.succeedTask(taskPtr, QStringLiteral("created SWC #%1").arg(newSwcId));
 
           if (onNewSwcCreated) {
             try {

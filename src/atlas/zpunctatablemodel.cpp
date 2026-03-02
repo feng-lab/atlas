@@ -31,7 +31,7 @@ QVariant ZPunctaTableModel::data(const QModelIndex& index, int role) const
       case RadiusColumn:
         return p.radius();
       case VolSizeColumn:
-        return qulonglong(p.volSize());
+        return QVariant::fromValue(p.volSize());
       case MassColumn:
         return p.mass();
       case MeanIntensityColumn:

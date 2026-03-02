@@ -617,7 +617,7 @@ void ZSwcFilter::estimateSwcNodeRadius()
 
   ZImgDoc& imgDoc = doc.imgDoc();
   if (!imgDoc.hasObjWithID(*imgIdOpt)) {
-    LOG(WARNING) << "Estimate Radius: source image id " << static_cast<qulonglong>(*imgIdOpt) << " is not loaded.";
+    LOG(WARNING) << "Estimate Radius: source image id " << *imgIdOpt << " is not loaded.";
     return;
   }
 
