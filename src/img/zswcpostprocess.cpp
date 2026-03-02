@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -428,8 +429,9 @@ void tuneBranchNodeLegacyLike(ZSwc& tree, Iter tn)
   // - ZSwcDistTrunkAnalyzer::extractMainTrunk with distance weights (0, 1)
   // - ZSwcPath::getLength on the returned endpoints/path.
   //
-  // This selects endpoints by maximizing Euclidean distance, then measures geodesic
-  // length along the parent-chain path between the endpoints.
+  // With weights (euclidean=0, geodesic=1), the legacy code selects the pair of
+  // leaves that maximizes geodesic distance along the tree, then returns the
+  // corresponding path length (also geodesic).
   if (subtree.empty()) {
     return 0.0;
   }
@@ -455,69 +457,89 @@ void tuneBranchNodeLegacyLike(ZSwc& tree, Iter tn)
     }
   }
 
-  ZSwc::ConstSwcTreeNode leaf1;
-  ZSwc::ConstSwcTreeNode leaf2;
-  double maxLength = -1.0;
+  if (leafArray.size() < 2) {
+    return 0.0;
+  }
 
-  auto euclideanDistance = [](const ZSwc::ConstSwcTreeNode& a, const ZSwc::ConstSwcTreeNode& b) -> double {
-    const double dx = a->x - b->x;
-    const double dy = a->y - b->y;
-    const double dz = a->z - b->z;
-    return std::sqrt(dx * dx + dy * dy + dz * dz);
+  std::unordered_map<const void*, double> distFromRoot;
+  distFromRoot.reserve(subtree.size());
+  distFromRoot.emplace(static_cast<const void*>(regularRoot.node), 0.0);
+
+  for (auto it = subtree.cbegin(regularRoot); it != subtree.cend(regularRoot); ++it) {
+    if (it == regularRoot) {
+      continue;
+    }
+    const auto parent = ZSwc::parent(it);
+    if (ZSwc::isNull(parent) || isVirtualLegacyLike(parent)) {
+      distFromRoot.emplace(static_cast<const void*>(it.node), 0.0);
+      continue;
+    }
+
+    const auto parentKey = static_cast<const void*>(parent.node);
+    const auto parentIt = distFromRoot.find(parentKey);
+    CHECK(parentIt != distFromRoot.end()) << "mainTrunkLengthLegacyLike: parent distance missing (non-preorder tree?)";
+
+    const double dx = it->x - parent->x;
+    const double dy = it->y - parent->y;
+    const double dz = it->z - parent->z;
+    const double edgeLen = std::sqrt(dx * dx + dy * dy + dz * dz);
+    distFromRoot.emplace(static_cast<const void*>(it.node), parentIt->second + edgeLen);
+  }
+
+  auto commonAncestor = [](ZSwc::ConstSwcTreeNode a, ZSwc::ConstSwcTreeNode b) -> ZSwc::ConstSwcTreeNode {
+    std::unordered_set<const void*> ancestors;
+    ancestors.reserve(128);
+    for (auto it = a; !ZSwc::isNull(it); it = ZSwc::parent(it)) {
+      ancestors.insert(static_cast<const void*>(it.node));
+    }
+    for (auto it = b; !ZSwc::isNull(it); it = ZSwc::parent(it)) {
+      if (ancestors.find(static_cast<const void*>(it.node)) != ancestors.end()) {
+        return it;
+      }
+    }
+    return {};
   };
 
+  double maxGeodesicLength = 0.0;
   for (size_t i = 0; i < leafArray.size(); ++i) {
+    const auto leaf1 = leafArray[i];
+    const auto leaf1Key = static_cast<const void*>(leaf1.node);
+    const auto leaf1It = distFromRoot.find(leaf1Key);
+    if (leaf1It == distFromRoot.end()) {
+      continue;
+    }
+
     for (size_t j = 0; j < leafArray.size(); ++j) {
-      if (leafArray[i] != leafArray[j]) {
-        const double length = euclideanDistance(leafArray[i], leafArray[j]);
-        if (length > maxLength) {
-          maxLength = length;
-          leaf1 = leafArray[i];
-          leaf2 = leafArray[j];
-        }
+      const auto leaf2 = leafArray[j];
+      if (leaf1 == leaf2) {
+        continue;
+      }
+
+      const auto leaf2Key = static_cast<const void*>(leaf2.node);
+      const auto leaf2It = distFromRoot.find(leaf2Key);
+      if (leaf2It == distFromRoot.end()) {
+        continue;
+      }
+
+      const auto ancestor = commonAncestor(leaf1, leaf2);
+      if (ZSwc::isNull(ancestor) || isVirtualLegacyLike(ancestor)) {
+        continue;
+      }
+
+      const auto ancestorKey = static_cast<const void*>(ancestor.node);
+      const auto ancestorIt = distFromRoot.find(ancestorKey);
+      if (ancestorIt == distFromRoot.end()) {
+        continue;
+      }
+
+      const double length = leaf1It->second + leaf2It->second - 2.0 * ancestorIt->second;
+      if (length > maxGeodesicLength) {
+        maxGeodesicLength = length;
       }
     }
   }
 
-  if (ZSwc::isNull(leaf1) || ZSwc::isNull(leaf2)) {
-    return 0.0;
-  }
-
-  std::unordered_set<const void*> ancestors;
-  ancestors.reserve(128);
-  for (auto it = leaf1; !ZSwc::isNull(it); it = ZSwc::parent(it)) {
-    ancestors.insert(static_cast<const void*>(it.node));
-  }
-
-  ZSwc::ConstSwcTreeNode ancestor;
-  for (auto it = leaf2; !ZSwc::isNull(it); it = ZSwc::parent(it)) {
-    if (ancestors.find(static_cast<const void*>(it.node)) != ancestors.end()) {
-      ancestor = it;
-      break;
-    }
-  }
-  if (ZSwc::isNull(ancestor)) {
-    return 0.0;
-  }
-  if (isVirtualLegacyLike(ancestor)) {
-    return 0.0;
-  }
-
-  auto accumulateUp = [&](ZSwc::ConstSwcTreeNode tn) -> double {
-    double length = 0.0;
-    while (tn != ancestor) {
-      const auto p = ZSwc::parent(tn);
-      if (ZSwc::isNull(p)) {
-        break;
-      }
-      length +=
-        std::sqrt((tn->x - p->x) * (tn->x - p->x) + (tn->y - p->y) * (tn->y - p->y) + (tn->z - p->z) * (tn->z - p->z));
-      tn = p;
-    }
-    return length;
-  };
-
-  return accumulateUp(leaf1) + accumulateUp(leaf2);
+  return maxGeodesicLength;
 }
 
 } // namespace

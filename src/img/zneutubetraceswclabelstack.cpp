@@ -6,6 +6,7 @@
 #include "zneutubetraceswclocseg.h"
 
 #include "zlog.h"
+#include "zvoxelvolume.h"
 
 #include <algorithm>
 #include <cmath>
@@ -65,6 +66,13 @@ void scaleXRotateZLegacyLike(std::array<double, 3>* p, double s, double alpha, i
 
   CHECK(false) << "Unsupported mask voxel type: " << mask.info();
   return false;
+}
+
+void writeMaskVoxel(ZVoxelVolumeMutable& mask, int x, int y, int z, int value)
+{
+  CHECK(value >= 0);
+  CHECK(value <= static_cast<int>(std::numeric_limits<std::uint16_t>::max()));
+  mask.setValueU16(x, y, z, static_cast<std::uint16_t>(value));
 }
 
 } // namespace
@@ -206,6 +214,82 @@ void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZImg& mask, doub
   }
 }
 
+void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZVoxelVolumeMutable& mask, double zScale, int value)
+{
+  // Port of tz_local_neuroseg.c::Local_Neuroseg_Label_C().
+  if (mask.isEmpty()) {
+    return;
+  }
+
+  const size_t width = mask.width();
+  const size_t height = mask.height();
+  const size_t depth = mask.depth();
+
+  const std::array<double, 3> bottom = localNeurosegBottomLegacyLike(locseg);
+
+  std::array<int, 3> c = {0, 0, 0};
+  std::array<double, 3> offpos = {0.0, 0.0, 0.0};
+
+  c[0] = static_cast<int>(std::lrint(bottom[0]));
+  c[1] = static_cast<int>(std::lrint(bottom[1]));
+  offpos[0] = bottom[0] - static_cast<double>(c[0]);
+  offpos[1] = bottom[1] - static_cast<double>(c[1]);
+
+  if (testZScaleLegacyLike(zScale) != 0) {
+    c[2] = static_cast<int>(std::lrint(bottom[2] * zScale));
+    offpos[2] = bottom[2] * zScale - static_cast<double>(c[2]);
+  } else {
+    c[2] = static_cast<int>(std::lrint(bottom[2]));
+    offpos[2] = bottom[2] - static_cast<double>(c[2]);
+  }
+
+  const FieldRangeLegacyLike range = neurosegFieldRangeLegacyLike(locseg.seg, zScale);
+
+  const std::array<int, 3> regionCorner = {range.firstCorner[0] + c[0],
+                                           range.firstCorner[1] + c[1],
+                                           range.firstCorner[2] + c[2]};
+
+  const double coef = locseg.seg.c;
+
+  for (int k = 0; k < range.size[2]; ++k) {
+    const int pz = regionCorner[2] + k;
+    for (int j = 0; j < range.size[1]; ++j) {
+      const int py = regionCorner[1] + j;
+      for (int i = 0; i < range.size[0]; ++i) {
+        const int px = regionCorner[0] + i;
+
+        std::array<double, 3> coord = {static_cast<double>(i + range.firstCorner[0]),
+                                       static_cast<double>(j + range.firstCorner[1]),
+                                       static_cast<double>(k + range.firstCorner[2])};
+
+        if (testZScaleLegacyLike(zScale) != 0) {
+          coord[2] /= zScale;
+        }
+
+        coord[0] -= offpos[0];
+        coord[1] -= offpos[1];
+        coord[2] -= offpos[2];
+
+        rotateXZLegacyLike(&coord, 1, locseg.seg.theta, locseg.seg.psi, 1);
+        scaleXRotateZLegacyLike(&coord, locseg.seg.scale, locseg.seg.alpha, 1);
+
+        const double f = neurofield7LegacyLike(coef,
+                                               locseg.seg.r1,
+                                               coord[0],
+                                               coord[1],
+                                               coord[2],
+                                               /*zMin*/ -0.5,
+                                               /*zMax*/ locseg.seg.h - 0.5);
+
+        if ((px >= 0) && (py >= 0) && (pz >= 0) && (static_cast<size_t>(px) < width) &&
+            (static_cast<size_t>(py) < height) && (static_cast<size_t>(pz) < depth) && (f > 0.0)) {
+          writeMaskVoxel(mask, px, py, pz, value);
+        }
+      }
+    }
+  }
+}
+
 void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center, double radius, ZImg& mask, int value)
 {
   // Port of tz_geo3d_ball.c::Geo3d_Ball_Label_Stack().
@@ -246,9 +330,67 @@ void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center, double r
   }
 }
 
+void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center,
+                                   double radius,
+                                   ZVoxelVolumeMutable& mask,
+                                   int value)
+{
+  // Port of tz_geo3d_ball.c::Geo3d_Ball_Label_Stack().
+  if (mask.isEmpty()) {
+    return;
+  }
+
+  const int width = static_cast<int>(mask.width());
+  const int height = static_cast<int>(mask.height());
+  const int depth = static_cast<int>(mask.depth());
+
+  std::array<int, 3> cb{};
+  std::array<int, 3> ce{};
+  for (size_t i = 0; i < 3; ++i) {
+    cb[i] = std::max(0, static_cast<int>(std::ceil(center[i] - radius)));
+    ce[i] = static_cast<int>(std::floor(center[i] + radius));
+  }
+
+  ce[0] = std::min(ce[0], width - 1);
+  ce[1] = std::min(ce[1], height - 1);
+  ce[2] = std::min(ce[2], depth - 1);
+
+  const double r2 = radius * radius;
+  for (int k = cb[2]; k <= ce[2]; ++k) {
+    for (int j = cb[1]; j <= ce[1]; ++j) {
+      for (int i = cb[0]; i <= ce[0]; ++i) {
+        const double dx = static_cast<double>(i) - center[0];
+        const double dy = static_cast<double>(j) - center[1];
+        const double dz = static_cast<double>(k) - center[2];
+        if (dx * dx + dy * dy + dz * dz <= r2) {
+          writeMaskVoxel(mask, i, j, k, value);
+        }
+      }
+    }
+  }
+}
+
 void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZImg& mask, double zScale, int value)
 {
   // Port of ZSwcTree::labelStack(Stack*) -> Swc_Tree_Node_Label_Stack().
+  for (auto it = swc.cbeginBreadthFirst(); it != swc.cendBreadthFirst(); ++it) {
+    if (ZSwc::isNull(it)) {
+      continue;
+    }
+
+    if (!ZSwc::isRoot(it)) {
+      const std::optional<LocalNeuroseg> seg = swcNodeToLocsegLegacyLike(it);
+      if (seg.has_value()) {
+        localNeurosegLabelCLegacyLike(*seg, mask, zScale, value);
+      }
+    }
+
+    geo3dBallLabelStackLegacyLike({it->x, it->y, it->z}, it->radius, mask, value);
+  }
+}
+
+void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZVoxelVolumeMutable& mask, double zScale, int value)
+{
   for (auto it = swc.cbeginBreadthFirst(); it != swc.cendBreadthFirst(); ++it) {
     if (ZSwc::isNull(it)) {
       continue;

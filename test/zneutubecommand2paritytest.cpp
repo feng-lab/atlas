@@ -10,6 +10,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <cstdio>
 #include <sstream>
 #include <tuple>
 #include <memory>
@@ -17,8 +18,14 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <optional>
 
 #include <fmt/format.h>
+
+#if !defined(_WIN32)
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 #if !defined(_MSC_VER)
 // neurolabi's legacy tz_* code is built as C++ on MSVC (see `tz_cdefs.h`), so
@@ -29,10 +36,12 @@ extern "C" {
 #include "tz_darray.h"
 #include "tz_geo3d_scalar_field.h"
 #include "tz_local_neuroseg.h"
+#include "tz_locseg_chain.h"
 #include "tz_neuroseg.h"
 #include "tz_perceptor.h"
 #include "tz_stack_bwmorph.h"
 #include "tz_stack_lib.h"
+#include "tz_stack_math.h"
 #include "tz_stack_neighborhood.h"
 #include "tz_stack_objlabel.h"
 #include "tz_stack_sampling.h"
@@ -42,6 +51,9 @@ extern "C" {
 #if !defined(_MSC_VER)
 }
 #endif
+
+#include "zstack.hxx"
+#include "zneurontracer.h"
 
 #include "zneutubecompareswc.h"
 #include "zneutubedarraymath.h"
@@ -58,6 +70,14 @@ extern "C" {
 #include "zneutubetraceworkspace.h"
 #include "zneutubetracerecord.h"
 #include "zneutubetracelocseglabel.h"
+#include "zneutubetraceseeder.h"
+#include "zneutubetraceallseeds.h"
+#include "zneutubetracescorethresholds.h"
+#include "zneutubetraceconfig.h"
+#include "zneutubetracemask.h"
+#include "zneutubetracerecover.h"
+#include "zneutubeimgbinarizer.h"
+#include "zneutubelocsegchainmetrics.h"
 #include "zneutubestackfitscore.h"
 #include "zneutubestackfitoptions.h"
 #include "zneutubetraceseed.h"
@@ -99,6 +119,145 @@ public:
 private:
   std::unique_ptr<QCoreApplication> _app;
 };
+
+class ScopedStdoutSilencer
+{
+public:
+  ScopedStdoutSilencer()
+  {
+#if !defined(_WIN32)
+    std::fflush(stdout);
+    _saved = dup(fileno(stdout));
+    if (_saved < 0) {
+      return;
+    }
+    const int nullFd = open("/dev/null", O_WRONLY);
+    if (nullFd < 0) {
+      return;
+    }
+    (void)dup2(nullFd, fileno(stdout));
+    (void)close(nullFd);
+#endif
+  }
+
+  ~ScopedStdoutSilencer()
+  {
+#if !defined(_WIN32)
+    if (_saved >= 0) {
+      std::fflush(stdout);
+      (void)dup2(_saved, fileno(stdout));
+      (void)close(_saved);
+    }
+#endif
+  }
+
+  ScopedStdoutSilencer(const ScopedStdoutSilencer&) = delete;
+  ScopedStdoutSilencer& operator=(const ScopedStdoutSilencer&) = delete;
+  ScopedStdoutSilencer(ScopedStdoutSilencer&&) = delete;
+  ScopedStdoutSilencer& operator=(ScopedStdoutSilencer&&) = delete;
+
+private:
+#if !defined(_WIN32)
+  int _saved = -1;
+#endif
+};
+
+void writeTextFile(const fs::path& path, std::string_view text);
+
+struct DevOnlyAutoTraceConfigPaths
+{
+  fs::path commandConfig;
+  fs::path skeletonizeCfg;
+  fs::path traceCfg;
+};
+
+[[nodiscard]] DevOnlyAutoTraceConfigPaths writeDevOnlyAutoTraceConfigFiles(const fs::path& dir)
+{
+  DevOnlyAutoTraceConfigPaths out;
+  out.commandConfig = dir / "command_config.json";
+  out.skeletonizeCfg = dir / "skeletonize.json";
+  out.traceCfg = dir / "trace_config.json";
+
+  writeTextFile(out.commandConfig,
+                R"json({
+  "skeletonize": {
+    "include": "skeletonize.json"
+  },
+  "trace": {
+    "include": "trace_config.json"
+  }
+}
+)json");
+
+  writeTextFile(out.skeletonizeCfg,
+                R"json({
+  "downsampleInterval": [0, 0, 0],
+  "minimalLength": 40,
+  "finalMinimalLength": 0,
+  "keepingSingleObject": true,
+  "rebase": true,
+  "fillingHole": true,
+  "maximalDistance": 100
+}
+)json");
+
+  writeTextFile(out.traceCfg,
+                R"json({
+  "tag": "trace configuration",
+  "default": {
+    "minimalScoreAuto": 0.3,
+    "minimalScoreManual": 0.3,
+    "minimalScoreSeed": 0.35,
+    "minimalScore2d": 0.5,
+    "refit": false,
+    "spTest": false,
+    "crossoverTest": false,
+    "tuneEnd": true,
+    "edgePath": false,
+    "enhanceMask": false,
+    "seedMethod": 1,
+    "recover": 1,
+    "maxEucDist": 10
+  },
+  "level": {
+    "1": {
+      "seedMethod": 2,
+      "recover": 0
+    },
+    "2": {
+      "seedMethod": 2,
+      "recover": 1
+    },
+    "3": {
+      "seedMethod": 2,
+      "spTest": true,
+      "recover": 1
+    },
+    "4": {
+      "seedMethod": 2,
+      "spTest": true,
+      "enhanceMask": true,
+      "recover": 1
+    },
+    "5": {
+      "seedMethod": 2,
+      "spTest": true,
+      "enhanceMask": true,
+      "recover": 1
+    },
+    "6": {
+      "seedMethod": 2,
+      "spTest": true,
+      "enhanceMask": true,
+      "recover": 1,
+      "refit": true
+    }
+  }
+}
+)json");
+
+  return out;
+}
 
 TEST(NeutubeImagePortsParity, Bwdist3dSquaredU16_MatchesLegacyC)
 {
@@ -413,6 +572,308 @@ void writeSimpleLineTiff(const fs::path& path, size_t w, size_t h, size_t d, uin
   }
 
   img.save(QString::fromStdString(path.string()));
+}
+
+[[nodiscard]] size_t firstDiffIndex(std::string_view a, std::string_view b)
+{
+  const size_t n = std::min(a.size(), b.size());
+  for (size_t i = 0; i < n; ++i) {
+    if (a[i] != b[i]) {
+      return i;
+    }
+  }
+  return n;
+}
+
+[[nodiscard]] std::pair<size_t, size_t> lineColFromIndex(std::string_view text, size_t index)
+{
+  size_t line = 1;
+  size_t col = 1;
+  const size_t n = std::min(index, text.size());
+  for (size_t i = 0; i < n; ++i) {
+    if (text[i] == '\n') {
+      ++line;
+      col = 1;
+    } else {
+      ++col;
+    }
+  }
+  return {line, col};
+}
+
+[[nodiscard]] std::string lineAt(std::string_view text, size_t index)
+{
+  const size_t n = text.size();
+  const size_t i = std::min(index, n);
+
+  size_t begin = i;
+  while (begin > 0 && text[begin - 1] != '\n') {
+    --begin;
+  }
+
+  size_t end = i;
+  while (end < n && text[end] != '\n') {
+    ++end;
+  }
+
+  return std::string(text.substr(begin, end - begin));
+}
+
+struct VolumeDigest
+{
+  size_t width = 0;
+  size_t height = 0;
+  size_t depth = 0;
+  size_t voxelNumber = 0;
+  size_t bytesPerVoxel = 0;
+  uint64_t hash = 0;
+  uint64_t nonzero = 0;
+  uint64_t minValue = 0;
+  uint64_t maxValue = 0;
+};
+
+template<typename T>
+[[nodiscard]] VolumeDigest digestVolume(const T* data, size_t w, size_t h, size_t d)
+{
+  CHECK(data != nullptr);
+
+  VolumeDigest out;
+  out.width = w;
+  out.height = h;
+  out.depth = d;
+  out.voxelNumber = w * h * d;
+  out.bytesPerVoxel = sizeof(T);
+
+  constexpr uint64_t FnvOffset = 14695981039346656037ull;
+  constexpr uint64_t FnvPrime = 1099511628211ull;
+
+  uint64_t h64 = FnvOffset;
+  uint64_t minV = std::numeric_limits<uint64_t>::max();
+  uint64_t maxV = 0;
+  uint64_t nonzero = 0;
+
+  for (size_t i = 0; i < out.voxelNumber; ++i) {
+    const uint64_t v = static_cast<uint64_t>(data[i]);
+    if (v != 0) {
+      ++nonzero;
+    }
+    minV = std::min(minV, v);
+    maxV = std::max(maxV, v);
+    h64 ^= v + 0x9e3779b97f4a7c15ull + (h64 << 6) + (h64 >> 2);
+    h64 *= FnvPrime;
+  }
+
+  out.hash = h64;
+  out.nonzero = nonzero;
+  out.minValue = (out.voxelNumber == 0) ? 0 : minV;
+  out.maxValue = maxV;
+  return out;
+}
+
+[[nodiscard]] VolumeDigest digestZImgU8OrU16(const nim::ZImg& img)
+{
+  CHECK(img.numChannels() == 1);
+  CHECK(img.numTimes() == 1);
+
+  if (img.isType<uint8_t>()) {
+    return digestVolume(img.timeData<uint8_t>(0), img.width(), img.height(), img.depth());
+  }
+  if (img.isType<uint16_t>()) {
+    return digestVolume(img.timeData<uint16_t>(0), img.width(), img.height(), img.depth());
+  }
+
+  CHECK(false) << "digestZImgU8OrU16: unsupported type: " << img.info();
+  return {};
+}
+
+[[nodiscard]] VolumeDigest digestLegacyStackU8OrU16(const Stack* stack)
+{
+  CHECK(stack != nullptr);
+
+  const size_t w = static_cast<size_t>(stack->width);
+  const size_t h = static_cast<size_t>(stack->height);
+  const size_t d = static_cast<size_t>(stack->depth);
+
+  if (stack->kind == GREY) {
+    return digestVolume(stack->array, w, h, d);
+  }
+  if (stack->kind == GREY16) {
+    return digestVolume(reinterpret_cast<const uint16_t*>(stack->array), w, h, d);
+  }
+
+  CHECK(false) << "digestLegacyStackU8OrU16: unsupported kind=" << stack->kind;
+  return {};
+}
+
+template<typename T>
+[[nodiscard]] std::optional<std::tuple<size_t, size_t, size_t, uint64_t, uint64_t>>
+firstMismatch(const T* a, const T* b, size_t w, size_t h, size_t d)
+{
+  CHECK(a != nullptr);
+  CHECK(b != nullptr);
+  const size_t voxelNumber = w * h * d;
+  const size_t plane = w * h;
+
+  for (size_t idx = 0; idx < voxelNumber; ++idx) {
+    if (a[idx] == b[idx]) {
+      continue;
+    }
+    const size_t z = idx / plane;
+    const size_t rem = idx - z * plane;
+    const size_t y = rem / w;
+    const size_t x = rem - y * w;
+    return std::make_tuple(x, y, z, static_cast<uint64_t>(a[idx]), static_cast<uint64_t>(b[idx]));
+  }
+  return std::nullopt;
+}
+
+struct IntSeed
+{
+  int x = 0;
+  int y = 0;
+  int z = 0;
+  double value = 0.0;
+};
+
+[[nodiscard]] std::vector<IntSeed> toIntSeeds(const Geo3d_Scalar_Field* field)
+{
+  std::vector<IntSeed> out;
+  if (field == nullptr) {
+    return out;
+  }
+  out.reserve(static_cast<size_t>(field->size));
+  for (int i = 0; i < field->size; ++i) {
+    IntSeed s;
+    s.x = static_cast<int>(field->points[i][0]);
+    s.y = static_cast<int>(field->points[i][1]);
+    s.z = static_cast<int>(field->points[i][2]);
+    s.value = field->values[i];
+    out.push_back(s);
+  }
+  return out;
+}
+
+[[nodiscard]] std::vector<IntSeed> toIntSeeds(const nim::Geo3dScalarField& field)
+{
+  std::vector<IntSeed> out;
+  out.reserve(field.size());
+  for (size_t i = 0; i < field.size(); ++i) {
+    IntSeed s;
+    s.x = static_cast<int>(field.points[i][0]);
+    s.y = static_cast<int>(field.points[i][1]);
+    s.z = static_cast<int>(field.points[i][2]);
+    s.value = field.values[i];
+    out.push_back(s);
+  }
+  return out;
+}
+
+[[nodiscard]] Geo3d_Scalar_Field* extractSeedOriginalLegacyC(const Stack* mask)
+{
+  CHECK(mask != nullptr);
+  CHECK(mask->kind == GREY) << "Legacy seed extraction expects GREY mask, got kind=" << mask->kind;
+
+  Stack* dist = Stack_Bwdist_L_U16(mask, nullptr, /*pad*/ 0);
+  CHECK(dist != nullptr);
+
+  Stack* seeds = Stack_Local_Max(dist, nullptr, STACK_LOCMAX_CENTER);
+  CHECK(seeds != nullptr);
+
+  Voxel_List* list = Stack_To_Voxel_List(seeds);
+  CHECK(list != nullptr);
+
+  Pixel_Array* pa = Voxel_List_Sampling(dist, list);
+  CHECK(pa != nullptr);
+
+  Kill_Stack(dist);
+  dist = nullptr;
+
+  Voxel_P* voxelArray = Voxel_List_To_Array(list, 1, nullptr, nullptr);
+  CHECK(voxelArray != nullptr);
+
+  const auto* paArray = reinterpret_cast<const uint16_t*>(pa->array);
+
+  Geo3d_Scalar_Field* field = Make_Geo3d_Scalar_Field(pa->size);
+  CHECK(field != nullptr);
+  field->size = 0;
+
+  for (int i = 0; i < pa->size; ++i) {
+    if (IS_IN_OPEN_RANGE3(voxelArray[i]->x,
+                          voxelArray[i]->y,
+                          voxelArray[i]->z,
+                          0,
+                          seeds->width - 1,
+                          0,
+                          seeds->height - 1,
+                          0,
+                          seeds->depth - 1)) {
+      field->points[field->size][0] = voxelArray[i]->x;
+      field->points[field->size][1] = voxelArray[i]->y;
+      field->points[field->size][2] = voxelArray[i]->z;
+      field->values[field->size] = std::sqrt(static_cast<double>(paArray[i]));
+      field->size++;
+    }
+  }
+
+  Kill_Voxel_List(list);
+  Kill_Pixel_Array(pa);
+  free(voxelArray);
+  Kill_Stack(seeds);
+
+  return field;
+}
+
+struct LegacyRemoveNoisySeedResult
+{
+  Geo3d_Scalar_Field* seeds = nullptr;
+  Stack* mask = nullptr;
+  double seedDensity = 0.0;
+  int minSeedSize = 0;
+};
+
+[[nodiscard]] LegacyRemoveNoisySeedResult
+removeNoisySeedLegacyC(Geo3d_Scalar_Field* seeds, Stack* mask, int seedMethod, bool screeningSeed)
+{
+  LegacyRemoveNoisySeedResult out;
+  out.seeds = seeds;
+  out.mask = mask;
+
+  if (mask == nullptr || seeds == nullptr) {
+    return out;
+  }
+
+  const double voxelNumber = static_cast<double>(static_cast<size_t>(mask->width) * mask->height * mask->depth);
+  const double seedDensity = (voxelNumber == 0.0) ? 0.0 : static_cast<double>(seeds->size) / voxelNumber;
+  const int minSeedSize = screeningSeed ? static_cast<int>(seedDensity * 16000.0) : 0;
+
+  out.seedDensity = seedDensity;
+  out.minSeedSize = minSeedSize;
+
+  if (minSeedSize <= 0) {
+    return out;
+  }
+
+  Stack* tmp = Copy_Stack(mask);
+  CHECK(tmp != nullptr);
+  mask = Stack_Remove_Small_Object(tmp, mask, minSeedSize, 26);
+  Kill_Stack(tmp);
+
+  if (mask->kind != GREY) {
+    C_Stack::translate(mask, GREY, 1);
+  }
+
+  Kill_Geo3d_Scalar_Field(seeds);
+  seeds = nullptr;
+
+  if (seedMethod == 1) {
+    seeds = extractSeedOriginalLegacyC(mask);
+  } else {
+    CHECK(false) << "removeNoisySeedLegacyC: seedMethod=" << seedMethod << " not supported in this diagnostic helper.";
+  }
+
+  out.seeds = seeds;
+  out.mask = mask;
+  return out;
 }
 
 [[nodiscard]] std::vector<uint32_t> toU32Labels(const nim::ZImg& img)
@@ -2696,6 +3157,524 @@ TEST(NeutubeCommand2Parity, Skeletonize_FromTestDataBinary_MatchesLegacy)
 
   std::error_code ec;
   fs::remove_all(dir, ec);
+}
+
+TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_DevOnly)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const fs::path input =
+    fs::path(QDir::homePath().toStdString()) / "Dropbox/atlas_test/slice15/slice15_L34_Sum.lsm_ch2.tif";
+  if (!fs::exists(input)) {
+    GTEST_SKIP() << "Missing dev-only auto-trace input: " << input.string();
+  }
+
+  const fs::path dir = makeUniqueTempDir();
+  const DevOnlyAutoTraceConfigPaths cfgPaths = writeDevOnlyAutoTraceConfigFiles(dir);
+
+  nim::TraceConfig portedCfg;
+  ASSERT_TRUE(nim::loadTraceConfigLegacyLike(cfgPaths.traceCfg.string(), portedCfg));
+  EXPECT_EQ(portedCfg.seedMethod, 1) << "This diagnostic helper currently expects seedMethod=1.";
+
+  // Load raw signal through both legacy (ZStack) and ported (ZImg) IO to ensure we are comparing the same input.
+  ZStack legacySignalStack;
+  ASSERT_TRUE(legacySignalStack.load(input.string()));
+
+  Stack* legacySignal = legacySignalStack.c_stack(0);
+  ASSERT_NE(legacySignal, nullptr);
+
+  nim::ZImg portedSignal;
+  portedSignal.load(QString::fromStdString(input.string()));
+  ASSERT_FALSE(portedSignal.isEmpty());
+  ASSERT_EQ(portedSignal.numChannels(), 1);
+  ASSERT_EQ(portedSignal.numTimes(), 1);
+
+  {
+    SCOPED_TRACE("raw_signal");
+    const VolumeDigest legacyRaw = digestLegacyStackU8OrU16(legacySignal);
+    const VolumeDigest portedRaw = digestZImgU8OrU16(portedSignal);
+
+    ASSERT_EQ(legacyRaw.width, portedRaw.width);
+    ASSERT_EQ(legacyRaw.height, portedRaw.height);
+    ASSERT_EQ(legacyRaw.depth, portedRaw.depth);
+    ASSERT_EQ(legacyRaw.bytesPerVoxel, portedRaw.bytesPerVoxel);
+
+    if (legacyRaw.hash != portedRaw.hash) {
+      ADD_FAILURE() << fmt::format("Raw signal mismatch: legacy hash={} ported hash={} (nonzero legacy={} ported={})",
+                                   legacyRaw.hash,
+                                   portedRaw.hash,
+                                   legacyRaw.nonzero,
+                                   portedRaw.nonzero);
+
+      if (legacyRaw.bytesPerVoxel == 1) {
+        const auto* a = legacySignal->array;
+        const auto* b = portedSignal.timeData<uint8_t>(0);
+        const auto mismatch = firstMismatch(a, b, legacyRaw.width, legacyRaw.height, legacyRaw.depth);
+        if (mismatch) {
+          const auto [x, y, z, va, vb] = *mismatch;
+          ADD_FAILURE()
+            << fmt::format("First raw signal mismatch at ({}, {}, {}): legacy={} ported={}", x, y, z, va, vb);
+        }
+      } else if (legacyRaw.bytesPerVoxel == 2) {
+        const auto* a = reinterpret_cast<const uint16_t*>(legacySignal->array);
+        const auto* b = portedSignal.timeData<uint16_t>(0);
+        const auto mismatch = firstMismatch(a, b, legacyRaw.width, legacyRaw.height, legacyRaw.depth);
+        if (mismatch) {
+          const auto [x, y, z, va, vb] = *mismatch;
+          ADD_FAILURE()
+            << fmt::format("First raw signal mismatch at ({}, {}, {}): legacy={} ported={}", x, y, z, va, vb);
+        }
+      }
+    }
+  }
+
+  // Preprocess (subtract background).
+  ZNeuronTracerConfig::getInstance().load(cfgPaths.traceCfg.string());
+
+  ZNeuronTracer legacyTracer;
+  legacyTracer.setIntensityField(&legacySignalStack);
+  legacyTracer.setTraceLevel(/*level*/ 0);
+  legacyTracer.initTraceMask(/*clearing*/ false);
+
+  if (legacyTracer._preprocess) {
+    legacyTracer._preprocess(legacySignal);
+  }
+
+  (void)nim::subtractBackgroundLegacyLike(portedSignal, /*minFr*/ 0.5, /*maxIter*/ 3);
+
+  {
+    SCOPED_TRACE("preprocessed_signal");
+    const VolumeDigest legacyPre = digestLegacyStackU8OrU16(legacySignal);
+    const VolumeDigest portedPre = digestZImgU8OrU16(portedSignal);
+
+    ASSERT_EQ(legacyPre.width, portedPre.width);
+    ASSERT_EQ(legacyPre.height, portedPre.height);
+    ASSERT_EQ(legacyPre.depth, portedPre.depth);
+    ASSERT_EQ(legacyPre.bytesPerVoxel, portedPre.bytesPerVoxel);
+
+    if (legacyPre.hash != portedPre.hash) {
+      ADD_FAILURE() << fmt::format("Preprocessed signal mismatch: legacy hash={} ported hash={}",
+                                   legacyPre.hash,
+                                   portedPre.hash);
+
+      if (legacyPre.bytesPerVoxel == 1) {
+        const auto* a = legacySignal->array;
+        const auto* b = portedSignal.timeData<uint8_t>(0);
+        const auto mismatch = firstMismatch(a, b, legacyPre.width, legacyPre.height, legacyPre.depth);
+        if (mismatch) {
+          const auto [x, y, z, va, vb] = *mismatch;
+          ADD_FAILURE()
+            << fmt::format("First preprocessed signal mismatch at ({}, {}, {}): legacy={} ported={}", x, y, z, va, vb);
+        }
+      } else if (legacyPre.bytesPerVoxel == 2) {
+        const auto* a = reinterpret_cast<const uint16_t*>(legacySignal->array);
+        const auto* b = portedSignal.timeData<uint16_t>(0);
+        const auto mismatch = firstMismatch(a, b, legacyPre.width, legacyPre.height, legacyPre.depth);
+        if (mismatch) {
+          const auto [x, y, z, va, vb] = *mismatch;
+          ADD_FAILURE()
+            << fmt::format("First preprocessed signal mismatch at ({}, {}, {}): legacy={} ported={}", x, y, z, va, vb);
+        }
+      }
+    }
+  }
+
+  // Mask generation.
+  Stack* legacyMask = legacyTracer.makeMask(legacySignal);
+  ASSERT_NE(legacyMask, nullptr);
+  ASSERT_EQ(legacyMask->kind, GREY);
+
+  nim::MakeMaskDiagnosticsLegacyLike maskDiag;
+  std::optional<nim::ZImg> portedMaskOpt = nim::makeMaskLegacyLike(portedSignal, portedCfg, &maskDiag);
+  ASSERT_TRUE(portedMaskOpt.has_value());
+  nim::ZImg portedMask = std::move(*portedMaskOpt);
+
+  {
+    SCOPED_TRACE("mask");
+    const VolumeDigest legacyMaskDigest = digestLegacyStackU8OrU16(legacyMask);
+    const VolumeDigest portedMaskDigest = digestZImgU8OrU16(portedMask);
+
+    ASSERT_EQ(legacyMaskDigest.width, portedMaskDigest.width);
+    ASSERT_EQ(legacyMaskDigest.height, portedMaskDigest.height);
+    ASSERT_EQ(legacyMaskDigest.depth, portedMaskDigest.depth);
+    ASSERT_EQ(legacyMaskDigest.bytesPerVoxel, 1u);
+    ASSERT_EQ(portedMaskDigest.bytesPerVoxel, 1u);
+
+    if (legacyMaskDigest.hash != portedMaskDigest.hash) {
+      ADD_FAILURE() << fmt::format("Mask mismatch: legacy hash={} ported hash={} (nonzero legacy={} ported={})",
+                                   legacyMaskDigest.hash,
+                                   portedMaskDigest.hash,
+                                   legacyMaskDigest.nonzero,
+                                   portedMaskDigest.nonzero);
+
+      const auto* a = legacyMask->array;
+      const auto* b = portedMask.timeData<uint8_t>(0);
+      const auto mismatch =
+        firstMismatch(a, b, legacyMaskDigest.width, legacyMaskDigest.height, legacyMaskDigest.depth);
+      if (mismatch) {
+        const auto [x, y, z, va, vb] = *mismatch;
+        ADD_FAILURE() << fmt::format("First mask mismatch at ({}, {}, {}): legacy={} ported={}", x, y, z, va, vb);
+      }
+    }
+  }
+
+  // Seed extraction (pre-noise-removal).
+  Geo3d_Scalar_Field* legacySeeds0 = extractSeedOriginalLegacyC(legacyMask);
+  ASSERT_NE(legacySeeds0, nullptr);
+
+  nim::Geo3dScalarField portedSeeds0 = nim::extractSeedOriginalLegacyLike(portedMask);
+
+  {
+    SCOPED_TRACE("seed_extract_pre_noise");
+    const auto legacySeedsVec = toIntSeeds(legacySeeds0);
+    const auto portedSeedsVec = toIntSeeds(portedSeeds0);
+
+    ASSERT_EQ(legacySeedsVec.size(), portedSeedsVec.size());
+
+    for (size_t i = 0; i < legacySeedsVec.size(); ++i) {
+      const auto& a = legacySeedsVec[i];
+      const auto& b = portedSeedsVec[i];
+      if (a.x != b.x || a.y != b.y || a.z != b.z || std::abs(a.value - b.value) > 1e-12) {
+        ADD_FAILURE() << fmt::format("Seed mismatch at i={}: legacy=({}, {}, {}, {}) ported=({}, {}, {}, {})",
+                                     i,
+                                     a.x,
+                                     a.y,
+                                     a.z,
+                                     a.value,
+                                     b.x,
+                                     b.y,
+                                     b.z,
+                                     b.value);
+        break;
+      }
+    }
+  }
+
+  // Noise removal (may mutate mask + recompute seeds).
+  LegacyRemoveNoisySeedResult legacyNoisy =
+    removeNoisySeedLegacyC(legacySeeds0, legacyMask, /*seedMethod*/ portedCfg.seedMethod, /*screeningSeed*/ true);
+  ASSERT_NE(legacyNoisy.seeds, nullptr);
+  ASSERT_NE(legacyNoisy.mask, nullptr);
+
+  nim::RemoveNoisySeedDiagnosticsLegacyLike portedNoisyDiag;
+  nim::Geo3dScalarField portedSeeds1 = nim::removeNoisySeedLegacyLike(std::move(portedSeeds0),
+                                                                      portedMask,
+                                                                      portedCfg.seedMethod,
+                                                                      /*screeningSeed*/ true,
+                                                                      &portedNoisyDiag);
+
+  EXPECT_NEAR(legacyNoisy.seedDensity, portedNoisyDiag.seedDensity, 0.0);
+  EXPECT_EQ(legacyNoisy.minSeedSize, portedNoisyDiag.minSeedSize);
+
+  {
+    SCOPED_TRACE("mask_after_noise_removal");
+    const VolumeDigest legacyMaskDigest = digestLegacyStackU8OrU16(legacyNoisy.mask);
+    const VolumeDigest portedMaskDigest = digestZImgU8OrU16(portedMask);
+
+    ASSERT_EQ(legacyMaskDigest.hash, portedMaskDigest.hash)
+      << fmt::format("legacy nonzero={} ported nonzero={}", legacyMaskDigest.nonzero, portedMaskDigest.nonzero);
+  }
+
+  {
+    SCOPED_TRACE("seed_extract_post_noise");
+    const auto legacySeedsVec = toIntSeeds(legacyNoisy.seeds);
+    const auto portedSeedsVec = toIntSeeds(portedSeeds1);
+
+    ASSERT_EQ(legacySeedsVec.size(), portedSeedsVec.size());
+    for (size_t i = 0; i < legacySeedsVec.size(); ++i) {
+      const auto& a = legacySeedsVec[i];
+      const auto& b = portedSeedsVec[i];
+      if (a.x != b.x || a.y != b.y || a.z != b.z || std::abs(a.value - b.value) > 1e-12) {
+        ADD_FAILURE() << fmt::format("Seed mismatch at i={}: legacy=({}, {}, {}, {}) ported=({}, {}, {}, {})",
+                                     i,
+                                     a.x,
+                                     a.y,
+                                     a.z,
+                                     a.value,
+                                     b.x,
+                                     b.y,
+                                     b.z,
+                                     b.value);
+        break;
+      }
+    }
+  }
+
+  // Sort seeds.
+  legacyTracer.prepareTraceScoreThreshold(ZNeuronTracer::TRACING_SEED);
+  ZNeuronTraceSeeder legacySeeder;
+  Stack* legacyBaseMask = legacySeeder.sortSeed(legacyNoisy.seeds, legacySignal, legacyTracer.getTraceWorkspace());
+  ASSERT_NE(legacyBaseMask, nullptr);
+
+  nim::TraceWorkspace portedTw;
+  nim::locsegChainDefaultTraceWorkspaceLegacyLike(portedTw, portedSignal);
+  portedTw.refit = portedCfg.refit;
+  portedTw.tuneEnd = portedCfg.tuneEnd;
+  portedTw.traceMaskUpdating = true;
+  nim::traceWorkspaceInitTraceMaskLegacyLike(portedTw, portedSignal, /*clearing*/ false);
+  nim::prepareTraceScoreThresholdLegacyLike(portedSignal, portedCfg, nim::TracingModeLegacyLike::Seed, portedTw);
+  const nim::SeedSortResultLegacyLike portedSorted = nim::sortSeedsLegacyLike(portedSeeds1, portedSignal, portedTw);
+
+  {
+    SCOPED_TRACE("base_mask_after_seed_sort");
+    const VolumeDigest legacyBaseDigest = digestLegacyStackU8OrU16(legacyBaseMask);
+    const VolumeDigest portedBaseDigest = digestZImgU8OrU16(portedSorted.baseMask);
+    ASSERT_EQ(legacyBaseDigest.hash, portedBaseDigest.hash)
+      << fmt::format("legacy nonzero={} ported nonzero={}", legacyBaseDigest.nonzero, portedBaseDigest.nonzero);
+  }
+
+  ASSERT_EQ(legacySeeder.getScoreArray().size(), portedSorted.scoreArray.size());
+
+  for (size_t i = 0; i < legacySeeder.getScoreArray().size(); ++i) {
+    const double a = legacySeeder.getScoreArray()[i];
+    const double b = portedSorted.scoreArray[i];
+    if (std::abs(a - b) > 1e-10) {
+      ADD_FAILURE() << fmt::format("Seed score mismatch at i={}: legacy={} ported={}", i, a, b);
+      break;
+    }
+  }
+
+  // Trace all seeds (initial stage) and compare chain counts/lengths.
+  legacyTracer.prepareTraceScoreThreshold(ZNeuronTracer::TRACING_AUTO);
+  nim::prepareTraceScoreThresholdLegacyLike(portedSignal, portedCfg, nim::TracingModeLegacyLike::Auto, portedTw);
+
+  std::vector<Local_Neuroseg> legacyLocsegs = legacySeeder.getSeedArray();
+  std::vector<double> legacyScores = legacySeeder.getScoreArray();
+
+  std::vector<nim::LocalNeuroseg> portedLocsegs = portedSorted.locsegArray;
+  std::vector<double> portedScores = portedSorted.scoreArray;
+
+  int legacyNchain = 0;
+  Locseg_Chain** legacyChainsRaw = nullptr;
+  {
+    ScopedStdoutSilencer silence;
+    legacyChainsRaw = Trace_Locseg_S(legacySignal,
+                                     /*z_scale*/ 1.0,
+                                     legacyLocsegs.data(),
+                                     legacyScores.data(),
+                                     static_cast<int>(legacyLocsegs.size()),
+                                     legacyTracer.getTraceWorkspace(),
+                                     &legacyNchain);
+  }
+  ASSERT_NE(legacyChainsRaw, nullptr);
+  ASSERT_GE(legacyNchain, 0);
+
+  std::vector<Locseg_Chain*> legacyChains;
+  legacyChains.reserve(static_cast<size_t>(legacyNchain));
+  for (int i = 0; i < legacyNchain; ++i) {
+    legacyChains.push_back(legacyChainsRaw[i]);
+  }
+  free(legacyChainsRaw);
+
+  std::vector<std::unique_ptr<nim::LocsegChain>> portedChains;
+  {
+    ScopedStdoutSilencer silence;
+    portedChains = nim::traceAllSeedsLegacyLike(portedSignal, /*zScale*/ 1.0, portedLocsegs, portedScores, portedTw);
+  }
+
+  ASSERT_EQ(static_cast<size_t>(legacyNchain), portedChains.size());
+
+  for (size_t i = 0; i < portedChains.size(); ++i) {
+    const double a = Locseg_Chain_Geolen(legacyChains[i]);
+    const double b = nim::locsegChainGeolenLegacyLike(*portedChains[i]);
+    if (std::abs(a - b) > 1e-6) {
+      ADD_FAILURE() << fmt::format("Chain geolen mismatch at i={}: legacy={} ported={}", i, a, b);
+      break;
+    }
+  }
+
+  for (Locseg_Chain* c : legacyChains) {
+    Kill_Locseg_Chain(c);
+  }
+
+  // Recover stage and compare recovered chain counts/lengths.
+  if (portedCfg.recover > 0) {
+    // Legacy leftover computation:
+    //   traceMaskBinary = (trace_mask > 0) OR (baseMask == 1)
+    //   traceMaskBinary = leftover - dilate(traceMaskBinary, 5)
+    //   leftover = removeSmallObjects(traceMaskBinary, 27)
+    Stack* legacyLeftover = Copy_Stack(legacyMask);
+    ASSERT_NE(legacyLeftover, nullptr);
+
+    Stack* legacyTraceMaskBinary = Make_Stack(GREY, legacyMask->width, legacyMask->height, legacyMask->depth);
+    ASSERT_NE(legacyTraceMaskBinary, nullptr);
+
+    const size_t legacyVoxelNumber = static_cast<size_t>(legacyMask->width) * legacyMask->height * legacyMask->depth;
+    const auto* legacyTraceMaskLabels =
+      reinterpret_cast<const uint16_t*>(legacyTracer.getTraceWorkspace()->trace_mask->array);
+    auto* legacyTraceBin = legacyTraceMaskBinary->array;
+    const auto* legacyBase = legacyBaseMask->array;
+    for (size_t i = 0; i < legacyVoxelNumber; ++i) {
+      legacyTraceBin[i] = (legacyTraceMaskLabels[i] > 0 || legacyBase[i] == 1) ? uint8_t{1} : uint8_t{0};
+    }
+
+    Stack* legacySubmask = Stack_Z_Dilate(legacyTraceMaskBinary, /*size*/ 5, legacySignal, nullptr);
+    ASSERT_NE(legacySubmask, nullptr);
+    Stack_Bsub(legacyLeftover, legacySubmask, legacyTraceMaskBinary);
+    Kill_Stack(legacySubmask);
+    legacySubmask = nullptr;
+
+    Stack_Remove_Small_Object(legacyTraceMaskBinary, legacyLeftover, /*minSize*/ 27, /*connectivity*/ 26);
+    C_Stack::translate(legacyLeftover, GREY, 1);
+    Kill_Stack(legacyTraceMaskBinary);
+    legacyTraceMaskBinary = nullptr;
+
+    std::vector<Locseg_Chain*> legacyRecoveredChains;
+    Stack* legacyRecoverBaseMask = nullptr;
+    if (!Stack_Is_Dark(legacyLeftover)) {
+      const double originalMinChainLength = legacyTracer.getTraceWorkspace()->min_chain_length;
+      if (legacyTracer.getTraceWorkspace()->refit == _FALSE_) {
+        legacyTracer.getTraceWorkspace()->min_chain_length = (NEUROSEG_DEFAULT_H - 1.0) * 2.0 - 1.0;
+      } else {
+        legacyTracer.getTraceWorkspace()->min_chain_length = (NEUROSEG_DEFAULT_H - 1.0) * 1.5 - 1.0;
+      }
+
+      Geo3d_Scalar_Field* legacyRecoverSeeds = extractSeedOriginalLegacyC(legacyLeftover);
+      ASSERT_NE(legacyRecoverSeeds, nullptr);
+      Kill_Stack(legacyLeftover);
+      legacyLeftover = nullptr;
+
+      legacyTracer.prepareTraceScoreThreshold(ZNeuronTracer::TRACING_SEED);
+      ZNeuronTraceSeeder legacyRecoverSeeder;
+      legacyRecoverBaseMask =
+        legacyRecoverSeeder.sortSeed(legacyRecoverSeeds, legacySignal, legacyTracer.getTraceWorkspace());
+      ASSERT_NE(legacyRecoverBaseMask, nullptr);
+      Kill_Geo3d_Scalar_Field(legacyRecoverSeeds);
+      legacyRecoverSeeds = nullptr;
+
+      legacyTracer.prepareTraceScoreThreshold(ZNeuronTracer::TRACING_AUTO);
+      std::vector<Local_Neuroseg> legacyRecoverLocsegs = legacyRecoverSeeder.getSeedArray();
+      std::vector<double> legacyRecoverScores = legacyRecoverSeeder.getScoreArray();
+
+      int legacyRecoverNchain = 0;
+      Locseg_Chain** legacyRecoverChainsRaw = nullptr;
+      {
+        ScopedStdoutSilencer silence;
+        legacyRecoverChainsRaw = Trace_Locseg_S(legacySignal,
+                                                /*z_scale*/ 1.0,
+                                                legacyRecoverLocsegs.data(),
+                                                legacyRecoverScores.data(),
+                                                static_cast<int>(legacyRecoverLocsegs.size()),
+                                                legacyTracer.getTraceWorkspace(),
+                                                &legacyRecoverNchain);
+      }
+      ASSERT_NE(legacyRecoverChainsRaw, nullptr);
+      ASSERT_GE(legacyRecoverNchain, 0);
+
+      legacyRecoveredChains.reserve(static_cast<size_t>(legacyRecoverNchain));
+      for (int i = 0; i < legacyRecoverNchain; ++i) {
+        legacyRecoveredChains.push_back(legacyRecoverChainsRaw[i]);
+      }
+      free(legacyRecoverChainsRaw);
+
+      legacyTracer.getTraceWorkspace()->min_chain_length = originalMinChainLength;
+    } else {
+      Kill_Stack(legacyLeftover);
+      legacyLeftover = nullptr;
+    }
+
+    std::optional<nim::ZImg> portedBaseMaskForRecover = portedSorted.baseMask;
+    nim::RecoverResultLegacyLike portedRecover =
+      nim::recoverLegacyLike(portedSignal, portedCfg, portedMask, std::move(portedBaseMaskForRecover), portedTw);
+
+    ASSERT_EQ(legacyRecoveredChains.size(), portedRecover.chains.size());
+
+    for (size_t i = 0; i < portedRecover.chains.size(); ++i) {
+      const double a = Locseg_Chain_Geolen(legacyRecoveredChains[i]);
+      const double b = nim::locsegChainGeolenLegacyLike(*portedRecover.chains[i]);
+      if (std::abs(a - b) > 1e-6) {
+        ADD_FAILURE() << fmt::format("Recovered chain geolen mismatch at i={}: legacy={} ported={}", i, a, b);
+        break;
+      }
+    }
+
+    for (Locseg_Chain* c : legacyRecoveredChains) {
+      Kill_Locseg_Chain(c);
+    }
+    if (legacyRecoverBaseMask != nullptr) {
+      Kill_Stack(legacyRecoverBaseMask);
+    }
+  }
+
+  Kill_Stack(legacyBaseMask);
+  Kill_Geo3d_Scalar_Field(legacyNoisy.seeds);
+  Kill_Stack(legacyMask);
+
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+}
+
+TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
+{
+  ScopedQtCoreApplication qtApp;
+  std::ignore = nim::ZImgInit::instance("", "", "", false);
+
+  const fs::path input =
+    fs::path(QDir::homePath().toStdString()) / "Dropbox/atlas_test/slice15/slice15_L34_Sum.lsm_ch2.tif";
+  if (!fs::exists(input)) {
+    GTEST_SKIP() << "Missing dev-only auto-trace input: " << input.string();
+  }
+
+  const fs::path dir = makeUniqueTempDir();
+  const DevOnlyAutoTraceConfigPaths cfgPaths = writeDevOnlyAutoTraceConfigFiles(dir);
+  const fs::path legacyOut = dir / "legacy_autotrace.swc";
+  const fs::path v2Out = dir / "v2_autotrace.swc";
+
+  const int legacyRc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      input.string(),
+      "-o",
+      legacyOut.string(),
+      "--config",
+      cfgPaths.commandConfig.string(),
+    });
+    return nim::ZRunNeuTuCommand().run(argv.argc(), argv.argv());
+  }();
+
+  const int v2Rc = [&]() {
+    ArgvBuilder argv({
+      "Atlas",
+      "--command",
+      "--trace",
+      input.string(),
+      "-o",
+      v2Out.string(),
+      "--config",
+      cfgPaths.commandConfig.string(),
+    });
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+  }();
+
+  EXPECT_EQ(legacyRc, v2Rc);
+  EXPECT_EQ(legacyRc, 0);
+
+  ASSERT_TRUE(fs::exists(legacyOut)) << legacyOut.string();
+  ASSERT_TRUE(fs::exists(v2Out)) << v2Out.string();
+  const std::string legacyText = readTextFile(legacyOut);
+  const std::string v2Text = readTextFile(v2Out);
+  if (legacyText != v2Text) {
+    const size_t i = firstDiffIndex(legacyText, v2Text);
+    const auto [line, col] = lineColFromIndex(legacyText, i);
+    const std::string legacyLine = lineAt(legacyText, i);
+    const std::string v2Line = lineAt(v2Text, i);
+    ADD_FAILURE() << fmt::format("Auto-trace SWC mismatch at byte {} (line {}, col {}).\nLegacy: {}\nV2: {}\n"
+                                 "Keeping outputs for inspection under: {}",
+                                 i,
+                                 line,
+                                 col,
+                                 legacyLine,
+                                 v2Line,
+                                 dir.string());
+  }
+
+  if (legacyText == v2Text) {
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+  }
 }
 
 TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)

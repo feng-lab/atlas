@@ -9,7 +9,7 @@
 namespace nim {
 
 class ZImg;
-
+class ZVoxelVolume;
 }
 
 namespace nim {
@@ -42,12 +42,21 @@ struct Geo3dScalarField
                                                                           size_t c = 0,
                                                                           size_t t = 0);
 
+// Overload for read-only voxel volumes (single-channel/time view).
+[[nodiscard]] std::vector<double>
+geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVoxelVolume& stack, double zScale);
+
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Sampling_W().
 [[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingWeightedLegacyLike(const Geo3dScalarField& field,
                                                                                   const ZImg& stack,
                                                                                   double zScale,
                                                                                   size_t c = 0,
                                                                                   size_t t = 0);
+
+// Overload for read-only voxel volumes (single-channel/time view).
+[[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingWeightedLegacyLike(const Geo3dScalarField& field,
+                                                                                  const ZVoxelVolume& stack,
+                                                                                  double zScale);
 
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Sampling_M().
 [[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dScalarField& field,
@@ -56,6 +65,12 @@ struct Geo3dScalarField
                                                                                 const ZImg& mask,
                                                                                 size_t c = 0,
                                                                                 size_t t = 0);
+
+// Overload for read-only voxel volumes (single-channel/time view).
+[[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dScalarField& field,
+                                                                                const ZVoxelVolume& stack,
+                                                                                double zScale,
+                                                                                const ZVoxelVolume& mask);
 
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Score().
 //
@@ -68,6 +83,12 @@ struct Geo3dScalarField
                                                           size_t c = 0,
                                                           size_t t = 0);
 
+// Overload for read-only voxel volumes (single-channel/time view).
+[[nodiscard]] double geo3dScalarFieldStackScoreLegacyLike(const Geo3dScalarField& field,
+                                                          const ZVoxelVolume& stack,
+                                                          double zScale,
+                                                          /*nullable*/ StackFitScore* fs);
+
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Score_M().
 //
 // Notes:
@@ -79,5 +100,12 @@ struct Geo3dScalarField
                                                                 /*nullable*/ StackFitScore* fs,
                                                                 size_t c = 0,
                                                                 size_t t = 0);
+
+// Overload for read-only voxel volumes (single-channel/time view).
+[[nodiscard]] double geo3dScalarFieldStackScoreMaskedLegacyLike(const Geo3dScalarField& field,
+                                                                const ZVoxelVolume& stack,
+                                                                double zScale,
+                                                                const ZVoxelVolume& mask,
+                                                                /*nullable*/ StackFitScore* fs);
 
 } // namespace nim

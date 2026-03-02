@@ -33,15 +33,16 @@ is reached.
   - **Seed tracing** is integrated in both **2D** and **3D** views via the shared **Trace Settings** state.
   - **Auto Trace** is integrated as a **background task** with progress + cancel in the shared **Tasks** dock.
   - **SWC node context menu parity** (neuTube-style 2D + 3D) is migrated, including the key interactive edit modes.
+- **Large-image readiness (interactive tracing):**
+  - Seed tracing + SWC smart-extend can now run against disk-cached `ZImgPack` without calling `wholeImg()` (tile-cached
+    random-access reads via `ZVoxelVolume`).
+  - Auto Trace avoids `wholeImg()` by assembling only the selected channel/time into a dense `ZImg` when needed.
 - **Code consolidation:** the ported neuTube v2 implementation (previously in `src/neutube/`) now lives in `src/img/`
   (no separate `neutube` target).
 - **SWC file tools:** `Swc → Rescale SWC...` is migrated as a file-based operation (similar to `Swc → Subtract SWCs...`).
 
 ⬜ Next (near-term)
 
-- Large-image readiness (separate milestone):
-  - implement an image-access abstraction on `ZImgPack` for tracing/skeletonize so very large volumes can be processed
-    without requiring full in-RAM materialization (while preserving strict parity).
 - Optional cleanups once parity is stable:
   - Rename/refactor `zneutube*` “ported legacy” files into first-class `z*` APIs (keeping A/B tests intact).
 
@@ -287,11 +288,17 @@ Phase 2E: SWC editing menu parity expansion (Atlas `ZSwcPack` context menu)
 Phase 2F: large-image readiness (Atlas advantage, but staged)
 
 28. Initial interactive tracing can operate on in-memory `ZImg` (small/medium stacks).
-29. Add a staged path for disk-cached/paged images:
-    - Use `ZImgPack::readRegionToImgAsync(...)` to fetch a conservative region around the seed.
-    - Document clearly if this is an approximation relative to full-volume tracing and guard it behind a preference.
-30. Longer-term (post parity): refactor algorithms that fundamentally assume full-volume array access so they can run on
-    region readers without changing semantics (this is a separate milestone and may require algorithm-aware paging).
+29. Add a disk-cached path that preserves the full-volume semantics of the legacy tracer:
+    - Introduce a small random-access abstraction (`nim::ZVoxelVolume`) used by the ported neuTube algorithms.
+    - Provide:
+      - `nim::ZDenseVoxelVolume` (wraps a single-channel/time `ZImg` view)
+      - `nim::ZImgPackVoxelVolume` (wraps a disk-cached `ZImgPack` with a 1-tile read cache)
+      - `nim::ZSparseVoxelMaskU8` (sparse occupancy mask used when attaching to an existing host SWC)
+    - Update seeded trace + SWC smart-extend to operate on `ZVoxelVolume` so they can run on disk-cached volumes without
+      materializing `wholeImg()`.
+30. Auto Trace still requires a dense volume today:
+    - It avoids `wholeImg()` by assembling only the requested channel/time via `ZImgPack::assembleChannelTime({1, 1, 1}, c, t)`.
+    - Future work (post parity): investigate algorithm-aware paging for auto-trace if it becomes a practical need.
 
 Phase 2G: validation + documentation
 
@@ -697,9 +704,9 @@ Legend: ⬜ not started, 🟨 in progress, ✅ done
   - ✅ Local neuroseg optimize loop (`Local_Neuroseg_Position_Adjust`, `Local_Neuroseg_Orientation_Search_C`,
     `Local_Neuroseg_R_Scale_Search`, `Local_Neuroseg_Optimize_W`): `src/img/zneutubelocalneuroseg.*`
   - ✅ Legacy `darray_qsort(...)` parity helper: `src/img/zneutubedarrayqsort.*`
-  - ✅ darray math helpers (`darray_dot_n`, `darray_dot_nw`, `darray_sum_n`, `darray_mean_n`, `darray_corrcoef_n`, `darray_max`):
+- ✅ darray math helpers (`darray_dot_n`, `darray_dot_nw`, `darray_sum_n`, `darray_mean_n`, `darray_corrcoef_n`, `darray_max`):
     `src/img/zneutubedarraymath.*`
-- ⬜ Implement image-access abstraction on `ZImg`/`ZImgPack` (streaming for very large volumes)
+- ✅ Implement image-access abstraction on `ZImg`/`ZImgPack` for disk-cached tracing (no `wholeImg()`)
 - ✅ Port/implement skeletonize on modern image types (exact behavior)
   - ✅ Port `ZStackSkeletonizer::makeSkeletonWithoutDs(Stack*, const int*)` behavior into
     `nim::ZNeutubeSkeletonizer` (`src/img/zneutubeskeletonizer.*`) using only `ZImg` + `ZSwc`.

@@ -7,6 +7,7 @@
 
 #include <folly/CancellationToken.h>
 
+#include <array>
 #include <functional>
 
 namespace nim {
@@ -62,6 +63,17 @@ public:
     m_doResampleAfterTracing = enabled;
   }
 
+  // If the signal image is downsampled before tracing, the traced SWC coordinates
+  // are in the downsampled voxel space. Set this ratio so the result is rescaled
+  // back to the original image coordinates before writing.
+  void setSignalDownsampleRatio(std::array<size_t, 3> ratio)
+  {
+    CHECK(ratio[0] > 0);
+    CHECK(ratio[1] > 0);
+    CHECK(ratio[2] > 0);
+    m_signalDownsampleRatio = ratio;
+  }
+
   void setDocHasAnySwc(bool v)
   {
     m_docHasAnySwc = v;
@@ -111,6 +123,8 @@ private:
 
   bool m_doResampleAfterTracing = true;
   bool m_docHasAnySwc = false;
+
+  std::array<size_t, 3> m_signalDownsampleRatio = {1, 1, 1};
 
   QString m_outputSwcPath;
 

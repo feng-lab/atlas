@@ -23,6 +23,7 @@
 #include <QPalette>
 #include <QPushButton>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStandardItem>
 #include <QStandardItemModel>
 #include <QVBoxLayout>
@@ -32,6 +33,7 @@
 #include <QRegularExpression>
 
 #include <algorithm>
+#include <limits>
 
 namespace nim {
 
@@ -66,11 +68,11 @@ void disableFirstComboRow(QComboBox* combo)
   const ZImgInfo info = imgDoc.imgPackShared(imgObjId)->imgInfo();
   return QStringLiteral("%1\n%2×%3×%4, c=%5, t=%6, %7")
     .arg(doc.objNameWithModifiedMarkerAndID(imgObjId))
-    .arg(static_cast<qulonglong>(info.width))
-    .arg(static_cast<qulonglong>(info.height))
-    .arg(static_cast<qulonglong>(info.depth))
-    .arg(static_cast<qulonglong>(info.numChannels))
-    .arg(static_cast<qulonglong>(info.numTimes))
+    .arg(info.width)
+    .arg(info.height)
+    .arg(info.depth)
+    .arg(info.numChannels)
+    .arg(info.numTimes)
     .arg(info.typeAsQString());
 }
 
@@ -181,6 +183,34 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
   m_resampleCheck->setChecked(true);
   optionsLayout->addWidget(m_resampleCheck);
 
+  m_downsampleCheck = new QCheckBox(tr("Trace on downsampled image"), optionsGroup);
+  m_downsampleCheck->setToolTip(tr("Downsamples the selected channel/time before tracing.\n"
+                                   "The output SWC is rescaled back to the original image coordinates."));
+  m_downsampleCheck->setChecked(false);
+  optionsLayout->addWidget(m_downsampleCheck);
+
+  auto* dsRow = new QWidget(optionsGroup);
+  auto* dsLayout = new QHBoxLayout(dsRow);
+  dsLayout->setContentsMargins(20, 0, 0, 0);
+  dsLayout->setSpacing(8);
+
+  dsLayout->addWidget(new QLabel(tr("XY ratio:"), dsRow));
+  m_downsampleRatioXYSpin = new QSpinBox(dsRow);
+  m_downsampleRatioXYSpin->setMinimum(1);
+  m_downsampleRatioXYSpin->setMaximum(std::numeric_limits<int>::max());
+  m_downsampleRatioXYSpin->setValue(2);
+  dsLayout->addWidget(m_downsampleRatioXYSpin);
+
+  dsLayout->addWidget(new QLabel(tr("Z ratio:"), dsRow));
+  m_downsampleRatioZSpin = new QSpinBox(dsRow);
+  m_downsampleRatioZSpin->setMinimum(1);
+  m_downsampleRatioZSpin->setMaximum(std::numeric_limits<int>::max());
+  m_downsampleRatioZSpin->setValue(1);
+  dsLayout->addWidget(m_downsampleRatioZSpin);
+
+  dsLayout->addStretch(1);
+  optionsLayout->addWidget(dsRow);
+
   layout->addWidget(optionsGroup);
 
   auto* outputGroup = new QGroupBox(tr("Output"), this);
@@ -219,6 +249,17 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
   rebuildSuggestedOutputs();
   updateBudgetUi();
 
+  auto updateDownsampleUi = [this]() {
+    CHECK(m_downsampleCheck != nullptr);
+    CHECK(m_downsampleRatioXYSpin != nullptr);
+    CHECK(m_downsampleRatioZSpin != nullptr);
+
+    const bool enabled = m_downsampleCheck->isChecked();
+    m_downsampleRatioXYSpin->setEnabled(enabled);
+    m_downsampleRatioZSpin->setEnabled(enabled);
+  };
+  updateDownsampleUi();
+
   connect(m_imageCombo, &QComboBox::currentIndexChanged, this, [this](int) {
     rebuildChannelAndTimeCombos();
     rebuildSuggestedOutputs();
@@ -229,6 +270,19 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
   });
 
   connect(m_timeCombo, &QComboBox::currentIndexChanged, this, [this](int) {
+    rebuildSuggestedOutputs();
+  });
+
+  connect(m_downsampleCheck, &QCheckBox::toggled, this, [this, updateDownsampleUi](bool) {
+    updateDownsampleUi();
+    rebuildSuggestedOutputs();
+  });
+
+  connect(m_downsampleRatioXYSpin, &QSpinBox::valueChanged, this, [this](int) {
+    rebuildSuggestedOutputs();
+  });
+
+  connect(m_downsampleRatioZSpin, &QSpinBox::valueChanged, this, [this](int) {
     rebuildSuggestedOutputs();
   });
 
@@ -284,6 +338,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
 
   const size_t sc = selectedChannel();
   const size_t t = selectedTime();
+  const std::array<size_t, 3> ratio = signalRatio();
   const int traceLevelValue = traceLevel();
   const bool doResample = optimalResamplingEnabled();
   const QString outputSwc = outputSwcPath();
@@ -327,10 +382,12 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
   CHECK(imgPack != nullptr);
 
   const ZImgInfo info = imgPack->imgInfo();
-  const QString channelLabel = (sc < info.channelNames.size())
-                                 ? info.displayChannelName(sc)
-                                 : QStringLiteral("Ch%1").arg(static_cast<qulonglong>(sc + 1));
-  const QString timeLabel = QStringLiteral("T%1").arg(static_cast<qulonglong>(t + 1));
+  const QString channelLabel =
+    (sc < info.channelNames.size()) ? info.displayChannelName(sc) : QStringLiteral("Ch%1").arg(sc + 1);
+  const QString timeLabel = QStringLiteral("T%1").arg(t + 1);
+  const QString ratioLabel = (ratio == std::array<size_t, 3>{1, 1, 1})
+                               ? QString{}
+                               : QStringLiteral("ratio=[%1,%2,%3]").arg(ratio[0]).arg(ratio[1]).arg(ratio[2]);
   const QString outputSwcLabel = QFileInfo(outputSwc).fileName();
   const QString outputLabel = outputSwcLabel.isEmpty() ? outputSwc : outputSwcLabel;
 
@@ -338,15 +395,22 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
 
   WorkerSpec spec;
   spec.workerName = QStringLiteral("Auto Trace");
-  spec.taskTitle = QStringLiteral("Auto Trace: %1, %2, %3 -> %4")
-                     .arg(m_doc.objNameWithModifiedMarkerAndID(imgId))
-                     .arg(channelLabel)
-                     .arg(timeLabel)
-                     .arg(outputLabel);
+  spec.taskTitle = ratioLabel.isEmpty() ? QStringLiteral("Auto Trace: %1, %2, %3 -> %4")
+                                            .arg(m_doc.objNameWithModifiedMarkerAndID(imgId))
+                                            .arg(channelLabel)
+                                            .arg(timeLabel)
+                                            .arg(outputLabel)
+                                        : QStringLiteral("Auto Trace: %1, %2, %3, %4 -> %5")
+                                            .arg(m_doc.objNameWithModifiedMarkerAndID(imgId))
+                                            .arg(channelLabel)
+                                            .arg(timeLabel)
+                                            .arg(ratioLabel)
+                                            .arg(outputLabel);
   spec.successMessage = QStringLiteral("wrote %1").arg(outputLabel);
   spec.makeWorker = [imgPack,
                      sc,
                      t,
+                     ratio,
                      traceCfgPath,
                      traceLevelValue,
                      haveAlgoConfig,
@@ -368,32 +432,19 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
     worker->setDoResampleAfterTracing(doResample);
     worker->setDocHasAnySwc(docHasAnySwc);
     worker->setOutputSwcPath(outputSwc);
-    worker->setSignalProvider([imgPack, sc, t](folly::CancellationToken token) -> ZImg {
+    worker->setSignalDownsampleRatio(ratio);
+    worker->setSignalProvider([imgPack, sc, t, ratio](folly::CancellationToken token) -> ZImg {
       maybeCancel(token);
 
       const ZImgInfo info = imgPack->imgInfo();
       if (sc >= info.numChannels || t >= info.numTimes) {
-        throw ZException(QStringLiteral("Auto Trace failed: invalid channel/time selection (c=%1, t=%2).")
-                           .arg(static_cast<qulonglong>(sc))
-                           .arg(static_cast<qulonglong>(t)));
+        throw ZException(
+          QStringLiteral("Auto Trace failed: invalid channel/time selection (c=%1, t=%2).").arg(sc).arg(t));
       }
 
-      const ZImg* fullSignalPtr = nullptr;
-      ZImg ownedSignal;
-      if (imgPack->isDiskCached()) {
-        ownedSignal = imgPack->wholeImg();
-        fullSignalPtr = &ownedSignal;
-      } else {
-        fullSignalPtr = &imgPack->img();
-      }
-      CHECK(fullSignalPtr != nullptr);
-      const ZImg& fullSignal = *fullSignalPtr;
-      if (fullSignal.isEmpty()) {
-        return {};
-      }
-
+      ZImg signal = imgPack->assembleChannelTime(ratio, sc, t);
       maybeCancel(token);
-      return fullSignal.extractChannel(sc, static_cast<index_t>(t));
+      return signal;
     });
     return worker;
   };
@@ -419,7 +470,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
       return;
     }
 
-    tm.setTaskMessage(&task, QStringLiteral("created SWC #%1").arg(static_cast<qulonglong>(newSwcId)));
+    tm.setTaskMessage(&task, QStringLiteral("created SWC #%1").arg(newSwcId));
     doc.traceSettings().promoteNewSwcTargetToExistingIfStillNew(imgId, sc, newSwcId);
   };
 
@@ -494,6 +545,23 @@ bool ZAutoTraceDialog::optimalResamplingEnabled() const
   return m_resampleCheck->isChecked();
 }
 
+std::array<size_t, 3> ZAutoTraceDialog::signalRatio() const
+{
+  CHECK(m_downsampleCheck != nullptr);
+  CHECK(m_downsampleRatioXYSpin != nullptr);
+  CHECK(m_downsampleRatioZSpin != nullptr);
+
+  if (!m_downsampleCheck->isChecked()) {
+    return {1, 1, 1};
+  }
+
+  const size_t xy = static_cast<size_t>(m_downsampleRatioXYSpin->value());
+  const size_t z = static_cast<size_t>(m_downsampleRatioZSpin->value());
+  CHECK(xy > 0);
+  CHECK(z > 0);
+  return {xy, xy, z};
+}
+
 void ZAutoTraceDialog::rebuildImageCombo()
 {
   CHECK(m_imageCombo != nullptr);
@@ -505,7 +573,7 @@ void ZAutoTraceDialog::rebuildImageCombo()
   const ZImgDoc& imgDoc = m_doc.imgDoc();
   const std::vector<size_t> imgIds = imgDoc.objs();
   for (size_t id : imgIds) {
-    m_imageCombo->addItem(m_doc.objNameWithModifiedMarkerAndID(id), QVariant::fromValue(static_cast<qulonglong>(id)));
+    m_imageCombo->addItem(m_doc.objNameWithModifiedMarkerAndID(id), QVariant::fromValue(id));
     m_imageCombo->setItemData(m_imageCombo->count() - 1, imageToolTip(m_doc, id), Qt::ToolTipRole);
   }
   disableFirstComboRow(m_imageCombo);
@@ -561,10 +629,9 @@ void ZAutoTraceDialog::rebuildChannelAndTimeCombos()
     const QSignalBlocker blocker(*m_channelCombo);
     m_channelCombo->clear();
     for (size_t sc = 0; sc < info.numChannels; ++sc) {
-      const QString label = (sc < info.channelNames.size())
-                              ? info.displayChannelName(sc)
-                              : QStringLiteral("Ch%1").arg(static_cast<qulonglong>(sc + 1));
-      m_channelCombo->addItem(label, QVariant::fromValue(static_cast<qulonglong>(sc)));
+      const QString label =
+        (sc < info.channelNames.size()) ? info.displayChannelName(sc) : QStringLiteral("Ch%1").arg(sc + 1);
+      m_channelCombo->addItem(label, QVariant::fromValue(sc));
 
       if (sc < info.channelColors.size()) {
         const col4 col = info.channelColors[sc];
@@ -587,8 +654,7 @@ void ZAutoTraceDialog::rebuildChannelAndTimeCombos()
     const QSignalBlocker blocker(*m_timeCombo);
     m_timeCombo->clear();
     for (size_t t = 0; t < info.numTimes; ++t) {
-      m_timeCombo->addItem(QStringLiteral("T%1").arg(static_cast<qulonglong>(t + 1)),
-                           QVariant::fromValue(static_cast<qulonglong>(t)));
+      m_timeCombo->addItem(QStringLiteral("T%1").arg(t + 1), QVariant::fromValue(t));
     }
     if (m_timeCombo->count() > 0) {
       m_timeCombo->setCurrentIndex(0);
@@ -632,8 +698,11 @@ void ZAutoTraceDialog::rebuildSuggestedOutputs()
   }
 
   baseStem = makeSafeStem(baseStem);
-  const QString tag =
-    QStringLiteral("_autotrace_c%1_t%2").arg(static_cast<qulonglong>(c + 1)).arg(static_cast<qulonglong>(t + 1));
+  QString tag = QStringLiteral("_autotrace_c%1_t%2").arg(c + 1).arg(t + 1);
+  const std::array<size_t, 3> ratio = signalRatio();
+  if (ratio != std::array<size_t, 3>{1, 1, 1}) {
+    tag += QStringLiteral("_dsxy%1_z%2").arg(ratio[0]).arg(ratio[2]);
+  }
   const QString suggestedSwc = QDir(baseDir).absoluteFilePath(baseStem + tag + QStringLiteral(".swc"));
   const QString suggestedLog = QDir(baseDir).absoluteFilePath(baseStem + tag + QStringLiteral("_log.txt"));
 

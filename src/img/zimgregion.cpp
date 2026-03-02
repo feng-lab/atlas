@@ -68,6 +68,8 @@ ZImgInfo ZImgRegion::clip(const ZImgInfo& info) const
   res.numChannels = rcEnd - start.c;
   res.channelColors = std::vector(info.channelColors.begin() + start.c, info.channelColors.begin() + rcEnd);
   res.channelNames = std::vector(info.channelNames.begin() + start.c, info.channelNames.begin() + rcEnd);
+  res.lastChannelIsAlphaChannel =
+    info.lastChannelIsAlphaChannel && (rcEnd == static_cast<value_type>(info.numChannels));
   res.depth = end.z >= 0 ? (end.z - start.z) : (info.depth - start.z);
   res.height = end.y >= 0 ? (end.y - start.y) : (info.height - start.y);
   res.width = end.x >= 0 ? (end.x - start.x) : (info.width - start.x);

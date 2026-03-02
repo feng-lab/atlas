@@ -14,15 +14,29 @@
 
 #include <folly/ScopeGuard.h>
 
+#include <cmath>
 #include <utility>
 
 namespace nim {
 
 namespace {
 
-[[nodiscard]] QString qulonglongStr(size_t v)
+void rescaleSwcInPlace(ZSwc& tree, double scaleX, double scaleY, double scaleZ, bool scaleRadius)
 {
-  return QString::number(static_cast<qulonglong>(v));
+  if (scaleX == 1.0 && scaleY == 1.0 && scaleZ == 1.0) {
+    return;
+  }
+
+  const double radiusScale = std::sqrt(scaleX * scaleY);
+
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
+    it->x *= scaleX;
+    it->y *= scaleY;
+    it->z *= scaleZ;
+    if (scaleRadius) {
+      it->radius *= radiusScale;
+    }
+  }
 }
 
 } // namespace
@@ -120,8 +134,10 @@ void ZNeutubeAutoTraceProcess::doWork()
   m_hasResult = false;
 
   LOG(INFO) << "Atlas Auto Trace";
-  LOG(INFO) << "Selected channel (0-based): " << qulonglongStr(m_selectedChannel);
-  LOG(INFO) << "Selected time (0-based): " << qulonglongStr(m_selectedTime);
+  LOG(INFO) << "Selected channel (0-based): " << m_selectedChannel;
+  LOG(INFO) << "Selected time (0-based): " << m_selectedTime;
+  LOG(INFO) << "Signal downsample ratio: [" << m_signalDownsampleRatio[0] << "," << m_signalDownsampleRatio[1] << ","
+            << m_signalDownsampleRatio[2] << "]";
   LOG(INFO) << "Budget level override (0=default): " << m_traceLevel;
   LOG(INFO) << "Optimal node resampling: " << (m_doResampleAfterTracing ? "enabled" : "disabled");
   LOG(INFO) << "Trace config path: " << m_traceConfigPath;
@@ -167,6 +183,16 @@ void ZNeutubeAutoTraceProcess::doWork()
     return;
   }
 
+  if (m_signalDownsampleRatio != std::array<size_t, 3>{1, 1, 1}) {
+    LOG(INFO) << "Rescaling SWC back to original voxel coordinates...";
+    rescaleSwcInPlace(*swc,
+                      static_cast<double>(m_signalDownsampleRatio[0]),
+                      static_cast<double>(m_signalDownsampleRatio[1]),
+                      static_cast<double>(m_signalDownsampleRatio[2]),
+                      /*scaleRadius=*/true);
+    maybeCancel(m_cancellationToken);
+  }
+
   LOG(INFO) << "Writing SWC...";
   writeSwcAtomicOrThrow(*swc);
   m_hasResult = true;
@@ -177,10 +203,22 @@ void ZNeutubeAutoTraceProcess::doWork()
 void ZNeutubeAutoTraceProcess::read(const json::object& jo)
 {
   if (auto it = jo.find("selected_channel"); it != jo.end()) {
-    m_selectedChannel = static_cast<size_t>(json::value_to<qulonglong>(it->value()));
+    m_selectedChannel = json::value_to<size_t>(it->value());
   }
   if (auto it = jo.find("selected_time"); it != jo.end()) {
-    m_selectedTime = static_cast<size_t>(json::value_to<qulonglong>(it->value()));
+    m_selectedTime = json::value_to<size_t>(it->value());
+  }
+  if (auto it = jo.find("signal_downsample_ratio"); it != jo.end() && it->value().is_array()) {
+    const auto& a = it->value().as_array();
+    CHECK(a.size() == 3);
+    m_signalDownsampleRatio = {
+      json::value_to<size_t>(a.at(0)),
+      json::value_to<size_t>(a.at(1)),
+      json::value_to<size_t>(a.at(2)),
+    };
+    CHECK(m_signalDownsampleRatio[0] > 0);
+    CHECK(m_signalDownsampleRatio[1] > 0);
+    CHECK(m_signalDownsampleRatio[2] > 0);
   }
   if (auto it = jo.find("trace_config_path"); it != jo.end()) {
     m_traceConfigPath = json::value_to<QString>(it->value());
@@ -251,8 +289,15 @@ void ZNeutubeAutoTraceProcess::read(const json::object& jo)
 
 void ZNeutubeAutoTraceProcess::write(json::object& jo) const
 {
-  jo["selected_channel"] = json::value_from(static_cast<qulonglong>(m_selectedChannel));
-  jo["selected_time"] = json::value_from(static_cast<qulonglong>(m_selectedTime));
+  jo["selected_channel"] = json::value_from(m_selectedChannel);
+  jo["selected_time"] = json::value_from(m_selectedTime);
+  {
+    json::array a;
+    a.push_back(json::value_from(m_signalDownsampleRatio[0]));
+    a.push_back(json::value_from(m_signalDownsampleRatio[1]));
+    a.push_back(json::value_from(m_signalDownsampleRatio[2]));
+    jo["signal_downsample_ratio"] = std::move(a);
+  }
   jo["trace_config_path"] = json::value_from(m_traceConfigPath);
   jo["trace_level"] = json::value_from(m_traceLevel);
   jo["do_resample_after_tracing"] = json::value_from(m_doResampleAfterTracing);

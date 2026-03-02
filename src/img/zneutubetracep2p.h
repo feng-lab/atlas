@@ -11,6 +11,8 @@
 
 namespace nim {
 
+class ZVoxelVolume;
+
 // Port of legacy `ZNeuronTracer::trace(x1,y1,z1,r1, x2,y2,z2,r2)` used by
 // SWC smart-extend (path computation).
 //
@@ -20,6 +22,15 @@ namespace nim {
 [[nodiscard]] std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZImg& signal,
                                                                 size_t c,
                                                                 size_t t,
+                                                                const std::array<double, 3>& start,
+                                                                double startRadius,
+                                                                const std::array<double, 3>& target,
+                                                                double targetRadius,
+                                                                const TraceConfig& cfg,
+                                                                ZNeutubeImageBackgroundLegacyLike background);
+
+// Overload for read-only voxel volumes (single-channel/time view).
+[[nodiscard]] std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZVoxelVolume& signal,
                                                                 const std::array<double, 3>& start,
                                                                 double startRadius,
                                                                 const std::array<double, 3>& target,

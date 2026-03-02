@@ -6,6 +6,7 @@
 
 #include "zcancellation.h"
 #include "zlog.h"
+#include "zvoxelvolume.h"
 
 #include <cmath>
 
@@ -59,18 +60,31 @@ void locsegChainFitLegacyLike(LocalNeuroseg& locseg,
   recordTraceScoreLegacyLike(tr, fitWs);
 }
 
+template<typename StackLike>
+void locsegChainFitLegacyLike(LocalNeuroseg& locseg,
+                              const StackLike& stack,
+                              double zScale,
+                              LocsegFitWorkspace& fitWs,
+                              TraceRecord& tr)
+{
+  // Port of `LOCSEG_CHAIN_FIT(locseg)` macro.
+  (void)fitLocalNeurosegWLegacyLike(locseg, stack, zScale, fitWs);
+  recordTraceScoreLegacyLike(tr, fitWs);
+}
+
 } // namespace
 
-TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
-                                           const LocsegChain* chain,
-                                           const TraceWorkspace& tw,
-                                           TraceRecord* tr,
-                                           double zScale,
-                                           double maxR,
-                                           TraceDirection traceDirection,
-                                           double minR,
-                                           const LocalNeuroseg* prevLocseg,
-                                           const ZImg& stack)
+template<typename StackLike>
+[[nodiscard]] TraceStatus locsegChainTraceTestLegacyLikeImpl(const LocalNeuroseg* locseg,
+                                                             const LocsegChain* chain,
+                                                             const TraceWorkspace& tw,
+                                                             TraceRecord* tr,
+                                                             double zScale,
+                                                             double maxR,
+                                                             TraceDirection traceDirection,
+                                                             double minR,
+                                                             const LocalNeuroseg* prevLocseg,
+                                                             const StackLike& stack)
 {
   std::array<double, 3> pos = {-1.0, -1.0, -1.0};
   double segr1 = 1.0;
@@ -180,7 +194,54 @@ TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
   return TraceStatus::Normal;
 }
 
-void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain, TraceWorkspace& tw)
+TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
+                                           const LocsegChain* chain,
+                                           const TraceWorkspace& tw,
+                                           TraceRecord* tr,
+                                           double zScale,
+                                           double maxR,
+                                           TraceDirection traceDirection,
+                                           double minR,
+                                           const LocalNeuroseg* prevLocseg,
+                                           const ZImg& stack)
+{
+  return locsegChainTraceTestLegacyLikeImpl(locseg,
+                                            chain,
+                                            tw,
+                                            tr,
+                                            zScale,
+                                            maxR,
+                                            traceDirection,
+                                            minR,
+                                            prevLocseg,
+                                            stack);
+}
+
+TraceStatus locsegChainTraceTestLegacyLike(const LocalNeuroseg* locseg,
+                                           const LocsegChain* chain,
+                                           const TraceWorkspace& tw,
+                                           TraceRecord* tr,
+                                           double zScale,
+                                           double maxR,
+                                           TraceDirection traceDirection,
+                                           double minR,
+                                           const LocalNeuroseg* prevLocseg,
+                                           const ZVoxelVolume& stack)
+{
+  return locsegChainTraceTestLegacyLikeImpl(locseg,
+                                            chain,
+                                            tw,
+                                            tr,
+                                            zScale,
+                                            maxR,
+                                            traceDirection,
+                                            minR,
+                                            prevLocseg,
+                                            stack);
+}
+
+template<typename StackLike>
+void traceLocsegLegacyLikeImpl(const StackLike& stack, double zScale, LocsegChain& chain, TraceWorkspace& tw)
 {
   // Port of tz_locseg_chain.c::Trace_Locseg().
   if (chain.empty()) {
@@ -355,7 +416,11 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain,
     }
 
     locsegChainBeginFitLegacyLike(p->locseg, listEnd, traceDirection);
-    if (tw.traceMask) {
+    if (tw.traceMaskVolume) {
+      if (localNeurosegTopSampleLegacyLike(p->locseg, *tw.traceMaskVolume, zScale) > 0.0) {
+        curEndStatus = TraceStatus::NotAssigned;
+      }
+    } else if (tw.traceMask) {
       if (localNeurosegTopSampleLegacyLike(p->locseg, *tw.traceMask, zScale) > 0.0) {
         curEndStatus = TraceStatus::NotAssigned;
       }
@@ -573,6 +638,16 @@ void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain,
 
   --fitWs.sws.fs.n;
   --fitWsH.sws.fs.n;
+}
+
+void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain, TraceWorkspace& tw)
+{
+  traceLocsegLegacyLikeImpl(stack, zScale, chain, tw);
+}
+
+void traceLocsegLegacyLike(const ZVoxelVolume& stack, double zScale, LocsegChain& chain, TraceWorkspace& tw)
+{
+  traceLocsegLegacyLikeImpl(stack, zScale, chain, tw);
 }
 
 } // namespace nim

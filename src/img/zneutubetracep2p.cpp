@@ -11,6 +11,7 @@
 #include "zswcresampler.h"
 #include "zswctreenodegeomlegacy.h"
 #include "zneutubevoxel.h"
+#include "zvoxelvolume.h"
 
 #include <algorithm>
 #include <cmath>
@@ -85,6 +86,83 @@ void inferWeightParameterLegacyLike(StackGraphWorkspaceLegacyLike& sgw, const ZI
                              1,
                              1);
   return stack.crop(ZImgRegion(start, end));
+}
+
+[[nodiscard]] ZImg cropByRange(const ZVoxelVolume& stack, const std::array<int, 6>& range)
+{
+  const int x0 = range[0];
+  const int x1 = range[1];
+  const int y0 = range[2];
+  const int y1 = range[3];
+  const int z0 = range[4];
+  const int z1 = range[5];
+
+  const int w = x1 - x0 + 1;
+  const int h = y1 - y0 + 1;
+  const int d = z1 - z0 + 1;
+
+  if (w <= 0 || h <= 0 || d <= 0) {
+    return {};
+  }
+
+  CHECK(x0 >= 0 && y0 >= 0 && z0 >= 0);
+  CHECK(x1 >= 0 && y1 >= 0 && z1 >= 0);
+
+  CHECK(static_cast<size_t>(x1) < stack.width());
+  CHECK(static_cast<size_t>(y1) < stack.height());
+  CHECK(static_cast<size_t>(z1) < stack.depth());
+
+  ZImgInfo outInfo(static_cast<size_t>(w),
+                   static_cast<size_t>(h),
+                   static_cast<size_t>(d),
+                   /*c*/ 1,
+                   /*t*/ 1,
+                   /*bytesPerVoxel*/ 1,
+                   VoxelFormat::Unsigned);
+  outInfo.voxelSizeX = stack.voxelSizeX();
+  outInfo.voxelSizeY = stack.voxelSizeY();
+  outInfo.voxelSizeZ = stack.voxelSizeZ();
+
+  if (stack.valueType() == ZVoxelValueType::Uint8) {
+    outInfo.bytesPerVoxel = 1;
+    outInfo.setVoxelFormat<uint8_t>();
+  } else if (stack.valueType() == ZVoxelValueType::Uint16) {
+    outInfo.bytesPerVoxel = 2;
+    outInfo.setVoxelFormat<uint16_t>();
+  } else {
+    throw ZException("P2P trace: cropByRange: unsupported voxel type");
+  }
+  outInfo.createDefaultDescriptions();
+
+  ZImg out(outInfo);
+  out.fill(0);
+
+  if (out.isType<uint8_t>()) {
+    auto* dst = out.timeData<uint8_t>(0);
+    size_t idx = 0;
+    for (int z = 0; z < d; ++z) {
+      for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+          const double v = stack.valueAsDouble(x0 + x, y0 + y, z0 + z);
+          dst[idx++] = static_cast<uint8_t>(std::clamp(static_cast<int>(v), 0, 255));
+        }
+      }
+    }
+  } else if (out.isType<uint16_t>()) {
+    auto* dst = out.timeData<uint16_t>(0);
+    size_t idx = 0;
+    for (int z = 0; z < d; ++z) {
+      for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+          const double v = stack.valueAsDouble(x0 + x, y0 + y, z0 + z);
+          dst[idx++] = static_cast<uint16_t>(
+            std::clamp(static_cast<int>(v), 0, static_cast<int>(std::numeric_limits<uint16_t>::max())));
+        }
+      }
+    }
+  }
+
+  return out;
 }
 
 template<typename TVoxel>
@@ -247,6 +325,41 @@ void updateRangeLegacyLike(StackGraphWorkspaceLegacyLike& sgw,
   return voxels;
 }
 
+[[nodiscard]] std::vector<ZNeutubeVoxel> pathIndicesToVoxels(const ZVoxelVolume& stack,
+                                                             const std::vector<int64_t>& pathIndices)
+{
+  std::vector<ZNeutubeVoxel> voxels;
+  if (pathIndices.empty() || stack.isEmpty()) {
+    return voxels;
+  }
+
+  CHECK(stack.width() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK(stack.height() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK(stack.depth() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+
+  const int64_t w = static_cast<int64_t>(stack.width());
+  const int64_t h = static_cast<int64_t>(stack.height());
+  const int64_t d = static_cast<int64_t>(stack.depth());
+  const int64_t area = w * h;
+  const int64_t nvoxel = area * d;
+
+  voxels.reserve(pathIndices.size());
+
+  for (auto it = pathIndices.rbegin(); it != pathIndices.rend(); ++it) {
+    const int64_t idx = *it;
+    if (idx < 0 || idx >= nvoxel) {
+      continue;
+    }
+    const int64_t z = idx / area;
+    const int64_t rem = idx - z * area;
+    const int64_t y = rem / w;
+    const int64_t x = rem - y * w;
+    voxels.emplace_back(static_cast<int>(x), static_cast<int>(y), static_cast<int>(z), 0.0);
+  }
+
+  return voxels;
+}
+
 void interpolateRadiiLegacyLike(std::vector<ZNeutubeVoxel>& voxels, double r1, double r2)
 {
   if (voxels.empty()) {
@@ -340,6 +453,136 @@ void fitSignalOnTreeLegacyLike(ZSwc& tree, const ZImg& stack, ZNeutubeImageBackg
 
     SwcNode nodeCopy = *it;
     (void)fitSwcNodeSignalWithFallbackLegacyLike(nodeCopy, stack, bg);
+
+    it->x = nodeCopy.x;
+    it->y = nodeCopy.y;
+    it->radius = nodeCopy.radius;
+
+    if (fixTerminal && isLeaf(it)) {
+      it->x = oldCenter.x;
+      it->y = oldCenter.y;
+      it->z = oldCenter.z;
+    }
+
+    const double newBend = swcNodeMaxBendingEnergyLegacyLike(tree, it);
+    if (newBend > 1.0) {
+      if (newBend - oldBend > 0.5) {
+        it->x = oldCenter.x;
+        it->y = oldCenter.y;
+        it->z = oldCenter.z;
+      }
+    }
+  }
+}
+
+[[nodiscard]] bool fitSwcNodeSignalWithFallbackVolumeLegacyLike(SwcNode& node,
+                                                                const ZVoxelVolume& stack,
+                                                                ZNeutubeImageBackgroundLegacyLike bg)
+{
+  if (stack.isEmpty()) {
+    return false;
+  }
+
+  if (stack.valueType() != ZVoxelValueType::Uint8 && stack.valueType() != ZVoxelValueType::Uint16) {
+    throw ZException("P2P trace: fit node signal: unsupported stack voxel type");
+  }
+
+  if (node.radius <= 0.0) {
+    return false;
+  }
+
+  const double expandScale = 2.0;
+  const double expandRadius = node.radius * expandScale + 3.0;
+
+  int x1 = iroundLegacyLike(node.x - expandRadius);
+  int y1 = iroundLegacyLike(node.y - expandRadius);
+  int x2 = iroundLegacyLike(node.x + expandRadius);
+  int y2 = iroundLegacyLike(node.y + expandRadius);
+
+  x1 = std::max(x1, 0);
+  y1 = std::max(y1, 0);
+  x2 = std::min(x2, static_cast<int>(stack.width()) - 1);
+  y2 = std::min(y2, static_cast<int>(stack.height()) - 1);
+
+  const int cz = iroundLegacyLike(node.z);
+  if (cz < 0 || cz >= static_cast<int>(stack.depth())) {
+    return false;
+  }
+
+  const int w = x2 - x1 + 1;
+  const int h = y2 - y1 + 1;
+  if (w <= 0 || h <= 0) {
+    return false;
+  }
+
+  ZImgInfo sliceInfo(static_cast<size_t>(w),
+                     static_cast<size_t>(h),
+                     /*d*/ 1,
+                     /*c*/ 1,
+                     /*t*/ 1,
+                     /*bytesPerVoxel*/ 1,
+                     VoxelFormat::Unsigned);
+  sliceInfo.voxelSizeX = stack.voxelSizeX();
+  sliceInfo.voxelSizeY = stack.voxelSizeY();
+  sliceInfo.voxelSizeZ = stack.voxelSizeZ();
+
+  if (stack.valueType() == ZVoxelValueType::Uint8) {
+    sliceInfo.bytesPerVoxel = 1;
+    sliceInfo.setVoxelFormat<uint8_t>();
+  } else {
+    sliceInfo.bytesPerVoxel = 2;
+    sliceInfo.setVoxelFormat<uint16_t>();
+  }
+  sliceInfo.createDefaultDescriptions();
+
+  ZImg slice(sliceInfo);
+  slice.fill(0);
+
+  if (slice.isType<uint8_t>()) {
+    auto* dst = slice.timeData<uint8_t>(0);
+    size_t idx = 0;
+    for (int y = 0; y < h; ++y) {
+      for (int x = 0; x < w; ++x) {
+        const double v = stack.valueAsDouble(x1 + x, y1 + y, cz);
+        dst[idx++] = static_cast<uint8_t>(std::clamp(static_cast<int>(v), 0, 255));
+      }
+    }
+  } else {
+    auto* dst = slice.timeData<uint16_t>(0);
+    size_t idx = 0;
+    for (int y = 0; y < h; ++y) {
+      for (int x = 0; x < w; ++x) {
+        const double v = stack.valueAsDouble(x1 + x, y1 + y, cz);
+        dst[idx++] = static_cast<uint16_t>(
+          std::clamp(static_cast<int>(v), 0, static_cast<int>(std::numeric_limits<uint16_t>::max())));
+      }
+    }
+  }
+
+  return fitSwcNodeSignalWithFallbackInCroppedSliceLegacyLike(node, slice, x1, y1, bg);
+}
+
+void fitSignalOnTreeLegacyLike(ZSwc& tree,
+                               const ZVoxelVolume& stack,
+                               ZNeutubeImageBackgroundLegacyLike bg,
+                               bool fixTerminal)
+{
+  if (tree.empty()) {
+    return;
+  }
+
+  const ZSwc::SwcTreeNode root = tree.beginRoot();
+
+  for (auto it = tree.begin(); it != tree.end(); ++it) {
+    if (it == root) {
+      continue;
+    }
+
+    const glm::dvec3 oldCenter(it->x, it->y, it->z);
+    const double oldBend = swcNodeMaxBendingEnergyLegacyLike(tree, it);
+
+    SwcNode nodeCopy = *it;
+    (void)fitSwcNodeSignalWithFallbackVolumeLegacyLike(nodeCopy, stack, bg);
 
     it->x = nodeCopy.x;
     it->y = nodeCopy.y;
@@ -502,6 +745,156 @@ std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZImg& signal,
   }
 
   fitSignalOnTreeLegacyLike(*tree, stackView, background, /*fixTerminal*/ true);
+
+  ZSwc::SwcTreeNode leaf = tree->beginRoot();
+  while (true) {
+    const auto child = ZSwc::firstChild(leaf);
+    if (ZSwc::isNull(child)) {
+      break;
+    }
+    leaf = child;
+  }
+  leaf->x = targetPos[0];
+  leaf->y = targetPos[1];
+  leaf->z = targetPos[2];
+
+  return tree;
+}
+
+std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZVoxelVolume& signal,
+                                                  const std::array<double, 3>& start,
+                                                  double startRadius,
+                                                  const std::array<double, 3>& target,
+                                                  double targetRadius,
+                                                  const TraceConfig& cfg,
+                                                  ZNeutubeImageBackgroundLegacyLike background)
+{
+  if (signal.isEmpty()) {
+    return nullptr;
+  }
+
+  const std::array<double, 3> targetPos = target;
+
+  int x1 = iroundLegacyLike(start[0]);
+  int y1 = iroundLegacyLike(start[1]);
+  int z1 = iroundLegacyLike(start[2]);
+  int x2 = iroundLegacyLike(target[0]);
+  int y2 = iroundLegacyLike(target[1]);
+  int z2 = iroundLegacyLike(target[2]);
+
+  CHECK(signal.width() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK(signal.height() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK(signal.depth() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+
+  const int width = static_cast<int>(signal.width());
+  const int height = static_cast<int>(signal.height());
+  const int depth = static_cast<int>(signal.depth());
+
+  if (x1 < 0 || y1 < 0 || z1 < 0 || x1 >= width || y1 >= height || z1 >= depth) {
+    return nullptr;
+  }
+
+  StackGraphWorkspaceLegacyLike sgw;
+  defaultStackGraphWorkspaceLegacyLike(sgw);
+
+  sgw.resolution = {signal.voxelSizeX(), signal.voxelSizeY(), signal.voxelSizeZ()};
+
+  int zMargin = -1;
+  if (sgw.resolution[0] > 0.0 && (sgw.resolution[2] / sgw.resolution[0] > 3.0)) {
+    zMargin = 2;
+  }
+
+  if (background == ZNeutubeImageBackgroundLegacyLike::Bright) {
+    sgw.weightFunc = &stackVoxelWeightSrLegacyLike;
+  } else {
+    sgw.weightFunc = &stackVoxelWeightSLegacyLike;
+  }
+
+  updateRangeLegacyLike(sgw, x1, y1, z1, x2, y2, z2, width, height, depth, zMargin);
+  if (!sgw.range.has_value()) {
+    return nullptr;
+  }
+
+  const std::array<int, 6> range = *sgw.range;
+  if (roiVolumeLegacyLike(range) > static_cast<size_t>(MaxP2PTraceVolumeLegacyLike)) {
+    return nullptr;
+  }
+
+  if (cfg.edgePath) {
+    const int x0 = range[0];
+    const int y0 = range[2];
+    const int z0 = range[4];
+
+    ZImg partial = cropByRange(signal, range);
+    if (partial.isEmpty()) {
+      return nullptr;
+    }
+
+    ZImg partialEdge = computeGradientLegacyLike(partial);
+    partial = {};
+
+    inferWeightParameterLegacyLike(sgw, partialEdge);
+
+    const int pw = static_cast<int>(partialEdge.width());
+    const int ph = static_cast<int>(partialEdge.height());
+    const int pd = static_cast<int>(partialEdge.depth());
+
+    stackGraphWorkspaceSetRangeLegacyLike(sgw, 0, pw - 1, 0, ph - 1, 0, pd - 1);
+
+    const std::array<int, 3> startPos = {x1 - x0, y1 - y0, z1 - z0};
+    const std::array<int, 3> endPos = {x2 - x0, y2 - y0, z2 - z0};
+
+    std::vector<int64_t> path = stackRouteLegacyLike(partialEdge, startPos, endPos, sgw);
+    std::vector<ZNeutubeVoxel> voxels = pathIndicesToVoxels(partialEdge, path);
+    for (auto& v : voxels) {
+      v.translate(x0, y0, z0);
+    }
+
+    interpolateRadiiLegacyLike(voxels, startRadius, targetRadius);
+    std::unique_ptr<ZSwc> tree = voxelsToSwcLegacyLike(voxels);
+    if (!tree || tree->empty()) {
+      return nullptr;
+    }
+
+    fitSignalOnTreeLegacyLike(*tree, signal, background, /*fixTerminal*/ true);
+
+    // Force leaf position back to the original target coordinates.
+    ZSwc::SwcTreeNode leaf = tree->beginRoot();
+    while (true) {
+      const auto child = ZSwc::firstChild(leaf);
+      if (ZSwc::isNull(child)) {
+        break;
+      }
+      leaf = child;
+    }
+    leaf->x = targetPos[0];
+    leaf->y = targetPos[1];
+    leaf->z = targetPos[2];
+
+    return tree;
+  }
+
+  // Non-edge-path: infer weights on cropped ROI but route on the full stack view.
+  {
+    const ZImg partial = cropByRange(signal, range);
+    if (!partial.isEmpty()) {
+      inferWeightParameterLegacyLike(sgw, partial);
+    }
+  }
+
+  const std::array<int, 3> startPos = {x1, y1, z1};
+  const std::array<int, 3> endPos = {x2, y2, z2};
+
+  std::vector<int64_t> path = stackRouteLegacyLike(signal, startPos, endPos, sgw);
+  std::vector<ZNeutubeVoxel> voxels = pathIndicesToVoxels(signal, path);
+
+  interpolateRadiiLegacyLike(voxels, startRadius, targetRadius);
+  std::unique_ptr<ZSwc> tree = voxelsToSwcLegacyLike(voxels);
+  if (!tree || tree->empty()) {
+    return nullptr;
+  }
+
+  fitSignalOnTreeLegacyLike(*tree, signal, background, /*fixTerminal*/ true);
 
   ZSwc::SwcTreeNode leaf = tree->beginRoot();
   while (true) {

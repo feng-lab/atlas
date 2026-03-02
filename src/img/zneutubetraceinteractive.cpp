@@ -7,6 +7,9 @@
 #include "zneutubetraceworkspace.h"
 #include "zneutubetraceswclabelstack.h"
 
+#include "zsparsevoxelmask.h"
+#include "zvoxelvolumedense.h"
+
 #include "zcancellation.h"
 #include "zlog.h"
 #include "zswcops.h"
@@ -42,7 +45,7 @@ struct TraceCirclesResult
   return signal.createView(static_cast<index_t>(c), static_cast<index_t>(t));
 }
 
-[[nodiscard]] TraceCirclesResult traceSeedToCirclesLegacyLike(const ZImg& signal,
+[[nodiscard]] TraceCirclesResult traceSeedToCirclesLegacyLike(const ZVoxelVolume& signal,
                                                               const std::array<double, 3>& position,
                                                               const TraceConfig& cfg,
                                                               const folly::CancellationToken& cancellationToken)
@@ -54,14 +57,11 @@ struct TraceCirclesResult
   res.tw.refit = cfg.refit;
   res.tw.tuneEnd = cfg.tuneEnd;
 
-  // Port of ZNeuronTracer::prepareTraceScoreThreshold(TRACING_INTERACTIVE).
   if (signal.depth() == 1) {
     res.tw.minScore = cfg.min2dScore;
   } else {
     res.tw.minScore = cfg.minManualScore;
   }
-
-  traceWorkspaceInitTraceMaskLegacyLike(res.tw, signal, false);
 
   LocalNeuroseg seedLocseg;
   seedLocseg.seg.r1 = 3.0;
@@ -148,7 +148,20 @@ SeedTraceResult traceSeedNewSwcLegacyLike(const ZImg& signal,
   }
 
   const ZImg signalView = traceSignalViewLegacyLike(signal, c, t);
-  TraceCirclesResult tr = traceSeedToCirclesLegacyLike(signalView, position, cfg, cancellationToken);
+  const ZDenseVoxelVolume vol(signalView);
+  return traceSeedNewSwcLegacyLike(vol, position, cfg, cancellationToken);
+}
+
+SeedTraceResult traceSeedNewSwcLegacyLike(const ZVoxelVolume& signal,
+                                          const std::array<double, 3>& position,
+                                          const TraceConfig& cfg,
+                                          folly::CancellationToken cancellationToken)
+{
+  if (signal.isEmpty()) {
+    return {};
+  }
+
+  TraceCirclesResult tr = traceSeedToCirclesLegacyLike(signal, position, cfg, cancellationToken);
   if (tr.circles.empty()) {
     return {};
   }
@@ -197,6 +210,25 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
                                                size_t t,
                                                folly::CancellationToken cancellationToken)
 {
+  if (signal.isEmpty()) {
+    auto outSwc = std::make_unique<ZSwc>(hostSwc);
+    for (auto& tn : *outSwc) {
+      tn.selected = false;
+    }
+    return {.swc = std::move(outSwc), .newNodes = 0};
+  }
+
+  const ZImg signalView = traceSignalViewLegacyLike(signal, c, t);
+  const ZDenseVoxelVolume vol(signalView);
+  return traceSeedIntoHostSwcLegacyLike(vol, hostSwc, position, cfg, cancellationToken);
+}
+
+SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZVoxelVolume& signal,
+                                               const ZSwc& hostSwc,
+                                               const std::array<double, 3>& position,
+                                               const TraceConfig& cfg,
+                                               folly::CancellationToken cancellationToken)
+{
   auto outSwc = std::make_unique<ZSwc>(hostSwc);
   for (auto& tn : *outSwc) {
     tn.selected = false;
@@ -212,27 +244,24 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
     return {.swc = std::move(outSwc), .newNodes = 0};
   }
 
-  maybeCancel(cancellationToken);
-  const ZImg signalView = traceSignalViewLegacyLike(signal, c, t);
-
   // This variant follows the CLI "host SWC provided" behavior: the host is labeled into a mask so that the traced
   // branch can be trimmed and then connected to the host structure.
   TraceCirclesResult tr;
-  locsegChainDefaultTraceWorkspaceLegacyLike(tr.tw, signalView);
+  locsegChainDefaultTraceWorkspaceLegacyLike(tr.tw, signal);
   tr.tw.cancellationToken = cancellationToken;
   tr.tw.refit = cfg.refit;
   tr.tw.tuneEnd = cfg.tuneEnd;
 
-  if (signalView.depth() == 1) {
+  if (signal.depth() == 1) {
     tr.tw.minScore = cfg.min2dScore;
   } else {
     tr.tw.minScore = cfg.minManualScore;
   }
 
-  const ZImgInfo maskInfo(signalView.width(), signalView.height(), signalView.depth(), 1, 1, 1, VoxelFormat::Unsigned);
-  tr.tw.traceMask = std::make_unique<ZImg>(maskInfo);
-  tr.tw.traceMask->fill(0);
-  labelSwcIntoMaskLegacyLike(*outSwc, *tr.tw.traceMask, /*zScale*/ 1.0, /*value*/ 255);
+  auto swcMask = std::make_unique<ZSparseVoxelMaskU8>(signal.width(), signal.height(), signal.depth());
+  swcMask->clearU16(0);
+  labelSwcIntoMaskLegacyLike(*outSwc, *swcMask, /*zScale*/ 1.0, /*value*/ 255);
+  tr.tw.traceMaskVolume = std::move(swcMask);
 
   maybeCancel(tr.tw.cancellationToken);
   LocalNeuroseg seedLocseg;
@@ -246,7 +275,7 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
   seedLocseg.seg.scale = 1.0;
   setNeurosegPositionLegacyLike(seedLocseg, position, NeuroposReferenceLegacyLike::Center);
 
-  (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signalView, 1.0, 1, tr.tw.fitWorkspace);
+  (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signal, 1.0, 1, tr.tw.fitWorkspace);
   maybeCancel(tr.tw.cancellationToken);
 
   TraceRecord seedTr;
@@ -261,7 +290,7 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
   (void)chain.addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
 
   traceWorkspaceSetTraceStatusLegacyLike(tr.tw, TraceStatus::Normal, TraceStatus::Normal);
-  traceLocsegLegacyLike(signalView, 1.0, chain, tr.tw);
+  traceLocsegLegacyLike(signal, 1.0, chain, tr.tw);
   maybeCancel(tr.tw.cancellationToken);
   (void)locsegChainRemoveOverlapEndsLegacyLike(chain);
   locsegChainRemoveTurnEndsLegacyLike(chain, 1.0);
@@ -302,7 +331,7 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
   }
 
   if (!ZSwc::isNull(branchRoot)) {
-    connectBranchToHostLegacyLike(*outSwc, hostRoots, branchRoot, signalView);
+    connectBranchToHostLegacyLike(*outSwc, hostRoots, branchRoot, signal);
   } else {
     LOG(ERROR) << "traceSeedIntoHostSwcLegacyLike: internal error (null branch root after append).";
   }

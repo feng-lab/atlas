@@ -3,6 +3,7 @@
 #include "zswcdoc.h"
 #include "zimgdoc.h"
 #include "zimgpack.h"
+#include "zimgpackvoxelvolume.h"
 #include "zsysteminfo.h"
 #include "ztracesettings.h"
 #include "zinformationdialog.h"
@@ -451,21 +452,6 @@ void ZSwcPack::extendSelectedNodeSmartLegacyLike(const glm::dvec3& center, doubl
     return;
   }
 
-  const ZImg* signalPtr = nullptr;
-  ZImg ownedSignal;
-  if (imgPack->isDiskCached()) {
-    ownedSignal = imgPack->wholeImg();
-    signalPtr = &ownedSignal;
-  } else {
-    signalPtr = &imgPack->img();
-  }
-  CHECK(signalPtr != nullptr);
-  const ZImg& signal = *signalPtr;
-  if (signal.isEmpty()) {
-    LOG(WARNING) << "SWC smart-extend: the source image is empty.";
-    return;
-  }
-
   TraceConfig cfg;
   const QString traceCfgPath = QDir(ZSystemInfo::jsonDirPath()).absoluteFilePath(QStringLiteral("trace_config.json"));
   const bool ok = loadTraceConfigLegacyLike(traceCfgPath.toStdString(), cfg);
@@ -496,15 +482,32 @@ void ZSwcPack::extendSelectedNodeSmartLegacyLike(const glm::dvec3& center, doubl
   const std::array<double, 3> target{center.x, center.y, center.z};
   const double targetRadius = radius;
 
-  std::unique_ptr<ZSwc> branch = tracePointToPointLegacyLike(signal,
-                                                             sc,
-                                                             t,
-                                                             start,
-                                                             startRadius,
-                                                             target,
-                                                             targetRadius,
-                                                             cfg,
-                                                             ZNeutubeImageBackgroundLegacyLike::Dark);
+  std::unique_ptr<ZSwc> branch;
+  if (imgPack->isDiskCached()) {
+    const ZImgPackVoxelVolume signalVol(imgPack, sc, t);
+    branch = tracePointToPointLegacyLike(signalVol,
+                                         start,
+                                         startRadius,
+                                         target,
+                                         targetRadius,
+                                         cfg,
+                                         ZNeutubeImageBackgroundLegacyLike::Dark);
+  } else {
+    const ZImg& signal = imgPack->img();
+    if (signal.isEmpty()) {
+      LOG(WARNING) << "SWC smart-extend: the source image is empty.";
+      return;
+    }
+    branch = tracePointToPointLegacyLike(signal,
+                                         sc,
+                                         t,
+                                         start,
+                                         startRadius,
+                                         target,
+                                         targetRadius,
+                                         cfg,
+                                         ZNeutubeImageBackgroundLegacyLike::Dark);
+  }
   if (!branch || branch->empty()) {
     return;
   }

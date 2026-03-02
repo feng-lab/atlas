@@ -253,6 +253,20 @@ public:
   // same as value but can use low resolution image value
   double displayValue(size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0, bool mip = false) const;
 
+  // Disk-cached helper: find the base (ratio 1,1,1) tile index covering the specified voxel.
+  //
+  // Returns nullopt if:
+  // - this ZImgPack is not disk-cached,
+  // - no base tiles are indexed for the requested time, or
+  // - the voxel is out of bounds / not covered by any tile.
+  [[nodiscard]] std::optional<size_t> tryFindBaseTileIndexForVoxel(size_t x, size_t y, size_t z, size_t t) const;
+
+  // Disk-cached helper: returns the tile descriptor for `tileIndex` (valid for the lifetime of this ZImgPack).
+  [[nodiscard]] const ZImgSubBlock& tileByIndex(size_t tileIndex) const;
+
+  // Disk-cached helper: blocking read of a tile image via ZImgCache.
+  [[nodiscard]] std::shared_ptr<ZImg> readTileBlocking(size_t tileIndex) const;
+
   // Neuroglancer: returns a cached segmentation ID (uint64) at the specified base voxel coordinate,
   // without triggering any network I/O. This is suitable for hot UI paths (e.g. context-menu actions)
   // that must not block or initiate downloads. Returns nullopt if the needed chunk is not in cache.
@@ -371,6 +385,12 @@ public:
 
   ZImg wholeImg() const override;
 
+  // Materializes a single-channel, single-time dense image at the requested ratio.
+  //
+  // This is intended for algorithms that require a contiguous in-memory volume (e.g. legacy auto-trace).
+  // For disk-cached datasets, this avoids materializing all channels/times like wholeImg() would.
+  [[nodiscard]] ZImg assembleChannelTime(std::array<size_t, 3> ratio, size_t c, size_t t) const;
+
 Q_SIGNALS:
   void enterSubregionView(float x, float y, float z);
 
@@ -401,7 +421,13 @@ protected:
 
   ZImg assembleImg(std::array<size_t, 3> ratio, size_t t) const;
 
-  ZImg assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) const;
+  ZImg assembleImg(std::array<size_t, 3> ratio, size_t c, size_t t) const;
+
+  // Assemble a single Z slice at ratio (ratio[2] must be 1).
+  //
+  // If c < 0, all channels are assembled into the result.
+  // If c >= 0, only channel c is assembled into a single-channel result.
+  ZImg assembleImg(std::array<size_t, 3> ratio, size_t z, int c, size_t t) const;
 
   void updateDerivedData();
 

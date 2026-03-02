@@ -8,7 +8,7 @@
 namespace nim {
 
 class ZImg;
-
+class ZVoxelVolume;
 }
 
 namespace nim {
@@ -23,6 +23,12 @@ namespace nim {
                                                      double innerRadius,
                                                      const ZImg& stack);
 
+[[nodiscard]] double findBestTerminalBreakLegacyLike(const std::array<double, 3>& terminalCenter,
+                                                     double terminalRadius,
+                                                     const std::array<double, 3>& innerCenter,
+                                                     double innerRadius,
+                                                     const ZVoxelVolume& stack);
+
 // Port of `ZNeuronTracer::connectBranch` (branch is a single chain rooted at `branchRoot`).
 //
 // `hostRoots` must contain only the host SWC roots (excluding the just-added traced branch root),
@@ -31,5 +37,10 @@ void connectBranchToHostLegacyLike(ZSwc& swc,
                                    const std::vector<ZSwc::SwcTreeNode>& hostRoots,
                                    ZSwc::SwcTreeNode branchRoot,
                                    const ZImg& stack);
+
+void connectBranchToHostLegacyLike(ZSwc& swc,
+                                   const std::vector<ZSwc::SwcTreeNode>& hostRoots,
+                                   ZSwc::SwcTreeNode branchRoot,
+                                   const ZVoxelVolume& stack);
 
 } // namespace nim

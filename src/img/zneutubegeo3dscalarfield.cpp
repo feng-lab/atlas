@@ -3,6 +3,9 @@
 #include "zneutubeimgsampling.h"
 #include "zneutubestackfitscore.h"
 
+#include "zvoxelvolume.h"
+#include "zvoxelvolumedense.h"
+
 #include "zlog.h"
 
 #include <cmath>
@@ -80,12 +83,20 @@ std::vector<double> geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarFie
                                                             size_t c,
                                                             size_t t)
 {
+  const ZImg view = stack.createView(static_cast<index_t>(c), static_cast<index_t>(t));
+  const ZDenseVoxelVolume vol(view);
+  return geo3dScalarFieldStackSamplingLegacyLike(field, vol, zScale);
+}
+
+std::vector<double>
+geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVoxelVolume& stack, double zScale)
+{
   CHECK(field.points.size() == field.values.size());
 
   std::vector<double> signal(field.size(), 0.0);
   for (size_t i = 0; i < field.size(); ++i) {
     const auto& p = field.points[i];
-    signal[i] = pointSampleLegacyLike(stack, p[0], p[1], scaledZ(p[2], zScale), c, t);
+    signal[i] = pointSampleLegacyLike(stack, p[0], p[1], scaledZ(p[2], zScale));
   }
   return signal;
 }
@@ -96,9 +107,17 @@ std::vector<double> geo3dScalarFieldStackSamplingWeightedLegacyLike(const Geo3dS
                                                                     size_t c,
                                                                     size_t t)
 {
+  const ZImg view = stack.createView(static_cast<index_t>(c), static_cast<index_t>(t));
+  const ZDenseVoxelVolume vol(view);
+  return geo3dScalarFieldStackSamplingWeightedLegacyLike(field, vol, zScale);
+}
+
+std::vector<double>
+geo3dScalarFieldStackSamplingWeightedLegacyLike(const Geo3dScalarField& field, const ZVoxelVolume& stack, double zScale)
+{
   CHECK(field.points.size() == field.values.size());
 
-  std::vector<double> signal = geo3dScalarFieldStackSamplingLegacyLike(field, stack, zScale, c, t);
+  std::vector<double> signal = geo3dScalarFieldStackSamplingLegacyLike(field, stack, zScale);
   for (size_t i = 0; i < field.size(); ++i) {
     signal[i] *= field.values[i];
   }
@@ -112,6 +131,18 @@ std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dSca
                                                                   size_t c,
                                                                   size_t t)
 {
+  const ZImg stackView = stack.createView(static_cast<index_t>(c), static_cast<index_t>(t));
+  const ZImg maskView = mask.createView(static_cast<index_t>(c), static_cast<index_t>(t));
+  const ZDenseVoxelVolume stackVol(stackView);
+  const ZDenseVoxelVolume maskVol(maskView);
+  return geo3dScalarFieldStackSamplingMaskedLegacyLike(field, stackVol, zScale, maskVol);
+}
+
+std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dScalarField& field,
+                                                                  const ZVoxelVolume& stack,
+                                                                  double zScale,
+                                                                  const ZVoxelVolume& mask)
+{
   CHECK(field.points.size() == field.values.size());
 
   std::vector<double> signal(field.size(), 0.0);
@@ -119,10 +150,10 @@ std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dSca
     // Matches Geo3d_Scalar_Field_Stack_Sampling_M() -> Stack_Points_Sampling_M().
     for (size_t i = 0; i < field.size(); ++i) {
       const auto& p = field.points[i];
-      if (pointHitMaskLegacyLike(mask, p[0], p[1], p[2], c, t)) {
+      if (pointHitMaskLegacyLike(mask, p[0], p[1], p[2])) {
         signal[i] = nanValue();
       } else {
-        signal[i] = pointSampleLegacyLike(stack, p[0], p[1], p[2], c, t);
+        signal[i] = pointSampleLegacyLike(stack, p[0], p[1], p[2]);
       }
     }
   } else {
@@ -130,10 +161,10 @@ std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dSca
     for (size_t i = 0; i < field.size(); ++i) {
       const auto& p = field.points[i];
       const double z = p[2] * zScale;
-      if (pointSampleLegacyLike(mask, p[0], p[1], z, c, t) > 0.0) {
+      if (pointSampleLegacyLike(mask, p[0], p[1], z) > 0.0) {
         signal[i] = nanValue();
       } else {
-        signal[i] = pointSampleLegacyLike(stack, p[0], p[1], z, c, t);
+        signal[i] = pointSampleLegacyLike(stack, p[0], p[1], z);
       }
     }
   }
@@ -147,12 +178,22 @@ double geo3dScalarFieldStackScoreLegacyLike(const Geo3dScalarField& field,
                                             size_t c,
                                             size_t t)
 {
+  const ZImg view = stack.createView(static_cast<index_t>(c), static_cast<index_t>(t));
+  const ZDenseVoxelVolume vol(view);
+  return geo3dScalarFieldStackScoreLegacyLike(field, vol, zScale, fs);
+}
+
+double geo3dScalarFieldStackScoreLegacyLike(const Geo3dScalarField& field,
+                                            const ZVoxelVolume& stack,
+                                            double zScale,
+                                            StackFitScore* fs)
+{
   CHECK(field.points.size() == field.values.size());
   if (field.size() == 0) {
     return 0.0;
   }
 
-  std::vector<double> signal = geo3dScalarFieldStackSamplingLegacyLike(field, stack, zScale, c, t);
+  std::vector<double> signal = geo3dScalarFieldStackSamplingLegacyLike(field, stack, zScale);
   return computeStackFitScoresLegacyLike(field.values.data(), signal.data(), field.size(), fs);
 }
 
@@ -164,12 +205,25 @@ double geo3dScalarFieldStackScoreMaskedLegacyLike(const Geo3dScalarField& field,
                                                   size_t c,
                                                   size_t t)
 {
+  const ZImg stackView = stack.createView(static_cast<index_t>(c), static_cast<index_t>(t));
+  const ZImg maskView = mask.createView(static_cast<index_t>(c), static_cast<index_t>(t));
+  const ZDenseVoxelVolume stackVol(stackView);
+  const ZDenseVoxelVolume maskVol(maskView);
+  return geo3dScalarFieldStackScoreMaskedLegacyLike(field, stackVol, zScale, maskVol, fs);
+}
+
+double geo3dScalarFieldStackScoreMaskedLegacyLike(const Geo3dScalarField& field,
+                                                  const ZVoxelVolume& stack,
+                                                  double zScale,
+                                                  const ZVoxelVolume& mask,
+                                                  StackFitScore* fs)
+{
   CHECK(field.points.size() == field.values.size());
   if (field.size() == 0) {
     return 0.0;
   }
 
-  std::vector<double> signal = geo3dScalarFieldStackSamplingMaskedLegacyLike(field, stack, zScale, mask, c, t);
+  std::vector<double> signal = geo3dScalarFieldStackSamplingMaskedLegacyLike(field, stack, zScale, mask);
   return computeStackFitScoresMaskedLegacyLike(field.values.data(), signal.data(), field.size(), fs);
 }
 

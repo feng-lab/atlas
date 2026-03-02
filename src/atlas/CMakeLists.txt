@@ -647,6 +647,7 @@ set(SOURCES
     zimgreadstats.h
     zimgreadstatsscope.h zimgreadstatsscope.cpp
     zimgpack.h zimgpack.cpp
+    zimgpackvoxelvolume.h
     zimgpackdisplay.h zimgpackdisplay.cpp
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
     zneuroglancerstate.h zneuroglancerstate.cpp

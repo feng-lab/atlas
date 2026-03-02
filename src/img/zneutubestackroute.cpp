@@ -4,6 +4,7 @@
 #include "zswcgeom.h"
 
 #include "zlog.h"
+#include "zvoxelvolume.h"
 
 #include <algorithm>
 #include <array>
@@ -468,6 +469,302 @@ std::vector<int64_t> stackRouteLegacyLike(const ZImg& stack,
             CHECK(nOffset2Signed >= 0);
             const size_t nOffset2 = static_cast<size_t>(nOffset2Signed);
             double v2 = stackArrayValueLegacyLike(stack, nOffset2);
+            if (sgw.greyFactor != 1.0 || sgw.greyOffset != 0.0) {
+              v1 = stackIntensityLegacyLike(v1, sgw);
+              v2 = stackIntensityLegacyLike(v2, sgw);
+            }
+
+            sgw.argv[1] = v1;
+            sgw.argv[2] = v2;
+
+            weight = sgw.weightFunc(sgw.argv.data());
+          }
+
+          addUndirectedEdge(offset, offset + neighborSub[i], weight);
+        }
+
+        if (useGroupMask) {
+          const int groupId = static_cast<int>(sgw.groupMask->timeData<uint8_t>(0)[offset2]);
+          if (groupId > 0 && groupId < static_cast<int>(groupVertexMap.size())) {
+            int groupVertex = groupVertexMap[static_cast<size_t>(groupId)];
+            if (groupVertex <= 0) {
+              groupVertex = nextVertexId++;
+              groupVertexMap[static_cast<size_t>(groupId)] = groupVertex;
+              adjacency.resize(static_cast<size_t>(nextVertexId));
+            }
+
+            addUndirectedEdge(groupVertex, offset, 0.0);
+          }
+        }
+
+        ++offset;
+      }
+    }
+  }
+
+  const int nvertex = nextVertexId;
+
+  // Dijkstra (Graph_Shortest_Path_E semantics).
+  std::vector<double> dist(static_cast<size_t>(nvertex), std::numeric_limits<double>::infinity());
+  std::vector<int> path(static_cast<size_t>(nvertex), -1);
+  std::vector<int> checked(static_cast<size_t>(nvertex), 0);
+
+  dist[static_cast<size_t>(startIndex)] = 0.0;
+  path[static_cast<size_t>(startIndex)] = -1;
+  checked[static_cast<size_t>(startIndex)] = 1;
+
+  IntHeapLegacyLike heap;
+  heap.reset();
+
+  int curVertex = startIndex;
+
+  for (int iter = 1; iter < nvertex; ++iter) {
+    for (const NeighborEdge& e : adjacency[static_cast<size_t>(curVertex)]) {
+      const int updatingVertex = e.v;
+      if (checked[static_cast<size_t>(updatingVertex)] == 1) {
+        continue;
+      }
+
+      const double tmpdist = e.w + dist[static_cast<size_t>(curVertex)];
+      if (dist[static_cast<size_t>(updatingVertex)] > tmpdist) {
+        dist[static_cast<size_t>(updatingVertex)] = tmpdist;
+        path[static_cast<size_t>(updatingVertex)] = curVertex;
+
+        if (checked[static_cast<size_t>(updatingVertex)] > 1) {
+          heap.update(updatingVertex, dist, checked);
+        } else {
+          heap.add(updatingVertex, dist, checked);
+        }
+      }
+    }
+
+    curVertex = extractMinLegacyLike(dist, checked, heap);
+    if (curVertex == endIndex) {
+      break;
+    }
+    if (curVertex < 0) {
+      break;
+    }
+  }
+
+  sgw.value = dist[static_cast<size_t>(endIndex)];
+  if (sgw.value == std::numeric_limits<double>::infinity()) {
+    return {};
+  }
+
+  // Parse_Stack_Shortest_Path.
+  std::vector<int64_t> offsetPath;
+  offsetPath.reserve(256);
+
+  int end = endIndex;
+  while (end >= 0) {
+    int64_t index = -1;
+    if (end < svolume) {
+      index = stackSubindexLegacyLike(end, stackRange[0], stackRange[2], stackRange[4], swidth, sarea, width, area);
+    }
+    offsetPath.push_back(index);
+    end = path[static_cast<size_t>(end)];
+  }
+
+  const int64_t orgStart = static_cast<int64_t>(stackUtilOffset(startPos[0], startPos[1], startPos[2], width, height));
+  if (!offsetPath.empty() && orgStart != offsetPath.front()) {
+    std::reverse(offsetPath.begin(), offsetPath.end());
+  }
+
+  const int64_t orgEnd = static_cast<int64_t>(stackUtilOffset(endPos[0], endPos[1], endPos[2], width, height));
+  CHECK(!offsetPath.empty());
+  CHECK(orgStart == offsetPath.front()) << "Wrong path head. orgStart=" << orgStart << " got=" << offsetPath.front();
+  CHECK(orgEnd == offsetPath.back()) << "Wrong path tail. orgEnd=" << orgEnd << " got=" << offsetPath.back();
+
+  return offsetPath;
+}
+
+std::vector<int64_t> stackRouteLegacyLike(const ZVoxelVolume& stack,
+                                          const std::array<int, 3>& startPos,
+                                          const std::array<int, 3>& endPos,
+                                          StackGraphWorkspaceLegacyLike& sgw)
+{
+  if (stack.isEmpty()) {
+    sgw.value = std::numeric_limits<double>::infinity();
+    return {};
+  }
+
+  CHECK(stack.valueType() == ZVoxelValueType::Uint8 || stack.valueType() == ZVoxelValueType::Uint16)
+    << "stackRouteLegacyLike: unsupported voxel value type";
+
+  CHECK(stack.width() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK(stack.height() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK(stack.depth() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+
+  const int width = static_cast<int>(stack.width());
+  const int height = static_cast<int>(stack.height());
+  const int depth = static_cast<int>(stack.depth());
+  const int64_t area = static_cast<int64_t>(width) * static_cast<int64_t>(height);
+
+  if (!sgw.range.has_value()) {
+    const double dist = geo3dDist(static_cast<double>(startPos[0]),
+                                  static_cast<double>(startPos[1]),
+                                  static_cast<double>(startPos[2]),
+                                  static_cast<double>(endPos[0]),
+                                  static_cast<double>(endPos[1]),
+                                  static_cast<double>(endPos[2]));
+
+    std::array<int, 3> margin{};
+    for (int i = 0; i < 3; ++i) {
+      margin[static_cast<size_t>(i)] =
+        iroundLegacyLike(dist - std::abs(endPos[static_cast<size_t>(i)] - startPos[static_cast<size_t>(i)] + 1));
+      if (margin[static_cast<size_t>(i)] < 0) {
+        margin[static_cast<size_t>(i)] = 0;
+      }
+    }
+
+    stackGraphWorkspaceSetRangeLegacyLike(sgw, startPos[0], endPos[0], startPos[1], endPos[1], startPos[2], endPos[2]);
+    stackGraphWorkspaceExpandRangeLegacyLike(sgw, margin[0], margin[0], margin[1], margin[1], margin[2], margin[2]);
+    stackGraphWorkspaceValidateRangeLegacyLike(sgw, width, height, depth);
+  }
+
+  CHECK(sgw.range.has_value());
+
+  // Clamp to stack dims like Stack_Graph_W does.
+  std::array<int, 6> stackRange = *sgw.range;
+  stackRange[0] = std::max(0, stackRange[0]);
+  stackRange[1] = std::min(width - 1, stackRange[1]);
+  stackRange[2] = std::max(0, stackRange[2]);
+  stackRange[3] = std::min(height - 1, stackRange[3]);
+  stackRange[4] = std::max(0, stackRange[4]);
+  stackRange[5] = std::min(depth - 1, stackRange[5]);
+
+  const int swidth = stackRange[1] - stackRange[0] + 1;
+  const int sheight = stackRange[3] - stackRange[2] + 1;
+  const int sdepth = stackRange[5] - stackRange[4] + 1;
+  const int sarea = swidth * sheight;
+  const int svolume = sarea * sdepth;
+
+  CHECK(swidth > 0);
+  CHECK(sheight > 0);
+  CHECK(sdepth > 0);
+
+  int startIndex = stackUtilOffset(startPos[0] - stackRange[0],
+                                   startPos[1] - stackRange[2],
+                                   startPos[2] - stackRange[4],
+                                   swidth,
+                                   sheight);
+  int endIndex =
+    stackUtilOffset(endPos[0] - stackRange[0], endPos[1] - stackRange[2], endPos[2] - stackRange[4], swidth, sheight);
+
+  if (startIndex > endIndex) {
+    std::swap(startIndex, endIndex);
+  }
+
+  CHECK(startIndex >= 0);
+  CHECK(endIndex >= 0);
+  CHECK(startIndex < svolume);
+  CHECK(endIndex < svolume);
+
+  const int baseVertexCount = svolume;
+  sgw.virtualVertex = baseVertexCount;
+
+  std::array<int, 256> groupVertexMap{};
+  groupVertexMap.fill(0);
+
+  std::vector<std::vector<NeighborEdge>> adjacency;
+  adjacency.resize(static_cast<size_t>(baseVertexCount));
+
+  const std::vector<int> neighborSub = neighborOffsetLegacyLike(sgw.conn, swidth, sheight);
+  const std::vector<int64_t> neighborOrg = neighborOffsetI64LegacyLike(sgw.conn, width, height);
+  const std::vector<double> neighborDist = neighborDistRLegacyLike(sgw.conn, sgw.resolution);
+  const ZNeighborhood& nb = neighborhoodLegacyOrder(sgw.conn);
+
+  auto addUndirectedEdge = [&adjacency](int v1, int v2, double w) {
+    CHECK(v1 >= 0);
+    CHECK(v2 >= 0);
+    CHECK(static_cast<size_t>(v1) < adjacency.size());
+    CHECK(static_cast<size_t>(v2) < adjacency.size());
+    adjacency[static_cast<size_t>(v1)].push_back(NeighborEdge{v2, w});
+    adjacency[static_cast<size_t>(v2)].push_back(NeighborEdge{v1, w});
+  };
+
+  const bool useSignalMask = (sgw.signalMask != nullptr) && (!sgw.signalMask->isEmpty());
+  if (useSignalMask) {
+    CHECK(sgw.signalMask->numChannels() == 1);
+    CHECK(sgw.signalMask->numTimes() == 1);
+    CHECK(sgw.signalMask->width() == stack.width());
+    CHECK(sgw.signalMask->height() == stack.height());
+    CHECK(sgw.signalMask->depth() == stack.depth());
+  }
+
+  const bool useGroupMask = sgw.groupMask.has_value() && (!sgw.groupMask->isEmpty());
+  if (useGroupMask) {
+    CHECK(sgw.groupMask->numChannels() == 1);
+    CHECK(sgw.groupMask->numTimes() == 1);
+    CHECK(sgw.groupMask->width() == stack.width());
+    CHECK(sgw.groupMask->height() == stack.height());
+    CHECK(sgw.groupMask->depth() == stack.depth());
+    CHECK(sgw.groupMask->isType<uint8_t>());
+  }
+
+  int nextVertexId = baseVertexCount;
+  int offset = 0;
+
+  for (int z = 0; z < sdepth; ++z) {
+    for (int y = 0; y < sheight; ++y) {
+      for (int x = 0; x < swidth; ++x) {
+        const int gx = x + stackRange[0];
+        const int gy = y + stackRange[2];
+        const int gz = z + stackRange[4];
+
+        const int64_t offset2Signed = static_cast<int64_t>(gx) +
+                                      static_cast<int64_t>(gy) * static_cast<int64_t>(width) +
+                                      static_cast<int64_t>(gz) * area;
+        CHECK(offset2Signed >= 0);
+        const size_t offset2 = static_cast<size_t>(offset2Signed);
+
+        int nbound = 0;
+        std::array<uint8_t, 26> isInBound{};
+        for (size_t i = 0; i < nb.size(); ++i) {
+          const ZVoxelCoordinate& o = nb.offset(i);
+          const int nx = x + static_cast<int>(o.x);
+          const int ny = y + static_cast<int>(o.y);
+          const int nz = z + static_cast<int>(o.z);
+          const bool in = (nx >= 0 && ny >= 0 && nz >= 0 && nx < swidth && ny < sheight && nz < sdepth);
+          isInBound[i] = static_cast<uint8_t>(in);
+          if (in) {
+            ++nbound;
+          }
+        }
+
+        const bool isFullyInBound = (nbound == sgw.conn);
+
+        // Add forward voxel-voxel edges (legacy scan_mask: neighborSub[i] > 0).
+        for (size_t i = 0; i < nb.size(); ++i) {
+          if (neighborSub[i] <= 0) {
+            continue;
+          }
+          if (!isFullyInBound && isInBound[i] == 0) {
+            continue;
+          }
+
+          const int64_t nOffset2Signed = offset2Signed + neighborOrg[i];
+          CHECK(nOffset2Signed >= 0);
+          const size_t nOffset2 = static_cast<size_t>(nOffset2Signed);
+
+          if (useSignalMask) {
+            const bool a = maskPositiveLegacyLike(*sgw.signalMask, offset2);
+            const bool b = maskPositiveLegacyLike(*sgw.signalMask, nOffset2);
+            const bool ok = sgw.includingSignalBorder ? (a || b) : (a && b);
+            if (!ok) {
+              continue;
+            }
+          }
+
+          double weight = neighborDist[i];
+          if (sgw.weightFunc != nullptr) {
+            sgw.argv[0] = neighborDist[i];
+
+            const ZVoxelCoordinate& o = nb.offset(i);
+            double v1 = stack.valueAsDouble(gx, gy, gz);
+            double v2 =
+              stack.valueAsDouble(gx + static_cast<int>(o.x), gy + static_cast<int>(o.y), gz + static_cast<int>(o.z));
             if (sgw.greyFactor != 1.0 || sgw.greyOffset != 0.0) {
               v1 = stackIntensityLegacyLike(v1, sgw);
               v2 = stackIntensityLegacyLike(v2, sgw);

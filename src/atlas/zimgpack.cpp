@@ -1185,9 +1185,9 @@ void ZImgPack::retrieveCoveredMIPImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
     return;
   }
 
-  m_mipImgs[t] = std::make_shared<ZImg>(assembleImg(std::array<size_t, 3>{1, 1, 1}, t, zStart));
+  m_mipImgs[t] = std::make_shared<ZImg>(assembleImg(std::array<size_t, 3>{1, 1, 1}, zStart, /*c*/ -1, t));
   for (size_t z = zStart + 1; z <= zEnd; ++z) {
-    m_mipImgs[t]->binaryOperation(assembleImg(std::array<size_t, 3>{1, 1, 1}, t, z), MaxOp());
+    m_mipImgs[t]->binaryOperation(assembleImg(std::array<size_t, 3>{1, 1, 1}, z, /*c*/ -1, t), MaxOp());
   }
   m_mipZStart = zStart;
   m_mipZEnd = zEnd;
@@ -1271,6 +1271,47 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
     return m_maximumProjectedAlongZImg.value<double>(x, y, 0, c, t);
   }
   return m_img.value<double>(x, y, z, c, t);
+}
+
+std::optional<size_t> ZImgPack::tryFindBaseTileIndexForVoxel(size_t x, size_t y, size_t z, size_t t) const
+{
+  if (!m_diskCached) {
+    return std::nullopt;
+  }
+
+  if (x >= m_imgInfo.width || y >= m_imgInfo.height || z >= m_imgInfo.depth) {
+    return std::nullopt;
+  }
+
+  auto it = m_rtToTileBoxRTree.find(std::make_tuple(1_uz, 1_uz, 1_uz, t));
+  if (it == m_rtToTileBoxRTree.end() || !it->second) {
+    return std::nullopt;
+  }
+
+  const TileCornerType p(static_cast<index_t>(x), static_cast<index_t>(y), static_cast<index_t>(z));
+  const TileBoxType queryBox(p, p);
+
+  std::optional<size_t> tileIndexOpt;
+  it->second->query(bgi::intersects(queryBox), boost::make_function_output_iterator([&](const auto& val) {
+                      if (!tileIndexOpt.has_value()) {
+                        tileIndexOpt = val.second;
+                      }
+                    }));
+  return tileIndexOpt;
+}
+
+const ZImgSubBlock& ZImgPack::tileByIndex(size_t tileIndex) const
+{
+  CHECK(tileIndex < m_allTiles.size());
+  CHECK(m_allTiles[tileIndex] != nullptr);
+  return *m_allTiles[tileIndex].get();
+}
+
+std::shared_ptr<ZImg> ZImgPack::readTileBlocking(size_t tileIndex) const
+{
+  CHECK(m_diskCached);
+  const ZImgSubBlock& tile = tileByIndex(tileIndex);
+  return ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), tile);
 }
 
 double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, bool mip) const
@@ -2489,7 +2530,7 @@ void ZImgPack::show3DImgContextMenu(QPoint globalPos, float x, float y, float z,
 ZImg ZImgPack::slice(size_t z, size_t t) const
 {
   CHECK(m_diskCached);
-  return assembleImg({1, 1, 1}, t, z);
+  return assembleImg({1, 1, 1}, z, /*c*/ -1, t);
 }
 
 ZImg ZImgPack::allSlices(size_t t) const
@@ -2502,6 +2543,72 @@ ZImg ZImgPack::wholeImg() const
 {
   CHECK(m_diskCached);
   return assembleImg({1, 1, 1});
+}
+
+ZImg ZImgPack::assembleChannelTime(std::array<size_t, 3> ratio, size_t c, size_t t) const
+{
+  const ZImgInfo info = imgInfo();
+  if (c >= info.numChannels || t >= info.numTimes) {
+    throw ZException(fmt::format("assembleChannelTime: invalid channel/time selection (c={}, t={}, ratio=[{},{},{}]).",
+                                 c,
+                                 t,
+                                 ratio[0],
+                                 ratio[1],
+                                 ratio[2]));
+  }
+  if (ratio[0] == 0 || ratio[1] == 0 || ratio[2] == 0) {
+    throw ZException(fmt::format("assembleChannelTime: ratio values must be > 0, got ratio=[{},{},{}].",
+                                 ratio[0],
+                                 ratio[1],
+                                 ratio[2]));
+  }
+
+  if (!m_diskCached) {
+    ZImg res = m_img.extractChannel(c, static_cast<index_t>(t));
+    if (ratio != std::array<size_t, 3>{1, 1, 1}) {
+      res = res.blockDownsampled(ratio[0], ratio[1], ratio[2], ImgMergeMode::Interpolation);
+    }
+    return res;
+  }
+
+  if (m_ngVolume) {
+    CHECK(t == 0);
+  }
+
+  std::array<size_t, 3> readRatio = ratio;
+  if (!m_pyramidalRatios.contains(readRatio)) {
+    readRatio = readRatioOf(ratio[0], ratio[1], ratio[2]);
+  }
+  CHECK(m_pyramidalRatios.contains(readRatio));
+
+  ZImg res = assembleImg(readRatio, c, t);
+
+  const size_t desWidth = (info.width + ratio[0] - 1) / ratio[0];
+  const size_t desHeight = (info.height + ratio[1] - 1) / ratio[1];
+  const size_t desDepth = (info.depth + ratio[2] - 1) / ratio[2];
+
+  if (res.width() != desWidth || res.height() != desHeight || res.depth() != desDepth) {
+    const Interpolant interpolant = m_ngSegmentationRgbFor3D ? Interpolant::Nearest : Interpolant::Cubic;
+    const bool antialiasing = m_ngSegmentationRgbFor3D ? false : true;
+    res.resize(desWidth,
+               desHeight,
+               desDepth,
+               interpolant,
+               antialiasing,
+               false,
+               FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+  }
+
+  // For file-backed (non-Neuroglancer) datasets, the assembled mip levels represent
+  // downsampled voxels; reflect this in voxel sizes so callers that care about
+  // physical scale (or later resizes) see a consistent image model.
+  if (!m_ngVolume) {
+    res.infoRef().voxelSizeX = info.voxelSizeX * static_cast<double>(ratio[0]);
+    res.infoRef().voxelSizeY = info.voxelSizeY * static_cast<double>(ratio[1]);
+    res.infoRef().voxelSizeZ = info.voxelSizeZ * static_cast<double>(ratio[2]);
+  }
+
+  return res;
 }
 
 void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t)
@@ -2948,6 +3055,37 @@ void ZImgPack::createTileIndexStructure()
   }
 }
 
+namespace {
+
+void setInfoToSingleTime(ZImgInfo* info, const ZImgInfo& baseInfo, size_t t)
+{
+  CHECK(info);
+  CHECK(t < baseInfo.numTimes);
+  CHECK(baseInfo.timeStamps.size() == baseInfo.numTimes);
+  info->numTimes = 1;
+  info->timeStamps = {baseInfo.timeStamps[t]};
+}
+
+void setInfoToSingleChannel(ZImgInfo* info, const ZImgInfo& baseInfo, size_t c)
+{
+  CHECK(info);
+  CHECK(c < baseInfo.numChannels);
+  CHECK(baseInfo.channelNames.size() == baseInfo.numChannels);
+  CHECK(baseInfo.channelColors.size() == baseInfo.numChannels);
+  info->numChannels = 1;
+  info->channelNames = {baseInfo.channelNames[c]};
+  info->channelColors = {baseInfo.channelColors[c]};
+  info->lastChannelIsAlphaChannel = baseInfo.lastChannelIsAlphaChannel && (c + 1 == baseInfo.numChannels);
+}
+
+void setInfoToSingleChannelTime(ZImgInfo* info, const ZImgInfo& baseInfo, size_t c, size_t t)
+{
+  setInfoToSingleChannel(info, baseInfo, c);
+  setInfoToSingleTime(info, baseInfo, t);
+}
+
+} // namespace
+
 ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio) const
 {
   CHECK(m_pyramidalRatios.contains(ratio));
@@ -2959,6 +3097,9 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio) const
   info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
   info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
   info.depth = (m_imgInfo.depth + ratio[2] - 1) / ratio[2];
+  info.voxelSizeX *= static_cast<double>(ratio[0]);
+  info.voxelSizeY *= static_cast<double>(ratio[1]);
+  info.voxelSizeZ *= static_cast<double>(ratio[2]);
   ZImg res(info);
 
   for (size_t t = 0; t < m_imgInfo.numTimes; ++t) {
@@ -2998,7 +3139,7 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
     info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
     info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
     info.depth = (m_imgInfo.depth + ratio[2] - 1) / ratio[2];
-    info.numTimes = 1;
+    setInfoToSingleTime(&info, m_imgInfo, t);
     const auto& scale = m_ngVolume->scales().at(*scaleIndexOpt);
     info.voxelSizeX = scale.resolutionNm[0];
     info.voxelSizeY = scale.resolutionNm[1];
@@ -3042,11 +3183,15 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
 
     return res;
   }
+  CHECK(t < m_imgInfo.numTimes);
   ZImgInfo info = m_imgInfo;
   info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
   info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
   info.depth = (m_imgInfo.depth + ratio[2] - 1) / ratio[2];
-  info.numTimes = 1;
+  info.voxelSizeX *= static_cast<double>(ratio[0]);
+  info.voxelSizeY *= static_cast<double>(ratio[1]);
+  info.voxelSizeZ *= static_cast<double>(ratio[2]);
+  setInfoToSingleTime(&info, m_imgInfo, t);
   ZImg res(info);
 
   auto tiit = m_rtToTileIndice.find(std::make_tuple(ratio[0], ratio[1], ratio[2], t));
@@ -3072,9 +3217,115 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
   return res;
 }
 
-ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) const
+ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t c, size_t t) const
+{
+  CHECK(m_pyramidalRatios.contains(ratio));
+
+  if (m_ngVolume) {
+    CHECK(t == 0);
+    auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(ratio);
+    CHECK(scaleIndexOpt);
+    CHECK(c < m_imgInfo.numChannels);
+
+    ZImgInfo info = m_imgInfo;
+    info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
+    info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
+    info.depth = (m_imgInfo.depth + ratio[2] - 1) / ratio[2];
+    setInfoToSingleChannelTime(&info, m_imgInfo, c, t);
+    const auto& scale = m_ngVolume->scales().at(*scaleIndexOpt);
+    info.voxelSizeX = scale.resolutionNm[0];
+    info.voxelSizeY = scale.resolutionNm[1];
+    info.voxelSizeZ = scale.resolutionNm[2];
+
+    ZImg res(info);
+
+    const auto chunks = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt,
+                                                              {0, 0, 0},
+                                                              {static_cast<int64_t>(m_imgInfo.width),
+                                                               static_cast<int64_t>(m_imgInfo.height),
+                                                               static_cast<int64_t>(m_imgInfo.depth)});
+    if (chunks.empty()) {
+      return res;
+    }
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
+      for (size_t i = r.begin(); i != r.end(); ++i) {
+        std::shared_ptr<ZImg> chunkImg;
+        try {
+          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        }
+        catch (const std::exception&) {
+          continue;
+        }
+        if (!chunkImg) {
+          continue;
+        }
+
+        ZVoxelCoordinate start(std::round(static_cast<double>(chunks[i].baseStart[0]) / ratio[0]),
+                               std::round(static_cast<double>(chunks[i].baseStart[1]) / ratio[1]),
+                               std::round(static_cast<double>(chunks[i].baseStart[2]) / ratio[2]),
+                               0,
+                               0);
+        if (m_ngSegmentationRgbFor3D) {
+          CHECK(m_ngVolume->isSegmentation());
+          CHECK(c < 3);
+          pasteNeuroglancerSegmentationChunkAsRgbComponent(*chunkImg, res, start, c);
+        } else {
+          start.c = -static_cast<index_t>(c);
+          res.pasteImg(*chunkImg, start, false);
+        }
+      }
+    });
+
+    return res;
+  }
+
+  CHECK(t < m_imgInfo.numTimes);
+  CHECK(c < m_imgInfo.numChannels);
+
+  ZImgInfo info = m_imgInfo;
+  info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
+  info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
+  info.depth = (m_imgInfo.depth + ratio[2] - 1) / ratio[2];
+  info.voxelSizeX *= static_cast<double>(ratio[0]);
+  info.voxelSizeY *= static_cast<double>(ratio[1]);
+  info.voxelSizeZ *= static_cast<double>(ratio[2]);
+  setInfoToSingleChannelTime(&info, m_imgInfo, c, t);
+  ZImg res(info);
+
+  auto tiit = m_rtToTileIndice.find(std::make_tuple(ratio[0], ratio[1], ratio[2], t));
+  if (tiit != m_rtToTileIndice.end()) {
+    const std::vector<size_t>& tileIndice = tiit->second;
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, tileIndice.size()), [&](const tbb::blocked_range<size_t>& r) {
+      for (size_t i = r.begin(); i != r.end(); ++i) {
+        const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
+        ZVoxelCoordinate start(std::round(static_cast<double>(tile.x) / ratio[0]),
+                               std::round(static_cast<double>(tile.y) / ratio[1]),
+                               std::round(static_cast<double>(tile.z) / ratio[2]),
+                               -static_cast<index_t>(c),
+                               0);
+
+        std::shared_ptr<ZImg> imgPtr =
+          ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndice[i]), tile);
+        res.pasteImg(*imgPtr, start);
+      }
+    });
+  }
+
+  return res;
+}
+
+ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t z, int c, size_t t) const
 {
   CHECK(m_pyramidalRatios.contains(ratio) && ratio[2] == 1);
+  const bool allChannels = c < 0;
+  const size_t sc = allChannels ? 0_uz : static_cast<size_t>(c);
+  if (!allChannels) {
+    CHECK(c >= 0);
+    CHECK(sc < m_imgInfo.numChannels) << "Invalid channel index c=" << sc
+                                      << " for numChannels=" << m_imgInfo.numChannels;
+  }
+
   if (m_ngVolume) {
     CHECK(t == 0);
     auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(ratio);
@@ -3084,7 +3335,11 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
     info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
     info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
     info.depth = 1;
-    info.numTimes = 1;
+    if (allChannels) {
+      setInfoToSingleTime(&info, m_imgInfo, t);
+    } else {
+      setInfoToSingleChannelTime(&info, m_imgInfo, sc, t);
+    }
     const auto& scale = m_ngVolume->scales().at(*scaleIndexOpt);
     info.voxelSizeX = scale.resolutionNm[0];
     info.voxelSizeY = scale.resolutionNm[1];
@@ -3120,19 +3375,38 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
                                      0);
         if (m_ngSegmentationRgbFor3D) {
           CHECK(m_ngVolume->isSegmentation());
-          pasteNeuroglancerSegmentationChunkAsRgb(*chunkImg, res, start);
+          if (allChannels) {
+            pasteNeuroglancerSegmentationChunkAsRgb(*chunkImg, res, start);
+          } else {
+            CHECK(sc < 3);
+            pasteNeuroglancerSegmentationChunkAsRgbComponent(*chunkImg, res, start, sc);
+          }
         } else {
-          res.pasteImg(*chunkImg, start, false);
+          if (allChannels) {
+            res.pasteImg(*chunkImg, start, false);
+          } else {
+            ZVoxelCoordinate startWithChannel = start;
+            startWithChannel.c = -static_cast<index_t>(sc);
+            res.pasteImg(*chunkImg, startWithChannel, false);
+          }
         }
       }
     });
     return res;
   }
+  CHECK(t < m_imgInfo.numTimes);
   ZImgInfo info = m_imgInfo;
   info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
   info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
   info.depth = 1;
-  info.numTimes = 1;
+  info.voxelSizeX *= static_cast<double>(ratio[0]);
+  info.voxelSizeY *= static_cast<double>(ratio[1]);
+  info.voxelSizeZ *= static_cast<double>(ratio[2]);
+  if (allChannels) {
+    setInfoToSingleTime(&info, m_imgInfo, t);
+  } else {
+    setInfoToSingleChannelTime(&info, m_imgInfo, sc, t);
+  }
   ZImg res(info);
 
   auto tiit = m_rtToTileIndice.find(std::make_tuple(ratio[0], ratio[1], ratio[2], t));
@@ -3145,7 +3419,7 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
           ZVoxelCoordinate start(std::round(static_cast<double>(tile.x) / ratio[0]),
                                  std::round(static_cast<double>(tile.y) / ratio[1]),
                                  tile.z - static_cast<index_t>(z),
-                                 0,
+                                 allChannels ? 0 : -static_cast<index_t>(sc),
                                  0);
 
           std::shared_ptr<ZImg> imgPtr =

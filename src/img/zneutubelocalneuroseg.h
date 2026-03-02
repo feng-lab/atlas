@@ -11,7 +11,7 @@
 namespace nim {
 
 class ZImg;
-
+class ZVoxelVolume;
 }
 
 namespace nim {
@@ -45,7 +45,7 @@ struct LocsegScoreWorkspace
 {
   StackFitScore fs{};
   NeurosegFieldFunctionLegacyLike fieldFunc = nullptr;
-  const ZImg* mask = nullptr;
+  const ZVoxelVolume* mask = nullptr;
 };
 
 // C++ port of tz_workspace.h::Locseg_Fit_Workspace (alias of Receptor_Fit_Workspace).
@@ -116,12 +116,18 @@ void localNeurosegScaleLegacyLike(LocalNeuroseg& locseg, double xyScale, double 
                                                           size_t c = 0,
                                                           size_t t = 0);
 
+[[nodiscard]] double
+localNeurosegAverageSignalLegacyLike(const LocalNeuroseg& locseg, const ZVoxelVolume& stack, double zScale);
+
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Top_Sample().
 [[nodiscard]] double localNeurosegTopSampleLegacyLike(const LocalNeuroseg& locseg,
                                                       const ZImg& stack,
                                                       double zScale,
                                                       size_t c = 0,
                                                       size_t t = 0);
+
+[[nodiscard]] double
+localNeurosegTopSampleLegacyLike(const LocalNeuroseg& locseg, const ZVoxelVolume& stack, double zScale);
 
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Height_Profile().
 [[nodiscard]] std::vector<double> localNeurosegHeightProfileLegacyLike(const LocalNeuroseg& locseg,
@@ -133,6 +139,13 @@ void localNeurosegScaleLegacyLike(LocalNeuroseg& locseg, double xyScale, double 
                                                                        size_t c = 0,
                                                                        size_t t = 0);
 
+[[nodiscard]] std::vector<double> localNeurosegHeightProfileLegacyLike(const LocalNeuroseg& locseg,
+                                                                       const ZVoxelVolume& stack,
+                                                                       double zScale,
+                                                                       int n,
+                                                                       int option,
+                                                                       NeurosegFieldFunctionLegacyLike fieldFunc);
+
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Height_Search_W().
 [[nodiscard]] bool localNeurosegHeightSearchWLegacyLike(LocalNeuroseg& locseg,
                                                         const ZImg& stack,
@@ -140,6 +153,11 @@ void localNeurosegScaleLegacyLike(LocalNeuroseg& locseg, double xyScale, double 
                                                         LocsegScoreWorkspace& sws,
                                                         size_t c = 0,
                                                         size_t t = 0);
+
+[[nodiscard]] bool localNeurosegHeightSearchWLegacyLike(LocalNeuroseg& locseg,
+                                                        const ZVoxelVolume& stack,
+                                                        double zScale,
+                                                        LocsegScoreWorkspace& sws);
 
 // Ports of tz_local_neuroseg.c LocalNeuroseg -> Geo3d_Circle helpers.
 [[nodiscard]] Geo3dCircle localNeurosegToCircleZLegacyLike(const LocalNeuroseg& locseg, double z, int option);
@@ -153,6 +171,8 @@ void localNeurosegScaleLegacyLike(LocalNeuroseg& locseg, double xyScale, double 
 // - Transforms them into stack coordinates,
 // - Returns true if any sampled point hits a non-zero mask voxel.
 [[nodiscard]] bool localNeurosegHitMaskLegacyLike(const LocalNeuroseg& locseg, const ZImg& mask);
+
+[[nodiscard]] bool localNeurosegHitMaskLegacyLike(const LocalNeuroseg& locseg, const ZVoxelVolume& mask);
 
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Field_S().
 [[nodiscard]] Geo3dScalarField localNeurosegFieldSLegacyLike(const LocalNeuroseg& locseg,
@@ -180,12 +200,19 @@ void localNeurosegScaleLegacyLike(LocalNeuroseg& locseg, double xyScale, double 
                                                    size_t c = 0,
                                                    size_t t = 0);
 
+[[nodiscard]] double localNeurosegScorePLegacyLike(const LocalNeuroseg& locseg,
+                                                   const ZVoxelVolume& stack,
+                                                   double zScale,
+                                                   /*nullable*/ StackFitScore* fs);
+
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Position_Adjust().
 void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg,
                                            const ZImg& stack,
                                            double zScale,
                                            size_t c = 0,
                                            size_t t = 0);
+
+void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg, const ZVoxelVolume& stack, double zScale);
 
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Orientation_Search_C().
 [[nodiscard]] double localNeurosegOrientationSearchCLegacyLike(LocalNeuroseg& locseg,
@@ -195,6 +222,11 @@ void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg,
                                                                size_t c = 0,
                                                                size_t t = 0);
 
+[[nodiscard]] double localNeurosegOrientationSearchCLegacyLike(LocalNeuroseg& locseg,
+                                                               const ZVoxelVolume& stack,
+                                                               double zScale,
+                                                               StackFitScore& fs);
+
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Orientation_Search_B().
 [[nodiscard]] double localNeurosegOrientationSearchBLegacyLike(LocalNeuroseg& locseg,
                                                                const ZImg& stack,
@@ -202,6 +234,11 @@ void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg,
                                                                StackFitScore& fs,
                                                                size_t c = 0,
                                                                size_t t = 0);
+
+[[nodiscard]] double localNeurosegOrientationSearchBLegacyLike(LocalNeuroseg& locseg,
+                                                               const ZVoxelVolume& stack,
+                                                               double zScale,
+                                                               StackFitScore& fs);
 
 // Port of tz_local_neuroseg.c::Local_Neuroseg_R_Scale_Search().
 //
@@ -221,6 +258,17 @@ void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg,
                                                          size_t c = 0,
                                                          size_t t = 0);
 
+[[nodiscard]] double localNeurosegRScaleSearchLegacyLike(LocalNeuroseg& locseg,
+                                                         const ZVoxelVolume& stack,
+                                                         double zScale,
+                                                         double rStart,
+                                                         double rEnd,
+                                                         double rStep,
+                                                         double sStart,
+                                                         double sEnd,
+                                                         double sStep,
+                                                         /*nullable*/ StackFitScore* fs);
+
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Score_W().
 [[nodiscard]] double localNeurosegScoreWLegacyLike(const LocalNeuroseg& locseg,
                                                    const ZImg& stack,
@@ -228,6 +276,11 @@ void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg,
                                                    LocsegScoreWorkspace& ws,
                                                    size_t c = 0,
                                                    size_t t = 0);
+
+[[nodiscard]] double localNeurosegScoreWLegacyLike(const LocalNeuroseg& locseg,
+                                                   const ZVoxelVolume& stack,
+                                                   double zScale,
+                                                   LocsegScoreWorkspace& ws);
 
 // Port of tz_local_neuroseg.c::Fit_Local_Neuroseg_W().
 [[nodiscard]] double fitLocalNeurosegWLegacyLike(LocalNeuroseg& locseg,
@@ -237,6 +290,9 @@ void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg,
                                                  size_t c = 0,
                                                  size_t t = 0);
 
+[[nodiscard]] double
+fitLocalNeurosegWLegacyLike(LocalNeuroseg& locseg, const ZVoxelVolume& stack, double zScale, LocsegFitWorkspace& ws);
+
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Optimize_W().
 [[nodiscard]] double localNeurosegOptimizeWLegacyLike(LocalNeuroseg& locseg,
                                                       const ZImg& stack,
@@ -245,6 +301,12 @@ void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg,
                                                       LocsegFitWorkspace& ws,
                                                       size_t c = 0,
                                                       size_t t = 0);
+
+[[nodiscard]] double localNeurosegOptimizeWLegacyLike(LocalNeuroseg& locseg,
+                                                      const ZVoxelVolume& stack,
+                                                      double zScale,
+                                                      int option,
+                                                      LocsegFitWorkspace& ws);
 
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Ball_Bound().
 void localNeurosegBallBoundLegacyLike(const LocalNeuroseg& locseg, Geo3dBallLegacyLike& ball);

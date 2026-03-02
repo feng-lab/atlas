@@ -5,16 +5,11 @@
 #include "zneutubetracedefs.h"
 
 #include "zimg.h"
+#include "zvoxelvolume.h"
 
 #include <array>
 #include <folly/CancellationToken.h>
 #include <memory>
-
-namespace nim {
-
-class ZImg;
-
-}
 
 namespace nim {
 
@@ -49,6 +44,7 @@ struct TraceWorkspace
   const ZImg* swcMask = nullptr;
 
   std::unique_ptr<ZImg> traceMask;
+  std::unique_ptr<ZVoxelVolumeMutable> traceMaskVolume;
   bool traceMaskUpdating = true;
 
   // Reserved/dynamic variables (legacy behavior depends on routine).
@@ -68,6 +64,7 @@ void defaultTraceWorkspaceLegacyLike(TraceWorkspace& tw);
 // Port of tz_locseg_chain.c::Locseg_Chain_Default_Trace_Workspace().
 void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace& tw);
 void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace& tw, const ZImg& stack);
+void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace& tw, const ZVoxelVolume& stack);
 
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Set_Trace_Status().
 //
@@ -79,8 +76,13 @@ void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace& tw, const ZImg& 
 void traceWorkspaceSetTraceStatusLegacyLike(TraceWorkspace& tw, TraceStatus headStatus, TraceStatus tailStatus);
 
 // Port of `ZNeuronTracer::initTraceMask(bool clearing)`:
-// - Ensures `tw->traceMask` exists (allocates GREY16-equivalent mask on demand).
+// - Ensures `tw->traceMask` exists (allocates GREY16/uint16 mask on demand).
 // - Zeros the mask if `clearing` is true, or if the mask had to be allocated.
+//
+// Notes:
+// - This mask stores legacy per-chain region IDs (`chainId+1`) just like NeuTu's `Trace_Workspace::trace_mask`.
+//   Even though Atlas does not expose chain IDs as a user-facing concept, the algorithm relies on these IDs
+//   (e.g., recording `Trace_Record::hit_region`) to reproduce legacy trace/merge behavior.
 void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace& tw, const ZImg& stack, bool clearing);
 
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Mask_Value().

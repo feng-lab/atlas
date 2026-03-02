@@ -144,6 +144,9 @@ set(IMG_SOURCES
         zimgitkinterface.h
         zcompleximg.h zcompleximg.cpp
         zfft.h zfft.cpp
+        zvoxelvolume.h
+        zvoxelvolumedense.h
+        zsparsevoxelmask.h
         zaffine2d.h zaffine2d.cpp
         zaffine3d.h zaffine3d.cpp
         zimageinterpolation.h zimageinterpolation.cpp

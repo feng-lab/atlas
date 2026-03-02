@@ -11,6 +11,7 @@ namespace nim {
 
 struct Neuroseg;
 struct LocalNeuroseg;
+class ZVoxelVolumeMutable;
 
 // Port of tz_neurofield.c::Neurofield7().
 [[nodiscard]] double
@@ -27,5 +28,13 @@ void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center, double r
 
 // Port of neuTube's SWC->mask labeling used by `ZSwcTree::labelStack(Stack*)`.
 void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZImg& mask, double zScale, int value);
+
+// Overloads for voxel-mask adapters (e.g. sparse masks for disk-cached tracing).
+void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZVoxelVolumeMutable& mask, double zScale, int value);
+void geo3dBallLabelStackLegacyLike(const std::array<double, 3>& center,
+                                   double radius,
+                                   ZVoxelVolumeMutable& mask,
+                                   int value);
+void labelSwcIntoMaskLegacyLike(const ZSwc& swc, ZVoxelVolumeMutable& mask, double zScale, int value);
 
 } // namespace nim

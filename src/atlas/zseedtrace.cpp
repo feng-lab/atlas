@@ -6,6 +6,7 @@
 #include "zimg.h"
 #include "zimgdoc.h"
 #include "zimgpack.h"
+#include "zimgpackvoxelvolume.h"
 #include "zswcdoc.h"
 #include "zswcpack.h"
 #include "zswcresampler.h"
@@ -159,22 +160,6 @@ struct SeededTraceAsyncResult
       return res;
     }
 
-    const ZImg* signalPtr = nullptr;
-    ZImg ownedSignal;
-    if (imgPack->isDiskCached()) {
-      ownedSignal = imgPack->wholeImg();
-      signalPtr = &ownedSignal;
-    } else {
-      signalPtr = &imgPack->img();
-    }
-    CHECK(signalPtr != nullptr);
-    const ZImg& signal = *signalPtr;
-
-    if (signal.isEmpty()) {
-      res.error = QStringLiteral("Trace failed: the image is empty.");
-      return res;
-    }
-
     TraceConfig cfg;
     if (!traceConfigPath.isEmpty()) {
       const bool ok = loadTraceConfigLegacyLike(traceConfigPath.toStdString(), cfg);
@@ -204,8 +189,18 @@ struct SeededTraceAsyncResult
 
     maybeCancel(cancellationToken);
     if (hostSwcOpt.has_value()) {
-      SeedTraceResult tr =
-        traceSeedIntoHostSwcLegacyLike(signal, hostSwcOpt->second, seed, cfg, sc, t, cancellationToken);
+      SeedTraceResult tr;
+      if (imgPack->isDiskCached()) {
+        const ZImgPackVoxelVolume signalVol(imgPack, sc, t);
+        tr = traceSeedIntoHostSwcLegacyLike(signalVol, hostSwcOpt->second, seed, cfg, cancellationToken);
+      } else {
+        const ZImg& signal = imgPack->img();
+        if (signal.isEmpty()) {
+          res.error = QStringLiteral("Trace failed: the image is empty.");
+          return res;
+        }
+        tr = traceSeedIntoHostSwcLegacyLike(signal, hostSwcOpt->second, seed, cfg, sc, t, cancellationToken);
+      }
       if (tr.swc) {
         size_t resampledNewNodes = tr.newNodes;
         size_t tmpNewNodes = 0;
@@ -216,7 +211,18 @@ struct SeededTraceAsyncResult
         res.newNodes = resampledNewNodes;
       }
     } else {
-      SeedTraceResult tr = traceSeedNewSwcLegacyLike(signal, seed, cfg, sc, t, cancellationToken);
+      SeedTraceResult tr;
+      if (imgPack->isDiskCached()) {
+        const ZImgPackVoxelVolume signalVol(imgPack, sc, t);
+        tr = traceSeedNewSwcLegacyLike(signalVol, seed, cfg, cancellationToken);
+      } else {
+        const ZImg& signal = imgPack->img();
+        if (signal.isEmpty()) {
+          res.error = QStringLiteral("Trace failed: the image is empty.");
+          return res;
+        }
+        tr = traceSeedNewSwcLegacyLike(signal, seed, cfg, sc, t, cancellationToken);
+      }
       if (tr.swc) {
         ZNeutubeSwcResampler resampler;
         resampler.optimalDownsample(*tr.swc);

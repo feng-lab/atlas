@@ -4,11 +4,13 @@
 
 #include <cstddef>
 #include <optional>
+#include <array>
 
 class QCheckBox;
 class QComboBox;
 class QLabel;
 class QSlider;
+class QSpinBox;
 
 namespace nim {
 
@@ -34,6 +36,7 @@ private:
   [[nodiscard]] bool loadResultEnabled() const;
   [[nodiscard]] int traceLevel() const;
   [[nodiscard]] bool optimalResamplingEnabled() const;
+  [[nodiscard]] std::array<size_t, 3> signalRatio() const;
 
   void rebuildImageCombo();
   void rebuildChannelAndTimeCombos();
@@ -54,6 +57,10 @@ private:
   QSlider* m_levelSlider = nullptr;
   QCheckBox* m_defaultLevelCheck = nullptr;
   QCheckBox* m_resampleCheck = nullptr;
+
+  QCheckBox* m_downsampleCheck = nullptr;
+  QSpinBox* m_downsampleRatioXYSpin = nullptr;
+  QSpinBox* m_downsampleRatioZSpin = nullptr;
 
   bool m_outputSwcCustomized = false;
   bool m_outputLogCustomized = false;

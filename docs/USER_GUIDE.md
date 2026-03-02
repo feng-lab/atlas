@@ -933,6 +933,9 @@ In the Auto Trace dialog:
   - **Default** (recommended): uses the default tracing configuration.
   - Or uncheck Default and pick a budget level (1–6). Higher levels can take longer and sometimes improve results.
 - **Optimal Node Resampling** (recommended): produces a less redundant SWC by resampling after tracing.
+- **Trace on downsampled image** (optional): traces on a downsampled copy of the selected channel/time.
+  - Choose an **XY ratio** and a **Z ratio** (integer factors). Larger ratios mean a smaller image (faster/less memory, but can lose fine detail).
+  - The generated SWC is automatically **rescaled back to the original image coordinates** (x/y/z and radii).
 
 #### Step 3: start and monitor the task
 

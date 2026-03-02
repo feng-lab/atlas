@@ -8,6 +8,8 @@
 
 namespace nim {
 
+class ZVoxelVolume;
+
 // Port of tz_stack_graph.c::Stack_Route().
 //
 // Returns a list of voxel indices in the original `stack` (start..end).
@@ -17,6 +19,12 @@ namespace nim {
 // voxel indices should filter to `[0, stack.voxelNumber())`.
 // When no path exists, returns an empty vector and sets `sgw->value` to +inf.
 [[nodiscard]] std::vector<int64_t> stackRouteLegacyLike(const ZImg& stack,
+                                                        const std::array<int, 3>& startPos,
+                                                        const std::array<int, 3>& endPos,
+                                                        StackGraphWorkspaceLegacyLike& sgw);
+
+// Overload for read-only voxel volumes (single-channel/time view).
+[[nodiscard]] std::vector<int64_t> stackRouteLegacyLike(const ZVoxelVolume& stack,
                                                         const std::array<int, 3>& startPos,
                                                         const std::array<int, 3>& endPos,
                                                         StackGraphWorkspaceLegacyLike& sgw);

@@ -1,5 +1,7 @@
 #include "zneutubetraceworkspace.h"
 
+#include "zvoxelvolume.h"
+
 #include "zlog.h"
 
 #include <cmath>
@@ -36,6 +38,7 @@ void defaultTraceWorkspaceLegacyLike(TraceWorkspace& tw)
 
   tw.supStack = nullptr;
   tw.traceMask.reset();
+  tw.traceMaskVolume.reset();
   tw.swcMask = nullptr;
   tw.traceMaskUpdating = true;
 
@@ -67,6 +70,18 @@ void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace& tw, const ZImg& 
   tw.traceRange[5] = static_cast<double>(stack.depth()) - 1.0;
 }
 
+void locsegChainDefaultTraceWorkspaceLegacyLike(TraceWorkspace& tw, const ZVoxelVolume& stack)
+{
+  locsegChainDefaultTraceWorkspaceLegacyLike(tw);
+
+  tw.traceRange[0] = 0.0;
+  tw.traceRange[1] = 0.0;
+  tw.traceRange[2] = 0.0;
+  tw.traceRange[3] = static_cast<double>(stack.width()) - 1.0;
+  tw.traceRange[4] = static_cast<double>(stack.height()) - 1.0;
+  tw.traceRange[5] = static_cast<double>(stack.depth()) - 1.0;
+}
+
 void traceWorkspaceSetTraceStatusLegacyLike(TraceWorkspace& tw, TraceStatus headStatus, TraceStatus tailStatus)
 {
   // Port of tz_trace_utils.c::Trace_Workspace_Set_Trace_Status().
@@ -82,8 +97,12 @@ void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace& tw, const ZImg& stack
   }
 
   if (!tw.traceMask) {
-    // Legacy trace_mask is GREY16 (uint16) regardless of input stack type.
-    const ZImgInfo info(stack.width(), stack.height(), stack.depth(), 1, 1, 2, VoxelFormat::Unsigned);
+    // Match NeuTu's Trace_Workspace::trace_mask semantics: a GREY16 label image storing
+    // per-chain region IDs (`chainId+1`). This is required for hit-region bookkeeping
+    // and for A/B parity with the legacy tracer.
+    ZImgInfo info(stack.width(), stack.height(), stack.depth(), 1, 1, 1, VoxelFormat::Unsigned);
+    info.setVoxelFormat<uint16_t>();
+    info.createDefaultDescriptions();
     tw.traceMask = std::make_unique<ZImg>(info);
     clearing = true;
   }
@@ -95,11 +114,6 @@ void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace& tw, const ZImg& stack
 
 int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array<double, 3>& pos)
 {
-  if (!tw.traceMask) {
-    return 0;
-  }
-
-  const ZImg& mask = *tw.traceMask;
   const int x = iroundLegacyLike(pos[0]);
   const int y = iroundLegacyLike(pos[1]);
   const int z = iroundLegacyLike(pos[2]);
@@ -107,6 +121,34 @@ int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array
   if (x < 0 || y < 0 || z < 0) {
     return 0;
   }
+
+  if (tw.traceMaskVolume) {
+    const ZVoxelVolume& mask = *tw.traceMaskVolume;
+
+    const size_t width = mask.width();
+    const size_t height = mask.height();
+    const size_t depth = mask.depth();
+
+    // Legacy bounds check:
+    //   z < trace_mask->width   (bug: should be depth)
+    if (static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height || static_cast<size_t>(z) >= width) {
+      return 0;
+    }
+
+    // Prevent undefined reads if the legacy bug is ever triggered.
+    CHECK(static_cast<size_t>(z) < depth)
+      << "Legacy Trace_Workspace_Mask_Value bounds bug triggered (z < width)."
+      << " width=" << width << " height=" << height << " depth=" << depth << " x=" << x << " y=" << y << " z=" << z;
+
+    const double v = mask.valueAsDouble(x, y, z);
+    return static_cast<int>(v);
+  }
+
+  if (!tw.traceMask) {
+    return 0;
+  }
+
+  const ZImg& mask = *tw.traceMask;
 
   const size_t width = mask.width();
   const size_t height = mask.height();

@@ -12,6 +12,8 @@
 
 namespace nim {
 
+class ZVoxelVolume;
+
 struct SeedTraceResult
 {
   // For "trace new": a newly created SWC (typically a single-root chain).
@@ -44,6 +46,13 @@ traceSeedNewSwcLegacyLike(const ZImg& signal,
                           size_t t = 0,
                           folly::CancellationToken cancellationToken = folly::CancellationToken());
 
+// Overload for read-only voxel volumes (single-channel/time view).
+[[nodiscard]] SeedTraceResult
+traceSeedNewSwcLegacyLike(const ZVoxelVolume& signal,
+                          const std::array<double, 3>& position,
+                          const TraceConfig& cfg,
+                          folly::CancellationToken cancellationToken = folly::CancellationToken());
+
 [[nodiscard]] SeedTraceResult
 traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
                                const ZSwc& hostSwc,
@@ -51,6 +60,14 @@ traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
                                const TraceConfig& cfg,
                                size_t c = 0,
                                size_t t = 0,
+                               folly::CancellationToken cancellationToken = folly::CancellationToken());
+
+// Overload for read-only voxel volumes (single-channel/time view).
+[[nodiscard]] SeedTraceResult
+traceSeedIntoHostSwcLegacyLike(const ZVoxelVolume& signal,
+                               const ZSwc& hostSwc,
+                               const std::array<double, 3>& position,
+                               const TraceConfig& cfg,
                                folly::CancellationToken cancellationToken = folly::CancellationToken());
 
 } // namespace nim

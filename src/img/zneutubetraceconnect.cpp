@@ -5,6 +5,7 @@
 
 #include "zimg.h"
 #include "zlog.h"
+#include "zvoxelvolume.h"
 
 #include <cmath>
 #include <limits>
@@ -103,11 +104,12 @@ swcConnectorDistanceLegacyLike(const ZSwc::ConstSwcTreeNode& a, const ZSwc::Cons
 
 } // namespace
 
-double findBestTerminalBreakLegacyLike(const std::array<double, 3>& terminalCenter,
-                                       double terminalRadius,
-                                       const std::array<double, 3>& innerCenter,
-                                       double innerRadius,
-                                       const ZImg& stack)
+template<typename StackLike>
+[[nodiscard]] double findBestTerminalBreakLegacyLikeImpl(const std::array<double, 3>& terminalCenter,
+                                                         double terminalRadius,
+                                                         const std::array<double, 3>& innerCenter,
+                                                         double innerRadius,
+                                                         const StackLike& stack)
 {
   // Port of ZNeuronTracer::findBestTerminalBreak().
   const double dx = terminalCenter[0] - innerCenter[0];
@@ -147,10 +149,29 @@ double findBestTerminalBreakLegacyLike(const std::array<double, 3>& terminalCent
   return lambda;
 }
 
-void connectBranchToHostLegacyLike(ZSwc& swc,
-                                   const std::vector<ZSwc::SwcTreeNode>& hostRoots,
-                                   ZSwc::SwcTreeNode branchRoot,
-                                   const ZImg& stack)
+double findBestTerminalBreakLegacyLike(const std::array<double, 3>& terminalCenter,
+                                       double terminalRadius,
+                                       const std::array<double, 3>& innerCenter,
+                                       double innerRadius,
+                                       const ZImg& stack)
+{
+  return findBestTerminalBreakLegacyLikeImpl(terminalCenter, terminalRadius, innerCenter, innerRadius, stack);
+}
+
+double findBestTerminalBreakLegacyLike(const std::array<double, 3>& terminalCenter,
+                                       double terminalRadius,
+                                       const std::array<double, 3>& innerCenter,
+                                       double innerRadius,
+                                       const ZVoxelVolume& stack)
+{
+  return findBestTerminalBreakLegacyLikeImpl(terminalCenter, terminalRadius, innerCenter, innerRadius, stack);
+}
+
+template<typename StackLike>
+void connectBranchToHostLegacyLikeImpl(ZSwc& swc,
+                                       const std::vector<ZSwc::SwcTreeNode>& hostRoots,
+                                       ZSwc::SwcTreeNode branchRoot,
+                                       const StackLike& stack)
 {
   // Port of ZNeuronTracer::connectBranch(const ZSwcPath&, ZSwcTree*).
   if (ZSwc::isNull(branchRoot)) {
@@ -215,7 +236,7 @@ void connectBranchToHostLegacyLike(ZSwc& swc,
       const std::array<double, 3> nbrCenter = {rootNeighbor->x, rootNeighbor->y, rootNeighbor->z};
 
       const double lambda =
-        findBestTerminalBreakLegacyLike(rootCenter, branchRoot->radius, nbrCenter, rootNeighbor->radius, stack);
+        findBestTerminalBreakLegacyLikeImpl(rootCenter, branchRoot->radius, nbrCenter, rootNeighbor->radius, stack);
 
       if (lambda < 1.0) {
         swcNodeInterpolateLegacyLike(branchRoot, rootNeighbor, lambda, branchRoot);
@@ -245,8 +266,11 @@ void connectBranchToHostLegacyLike(ZSwc& swc,
       const std::array<double, 3> terminalCenter = {terminal->x, terminal->y, terminal->z};
       const std::array<double, 3> nbrCenter = {terminalNeighbor->x, terminalNeighbor->y, terminalNeighbor->z};
 
-      const double lambda =
-        findBestTerminalBreakLegacyLike(terminalCenter, terminal->radius, nbrCenter, terminalNeighbor->radius, stack);
+      const double lambda = findBestTerminalBreakLegacyLikeImpl(terminalCenter,
+                                                                terminal->radius,
+                                                                nbrCenter,
+                                                                terminalNeighbor->radius,
+                                                                stack);
       if (lambda < 1.0) {
         swcNodeInterpolateLegacyLike(terminal, terminalNeighbor, lambda, terminal);
       }
@@ -257,6 +281,22 @@ void connectBranchToHostLegacyLike(ZSwc& swc,
     CHECK(!ZSwc::isNull(loop));
     swc.appendChild(loop, hook);
   }
+}
+
+void connectBranchToHostLegacyLike(ZSwc& swc,
+                                   const std::vector<ZSwc::SwcTreeNode>& hostRoots,
+                                   ZSwc::SwcTreeNode branchRoot,
+                                   const ZImg& stack)
+{
+  connectBranchToHostLegacyLikeImpl(swc, hostRoots, branchRoot, stack);
+}
+
+void connectBranchToHostLegacyLike(ZSwc& swc,
+                                   const std::vector<ZSwc::SwcTreeNode>& hostRoots,
+                                   ZSwc::SwcTreeNode branchRoot,
+                                   const ZVoxelVolume& stack)
+{
+  connectBranchToHostLegacyLikeImpl(swc, hostRoots, branchRoot, stack);
 }
 
 } // namespace nim
