@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zneutubetraceconfig.h"
+#include "zneutubeimgbinarizer.h"
 
 #include "zimg.h"
 
@@ -11,6 +12,14 @@ namespace nim {
 struct MakeMaskDiagnosticsLegacyLike
 {
   int binarizeThreshold = 0;
+
+  // Optional timings/counters to help profile mask generation in tests.
+  // Keep this disabled by default to avoid overhead in production use.
+  bool collectTiming = false;
+  std::int64_t ms_binarize_locmax = 0;
+  std::int64_t ms_bwsolid_majority_filter_r = 0;
+
+  BinarizeLocmaxDiagnosticsLegacyLike binarizeDiag;
 };
 
 // Port of `ZNeuronTracer::makeMask` (excluding optional thin-branch enhancement).

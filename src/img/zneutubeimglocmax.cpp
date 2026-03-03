@@ -10,6 +10,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
+#include <new>
 #include <vector>
 
 namespace nim {
@@ -423,7 +425,7 @@ void stackLocalMaxMaskImpl(const ZImg& stack, uint8_t* out, StackLocmaxOptionLeg
   }
 }
 
-template<typename TScalar>
+template<typename TScalar, typename TIndex>
 void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity)
 {
   CHECK(out != nullptr);
@@ -443,15 +445,33 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
 
   const ZNeighborhood& nb = neighborhoodLegacyOrder(connectivity);
   CHECK(nb.size() == static_cast<size_t>(connectivity));
+  const size_t conn = nb.size();
 
   const auto* array = stack.timeData<TScalar>(0);
+
+  std::vector<std::int64_t> nbLinearOffsets(conn);
+  {
+    const std::int64_t width64 = static_cast<std::int64_t>(width);
+    const std::int64_t plane64 = static_cast<std::int64_t>(planeSize);
+    for (size_t i = 0; i < conn; ++i) {
+      const ZVoxelCoordinate& o = nb.offset(i);
+      nbLinearOffsets[i] = static_cast<std::int64_t>(o.x) + static_cast<std::int64_t>(o.y) * width64 +
+                           static_cast<std::int64_t>(o.z) * plane64;
+    }
+  }
 
   // Initialize queue with non-max voxels.
   //
   // This can grow large for dense volumes. Use a vector-backed FIFO queue to reduce
   // allocator/iterator overhead compared to std::deque in this hot path.
-  std::vector<size_t> q;
-  q.reserve(1024);
+  std::vector<TIndex> q;
+  try {
+    q.reserve(voxelNumber);
+  }
+  catch (const std::bad_alloc&) {
+    // Fall back to amortized growth. This keeps the function usable for large volumes where
+    // pre-reserving `voxelNumber` indices (size_t) would be prohibitively expensive.
+  }
   size_t qHead = 0;
 
   size_t offset = 0;
@@ -463,21 +483,34 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
           continue;
         }
 
-        for (size_t i = 0; i < nb.size(); ++i) {
-          const ZVoxelCoordinate& o = nb.offset(i);
-          const int nx = x + o.x;
-          const int ny = y + o.y;
-          const int nz = z + o.z;
-          if (nx < 0 || ny < 0 || nz < 0 || nx > cwidth || ny > cheight || nz > cdepth) {
-            continue;
+        const bool internal = (x > 0 && x < cwidth && y > 0 && y < cheight && z > 0 && z < cdepth);
+        if (internal) {
+          const std::int64_t offset64 = static_cast<std::int64_t>(offset);
+          for (size_t i = 0; i < conn; ++i) {
+            const size_t nidx = static_cast<size_t>(offset64 + nbLinearOffsets[i]);
+            if (array[offset] < array[nidx]) {
+              q.push_back(static_cast<TIndex>(offset));
+              out[offset] = 0;
+              break;
+            }
           }
+        } else {
+          for (size_t i = 0; i < conn; ++i) {
+            const ZVoxelCoordinate& o = nb.offset(i);
+            const int nx = x + o.x;
+            const int ny = y + o.y;
+            const int nz = z + o.z;
+            if (nx < 0 || ny < 0 || nz < 0 || nx > cwidth || ny > cheight || nz > cdepth) {
+              continue;
+            }
 
-          const size_t nidx =
-            static_cast<size_t>(nx) + static_cast<size_t>(ny) * widthS + static_cast<size_t>(nz) * planeSize;
-          if (array[offset] < array[nidx]) {
-            q.push_back(offset);
-            out[offset] = 0;
-            break;
+            const size_t nidx =
+              static_cast<size_t>(nx) + static_cast<size_t>(ny) * widthS + static_cast<size_t>(nz) * planeSize;
+            if (array[offset] < array[nidx]) {
+              q.push_back(static_cast<TIndex>(offset));
+              out[offset] = 0;
+              break;
+            }
           }
         }
       }
@@ -486,7 +519,7 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
 
   // Propagate removals (non-increasing paths from non-max voxels).
   while (qHead < q.size()) {
-    const size_t c = q[qHead];
+    const size_t c = static_cast<size_t>(q[qHead]);
     ++qHead;
 
     const int z = static_cast<int>(c / planeSize);
@@ -494,20 +527,36 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
     const int y = static_cast<int>(rem / widthS);
     const int x = static_cast<int>(rem - static_cast<size_t>(y) * widthS);
 
-    for (size_t i = 0; i < nb.size(); ++i) {
-      const ZVoxelCoordinate& o = nb.offset(i);
-      const int nx = x + o.x;
-      const int ny = y + o.y;
-      const int nz = z + o.z;
-      if (nx < 0 || ny < 0 || nz < 0 || nx > cwidth || ny > cheight || nz > cdepth) {
-        continue;
+    const bool internal = (x > 0 && x < cwidth && y > 0 && y < cheight && z > 0 && z < cdepth);
+    const TScalar cv = array[c];
+
+    if (internal) {
+      const std::int64_t c64 = static_cast<std::int64_t>(c);
+      for (size_t i = 0; i < conn; ++i) {
+        const size_t nidx = static_cast<size_t>(c64 + nbLinearOffsets[i]);
+        if (out[nidx] == 1) {
+          if (array[nidx] <= cv) {
+            out[nidx] = 0;
+            q.push_back(static_cast<TIndex>(nidx));
+          }
+        }
       }
-      const size_t nidx =
-        static_cast<size_t>(nx) + static_cast<size_t>(ny) * widthS + static_cast<size_t>(nz) * planeSize;
-      if (out[nidx] == 1) {
-        if (array[nidx] <= array[c]) {
-          out[nidx] = 0;
-          q.push_back(nidx);
+    } else {
+      for (size_t i = 0; i < conn; ++i) {
+        const ZVoxelCoordinate& o = nb.offset(i);
+        const int nx = x + o.x;
+        const int ny = y + o.y;
+        const int nz = z + o.z;
+        if (nx < 0 || ny < 0 || nz < 0 || nx > cwidth || ny > cheight || nz > cdepth) {
+          continue;
+        }
+        const size_t nidx =
+          static_cast<size_t>(nx) + static_cast<size_t>(ny) * widthS + static_cast<size_t>(nz) * planeSize;
+        if (out[nidx] == 1) {
+          if (array[nidx] <= cv) {
+            out[nidx] = 0;
+            q.push_back(static_cast<TIndex>(nidx));
+          }
         }
       }
     }
@@ -567,8 +616,14 @@ ZImg stackLocmaxRegionMaskLegacyLike(const ZImg& stack, int connectivity)
 
   auto* outData = out.timeData<uint8_t>(0);
 
+  const size_t voxelNumber = stack.voxelNumber();
+
   imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() {
-    stackLocmaxRegionMaskImpl<TVoxel>(stack, outData, connectivity);
+    if (voxelNumber <= static_cast<size_t>(std::numeric_limits<uint32_t>::max())) {
+      stackLocmaxRegionMaskImpl<TVoxel, uint32_t>(stack, outData, connectivity);
+    } else {
+      stackLocmaxRegionMaskImpl<TVoxel, size_t>(stack, outData, connectivity);
+    }
   });
 
   return out;

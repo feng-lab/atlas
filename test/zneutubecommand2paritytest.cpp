@@ -95,6 +95,7 @@ extern "C" {
 #include "zimgneighborhooditerator.h"
 #include "zimginfo.h"
 #include "zimginit.h"
+#include "zimgregionalextrema.h"
 #include "zjson.h"
 #include "zlog.h"
 #include "zrunneutucommand.h"
@@ -3395,6 +3396,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   ASSERT_EQ(legacyMask->kind, GREY);
 
   nim::MakeMaskDiagnosticsLegacyLike maskDiag;
+  maskDiag.collectTiming = true;
   std::optional<nim::ZImg> portedMaskOpt;
   const int64_t portedMaskMs = timeMs([&]() {
     portedMaskOpt = nim::makeMaskLegacyLike(portedSignal, portedCfg, &maskDiag);
@@ -3404,6 +3406,56 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
 
   perf.push_back(StagePerf{.name = "make_mask", .legacyMs = legacyMaskMs, .portedMs = portedMaskMs});
   LOG(INFO) << fmt::format("Slice15 make_mask threshold={}", maskDiag.binarizeThreshold);
+  LOG(INFO) << fmt::format(
+    "Slice15 make_mask (ported) breakdown: binarize={}ms majority_filter_r={}ms | hist_full={}ms "
+    "locmax_hist={}ms (region={}ms seed_select={}ms masked_hist={}ms, region_nonzero={}, seed_nonzero={}) "
+    "threshold_select={}ms threshold_binarize={}ms",
+    maskDiag.ms_binarize_locmax,
+    maskDiag.ms_bwsolid_majority_filter_r,
+    maskDiag.binarizeDiag.ms_hist_full,
+    maskDiag.binarizeDiag.ms_locmax_hist,
+    maskDiag.binarizeDiag.ms_locmax_region_mask,
+    maskDiag.binarizeDiag.ms_locmax_seed_select,
+    maskDiag.binarizeDiag.ms_locmax_hist_masked,
+    maskDiag.binarizeDiag.locmax_region_nonzero,
+    maskDiag.binarizeDiag.locmax_seed_nonzero,
+    maskDiag.binarizeDiag.ms_threshold,
+    maskDiag.binarizeDiag.ms_threshold_binarize);
+
+  // Compare alternative implementation (ZImgRegionalExtrema) for locmax-region mask performance and equivalence.
+  {
+    constexpr int conn = 18;
+
+    nim::ZImg locmaxLegacyLike;
+    const int64_t legacyLikeMs = timeMs([&]() {
+      locmaxLegacyLike = nim::stackLocmaxRegionMaskLegacyLike(portedSignal, conn);
+    });
+
+    nim::ZImg locmaxRegionalExtrema;
+    const int64_t regionalExtremaMs = timeMs([&]() {
+      nim::ZImgRegionalExtrema regionalExtrema;
+      locmaxRegionalExtrema = regionalExtrema.regionalMax(portedSignal, conn);
+    });
+
+    LOG(INFO) << fmt::format("Slice15 locmax_region_mask perf (ported): stackLocmaxRegionMaskLegacyLike={}ms "
+                             "ZImgRegionalExtrema::regionalMax={}ms",
+                             legacyLikeMs,
+                             regionalExtremaMs);
+
+    const VolumeDigest legacyLikeDigest = digestZImgU8OrU16(locmaxLegacyLike);
+    const VolumeDigest regionalExtremaDigest = digestZImgU8OrU16(locmaxRegionalExtrema);
+    ASSERT_EQ(legacyLikeDigest.width, regionalExtremaDigest.width);
+    ASSERT_EQ(legacyLikeDigest.height, regionalExtremaDigest.height);
+    ASSERT_EQ(legacyLikeDigest.depth, regionalExtremaDigest.depth);
+    ASSERT_EQ(legacyLikeDigest.bytesPerVoxel, 1u);
+    ASSERT_EQ(regionalExtremaDigest.bytesPerVoxel, 1u);
+    if (legacyLikeDigest.hash != regionalExtremaDigest.hash) {
+      ADD_FAILURE() << fmt::format("locmax_region_mask mismatch vs ZImgRegionalExtrema: legacyLike hash={} "
+                                   "regionalExtrema hash={}",
+                                   legacyLikeDigest.hash,
+                                   regionalExtremaDigest.hash);
+    }
+  }
 
   {
     SCOPED_TRACE("mask");
