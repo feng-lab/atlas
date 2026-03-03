@@ -902,31 +902,7 @@ public:
   // bin size for float img is (maxData-minData)/nbins
   // bin size for integer img is (maxData-minData+1)/nbins
   template<typename TRange>
-  std::vector<size_t> histogram(TRange minData, TRange maxData, size_t nbins = 0, const ZImg& mask = ZImg()) const
-  {
-    if (nbins == 0) {
-      nbins = bytesPerVoxel() > 1 ? 65536 : 256;
-    }
-
-    std::vector<size_t> res(nbins, 0);
-
-    if (mask.isEmpty()) {
-      imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
-        this->histogram_Impl<TVoxel>(res, minData, maxData);
-      });
-    } else if (isSameSize(mask)) {
-      imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
-        imgTypeDispatcher(mask.info(), [&, this]<typename TMaskVoxel>() {
-          this->histogramMask_Impl<TVoxel, TMaskVoxel>(res, minData, maxData, mask);
-        });
-      });
-    } else {
-      throw ZException(
-        fmt::format("histogram mask has different size <{}> than current img <{}>", mask.info(), m_info));
-    }
-
-    return res;
-  }
+  std::vector<size_t> histogram(TRange minData, TRange maxData, size_t nbins = 0, const ZImg& mask = ZImg()) const;
 
   // overload
   template<typename TRange>

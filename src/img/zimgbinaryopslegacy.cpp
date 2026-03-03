@@ -1,44 +1,48 @@
 #include "zimgbinaryopslegacy.h"
 
-#include "zlog.h"
+#ifndef __GNUG__ // not clang or gcc
+#include <boost/multiprecision/cpp_int.hpp>
+#endif
 
-#include <algorithm>
+#include <cstdint>
 #include <limits>
+#include <type_traits>
 
 namespace nim {
 
 namespace {
 
-template<typename T>
+template<typename TVoxel>
 void invertValueInPlaceTyped(ZImg& img)
 {
-  const size_t w = img.width();
-  const size_t h = img.height();
-  const size_t d = img.depth();
+  const size_t channelVoxelNumber = img.channelVoxelNumber();
+
+  constexpr bool isSignedIntegral = std::is_integral_v<TVoxel> && std::is_signed_v<TVoxel>;
 
   for (size_t t = 0; t < img.numTimes(); ++t) {
     for (size_t c = 0; c < img.numChannels(); ++c) {
-      T minV = std::numeric_limits<T>::max();
-      T maxV = std::numeric_limits<T>::lowest();
+      const ZImg view = img.createView(static_cast<int>(c), static_cast<int>(t));
+      TVoxel minV{};
+      TVoxel maxV{};
+      view.computeMinMax(minV, maxV);
 
-      for (size_t z = 0; z < d; ++z) {
-        const T* row0 = img.rowData<T>(0, z, c, t);
-        for (size_t i = 0; i < w * h; ++i) {
-          const T v = row0[i];
-          minV = std::min(minV, v);
-          maxV = std::max(maxV, v);
+      TVoxel* data = img.channelData<TVoxel>(c, t);
+
+      if constexpr (isSignedIntegral) {
+#ifdef __GNUG__ // clang or gcc
+        using TWide = __int128_t;
+#else
+        using TWide = boost::multiprecision::int128_t;
+#endif
+
+        const TWide sum = static_cast<TWide>(minV) + static_cast<TWide>(maxV);
+        for (size_t i = 0; i < channelVoxelNumber; ++i) {
+          data[i] = static_cast<TVoxel>(sum - static_cast<TWide>(data[i]));
         }
-      }
-
-      const double minD = static_cast<double>(minV);
-      const double maxD = static_cast<double>(maxV);
-
-      for (size_t z = 0; z < d; ++z) {
-        T* row0 = img.rowData<T>(0, z, c, t);
-        for (size_t i = 0; i < w * h; ++i) {
-          const double v = static_cast<double>(row0[i]);
-          const double inv = minD + maxD - v;
-          row0[i] = static_cast<T>(inv);
+      } else {
+        const auto sum = minV + maxV;
+        for (size_t i = 0; i < channelVoxelNumber; ++i) {
+          data[i] = static_cast<TVoxel>(sum - data[i]);
         }
       }
     }
@@ -53,27 +57,14 @@ void invertValueInPlaceLegacyLike(ZImg& img)
     return;
   }
 
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {
-    if (img.voxelByteNumber() == sizeof(uint8_t)) {
-      invertValueInPlaceTyped<uint8_t>(img);
-      return;
-    }
-    if (img.voxelByteNumber() == sizeof(uint16_t)) {
-      invertValueInPlaceTyped<uint16_t>(img);
-      return;
-    }
-  }
-
-  LOG(WARNING) << "invertValueInPlaceLegacyLike: unsupported voxel type " << img.info();
+  imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
+    invertValueInPlaceTyped<TVoxel>(img);
+  });
 }
 
 ZImg binarizeGreaterThanLegacyLike(const ZImg& img, int threshold)
 {
   if (img.isEmpty()) {
-    return {};
-  }
-  if (img.voxelFormat() != VoxelFormat::Unsigned) {
-    LOG(WARNING) << "binarizeGreaterThanLegacyLike: expected unsigned input; got " << img.info();
     return {};
   }
 
@@ -86,38 +77,50 @@ ZImg binarizeGreaterThanLegacyLike(const ZImg& img, int threshold)
   const size_t h = img.height();
   const size_t d = img.depth();
 
-  if (img.voxelByteNumber() == sizeof(uint8_t)) {
+  imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
+    if constexpr (std::is_integral_v<TVoxel>) {
+      if constexpr (std::is_unsigned_v<TVoxel>) {
+        if (threshold < 0) {
+          out.fill(1);
+          return;
+        }
+        const std::uint64_t thr = static_cast<std::uint64_t>(threshold);
+        const std::uint64_t maxV = static_cast<std::uint64_t>(std::numeric_limits<TVoxel>::max());
+        if (thr >= maxV) {
+          out.fill(0);
+          return;
+        }
+      } else {
+        const std::int64_t thr = static_cast<std::int64_t>(threshold);
+        const std::int64_t minV = static_cast<std::int64_t>(std::numeric_limits<TVoxel>::lowest());
+        const std::int64_t maxV = static_cast<std::int64_t>(std::numeric_limits<TVoxel>::max());
+        if (thr < minV) {
+          out.fill(1);
+          return;
+        }
+        if (thr >= maxV) {
+          out.fill(0);
+          return;
+        }
+      }
+    }
+
+    const TVoxel thresholdV = static_cast<TVoxel>(threshold);
+
     for (size_t t = 0; t < img.numTimes(); ++t) {
       for (size_t c = 0; c < img.numChannels(); ++c) {
         for (size_t z = 0; z < d; ++z) {
-          const uint8_t* src = img.rowData<uint8_t>(0, z, c, t);
+          const TVoxel* src = img.rowData<TVoxel>(0, z, c, t);
           uint8_t* dst = out.rowData<uint8_t>(0, z, c, t);
           for (size_t i = 0; i < w * h; ++i) {
-            dst[i] = static_cast<uint8_t>(src[i] > threshold);
+            dst[i] = static_cast<uint8_t>(src[i] > thresholdV);
           }
         }
       }
     }
-    return out;
-  }
+  });
 
-  if (img.voxelByteNumber() == sizeof(uint16_t)) {
-    for (size_t t = 0; t < img.numTimes(); ++t) {
-      for (size_t c = 0; c < img.numChannels(); ++c) {
-        for (size_t z = 0; z < d; ++z) {
-          const uint16_t* src = img.rowData<uint16_t>(0, z, c, t);
-          uint8_t* dst = out.rowData<uint8_t>(0, z, c, t);
-          for (size_t i = 0; i < w * h; ++i) {
-            dst[i] = static_cast<uint8_t>(src[i] > threshold);
-          }
-        }
-      }
-    }
-    return out;
-  }
-
-  LOG(WARNING) << "binarizeGreaterThanLegacyLike: unsupported voxel type " << img.info();
-  return {};
+  return out;
 }
 
 } // namespace nim

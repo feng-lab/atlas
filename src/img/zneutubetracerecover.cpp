@@ -21,7 +21,6 @@ namespace {
 {
   ZImgInfo info(like.width(), like.height(), like.depth(), 1, 1, 1, VoxelFormat::Unsigned);
   ZImg out(info);
-  out.fill(0);
   return out;
 }
 
@@ -226,37 +225,32 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
   {
     const size_t n = traceMaskBinary.voxelNumber();
     const size_t plane = mask.width() * mask.height();
+    const size_t depth = mask.depth();
+    CHECK(plane * depth == n);
     auto* traceBin = traceMaskBinary.timeData<uint8_t>(0);
     const auto* base = baseMask->timeData<uint8_t>(0);
 
     const bool haveTraceMask = static_cast<bool>(tw.traceMask);
     const uint8_t* traceMaskU8 = nullptr;
-    const uint16_t* traceMaskU16 = nullptr;
     if (haveTraceMask) {
-      if (tw.traceMask->isType<uint8_t>()) {
-        traceMaskU8 = tw.traceMask->timeData<uint8_t>(0);
-      } else if (tw.traceMask->isType<uint16_t>()) {
-        traceMaskU16 = tw.traceMask->timeData<uint16_t>(0);
-      } else {
-        CHECK(false) << "recoverLegacyLike: unsupported traceMask voxel type " << tw.traceMask->info();
-      }
+      CHECK(tw.traceMask->isType<uint8_t>())
+        << "recoverLegacyLike: unsupported traceMask voxel type " << tw.traceMask->info();
+      traceMaskU8 = tw.traceMask->timeData<uint8_t>(0);
     }
 
-    for (size_t i = 0; i < n; ++i) {
-      if (plane > 0 && (i % plane) == 0) {
-        maybeCancel(tw.cancellationToken);
-      }
-      bool traced = false;
-      if (haveTraceMask) {
-        if (traceMaskU8 != nullptr) {
-          traced = traceMaskU8[i] > 0;
-        } else {
-          CHECK(traceMaskU16 != nullptr);
-          traced = traceMaskU16[i] > 0;
+    for (size_t z = 0; z < depth; ++z) {
+      maybeCancel(tw.cancellationToken);
+      const size_t zOffset = z * plane;
+      for (size_t i = 0; i < plane; ++i) {
+        const size_t idx = zOffset + i;
+        bool traced = false;
+        if (haveTraceMask) {
+          CHECK(traceMaskU8 != nullptr);
+          traced = traceMaskU8[idx] > 0;
         }
+        const bool baseOne = (base[idx] == 1);
+        traceBin[idx] = static_cast<uint8_t>(traced || baseOne);
       }
-      const bool baseOne = (base[i] == 1);
-      traceBin[i] = static_cast<uint8_t>(traced || baseOne);
     }
   }
 
@@ -274,12 +268,16 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
   {
     const size_t n = leftover.voxelNumber();
     const size_t plane = leftover.width() * leftover.height();
+    const size_t depth = leftover.depth();
+    CHECK(plane * depth == n);
     auto* a = leftover.timeData<uint8_t>(0);
-    for (size_t i = 0; i < n; ++i) {
-      if (plane > 0 && (i % plane) == 0) {
-        maybeCancel(tw.cancellationToken);
+    for (size_t z = 0; z < depth; ++z) {
+      maybeCancel(tw.cancellationToken);
+      const size_t zOffset = z * plane;
+      for (size_t i = 0; i < plane; ++i) {
+        const size_t idx = zOffset + i;
+        a[idx] = static_cast<uint8_t>(a[idx] > 0);
       }
-      a[i] = static_cast<uint8_t>(a[i] > 0);
     }
   }
 

@@ -12,6 +12,7 @@
 #include <fstream>
 #include <cstdio>
 #include <sstream>
+#include <span>
 #include <tuple>
 #include <memory>
 #include <limits>
@@ -1373,25 +1374,27 @@ TEST(NeutubeLegacyDarrayMath, DotSumMeanCorrcoefMatchLegacy)
   a[10] = std::numeric_limits<double>::quiet_NaN();
   b[10] = std::numeric_limits<double>::quiet_NaN();
 
-  EXPECT_DOUBLE_EQ(nim::darrayDotNLegacyLike(a.data(), b.data(), a.size()), darray_dot_n(a.data(), b.data(), a.size()));
+  const std::span<const double> aspan(a.data(), a.size());
+  const std::span<const double> bspan(b.data(), b.size());
+
+  EXPECT_DOUBLE_EQ(nim::darrayDotNLegacyLike(aspan, bspan), darray_dot_n(a.data(), b.data(), a.size()));
   {
     const double legacy = darray_dot_nw(a.data(), b.data(), a.size());
-    const double ported = nim::darrayDotNWLegacyLike(a.data(), b.data(), a.size());
+    const double ported = nim::darrayDotNWLegacyLike(aspan, bspan);
     if (std::isnan(legacy)) {
       EXPECT_TRUE(std::isnan(ported));
     } else {
       EXPECT_DOUBLE_EQ(ported, legacy);
     }
   }
-  EXPECT_DOUBLE_EQ(nim::darraySumNLegacyLike(a.data(), a.size()), darray_sum_n(a.data(), a.size()));
-  EXPECT_DOUBLE_EQ(nim::darrayMeanNLegacyLike(a.data(), a.size()), darray_mean_n(a.data(), a.size()));
-  EXPECT_DOUBLE_EQ(nim::darrayCorrcoefNLegacyLike(a.data(), b.data(), a.size()),
-                   darray_corrcoef_n(a.data(), b.data(), a.size()));
+  EXPECT_DOUBLE_EQ(nim::darraySumNLegacyLike(aspan), darray_sum_n(a.data(), a.size()));
+  EXPECT_DOUBLE_EQ(nim::darrayMeanNLegacyLike(aspan), darray_mean_n(a.data(), a.size()));
+  EXPECT_DOUBLE_EQ(nim::darrayCorrcoefNLegacyLike(aspan, bspan), darray_corrcoef_n(a.data(), b.data(), a.size()));
 
   size_t legacyIdx = 0;
   size_t portedIdx = 0;
   const double legacyMax = darray_max(a.data(), a.size(), &legacyIdx);
-  const double portedMax = nim::darrayMaxLegacyLike(a.data(), a.size(), &portedIdx);
+  const double portedMax = nim::darrayMaxLegacyLike(aspan, &portedIdx);
 
   if (std::isnan(legacyMax)) {
     EXPECT_TRUE(std::isnan(portedMax));
@@ -1423,21 +1426,29 @@ TEST(NeutubeLegacyStackFitScore, BasicOptionsMatchLegacy)
   fs.n = 1;
 
   fs.options[0] = static_cast<int>(nim::StackFitOption::Dot);
-  const double dotScore = nim::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), &fs);
+  const double dotScore = nim::computeStackFitScoresLegacyLike(std::span<const double>(field.data(), field.size()),
+                                                               std::span<const double>(signal.data(), signal.size()),
+                                                               &fs);
   EXPECT_DOUBLE_EQ(dotScore, darray_dot_n(field.data(), signal.data(), field.size()));
 
   fs.options[0] = static_cast<int>(nim::StackFitOption::Corrcoef);
-  const double corrScore = nim::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), &fs);
+  const double corrScore = nim::computeStackFitScoresLegacyLike(std::span<const double>(field.data(), field.size()),
+                                                                std::span<const double>(signal.data(), signal.size()),
+                                                                &fs);
   EXPECT_DOUBLE_EQ(corrScore, darray_corrcoef_n(field.data(), signal.data(), field.size()));
 
   fs.options[0] = static_cast<int>(nim::StackFitOption::Edot);
-  const double edotScore = nim::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), &fs);
+  const double edotScore = nim::computeStackFitScoresLegacyLike(std::span<const double>(field.data(), field.size()),
+                                                                std::span<const double>(signal.data(), signal.size()),
+                                                                &fs);
   EXPECT_DOUBLE_EQ(edotScore,
                    darray_dot_n(field.data(), signal.data(), field.size()) +
                      darray_sum_n(signal.data(), signal.size()));
 
   fs.options[0] = static_cast<int>(nim::StackFitOption::CorrcoefSc);
-  const double corrScScore = nim::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), &fs);
+  const double corrScScore = nim::computeStackFitScoresLegacyLike(std::span<const double>(field.data(), field.size()),
+                                                                  std::span<const double>(signal.data(), signal.size()),
+                                                                  &fs);
   const double legacyCorrSc =
     darray_corrcoef_n(field.data(), signal.data(), field.size()) * darray_max(signal.data(), signal.size(), nullptr);
   if (std::isnan(legacyCorrSc)) {
@@ -1447,7 +1458,9 @@ TEST(NeutubeLegacyStackFitScore, BasicOptionsMatchLegacy)
   }
 
   // nullptr fs behaves like legacy default: dot_n
-  EXPECT_DOUBLE_EQ(nim::computeStackFitScoresLegacyLike(field.data(), signal.data(), field.size(), nullptr),
+  EXPECT_DOUBLE_EQ(nim::computeStackFitScoresLegacyLike(std::span<const double>(field.data(), field.size()),
+                                                        std::span<const double>(signal.data(), signal.size()),
+                                                        nullptr),
                    darray_dot_n(field.data(), signal.data(), field.size()));
 }
 
@@ -1510,7 +1523,9 @@ TEST(NeutubeLegacyStackFitScore, StatMatchesLegacyGeo3dScore)
   nim::StackFitScore fsCpp;
   fsCpp.n = 1;
   fsCpp.options[0] = static_cast<int>(nim::StackFitOption::Stat);
-  const double portedScore = nim::computeStackFitScoresLegacyLike(filter.data(), signal.data(), FieldSize, &fsCpp);
+  const double portedScore = nim::computeStackFitScoresLegacyLike(std::span<const double>(filter.data(), filter.size()),
+                                                                  std::span<const double>(signal.data(), signal.size()),
+                                                                  &fsCpp);
 
   if (std::isnan(legacyScore)) {
     EXPECT_TRUE(std::isnan(portedScore));
@@ -1580,7 +1595,9 @@ TEST(NeutubeLegacyStackFitScore, DotCenterMatchesLegacyGeo3dScore)
   nim::StackFitScore fsCpp;
   fsCpp.n = 1;
   fsCpp.options[0] = static_cast<int>(nim::StackFitOption::DotCenter);
-  const double portedScore = nim::computeStackFitScoresLegacyLike(filter.data(), signal.data(), FieldSize, &fsCpp);
+  const double portedScore = nim::computeStackFitScoresLegacyLike(std::span<const double>(filter.data(), filter.size()),
+                                                                  std::span<const double>(signal.data(), signal.size()),
+                                                                  &fsCpp);
 
   if (std::isnan(legacyScore)) {
     EXPECT_TRUE(std::isnan(portedScore));
@@ -3190,6 +3207,56 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   ScopedQtCoreApplication qtApp;
   std::ignore = nim::ZImgInit::instance("", "", "", false);
 
+  struct StagePerf
+  {
+    std::string name;
+    int64_t legacyMs = 0;
+    int64_t portedMs = 0;
+  };
+
+  std::vector<StagePerf> perf;
+  perf.reserve(24);
+
+  struct PerfLogger
+  {
+    std::vector<StagePerf>* perfPtr = nullptr;
+    ~PerfLogger()
+    {
+      if (perfPtr == nullptr || perfPtr->empty()) {
+        return;
+      }
+
+      int64_t sumLegacy = 0;
+      int64_t sumPorted = 0;
+      for (const StagePerf& p : *perfPtr) {
+        sumLegacy += p.legacyMs;
+        sumPorted += p.portedMs;
+      }
+
+      LOG(INFO) << "Slice15 stage runtime breakdown (ms):";
+      for (const StagePerf& p : *perfPtr) {
+        const double ratio =
+          (p.legacyMs > 0) ? (static_cast<double>(p.portedMs) / static_cast<double>(p.legacyMs)) : 0.0;
+        LOG(INFO)
+          << fmt::format("  {:<28} legacy={:>8}  ported={:>8}  ratio={:>6.3f}x", p.name, p.legacyMs, p.portedMs, ratio);
+      }
+
+      const double totalRatio =
+        (sumLegacy > 0) ? (static_cast<double>(sumPorted) / static_cast<double>(sumLegacy)) : 0.0;
+      LOG(INFO) << fmt::format("  {:<28} legacy={:>8}  ported={:>8}  ratio={:>6.3f}x",
+                               "TOTAL",
+                               sumLegacy,
+                               sumPorted,
+                               totalRatio);
+    }
+  } perfLogger{&perf};
+
+  auto timeMs = [](auto&& fn) -> int64_t {
+    const auto start = std::chrono::steady_clock::now();
+    fn();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+  };
+
   const fs::path input =
     fs::path(QDir::homePath().toStdString()) / "Dropbox/atlas_test/slice15/slice15_L34_Sum.lsm_ch2.tif";
   if (!fs::exists(input)) {
@@ -3205,16 +3272,25 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
 
   // Load raw signal through both legacy (ZStack) and ported (ZImg) IO to ensure we are comparing the same input.
   ZStack legacySignalStack;
-  ASSERT_TRUE(legacySignalStack.load(input.string()));
+  const auto legacyLoadStart = std::chrono::steady_clock::now();
+  const bool legacyLoadOk = legacySignalStack.load(input.string());
+  const int64_t legacyLoadMs =
+    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - legacyLoadStart).count();
+  ASSERT_TRUE(legacyLoadOk);
 
   Stack* legacySignal = legacySignalStack.c_stack(0);
   ASSERT_NE(legacySignal, nullptr);
 
   nim::ZImg portedSignal;
+  const auto portedLoadStart = std::chrono::steady_clock::now();
   portedSignal.load(QString::fromStdString(input.string()));
+  const int64_t portedLoadMs =
+    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - portedLoadStart).count();
   ASSERT_FALSE(portedSignal.isEmpty());
   ASSERT_EQ(portedSignal.numChannels(), 1);
   ASSERT_EQ(portedSignal.numTimes(), 1);
+
+  perf.push_back(StagePerf{.name = "load_signal", .legacyMs = legacyLoadMs, .portedMs = portedLoadMs});
 
   {
     SCOPED_TRACE("raw_signal");
@@ -3263,11 +3339,15 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   legacyTracer.setTraceLevel(/*level*/ 0);
   legacyTracer.initTraceMask(/*clearing*/ false);
 
-  if (legacyTracer._preprocess) {
-    legacyTracer._preprocess(legacySignal);
-  }
-
-  (void)nim::subtractBackgroundLegacyLike(portedSignal, /*minFr*/ 0.5, /*maxIter*/ 3);
+  const int64_t legacyPreprocessMs = timeMs([&]() {
+    if (legacyTracer._preprocess) {
+      legacyTracer._preprocess(legacySignal);
+    }
+  });
+  const int64_t portedPreprocessMs = timeMs([&]() {
+    (void)nim::subtractBackgroundLegacyLike(portedSignal, /*minFr*/ 0.5, /*maxIter*/ 3);
+  });
+  perf.push_back(StagePerf{.name = "preprocess_bgsub", .legacyMs = legacyPreprocessMs, .portedMs = portedPreprocessMs});
 
   {
     SCOPED_TRACE("preprocessed_signal");
@@ -3307,14 +3387,23 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   }
 
   // Mask generation.
-  Stack* legacyMask = legacyTracer.makeMask(legacySignal);
+  Stack* legacyMask = nullptr;
+  const int64_t legacyMaskMs = timeMs([&]() {
+    legacyMask = legacyTracer.makeMask(legacySignal);
+  });
   ASSERT_NE(legacyMask, nullptr);
   ASSERT_EQ(legacyMask->kind, GREY);
 
   nim::MakeMaskDiagnosticsLegacyLike maskDiag;
-  std::optional<nim::ZImg> portedMaskOpt = nim::makeMaskLegacyLike(portedSignal, portedCfg, &maskDiag);
+  std::optional<nim::ZImg> portedMaskOpt;
+  const int64_t portedMaskMs = timeMs([&]() {
+    portedMaskOpt = nim::makeMaskLegacyLike(portedSignal, portedCfg, &maskDiag);
+  });
   ASSERT_TRUE(portedMaskOpt.has_value());
   nim::ZImg portedMask = std::move(*portedMaskOpt);
+
+  perf.push_back(StagePerf{.name = "make_mask", .legacyMs = legacyMaskMs, .portedMs = portedMaskMs});
+  LOG(INFO) << fmt::format("Slice15 make_mask threshold={}", maskDiag.binarizeThreshold);
 
   {
     SCOPED_TRACE("mask");
@@ -3346,10 +3435,18 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   }
 
   // Seed extraction (pre-noise-removal).
-  Geo3d_Scalar_Field* legacySeeds0 = extractSeedOriginalLegacyC(legacyMask);
+  Geo3d_Scalar_Field* legacySeeds0 = nullptr;
+  const int64_t legacySeedExtract0Ms = timeMs([&]() {
+    legacySeeds0 = extractSeedOriginalLegacyC(legacyMask);
+  });
   ASSERT_NE(legacySeeds0, nullptr);
 
-  nim::Geo3dScalarField portedSeeds0 = nim::extractSeedOriginalLegacyLike(portedMask);
+  nim::Geo3dScalarField portedSeeds0;
+  const int64_t portedSeedExtract0Ms = timeMs([&]() {
+    portedSeeds0 = nim::extractSeedOriginalLegacyLike(portedMask);
+  });
+  perf.push_back(
+    StagePerf{.name = "seed_extract_pre", .legacyMs = legacySeedExtract0Ms, .portedMs = portedSeedExtract0Ms});
 
   {
     SCOPED_TRACE("seed_extract_pre_noise");
@@ -3378,17 +3475,25 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   }
 
   // Noise removal (may mutate mask + recompute seeds).
-  LegacyRemoveNoisySeedResult legacyNoisy =
-    removeNoisySeedLegacyC(legacySeeds0, legacyMask, /*seedMethod*/ portedCfg.seedMethod, /*screeningSeed*/ true);
+  LegacyRemoveNoisySeedResult legacyNoisy;
+  const int64_t legacyNoiseMs = timeMs([&]() {
+    ScopedStdoutSilencer silence;
+    legacyNoisy =
+      removeNoisySeedLegacyC(legacySeeds0, legacyMask, /*seedMethod*/ portedCfg.seedMethod, /*screeningSeed*/ true);
+  });
   ASSERT_NE(legacyNoisy.seeds, nullptr);
   ASSERT_NE(legacyNoisy.mask, nullptr);
 
   nim::RemoveNoisySeedDiagnosticsLegacyLike portedNoisyDiag;
-  nim::Geo3dScalarField portedSeeds1 = nim::removeNoisySeedLegacyLike(std::move(portedSeeds0),
-                                                                      portedMask,
-                                                                      portedCfg.seedMethod,
-                                                                      /*screeningSeed*/ true,
-                                                                      &portedNoisyDiag);
+  nim::Geo3dScalarField portedSeeds1;
+  const int64_t portedNoiseMs = timeMs([&]() {
+    portedSeeds1 = nim::removeNoisySeedLegacyLike(std::move(portedSeeds0),
+                                                  portedMask,
+                                                  portedCfg.seedMethod,
+                                                  /*screeningSeed*/ true,
+                                                  &portedNoisyDiag);
+  });
+  perf.push_back(StagePerf{.name = "noise_removal", .legacyMs = legacyNoiseMs, .portedMs = portedNoiseMs});
 
   EXPECT_NEAR(legacyNoisy.seedDensity, portedNoisyDiag.seedDensity, 0.0);
   EXPECT_EQ(legacyNoisy.minSeedSize, portedNoisyDiag.minSeedSize);
@@ -3428,19 +3533,40 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   }
 
   // Sort seeds.
-  legacyTracer.prepareTraceScoreThreshold(ZNeuronTracer::TRACING_SEED);
+  const int64_t legacySeedThresholdMs = timeMs([&]() {
+    legacyTracer.prepareTraceScoreThreshold(ZNeuronTracer::TRACING_SEED);
+  });
   ZNeuronTraceSeeder legacySeeder;
-  Stack* legacyBaseMask = legacySeeder.sortSeed(legacyNoisy.seeds, legacySignal, legacyTracer.getTraceWorkspace());
+  Stack* legacyBaseMask = nullptr;
+  const int64_t legacySortMs = timeMs([&]() {
+    ScopedStdoutSilencer silence;
+    legacyBaseMask = legacySeeder.sortSeed(legacyNoisy.seeds, legacySignal, legacyTracer.getTraceWorkspace());
+  });
   ASSERT_NE(legacyBaseMask, nullptr);
 
   nim::TraceWorkspace portedTw;
-  nim::locsegChainDefaultTraceWorkspaceLegacyLike(portedTw, portedSignal);
+  const int64_t portedTwInitMs = timeMs([&]() {
+    nim::locsegChainDefaultTraceWorkspaceLegacyLike(portedTw, portedSignal);
+  });
   portedTw.refit = portedCfg.refit;
   portedTw.tuneEnd = portedCfg.tuneEnd;
   portedTw.traceMaskUpdating = true;
-  nim::traceWorkspaceInitTraceMaskLegacyLike(portedTw, portedSignal, /*clearing*/ false);
-  nim::prepareTraceScoreThresholdLegacyLike(portedSignal, portedCfg, nim::TracingModeLegacyLike::Seed, portedTw);
-  const nim::SeedSortResultLegacyLike portedSorted = nim::sortSeedsLegacyLike(portedSeeds1, portedSignal, portedTw);
+  const int64_t portedTraceMaskInitMs = timeMs([&]() {
+    nim::traceWorkspaceInitTraceMaskLegacyLike(portedTw, portedSignal, /*clearing*/ false);
+  });
+  const int64_t portedSeedThresholdMs = timeMs([&]() {
+    nim::prepareTraceScoreThresholdLegacyLike(portedSignal, portedCfg, nim::TracingModeLegacyLike::Seed, portedTw);
+  });
+  nim::SeedSortResultLegacyLike portedSorted;
+  const int64_t portedSortMs = timeMs([&]() {
+    portedSorted = nim::sortSeedsLegacyLike(portedSeeds1, portedSignal, portedTw);
+  });
+
+  perf.push_back(
+    StagePerf{.name = "seed_threshold", .legacyMs = legacySeedThresholdMs, .portedMs = portedSeedThresholdMs});
+  perf.push_back(
+    StagePerf{.name = "trace_workspace", .legacyMs = 0, .portedMs = portedTwInitMs + portedTraceMaskInitMs});
+  perf.push_back(StagePerf{.name = "seed_sort", .legacyMs = legacySortMs, .portedMs = portedSortMs});
 
   {
     SCOPED_TRACE("base_mask_after_seed_sort");
@@ -3462,8 +3588,14 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   }
 
   // Trace all seeds (initial stage) and compare chain counts/lengths.
-  legacyTracer.prepareTraceScoreThreshold(ZNeuronTracer::TRACING_AUTO);
-  nim::prepareTraceScoreThresholdLegacyLike(portedSignal, portedCfg, nim::TracingModeLegacyLike::Auto, portedTw);
+  const int64_t legacyAutoThresholdMs = timeMs([&]() {
+    legacyTracer.prepareTraceScoreThreshold(ZNeuronTracer::TRACING_AUTO);
+  });
+  const int64_t portedAutoThresholdMs = timeMs([&]() {
+    nim::prepareTraceScoreThresholdLegacyLike(portedSignal, portedCfg, nim::TracingModeLegacyLike::Auto, portedTw);
+  });
+  perf.push_back(
+    StagePerf{.name = "auto_threshold", .legacyMs = legacyAutoThresholdMs, .portedMs = portedAutoThresholdMs});
 
   std::vector<Local_Neuroseg> legacyLocsegs = legacySeeder.getSeedArray();
   std::vector<double> legacyScores = legacySeeder.getScoreArray();
@@ -3473,15 +3605,18 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
 
   int legacyNchain = 0;
   Locseg_Chain** legacyChainsRaw = nullptr;
+  int64_t legacyTraceAllSeedsMs = 0;
   {
     ScopedStdoutSilencer silence;
-    legacyChainsRaw = Trace_Locseg_S(legacySignal,
-                                     /*z_scale*/ 1.0,
-                                     legacyLocsegs.data(),
-                                     legacyScores.data(),
-                                     static_cast<int>(legacyLocsegs.size()),
-                                     legacyTracer.getTraceWorkspace(),
-                                     &legacyNchain);
+    legacyTraceAllSeedsMs = timeMs([&]() {
+      legacyChainsRaw = Trace_Locseg_S(legacySignal,
+                                       /*z_scale*/ 1.0,
+                                       legacyLocsegs.data(),
+                                       legacyScores.data(),
+                                       static_cast<int>(legacyLocsegs.size()),
+                                       legacyTracer.getTraceWorkspace(),
+                                       &legacyNchain);
+    });
   }
   ASSERT_NE(legacyChainsRaw, nullptr);
   ASSERT_GE(legacyNchain, 0);
@@ -3494,10 +3629,15 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   free(legacyChainsRaw);
 
   std::vector<std::unique_ptr<nim::LocsegChain>> portedChains;
+  int64_t portedTraceAllSeedsMs = 0;
   {
     ScopedStdoutSilencer silence;
-    portedChains = nim::traceAllSeedsLegacyLike(portedSignal, /*zScale*/ 1.0, portedLocsegs, portedScores, portedTw);
+    portedTraceAllSeedsMs = timeMs([&]() {
+      portedChains = nim::traceAllSeedsLegacyLike(portedSignal, /*zScale*/ 1.0, portedLocsegs, portedScores, portedTw);
+    });
   }
+  perf.push_back(
+    StagePerf{.name = "trace_all_seeds", .legacyMs = legacyTraceAllSeedsMs, .portedMs = portedTraceAllSeedsMs});
 
   ASSERT_EQ(static_cast<size_t>(legacyNchain), portedChains.size());
 
@@ -3516,6 +3656,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
 
   // Recover stage and compare recovered chain counts/lengths.
   if (portedCfg.recover > 0) {
+    const auto legacyRecoverStart = std::chrono::steady_clock::now();
     // Legacy leftover computation:
     //   traceMaskBinary = (trace_mask > 0) OR (baseMask == 1)
     //   traceMaskBinary = leftover - dilate(traceMaskBinary, 5)
@@ -3598,9 +3739,19 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
       legacyLeftover = nullptr;
     }
 
+    const int64_t legacyRecoverMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - legacyRecoverStart)
+        .count();
+
     std::optional<nim::ZImg> portedBaseMaskForRecover = portedSorted.baseMask;
+    const auto portedRecoverStart = std::chrono::steady_clock::now();
     portedRecover =
       nim::recoverLegacyLike(portedSignal, portedCfg, portedMask, std::move(portedBaseMaskForRecover), portedTw);
+    const int64_t portedRecoverMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - portedRecoverStart)
+        .count();
+
+    perf.push_back(StagePerf{.name = "recover", .legacyMs = legacyRecoverMs, .portedMs = portedRecoverMs});
 
     ASSERT_EQ(legacyRecoveredChains.size(), portedRecover.chains.size());
 
@@ -3626,7 +3777,9 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   portedRecover.chains.clear();
 
   ZSwcTree* legacyReconTree = nullptr;
+  int64_t legacyReconstructMs = 0;
   {
+    const auto start = std::chrono::steady_clock::now();
     legacyTracer.initConnectionTestWorkspace();
     Connection_Test_Workspace* legacyCtw = legacyTracer.getConnectionTestWorkspace();
     ASSERT_NE(legacyCtw, nullptr);
@@ -3645,6 +3798,8 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
 
     // Legacy reconstruction frees the Locseg_Chain objects via Clean_Neuron_Component_Array().
     legacyChains.clear();
+    legacyReconstructMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
   }
 
   ASSERT_NE(legacyReconTree, nullptr);
@@ -3659,18 +3814,26 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
     portedCtw.spTest = false;
   }
 
-  nim::NeuronStructureChainsLegacyLike ns = nim::locsegChainCompNeurostructLegacyLike(portedChains,
-                                                                                      &portedSignal,
-                                                                                      /*zScale*/ 1.0,
-                                                                                      portedCtw);
-  nim::processNeuronStructureLegacyLike(ns);
-  nim::NeuronStructureCirclesLegacyLike ns2 =
-    nim::neuronStructureLocsegChainToCircleSLegacyLike(ns, /*xyScale*/ 1.0, /*zScale*/ 1.0);
-  nim::neuronStructureToTreeLegacyLike(ns2);
+  int64_t portedReconstructMs = 0;
+  std::unique_ptr<nim::ZSwc> portedReconTree;
+  {
+    const auto start = std::chrono::steady_clock::now();
+    nim::NeuronStructureChainsLegacyLike ns = nim::locsegChainCompNeurostructLegacyLike(portedChains,
+                                                                                        &portedSignal,
+                                                                                        /*zScale*/ 1.0,
+                                                                                        portedCtw);
+    nim::processNeuronStructureLegacyLike(ns);
+    nim::NeuronStructureCirclesLegacyLike ns2 =
+      nim::neuronStructureLocsegChainToCircleSLegacyLike(ns, /*xyScale*/ 1.0, /*zScale*/ 1.0);
+    nim::neuronStructureToTreeLegacyLike(ns2);
 
-  std::unique_ptr<nim::ZSwc> portedReconTree = nim::neuronStructureToSwcTreeCircleZLegacyLike(ns2, /*zScale*/ 1.0);
+    portedReconTree = nim::neuronStructureToSwcTreeCircleZLegacyLike(ns2, /*zScale*/ 1.0);
+    portedReconstructMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+  }
   ASSERT_TRUE(portedReconTree != nullptr);
   ASSERT_FALSE(portedReconTree->empty());
+  perf.push_back(StagePerf{.name = "reconstruct", .legacyMs = legacyReconstructMs, .portedMs = portedReconstructMs});
 
   // Match `ZNeuronConstructor::reconstruct`: IDs are resorted before SWC post-processing.
   nim::resortId(*portedReconTree);

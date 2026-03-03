@@ -24,12 +24,6 @@ struct VariableSet
   int nvar = 0;
 };
 
-inline void variableSetAddLinkLegacyLike(int* link, int master, int slave)
-{
-  CHECK(link != nullptr);
-  link[master] = link[master] * 100 + slave + 1;
-}
-
 // Port of tz_cont_fun.c::Variable_Set_Update_Link().
 inline void variableSetUpdateLinkLegacyLike(VariableSet& vs)
 {

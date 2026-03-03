@@ -7,9 +7,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <deque>
 #include <vector>
 
 namespace nim {
@@ -439,6 +439,7 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
 
   const size_t voxelNumber = stack.voxelNumber();
   const size_t planeSize = static_cast<size_t>(width) * static_cast<size_t>(height);
+  const size_t widthS = static_cast<size_t>(width);
 
   const ZNeighborhood& nb = neighborhoodLegacyOrder(connectivity);
   CHECK(nb.size() == static_cast<size_t>(connectivity));
@@ -446,8 +447,12 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
   const auto* array = stack.timeData<TScalar>(0);
 
   // Initialize queue with non-max voxels.
-  std::deque<size_t> q;
-  q.clear();
+  //
+  // This can grow large for dense volumes. Use a vector-backed FIFO queue to reduce
+  // allocator/iterator overhead compared to std::deque in this hot path.
+  std::vector<size_t> q;
+  q.reserve(1024);
+  size_t qHead = 0;
 
   size_t offset = 0;
   for (int z = 0; z < depth; ++z) {
@@ -458,7 +463,6 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
           continue;
         }
 
-        bool pushed = false;
         for (size_t i = 0; i < nb.size(); ++i) {
           const ZVoxelCoordinate& o = nb.offset(i);
           const int nx = x + o.x;
@@ -468,30 +472,27 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
             continue;
           }
 
-          const size_t nidx = static_cast<size_t>(nx) + static_cast<size_t>(ny) * static_cast<size_t>(width) +
-                              static_cast<size_t>(nz) * planeSize;
+          const size_t nidx =
+            static_cast<size_t>(nx) + static_cast<size_t>(ny) * widthS + static_cast<size_t>(nz) * planeSize;
           if (array[offset] < array[nidx]) {
             q.push_back(offset);
             out[offset] = 0;
-            pushed = true;
             break;
           }
         }
-
-        (void)pushed;
       }
     }
   }
 
   // Propagate removals (non-increasing paths from non-max voxels).
-  while (!q.empty()) {
-    const size_t c = q.front();
-    q.pop_front();
+  while (qHead < q.size()) {
+    const size_t c = q[qHead];
+    ++qHead;
 
     const int z = static_cast<int>(c / planeSize);
     const size_t rem = c - static_cast<size_t>(z) * planeSize;
-    const int y = static_cast<int>(rem / static_cast<size_t>(width));
-    const int x = static_cast<int>(rem - static_cast<size_t>(y) * static_cast<size_t>(width));
+    const int y = static_cast<int>(rem / widthS);
+    const int x = static_cast<int>(rem - static_cast<size_t>(y) * widthS);
 
     for (size_t i = 0; i < nb.size(); ++i) {
       const ZVoxelCoordinate& o = nb.offset(i);
@@ -501,8 +502,8 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
       if (nx < 0 || ny < 0 || nz < 0 || nx > cwidth || ny > cheight || nz > cdepth) {
         continue;
       }
-      const size_t nidx = static_cast<size_t>(nx) + static_cast<size_t>(ny) * static_cast<size_t>(width) +
-                          static_cast<size_t>(nz) * planeSize;
+      const size_t nidx =
+        static_cast<size_t>(nx) + static_cast<size_t>(ny) * widthS + static_cast<size_t>(nz) * planeSize;
       if (out[nidx] == 1) {
         if (array[nidx] <= array[c]) {
           out[nidx] = 0;
@@ -521,7 +522,6 @@ void stackLocmaxRegionMaskImpl(const ZImg& stack, uint8_t* out, int connectivity
   info.setVoxelFormat<uint8_t>();
   info.createDefaultDescriptions();
   ZImg out(info);
-  out.fill(0);
   return out;
 }
 
@@ -541,17 +541,9 @@ ZImg stackLocalMaxMaskLegacyLike(const ZImg& stack, StackLocmaxOptionLegacyLike 
 
   auto* outData = out.timeData<uint8_t>(0);
 
-  if (stack.isType<uint8_t>()) {
-    stackLocalMaxMaskImpl<uint8_t>(stack, outData, option);
-  } else if (stack.isType<uint16_t>()) {
-    stackLocalMaxMaskImpl<uint16_t>(stack, outData, option);
-  } else if (stack.isType<float>()) {
-    stackLocalMaxMaskImpl<float>(stack, outData, option);
-  } else if (stack.isType<double>()) {
-    stackLocalMaxMaskImpl<double>(stack, outData, option);
-  } else {
-    throw ZException(fmt::format("stackLocalMaxMaskLegacyLike: unsupported voxel type {}", stack.info()));
-  }
+  imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() {
+    stackLocalMaxMaskImpl<TVoxel>(stack, outData, option);
+  });
 
   return out;
 }
@@ -575,17 +567,9 @@ ZImg stackLocmaxRegionMaskLegacyLike(const ZImg& stack, int connectivity)
 
   auto* outData = out.timeData<uint8_t>(0);
 
-  if (stack.isType<uint8_t>()) {
-    stackLocmaxRegionMaskImpl<uint8_t>(stack, outData, connectivity);
-  } else if (stack.isType<uint16_t>()) {
-    stackLocmaxRegionMaskImpl<uint16_t>(stack, outData, connectivity);
-  } else if (stack.isType<float>()) {
-    stackLocmaxRegionMaskImpl<float>(stack, outData, connectivity);
-  } else if (stack.isType<double>()) {
-    stackLocmaxRegionMaskImpl<double>(stack, outData, connectivity);
-  } else {
-    throw ZException(fmt::format("stackLocmaxRegionMaskLegacyLike: unsupported voxel type {}", stack.info()));
-  }
+  imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() {
+    stackLocmaxRegionMaskImpl<TVoxel>(stack, outData, connectivity);
+  });
 
   return out;
 }

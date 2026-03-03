@@ -61,14 +61,9 @@ namespace {
   CHECK(stack.numChannels() == 1);
   CHECK(stack.numTimes() == 1);
 
-  if (stack.isType<uint8_t>()) {
-    return static_cast<double>(stack.timeData<uint8_t>(0)[idx]);
-  }
-  if (stack.isType<uint16_t>()) {
-    return static_cast<double>(stack.timeData<uint16_t>(0)[idx]);
-  }
-
-  throw ZException(fmt::format("stackSpGrow: unsupported voxel type {}", stack.info()));
+  return imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() -> double {
+    return static_cast<double>(stack.timeData<TVoxel>(0)[idx]);
+  });
 }
 
 [[nodiscard]] std::vector<double> neighborDistR(int conn, const std::array<double, 3>& res)

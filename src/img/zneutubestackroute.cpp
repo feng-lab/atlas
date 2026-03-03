@@ -1,5 +1,6 @@
 #include "zneutubestackroute.h"
 
+#include "zneutubemathutils.h"
 #include "zneutubeneighborhood.h"
 #include "zswcgeom.h"
 
@@ -17,25 +18,14 @@ namespace nim {
 
 namespace {
 
-[[nodiscard]] int iroundLegacyLike(double x)
-{
-  return static_cast<int>(std::lround(x));
-}
-
 [[nodiscard]] double stackArrayValueLegacyLike(const ZImg& stack, size_t idx)
 {
   CHECK(stack.numChannels() == 1);
   CHECK(stack.numTimes() == 1);
 
-  if (stack.isType<uint8_t>()) {
-    return static_cast<double>(stack.timeData<uint8_t>(0)[idx]);
-  }
-  if (stack.isType<uint16_t>()) {
-    return static_cast<double>(stack.timeData<uint16_t>(0)[idx]);
-  }
-
-  CHECK(false) << "stackRouteLegacyLike: unsupported voxel type " << stack.info();
-  return 0.0;
+  return imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() -> double {
+    return static_cast<double>(stack.timeData<TVoxel>(0)[idx]);
+  });
 }
 
 [[nodiscard]] bool maskPositiveLegacyLike(const ZImg& mask, size_t idx)
@@ -43,15 +33,9 @@ namespace {
   CHECK(mask.numChannels() == 1);
   CHECK(mask.numTimes() == 1);
 
-  if (mask.isType<uint8_t>()) {
-    return mask.timeData<uint8_t>(0)[idx] > 0;
-  }
-  if (mask.isType<uint16_t>()) {
-    return mask.timeData<uint16_t>(0)[idx] > 0;
-  }
-
-  CHECK(false) << "stackRouteLegacyLike: unsupported signal mask voxel type " << mask.info();
-  return false;
+  return imgTypeDispatcher(mask.info(), [&]<typename TVoxel>() -> bool {
+    return mask.timeData<TVoxel>(0)[idx] > static_cast<TVoxel>(0);
+  });
 }
 
 [[nodiscard]] double stackIntensityLegacyLike(double v, const StackGraphWorkspaceLegacyLike& sgw)

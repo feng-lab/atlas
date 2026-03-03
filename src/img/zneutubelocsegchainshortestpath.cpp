@@ -3,6 +3,7 @@
 #include "zneutubegeo3dellipse.h"
 #include "zneutubeimgsampling.h"
 #include "zneutubeinthistogram.h"
+#include "zneutubemathutils.h"
 #include "zneutubelocsegchaincircle.h"
 #include "zneutubelocsegchainknot.h"
 #include "zneutubelocsegchainmetrics.h"
@@ -22,11 +23,6 @@
 namespace nim {
 
 namespace {
-
-[[nodiscard]] int iroundLegacyLike(double x)
-{
-  return static_cast<int>(std::lround(x));
-}
 
 [[nodiscard]] double coordinate3dDistance(const std::array<double, 3>& a, const std::array<double, 3>& b)
 {
@@ -348,42 +344,25 @@ void locsegChainPointRangeLegacyLike(const LocsegChain& target,
   info.setSize(Dimension::T, 1);
 
   ZImg out(info);
-  out.fill(0);
 
   const size_t srcW = src.width();
   const size_t srcH = src.height();
   const size_t srcPlane = srcW * srcH;
   const size_t dstPlane = w * h;
 
-  if (src.isType<uint8_t>()) {
-    const auto* in = src.timeData<uint8_t>(0);
-    auto* dst = out.timeData<uint8_t>(0);
+  imgTypeDispatcher(src.info(), [&]<typename TVoxel>() {
+    const auto* in = src.timeData<TVoxel>(0);
+    auto* dst = out.timeData<TVoxel>(0);
     for (int zz = z0; zz <= z1; ++zz) {
       for (int yy = y0; yy <= y1; ++yy) {
         const size_t srcOff =
           static_cast<size_t>(x0) + static_cast<size_t>(yy) * srcW + static_cast<size_t>(zz) * srcPlane;
         const size_t dstOff = static_cast<size_t>(yy - y0) * w + static_cast<size_t>(zz - z0) * dstPlane;
-        std::memcpy(dst + dstOff, in + srcOff, w * sizeof(uint8_t));
+        std::memcpy(dst + dstOff, in + srcOff, w * sizeof(TVoxel));
       }
     }
-    return out;
-  }
-
-  if (src.isType<uint16_t>()) {
-    const auto* in = src.timeData<uint16_t>(0);
-    auto* dst = out.timeData<uint16_t>(0);
-    for (int zz = z0; zz <= z1; ++zz) {
-      for (int yy = y0; yy <= y1; ++yy) {
-        const size_t srcOff =
-          static_cast<size_t>(x0) + static_cast<size_t>(yy) * srcW + static_cast<size_t>(zz) * srcPlane;
-        const size_t dstOff = static_cast<size_t>(yy - y0) * w + static_cast<size_t>(zz - z0) * dstPlane;
-        std::memcpy(dst + dstOff, in + srcOff, w * sizeof(uint16_t));
-      }
-    }
-    return out;
-  }
-
-  throw ZException(fmt::format("cropStackLegacyLike: unsupported voxel type {}", src.info()));
+  });
+  return out;
 }
 
 [[nodiscard]] ZImg cropMaskU8LegacyLike(const ZImg& src, const std::array<int, 6>& r)

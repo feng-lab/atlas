@@ -3,6 +3,7 @@
 #include "zneutubetracerecord.h"
 
 #include <cstddef>
+#include <span>
 
 namespace nim {
 
@@ -15,9 +16,8 @@ namespace nim {
 //
 // Returns the primary score (fs->scores[0]) when `fs != nullptr`, otherwise
 // returns the legacy default `darray_dot_n(fieldValues, signalValues, length)`.
-[[nodiscard]] double computeStackFitScoresLegacyLike(const double* fieldValues,
-                                                     const double* signalValues,
-                                                     size_t length,
+[[nodiscard]] double computeStackFitScoresLegacyLike(std::span<const double> fieldValues,
+                                                     std::span<const double> signalValues,
                                                      /*nullable*/ StackFitScore* fs);
 
 // Port of the `Stack_Fit_Score` switch logic used by legacy
@@ -28,9 +28,8 @@ namespace nim {
 //   - `STACK_FIT_PDOT` and `STACK_FIT_MEAN_SIGNAL` use `fieldValues[i] > 0.0` (strict) instead of `>= 0.0`.
 //   - `STACK_FIT_LOW_MEAN_SIGNAL` is not implemented in the legacy masked scorer and triggers an error.
 // - When `fs == nullptr`, legacy returns `darray_dot_nw(fieldValues, signalValues, length)` (not dot_n).
-[[nodiscard]] double computeStackFitScoresMaskedLegacyLike(const double* fieldValues,
-                                                           const double* signalValues,
-                                                           size_t length,
+[[nodiscard]] double computeStackFitScoresMaskedLegacyLike(std::span<const double> fieldValues,
+                                                           std::span<const double> signalValues,
                                                            /*nullable*/ StackFitScore* fs);
 
 } // namespace nim

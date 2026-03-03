@@ -65,6 +65,14 @@ void neurosegSwellLegacyLike(Neuroseg& seg, double ratio, double diff, double ma
                                                                /*nullable*/ const std::array<double, 3>* offpos,
                                                                double zScale);
 
+// Allocation-free helper for hot loops: fills `out` (reusing capacity) with the same data as
+// `neurosegDistFilterLegacyLike()`.
+void neurosegDistFilterLegacyLikeInto(const Neuroseg& seg,
+                                      const FieldRangeLegacyLike& range,
+                                      /*nullable*/ const std::array<double, 3>* offpos,
+                                      double zScale,
+                                      std::vector<double>& out);
+
 // Port of tz_neuroseg.c::Neuroseg_Angle_Between().
 [[nodiscard]] double neurosegAngleBetweenLegacyLike(const Neuroseg& seg1, const Neuroseg& seg2);
 
@@ -98,6 +106,10 @@ struct NeurosegSliceField
 // Port of tz_neuroseg.c::Neuroseg_Field_Z().
 [[nodiscard]] Geo3dScalarField neurosegFieldZLegacyLike(const Neuroseg& seg, double z, double step);
 
+// Allocation-free helper for hot loops: fills `out` (reusing capacity) with the same data as
+// `neurosegFieldZLegacyLike()`.
+void neurosegFieldZLegacyLikeInto(const Neuroseg& seg, double z, double step, Geo3dScalarField& out);
+
 // Port of tz_neuroseg.c::Neuroseg_Slice_Field().
 [[nodiscard]] NeurosegSliceField neurosegSliceFieldLegacyLike(NeurosegFieldFunctionLegacyLike fieldFunc);
 
@@ -108,8 +120,20 @@ struct NeurosegSliceField
 [[nodiscard]] Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg,
                                                             NeurosegFieldFunctionLegacyLike fieldFunc);
 
+// Allocation-free helper for hot loops: fills `out` (reusing capacity) with the same data as
+// `neurosegFieldSFastLegacyLike()`.
+void neurosegFieldSFastLegacyLikeInto(const Neuroseg& seg,
+                                      NeurosegFieldFunctionLegacyLike fieldFunc,
+                                      Geo3dScalarField& out);
+
 // Port of tz_neuroseg.c::Neuroseg_Field_Sp().
 [[nodiscard]] Geo3dScalarField neurosegFieldSpLegacyLike(const Neuroseg& seg,
                                                          NeurosegFieldFunctionLegacyLike fieldFunc);
+
+// Allocation-free helper for hot loops: fills `out` (reusing capacity) with the same data as
+// `neurosegFieldSpLegacyLike()`.
+void neurosegFieldSpLegacyLikeInto(const Neuroseg& seg,
+                                   NeurosegFieldFunctionLegacyLike fieldFunc,
+                                   Geo3dScalarField& out);
 
 } // namespace nim

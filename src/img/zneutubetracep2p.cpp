@@ -1,5 +1,6 @@
 #include "zneutubetracep2p.h"
 
+#include "zneutubemathutils.h"
 #include "zneutubeinthistogram.h"
 #include "zneutubestackgraph.h"
 #include "zneutubestackroute.h"
@@ -17,6 +18,7 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <type_traits>
 #include <vector>
 
 namespace nim {
@@ -24,11 +26,6 @@ namespace nim {
 namespace {
 
 constexpr int MaxP2PTraceVolumeLegacyLike = 1000000;
-
-[[nodiscard]] int iroundLegacyLike(double v)
-{
-  return static_cast<int>(std::lround(v));
-}
 
 [[nodiscard]] ZImg traceSignalViewLegacyLike(const ZImg& signal, size_t c, size_t t)
 {
@@ -129,38 +126,40 @@ void inferWeightParameterLegacyLike(StackGraphWorkspaceLegacyLike& sgw, const ZI
   } else if (stack.valueType() == ZVoxelValueType::Uint16) {
     outInfo.bytesPerVoxel = 2;
     outInfo.setVoxelFormat<uint16_t>();
+  } else if (stack.valueType() == ZVoxelValueType::Float32) {
+    outInfo.bytesPerVoxel = 4;
+    outInfo.setVoxelFormat<float>();
+  } else if (stack.valueType() == ZVoxelValueType::Float64) {
+    outInfo.bytesPerVoxel = 8;
+    outInfo.setVoxelFormat<double>();
   } else {
     throw ZException("P2P trace: cropByRange: unsupported voxel type");
   }
   outInfo.createDefaultDescriptions();
 
   ZImg out(outInfo);
-  out.fill(0);
 
-  if (out.isType<uint8_t>()) {
-    auto* dst = out.timeData<uint8_t>(0);
+  imgTypeDispatcher(out.info(), [&]<typename TVoxel>() {
+    auto* dst = out.timeData<TVoxel>(0);
     size_t idx = 0;
     for (int z = 0; z < d; ++z) {
       for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
           const double v = stack.valueAsDouble(x0 + x, y0 + y, z0 + z);
-          dst[idx++] = static_cast<uint8_t>(std::clamp(static_cast<int>(v), 0, 255));
+          if constexpr (std::is_floating_point_v<TVoxel>) {
+            dst[idx++] = static_cast<TVoxel>(v);
+          } else if constexpr (std::is_signed_v<TVoxel>) {
+            const double minD = static_cast<double>(std::numeric_limits<TVoxel>::lowest());
+            const double maxD = static_cast<double>(std::numeric_limits<TVoxel>::max());
+            dst[idx++] = static_cast<TVoxel>(std::clamp(v, minD, maxD));
+          } else {
+            const double maxD = static_cast<double>(std::numeric_limits<TVoxel>::max());
+            dst[idx++] = static_cast<TVoxel>(std::clamp(v, 0.0, maxD));
+          }
         }
       }
     }
-  } else if (out.isType<uint16_t>()) {
-    auto* dst = out.timeData<uint16_t>(0);
-    size_t idx = 0;
-    for (int z = 0; z < d; ++z) {
-      for (int y = 0; y < h; ++y) {
-        for (int x = 0; x < w; ++x) {
-          const double v = stack.valueAsDouble(x0 + x, y0 + y, z0 + z);
-          dst[idx++] = static_cast<uint16_t>(
-            std::clamp(static_cast<int>(v), 0, static_cast<int>(std::numeric_limits<uint16_t>::max())));
-        }
-      }
-    }
-  }
+  });
 
   return out;
 }
@@ -194,7 +193,6 @@ template<typename TVoxel>
   outInfo.createDefaultDescriptions();
 
   ZImg out(outInfo);
-  out.fill(0);
 
   const int64_t area = static_cast<int64_t>(width) * static_cast<int64_t>(height);
   const int cwidth = width - 1;
@@ -240,13 +238,9 @@ template<typename TVoxel>
     }
   };
 
-  if (in.isType<uint8_t>()) {
-    compute(in.timeData<uint8_t>(0));
-  } else if (in.isType<uint16_t>()) {
-    compute(in.timeData<uint16_t>(0));
-  } else {
-    throw ZException(fmt::format("P2P trace: unsupported voxel type {}", in.info()));
-  }
+  imgTypeDispatcher(in.info(), [&]<typename TVoxel>() {
+    compute(in.timeData<TVoxel>(0));
+  });
 
   return out;
 }
@@ -483,10 +477,6 @@ void fitSignalOnTreeLegacyLike(ZSwc& tree, const ZImg& stack, ZNeutubeImageBackg
     return false;
   }
 
-  if (stack.valueType() != ZVoxelValueType::Uint8 && stack.valueType() != ZVoxelValueType::Uint16) {
-    throw ZException("P2P trace: fit node signal: unsupported stack voxel type");
-  }
-
   if (node.radius <= 0.0) {
     return false;
   }
@@ -529,35 +519,39 @@ void fitSignalOnTreeLegacyLike(ZSwc& tree, const ZImg& stack, ZNeutubeImageBackg
   if (stack.valueType() == ZVoxelValueType::Uint8) {
     sliceInfo.bytesPerVoxel = 1;
     sliceInfo.setVoxelFormat<uint8_t>();
-  } else {
+  } else if (stack.valueType() == ZVoxelValueType::Uint16) {
     sliceInfo.bytesPerVoxel = 2;
     sliceInfo.setVoxelFormat<uint16_t>();
+  } else if (stack.valueType() == ZVoxelValueType::Float32) {
+    sliceInfo.bytesPerVoxel = 4;
+    sliceInfo.setVoxelFormat<float>();
+  } else if (stack.valueType() == ZVoxelValueType::Float64) {
+    sliceInfo.bytesPerVoxel = 8;
+    sliceInfo.setVoxelFormat<double>();
   }
   sliceInfo.createDefaultDescriptions();
 
   ZImg slice(sliceInfo);
-  slice.fill(0);
 
-  if (slice.isType<uint8_t>()) {
-    auto* dst = slice.timeData<uint8_t>(0);
+  imgTypeDispatcher(slice.info(), [&]<typename TVoxel>() {
+    auto* dst = slice.timeData<TVoxel>(0);
     size_t idx = 0;
     for (int y = 0; y < h; ++y) {
       for (int x = 0; x < w; ++x) {
         const double v = stack.valueAsDouble(x1 + x, y1 + y, cz);
-        dst[idx++] = static_cast<uint8_t>(std::clamp(static_cast<int>(v), 0, 255));
+        if constexpr (std::is_floating_point_v<TVoxel>) {
+          dst[idx++] = static_cast<TVoxel>(v);
+        } else if constexpr (std::is_signed_v<TVoxel>) {
+          const double minD = static_cast<double>(std::numeric_limits<TVoxel>::lowest());
+          const double maxD = static_cast<double>(std::numeric_limits<TVoxel>::max());
+          dst[idx++] = static_cast<TVoxel>(std::clamp(v, minD, maxD));
+        } else {
+          const double maxD = static_cast<double>(std::numeric_limits<TVoxel>::max());
+          dst[idx++] = static_cast<TVoxel>(std::clamp(v, 0.0, maxD));
+        }
       }
     }
-  } else {
-    auto* dst = slice.timeData<uint16_t>(0);
-    size_t idx = 0;
-    for (int y = 0; y < h; ++y) {
-      for (int x = 0; x < w; ++x) {
-        const double v = stack.valueAsDouble(x1 + x, y1 + y, cz);
-        dst[idx++] = static_cast<uint16_t>(
-          std::clamp(static_cast<int>(v), 0, static_cast<int>(std::numeric_limits<uint16_t>::max())));
-      }
-    }
-  }
+  });
 
   return fitSwcNodeSignalWithFallbackInCroppedSliceLegacyLike(node, slice, x1, y1, bg);
 }

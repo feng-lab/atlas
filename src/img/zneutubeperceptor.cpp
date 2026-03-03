@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <span>
 #include <vector>
 
 namespace nim {
@@ -14,25 +15,17 @@ namespace {
 
 constexpr int FitPerceptorMaxIterLegacyLike = 500;
 
-[[nodiscard]] double sqsumLegacyLike(const double* a, int n)
+[[nodiscard]] double sqsumLegacyLike(std::span<const double> a)
 {
-  CHECK(a != nullptr);
-  CHECK(n >= 0);
-
   double s = 0.0;
-  for (int i = 0; i < n; ++i) {
-    s += a[i] * a[i];
+  for (double v : a) {
+    s += v * v;
   }
   return s;
 }
 
 inline void updateVariableLegacyLike(VariableSet& vs, int index, double delta)
 {
-  CHECK(vs.var != nullptr);
-  CHECK(vs.varIndex != nullptr);
-  CHECK(index >= 0);
-  CHECK(index < vs.nvar);
-
   vs.var[vs.varIndex[index]] += delta;
   variableSetUpdateLinkLegacyLike(vs);
 }
@@ -45,8 +38,6 @@ double perceptorGradientPartialLegacyLike(VariableSet& vs,
                                           const void* arg,
                                           ScoreFunctionLegacyLike f)
 {
-  CHECK(f != nullptr);
-
   updateVariableLegacyLike(vs, index, delta);
 
   const void* paramArray[2];
@@ -99,6 +90,9 @@ void perceptorGradientLegacyLike(const Perceptor& perceptor, const void* stack, 
   CHECK(gradient != nullptr);
 
   VariableSet& vs = *perceptor.vs;
+  CHECK(vs.var != nullptr);
+  CHECK(vs.varIndex != nullptr);
+  CHECK(vs.nvar >= 0);
 
   const void* paramArray[2];
   paramArray[0] = stack;
@@ -121,13 +115,21 @@ double fitPerceptorLegacyLike(Perceptor& perceptor, const void* stack)
   CHECK(perceptor.delta != nullptr);
 
   VariableSet& vs = *perceptor.vs;
+  CHECK(vs.var != nullptr);
+  CHECK(vs.varIndex != nullptr);
   CHECK(vs.nvar >= 0);
 
   const int nvar = vs.nvar;
-  LineSearchWorkspace lsw(nvar);
+  static thread_local LineSearchWorkspace lsw(0);
+  if (lsw.nvar != nvar) {
+    lsw.nvar = nvar;
+    lsw.grad.resize(static_cast<size_t>(nvar));
+    lsw.startGrad.resize(static_cast<size_t>(nvar));
+  }
   setLineSearchWorkspaceLegacyLike(lsw, 0.2, 0.8, 0.01, 0.1, perceptor.minGradient);
 
-  std::vector<double> updateDirection(static_cast<size_t>(nvar));
+  static thread_local std::vector<double> updateDirectionScratch;
+  updateDirectionScratch.resize(static_cast<size_t>(nvar));
 
   perceptorGradientLegacyLike(perceptor, stack, lsw.startGrad.data());
 
@@ -136,37 +138,41 @@ double fitPerceptorLegacyLike(Perceptor& perceptor, const void* stack)
   paramArray[1] = perceptor.arg;
   lsw.score = perceptor.s->f(vs.var, paramArray);
 
-  std::copy(lsw.startGrad.begin(), lsw.startGrad.end(), updateDirection.begin());
+  std::copy(lsw.startGrad.begin(), lsw.startGrad.end(), updateDirectionScratch.begin());
 
   bool stop = false;
   int iter = 0;
   bool succ = true;
 
   while (!stop) {
-    const double directionLength = std::sqrt(sqsumLegacyLike(updateDirection.data(), nvar));
+    const double directionLength =
+      std::sqrt(sqsumLegacyLike(std::span<const double>(updateDirectionScratch.data(), static_cast<size_t>(nvar))));
     if (directionLength < lsw.minDirection) {
       succ = false;
     } else {
-      succ = lineSearchVarBacktrackLegacyLike(vs,
-                                              paramArray,
-                                              *perceptor.s,
-                                              perceptor.delta,
-                                              perceptor.weight,
-                                              updateDirection.data(),
-                                              lsw);
+      succ = lineSearchVarBacktrackLegacyLike(
+        vs,
+        paramArray,
+        *perceptor.s,
+        (perceptor.weight != nullptr) ? std::span<const double>(perceptor.weight, static_cast<size_t>(nvar))
+                                      : std::span<const double>{},
+        std::span<double>(updateDirectionScratch.data(), updateDirectionScratch.size()),
+        lsw);
     }
 
     if (!succ) {
-      const double startGradLength = std::sqrt(sqsumLegacyLike(lsw.startGrad.data(), nvar));
+      const double startGradLength =
+        std::sqrt(sqsumLegacyLike(std::span<const double>(lsw.startGrad.data(), static_cast<size_t>(nvar))));
       if (startGradLength > perceptor.minGradient) {
-        std::copy(lsw.startGrad.begin(), lsw.startGrad.end(), updateDirection.begin());
-        succ = lineSearchVarBacktrackLegacyLike(vs,
-                                                paramArray,
-                                                *perceptor.s,
-                                                perceptor.delta,
-                                                perceptor.weight,
-                                                updateDirection.data(),
-                                                lsw);
+        std::copy(lsw.startGrad.begin(), lsw.startGrad.end(), updateDirectionScratch.begin());
+        succ = lineSearchVarBacktrackLegacyLike(
+          vs,
+          paramArray,
+          *perceptor.s,
+          (perceptor.weight != nullptr) ? std::span<const double>(perceptor.weight, static_cast<size_t>(nvar))
+                                        : std::span<const double>{},
+          std::span<double>(updateDirectionScratch.data(), updateDirectionScratch.size()),
+          lsw);
       }
     }
 
@@ -176,7 +182,10 @@ double fitPerceptorLegacyLike(Perceptor& perceptor, const void* stack)
         stop = true;
       } else {
         perceptorGradientLegacyLike(perceptor, stack, lsw.grad.data());
-        conjugateUpdateDirectionLegacyLike(nvar, lsw.grad.data(), lsw.startGrad.data(), updateDirection.data());
+        conjugateUpdateDirectionLegacyLike(
+          lsw.grad,
+          lsw.startGrad,
+          std::span<double>(updateDirectionScratch.data(), updateDirectionScratch.size()));
         std::copy(lsw.grad.begin(), lsw.grad.end(), lsw.startGrad.begin());
       }
     } else {

@@ -2,6 +2,7 @@
 
 #include "zneutubecontfun.h"
 
+#include <span>
 #include <vector>
 
 namespace nim {
@@ -39,20 +40,20 @@ void setLineSearchWorkspaceLegacyLike(LineSearchWorkspace& lsw,
 // Notes:
 // - Preserves the legacy in-place scaling of `direction` when `weight != nullptr`.
 //
-// Pointer-parameter semantics:
+// Parameter semantics:
 // - `param` is forwarded as an opaque context pointer to `cf.f(...)` (legacy API).
-// - `delta` is currently unused by the legacy backtracking routine but preserved for signature parity.
-// - `weight` is optional; when non-null it scales `direction[i]` in-place before the line-search.
-// - `direction` is an in/out array of length `vs.nvar`.
+// - `weight` is optional; when non-empty it scales `direction[i]` in-place before the line-search.
+// - `direction` is an in/out span of length `vs.nvar`.
 [[nodiscard]] bool lineSearchVarBacktrackLegacyLike(VariableSet& vs,
                                                     const void* param,
                                                     const ContinuousFunction& cf,
-                                                    const double* delta,
-                                                    /*nullable*/ const double* weight,
-                                                    double* direction,
+                                                    std::span<const double> weight,
+                                                    std::span<double> direction,
                                                     LineSearchWorkspace& lsw);
 
 // Port of tz_optimize_utils.c::Conjugate_Update_Direction() (Polak-Ribiere+).
-void conjugateUpdateDirectionLegacyLike(int nvar, const double* grad, const double* prevGrad, double* direction);
+void conjugateUpdateDirectionLegacyLike(std::span<const double> grad,
+                                        std::span<const double> prevGrad,
+                                        std::span<double> direction);
 
 } // namespace nim

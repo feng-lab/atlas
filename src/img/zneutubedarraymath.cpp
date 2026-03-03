@@ -1,18 +1,13 @@
 #include "zneutubedarraymath.h"
 
-#include "zlog.h"
-
 #include <cmath>
 
 namespace nim {
 
-double darrayMaxLegacyLike(const double* data, size_t length, size_t* idx)
+double darrayMaxLegacyLike(std::span<const double> data, size_t* idx)
 {
-  CHECK(data != nullptr);
-  CHECK(length > 0);
-
   size_t maxIdx = 0;
-  for (size_t i = 1; i < length; ++i) {
+  for (size_t i = 1; i < data.size(); ++i) {
     if (data[i] > data[maxIdx]) {
       maxIdx = i;
     }
@@ -25,13 +20,10 @@ double darrayMaxLegacyLike(const double* data, size_t length, size_t* idx)
   return data[maxIdx];
 }
 
-double darrayDotNLegacyLike(const double* a, const double* b, size_t length)
+double darrayDotNLegacyLike(std::span<const double> a, std::span<const double> b)
 {
-  CHECK(a != nullptr);
-  CHECK(b != nullptr);
-
   double d = 0.0;
-  for (size_t i = 0; i < length; ++i) {
+  for (size_t i = 0; i < a.size(); ++i) {
     const double p = a[i] * b[i];
     if (!std::isnan(p)) {
       d += p;
@@ -41,11 +33,8 @@ double darrayDotNLegacyLike(const double* a, const double* b, size_t length)
   return d;
 }
 
-double darrayDotNWLegacyLike(const double* a, const double* b, size_t length)
+double darrayDotNWLegacyLike(std::span<const double> a, std::span<const double> b)
 {
-  CHECK(a != nullptr);
-  CHECK(b != nullptr);
-
   // Port of tz_darray.c::darray_dot_nw(). This is a NaN-aware dot product that
   // balances positive/negative weights based on which samples are valid.
   double w1 = 0.0;
@@ -53,7 +42,7 @@ double darrayDotNWLegacyLike(const double* a, const double* b, size_t length)
   double nw1 = 0.0;
   double nw2 = 0.0;
 
-  for (size_t i = 0; i < length; ++i) {
+  for (size_t i = 0; i < a.size(); ++i) {
     if (a[i] > 0.0) {
       w1 += a[i];
     } else {
@@ -75,7 +64,7 @@ double darrayDotNWLegacyLike(const double* a, const double* b, size_t length)
   }
 
   double d = 0.0;
-  for (size_t i = 0; i < length; ++i) {
+  for (size_t i = 0; i < a.size(); ++i) {
     if (!(std::isnan(a[i]) || std::isnan(b[i]))) {
       if (a[i] > 0.0) {
         d += a[i] * b[i] * w1;
@@ -88,12 +77,10 @@ double darrayDotNWLegacyLike(const double* a, const double* b, size_t length)
   return d;
 }
 
-double darraySumNLegacyLike(const double* a, size_t length)
+double darraySumNLegacyLike(std::span<const double> a)
 {
-  CHECK(a != nullptr);
-
   double sum = 0.0;
-  for (size_t i = 0; i < length; ++i) {
+  for (size_t i = 0; i < a.size(); ++i) {
     if (!std::isnan(a[i])) {
       sum += a[i];
     }
@@ -101,25 +88,21 @@ double darraySumNLegacyLike(const double* a, size_t length)
   return sum;
 }
 
-double darrayMeanNLegacyLike(const double* a, size_t length)
+double darrayMeanNLegacyLike(std::span<const double> a)
 {
-  CHECK(length > 0);
-  return darraySumNLegacyLike(a, length) / static_cast<double>(length);
+  return darraySumNLegacyLike(a) / static_cast<double>(a.size());
 }
 
-double darrayCorrcoefNLegacyLike(const double* a, const double* b, size_t length)
+double darrayCorrcoefNLegacyLike(std::span<const double> a, std::span<const double> b)
 {
-  CHECK(a != nullptr);
-  CHECK(b != nullptr);
-
-  const double mu1 = darrayMeanNLegacyLike(a, length);
-  const double mu2 = darrayMeanNLegacyLike(b, length);
+  const double mu1 = darrayMeanNLegacyLike(a);
+  const double mu2 = darrayMeanNLegacyLike(b);
 
   double r = 0.0;
   double v1 = 0.0;
   double v2 = 0.0;
 
-  for (size_t i = 0; i < length; ++i) {
+  for (size_t i = 0; i < a.size(); ++i) {
     if (!(std::isnan(a[i]) || std::isnan(b[i]))) {
       const double sd1 = a[i] - mu1;
       const double sd2 = b[i] - mu2;

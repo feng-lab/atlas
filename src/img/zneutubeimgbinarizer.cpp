@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
 #include <vector>
 
 namespace nim {
@@ -24,8 +25,28 @@ namespace {
   info.setVoxelFormat<uint8_t>();
   info.createDefaultDescriptions();
   ZImg out(info);
-  out.fill(0);
   return out;
+}
+
+template<typename TVoxel>
+[[nodiscard]] TVoxel clampIntToVoxelRangeLegacyLike(int v)
+{
+  if constexpr (std::is_floating_point_v<TVoxel>) {
+    return static_cast<TVoxel>(v);
+  } else if constexpr (std::is_signed_v<TVoxel>) {
+    const std::int64_t minV = static_cast<std::int64_t>(std::numeric_limits<TVoxel>::lowest());
+    const std::int64_t maxV = static_cast<std::int64_t>(std::numeric_limits<TVoxel>::max());
+    const std::int64_t vv = static_cast<std::int64_t>(v);
+    const std::int64_t clamped = std::clamp(vv, minV, maxV);
+    return static_cast<TVoxel>(clamped);
+  } else {
+    if (v <= 0) {
+      return static_cast<TVoxel>(0);
+    }
+    const std::uint64_t maxV = static_cast<std::uint64_t>(std::numeric_limits<TVoxel>::max());
+    const std::uint64_t vv = static_cast<std::uint64_t>(v);
+    return static_cast<TVoxel>(std::min(vv, maxV));
+  }
 }
 
 void stackSubcLegacyLike(ZImg& stack, int subtr)
@@ -38,11 +59,6 @@ void stackSubcLegacyLike(ZImg& stack, int subtr)
   }
 
   // Use ZImg's saturating arithmetic implementation (same semantics as the legacy Stack_Subc path).
-  //
-  // Keep the same short-circuit behavior for unsupported types.
-  if (!stack.isType<uint8_t>() && !stack.isType<uint16_t>()) {
-    throw ZException(fmt::format("stackSubcLegacyLike: unsupported voxel type {}", stack.info()));
-  }
   stack -= subtr;
 }
 
@@ -52,31 +68,17 @@ void stackSubcLegacyLike(ZImg& stack, int subtr)
   CHECK(stack.numTimes() == 1);
 
   const size_t n = stack.voxelNumber();
-  size_t count = 0;
-
-  if (stack.isType<uint8_t>()) {
-    const auto* a = stack.timeData<uint8_t>(0);
-    const uint8_t t = static_cast<uint8_t>(std::clamp(thre, 0, 255));
+  return imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() -> size_t {
+    const auto* a = stack.timeData<TVoxel>(0);
+    const TVoxel t = clampIntToVoxelRangeLegacyLike<TVoxel>(thre);
+    size_t count = 0;
     for (size_t i = 0; i < n; ++i) {
       if (a[i] > t) {
         ++count;
       }
     }
     return count;
-  }
-
-  if (stack.isType<uint16_t>()) {
-    const auto* a = stack.timeData<uint16_t>(0);
-    const uint16_t t = static_cast<uint16_t>(std::clamp(thre, 0, 65535));
-    for (size_t i = 0; i < n; ++i) {
-      if (a[i] > t) {
-        ++count;
-      }
-    }
-    return count;
-  }
-
-  throw ZException(fmt::format("fgAreaAboveThresholdLegacyLike: unsupported voxel type {}", stack.info()));
+  });
 }
 
 void thresholdBinarizeToUint8LegacyLike(const ZImg& in, int thre, ZImg& out)
@@ -101,25 +103,13 @@ void thresholdBinarizeToUint8LegacyLike(const ZImg& in, int thre, ZImg& out)
   const size_t n = in.voxelNumber();
   auto* dst = out.timeData<uint8_t>(0);
 
-  if (in.isType<uint8_t>()) {
-    const auto* src = in.timeData<uint8_t>(0);
-    const uint8_t t = static_cast<uint8_t>(std::clamp(thre, 0, 255));
+  imgTypeDispatcher(in.info(), [&]<typename TVoxel>() {
+    const auto* src = in.timeData<TVoxel>(0);
+    const TVoxel t = clampIntToVoxelRangeLegacyLike<TVoxel>(thre);
     for (size_t i = 0; i < n; ++i) {
       dst[i] = static_cast<uint8_t>(src[i] > t);
     }
-    return;
-  }
-
-  if (in.isType<uint16_t>()) {
-    const auto* src = in.timeData<uint16_t>(0);
-    const uint16_t t = static_cast<uint16_t>(std::clamp(thre, 0, 65535));
-    for (size_t i = 0; i < n; ++i) {
-      dst[i] = static_cast<uint8_t>(src[i] > t);
-    }
-    return;
-  }
-
-  throw ZException(fmt::format("thresholdBinarizeToUint8LegacyLike: unsupported voxel type {}", in.info()));
+  });
 }
 
 [[nodiscard]] int refineLocmaxThresholdLegacyLike(const ZImg& stack,
@@ -178,6 +168,14 @@ void thresholdBinarizeToUint8LegacyLike(const ZImg& in, int thre, ZImg& out)
     auto* a = locmax.timeData<uint8_t>(0);
     const size_t n = locmax.voxelNumber();
 
+    const size_t width = locmax.width();
+    const size_t height = locmax.height();
+    const size_t depth = locmax.depth();
+    const size_t plane = width * height;
+    const int widthI = static_cast<int>(width);
+    const int heightI = static_cast<int>(height);
+    const int depthI = static_cast<int>(depth);
+
     const ZNeighborhood& nb = neighborhoodLegacyOrder(conn);
     std::vector<size_t> q;
     q.reserve(1024);
@@ -195,11 +193,6 @@ void thresholdBinarizeToUint8LegacyLike(const ZImg& in, int thre, ZImg& out)
         const size_t idx = q.back();
         q.pop_back();
 
-        const size_t width = locmax.width();
-        const size_t height = locmax.height();
-        const size_t depth = locmax.depth();
-        const size_t plane = width * height;
-
         const int z = static_cast<int>(idx / plane);
         const size_t rem = idx - static_cast<size_t>(z) * plane;
         const int y = static_cast<int>(rem / width);
@@ -210,8 +203,7 @@ void thresholdBinarizeToUint8LegacyLike(const ZImg& in, int thre, ZImg& out)
           const int nx = x + o.x;
           const int ny = y + o.y;
           const int nz = z + o.z;
-          if (nx < 0 || ny < 0 || nz < 0 || nx >= static_cast<int>(width) || ny >= static_cast<int>(height) ||
-              nz >= static_cast<int>(depth)) {
+          if (nx < 0 || ny < 0 || nz < 0 || nx >= widthI || ny >= heightI || nz >= depthI) {
             continue;
           }
           const size_t nidx =
@@ -295,10 +287,6 @@ BinarizeResultLegacyLike binarizeLocmaxLegacyLike(const ZImg& stack, int retryCo
 
   CHECK(stack.numChannels() == 1);
   CHECK(stack.numTimes() == 1);
-
-  if (!stack.isType<uint8_t>() && !stack.isType<uint16_t>()) {
-    throw ZException(fmt::format("binarizeLocmaxLegacyLike: unsupported voxel type {}", stack.info()));
-  }
 
   const size_t voxelNumber = stack.voxelNumber();
 

@@ -5,6 +5,7 @@
 #include "zexception.h"
 #include "zlog.h"
 #include "zswc.h"
+#include "zneutubemathutils.h"
 
 #include <QString>
 
@@ -31,13 +32,6 @@ struct Point3d
   double y = 0.0;
   double z = 0.0;
 };
-
-[[nodiscard]] int iroundLegacy(double v)
-{
-  // Legacy neuTube uses `iround(...)` which prefers `lrint` when available.
-  // `lrint` follows the current rounding mode; the default is typically FE_TONEAREST.
-  return static_cast<int>(std::lrint(v));
-}
 
 [[nodiscard]] double dist3d(double x0, double y0, double z0, double x1, double y1, double z1)
 {
@@ -577,7 +571,7 @@ void resampleBranchLegacy(ZSwc& tree, const ZSwc::SwcTreeNode& begin, const ZSwc
     return;
   }
 
-  const int nseg = iroundLegacy(len / step);
+  const int nseg = iroundLegacyLike(len / step);
   if (nseg > 1) {
     const double realStep = len / static_cast<double>(nseg);
     const std::vector<Point3d> pointArray = sampleBranchLegacy(nodes, realStep);

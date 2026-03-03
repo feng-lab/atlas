@@ -6,6 +6,7 @@
 #include "zlog.h"
 
 #include <algorithm>
+#include <cstddef>
 
 namespace nim {
 
@@ -158,14 +159,10 @@ ZImg majorityFilterBinaryU8RLegacyLike(const ZImg& in, int connectivity, int mnb
   const auto* inData = in.timeData<uint8_t>(0);
   auto* outData = out.timeData<uint8_t>(0);
 
-  auto inBound2d = [width, height](int x, int y) -> bool {
-    return x >= 0 && y >= 0 && x < static_cast<int>(width) && y < static_cast<int>(height);
-  };
-
-  auto inBound3d = [width, height, depth](int x, int y, int z) -> bool {
-    return x >= 0 && y >= 0 && z >= 0 && x < static_cast<int>(width) && y < static_cast<int>(height) &&
-           z < static_cast<int>(depth);
-  };
+  const int widthI = static_cast<int>(width);
+  const int heightI = static_cast<int>(height);
+  const int depthI = static_cast<int>(depth);
+  const size_t planeSize = width * height;
 
   size_t offset = 0;
   for (size_t z = 0; z < depth; ++z) {
@@ -186,9 +183,9 @@ ZImg majorityFilterBinaryU8RLegacyLike(const ZImg& in, int connectivity, int mnb
 
           bool ok = false;
           if (is2dConn) {
-            ok = inBound2d(nx, ny);
+            ok = nx >= 0 && ny >= 0 && nx < widthI && ny < heightI;
           } else {
-            ok = inBound3d(nx, ny, nz);
+            ok = nx >= 0 && ny >= 0 && nz >= 0 && nx < widthI && ny < heightI && nz < depthI;
           }
 
           if (!ok) {
@@ -197,7 +194,7 @@ ZImg majorityFilterBinaryU8RLegacyLike(const ZImg& in, int connectivity, int mnb
 
           ++nbound;
           const size_t nidx =
-            static_cast<size_t>(nx) + static_cast<size_t>(ny) * width + static_cast<size_t>(nz) * width * height;
+            static_cast<size_t>(nx) + static_cast<size_t>(ny) * width + static_cast<size_t>(nz) * planeSize;
           if (inData[nidx] > 0) {
             ++n;
           }

@@ -6,6 +6,7 @@
 
 #include <array>
 #include <memory>
+#include <vector>
 
 namespace nim {
 
@@ -24,6 +25,10 @@ struct LocsegLabelWorkspaceLegacyLike
 
   // Buffer mask used by LOCSEG_LABEL_OPTION_ADD / SUB (legacy options 6/7).
   std::unique_ptr<ZImg> bufferMask;
+
+  // Scratch space for `localNeurosegLabelWLegacyLike` (reuses allocations between calls).
+  std::vector<double> filterScratch;
+  std::vector<double> filter2Scratch;
 
   // Updated by Local_Neuroseg_Label_W (legacy semantics). Range is
   // [sx, sy, sz, ex, ey, ez] and may use legacy clamping behavior.

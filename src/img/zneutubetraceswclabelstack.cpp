@@ -2,6 +2,7 @@
 
 #include "zneutube3dgeom.h"
 #include "zneutubegeo3dscalarfield.h"
+#include "zneutubemathutils.h"
 #include "zneutubeneuroseg.h"
 #include "zneutubetraceswclocseg.h"
 
@@ -55,17 +56,10 @@ void scaleXRotateZLegacyLike(std::array<double, 3>* p, double s, double alpha, i
   CHECK(mask.numChannels() == 1);
   CHECK(mask.numTimes() == 1);
 
-  if (mask.isType<uint8_t>()) {
-    *mask.data<uint8_t>(x, y, z) = static_cast<uint8_t>(value);
-    return true;
-  }
-  if (mask.isType<uint16_t>()) {
-    *mask.data<uint16_t>(x, y, z) = static_cast<uint16_t>(value);
-    return true;
-  }
-
-  CHECK(false) << "Unsupported mask voxel type: " << mask.info();
-  return false;
+  imgTypeDispatcher(mask.info(), [&]<typename TVoxel>() {
+    *mask.data<TVoxel>(x, y, z) = static_cast<TVoxel>(value);
+  });
+  return true;
 }
 
 void writeMaskVoxel(ZVoxelMaskMutable& mask, int x, int y, int z, int value)
@@ -105,16 +99,17 @@ FieldRangeLegacyLike neurosegFieldRangeLegacyLike(const Neuroseg& seg, double zS
   // Port of tz_neuroseg.c::Neuroseg_Field_Range().
   FieldRangeLegacyLike out;
 
-  Geo3dScalarField field = neurosegFieldSFastLegacyLike(seg, nullptr);
-  if (field.points.empty()) {
+  static thread_local Geo3dScalarField fieldScratch;
+  neurosegFieldSFastLegacyLikeInto(seg, nullptr, fieldScratch);
+  if (fieldScratch.points.empty()) {
     return out;
   }
 
-  std::array<double, 3> boundMin = field.points.front();
-  std::array<double, 3> boundMax = field.points.front();
+  std::array<double, 3> boundMin = fieldScratch.points.front();
+  std::array<double, 3> boundMax = fieldScratch.points.front();
 
-  for (size_t i = 1; i < field.points.size(); ++i) {
-    const auto& p = field.points[i];
+  for (size_t i = 1; i < fieldScratch.points.size(); ++i) {
+    const auto& p = fieldScratch.points[i];
     for (size_t j = 0; j < 3; ++j) {
       if (p[j] <= boundMin[j]) {
         boundMin[j] = p[j];
@@ -154,16 +149,16 @@ void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZImg& mask, doub
   std::array<int, 3> c = {0, 0, 0};
   std::array<double, 3> offpos = {0.0, 0.0, 0.0};
 
-  c[0] = static_cast<int>(std::lrint(bottom[0]));
-  c[1] = static_cast<int>(std::lrint(bottom[1]));
+  c[0] = iroundLegacyLike(bottom[0]);
+  c[1] = iroundLegacyLike(bottom[1]);
   offpos[0] = bottom[0] - static_cast<double>(c[0]);
   offpos[1] = bottom[1] - static_cast<double>(c[1]);
 
   if (testZScaleLegacyLike(zScale) != 0) {
-    c[2] = static_cast<int>(std::lrint(bottom[2] * zScale));
+    c[2] = iroundLegacyLike(bottom[2] * zScale);
     offpos[2] = bottom[2] * zScale - static_cast<double>(c[2]);
   } else {
-    c[2] = static_cast<int>(std::lrint(bottom[2]));
+    c[2] = iroundLegacyLike(bottom[2]);
     offpos[2] = bottom[2] - static_cast<double>(c[2]);
   }
 
@@ -194,7 +189,7 @@ void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZImg& mask, doub
         coord[1] -= offpos[1];
         coord[2] -= offpos[2];
 
-        rotateXZLegacyLike(&coord, 1, locseg.seg.theta, locseg.seg.psi, 1);
+        rotateXZLegacyLike(coord, locseg.seg.theta, locseg.seg.psi, 1);
         scaleXRotateZLegacyLike(&coord, locseg.seg.scale, locseg.seg.alpha, 1);
 
         const double f = neurofield7LegacyLike(coef,
@@ -230,16 +225,16 @@ void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZVoxelMaskMutabl
   std::array<int, 3> c = {0, 0, 0};
   std::array<double, 3> offpos = {0.0, 0.0, 0.0};
 
-  c[0] = static_cast<int>(std::lrint(bottom[0]));
-  c[1] = static_cast<int>(std::lrint(bottom[1]));
+  c[0] = iroundLegacyLike(bottom[0]);
+  c[1] = iroundLegacyLike(bottom[1]);
   offpos[0] = bottom[0] - static_cast<double>(c[0]);
   offpos[1] = bottom[1] - static_cast<double>(c[1]);
 
   if (testZScaleLegacyLike(zScale) != 0) {
-    c[2] = static_cast<int>(std::lrint(bottom[2] * zScale));
+    c[2] = iroundLegacyLike(bottom[2] * zScale);
     offpos[2] = bottom[2] * zScale - static_cast<double>(c[2]);
   } else {
-    c[2] = static_cast<int>(std::lrint(bottom[2]));
+    c[2] = iroundLegacyLike(bottom[2]);
     offpos[2] = bottom[2] - static_cast<double>(c[2]);
   }
 
@@ -270,7 +265,7 @@ void localNeurosegLabelCLegacyLike(const LocalNeuroseg& locseg, ZVoxelMaskMutabl
         coord[1] -= offpos[1];
         coord[2] -= offpos[2];
 
-        rotateXZLegacyLike(&coord, 1, locseg.seg.theta, locseg.seg.psi, 1);
+        rotateXZLegacyLike(coord, locseg.seg.theta, locseg.seg.psi, 1);
         scaleXRotateZLegacyLike(&coord, locseg.seg.scale, locseg.seg.alpha, 1);
 
         const double f = neurofield7LegacyLike(coef,

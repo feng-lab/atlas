@@ -4,23 +4,14 @@
 
 #include <algorithm>
 #include <array>
-#include <type_traits>
 
 namespace nim {
 
 namespace {
 
-template<typename T>
-[[nodiscard]] constexpr bool isSupportedUnsignedType()
-{
-  return std::is_same_v<T, uint8_t> || std::is_same_v<T, uint16_t>;
-}
-
-template<typename T>
+template<typename TVoxel>
 void medianFilterConn8Impl(const ZImg& in, ZImg& out)
 {
-  static_assert(isSupportedUnsignedType<T>(), "medianFilterConn8LegacyLike: unsupported voxel type");
-
   CHECK(in.width() == out.width());
   CHECK(in.height() == out.height());
   CHECK(in.depth() == 1);
@@ -35,27 +26,29 @@ void medianFilterConn8Impl(const ZImg& in, ZImg& out)
     return;
   }
 
-  std::array<double, 9> values{};
+  std::array<TVoxel, 9> values{};
 
   for (size_t t = 0; t < in.numTimes(); ++t) {
     for (size_t c = 0; c < in.numChannels(); ++c) {
       // Interior pixels only (border remains as the original copy).
       for (size_t y = 1; y + 1 < h; ++y) {
+        const TVoxel* rowPrev = in.rowData<TVoxel>(y - 1, /*z*/ 0, c, t);
+        const TVoxel* rowCur = in.rowData<TVoxel>(y, /*z*/ 0, c, t);
+        const TVoxel* rowNext = in.rowData<TVoxel>(y + 1, /*z*/ 0, c, t);
+
         for (size_t x = 1; x + 1 < w; ++x) {
-          size_t k = 0;
-          for (int dy = -1; dy <= 1; ++dy) {
-            for (int dx = -1; dx <= 1; ++dx) {
-              const size_t xx = static_cast<size_t>(static_cast<int>(x) + dx);
-              const size_t yy = static_cast<size_t>(static_cast<int>(y) + dy);
-              values[k++] = static_cast<double>(*in.data<T>(xx,
-                                                            yy,
-                                                            /*z*/ 0,
-                                                            c,
-                                                            t));
-            }
-          }
+          values[0] = rowPrev[x - 1];
+          values[1] = rowPrev[x];
+          values[2] = rowPrev[x + 1];
+          values[3] = rowCur[x - 1];
+          values[4] = rowCur[x];
+          values[5] = rowCur[x + 1];
+          values[6] = rowNext[x - 1];
+          values[7] = rowNext[x];
+          values[8] = rowNext[x + 1];
+
           std::sort(values.begin(), values.end());
-          *out.data<T>(x, y, /*z*/ 0, c, t) = static_cast<T>(values[4]);
+          *out.data<TVoxel>(x, y, /*z*/ 0, c, t) = values[4];
         }
       }
     }
@@ -76,19 +69,11 @@ ZImg medianFilterConn8LegacyLike(const ZImg& img)
 
   ZImg out = img;
 
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {
-    if (img.voxelByteNumber() == sizeof(uint8_t)) {
-      medianFilterConn8Impl<uint8_t>(img, out);
-      return out;
-    }
-    if (img.voxelByteNumber() == sizeof(uint16_t)) {
-      medianFilterConn8Impl<uint16_t>(img, out);
-      return out;
-    }
-  }
+  imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
+    medianFilterConn8Impl<TVoxel>(img, out);
+  });
 
-  LOG(WARNING) << "medianFilterConn8LegacyLike: unsupported voxel type " << img.info();
-  return img;
+  return out;
 }
 
 } // namespace nim

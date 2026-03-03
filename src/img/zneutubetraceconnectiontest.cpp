@@ -48,18 +48,9 @@ void stackUtilCoordLegacyLike(int64_t offset, int width, int height, int* x, int
   CHECK(offset >= 0);
   CHECK(static_cast<size_t>(offset) < stack.voxelNumber());
 
-  if (stack.isType<uint8_t>()) {
-    return static_cast<double>(stack.timeData<uint8_t>(0)[static_cast<size_t>(offset)]);
-  }
-  if (stack.isType<uint16_t>()) {
-    return static_cast<double>(stack.timeData<uint16_t>(0)[static_cast<size_t>(offset)]);
-  }
-  if (stack.isType<float>()) {
-    return static_cast<double>(stack.timeData<float>(0)[static_cast<size_t>(offset)]);
-  }
-
-  CHECK(false) << "stackArrayValueLegacyLike: unsupported voxel format: " << stack.info();
-  return 0.0;
+  return imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() -> double {
+    return static_cast<double>(stack.timeData<TVoxel>(0)[static_cast<size_t>(offset)]);
+  });
 }
 
 void coordinate3dUnitizeLegacyLike(std::array<double, 3>* v)

@@ -3,6 +3,7 @@
 #include "zneutubedarrayqsort.h"
 #include "zneutubelocsegchainmetrics.h"
 #include "zneutubelocsegchaintrace.h"
+#include "zneutubemathutils.h"
 #include "zneutubetracelocseglabel.h"
 
 #include "zcancellation.h"
@@ -14,11 +15,6 @@ namespace nim {
 
 namespace {
 
-[[nodiscard]] int iroundLegacyLike(double x)
-{
-  return static_cast<int>(std::lround(x));
-}
-
 [[nodiscard]] int maskValueAt(const ZImg& mask, int x, int y, int z)
 {
   const int width = static_cast<int>(mask.width());
@@ -28,17 +24,9 @@ namespace {
     return 0;
   }
 
-  if (mask.isType<uint8_t>()) {
-    return static_cast<int>(
-      *mask.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
-  }
-  if (mask.isType<uint16_t>()) {
-    return static_cast<int>(
-      *mask.data<uint16_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
-  }
-
-  CHECK(false) << "maskValueAt: unsupported mask type " << mask.info();
-  return 0;
+  return imgTypeDispatcher(mask.info(), [&]<typename TVoxel>() -> int {
+    return static_cast<int>(*mask.data<TVoxel>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
+  });
 }
 
 } // namespace

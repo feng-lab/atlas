@@ -2599,15 +2599,6 @@ ZImg ZImgPack::assembleChannelTime(std::array<size_t, 3> ratio, size_t c, size_t
                FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
   }
 
-  // For file-backed (non-Neuroglancer) datasets, the assembled mip levels represent
-  // downsampled voxels; reflect this in voxel sizes so callers that care about
-  // physical scale (or later resizes) see a consistent image model.
-  if (!m_ngVolume) {
-    res.infoRef().voxelSizeX = info.voxelSizeX * static_cast<double>(ratio[0]);
-    res.infoRef().voxelSizeY = info.voxelSizeY * static_cast<double>(ratio[1]);
-    res.infoRef().voxelSizeZ = info.voxelSizeZ * static_cast<double>(ratio[2]);
-  }
-
   return res;
 }
 

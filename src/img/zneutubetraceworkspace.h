@@ -85,9 +85,7 @@ void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace& tw, const ZImg& stack
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Mask_Value().
 //
 // Notes:
-// - Preserves legacy rounding semantics via `std::lround`.
-// - Preserves the legacy bounds check bug (`z < mask.width()` instead of `z < mask.depth()`),
-//   but adds a hard CHECK to prevent undefined memory reads if the bug is ever triggered.
+// - Preserves legacy rounding semantics via the same `iround()` rule used by neurolabi.
 [[nodiscard]] int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array<double, 3>& pos);
 
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Mask_Value_Z().

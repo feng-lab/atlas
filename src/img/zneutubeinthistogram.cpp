@@ -249,15 +249,9 @@ std::optional<IntHistogramLegacyLike> imageHistogramLegacyLike(const ZImg& img, 
     return std::nullopt;
   }
 
-  std::optional<std::pair<int, int>> minMax;
-
-  if (img.isType<uint8_t>()) {
-    minMax = maskedMinMax<uint8_t>(img.timeData<uint8_t>(0), maskData, n);
-  } else if (img.isType<uint16_t>()) {
-    minMax = maskedMinMax<uint16_t>(img.timeData<uint16_t>(0), maskData, n);
-  } else {
-    throw ZException(fmt::format("imageHistogramLegacyLike: unsupported voxel type {}", img.info()));
-  }
+  const auto minMax = imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
+    return maskedMinMax<TVoxel>(img.timeData<TVoxel>(0), maskData, n);
+  });
 
   if (!minMax) {
     return std::nullopt;
@@ -286,8 +280,8 @@ std::optional<IntHistogramLegacyLike> imageHistogramLegacyLike(const ZImg& img, 
     }
   };
 
-  if (img.isType<uint8_t>()) {
-    const auto* a = img.timeData<uint8_t>(0);
+  imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
+    const auto* a = img.timeData<TVoxel>(0);
     if (maskData == nullptr) {
       for (size_t i = 0; i < n; ++i) {
         addValue(static_cast<int>(a[i]));
@@ -299,20 +293,7 @@ std::optional<IntHistogramLegacyLike> imageHistogramLegacyLike(const ZImg& img, 
         }
       }
     }
-  } else {
-    const auto* a = img.timeData<uint16_t>(0);
-    if (maskData == nullptr) {
-      for (size_t i = 0; i < n; ++i) {
-        addValue(static_cast<int>(a[i]));
-      }
-    } else {
-      for (size_t i = 0; i < n; ++i) {
-        if (maskData[i] == 1) {
-          addValue(static_cast<int>(a[i]));
-        }
-      }
-    }
-  }
+  });
 
   return IntHistogramLegacyLike(std::move(hist));
 }

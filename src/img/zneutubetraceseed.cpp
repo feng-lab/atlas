@@ -34,8 +34,7 @@ namespace {
   const LabelLargeObjectsResult labeled = labelLargeObjectsLegacy(mask, params);
   CHECK(labeled.labels.voxelNumber() == mask.voxelNumber());
 
-  ZImg out = mask;
-  out.fill(0);
+  ZImg out(mask.info());
   auto* outData = out.timeData<uint8_t>(0);
 
   const size_t n = out.voxelNumber();

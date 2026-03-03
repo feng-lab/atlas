@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace nim {
 
@@ -34,45 +35,24 @@ constexpr double TzPiLegacyLike = 3.14159265358979323846264338328;
   return compareFloatLegacyLike(zScale, 1.0, 1e-5);
 }
 
-void scaleXRotateZLegacyLike(std::array<double, 3>* p, double s, double alpha, int inverse)
-{
-  CHECK(p != nullptr);
-
-  const double cosA = std::cos(alpha);
-  const double sinA = std::sin(alpha);
-
-  if (inverse == 0) {
-    const double tmp = (*p)[0] * s * cosA - (*p)[1] * sinA;
-    (*p)[1] = (*p)[0] * s * sinA + (*p)[1] * cosA;
-    (*p)[0] = tmp;
-  } else {
-    const double tmp = ((*p)[0] * cosA + (*p)[1] * sinA) / s;
-    (*p)[1] = -(*p)[0] * sinA + (*p)[1] * cosA;
-    (*p)[0] = tmp;
-  }
-}
-
-void neurosegScaleFieldSlice0LegacyLike(std::array<double, 3>* pt,
-                                        double* value,
+void neurosegScaleFieldSlice0LegacyLike(std::array<double, 3>& pt,
+                                        double& value,
                                         double rScale,
                                         double r,
                                         double sqrtRScale)
 {
-  CHECK(pt != nullptr);
-  CHECK(value != nullptr);
-
-  if (value[0] >= 0.0) {
-    (*pt)[0] *= rScale;
-    (*pt)[1] *= r;
-    value[0] *= sqrtRScale;
+  if (value >= 0.0) {
+    pt[0] *= rScale;
+    pt[1] *= r;
+    value *= sqrtRScale;
   } else {
-    const double norm = std::sqrt((*pt)[0] * (*pt)[0] + (*pt)[1] * (*pt)[1]);
+    const double norm = std::sqrt(pt[0] * pt[0] + pt[1] * pt[1]);
     double alpha = norm - 1.0;
 
-    (*pt)[0] *= rScale / norm;
-    (*pt)[1] *= r / norm;
+    pt[0] *= rScale / norm;
+    pt[1] *= r / norm;
 
-    const double enorm = (*pt)[0] * (*pt)[0] + (*pt)[1] * (*pt)[1];
+    const double enorm = pt[0] * pt[0] + pt[1] * pt[1];
     if (enorm < 1.0) {
       alpha /= std::sqrt(enorm);
     } else if (enorm > 4.0) {
@@ -80,44 +60,41 @@ void neurosegScaleFieldSlice0LegacyLike(std::array<double, 3>* pt,
       alpha = alpha + alpha;
     }
 
-    (*pt)[0] *= 1.0 + alpha;
-    (*pt)[1] *= 1.0 + alpha;
+    pt[0] *= 1.0 + alpha;
+    pt[1] *= 1.0 + alpha;
   }
 }
 
-void neurosegScaleFieldConeSliceLegacyLike(std::array<double, 3>* pt,
-                                           double* value,
+void neurosegScaleFieldConeSliceLegacyLike(std::array<double, 3>& pt,
+                                           double& value,
                                            double r,
                                            double scale,
                                            double rScale,
                                            double sqrtRScale)
 {
-  CHECK(pt != nullptr);
-  CHECK(value != nullptr);
-
-  if (value[0] >= 0.0) {
-    (*pt)[0] *= rScale;
-    (*pt)[1] *= r;
-    value[0] *= sqrtRScale;
+  if (value >= 0.0) {
+    pt[0] *= rScale;
+    pt[1] *= r;
+    value *= sqrtRScale;
   } else {
-    const double norm = std::sqrt((*pt)[0] * (*pt)[0] + (*pt)[1] * (*pt)[1]);
+    const double norm = std::sqrt(pt[0] * pt[0] + pt[1] * pt[1]);
     double alpha = norm - 1.0;
 
     // positive boundary
     const double rnorm = r / norm;
-    (*pt)[0] *= rnorm * scale;
-    (*pt)[1] *= rnorm;
+    pt[0] *= rnorm * scale;
+    pt[1] *= rnorm;
 
     // length to positive boundary
-    const double enorm = (*pt)[0] * (*pt)[0] + (*pt)[1] * (*pt)[1];
+    const double enorm = pt[0] * pt[0] + pt[1] * pt[1];
     if (enorm < 1.0) {
       alpha /= std::sqrt(enorm);
     } else if (enorm > 4.0) {
       alpha *= 2.0 / std::sqrt(enorm);
     }
 
-    (*pt)[0] *= 1.0 + alpha;
-    (*pt)[1] *= 1.0 + alpha;
+    pt[0] *= 1.0 + alpha;
+    pt[1] *= 1.0 + alpha;
   }
 }
 
@@ -203,7 +180,27 @@ std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
                                                  const std::array<double, 3>* offpos,
                                                  double zScale)
 {
-  // Port of tz_neuroseg.c::Neuroseg_Dist_Filter().
+  const int sizeX = range.size[0];
+  const int sizeY = range.size[1];
+  const int sizeZ = range.size[2];
+  CHECK(sizeX >= 0);
+  CHECK(sizeY >= 0);
+  CHECK(sizeZ >= 0);
+  const size_t n = static_cast<size_t>(sizeX) * static_cast<size_t>(sizeY) * static_cast<size_t>(sizeZ);
+
+  std::vector<double> filter;
+  neurosegDistFilterLegacyLikeInto(seg, range, offpos, zScale, filter);
+  filter.resize(n);
+  return filter;
+}
+
+void neurosegDistFilterLegacyLikeInto(const Neuroseg& seg,
+                                      const FieldRangeLegacyLike& range,
+                                      const std::array<double, 3>* offpos,
+                                      double zScale,
+                                      std::vector<double>& out)
+{
+  // Port of tz_neuroseg.c::Neuroseg_Dist_Filter(), written in an allocation-free style for hot loops.
   const int sizeX = range.size[0];
   const int sizeY = range.size[1];
   const int sizeZ = range.size[2];
@@ -213,10 +210,24 @@ std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
   CHECK(sizeZ >= 0);
 
   const size_t n = static_cast<size_t>(sizeX) * static_cast<size_t>(sizeY) * static_cast<size_t>(sizeZ);
-  std::vector<double> filter(n);
+  if (out.size() < n) {
+    out.resize(n);
+  }
 
   const std::array<int, 3> coffset = range.firstCorner;
   const double coef = seg.c;
+
+  const bool needZScale = testZScaleLegacyLike(zScale) != 0;
+  const bool needRotateXZ = seg.theta != 0.0 || seg.psi != 0.0;
+  const bool needScaleXRotateZ = seg.scale != 1.0 || seg.alpha != 0.0;
+
+  const double ar0 = std::cos(seg.theta);
+  const double ar1 = std::sin(seg.theta);
+  const double ar2 = std::cos(seg.psi);
+  const double ar3 = std::sin(seg.psi);
+
+  const double cosA = std::cos(seg.alpha);
+  const double sinA = std::sin(seg.alpha);
 
   size_t offset = 0;
   for (int k = 0; k < sizeZ; ++k) {
@@ -226,7 +237,7 @@ std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
                                        static_cast<double>(j + coffset[1]),
                                        static_cast<double>(k + coffset[2])};
 
-        if (testZScaleLegacyLike(zScale) != 0) {
+        if (needZScale) {
           // image space -> physical space
           coord[2] /= zScale;
         }
@@ -237,11 +248,33 @@ std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
           coord[2] -= (*offpos)[2];
         }
 
-        rotateXZLegacyLike(&coord, 1, seg.theta, seg.psi, 1);
-        scaleXRotateZLegacyLike(&coord, seg.scale, seg.alpha, 1);
+        if (needRotateXZ) {
+          // rotateXZLegacyLike(coord, seg.theta, seg.psi, inverse=1)
+          const double inx = coord[0];
+          const double iny = coord[1];
+          const double inz = coord[2];
+
+          double result0 = ar2 * inx + ar3 * iny;
+          double result1 = iny * ar2 - inx * ar3;
+          double result2 = inz * ar0 - result1 * ar1;
+          result1 = inz * ar1 + result1 * ar0;
+
+          coord[0] = result0;
+          coord[1] = result1;
+          coord[2] = result2;
+        }
+
+        if (needScaleXRotateZ) {
+          // scaleXRotateZLegacyLike(coord, seg.scale, seg.alpha, inverse=1)
+          const double x = coord[0];
+          const double y = coord[1];
+          const double tmp = (x * cosA + y * sinA) / seg.scale;
+          coord[1] = -x * sinA + y * cosA;
+          coord[0] = tmp;
+        }
 
         if (coord[2] < -0.5 || coord[2] > seg.h - 0.5) {
-          filter[offset++] = 2.0;
+          out[offset++] = 2.0;
           continue;
         }
 
@@ -249,13 +282,12 @@ std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
         const double sigma2 = sigma * sigma;
         const double d2 = coord[0] * coord[0] + coord[1] * coord[1];
         const double t = d2 / sigma2;
-        filter[offset++] = std::sqrt(t);
+        out[offset++] = std::sqrt(t);
       }
     }
   }
 
   CHECK(offset == n);
-  return filter;
 }
 
 namespace {
@@ -502,11 +534,20 @@ NeurosegSliceField neurosegSliceFieldLegacyLike(NeurosegFieldFunctionLegacyLike 
   return out;
 }
 
-Geo3dScalarField neurosegFieldZLegacyLike(const Neuroseg& seg, double z, double /*step*/)
+Geo3dScalarField neurosegFieldZLegacyLike(const Neuroseg& seg, double z, double step)
+{
+  Geo3dScalarField field;
+  neurosegFieldZLegacyLikeInto(seg, z, step, field);
+  return field;
+}
+
+void neurosegFieldZLegacyLikeInto(const Neuroseg& seg, double z, double /*step*/, Geo3dScalarField& field)
 {
   // Port of tz_neuroseg.c::Neuroseg_Field_Z().
   if (seg.r1 == 0.0 || seg.scale == 0.0) {
-    return {};
+    field.points.clear();
+    field.values.clear();
+    return;
   }
 
   const double coef = neurosegCoefLegacyLike(seg);
@@ -516,16 +557,18 @@ Geo3dScalarField neurosegFieldZLegacyLike(const Neuroseg& seg, double z, double 
   const double sqrtR = std::sqrt(r);
   const double sqrtRScale = sqrtR * std::sqrt(std::sqrt(seg.scale));
 
-  NeurosegSliceField base = neurosegSliceFieldLegacyLike(nullptr);
-  Geo3dScalarField field;
-  field.points = std::move(base.points);
-  field.values = std::move(base.values);
+  static const NeurosegSliceField sliceCached = neurosegSliceFieldLegacyLike(nullptr);
+  const NeurosegSliceField& slice = sliceCached;
+  CHECK(slice.points.size() == slice.values.size());
+
+  field.points = slice.points;
+  field.values = slice.values;
 
   CHECK(field.points.size() == field.values.size());
 
   double weight = 0.0;
   for (size_t i = 0; i < field.points.size(); ++i) {
-    neurosegScaleFieldSlice0LegacyLike(&field.points[i], &field.values[i], rScale, r, sqrtRScale);
+    neurosegScaleFieldSlice0LegacyLike(field.points[i], field.values[i], rScale, r, sqrtRScale);
     field.points[i][2] = z;
     weight += std::fabs(field.values[i]);
   }
@@ -535,7 +578,7 @@ Geo3dScalarField neurosegFieldZLegacyLike(const Neuroseg& seg, double z, double 
   }
 
   if (seg.alpha != 0.0) {
-    rotateZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.alpha, 0);
+    rotateZLegacyLike(std::span(field.points.data(), field.points.size()), seg.alpha, 0);
   }
 
   if (seg.curvature >= NeurosegMinCurvatureLegacyLike) {
@@ -547,10 +590,8 @@ Geo3dScalarField neurosegFieldZLegacyLike(const Neuroseg& seg, double z, double 
   }
 
   if (seg.theta != 0.0 || seg.psi != 0.0) {
-    rotateXZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.theta, seg.psi, 0);
+    rotateXZLegacyLike(std::span(field.points.data(), field.points.size()), seg.theta, seg.psi, 0);
   }
-
-  return field;
 }
 
 NeurosegSliceField neurosegSliceFieldPLegacyLike(NeurosegFieldFunctionLegacyLike fieldFunc)
@@ -626,28 +667,39 @@ NeurosegSliceField neurosegSliceFieldPLegacyLike(NeurosegFieldFunctionLegacyLike
   return out;
 }
 
-Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegFieldFunctionLegacyLike fieldFunc)
+void neurosegFieldSFastLegacyLikeInto(const Neuroseg& seg,
+                                      NeurosegFieldFunctionLegacyLike fieldFunc,
+                                      Geo3dScalarField& out)
 {
-  Geo3dScalarField field;
-
   if (seg.r1 == 0.0 || seg.scale == 0.0) {
-    return field;
+    out.points.clear();
+    out.values.clear();
+    return;
   }
 
   constexpr int nslice = NeurosegDefaultHSlicesLegacyLike;
-  static_assert(nslice > 1, "neurosegFieldSFastLegacyLike expects nslice > 1.");
+  static_assert(nslice > 1, "neurosegFieldSFastLegacyLikeInto expects nslice > 1.");
 
-  NeurosegSliceField slice = neurosegSliceFieldLegacyLike(fieldFunc);
+  const NeurosegSliceField* slicePtr = nullptr;
+  NeurosegSliceField sliceOwned;
+  if (fieldFunc == nullptr || fieldFunc == neurofieldLegacyLike) {
+    static const NeurosegSliceField sliceCached = neurosegSliceFieldLegacyLike(nullptr);
+    slicePtr = &sliceCached;
+  } else {
+    sliceOwned = neurosegSliceFieldLegacyLike(fieldFunc);
+    slicePtr = &sliceOwned;
+  }
+  const NeurosegSliceField& slice = *slicePtr;
+
   const int length = static_cast<int>(slice.points.size());
   CHECK(length == 213);
 
-  field.points.resize(static_cast<size_t>(length) * static_cast<size_t>(nslice));
-  field.values.resize(static_cast<size_t>(length) * static_cast<size_t>(nslice));
+  const size_t total = static_cast<size_t>(length) * static_cast<size_t>(nslice);
+  out.points.resize(total);
+  out.values.resize(total);
 
-  for (int i = 0; i < length; ++i) {
-    field.points[static_cast<size_t>(i)] = slice.points[static_cast<size_t>(i)];
-    field.values[static_cast<size_t>(i)] = slice.values[static_cast<size_t>(i)];
-  }
+  std::memcpy(out.points.data(), slice.points.data(), sizeof(out.points[0]) * static_cast<size_t>(length));
+  std::memcpy(out.values.data(), slice.values.data(), sizeof(out.values[0]) * static_cast<size_t>(length));
 
   const double zStart = 0.0;
   const double zStep = (seg.h - 1.0) / static_cast<double>(nslice - 1);
@@ -659,9 +711,9 @@ Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegField
   const double sqrtSqrtScale = std::sqrt(std::sqrt(seg.scale));
 
   if (coef != 0.0) {
-    for (int i = 0; i < length; ++i) {
-      field.values[static_cast<size_t>(length + i)] = field.values[static_cast<size_t>(i)];
-    }
+    std::memcpy(out.values.data() + static_cast<size_t>(length),
+                out.values.data(),
+                sizeof(out.values[0]) * static_cast<size_t>(length));
   }
 
   // Slice 0: scale + normalize values in place.
@@ -672,23 +724,23 @@ Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegField
 
     double weight = 0.0;
     for (int i = 0; i < length; ++i) {
-      field.points[static_cast<size_t>(i)][2] = z;
-      neurosegScaleFieldSlice0LegacyLike(&field.points[static_cast<size_t>(i)],
-                                         &field.values[static_cast<size_t>(i)],
+      out.points[static_cast<size_t>(i)][2] = z;
+      neurosegScaleFieldSlice0LegacyLike(out.points[static_cast<size_t>(i)],
+                                         out.values[static_cast<size_t>(i)],
                                          rScale,
                                          r,
                                          sqrtRScale);
-      weight += std::fabs(field.values[static_cast<size_t>(i)]);
+      weight += std::fabs(out.values[static_cast<size_t>(i)]);
     }
     for (int i = 0; i < length; ++i) {
-      field.values[static_cast<size_t>(i)] /= weight;
+      out.values[static_cast<size_t>(i)] /= weight;
     }
   }
 
   if (coef == 0.0) {
-    for (int i = 0; i < length; ++i) {
-      field.values[static_cast<size_t>(length + i)] = field.values[static_cast<size_t>(i)];
-    }
+    std::memcpy(out.values.data() + static_cast<size_t>(length),
+                out.values.data(),
+                sizeof(out.values[0]) * static_cast<size_t>(length));
   }
 
   // Remaining slices.
@@ -702,18 +754,16 @@ Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegField
     const size_t offset = static_cast<size_t>(j) * static_cast<size_t>(length);
 
     // Copy base points (already scaled in slice 0).
+    std::memcpy(out.points.data() + offset, out.points.data(), sizeof(out.points[0]) * static_cast<size_t>(length));
     for (int i = 0; i < length; ++i) {
-      field.points[offset + static_cast<size_t>(i)] = field.points[static_cast<size_t>(i)];
-      field.points[offset + static_cast<size_t>(i)][2] = z;
+      out.points[offset + static_cast<size_t>(i)][2] = z;
     }
 
     // Values:
     // - j == 1 and coef != 0.0: keep the pre-copied raw values.
     // - j > 1: copy normalized slice-0 values before scaling.
     if (j > 1) {
-      for (int i = 0; i < length; ++i) {
-        field.values[offset + static_cast<size_t>(i)] = field.values[static_cast<size_t>(i)];
-      }
+      std::memcpy(out.values.data() + offset, out.values.data(), sizeof(out.values[0]) * static_cast<size_t>(length));
     }
 
     if (coef != 0.0) {
@@ -723,23 +773,23 @@ Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegField
 
       double weight = 0.0;
       for (int i = 0; i < length; ++i) {
-        field.points[offset + static_cast<size_t>(i)][2] = z;
-        neurosegScaleFieldConeSliceLegacyLike(&field.points[offset + static_cast<size_t>(i)],
-                                              &field.values[offset + static_cast<size_t>(i)],
+        out.points[offset + static_cast<size_t>(i)][2] = z;
+        neurosegScaleFieldConeSliceLegacyLike(out.points[offset + static_cast<size_t>(i)],
+                                              out.values[offset + static_cast<size_t>(i)],
                                               r,
                                               seg.scale,
                                               rScale,
                                               sqrtRScale);
-        weight += std::fabs(field.values[offset + static_cast<size_t>(i)]);
+        weight += std::fabs(out.values[offset + static_cast<size_t>(i)]);
       }
       for (int i = 0; i < length; ++i) {
-        field.values[offset + static_cast<size_t>(i)] /= weight;
+        out.values[offset + static_cast<size_t>(i)] /= weight;
       }
     }
   }
 
   if (seg.alpha != 0.0) {
-    rotateZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.alpha, 0);
+    rotateZLegacyLike(std::span(out.points.data(), out.points.size()), seg.alpha, 0);
   }
 
   if (seg.curvature >= NeurosegMinCurvatureLegacyLike) {
@@ -747,32 +797,67 @@ Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegField
     if (curvature > TzPiLegacyLike) {
       curvature = TzPiLegacyLike;
     }
-    geo3dPointArrayBendLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.h / curvature);
+    geo3dPointArrayBendLegacyLike(out.points.data(), static_cast<int>(out.points.size()), seg.h / curvature);
   }
 
   if (seg.theta != 0.0 || seg.psi != 0.0) {
-    rotateXZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.theta, seg.psi, 0);
+    rotateXZLegacyLike(std::span(out.points.data(), out.points.size()), seg.theta, seg.psi, 0);
   }
-
-  return field;
 }
 
-Geo3dScalarField neurosegFieldSpLegacyLike(const Neuroseg& seg, NeurosegFieldFunctionLegacyLike fieldFunc)
+void neurosegFieldSpLegacyLikeInto(const Neuroseg& seg,
+                                   NeurosegFieldFunctionLegacyLike fieldFunc,
+                                   Geo3dScalarField& out)
 {
-  Geo3dScalarField field;
-
   if (seg.r1 == 0.0 || seg.scale == 0.0) {
-    return field;
+    out.points.clear();
+    out.values.clear();
+    return;
   }
 
   constexpr int nslice = NeurosegDefaultHSlicesLegacyLike;
 
-  NeurosegSliceField slice = neurosegSliceFieldPLegacyLike(fieldFunc);
+  const NeurosegSliceField* slicePtr = nullptr;
+  const double* normalizedValuesPtr = nullptr;
+  NeurosegSliceField sliceOwned;
+  std::array<double, 69> normalizedValuesOwned{};
+  if (fieldFunc == nullptr || fieldFunc == neurofieldLegacyLike) {
+    static const NeurosegSliceField sliceCached = neurosegSliceFieldPLegacyLike(nullptr);
+    slicePtr = &sliceCached;
+    static const std::array<double, 69> normalizedValuesCached = [&]() {
+      std::array<double, 69> outArr{};
+      double weight = 0.0;
+      for (const double v : sliceCached.values) {
+        weight += std::fabs(v);
+      }
+      for (size_t i = 0; i < sliceCached.values.size(); ++i) {
+        outArr[i] = sliceCached.values[i] / weight;
+      }
+      return outArr;
+    }();
+    normalizedValuesPtr = normalizedValuesCached.data();
+  } else {
+    sliceOwned = neurosegSliceFieldPLegacyLike(fieldFunc);
+    slicePtr = &sliceOwned;
+    double weight = 0.0;
+    for (const double v : sliceOwned.values) {
+      weight += std::fabs(v);
+    }
+    for (size_t i = 0; i < sliceOwned.values.size(); ++i) {
+      normalizedValuesOwned[i] = sliceOwned.values[i] / weight;
+    }
+    normalizedValuesPtr = normalizedValuesOwned.data();
+  }
+  const NeurosegSliceField& slice = *slicePtr;
+
   const int length = static_cast<int>(slice.points.size());
   CHECK(length == 69);
 
-  field.points.resize(static_cast<size_t>(length) * static_cast<size_t>(nslice));
-  field.values.resize(static_cast<size_t>(length) * static_cast<size_t>(nslice));
+  CHECK(normalizedValuesPtr != nullptr);
+
+  const size_t total = static_cast<size_t>(length) * static_cast<size_t>(nslice);
+  out.points.resize(total);
+  out.values.resize(total);
 
   const double zStart = 0.0;
   const double zStep = (seg.h - 1.0) / static_cast<double>(nslice - 1);
@@ -784,26 +869,18 @@ Geo3dScalarField neurosegFieldSpLegacyLike(const Neuroseg& seg, NeurosegFieldFun
   for (int j = 0; j < nslice; ++j) {
     const size_t offset = static_cast<size_t>(j) * static_cast<size_t>(length);
 
-    double weight = 0.0;
     for (int i = 0; i < length; ++i) {
       const auto& p0 = slice.points[static_cast<size_t>(i)];
-      field.points[offset + static_cast<size_t>(i)] = {p0[0] * (r * seg.scale), p0[1] * r, z};
-
-      const double v = slice.values[static_cast<size_t>(i)];
-      field.values[offset + static_cast<size_t>(i)] = v;
-      weight += std::fabs(v);
+      out.points[offset + static_cast<size_t>(i)] = {p0[0] * (r * seg.scale), p0[1] * r, z};
     }
-
-    for (int i = 0; i < length; ++i) {
-      field.values[offset + static_cast<size_t>(i)] /= weight;
-    }
+    std::memcpy(out.values.data() + offset, normalizedValuesPtr, sizeof(out.values[0]) * static_cast<size_t>(length));
 
     z += zStep;
     r += coef;
   }
 
   if (seg.alpha != 0.0) {
-    rotateZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.alpha, 0);
+    rotateZLegacyLike(std::span(out.points.data(), out.points.size()), seg.alpha, 0);
   }
 
   if (seg.curvature >= NeurosegMinCurvatureLegacyLike) {
@@ -811,13 +888,25 @@ Geo3dScalarField neurosegFieldSpLegacyLike(const Neuroseg& seg, NeurosegFieldFun
     if (curvature > TzPiLegacyLike) {
       curvature = TzPiLegacyLike;
     }
-    geo3dPointArrayBendLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.h / curvature);
+    geo3dPointArrayBendLegacyLike(out.points.data(), static_cast<int>(out.points.size()), seg.h / curvature);
   }
 
   if (seg.theta != 0.0 || seg.psi != 0.0) {
-    rotateXZLegacyLike(field.points.data(), static_cast<int>(field.points.size()), seg.theta, seg.psi, 0);
+    rotateXZLegacyLike(std::span(out.points.data(), out.points.size()), seg.theta, seg.psi, 0);
   }
+}
 
+Geo3dScalarField neurosegFieldSFastLegacyLike(const Neuroseg& seg, NeurosegFieldFunctionLegacyLike fieldFunc)
+{
+  Geo3dScalarField field;
+  neurosegFieldSFastLegacyLikeInto(seg, fieldFunc, field);
+  return field;
+}
+
+Geo3dScalarField neurosegFieldSpLegacyLike(const Neuroseg& seg, NeurosegFieldFunctionLegacyLike fieldFunc)
+{
+  Geo3dScalarField field;
+  neurosegFieldSpLegacyLikeInto(seg, fieldFunc, field);
   return field;
 }
 

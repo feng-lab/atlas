@@ -205,10 +205,11 @@ set(IMG_SOURCES
         zcachedimg.cpp zcachedimg.h
         zstructutils.h
         zwindowsheader.cpp
-        zcancellation.h
-        zconcurrentlrucache.h
-        zneutubedarrayqsort.cpp zneutubedarrayqsort.h
+    zcancellation.h
+    zconcurrentlrucache.h
+    zneutubedarrayqsort.cpp zneutubedarrayqsort.h
     zneutubedarraymath.cpp zneutubedarraymath.h
+    zneutubemathutils.h
     zneutubecontfun.h
     zneutube3dgeom.cpp zneutube3dgeom.h
     zneutubecompareswc.cpp zneutubecompareswc.h

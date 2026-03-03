@@ -1,5 +1,6 @@
 #include "zneutubevoxelarray.h"
 
+#include "zneutubemathutils.h"
 #include "zimg.h"
 
 #include "zexception.h"
@@ -12,24 +13,14 @@ namespace nim {
 
 namespace {
 
-[[nodiscard]] int iround(double v)
-{
-  return static_cast<int>(std::lround(v));
-}
-
 [[nodiscard]] double imgValueAt(const ZImg& img, size_t idx)
 {
   CHECK(img.numChannels() == 1);
   CHECK(img.numTimes() == 1);
 
-  if (img.isType<uint8_t>()) {
-    return static_cast<double>(img.timeData<uint8_t>(0)[idx]);
-  }
-  if (img.isType<uint16_t>()) {
-    return static_cast<double>(img.timeData<uint16_t>(0)[idx]);
-  }
-
-  throw ZException(fmt::format("ZNeutubeVoxelArray::sample: unsupported voxel type {}", img.info()));
+  return imgTypeDispatcher(img.info(), [&]<typename TVoxel>() -> double {
+    return static_cast<double>(img.timeData<TVoxel>(0)[idx]);
+  });
 }
 
 } // namespace
@@ -101,7 +92,7 @@ void ZNeutubeVoxelArray::labelImgWithBall(ZImg& img, uint8_t label) const
   for (const auto& center : m_voxels) {
     CHECK(center.isInBound(width, height, depth));
 
-    const int r = iround(center.value);
+    const int r = iroundLegacyLike(center.value);
     const int zRange = r;
     const int zStart = std::max(0, center.z - zRange);
     const int zEnd = std::min(center.z + zRange, depth - 1);
@@ -112,14 +103,14 @@ void ZNeutubeVoxelArray::labelImgWithBall(ZImg& img, uint8_t label) const
     for (int z = zStart; z <= zEnd; ++z) {
       const int dz = std::abs(z - center.z);
       const double y_r = std::sqrt(center.value * center.value - static_cast<double>(dz * dz));
-      const int yRange = iround(y_r);
+      const int yRange = iroundLegacyLike(y_r);
       const int yStart = std::max(0, center.y - yRange);
       const int yEnd = std::min(center.y + yRange, height - 1);
 
       uint8_t* yArrayStart = zArrayStart - width * std::min(center.y, yRange);
       for (int y = yStart; y <= yEnd; ++y) {
         const int dy = std::abs(y - center.y);
-        const int xRange = iround(std::sqrt(y_r * y_r - static_cast<double>(dy * dy)));
+        const int xRange = iroundLegacyLike(std::sqrt(y_r * y_r - static_cast<double>(dy * dy)));
         const int xStart = std::max(0, center.x - xRange);
         const int xEnd = std::min(center.x + xRange, width - 1);
 

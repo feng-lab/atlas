@@ -177,11 +177,11 @@ double geo3dEllipsePointDistanceLegacyLike(const Geo3dEllipseLegacyLike& ellipse
   std::array<double, 3> tmpPt = {pt[0] - ellipse.center[0], pt[1] - ellipse.center[1], pt[2] - ellipse.center[2]};
 
   if (ellipse.alpha != 0.0) {
-    rotateZLegacyLike(&tmpPt, 1, ellipse.alpha, 1);
+    rotateZLegacyLike(tmpPt, ellipse.alpha, 1);
   }
 
   if (ellipse.orientation[0] != 0.0 || ellipse.orientation[1] != 0.0) {
-    rotateXZLegacyLike(&tmpPt, 1, ellipse.orientation[0], ellipse.orientation[1], 1);
+    rotateXZLegacyLike(tmpPt, ellipse.orientation[0], ellipse.orientation[1], 1);
   }
 
   double d = 0.0;

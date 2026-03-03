@@ -32,7 +32,6 @@ namespace {
   info.setVoxelFormat<uint8_t>();
   info.createDefaultDescriptions();
   ZImg img(info);
-  img.fill(0);
   return img;
 }
 
@@ -42,7 +41,6 @@ namespace {
   info.setVoxelFormat<uint16_t>();
   info.createDefaultDescriptions();
   ZImg img(info);
-  img.fill(0);
   return img;
 }
 
@@ -120,16 +118,13 @@ LabelLargeObjectsResult labelLargeObjectsLegacy(const ZImg& img, const LabelLarg
   const size_t voxelNumber = img.voxelNumber();
 
   ZImg marker = makeUint8Volume(width, height, depth);
-  if (img.isType<uint8_t>()) {
-    fillMarkerEqFlag<uint8_t>(img, params.flag, &marker);
-  } else if (img.isType<uint16_t>()) {
-    fillMarkerEqFlag<uint16_t>(img, params.flag, &marker);
-  } else {
-    throw ZException(fmt::format("labelLargeObjectsLegacy: unsupported voxel type '{}'.", img.info()));
-  }
+  imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
+    fillMarkerEqFlag<TVoxel>(img, params.flag, &marker);
+  });
 
   ZImg labels;
-  const bool startAsUint16 = img.isType<uint16_t>() || !fitsInUint8(params.smallLabel) || !fitsInUint8(params.flag);
+  const bool startAsUint16 =
+    img.voxelByteNumber() > sizeof(uint8_t) || !fitsInUint8(params.smallLabel) || !fitsInUint8(params.flag);
   if (startAsUint16) {
     if (!fitsInUint16(params.smallLabel) || !fitsInUint16(params.flag)) {
       throw ZException("labelLargeObjectsLegacy: label values exceed uint16, unsupported by legacy semantics.");

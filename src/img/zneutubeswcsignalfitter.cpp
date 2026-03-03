@@ -1,6 +1,7 @@
 #include "zneutubeswcsignalfitter.h"
 
 #include "zneutubeinthistogram.h"
+#include "zneutubemathutils.h"
 #include "zneutubeplanaredt.h"
 
 #include "zexception.h"
@@ -13,16 +14,12 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
 #include <fmt/format.h>
 
 namespace nim {
 
 namespace {
-
-[[nodiscard]] int iroundLegacyLike(double v)
-{
-  return static_cast<int>(std::lround(v));
-}
 
 void shrinkSkeletonOnceLegacyLike(ZImg& skel)
 {
@@ -84,6 +81,92 @@ void shrinkSkeletonLegacyLike(ZImg& skel, int level)
   }
 }
 
+[[nodiscard]] std::optional<ZImg> binarizeSignalFitWorkImageLegacyLike(const ZImg& work, int option)
+{
+  CHECK(!work.isEmpty());
+  CHECK(work.numChannels() == 1) << work.info();
+  CHECK(work.numTimes() == 1) << work.info();
+  CHECK(work.depth() == 1) << work.info();
+
+  if (work.isType<uint8_t>() || work.isType<uint16_t>()) {
+    const std::optional<IntHistogramLegacyLike> histOpt = imageHistogramLegacyLike(work, nullptr);
+    if (!histOpt.has_value() || histOpt->empty()) {
+      return std::nullopt;
+    }
+
+    int thre = 0;
+    if (option == 1) {
+      thre = rcthreLegacyLike(*histOpt, 0, 65535);
+    } else {
+      thre = triangleThresholdLegacyLike(*histOpt, 0, 65535);
+    }
+    return binarizeGreaterThanLegacyLike(work, thre);
+  }
+
+  return imgTypeDispatcher(work.info(), [&]<typename TVoxel>() -> std::optional<ZImg> {
+    TVoxel minV{};
+    TVoxel maxV{};
+    work.computeMinMax(minV, maxV);
+
+    const size_t defaultBins = work.bytesPerVoxel() > 1 ? 65536_uz : 256_uz;
+
+    size_t nbins = defaultBins;
+    if constexpr (std::is_integral_v<TVoxel>) {
+      using U = std::make_unsigned_t<TVoxel>;
+      const U rangeU = static_cast<U>(maxV) - static_cast<U>(minV);
+      size_t numData = static_cast<size_t>(rangeU);
+      if (numData != std::numeric_limits<size_t>::max()) {
+        ++numData;
+      }
+      nbins = std::min(nbins, std::max<size_t>(numData, 1_uz));
+    }
+
+    CHECK(nbins >= 1);
+    CHECK(nbins <= static_cast<size_t>(std::numeric_limits<int>::max()));
+
+    std::vector<size_t> hist;
+    if (maxV == minV) {
+      hist.assign(1, work.voxelNumber());
+      nbins = 1;
+    } else {
+      hist = work.histogram(minV, maxV, nbins);
+      CHECK(hist.size() == nbins);
+    }
+
+    std::vector<int> legacyHist(nbins + 2, 0);
+    legacyHist[0] = static_cast<int>(nbins);
+    legacyHist[1] = 0;
+
+    for (size_t i = 0; i < nbins; ++i) {
+      const size_t c = hist[i];
+      legacyHist[2 + i] = static_cast<int>(std::min(c, static_cast<size_t>(IntHistogramMaxCountLegacyLike)));
+    }
+
+    const IntHistogramLegacyLike histObj(std::move(legacyHist));
+
+    int threBin = 0;
+    if (option == 1) {
+      threBin = rcthreLegacyLike(histObj, 0, 65535);
+    } else {
+      threBin = triangleThresholdLegacyLike(histObj, 0, 65535);
+    }
+
+    if (threBin < 0) {
+      ZImgInfo outInfo = work.info();
+      outInfo.setVoxelFormat<uint8_t>();
+      outInfo.createDefaultDescriptions();
+      ZImg out(outInfo);
+      out.fill(1);
+      return out;
+    }
+
+    const size_t threBinU = static_cast<size_t>(threBin);
+    CHECK(threBinU < nbins);
+    const double threValue = work.binRange(threBinU, minV, maxV, nbins).first;
+    return work.binarized(threValue, ZImg::ThresholdMode::ExcludeThreshold);
+  });
+}
+
 [[nodiscard]] size_t closestForegroundPixelLegacyLike(const ZImg& mask, double cx, double cy, double cz)
 {
   CHECK(mask.numChannels() == 1);
@@ -130,10 +213,6 @@ bool fitSwcNodeSignalLegacyLike(SwcNode& node, const ZImg& stack, ZNeutubeImageB
 
   CHECK(stack.numChannels() == 1) << stack.info();
   CHECK(stack.numTimes() == 1) << stack.info();
-
-  if (!stack.isType<uint8_t>() && !stack.isType<uint16_t>()) {
-    throw ZException(fmt::format("fitSwcNodeSignalLegacyLike: unsupported stack voxel type {}", stack.info()));
-  }
 
   if (node.radius <= 0.0) {
     return false;
@@ -186,11 +265,6 @@ bool fitSwcNodeSignalInCroppedSliceLegacyLike(SwcNode& node,
   CHECK(slice.numTimes() == 1) << slice.info();
   CHECK(slice.depth() == 1) << slice.info();
 
-  if (!slice.isType<uint8_t>() && !slice.isType<uint16_t>()) {
-    throw ZException(
-      fmt::format("fitSwcNodeSignalInCroppedSliceLegacyLike: unsupported slice voxel type {}", slice.info()));
-  }
-
   ZImg work = slice;
   if (bg == ZNeutubeImageBackgroundLegacyLike::Bright) {
     invertValueInPlaceLegacyLike(work);
@@ -198,19 +272,11 @@ bool fitSwcNodeSignalInCroppedSliceLegacyLike(SwcNode& node,
 
   work = medianFilterConn8LegacyLike(work);
 
-  const std::optional<IntHistogramLegacyLike> histOpt = imageHistogramLegacyLike(work, nullptr);
-  if (!histOpt.has_value() || histOpt->empty()) {
+  const auto binaryOpt = binarizeSignalFitWorkImageLegacyLike(work, option);
+  if (!binaryOpt) {
     return false;
   }
-
-  int thre = 0;
-  if (option == 1) {
-    thre = rcthreLegacyLike(*histOpt, 0, 65535);
-  } else {
-    thre = triangleThresholdLegacyLike(*histOpt, 0, 65535);
-  }
-
-  const ZImg binary = binarizeGreaterThanLegacyLike(work, thre);
+  const ZImg& binary = *binaryOpt;
   ZImg skel = bwthinLegacyLike(binary);
 
   ZImg dist = planarBwdistSquaredU16P(binary);

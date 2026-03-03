@@ -761,6 +761,43 @@ std::vector<size_t> ZImg::histogram(size_t nbins, const ZImg& mask) const
   return res;
 }
 
+template<typename TRange>
+std::vector<size_t> ZImg::histogram(TRange minData, TRange maxData, size_t nbins, const ZImg& mask) const
+{
+  if (nbins == 0) {
+    nbins = bytesPerVoxel() > 1 ? 65536 : 256;
+  }
+
+  std::vector<size_t> res(nbins, 0);
+
+  if (mask.isEmpty()) {
+    imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
+      this->histogram_Impl<TVoxel>(res, minData, maxData);
+    });
+  } else if (isSameSize(mask)) {
+    imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
+      imgTypeDispatcher(mask.info(), [&, this]<typename TMaskVoxel>() {
+        this->histogramMask_Impl<TVoxel, TMaskVoxel>(res, minData, maxData, mask);
+      });
+    });
+  } else {
+    throw ZException(fmt::format("histogram mask has different size <{}> than current img <{}>", mask.info(), m_info));
+  }
+
+  return res;
+}
+
+template std::vector<size_t> ZImg::histogram(uint8_t, uint8_t, size_t, const ZImg&) const;
+template std::vector<size_t> ZImg::histogram(uint16_t, uint16_t, size_t, const ZImg&) const;
+template std::vector<size_t> ZImg::histogram(uint32_t, uint32_t, size_t, const ZImg&) const;
+template std::vector<size_t> ZImg::histogram(uint64_t, uint64_t, size_t, const ZImg&) const;
+template std::vector<size_t> ZImg::histogram(int8_t, int8_t, size_t, const ZImg&) const;
+template std::vector<size_t> ZImg::histogram(int16_t, int16_t, size_t, const ZImg&) const;
+template std::vector<size_t> ZImg::histogram(int32_t, int32_t, size_t, const ZImg&) const;
+template std::vector<size_t> ZImg::histogram(int64_t, int64_t, size_t, const ZImg&) const;
+template std::vector<size_t> ZImg::histogram(float, float, size_t, const ZImg&) const;
+template std::vector<size_t> ZImg::histogram(double, double, size_t, const ZImg&) const;
+
 ZImg ZImg::crop(const ZImgRegion& region) const
 {
   ZImg res;

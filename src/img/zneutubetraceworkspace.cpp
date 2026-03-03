@@ -1,5 +1,6 @@
 #include "zneutubetraceworkspace.h"
 
+#include "zneutubemathutils.h"
 #include "zvoxelvolume.h"
 
 #include "zlog.h"
@@ -7,15 +8,6 @@
 #include <cmath>
 
 namespace nim {
-
-namespace {
-
-[[nodiscard]] int iroundLegacyLike(double x)
-{
-  return static_cast<int>(std::lround(x));
-}
-
-} // namespace
 
 void defaultTraceWorkspaceLegacyLike(TraceWorkspace& tw)
 {
@@ -130,16 +122,9 @@ int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array
     const size_t height = mask.height();
     const size_t depth = mask.depth();
 
-    // Legacy bounds check:
-    //   z < trace_mask->width   (bug: should be depth)
-    if (static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height || static_cast<size_t>(z) >= width) {
+    if (static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height || static_cast<size_t>(z) >= depth) {
       return 0;
     }
-
-    // Prevent undefined reads if the legacy bug is ever triggered.
-    CHECK(static_cast<size_t>(z) < depth)
-      << "Legacy Trace_Workspace_Mask_Value bounds bug triggered (z < width)."
-      << " width=" << width << " height=" << height << " depth=" << depth << " x=" << x << " y=" << y << " z=" << z;
 
     const double v = mask.valueAsDouble(x, y, z);
     return static_cast<int>(v);
@@ -155,27 +140,11 @@ int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array
   const size_t height = mask.height();
   const size_t depth = mask.depth();
 
-  // Legacy bounds check:
-  //   z < trace_mask->width   (bug: should be depth)
-  if (static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height || static_cast<size_t>(z) >= width) {
+  if (static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height || static_cast<size_t>(z) >= depth) {
     return 0;
   }
 
-  // Prevent undefined reads if the legacy bug is ever triggered.
-  CHECK(static_cast<size_t>(z) < depth) << "Legacy Trace_Workspace_Mask_Value bounds bug triggered (z < width)."
-                                        << " mask=" << mask.info() << " x=" << x << " y=" << y << " z=" << z;
-
-  if (mask.isType<uint16_t>()) {
-    return static_cast<int>(
-      *mask.data<uint16_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
-  }
-  if (mask.isType<uint8_t>()) {
-    return static_cast<int>(
-      *mask.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
-  }
-
-  CHECK(false) << "Unsupported trace mask voxel type (expected uint16/uint8): " << mask.info();
-  return 0;
+  return static_cast<int>(*mask.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
 }
 
 int traceWorkspaceMaskValueZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zScale)

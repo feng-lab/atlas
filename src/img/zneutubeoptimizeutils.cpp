@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <span>
 
 namespace nim {
 
@@ -11,26 +12,21 @@ namespace {
 
 constexpr double StopGradientLegacyLike = 1e-1;
 
-[[nodiscard]] double dotLegacyLike(const double* a, const double* b, int n)
+[[nodiscard]] double dotLegacyLike(std::span<const double> a, std::span<const double> b)
 {
-  CHECK(a != nullptr);
-  CHECK(b != nullptr);
-  CHECK(n >= 0);
+  CHECK(a.size() == b.size());
 
   double d = 0.0;
-  for (int i = 0; i < n; ++i) {
+  for (size_t i = 0; i < a.size(); ++i) {
     d += a[i] * b[i];
   }
   return d;
 }
 
-[[nodiscard]] double sqsumLegacyLike(const double* a, int n)
+[[nodiscard]] double sqsumLegacyLike(std::span<const double> a)
 {
-  CHECK(a != nullptr);
-  CHECK(n >= 0);
-
   double s = 0.0;
-  for (int i = 0; i < n; ++i) {
+  for (size_t i = 0; i < a.size(); ++i) {
     s += a[i] * a[i];
   }
   return s;
@@ -55,43 +51,45 @@ void setLineSearchWorkspaceLegacyLike(LineSearchWorkspace& lsw,
 bool lineSearchVarBacktrackLegacyLike(VariableSet& vs,
                                       const void* param,
                                       const ContinuousFunction& cf,
-                                      const double* /*delta*/,
-                                      const double* weight,
-                                      double* direction,
+                                      std::span<const double> weight,
+                                      std::span<double> direction,
                                       LineSearchWorkspace& lsw)
 {
-  CHECK(direction != nullptr);
+  CHECK(vs.nvar >= 0);
+  CHECK(direction.size() == static_cast<size_t>(vs.nvar));
+  CHECK(weight.empty() || weight.size() == direction.size());
   CHECK(cf.f != nullptr);
   CHECK(cf.v != nullptr);
   CHECK(cf.varMin != nullptr);
   CHECK(cf.varMax != nullptr);
 
-  if (weight != nullptr) {
+  if (!weight.empty()) {
     for (int i = 0; i < vs.nvar; ++i) {
       direction[i] *= weight[i];
     }
   }
 
-  const double directionLength = std::sqrt(sqsumLegacyLike(direction, vs.nvar));
+  const double directionLength = std::sqrt(sqsumLegacyLike(direction));
 
   bool improved = true;
   if (directionLength > lsw.minDirection) {
-    std::vector<double> orgVar(static_cast<size_t>(vs.nvar));
+    static thread_local std::vector<double> orgVarScratch;
+    orgVarScratch.resize(static_cast<size_t>(vs.nvar));
     for (int i = 0; i < vs.nvar; ++i) {
-      orgVar[static_cast<size_t>(i)] = vs.var[vs.varIndex[i]];
+      orgVarScratch[static_cast<size_t>(i)] = vs.var[vs.varIndex[i]];
     }
 
     const double startScore = lsw.score;
     double alpha = lsw.alpha / directionLength;
 
-    const double gdDot = dotLegacyLike(lsw.startGrad.data(), direction, vs.nvar);
+    const double gdDot = dotLegacyLike(lsw.startGrad, direction);
     const double gdDotC1 = gdDot * lsw.c1;
 
     double wolfe1 = 0.0;
     do {
       for (int i = 0; i < vs.nvar; ++i) {
         vs.var[vs.varIndex[i]] = alpha * direction[i];
-        vs.var[vs.varIndex[i]] += orgVar[static_cast<size_t>(i)];
+        vs.var[vs.varIndex[i]] += orgVarScratch[static_cast<size_t>(i)];
       }
 
       cf.v(vs.var, cf.varMin, cf.varMax, nullptr);
@@ -101,7 +99,7 @@ bool lineSearchVarBacktrackLegacyLike(VariableSet& vs,
       alpha *= lsw.ro;
       if (alpha * directionLength < StopGradientLegacyLike) {
         for (int i = 0; i < vs.nvar; ++i) {
-          vs.var[vs.varIndex[i]] = orgVar[static_cast<size_t>(i)];
+          vs.var[vs.varIndex[i]] = orgVarScratch[static_cast<size_t>(i)];
         }
         variableSetUpdateLinkLegacyLike(vs);
         lsw.score = startScore;
@@ -118,24 +116,25 @@ bool lineSearchVarBacktrackLegacyLike(VariableSet& vs,
   return improved;
 }
 
-void conjugateUpdateDirectionLegacyLike(int nvar, const double* grad, const double* prevGrad, double* direction)
+void conjugateUpdateDirectionLegacyLike(std::span<const double> grad,
+                                        std::span<const double> prevGrad,
+                                        std::span<double> direction)
 {
-  CHECK(grad != nullptr);
-  CHECK(prevGrad != nullptr);
-  CHECK(direction != nullptr);
-  CHECK(nvar >= 0);
+  CHECK(grad.size() == prevGrad.size());
+  CHECK(grad.size() == direction.size());
 
-  std::vector<double> dg(static_cast<size_t>(nvar));
-  for (int i = 0; i < nvar; ++i) {
-    dg[static_cast<size_t>(i)] = grad[i] - prevGrad[i];
+  static thread_local std::vector<double> dgScratch;
+  dgScratch.resize(grad.size());
+  for (size_t i = 0; i < grad.size(); ++i) {
+    dgScratch[i] = grad[i] - prevGrad[i];
   }
 
-  double beta = dotLegacyLike(grad, dg.data(), nvar) / dotLegacyLike(prevGrad, prevGrad, nvar);
+  double beta = dotLegacyLike(grad, dgScratch) / dotLegacyLike(prevGrad, prevGrad);
   if (beta < 0.0) {
     beta = 0.0;
   }
 
-  for (int i = 0; i < nvar; ++i) {
+  for (size_t i = 0; i < grad.size(); ++i) {
     direction[i] *= beta;
     direction[i] += grad[i];
   }

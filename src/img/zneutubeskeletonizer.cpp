@@ -107,15 +107,9 @@ struct ObjectStat
   CHECK(labels.numChannels() == 1);
   CHECK(labels.numTimes() == 1);
 
-  if (labels.isType<uint8_t>()) {
-    return static_cast<int>(labels.timeData<uint8_t>(0)[idx]);
-  }
-  if (labels.isType<uint16_t>()) {
-    return static_cast<int>(labels.timeData<uint16_t>(0)[idx]);
-  }
-
-  CHECK(false) << "Unsupported label type: " << labels.info();
-  return 0;
+  return imgTypeDispatcher(labels.info(), [&]<typename TVoxel>() -> int {
+    return static_cast<int>(labels.timeData<TVoxel>(0)[idx]);
+  });
 }
 
 [[nodiscard]] std::vector<ObjectStat> computeObjectStatsLegacy(const ZImg& labels, size_t nobj)

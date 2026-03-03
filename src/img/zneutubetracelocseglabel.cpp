@@ -1,7 +1,7 @@
 #include "zneutubetracelocseglabel.h"
 
-#include "zneutube3dgeom.h"
 #include "zneutubelocsegchain.h"
+#include "zneutubemathutils.h"
 #include "zneutubeneighborhood.h"
 #include "zneutubestackfitoptions.h"
 #include "zneutubetraceswclabelstack.h"
@@ -10,16 +10,11 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
+#include <cstdint>
 
 namespace nim {
 
 namespace {
-
-[[nodiscard]] int iroundLegacyLike(double x)
-{
-  return static_cast<int>(std::lround(x));
-}
 
 [[nodiscard]] int compareFloatLegacyLike(double a, double b, double eps)
 {
@@ -37,217 +32,91 @@ namespace {
   return compareFloatLegacyLike(zScale, 1.0, 1e-5);
 }
 
-void scaleXRotateZLegacyLike(std::array<double, 3>* p, double s, double alpha, int inverse)
+void scaleXRotateZLegacyLike(std::array<double, 3>& p, double s, double alpha, int inverse)
 {
-  CHECK(p != nullptr);
-
   const double cosA = std::cos(alpha);
   const double sinA = std::sin(alpha);
 
   if (inverse == 0) {
-    const double tmp = (*p)[0] * s * cosA - (*p)[1] * sinA;
-    (*p)[1] = (*p)[0] * s * sinA + (*p)[1] * cosA;
-    (*p)[0] = tmp;
+    const double tmp = p[0] * s * cosA - p[1] * sinA;
+    p[1] = p[0] * s * sinA + p[1] * cosA;
+    p[0] = tmp;
   } else {
-    const double tmp = ((*p)[0] * cosA + (*p)[1] * sinA) / s;
-    (*p)[1] = -(*p)[0] * sinA + (*p)[1] * cosA;
-    (*p)[0] = tmp;
+    const double tmp = (p[0] * cosA + p[1] * sinA) / s;
+    p[1] = -p[0] * sinA + p[1] * cosA;
+    p[0] = tmp;
   }
 }
 
-[[nodiscard]] int readVoxelAsIntLegacyLike(const ZImg& stack, size_t x, size_t y, size_t z)
+[[nodiscard]] double stackNeighborMeanLegacyLike(const ZImg& stack, const ZNeighborhood& nb, int x, int y, int z)
 {
-  CHECK(stack.numChannels() == 1);
-  CHECK(stack.numTimes() == 1);
-
-  if (stack.isType<uint8_t>()) {
-    return static_cast<int>(*stack.data<uint8_t>(x, y, z));
-  }
-  if (stack.isType<uint16_t>()) {
-    return static_cast<int>(*stack.data<uint16_t>(x, y, z));
-  }
-
-  CHECK(false) << "Unsupported stack voxel type: " << stack.info();
-  return 0;
-}
-
-void writeVoxelFromIntLegacyLike(ZImg& stack, size_t x, size_t y, size_t z, int value)
-{
-  CHECK(stack.numChannels() == 1);
-  CHECK(stack.numTimes() == 1);
-
-  if (stack.isType<uint8_t>()) {
-    *stack.data<uint8_t>(x, y, z) = static_cast<uint8_t>(value);
-    return;
-  }
-  if (stack.isType<uint16_t>()) {
-    *stack.data<uint16_t>(x, y, z) = static_cast<uint16_t>(value);
-    return;
-  }
-
-  CHECK(false) << "Unsupported stack voxel type: " << stack.info();
-}
-
-[[nodiscard]] int clampToStackTypeLegacyLike(const ZImg& stack, int value)
-{
-  CHECK(stack.numChannels() == 1);
-  CHECK(stack.numTimes() == 1);
-
-  if (stack.isType<uint8_t>()) {
-    return std::clamp(value, 0, 255);
-  }
-  if (stack.isType<uint16_t>()) {
-    return std::clamp(value, 0, 65535);
-  }
-
-  CHECK(false) << "Unsupported stack voxel type: " << stack.info();
-  return 0;
-}
-
-void stackAddRLegacyLike(const ZImg& stack1, const ZImg& stack2, const std::array<int, 6>& range, ZImg& out)
-{
-  CHECK(stack1.numChannels() == 1 && stack1.numTimes() == 1);
-  CHECK(stack2.numChannels() == 1 && stack2.numTimes() == 1);
-  CHECK(out.numChannels() == 1 && out.numTimes() == 1);
-  CHECK(stack1.width() == stack2.width() && stack1.height() == stack2.height() && stack1.depth() == stack2.depth());
-  CHECK(stack1.width() == out.width() && stack1.height() == out.height() && stack1.depth() == out.depth());
-
-  for (int k = range[2]; k <= range[5]; ++k) {
-    for (int j = range[1]; j <= range[4]; ++j) {
-      for (int i = range[0]; i <= range[3]; ++i) {
-        const int v1 =
-          readVoxelAsIntLegacyLike(stack1, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k));
-        const int v2 =
-          readVoxelAsIntLegacyLike(stack2, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k));
-        const int res = clampToStackTypeLegacyLike(out, v1 + v2);
-        writeVoxelFromIntLegacyLike(out, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k), res);
-      }
-    }
-  }
-}
-
-void stackSubRLegacyLike(const ZImg& stack1, const ZImg& stack2, const std::array<int, 6>& range, ZImg& out)
-{
-  CHECK(stack1.numChannels() == 1 && stack1.numTimes() == 1);
-  CHECK(stack2.numChannels() == 1 && stack2.numTimes() == 1);
-  CHECK(out.numChannels() == 1 && out.numTimes() == 1);
-  CHECK(stack1.width() == stack2.width() && stack1.height() == stack2.height() && stack1.depth() == stack2.depth());
-  CHECK(stack1.width() == out.width() && stack1.height() == out.height() && stack1.depth() == out.depth());
-
-  for (int k = range[2]; k <= range[5]; ++k) {
-    for (int j = range[1]; j <= range[4]; ++j) {
-      for (int i = range[0]; i <= range[3]; ++i) {
-        const int v1 =
-          readVoxelAsIntLegacyLike(stack1, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k));
-        const int v2 =
-          readVoxelAsIntLegacyLike(stack2, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k));
-        const int res = clampToStackTypeLegacyLike(out, v1 - v2);
-        writeVoxelFromIntLegacyLike(out, static_cast<size_t>(i), static_cast<size_t>(j), static_cast<size_t>(k), res);
-      }
-    }
-  }
-}
-
-[[nodiscard]] double readVoxelAsDoubleLegacyLike(const ZImg& stack, size_t x, size_t y, size_t z)
-{
-  CHECK(stack.numChannels() == 1);
-  CHECK(stack.numTimes() == 1);
-
-  if (stack.isType<uint8_t>()) {
-    return static_cast<double>(*stack.data<uint8_t>(x, y, z));
-  }
-  if (stack.isType<uint16_t>()) {
-    return static_cast<double>(*stack.data<uint16_t>(x, y, z));
-  }
-
-  CHECK(false) << "Unsupported stack voxel type: " << stack.info();
-  return 0.0;
-}
-
-[[nodiscard]] double stackNeighborMeanLegacyLike(const ZImg& stack, int connectivity, int x, int y, int z)
-{
-  CHECK(stack.numChannels() == 1);
-  CHECK(stack.numTimes() == 1);
-
-  if (x < 0 || y < 0 || z < 0) {
-    return 0.0;
-  }
-
   const size_t width = stack.width();
   const size_t height = stack.height();
   const size_t depth = stack.depth();
+  const size_t plane = width * height;
 
-  if (static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height || static_cast<size_t>(z) >= depth) {
-    return 0.0;
-  }
+  const size_t centerIdx = static_cast<size_t>(x) + static_cast<size_t>(y) * width + static_cast<size_t>(z) * plane;
 
-  const ZNeighborhood& nb = neighborhoodLegacyOrder(connectivity);
+  return imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() -> double {
+    const TVoxel* data = stack.timeData<TVoxel>(0);
+    double sum = static_cast<double>(data[centerIdx]);
+    int nInBound = 0;
 
-  double sum =
-    readVoxelAsDoubleLegacyLike(stack, static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z));
-  int nInBound = 0;
+    for (size_t i = 0; i < nb.size(); ++i) {
+      const auto& o = nb.offset(i);
+      const int nx = x + o.x;
+      const int ny = y + o.y;
+      const int nz = z + o.z;
+      if (nx < 0 || ny < 0 || nz < 0) {
+        continue;
+      }
+      if (static_cast<size_t>(nx) >= width || static_cast<size_t>(ny) >= height || static_cast<size_t>(nz) >= depth) {
+        continue;
+      }
 
-  for (size_t i = 0; i < nb.size(); ++i) {
-    const auto& o = nb.offset(i);
-    const int nx = x + o.x;
-    const int ny = y + o.y;
-    const int nz = z + o.z;
-    if (nx < 0 || ny < 0 || nz < 0) {
-      continue;
+      const size_t idx = static_cast<size_t>(nx) + static_cast<size_t>(ny) * width + static_cast<size_t>(nz) * plane;
+      sum += static_cast<double>(data[idx]);
+      ++nInBound;
     }
-    if (static_cast<size_t>(nx) >= width || static_cast<size_t>(ny) >= height || static_cast<size_t>(nz) >= depth) {
-      continue;
-    }
 
-    sum +=
-      readVoxelAsDoubleLegacyLike(stack, static_cast<size_t>(nx), static_cast<size_t>(ny), static_cast<size_t>(nz));
-    ++nInBound;
-  }
-
-  return sum / static_cast<double>(nInBound + 1);
+    return sum / static_cast<double>(nInBound + 1);
+  });
 }
 
-[[nodiscard]] double stackNeighborMinLegacyLike(const ZImg& stack, int connectivity, int x, int y, int z)
+[[nodiscard]] double stackNeighborMinLegacyLike(const ZImg& stack, const ZNeighborhood& nb, int x, int y, int z)
 {
-  CHECK(stack.numChannels() == 1);
-  CHECK(stack.numTimes() == 1);
-
-  if (x < 0 || y < 0 || z < 0) {
-    return 0.0;
-  }
-
   const size_t width = stack.width();
   const size_t height = stack.height();
   const size_t depth = stack.depth();
+  const size_t plane = width * height;
 
-  if (static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height || static_cast<size_t>(z) >= depth) {
-    return 0.0;
-  }
+  const size_t centerIdx = static_cast<size_t>(x) + static_cast<size_t>(y) * width + static_cast<size_t>(z) * plane;
 
-  const ZNeighborhood& nb = neighborhoodLegacyOrder(connectivity);
+  return imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() -> double {
+    const TVoxel* data = stack.timeData<TVoxel>(0);
+    double minV = static_cast<double>(data[centerIdx]);
 
-  double minV =
-    readVoxelAsDoubleLegacyLike(stack, static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z));
-  for (size_t i = 0; i < nb.size(); ++i) {
-    const auto& o = nb.offset(i);
-    const int nx = x + o.x;
-    const int ny = y + o.y;
-    const int nz = z + o.z;
-    if (nx < 0 || ny < 0 || nz < 0) {
-      continue;
+    for (size_t i = 0; i < nb.size(); ++i) {
+      const auto& o = nb.offset(i);
+      const int nx = x + o.x;
+      const int ny = y + o.y;
+      const int nz = z + o.z;
+      if (nx < 0 || ny < 0 || nz < 0) {
+        continue;
+      }
+      if (static_cast<size_t>(nx) >= width || static_cast<size_t>(ny) >= height || static_cast<size_t>(nz) >= depth) {
+        continue;
+      }
+
+      const size_t idx = static_cast<size_t>(nx) + static_cast<size_t>(ny) * width + static_cast<size_t>(nz) * plane;
+      const double v = static_cast<double>(data[idx]);
+      if (v < minV) {
+        minV = v;
+      }
     }
-    if (static_cast<size_t>(nx) >= width || static_cast<size_t>(ny) >= height || static_cast<size_t>(nz) >= depth) {
-      continue;
-    }
 
-    const double v =
-      readVoxelAsDoubleLegacyLike(stack, static_cast<size_t>(nx), static_cast<size_t>(ny), static_cast<size_t>(nz));
-    if (v < minV) {
-      minV = v;
-    }
-  }
-
-  return minV;
+    return minV;
+  });
 }
 
 } // namespace
@@ -274,16 +143,17 @@ void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int fl
   std::array<int, 3> c = {0, 0, 0};
   std::array<double, 3> offpos = {0.0, 0.0, 0.0};
 
-  c[0] = static_cast<int>(std::lrint(bottom[0]));
-  c[1] = static_cast<int>(std::lrint(bottom[1]));
+  c[0] = iroundLegacyLike(bottom[0]);
+  c[1] = iroundLegacyLike(bottom[1]);
   offpos[0] = bottom[0] - static_cast<double>(c[0]);
   offpos[1] = bottom[1] - static_cast<double>(c[1]);
 
-  if (testZScaleLegacyLike(zScale) != 0) {
-    c[2] = static_cast<int>(std::lrint(bottom[2] * zScale));
+  const bool needZScale = (testZScaleLegacyLike(zScale) != 0);
+  if (needZScale) {
+    c[2] = iroundLegacyLike(bottom[2] * zScale);
     offpos[2] = bottom[2] * zScale - static_cast<double>(c[2]);
   } else {
-    c[2] = static_cast<int>(std::lrint(bottom[2]));
+    c[2] = iroundLegacyLike(bottom[2]);
     offpos[2] = bottom[2] - static_cast<double>(c[2]);
   }
 
@@ -295,61 +165,99 @@ void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int fl
 
   const double coef = seg.seg.c;
 
-  for (int k = 0; k < range.size[2]; ++k) {
-    const int pz = regionCorner[2] + k;
-    for (int j = 0; j < range.size[1]; ++j) {
-      const int py = regionCorner[1] + j;
-      for (int i = 0; i < range.size[0]; ++i) {
-        const int px = regionCorner[0] + i;
+  // Avoid per-voxel trigonometric function calls by hoisting cos/sin outside the
+  // inner loops, and dispatch voxel type once per call.
+  const size_t plane = width * height;
 
-        std::array<double, 3> coord = {static_cast<double>(i + range.firstCorner[0]),
-                                       static_cast<double>(j + range.firstCorner[1]),
-                                       static_cast<double>(k + range.firstCorner[2])};
+  const int x0 = range.firstCorner[0];
+  const int y0 = range.firstCorner[1];
+  const int z0 = range.firstCorner[2];
 
-        if (testZScaleLegacyLike(zScale) != 0) {
-          coord[2] /= zScale;
-        }
+  const double theta = seg.seg.theta;
+  const double psi = seg.seg.psi;
+  const double cosTheta = std::cos(theta);
+  const double sinTheta = std::sin(theta);
+  const double cosPsi = std::cos(psi);
+  const double sinPsi = std::sin(psi);
 
-        coord[0] -= offpos[0];
-        coord[1] -= offpos[1];
-        coord[2] -= offpos[2];
+  const double alpha = seg.seg.alpha;
+  const double cosAlpha = std::cos(alpha);
+  const double sinAlpha = std::sin(alpha);
+  const double scale = seg.seg.scale;
 
-        rotateXZLegacyLike(&coord, 1, seg.seg.theta, seg.seg.psi, 1);
-        scaleXRotateZLegacyLike(&coord, seg.seg.scale, seg.seg.alpha, 1);
+  const double zMin = -0.5;
+  const double zMax = seg.seg.h - 0.5;
 
-        const double f = neurofield7LegacyLike(coef,
-                                               seg.seg.r1,
-                                               coord[0],
-                                               coord[1],
-                                               coord[2],
-                                               /*zMin*/ -0.5,
-                                               /*zMax*/ seg.seg.h - 0.5);
-        if (f <= 0.0) {
-          continue;
-        }
+  const bool clampUint8 = stack.isType<uint8_t>() && flag < 0;
 
-        if ((px < 0) || (py < 0) || (pz < 0) || (static_cast<size_t>(px) >= width) ||
-            (static_cast<size_t>(py) >= height) || (static_cast<size_t>(pz) >= depth)) {
-          continue;
-        }
+  imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() {
+    auto* stackData = stack.timeData<TVoxel>(0);
 
-        if (flag >= 0) {
-          if (readVoxelAsIntLegacyLike(stack,
-                                       static_cast<size_t>(px),
-                                       static_cast<size_t>(py),
-                                       static_cast<size_t>(pz)) != flag) {
+    TVoxel writeValue = static_cast<TVoxel>(value);
+    if (clampUint8) {
+      writeValue = static_cast<TVoxel>(std::clamp(value, 0, 255));
+    }
+
+    for (int k = 0; k < range.size[2]; ++k) {
+      const int pz = regionCorner[2] + k;
+      for (int j = 0; j < range.size[1]; ++j) {
+        const int py = regionCorner[1] + j;
+        for (int i = 0; i < range.size[0]; ++i) {
+          const int px = regionCorner[0] + i;
+
+          if ((px < 0) || (py < 0) || (pz < 0) || (static_cast<size_t>(px) >= width) ||
+              (static_cast<size_t>(py) >= height) || (static_cast<size_t>(pz) >= depth)) {
             continue;
           }
-        }
 
-        writeVoxelFromIntLegacyLike(stack,
-                                    static_cast<size_t>(px),
-                                    static_cast<size_t>(py),
-                                    static_cast<size_t>(pz),
-                                    value);
+          double coord0 = static_cast<double>(i + x0);
+          double coord1 = static_cast<double>(j + y0);
+          double coord2 = static_cast<double>(k + z0);
+
+          if (needZScale) {
+            coord2 /= zScale;
+          }
+
+          coord0 -= offpos[0];
+          coord1 -= offpos[1];
+          coord2 -= offpos[2];
+
+          // rotateXZLegacyLike(coord, theta, psi, inverse=1)
+          const double inx = coord0;
+          const double iny = coord1;
+          const double inz = coord2;
+          double result0 = cosPsi * inx + sinPsi * iny;
+          double result1 = iny * cosPsi - inx * sinPsi;
+          double result2 = inz * cosTheta - result1 * sinTheta;
+          result1 = inz * sinTheta + result1 * cosTheta;
+
+          // scaleXRotateZLegacyLike(coord, scale, alpha, inverse=1)
+          const double preX = result0;
+          const double preY = result1;
+          const double tmp = (preX * cosAlpha + preY * sinAlpha) / scale;
+          result1 = -preX * sinAlpha + preY * cosAlpha;
+          result0 = tmp;
+
+          const double f = neurofield7LegacyLike(coef, seg.seg.r1, result0, result1, result2, zMin, zMax);
+          if (f <= 0.0) {
+            continue;
+          }
+
+          const size_t idx =
+            static_cast<size_t>(px) + static_cast<size_t>(py) * width + static_cast<size_t>(pz) * plane;
+
+          if (flag >= 0) {
+            const int current = static_cast<int>(stackData[idx]);
+            if (current != flag) {
+              continue;
+            }
+          }
+
+          stackData[idx] = writeValue;
+        }
       }
     }
-  }
+  });
 }
 
 void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
@@ -382,18 +290,30 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
 
   const FieldRangeLegacyLike range = neurosegFieldRangeLegacyLike(labelLocseg.seg, zScale);
 
-  std::vector<double> filter;
+  CHECK(range.size[0] >= 0);
+  CHECK(range.size[1] >= 0);
+  CHECK(range.size[2] >= 0);
+  const size_t filterSize =
+    static_cast<size_t>(range.size[0]) * static_cast<size_t>(range.size[1]) * static_cast<size_t>(range.size[2]);
+
+  auto& filter = ws.filterScratch;
   if (ws.option > 10) {
     CHECK(false) << "localNeurosegLabelWLegacyLike: option > 10 is not supported yet: " << ws.option;
   } else {
-    filter = neurosegDistFilterLegacyLike(labelLocseg.seg, range, &offpos, zScale);
+    neurosegDistFilterLegacyLikeInto(labelLocseg.seg, range, &offpos, zScale, filter);
   }
+  CHECK(filter.size() >= filterSize);
 
-  std::vector<double> filter2;
+  auto& filter2 = ws.filter2Scratch;
   double threshold = 0.0;
   if (ws.option >= 2 && ws.option <= 4) {
     CHECK(ws.signal != nullptr) << "localNeurosegLabelWLegacyLike: option " << ws.option
                                 << " requires ws.signal (input stack)";
+    CHECK(ws.signal->numChannels() == 1);
+    CHECK(ws.signal->numTimes() == 1);
+    CHECK(ws.signal->width() == stack.width());
+    CHECK(ws.signal->height() == stack.height());
+    CHECK(ws.signal->depth() == stack.depth());
 
     StackFitScore fs{};
     fs.n = 1;
@@ -401,8 +321,8 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
     (void)localNeurosegScorePLegacyLike(seg, *ws.signal, zScale, &fs);
     threshold = fs.scores[0];
 
-    filter2 = neurosegDistFilterLegacyLike(seg.seg, range, &offpos, zScale);
-    CHECK(filter2.size() == filter.size());
+    neurosegDistFilterLegacyLikeInto(seg.seg, range, &offpos, zScale, filter2);
+    CHECK(filter2.size() >= filterSize);
   }
 
   const std::array<int, 3> regionCorner = {range.firstCorner[0] + c[0],
@@ -458,105 +378,92 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
     ws.range[5] = depth;
   }
 
+  const ZNeighborhood& conn18 = neighborhoodLegacyOrder(18);
+  const bool clampUint8 = stack.isType<uint8_t>();
+  const size_t widthS = stack.width();
+  const size_t plane = widthS * stack.height();
+
   size_t offset = 0;
-  for (int k = 0; k < range.size[2]; ++k) {
-    const int pz = regionCorner[2] + k;
-    for (int j = 0; j < range.size[1]; ++j) {
-      const int py = regionCorner[1] + j;
-      for (int i = 0; i < range.size[0]; ++i) {
-        const int px = regionCorner[0] + i;
+  imgTypeDispatcher(stack.info(), [&]<typename TVoxel>() {
+    auto* stackData = stack.timeData<TVoxel>(0);
+    TVoxel writeValue = static_cast<TVoxel>(ws.value);
+    if (clampUint8) {
+      writeValue = static_cast<TVoxel>(std::clamp(ws.value, 0, 255));
+    }
 
-        if (px >= 0 && py >= 0 && pz >= 0 && px < width && py < height && pz < depth) {
-          bool label = true;
-          if (ws.flag >= 0) {
-            const int current = readVoxelAsIntLegacyLike(stack,
-                                                         static_cast<size_t>(px),
-                                                         static_cast<size_t>(py),
-                                                         static_cast<size_t>(pz));
-            if (iroundLegacyLike(static_cast<double>(current)) != ws.flag) {
-              label = false;
+    for (int k = 0; k < range.size[2]; ++k) {
+      const int pz = regionCorner[2] + k;
+      for (int j = 0; j < range.size[1]; ++j) {
+        const int py = regionCorner[1] + j;
+        for (int i = 0; i < range.size[0]; ++i) {
+          const int px = regionCorner[0] + i;
+
+          if (px >= 0 && py >= 0 && pz >= 0 && px < width && py < height && pz < depth) {
+            const size_t idx =
+              static_cast<size_t>(px) + static_cast<size_t>(py) * widthS + static_cast<size_t>(pz) * plane;
+
+            bool label = true;
+            if (ws.flag >= 0) {
+              const int current = static_cast<int>(stackData[idx]);
+              if (current != ws.flag) {
+                label = false;
+              }
+            }
+
+            if (label) {
+              switch (ws.option) {
+                case 1:
+                case 10:
+                  if (filter[offset] <= 1.0) {
+                    stackData[idx] = writeValue;
+                  }
+                  break;
+                case 2:
+                  if (filter2[offset] <= 1.0) {
+                    stackData[idx] = writeValue;
+                  } else if (filter[offset] <= 1.0) {
+                    const double v = imgTypeDispatcher(ws.signal->info(), [&]<typename TSignalVoxel>() -> double {
+                      return static_cast<double>(*ws.signal->data<TSignalVoxel>(static_cast<size_t>(px),
+                                                                                static_cast<size_t>(py),
+                                                                                static_cast<size_t>(pz)));
+                    });
+                    if (v < threshold) {
+                      stackData[idx] = writeValue;
+                    }
+                  }
+                  break;
+                case 3:
+                  if (filter2[offset] <= 1.0) {
+                    stackData[idx] = writeValue;
+                  } else if (filter[offset] <= 1.0) {
+                    if (stackNeighborMeanLegacyLike(*ws.signal, conn18, px, py, pz) < threshold) {
+                      stackData[idx] = writeValue;
+                    }
+                  }
+                  break;
+                case 4:
+                  if (filter2[offset] <= 1.0) {
+                    stackData[idx] = writeValue;
+                  } else if (filter[offset] <= 1.0) {
+                    if (stackNeighborMinLegacyLike(*ws.signal, conn18, px, py, pz) < threshold) {
+                      stackData[idx] = writeValue;
+                    }
+                  }
+                  break;
+                default:
+                  CHECK(false) << "localNeurosegLabelWLegacyLike: unsupported option: " << ws.option;
+                  break;
+              }
             }
           }
 
-          if (label) {
-            switch (ws.option) {
-              case 1:
-              case 10:
-                if (filter[offset] <= 1.0) {
-                  writeVoxelFromIntLegacyLike(stack,
-                                              static_cast<size_t>(px),
-                                              static_cast<size_t>(py),
-                                              static_cast<size_t>(pz),
-                                              ws.value);
-                }
-                break;
-              case 2:
-                if (filter2[offset] <= 1.0) {
-                  writeVoxelFromIntLegacyLike(stack,
-                                              static_cast<size_t>(px),
-                                              static_cast<size_t>(py),
-                                              static_cast<size_t>(pz),
-                                              ws.value);
-                } else if (filter[offset] <= 1.0) {
-                  if (readVoxelAsDoubleLegacyLike(*ws.signal,
-                                                  static_cast<size_t>(px),
-                                                  static_cast<size_t>(py),
-                                                  static_cast<size_t>(pz)) < threshold) {
-                    writeVoxelFromIntLegacyLike(stack,
-                                                static_cast<size_t>(px),
-                                                static_cast<size_t>(py),
-                                                static_cast<size_t>(pz),
-                                                ws.value);
-                  }
-                }
-                break;
-              case 3:
-                if (filter2[offset] <= 1.0) {
-                  writeVoxelFromIntLegacyLike(stack,
-                                              static_cast<size_t>(px),
-                                              static_cast<size_t>(py),
-                                              static_cast<size_t>(pz),
-                                              ws.value);
-                } else if (filter[offset] <= 1.0) {
-                  if (stackNeighborMeanLegacyLike(*ws.signal, /*connectivity*/ 18, px, py, pz) < threshold) {
-                    writeVoxelFromIntLegacyLike(stack,
-                                                static_cast<size_t>(px),
-                                                static_cast<size_t>(py),
-                                                static_cast<size_t>(pz),
-                                                ws.value);
-                  }
-                }
-                break;
-              case 4:
-                if (filter2[offset] <= 1.0) {
-                  writeVoxelFromIntLegacyLike(stack,
-                                              static_cast<size_t>(px),
-                                              static_cast<size_t>(py),
-                                              static_cast<size_t>(pz),
-                                              ws.value);
-                } else if (filter[offset] <= 1.0) {
-                  if (stackNeighborMinLegacyLike(*ws.signal, /*connectivity*/ 18, px, py, pz) < threshold) {
-                    writeVoxelFromIntLegacyLike(stack,
-                                                static_cast<size_t>(px),
-                                                static_cast<size_t>(py),
-                                                static_cast<size_t>(pz),
-                                                ws.value);
-                  }
-                }
-                break;
-              default:
-                CHECK(false) << "localNeurosegLabelWLegacyLike: unsupported option: " << ws.option;
-                break;
-            }
-          }
+          ++offset;
         }
-
-        ++offset;
       }
     }
-  }
+  });
 
-  CHECK(offset == filter.size());
+  CHECK(offset == filterSize);
 }
 
 void locsegChainLabelWLegacyLike(const LocsegChain& chain,
@@ -596,41 +503,14 @@ void locsegChainLabelWLegacyLike(const LocsegChain& chain,
     tmpWs.sratio = ws.sratio;
     tmpWs.sdiff = ws.sdiff;
     tmpWs.slimit = ws.slimit;
-    tmpWs.range = {-1, -1, -1, -1, -1, -1};
 
     locsegChainLabelWLegacyLike(chain, *ws.bufferMask, zScale, begin, end, tmpWs);
-
-    for (int i = 0; i < 3; ++i) {
-      if (tmpWs.range[static_cast<size_t>(i)] < 0) {
-        tmpWs.range[static_cast<size_t>(i)] = 0;
-      }
-    }
-
-    const int width = static_cast<int>(stack.width());
-    const int height = static_cast<int>(stack.height());
-    const int depth = static_cast<int>(stack.depth());
-
-    if (tmpWs.range[3] < 0 || tmpWs.range[3] >= width) {
-      tmpWs.range[3] = width - 1;
-    }
-    if (tmpWs.range[4] < 0 || tmpWs.range[4] >= height) {
-      tmpWs.range[4] = height - 1;
-    }
-    if (tmpWs.range[5] < 0 || tmpWs.range[5] >= depth) {
-      tmpWs.range[5] = depth - 1;
-    }
 
     if (ws.option == 6) {
-      stackAddRLegacyLike(stack, *ws.bufferMask, tmpWs.range, stack);
+      stack += *ws.bufferMask;
     } else {
-      stackSubRLegacyLike(stack, *ws.bufferMask, tmpWs.range, stack);
+      stack -= *ws.bufferMask;
     }
-
-    // Clean the buffer mask.
-    tmpWs.option = 1;
-    tmpWs.value = 0;
-    tmpWs.flag = 1;
-    locsegChainLabelWLegacyLike(chain, *ws.bufferMask, zScale, begin, end, tmpWs);
     return;
   }
 

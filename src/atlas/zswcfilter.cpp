@@ -14,6 +14,7 @@
 #include "zimgpack.h"
 #include "zlog.h"
 #include "ztracesettings.h"
+#include "zneutubemathutils.h"
 #include <QWindow>
 #include <QStyleOption>
 #include <QPushButton>
@@ -645,10 +646,6 @@ void ZSwcFilter::estimateSwcNodeRadius()
   // Copy-and-edit to preserve existing selection set and undo behavior.
   ZSwc newSwc = m_swcPack->swc();
   bool anyChange = false;
-
-  auto iroundLegacyLike = [](double v) -> int {
-    return static_cast<int>(std::lround(v));
-  };
 
   for (auto it = newSwc.begin(); it != newSwc.end(); ++it) {
     if (!it->selected) {

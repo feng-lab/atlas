@@ -76,7 +76,7 @@ void geo3dRotateOrientationLegacyLike(double rtheta, double rpsi, double& theta,
   // Port of tz_geo3d_utils.c::Geo3d_Rotate_Orientation().
   std::array<double, 3> coord{};
   geo3dOrientationNormalLegacyLike(theta, psi, coord[0], coord[1], coord[2]);
-  rotateXZLegacyLike(&coord, 1, rtheta, rpsi, 0);
+  rotateXZLegacyLike(coord, rtheta, rpsi, 0);
   geo3dNormalOrientationLegacyLike(coord[0], coord[1], coord[2], theta, psi);
 }
 

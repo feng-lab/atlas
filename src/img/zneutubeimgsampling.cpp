@@ -106,21 +106,9 @@ double pointSampleLegacyLike(const ZImg& img, double x, double y, double z, size
   CHECK(img.numChannels() > c);
   CHECK(img.numTimes() > t);
 
-  if (img.isType<uint8_t>()) {
-    return pointSampleLegacyLikeTyped<uint8_t>(img, x, y, z, c, t);
-  }
-  if (img.isType<uint16_t>()) {
-    return pointSampleLegacyLikeTyped<uint16_t>(img, x, y, z, c, t);
-  }
-  if (img.isType<float>()) {
-    return pointSampleLegacyLikeTyped<float>(img, x, y, z, c, t);
-  }
-  if (img.isType<double>()) {
-    return pointSampleLegacyLikeTyped<double>(img, x, y, z, c, t);
-  }
-
-  CHECK(false) << "Unsupported voxel type for pointSampleLegacyLike: " << img.info();
-  return nanValue();
+  return imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
+    return pointSampleLegacyLikeTyped<TVoxel>(img, x, y, z, c, t);
+  });
 }
 
 bool pointHitMaskLegacyLike(const ZImg& img, double x, double y, double z, size_t c, size_t t)
@@ -129,21 +117,9 @@ bool pointHitMaskLegacyLike(const ZImg& img, double x, double y, double z, size_
   CHECK(img.numChannels() > c);
   CHECK(img.numTimes() > t);
 
-  if (img.isType<uint8_t>()) {
-    return pointHitMaskLegacyLikeTyped<uint8_t>(img, x, y, z, c, t);
-  }
-  if (img.isType<uint16_t>()) {
-    return pointHitMaskLegacyLikeTyped<uint16_t>(img, x, y, z, c, t);
-  }
-  if (img.isType<float>()) {
-    return pointHitMaskLegacyLikeTyped<float>(img, x, y, z, c, t);
-  }
-  if (img.isType<double>()) {
-    return pointHitMaskLegacyLikeTyped<double>(img, x, y, z, c, t);
-  }
-
-  CHECK(false) << "Unsupported voxel type for pointHitMaskLegacyLike: " << img.info();
-  return false;
+  return imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
+    return pointHitMaskLegacyLikeTyped<TVoxel>(img, x, y, z, c, t);
+  });
 }
 
 double pointSampleLegacyLike(const ZVoxelVolume& img, double x, double y, double z)
