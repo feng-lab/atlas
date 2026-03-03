@@ -271,25 +271,26 @@ std::optional<IntHistogramLegacyLike> imageHistogramLegacyLike(const ZImg& img, 
   const size_t bins = static_cast<size_t>(hist[0]);
   CHECK(hist.size() == bins + 2);
 
-  auto addValue = [&](int v) {
-    const size_t idx = static_cast<size_t>(v - minV);
-    CHECK(idx < bins);
-    int& c = hist[2 + idx];
-    if (c < IntHistogramMaxCountLegacyLike) {
-      ++c;
-    }
-  };
+  int* counts = hist.data() + 2;
 
   imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
     const auto* a = img.timeData<TVoxel>(0);
     if (maskData == nullptr) {
       for (size_t i = 0; i < n; ++i) {
-        addValue(static_cast<int>(a[i]));
+        const size_t idx = static_cast<size_t>(static_cast<int>(a[i]) - minV);
+        int& c = counts[idx];
+        if (c < IntHistogramMaxCountLegacyLike) {
+          ++c;
+        }
       }
     } else {
       for (size_t i = 0; i < n; ++i) {
         if (maskData[i] == 1) {
-          addValue(static_cast<int>(a[i]));
+          const size_t idx = static_cast<size_t>(static_cast<int>(a[i]) - minV);
+          int& c = counts[idx];
+          if (c < IntHistogramMaxCountLegacyLike) {
+            ++c;
+          }
         }
       }
     }

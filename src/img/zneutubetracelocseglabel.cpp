@@ -32,22 +32,6 @@ namespace {
   return compareFloatLegacyLike(zScale, 1.0, 1e-5);
 }
 
-void scaleXRotateZLegacyLike(std::array<double, 3>& p, double s, double alpha, int inverse)
-{
-  const double cosA = std::cos(alpha);
-  const double sinA = std::sin(alpha);
-
-  if (inverse == 0) {
-    const double tmp = p[0] * s * cosA - p[1] * sinA;
-    p[1] = p[0] * s * sinA + p[1] * cosA;
-    p[0] = tmp;
-  } else {
-    const double tmp = (p[0] * cosA + p[1] * sinA) / s;
-    p[1] = -p[0] * sinA + p[1] * cosA;
-    p[0] = tmp;
-  }
-}
-
 [[nodiscard]] double stackNeighborMeanLegacyLike(const ZImg& stack, const ZNeighborhood& nb, int x, int y, int z)
 {
   const size_t width = stack.width();
