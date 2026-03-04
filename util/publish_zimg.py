@@ -28,7 +28,9 @@ def _run_checked(
     display_cmd: list[str] | None = None,
 ) -> None:
     try:
-        subprocess.run(cmd, cwd=str(cwd) if cwd is not None else None, env=env, check=True)
+        subprocess.run(
+            cmd, cwd=str(cwd) if cwd is not None else None, env=env, check=True
+        )
     except subprocess.CalledProcessError as e:
         display = display_cmd if display_cmd is not None else cmd
         raise RuntimeError(
@@ -101,10 +103,14 @@ def _wheel_tags_from_wheel_metadata(wheel_path: Path) -> list[str]:
     return tags
 
 
-def _assert_macos_wheel_has_universal2_tag(*, wheel_path: Path, macos_target: str) -> None:
+def _assert_macos_wheel_has_universal2_tag(
+    *, wheel_path: Path, macos_target: str
+) -> None:
     token = macos_target.strip()
     if not token:
-        raise RuntimeError(f"Empty macOS target for wheel tag check (from {macos_target!r})")
+        raise RuntimeError(
+            f"Empty macOS target for wheel tag check (from {macos_target!r})"
+        )
     token = token.replace(".", "_")
     expected_platform = f"macosx_{token}_universal2"
 
@@ -201,7 +207,10 @@ def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
             )
 
     if common_dirs.is_windows() and common_dirs.use_clang_cl():
-        _append_cmake_args(env, ["-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"])
+        _append_cmake_args(
+            env, ["-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"]
+        )
+        _append_cmake_args(env, ["-DCMAKE_LINKER=lld-link"])
 
 
 def _assert_linux_wheel_contains_expected_libs(
@@ -258,7 +267,8 @@ def _assert_linux_wheel_contains_expected_libs(
             unexpected = sorted(
                 name
                 for name in lib_names
-                if name.startswith("libfreeimageplus.so") or name.startswith("libfreeimageplus-")
+                if name.startswith("libfreeimageplus.so")
+                or name.startswith("libfreeimageplus-")
             )
             raise RuntimeError(
                 "Linux wheel contains FreeImage shared libraries, but FreeImage was disabled.\n"
@@ -324,7 +334,9 @@ def _repair_linux_wheel_with_auditwheel(*, wheel_path: Path, out_dir: Path) -> P
     qt_lib_dir = Path(common_dirs.qt_base_dir()) / "lib"
     if qt_lib_dir.is_dir():
         _prepend_search_path(env, key="LD_LIBRARY_PATH", dir_path=qt_lib_dir)
-        logger.info("auditwheel: prepending LD_LIBRARY_PATH with: %s", qt_lib_dir.as_posix())
+        logger.info(
+            "auditwheel: prepending LD_LIBRARY_PATH with: %s", qt_lib_dir.as_posix()
+        )
     else:
         logger.warning(
             "auditwheel: Qt lib dir not found; repair may fail (qt_lib_dir=%s)",
@@ -388,7 +400,9 @@ def _stage_conda_zimg_from_wheel(*, wheel_path: Path, conda_source_dir: Path) ->
 
         src_pkg_dir = wheel_root / "zimg"
         if not src_pkg_dir.is_dir():
-            raise RuntimeError(f"Wheel is missing top-level zimg/ package dir: {wheel_path}")
+            raise RuntimeError(
+                f"Wheel is missing top-level zimg/ package dir: {wheel_path}"
+            )
 
         dst_pkg_dir = conda_source_dir / "zimg"
         if dst_pkg_dir.exists():
@@ -570,11 +584,15 @@ def main() -> int:
             repaired: list[Path] = []
             for wheel_path in wheels:
                 repaired.append(
-                    _repair_linux_wheel_with_auditwheel(wheel_path=wheel_path, out_dir=out_dir)
+                    _repair_linux_wheel_with_auditwheel(
+                        wheel_path=wheel_path, out_dir=out_dir
+                    )
                 )
             wheels = repaired
             for wheel_path in wheels:
-                _assert_linux_wheel_has_pypi_compatible_platform_tag(wheel_path=wheel_path)
+                _assert_linux_wheel_has_pypi_compatible_platform_tag(
+                    wheel_path=wheel_path
+                )
 
         if common_dirs.is_mac():
             for wheel_path in wheels:

@@ -57,6 +57,7 @@ endif ()
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "CMAKE_LINKER: ${CMAKE_LINKER}")
 
 # generate a version string from git tag-hash and current build time
 include(GetGitRevisionDescription)
@@ -194,6 +195,7 @@ endif ()
 
 nanobind_add_module(${module_name} ${NB_ARGS} imgpy.cpp)
 target_link_libraries(${module_name} PRIVATE img)
+set_property(TARGET ${module_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 
 if (APPLE)
   target_compile_options(${module_name} PRIVATE -faligned-allocation)

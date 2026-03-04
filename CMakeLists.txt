@@ -49,6 +49,17 @@ endif ()
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
+message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
+message(STATUS "CMAKE_LINKER: ${CMAKE_LINKER}")
+
+# Centralize linker selection for Linux+Clang builds. This avoids sprinkling
+# per-target `target_link_options(... -fuse-ld=lld)` and ensures all binaries
+# (including tests) can link against ThinLTO objects.
+if (UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  message(STATUS "Linux+Clang: forcing lld via -fuse-ld=lld")
+  add_link_options(-fuse-ld=lld)
+endif ()
 
 # generate a version string from git tag-hash and current build time
 include(GetGitRevisionDescription)

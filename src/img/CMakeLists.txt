@@ -285,10 +285,12 @@ if (NOT ZIMG_DISABLE_FREEIMAGE)
 endif ()
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "CMAKE_LINKER: ${CMAKE_LINKER}")
 
 # our target
 set(LIBRARY_NAME img)
 add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${SCIFIO_SOURCES} ${IMG_SOURCES})
+set_property(TARGET ${LIBRARY_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 
 if (NOT ZIMG_DISABLE_FREEIMAGE)
     target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_HAVE_FREEIMAGE)
@@ -361,7 +363,6 @@ if (WIN32)
         target_compile_options(${LIBRARY_NAME} PUBLIC /wd6262) # Function uses constant_1 bytes of stack: exceeds /analyze:stacksize constant_2. Consider moving some data to heap
         target_compile_options(${LIBRARY_NAME} PUBLIC /wd6385) # Invalid data: accessing buffer-name, the readable size is size1 bytes, but size2 bytes may be read: Lines: x, y
         target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
-        target_compile_options(${LIBRARY_NAME} PUBLIC /GL) # Enables whole program optimization.
     else ()
         target_compile_options(${LIBRARY_NAME} PUBLIC /MD)
     endif ()
@@ -371,7 +372,7 @@ if (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:__cplusplus) # The /Zc:__cplusplus compiler option enables the __cplusplus preprocessor macro to report an updated value for recent C++ language standards support
 
     target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)
-    target_link_options(${LIBRARY_NAME} PUBLIC /LTCG:STATUS /FORCE:MULTIPLE)
+    target_link_options(${LIBRARY_NAME} PUBLIC /FORCE:MULTIPLE)
 
     # for some files
     set_source_files_properties(zimageavx512.cpp PROPERTIES COMPILE_FLAGS /arch:AVX512)

@@ -1040,6 +1040,10 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                main.cpp
                ${FORMS} ${RESOURCES} ${ASSETS})
 add_dependencies(${APP_NAME} vulkan_shaders)
+# The core libraries enable IPO for Release. Ensure the final link step also
+# participates so Release builds actually perform LTO (important for both MSVC
+# and clang-cl + lld-link).
+set_property(TARGET ${APP_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 if (WIN32)
   set_source_files_properties(${LIBQXTDIR}/core/qxtcsvmodel.cpp PROPERTIES COMPILE_FLAGS /wd4458) # declaration of 'd_ptr' hides class member
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
@@ -1047,7 +1051,7 @@ if (WIN32)
 
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # to create an output file whether or not LINK finds more than one definition for a symbol.
-    target_link_options(${APP_NAME} PUBLIC /LTCG:STATUS /DEBUG:NONE /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
+    target_link_options(${APP_NAME} PUBLIC /DEBUG:NONE /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
   endif ()
 
   # add manifest
@@ -1146,11 +1150,6 @@ else (WIN32)
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
-  endif ()
-
-  # Use LLVM lld for the main Atlas binary on Linux+Clang when available.
-  if (UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    target_link_options(${APP_NAME} PRIVATE -fuse-ld=lld)
   endif ()
 
   if (ATLAS_SANITIZE_ADDRESS)
