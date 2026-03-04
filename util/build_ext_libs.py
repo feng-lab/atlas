@@ -822,24 +822,31 @@ def build_boost(src_dir: str, install_dir: str):
             cbf = get_common_build_flags(with_optimization=True)
             env = get_vcvars_environment()
             subprocess.run(["bootstrap"], cwd=src_dir, shell=True, check=True, env=env)
-            subprocess.run(
+            boost_b2_cmd = [
+                ".\\b2",
+                "--prefix=" + install_dir,
+                f"cxxflags={cbf['CXXFLAGS']}",
+                "--with-headers",
+                "--with-context",
+                "--with-filesystem",
+                "--with-program_options",
+                "--with-thread",
+                "--with-charconv",
+            ]
+            if use_clang_cl():
+                boost_b2_cmd.append("toolset=clang-win")
+            boost_b2_cmd.extend(
                 [
-                    ".\\b2",
-                    "--prefix=" + install_dir,
-                    f"cxxflags={cbf['CXXFLAGS']}",
-                    "--with-headers",
-                    "--with-context",
-                    "--with-filesystem",
-                    "--with-program_options",
-                    "--with-thread",
-                    "--with-charconv",
                     "address-model=64",
                     "variant=release",
                     "link=static",
                     "threading=multi",
                     "runtime-link=shared",
                     "install",
-                ],
+                ]
+            )
+            subprocess.run(
+                boost_b2_cmd,
                 cwd=src_dir,
                 shell=True,
                 check=True,
