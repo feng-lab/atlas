@@ -604,6 +604,7 @@ set(SOURCES
     z3dcanvaseventlistener.h
     zimgvoxelcolormap.h
     zimgqtutils.h zimgqtutils.cpp
+    zlogcache.h zlogcache.cpp
     zlogqtgui.h zlogqtgui.cpp
     zroi.h zroi.cpp
     zroitypes.h zroitypes.cpp

@@ -101,8 +101,6 @@ inline void removeLogSink(const std::shared_ptr<google::LogSink>& sink)
   }
 }
 
-void relayLogToQtGUI();
-
 // enum related
 template<typename TEnum>
   requires std::is_enum_v<TEnum>

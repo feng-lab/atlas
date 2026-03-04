@@ -234,7 +234,6 @@ print_target_properties(Threads::Threads)
 
 message(STATUS "QT_HOST_PATH: " ${QT_HOST_PATH})
 message(STATUS "QT_VERSION: " ${QT_VERSION})
-set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
 print_target_properties(Qt6::Core)

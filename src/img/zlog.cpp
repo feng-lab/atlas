@@ -1,7 +1,6 @@
 #include "zlog.h"
 
 #include "zioutils.h"
-#include "zlogcache.h"
 #include "zglmutils.h"
 #include "zimginterface.h"
 #include "zvoxelcoordinate.h"
@@ -179,11 +178,6 @@ std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename)
   }
   auto res = std::make_shared<FileLogSink>(filename);
   return res->isValid() ? res : std::shared_ptr<google::LogSink>();
-}
-
-void relayLogToQtGUI()
-{
-  addLogSink(&ZLogCache::instance());
 }
 
 // test code:

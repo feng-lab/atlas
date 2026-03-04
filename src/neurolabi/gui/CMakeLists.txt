@@ -1,12 +1,6 @@
 cmake_minimum_required(VERSION 3.17.5)
 project(neutu)
 
-# main stuff
-
-find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core
-             PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
-print_target_properties(Qt6::Core)
-
 # main srcs
 set(NEUTU_SOURCES
     swc/zswcpruner.cpp swc/zswcpruner.h
@@ -151,4 +145,4 @@ else (WIN32)
   endif ()
 endif (WIN32)
 
-target_link_libraries(${LIBRARY_NAME} PUBLIC neurolabi img glm::glm Qt6::Core)
+target_link_libraries(${LIBRARY_NAME} PUBLIC neurolabi img)

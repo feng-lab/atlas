@@ -4,6 +4,7 @@
 #include "zexception.h"
 #include "zimginit.h"
 #include "zlog.h"
+#include "zlogcache.h"
 #include "zmainwindow.h"
 #include "zservicemanager.h"
 #include "zrpcservice.h"
@@ -183,7 +184,7 @@ int main(int argc, char* argv[])
   ZSystemInfo::removeOldLogs();
   ZLogInit::instance("Atlas"s, logDir.filePath("atlas"));
   if (isGUIMode) {
-    relayLogToQtGUI();
+    addLogSink(&ZLogCache::instance());
   }
 
   try {
