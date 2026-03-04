@@ -362,7 +362,7 @@ if (WIN32)
         target_compile_options(${LIBRARY_NAME} PUBLIC /wd6262) # Function uses constant_1 bytes of stack: exceeds /analyze:stacksize constant_2. Consider moving some data to heap
         target_compile_options(${LIBRARY_NAME} PUBLIC /wd6385) # Invalid data: accessing buffer-name, the readable size is size1 bytes, but size2 bytes may be read: Lines: x, y
         target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
-        target_compile_options(${LIBRARY_NAME} PUBLIC /GL) # Enables whole program optimization.
+        target_compile_options(${LIBRARY_NAME} PRIVATE /GL) # Enables whole program optimization.
     else ()
         target_compile_options(${LIBRARY_NAME} PUBLIC /MD)
     endif ()
