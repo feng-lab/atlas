@@ -469,11 +469,11 @@ Right-click an SWC node in the 2D view to open the node context menu.
 
 **Editing / inspection submenus (shared with 3D)**
 
-- **Delete** (`X`): deletes selected nodes (legacy behavior: descendants become new roots).
-- **Delete Unselected**: deletes all unselected nodes (legacy behavior: descendants become new roots).
+- **Delete** (`X`): deletes selected nodes (descendants become new roots).
+- **Delete Unselected**: deletes all unselected nodes (descendants become new roots).
 - **Break** (`B`): breaks parent-child links between selected nodes.
-- **Connect** (`C`): connects selected nodes into one tree (legacy connector semantics).
-- **Merge**: merges selected nodes into one node (legacy semantics).
+- **Connect** (`C`): connects selected nodes into one tree.
+- **Merge**: merges selected nodes into one node.
 - **Insert** (`I`): inserts nodes between adjacent selected nodes.
 - **Interpolate**:
   - **Position and Radius**
@@ -897,7 +897,7 @@ Selection behavior:
 
 In **Trace Settings → Tracing Config**, you can adjust key neuTube tracing parameters (score thresholds, fitting/refit options, crossover tests, etc.).
 
-These settings are applied to subsequent traces and are intended to match the legacy neuTube semantics.
+These settings are applied to subsequent traces and are intended to match neuTube semantics.
 
 ---
 

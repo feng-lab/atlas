@@ -15,6 +15,64 @@ Key References
 - Image Paging & Progressive Rendering: [Atlas_Image_Paging_and_Progressive_Rendering.md](Atlas_Image_Paging_and_Progressive_Rendering.md)
 - Agents Overview and Tools: [AGENTS_GUIDE.md](AGENTS_GUIDE.md)
 
+Tracing (Seeded + Auto)
+
+- User-facing workflow documentation lives in `docs/USER_GUIDE.md`:
+  - “Interactive Tracing” (2D + 3D): section 5.7
+  - “Automatic Tracing and Background Tasks”: section 5.8
+- Core tracing algorithms are implemented in `src/img/` and integrated into the app UI in `src/atlas/`.
+
+Entry Points
+
+- CLI:
+  - Atlas routes `--command` to the migrated runner in `src/img/zrunneutucommand2.*` (type-safe config parsing via `boost::json`).
+  - The `--trace` and `--auto_trace` subcommands use the `src/img/zneutube*` tracing stack.
+- Seeded trace (interactive-like, single seed):
+  - Core API (in-memory, file-free): `nim::traceSeedNewSwcLegacyLike(...)` and `nim::traceSeedIntoHostSwcLegacyLike(...)`
+    (`src/img/zneutubetraceinteractive.*`).
+  - These functions support two signal backends:
+    - `const ZImg&` (fast path for in-memory images; avoids virtual sampling in hot loops).
+    - `const ZVoxelVolume&` (random-access virtual volume; used for disk-cached images and future paging work).
+- Auto trace (whole neuron, no explicit seed click):
+  - Core algorithm: `nim::traceNeuronAutoLegacyLike(...)` (`src/img/zneutubetraceauto.*`).
+  - Process wrapper for UI + Python: `nim::ZNeutubeAutoTraceProcess` (`src/img/zneutubeautotraceprocess.*`) which plugs into
+    the shared image-processing/background-task framework.
+
+GUI Integration
+
+- Shared state:
+  - `ZTraceSettings` (`src/atlas/ztracesettings.*`) stores the trace source (image/channel/time) and SWC target mapping.
+  - `ZTraceSettingsWidget` (`src/atlas/ztracesettingswidget.*`) exposes this state in a dock panel shared by the 2D and 3D windows.
+- 2D trace click workflow:
+  - Left-click trace menu is built in `ZGraphicsScene` and delegates view-specific actions through `ZView`/`ZImgView`
+    (`src/atlas/zgraphicsscene.cpp`, `src/atlas/zimgview.cpp`).
+- 3D trace click workflow:
+  - Left-click trace is handled in the 3D canvas/view layer and uses image-volume picking to determine the seed location
+    (`src/atlas/z3dcanvas.*`, `src/atlas/z3dimgfilter.*`).
+- SWC editing:
+  - The SWC node context menu is built from `ZSwcPack` and shared between 2D and 3D views, with view-specific wrappers as needed
+    (`src/atlas/zswcpack.*`, `src/atlas/zswcfilter.*`, `src/atlas/z3dcanvas.*`).
+
+Background Tasks and Cancellation
+
+- Long-running operations (including Auto Trace) run as background tasks so the UI stays responsive:
+  - Task management: `ZBackgroundTaskManager` (`src/atlas/zbackgroundtaskmanager.*`)
+  - UI: `ZBackgroundTaskManagerWidget` (`src/atlas/zbackgroundtaskmanagerwidget.*`)
+- Cancellation is threaded through tracing code using `folly::CancellationToken` and checked at safe points (see `maybeCancel(...)` in
+  `src/img/zcancellation.*` and the tracing loops in `src/img/zneutubetrace*.cpp`).
+
+Logging and Debugging
+
+- Tracing emits high-level stage logs via `LOG(INFO)` and optional detailed progress via `VLOG(1)`/`VLOG(2)` (see `src/img/zlog.*`).
+  - Run with `--v=1` to see stage/progress logs (seed sorting progress, per-stage Auto Trace logs, etc.).
+  - Run with `--v=2` for per-seed details (useful when diagnosing “stuck” traces).
+
+Testing
+
+- The main A/B regression test harness for tracing is `zneutubecommand2paritytest` (`test/zneutubecommand2paritytest.cpp`).
+  - It compares Atlas’ tracing outputs against a reference implementation for a set of curated fixtures in `atlas_test_data`.
+  - Some tests are developer-only and auto-skip when large local datasets are not available.
+
 Neuroglancer Precomputed (HTTP)
 
 - Atlas can load Neuroglancer “precomputed” volumes over HTTP (both unsharded and sharded storage via `"sharding": {"@type":"neuroglancer_uint64_sharded_v1", ...}`) with these chunk encodings:
