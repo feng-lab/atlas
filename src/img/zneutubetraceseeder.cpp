@@ -42,6 +42,8 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
   CHECK(signal.numChannels() == 1);
   CHECK(signal.numTimes() == 1);
 
+  VLOG(1) << fmt::format("Seed sort: start (seeds={}, minScore={})", seeds.size(), tw.minScore);
+
   SeedSortResultLegacyLike out;
   out.locsegArray.resize(seeds.size());
   out.scoreArray.assign(seeds.size(), 0.0);
@@ -60,7 +62,12 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
 
   auto* baseMaskData = out.baseMask.timeData<uint8_t>(0);
 
+  const size_t reportEvery = 1000;
   for (size_t i = 0; i < seeds.size(); ++i) {
+    if (VLOG_IS_ON(1) && ((i % reportEvery) == 0 || i + 1 == seeds.size())) {
+      VLOG(1) << fmt::format("Seed sort: {}/{}", i + 1, seeds.size());
+    }
+
     const int x = static_cast<int>(seeds.points[i][0]);
     const int y = static_cast<int>(seeds.points[i][1]);
     const int z = static_cast<int>(seeds.points[i][2]);
@@ -119,6 +126,7 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
     localNeurosegLabelGLegacyLike(seed, out.baseMask, /*flag*/ -1, labelValue, zScale);
   }
 
+  VLOG(1) << "Seed sort: done.";
   return out;
 }
 

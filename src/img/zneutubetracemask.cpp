@@ -25,6 +25,8 @@ std::optional<ZImg> makeMaskLegacyLike(const ZImg& stack, const TraceConfig& cfg
     return std::nullopt;
   }
 
+  VLOG(1) << "Make mask: binarize (LOCMAX) ...";
+
   // Legacy `ZNeuronTracer::binarize()` behavior (ZStackBinarizer LOCMAX, retry count 3).
   const bool collectTiming = (diag != nullptr) && diag->collectTiming;
   if (diag != nullptr) {
@@ -39,6 +41,7 @@ std::optional<ZImg> makeMaskLegacyLike(const ZImg& stack, const TraceConfig& cfg
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
   }
   if (!bin.success) {
+    LOG(INFO) << "Make mask: binarize failed.";
     return std::nullopt;
   }
 
@@ -46,8 +49,11 @@ std::optional<ZImg> makeMaskLegacyLike(const ZImg& stack, const TraceConfig& cfg
     diag->binarizeThreshold = bin.actualThreshold;
   }
 
+  VLOG(1) << fmt::format("Make mask: binarize done (threshold={}).", bin.actualThreshold);
+
   // Legacy `bwsolid(bw)` currently only applies a majority filter R.
   constexpr int mnbr = 4;
+  VLOG(1) << "Make mask: majority filter (bwsolid) ...";
   const auto t1 = collectTiming ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   ZImg mask = majorityFilterBinaryU8RLegacyLike(bin.binary, /*connectivity*/ 26, /*mnbr*/ mnbr);
   if (collectTiming) {
@@ -55,6 +61,7 @@ std::optional<ZImg> makeMaskLegacyLike(const ZImg& stack, const TraceConfig& cfg
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t1).count();
   }
 
+  VLOG(1) << "Make mask: done.";
   return mask;
 }
 

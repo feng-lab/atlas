@@ -44,6 +44,8 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
     return {};
   }
 
+  VLOG(1) << fmt::format("Trace all seeds: start (nseed={}, minScore={})", nseed, tw.minScore);
+
   std::vector<int> indices;
   darrayQsortLegacy(scores, &indices);
   CHECK(static_cast<int>(indices.size()) == nseed);
@@ -67,6 +69,24 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
 
     const LocalNeuroseg& seedLocseg = locsegArray[static_cast<size_t>(seedIndex)];
     const double seedScore = scores[static_cast<size_t>(i)];
+
+    const int seedRank = nseed - i; // 1..nseed in trace order (highest score first)
+    if (VLOG_IS_ON(1)) {
+      const int reportEvery = 100;
+      if (seedRank <= 3 || (seedRank % reportEvery) == 0 || seedRank == nseed) {
+        VLOG(1) << fmt::format("Trace all seeds: seed {}/{} (score={:.6f})", seedRank, nseed, seedScore);
+      }
+    }
+    if (VLOG_IS_ON(2)) {
+      const std::array<double, 3> center = localNeurosegCenterLegacyLike(seedLocseg);
+      VLOG(2) << fmt::format("Trace all seeds: seed {}/{} center=({:.1f}, {:.1f}, {:.1f}) score={:.6f}",
+                             seedRank,
+                             nseed,
+                             center[0],
+                             center[1],
+                             center[2],
+                             seedScore);
+    }
 
     if (!localNeurosegGoodScoreLegacyLike(seedLocseg, seedScore, tw.minScore)) {
       continue;
@@ -140,6 +160,7 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
     chains.push_back(std::move(chain));
   }
 
+  VLOG(1) << fmt::format("Trace all seeds: done (chains={}).", chains.size());
   return chains;
 }
 

@@ -8,7 +8,6 @@
 #include "zneutubetraceswclabelstack.h"
 
 #include "zsparsevoxelmask.h"
-#include "zvoxelvolumedense.h"
 
 #include "zcancellation.h"
 #include "zlog.h"
@@ -30,25 +29,11 @@ struct TraceCirclesResult
   TraceWorkspace tw;
 };
 
-[[nodiscard]] ZImg traceSignalViewLegacyLike(const ZImg& signal, size_t c, size_t t)
-{
-  if (signal.isEmpty()) {
-    return {};
-  }
-
-  const ZImgInfo info = signal.info();
-  if (c >= info.numChannels || t >= info.numTimes) {
-    throw ZException(
-      fmt::format("Seed trace: invalid channel/time selection (c={}, t={}) for signal <{}>.", c, t, info));
-  }
-
-  return signal.createView(static_cast<index_t>(c), static_cast<index_t>(t));
-}
-
-[[nodiscard]] TraceCirclesResult traceSeedToCirclesLegacyLike(const ZVoxelVolume& signal,
-                                                              const std::array<double, 3>& position,
-                                                              const TraceConfig& cfg,
-                                                              const folly::CancellationToken& cancellationToken)
+template<typename TSignal>
+[[nodiscard]] TraceCirclesResult traceSeedToCirclesLegacyLikeImpl(const TSignal& signal,
+                                                                  const std::array<double, 3>& position,
+                                                                  const TraceConfig& cfg,
+                                                                  const folly::CancellationToken& cancellationToken)
 {
   TraceCirclesResult res;
 
@@ -74,9 +59,17 @@ struct TraceCirclesResult
   seedLocseg.seg.scale = 1.0;
   setNeurosegPositionLegacyLike(seedLocseg, position, NeuroposReferenceLegacyLike::Center);
 
+  VLOG(1) << fmt::format("Seed trace: optimize seed at ({:.3f}, {:.3f}, {:.3f})",
+                         position[0],
+                         position[1],
+                         position[2]);
+
   maybeCancel(res.tw.cancellationToken);
-  (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signal, 1.0, 1, res.tw.fitWorkspace);
+  const double seedScore =
+    localNeurosegOptimizeWLegacyLike(seedLocseg, signal, /*zScale*/ 1.0, /*option*/ 1, res.tw.fitWorkspace);
   maybeCancel(res.tw.cancellationToken);
+
+  VLOG(1) << fmt::format("Seed trace: seed optimize score={:.6f} (minScore={:.6f})", seedScore, res.tw.minScore);
 
   TraceRecord seedTr;
   traceRecordReset(seedTr);
@@ -90,13 +83,51 @@ struct TraceCirclesResult
   (void)chain.addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
 
   traceWorkspaceSetTraceStatusLegacyLike(res.tw, TraceStatus::Normal, TraceStatus::Normal);
-  traceLocsegLegacyLike(signal, 1.0, chain, res.tw);
+
+  VLOG(1) << "Seed trace: tracing chain ...";
+  traceLocsegLegacyLike(signal, /*zScale*/ 1.0, chain, res.tw);
   maybeCancel(res.tw.cancellationToken);
+  VLOG(1) << fmt::format("Seed trace: chain trace done (len={}, status=[{},{}])",
+                         chain.length(),
+                         static_cast<int>(res.tw.traceStatus[0]),
+                         static_cast<int>(res.tw.traceStatus[1]));
+
   (void)locsegChainRemoveOverlapEndsLegacyLike(chain);
   locsegChainRemoveTurnEndsLegacyLike(chain, 1.0);
 
   res.circles = locsegChainToGeo3dCircleArrayLegacyLike(chain);
   return res;
+}
+
+[[nodiscard]] ZImg traceSignalViewLegacyLike(const ZImg& signal, size_t c, size_t t)
+{
+  if (signal.isEmpty()) {
+    return {};
+  }
+
+  const ZImgInfo info = signal.info();
+  if (c >= info.numChannels || t >= info.numTimes) {
+    throw ZException(
+      fmt::format("Seed trace: invalid channel/time selection (c={}, t={}) for signal <{}>.", c, t, info));
+  }
+
+  return signal.createView(static_cast<index_t>(c), static_cast<index_t>(t));
+}
+
+[[nodiscard]] TraceCirclesResult traceSeedToCirclesLegacyLike(const ZImg& signal,
+                                                              const std::array<double, 3>& position,
+                                                              const TraceConfig& cfg,
+                                                              const folly::CancellationToken& cancellationToken)
+{
+  return traceSeedToCirclesLegacyLikeImpl(signal, position, cfg, cancellationToken);
+}
+
+[[nodiscard]] TraceCirclesResult traceSeedToCirclesLegacyLike(const ZVoxelVolume& signal,
+                                                              const std::array<double, 3>& position,
+                                                              const TraceConfig& cfg,
+                                                              const folly::CancellationToken& cancellationToken)
+{
+  return traceSeedToCirclesLegacyLikeImpl(signal, position, cfg, cancellationToken);
 }
 
 // Port of the start/end trimming used by the seeded-trace codepaths.
@@ -134,41 +165,31 @@ struct TraceCirclesResult
   return {start, end};
 }
 
-} // namespace
-
-SeedTraceResult traceSeedNewSwcLegacyLike(const ZImg& signal,
-                                          const std::array<double, 3>& position,
-                                          const TraceConfig& cfg,
-                                          size_t c,
-                                          size_t t,
-                                          folly::CancellationToken cancellationToken)
+template<typename TSignal>
+[[nodiscard]] SeedTraceResult traceSeedNewSwcFromSignalViewLegacyLike(const TSignal& signal,
+                                                                      const std::array<double, 3>& position,
+                                                                      const TraceConfig& cfg,
+                                                                      folly::CancellationToken cancellationToken)
 {
   if (signal.isEmpty()) {
     return {};
   }
 
-  const ZImg signalView = traceSignalViewLegacyLike(signal, c, t);
-  const ZDenseVoxelVolume vol(signalView);
-  return traceSeedNewSwcLegacyLike(vol, position, cfg, cancellationToken);
-}
+  LOG(INFO) << fmt::format("Seed trace (new SWC): seed=({:.3f}, {:.3f}, {:.3f})",
+                           position[0],
+                           position[1],
+                           position[2]);
 
-SeedTraceResult traceSeedNewSwcLegacyLike(const ZVoxelVolume& signal,
-                                          const std::array<double, 3>& position,
-                                          const TraceConfig& cfg,
-                                          folly::CancellationToken cancellationToken)
-{
-  if (signal.isEmpty()) {
-    return {};
-  }
-
-  TraceCirclesResult tr = traceSeedToCirclesLegacyLike(signal, position, cfg, cancellationToken);
+  TraceCirclesResult tr = traceSeedToCirclesLegacyLikeImpl(signal, position, cfg, cancellationToken);
   if (tr.circles.empty()) {
+    VLOG(1) << "Seed trace: no circles produced.";
     return {};
   }
 
   maybeCancel(cancellationToken);
   const auto [start, end] = trimmedCircleIndexRangeLegacyLike(tr.tw, tr.circles);
   if (start >= end) {
+    VLOG(1) << "Seed trace: circle range empty after trimming.";
     return {};
   }
 
@@ -199,40 +220,23 @@ SeedTraceResult traceSeedNewSwcLegacyLike(const ZVoxelVolume& signal,
   SeedTraceResult res;
   res.newNodes = static_cast<size_t>(end - start);
   res.swc = std::move(swc);
+  LOG(INFO) << fmt::format("Seed trace (new SWC): done (newNodes={})", res.newNodes);
   return res;
 }
 
-SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
-                                               const ZSwc& hostSwc,
-                                               const std::array<double, 3>& position,
-                                               const TraceConfig& cfg,
-                                               size_t c,
-                                               size_t t,
-                                               folly::CancellationToken cancellationToken)
-{
-  if (signal.isEmpty()) {
-    auto outSwc = std::make_unique<ZSwc>(hostSwc);
-    for (auto& tn : *outSwc) {
-      tn.selected = false;
-    }
-    return {.swc = std::move(outSwc), .newNodes = 0};
-  }
-
-  const ZImg signalView = traceSignalViewLegacyLike(signal, c, t);
-  const ZDenseVoxelVolume vol(signalView);
-  return traceSeedIntoHostSwcLegacyLike(vol, hostSwc, position, cfg, cancellationToken);
-}
-
-SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZVoxelVolume& signal,
-                                               const ZSwc& hostSwc,
-                                               const std::array<double, 3>& position,
-                                               const TraceConfig& cfg,
-                                               folly::CancellationToken cancellationToken)
+template<typename TSignal>
+[[nodiscard]] SeedTraceResult traceSeedIntoHostSwcFromSignalViewLegacyLike(const TSignal& signal,
+                                                                           const ZSwc& hostSwc,
+                                                                           const std::array<double, 3>& position,
+                                                                           const TraceConfig& cfg,
+                                                                           folly::CancellationToken cancellationToken)
 {
   auto outSwc = std::make_unique<ZSwc>(hostSwc);
   for (auto& tn : *outSwc) {
     tn.selected = false;
   }
+
+  LOG(INFO) << fmt::format("Seed trace (attach): seed=({:.3f}, {:.3f}, {:.3f})", position[0], position[1], position[2]);
 
   std::vector<ZSwc::SwcTreeNode> hostRoots;
   hostRoots.reserve(outSwc->numRoots());
@@ -275,7 +279,8 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZVoxelVolume& signal,
   seedLocseg.seg.scale = 1.0;
   setNeurosegPositionLegacyLike(seedLocseg, position, NeuroposReferenceLegacyLike::Center);
 
-  (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signal, 1.0, 1, tr.tw.fitWorkspace);
+  VLOG(1) << "Seed trace: optimize seed (attach) ...";
+  (void)localNeurosegOptimizeWLegacyLike(seedLocseg, signal, /*zScale*/ 1.0, /*option*/ 1, tr.tw.fitWorkspace);
   maybeCancel(tr.tw.cancellationToken);
 
   TraceRecord seedTr;
@@ -290,19 +295,22 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZVoxelVolume& signal,
   (void)chain.addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
 
   traceWorkspaceSetTraceStatusLegacyLike(tr.tw, TraceStatus::Normal, TraceStatus::Normal);
-  traceLocsegLegacyLike(signal, 1.0, chain, tr.tw);
+  VLOG(1) << "Seed trace: tracing chain (attach) ...";
+  traceLocsegLegacyLike(signal, /*zScale*/ 1.0, chain, tr.tw);
   maybeCancel(tr.tw.cancellationToken);
   (void)locsegChainRemoveOverlapEndsLegacyLike(chain);
   locsegChainRemoveTurnEndsLegacyLike(chain, 1.0);
 
   tr.circles = locsegChainToGeo3dCircleArrayLegacyLike(chain);
   if (tr.circles.empty()) {
+    LOG(INFO) << "Seed trace (attach): no circles produced.";
     return {.swc = std::move(outSwc), .newNodes = 0};
   }
 
   const auto [start, end] = trimmedCircleIndexRangeLegacyLike(tr.tw, tr.circles);
   const int trimmedCount = end - start;
   if (start >= end || trimmedCount <= 1) {
+    LOG(INFO) << "Seed trace (attach): circle range empty after trimming.";
     return {.swc = std::move(outSwc), .newNodes = 0};
   }
 
@@ -339,7 +347,62 @@ SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZVoxelVolume& signal,
   // `ZNeuronConstructor::reconstruct` resorts IDs before returning its ZSwcTree.
   resortId(*outSwc);
 
+  LOG(INFO) << fmt::format("Seed trace (attach): done (newNodes={})", added);
   return {.swc = std::move(outSwc), .newNodes = added};
+}
+
+} // namespace
+
+SeedTraceResult traceSeedNewSwcLegacyLike(const ZImg& signal,
+                                          const std::array<double, 3>& position,
+                                          const TraceConfig& cfg,
+                                          size_t c,
+                                          size_t t,
+                                          folly::CancellationToken cancellationToken)
+{
+  if (signal.isEmpty()) {
+    return {};
+  }
+
+  const ZImg signalView = traceSignalViewLegacyLike(signal, c, t);
+  return traceSeedNewSwcFromSignalViewLegacyLike(signalView, position, cfg, cancellationToken);
+}
+
+SeedTraceResult traceSeedNewSwcLegacyLike(const ZVoxelVolume& signal,
+                                          const std::array<double, 3>& position,
+                                          const TraceConfig& cfg,
+                                          folly::CancellationToken cancellationToken)
+{
+  return traceSeedNewSwcFromSignalViewLegacyLike(signal, position, cfg, cancellationToken);
+}
+
+SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
+                                               const ZSwc& hostSwc,
+                                               const std::array<double, 3>& position,
+                                               const TraceConfig& cfg,
+                                               size_t c,
+                                               size_t t,
+                                               folly::CancellationToken cancellationToken)
+{
+  if (signal.isEmpty()) {
+    auto outSwc = std::make_unique<ZSwc>(hostSwc);
+    for (auto& tn : *outSwc) {
+      tn.selected = false;
+    }
+    return {.swc = std::move(outSwc), .newNodes = 0};
+  }
+
+  const ZImg signalView = traceSignalViewLegacyLike(signal, c, t);
+  return traceSeedIntoHostSwcFromSignalViewLegacyLike(signalView, hostSwc, position, cfg, cancellationToken);
+}
+
+SeedTraceResult traceSeedIntoHostSwcLegacyLike(const ZVoxelVolume& signal,
+                                               const ZSwc& hostSwc,
+                                               const std::array<double, 3>& position,
+                                               const TraceConfig& cfg,
+                                               folly::CancellationToken cancellationToken)
+{
+  return traceSeedIntoHostSwcFromSignalViewLegacyLike(signal, hostSwc, position, cfg, cancellationToken);
 }
 
 } // namespace nim

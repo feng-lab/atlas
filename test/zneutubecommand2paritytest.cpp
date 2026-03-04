@@ -76,6 +76,7 @@ extern "C" {
 #include "zneutubetracelocseglabel.h"
 #include "zneutubetraceseeder.h"
 #include "zneutubetraceallseeds.h"
+#include "zneutubetraceinteractive.h"
 #include "zneutubetracescorethresholds.h"
 #include "zneutubetraceconfig.h"
 #include "zneutubetracemask.h"
@@ -90,6 +91,7 @@ extern "C" {
 #include "zneutubestackfitscore.h"
 #include "zneutubestackfitoptions.h"
 #include "zneutubetraceseed.h"
+#include "zvoxelvolumedense.h"
 
 #include "zimg.h"
 #include "zimgneighborhooditerator.h"
@@ -713,6 +715,50 @@ template<typename T>
 
   CHECK(false) << "digestLegacyStackU8OrU16: unsupported kind=" << stack->kind;
   return {};
+}
+
+struct SwcDigest
+{
+  size_t nodes = 0;
+  uint64_t hash = 0;
+};
+
+[[nodiscard]] SwcDigest digestSwc(const nim::ZSwc& swc)
+{
+  constexpr uint64_t FnvOffset = 14695981039346656037ull;
+  constexpr uint64_t FnvPrime = 1099511628211ull;
+
+  uint64_t h64 = FnvOffset;
+  size_t nodes = 0;
+
+  auto mixU64 = [&](uint64_t v) {
+    h64 ^= v + 0x9e3779b97f4a7c15ull + (h64 << 6) + (h64 >> 2);
+    h64 *= FnvPrime;
+  };
+
+  auto mixI64 = [&](int64_t v) {
+    mixU64(static_cast<uint64_t>(v));
+  };
+
+  auto mixDouble = [&](double v) {
+    uint64_t bits = 0;
+    static_assert(sizeof(bits) == sizeof(v));
+    std::memcpy(&bits, &v, sizeof(bits));
+    mixU64(bits);
+  };
+
+  for (auto it = swc.begin(); it != swc.end(); ++it) {
+    ++nodes;
+    mixI64(it->id);
+    mixI64(it->type);
+    mixDouble(it->x);
+    mixDouble(it->y);
+    mixDouble(it->z);
+    mixDouble(it->radius);
+    mixI64(nim::ZSwc::parentID(it));
+  }
+
+  return {.nodes = nodes, .hash = h64};
 }
 
 template<typename T>
@@ -3654,6 +3700,104 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
 
   std::vector<nim::LocalNeuroseg> portedLocsegs = portedSorted.locsegArray;
   std::vector<double> portedScores = portedSorted.scoreArray;
+
+  // Interactive trace perf: reuse sorted seed scores from auto tracing to pick a few seeds, then
+  // trace them one-by-one. Compare the ZImg fast path vs ZVoxelVolume interface path.
+  {
+    std::vector<size_t> seedOrder;
+    seedOrder.resize(portedScores.size());
+    for (size_t i = 0; i < seedOrder.size(); ++i) {
+      seedOrder[i] = i;
+    }
+    std::sort(seedOrder.begin(), seedOrder.end(), [&](size_t a, size_t b) {
+      return portedScores[a] > portedScores[b];
+    });
+
+    std::vector<std::array<double, 3>> chosenSeeds;
+    chosenSeeds.reserve(5);
+    const double minDist = 0.25 * std::min<double>(portedSignal.width(), portedSignal.height());
+    const double minDist2 = minDist * minDist;
+    for (size_t idx : seedOrder) {
+      if (chosenSeeds.size() >= 5) {
+        break;
+      }
+      if (idx >= portedSeeds1.points.size()) {
+        continue;
+      }
+      const auto cand = portedSeeds1.points[idx];
+
+      bool farEnough = true;
+      for (const auto& s : chosenSeeds) {
+        const double dx = cand[0] - s[0];
+        const double dy = cand[1] - s[1];
+        const double dz = cand[2] - s[2];
+        const double d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < minDist2) {
+          farEnough = false;
+          break;
+        }
+      }
+      if (farEnough) {
+        chosenSeeds.push_back(cand);
+      }
+    }
+    if (chosenSeeds.size() < 3) {
+      // Fallback: take the top few seeds even if clustered.
+      chosenSeeds.clear();
+      for (size_t i = 0; i < seedOrder.size() && chosenSeeds.size() < 3; ++i) {
+        const size_t idx = seedOrder[i];
+        if (idx < portedSeeds1.points.size()) {
+          chosenSeeds.push_back(portedSeeds1.points[idx]);
+        }
+      }
+    }
+
+    if (!chosenSeeds.empty()) {
+      nim::ZDenseVoxelVolume denseVol(portedSignal);
+      int64_t sumImgMs = 0;
+      int64_t sumVolMs = 0;
+
+      for (size_t i = 0; i < chosenSeeds.size(); ++i) {
+        const auto seed = chosenSeeds[i];
+
+        nim::SeedTraceResult imgRes;
+        const int64_t imgMs = timeMs([&]() {
+          imgRes = nim::traceSeedNewSwcLegacyLike(portedSignal, seed, portedCfg, /*c*/ 0, /*t*/ 0);
+        });
+
+        nim::SeedTraceResult volRes;
+        const int64_t volMs = timeMs([&]() {
+          volRes = nim::traceSeedNewSwcLegacyLike(denseVol, seed, portedCfg);
+        });
+
+        sumImgMs += imgMs;
+        sumVolMs += volMs;
+
+        LOG(INFO) << fmt::format("Slice15 interactive trace seed[{}]: img={}ms vol={}ms seed=({:.1f},{:.1f},{:.1f})",
+                                 i,
+                                 imgMs,
+                                 volMs,
+                                 seed[0],
+                                 seed[1],
+                                 seed[2]);
+
+        if (imgRes.swc && volRes.swc) {
+          const SwcDigest a = digestSwc(*imgRes.swc);
+          const SwcDigest b = digestSwc(*volRes.swc);
+          EXPECT_EQ(a.nodes, b.nodes);
+          EXPECT_EQ(a.hash, b.hash);
+        } else {
+          EXPECT_EQ(imgRes.swc != nullptr, volRes.swc != nullptr);
+        }
+      }
+
+      const double ratio = (sumVolMs > 0) ? (static_cast<double>(sumImgMs) / static_cast<double>(sumVolMs)) : 0.0;
+      LOG(INFO) << fmt::format("Slice15 interactive trace total: img={}ms vol={}ms (ratio={:.3f}x)",
+                               sumImgMs,
+                               sumVolMs,
+                               ratio);
+    }
+  }
 
   int legacyNchain = 0;
   Locseg_Chain** legacyChainsRaw = nullptr;
