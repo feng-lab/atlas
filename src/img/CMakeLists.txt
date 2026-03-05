@@ -334,7 +334,6 @@ if (WIN32)
 
     target_compile_options(${LIBRARY_NAME} PUBLIC /GR) # Enable Run-Time Type Information
     target_compile_options(${LIBRARY_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
-    target_compile_options(${LIBRARY_NAME} PUBLIC /Wall)
     target_compile_options(${LIBRARY_NAME} PUBLIC /bigobj) # increases the number of sections that an object file can contain.
     target_compile_options(${LIBRARY_NAME} PUBLIC /wd4267) # 'var' : conversion from 'size_t' to 'type', possible loss of data
     target_compile_options(${LIBRARY_NAME} PUBLIC /wd4244) # 'argument' : conversion from 'type1' to 'type2', possible loss of data
@@ -351,6 +350,7 @@ if (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC /wd5246) # 'member': the initialization of a subobject should be wrapped in braces
     target_compile_options(${LIBRARY_NAME} PUBLIC /utf-8)  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
     if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(${LIBRARY_NAME} PUBLIC /Wall)
         target_compile_options(${LIBRARY_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
         # target_compile_options(${LIBRARY_NAME} PUBLIC /wd6255) # _alloca indicates failure by raising a stack overflow exception. Consider using _malloca instead.
         target_compile_options(${LIBRARY_NAME} PUBLIC /wd6326) # Potential comparison of a constant with another constant.
@@ -364,8 +364,9 @@ if (WIN32)
         target_compile_options(${LIBRARY_NAME} PUBLIC /wd6385) # Invalid data: accessing buffer-name, the readable size is size1 bytes, but size2 bytes may be read: Lines: x, y
         target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
         # standard conformance
-        target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:preprocessor /Zc:lambda /Zc:externConstexpr /Zc:throwingNew /Zc:enumTypes /Zc:templateScope)
+        target_compile_options(${LIBRARY_NAME} PUBLIC /permissive- /Zc:preprocessor /Zc:lambda /Zc:externConstexpr /Zc:throwingNew /Zc:enumTypes /Zc:templateScope)
     else ()
+        target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wall /clang:-Wextra)
         target_compile_options(${LIBRARY_NAME} PUBLIC /MD)
         target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-c++98-c++11-c++14-c++17-compat)
         target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-unsafe-buffer-usage)
@@ -374,7 +375,7 @@ if (WIN32)
         set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "/clang:-Wno-reserved-identifier /clang:-Wno-unused-parameter /clang:-Wno-unused-command-line-argument /clang:-Wno-sign-conversion /clang:-Wno-format")
     endif ()
     # standard conformance
-    target_compile_options(${LIBRARY_NAME} PUBLIC /permissive- /volatile:iso /Zc:inline)
+    target_compile_options(${LIBRARY_NAME} PUBLIC /volatile:iso /Zc:inline)
     target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:__cplusplus) # The /Zc:__cplusplus compiler option enables the __cplusplus preprocessor macro to report an updated value for recent C++ language standards support
 
     target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)

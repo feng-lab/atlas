@@ -1023,9 +1023,9 @@ if (MSVC)
     atlas_core_n_p
     atlas_core_q_r
     atlas_core_s_z
-    atlas_z3d
-    atlas_vulkan
     PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    set_property(TARGET atlas_z3d PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    set_property(TARGET atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 else ()
   set_property(TARGET atlas_core atlas_z3d atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 endif ()

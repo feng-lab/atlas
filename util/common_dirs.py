@@ -28,7 +28,7 @@ def is_linux() -> bool:
 
 
 def use_clang_cl() -> bool:
-    return True
+    return False
 
 
 def use_ninja() -> bool:
