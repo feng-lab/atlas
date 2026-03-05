@@ -363,12 +363,18 @@ if (WIN32)
         target_compile_options(${LIBRARY_NAME} PUBLIC /wd6262) # Function uses constant_1 bytes of stack: exceeds /analyze:stacksize constant_2. Consider moving some data to heap
         target_compile_options(${LIBRARY_NAME} PUBLIC /wd6385) # Invalid data: accessing buffer-name, the readable size is size1 bytes, but size2 bytes may be read: Lines: x, y
         target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
+        # standard conformance
+        target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:preprocessor /Zc:lambda /Zc:externConstexpr /Zc:throwingNew /Zc:enumTypes /Zc:templateScope)
     else ()
         target_compile_options(${LIBRARY_NAME} PUBLIC /MD)
+        target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-c++98-c++11-c++14-c++17-compat)
+        target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-unsafe-buffer-usage)
+        target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-switch-default)
+        target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-float-conversion)
+        set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "/clang:-Wno-reserved-identifier /clang:-Wno-unused-parameter /clang:-Wno-unused-command-line-argument /clang:-Wno-sign-conversion /clang:-Wno-format")
     endif ()
     # standard conformance
-    target_compile_options(${LIBRARY_NAME} PUBLIC /permissive- /volatile:iso /Zc:inline /Zc:preprocessor /Zc:lambda)
-    target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:externConstexpr /Zc:throwingNew /Zc:enumTypes /Zc:templateScope)
+    target_compile_options(${LIBRARY_NAME} PUBLIC /permissive- /volatile:iso /Zc:inline)
     target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:__cplusplus) # The /Zc:__cplusplus compiler option enables the __cplusplus preprocessor macro to report an updated value for recent C++ language standards support
 
     target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)
