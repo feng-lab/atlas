@@ -3,12 +3,68 @@ import logging
 import os
 import subprocess
 
+import atlas_pypi
 import build_ext_libs
 import common_dirs
 from download_atlas_test_data import download_atlas_test_data
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
+
+
+def _git_describe(repo_dir: str) -> str | None:
+    try:
+        res = subprocess.run(
+            ["git", "describe", "--tags", "--dirty", "--always"],
+            cwd=repo_dir,
+            shell=False,
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+    except FileNotFoundError:
+        return None
+
+    if res.returncode != 0:
+        return None
+    return res.stdout.strip() or None
+
+
+def _is_clean_release_tag_build(repo_dir: str) -> tuple[bool, str | None]:
+    git_describe = _git_describe(repo_dir)
+    if not git_describe:
+        return (False, None)
+    if git_describe.endswith("-dirty"):
+        return (False, git_describe)
+    return (atlas_pypi.is_clean_release_tag(git_describe), git_describe)
+
+
+def _resolve_skip_test(
+    skip_test: bool | None, *, use_asan: bool, debug_version: bool
+) -> bool:
+    if skip_test is not None:
+        if use_asan and not skip_test:
+            # Tests are currently excluded from ASAN builds in CMake (see CMakeLists.txt).
+            logger.warning("Tests are disabled for ASAN builds; forcing --skip-test.")
+            return True
+        return skip_test
+
+    # Preserve historical behavior: ASAN and debug builds skip tests by default.
+    if use_asan or debug_version:
+        return True
+
+    is_release_tag, git_describe = _is_clean_release_tag_build(
+        common_dirs.atlas_repository_dir()
+    )
+    if is_release_tag:
+        logger.info(
+            "Detected clean release tag build (%s); skipping tests by default.",
+            git_describe,
+        )
+        return True
+    if git_describe:
+        logger.info("git describe: %s", git_describe)
+    return False
 
 
 def get_cmake_cmd_common_part():
@@ -82,7 +138,7 @@ def get_cmake_cmd_common_part():
 
 def build_atlas(
     use_asan: bool = False,
-    skip_test: bool = False,
+    skip_test: bool | None = None,
     debug_version: bool = False,
     enable_network_tests: bool = False,
 ):
@@ -90,13 +146,16 @@ def build_atlas(
     logger.info(f"buildDIR: {common_dirs.atlas_build_dir()}")
     logger.info(f"useNinja: {common_dirs.use_ninja()}")
 
-    skip_test = skip_test or use_asan or debug_version
+    skip_test = _resolve_skip_test(
+        skip_test, use_asan=use_asan, debug_version=debug_version
+    )
 
     cmakecmd = get_cmake_cmd_common_part()
     cmakecmd[:] = [x for x in cmakecmd if x]
 
     cmakecmd.extend(
         [
+            "-DBUILD_TESTING:BOOL=" + ("OFF" if skip_test else "ON"),
             "-DATLAS_SANITIZE_ADDRESS:BOOL=" + ("ON" if use_asan else "OFF"),
             "-DATLAS_DEBUG_VERSION:BOOL=" + ("ON" if debug_version else "OFF"),
             # Developer-only tool; keep it out of deployed builds by default.
@@ -216,12 +275,25 @@ if __name__ == "__main__":
         epilog="""
 Examples:
 
-python build_atlas.py [--use-asan] [--skip-test] [--debug-version]
+python build_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-version]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--use-asan", action="store_true", help="use sanitizers")
-    parser.add_argument("--skip-test", action="store_true", help="skip test")
+    tests = parser.add_mutually_exclusive_group()
+    tests.add_argument(
+        "--skip-test",
+        dest="skip_test",
+        action="store_true",
+        help="skip building and running tests",
+    )
+    tests.add_argument(
+        "--run-test",
+        dest="skip_test",
+        action="store_false",
+        help="force building and running tests (overrides auto-skip on release tags)",
+    )
+    parser.set_defaults(skip_test=None)
     parser.add_argument("--debug-version", action="store_true", help="debug version")
     parser.add_argument(
         "--enable-network-tests",

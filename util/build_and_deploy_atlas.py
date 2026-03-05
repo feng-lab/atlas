@@ -12,13 +12,26 @@ if __name__ == "__main__":
         epilog="""
 Examples:
 
-python build_and_deploy_atlas.py [--use-asan] [--skip-test] [--debug-version]
+python build_and_deploy_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-version]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
-    parser.add_argument("--skip-test", action='store_true', help="skip test")
-    parser.add_argument("--debug-version", action='store_true', help="debug version")
+    parser.add_argument("--use-asan", action="store_true", help="use sanitizers")
+    tests = parser.add_mutually_exclusive_group()
+    tests.add_argument(
+        "--skip-test",
+        dest="skip_test",
+        action="store_true",
+        help="skip building and running tests",
+    )
+    tests.add_argument(
+        "--run-test",
+        dest="skip_test",
+        action="store_false",
+        help="force building and running tests (overrides auto-skip on release tags)",
+    )
+    parser.set_defaults(skip_test=None)
+    parser.add_argument("--debug-version", action="store_true", help="debug version")
     parser.add_argument(
         "--enable-network-tests",
         action="store_true",
