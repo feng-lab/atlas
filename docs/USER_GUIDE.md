@@ -1,12 +1,6 @@
-Atlas User Manual
-=================
-<!-- 这是一段被注释掉的文字 -->
-
+Atlas User Guide
+================
 <!-- > 📸 **Screenshot to add:** Application splash or title screen that introduces Atlas. Include version number in the window title.-->
-
-<p align="center">
-  <img src="./images/version.png" alt="label_region" width="200">
-</p>
 
 ## Table of Contents
 - [1. Introduction](#1-introduction)
@@ -92,7 +86,7 @@ Atlas is a multi-modal visualization and analysis environment designed for large
 
 - High-performance volume rendering for large image stacks.
 - Interactive editing and inspection tools for meshes, neuronal skeletons (SWC), puncta, ROI masks, and SVG overlays.
-- Dedicated 2D and 3D workspaces that share the same underlying documents (`ZDoc` and friends) so state stays synchronized.
+- Dedicated 2D and 3D workspaces that stay synchronized, so you can inspect and edit the same data in either view.
 - Scene persistence (`*.scene`) and animation timelines (`*.animation3d` and 2D counterparts) for reproducible visual storytelling.
 - GPU-accelerated rendering (OpenGL or Vulkan backends) with CLI automation for headless exports.
 
@@ -107,24 +101,22 @@ Atlas is crafted to handle entire imaging pipelines, from loading raw data to pr
 
 ### 1.3 Supported Data Types
 
-Atlas organizes data into documents. Each document type contributes load actions, save routines, and editing widgets.
+Atlas organizes data by object type so each kind of content has the right loading, editing, and export tools.
 
-| Document | Typical Extensions | Notes |
+| Object Type | Typical Extensions | Notes |
 | --- | --- | --- |
-| `ZImgDoc` (Images) | `.tif`, `.tiff`, `.ome.tif`, `.mhd`, `.raw`, `.nii`, `.hdr`, `.png`, `.jpg`, `.bmp`, `.exr`, `.lsm`, `.v3draw` | Multi-channel, multi-timepoint volumes supported. Sequences can be imported as stacks. Also supports Neuroglancer precomputed volumes (`raw`/`jpeg`/`png`/`compresso`/`compressed_segmentation`, sharded or unsharded) via URL. |
-| `ZROIDoc` (ROI Masks) | `.roi`, `.mask`, `.nii`, `.mhd`, `.nrrd` | Accepts atlas-generated ROI files or converts mask images into editable ROIs. |
-| `ZRegionAnnotationDoc` | `.annotation`, `.json`, label images | Handles labeled regions; can import/export label images. |
-| `ZPunctaDoc` | `.apo`, `.csv`, `.json` | Stores point clouds like synaptic puncta with undo support. |
-| `ZSwcDoc` | `.swc`, `.eswc`, `.json` | Manages neuronal tree structures with per-node attributes. |
-| `ZMeshDoc` | `.obj`, `.ply`, `.stl`, `.off`, `.vtk`, `.gii` | Calculates surface/volume metrics on load. |
-| `ZSvgDoc` | `.svg` | Overlays vector graphics (regions, labels). |
-| `Z2DAnimationDoc` | `.animation2d` | Timeline for 2D view parameters. |
-| `Z3DAnimationDoc` | `.animation3d` | Timeline for 3D parameters and camera paths. |
+| Images | `.tif`, `.tiff`, `.ome.tif`, `.mhd`, `.raw`, `.nii`, `.hdr`, `.png`, `.jpg`, `.bmp`, `.exr`, `.lsm`, `.v3draw` | Multi-channel, multi-timepoint volumes supported. Sequences can be imported as stacks. Also supports Neuroglancer precomputed volumes (`raw`/`jpeg`/`png`/`compresso`/`compressed_segmentation`, sharded or unsharded) via URL. |
+| ROI Masks | `.roi`, `.mask`, `.nii`, `.mhd`, `.nrrd` | Accepts Atlas-generated ROI files or converts mask images into editable ROIs. |
+| Region Annotations | `.annotation`, `.json`, label images | Handles labeled regions and can import or export label images. |
+| Puncta Sets | `.apo`, `.csv`, `.json` | Stores point-based annotations such as synaptic puncta with undo support. |
+| SWC Trees | `.swc`, `.eswc`, `.json` | Manages neuronal tree structures with per-node attributes. |
+| Meshes | `.obj`, `.ply`, `.stl`, `.off`, `.vtk`, `.gii` | Calculates common surface and volume measurements on load. |
+| SVG Overlays | `.svg` | Overlays vector graphics such as outlines and labels. |
+| 2D Animations | `.animation2d` | Timeline for 2D view parameters. |
+| 3D Animations | `.animation3d` | Timeline for 3D parameters and camera paths. |
 
 <!-- > 📸 **Screenshot to add:** A collage showing different supported object types loaded into the Objects Manager.-->
-<p align="center">
-  <img src="./images/zuhe.png" alt="label_region" width="800">
-</p>
+![Atlas object types loaded in the Objects Manager](images/zuhe.png)
 
 ### 1.4 How This Guide Is Organized
 
@@ -137,9 +129,9 @@ Sections 2–6 walk through setup and the interface. Sections 7–10 cover every
 ### 2.1 Building or Installing
 
 1. **Clone the repository** (or obtain binaries if your organization provides them).
-2. **Follow `readme.md`** for platform-specific build instructions. Typical steps include configuring CMake with either Qt’s qmake-compatible toolchain or Ninja, then compiling the `atlas` target.
+2. **Follow `readme.md`** for platform-specific build instructions. Typical steps include configuring CMake, building Atlas, and installing any required runtime components.
 3. **Install runtime dependencies** such as Qt libraries and OpenGL/Vulkan drivers. Verify GPU driver updates before launching.
-4. **Run the application** through the provided launcher or by executing the compiled binary:
+4. **Run the application** through the provided launcher or by executing the Atlas application directly:
    ```bash
    ./build/atlas
    ```
@@ -150,8 +142,8 @@ Sections 2–6 walk through setup and the interface. Sections 7–10 cover every
 Perform the following steps the first time you open Atlas:
 
 1. **Start Atlas**. The 2D main window appears.
-2. **Confirm GPU initialization**. In the console/log window you should see messages from `Z3DRenderingEngine` indicating that the OpenGL or Vulkan context initialized. When Vulkan is enabled, Atlas performs asynchronous end‑of‑frame readback (offscreen) with a default one‑frame latency for UI display.
-3. **Open the 3D window** via **View → Open 3D Window** once to confirm that the rendering engine loads correctly. Close it again if you prefer to start in 2D.
+2. **Confirm GPU initialization**. In the console or log window, look for messages showing that the OpenGL or Vulkan renderer initialized successfully. When Vulkan is enabled, Atlas may present the 3D view with a small display latency because frames are read back asynchronously.
+3. **Open the 3D window** via **View → Open 3D Window** once to confirm that 3D rendering is working correctly. Close it again if you prefer to start in 2D.
 4. **Open the Help dock** and skim navigation shortcuts.
 5. **Generate configuration file** if you require custom flags: **Help → Generate Config File** copies the default `settings_flagfile.txt` into your config directory. You can edit the new `user_settings_flagfile.txt` afterwards.
 6. **Set your default working folders** by loading an image to seed the recent-files list and default directory history.
@@ -160,16 +152,14 @@ Perform the following steps the first time you open Atlas:
 
 Atlas keeps runtime files in a few key locations:
 
-- **Installation directory**: contains the executable, Qt frameworks, and resources.
-- **Log directory** (`ZSystemInfo::logDir()`): runtime logs, including 3D engine diagnostics.
-- **Config directory** (`ZSystemInfo::configDir()`): user settings, generated flag files, animation defaults.
-- **Scene files** (`*.scene`): stored wherever you save them; contain serialized document state and view settings.
+- **Installation directory**: contains the executable and bundled application resources.
+- **Log directory**: runtime logs, including 3D engine diagnostics.
+- **Config directory**: user settings, generated flag files, and animation defaults.
+- **Scene files** (`*.scene`): stored wherever you save them; contain the saved workspace state and view settings.
 - **Animation files** (`*.animation3d`, `*.animation2d`): saved alongside your data or in project folders.
 
 <!-- > 📸 **Screenshot to add:** Finder/Explorer window showing config and log directories after first launch. -->
-<p align="center">
-  <img src="./images/logfolder.png" alt="label_region" width="300">
-</p>
+![Atlas log and config folders](images/logfolder.png)
 ---
 
 ## 3. Guided Tour of the Interface
@@ -177,9 +167,7 @@ Atlas keeps runtime files in a few key locations:
 ### 3.1 2D Main Window at a Glance
 
 <!-- > 📸 **Screenshot to add:** The main window with each labeled region (Menus, Toolbars, Objects Manager, 2D View, Docks). -->
-<p align="center">
-  <img src="./images/labeled_region.png" alt="label_region" width="800">
-</p>
+![Atlas main window layout](images/labeled_region.png)
 
 Key regions:
 
@@ -192,22 +180,22 @@ Key regions:
 
 ### 3.2 Menus in Detail
 
-Below is an expanded description of each menu. Items contributed by individual documents (for example, `ZImgDoc`) appear dynamically.
+Below is an expanded description of each menu. Some menu items appear only when the relevant object types are loaded.
 
 #### File
 
 1. **Open...** – prompts for `.scene` files; loads entire workspaces.
-2. **Save** – saves all modified objects back to their original source files via the owning document (`ZObjDoc::save`).
+2. **Save** – saves all modified objects back to their original source files when the format supports writing.
 3. **Save As...** – saves selected objects to new filenames.
 4. **Load Scene... / Save Scene...** – persistent workspace import/export.
-5. **Document-specific actions** – one cluster per document, including `Load Image...`, `Import Sequence Images...`, `Load ROI...`, `Load Mesh...`, etc., followed by `Remove All <Type>` items.
+5. **Type-specific actions** – one cluster per data type, including `Load Image...`, `Import Sequence Images...`, `Load ROI...`, `Load Mesh...`, and related cleanup actions such as `Remove All <Type>`.
 6. **Recent files** – up to nine entries for quick reopening.
 7. **Close** – closes the 2D window (prompts to save unsaved objects).
 8. **Exit** – quits Atlas entirely.
 
 #### Edit
 
-1. **Undo / Redo** – connected to the active object’s undo stack (from `QUndoGroup`).
+1. **Undo / Redo** – applies to the active editor or selected object when that content supports undo history.
 2. **Copy / Paste** – operate on 2D selections, ROI shapes, or annotation data depending on current tool.
 
 #### View
@@ -235,7 +223,7 @@ Below is an expanded description of each menu. Items contributed by individual d
 4. **Create Desktop Entry** (Linux) – writes a `.desktop` file under `~/.local/share/applications`.
 5. **Open Log Folder / Open Config Folder** – opens respective directories in the OS file browser.
 6. **Generate Config File** – copies `settings_flagfile.txt` from resources to the config directory.
-7. **Run Custom Command** – invokes `ZCustomCommand` (optional; may be disabled in deployed builds — see section 10.3).
+7. **Run Custom Command** – launches the optional custom-command feature for local automation or scripting workflows (see section 10.3).
 
 ### 3.3 Toolbars and Quick Controls
 
@@ -243,29 +231,27 @@ Toolbars mirror frequently used menu actions:
 
 - **File Toolbar** – Open, Save.
 - **Edit Toolbar** – Undo, Redo.
-- **View Toolbar** – Zoom controls, scale widget (progressively updated by `ZView`), view style toggles, 3D window shortcut, screenshot trigger.
+- **View Toolbar** – Zoom controls, the current scale display, view style toggles, a 3D window shortcut, and screenshot access.
 - **Drag Mode Toolbar** – toggles between Scroll Hand Drag and Rubber Band Drag; integrates ROI sculpting actions (spline, polygon, rectangle, ellipse, cut).
 - **ROI Toolbar** – drop-down ROI tool selector plus ROI mode switch (RegionAnnotation vs ROI).
 - **Help Toolbar** – quick access to the Help dock.
 
-Toolbars can be rearranged or floated like standard Qt toolbars. Right-click a toolbar area to toggle visibility.
+Toolbars can be rearranged or floated like standard application toolbars. Right-click a toolbar area to toggle visibility.
 
 ### 3.4 Dock Widgets
 
 Dock widgets provide specialized interfaces. You can anchor them to any side, tabify related docks, or float them.
 
-- **Objects Manager** (`ZObjWidget`) – lists objects with eye icons (visibility) and lock icons. Supports multi-selection, context menu operations, and Delete/Backspace removal.
-- **Object View Setting** (`ZViewSettingWidget`) – per-object controls like channel visibility, transfer functions, transforms, bounding box styling.
+- **Objects Manager** – lists objects with eye icons (visibility) and lock icons. Supports multi-selection, context menu operations, and Delete/Backspace removal.
+- **Object View Setting** – per-object controls such as channel visibility, transfer functions, transforms, and bounding box styling.
 - **Global View Setting** – controls for global plane cuts, camera defaults, fog, transparency mode, lighting and stereo parameters.
-- **Object Detailed Info** (`ZObjDetailedInfoWidget`) – read-only metadata such as voxel sizes, mesh statistics, ROI metrics.
-- **Capture** – wraps `ZTakeScreenShotWidget` for 2D output.
+- **Object Detailed Info** – read-only metadata such as voxel sizes, mesh statistics, and ROI metrics.
+- **Capture** – controls for saving 2D output.
 - **Help** – static reminder of navigation shortcuts; can float for quick reference.
-- **Edit and Output** (`ZObjEditWidget`) – hosts a tab per active editor (ROI editor, animation timeline, puncta detection). Also contains a persistent “Log Output” tab for system logs.
+- **Edit and Output** – hosts a tab per active editor, such as ROI editing, animation timelines, or puncta detection. It also contains a persistent “Log Output” tab for system logs.
 
 <!-- > 📸 **Screenshot to add:** Objects Manager context menu showing Show/Hide, Lock/Unlock, Save, Save As, Make Alias.-->
-<p align="center">
-  <img src="./images/Objects_Manager _context_menu.png" alt="Objects_Manager _context_menu" width="200">
-</p>
+![Objects Manager context menu](images/objects-manager-context-menu.png)
 
 ### 3.5 Status Bar and Notifications
 
@@ -275,7 +261,7 @@ Dock widgets provide specialized interfaces. You can anchor them to any side, ta
 
 ### 3.6 Customizing Your Workspace
 
-1. Resize docks and arrange toolbars to fit your workflow. Atlas remembers window size (via `QSettings`).
+1. Resize docks and arrange toolbars to fit your workflow. Atlas remembers your workspace layout between launches.
 2. Tabify related docks (e.g., Object View Setting and Global View Setting) to save space.
 3. Float the Help dock or Capture dock onto a secondary monitor if desired.
 4. If you have multiple monitors, drag the 3D window to a dedicated display and Atlas will remember the position (3D window geometry is saved separately).
@@ -286,18 +272,18 @@ Dock widgets provide specialized interfaces. You can anchor them to any side, ta
 
 ### 4.1 The Object Lifecycle
 
-1. **Load** – Each document exposes `loadFile` actions that return a unique object ID. Atlas records the source path and adds the object to the Objects Manager.
+1. **Load** – Use the File menu, drag and drop, or format-specific import actions to bring data into Atlas. Loaded items appear in the Objects Manager.
 2. **Inspect** – Select the object to switch the Object View Setting and Detailed Info docks to the relevant controls.
 3. **Edit** – For editable objects, double-click or use context actions to open editors in the Edit and Output dock.
-4. **Save** – Use context menu → Save, or global Save (Ctrl/Cmd+S) to persist modifications via the owning document.
+4. **Save** – Use context menu → Save, or global Save (`Ctrl/Cmd+S`) to write your changes back to disk.
 5. **Remove** – Delete keys or context menu → Remove. Scene saves do not include removed objects.
 6. **Alias** – Create aliases for alternative views without duplicating data.
 
-Tip: Objects with IDs <100 (background, axis, lighting) belong to the 3D environment and remain hidden in most lists. User objects start at ID 100.
+Tip: Atlas may keep a few built-in scene helpers, such as the 3D background and axis, separate from your loaded data so the object list stays focused on user content.
 
 ### 4.2 Images
 
-Steps to load and manage images via `ZImgDoc`:
+Steps to load and manage images:
 
 1. **Load local images**
    1. Choose **File → Load Image...**.
@@ -319,8 +305,8 @@ Steps to load and manage images via `ZImgDoc`:
       - **Segment Properties**: if the dataset has a `segment_properties/` directory, Atlas can load and browse it from the 2D slice view (right‑click) via **Show Neuroglancer Segment Properties…**. Some public datasets do not provide this metadata.
         - When segment properties are loaded, Atlas augments hover readouts (status bar) with the segment’s **Label** and **Description** (when available).
       - **Meshes and Skeletons**: Atlas can import Neuroglancer segmentation-derived geometry as normal Atlas objects:
-        - **Meshes** (`mesh/`) → `ZMeshDoc` (rendered in 3D like other meshes).
-        - **Skeletons/Graphs** (`skeletons/`) → `ZSkeletonDoc` (rendered similar to SWC, with a line-style default).
+        - **Meshes** (`mesh/`) load as regular mesh objects.
+        - **Skeletons/Graphs** (`skeletons/`) load as regular skeleton-style objects.
         - **Source configuration (per dataset)**:
           - If the dataset’s `info` declares `mesh` and/or `skeletons`, Atlas uses those automatically.
           - If not, configure sources in **Object View Setting → Neuroglancer Sources** for that segmentation object:
@@ -342,7 +328,7 @@ Steps to load and manage images via `ZImgDoc`:
           - **Load Neuroglancer Skeletons for All Segments (segment_properties)…**
         - Mesh import is progressive: Atlas loads a coarse mesh first, then refines to the finest available LOD by replacing mesh geometry in-place.
         - Note: these actions only pick IDs from already visible/cached tiles and will not trigger additional chunk downloads just to resolve a segment ID. If multiple segmentation layers are visible, Atlas uses the top-most layer (highest view precedence) under the cursor (and for dataset‑scoped actions, the top-most visible segmentation layer).
-      - **Annotations** (precomputed annotations collections) → either `ZPunctaDoc` (for `POINT` / `ELLIPSOID`) or `ZSkeletonDoc` (for `LINE` / `POLYLINE`):
+      - **Annotations** (precomputed annotations collections) load as point annotations for `POINT` / `ELLIPSOID` data or line-based annotations for `LINE` / `POLYLINE` data:
         - Unlike meshes/skeletons, annotation datasets are separate roots and are not discoverable from the segmentation `info` by default.
         - Configure the dataset link in **Object View Setting → Neuroglancer Sources** on the segmentation object:
           - **Set Annotations Source Override…** (absolute URL or relative path resolved against the segmentation root).
@@ -350,25 +336,25 @@ Steps to load and manage images via `ZImgDoc`:
           - **Load Neuroglancer Annotations for Segment Under Cursor** (uses the relationship index; requires a cached segment ID)
           - **Load Neuroglancer Annotations for Segment ID…** (manual segment/object ID entry)
           - **Load Neuroglancer Annotations in View (spatial index)…** (queries the current viewport region at the current slice; does not require a segment ID)
-        - Ellipsoid annotations preserve anisotropic radii and render as true ellipsoids in 3D (via `Z3DEllipsoidRenderer`).
+        - Ellipsoid annotations preserve anisotropic radii and render as true ellipsoids in 3D.
    9. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
    10. Optional: enable the persistent HTTP disk cache to speed up repeated Neuroglancer sessions (and reduce duplicated downloads):
        - `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable; tune e.g. 10–50 GiB depending on disk space)
-       - `--atlas_disk_cache_http_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued async SQLite writes; when full, writes are dropped best-effort)
+       - `--atlas_disk_cache_http_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued background cache writes; when full, writes are dropped on a best-effort basis)
        - `--atlas_disk_cache_dir=<path>` (optional override; default is auto-chosen Atlas cache/config directory)
-       - The cache is stored in a single SQLite DB file at `<dir>/atlas_disk_cache_v1/http.sqlite`.
+       - The cache is stored in a single database file at `<dir>/atlas_disk_cache_v1/http.sqlite`.
        - Multiple Atlas instances can share the same disk cache; under heavy write contention, cache writes may be dropped (best-effort).
    11. Optional: enable the persistent image-region disk cache to persist computed full-resolution blocks for file-backed datasets:
        - `--atlas_disk_cache_imgregion_max_bytes=<N>` (default 20 GiB; set to 0 to disable; tune depending on disk space)
-       - `--atlas_disk_cache_imgregion_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued async SQLite writes; when full, writes are dropped best-effort)
+       - `--atlas_disk_cache_imgregion_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued background cache writes; when full, writes are dropped on a best-effort basis)
        - `--atlas_disk_cache_dir=<path>` (shared root with the HTTP cache; defaults to an auto-chosen Atlas cache/config directory)
-       - The cache is stored in a single SQLite DB file at `<dir>/atlas_disk_cache_v1/imgregion.sqlite`.
+       - The cache is stored in a single database file at `<dir>/atlas_disk_cache_v1/imgregion.sqlite`.
        - Multiple Atlas instances can share the same disk cache; under heavy write contention, cache writes may be dropped (best-effort).
    12. Optional: enable the persistent image-preview disk cache to persist the downsampled 3D “fast preview” volume for file-backed datasets:
        - `--atlas_disk_cache_imgpreview_max_bytes=<N>` (default 5 GiB; set to 0 to disable; tune depending on disk space)
-       - `--atlas_disk_cache_imgpreview_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued async SQLite writes; when full, writes are dropped best-effort)
+       - `--atlas_disk_cache_imgpreview_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued background cache writes; when full, writes are dropped on a best-effort basis)
        - `--atlas_disk_cache_dir=<path>` (shared root with the other disk caches; defaults to an auto-chosen Atlas cache/config directory)
-       - The cache is stored in a single SQLite DB file at `<dir>/atlas_disk_cache_v1/imgpreview.sqlite`.
+       - The cache is stored in a single database file at `<dir>/atlas_disk_cache_v1/imgpreview.sqlite`.
        - This cache is file-backed only (not Neuroglancer) and is best-effort.
 3. **Load Neuroglancer (State JSON)**
    1. Choose **File → Load Neuroglancer (State JSON)...**.
@@ -382,7 +368,7 @@ Steps to load and manage images via `ZImgDoc`:
 4. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
 5. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.
 6. **Full resolution rendering** – in 3D, enable Full Resolution in Object View Setting when you require high-quality output. Monitor GPU memory usage and progress logs.
-7. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...**(Ctrl/Cmd+Shift+S) to choose a new format.
+7. **Save** – Atlas saves back to the original path when possible. If the format does not support writing, or the image was imported as a sequence, use **Save As...** (`Ctrl/Cmd+Shift+S`) to choose a new format.
 8. **Advanced processing** – Access via the document menu or object context menu:
    - **Stitch Images...** – run the image stitching dialog for tiled data.
    - **Align Sections...** – align serial sections.
@@ -393,13 +379,9 @@ Steps to load and manage images via `ZImgDoc`:
    - **Enhance Line...** – enhance line-like structures in a selected channel (neuTube-style).
 
 <!-- > 📸 **Screenshot to add:** Object View Setting dock for an image showing channel controls.-->
-<p align="center">
-  <img src="./images/channel_control.png" alt="channel_control" width="400">
-</p>
+![Image channel controls in the Object View Setting dock](images/channel_control.png)
 
 ### 4.3 Region of Interest (ROI) Masks
-
-`ZROIDoc` handles ROI packs.
 
 1. **Load ROI files** – **File → Load ROI...** and select `.roi` or compatible files.
 2. **Import mask image** – **File → Import Mask Image...** converts a mask image into atlas-editable ROI(s).
@@ -410,8 +392,6 @@ Steps to load and manage images via `ZImgDoc`:
 
 ### 4.4 Region Annotations
 
-`ZRegionAnnotationDoc` manages labeled annotations.
-
 1. **Load** – **File → Load RegionAnnotation...**.
 2. **Import label images** – use **Import Label Image...** to convert a label volume into Atlas annotations.
 3. **Edit** – open the annotation editor in the Edit and Output dock. Modify labels, merge/split as needed.
@@ -419,8 +399,6 @@ Steps to load and manage images via `ZImgDoc`:
 5. **Alias** – create aliases to compare different styling or visibility combinations.
 
 ### 4.5 Puncta Sets
-
-`ZPunctaDoc` stores point-based annotations (e.g., synapses).
 
 1. **Load** – **File → Load Puncta...**; supports typical `.apo` formats.
 2. **Detect** – choose **Detect Puncta...** to launch automatic detection (when available) and feed results into the document.
@@ -430,9 +408,7 @@ Steps to load and manage images via `ZImgDoc`:
 
 ### 4.6 SWC Trees
 
-`ZSwcDoc` manages neuronal skeletons.
-
-1. **Load** – **File → Load Swc...**. Atlas prevents duplicate loads by checking canonical paths.
+1. **Load** – **File → Load Swc...**. Atlas avoids loading the same SWC file twice when it resolves to the same source path.
 2. **Edit** – open the SWC editor to adjust node positions, prune branches, annotate attributes.
 3. **View settings** – adjust line thickness, color schemes in Object View Setting.
 4. **Save** – Save writes to the source path if the format supports writing; otherwise Save As prompts for a new file.
@@ -523,16 +499,12 @@ Related image → SWC utilities:
 
 ### 4.7 Meshes
 
-`ZMeshDoc` handles triangle meshes.
-
 1. **Load** – **File → Load Mesh...**.
-2. **Inspect** – Object Detailed Info shows metrics (bounding box, surface area, volume, curvature statistics) computed lazily by `MeshPack`.
+2. **Inspect** – Object Detailed Info shows metrics such as bounding box, surface area, volume, and curvature statistics.
 3. **Aliases** – create multiple aliases to compare shading or transformations without duplicating geometry.
 4. **Save** – Save As writes to canonical formats; Save uses the original format if writeable.
 
 ### 4.8 SVG Overlays
-
-`ZSvgDoc` imports vector overlays.
 
 1. **Load** – **File → Load Svg...**.
 2. **View** – overlays appear in both 2D and 3D (if applicable) for labeling or outlining features.
@@ -540,8 +512,6 @@ Related image → SWC utilities:
 4. **Save** – Save writes to the original SVG path.
 
 ### 4.9 2D Animations
-
-`Z2DAnimationDoc` stores viewport animations.
 
 1. **Create** – **Animation → Make 2D Animation**; name the animation.
 2. **Edit** – open the animation tab in Edit and Output. Set keyframes, timing, interpolation.
@@ -551,11 +521,9 @@ Related image → SWC utilities:
 
 ### 4.10 3D Animations
 
-`Z3DAnimationDoc` governs 3D timelines.
-
 1. **Load** – **File → Load 3D Animations...** (`*.animation3d`).
 2. **Create** – in the 3D window use **Animation → Make 3D Animation**.
-3. **Bind view** – the animation binds to the 3D rendering engine once the 3D window is ready. Logs show “3D animation parameters bound”.
+3. **Bind view** – the animation becomes active once the 3D window is ready.
 4. **Edit** – double-click the animation object in **Objects Manager** to open the animation editor in the bottom **Edit and Output** dock.
 5. **Export** – use the animation editor’s export panel (section 8.3) or headless export (section 8.4).
 
@@ -571,7 +539,7 @@ Atlas 3D animations are **keyframe-based**:
 
 **Key easing / interpolation**
 
-- Each key has a **Type** (Qt `QEasingCurve`) that controls how time is eased between the previous key and this key:
+- Each key has a **Type** (an easing curve) that controls how time is eased between the previous key and this key:
   - **Linear** – constant speed change.
   - **In/Out/InOut Quad/Cubic/...** – ease-in/ease-out curves.
   - **Switch** – step/hold (no interpolation; value jumps at the key time).
@@ -590,15 +558,10 @@ The main workflow tool is **Save Key Frame**:
 
 #### Editing UI: timeline, tracks, and keys
 
-Open the editor by double-clicking the animation object (type `Animation3D`) in **Objects Manager**.
+Open the editor by double-clicking the 3D animation item in **Objects Manager**.
 
-<!-- > 📸 **Screenshot to add:** Animation3D editor inside the bottom “Edit and Output” dock.
+<!-- > 📸 **Screenshot to add:** 3D animation editor inside the bottom “Edit and Output” dock.
   Suggested filename: docs/images/animation_editor.png
-
-  Suggested embed (uncomment when ready):
-  <p align="center">
-    <img src="./images/animation_editor.png" alt="animation_editor" width="900">
-  </p>
 
   Annotate:
   - Playback row: Speed, Go to Start/End, Reverse Play, Play, Repeat, Duration, Current Time, Save Key Frame.
@@ -687,12 +650,12 @@ Atlas is designed to stay responsive on **large-scale images**. The 2D view is v
      3. Atlas zooms **around that point** (the view zoom anchor is “under mouse”).
      - If your cursor is not over the 2D view, zoom behaves like a normal centered zoom.
    - You can also type an exact zoom percentage in the **Zoom** widget (percent scale).
-   - Trackpad/touch devices: pinch zoom is supported (Qt pinch gesture).
+   - Trackpad/touch devices: pinch zoom is supported on compatible hardware.
 
 2. **Pan / scroll**
    - Mouse wheel scroll pans the view (scrollbars) when the scene is larger than the viewport.
    - Switch to **Scroll Hand Drag** mode to pan by left-dragging.
-   - Trackpad/touch devices: two-finger pan is supported (Qt pan gesture).
+   - Trackpad/touch devices: two-finger pan is supported on compatible hardware.
 
 3. **Rubber band selection**
    - Switch to **Rubber Band Drag** mode, then left-drag to draw a selection rectangle.
@@ -703,10 +666,10 @@ Atlas is designed to stay responsive on **large-scale images**. The 2D view is v
 ### 5.2 View Styles and Slicing
 
 1. **Normal View** – displays the current slice (controlled by the slice spin box below the view).
-2. **Maximum Z Projection** – integrates all slices along Z. Range display updates to `[min, max+1]` as implemented in `ZView::currentSliceRange`.
+2. **Maximum Z Projection** – integrates all slices along Z. Atlas updates the displayed slice range to match the projected span.
 3. **Montage View** – arranges slices into a grid; adjust columns via the “Montage Columns” parameter. Atlas computes rows based on dataset depth.
 4. **Time navigation** – for time-series data, adjust the time spin box.
-5. **Viewport parameter** – read `ZView::viewportPara` to track the exact bounding box displayed.
+5. **Viewport readout** – use the current view controls when you need to inspect the exact area being displayed.
 
 Shortcuts and tips:
 
@@ -719,8 +682,8 @@ Shortcuts and tips:
 
 Atlas provides interactive ROI drawing tools that work in two closely related modes:
 
-- **ROI mode**: creates/edits ROI objects (`ZROIDoc`).
-- **RegionAnnotation mode**: creates region-annotation ROIs (ROIs associated with regions; may expose region-specific actions).
+- **ROI mode**: creates and edits ROI objects.
+- **RegionAnnotation mode**: creates region-annotation shapes associated with labeled regions.
 
 #### Step 1: choose ROI mode
 
@@ -809,8 +772,8 @@ All drawing happens directly in the 2D view.
 
 ### 5.4 Selection, Copy, and Paste
 
-- `Ctrl/Cmd+C` (`ZView::copy`) copies the current ROI/selection.
-- `Ctrl/Cmd+V` (`ZView::paste`) pastes into the current document (ROI or RegionAnnotation as dictated by ROI mode) at the **last left-clicked point** in the 2D view.
+- `Ctrl/Cmd+C` copies the current ROI or selection.
+- `Ctrl/Cmd+V` pastes into the current ROI or Region Annotation target at the **last left-clicked point** in the 2D view.
 - Right-click in the 2D view for paste variants:
   - **Paste Here**
   - **Paste Horizontally Flipped**
@@ -821,8 +784,8 @@ All drawing happens directly in the 2D view.
 
 1. **Access** – double-click an object in Objects Manager or choose **Open Edit Widget** from context.
 2. **Tabs** – each object with an editor gets its own tab labeled `Edit <Name [ID]>`. Titles update automatically when objects are renamed or modified.
-3. **Log Output** – pinned first tab collects log lines (via `ZLogWidget`).
-4. **Closing tabs** – click the close button. The log tab cannot be closed (`ZObjEditWidget` hides the close button for tab index 0).
+3. **Log Output** – the first tab collects log lines for troubleshooting and progress tracking.
+4. **Closing tabs** – click the close button. The log tab remains available at all times.
 
 ### 5.6 Logging View Changes
 
@@ -933,6 +896,10 @@ In the Auto Trace dialog:
   - **Default** (recommended): uses the default tracing configuration.
   - Or uncheck Default and pick a budget level (1–6). Higher levels can take longer and sometimes improve results.
 - **Optimal Node Resampling** (recommended): produces a less redundant SWC by resampling after tracing.
+- **Competitive Large-Image Mode** (optional): enables the new large-image tracing path for datasets that are too large to process as one dense volume.
+  - This mode keeps tracing at full-resolution image coordinates and loads data block-by-block/on-demand instead of assembling the full volume first.
+  - Use this mode for very large file-backed images where the legacy whole-volume path would be too slow or too memory-intensive.
+  - Competitive mode currently requires full-resolution tracing. When it is enabled, downsample tracing is disabled.
 - **Trace on downsampled image** (optional): traces on a downsampled copy of the selected channel/time.
   - Choose an **XY ratio** and a **Z ratio** (integer factors). Larger ratios mean a smaller image (faster/less memory, but can lose fine detail).
   - The generated SWC is automatically **rescaled back to the original image coordinates** (x/y/z and radii).
@@ -954,7 +921,7 @@ When the task finishes:
 ### 6.1 Opening and Reusing the 3D Window
 
 1. In the 2D window, choose **View → Open 3D Window** or press the toolbar button.
-2. Atlas creates `Z3DMainWindow`, shares the `ZDoc`, and wires up signals so selection state remains synchronized.
+2. Atlas opens a synchronized 3D window that works with the same loaded data and selections as the 2D workspace.
 3. Closing the 3D window releases GPU resources but keeps objects intact. Reopen at any time.
 4. If a scene file contains 3D state, Atlas automatically opens the 3D window during load (see section 7.2).
 
@@ -1009,11 +976,6 @@ At the top of the global settings you will see a **Camera Control** widget with 
 
 <!-- > 📸 **Screenshot to add:** Global View Setting dock focused on the “Camera Control” widget.
   Suggested filename: docs/images/global_view_setting_camera_control.png
-
-  Suggested embed (uncomment when ready):
-  <p align="center">
-    <img src="./images/global_view_setting_camera_control.png" alt="global_view_setting_camera_control" width="800">
-  </p>
 
   Annotate:
   - Azimuth/Elevation/Roll/Yaw/Pitch buttons + degree spin boxes.
@@ -1086,9 +1048,7 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 3. Check logs for “waiting for 3D scene apply to finish” messages when using blocking options.
 
 <!-- > 📸 **Screenshot to add:** 3D window with Progress toolbar visible during a render.-->
-<p align="center">
-  <img src="./images/Progress_toolbar.png" alt="Progress_toolbar" width="800">
-</p>
+![3D rendering progress toolbar](images/Progress_toolbar.png)
 
 ---
 
@@ -1100,10 +1060,10 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 2. Choose **File → Save Scene...**.
 3. Select a destination `.scene` file. Atlas records the directory to seed next time.
 4. Atlas serializes:
-   - Document state (`ZDoc::write`).
-   - Per-object 2D view settings.
-   - Per-object 3D view settings (queried from the 3D engine via `Z3DRenderingEngine::write`).
-   - Global view settings for both 2D and 3D scenes.
+   - loaded objects and their saved references,
+   - per-object 2D view settings,
+   - per-object 3D view settings,
+   - global view settings for both the 2D and 3D workspaces.
 5. Confirmation appears in the status bar (“scene saved as ...”).
 
 ### 7.2 Loading Scenes Step by Step
@@ -1137,13 +1097,11 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 4. Decide on resolution:
    - Use window size or specify custom width/height.
 5. Click **Capture**.
-6. 2D captures emit the signal `take2DScreenShot` or `takeFixedSize2DScreenShot`, writing PNG images.
+6. Atlas writes the captured 2D output as image files, typically PNG.
 7. If the view contains async-rendered content (e.g. Neuroglancer), Atlas waits for refinement to complete before saving; cancel to stop waiting.
 
 <!-- > 📸 **Screenshot to add:** 2D Capture dock with annotations of important controls.-->
-<p align="center">
-  <img src="./images/2DCapture.png" alt="2DCapture" width="400">
-</p>
+![2D capture dock](images/2DCapture.png)
 
 ### 8.2 3D Screenshots
 
@@ -1153,9 +1111,7 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 4. Optionally configure rotation sequences (axis, direction, duration, frame rate) for dynamic captures.
 5. Click **Capture**. The engine renders the frame(s) and stores them in the target folder.
 6. Monitor the Progress toolbar; cancel if necessary.
-<p align="center">
-  <img src="./images/3DCapture.png" alt="3DCapture" width="400">
-</p>
+![3D capture dock](images/3DCapture.png)
 
 ### 8.3 3D Animation Export in the GUI
 
@@ -1171,9 +1127,7 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
    - **Output filename** (`*.mp4` / `*.mov`).
 4. Click **Export**. Atlas renders frames and encodes the video, showing progress in the 3D window’s progress UI.
 5. To stop an export, use **Cancel Rendering** in the 3D window progress toolbar. Check logs if an export fails mid-way (GPU memory pressure, missing files, or encoder errors).
-<p align="center">
-  <img src="./images/animationexport.png" alt="animationexport" width="800">
-</p>
+![3D animation export panel](images/animationexport.png)
 
 ### 8.4 Headless 3D Animation Export
 
@@ -1202,7 +1156,7 @@ For automation or cluster rendering:
    - `--output_tile_border 32`
    - `--limit_memory_usage_in_gb_to 12`
    - On Linux: `--use_gpu_devices 0,1 --__use_EGL`
-4. Monitor CLI logs for status messages (`3D animation parameters bound`, progress updates, errors).
+4. Monitor CLI logs for progress updates and errors while the export is running.
 
 ---
 
@@ -1245,7 +1199,7 @@ For automation or cluster rendering:
    - Give it a descriptive name (e.g., “Presentation”).
 
 3. **Open the animation editor**
-   - In **Objects Manager**, find the new `Animation3D` object and **double-click** it.
+   - In **Objects Manager**, find the new 3D animation item and **double-click** it.
    - The animation editor appears in the bottom **Edit and Output** dock.
 
 4. **Set duration + baseline**
@@ -1318,7 +1272,7 @@ For automation or cluster rendering:
 
 ### 10.1 Configure via Flag File
 
-Atlas supports a gflags-based configuration file that lets you tweak performance, memory, and debugging behavior without recompiling.
+Atlas supports a flag-based configuration file that lets you tweak performance, memory, and debugging behavior without rebuilding the application.
 
 - Generate file: use **Help → Generate Config File**. This copies the template into your config directory as `user_settings_flagfile.txt`.
 - Open location: use **Help → Open Config Folder** to open the directory in your file browser.
@@ -1356,21 +1310,20 @@ Tips
 
 1. **Open log folder**: **Help → Open Log Folder**. Each run generates timestamped logs.
 2. **Increase verbosity**: launch Atlas with `--v=1` or set environment variable `GLOG_v=1` for detailed logging.
-3. **Debug builds** (compiled with `ATLAS_DEBUG_VERSION`) provide additional lines (parameter-change reasons, port propagation, image filter cut checks, camera near/far plane changes).
+3. **Debug-oriented builds** may provide additional diagnostic lines beyond the standard release logs.
 
 ### 10.3 Custom Commands
 
 This feature is intended for offline/developer scripting and may be omitted from deployed builds.
 
-1. If the menu item is present: configure the custom command (see `ZCustomCommand` configuration) to point to scripts or executables.
+1. If the menu item is present, configure the custom command to point to your script or executable.
 2. Run **Help → Run Custom Command** to execute the script within Atlas. Useful for data preprocessing or invoking external pipelines.
 3. Monitor log output for command status.
-4. If the menu item is not present: your build was compiled without `ZCustomCommand` support.
-   - For local/source builds, enable it by configuring CMake with `-DATLAS_ENABLE_CUSTOM_COMMAND=ON`.
+4. If the menu item is not present, your installation does not include this optional feature.
 
 ### 10.4 Updating and Multiple Instances
 
-- **Updates**: **Help → Check for Updates** launches Qt MaintenanceTool if present.
+- **Updates**: **Help → Check for Updates** opens the installed update tool if that feature is available on your platform.
 - **Multiple instances (macOS)**: from the dock icon, choose **Open Additional Instance of Atlas**.
 - **Desktop entry (Linux)**: create a launcher for easy access.
 
@@ -1384,7 +1337,7 @@ This feature is intended for offline/developer scripting and may be omitted from
 | --- | --- | --- |
 | “Can not read file ...” | Unsupported format or missing file | Validate path, convert format, or ensure file exists. |
 | Scene load waits indefinitely | 3D window not ready | Watch logs; ensure 3D window is visible. Use `--atlas_block_scene_3d_apply` only when necessary. |
-| 3D window fails to open | GPU initialization error | Update GPU drivers, verify OpenGL/Vulkan support, check logs for `Z3DRenderingEngine` errors. |
+| 3D window fails to open | GPU initialization error | Update GPU drivers, verify OpenGL/Vulkan support, and check the startup logs for renderer initialization errors. |
 | Exported animations missing frames | Out-of-disk space or canceled job | Increase disk space, rerun export, check progress log. |
 | Full-resolution render never starts | Insufficient GPU memory or aggressive cuts | Reduce `atlas_image_block_size`, limit visible region, disable other full-res objects. |
 
@@ -1461,19 +1414,19 @@ This feature is intended for offline/developer scripting and may be omitted from
 
 ### 12.3 File Format Support at a Glance
 
-- **Images** – Standard scientific formats via `ZImg` (TIFF/OME-TIFF, LSM, V3DRAW, MHD/RAW, PNG, JPG, EXR, BMP, NIfTI).
+- **Images** – Standard scientific formats including TIFF/OME-TIFF, LSM, V3DRAW, MHD/RAW, PNG, JPG, EXR, BMP, and NIfTI.
 - **Meshes** – OBJ, PLY, STL, OFF, VTK, GIfTI (verify on load via logs).
 - **SWC** – SWC/eSWC variations; duplicates avoided through canonical path checks.
 - **Puncta** – APO and CSV point sets.
 - **ROI/Annotations** – Native ROI/annotation formats plus conversions from mask/label images.
-- **Animations** – `.animation2d`, `.animation3d` JSON structures.
+- **Animations** – `.animation2d` and `.animation3d` timeline files.
 
 Always consult log output for unsupported file types; Atlas reports when a document cannot read a file.
 
 ### 12.4 Glossary
 
 - **Alias** – A secondary handle to an object sharing the same data but with independent view settings.
-- **Document** – Class deriving from `ZObjDoc`, responsible for managing a specific object type.
+- **Document** – A built-in manager for a specific object type, such as images, meshes, or annotations.
 - **Scene** – Serialized workspace containing all loaded objects and view states.
 - **ROI (Region of Interest)** – User-defined subset of an image for focused analysis.
 - **Puncta** – Point-based annotations (e.g., synapses).
@@ -1483,7 +1436,5 @@ Always consult log output for unsupported file types; Atlas reports when a docum
 
 ---
 
-<!-- > 📸 **Screenshot to add:** Closing image showing a completed workspace with 2D and 3D windows side-by-side, annotated with key features referenced in this manual.-->
-<p align="center">
-  <img src="./images/workspace.png" alt="workspace" width="800">
-</p>
+<!-- > 📸 **Screenshot to add:** Closing image showing a completed workspace with 2D and 3D windows side-by-side, annotated with key features referenced in this guide.-->
+![Completed Atlas workspace with 2D and 3D views](images/workspace.png)
