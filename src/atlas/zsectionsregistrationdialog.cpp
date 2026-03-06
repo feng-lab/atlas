@@ -123,10 +123,12 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
 
   QString fn = fns[0];
   QFileInfo fi(fn);
-  QString logFn = fi.path() + "/" + replaceLastInteger(fi.baseName(), "_all") + "_sections_registration_log.txt";
-  m_outputLogFileWidget->setFile(logFn);
-  QString stackFn = fi.path() + "/" + replaceLastInteger(fi.baseName(), "_all") + "_aligned_stack.nim";
-  m_outputStackWidget->setFile(stackFn);
+  const QString baseName = replaceLastInteger(fi.baseName(), "_all");
+  const QStringList outputPaths = makeUniqueOutputPaths(
+    {fi.path() + "/" + baseName + "_sections_registration_log.txt", fi.path() + "/" + baseName + "_aligned_stack.nim"});
+  CHECK(outputPaths.size() == 2);
+  m_outputLogFileWidget->setFile(outputPaths[0]);
+  m_outputStackWidget->setFile(outputPaths[1]);
 
   size_t channelNumber;
   size_t numFrames;

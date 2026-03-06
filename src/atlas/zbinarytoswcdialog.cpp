@@ -366,17 +366,19 @@ void ZBinaryToSwcDialog::rebuildSuggestedOutputs()
   }
 
   const QFileInfo fi(inputPath);
-  const QString suggestedSwc = fi.dir().absoluteFilePath(fi.completeBaseName() + QStringLiteral("_skel.swc"));
-  const QString suggestedLog = fi.dir().absoluteFilePath(fi.completeBaseName() + QStringLiteral("_skel_log.txt"));
+  const QStringList outputPaths =
+    makeUniqueOutputPaths({fi.dir().absoluteFilePath(fi.completeBaseName() + QStringLiteral("_skel.swc")),
+                           fi.dir().absoluteFilePath(fi.completeBaseName() + QStringLiteral("_skel_log.txt"))});
+  CHECK(outputPaths.size() == 2);
 
   m_applyingSuggestedOutputs = true;
   if (!m_outputSwcCustomized) {
     const QSignalBlocker blocker(*m_outputSwcWidget);
-    m_outputSwcWidget->setFile(suggestedSwc);
+    m_outputSwcWidget->setFile(outputPaths[0]);
   }
   if (!m_outputLogCustomized) {
     const QSignalBlocker blocker(*m_outputLogWidget);
-    m_outputLogWidget->setFile(suggestedLog);
+    m_outputLogWidget->setFile(outputPaths[1]);
   }
   m_applyingSuggestedOutputs = false;
 }

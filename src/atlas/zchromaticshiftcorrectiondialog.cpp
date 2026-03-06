@@ -131,10 +131,12 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
   }
 
   QFileInfo fi(fn);
-  QString logFn = fi.path() + "/" + fi.baseName() + "_chromatic_shift_correction_log.txt";
-  m_outputLogFileWidget->setFile(logFn);
-  QString stackFn = fi.path() + "/" + fi.baseName() + "_chromatic_shift_corrected.nim";
-  m_outputStackWidget->setFile(stackFn);
+  const QStringList outputPaths =
+    makeUniqueOutputPaths({fi.path() + "/" + fi.baseName() + "_chromatic_shift_correction_log.txt",
+                           fi.path() + "/" + fi.baseName() + "_chromatic_shift_corrected.nim"});
+  CHECK(outputPaths.size() == 2);
+  m_outputLogFileWidget->setFile(outputPaths[0]);
+  m_outputStackWidget->setFile(outputPaths[1]);
 
   size_t channelNumber;
   try {

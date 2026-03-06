@@ -8,8 +8,12 @@
 #include <QPainter>
 #include <QRegularExpression>
 #include <QSvgRenderer>
+#include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTextFragment>
+#include <QTextImageFormat>
+#include <QTextLength>
 #include <QUrl>
 
 namespace {
@@ -115,6 +119,62 @@ bool isSvgUrl(const QUrl& url)
     path = url.toString();
   }
   return path.endsWith(".svg", Qt::CaseInsensitive);
+}
+
+void applyImageMaximumWidth(QTextDocument* document)
+{
+  if (document == nullptr) {
+    return;
+  }
+
+  struct ImageUpdate
+  {
+    int position = 0;
+    int length = 0;
+    QTextImageFormat format;
+  };
+
+  std::vector<ImageUpdate> updates;
+  for (QTextBlock block = document->begin(); block.isValid(); block = block.next()) {
+    for (QTextBlock::iterator it = block.begin(); !it.atEnd(); ++it) {
+      const QTextFragment fragment = it.fragment();
+      if (!fragment.isValid()) {
+        continue;
+      }
+
+      const QTextCharFormat format = fragment.charFormat();
+      if (!format.isImageFormat()) {
+        continue;
+      }
+
+      QTextImageFormat imageFormat = format.toImageFormat();
+      imageFormat.setMaximumWidth(QTextLength(QTextLength::PercentageLength, 100.0));
+      updates.push_back(ImageUpdate{fragment.position(), fragment.length(), imageFormat});
+    }
+  }
+
+  if (updates.empty()) {
+    return;
+  }
+
+  QTextCursor cursor(document);
+  cursor.beginEditBlock();
+  for (const ImageUpdate& update : updates) {
+    cursor.setPosition(update.position);
+    cursor.setPosition(update.position + update.length, QTextCursor::KeepAnchor);
+    cursor.mergeCharFormat(update.format);
+  }
+  cursor.endEditBlock();
+}
+
+void positionDocument(QTextBrowser& browser, const QString& fragment)
+{
+  if (!fragment.isEmpty()) {
+    browser.scrollToAnchor(fragment);
+  } else {
+    browser.moveCursor(QTextCursor::Start);
+    browser.ensureCursorVisible();
+  }
 }
 
 } // namespace
@@ -340,7 +400,6 @@ void ZMarkdownBrowser::renderUrl(const QUrl& url)
   m_currentSource = QUrl::fromLocalFile(info.absoluteFilePath());
 
   const QUrl baseDir = QUrl::fromLocalFile(info.dir().absolutePath() + '/');
-  document()->setBaseUrl(baseDir);
 
   const QString suffix = info.suffix().toLower();
   if (suffix == QStringLiteral("md") || suffix == QStringLiteral("markdown")) {
@@ -350,17 +409,14 @@ void ZMarkdownBrowser::renderUrl(const QUrl& url)
       setPlainText(tr("Failed reading %1: %2").arg(path, error));
       return;
     }
+    document()->setBaseUrl(baseDir);
     setHtml(markdownToHtmlWithImages(markdown));
     document()->setBaseUrl(baseDir);
+    applyImageMaximumWidth(document());
+    positionDocument(*this, fragment);
   } else {
     QTextBrowser::setSource(m_currentSource);
-  }
-
-  if (!fragment.isEmpty()) {
-    scrollToAnchor(fragment);
-  } else {
-    moveCursor(QTextCursor::Start);
-    ensureCursorVisible();
+    positionDocument(*this, fragment);
   }
 }
 

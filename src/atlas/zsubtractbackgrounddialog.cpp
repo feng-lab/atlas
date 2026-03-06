@@ -176,10 +176,12 @@ void ZSubtractBackgroundDialog::inputImageChanged()
       m_channelCombo->setCurrentIndex(0);
     }
 
-    const QString outImage = fi.path() + "/" + fi.baseName() + QStringLiteral("_bg_sub_ch1.nim");
-    const QString outLog = fi.path() + "/" + fi.baseName() + QStringLiteral("_subtract_background_ch1_log.txt");
-    m_outputImageWidget->setFile(outImage);
-    m_outputLogWidget->setFile(outLog);
+    const QStringList outputPaths =
+      makeUniqueOutputPaths({fi.path() + "/" + fi.baseName() + QStringLiteral("_bg_sub_ch1.nim"),
+                             fi.path() + "/" + fi.baseName() + QStringLiteral("_subtract_background_ch1_log.txt")});
+    CHECK(outputPaths.size() == 2);
+    m_outputImageWidget->setFile(outputPaths[0]);
+    m_outputLogWidget->setFile(outputPaths[1]);
   }
   catch (const ZException& e) {
     m_channelCombo->clear();

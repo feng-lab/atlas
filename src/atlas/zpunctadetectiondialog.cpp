@@ -183,13 +183,15 @@ void ZPunctaDetectionDialog::dendriteChannelChanged()
 void ZPunctaDetectionDialog::updateInterface(const QString& fn, size_t numChannel, double vsx, double vsy, double vsz)
 {
   if (QFile::exists(fn)) {
-    QFileInfo fi(fn);
-    QString logFn = fi.path() + "/" + fi.baseName() + "_puncta_detection_log.txt";
-    m_outputLogFileWidget->setFile(logFn);
-    QString punctaFn = fi.path() + "/" + fi.baseName() + "_detected_puncta.nimp";
-    m_outputPunctaFileWidget->setFile(punctaFn);
-    QString spunctaFn = fi.path() + "/" + fi.baseName() + "_detected_soma_puncta.nimp";
-    m_outputSomaPunctaFileWidget->setFile(spunctaFn);
+    const QFileInfo fi(fn);
+    const QStringList outputPaths =
+      makeUniqueOutputPaths({fi.path() + "/" + fi.baseName() + "_puncta_detection_log.txt",
+                             fi.path() + "/" + fi.baseName() + "_detected_puncta.nimp",
+                             fi.path() + "/" + fi.baseName() + "_detected_soma_puncta.nimp"});
+    CHECK(outputPaths.size() == 3);
+    m_outputLogFileWidget->setFile(outputPaths[0]);
+    m_outputPunctaFileWidget->setFile(outputPaths[1]);
+    m_outputSomaPunctaFileWidget->setFile(outputPaths[2]);
   } else {
     m_outputLogFileWidget->setFile("");
     m_outputPunctaFileWidget->setFile("");

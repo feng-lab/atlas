@@ -7,9 +7,13 @@
 #include "zlog.h"
 #include "zmessageboxhelpers.h"
 
-#include <QKeyEvent>
 #include <QApplication>
+#include <QDateTime>
+#include <QDir>
+#include <QFileInfo>
+#include <QKeyEvent>
 #include <QPushButton>
+#include <QSet>
 
 #include <folly/executors/GlobalExecutor.h>
 
@@ -17,11 +21,91 @@
 
 namespace nim {
 
+namespace {
+
+QString appendOutputSuffix(const QString& path, const QString& suffix)
+{
+  if (path.trimmed().isEmpty()) {
+    return path;
+  }
+
+  const QFileInfo fi(path);
+  const QString baseName = fi.completeBaseName();
+  const QString extension = fi.completeSuffix();
+  const QString fileName = extension.isEmpty() ? QStringLiteral("%1_%2").arg(baseName, suffix)
+                                               : QStringLiteral("%1_%2.%3").arg(baseName, suffix, extension);
+  const QString dirPath = fi.path();
+  if (dirPath.isEmpty() || dirPath == QStringLiteral(".")) {
+    return fileName;
+  }
+  return QDir(dirPath).filePath(fileName);
+}
+
+bool outputPathsAvailable(const QStringList& paths)
+{
+  QSet<QString> uniquePaths;
+  for (const QString& path : paths) {
+    if (path.trimmed().isEmpty()) {
+      continue;
+    }
+
+    const QString cleanPath = QDir::cleanPath(path);
+    if (uniquePaths.contains(cleanPath)) {
+      return false;
+    }
+    uniquePaths.insert(cleanPath);
+
+    if (QFileInfo::exists(path)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+} // namespace
+
 ZImgProcessDialog::ZImgProcessDialog(ZDoc& doc, QWidget* parent)
   : QDialog(parent)
   , m_doc(&doc)
 {
   CHECK(m_doc != nullptr);
+}
+
+QString ZImgProcessDialog::makeUniqueOutputPath(const QString& suggestedPath)
+{
+  const QStringList uniquePaths = makeUniqueOutputPaths(QStringList{suggestedPath});
+  CHECK(uniquePaths.size() == 1);
+  return uniquePaths.front();
+}
+
+QStringList ZImgProcessDialog::makeUniqueOutputPaths(const QStringList& suggestedPaths)
+{
+  if (suggestedPaths.isEmpty() || outputPathsAvailable(suggestedPaths)) {
+    return suggestedPaths;
+  }
+
+  const QString timestamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMddhhmm"));
+  QStringList candidatePaths;
+  candidatePaths.reserve(suggestedPaths.size());
+  for (const QString& path : suggestedPaths) {
+    candidatePaths.append(appendOutputSuffix(path, timestamp));
+  }
+  if (outputPathsAvailable(candidatePaths)) {
+    return candidatePaths;
+  }
+
+  for (int disambiguationIndex = 1;; ++disambiguationIndex) {
+    const QString disambiguatedTimestamp = QStringLiteral("%1_%2").arg(timestamp).arg(disambiguationIndex);
+    candidatePaths.clear();
+    candidatePaths.reserve(suggestedPaths.size());
+    for (const QString& path : suggestedPaths) {
+      candidatePaths.append(appendOutputSuffix(path, disambiguatedTimestamp));
+    }
+    if (outputPathsAvailable(candidatePaths)) {
+      return candidatePaths;
+    }
+  }
 }
 
 void ZImgProcessDialog::keyPressEvent(QKeyEvent* e)

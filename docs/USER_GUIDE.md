@@ -377,6 +377,7 @@ Steps to load and manage images:
    - **Subtract Background...** – subtract background intensity from a selected channel (neuTube-style).
    - **Subtract Background (Adaptive)...** – subtract background using adaptive neighborhood sampling (neuTube-style).
    - **Enhance Line...** – enhance line-like structures in a selected channel (neuTube-style).
+   - When a processing dialog auto-suggests output filenames from the input name, Atlas now checks for existing files first and appends a local timestamp such as `202601101630` when needed to avoid overwriting prior results.
 
 <!-- > 📸 **Screenshot to add:** Object View Setting dock for an image showing channel controls.-->
 ![Image channel controls in the Object View Setting dock](images/channel_control.png)

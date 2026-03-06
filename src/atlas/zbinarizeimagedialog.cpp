@@ -198,10 +198,12 @@ void ZBinarizeImageDialog::inputImageChanged()
     const int maxThre = (info.bytesPerVoxel <= 1) ? 255 : 65535;
     m_thresholdSpin->setRange(0, maxThre);
 
-    const QString outImage = fi.path() + "/" + fi.baseName() + QStringLiteral("_binarized_ch1.nim");
-    const QString outLog = fi.path() + "/" + fi.baseName() + QStringLiteral("_binarize_ch1_log.txt");
-    m_outputImageWidget->setFile(outImage);
-    m_outputLogWidget->setFile(outLog);
+    const QStringList outputPaths =
+      makeUniqueOutputPaths({fi.path() + "/" + fi.baseName() + QStringLiteral("_binarized_ch1.nim"),
+                             fi.path() + "/" + fi.baseName() + QStringLiteral("_binarize_ch1_log.txt")});
+    CHECK(outputPaths.size() == 2);
+    m_outputImageWidget->setFile(outputPaths[0]);
+    m_outputLogWidget->setFile(outputPaths[1]);
   }
   catch (const ZException& e) {
     m_channelCombo->clear();

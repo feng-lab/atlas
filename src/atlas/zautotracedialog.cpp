@@ -705,15 +705,17 @@ void ZAutoTraceDialog::rebuildSuggestedOutputs()
   }
   const QString suggestedSwc = QDir(baseDir).absoluteFilePath(baseStem + tag + QStringLiteral(".swc"));
   const QString suggestedLog = QDir(baseDir).absoluteFilePath(baseStem + tag + QStringLiteral("_log.txt"));
+  const QStringList outputPaths = makeUniqueOutputPaths({suggestedSwc, suggestedLog});
+  CHECK(outputPaths.size() == 2);
 
   m_applyingSuggestedOutputs = true;
   if (!m_outputSwcCustomized) {
     const QSignalBlocker blocker(*m_outputSwcWidget);
-    m_outputSwcWidget->setFile(suggestedSwc);
+    m_outputSwcWidget->setFile(outputPaths[0]);
   }
   if (!m_outputLogCustomized) {
     const QSignalBlocker blocker(*m_outputLogWidget);
-    m_outputLogWidget->setFile(suggestedLog);
+    m_outputLogWidget->setFile(outputPaths[1]);
   }
   m_applyingSuggestedOutputs = false;
 }

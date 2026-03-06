@@ -2,6 +2,7 @@
 
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QStringList>
 #include <folly/CancellationToken.h>
 #include <folly/Function.h>
 #include <functional>
@@ -47,6 +48,9 @@ public:
 protected:
   // Subclass fills the WorkerSpec, throwing ZException on validation failures.
   virtual WorkerSpec createWorkerSpec() = 0;
+
+  [[nodiscard]] static QString makeUniqueOutputPath(const QString& suggestedPath);
+  [[nodiscard]] static QStringList makeUniqueOutputPaths(const QStringList& suggestedPaths);
 
   void keyPressEvent(QKeyEvent* e) override;
 
