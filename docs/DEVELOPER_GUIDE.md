@@ -3,6 +3,8 @@ Atlas Developer Guide
 Build, Run, and Layout
 
 - Build instructions: see `readme.md` (macOS/Linux/Windows, Qt 6.9.x, Intel oneAPI, Vulkan SDK 1.3+, Ninja, Conda recipe for `zimg`).
+  - Local developer note: when `ATLAS_DEBUG_VERSION=ON`, Atlas still configures a Release build but disables Release IPO/LTO so
+    incremental relinks stay usable during day-to-day development.
   - Minimum Vulkan runtime/driver: 1.3. The engine assumes 1.3 core features (dynamic rendering, synchronization2) and no longer enables 1.2 KHR fallbacks.
 - Source layout (selected):
   - `src/atlas/` — application code (UI, engine, docs, filters, views)
@@ -60,6 +62,11 @@ Background Tasks and Cancellation
   - UI: `ZBackgroundTaskManagerWidget` (`src/atlas/zbackgroundtaskmanagerwidget.*`)
 - Cancellation is threaded through tracing code using `folly::CancellationToken` and checked at safe points (see `maybeCancel(...)` in
   `src/img/zcancellation.*` and the tracing loops in `src/img/zneutubetrace*.cpp`).
+  - Auto-trace seed sorting now prepares per-seed fits with a bounded rolling window on `folly::getGlobalCPUExecutor()`, then
+    commits the results by descending score by default so overlap suppression favors stronger local fits while cancellation
+    remains responsive without fixed batch barriers. The max in-flight prepare count is tunable via
+    `--atlas_autotrace_seed_sort_precompute_window_size` (default `1000`), and parity tests can restore the legacy
+    original-order commit behavior with `--atlas_autotrace_seed_sort_commit_by_score=false`.
 
 Logging and Debugging
 

@@ -92,6 +92,14 @@ if (ATLAS_DEBUG_VERSION)
 endif ()
 message(STATUS "ATLAS_DEBUG_VERSION: ${ATLAS_DEBUG_VERSION}")
 
+# Keep local debug-version builds fast to relink by disabling Release IPO/LTO.
+# Production-style Release builds (ATLAS_DEBUG_VERSION=OFF) still keep IPO enabled.
+set(ATLAS_ENABLE_RELEASE_IPO ON)
+if (ATLAS_DEBUG_VERSION)
+  set(ATLAS_ENABLE_RELEASE_IPO OFF)
+endif ()
+message(STATUS "ATLAS_ENABLE_RELEASE_IPO: ${ATLAS_ENABLE_RELEASE_IPO}")
+
 option(
   ATLAS_ENABLE_CUSTOM_COMMAND
   "Enable the developer-only \"Help → Run Custom Command\" feature (ZCustomCommand)."

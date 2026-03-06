@@ -1023,11 +1023,12 @@ if (MSVC)
     atlas_core_n_p
     atlas_core_q_r
     atlas_core_s_z
-    PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-    set_property(TARGET atlas_z3d PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-    set_property(TARGET atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
+    set_property(TARGET atlas_z3d PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
+    set_property(TARGET atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 else ()
-  set_property(TARGET atlas_core atlas_z3d atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+  set_property(TARGET atlas_core atlas_z3d atlas_vulkan
+    PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 endif ()
 
 # Umbrella target preserves the original consumer name without producing a giant .lib
@@ -1043,7 +1044,7 @@ add_dependencies(${APP_NAME} vulkan_shaders)
 # The core libraries enable IPO for Release. Ensure the final link step also
 # participates so Release builds actually perform LTO (important for both MSVC
 # and clang-cl + lld-link).
-set_property(TARGET ${APP_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+set_property(TARGET ${APP_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 if (WIN32)
   set_source_files_properties(${LIBQXTDIR}/core/qxtcsvmodel.cpp PROPERTIES COMPILE_FLAGS /wd4458) # declaration of 'd_ptr' hides class member
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'

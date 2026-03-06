@@ -2,15 +2,42 @@
 
 #include "zneutubestackfitoptions.h"
 #include "zneutubetracelocseglabel.h"
+#include "zcancellation.h"
 
 #include "zlog.h"
 
+#include <folly/ScopeGuard.h>
+#include <folly/OperationCancelled.h>
+#include <folly/coro/BlockingWait.h>
+#include <folly/coro/Collect.h>
+#include <folly/coro/Task.h>
+#include <folly/executors/GlobalExecutor.h>
+
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <numeric>
+#include <thread>
+
+DEFINE_bool(
+  atlas_autotrace_seed_sort_commit_by_score,
+  true,
+  "Whether auto-trace seed sort commits prepared seeds in descending score order. Disable to preserve the legacy "
+  "original-order base-mask commit semantics for parity tests.");
+
+DEFINE_uint32(
+  atlas_autotrace_seed_sort_precompute_window_size,
+  1000,
+  "Maximum number of seed-sort fit tasks kept in flight while preparing scores on folly's global CPU executor. "
+  "Higher values can improve throughput when individual seeds have uneven runtimes, but also increase queued work "
+  "that may still finish after cancellation is requested. Default is 1000.");
 
 namespace nim {
 
 namespace {
+
+constexpr size_t SeedSortProgressReportEvery = 1000;
+constexpr double SeedSortZScaleLegacyLike = 1.0;
 
 [[nodiscard]] ZImg makeBaseMaskLike(const ZImg& signal)
 {
@@ -35,25 +62,109 @@ namespace {
   });
 }
 
-} // namespace
-
-SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw)
+void configureSeedSortFitWorkspace(TraceWorkspace& tw)
 {
-  CHECK(signal.numChannels() == 1);
-  CHECK(signal.numTimes() == 1);
+  tw.fitWorkspace.sws.fs.n = 2;
+  tw.fitWorkspace.sws.fs.options[0] = static_cast<int>(StackFitOption::Dot);
+  tw.fitWorkspace.sws.fs.options[1] = static_cast<int>(StackFitOption::Corrcoef);
+  tw.fitWorkspace.posAdjust = 1;
+}
 
-  VLOG(1) << fmt::format("Seed sort: start (seeds={}, minScore={})", seeds.size(), tw.minScore);
+[[nodiscard]] size_t seedSortMaxInFlight()
+{
+  const size_t concurrency = std::max<size_t>(1, static_cast<size_t>(std::thread::hardware_concurrency()));
+  return std::max(concurrency, static_cast<size_t>(FLAGS_atlas_autotrace_seed_sort_precompute_window_size));
+}
+
+struct PreparedSeedSortEntry
+{
+  bool didOptimize = false;
+  bool rejectedByTraceMask = false;
+  size_t seedOffset = 0;
+  LocalNeuroseg locseg{};
+  double score = 0.0;
+  LocsegFitWorkspace fitWorkspaceAfterOptimize{};
+};
+
+[[nodiscard]] folly::coro::Task<PreparedSeedSortEntry> prepareSeedSortEntryAsync(const Geo3dScalarField& seeds,
+                                                                                 const ZImg& signal,
+                                                                                 const TraceWorkspace& tw,
+                                                                                 size_t seedIndex,
+                                                                                 size_t width,
+                                                                                 size_t height,
+                                                                                 size_t depth,
+                                                                                 size_t plane,
+                                                                                 std::atomic<size_t>& preparedCount)
+{
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
+
+  auto progressGuard = folly::makeGuard([&]() {
+    const size_t done = preparedCount.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (VLOG_IS_ON(1) && (((done % SeedSortProgressReportEvery) == 0) || done == seeds.size())) {
+      VLOG(1) << fmt::format("Seed sort prepare: {}/{}", done, seeds.size());
+    }
+  });
+
+  PreparedSeedSortEntry out;
+
+  const int x = static_cast<int>(seeds.points[seedIndex][0]);
+  const int y = static_cast<int>(seeds.points[seedIndex][1]);
+  const int z = static_cast<int>(seeds.points[seedIndex][2]);
+
+  if (tw.traceMask && maskValueAt(*tw.traceMask, x, y, z) > 0) {
+    co_return out;
+  }
+
+  double widthValue = seeds.values[seedIndex];
+  if (widthValue < 3.0) {
+    widthValue += 0.5;
+  }
+
+  if (x < 0 || y < 0 || z < 0 || static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height ||
+      static_cast<size_t>(z) >= depth) {
+    co_return out;
+  }
+
+  out.seedOffset = static_cast<size_t>(x) + static_cast<size_t>(y) * width + static_cast<size_t>(z) * plane;
+  out.locseg.seg.r1 = widthValue;
+  out.locseg.seg.c = 0.0;
+  out.locseg.seg.h = NeurosegDefaultHLegacyLike;
+  out.locseg.seg.theta = 0.0;
+  out.locseg.seg.psi = 0.0;
+  out.locseg.seg.curvature = 0.0;
+  out.locseg.seg.alpha = 0.0;
+  out.locseg.seg.scale = 1.0;
+
+  const std::array<double, 3> cpos = {static_cast<double>(x), static_cast<double>(y), static_cast<double>(z)};
+  setNeurosegPositionLegacyLike(out.locseg, cpos, NeuroposReferenceLegacyLike::Center);
+
+  LocsegFitWorkspace fitWorkspace = tw.fitWorkspace;
+  (void)localNeurosegOptimizeWLegacyLike(out.locseg, signal, SeedSortZScaleLegacyLike, /*option*/ 0, fitWorkspace);
+  maybeCancel(cancellationToken);
+
+  out.didOptimize = true;
+  out.fitWorkspaceAfterOptimize = fitWorkspace;
+
+  if (tw.traceMask && localNeurosegHitMaskLegacyLike(out.locseg, *tw.traceMask)) {
+    out.rejectedByTraceMask = true;
+    co_return out;
+  }
+
+  out.score = fitWorkspace.sws.fs.scores[1];
+  co_return out;
+}
+
+[[nodiscard]] folly::coro::Task<SeedSortResultLegacyLike>
+sortSeedsLegacyLikeAsync(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw)
+{
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
 
   SeedSortResultLegacyLike out;
   out.locsegArray.resize(seeds.size());
   out.scoreArray.assign(seeds.size(), 0.0);
   out.baseMask = makeBaseMaskLike(signal);
-
-  // Configure fit workspace like legacy ZNeuronTraceSeeder::sortSeed.
-  tw.fitWorkspace.sws.fs.n = 2;
-  tw.fitWorkspace.sws.fs.options[0] = static_cast<int>(StackFitOption::Dot);
-  tw.fitWorkspace.sws.fs.options[1] = static_cast<int>(StackFitOption::Corrcoef);
-  tw.fitWorkspace.posAdjust = 1;
 
   const size_t width = out.baseMask.width();
   const size_t height = out.baseMask.height();
@@ -62,72 +173,117 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
 
   auto* baseMaskData = out.baseMask.timeData<uint8_t>(0);
 
-  const size_t reportEvery = 1000;
-  for (size_t i = 0; i < seeds.size(); ++i) {
-    if (VLOG_IS_ON(1) && ((i % reportEvery) == 0 || i + 1 == seeds.size())) {
-      VLOG(1) << fmt::format("Seed sort: {}/{}", i + 1, seeds.size());
-    }
+  const bool commitByScore = FLAGS_atlas_autotrace_seed_sort_commit_by_score;
+  bool haveLastCommittedFitWorkspace = false;
+  LocsegFitWorkspace lastCommittedFitWorkspace = tw.fitWorkspace;
 
-    const int x = static_cast<int>(seeds.points[i][0]);
-    const int y = static_cast<int>(seeds.points[i][1]);
-    const int z = static_cast<int>(seeds.points[i][2]);
+  auto cpuExecutor = folly::getGlobalCPUExecutor();
+  const size_t maxInFlight = seedSortMaxInFlight();
+  std::atomic<size_t> preparedCount{0};
+  std::vector<folly::coro::TaskWithExecutor<PreparedSeedSortEntry>> prepareTasks;
+  prepareTasks.reserve(seeds.size());
+  for (size_t seedIndex = 0; seedIndex < seeds.size(); ++seedIndex) {
+    maybeCancel(cancellationToken);
+    prepareTasks.push_back(folly::coro::co_withExecutor(
+      cpuExecutor,
+      prepareSeedSortEntryAsync(seeds, signal, tw, seedIndex, width, height, depth, plane, preparedCount)));
+  }
 
-    if (tw.traceMask) {
-      const int v = maskValueAt(*tw.traceMask, x, y, z);
-      if (v > 0) {
-        out.scoreArray[i] = 0.0;
-        continue;
+  std::vector<PreparedSeedSortEntry> preparedSeeds =
+    co_await folly::coro::co_withExecutor(cpuExecutor,
+                                          folly::coro::collectAllWindowed(std::move(prepareTasks), maxInFlight));
+  maybeCancel(cancellationToken);
+
+  std::vector<size_t> commitOrder(seeds.size());
+  std::iota(commitOrder.begin(), commitOrder.end(), size_t{0});
+  if (commitByScore) {
+    std::stable_sort(commitOrder.begin(), commitOrder.end(), [&preparedSeeds](size_t lhs, size_t rhs) {
+      const PreparedSeedSortEntry& left = preparedSeeds[lhs];
+      const PreparedSeedSortEntry& right = preparedSeeds[rhs];
+      const bool leftIsCommitCandidate = left.didOptimize && !left.rejectedByTraceMask;
+      const bool rightIsCommitCandidate = right.didOptimize && !right.rejectedByTraceMask;
+      if (leftIsCommitCandidate != rightIsCommitCandidate) {
+        return leftIsCommitCandidate > rightIsCommitCandidate;
       }
+      if (leftIsCommitCandidate && (left.score != right.score)) {
+        return left.score > right.score;
+      }
+      return false;
+    });
+  }
+
+  for (size_t processedIndex = 0; processedIndex < commitOrder.size(); ++processedIndex) {
+    maybeCancel(cancellationToken);
+
+    if (VLOG_IS_ON(1) &&
+        (((processedIndex % SeedSortProgressReportEvery) == 0) || (processedIndex + 1 == commitOrder.size()))) {
+      VLOG(1) << fmt::format("Seed sort commit: {}/{}", processedIndex + 1, commitOrder.size());
     }
 
-    double widthValue = seeds.values[i];
-    if (widthValue < 3.0) {
-      widthValue += 0.5;
-    }
-
-    if (x < 0 || y < 0 || z < 0 || static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height ||
-        static_cast<size_t>(z) >= depth) {
-      out.scoreArray[i] = 0.0;
+    const size_t seedIndex = commitOrder[processedIndex];
+    const PreparedSeedSortEntry& prepared = preparedSeeds[seedIndex];
+    if (!prepared.didOptimize) {
       continue;
     }
 
-    const size_t seedOffset = static_cast<size_t>(x) + static_cast<size_t>(y) * width + static_cast<size_t>(z) * plane;
-    if (baseMaskData[seedOffset] > 0) {
-      out.scoreArray[i] = 0.0;
+    if (baseMaskData[prepared.seedOffset] > 0) {
       continue;
     }
 
-    LocalNeuroseg& seed = out.locsegArray[i];
-    seed.seg.r1 = widthValue;
-    seed.seg.c = 0.0;
-    seed.seg.h = NeurosegDefaultHLegacyLike;
-    seed.seg.theta = 0.0;
-    seed.seg.psi = 0.0;
-    seed.seg.curvature = 0.0;
-    seed.seg.alpha = 0.0;
-    seed.seg.scale = 1.0;
-
-    const std::array<double, 3> cpos = {static_cast<double>(x), static_cast<double>(y), static_cast<double>(z)};
-    setNeurosegPositionLegacyLike(seed, cpos, NeuroposReferenceLegacyLike::Center);
-
-    constexpr double zScale = 1.0;
-    (void)localNeurosegOptimizeWLegacyLike(seed, signal, zScale, /*option*/ 0, tw.fitWorkspace);
-
-    if (tw.traceMask) {
-      if (localNeurosegHitMaskLegacyLike(seed, *tw.traceMask)) {
-        out.scoreArray[i] = 0.0;
-        continue;
-      }
+    if (!commitByScore) {
+      lastCommittedFitWorkspace = prepared.fitWorkspaceAfterOptimize;
+      haveLastCommittedFitWorkspace = true;
     }
 
-    out.scoreArray[i] = tw.fitWorkspace.sws.fs.scores[1];
+    if (prepared.rejectedByTraceMask) {
+      continue;
+    }
 
-    const int labelValue = (out.scoreArray[i] > tw.minScore) ? 2 : 1;
-    localNeurosegLabelGLegacyLike(seed, out.baseMask, /*flag*/ -1, labelValue, zScale);
+    if (commitByScore) {
+      lastCommittedFitWorkspace = prepared.fitWorkspaceAfterOptimize;
+      haveLastCommittedFitWorkspace = true;
+    }
+
+    out.locsegArray[seedIndex] = prepared.locseg;
+    out.scoreArray[seedIndex] = prepared.score;
+
+    const int labelValue = (out.scoreArray[seedIndex] > tw.minScore) ? 2 : 1;
+    localNeurosegLabelGLegacyLike(out.locsegArray[seedIndex],
+                                  out.baseMask,
+                                  /*flag*/ -1,
+                                  labelValue,
+                                  SeedSortZScaleLegacyLike);
+  }
+
+  if (haveLastCommittedFitWorkspace) {
+    tw.fitWorkspace = lastCommittedFitWorkspace;
   }
 
   VLOG(1) << "Seed sort: done.";
-  return out;
+  co_return out;
+}
+
+} // namespace
+
+SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw)
+{
+  CHECK(signal.numChannels() == 1);
+  CHECK(signal.numTimes() == 1);
+
+  configureSeedSortFitWorkspace(tw);
+  maybeCancel(tw.cancellationToken);
+
+  VLOG(1) << fmt::format("Seed sort: start (seeds={}, minScore={})", seeds.size(), tw.minScore);
+  VLOG(1) << fmt::format("Seed sort: max in-flight prepare tasks={}, commit order={}",
+                         seedSortMaxInFlight(),
+                         FLAGS_atlas_autotrace_seed_sort_commit_by_score ? "score" : "legacy");
+  try {
+    return folly::coro::blockingWait(
+      folly::coro::co_withCancellation(tw.cancellationToken, sortSeedsLegacyLikeAsync(seeds, signal, tw)));
+  }
+  catch (const folly::OperationCancelled&) {
+    throw ZCancellationException();
+  }
 }
 
 } // namespace nim

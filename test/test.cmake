@@ -81,6 +81,7 @@ add_gtest_executable(zstructutilstest)
 add_gtest_executable(zenumtest)
 add_gtest_executable(zstringutilstest)
 add_gtest_executable(ztupleliketest)
+add_gtest_executable(zneutubetraceseedersorttest)
 
 # Atlas-side tests
 
@@ -130,7 +131,7 @@ else ()
     ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
   # This test suite does not depend on Vulkan. Avoid linking atlas_vulkan to keep
   # the link step lighter (especially on Windows CI and developer machines).
-  target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_z3d atlas_core)
+  target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_vulkan atlas_z3d atlas_core)
   target_compile_definitions(zatlasheavytest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
   gtest_discover_tests(zatlasheavytest DISCOVERY_TIMEOUT 600)
 endif ()

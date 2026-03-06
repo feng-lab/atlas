@@ -22,6 +22,7 @@
 #include <optional>
 
 #include <fmt/format.h>
+#include <gflags/gflags.h>
 
 #if !defined(_WIN32)
 #include <fcntl.h>
@@ -111,7 +112,30 @@ extern "C" {
 
 namespace fs = std::filesystem;
 
+DECLARE_bool(atlas_autotrace_seed_sort_commit_by_score);
+
 namespace {
+
+class LegacySeedSortCommitParityEnvironment : public ::testing::Environment
+{
+public:
+  void SetUp() override
+  {
+    _previousFlag = FLAGS_atlas_autotrace_seed_sort_commit_by_score;
+    FLAGS_atlas_autotrace_seed_sort_commit_by_score = false;
+  }
+
+  void TearDown() override
+  {
+    FLAGS_atlas_autotrace_seed_sort_commit_by_score = _previousFlag;
+  }
+
+private:
+  bool _previousFlag = true;
+};
+
+[[maybe_unused]] ::testing::Environment* const kLegacySeedSortCommitParityEnvironment =
+  ::testing::AddGlobalTestEnvironment(new LegacySeedSortCommitParityEnvironment());
 
 class ScopedQtCoreApplication
 {

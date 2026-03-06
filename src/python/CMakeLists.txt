@@ -195,7 +195,7 @@ endif ()
 
 nanobind_add_module(${module_name} ${NB_ARGS} imgpy.cpp)
 target_link_libraries(${module_name} PRIVATE img)
-set_property(TARGET ${module_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+set_property(TARGET ${module_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 
 if (APPLE)
   target_compile_options(${module_name} PRIVATE -faligned-allocation)
