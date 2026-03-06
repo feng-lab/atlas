@@ -59,6 +59,14 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMAKE_LINKER: ${CMAKE_LINKER}")
 
+# Match the top-level Atlas build: standalone zimg package builds may reuse a
+# prebuilt `img` archive containing ThinLTO objects, so Linux+Clang must link
+# with lld for the final extension link to succeed.
+if (UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  message(STATUS "Linux+Clang: forcing lld via -fuse-ld=lld")
+  add_link_options(-fuse-ld=lld)
+endif ()
+
 # generate a version string from git tag-hash and current build time
 include(GetGitRevisionDescription)
 git_describe(GIT_VERSION)
@@ -74,6 +82,14 @@ if (NOT CMAKE_DEBUG_POSTFIX)
   set(CMAKE_DEBUG_POSTFIX d)
 endif ()
 message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
+
+# Python packages are shipped as release artifacts. Keep Release IPO/LTO on for
+# the standalone package build even when the top-level Atlas app disables it for
+# faster local relinks.
+# `src/img/CMakeLists.txt` consumes this when the package build needs to build
+# `img` locally instead of reusing a prebuilt Atlas archive.
+set(ATLAS_ENABLE_RELEASE_IPO ON)
+message(STATUS "ATLAS_ENABLE_RELEASE_IPO: ${ATLAS_ENABLE_RELEASE_IPO}")
 
 include(PrintCMakeTargetInfo)
 
