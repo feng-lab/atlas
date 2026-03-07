@@ -4,6 +4,10 @@
 #include "zneutubetraceworkspace.h"
 #include "zimg.h"
 
+namespace folly {
+class CancellationToken;
+} // namespace folly
+
 namespace nim {
 
 // Port of `ZNeuronTracer::extractSeedOriginal`.
@@ -11,6 +15,10 @@ namespace nim {
 // - Input `mask` must be a GREY (uint8) binary mask with values {0,1}.
 // - Returns seeds in the same order as legacy `Stack_To_Voxel_List` (reverse stack-array order).
 [[nodiscard]] Geo3dScalarField extractSeedOriginalLegacyLike(const ZImg& mask);
+
+// Cancellation-aware overload. Throws `ZCancellationException` when cancellation is requested.
+[[nodiscard]] Geo3dScalarField extractSeedOriginalLegacyLike(const ZImg& mask,
+                                                             const folly::CancellationToken& cancellationToken);
 
 // Port of `ZNeuronTracer::removeTracedSeed`.
 //
@@ -31,6 +39,14 @@ struct RemoveNoisySeedDiagnosticsLegacyLike
                                                          ZImg& mask,
                                                          int seedMethod,
                                                          bool screeningSeed,
+                                                         /*nullable*/ RemoveNoisySeedDiagnosticsLegacyLike* diag);
+
+// Cancellation-aware overload. Throws `ZCancellationException` when cancellation is requested.
+[[nodiscard]] Geo3dScalarField removeNoisySeedLegacyLike(Geo3dScalarField seeds,
+                                                         ZImg& mask,
+                                                         int seedMethod,
+                                                         bool screeningSeed,
+                                                         const folly::CancellationToken& cancellationToken,
                                                          /*nullable*/ RemoveNoisySeedDiagnosticsLegacyLike* diag);
 
 } // namespace nim

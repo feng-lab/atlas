@@ -76,9 +76,6 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   ctx.tw.tuneEnd = cfg.tuneEnd;
   ctx.tw.traceMaskUpdating = ctx.maskTracing;
 
-  traceWorkspaceInitTraceMaskLegacyLike(ctx.tw, ctx.signal, /*clearing*/ false);
-  maybeCancel(ctx.tw.cancellationToken);
-
   // Legacy default preprocess: subtract background and optionally invert bright-background images.
   // Bright-background handling is not yet ported (Atlas currently assumes dark background).
   LOG(INFO) << "Auto trace: preprocess (subtract background) ...";
@@ -103,12 +100,17 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   VLOG(1) << fmt::format("Auto trace: mask threshold={}", maskDiag.binarizeThreshold);
 
   LOG(INFO) << "Auto trace: extract seeds ...";
-  Geo3dScalarField seeds = extractSeedOriginalLegacyLike(*ctx.mask);
+  Geo3dScalarField seeds = extractSeedOriginalLegacyLike(*ctx.mask, ctx.tw.cancellationToken);
   LOG(INFO) << fmt::format("Auto trace: extracted {} seeds.", seeds.size());
 
   RemoveNoisySeedDiagnosticsLegacyLike seedDiag;
   LOG(INFO) << "Auto trace: remove noisy seeds ...";
-  seeds = removeNoisySeedLegacyLike(std::move(seeds), *ctx.mask, cfg.seedMethod, ctx.screeningSeed, &seedDiag);
+  seeds = removeNoisySeedLegacyLike(std::move(seeds),
+                                    *ctx.mask,
+                                    cfg.seedMethod,
+                                    ctx.screeningSeed,
+                                    ctx.tw.cancellationToken,
+                                    &seedDiag);
   LOG(INFO) << fmt::format("Auto trace: {} seeds after noise removal.", seeds.size());
   seeds = removeTracedSeedLegacyLike(seeds, ctx.tw);
   VLOG(1) << fmt::format("Auto trace: {} seeds after removing traced hits.", seeds.size());

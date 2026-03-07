@@ -19,6 +19,106 @@ namespace nim {
 
 namespace {
 
+struct ChainConnectionBoundsLegacyLike
+{
+  bool isEmpty = true;
+
+  // Hook-end balls (scaled to the connection-test coordinate space).
+  Geo3dBallLegacyLike hookHead{};
+  Geo3dBallLegacyLike hookTail{};
+
+  // Axis-aligned bounding box of per-segment ball centers (scaled).
+  std::array<double, 3> centersMin{};
+  std::array<double, 3> centersMax{};
+
+  // Maximum per-segment ball radius (scaled).
+  double maxRadius = 0.0;
+};
+
+[[nodiscard]] double distSqPointToAabb(const std::array<double, 3>& p,
+                                       const std::array<double, 3>& aabbMin,
+                                       const std::array<double, 3>& aabbMax)
+{
+  double dx = 0.0;
+  if (p[0] < aabbMin[0]) {
+    dx = aabbMin[0] - p[0];
+  } else if (p[0] > aabbMax[0]) {
+    dx = p[0] - aabbMax[0];
+  }
+
+  double dy = 0.0;
+  if (p[1] < aabbMin[1]) {
+    dy = aabbMin[1] - p[1];
+  } else if (p[1] > aabbMax[1]) {
+    dy = p[1] - aabbMax[1];
+  }
+
+  double dz = 0.0;
+  if (p[2] < aabbMin[2]) {
+    dz = aabbMin[2] - p[2];
+  } else if (p[2] > aabbMax[2]) {
+    dz = p[2] - aabbMax[2];
+  }
+
+  return dx * dx + dy * dy + dz * dz;
+}
+
+[[nodiscard]] ChainConnectionBoundsLegacyLike computeChainConnectionBoundsLegacyLike(const LocsegChain& chain,
+                                                                                     double xzRatio)
+{
+  ChainConnectionBoundsLegacyLike out;
+  out.isEmpty = chain.empty();
+  if (out.isEmpty) {
+    return out;
+  }
+
+  // Hook-end bounds: match `locsegChainConnectionTestLegacyLike()` setup (head+tail balls scaled by xzRatio,
+  // and tail flipped so both ends are oriented outward).
+  const LocalNeuroseg* shead = chain.headSeg();
+  const LocalNeuroseg* stail = chain.tailSeg();
+  CHECK(shead != nullptr);
+  CHECK(stail != nullptr);
+
+  LocalNeuroseg head = *shead;
+  LocalNeuroseg tail = *stail;
+  flipLocalNeurosegLegacyLike(tail);
+
+  if (chain.length() >= 1) {
+    head.seg.h = 2.0;
+    tail.seg.h = 2.0;
+  }
+
+  localNeurosegScaleZLegacyLike(head, xzRatio);
+  localNeurosegScaleZLegacyLike(tail, xzRatio);
+  localNeurosegBallBoundLegacyLike(head, out.hookHead);
+  localNeurosegBallBoundLegacyLike(tail, out.hookTail);
+
+  // Loop bounds: per-segment ball centers/radii in the same scaled coordinate space.
+  const double posInf = std::numeric_limits<double>::infinity();
+  out.centersMin = {posInf, posInf, posInf};
+  out.centersMax = {-posInf, -posInf, -posInf};
+  out.maxRadius = 0.0;
+
+  Geo3dBallLegacyLike segBall{};
+  for (const auto& node : chain) {
+    LocalNeuroseg seg = node.locseg;
+    localNeurosegScaleZLegacyLike(seg, xzRatio);
+    localNeurosegBallBoundLegacyLike(seg, segBall);
+
+    out.centersMin[0] = std::min(out.centersMin[0], segBall.center[0]);
+    out.centersMin[1] = std::min(out.centersMin[1], segBall.center[1]);
+    out.centersMin[2] = std::min(out.centersMin[2], segBall.center[2]);
+
+    out.centersMax[0] = std::max(out.centersMax[0], segBall.center[0]);
+    out.centersMax[1] = std::max(out.centersMax[1], segBall.center[1]);
+    out.centersMax[2] = std::max(out.centersMax[2], segBall.center[2]);
+
+    out.maxRadius = std::max(out.maxRadius, segBall.radius);
+  }
+
+  return out;
+}
+
 [[nodiscard]] std::vector<Geo3dCircle>
 locsegChainToCirclesScaledLegacyLike(const LocsegChain& chain, double xyScale, double zScale)
 {
@@ -103,9 +203,62 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
     return ns;
   }
 
+  // Conservative distance prefilter:
+  //
+  // The legacy implementation runs an ordered O(n^2) connection test between every pair of chains. For large chain
+  // counts this becomes a dominant cost even when most chains are far apart and would fail `distThre`.
+  //
+  // To preserve behavior, we only skip pairs that are *provably* too far to pass the `conn.sdist > ctw.distThre`
+  // check inside `locsegChainConnectionTestLegacyLike()`. This prefilter uses:
+  // - a per-chain AABB of per-segment ball centers (scaled to the same xzRatio space), and
+  // - a per-chain maximum segment ball radius.
+  //
+  // These bounds remain conservative even when connection tests interpolate inside an existing chain, since
+  // interpolation inserts segments between existing knots and does not expand the chain's extent.
+  const double xzRatio = (ctw.resolution[0] != ctw.resolution[2]) ? (ctw.resolution[0] / ctw.resolution[2]) : 1.0;
+  std::vector<ChainConnectionBoundsLegacyLike> connBounds;
+  connBounds.reserve(static_cast<size_t>(n));
   for (int i = 0; i < n; ++i) {
+    const LocsegChain* chain = ns.chains[static_cast<size_t>(i)];
+    CHECK(chain != nullptr);
+    connBounds.push_back(computeChainConnectionBoundsLegacyLike(*chain, xzRatio));
+  }
+
+  for (int i = 0; i < n; ++i) {
+    if (connBounds[static_cast<size_t>(i)].isEmpty) {
+      continue;
+    }
     for (int j = 0; j < n; ++j) {
       if (i == j) {
+        continue;
+      }
+      if (connBounds[static_cast<size_t>(j)].isEmpty) {
+        continue;
+      }
+
+      const ChainConnectionBoundsLegacyLike& hookBounds = connBounds[static_cast<size_t>(i)];
+      const ChainConnectionBoundsLegacyLike& loopBounds = connBounds[static_cast<size_t>(j)];
+
+      const double distThre = ctw.distThre;
+      const double loopRadius = loopBounds.maxRadius;
+
+      auto tooFar = [&](const Geo3dBallLegacyLike& hook) -> bool {
+        const double r = distThre + hook.radius + loopRadius;
+        const double distSq = distSqPointToAabb(hook.center, loopBounds.centersMin, loopBounds.centersMax);
+        return distSq > (r * r);
+      };
+
+      bool definitelyTooFar = false;
+      if (ctw.hookSpot == 0) {
+        definitelyTooFar = tooFar(hookBounds.hookHead);
+      } else if (ctw.hookSpot == 1) {
+        definitelyTooFar = tooFar(hookBounds.hookTail);
+      } else {
+        CHECK(ctw.hookSpot == -1);
+        definitelyTooFar = tooFar(hookBounds.hookHead) && tooFar(hookBounds.hookTail);
+      }
+
+      if (definitelyTooFar) {
         continue;
       }
 

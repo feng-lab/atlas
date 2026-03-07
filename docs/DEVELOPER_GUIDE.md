@@ -65,7 +65,8 @@ Background Tasks and Cancellation
   - Auto-trace seed sorting now prepares per-seed fits with a bounded rolling window on `folly::getGlobalCPUExecutor()`, then
     commits the results by descending score by default so overlap suppression favors stronger local fits while cancellation
     remains responsive without fixed batch barriers. The max in-flight prepare count is tunable via
-    `--atlas_autotrace_seed_sort_precompute_window_size` (default `1000`), and parity tests can restore the legacy
+    `--atlas_autotrace_seed_sort_precompute_window_size` (default `0`, meaning "use the global CPU executor's thread count"), and
+    parity tests can restore the legacy
     original-order commit behavior with `--atlas_autotrace_seed_sort_commit_by_score=false`.
 
 Logging and Debugging

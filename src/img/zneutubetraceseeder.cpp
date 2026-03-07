@@ -12,6 +12,7 @@
 #include <folly/coro/Collect.h>
 #include <folly/coro/Task.h>
 #include <folly/executors/GlobalExecutor.h>
+#include <folly/executors/ThreadPoolExecutor.h>
 
 #include <algorithm>
 #include <atomic>
@@ -27,10 +28,16 @@ DEFINE_bool(
 
 DEFINE_uint32(
   atlas_autotrace_seed_sort_precompute_window_size,
-  1000,
+  0,
   "Maximum number of seed-sort fit tasks kept in flight while preparing scores on folly's global CPU executor. "
+  "0 uses the global executor's thread count. "
   "Higher values can improve throughput when individual seeds have uneven runtimes, but also increase queued work "
-  "that may still finish after cancellation is requested. Default is 1000.");
+  "that may still finish after cancellation is requested.");
+
+DEFINE_bool(atlas_autotrace_seed_sort_log_cpu_executor_pool_stats,
+            true,
+            "Log folly global CPU executor pool stats during seed sort prepare progress reports. Useful for diagnosing "
+            "whether the executor is idle, saturated, or queueing work.");
 
 namespace nim {
 
@@ -70,10 +77,28 @@ void configureSeedSortFitWorkspace(TraceWorkspace& tw)
   tw.fitWorkspace.posAdjust = 1;
 }
 
+[[nodiscard]] size_t globalCpuExecutorThreadCountOrFallback()
+{
+  auto cpuExecutor = folly::getGlobalCPUExecutor();
+  if (auto* threadPool = dynamic_cast<folly::ThreadPoolExecutor*>(cpuExecutor.get())) {
+    const size_t threads = threadPool->numThreads();
+    if (threads > 0) {
+      return threads;
+    }
+  }
+
+  const size_t fallback = static_cast<size_t>(std::thread::hardware_concurrency());
+  return std::max<size_t>(1, fallback);
+}
+
 [[nodiscard]] size_t seedSortMaxInFlight()
 {
-  const size_t concurrency = std::max<size_t>(1, static_cast<size_t>(std::thread::hardware_concurrency()));
-  return std::max(concurrency, static_cast<size_t>(FLAGS_atlas_autotrace_seed_sort_precompute_window_size));
+  const size_t concurrencyFloor = globalCpuExecutorThreadCountOrFallback();
+  const size_t requested = static_cast<size_t>(FLAGS_atlas_autotrace_seed_sort_precompute_window_size);
+  if (requested == 0) {
+    return concurrencyFloor;
+  }
+  return std::max(concurrencyFloor, requested);
 }
 
 struct PreparedSeedSortEntry
@@ -86,15 +111,17 @@ struct PreparedSeedSortEntry
   LocsegFitWorkspace fitWorkspaceAfterOptimize{};
 };
 
-[[nodiscard]] folly::coro::Task<PreparedSeedSortEntry> prepareSeedSortEntryAsync(const Geo3dScalarField& seeds,
-                                                                                 const ZImg& signal,
-                                                                                 const TraceWorkspace& tw,
-                                                                                 size_t seedIndex,
-                                                                                 size_t width,
-                                                                                 size_t height,
-                                                                                 size_t depth,
-                                                                                 size_t plane,
-                                                                                 std::atomic<size_t>& preparedCount)
+[[nodiscard]] folly::coro::Task<PreparedSeedSortEntry>
+prepareSeedSortEntryAsync(const Geo3dScalarField& seeds,
+                          const ZImg& signal,
+                          const TraceWorkspace& tw,
+                          size_t seedIndex,
+                          size_t width,
+                          size_t height,
+                          size_t depth,
+                          size_t plane,
+                          folly::ThreadPoolExecutor* cpuThreadPool,
+                          std::atomic<size_t>& preparedCount)
 {
   const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
@@ -102,7 +129,18 @@ struct PreparedSeedSortEntry
   auto progressGuard = folly::makeGuard([&]() {
     const size_t done = preparedCount.fetch_add(1, std::memory_order_relaxed) + 1;
     if (VLOG_IS_ON(1) && (((done % SeedSortProgressReportEvery) == 0) || done == seeds.size())) {
-      VLOG(1) << fmt::format("Seed sort prepare: {}/{}", done, seeds.size());
+      if (FLAGS_atlas_autotrace_seed_sort_log_cpu_executor_pool_stats && cpuThreadPool != nullptr) {
+        const auto poolStats = cpuThreadPool->getPoolStats();
+        VLOG(1) << fmt::format("Seed sort prepare: {}/{} (pending/total tasks={}/{}, active/idle threads={}/{})",
+                               done,
+                               seeds.size(),
+                               poolStats.pendingTaskCount,
+                               poolStats.totalTaskCount,
+                               poolStats.activeThreadCount,
+                               poolStats.idleThreadCount);
+      } else {
+        VLOG(1) << fmt::format("Seed sort prepare: {}/{}", done, seeds.size());
+      }
     }
   });
 
@@ -155,11 +193,24 @@ struct PreparedSeedSortEntry
   co_return out;
 }
 
-[[nodiscard]] folly::coro::Task<SeedSortResultLegacyLike>
-sortSeedsLegacyLikeAsync(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw)
+} // namespace
+
+SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw)
 {
-  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
-  maybeCancel(cancellationToken);
+  CHECK(signal.numChannels() == 1);
+  CHECK(signal.numTimes() == 1);
+
+  configureSeedSortFitWorkspace(tw);
+  maybeCancel(tw.cancellationToken);
+
+  VLOG(1) << fmt::format("Seed sort: start (seeds={}, minScore={})", seeds.size(), tw.minScore);
+  VLOG(1) << fmt::format(
+    "Seed sort: global CPU executor threads={}, requested prepare window={}, max in-flight prepare "
+    "tasks={}, commit order={}",
+    globalCpuExecutorThreadCountOrFallback(),
+    FLAGS_atlas_autotrace_seed_sort_precompute_window_size,
+    seedSortMaxInFlight(),
+    FLAGS_atlas_autotrace_seed_sort_commit_by_score ? "score" : "legacy");
 
   SeedSortResultLegacyLike out;
   out.locsegArray.resize(seeds.size());
@@ -178,21 +229,32 @@ sortSeedsLegacyLikeAsync(const Geo3dScalarField& seeds, const ZImg& signal, Trac
   LocsegFitWorkspace lastCommittedFitWorkspace = tw.fitWorkspace;
 
   auto cpuExecutor = folly::getGlobalCPUExecutor();
+  auto* cpuThreadPool = dynamic_cast<folly::ThreadPoolExecutor*>(cpuExecutor.get());
   const size_t maxInFlight = seedSortMaxInFlight();
   std::atomic<size_t> preparedCount{0};
+
   std::vector<folly::coro::TaskWithExecutor<PreparedSeedSortEntry>> prepareTasks;
   prepareTasks.reserve(seeds.size());
   for (size_t seedIndex = 0; seedIndex < seeds.size(); ++seedIndex) {
-    maybeCancel(cancellationToken);
-    prepareTasks.push_back(folly::coro::co_withExecutor(
-      cpuExecutor,
-      prepareSeedSortEntryAsync(seeds, signal, tw, seedIndex, width, height, depth, plane, preparedCount)));
+    maybeCancel(tw.cancellationToken);
+    prepareTasks.push_back(folly::coro::co_withExecutor(cpuExecutor,
+                                                        prepareSeedSortEntryAsync(seeds,
+                                                                                  signal,
+                                                                                  tw,
+                                                                                  seedIndex,
+                                                                                  width,
+                                                                                  height,
+                                                                                  depth,
+                                                                                  plane,
+                                                                                  cpuThreadPool,
+                                                                                  preparedCount)));
   }
 
-  std::vector<PreparedSeedSortEntry> preparedSeeds =
-    co_await folly::coro::co_withExecutor(cpuExecutor,
-                                          folly::coro::collectAllWindowed(std::move(prepareTasks), maxInFlight));
-  maybeCancel(cancellationToken);
+  // Keep the window manager off the CPU thread pool so worker threads stay focused on the per-seed optimize work.
+  std::vector<PreparedSeedSortEntry> preparedSeeds = folly::coro::blockingWait(
+    folly::coro::co_withCancellation(tw.cancellationToken,
+                                     folly::coro::collectAllWindowed(std::move(prepareTasks), maxInFlight)));
+  maybeCancel(tw.cancellationToken);
 
   std::vector<size_t> commitOrder(seeds.size());
   std::iota(commitOrder.begin(), commitOrder.end(), size_t{0});
@@ -213,7 +275,7 @@ sortSeedsLegacyLikeAsync(const Geo3dScalarField& seeds, const ZImg& signal, Trac
   }
 
   for (size_t processedIndex = 0; processedIndex < commitOrder.size(); ++processedIndex) {
-    maybeCancel(cancellationToken);
+    maybeCancel(tw.cancellationToken);
 
     if (VLOG_IS_ON(1) &&
         (((processedIndex % SeedSortProgressReportEvery) == 0) || (processedIndex + 1 == commitOrder.size()))) {
@@ -260,30 +322,7 @@ sortSeedsLegacyLikeAsync(const Geo3dScalarField& seeds, const ZImg& signal, Trac
   }
 
   VLOG(1) << "Seed sort: done.";
-  co_return out;
-}
-
-} // namespace
-
-SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw)
-{
-  CHECK(signal.numChannels() == 1);
-  CHECK(signal.numTimes() == 1);
-
-  configureSeedSortFitWorkspace(tw);
-  maybeCancel(tw.cancellationToken);
-
-  VLOG(1) << fmt::format("Seed sort: start (seeds={}, minScore={})", seeds.size(), tw.minScore);
-  VLOG(1) << fmt::format("Seed sort: max in-flight prepare tasks={}, commit order={}",
-                         seedSortMaxInFlight(),
-                         FLAGS_atlas_autotrace_seed_sort_commit_by_score ? "score" : "legacy");
-  try {
-    return folly::coro::blockingWait(
-      folly::coro::co_withCancellation(tw.cancellationToken, sortSeedsLegacyLikeAsync(seeds, signal, tw)));
-  }
-  catch (const folly::OperationCancelled&) {
-    throw ZCancellationException();
-  }
+  return out;
 }
 
 } // namespace nim

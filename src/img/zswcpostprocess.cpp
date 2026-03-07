@@ -7,8 +7,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 namespace nim {
@@ -449,95 +447,79 @@ void tuneBranchNodeLegacyLike(ZSwc& tree, Iter tn)
     return 0.0;
   }
 
-  std::vector<ZSwc::ConstSwcTreeNode> leafArray;
-  leafArray.push_back(regularRoot);
-
-  for (auto it = subtree.cbeginLeaf(regularRoot); it != subtree.cendLeaf(regularRoot); ++it) {
-    if (isRegularLegacyLike(it) && isLeafLegacyLike(it)) {
-      leafArray.push_back(it);
-    }
-  }
-
-  if (leafArray.size() < 2) {
-    return 0.0;
-  }
-
-  std::unordered_map<const void*, double> distFromRoot;
-  distFromRoot.reserve(subtree.size());
-  distFromRoot.emplace(static_cast<const void*>(regularRoot.node), 0.0);
-
-  for (auto it = subtree.cbegin(regularRoot); it != subtree.cend(regularRoot); ++it) {
-    if (it == regularRoot) {
-      continue;
-    }
-    const auto parent = ZSwc::parent(it);
-    if (ZSwc::isNull(parent) || isVirtualLegacyLike(parent)) {
-      distFromRoot.emplace(static_cast<const void*>(it.node), 0.0);
-      continue;
-    }
-
-    const auto parentKey = static_cast<const void*>(parent.node);
-    const auto parentIt = distFromRoot.find(parentKey);
-    CHECK(parentIt != distFromRoot.end()) << "mainTrunkLengthLegacyLike: parent distance missing (non-preorder tree?)";
-
-    const double dx = it->x - parent->x;
-    const double dy = it->y - parent->y;
-    const double dz = it->z - parent->z;
-    const double edgeLen = std::sqrt(dx * dx + dy * dy + dz * dz);
-    distFromRoot.emplace(static_cast<const void*>(it.node), parentIt->second + edgeLen);
-  }
-
-  auto commonAncestor = [](ZSwc::ConstSwcTreeNode a, ZSwc::ConstSwcTreeNode b) -> ZSwc::ConstSwcTreeNode {
-    std::unordered_set<const void*> ancestors;
-    ancestors.reserve(128);
-    for (auto it = a; !ZSwc::isNull(it); it = ZSwc::parent(it)) {
-      ancestors.insert(static_cast<const void*>(it.node));
-    }
-    for (auto it = b; !ZSwc::isNull(it); it = ZSwc::parent(it)) {
-      if (ancestors.find(static_cast<const void*>(it.node)) != ancestors.end()) {
-        return it;
-      }
-    }
-    return {};
+  // The legacy implementation enumerates all leaf pairs and computes geodesic
+  // distance via LCA. With pure geodesic weighting (0, 1), this is exactly the
+  // weighted diameter of the tree (longest path length). Compute it in O(N).
+  struct DiameterFrame
+  {
+    ZSwc::ConstSwcTreeNode node;
+    ZSwc::ConstChildIterator childIt;
+    ZSwc::ConstChildIterator childEnd;
+    size_t regularAncestorFrameIndex = std::numeric_limits<size_t>::max();
+    bool isRegular = false;
+    double bestDown1 = 0.0;
+    double bestDown2 = 0.0;
   };
 
+  constexpr size_t kNoRegularAncestor = std::numeric_limits<size_t>::max();
+
   double maxGeodesicLength = 0.0;
-  for (size_t i = 0; i < leafArray.size(); ++i) {
-    const auto leaf1 = leafArray[i];
-    const auto leaf1Key = static_cast<const void*>(leaf1.node);
-    const auto leaf1It = distFromRoot.find(leaf1Key);
-    if (leaf1It == distFromRoot.end()) {
+  std::vector<DiameterFrame> stack;
+  std::vector<size_t> regularFrameStack;
+  stack.reserve(256);
+  regularFrameStack.reserve(256);
+
+  auto pushFrame = [&](ZSwc::ConstSwcTreeNode node) {
+    const bool regular = isRegularLegacyLike(node);
+    const size_t regularAncestorIndex = regularFrameStack.empty() ? kNoRegularAncestor : regularFrameStack.back();
+    stack.push_back(
+      DiameterFrame{node, subtree.cbeginChild(node), subtree.cendChild(node), regularAncestorIndex, regular, 0.0, 0.0});
+    if (regular) {
+      regularFrameStack.push_back(stack.size() - 1);
+    }
+  };
+
+  pushFrame(regularRoot);
+
+  while (!stack.empty()) {
+    auto& frame = stack.back();
+    if (frame.childIt != frame.childEnd) {
+      const auto child = ZSwc::ConstSwcTreeNode(frame.childIt.node);
+      ++frame.childIt;
+      pushFrame(child);
       continue;
     }
 
-    for (size_t j = 0; j < leafArray.size(); ++j) {
-      const auto leaf2 = leafArray[j];
-      if (leaf1 == leaf2) {
-        continue;
-      }
+    if (frame.isRegular) {
+      // Virtual nodes are transparent in the legacy length accumulation
+      // (it connects regular nodes to their nearest regular ancestor), so we
+      // compute the diameter on that implicit regular-only tree.
+      maxGeodesicLength = std::max(maxGeodesicLength, frame.bestDown1 + frame.bestDown2);
 
-      const auto leaf2Key = static_cast<const void*>(leaf2.node);
-      const auto leaf2It = distFromRoot.find(leaf2Key);
-      if (leaf2It == distFromRoot.end()) {
-        continue;
-      }
+      const double bestDown = frame.bestDown1;
+      const auto finishedNode = frame.node;
+      const size_t regularAncestorIndex = frame.regularAncestorFrameIndex;
 
-      const auto ancestor = commonAncestor(leaf1, leaf2);
-      if (ZSwc::isNull(ancestor) || isVirtualLegacyLike(ancestor)) {
-        continue;
-      }
+      CHECK(!regularFrameStack.empty());
+      CHECK(regularFrameStack.back() == stack.size() - 1);
+      regularFrameStack.pop_back();
 
-      const auto ancestorKey = static_cast<const void*>(ancestor.node);
-      const auto ancestorIt = distFromRoot.find(ancestorKey);
-      if (ancestorIt == distFromRoot.end()) {
-        continue;
-      }
+      if (regularAncestorIndex != kNoRegularAncestor) {
+        CHECK(regularAncestorIndex < stack.size());
+        auto& regularAncestorFrame = stack[regularAncestorIndex];
+        CHECK(regularAncestorFrame.isRegular);
 
-      const double length = leaf1It->second + leaf2It->second - 2.0 * ancestorIt->second;
-      if (length > maxGeodesicLength) {
-        maxGeodesicLength = length;
+        const double candidate = bestDown + nodeDistLegacyLike(finishedNode, regularAncestorFrame.node);
+        if (candidate > regularAncestorFrame.bestDown1) {
+          regularAncestorFrame.bestDown2 = regularAncestorFrame.bestDown1;
+          regularAncestorFrame.bestDown1 = candidate;
+        } else if (candidate > regularAncestorFrame.bestDown2) {
+          regularAncestorFrame.bestDown2 = candidate;
+        }
       }
     }
+
+    stack.pop_back();
   }
 
   return maxGeodesicLength;
@@ -680,27 +662,24 @@ void swcTreeRemoveOrphanBlobLegacyLike(ZSwc& tree, double minLength, int minOrph
     return;
   }
 
+  // Compute per-root trunk lengths once and reuse for both mean/minLength and pruning.
+  std::vector<double> trunkLengths;
+  trunkLengths.reserve(roots.size());
+  double sum = 0.0;
+  for (const auto& root : roots) {
+    const ZSwc subtree = copySubtreeLegacyLike(tree, root);
+    const double trunkLength = mainTrunkLengthLegacyLike(subtree);
+    trunkLengths.push_back(trunkLength);
+    sum += trunkLength;
+  }
+
   if (minLength == 0.0 && static_cast<int>(roots.size()) >= minOrphanCount) {
-    double sum = 0.0;
-    for (const auto& root : roots) {
-      const ZSwc subtree = copySubtreeLegacyLike(tree, root);
-      sum += mainTrunkLengthLegacyLike(subtree);
-    }
     minLength = sum / static_cast<double>(roots.size());
   }
 
-  std::vector<ZSwc::SwcTreeNode> keep;
-  keep.reserve(roots.size());
-  for (const auto& root : roots) {
-    const ZSwc subtree = copySubtreeLegacyLike(tree, root);
-    if (mainTrunkLengthLegacyLike(subtree) >= minLength) {
-      keep.push_back(root);
-    }
-  }
-
-  for (const auto& root : roots) {
-    if (std::find(keep.begin(), keep.end(), root) == keep.end()) {
-      tree.eraseSubtree(root);
+  for (size_t i = 0; i < roots.size(); ++i) {
+    if (trunkLengths[i] < minLength) {
+      tree.eraseSubtree(roots[i]);
     }
   }
 

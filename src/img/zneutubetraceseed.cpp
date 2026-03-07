@@ -1,5 +1,6 @@
 #include "zneutubetraceseed.h"
 
+#include "zcancellation.h"
 #include "zneutubeedt3d.h"
 #include "zneutubeimglocmax.h"
 #include "zneutubeobjlabel.h"
@@ -7,6 +8,7 @@
 #include "zlog.h"
 
 #include <cmath>
+#include <utility>
 
 namespace nim {
 
@@ -67,22 +69,31 @@ namespace {
 
 Geo3dScalarField extractSeedOriginalLegacyLike(const ZImg& mask)
 {
+  return extractSeedOriginalLegacyLike(mask, folly::CancellationToken{});
+}
+
+Geo3dScalarField extractSeedOriginalLegacyLike(const ZImg& mask, const folly::CancellationToken& cancellationToken)
+{
   Geo3dScalarField field;
 
   if (mask.isEmpty()) {
     return field;
   }
 
+  maybeCancel(cancellationToken);
+
   CHECK(mask.numChannels() == 1);
   CHECK(mask.numTimes() == 1);
   CHECK(mask.isType<uint8_t>()) << "Expected uint8 mask, got " << mask.info();
 
-  const ZImg dist = bwdistSquaredU16LegacyLike(mask, /*pad*/ 0);
+  const ZImg dist = bwdistSquaredU16LegacyLike(mask, /*pad*/ 0, cancellationToken);
   CHECK(dist.isType<uint16_t>()) << dist.info();
+  maybeCancel(cancellationToken);
 
   const ZImg seeds = stackLocalMaxMaskLegacyLike(dist, StackLocmaxOptionLegacyLike::Center);
   CHECK(seeds.isType<uint8_t>()) << seeds.info();
   CHECK(seeds.voxelNumber() == mask.voxelNumber());
+  maybeCancel(cancellationToken);
 
   const size_t width = seeds.width();
   const size_t height = seeds.height();
@@ -95,7 +106,13 @@ Geo3dScalarField extractSeedOriginalLegacyLike(const ZImg& mask)
 
   // Legacy `Stack_To_Voxel_List` builds a linked list by pushing each voxel to the head,
   // so the final order is the reverse of the stack-array scan order.
+  constexpr size_t kCancelCheckEvery = 1u << 20;
+  size_t untilCheck = kCancelCheckEvery;
   for (size_t idx = voxelNumber; idx-- > 0;) {
+    if (--untilCheck == 0) {
+      maybeCancel(cancellationToken);
+      untilCheck = kCancelCheckEvery;
+    }
     if (seedsData[idx] == 0) {
       continue;
     }
@@ -155,11 +172,23 @@ Geo3dScalarField removeNoisySeedLegacyLike(Geo3dScalarField seeds,
                                            bool screeningSeed,
                                            RemoveNoisySeedDiagnosticsLegacyLike* diag)
 {
+  return removeNoisySeedLegacyLike(std::move(seeds), mask, seedMethod, screeningSeed, folly::CancellationToken{}, diag);
+}
+
+Geo3dScalarField removeNoisySeedLegacyLike(Geo3dScalarField seeds,
+                                           ZImg& mask,
+                                           int seedMethod,
+                                           bool screeningSeed,
+                                           const folly::CancellationToken& cancellationToken,
+                                           RemoveNoisySeedDiagnosticsLegacyLike* diag)
+{
   if (mask.isEmpty()) {
     seeds.points.clear();
     seeds.values.clear();
     return seeds;
   }
+
+  maybeCancel(cancellationToken);
 
   const double seedDensity =
     (mask.voxelNumber() == 0) ? 0.0 : static_cast<double>(seeds.size()) / static_cast<double>(mask.voxelNumber());
@@ -175,10 +204,11 @@ Geo3dScalarField removeNoisySeedLegacyLike(Geo3dScalarField seeds,
   }
 
   mask = removeSmallObjectsLegacyLike(mask, minSeedSize, /*connectivity*/ 26);
+  maybeCancel(cancellationToken);
 
   switch (seedMethod) {
     case 1:
-      return extractSeedOriginalLegacyLike(mask);
+      return extractSeedOriginalLegacyLike(mask, cancellationToken);
     case 2:
       LOG(ERROR) << "removeNoisySeedLegacyLike: seedMethod=2 (skeleton seeding) not supported yet.";
       seeds.points.clear();
