@@ -93,7 +93,7 @@ void configureSeedSortFitWorkspace(TraceWorkspace& tw)
 
 [[nodiscard]] size_t seedSortMaxInFlight()
 {
-  const size_t concurrencyFloor = globalCpuExecutorThreadCountOrFallback();
+  const size_t concurrencyFloor = globalCpuExecutorThreadCountOrFallback() * 8;
   const size_t requested = static_cast<size_t>(FLAGS_atlas_autotrace_seed_sort_precompute_window_size);
   if (requested == 0) {
     return concurrencyFloor;

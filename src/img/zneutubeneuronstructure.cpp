@@ -9,11 +9,18 @@
 
 #include "zlog.h"
 
+#include <gflags/gflags.h>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
 #include <optional>
+
+DEFINE_bool(atlas_autotrace_reconstruct_chain_connection_prefilter,
+            true,
+            "Use a knot-aware conservative distance prefilter before chain-connection tests during auto-trace "
+            "reconstruction. Disable for debugging or parity investigations.");
 
 namespace nim {
 
@@ -27,11 +34,19 @@ struct ChainConnectionBoundsLegacyLike
   Geo3dBallLegacyLike hookHead{};
   Geo3dBallLegacyLike hookTail{};
 
-  // Axis-aligned bounding box of per-segment ball centers (scaled).
-  std::array<double, 3> centersMin{};
-  std::array<double, 3> centersMax{};
+  // Axis-aligned bounding box of chain support points in the connection-test coordinate space.
+  //
+  // This includes:
+  // - original per-segment ball centers, and
+  // - knot positions from `locsegChainToKnotArrayLegacyLike()`.
+  //
+  // The knot positions matter because connection tests can interpolate `chain2` in place. New segments are inserted on
+  // the pre-existing knot polyline, so their centers can move outside the original center-only AABB while still
+  // remaining within the knot envelope.
+  std::array<double, 3> aabbMin{};
+  std::array<double, 3> aabbMax{};
 
-  // Maximum per-segment ball radius (scaled).
+  // Maximum conservative per-segment cover radius in the same scaled space.
   double maxRadius = 0.0;
 };
 
@@ -63,6 +78,40 @@ struct ChainConnectionBoundsLegacyLike
   return dx * dx + dy * dy + dz * dz;
 }
 
+void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, const std::array<double, 3>& p)
+{
+  aabbMin[0] = std::min(aabbMin[0], p[0]);
+  aabbMin[1] = std::min(aabbMin[1], p[1]);
+  aabbMin[2] = std::min(aabbMin[2], p[2]);
+
+  aabbMax[0] = std::max(aabbMax[0], p[0]);
+  aabbMax[1] = std::max(aabbMax[1], p[1]);
+  aabbMax[2] = std::max(aabbMax[2], p[2]);
+}
+
+[[nodiscard]] double locsegSegmentCoverRadiusLegacyLike(const LocalNeuroseg& scaledSeg)
+{
+  // `Local_Neuroseg_Ball_Bound()` matches legacy connection-test heuristics, but its radius is not a strict enclosing
+  // radius for fat short segments. That is acceptable inside the legacy per-segment loop because it is only an
+  // acceleration hint there. For the chain-level prefilter we need a true hard bound, especially around soma-like
+  // segments with very large radii.
+  const std::array<double, 3> center = localNeurosegCenterLegacyLike(scaledSeg);
+  const std::array<double, 3> bottom = localNeurosegBottomLegacyLike(scaledSeg);
+  const std::array<double, 3> top = localNeurosegTopLegacyLike(scaledSeg);
+
+  const auto pointDist = [](const std::array<double, 3>& lhs, const std::array<double, 3>& rhs) {
+    return std::hypot(lhs[0] - rhs[0], lhs[1] - rhs[1], lhs[2] - rhs[2]);
+  };
+
+  const double halfAxisExtent = std::max(pointDist(center, bottom), pointDist(center, top));
+
+  const double maxSectionRadius =
+    std::max(neurosegRyZLegacyLike(scaledSeg.seg, 0.0), neurosegRyZLegacyLike(scaledSeg.seg, scaledSeg.seg.h - 1.0)) *
+    std::max(1.0, scaledSeg.seg.scale);
+
+  return std::hypot(halfAxisExtent, maxSectionRadius);
+}
+
 [[nodiscard]] ChainConnectionBoundsLegacyLike computeChainConnectionBoundsLegacyLike(const LocsegChain& chain,
                                                                                      double xzRatio)
 {
@@ -92,11 +141,13 @@ struct ChainConnectionBoundsLegacyLike
   localNeurosegScaleZLegacyLike(tail, xzRatio);
   localNeurosegBallBoundLegacyLike(head, out.hookHead);
   localNeurosegBallBoundLegacyLike(tail, out.hookTail);
+  out.hookHead.radius = std::max(out.hookHead.radius, locsegSegmentCoverRadiusLegacyLike(head));
+  out.hookTail.radius = std::max(out.hookTail.radius, locsegSegmentCoverRadiusLegacyLike(tail));
 
   // Loop bounds: per-segment ball centers/radii in the same scaled coordinate space.
   const double posInf = std::numeric_limits<double>::infinity();
-  out.centersMin = {posInf, posInf, posInf};
-  out.centersMax = {-posInf, -posInf, -posInf};
+  out.aabbMin = {posInf, posInf, posInf};
+  out.aabbMax = {-posInf, -posInf, -posInf};
   out.maxRadius = 0.0;
 
   Geo3dBallLegacyLike segBall{};
@@ -105,15 +156,18 @@ struct ChainConnectionBoundsLegacyLike
     localNeurosegScaleZLegacyLike(seg, xzRatio);
     localNeurosegBallBoundLegacyLike(seg, segBall);
 
-    out.centersMin[0] = std::min(out.centersMin[0], segBall.center[0]);
-    out.centersMin[1] = std::min(out.centersMin[1], segBall.center[1]);
-    out.centersMin[2] = std::min(out.centersMin[2], segBall.center[2]);
+    growAabb(out.aabbMin, out.aabbMax, segBall.center);
+    out.maxRadius = std::max(out.maxRadius, locsegSegmentCoverRadiusLegacyLike(seg));
+  }
 
-    out.centersMax[0] = std::max(out.centersMax[0], segBall.center[0]);
-    out.centersMax[1] = std::max(out.centersMax[1], segBall.center[1]);
-    out.centersMax[2] = std::max(out.centersMax[2], segBall.center[2]);
-
-    out.maxRadius = std::max(out.maxRadius, segBall.radius);
+  // Keep the original knot envelope as well so later in-place interpolation does not invalidate the prefilter.
+  const auto kaOpt = locsegChainToKnotArrayLegacyLike(chain);
+  CHECK(kaOpt.has_value()) << "Expected knot array for non-empty LocsegChain";
+  const LocsegChainKnotArrayLegacyLike& ka = *kaOpt;
+  for (int i = 0; i < static_cast<int>(ka.knots.size()); ++i) {
+    std::array<double, 3> knotPos = locsegChainKnotPosLegacyLike(ka, i);
+    knotPos[2] /= xzRatio;
+    growAabb(out.aabbMin, out.aabbMax, knotPos);
   }
 
   return out;
@@ -203,63 +257,69 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
     return ns;
   }
 
-  // Conservative distance prefilter:
-  //
-  // The legacy implementation runs an ordered O(n^2) connection test between every pair of chains. For large chain
-  // counts this becomes a dominant cost even when most chains are far apart and would fail `distThre`.
-  //
-  // To preserve behavior, we only skip pairs that are *provably* too far to pass the `conn.sdist > ctw.distThre`
-  // check inside `locsegChainConnectionTestLegacyLike()`. This prefilter uses:
-  // - a per-chain AABB of per-segment ball centers (scaled to the same xzRatio space), and
-  // - a per-chain maximum segment ball radius.
-  //
-  // These bounds remain conservative even when connection tests interpolate inside an existing chain, since
-  // interpolation inserts segments between existing knots and does not expand the chain's extent.
   const double xzRatio = (ctw.resolution[0] != ctw.resolution[2]) ? (ctw.resolution[0] / ctw.resolution[2]) : 1.0;
+  const bool usePrefilter = FLAGS_atlas_autotrace_reconstruct_chain_connection_prefilter;
   std::vector<ChainConnectionBoundsLegacyLike> connBounds;
-  connBounds.reserve(static_cast<size_t>(n));
-  for (int i = 0; i < n; ++i) {
-    const LocsegChain* chain = ns.chains[static_cast<size_t>(i)];
-    CHECK(chain != nullptr);
-    connBounds.push_back(computeChainConnectionBoundsLegacyLike(*chain, xzRatio));
+  if (usePrefilter) {
+    // Conservative distance prefilter:
+    //
+    // The legacy implementation runs an ordered O(n^2) connection test between every pair of chains. For large chain
+    // counts this becomes a dominant cost even when most chains are far apart and would fail `distThre`.
+    //
+    // To preserve behavior, we only skip pairs that are provably too far to pass the `conn.sdist > ctw.distThre`
+    // check inside `locsegChainConnectionTestLegacyLike()`. The bound is built from:
+    // - per-segment ball centers,
+    // - the chain knot positions used by interpolation, and
+    // - the maximum per-segment ball radius.
+    //
+    // Successful connection tests can interpolate `chain2` in place, so we refresh the target chain's bounds after a
+    // length-changing success. That keeps later ordered pair tests consistent with the evolving chain geometry.
+    connBounds.reserve(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) {
+      const LocsegChain* chain = ns.chains[static_cast<size_t>(i)];
+      CHECK(chain != nullptr);
+      connBounds.push_back(computeChainConnectionBoundsLegacyLike(*chain, xzRatio));
+    }
   }
 
   for (int i = 0; i < n; ++i) {
-    if (connBounds[static_cast<size_t>(i)].isEmpty) {
+    if (usePrefilter && connBounds[static_cast<size_t>(i)].isEmpty) {
       continue;
     }
     for (int j = 0; j < n; ++j) {
       if (i == j) {
         continue;
       }
-      if (connBounds[static_cast<size_t>(j)].isEmpty) {
-        continue;
-      }
+      if (usePrefilter) {
+        if (connBounds[static_cast<size_t>(j)].isEmpty) {
+          continue;
+        }
 
-      const ChainConnectionBoundsLegacyLike& hookBounds = connBounds[static_cast<size_t>(i)];
-      const ChainConnectionBoundsLegacyLike& loopBounds = connBounds[static_cast<size_t>(j)];
+        const ChainConnectionBoundsLegacyLike& hookBounds = connBounds[static_cast<size_t>(i)];
+        const ChainConnectionBoundsLegacyLike& loopBounds = connBounds[static_cast<size_t>(j)];
 
-      const double distThre = ctw.distThre;
-      const double loopRadius = loopBounds.maxRadius;
+        const double distThre = ctw.distThre;
+        const double loopRadius = loopBounds.maxRadius;
 
-      auto tooFar = [&](const Geo3dBallLegacyLike& hook) -> bool {
-        const double r = distThre + hook.radius + loopRadius;
-        const double distSq = distSqPointToAabb(hook.center, loopBounds.centersMin, loopBounds.centersMax);
-        return distSq > (r * r);
-      };
+        auto tooFar = [&](const Geo3dBallLegacyLike& hook) -> bool {
+          const double r = distThre + hook.radius + loopRadius;
+          const double distSq = distSqPointToAabb(hook.center, loopBounds.aabbMin, loopBounds.aabbMax);
+          return distSq > (r * r);
+        };
 
-      bool definitelyTooFar = false;
-      if (ctw.hookSpot == 0) {
-        definitelyTooFar = tooFar(hookBounds.hookHead);
-      } else if (ctw.hookSpot == 1) {
-        definitelyTooFar = tooFar(hookBounds.hookTail);
-      } else {
-        CHECK(ctw.hookSpot == -1);
-        definitelyTooFar = tooFar(hookBounds.hookHead) && tooFar(hookBounds.hookTail);
-      }
+        bool definitelyTooFar = false;
+        if (ctw.hookSpot == 0) {
+          definitelyTooFar = tooFar(hookBounds.hookHead);
+        } else if (ctw.hookSpot == 1) {
+          definitelyTooFar = tooFar(hookBounds.hookTail);
+        } else {
+          CHECK(ctw.hookSpot == -1);
+          definitelyTooFar = tooFar(hookBounds.hookHead) && tooFar(hookBounds.hookTail);
+        }
 
-      if (definitelyTooFar) {
-        continue;
+        if (definitelyTooFar) {
+          continue;
+        }
       }
 
       NeurocompConnLegacyLike conn;
@@ -271,8 +331,13 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
       CHECK(chainI != nullptr);
       CHECK(chainJ != nullptr);
 
+      const int chainJLengthBefore = chainJ->length();
       if (!locsegChainConnectionTestLegacyLike(*chainI, *chainJ, signal, zScale, conn, ctw)) {
         continue;
+      }
+
+      if (usePrefilter && chainJ->length() != chainJLengthBefore) {
+        connBounds[static_cast<size_t>(j)] = computeChainConnectionBoundsLegacyLike(*chainJ, xzRatio);
       }
 
       neurocompConnTranslateModeLegacyLike(chainJ->length(), conn);
