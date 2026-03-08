@@ -113,7 +113,7 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
 }
 
 [[nodiscard]] ChainConnectionBoundsLegacyLike computeChainConnectionBoundsLegacyLike(const LocsegChain& chain,
-                                                                                     double xzRatio)
+                                                                                     double zScale)
 {
   ChainConnectionBoundsLegacyLike out;
   out.isEmpty = chain.empty();
@@ -121,7 +121,7 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
     return out;
   }
 
-  // Hook-end bounds: match `locsegChainConnectionTestLegacyLike()` setup (head+tail balls scaled by xzRatio,
+  // Hook-end bounds: match `locsegChainConnectionTestLegacyLike()` setup (head+tail balls scaled by zScale,
   // and tail flipped so both ends are oriented outward).
   const LocalNeuroseg* shead = chain.headSeg();
   const LocalNeuroseg* stail = chain.tailSeg();
@@ -137,8 +137,8 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
     tail.seg.h = 2.0;
   }
 
-  localNeurosegScaleZLegacyLike(head, xzRatio);
-  localNeurosegScaleZLegacyLike(tail, xzRatio);
+  localNeurosegScaleZLegacyLike(head, zScale);
+  localNeurosegScaleZLegacyLike(tail, zScale);
   localNeurosegBallBoundLegacyLike(head, out.hookHead);
   localNeurosegBallBoundLegacyLike(tail, out.hookTail);
   out.hookHead.radius = std::max(out.hookHead.radius, locsegSegmentCoverRadiusLegacyLike(head));
@@ -153,7 +153,7 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
   Geo3dBallLegacyLike segBall{};
   for (const auto& node : chain) {
     LocalNeuroseg seg = node.locseg;
-    localNeurosegScaleZLegacyLike(seg, xzRatio);
+    localNeurosegScaleZLegacyLike(seg, zScale);
     localNeurosegBallBoundLegacyLike(seg, segBall);
 
     growAabb(out.aabbMin, out.aabbMax, segBall.center);
@@ -166,7 +166,7 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
   const LocsegChainKnotArrayLegacyLike& ka = *kaOpt;
   for (int i = 0; i < static_cast<int>(ka.knots.size()); ++i) {
     std::array<double, 3> knotPos = locsegChainKnotPosLegacyLike(ka, i);
-    knotPos[2] /= xzRatio;
+    knotPos[2] /= zScale;
     growAabb(out.aabbMin, out.aabbMax, knotPos);
   }
 
@@ -257,7 +257,6 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
     return ns;
   }
 
-  const double xzRatio = (ctw.resolution[0] != ctw.resolution[2]) ? (ctw.resolution[0] / ctw.resolution[2]) : 1.0;
   const bool usePrefilter = FLAGS_atlas_autotrace_reconstruct_chain_connection_prefilter;
   std::vector<ChainConnectionBoundsLegacyLike> connBounds;
   if (usePrefilter) {
@@ -278,7 +277,7 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
     for (int i = 0; i < n; ++i) {
       const LocsegChain* chain = ns.chains[static_cast<size_t>(i)];
       CHECK(chain != nullptr);
-      connBounds.push_back(computeChainConnectionBoundsLegacyLike(*chain, xzRatio));
+      connBounds.push_back(computeChainConnectionBoundsLegacyLike(*chain, zScale));
     }
   }
 
@@ -337,7 +336,7 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
       }
 
       if (usePrefilter && chainJ->length() != chainJLengthBefore) {
-        connBounds[static_cast<size_t>(j)] = computeChainConnectionBoundsLegacyLike(*chainJ, xzRatio);
+        connBounds[static_cast<size_t>(j)] = computeChainConnectionBoundsLegacyLike(*chainJ, zScale);
       }
 
       neurocompConnTranslateModeLegacyLike(chainJ->length(), conn);

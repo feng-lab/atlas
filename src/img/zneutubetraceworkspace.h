@@ -48,6 +48,10 @@ struct TraceWorkspace
   // Reserved/dynamic variables (legacy behavior depends on routine).
   std::array<double, 5> dyvar = {-1.0, -1.0, -1.0, -1.0, -1.0};
 
+  // Optional trace-space resolution for size-based checks.
+  //
+  // Current tracing code only uses the XY entries here; tracing entry points should still set the full
+  // `{1, 1, zScale}` tuple explicitly so the workspace stays aligned with the chosen anisotropy contract.
   std::array<double, 3> resolution = {-1.0, -1.0, -1.0};
 
   bool addHit = true;

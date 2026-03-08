@@ -861,6 +861,13 @@ Selection behavior:
 
 In **Trace Settings → Tracing Config**, you can adjust key neuTube tracing parameters (score thresholds, fitting/refit options, crossover tests, etc.).
 
+In **Trace Settings → Z Scale**, Atlas also shows the metadata-derived tracing anisotropy and an optional override:
+
+- **Derived** shows the value Atlas computes from the image metadata.
+- **Override** lets you force an explicit tracing value for the selected image/channel pair.
+- **Effective** shows the exact value that the interactive tracer will use.
+- `zScale` means `voxelSizeZ / voxelSizeXY`, where Atlas derives `voxelSizeXY` as `(voxelSizeX + voxelSizeY) / 2`.
+
 These settings are applied to subsequent traces and are intended to match neuTube semantics.
 
 ---
@@ -893,6 +900,11 @@ Output paths are auto-suggested based on the selected image/channel/time, but yo
 
 In the Auto Trace dialog:
 
+- **Z Scale**
+  - **Derived** shows the tracing `zScale` computed from the selected image metadata and the current downsample ratio.
+  - **Override** lets you replace that metadata-derived value with an explicit tracing `zScale` for the selected image/channel.
+  - **Effective** shows the exact value that Auto Trace will launch with.
+  - `zScale` means `voxelSizeZ / voxelSizeXY`, where Atlas derives `voxelSizeXY` as `(voxelSizeX + voxelSizeY) / 2`.
 - **Computational budget**
   - **Default** (recommended): uses the default tracing configuration.
   - Or uncheck Default and pick a budget level (1–6). Higher levels can take longer and sometimes improve results.
@@ -900,6 +912,14 @@ In the Auto Trace dialog:
 - **Trace on downsampled image** (optional): traces on a downsampled copy of the selected channel/time.
   - Choose an **XY ratio** and a **Z ratio** (integer factors). Larger ratios mean a smaller image (faster/less memory, but can lose fine detail).
   - The generated SWC is automatically **rescaled back to the original image coordinates** (x/y/z and radii).
+- **Blocked tracing (large image / resumable)**:
+  - Use this for disk-cached or Neuroglancer datasets that are too large to trace as one in-memory volume.
+  - Atlas writes a session folder containing `manifest.json`, immutable per-block checkpoints under `blocks/`, a rolling
+    `result_tracing.swc`, the final `result.swc`, and `log.txt`.
+  - Resume is allowed only for the exact same image source. Atlas binds the session folder to the selected source image,
+    channel/time, downsample ratio, `zScale`, and block settings.
+  - When resuming an existing blocked session, the dialog locks the effective `zScale` to the value stored in the
+    session `manifest.json`.
 
 #### Step 3: start and monitor the task
 

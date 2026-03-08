@@ -4,6 +4,7 @@
 #include "zneutubeinthistogram.h"
 #include "zneutubestackgraph.h"
 #include "zneutubestackroute.h"
+#include "zneutubetracezscale.h"
 
 #include "zexception.h"
 #include "zlog.h"
@@ -608,9 +609,13 @@ std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZImg& signal,
                                                   double startRadius,
                                                   const std::array<double, 3>& target,
                                                   double targetRadius,
+                                                  double zScale,
                                                   const TraceConfig& cfg,
                                                   ZNeutubeImageBackgroundLegacyLike background)
 {
+  CHECK(std::isfinite(zScale));
+  CHECK(zScale > 0.0);
+
   if (signal.isEmpty()) {
     return nullptr;
   }
@@ -639,9 +644,7 @@ std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZImg& signal,
 
   StackGraphWorkspaceLegacyLike sgw;
   defaultStackGraphWorkspaceLegacyLike(sgw);
-
-  const ZImgInfo info = stackView.info();
-  sgw.resolution = {info.voxelSizeX, info.voxelSizeY, info.voxelSizeZ};
+  sgw.resolution = traceResolutionFromZScaleLegacyLike(zScale);
 
   int zMargin = -1;
   if (sgw.resolution[0] > 0.0 && (sgw.resolution[2] / sgw.resolution[0] > 3.0)) {
@@ -760,9 +763,13 @@ std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZVoxelVolume& signal,
                                                   double startRadius,
                                                   const std::array<double, 3>& target,
                                                   double targetRadius,
+                                                  double zScale,
                                                   const TraceConfig& cfg,
                                                   ZNeutubeImageBackgroundLegacyLike background)
 {
+  CHECK(std::isfinite(zScale));
+  CHECK(zScale > 0.0);
+
   if (signal.isEmpty()) {
     return nullptr;
   }
@@ -790,8 +797,7 @@ std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZVoxelVolume& signal,
 
   StackGraphWorkspaceLegacyLike sgw;
   defaultStackGraphWorkspaceLegacyLike(sgw);
-
-  sgw.resolution = {signal.voxelSizeX(), signal.voxelSizeY(), signal.voxelSizeZ()};
+  sgw.resolution = traceResolutionFromZScaleLegacyLike(zScale);
 
   int zMargin = -1;
   if (sgw.resolution[0] > 0.0 && (sgw.resolution[2] / sgw.resolution[0] > 3.0)) {

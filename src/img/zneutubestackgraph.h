@@ -28,6 +28,11 @@ struct StackGraphWorkspaceLegacyLike
   // When not set, Stack_Route computes a range based on start/end and margins.
   std::optional<std::array<int, 6>> range;
 
+  // Neighbor step lengths used when converting voxel offsets to edge lengths.
+  //
+  // In tracing code this is usually the explicit trace-space resolution `{1, 1, zScale}`.
+  // Other clients may provide different explicit spacings, but callers must not infer a tracing `zScale`
+  // from image metadata inside inner loops.
   std::array<double, 3> resolution = {1.0, 1.0, 1.0};
   WeightFunc weightFunc = nullptr;
   int spOption = 0;

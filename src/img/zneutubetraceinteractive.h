@@ -34,6 +34,7 @@ struct SeedTraceResult
 // - `signal`: image volume (may be multi-channel/time; tracing uses the selected `c`/`t`)
 // - `position`: seed in image voxel coordinates (x,y,z). Fractional x/y are allowed; z is typically an integer slice.
 // - `cfg`: already-resolved trace configuration (including any level overrides)
+// - `zScale`: tracing anisotropy in voxel coordinates (`voxelSizeZ / voxelSizeXY`).
 //
 // Output:
 // - `SeedTraceResult::swc` is null when no branch was produced.
@@ -42,6 +43,7 @@ struct SeedTraceResult
 traceSeedNewSwcLegacyLike(const ZImg& signal,
                           const std::array<double, 3>& position,
                           const TraceConfig& cfg,
+                          double zScale,
                           size_t c = 0,
                           size_t t = 0,
                           folly::CancellationToken cancellationToken = folly::CancellationToken());
@@ -51,6 +53,7 @@ traceSeedNewSwcLegacyLike(const ZImg& signal,
 traceSeedNewSwcLegacyLike(const ZVoxelVolume& signal,
                           const std::array<double, 3>& position,
                           const TraceConfig& cfg,
+                          double zScale,
                           folly::CancellationToken cancellationToken = folly::CancellationToken());
 
 [[nodiscard]] SeedTraceResult
@@ -58,6 +61,7 @@ traceSeedIntoHostSwcLegacyLike(const ZImg& signal,
                                const ZSwc& hostSwc,
                                const std::array<double, 3>& position,
                                const TraceConfig& cfg,
+                               double zScale,
                                size_t c = 0,
                                size_t t = 0,
                                folly::CancellationToken cancellationToken = folly::CancellationToken());
@@ -68,6 +72,7 @@ traceSeedIntoHostSwcLegacyLike(const ZVoxelVolume& signal,
                                const ZSwc& hostSwc,
                                const std::array<double, 3>& position,
                                const TraceConfig& cfg,
+                               double zScale,
                                folly::CancellationToken cancellationToken = folly::CancellationToken());
 
 } // namespace nim

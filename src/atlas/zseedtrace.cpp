@@ -13,6 +13,7 @@
 #include "ztracesettings.h"
 #include "zneutubetraceconfig.h"
 #include "zneutubetraceinteractive.h"
+#include "zneutubetracezscale.h"
 
 #include <QApplication>
 #include <QDir>
@@ -20,6 +21,8 @@
 #include <QMetaObject>
 #include <QPointer>
 #include <QUuid>
+
+#include <cmath>
 
 #include <folly/CancellationToken.h>
 #include <folly/coro/Invoke.h>
@@ -144,12 +147,15 @@ struct SeededTraceAsyncResult
                                                             const QString& traceConfigPath,
                                                             bool haveAlgoConfig,
                                                             const ZTraceSettings::AlgoConfig& algoCfg,
+                                                            double zScale,
                                                             std::optional<std::pair<size_t, ZSwc>> hostSwcOpt,
                                                             folly::CancellationToken cancellationToken)
 {
   SeededTraceAsyncResult res;
 
   try {
+    CHECK(std::isfinite(zScale));
+    CHECK(zScale > 0.0);
     maybeCancel(cancellationToken);
 
     const ZImgInfo info = imgPack->imgInfo();
@@ -190,14 +196,14 @@ struct SeededTraceAsyncResult
       SeedTraceResult tr;
       if (imgPack->isDiskCached()) {
         const ZImgPackVoxelVolume signalVol(imgPack, sc, t);
-        tr = traceSeedIntoHostSwcLegacyLike(signalVol, hostSwcOpt->second, seed, cfg, cancellationToken);
+        tr = traceSeedIntoHostSwcLegacyLike(signalVol, hostSwcOpt->second, seed, cfg, zScale, cancellationToken);
       } else {
         const ZImg& signal = imgPack->img();
         if (signal.isEmpty()) {
           res.error = QStringLiteral("Trace failed: the image is empty.");
           return res;
         }
-        tr = traceSeedIntoHostSwcLegacyLike(signal, hostSwcOpt->second, seed, cfg, sc, t, cancellationToken);
+        tr = traceSeedIntoHostSwcLegacyLike(signal, hostSwcOpt->second, seed, cfg, zScale, sc, t, cancellationToken);
       }
       if (tr.swc) {
         size_t resampledNewNodes = tr.newNodes;
@@ -212,14 +218,14 @@ struct SeededTraceAsyncResult
       SeedTraceResult tr;
       if (imgPack->isDiskCached()) {
         const ZImgPackVoxelVolume signalVol(imgPack, sc, t);
-        tr = traceSeedNewSwcLegacyLike(signalVol, seed, cfg, cancellationToken);
+        tr = traceSeedNewSwcLegacyLike(signalVol, seed, cfg, zScale, cancellationToken);
       } else {
         const ZImg& signal = imgPack->img();
         if (signal.isEmpty()) {
           res.error = QStringLiteral("Trace failed: the image is empty.");
           return res;
         }
-        tr = traceSeedNewSwcLegacyLike(signal, seed, cfg, sc, t, cancellationToken);
+        tr = traceSeedNewSwcLegacyLike(signal, seed, cfg, zScale, sc, t, cancellationToken);
       }
       if (tr.swc) {
         ZNeutubeSwcResampler resampler;
@@ -268,6 +274,8 @@ void startSeedTraceInteractive(ZDoc& doc,
   const ZTraceSettings::AlgoConfig algoCfg = traceSettings.algoConfig();
 
   const ZImgInfo info = imgPack->imgInfo();
+  const double derivedZScale = preferredZScaleFromImgInfoLegacyLike(info);
+  const double zScale = traceSettings.zScaleOverrideForSelection(sourceImgObjId, sc).value_or(derivedZScale);
   const QString channelLabel =
     (sc < info.channelNames.size()) ? info.displayChannelName(sc) : QStringLiteral("Ch%1").arg(sc + 1);
   const QString timeLabel = QStringLiteral("T%1").arg(t + 1);
@@ -319,6 +327,7 @@ void startSeedTraceInteractive(ZDoc& doc,
                             traceConfigPath,
                             haveAlgoConfig,
                             algoCfg,
+                            zScale,
                             hostSwcOpt = std::move(hostSwcOpt),
                             promoteNewSwcToExistingTarget,
                             hostSwcId,
@@ -331,6 +340,7 @@ void startSeedTraceInteractive(ZDoc& doc,
                                                                 traceConfigPath,
                                                                 haveAlgoConfig,
                                                                 algoCfg,
+                                                                zScale,
                                                                 std::move(hostSwcOpt),
                                                                 cancellationToken);
 

@@ -5,12 +5,26 @@
 #include <itkMacro.h>
 #include <itkProcessObject.h>
 #include <folly/ScopeGuard.h>
+#include <QDir>
+#include <QFileInfo>
 
 namespace nim {
 
 void ZImgProcess::run()
 {
-  auto fileDestination = createFileLogSink(m_logFile);
+  QString logFile = m_logFile;
+  if (!logFile.isEmpty()) {
+    const QFileInfo fi(logFile);
+    const QDir dir = fi.dir();
+    if (!dir.exists()) {
+      if (!QDir().mkpath(dir.absolutePath())) {
+        LOG(ERROR) << "Failed to create log directory: " << dir.absolutePath();
+        logFile.clear();
+      }
+    }
+  }
+
+  auto fileDestination = createFileLogSink(logFile);
   if (fileDestination) {
     addLogSink(fileDestination);
   }

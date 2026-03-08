@@ -137,6 +137,9 @@ set(IMG_SOURCES
         zswcresampler.cpp zswcresampler.h
         zswctreenodegeomlegacy.cpp zswctreenodegeomlegacy.h
         zswcwriter.cpp zswcwriter.h
+        zswcspatialindex.cpp zswcspatialindex.h
+        zswcgeometrymaskvolume.cpp zswcgeometrymaskvolume.h
+        zblockedautotracesession.cpp zblockedautotracesession.h
         zskeleton.h zskeleton.cpp
         ztree.hpp
         zvoxelregion.h zvoxelregion.cpp
@@ -240,6 +243,7 @@ set(IMG_SOURCES
     zneutubetraceauto.cpp zneutubetraceauto.h
     zneutubetraceconfig.cpp zneutubetraceconfig.h
     zneutubeautotraceprocess.cpp zneutubeautotraceprocess.h
+    zneutubeblockedautotraceprocess.cpp zneutubeblockedautotraceprocess.h
     zneutubeskeletonizeprocess.cpp zneutubeskeletonizeprocess.h
     zneutubetraceconnectiontestworkspace.cpp zneutubetraceconnectiontestworkspace.h
     zneutubetraceconnectiontest.cpp zneutubetraceconnectiontest.h

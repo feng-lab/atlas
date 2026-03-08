@@ -80,6 +80,7 @@ extern "C" {
 #include "zneutubetraceinteractive.h"
 #include "zneutubetracescorethresholds.h"
 #include "zneutubetraceconfig.h"
+#include "zneutubetracezscale.h"
 #include "zneutubetracemask.h"
 #include "zneutubetracerecover.h"
 #include "zneutubeimgbinarizer.h"
@@ -113,6 +114,7 @@ extern "C" {
 namespace fs = std::filesystem;
 
 DECLARE_bool(atlas_autotrace_seed_sort_commit_by_score);
+DECLARE_bool(atlas_trace_use_swc_geometry_mask);
 
 namespace {
 
@@ -137,6 +139,27 @@ private:
 [[maybe_unused]] ::testing::Environment* const kLegacySeedSortCommitParityEnvironment =
   ::testing::AddGlobalTestEnvironment(new LegacySeedSortCommitParityEnvironment());
 
+class LegacyTraceMaskParityEnvironment : public ::testing::Environment
+{
+public:
+  void SetUp() override
+  {
+    _previousFlag = FLAGS_atlas_trace_use_swc_geometry_mask;
+    FLAGS_atlas_trace_use_swc_geometry_mask = false;
+  }
+
+  void TearDown() override
+  {
+    FLAGS_atlas_trace_use_swc_geometry_mask = _previousFlag;
+  }
+
+private:
+  bool _previousFlag = true;
+};
+
+[[maybe_unused]] ::testing::Environment* const kLegacyTraceMaskParityEnvironment =
+  ::testing::AddGlobalTestEnvironment(new LegacyTraceMaskParityEnvironment());
+
 class ScopedQtCoreApplication
 {
 public:
@@ -155,6 +178,24 @@ public:
 private:
   std::unique_ptr<QCoreApplication> _app;
 };
+
+class ZImgInitEnvironment : public ::testing::Environment
+{
+public:
+  void SetUp() override
+  {
+    _qtApp = std::make_unique<ScopedQtCoreApplication>();
+    // Some img ports use folly::getGlobalCPUExecutor(), which aborts until
+    // ZImgInit completes Folly singleton registration for the process.
+    std::ignore = nim::ZImgInit::instance("", "", "", false);
+  }
+
+private:
+  std::unique_ptr<ScopedQtCoreApplication> _qtApp;
+};
+
+[[maybe_unused]] ::testing::Environment* const kZImgInitEnvironment =
+  ::testing::AddGlobalTestEnvironment(new ZImgInitEnvironment());
 
 class ScopedStdoutSilencer
 {
@@ -2352,9 +2393,6 @@ TEST(NeutubeLegacyLocalNeuroseg, OptimizeWMatchesLegacy)
 
 TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const fs::path dir = makeUniqueTempDir();
   const fs::path commandConfig = dir / "command_config.json";
   const fs::path skeletonizeCfg = dir / "skeletonize.json";
@@ -2497,9 +2535,6 @@ TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)
 
 TEST(NeutubeCommand2Parity, Trace_WithHostSwc_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const fs::path dir = makeUniqueTempDir();
   const fs::path commandConfig = dir / "command_config.json";
   const fs::path traceCfg = dir / "trace_config.json";
@@ -2585,9 +2620,6 @@ TEST(NeutubeCommand2Parity, Trace_WithHostSwc_MatchesLegacy)
 
 TEST(NeutubeCommand2Parity, Trace_WithHostSwc_NoConnection_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const fs::path dir = makeUniqueTempDir();
   const fs::path commandConfig = dir / "command_config.json";
   const fs::path traceCfg = dir / "trace_config.json";
@@ -2673,9 +2705,6 @@ TEST(NeutubeCommand2Parity, Trace_WithHostSwc_NoConnection_MatchesLegacy)
 
 TEST(NeutubeCommand2Parity, Trace_DiagnosisSeeded_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const fs::path dir = makeUniqueTempDir();
   const fs::path commandConfig = dir / "command_config.json";
   const fs::path traceCfg = dir / "trace_config.json";
@@ -2754,9 +2783,6 @@ TEST(NeutubeCommand2Parity, Trace_DiagnosisSeeded_MatchesLegacy)
 
 TEST(NeutubeCommand2Parity, Trace_DiagnosisWithHostSwc_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const fs::path dir = makeUniqueTempDir();
   const fs::path commandConfig = dir / "command_config.json";
   const fs::path traceCfg = dir / "trace_config.json";
@@ -2844,9 +2870,6 @@ TEST(NeutubeCommand2Parity, Trace_DiagnosisWithHostSwc_MatchesLegacy)
 
 TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const std::vector<QString> candidateRelativePaths = {
     "benchmark/fake_neuron.tif",
     "benchmark/fake_neuron2.tif",
@@ -2962,9 +2985,6 @@ TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
 
 TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const QString forkTiff = nim::getTestDataDir().filePath("benchmark/stack_graph/fork/fork.tif");
   if (!QFileInfo::exists(forkTiff)) {
     GTEST_SKIP() << "Missing fork trace benchmark input: " << forkTiff.toStdString();
@@ -3067,9 +3087,6 @@ TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork_MatchesLegacy)
 
 TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork2_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const QString fork2Tiff = nim::getTestDataDir().filePath("benchmark/fork2/fork2.tif");
   if (!QFileInfo::exists(fork2Tiff)) {
     GTEST_SKIP() << "Missing fork2 trace benchmark input: " << fork2Tiff.toStdString();
@@ -3174,9 +3191,6 @@ TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork2_MatchesLegacy)
 
 TEST(NeutubeCommand2Parity, Skeletonize_FromTestDataBinary_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const std::vector<QString> candidateRelativePaths = {
     "benchmark/sphere_bw.tif",
     "benchmark/sphere_bw_crop.tif",
@@ -3275,9 +3289,6 @@ TEST(NeutubeCommand2Parity, Skeletonize_FromTestDataBinary_MatchesLegacy)
 
 TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_DevOnly)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   struct StagePerf
   {
     std::string name;
@@ -3777,6 +3788,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
     }
 
     if (!chosenSeeds.empty()) {
+      const double zScale = nim::preferredZScaleFromImgInfoLegacyLike(portedSignal.info());
       nim::ZDenseVoxelVolume denseVol(portedSignal);
       int64_t sumImgMs = 0;
       int64_t sumVolMs = 0;
@@ -3786,12 +3798,12 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
 
         nim::SeedTraceResult imgRes;
         const int64_t imgMs = timeMs([&]() {
-          imgRes = nim::traceSeedNewSwcLegacyLike(portedSignal, seed, portedCfg, /*c*/ 0, /*t*/ 0);
+          imgRes = nim::traceSeedNewSwcLegacyLike(portedSignal, seed, portedCfg, zScale, /*c*/ 0, /*t*/ 0);
         });
 
         nim::SeedTraceResult volRes;
         const int64_t volMs = timeMs([&]() {
-          volRes = nim::traceSeedNewSwcLegacyLike(denseVol, seed, portedCfg);
+          volRes = nim::traceSeedNewSwcLegacyLike(denseVol, seed, portedCfg, zScale);
         });
 
         sumImgMs += imgMs;
@@ -3964,9 +3976,14 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
         .count();
 
     std::optional<nim::ZImg> portedBaseMaskForRecover = portedSorted.baseMask;
+    const double recoverZScale = nim::preferredZScaleFromImgInfoLegacyLike(portedSignal.info());
     const auto portedRecoverStart = std::chrono::steady_clock::now();
-    portedRecover =
-      nim::recoverLegacyLike(portedSignal, portedCfg, portedMask, std::move(portedBaseMaskForRecover), portedTw);
+    portedRecover = nim::recoverLegacyLike(portedSignal,
+                                           portedCfg,
+                                           recoverZScale,
+                                           portedMask,
+                                           std::move(portedBaseMaskForRecover),
+                                           portedTw);
     const int64_t portedRecoverMs =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - portedRecoverStart)
         .count();
@@ -4154,9 +4171,6 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
 
 TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
 {
-  ScopedQtCoreApplication qtApp;
-  std::ignore = nim::ZImgInit::instance("", "", "", false);
-
   const fs::path input =
     fs::path(QDir::homePath().toStdString()) / "Dropbox/atlas_test/slice15/slice15_L34_Sum.lsm_ch2.tif";
   if (!fs::exists(input)) {
@@ -4237,8 +4251,6 @@ TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
 
 TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-
   const QDir compareDir(nim::getTestDataDir().filePath("benchmark/swc/compare"));
   if (!compareDir.exists()) {
     GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath().toStdString();
@@ -4262,8 +4274,6 @@ TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)
 
 TEST(NeutubeCommand2Parity, CompareSwc_Scale2_MatchesLegacy)
 {
-  ScopedQtCoreApplication qtApp;
-
   const QDir compareDir(nim::getTestDataDir().filePath("benchmark/swc/compare"));
   if (!compareDir.exists()) {
     GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath().toStdString();

@@ -8,6 +8,8 @@
 #include <folly/CancellationToken.h>
 
 #include <array>
+#include <cmath>
+#include <optional>
 #include <functional>
 
 namespace nim {
@@ -34,6 +36,13 @@ public:
   {
     m_selectedChannel = sc;
     m_selectedTime = t;
+  }
+
+  void setZScale(double zScale)
+  {
+    CHECK(std::isfinite(zScale));
+    CHECK(zScale > 0.0);
+    m_zScale = zScale;
   }
 
   void setTraceConfigPath(QString path)
@@ -114,6 +123,7 @@ private:
 
   size_t m_selectedChannel = 0;
   size_t m_selectedTime = 0;
+  std::optional<double> m_zScale;
 
   QString m_traceConfigPath;
   int m_traceLevel = 0;

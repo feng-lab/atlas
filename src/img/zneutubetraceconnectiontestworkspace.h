@@ -25,6 +25,11 @@ struct ConnectionTestWorkspaceLegacyLike
   double distThre = NeurosegDefaultHLegacyLike;
   bool goodDist = false;
 
+  // Step lengths used by the optional shortest-path test.
+  //
+  // Tracing code treats this as the trace-space resolution, not raw image metadata.
+  // Entry points should set it explicitly from the chosen tracing anisotropy via
+  // `traceResolutionFromZScaleLegacyLike(zScale)`.
   std::array<double, 3> resolution = {1.0, 1.0, 1.0};
   char unit = 'p'; // 'p' pixel, 'u' um
 

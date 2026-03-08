@@ -10,6 +10,7 @@
 #include "ztracesettings.h"
 
 #include "zneutubetraceconfig.h"
+#include "zneutubetracezscale.h"
 
 #include <algorithm>
 
@@ -102,6 +103,11 @@ void disableFirstComboRow(QComboBox* combo)
   return channelColor;
 }
 
+[[nodiscard]] QString formatZScale(double zScale)
+{
+  return QString::number(zScale, 'g', 6);
+}
+
 } // namespace
 
 [[nodiscard]] ZTraceSettings::AlgoConfig algoConfigFromTraceConfig(const TraceConfig& cfg)
@@ -157,6 +163,45 @@ ZTraceSettingsWidget::ZTraceSettingsWidget(ZDoc& doc, QWidget* parent)
   sourceForm->addRow(tr("Channel:"), m_channelCombo);
 
   layout->addWidget(sourceGroup);
+
+  auto* zScaleGroup = new QGroupBox(tr("Z Scale"), content);
+  auto* zScaleForm = new QFormLayout(zScaleGroup);
+  zScaleForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+  zScaleForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
+
+  m_derivedZScaleLabel = new QLabel(zScaleGroup);
+  m_derivedZScaleLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  zScaleForm->addRow(tr("Derived:"), m_derivedZScaleLabel);
+
+  auto* overrideRow = new QWidget(zScaleGroup);
+  auto* overrideLayout = new QHBoxLayout(overrideRow);
+  overrideLayout->setContentsMargins(0, 0, 0, 0);
+  overrideLayout->setSpacing(8);
+
+  m_overrideZScaleCheck = new QCheckBox(tr("Use override"), overrideRow);
+  overrideLayout->addWidget(m_overrideZScaleCheck);
+
+  m_overrideZScaleSpin = new QDoubleSpinBox(overrideRow);
+  m_overrideZScaleSpin->setDecimals(6);
+  m_overrideZScaleSpin->setRange(0.000001, 1000000.0);
+  m_overrideZScaleSpin->setSingleStep(0.1);
+  overrideLayout->addWidget(m_overrideZScaleSpin);
+  overrideLayout->addStretch(1);
+
+  zScaleForm->addRow(tr("Override:"), overrideRow);
+
+  m_effectiveZScaleLabel = new QLabel(zScaleGroup);
+  m_effectiveZScaleLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  zScaleForm->addRow(tr("Effective:"), m_effectiveZScaleLabel);
+
+  auto* zScaleHint =
+    new QLabel(tr("zScale means voxelSizeZ / voxelSizeXY. Atlas derives it from image metadata using voxelSizeXY = "
+                  "(voxelSizeX + voxelSizeY) / 2 unless you override it here."),
+               zScaleGroup);
+  zScaleHint->setWordWrap(true);
+  zScaleForm->addRow(QString(), zScaleHint);
+
+  layout->addWidget(zScaleGroup);
 
   auto* targetGroup = new QGroupBox(tr("SWC Target"), content);
   auto* targetLayout = new QVBoxLayout(targetGroup);
@@ -303,6 +348,19 @@ ZTraceSettingsWidget::ZTraceSettingsWidget(ZDoc& doc, QWidget* parent)
       return;
     }
     pushTargetUiToSettings();
+  });
+
+  connect(m_overrideZScaleCheck, &QCheckBox::toggled, this, [this](bool) {
+    if (m_updating) {
+      return;
+    }
+    pushZScaleUiToSettings();
+  });
+  connect(m_overrideZScaleSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double) {
+    if (m_updating) {
+      return;
+    }
+    pushZScaleUiToSettings();
   });
 
   connect(m_minAutoScoreSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double) {
@@ -600,6 +658,7 @@ void ZTraceSettingsWidget::applySettingsToUi()
   }
 
   updateMappingLabel();
+  updateZScaleUi();
 
   {
     const ZTraceSettings::AlgoConfig cfg = settings.algoConfig();
@@ -683,6 +742,69 @@ void ZTraceSettingsWidget::updateMappingLabel()
   m_mappingLabel->setText(lines.join('\n'));
 }
 
+std::optional<double> ZTraceSettingsWidget::derivedZScaleForCurrentSource() const
+{
+  const std::optional<size_t> imgIdOpt = currentSourceImageIdFromUi();
+  if (!imgIdOpt.has_value()) {
+    return std::nullopt;
+  }
+
+  const ZImgDoc& imgDoc = m_doc.imgDoc();
+  if (!imgDoc.hasObjWithID(*imgIdOpt)) {
+    return std::nullopt;
+  }
+
+  const std::shared_ptr<ZImgPack> imgPack = imgDoc.imgPackShared(*imgIdOpt);
+  CHECK(imgPack != nullptr);
+  return preferredZScaleFromImgInfoLegacyLike(imgPack->imgInfo());
+}
+
+void ZTraceSettingsWidget::updateZScaleUi()
+{
+  CHECK(m_derivedZScaleLabel != nullptr);
+  CHECK(m_overrideZScaleCheck != nullptr);
+  CHECK(m_overrideZScaleSpin != nullptr);
+  CHECK(m_effectiveZScaleLabel != nullptr);
+
+  const std::optional<size_t> imgIdOpt = currentSourceImageIdFromUi();
+
+  size_t sourceChannel = 0;
+  if (m_channelCombo != nullptr && m_channelCombo->isEnabled() && m_channelCombo->count() > 0) {
+    const QVariant scData = m_channelCombo->currentData();
+    if (scData.isValid()) {
+      sourceChannel = static_cast<size_t>(scData.toULongLong());
+    }
+  }
+
+  const std::optional<double> derivedZScale = derivedZScaleForCurrentSource();
+  const std::optional<double> overrideZScale =
+    m_doc.traceSettings().zScaleOverrideForSelection(imgIdOpt, sourceChannel);
+
+  {
+    const QSignalBlocker blockerCheck(*m_overrideZScaleCheck);
+    const QSignalBlocker blockerSpin(*m_overrideZScaleSpin);
+
+    m_overrideZScaleCheck->setEnabled(imgIdOpt.has_value());
+    m_overrideZScaleCheck->setChecked(overrideZScale.has_value());
+    m_overrideZScaleSpin->setValue(overrideZScale.value_or(derivedZScale.value_or(1.0)));
+    m_overrideZScaleSpin->setEnabled(imgIdOpt.has_value() && overrideZScale.has_value());
+  }
+
+  if (derivedZScale.has_value()) {
+    m_derivedZScaleLabel->setText(formatZScale(*derivedZScale));
+  } else {
+    m_derivedZScaleLabel->setText(tr("N/A"));
+  }
+
+  if (overrideZScale.has_value()) {
+    m_effectiveZScaleLabel->setText(tr("%1 (override)").arg(formatZScale(*overrideZScale)));
+  } else if (derivedZScale.has_value()) {
+    m_effectiveZScaleLabel->setText(tr("%1 (metadata)").arg(formatZScale(*derivedZScale)));
+  } else {
+    m_effectiveZScaleLabel->setText(tr("N/A"));
+  }
+}
+
 void ZTraceSettingsWidget::pushSourceUiToSettings()
 {
   if (m_updating) {
@@ -720,6 +842,34 @@ void ZTraceSettingsWidget::pushTargetUiToSettings()
   }
 
   settings.setTargetSelection(mode, targetSwcId);
+}
+
+void ZTraceSettingsWidget::pushZScaleUiToSettings()
+{
+  if (m_updating) {
+    return;
+  }
+
+  const std::optional<size_t> sourceImageId = currentSourceImageIdFromUi();
+  if (!sourceImageId.has_value()) {
+    return;
+  }
+
+  size_t sourceChannel = 0;
+  if (m_channelCombo != nullptr && m_channelCombo->isEnabled() && m_channelCombo->count() > 0) {
+    const QVariant scData = m_channelCombo->currentData();
+    if (scData.isValid()) {
+      sourceChannel = static_cast<size_t>(scData.toULongLong());
+    }
+  }
+
+  std::optional<double> zScaleOverride;
+  if (m_overrideZScaleCheck != nullptr && m_overrideZScaleCheck->isChecked()) {
+    CHECK(m_overrideZScaleSpin != nullptr);
+    zScaleOverride = m_overrideZScaleSpin->value();
+  }
+
+  m_doc.traceSettings().setZScaleOverrideForSelection(sourceImageId, sourceChannel, zScaleOverride);
 }
 
 void ZTraceSettingsWidget::pushAlgoUiToSettings()

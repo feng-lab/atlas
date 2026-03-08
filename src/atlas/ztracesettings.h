@@ -88,6 +88,17 @@ public:
                     SwcTargetMode swcTargetMode,
                     std::optional<size_t> targetSwcId);
 
+  [[nodiscard]] std::optional<double> zScaleOverride() const;
+
+  [[nodiscard]] std::optional<double> zScaleOverrideForSelection(std::optional<size_t> sourceImageId,
+                                                                 size_t sourceChannel) const;
+
+  void setZScaleOverride(std::optional<double> zScale);
+
+  void setZScaleOverrideForSelection(std::optional<size_t> sourceImageId,
+                                     size_t sourceChannel,
+                                     std::optional<double> zScale);
+
   // UX helper: when a trace is started with "New SWC", promote that choice to
   // "Existing SWC" after the first successful trace, but only if the user hasn't
   // already mapped that (image, channel) pair to some other target.
@@ -151,12 +162,15 @@ private:
 
   [[nodiscard]] SwcTargetSelection mappedSwcTargetSelection(std::optional<size_t> sourceImageId,
                                                             size_t sourceChannel) const;
+  [[nodiscard]] std::optional<double> mappedZScaleOverride(std::optional<size_t> sourceImageId,
+                                                           size_t sourceChannel) const;
 
   std::optional<size_t> m_sourceImageId;
   size_t m_sourceChannel = 0;
   SwcTargetMode m_swcTargetMode = SwcTargetMode::NewSwc;
   std::optional<size_t> m_targetSwcId;
   std::map<SourceKey, SwcTargetSelection> m_swcTargetBySource;
+  std::map<SourceKey, double> m_zScaleOverrideBySource;
   bool m_traceToolEnabled = false;
   bool m_traceInProgress = false;
   bool m_algoConfigInitialized = false;

@@ -10,6 +10,7 @@
 #include "zlog.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <vector>
 
@@ -193,10 +194,14 @@ namespace {
 
 RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
                                           const TraceConfig& cfg,
+                                          double zScale,
                                           const ZImg& mask,
                                           std::optional<ZImg> baseMask,
                                           TraceWorkspace& tw)
 {
+  CHECK(std::isfinite(zScale));
+  CHECK(zScale > 0.0);
+
   RecoverResultLegacyLike out;
 
   maybeCancel(tw.cancellationToken);
@@ -318,7 +323,7 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
 
   // Legacy traces with TRACING_AUTO thresholds after sorting seeds.
   prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Auto, tw);
-  out.chains = traceAllSeedsLegacyLike(signal, /*zScale*/ 1.0, sorted.locsegArray, sorted.scoreArray, tw);
+  out.chains = traceAllSeedsLegacyLike(signal, zScale, sorted.locsegArray, sorted.scoreArray, tw);
   tw.minChainLength = originalMinLength;
 
   return out;

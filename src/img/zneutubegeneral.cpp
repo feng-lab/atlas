@@ -5,6 +5,7 @@
 
 #include "zneutubetraceconfig.h"
 #include "zneutubetraceauto.h"
+#include "zneutubetracezscale.h"
 #include "zneutubetracemask.h"
 #include "zswcwriter.h"
 
@@ -250,8 +251,10 @@ int runGeneral(const std::string& generalConfigTextOrPath,
   }
 
   const ZImg* predefinedMask = maskOverride.mask ? &(*maskOverride.mask) : nullptr;
+  const double zScale = preferredZScaleFromImgInfoLegacyLike(signal.info());
   std::unique_ptr<ZSwc> tree = traceNeuronAutoLegacyLike(std::move(signal),
                                                          traceCfg,
+                                                         zScale,
                                                          diagnosis,
                                                          verbose,
                                                          /*doResampleAfterTracing=*/true,

@@ -3,7 +3,10 @@
 #include "zdoc.h"
 #include "zimgdoc.h"
 #include "zobjdoc.h"
+#include "zlog.h"
 #include "zswcdoc.h"
+
+#include <cmath>
 
 namespace nim {
 
@@ -29,6 +32,21 @@ ZTraceSettings::SwcTargetSelection ZTraceSettings::mappedSwcTargetSelection(std:
   const auto it = m_swcTargetBySource.find(key);
   if (it == m_swcTargetBySource.end()) {
     return {};
+  }
+  return it->second;
+}
+
+std::optional<double> ZTraceSettings::mappedZScaleOverride(std::optional<size_t> sourceImageId,
+                                                           size_t sourceChannel) const
+{
+  if (!sourceImageId.has_value()) {
+    return std::nullopt;
+  }
+
+  const SourceKey key{*sourceImageId, sourceChannel};
+  const auto it = m_zScaleOverrideBySource.find(key);
+  if (it == m_zScaleOverrideBySource.end()) {
+    return std::nullopt;
   }
   return it->second;
 }
@@ -164,6 +182,54 @@ void ZTraceSettings::setSelection(std::optional<size_t> sourceImageId,
   }
 }
 
+std::optional<double> ZTraceSettings::zScaleOverride() const
+{
+  return mappedZScaleOverride(m_sourceImageId, m_sourceChannel);
+}
+
+std::optional<double> ZTraceSettings::zScaleOverrideForSelection(std::optional<size_t> sourceImageId,
+                                                                 size_t sourceChannel) const
+{
+  return mappedZScaleOverride(sourceImageId, sourceChannel);
+}
+
+void ZTraceSettings::setZScaleOverride(std::optional<double> zScale)
+{
+  setZScaleOverrideForSelection(m_sourceImageId, m_sourceChannel, zScale);
+}
+
+void ZTraceSettings::setZScaleOverrideForSelection(std::optional<size_t> sourceImageId,
+                                                   size_t sourceChannel,
+                                                   std::optional<double> zScale)
+{
+  if (!sourceImageId.has_value()) {
+    CHECK(!zScale.has_value());
+    return;
+  }
+
+  if (zScale.has_value()) {
+    CHECK(std::isfinite(*zScale));
+    CHECK(*zScale > 0.0);
+  }
+
+  const SourceKey key{*sourceImageId, sourceChannel};
+  bool anyChanged = false;
+
+  if (!zScale.has_value()) {
+    anyChanged = (m_zScaleOverrideBySource.erase(key) > 0);
+  } else {
+    const auto it = m_zScaleOverrideBySource.find(key);
+    if (it == m_zScaleOverrideBySource.end() || it->second != *zScale) {
+      m_zScaleOverrideBySource[key] = *zScale;
+      anyChanged = true;
+    }
+  }
+
+  if (anyChanged) {
+    Q_EMIT changed();
+  }
+}
+
 void ZTraceSettings::promoteNewSwcTargetToExistingIfStillNew(size_t sourceImageId,
                                                              size_t sourceChannel,
                                                              size_t newSwcId)
@@ -232,6 +298,15 @@ void ZTraceSettings::onImageRemoved(size_t imageId)
   for (auto it = m_swcTargetBySource.begin(); it != m_swcTargetBySource.end();) {
     if (it->first.imageId == imageId) {
       it = m_swcTargetBySource.erase(it);
+      anyChanged = true;
+      continue;
+    }
+    ++it;
+  }
+
+  for (auto it = m_zScaleOverrideBySource.begin(); it != m_zScaleOverrideBySource.end();) {
+    if (it->first.imageId == imageId) {
+      it = m_zScaleOverrideBySource.erase(it);
       anyChanged = true;
       continue;
     }

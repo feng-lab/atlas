@@ -1,32 +1,82 @@
 #include "zneutubetraceallseeds.h"
 
 #include "zneutubedarrayqsort.h"
+#include "zneutubelocsegchaincircle.h"
 #include "zneutubelocsegchainmetrics.h"
 #include "zneutubelocsegchaintrace.h"
 #include "zneutubemathutils.h"
 #include "zneutubetracelocseglabel.h"
+#include "zneutubetracezscale.h"
+#include "zswcgeometrymaskvolume.h"
+#include "zswcspatialindex.h"
 
 #include "zcancellation.h"
 #include "zlog.h"
 
+#include <gflags/gflags.h>
+
 #include <cmath>
+
+DECLARE_bool(atlas_trace_use_swc_geometry_mask);
 
 namespace nim {
 
 namespace {
 
-[[nodiscard]] int maskValueAt(const ZImg& mask, int x, int y, int z)
+constexpr double TraceMaskExclusionSwellRatioLegacyLike = 1.5;
+constexpr double TraceMaskExclusionSwellDiffLegacyLike = 0.0;
+constexpr double TraceMaskExclusionSwellLimitLegacyLike = 3.0;
+
+[[nodiscard]] std::shared_ptr<ZSwcSpatialIndex>
+ensureSpatialTraceMaskVolumeLegacyLike(TraceWorkspace& tw, const ZImg& signal, double zScale)
 {
-  const int width = static_cast<int>(mask.width());
-  const int height = static_cast<int>(mask.height());
-  const int depth = static_cast<int>(mask.depth());
-  if (x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= depth) {
-    return 0;
+  CHECK(std::isfinite(zScale));
+  CHECK(zScale > 0.0);
+
+  std::shared_ptr<ZSwcSpatialIndex> index;
+  if (tw.traceMaskVolume) {
+    auto* spatialMask = dynamic_cast<ZSwcGeometryMaskVolume*>(tw.traceMaskVolume.get());
+    CHECK(spatialMask != nullptr)
+      << "traceAllSeedsLegacyLike: spatial trace-mask mode requires ZSwcGeometryMaskVolume.";
+    index = spatialMask->sharedIndex();
+    CHECK(index != nullptr);
+    index->setZScale(zScale);
+  } else {
+    index = std::make_shared<ZSwcSpatialIndex>();
+    index->setZScale(zScale);
   }
 
-  return imgTypeDispatcher(mask.info(), [&]<typename TVoxel>() -> int {
-    return static_cast<int>(*mask.data<TVoxel>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
-  });
+  tw.traceMaskVolume =
+    std::make_unique<ZSwcGeometryMaskVolume>(index, signal.width(), signal.height(), signal.depth(), zScale);
+  return index;
+}
+
+void insertChainIntoSpatialIndexLegacyLike(const LocsegChain& chain, ZSwcSpatialIndex& index)
+{
+  const std::vector<Geo3dCircle> circles =
+    locsegChainToGeo3dCircleArraySwelledZLegacyLike(chain,
+                                                    /*zScale*/ 1.0,
+                                                    TraceMaskExclusionSwellRatioLegacyLike,
+                                                    TraceMaskExclusionSwellDiffLegacyLike,
+                                                    TraceMaskExclusionSwellLimitLegacyLike);
+  if (circles.empty()) {
+    return;
+  }
+
+  const auto& first = circles.front();
+  index.insertSegment(glm::dvec3{first.center[0], first.center[1], first.center[2]},
+                      glm::dvec3{first.center[0], first.center[1], first.center[2]},
+                      std::max(0.0, first.radius),
+                      std::max(0.0, first.radius));
+
+  for (size_t i = 1; i < circles.size(); ++i) {
+    const auto& prev = circles[i - 1];
+    const auto& cur = circles[i];
+    index.insertSegment(glm::dvec3{prev.center[0], prev.center[1], prev.center[2]},
+                        glm::dvec3{cur.center[0], cur.center[1], cur.center[2]},
+                        std::max(0.0, prev.radius),
+                        std::max(0.0, cur.radius));
+  }
 }
 
 } // namespace
@@ -38,11 +88,15 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
                                                                   TraceWorkspace& tw)
 {
   CHECK(scores.size() == locsegArray.size());
+  CHECK(std::isfinite(zScale));
+  CHECK(zScale > 0.0);
 
   const int nseed = static_cast<int>(locsegArray.size());
   if (nseed <= 0) {
     return {};
   }
+
+  tw.resolution = traceResolutionFromZScaleLegacyLike(zScale);
 
   VLOG(1) << fmt::format("Trace all seeds: start (nseed={}, minScore={})", nseed, tw.minScore);
 
@@ -50,9 +104,15 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
   darrayQsortLegacy(scores, &indices);
   CHECK(static_cast<int>(indices.size()) == nseed);
 
+  std::shared_ptr<ZSwcSpatialIndex> spatialTraceMaskIndex;
+
   // Ensure trace mask exists if we're updating it (legacy allocates it lazily here).
   if (tw.traceMaskUpdating) {
-    traceWorkspaceInitTraceMaskLegacyLike(tw, signal, /*clearing*/ false);
+    if (FLAGS_atlas_trace_use_swc_geometry_mask) {
+      spatialTraceMaskIndex = ensureSpatialTraceMaskVolumeLegacyLike(tw, signal, zScale);
+    } else {
+      traceWorkspaceInitTraceMaskLegacyLike(tw, signal, /*clearing*/ false);
+    }
   }
 
   LocsegLabelWorkspaceLegacyLike labelWs;
@@ -99,20 +159,14 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
 
     traceWorkspaceSetTraceStatusLegacyLike(tw, TraceStatus::Normal, TraceStatus::Normal);
 
-    if (tw.traceMask) {
+    if (tw.traceMaskVolume || tw.traceMask) {
       std::array<double, 3> pt = localNeurosegAxisPositionLegacyLike(seedLocseg, seedLocseg.seg.h / 3.0);
-      int tmpx = iroundLegacyLike(pt[0]);
-      int tmpy = iroundLegacyLike(pt[1]);
-      int tmpz = iroundLegacyLike(pt[2] * zScale);
-      if (maskValueAt(*tw.traceMask, tmpx, tmpy, tmpz) > 0) {
+      if (traceWorkspaceMaskValueZLegacyLike(tw, pt, zScale) > 0) {
         tw.traceStatus[0] = TraceStatus::HitMark;
       }
 
       pt = localNeurosegAxisPositionLegacyLike(seedLocseg, seedLocseg.seg.h * 2.0 / 3.0);
-      tmpx = iroundLegacyLike(pt[0]);
-      tmpy = iroundLegacyLike(pt[1]);
-      tmpz = iroundLegacyLike(pt[2] * zScale);
-      if (maskValueAt(*tw.traceMask, tmpx, tmpy, tmpz) > 0) {
+      if (traceWorkspaceMaskValueZLegacyLike(tw, pt, zScale) > 0) {
         tw.traceStatus[1] = TraceStatus::HitMark;
       }
     }
@@ -141,20 +195,25 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
       continue;
     }
 
-    if (tw.traceMaskUpdating && tw.traceMask) {
-      labelWs.sratio = 1.5;
-      labelWs.sdiff = 0.0;
-      labelWs.option = 1;
-      // Atlas uses a binary "already traced" mask (0/1). The migrated algorithm only checks mask voxels as
-      // a boolean (>0), so a constant value is sufficient and avoids uint8 overflow edge cases.
-      labelWs.value = 1;
-      labelWs.flag = 0;
-      locsegChainLabelWLegacyLike(*chain,
-                                  *tw.traceMask,
-                                  zScale,
-                                  /*begin*/ 0,
-                                  /*end*/ chain->length() - 1,
-                                  labelWs);
+    if (tw.traceMaskUpdating) {
+      if (spatialTraceMaskIndex) {
+        insertChainIntoSpatialIndexLegacyLike(*chain, *spatialTraceMaskIndex);
+      } else if (tw.traceMask) {
+        labelWs.sratio = TraceMaskExclusionSwellRatioLegacyLike;
+        labelWs.sdiff = TraceMaskExclusionSwellDiffLegacyLike;
+        labelWs.slimit = TraceMaskExclusionSwellLimitLegacyLike;
+        labelWs.option = 1;
+        // Atlas uses a binary "already traced" mask (0/1). The migrated algorithm only checks mask voxels as
+        // a boolean (>0), so a constant value is sufficient and avoids uint8 overflow edge cases.
+        labelWs.value = 1;
+        labelWs.flag = 0;
+        locsegChainLabelWLegacyLike(*chain,
+                                    *tw.traceMask,
+                                    zScale,
+                                    /*begin*/ 0,
+                                    /*end*/ chain->length() - 1,
+                                    labelWs);
+      }
     }
 
     chains.push_back(std::move(chain));

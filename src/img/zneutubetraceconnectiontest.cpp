@@ -99,14 +99,6 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
     return false;
   }
 
-  // Initialize resolution.
-  std::array<double, 3> res = ctw.resolution;
-
-  double xzRatio = 1.0;
-  if (res[0] != res[2]) {
-    xzRatio = res[0] / res[2];
-  }
-
   // Get head and tail of the hook.
   const LocalNeuroseg* shead = chain1.headSeg();
   const LocalNeuroseg* stail = chain1.tailSeg();
@@ -124,18 +116,18 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
     tail.seg.h = 2.0;
   }
 
-  localNeurosegScaleZLegacyLike(head, xzRatio);
-  localNeurosegScaleZLegacyLike(tail, xzRatio);
+  localNeurosegScaleZLegacyLike(head, zScale);
+  localNeurosegScaleZLegacyLike(tail, zScale);
 
   double mindist = 0.0;
   if (ctw.hookSpot == 0) {
-    mindist = locsegChainDistUpperBoundLegacyLike(chain2, xzRatio, head);
+    mindist = locsegChainDistUpperBoundLegacyLike(chain2, zScale, head);
   } else if (ctw.hookSpot == 1) {
-    mindist = locsegChainDistUpperBoundLegacyLike(chain2, xzRatio, tail);
+    mindist = locsegChainDistUpperBoundLegacyLike(chain2, zScale, tail);
   } else {
     CHECK(ctw.hookSpot == -1);
-    mindist = std::min(locsegChainDistUpperBoundLegacyLike(chain2, xzRatio, head),
-                       locsegChainDistUpperBoundLegacyLike(chain2, xzRatio, tail));
+    mindist = std::min(locsegChainDistUpperBoundLegacyLike(chain2, zScale, head),
+                       locsegChainDistUpperBoundLegacyLike(chain2, zScale, tail));
   }
 
   conn.mode = NeurocompConnModeLegacyLike::HookLoop;
@@ -149,7 +141,7 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
   // Calculate the distance from the hook end(s) to the loop chain surface.
   for (const auto& node : chain2) {
     LocalNeuroseg locseg2 = node.locseg;
-    localNeurosegScaleZLegacyLike(locseg2, xzRatio);
+    localNeurosegScaleZLegacyLike(locseg2, zScale);
     localNeurosegBallBoundLegacyLike(locseg2, range1);
 
     // head test
@@ -219,7 +211,7 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
   }
 
   // scale position back to the chain space
-  conn.pos[2] *= xzRatio;
+  conn.pos[2] *= zScale;
 
   conn.sdist = mindist;
 

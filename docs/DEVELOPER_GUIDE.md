@@ -32,6 +32,19 @@ Entry Points
 - Seeded trace (interactive-like, single seed):
   - Core API (in-memory, file-free): `nim::traceSeedNewSwcLegacyLike(...)` and `nim::traceSeedIntoHostSwcLegacyLike(...)`
     (`src/img/zneutubetraceinteractive.*`).
+  - `zScale` is explicit at the tracing API boundary. Entry points decide it once; the tracing stack then passes that
+    value through consistently instead of recomputing anisotropy from signal metadata in inner loops.
+  - Legacy workspace fields named `resolution` remain in a few tracing ports (`TraceWorkspace`, connection-test
+    workspace, stack-graph workspace), but tracing code now treats those as explicit trace-space step lengths derived
+    from the chosen entry `zScale` rather than re-reading source voxel metadata inside the algorithm.
+  - `ZSwcSpatialIndex` stores SWC primitives in image-space coordinates and applies `zScale` only as the anisotropic
+    hit-test metric. `ZSwcGeometryMaskVolume` is the adapter for legacy z-scaled trace-mask queries: it converts
+    mask-space `z` back to image space before calling the spatial index.
+  - Under `--atlas_trace_use_swc_geometry_mask`, whole-volume auto tracing uses the spatial index instead of a dense
+    traced-region mask during the main multi-seed tracing loop. The inserted primitives represent the same swelled
+    traced-exclusion envelope the legacy dense mask uses (`sratio=1.5`, `sdiff=0`, `slimit=3`) rather than the raw
+    locseg centerline geometry. The legacy recovery stage still materializes a dense binary trace mask because its
+    z-dilate/subtract workflow is volume-based.
   - These functions support two signal backends:
     - `const ZImg&` (fast path for in-memory images; avoids virtual sampling in hot loops).
     - `const ZVoxelVolume&` (random-access virtual volume; used for disk-cached images and future paging work).
@@ -43,8 +56,12 @@ Entry Points
 GUI Integration
 
 - Shared state:
-  - `ZTraceSettings` (`src/atlas/ztracesettings.*`) stores the trace source (image/channel/time) and SWC target mapping.
-  - `ZTraceSettingsWidget` (`src/atlas/ztracesettingswidget.*`) exposes this state in a dock panel shared by the 2D and 3D windows.
+  - `ZTraceSettings` (`src/atlas/ztracesettings.*`) stores the trace source (image/channel/time), SWC target mapping,
+    and an optional per-image/channel `zScale` override.
+  - `ZTraceSettingsWidget` (`src/atlas/ztracesettingswidget.*`) exposes this state in a dock panel shared by the 2D and
+    3D windows, including the derived/override/effective `zScale` UI for interactive tracing.
+  - `ZAutoTraceDialog` (`src/atlas/zautotracedialog.*`) mirrors the same `zScale` override model for auto tracing, but
+    blocked-session resume always locks the effective value to the session manifest.
 - 2D trace click workflow:
   - Left-click trace menu is built in `ZGraphicsScene` and delegates view-specific actions through `ZView`/`ZImgView`
     (`src/atlas/zgraphicsscene.cpp`, `src/atlas/zimgview.cpp`).
@@ -289,6 +306,15 @@ Preferred “Process + Dialog” pattern (used by puncta detection, stitching, r
   - The base `ZImgProcessDialog` starts the worker via `startBackgroundJob(...)`, so it is cancellable and visible in Tasks.
 
 3. Wire the action entry point to `dialog.exec()` (no custom threading glue in docs).
+
+Blocked auto trace specifics:
+- The blocked auto trace manifest is part of the worker contract. Resume is allowed only when `dataset_id` matches the
+  exact `ZImgSource` JSON plus the persisted channel/time, downsample ratio, `z_scale`, dataset shape, block geometry,
+  preprocessing mode, and effective trace config.
+- ROI providers for blocked auto trace must distinguish `AllZero` from failure. A valid all-zero ROI can be committed;
+  unavailable/network-failed ROIs must throw so the block is retried instead of being marked visited.
+- The resumable session SWC remains append-only in tracing coordinates. Final output reconstruction reconnects the SWC
+  forest into one tree and then applies the legacy SWC postprocess pipeline before writing `result.swc`.
 
 Lower-level usage:
 - If an operation is not naturally expressed as a `ZImgProcess`, call `startBackgroundJob(ZDoc&, ZBackgroundJobSpec)` directly.
