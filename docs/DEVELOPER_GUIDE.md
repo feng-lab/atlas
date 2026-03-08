@@ -32,14 +32,18 @@ Entry Points
 - Seeded trace (interactive-like, single seed):
   - Core API (in-memory, file-free): `nim::traceSeedNewSwcLegacyLike(...)` and `nim::traceSeedIntoHostSwcLegacyLike(...)`
     (`src/img/zneutubetraceinteractive.*`).
-  - `zScale` is explicit at the tracing API boundary. Entry points decide it once; the tracing stack then passes that
-    value through consistently instead of recomputing anisotropy from signal metadata in inner loops.
+  - `zToXYRatio = voxelSizeZ / voxelSizeXY` is explicit at the tracing API boundary. Entry points decide it once; the
+    tracing stack then passes that value through consistently instead of recomputing anisotropy from signal metadata in
+    inner loops.
+  - Legacy neuTube tracing keeps locseg positions in isotropized trace space, not raw image space: callers multiply
+    input seed/click `z` by `zToXYRatio` when creating locseg geometry, while sampling and mask queries divide by
+    `zToXYRatio` to get back to image voxels.
   - Legacy workspace fields named `resolution` remain in a few tracing ports (`TraceWorkspace`, connection-test
     workspace, stack-graph workspace), but tracing code now treats those as explicit trace-space step lengths derived
-    from the chosen entry `zScale` rather than re-reading source voxel metadata inside the algorithm.
-  - `ZSwcSpatialIndex` stores SWC primitives in image-space coordinates and applies `zScale` only as the anisotropic
-    hit-test metric. `ZSwcGeometryMaskVolume` is the adapter for legacy z-scaled trace-mask queries: it converts
-    mask-space `z` back to image space before calling the spatial index.
+    from the chosen entry `zToXYRatio` rather than re-reading source voxel metadata inside the algorithm.
+  - `ZSwcSpatialIndex` stores SWC primitives in image-space coordinates and applies `zToXYRatio` only as the anisotropic
+    hit-test metric. `ZSwcGeometryMaskVolume` adapts that index to tracing code: callers can query either in raw
+    image-space voxels or in the older legacy mask-space convention where `z` was already multiplied by `zToXYRatio`.
   - Under `--atlas_trace_use_swc_geometry_mask`, whole-volume auto tracing uses the spatial index instead of a dense
     traced-region mask during the main multi-seed tracing loop. The inserted primitives represent the same swelled
     traced-exclusion envelope the legacy dense mask uses (`sratio=1.5`, `sdiff=0`, `slimit=3`) rather than the raw
@@ -57,10 +61,10 @@ GUI Integration
 
 - Shared state:
   - `ZTraceSettings` (`src/atlas/ztracesettings.*`) stores the trace source (image/channel/time), SWC target mapping,
-    and an optional per-image/channel `zScale` override.
+    and an optional per-image/channel `zToXYRatio` override.
   - `ZTraceSettingsWidget` (`src/atlas/ztracesettingswidget.*`) exposes this state in a dock panel shared by the 2D and
-    3D windows, including the derived/override/effective `zScale` UI for interactive tracing.
-  - `ZAutoTraceDialog` (`src/atlas/zautotracedialog.*`) mirrors the same `zScale` override model for auto tracing, but
+    3D windows, including the derived/override/effective `zToXYRatio` UI for interactive tracing.
+  - `ZAutoTraceDialog` (`src/atlas/zautotracedialog.*`) mirrors the same `zToXYRatio` override model for auto tracing, but
     blocked-session resume always locks the effective value to the session manifest.
 - 2D trace click workflow:
   - Left-click trace menu is built in `ZGraphicsScene` and delegates view-specific actions through `ZView`/`ZImgView`

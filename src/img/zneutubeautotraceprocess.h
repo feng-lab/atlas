@@ -38,11 +38,11 @@ public:
     m_selectedTime = t;
   }
 
-  void setZScale(double zScale)
+  void setZToXYRatio(double zToXYRatio)
   {
-    CHECK(std::isfinite(zScale));
-    CHECK(zScale > 0.0);
-    m_zScale = zScale;
+    CHECK(std::isfinite(zToXYRatio));
+    CHECK(zToXYRatio > 0.0);
+    m_zToXYRatio = zToXYRatio;
   }
 
   void setTraceConfigPath(QString path)
@@ -123,7 +123,7 @@ private:
 
   size_t m_selectedChannel = 0;
   size_t m_selectedTime = 0;
-  std::optional<double> m_zScale;
+  std::optional<double> m_zToXYRatio;
 
   QString m_traceConfigPath;
   int m_traceLevel = 0;

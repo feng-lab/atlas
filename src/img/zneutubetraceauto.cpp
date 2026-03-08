@@ -49,7 +49,7 @@ struct AutoTraceContextLegacyLike
 
 void materializeTraceMaskFromChainsLegacyLike(const ZImg& signal,
                                               const std::vector<std::unique_ptr<LocsegChain>>& chains,
-                                              double zScale,
+                                              double zToXYRatio,
                                               TraceWorkspace& tw)
 {
   traceWorkspaceInitTraceMaskLegacyLike(tw, signal, /*clearing*/ true);
@@ -70,7 +70,7 @@ void materializeTraceMaskFromChainsLegacyLike(const ZImg& signal,
 
     locsegChainLabelWLegacyLike(*chain,
                                 *tw.traceMask,
-                                zScale,
+                                zToXYRatio,
                                 /*begin*/ 0,
                                 /*end*/ chain->length() - 1,
                                 labelWs);
@@ -81,15 +81,15 @@ void materializeTraceMaskFromChainsLegacyLike(const ZImg& signal,
 
 std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
                                                 const TraceConfig& cfg,
-                                                double zScale,
+                                                double zToXYRatio,
                                                 bool /*diagnosis*/,
                                                 bool /*verbose*/,
                                                 bool doResampleAfterTracing,
                                                 const ZImg* predefinedMask,
                                                 folly::CancellationToken cancellationToken)
 {
-  CHECK(std::isfinite(zScale));
-  CHECK(zScale > 0.0);
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
 
   if (signal.isEmpty()) {
     return nullptr;
@@ -103,7 +103,7 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
                            signal.depth(),
                            signal.info(),
                            doResampleAfterTracing);
-  VLOG(1) << fmt::format("Auto trace: zScale={:.6g}", zScale);
+  VLOG(1) << fmt::format("Auto trace: zToXYRatio={:.6g}", zToXYRatio);
 
   AutoTraceContextLegacyLike ctx;
   ctx.signal = std::move(signal);
@@ -116,7 +116,7 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   ctx.tw.refit = cfg.refit;
   ctx.tw.tuneEnd = cfg.tuneEnd;
   ctx.tw.traceMaskUpdating = ctx.maskTracing;
-  ctx.tw.resolution = traceResolutionFromZScaleLegacyLike(zScale);
+  ctx.tw.resolution = traceResolutionFromZToXYRatioLegacyLike(zToXYRatio);
 
   // Legacy default preprocess: subtract background and optionally invert bright-background images.
   // Bright-background handling is not yet ported (Atlas currently assumes dark background).
@@ -161,7 +161,7 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   prepareTraceScoreThresholdLegacyLike(ctx.signal, cfg, TracingModeLegacyLike::Seed, ctx.tw);
 
   LOG(INFO) << "Auto trace: score/sort seeds ...";
-  SeedSortResultLegacyLike sorted = sortSeedsLegacyLike(seeds, ctx.signal, ctx.tw);
+  SeedSortResultLegacyLike sorted = sortSeedsLegacyLike(seeds, ctx.signal, zToXYRatio, ctx.tw);
   ctx.baseMask = sorted.baseMask;
 
   LOG(INFO) << "Auto trace: prepare auto thresholds ...";
@@ -169,18 +169,18 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
 
   LOG(INFO) << "Auto trace: trace all seeds ...";
   std::vector<std::unique_ptr<LocsegChain>> chains =
-    traceAllSeedsLegacyLike(ctx.signal, zScale, sorted.locsegArray, sorted.scoreArray, ctx.tw);
+    traceAllSeedsLegacyLike(ctx.signal, zToXYRatio, sorted.locsegArray, sorted.scoreArray, ctx.tw);
   maybeCancel(ctx.tw.cancellationToken);
   LOG(INFO) << fmt::format("Auto trace: trace all seeds done (chains={}).", chains.size());
 
   if (cfg.recover > 0) {
     if (FLAGS_atlas_trace_use_swc_geometry_mask && !ctx.tw.traceMask && ctx.tw.traceMaskVolume) {
       LOG(INFO) << "Auto trace: materialize dense trace mask for legacy recovery ...";
-      materializeTraceMaskFromChainsLegacyLike(ctx.signal, chains, zScale, ctx.tw);
+      materializeTraceMaskFromChainsLegacyLike(ctx.signal, chains, zToXYRatio, ctx.tw);
     }
     LOG(INFO) << "Auto trace: recover ...";
     RecoverResultLegacyLike recovered =
-      recoverLegacyLike(ctx.signal, cfg, zScale, *ctx.mask, std::move(ctx.baseMask), ctx.tw);
+      recoverLegacyLike(ctx.signal, cfg, zToXYRatio, *ctx.mask, std::move(ctx.baseMask), ctx.tw);
     ctx.baseMask = std::move(recovered.baseMask);
     for (auto& c : recovered.chains) {
       chains.push_back(std::move(c));
@@ -202,7 +202,7 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   ctw.spTest = cfg.spTest;
   ctw.crossoverTest = cfg.crossoverTest;
   ctw.distThre = cfg.maxEucDist;
-  ctw.resolution = traceResolutionFromZScaleLegacyLike(zScale);
+  ctw.resolution = traceResolutionFromZToXYRatioLegacyLike(zToXYRatio);
 
   if (chains.size() > 500) {
     ctw.spTest = false;
@@ -210,15 +210,19 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
 
   CHECK(ctx.maskTracing) << "traceNeuronAutoLegacyLike: maskTracing=false path is not ported yet.";
 
-  NeuronStructureChainsLegacyLike ns = locsegChainCompNeurostructLegacyLike(chains, &ctx.signal, zScale, ctw);
+  NeuronStructureChainsLegacyLike ns = locsegChainCompNeurostructLegacyLike(chains, &ctx.signal, zToXYRatio, ctw);
   processNeuronStructureLegacyLike(ns);
 
   CHECK(!ctw.crossoverTest) << "traceNeuronAutoLegacyLike: crossoverTest is not ported yet.";
 
-  NeuronStructureCirclesLegacyLike ns2 = neuronStructureLocsegChainToCircleSLegacyLike(ns, /*xyScale*/ 1.0, zScale);
+  // `ns` still stores traced chains in isotropized tracing space here.
+  // Keep circles/tree construction in that same space; the final SWC export below converts Z back to image space
+  // with the real `zToXYRatio`.
+  NeuronStructureCirclesLegacyLike ns2 =
+    neuronStructureLocsegChainToCircleSLegacyLike(ns, /*xyScale*/ 1.0, /*zToXYRatio*/ 1.0);
   neuronStructureToTreeLegacyLike(ns2);
 
-  std::unique_ptr<ZSwc> tree = neuronStructureToSwcTreeCircleZLegacyLike(ns2, zScale);
+  std::unique_ptr<ZSwc> tree = neuronStructureToSwcTreeCircleZLegacyLike(ns2, zToXYRatio);
   if (!tree || tree->empty()) {
     LOG(INFO) << "Auto trace: no SWC output produced.";
     return nullptr;

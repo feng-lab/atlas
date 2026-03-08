@@ -30,7 +30,7 @@ int labelForest(ZSwc& tree)
   return treeNumber;
 }
 
-void reconnectSwc(ZSwc& tree, double zScale, double distThre)
+void reconnectSwc(ZSwc& tree, double zToXYRatio, double distThre)
 {
   if (tree.numRoots() < 2) {
     return;
@@ -75,7 +75,7 @@ void reconnectSwc(ZSwc& tree, double zScale, double distThre)
 
     for (const int idx : candidates) {
       const auto n = nodeArray[static_cast<size_t>(idx)];
-      const double d = geo3dDist(pos[0], pos[1], pos[2] * zScale, n->x, n->y, n->z * zScale) - n->radius;
+      const double d = geo3dDist(pos[0], pos[1], pos[2] * zToXYRatio, n->x, n->y, n->z * zToXYRatio) - n->radius;
 
       if (mindist >= 0.0) {
         if (mindist > d) {

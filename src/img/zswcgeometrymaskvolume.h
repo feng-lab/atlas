@@ -8,6 +8,12 @@
 
 namespace nim {
 
+enum class ZSwcGeometryMaskQuerySpace
+{
+  ImageSpace,
+  LegacyScaledMaskSpace,
+};
+
 // Read-only ZVoxelVolume adapter backed by a continuous-geometry SWC spatial index.
 //
 // This lets existing tracing helpers (point sampling, hit-mask tests, trace workspace mask accessors)
@@ -15,20 +21,25 @@ namespace nim {
 //
 // Coordinate contract:
 // - The underlying `ZSwcSpatialIndex` operates in image space.
-// - This adapter exposes the legacy trace-mask interface, where callers query Z in
-//   z-scaled mask coordinates.
-// - `origin` is therefore expressed in image-space coordinates, while queried local
-//   `z` values are converted from mask space back to image space before hit testing.
+// - `origin` is always expressed in image-space coordinates.
+// - `querySpace` controls whether incoming voxel queries are already in image space or still
+//   in the older legacy "mask-space" convention where Z is multiplied by `zToXYRatio`.
 class ZSwcGeometryMaskVolume final : public ZVoxelMaskMutable
 {
 public:
-  ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index, size_t w, size_t h, size_t d, double zScale);
   ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index,
                          size_t w,
                          size_t h,
                          size_t d,
-                         double zScale,
-                         glm::dvec3 origin);
+                         double zToXYRatio,
+                         ZSwcGeometryMaskQuerySpace querySpace = ZSwcGeometryMaskQuerySpace::ImageSpace);
+  ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index,
+                         size_t w,
+                         size_t h,
+                         size_t d,
+                         double zToXYRatio,
+                         glm::dvec3 origin,
+                         ZSwcGeometryMaskQuerySpace querySpace = ZSwcGeometryMaskQuerySpace::ImageSpace);
 
   [[nodiscard]] std::shared_ptr<ZSwcSpatialIndex> sharedIndex() const;
 
@@ -54,8 +65,9 @@ private:
   size_t m_width = 0;
   size_t m_height = 0;
   size_t m_depth = 0;
-  double m_zScale = 1.0;
+  double m_zToXYRatio = 1.0;
   glm::dvec3 m_origin{0.0, 0.0, 0.0};
+  ZSwcGeometryMaskQuerySpace m_querySpace = ZSwcGeometryMaskQuerySpace::ImageSpace;
 };
 
 } // namespace nim

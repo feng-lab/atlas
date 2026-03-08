@@ -22,6 +22,11 @@ DEFINE_bool(atlas_autotrace_reconstruct_chain_connection_prefilter,
             "Use a knot-aware conservative distance prefilter before chain-connection tests during auto-trace "
             "reconstruction. Disable for debugging or parity investigations.");
 
+DEFINE_bool(atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity,
+            false,
+            "Preserve legacy Local_Neuroseg_Scale_Z(..., 1.0) canonicalization in chain connection/reconstruction "
+            "paths. This is a parity-only compatibility switch and should stay disabled for normal tracing.");
+
 namespace nim {
 
 namespace {
@@ -113,7 +118,7 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
 }
 
 [[nodiscard]] ChainConnectionBoundsLegacyLike computeChainConnectionBoundsLegacyLike(const LocsegChain& chain,
-                                                                                     double zScale)
+                                                                                     double zToXYRatio)
 {
   ChainConnectionBoundsLegacyLike out;
   out.isEmpty = chain.empty();
@@ -121,8 +126,7 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
     return out;
   }
 
-  // Hook-end bounds: match `locsegChainConnectionTestLegacyLike()` setup (head+tail balls scaled by zScale,
-  // and tail flipped so both ends are oriented outward).
+  // Hook-end bounds stay in trace space, matching `locsegChainConnectionTestLegacyLike()`.
   const LocalNeuroseg* shead = chain.headSeg();
   const LocalNeuroseg* stail = chain.tailSeg();
   CHECK(shead != nullptr);
@@ -136,15 +140,19 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
     head.seg.h = 2.0;
     tail.seg.h = 2.0;
   }
+  if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+    // Legacy C code still runs this isotropic no-op transform in these paths. Keep it behind a parity-only flag so
+    // the default runtime path follows the cleaner trace-space model without surprising canonicalization noise.
+    localNeurosegScaleZLegacyLike(head, 1.0);
+    localNeurosegScaleZLegacyLike(tail, 1.0);
+  }
 
-  localNeurosegScaleZLegacyLike(head, zScale);
-  localNeurosegScaleZLegacyLike(tail, zScale);
   localNeurosegBallBoundLegacyLike(head, out.hookHead);
   localNeurosegBallBoundLegacyLike(tail, out.hookTail);
   out.hookHead.radius = std::max(out.hookHead.radius, locsegSegmentCoverRadiusLegacyLike(head));
   out.hookTail.radius = std::max(out.hookTail.radius, locsegSegmentCoverRadiusLegacyLike(tail));
 
-  // Loop bounds: per-segment ball centers/radii in the same scaled coordinate space.
+  // Loop bounds: per-segment ball centers/radii in the same trace-space coordinate system.
   const double posInf = std::numeric_limits<double>::infinity();
   out.aabbMin = {posInf, posInf, posInf};
   out.aabbMax = {-posInf, -posInf, -posInf};
@@ -153,7 +161,9 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
   Geo3dBallLegacyLike segBall{};
   for (const auto& node : chain) {
     LocalNeuroseg seg = node.locseg;
-    localNeurosegScaleZLegacyLike(seg, zScale);
+    if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+      localNeurosegScaleZLegacyLike(seg, 1.0);
+    }
     localNeurosegBallBoundLegacyLike(seg, segBall);
 
     growAabb(out.aabbMin, out.aabbMax, segBall.center);
@@ -165,16 +175,15 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
   CHECK(kaOpt.has_value()) << "Expected knot array for non-empty LocsegChain";
   const LocsegChainKnotArrayLegacyLike& ka = *kaOpt;
   for (int i = 0; i < static_cast<int>(ka.knots.size()); ++i) {
-    std::array<double, 3> knotPos = locsegChainKnotPosLegacyLike(ka, i);
-    knotPos[2] /= zScale;
-    growAabb(out.aabbMin, out.aabbMax, knotPos);
+    growAabb(out.aabbMin, out.aabbMax, locsegChainKnotPosLegacyLike(ka, i));
   }
 
+  (void)zToXYRatio;
   return out;
 }
 
 [[nodiscard]] std::vector<Geo3dCircle>
-locsegChainToCirclesScaledLegacyLike(const LocsegChain& chain, double xyScale, double zScale)
+locsegChainToCirclesScaledLegacyLike(const LocsegChain& chain, double xyScale, double zToXYRatio)
 {
   // Port of tz_locseg_chain.c::Locseg_Chain_To_Neuron_Component_S(..., GEO3D_CIRCLE).
   const auto kaOpt = locsegChainToKnotArrayLegacyLike(chain);
@@ -191,7 +200,7 @@ locsegChainToCirclesScaledLegacyLike(const LocsegChain& chain, double xyScale, d
 
   for (const auto& node : chain) {
     LocalNeuroseg locseg2 = node.locseg;
-    localNeurosegScaleLegacyLike(locseg2, xyScale, zScale);
+    localNeurosegScaleLegacyLike(locseg2, xyScale, zToXYRatio);
 
     const LocsegChainKnotLegacyLike* knot = locsegChainKnotArrayAtLegacyLike(ka, knotIndex);
     while (knot != nullptr) {
@@ -241,7 +250,7 @@ closestCircleLegacyLike(const std::vector<Geo3dCircle>& circles, int start, int 
 
 NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector<std::unique_ptr<LocsegChain>>& chains,
                                                                      const ZImg* signal,
-                                                                     double zScale,
+                                                                     double zToXYRatio,
                                                                      const ConnectionTestWorkspaceLegacyLike& ctw)
 {
   NeuronStructureChainsLegacyLike ns;
@@ -277,7 +286,7 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
     for (int i = 0; i < n; ++i) {
       const LocsegChain* chain = ns.chains[static_cast<size_t>(i)];
       CHECK(chain != nullptr);
-      connBounds.push_back(computeChainConnectionBoundsLegacyLike(*chain, zScale));
+      connBounds.push_back(computeChainConnectionBoundsLegacyLike(*chain, zToXYRatio));
     }
   }
 
@@ -331,12 +340,12 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
       CHECK(chainJ != nullptr);
 
       const int chainJLengthBefore = chainJ->length();
-      if (!locsegChainConnectionTestLegacyLike(*chainI, *chainJ, signal, zScale, conn, ctw)) {
+      if (!locsegChainConnectionTestLegacyLike(*chainI, *chainJ, signal, zToXYRatio, conn, ctw)) {
         continue;
       }
 
       if (usePrefilter && chainJ->length() != chainJLengthBefore) {
-        connBounds[static_cast<size_t>(j)] = computeChainConnectionBoundsLegacyLike(*chainJ, zScale);
+        connBounds[static_cast<size_t>(j)] = computeChainConnectionBoundsLegacyLike(*chainJ, zToXYRatio);
       }
 
       neurocompConnTranslateModeLegacyLike(chainJ->length(), conn);
@@ -450,7 +459,9 @@ void processNeuronStructureLegacyLike(NeuronStructureChainsLegacyLike& ns)
 }
 
 NeuronStructureCirclesLegacyLike
-neuronStructureLocsegChainToCircleSLegacyLike(const NeuronStructureChainsLegacyLike& ns, double xyScale, double zScale)
+neuronStructureLocsegChainToCircleSLegacyLike(const NeuronStructureChainsLegacyLike& ns,
+                                              double xyScale,
+                                              double zToXYRatio)
 {
   // Port of tz_neuron_structure.c::Neuron_Structure_Locseg_Chain_To_Circle_S().
   NeuronStructureCirclesLegacyLike out;
@@ -468,7 +479,7 @@ neuronStructureLocsegChainToCircleSLegacyLike(const NeuronStructureChainsLegacyL
     const LocsegChain* chain = ns.chains[static_cast<size_t>(i)];
     CHECK(chain != nullptr);
 
-    const std::vector<Geo3dCircle> circles = locsegChainToCirclesScaledLegacyLike(*chain, xyScale, zScale);
+    const std::vector<Geo3dCircle> circles = locsegChainToCirclesScaledLegacyLike(*chain, xyScale, zToXYRatio);
     const int n = static_cast<int>(circles.size());
 
     const int base = startId[static_cast<size_t>(i)];
@@ -507,7 +518,7 @@ neuronStructureLocsegChainToCircleSLegacyLike(const NeuronStructureChainsLegacyL
       id0 = startId[static_cast<size_t>(chainId0 + 1)] - 1;
     }
 
-    const std::array<double, 3> pos = {conn2.pos[0] * xyScale, conn2.pos[1] * xyScale, conn2.pos[2] * zScale};
+    const std::array<double, 3> pos = {conn2.pos[0] * xyScale, conn2.pos[1] * xyScale, conn2.pos[2] * zToXYRatio};
 
     const int start = startId[static_cast<size_t>(chainId1)];
     const int count = startId[static_cast<size_t>(chainId1 + 1)] - start;
@@ -550,7 +561,7 @@ void neuronStructureToTreeLegacyLike(NeuronStructureCirclesLegacyLike& ns)
 }
 
 std::unique_ptr<ZSwc> neuronStructureToSwcTreeCircleZLegacyLike(const NeuronStructureCirclesLegacyLike& ns,
-                                                                double zScale)
+                                                                double zToXYRatio)
 {
   // Port of tz_neuron_structure.c::Neuron_Structure_To_Swc_Tree_Circle_Z(..., root_pos=NULL).
   const int ncomp = ns.graph.nvertex;
@@ -577,8 +588,8 @@ std::unique_ptr<ZSwc> neuronStructureToSwcTreeCircleZLegacyLike(const NeuronStru
     swcNode.x = circle.center[0];
     swcNode.y = circle.center[1];
     swcNode.z = circle.center[2];
-    if (zScale != 1.0) {
-      swcNode.z /= zScale;
+    if (zToXYRatio != 1.0) {
+      swcNode.z /= zToXYRatio;
     }
     swcNode.radius = circle.radius;
     swcNode.parentID = -1;

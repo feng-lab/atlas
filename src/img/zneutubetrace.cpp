@@ -97,8 +97,8 @@ namespace {
                                       static_cast<double>(position[1]),
                                       static_cast<double>(position[2])};
 
-  const double zScale = preferredZScaleFromImgInfoLegacyLike(signal.info());
-  const SeedTraceResult traceRes = traceSeedNewSwcLegacyLike(signal, seed, cfg, zScale);
+  const double zToXYRatio = preferredZToXYRatioFromImgInfoLegacyLike(signal.info());
+  const SeedTraceResult traceRes = traceSeedNewSwcLegacyLike(signal, seed, cfg, zToXYRatio);
   if (!traceRes.swc) {
     return 1;
   }
@@ -164,8 +164,8 @@ namespace {
                                       static_cast<double>(position[1]),
                                       static_cast<double>(position[2])};
 
-  const double zScale = preferredZScaleFromImgInfoLegacyLike(signal.info());
-  const SeedTraceResult traceRes = traceSeedIntoHostSwcLegacyLike(signal, hostSwc, seed, cfg, zScale);
+  const double zToXYRatio = preferredZToXYRatioFromImgInfoLegacyLike(signal.info());
+  const SeedTraceResult traceRes = traceSeedIntoHostSwcLegacyLike(signal, hostSwc, seed, cfg, zToXYRatio);
   CHECK(traceRes.swc);
   writeSwcLegacyNeuTu(*traceRes.swc, outputPath);
   return 0;
@@ -232,10 +232,10 @@ int runTrace(const std::vector<std::string>& input,
       }
     }
 
-    const double zScale = preferredZScaleFromImgInfoLegacyLike(signal.info());
+    const double zToXYRatio = preferredZToXYRatioFromImgInfoLegacyLike(signal.info());
     std::unique_ptr<ZSwc> tree = traceNeuronAutoLegacyLike(std::move(signal),
                                                            cfg,
-                                                           zScale,
+                                                           zToXYRatio,
                                                            diagnosis,
                                                            verbose,
                                                            /*doResampleAfterTracing=*/true,

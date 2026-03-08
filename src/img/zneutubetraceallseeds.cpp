@@ -28,10 +28,10 @@ constexpr double TraceMaskExclusionSwellDiffLegacyLike = 0.0;
 constexpr double TraceMaskExclusionSwellLimitLegacyLike = 3.0;
 
 [[nodiscard]] std::shared_ptr<ZSwcSpatialIndex>
-ensureSpatialTraceMaskVolumeLegacyLike(TraceWorkspace& tw, const ZImg& signal, double zScale)
+ensureSpatialTraceMaskVolumeLegacyLike(TraceWorkspace& tw, const ZImg& signal, double zToXYRatio)
 {
-  CHECK(std::isfinite(zScale));
-  CHECK(zScale > 0.0);
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
 
   std::shared_ptr<ZSwcSpatialIndex> index;
   if (tw.traceMaskVolume) {
@@ -40,22 +40,26 @@ ensureSpatialTraceMaskVolumeLegacyLike(TraceWorkspace& tw, const ZImg& signal, d
       << "traceAllSeedsLegacyLike: spatial trace-mask mode requires ZSwcGeometryMaskVolume.";
     index = spatialMask->sharedIndex();
     CHECK(index != nullptr);
-    index->setZScale(zScale);
+    index->setZToXYRatio(zToXYRatio);
   } else {
     index = std::make_shared<ZSwcSpatialIndex>();
-    index->setZScale(zScale);
+    index->setZToXYRatio(zToXYRatio);
   }
 
-  tw.traceMaskVolume =
-    std::make_unique<ZSwcGeometryMaskVolume>(index, signal.width(), signal.height(), signal.depth(), zScale);
+  tw.traceMaskVolume = std::make_unique<ZSwcGeometryMaskVolume>(index,
+                                                                signal.width(),
+                                                                signal.height(),
+                                                                signal.depth(),
+                                                                zToXYRatio,
+                                                                ZSwcGeometryMaskQuerySpace::ImageSpace);
   return index;
 }
 
-void insertChainIntoSpatialIndexLegacyLike(const LocsegChain& chain, ZSwcSpatialIndex& index)
+void insertChainIntoSpatialIndexLegacyLike(const LocsegChain& chain, ZSwcSpatialIndex& index, double zToXYRatio)
 {
   const std::vector<Geo3dCircle> circles =
     locsegChainToGeo3dCircleArraySwelledZLegacyLike(chain,
-                                                    /*zScale*/ 1.0,
+                                                    zToXYRatio,
                                                     TraceMaskExclusionSwellRatioLegacyLike,
                                                     TraceMaskExclusionSwellDiffLegacyLike,
                                                     TraceMaskExclusionSwellLimitLegacyLike);
@@ -82,21 +86,21 @@ void insertChainIntoSpatialIndexLegacyLike(const LocsegChain& chain, ZSwcSpatial
 } // namespace
 
 std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& signal,
-                                                                  double zScale,
+                                                                  double zToXYRatio,
                                                                   std::vector<LocalNeuroseg>& locsegArray,
                                                                   std::vector<double>& scores,
                                                                   TraceWorkspace& tw)
 {
   CHECK(scores.size() == locsegArray.size());
-  CHECK(std::isfinite(zScale));
-  CHECK(zScale > 0.0);
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
 
   const int nseed = static_cast<int>(locsegArray.size());
   if (nseed <= 0) {
     return {};
   }
 
-  tw.resolution = traceResolutionFromZScaleLegacyLike(zScale);
+  tw.resolution = traceResolutionFromZToXYRatioLegacyLike(zToXYRatio);
 
   VLOG(1) << fmt::format("Trace all seeds: start (nseed={}, minScore={})", nseed, tw.minScore);
 
@@ -109,7 +113,7 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
   // Ensure trace mask exists if we're updating it (legacy allocates it lazily here).
   if (tw.traceMaskUpdating) {
     if (FLAGS_atlas_trace_use_swc_geometry_mask) {
-      spatialTraceMaskIndex = ensureSpatialTraceMaskVolumeLegacyLike(tw, signal, zScale);
+      spatialTraceMaskIndex = ensureSpatialTraceMaskVolumeLegacyLike(tw, signal, zToXYRatio);
     } else {
       traceWorkspaceInitTraceMaskLegacyLike(tw, signal, /*clearing*/ false);
     }
@@ -161,12 +165,12 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
 
     if (tw.traceMaskVolume || tw.traceMask) {
       std::array<double, 3> pt = localNeurosegAxisPositionLegacyLike(seedLocseg, seedLocseg.seg.h / 3.0);
-      if (traceWorkspaceMaskValueZLegacyLike(tw, pt, zScale) > 0) {
+      if (traceWorkspaceMaskValueZLegacyLike(tw, pt, zToXYRatio) > 0) {
         tw.traceStatus[0] = TraceStatus::HitMark;
       }
 
       pt = localNeurosegAxisPositionLegacyLike(seedLocseg, seedLocseg.seg.h * 2.0 / 3.0);
-      if (traceWorkspaceMaskValueZLegacyLike(tw, pt, zScale) > 0) {
+      if (traceWorkspaceMaskValueZLegacyLike(tw, pt, zToXYRatio) > 0) {
         tw.traceStatus[1] = TraceStatus::HitMark;
       }
     }
@@ -185,7 +189,7 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
     node.tr = tr;
     (void)chain->addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
 
-    traceLocsegLegacyLike(signal, zScale, *chain, tw);
+    traceLocsegLegacyLike(signal, zToXYRatio, *chain, tw);
     (void)locsegChainRemoveOverlapEndsLegacyLike(*chain);
     locsegChainRemoveTurnEndsLegacyLike(*chain, 1.0);
 
@@ -197,7 +201,7 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
 
     if (tw.traceMaskUpdating) {
       if (spatialTraceMaskIndex) {
-        insertChainIntoSpatialIndexLegacyLike(*chain, *spatialTraceMaskIndex);
+        insertChainIntoSpatialIndexLegacyLike(*chain, *spatialTraceMaskIndex, zToXYRatio);
       } else if (tw.traceMask) {
         labelWs.sratio = TraceMaskExclusionSwellRatioLegacyLike;
         labelWs.sdiff = TraceMaskExclusionSwellDiffLegacyLike;
@@ -209,7 +213,7 @@ std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& si
         labelWs.flag = 0;
         locsegChainLabelWLegacyLike(*chain,
                                     *tw.traceMask,
-                                    zScale,
+                                    zToXYRatio,
                                     /*begin*/ 0,
                                     /*end*/ chain->length() - 1,
                                     labelWs);

@@ -16,7 +16,7 @@ constexpr int NeurosegCircleRxLegacyLike = 0;
 
 // Port of tz_locseg_chain_knot.c::Locseg_Chain_Knot_Array_To_Circle_Z().
 [[nodiscard]] std::vector<Geo3dCircle> locsegChainKnotArrayToCircleZLegacyLike(const LocsegChainKnotArrayLegacyLike& ka,
-                                                                               double zScale,
+                                                                               double zToXYRatio,
                                                                                double swellRatio,
                                                                                double swellDiff,
                                                                                double swellLimit)
@@ -35,8 +35,8 @@ constexpr int NeurosegCircleRxLegacyLike = 0;
     if (swellRatio != 1.0 || swellDiff != 0.0 || swellLimit > 0.0) {
       neurosegSwellLegacyLike(locseg2.seg, swellRatio, swellDiff, swellLimit);
     }
-    if (zScale != 1.0) {
-      localNeurosegScaleZLegacyLike(locseg2, zScale);
+    if (zToXYRatio != 1.0) {
+      localNeurosegScaleZLegacyLike(locseg2, zToXYRatio);
     }
 
     const LocsegChainKnotLegacyLike* knot = locsegChainKnotArrayAtLegacyLike(ka, knotIndex);
@@ -59,17 +59,17 @@ constexpr int NeurosegCircleRxLegacyLike = 0;
 
 } // namespace
 
-std::vector<Geo3dCircle> locsegChainToGeo3dCircleArrayZLegacyLike(const LocsegChain& chain, double zScale)
+std::vector<Geo3dCircle> locsegChainToGeo3dCircleArrayZLegacyLike(const LocsegChain& chain, double zToXYRatio)
 {
   return locsegChainToGeo3dCircleArraySwelledZLegacyLike(chain,
-                                                         zScale,
+                                                         zToXYRatio,
                                                          /*swellRatio*/ 1.0,
                                                          /*swellDiff*/ 0.0,
                                                          /*swellLimit*/ 0.0);
 }
 
 std::vector<Geo3dCircle> locsegChainToGeo3dCircleArraySwelledZLegacyLike(const LocsegChain& chain,
-                                                                         double zScale,
+                                                                         double zToXYRatio,
                                                                          double swellRatio,
                                                                          double swellDiff,
                                                                          double swellLimit)
@@ -80,7 +80,7 @@ std::vector<Geo3dCircle> locsegChainToGeo3dCircleArraySwelledZLegacyLike(const L
   if (!kaOpt) {
     return {};
   }
-  return locsegChainKnotArrayToCircleZLegacyLike(*kaOpt, zScale, swellRatio, swellDiff, swellLimit);
+  return locsegChainKnotArrayToCircleZLegacyLike(*kaOpt, zToXYRatio, swellRatio, swellDiff, swellLimit);
 }
 
 std::vector<Geo3dCircle> locsegChainToGeo3dCircleArrayLegacyLike(const LocsegChain& chain)

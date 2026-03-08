@@ -15,7 +15,7 @@ void screenChainsLegacyLike(const ZImg& signal, std::vector<std::unique_ptr<Locs
   }
 
   constexpr double scoreThreshold = 0.6;
-  constexpr double zScale = 1.0;
+  constexpr double zToXYRatio = 1.0;
 
   std::vector<double> scoreArray(chains.size(), 0.0);
   std::vector<double> intensityArray(chains.size(), 0.0);
@@ -25,8 +25,8 @@ void screenChainsLegacyLike(const ZImg& signal, std::vector<std::unique_ptr<Locs
   for (size_t i = 0; i < chains.size(); ++i) {
     const LocsegChain* chain = chains[i].get();
     CHECK(chain != nullptr);
-    scoreArray[i] = locsegChainAverageScoreLegacyLike(*chain, signal, zScale, StackFitOption::Corrcoef);
-    intensityArray[i] = locsegChainAverageSignalLegacyLike(*chain, signal, zScale);
+    scoreArray[i] = locsegChainAverageScoreLegacyLike(*chain, signal, zToXYRatio, StackFitOption::Corrcoef);
+    intensityArray[i] = locsegChainAverageSignalLegacyLike(*chain, signal, zToXYRatio);
     if (scoreArray[i] >= scoreThreshold) {
       if (intensityArray[i] < minIntensity) {
         minIntensity = intensityArray[i];

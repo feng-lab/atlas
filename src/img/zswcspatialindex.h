@@ -23,7 +23,7 @@ namespace nim {
 // Coordinate contract:
 // - SWC node coordinates stay in image space (the same x/y/z stored in the SWC).
 // - `containsPoint*()` therefore accepts image-space query coordinates too.
-// - `zScale` is applied only internally as the anisotropic hit-test metric.
+// - `zToXYRatio` is applied only internally as the anisotropic hit-test metric.
 // - Callers that need the legacy z-scaled trace-mask interface should go through
 //   `ZSwcGeometryMaskVolume`, which adapts mask-space z back into image-space queries.
 //
@@ -41,20 +41,20 @@ class ZSwcSpatialIndex final
 public:
   ZSwcSpatialIndex() = default;
 
-  // zScale controls how Z is weighted when testing "inside SWC tube?" in image-space coordinates.
+  // zToXYRatio controls how Z is weighted when testing "inside SWC tube?" in image-space coordinates.
   //
-  // Legacy NeuTu defines zScale as the voxel-size ratio:
-  //   zScale = voxelSizeZ / voxelSizeXY
+  // Legacy NeuTu defines the tracing anisotropy as the voxel-size ratio:
+  //   zToXYRatio = voxelSizeZ / voxelSizeXY
   // (usually > 1 for microscopy volumes where Z spacing is coarser than XY).
   //
   // Geometric meaning:
-  // - We treat distances in an anisotropic metric where dz is scaled by zScale:
-  //     dist^2 = dx^2 + dy^2 + (dz * zScale)^2
-  //   so for zScale>1, image-space points farther apart in Z are considered farther away.
+  // - We treat distances in an anisotropic metric where dz is scaled by zToXYRatio:
+  //     dist^2 = dx^2 + dy^2 + (dz * zToXYRatio)^2
+  //   so for zToXYRatio>1, image-space points farther apart in Z are considered farther away.
   //
-  // Note: Changing zScale invalidates any existing primitives; callers should set it before rebuild/insert.
-  void setZScale(double zScale);
-  [[nodiscard]] double zScale() const;
+  // Note: Changing zToXYRatio invalidates any existing primitives; callers should set it before rebuild/insert.
+  void setZToXYRatio(double zToXYRatio);
+  [[nodiscard]] double zToXYRatio() const;
 
   void clear();
 
@@ -89,7 +89,7 @@ private:
   [[nodiscard]] static bool primitiveContainsPoint(const Primitive& prim, const glm::dvec3& p);
 
 private:
-  double m_zScale = 1.0;
+  double m_zToXYRatio = 1.0;
 
   std::vector<Primitive> m_prims;
   RTree m_rtree;

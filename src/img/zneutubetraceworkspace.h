@@ -51,7 +51,7 @@ struct TraceWorkspace
   // Optional trace-space resolution for size-based checks.
   //
   // Current tracing code only uses the XY entries here; tracing entry points should still set the full
-  // `{1, 1, zScale}` tuple explicitly so the workspace stays aligned with the chosen anisotropy contract.
+  // `{1, 1, zToXYRatio}` tuple explicitly so the workspace stays aligned with the chosen anisotropy contract.
   std::array<double, 3> resolution = {-1.0, -1.0, -1.0};
 
   bool addHit = true;
@@ -94,13 +94,13 @@ void traceWorkspaceInitTraceMaskLegacyLike(TraceWorkspace& tw, const ZImg& stack
 
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Mask_Value_Z().
 [[nodiscard]] int
-traceWorkspaceMaskValueZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zScale);
+traceWorkspaceMaskValueZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zToXYRatio);
 
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Point_In_Bound().
 [[nodiscard]] bool traceWorkspacePointInBoundLegacyLike(const TraceWorkspace& tw, const std::array<double, 3>& pos);
 
 // Port of legacy tz_trace_utils.c::Trace_Workspace_Point_In_Bound_Z().
 [[nodiscard]] bool
-traceWorkspacePointInBoundZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zScale);
+traceWorkspacePointInBoundZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zToXYRatio);
 
 } // namespace nim

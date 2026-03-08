@@ -251,10 +251,10 @@ int runGeneral(const std::string& generalConfigTextOrPath,
   }
 
   const ZImg* predefinedMask = maskOverride.mask ? &(*maskOverride.mask) : nullptr;
-  const double zScale = preferredZScaleFromImgInfoLegacyLike(signal.info());
+  const double zToXYRatio = preferredZToXYRatioFromImgInfoLegacyLike(signal.info());
   std::unique_ptr<ZSwc> tree = traceNeuronAutoLegacyLike(std::move(signal),
                                                          traceCfg,
-                                                         zScale,
+                                                         zToXYRatio,
                                                          diagnosis,
                                                          verbose,
                                                          /*doResampleAfterTracing=*/true,

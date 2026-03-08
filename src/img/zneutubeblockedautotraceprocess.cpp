@@ -221,7 +221,8 @@ struct BlockGrid
     return r;
   }
 
-  [[nodiscard]] static std::array<double, 3> taskAnchorPoint(const LocalNeuroseg& endLocseg, TraceDirection direction)
+  [[nodiscard]] static std::array<double, 3>
+  taskAnchorPoint(const LocalNeuroseg& endLocseg, TraceDirection direction, double zToXYRatio)
   {
     std::array<double, 3> p = localNeurosegCenterLegacyLike(endLocseg);
     if (direction == TraceDirection::Forward) {
@@ -229,13 +230,14 @@ struct BlockGrid
     } else if (direction == TraceDirection::Backward) {
       p = localNeurosegBottomLegacyLike(endLocseg);
     }
+    p[2] /= zToXYRatio;
     return p;
   }
 
-  [[nodiscard]] ZBlockedAutoTraceBlockId suggestedBlockForTask(const LocalNeuroseg& endLocseg,
-                                                               TraceDirection direction) const
+  [[nodiscard]] ZBlockedAutoTraceBlockId
+  suggestedBlockForTask(const LocalNeuroseg& endLocseg, TraceDirection direction, double zToXYRatio) const
   {
-    const std::array<double, 3> p = taskAnchorPoint(endLocseg, direction);
+    const std::array<double, 3> p = taskAnchorPoint(endLocseg, direction, zToXYRatio);
 
     const int64_t x = static_cast<int64_t>(std::floor(p[0]));
     const int64_t y = static_cast<int64_t>(std::floor(p[1]));
@@ -286,12 +288,15 @@ struct ContinuationHint
   double radiusZ = 0.0;
 };
 
-[[nodiscard]] ContinuationHint continuationHintForTask(const LocalNeuroseg& endGlobal, TraceDirection direction)
+[[nodiscard]] ContinuationHint
+continuationHintForTask(const LocalNeuroseg& endGlobal, TraceDirection direction, double zToXYRatio)
 {
   ContinuationHint hint;
 
-  const auto top = localNeurosegTopLegacyLike(endGlobal);
-  const auto bottom = localNeurosegBottomLegacyLike(endGlobal);
+  auto top = localNeurosegTopLegacyLike(endGlobal);
+  auto bottom = localNeurosegBottomLegacyLike(endGlobal);
+  top[2] /= zToXYRatio;
+  bottom[2] /= zToXYRatio;
 
   if (direction == TraceDirection::Forward) {
     hint.anchor = top;
@@ -369,9 +374,10 @@ struct ContinuationHint
 }
 
 [[nodiscard]] ZBlockedAutoTraceSwcDeltaNode
-makeDeltaNode(int64_t id, int64_t parentId, const LocalNeuroseg& locseg, glm::dvec3 origin)
+makeDeltaNode(int64_t id, int64_t parentId, const LocalNeuroseg& locseg, glm::dvec3 origin, double zToXYRatio)
 {
-  const std::array<double, 3> c = localNeurosegCenterLegacyLike(locseg);
+  std::array<double, 3> c = localNeurosegCenterLegacyLike(locseg);
+  c[2] /= zToXYRatio;
   ZBlockedAutoTraceSwcDeltaNode d;
   d.id = id;
   d.type = 0;
@@ -481,7 +487,7 @@ TraceConfig ZNeutubeBlockedAutoTraceProcess::buildEffectiveTraceConfigOrThrow() 
 }
 
 void ZNeutubeBlockedAutoTraceProcess::writeFinalSwcAtomicOrThrow(ZSwc& tree,
-                                                                 double zScale,
+                                                                 double zToXYRatio,
                                                                  double reconnectDistThre) const
 {
   if (m_outputSwcPath.isEmpty()) {
@@ -490,12 +496,12 @@ void ZNeutubeBlockedAutoTraceProcess::writeFinalSwcAtomicOrThrow(ZSwc& tree,
 
   if (tree.numRoots() > 1) {
     LOG(INFO) << fmt::format("Blocked auto trace: reconnecting final SWC forest (roots={}).", tree.numRoots());
-    reconnectSwc(tree, zScale, reconnectDistThre);
+    reconnectSwc(tree, zToXYRatio, reconnectDistThre);
     if (tree.numRoots() > 1) {
       LOG(WARNING) << fmt::format(
         "Blocked auto trace: distance-threshold reconnect left {} roots; retrying without a distance cap.",
         tree.numRoots());
-      reconnectSwc(tree, zScale, /*distThre*/ -1.0);
+      reconnectSwc(tree, zToXYRatio, /*distThre*/ -1.0);
     }
   }
 
@@ -543,8 +549,8 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   if (m_datasetId.empty()) {
     throw ZException("Blocked auto trace: dataset identity is empty.");
   }
-  if (!m_zScale.has_value()) {
-    throw ZException("Blocked auto trace: missing zScale.");
+  if (!m_zToXYRatio.has_value()) {
+    throw ZException("Blocked auto trace: missing zToXYRatio.");
   }
 
   if (m_signalDownsampleRatio[0] != m_signalDownsampleRatio[1]) {
@@ -569,7 +575,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   LOG(INFO) << "Selected channel (0-based): " << m_selectedChannel;
   LOG(INFO) << "Selected time (0-based): " << m_selectedTime;
   LOG(INFO) << "Signal downsample ratio: [" << ratio[0] << "," << ratio[1] << "," << ratio[2] << "]";
-  LOG(INFO) << fmt::format("Tracing zScale: {:.6g}", *m_zScale);
+  LOG(INFO) << fmt::format("Tracing zToXYRatio: {:.6g}", *m_zToXYRatio);
   LOG(INFO) << "Budget level override (0=default): " << m_traceLevel;
   LOG(INFO) << "Optimal node resampling: " << (m_doResampleAfterTracing ? "enabled" : "disabled");
   LOG(INFO) << "Trace config path: " << m_traceConfigPath;
@@ -598,7 +604,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   manifest.channel = m_selectedChannel;
   manifest.time = m_selectedTime;
   manifest.signalDownsampleRatio = ratio;
-  manifest.zScale = *m_zScale;
+  manifest.zToXYRatio = *m_zToXYRatio;
   manifest.datasetShape = {
     .width = traceW,
     .height = traceH,
@@ -683,7 +689,6 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
 
   ZBlockedAutoTraceLoadedState state = session.loadLatestOrEmptyOrThrow();
   CHECK(state.manifest.formatVersion == kBlockedAutoTraceManifestFormatVersion);
-
   // Build in-memory state.
   int64_t nextNodeId = maxSwcNodeIdOrZero(state.swc) + 1;
   uint64_t nextTaskId = maxTaskIdOrZero(state.frontier) + 1;
@@ -715,7 +720,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
 
   // Global SWC geometry index for "already traced?" checks.
   auto swcIndex = std::make_shared<ZSwcSpatialIndex>();
-  swcIndex->setZScale(state.manifest.zScale);
+  swcIndex->setZToXYRatio(state.manifest.zToXYRatio);
   swcIndex->rebuild(state.swc);
 
   LOG(INFO) << fmt::format("Base dataset: {}x{}x{}", baseW, baseH, baseD);
@@ -779,7 +784,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   };
 
   auto continuationLeavesImage = [&](const LocalNeuroseg& endLocseg, TraceDirection direction) {
-    const ContinuationHint hint = continuationHintForTask(endLocseg, direction);
+    const ContinuationHint hint = continuationHintForTask(endLocseg, direction, state.manifest.zToXYRatio);
     return continuationWouldLeaveImageForVoxelSampling(grid.shape.width,
                                                        grid.shape.height,
                                                        grid.shape.depth,
@@ -794,7 +799,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     [&](const LocalNeuroseg& endLocseg,
         TraceDirection direction,
         std::optional<uint64_t> forbiddenLinearKey) -> std::optional<ZBlockedAutoTraceBlockId> {
-    const ContinuationHint hint = continuationHintForTask(endLocseg, direction);
+    const ContinuationHint hint = continuationHintForTask(endLocseg, direction, state.manifest.zToXYRatio);
     const int64_t maxCore = std::max({grid.block.coreX, grid.block.coreY, grid.block.coreZ});
     const double radiusBridgeStep = std::max({1.0, hint.radiusXY * 2.0 + 1.0, hint.radiusZ * 2.0 + 1.0});
     const double blockBridgeStep = static_cast<double>(std::max<int64_t>(1, maxCore + grid.block.halo + 1));
@@ -805,7 +810,8 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
       continuationPointAtDistance(hint, std::max({hint.step, radiusBridgeStep, blockBridgeStep})),
     };
 
-    const ZBlockedAutoTraceBlockId preferred = grid.suggestedBlockForTask(endLocseg, direction);
+    const ZBlockedAutoTraceBlockId preferred =
+      grid.suggestedBlockForTask(endLocseg, direction, state.manifest.zToXYRatio);
     const uint64_t preferredKey = grid.linearIndexOrThrow(preferred);
     if (!seedScanned.contains(preferredKey) && (!forbiddenLinearKey || preferredKey != *forbiddenLinearKey)) {
       const BlockGrid::Bounds preferredRoi = grid.roiBounds(grid.coreBounds(preferred));
@@ -884,7 +890,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
       // If a task points to a visited block, we either:
       // - drop it if it's already satisfied by existing SWC geometry, or
       // - reassign it to another unvisited block whose ROI still contains the anchor point.
-      const std::array<double, 3> p = BlockGrid::taskAnchorPoint(t.endLocseg, t.direction);
+      const std::array<double, 3> p = BlockGrid::taskAnchorPoint(t.endLocseg, t.direction, state.manifest.zToXYRatio);
       if (swcIndex->containsPoint(p[0], p[1], p[2])) {
         ++dropped;
         continue;
@@ -977,7 +983,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
 
     const auto nextBlock = findUnvisitedBlockForTask(endGlobal, direction, forbiddenLinearKey);
     if (!nextBlock.has_value()) {
-      const ContinuationHint hint = continuationHintForTask(endGlobal, direction);
+      const ContinuationHint hint = continuationHintForTask(endGlobal, direction, state.manifest.zToXYRatio);
       LOG(WARNING) << fmt::format("Blocked auto trace: terminating continuation without handoff block.\n"
                                   "  anchor=({:.3f},{:.3f},{:.3f})\n"
                                   "  direction={}\n"
@@ -1009,13 +1015,14 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
                                      const ZImg& signal,
                                      std::vector<ZBlockedAutoTraceSwcDeltaNode>& deltaOut,
                                      std::vector<ZBlockedAutoTracePendingTask>& newTasksOut) {
+    const double roiMinTraceZ = static_cast<double>(roi.minZ) * state.manifest.zToXYRatio;
     TraceWorkspace tw;
     locsegChainDefaultTraceWorkspaceLegacyLike(tw, signal);
     tw.cancellationToken = m_cancellationToken;
     tw.refit = cfg.refit;
     tw.tuneEnd = cfg.tuneEnd;
     tw.traceMaskUpdating = false;
-    tw.resolution = traceResolutionFromZScaleLegacyLike(state.manifest.zScale);
+    tw.resolution = traceResolutionFromZToXYRatioLegacyLike(state.manifest.zToXYRatio);
     prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Auto, tw);
 
     tw.traceMaskVolume = std::make_unique<ZSwcGeometryMaskVolume>(
@@ -1023,13 +1030,14 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
       signal.width(),
       signal.height(),
       signal.depth(),
-      state.manifest.zScale,
-      glm::dvec3{static_cast<double>(roi.minX), static_cast<double>(roi.minY), static_cast<double>(roi.minZ)});
+      state.manifest.zToXYRatio,
+      glm::dvec3{static_cast<double>(roi.minX), static_cast<double>(roi.minY), static_cast<double>(roi.minZ)},
+      ZSwcGeometryMaskQuerySpace::ImageSpace);
 
     LocalNeuroseg seedLocseg = task.endLocseg;
     seedLocseg.pos[0] -= static_cast<double>(roi.minX);
     seedLocseg.pos[1] -= static_cast<double>(roi.minY);
-    seedLocseg.pos[2] -= static_cast<double>(roi.minZ);
+    seedLocseg.pos[2] -= roiMinTraceZ;
 
     LocsegChain chain;
     LocsegNode seedNode;
@@ -1048,7 +1056,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     }
 
     maybeCancel(m_cancellationToken);
-    traceLocsegLegacyLike(signal, state.manifest.zScale, chain, tw);
+    traceLocsegLegacyLike(signal, state.manifest.zToXYRatio, chain, tw);
     maybeCancel(m_cancellationToken);
 
     const auto attachIt = state.nodeById.find(task.attachSwcNodeId);
@@ -1060,7 +1068,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     auto appendNode = [&](int64_t parentId, const LocalNeuroseg& locsegLocal) -> int64_t {
       const int64_t id = nextNodeId++;
       const ZBlockedAutoTraceSwcDeltaNode d =
-        makeDeltaNode(id, parentId, locsegLocal, glm::dvec3{roi.minX, roi.minY, roi.minZ});
+        makeDeltaNode(id, parentId, locsegLocal, glm::dvec3{roi.minX, roi.minY, roi.minZ}, state.manifest.zToXYRatio);
       appendDeltaNodeToSwcOrThrow(d, state.swc, state.nodeById);
       deltaOut.push_back(d);
 
@@ -1086,7 +1094,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
         LocalNeuroseg endGlobal = chain.tail()->locseg;
         endGlobal.pos[0] += static_cast<double>(roi.minX);
         endGlobal.pos[1] += static_cast<double>(roi.minY);
-        endGlobal.pos[2] += static_cast<double>(roi.minZ);
+        endGlobal.pos[2] += roiMinTraceZ;
         (void)tryAppendContinuationTask(endGlobal,
                                         task.attachSwcNodeId,
                                         TraceDirection::Forward,
@@ -1097,7 +1105,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
         LocalNeuroseg endGlobal = chain.head()->locseg;
         endGlobal.pos[0] += static_cast<double>(roi.minX);
         endGlobal.pos[1] += static_cast<double>(roi.minY);
-        endGlobal.pos[2] += static_cast<double>(roi.minZ);
+        endGlobal.pos[2] += roiMinTraceZ;
         (void)tryAppendContinuationTask(endGlobal,
                                         task.attachSwcNodeId,
                                         TraceDirection::Backward,
@@ -1127,7 +1135,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
         LocalNeuroseg endGlobal = endLocal;
         endGlobal.pos[0] += static_cast<double>(roi.minX);
         endGlobal.pos[1] += static_cast<double>(roi.minY);
-        endGlobal.pos[2] += static_cast<double>(roi.minZ);
+        endGlobal.pos[2] += roiMinTraceZ;
         (void)tryAppendContinuationTask(endGlobal,
                                         deltaOut.back().id,
                                         TraceDirection::Forward,
@@ -1156,7 +1164,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
         LocalNeuroseg endGlobal = endLocal;
         endGlobal.pos[0] += static_cast<double>(roi.minX);
         endGlobal.pos[1] += static_cast<double>(roi.minY);
-        endGlobal.pos[2] += static_cast<double>(roi.minZ);
+        endGlobal.pos[2] += roiMinTraceZ;
         (void)tryAppendContinuationTask(endGlobal,
                                         deltaOut.back().id,
                                         TraceDirection::Backward,
@@ -1452,13 +1460,14 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
             continue;
           }
 
+          const double roiMinTraceZ = static_cast<double>(roi.minZ) * state.manifest.zToXYRatio;
           TraceWorkspace tw;
           locsegChainDefaultTraceWorkspaceLegacyLike(tw, signal);
           tw.cancellationToken = m_cancellationToken;
           tw.refit = cfg.refit;
           tw.tuneEnd = cfg.tuneEnd;
           tw.traceMaskUpdating = false;
-          tw.resolution = traceResolutionFromZScaleLegacyLike(state.manifest.zScale);
+          tw.resolution = traceResolutionFromZToXYRatioLegacyLike(state.manifest.zToXYRatio);
           prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Auto, tw);
 
           tw.traceMaskVolume = std::make_unique<ZSwcGeometryMaskVolume>(
@@ -1466,8 +1475,9 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
             signal.width(),
             signal.height(),
             signal.depth(),
-            state.manifest.zScale,
-            glm::dvec3{static_cast<double>(roi.minX), static_cast<double>(roi.minY), static_cast<double>(roi.minZ)});
+            state.manifest.zToXYRatio,
+            glm::dvec3{static_cast<double>(roi.minX), static_cast<double>(roi.minY), static_cast<double>(roi.minZ)},
+            ZSwcGeometryMaskQuerySpace::ImageSpace);
 
           LocalNeuroseg seedLocseg;
           double widthValue = keptSeedVals[i];
@@ -1483,12 +1493,14 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
           seedLocseg.seg.alpha = 0.0;
           seedLocseg.seg.scale = 1.0;
 
-          const std::array<double, 3> cpos = {static_cast<double>(x), static_cast<double>(y), static_cast<double>(z)};
-          setNeurosegPositionLegacyLike(seedLocseg, cpos, NeuroposReferenceLegacyLike::Center);
+          setNeurosegPositionLegacyLike(
+            seedLocseg,
+            {static_cast<double>(x), static_cast<double>(y), static_cast<double>(z) * state.manifest.zToXYRatio},
+            NeuroposReferenceLegacyLike::Center);
 
           (void)localNeurosegOptimizeWLegacyLike(seedLocseg,
                                                  signal,
-                                                 state.manifest.zScale,
+                                                 state.manifest.zToXYRatio,
                                                  /*option*/ 0,
                                                  tw.fitWorkspace);
           maybeCancel(m_cancellationToken);
@@ -1501,7 +1513,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
           (void)chain.addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
 
           traceWorkspaceSetTraceStatusLegacyLike(tw, TraceStatus::Normal, TraceStatus::Normal);
-          traceLocsegLegacyLike(signal, state.manifest.zScale, chain, tw);
+          traceLocsegLegacyLike(signal, state.manifest.zToXYRatio, chain, tw);
           maybeCancel(m_cancellationToken);
 
           if (chain.length() < 2) {
@@ -1516,8 +1528,11 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
           int idx = 0;
           for (const auto& cn : chain) {
             const int64_t id = nextNodeId++;
-            const ZBlockedAutoTraceSwcDeltaNode d =
-              makeDeltaNode(id, parentId, cn.locseg, glm::dvec3{roi.minX, roi.minY, roi.minZ});
+            const ZBlockedAutoTraceSwcDeltaNode d = makeDeltaNode(id,
+                                                                  parentId,
+                                                                  cn.locseg,
+                                                                  glm::dvec3{roi.minX, roi.minY, roi.minZ},
+                                                                  state.manifest.zToXYRatio);
             appendDeltaNodeToSwcOrThrow(d, state.swc, state.nodeById);
             deltaNodes.push_back(d);
 
@@ -1551,7 +1566,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
             LocalNeuroseg endGlobal = chain.head()->locseg;
             endGlobal.pos[0] += static_cast<double>(roi.minX);
             endGlobal.pos[1] += static_cast<double>(roi.minY);
-            endGlobal.pos[2] += static_cast<double>(roi.minZ);
+            endGlobal.pos[2] += roiMinTraceZ;
             (void)tryAppendContinuationTask(endGlobal,
                                             firstId,
                                             TraceDirection::Backward,
@@ -1563,7 +1578,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
             LocalNeuroseg endGlobal = chain.tail()->locseg;
             endGlobal.pos[0] += static_cast<double>(roi.minX);
             endGlobal.pos[1] += static_cast<double>(roi.minY);
-            endGlobal.pos[2] += static_cast<double>(roi.minZ);
+            endGlobal.pos[2] += roiMinTraceZ;
             (void)tryAppendContinuationTask(endGlobal,
                                             lastId,
                                             TraceDirection::Forward,
@@ -1678,7 +1693,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   LOG(INFO) << "Blocked auto trace: writing final SWC ...";
   // Write final SWC artifact (optional postprocess).
   ZSwc finalTree = state.swc;
-  writeFinalSwcAtomicOrThrow(finalTree, state.manifest.zScale, cfg.maxEucDist);
+  writeFinalSwcAtomicOrThrow(finalTree, state.manifest.zToXYRatio, cfg.maxEucDist);
   m_hasResult = true;
 
   LOG(INFO) << "Blocked auto trace: finished.";
@@ -1693,7 +1708,7 @@ void ZNeutubeBlockedAutoTraceProcess::read(const json::object& jo)
     m_selectedTime = json::value_to<size_t>(it->value());
   }
   if (auto it = jo.find("z_scale"); it != jo.end()) {
-    setZScale(json::value_to<double>(it->value()));
+    setZToXYRatio(json::value_to<double>(it->value()));
   }
   if (auto it = jo.find("dataset_id"); it != jo.end() && it->value().is_string()) {
     const auto& s = it->value().as_string();
@@ -1812,8 +1827,8 @@ void ZNeutubeBlockedAutoTraceProcess::write(json::object& jo) const
 {
   jo["selected_channel"] = json::value_from(m_selectedChannel);
   jo["selected_time"] = json::value_from(m_selectedTime);
-  CHECK(m_zScale.has_value());
-  jo["z_scale"] = json::value_from(*m_zScale);
+  CHECK(m_zToXYRatio.has_value());
+  jo["z_scale"] = json::value_from(*m_zToXYRatio);
   jo["dataset_id"] = json::value_from(m_datasetId);
   {
     json::array ratio;

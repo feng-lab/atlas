@@ -482,8 +482,8 @@ void ZSwcPack::extendSelectedNodeSmartLegacyLike(const glm::dvec3& center, doubl
   const double startRadius = prevNode->radius;
   const std::array<double, 3> target{center.x, center.y, center.z};
   const double targetRadius = radius;
-  const double derivedZScale = preferredZScaleFromImgInfoLegacyLike(info);
-  const double zScale = settings.zScaleOverrideForSelection(*imgIdOpt, sc).value_or(derivedZScale);
+  const double derivedZToXYRatio = preferredZToXYRatioFromImgInfoLegacyLike(info);
+  const double zToXYRatio = settings.zToXYRatioOverrideForSelection(*imgIdOpt, sc).value_or(derivedZToXYRatio);
 
   std::unique_ptr<ZSwc> branch;
   if (imgPack->isDiskCached()) {
@@ -493,7 +493,7 @@ void ZSwcPack::extendSelectedNodeSmartLegacyLike(const glm::dvec3& center, doubl
                                          startRadius,
                                          target,
                                          targetRadius,
-                                         zScale,
+                                         zToXYRatio,
                                          cfg,
                                          ZNeutubeImageBackgroundLegacyLike::Dark);
   } else {
@@ -509,7 +509,7 @@ void ZSwcPack::extendSelectedNodeSmartLegacyLike(const glm::dvec3& center, doubl
                                          startRadius,
                                          target,
                                          targetRadius,
-                                         zScale,
+                                         zToXYRatio,
                                          cfg,
                                          ZNeutubeImageBackgroundLegacyLike::Dark);
   }

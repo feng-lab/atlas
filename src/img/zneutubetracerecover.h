@@ -30,7 +30,7 @@ struct RecoverResultLegacyLike
 // - Updates `tw->traceMask` by tracing additional chains, like the legacy code.
 [[nodiscard]] RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
                                                         const TraceConfig& cfg,
-                                                        double zScale,
+                                                        double zToXYRatio,
                                                         const ZImg& mask,
                                                         std::optional<ZImg> baseMask,
                                                         TraceWorkspace& tw);

@@ -27,23 +27,23 @@ namespace bgi = boost::geometry::index;
 
 } // namespace
 
-void ZSwcSpatialIndex::setZScale(double zScale)
+void ZSwcSpatialIndex::setZToXYRatio(double zToXYRatio)
 {
-  CHECK(std::isfinite(zScale));
-  CHECK(zScale > 0.0);
-  const double v = zScale;
-  if (v == m_zScale) {
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
+  const double v = zToXYRatio;
+  if (v == m_zToXYRatio) {
     return;
   }
 
-  // Changing zScale changes the coordinate transform; any existing primitives would become invalid.
+  // Changing zToXYRatio changes the coordinate transform; any existing primitives would become invalid.
   clear();
-  m_zScale = v;
+  m_zToXYRatio = v;
 }
 
-double ZSwcSpatialIndex::zScale() const
+double ZSwcSpatialIndex::zToXYRatio() const
 {
-  return m_zScale;
+  return m_zToXYRatio;
 }
 
 void ZSwcSpatialIndex::clear()
@@ -97,8 +97,8 @@ void ZSwcSpatialIndex::insertSegment(glm::dvec3 a, glm::dvec3 b, double ra, doub
   }
 
   Primitive prim;
-  prim.a = glm::dvec3{a.x, a.y, a.z * m_zScale};
-  prim.b = glm::dvec3{b.x, b.y, b.z * m_zScale};
+  prim.a = glm::dvec3{a.x, a.y, a.z * m_zToXYRatio};
+  prim.b = glm::dvec3{b.x, b.y, b.z * m_zToXYRatio};
   prim.ra = safeRadius(ra);
   prim.rb = safeRadius(rb);
 
@@ -132,7 +132,7 @@ bool ZSwcSpatialIndex::containsPoint(glm::dvec3 p) const
     return false;
   }
 
-  p.z *= m_zScale;
+  p.z *= m_zToXYRatio;
   const Point3 pt(p.x, p.y, p.z);
 
   for (auto it = m_rtree.qbegin(bgi::intersects(pt)); it != m_rtree.qend(); ++it) {

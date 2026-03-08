@@ -63,14 +63,14 @@ void neurosegSwellLegacyLike(Neuroseg& seg, double ratio, double diff, double ma
 [[nodiscard]] std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
                                                                const FieldRangeLegacyLike& range,
                                                                /*nullable*/ const std::array<double, 3>* offpos,
-                                                               double zScale);
+                                                               double zToXYRatio);
 
 // Allocation-free helper for hot loops: fills `out` (reusing capacity) with the same data as
 // `neurosegDistFilterLegacyLike()`.
 void neurosegDistFilterLegacyLikeInto(const Neuroseg& seg,
                                       const FieldRangeLegacyLike& range,
                                       /*nullable*/ const std::array<double, 3>* offpos,
-                                      double zScale,
+                                      double zToXYRatio,
                                       std::vector<double>& out);
 
 // Port of tz_neuroseg.c::Neuroseg_Angle_Between().

@@ -32,7 +32,7 @@ struct NeuronStructureChainsLegacyLike
 [[nodiscard]] NeuronStructureChainsLegacyLike
 locsegChainCompNeurostructLegacyLike(std::vector<std::unique_ptr<LocsegChain>>& chains,
                                      /*nullable*/ const ZImg* signal,
-                                     double zScale,
+                                     double zToXYRatio,
                                      const ConnectionTestWorkspaceLegacyLike& ctw);
 
 // Port of `Process_Neuron_Structure` (removes duplicate/low-priority hook-loop edges).
@@ -48,13 +48,15 @@ struct NeuronStructureCirclesLegacyLike
 
 // Port of `Neuron_Structure_Locseg_Chain_To_Circle_S`.
 [[nodiscard]] NeuronStructureCirclesLegacyLike
-neuronStructureLocsegChainToCircleSLegacyLike(const NeuronStructureChainsLegacyLike& ns, double xyScale, double zScale);
+neuronStructureLocsegChainToCircleSLegacyLike(const NeuronStructureChainsLegacyLike& ns,
+                                              double xyScale,
+                                              double zToXYRatio);
 
 // Port of `Neuron_Structure_To_Tree` (MST over weighted graph).
 void neuronStructureToTreeLegacyLike(NeuronStructureCirclesLegacyLike& ns);
 
 // Port of `Neuron_Structure_To_Swc_Tree_Circle_Z`.
 [[nodiscard]] std::unique_ptr<ZSwc>
-neuronStructureToSwcTreeCircleZLegacyLike(const NeuronStructureCirclesLegacyLike& ns, double zScale);
+neuronStructureToSwcTreeCircleZLegacyLike(const NeuronStructureCirclesLegacyLike& ns, double zToXYRatio);
 
 } // namespace nim

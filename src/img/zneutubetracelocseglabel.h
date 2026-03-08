@@ -40,18 +40,18 @@ struct LocsegLabelWorkspaceLegacyLike
 // - `flag >= 0`: only overwrite voxels whose current value equals `flag`.
 // - `flag == -1`: no overwrite constraint.
 // - `value` is written into `stack` for all voxels where the segment filter is positive.
-void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int flag, int value, double zScale);
+void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int flag, int value, double zToXYRatio);
 
 // Port of tz_local_neuroseg.c::Local_Neuroseg_Label_W().
 void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
                                    ZImg& stack,
-                                   double zScale,
+                                   double zToXYRatio,
                                    LocsegLabelWorkspaceLegacyLike& ws);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Label_W().
 void locsegChainLabelWLegacyLike(const LocsegChain& chain,
                                  ZImg& stack,
-                                 double zScale,
+                                 double zToXYRatio,
                                  int begin,
                                  int end,
                                  LocsegLabelWorkspaceLegacyLike& ws);

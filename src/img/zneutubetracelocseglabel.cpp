@@ -27,9 +27,9 @@ namespace {
   return 0;
 }
 
-[[nodiscard]] int testZScaleLegacyLike(double zScale)
+[[nodiscard]] int testZToXYRatioLegacyLike(double zToXYRatio)
 {
-  return compareFloatLegacyLike(zScale, 1.0, 1e-5);
+  return compareFloatLegacyLike(zToXYRatio, 1.0, 1e-5);
 }
 
 [[nodiscard]] double stackNeighborMeanLegacyLike(const ZImg& stack, const ZNeighborhood& nb, int x, int y, int z)
@@ -105,7 +105,7 @@ namespace {
 
 } // namespace
 
-void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int flag, int value, double zScale)
+void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int flag, int value, double zToXYRatio)
 {
   CHECK(stack.numChannels() == 1);
   CHECK(stack.numTimes() == 1);
@@ -132,16 +132,16 @@ void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int fl
   offpos[0] = bottom[0] - static_cast<double>(c[0]);
   offpos[1] = bottom[1] - static_cast<double>(c[1]);
 
-  const bool needZScale = (testZScaleLegacyLike(zScale) != 0);
+  const bool needZScale = (testZToXYRatioLegacyLike(zToXYRatio) != 0);
   if (needZScale) {
-    c[2] = iroundLegacyLike(bottom[2] * zScale);
-    offpos[2] = bottom[2] * zScale - static_cast<double>(c[2]);
+    c[2] = iroundLegacyLike(bottom[2] / zToXYRatio);
+    offpos[2] = bottom[2] / zToXYRatio - static_cast<double>(c[2]);
   } else {
     c[2] = iroundLegacyLike(bottom[2]);
     offpos[2] = bottom[2] - static_cast<double>(c[2]);
   }
 
-  const FieldRangeLegacyLike range = neurosegFieldRangeLegacyLike(seg.seg, zScale);
+  const FieldRangeLegacyLike range = neurosegFieldRangeLegacyLike(seg.seg, zToXYRatio);
 
   const std::array<int, 3> regionCorner = {range.firstCorner[0] + c[0],
                                            range.firstCorner[1] + c[1],
@@ -199,7 +199,7 @@ void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int fl
           double coord2 = static_cast<double>(k + z0);
 
           if (needZScale) {
-            coord2 /= zScale;
+            coord2 *= zToXYRatio;
           }
 
           coord0 -= offpos[0];
@@ -246,7 +246,7 @@ void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int fl
 
 void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
                                    ZImg& stack,
-                                   double zScale,
+                                   double zToXYRatio,
                                    LocsegLabelWorkspaceLegacyLike& ws)
 {
   // Port of tz_local_neuroseg.c::Local_Neuroseg_Label_W().
@@ -261,7 +261,7 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
 
   std::array<int, 3> c = {0, 0, 0};
   std::array<double, 3> offpos = {0.0, 0.0, 0.0};
-  localNeurosegStackPositionLegacyLike(bottom, c, offpos, zScale);
+  localNeurosegStackPositionLegacyLike(bottom, c, offpos, zToXYRatio);
 
   LocalNeuroseg labelLocseg = seg;
   if (ws.option == 10) {
@@ -272,7 +272,7 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
     neurosegSwellLegacyLike(labelLocseg.seg, ws.sratio, ws.sdiff, ws.slimit);
   }
 
-  const FieldRangeLegacyLike range = neurosegFieldRangeLegacyLike(labelLocseg.seg, zScale);
+  const FieldRangeLegacyLike range = neurosegFieldRangeLegacyLike(labelLocseg.seg, zToXYRatio);
 
   CHECK(range.size[0] >= 0);
   CHECK(range.size[1] >= 0);
@@ -284,7 +284,7 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
   if (ws.option > 10) {
     CHECK(false) << "localNeurosegLabelWLegacyLike: option > 10 is not supported yet: " << ws.option;
   } else {
-    neurosegDistFilterLegacyLikeInto(labelLocseg.seg, range, &offpos, zScale, filter);
+    neurosegDistFilterLegacyLikeInto(labelLocseg.seg, range, &offpos, zToXYRatio, filter);
   }
   CHECK(filter.size() >= filterSize);
 
@@ -302,10 +302,10 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
     StackFitScore fs{};
     fs.n = 1;
     fs.options[0] = static_cast<int>(StackFitOption::LowMeanSignal);
-    (void)localNeurosegScorePLegacyLike(seg, *ws.signal, zScale, &fs);
+    (void)localNeurosegScorePLegacyLike(seg, *ws.signal, zToXYRatio, &fs);
     threshold = fs.scores[0];
 
-    neurosegDistFilterLegacyLikeInto(seg.seg, range, &offpos, zScale, filter2);
+    neurosegDistFilterLegacyLikeInto(seg.seg, range, &offpos, zToXYRatio, filter2);
     CHECK(filter2.size() >= filterSize);
   }
 
@@ -452,7 +452,7 @@ void localNeurosegLabelWLegacyLike(const LocalNeuroseg& seg,
 
 void locsegChainLabelWLegacyLike(const LocsegChain& chain,
                                  ZImg& stack,
-                                 double zScale,
+                                 double zToXYRatio,
                                  int begin,
                                  int end,
                                  LocsegLabelWorkspaceLegacyLike& ws)
@@ -488,7 +488,7 @@ void locsegChainLabelWLegacyLike(const LocsegChain& chain,
     tmpWs.sdiff = ws.sdiff;
     tmpWs.slimit = ws.slimit;
 
-    locsegChainLabelWLegacyLike(chain, *ws.bufferMask, zScale, begin, end, tmpWs);
+    locsegChainLabelWLegacyLike(chain, *ws.bufferMask, zToXYRatio, begin, end, tmpWs);
 
     if (ws.option == 6) {
       stack += *ws.bufferMask;
@@ -501,7 +501,7 @@ void locsegChainLabelWLegacyLike(const LocsegChain& chain,
   int i = 0;
   for (const auto& node : chain) {
     if (i >= begin && i <= end) {
-      localNeurosegLabelWLegacyLike(node.locseg, stack, zScale, ws);
+      localNeurosegLabelWLegacyLike(node.locseg, stack, zToXYRatio, ws);
     }
     ++i;
   }

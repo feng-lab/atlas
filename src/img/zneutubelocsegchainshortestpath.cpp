@@ -51,7 +51,7 @@ namespace {
 }
 
 [[nodiscard]] std::vector<Geo3dEllipseLegacyLike>
-locsegChainKnotArrayToEllipseZLegacyLike(const LocsegChainKnotArrayLegacyLike& ka, double zScale)
+locsegChainKnotArrayToEllipseZLegacyLike(const LocsegChainKnotArrayLegacyLike& ka, double zScaleFactor)
 {
   // Port of tz_locseg_chain_knot.c::Locseg_Chain_Knot_Array_To_Ellipse_Z().
   CHECK(ka.chain != nullptr);
@@ -65,8 +65,8 @@ locsegChainKnotArrayToEllipseZLegacyLike(const LocsegChainKnotArrayLegacyLike& k
 
   for (const auto& node : *ka.chain) {
     LocalNeuroseg locseg2 = node.locseg;
-    if (zScale != 1.0) {
-      localNeurosegScaleZLegacyLike(locseg2, zScale);
+    if (zScaleFactor != 1.0) {
+      localNeurosegScaleZLegacyLike(locseg2, zScaleFactor);
     }
 
     const LocsegChainKnotLegacyLike* knot = locsegChainKnotArrayAtLegacyLike(ka, knotIndex);
@@ -105,7 +105,8 @@ double locsegChainPointDistLegacyLike(const LocsegChain& chain,
   }
 
   const LocsegChainKnotArrayLegacyLike& ka = *kaOpt;
-  const std::vector<Geo3dEllipseLegacyLike> ellipses = locsegChainKnotArrayToEllipseZLegacyLike(ka, /*zScale*/ 1.0);
+  const std::vector<Geo3dEllipseLegacyLike> ellipses =
+    locsegChainKnotArrayToEllipseZLegacyLike(ka, /*zScaleFactor*/ 1.0);
 
   const int n = static_cast<int>(ka.knots.size());
   CHECK(n == static_cast<int>(ellipses.size()));
@@ -168,7 +169,7 @@ double locsegChainPointDistLegacyLike(const LocsegChain& chain,
 void locsegChainBrightEndLegacyLike(const LocsegChain& chain,
                                     LocsegChainEndLegacyLike end,
                                     const ZImg& signal,
-                                    double zScale,
+                                    double zToXYRatio,
                                     std::array<double, 3>& pos)
 {
   // Port of tz_locseg_chain.c::Locseg_Chain_Bright_End().
@@ -202,21 +203,23 @@ void locsegChainBrightEndLegacyLike(const LocsegChain& chain,
   }
 
   pos = localNeurosegAxisPositionLegacyLike(*locseg, startOffset);
-  if (zScale != 1.0) {
-    pos[2] /= zScale;
+  std::array<double, 3> samplePos = pos;
+  if (zToXYRatio != 1.0) {
+    samplePos[2] /= zToXYRatio;
   }
 
-  double maxValue = pointSampleLegacyLike(signal, pos[0], pos[1], pos[2]);
+  double maxValue = pointSampleLegacyLike(signal, samplePos[0], samplePos[1], samplePos[2]);
   double offset = startOffset + step;
 
   std::array<double, 3> tmpPos{};
   while (((end == LocsegChainEndLegacyLike::Head) && (offset <= lastOffset)) ||
          ((end == LocsegChainEndLegacyLike::Tail) && (offset >= lastOffset))) {
     tmpPos = localNeurosegAxisPositionLegacyLike(*locseg, offset);
-    if (zScale != 1.0) {
-      tmpPos[2] /= zScale;
+    samplePos = tmpPos;
+    if (zToXYRatio != 1.0) {
+      samplePos[2] /= zToXYRatio;
     }
-    const double value = pointSampleLegacyLike(signal, tmpPos[0], tmpPos[1], tmpPos[2]);
+    const double value = pointSampleLegacyLike(signal, samplePos[0], samplePos[1], samplePos[2]);
     if (!std::isnan(value)) {
       if ((value > maxValue) || std::isnan(maxValue)) {
         maxValue = value;
@@ -376,11 +379,15 @@ void locsegChainPointRangeLegacyLike(const LocsegChain& target,
 void locsegChainUpdateStackGraphWorkspaceLegacyLike(const LocalNeuroseg& source,
                                                     const LocsegChain& target,
                                                     const ZImg& signal,
-                                                    double zScale,
+                                                    double zToXYRatio,
                                                     StackGraphWorkspaceLegacyLike& sgw)
 {
   // Port of tz_locseg_chain.c::Locseg_Chain_Update_Stack_Graph_Workspace().
   std::array<double, 3> pos = localNeurosegCenterLegacyLike(source);
+  std::array<double, 3> imagePos = pos;
+  if (zToXYRatio != 1.0) {
+    imagePos[2] /= zToXYRatio;
+  }
 
   int segIndex = 0;
   std::array<double, 3> skelPos{};
@@ -409,15 +416,15 @@ void locsegChainUpdateStackGraphWorkspaceLegacyLike(const LocalNeuroseg& source,
     sgw.groupMask->fill(0);
     ws.flag = 0;
     ws.value = 1;
-    locsegChainLabelWLegacyLike(target, *sgw.groupMask, /*zScale*/ 1.0, start, end, ws);
+    locsegChainLabelWLegacyLike(target, *sgw.groupMask, zToXYRatio, start, end, ws);
   }
 
   stackGraphWorkspaceSetRangeLegacyLike(sgw,
-                                        static_cast<int>(pos[0]),
+                                        static_cast<int>(imagePos[0]),
                                         ws.range[0],
-                                        static_cast<int>(pos[1]),
+                                        static_cast<int>(imagePos[1]),
                                         ws.range[1],
-                                        static_cast<int>(pos[2]),
+                                        static_cast<int>(imagePos[2]),
                                         ws.range[2]);
   stackGraphWorkspaceUpdateRangeLegacyLike(sgw, ws.range[3], ws.range[4], ws.range[5]);
 
@@ -464,9 +471,9 @@ void locsegChainUpdateStackGraphWorkspaceLegacyLike(const LocalNeuroseg& source,
         StackFitScore fs{};
         fs.n = 1;
         fs.options[0] = static_cast<int>(StackFitOption::MeanSignal);
-        const double inner = localNeurosegScorePLegacyLike(source, signal, zScale, &fs);
+        const double inner = localNeurosegScorePLegacyLike(source, signal, zToXYRatio, &fs);
         fs.options[0] = static_cast<int>(StackFitOption::OuterSignal);
-        const double outer = localNeurosegScorePLegacyLike(source, signal, zScale, &fs);
+        const double outer = localNeurosegScorePLegacyLike(source, signal, zToXYRatio, &fs);
 
         if (std::isnan(sgw.argv[3])) {
           sgw.argv[3] = inner * 0.1 + outer * 0.9;
@@ -489,7 +496,7 @@ std::vector<int64_t> locsegChainShortestPathPtLegacyLike(std::array<double, 3> p
                                                          int startIndex,
                                                          int endIndex,
                                                          const ZImg& signal,
-                                                         double zScale,
+                                                         double zToXYRatio,
                                                          StackGraphWorkspaceLegacyLike& sgw)
 {
   // Port of tz_locseg_chain.c::Locseg_Chain_Shortest_Path_Pt().
@@ -501,6 +508,9 @@ std::vector<int64_t> locsegChainShortestPathPtLegacyLike(std::array<double, 3> p
     endIndex = length - 1;
   }
 
+  if (zToXYRatio != 1.0) {
+    pos[2] /= zToXYRatio;
+  }
   std::array<int, 3> startPos = {iroundLegacyLike(pos[0]), iroundLegacyLike(pos[1]), iroundLegacyLike(pos[2])};
 
   int segIndex = (startIndex + endIndex) / 2;
@@ -518,8 +528,8 @@ std::vector<int64_t> locsegChainShortestPathPtLegacyLike(std::array<double, 3> p
   CHECK(locseg != nullptr);
   pos = localNeurosegCenterLegacyLike(*locseg);
 
-  if (zScale > 1.0) {
-    pos[2] /= zScale;
+  if (zToXYRatio != 1.0) {
+    pos[2] /= zToXYRatio;
   }
 
   std::array<int, 3> endPos = {iroundLegacyLike(pos[0]), iroundLegacyLike(pos[1]), iroundLegacyLike(pos[2])};
@@ -535,7 +545,7 @@ std::vector<int64_t> locsegChainShortestPathPtLegacyLike(std::array<double, 3> p
     sgw.groupMask->fill(0);
     ws.flag = 0;
     ws.value = 1;
-    locsegChainLabelWLegacyLike(target, *sgw.groupMask, /*zScale*/ 1.0, startIndex, endIndex, ws);
+    locsegChainLabelWLegacyLike(target, *sgw.groupMask, zToXYRatio, startIndex, endIndex, ws);
     stackGraphWorkspaceSetRangeLegacyLike(sgw,
                                           startPos[0],
                                           ws.range[0],
@@ -616,25 +626,19 @@ std::vector<int64_t> locsegChainShortestPathPtLegacyLike(std::array<double, 3> p
 std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source,
                                                        const LocsegChain& target,
                                                        const ZImg& signal,
-                                                       double zScale,
+                                                       double zToXYRatio,
                                                        StackGraphWorkspaceLegacyLike& sgw)
 {
   // Port of tz_locseg_chain.c::Locseg_Chain_Shortest_Path().
   std::array<double, 3> pos{};
-  locsegChainBrightEndLegacyLike(source, LocsegChainEndLegacyLike::Head, signal, /*zScale*/ 1.0, pos);
-  if (zScale != 1.0) {
-    pos[2] /= zScale;
-  }
+  locsegChainBrightEndLegacyLike(source, LocsegChainEndLegacyLike::Head, signal, zToXYRatio, pos);
 
   int segIndex = 0;
   std::array<double, 3> skelPos{};
   double dist = locsegChainPointDistLegacyLike(target, pos, &segIndex, &skelPos);
 
   std::array<double, 3> tmpPos{};
-  locsegChainBrightEndLegacyLike(source, LocsegChainEndLegacyLike::Tail, signal, /*zScale*/ 1.0, tmpPos);
-  if (zScale != 1.0) {
-    tmpPos[2] /= zScale;
-  }
+  locsegChainBrightEndLegacyLike(source, LocsegChainEndLegacyLike::Tail, signal, zToXYRatio, tmpPos);
 
   int tmpSegIndex = 0;
   std::array<double, 3> tmpSkelPos{};
@@ -649,7 +653,12 @@ std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source
     sourceSeg = source.tailSeg();
   }
 
-  if (!inCloseRange3(pos,
+  std::array<double, 3> imagePos = pos;
+  if (zToXYRatio != 1.0) {
+    imagePos[2] /= zToXYRatio;
+  }
+
+  if (!inCloseRange3(imagePos,
                      0,
                      static_cast<int>(signal.width()) - 1,
                      0,
@@ -661,16 +670,16 @@ std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source
 
   CHECK(sourceSeg != nullptr);
 
-  locsegChainUpdateStackGraphWorkspaceLegacyLike(*sourceSeg, target, signal, /*zScale*/ 1.0, sgw);
+  locsegChainUpdateStackGraphWorkspaceLegacyLike(*sourceSeg, target, signal, zToXYRatio, sgw);
   if (std::isnan(sgw.argv[3])) {
     double tmpc = 0.0;
-    double c2 = locsegChainMinSegScoreLegacyLike(source, signal, zScale, StackFitOption::MeanSignal);
-    tmpc = locsegChainMinSegScoreLegacyLike(target, signal, zScale, StackFitOption::MeanSignal);
+    double c2 = locsegChainMinSegScoreLegacyLike(source, signal, zToXYRatio, StackFitOption::MeanSignal);
+    tmpc = locsegChainMinSegScoreLegacyLike(target, signal, zToXYRatio, StackFitOption::MeanSignal);
     if (tmpc < c2) {
       c2 = tmpc;
     }
-    double c1 = locsegChainMinSegScoreLegacyLike(source, signal, zScale, StackFitOption::OuterSignal);
-    tmpc = locsegChainMinSegScoreLegacyLike(target, signal, zScale, StackFitOption::OuterSignal);
+    double c1 = locsegChainMinSegScoreLegacyLike(source, signal, zToXYRatio, StackFitOption::OuterSignal);
+    tmpc = locsegChainMinSegScoreLegacyLike(target, signal, zToXYRatio, StackFitOption::OuterSignal);
     if (tmpc < c1) {
       c1 = tmpc;
     }
@@ -688,7 +697,7 @@ std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source
   int endIndex = 0;
   locsegChainPointRangeLegacyLike(target, segIndex, skelPos, NeurosegDefaultHLegacyLike * 2.5, &startIndex, &endIndex);
 
-  return locsegChainShortestPathPtLegacyLike(pos, target, startIndex, endIndex, signal, zScale, sgw);
+  return locsegChainShortestPathPtLegacyLike(pos, target, startIndex, endIndex, signal, zToXYRatio, sgw);
 }
 
 } // namespace nim

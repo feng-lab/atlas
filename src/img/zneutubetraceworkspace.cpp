@@ -147,10 +147,10 @@ int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array
   return static_cast<int>(*mask.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
 }
 
-int traceWorkspaceMaskValueZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zScale)
+int traceWorkspaceMaskValueZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zToXYRatio)
 {
   // Port of tz_trace_utils.c::Trace_Workspace_Mask_Value_Z().
-  pos[2] *= zScale;
+  pos[2] /= zToXYRatio;
   return traceWorkspaceMaskValueLegacyLike(tw, pos);
 }
 
@@ -170,10 +170,10 @@ bool traceWorkspacePointInBoundLegacyLike(const TraceWorkspace& tw, const std::a
   return true;
 }
 
-bool traceWorkspacePointInBoundZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zScale)
+bool traceWorkspacePointInBoundZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zToXYRatio)
 {
   // Port of tz_trace_utils.c::Trace_Workspace_Point_In_Bound_Z().
-  pos[2] *= zScale;
+  pos[2] /= zToXYRatio;
   return traceWorkspacePointInBoundLegacyLike(tw, pos);
 }
 

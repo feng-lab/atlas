@@ -12,6 +12,10 @@ namespace nim {
 void localNeurosegChangeTopLegacyLike(LocalNeuroseg& locseg, const std::array<double, 3>& newTop);
 
 // Port of `Swc_Tree_Node_To_Locseg` (restricted to the regular-node case).
-[[nodiscard]] std::optional<LocalNeuroseg> swcNodeToLocsegLegacyLike(const ZSwc::ConstSwcTreeNode& node);
+//
+// SWC coordinates are image-space coordinates. The returned locseg is converted
+// into trace space so it can be used by the legacy tracing/mask code.
+[[nodiscard]] std::optional<LocalNeuroseg> swcNodeToLocsegLegacyLike(const ZSwc::ConstSwcTreeNode& node,
+                                                                     double zToXYRatio);
 
 } // namespace nim

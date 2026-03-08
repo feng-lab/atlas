@@ -136,10 +136,10 @@ void ZNeutubeAutoTraceProcess::doWork()
   LOG(INFO) << "Atlas Auto Trace";
   LOG(INFO) << "Selected channel (0-based): " << m_selectedChannel;
   LOG(INFO) << "Selected time (0-based): " << m_selectedTime;
-  if (!m_zScale.has_value()) {
-    throw ZException("Auto Trace failed: missing zScale.");
+  if (!m_zToXYRatio.has_value()) {
+    throw ZException("Auto Trace failed: missing zToXYRatio.");
   }
-  LOG(INFO) << fmt::format("Tracing zScale: {:.6g}", *m_zScale);
+  LOG(INFO) << fmt::format("Tracing zToXYRatio: {:.6g}", *m_zToXYRatio);
   LOG(INFO) << "Signal downsample ratio: [" << m_signalDownsampleRatio[0] << "," << m_signalDownsampleRatio[1] << ","
             << m_signalDownsampleRatio[2] << "]";
   LOG(INFO) << "Budget level override (0=default): " << m_traceLevel;
@@ -175,7 +175,7 @@ void ZNeutubeAutoTraceProcess::doWork()
   maybeCancel(m_cancellationToken);
   std::unique_ptr<ZSwc> swc = traceNeuronAutoLegacyLike(std::move(signal),
                                                         cfg,
-                                                        *m_zScale,
+                                                        *m_zToXYRatio,
                                                         /*diagnosis=*/false,
                                                         /*verbose=*/false,
                                                         /*doResampleAfterTracing=*/m_doResampleAfterTracing,
@@ -214,7 +214,7 @@ void ZNeutubeAutoTraceProcess::read(const json::object& jo)
     m_selectedTime = json::value_to<size_t>(it->value());
   }
   if (auto it = jo.find("z_scale"); it != jo.end()) {
-    setZScale(json::value_to<double>(it->value()));
+    setZToXYRatio(json::value_to<double>(it->value()));
   }
   if (auto it = jo.find("signal_downsample_ratio"); it != jo.end() && it->value().is_array()) {
     const auto& a = it->value().as_array();
@@ -299,8 +299,8 @@ void ZNeutubeAutoTraceProcess::write(json::object& jo) const
 {
   jo["selected_channel"] = json::value_from(m_selectedChannel);
   jo["selected_time"] = json::value_from(m_selectedTime);
-  CHECK(m_zScale.has_value());
-  jo["z_scale"] = json::value_from(*m_zScale);
+  CHECK(m_zToXYRatio.has_value());
+  jo["z_scale"] = json::value_from(*m_zToXYRatio);
   {
     json::array a;
     a.push_back(json::value_from(m_signalDownsampleRatio[0]));

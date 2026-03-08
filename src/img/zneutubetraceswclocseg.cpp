@@ -31,9 +31,11 @@ void localNeurosegChangeTopLegacyLike(LocalNeuroseg& locseg, const std::array<do
   setNeurosegPositionLegacyLike(locseg, newTop, NeuroposReferenceLegacyLike::Top);
 }
 
-std::optional<LocalNeuroseg> swcNodeToLocsegLegacyLike(const ZSwc::ConstSwcTreeNode& node)
+std::optional<LocalNeuroseg> swcNodeToLocsegLegacyLike(const ZSwc::ConstSwcTreeNode& node, double zToXYRatio)
 {
   // Port of tz_swc_tree.c::Swc_Tree_Node_To_Locseg().
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
   if (ZSwc::isNull(node)) {
     return std::nullopt;
   }
@@ -47,9 +49,9 @@ std::optional<LocalNeuroseg> swcNodeToLocsegLegacyLike(const ZSwc::ConstSwcTreeN
   }
 
   LocalNeuroseg locseg;
-  locseg.pos = {parent->x, parent->y, parent->z};
+  locseg.pos = {parent->x, parent->y, parent->z * zToXYRatio};
 
-  const std::array<double, 3> top = {node->x, node->y, node->z};
+  const std::array<double, 3> top = {node->x, node->y, node->z * zToXYRatio};
   localNeurosegChangeTopLegacyLike(locseg, top);
 
   locseg.seg.r1 = parent->radius;

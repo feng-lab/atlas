@@ -36,18 +36,18 @@ private:
   void rebuildTargetSwcCombo();
   void updateChannelComboForCurrentSource();
   void updateMappingLabel();
-  void updateZScaleUi();
+  void updateZToXYRatioUi();
   void initializeAlgoConfigFromLegacyDefaultsIfUnset();
 
   void applySettingsToUi();
   void pushSourceUiToSettings();
   void pushTargetUiToSettings();
-  void pushZScaleUiToSettings();
+  void pushZToXYRatioUiToSettings();
   void pushAlgoUiToSettings();
 
   [[nodiscard]] std::optional<size_t> currentSourceImageIdFromUi() const;
   [[nodiscard]] std::optional<size_t> currentTargetSwcIdFromUi() const;
-  [[nodiscard]] std::optional<double> derivedZScaleForCurrentSource() const;
+  [[nodiscard]] std::optional<double> derivedZToXYRatioForCurrentSource() const;
 
 private:
   ZDoc& m_doc;
@@ -61,10 +61,10 @@ private:
   QButtonGroup* m_swcTargetButtonGroup = nullptr;
 
   QLabel* m_mappingLabel = nullptr;
-  QLabel* m_derivedZScaleLabel = nullptr;
-  QCheckBox* m_overrideZScaleCheck = nullptr;
-  QDoubleSpinBox* m_overrideZScaleSpin = nullptr;
-  QLabel* m_effectiveZScaleLabel = nullptr;
+  QLabel* m_derivedZToXYRatioLabel = nullptr;
+  QCheckBox* m_overrideZToXYRatioCheck = nullptr;
+  QDoubleSpinBox* m_overrideZToXYRatioSpin = nullptr;
+  QLabel* m_effectiveZToXYRatioLabel = nullptr;
 
   QDoubleSpinBox* m_minAutoScoreSpin = nullptr;
   QDoubleSpinBox* m_minManualScoreSpin = nullptr;

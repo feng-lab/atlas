@@ -30,9 +30,9 @@ constexpr double TzPiLegacyLike = 3.14159265358979323846264338328;
   return 0;
 }
 
-[[nodiscard]] int testZScaleLegacyLike(double zScale)
+[[nodiscard]] int testZScaleLegacyLike(double zToXYRatio)
 {
-  return compareFloatLegacyLike(zScale, 1.0, 1e-5);
+  return compareFloatLegacyLike(zToXYRatio, 1.0, 1e-5);
 }
 
 void neurosegScaleFieldSlice0LegacyLike(std::array<double, 3>& pt,
@@ -178,7 +178,7 @@ void neurosegSwellLegacyLike(Neuroseg& seg, double ratio, double diff, double ma
 std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
                                                  const FieldRangeLegacyLike& range,
                                                  const std::array<double, 3>* offpos,
-                                                 double zScale)
+                                                 double zToXYRatio)
 {
   const int sizeX = range.size[0];
   const int sizeY = range.size[1];
@@ -189,7 +189,7 @@ std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
   const size_t n = static_cast<size_t>(sizeX) * static_cast<size_t>(sizeY) * static_cast<size_t>(sizeZ);
 
   std::vector<double> filter;
-  neurosegDistFilterLegacyLikeInto(seg, range, offpos, zScale, filter);
+  neurosegDistFilterLegacyLikeInto(seg, range, offpos, zToXYRatio, filter);
   filter.resize(n);
   return filter;
 }
@@ -197,7 +197,7 @@ std::vector<double> neurosegDistFilterLegacyLike(const Neuroseg& seg,
 void neurosegDistFilterLegacyLikeInto(const Neuroseg& seg,
                                       const FieldRangeLegacyLike& range,
                                       const std::array<double, 3>* offpos,
-                                      double zScale,
+                                      double zToXYRatio,
                                       std::vector<double>& out)
 {
   // Port of tz_neuroseg.c::Neuroseg_Dist_Filter(), written in an allocation-free style for hot loops.
@@ -217,7 +217,7 @@ void neurosegDistFilterLegacyLikeInto(const Neuroseg& seg,
   const std::array<int, 3> coffset = range.firstCorner;
   const double coef = seg.c;
 
-  const bool needZScale = testZScaleLegacyLike(zScale) != 0;
+  const bool needZScale = testZScaleLegacyLike(zToXYRatio) != 0;
   const bool needRotateXZ = seg.theta != 0.0 || seg.psi != 0.0;
   const bool needScaleXRotateZ = seg.scale != 1.0 || seg.alpha != 0.0;
 
@@ -239,7 +239,7 @@ void neurosegDistFilterLegacyLikeInto(const Neuroseg& seg,
 
         if (needZScale) {
           // image space -> physical space
-          coord[2] /= zScale;
+          coord[2] /= zToXYRatio;
         }
 
         if (offpos != nullptr) {

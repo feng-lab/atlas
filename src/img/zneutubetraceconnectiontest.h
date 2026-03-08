@@ -18,7 +18,7 @@ namespace nim {
 [[nodiscard]] bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
                                                        LocsegChain& chain2,
                                                        /*nullable*/ const ZImg* signal,
-                                                       double zScale,
+                                                       double zToXYRatio,
                                                        NeurocompConnLegacyLike& conn,
                                                        const ConnectionTestWorkspaceLegacyLike& ctw);
 

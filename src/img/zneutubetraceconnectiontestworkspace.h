@@ -29,7 +29,7 @@ struct ConnectionTestWorkspaceLegacyLike
   //
   // Tracing code treats this as the trace-space resolution, not raw image metadata.
   // Entry points should set it explicitly from the chosen tracing anisotropy via
-  // `traceResolutionFromZScaleLegacyLike(zScale)`.
+  // `traceResolutionFromZToXYRatioLegacyLike(zToXYRatio)`.
   std::array<double, 3> resolution = {1.0, 1.0, 1.0};
   char unit = 'p'; // 'p' pixel, 'u' um
 

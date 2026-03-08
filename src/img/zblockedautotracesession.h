@@ -63,10 +63,15 @@ struct ZBlockedAutoTracePendingTask
   uint64_t taskId = 0;
   int64_t attachSwcNodeId = -1;
   TraceDirection direction = TraceDirection::Unknown; // Forward/Backward
+
+  // Continuation endpoint in isotropized tracing space so resume can feed it back into the legacy locseg tracer
+  // without any additional coordinate conversion.
   LocalNeuroseg endLocseg{};
 
   // Optional diagnostics; not used for control flow.
   std::string reason;
+
+  // Target core block in tracing-image voxel coordinates after `signalDownsampleRatio` is applied.
   ZBlockedAutoTraceBlockId suggestedBlock{};
 };
 
@@ -89,9 +94,9 @@ struct ZBlockedAutoTraceManifest
   std::array<size_t, 3> signalDownsampleRatio = {1, 1, 1};
 
   // Explicit tracing anisotropy in tracing-voxel coordinates:
-  //   zScale = voxelSizeZ / voxelSizeXY
+  //   zToXYRatio = voxelSizeZ / voxelSizeXY
   // This is part of session identity and must remain stable across resume.
-  double zScale = 1.0;
+  double zToXYRatio = 1.0;
 
   ZBlockedAutoTraceDatasetShape datasetShape{};
   ZBlockedAutoTraceBlockSize block{};
@@ -124,6 +129,8 @@ struct ZBlockedAutoTraceCommitInfo
 
 struct ZBlockedAutoTraceSwcDeltaNode
 {
+  // Incremental SWC geometry in tracing-image voxel coordinates after `signalDownsampleRatio` is applied.
+  // This is intentionally different from `ZBlockedAutoTracePendingTask::endLocseg`, which remains in trace space.
   int64_t id = -1;
   int64_t type = 0;
   double x = 0.0;

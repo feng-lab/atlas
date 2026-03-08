@@ -115,6 +115,7 @@ namespace fs = std::filesystem;
 
 DECLARE_bool(atlas_autotrace_seed_sort_commit_by_score);
 DECLARE_bool(atlas_trace_use_swc_geometry_mask);
+DECLARE_bool(atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
 
 namespace {
 
@@ -159,6 +160,27 @@ private:
 
 [[maybe_unused]] ::testing::Environment* const kLegacyTraceMaskParityEnvironment =
   ::testing::AddGlobalTestEnvironment(new LegacyTraceMaskParityEnvironment());
+
+class LegacyIsotropicChainCanonicalizationParityEnvironment : public ::testing::Environment
+{
+public:
+  void SetUp() override
+  {
+    _previousFlag = FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity;
+    FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity = true;
+  }
+
+  void TearDown() override
+  {
+    FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity = _previousFlag;
+  }
+
+private:
+  bool _previousFlag = false;
+};
+
+[[maybe_unused]] ::testing::Environment* const kLegacyIsotropicChainCanonicalizationParityEnvironment =
+  ::testing::AddGlobalTestEnvironment(new LegacyIsotropicChainCanonicalizationParityEnvironment());
 
 class ScopedQtCoreApplication
 {
@@ -1790,13 +1812,16 @@ TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
   fieldC.points = points;
   fieldC.values = fieldCpp.values.data();
 
-  const std::array<double, 2> zScales = {1.0, 2.0};
-  for (double zScale : zScales) {
+  const std::array<double, 2> zToXYRatios = {1.0, 2.0};
+  for (double zToXYRatio : zToXYRatios) {
+    const double legacyZScale = 1.0 / zToXYRatio;
     auto expectSame = [&](const std::string& what, size_t i, double ported, double legacy) {
       if (std::isnan(legacy)) {
-        EXPECT_TRUE(std::isnan(ported)) << what << " zScale=" << zScale << " i=" << i;
+        EXPECT_TRUE(std::isnan(ported)) << what << " zToXYRatio=" << zToXYRatio << " legacyZScale=" << legacyZScale
+                                        << " i=" << i;
       } else {
-        EXPECT_DOUBLE_EQ(ported, legacy) << what << " zScale=" << zScale << " i=" << i;
+        EXPECT_DOUBLE_EQ(ported, legacy) << what << " zToXYRatio=" << zToXYRatio << " legacyZScale=" << legacyZScale
+                                         << " i=" << i;
       }
     };
 
@@ -1804,9 +1829,9 @@ TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
     // Sampling parity
     // ------------------------------------------------------------
     {
-      double* legacy = Geo3d_Scalar_Field_Stack_Sampling(&fieldC, stackC, zScale, nullptr);
+      double* legacy = Geo3d_Scalar_Field_Stack_Sampling(&fieldC, stackC, legacyZScale, nullptr);
       CHECK(legacy != nullptr);
-      const std::vector<double> ported = nim::geo3dScalarFieldStackSamplingLegacyLike(fieldCpp, stackImg, zScale);
+      const std::vector<double> ported = nim::geo3dScalarFieldStackSamplingLegacyLike(fieldCpp, stackImg, zToXYRatio);
 
       ASSERT_EQ(ported.size(), FieldSize);
       for (size_t i = 0; i < FieldSize; ++i) {
@@ -1816,10 +1841,10 @@ TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
     }
 
     {
-      double* legacy = Geo3d_Scalar_Field_Stack_Sampling_W(&fieldC, stackC, zScale, nullptr);
+      double* legacy = Geo3d_Scalar_Field_Stack_Sampling_W(&fieldC, stackC, legacyZScale, nullptr);
       CHECK(legacy != nullptr);
       const std::vector<double> ported =
-        nim::geo3dScalarFieldStackSamplingWeightedLegacyLike(fieldCpp, stackImg, zScale);
+        nim::geo3dScalarFieldStackSamplingWeightedLegacyLike(fieldCpp, stackImg, zToXYRatio);
 
       ASSERT_EQ(ported.size(), FieldSize);
       for (size_t i = 0; i < FieldSize; ++i) {
@@ -1829,10 +1854,10 @@ TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
     }
 
     {
-      double* legacy = Geo3d_Scalar_Field_Stack_Sampling_M(&fieldC, stackC, zScale, maskC, nullptr);
+      double* legacy = Geo3d_Scalar_Field_Stack_Sampling_M(&fieldC, stackC, legacyZScale, maskC, nullptr);
       CHECK(legacy != nullptr);
       const std::vector<double> ported =
-        nim::geo3dScalarFieldStackSamplingMaskedLegacyLike(fieldCpp, stackImg, zScale, maskImg);
+        nim::geo3dScalarFieldStackSamplingMaskedLegacyLike(fieldCpp, stackImg, zToXYRatio, maskImg);
 
       ASSERT_EQ(ported.size(), FieldSize);
       for (size_t i = 0; i < FieldSize; ++i) {
@@ -1857,7 +1882,7 @@ TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
     fsLegacy.options[8] = STACK_FIT_OUTER_SIGNAL;
     fsLegacy.options[9] = STACK_FIT_VALID_SIGNAL_RATIO;
 
-    const double legacyScore = Geo3d_Scalar_Field_Stack_Score(&fieldC, stackC, zScale, &fsLegacy);
+    const double legacyScore = Geo3d_Scalar_Field_Stack_Score(&fieldC, stackC, legacyZScale, &fsLegacy);
 
     nim::StackFitScore fsPorted;
     fsPorted.n = fsLegacy.n;
@@ -1865,7 +1890,7 @@ TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
       fsPorted.options[static_cast<size_t>(j)] = fsLegacy.options[j];
     }
 
-    const double portedScore = nim::geo3dScalarFieldStackScoreLegacyLike(fieldCpp, stackImg, zScale, &fsPorted);
+    const double portedScore = nim::geo3dScalarFieldStackScoreLegacyLike(fieldCpp, stackImg, zToXYRatio, &fsPorted);
     expectSame("Score", 0, portedScore, legacyScore);
 
     for (int j = 0; j < fsLegacy.n; ++j) {
@@ -1888,7 +1913,7 @@ TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
     fsLegacyM.options[8] = STACK_FIT_OUTER_SIGNAL;
     fsLegacyM.options[9] = STACK_FIT_VALID_SIGNAL_RATIO;
 
-    const double legacyScoreM = Geo3d_Scalar_Field_Stack_Score_M(&fieldC, stackC, zScale, maskC, &fsLegacyM);
+    const double legacyScoreM = Geo3d_Scalar_Field_Stack_Score_M(&fieldC, stackC, legacyZScale, maskC, &fsLegacyM);
 
     nim::StackFitScore fsPortedM;
     fsPortedM.n = fsLegacyM.n;
@@ -1897,7 +1922,7 @@ TEST(NeutubeLegacyGeo3dScalarField, SamplingAndScoreMatchLegacy)
     }
 
     const double portedScoreM =
-      nim::geo3dScalarFieldStackScoreMaskedLegacyLike(fieldCpp, stackImg, zScale, maskImg, &fsPortedM);
+      nim::geo3dScalarFieldStackScoreMaskedLegacyLike(fieldCpp, stackImg, zToXYRatio, maskImg, &fsPortedM);
     expectSame("Score_M", 0, portedScoreM, legacyScoreM);
 
     for (int j = 0; j < fsLegacyM.n; ++j) {
@@ -2189,6 +2214,113 @@ TEST(NeutubeLegacyLocalNeuroseg, PositionAdjustMatchesLegacy)
   EXPECT_DOUBLE_EQ(locsegCpp.pos[0], locsegC->pos[0]);
   EXPECT_DOUBLE_EQ(locsegCpp.pos[1], locsegC->pos[1]);
   EXPECT_DOUBLE_EQ(locsegCpp.pos[2], locsegC->pos[2]);
+
+  Kill_Local_Neuroseg(locsegC);
+  Kill_Stack(stackC);
+}
+
+TEST(NeutubeLegacyLocalNeuroseg, PositionAdjustAnisotropicMatchesLegacy)
+{
+  constexpr int width = 64;
+  constexpr int height = 64;
+  constexpr int depth = 64;
+  constexpr double zToXYRatio = 2.0;
+  constexpr double legacyZScale = 1.0 / zToXYRatio;
+
+  nim::ZImgInfo info(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg img(info);
+
+  for (int z = 0; z < depth; ++z) {
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const int v = x + 2 * y + 3 * z;
+        *img.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)) =
+          static_cast<uint8_t>(v & 0xFF);
+      }
+    }
+  }
+
+  Stack* stackC = Make_Stack(GREY, width, height, depth);
+  ASSERT_NE(stackC, nullptr);
+  std::memcpy(stackC->array, img.timeData<uint8_t>(0), img.voxelNumber());
+
+  const int cx = width / 2;
+  const int cy = height / 2;
+  const double czTrace = 16.0;
+
+  Local_Neuroseg* locsegC = New_Local_Neuroseg();
+  ASSERT_NE(locsegC, nullptr);
+  Set_Local_Neuroseg(locsegC, 2.0, 0.0, 11.0, 0.7, 1.1, 0.0, 0.0, 1.0, cx, cy, czTrace);
+
+  nim::LocalNeuroseg locsegCpp;
+  locsegCpp.seg.r1 = 2.0;
+  locsegCpp.seg.c = 0.0;
+  locsegCpp.seg.h = 11.0;
+  locsegCpp.seg.theta = 0.7;
+  locsegCpp.seg.psi = 1.1;
+  locsegCpp.seg.curvature = 0.0;
+  locsegCpp.seg.alpha = 0.0;
+  locsegCpp.seg.scale = 1.0;
+  locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), czTrace};
+
+  Local_Neuroseg_Position_Adjust(locsegC, stackC, legacyZScale);
+  nim::localNeurosegPositionAdjustLegacyLike(locsegCpp, img, zToXYRatio);
+
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[0], locsegC->pos[0]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[1], locsegC->pos[1]);
+  EXPECT_DOUBLE_EQ(locsegCpp.pos[2], locsegC->pos[2]);
+
+  Kill_Local_Neuroseg(locsegC);
+  Kill_Stack(stackC);
+}
+
+TEST(NeutubeLegacyLocalNeuroseg, TopSampleAnisotropicMatchesLegacy)
+{
+  constexpr int width = 64;
+  constexpr int height = 64;
+  constexpr int depth = 64;
+  constexpr double zToXYRatio = 2.0;
+  constexpr double legacyZScale = 1.0 / zToXYRatio;
+
+  nim::ZImgInfo info(width, height, depth, 1, 1, 1, nim::VoxelFormat::Unsigned);
+  nim::ZImg img(info);
+
+  for (int z = 0; z < depth; ++z) {
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const int v = x + 5 * y + 9 * z;
+        *img.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)) =
+          static_cast<uint8_t>(v & 0xFF);
+      }
+    }
+  }
+
+  Stack* stackC = Make_Stack(GREY, width, height, depth);
+  ASSERT_NE(stackC, nullptr);
+  std::memcpy(stackC->array, img.timeData<uint8_t>(0), img.voxelNumber());
+
+  const int cx = width / 2;
+  const int cy = height / 2;
+  const double czTrace = 16.0;
+
+  Local_Neuroseg* locsegC = New_Local_Neuroseg();
+  ASSERT_NE(locsegC, nullptr);
+  Set_Local_Neuroseg(locsegC, 2.0, 0.0, 11.0, 0.7, 1.1, 0.0, 0.0, 1.0, cx, cy, czTrace);
+
+  nim::LocalNeuroseg locsegCpp;
+  locsegCpp.seg.r1 = 2.0;
+  locsegCpp.seg.c = 0.0;
+  locsegCpp.seg.h = 11.0;
+  locsegCpp.seg.theta = 0.7;
+  locsegCpp.seg.psi = 1.1;
+  locsegCpp.seg.curvature = 0.0;
+  locsegCpp.seg.alpha = 0.0;
+  locsegCpp.seg.scale = 1.0;
+  locsegCpp.pos = {static_cast<double>(cx), static_cast<double>(cy), czTrace};
+
+  const double legacy = Local_Neuroseg_Top_Sample(locsegC, stackC, legacyZScale);
+  const double ported = nim::localNeurosegTopSampleLegacyLike(locsegCpp, img, zToXYRatio);
+  EXPECT_DOUBLE_EQ(ported, legacy);
 
   Kill_Local_Neuroseg(locsegC);
   Kill_Stack(stackC);
@@ -3692,7 +3824,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   });
   nim::SeedSortResultLegacyLike portedSorted;
   const int64_t portedSortMs = timeMs([&]() {
-    portedSorted = nim::sortSeedsLegacyLike(portedSeeds1, portedSignal, portedTw);
+    portedSorted = nim::sortSeedsLegacyLike(portedSeeds1, portedSignal, /*zScale*/ 1.0, portedTw);
   });
 
   perf.push_back(
@@ -3788,7 +3920,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
     }
 
     if (!chosenSeeds.empty()) {
-      const double zScale = nim::preferredZScaleFromImgInfoLegacyLike(portedSignal.info());
+      const double zScale = nim::preferredZToXYRatioFromImgInfoLegacyLike(portedSignal.info());
       nim::ZDenseVoxelVolume denseVol(portedSignal);
       int64_t sumImgMs = 0;
       int64_t sumVolMs = 0;
@@ -3976,7 +4108,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
         .count();
 
     std::optional<nim::ZImg> portedBaseMaskForRecover = portedSorted.baseMask;
-    const double recoverZScale = nim::preferredZScaleFromImgInfoLegacyLike(portedSignal.info());
+    const double recoverZScale = nim::preferredZToXYRatioFromImgInfoLegacyLike(portedSignal.info());
     const auto portedRecoverStart = std::chrono::steady_clock::now();
     portedRecover = nim::recoverLegacyLike(portedSignal,
                                            portedCfg,
@@ -4061,7 +4193,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
                                                                                         portedCtw);
     nim::processNeuronStructureLegacyLike(ns);
     nim::NeuronStructureCirclesLegacyLike ns2 =
-      nim::neuronStructureLocsegChainToCircleSLegacyLike(ns, /*xyScale*/ 1.0, /*zScale*/ 1.0);
+      nim::neuronStructureLocsegChainToCircleSLegacyLike(ns, /*xyScale*/ 1.0, /*zToXYRatio*/ 1.0);
     nim::neuronStructureToTreeLegacyLike(ns2);
 
     portedReconTree = nim::neuronStructureToSwcTreeCircleZLegacyLike(ns2, /*zScale*/ 1.0);

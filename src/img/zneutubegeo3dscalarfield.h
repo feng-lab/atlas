@@ -38,30 +38,30 @@ struct Geo3dScalarField
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Sampling().
 [[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field,
                                                                           const ZImg& stack,
-                                                                          double zScale,
+                                                                          double zToXYRatio,
                                                                           size_t c = 0,
                                                                           size_t t = 0);
 
 // Overload for read-only voxel volumes (single-channel/time view).
 [[nodiscard]] std::vector<double>
-geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVoxelVolume& stack, double zScale);
+geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVoxelVolume& stack, double zToXYRatio);
 
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Sampling_W().
 [[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingWeightedLegacyLike(const Geo3dScalarField& field,
                                                                                   const ZImg& stack,
-                                                                                  double zScale,
+                                                                                  double zToXYRatio,
                                                                                   size_t c = 0,
                                                                                   size_t t = 0);
 
 // Overload for read-only voxel volumes (single-channel/time view).
 [[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingWeightedLegacyLike(const Geo3dScalarField& field,
                                                                                   const ZVoxelVolume& stack,
-                                                                                  double zScale);
+                                                                                  double zToXYRatio);
 
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Sampling_M().
 [[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dScalarField& field,
                                                                                 const ZImg& stack,
-                                                                                double zScale,
+                                                                                double zToXYRatio,
                                                                                 const ZImg& mask,
                                                                                 size_t c = 0,
                                                                                 size_t t = 0);
@@ -69,7 +69,7 @@ geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVo
 // Overload for read-only voxel volumes (single-channel/time view).
 [[nodiscard]] std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dScalarField& field,
                                                                                 const ZVoxelVolume& stack,
-                                                                                double zScale,
+                                                                                double zToXYRatio,
                                                                                 const ZVoxelVolume& mask);
 
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Score().
@@ -78,7 +78,7 @@ geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVo
 // - `fs` is optional; pass nullptr to compute only the legacy default dot score.
 [[nodiscard]] double geo3dScalarFieldStackScoreLegacyLike(const Geo3dScalarField& field,
                                                           const ZImg& stack,
-                                                          double zScale,
+                                                          double zToXYRatio,
                                                           /*nullable*/ StackFitScore* fs,
                                                           size_t c = 0,
                                                           size_t t = 0);
@@ -86,7 +86,7 @@ geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVo
 // Overload for read-only voxel volumes (single-channel/time view).
 [[nodiscard]] double geo3dScalarFieldStackScoreLegacyLike(const Geo3dScalarField& field,
                                                           const ZVoxelVolume& stack,
-                                                          double zScale,
+                                                          double zToXYRatio,
                                                           /*nullable*/ StackFitScore* fs);
 
 // Port of tz_geo3d_scalar_field.c::Geo3d_Scalar_Field_Stack_Score_M().
@@ -95,7 +95,7 @@ geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVo
 // - `fs` is optional; pass nullptr to compute only the legacy default dot-nw score.
 [[nodiscard]] double geo3dScalarFieldStackScoreMaskedLegacyLike(const Geo3dScalarField& field,
                                                                 const ZImg& stack,
-                                                                double zScale,
+                                                                double zToXYRatio,
                                                                 const ZImg& mask,
                                                                 /*nullable*/ StackFitScore* fs,
                                                                 size_t c = 0,
@@ -104,7 +104,7 @@ geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVo
 // Overload for read-only voxel volumes (single-channel/time view).
 [[nodiscard]] double geo3dScalarFieldStackScoreMaskedLegacyLike(const Geo3dScalarField& field,
                                                                 const ZVoxelVolume& stack,
-                                                                double zScale,
+                                                                double zToXYRatio,
                                                                 const ZVoxelVolume& mask,
                                                                 /*nullable*/ StackFitScore* fs);
 

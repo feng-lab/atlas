@@ -18,7 +18,7 @@ class ZVoxelVolume;
                                                          /*nullable*/ const LocsegChain* chain,
                                                          const TraceWorkspace& tw,
                                                          /*nullable*/ TraceRecord* tr,
-                                                         double zScale,
+                                                         double zToXYRatio,
                                                          double maxR,
                                                          TraceDirection traceDirection,
                                                          double minR,
@@ -29,7 +29,7 @@ class ZVoxelVolume;
                                                          /*nullable*/ const LocsegChain* chain,
                                                          const TraceWorkspace& tw,
                                                          /*nullable*/ TraceRecord* tr,
-                                                         double zScale,
+                                                         double zToXYRatio,
                                                          double maxR,
                                                          TraceDirection traceDirection,
                                                          double minR,
@@ -37,8 +37,8 @@ class ZVoxelVolume;
                                                          const ZVoxelVolume& stack);
 
 // Port of tz_locseg_chain.c::Trace_Locseg().
-void traceLocsegLegacyLike(const ZImg& stack, double zScale, LocsegChain& chain, TraceWorkspace& tw);
+void traceLocsegLegacyLike(const ZImg& stack, double zToXYRatio, LocsegChain& chain, TraceWorkspace& tw);
 
-void traceLocsegLegacyLike(const ZVoxelVolume& stack, double zScale, LocsegChain& chain, TraceWorkspace& tw);
+void traceLocsegLegacyLike(const ZVoxelVolume& stack, double zToXYRatio, LocsegChain& chain, TraceWorkspace& tw);
 
 } // namespace nim

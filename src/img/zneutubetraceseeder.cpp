@@ -2,6 +2,7 @@
 
 #include "zneutubestackfitoptions.h"
 #include "zneutubetracelocseglabel.h"
+#include "zneutubetracezscale.h"
 #include "zcancellation.h"
 
 #include "zlog.h"
@@ -44,7 +45,6 @@ namespace nim {
 namespace {
 
 constexpr size_t SeedSortProgressReportEvery = 1000;
-constexpr double SeedSortZScaleLegacyLike = 1.0;
 
 [[nodiscard]] ZImg makeBaseMaskLike(const ZImg& signal)
 {
@@ -114,6 +114,7 @@ struct PreparedSeedSortEntry
 [[nodiscard]] folly::coro::Task<PreparedSeedSortEntry>
 prepareSeedSortEntryAsync(const Geo3dScalarField& seeds,
                           const ZImg& signal,
+                          double zToXYRatio,
                           const TraceWorkspace& tw,
                           size_t seedIndex,
                           size_t width,
@@ -174,17 +175,18 @@ prepareSeedSortEntryAsync(const Geo3dScalarField& seeds,
   out.locseg.seg.alpha = 0.0;
   out.locseg.seg.scale = 1.0;
 
-  const std::array<double, 3> cpos = {static_cast<double>(x), static_cast<double>(y), static_cast<double>(z)};
-  setNeurosegPositionLegacyLike(out.locseg, cpos, NeuroposReferenceLegacyLike::Center);
+  setNeurosegPositionLegacyLike(out.locseg,
+                                {static_cast<double>(x), static_cast<double>(y), static_cast<double>(z) * zToXYRatio},
+                                NeuroposReferenceLegacyLike::Center);
 
   LocsegFitWorkspace fitWorkspace = tw.fitWorkspace;
-  (void)localNeurosegOptimizeWLegacyLike(out.locseg, signal, SeedSortZScaleLegacyLike, /*option*/ 0, fitWorkspace);
+  (void)localNeurosegOptimizeWLegacyLike(out.locseg, signal, zToXYRatio, /*option*/ 0, fitWorkspace);
   maybeCancel(cancellationToken);
 
   out.didOptimize = true;
   out.fitWorkspaceAfterOptimize = fitWorkspace;
 
-  if (tw.traceMask && localNeurosegHitMaskLegacyLike(out.locseg, *tw.traceMask)) {
+  if (tw.traceMask && localNeurosegHitMaskLegacyLike(out.locseg, *tw.traceMask, zToXYRatio)) {
     out.rejectedByTraceMask = true;
     co_return out;
   }
@@ -195,8 +197,11 @@ prepareSeedSortEntryAsync(const Geo3dScalarField& seeds,
 
 } // namespace
 
-SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, TraceWorkspace& tw)
+SeedSortResultLegacyLike
+sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, double zToXYRatio, TraceWorkspace& tw)
 {
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
   CHECK(signal.numChannels() == 1);
   CHECK(signal.numTimes() == 1);
 
@@ -240,6 +245,7 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
     prepareTasks.push_back(folly::coro::co_withExecutor(cpuExecutor,
                                                         prepareSeedSortEntryAsync(seeds,
                                                                                   signal,
+                                                                                  zToXYRatio,
                                                                                   tw,
                                                                                   seedIndex,
                                                                                   width,
@@ -314,7 +320,7 @@ SeedSortResultLegacyLike sortSeedsLegacyLike(const Geo3dScalarField& seeds, cons
                                   out.baseMask,
                                   /*flag*/ -1,
                                   labelValue,
-                                  SeedSortZScaleLegacyLike);
+                                  zToXYRatio);
   }
 
   if (haveLastCommittedFitWorkspace) {

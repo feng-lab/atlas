@@ -19,7 +19,7 @@ class ZVoxelVolume;
 // Returns a single-chain SWC where:
 // - root is at (rounded) start position
 // - leaf is forced back to the original (unrounded) target position
-// - `zScale` is the explicit tracing anisotropy chosen by the caller
+// - `zToXYRatio` is the explicit tracing anisotropy chosen by the caller
 [[nodiscard]] std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZImg& signal,
                                                                 size_t c,
                                                                 size_t t,
@@ -27,7 +27,7 @@ class ZVoxelVolume;
                                                                 double startRadius,
                                                                 const std::array<double, 3>& target,
                                                                 double targetRadius,
-                                                                double zScale,
+                                                                double zToXYRatio,
                                                                 const TraceConfig& cfg,
                                                                 ZNeutubeImageBackgroundLegacyLike background);
 
@@ -37,7 +37,7 @@ class ZVoxelVolume;
                                                                 double startRadius,
                                                                 const std::array<double, 3>& target,
                                                                 double targetRadius,
-                                                                double zScale,
+                                                                double zToXYRatio,
                                                                 const TraceConfig& cfg,
                                                                 ZNeutubeImageBackgroundLegacyLike background);
 

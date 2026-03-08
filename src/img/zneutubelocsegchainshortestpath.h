@@ -25,11 +25,12 @@ namespace nim {
 // Port of tz_locseg_chain.c::Locseg_Chain_Bright_End().
 //
 // Finds the brightest point between the chain endpoint and its midpoint along the
-// endpoint segment axis (legacy point-sampling semantics).
+// endpoint segment axis (legacy point-sampling semantics). The returned point
+// stays in trace space; `zToXYRatio` is used only when sampling `signal`.
 void locsegChainBrightEndLegacyLike(const LocsegChain& chain,
                                     LocsegChainEndLegacyLike end,
                                     const ZImg& signal,
-                                    double zScale,
+                                    double zToXYRatio,
                                     std::array<double, 3>& pos);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Update_Stack_Graph_Workspace().
@@ -39,7 +40,7 @@ void locsegChainBrightEndLegacyLike(const LocsegChain& chain,
 void locsegChainUpdateStackGraphWorkspaceLegacyLike(const LocalNeuroseg& source,
                                                     const LocsegChain& target,
                                                     const ZImg& signal,
-                                                    double zScale,
+                                                    double zToXYRatio,
                                                     StackGraphWorkspaceLegacyLike& sgw);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Shortest_Path_Pt().
@@ -47,20 +48,20 @@ void locsegChainUpdateStackGraphWorkspaceLegacyLike(const LocalNeuroseg& source,
 // Returns a voxel-index path (stack offset indices) between `pos` and the
 // (startIndex..endIndex) window around `target`. The returned indices are in the
 // coordinate system of `signal` (not range-subvolume indices) and exclude any
-// invalid entries.
+// invalid entries. `pos` is in trace space.
 [[nodiscard]] std::vector<int64_t> locsegChainShortestPathPtLegacyLike(std::array<double, 3> pos,
                                                                        const LocsegChain& target,
                                                                        int startIndex,
                                                                        int endIndex,
                                                                        const ZImg& signal,
-                                                                       double zScale,
+                                                                       double zToXYRatio,
                                                                        StackGraphWorkspaceLegacyLike& sgw);
 
 // Port of tz_locseg_chain.c::Locseg_Chain_Shortest_Path().
 [[nodiscard]] std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source,
                                                                      const LocsegChain& target,
                                                                      const ZImg& signal,
-                                                                     double zScale,
+                                                                     double zToXYRatio,
                                                                      StackGraphWorkspaceLegacyLike& sgw);
 
 } // namespace nim

@@ -10,10 +10,14 @@
 
 #include "zlog.h"
 
+#include <gflags/gflags.h>
+
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+
+DECLARE_bool(atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
 
 namespace nim {
 
@@ -65,15 +69,18 @@ void coordinate3dUnitizeLegacyLike(std::array<double, 3>* v)
 }
 
 [[nodiscard]] double
-locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zScale, const LocalNeuroseg& testSeg)
+locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zToXYRatio, const LocalNeuroseg& testSeg)
 {
-  // Port of tz_locseg_chain.c::locseg_chain_dist_upper_bound().
+  // Chains are already stored in trace space, so this upper-bound check should stay in trace space too.
+  (void)zToXYRatio;
   const std::array<double, 3> source = localNeurosegCenterLegacyLike(testSeg);
 
   double minDist = std::numeric_limits<double>::infinity();
   for (const auto& node : chain) {
     LocalNeuroseg locseg2 = node.locseg;
-    localNeurosegScaleZLegacyLike(locseg2, zScale);
+    if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+      localNeurosegScaleZLegacyLike(locseg2, 1.0);
+    }
     const std::array<double, 3> target = localNeurosegCenterLegacyLike(locseg2);
     const double dist = geo3dDist(source[0], source[1], source[2], target[0], target[1], target[2]);
     if (dist < minDist) {
@@ -89,7 +96,7 @@ locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zScale, con
 bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
                                          LocsegChain& chain2,
                                          const ZImg* signal,
-                                         double zScale,
+                                         double zToXYRatio,
                                          NeurocompConnLegacyLike& conn,
                                          const ConnectionTestWorkspaceLegacyLike& ctw)
 {
@@ -115,19 +122,22 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
     head.seg.h = 2.0;
     tail.seg.h = 2.0;
   }
-
-  localNeurosegScaleZLegacyLike(head, zScale);
-  localNeurosegScaleZLegacyLike(tail, zScale);
+  if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+    // Keep the legacy isotropic canonicalization available only for parity tests. The default path should remain the
+    // clearer trace-space geometry model with no extra no-op scale transform.
+    localNeurosegScaleZLegacyLike(head, 1.0);
+    localNeurosegScaleZLegacyLike(tail, 1.0);
+  }
 
   double mindist = 0.0;
   if (ctw.hookSpot == 0) {
-    mindist = locsegChainDistUpperBoundLegacyLike(chain2, zScale, head);
+    mindist = locsegChainDistUpperBoundLegacyLike(chain2, zToXYRatio, head);
   } else if (ctw.hookSpot == 1) {
-    mindist = locsegChainDistUpperBoundLegacyLike(chain2, zScale, tail);
+    mindist = locsegChainDistUpperBoundLegacyLike(chain2, zToXYRatio, tail);
   } else {
     CHECK(ctw.hookSpot == -1);
-    mindist = std::min(locsegChainDistUpperBoundLegacyLike(chain2, zScale, head),
-                       locsegChainDistUpperBoundLegacyLike(chain2, zScale, tail));
+    mindist = std::min(locsegChainDistUpperBoundLegacyLike(chain2, zToXYRatio, head),
+                       locsegChainDistUpperBoundLegacyLike(chain2, zToXYRatio, tail));
   }
 
   conn.mode = NeurocompConnModeLegacyLike::HookLoop;
@@ -141,7 +151,9 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
   // Calculate the distance from the hook end(s) to the loop chain surface.
   for (const auto& node : chain2) {
     LocalNeuroseg locseg2 = node.locseg;
-    localNeurosegScaleZLegacyLike(locseg2, zScale);
+    if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+      localNeurosegScaleZLegacyLike(locseg2, 1.0);
+    }
     localNeurosegBallBoundLegacyLike(locseg2, range1);
 
     // head test
@@ -210,9 +222,6 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
     ++index;
   }
 
-  // scale position back to the chain space
-  conn.pos[2] *= zScale;
-
   conn.sdist = mindist;
 
   if (conn.sdist > ctw.distThre) {
@@ -249,7 +258,7 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
     sgw.signalMask = ctw.mask;
     sgw.includingSignalBorder = true;
 
-    const std::vector<int64_t> path = locsegChainShortestPathLegacyLike(chain1, chain2, *signal, zScale, sgw);
+    const std::vector<int64_t> path = locsegChainShortestPathLegacyLike(chain1, chain2, *signal, zToXYRatio, sgw);
     sgw.signalMask = nullptr;
 
     if (!path.empty()) {
@@ -268,10 +277,11 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
 
         if (hitIndex < 3) {
           stackUtilCoordLegacyLike(off, width, height, &coord[0], &coord[1], &coord[2]);
+          const double hitZ = static_cast<double>(coord[2]) * zToXYRatio;
           if (conn.info[0] == 0) {
-            hitIndex = locsegChainHitTestLegacyLike(chain1, TraceDirection::Forward, coord[0], coord[1], coord[2]);
+            hitIndex = locsegChainHitTestLegacyLike(chain1, TraceDirection::Forward, coord[0], coord[1], hitZ);
           } else {
-            hitIndex = locsegChainHitTestLegacyLike(chain1, TraceDirection::Backward, coord[0], coord[1], coord[2]);
+            hitIndex = locsegChainHitTestLegacyLike(chain1, TraceDirection::Backward, coord[0], coord[1], hitZ);
           }
         }
 
@@ -306,7 +316,7 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
             stackUtilCoordLegacyLike(path[static_cast<size_t>(i)], width, height, &curPos[0], &curPos[1], &curPos[2]);
             conn.ort[0] += static_cast<double>(prevPos[0] - curPos[0]);
             conn.ort[1] += static_cast<double>(prevPos[1] - curPos[1]);
-            conn.ort[2] += static_cast<double>(prevPos[2] - curPos[2]);
+            conn.ort[2] += static_cast<double>(prevPos[2] - curPos[2]) * zToXYRatio;
             prevPos[0] = curPos[0];
             prevPos[1] = curPos[1];
             prevPos[2] = curPos[2];

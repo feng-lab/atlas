@@ -548,11 +548,11 @@ std::unique_ptr<ZSwc> ZNeutubeSkeletonizer::makeSkeletonWithoutDs(ZImg img, cons
 
   if (m_connectingBranch) {
     LOG(INFO) << "Reconnecting ...";
-    double zScale = m_resolution[2];
+    double zToXYRatio = m_resolution[2];
     if (m_resolution[0] != 1.0) {
-      zScale /= m_resolution[0];
+      zToXYRatio /= m_resolution[0];
     }
-    reconnectSwc(wholeTree, zScale, m_distanceThreshold / m_resolution[0]);
+    reconnectSwc(wholeTree, zToXYRatio, m_distanceThreshold / m_resolution[0]);
   }
 
   if (m_resampleSwc) {

@@ -43,16 +43,16 @@ private:
   [[nodiscard]] bool blockedTraceEnabled() const;
   [[nodiscard]] int blockedTraceBlockSize() const;
   [[nodiscard]] int blockedTracePaddingSize() const;
-  [[nodiscard]] std::optional<double> derivedZScale() const;
-  [[nodiscard]] std::optional<double> selectedZScaleOverride() const;
+  [[nodiscard]] std::optional<double> derivedZToXYRatio() const;
+  [[nodiscard]] std::optional<double> selectedZToXYRatioOverride() const;
 
   void rebuildImageCombo();
   void rebuildChannelAndTimeCombos();
   void rebuildSuggestedOutputs();
   void syncSourceSelectionToTraceSettings();
-  void setSelectedZScaleOverride(std::optional<double> zScale);
+  void setSelectedZToXYRatioOverride(std::optional<double> zToXYRatio);
   void updateBudgetUi();
-  void updateZScaleUi();
+  void updateZToXYRatioUi();
 
   ZDoc& m_doc;
 
@@ -74,10 +74,10 @@ private:
   QCheckBox* m_downsampleCheck = nullptr;
   QSpinBox* m_downsampleRatioXYSpin = nullptr;
   QSpinBox* m_downsampleRatioZSpin = nullptr;
-  QLabel* m_derivedZScaleLabel = nullptr;
-  QCheckBox* m_overrideZScaleCheck = nullptr;
-  QDoubleSpinBox* m_overrideZScaleSpin = nullptr;
-  QLabel* m_effectiveZScaleLabel = nullptr;
+  QLabel* m_derivedZToXYRatioLabel = nullptr;
+  QCheckBox* m_overrideZToXYRatioCheck = nullptr;
+  QDoubleSpinBox* m_overrideZToXYRatioSpin = nullptr;
+  QLabel* m_effectiveZToXYRatioLabel = nullptr;
 
   QCheckBox* m_blockedTraceCheck = nullptr;
   QSpinBox* m_blockedTraceBlockSizeSpin = nullptr;
@@ -94,7 +94,7 @@ private:
   bool m_blockedSessionManifestPresent = false;
   QString m_blockedSessionManifestError;
   std::optional<std::array<size_t, 3>> m_blockedSessionSignalRatio;
-  std::optional<double> m_blockedSessionZScale;
+  std::optional<double> m_blockedSessionZToXYRatio;
   // {coreX, coreY, coreZ, halo} in tracing voxels.
   std::optional<std::array<int64_t, 4>> m_blockedSessionBlock;
   bool m_blockedTracePreferred = true;

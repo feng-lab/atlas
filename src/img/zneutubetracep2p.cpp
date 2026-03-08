@@ -609,12 +609,12 @@ std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZImg& signal,
                                                   double startRadius,
                                                   const std::array<double, 3>& target,
                                                   double targetRadius,
-                                                  double zScale,
+                                                  double zToXYRatio,
                                                   const TraceConfig& cfg,
                                                   ZNeutubeImageBackgroundLegacyLike background)
 {
-  CHECK(std::isfinite(zScale));
-  CHECK(zScale > 0.0);
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
 
   if (signal.isEmpty()) {
     return nullptr;
@@ -644,7 +644,7 @@ std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZImg& signal,
 
   StackGraphWorkspaceLegacyLike sgw;
   defaultStackGraphWorkspaceLegacyLike(sgw);
-  sgw.resolution = traceResolutionFromZScaleLegacyLike(zScale);
+  sgw.resolution = traceResolutionFromZToXYRatioLegacyLike(zToXYRatio);
 
   int zMargin = -1;
   if (sgw.resolution[0] > 0.0 && (sgw.resolution[2] / sgw.resolution[0] > 3.0)) {
@@ -763,12 +763,12 @@ std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZVoxelVolume& signal,
                                                   double startRadius,
                                                   const std::array<double, 3>& target,
                                                   double targetRadius,
-                                                  double zScale,
+                                                  double zToXYRatio,
                                                   const TraceConfig& cfg,
                                                   ZNeutubeImageBackgroundLegacyLike background)
 {
-  CHECK(std::isfinite(zScale));
-  CHECK(zScale > 0.0);
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
 
   if (signal.isEmpty()) {
     return nullptr;
@@ -797,7 +797,7 @@ std::unique_ptr<ZSwc> tracePointToPointLegacyLike(const ZVoxelVolume& signal,
 
   StackGraphWorkspaceLegacyLike sgw;
   defaultStackGraphWorkspaceLegacyLike(sgw);
-  sgw.resolution = traceResolutionFromZScaleLegacyLike(zScale);
+  sgw.resolution = traceResolutionFromZToXYRatioLegacyLike(zToXYRatio);
 
   int zMargin = -1;
   if (sgw.resolution[0] > 0.0 && (sgw.resolution[2] / sgw.resolution[0] > 3.0)) {

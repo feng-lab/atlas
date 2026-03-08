@@ -119,9 +119,9 @@ void disableFirstComboRow(QComboBox* combo)
   return s;
 }
 
-[[nodiscard]] QString formatZScale(double zScale)
+[[nodiscard]] QString formatZToXYRatio(double zToXYRatio)
 {
-  return QString::number(zScale, 'g', 6);
+  return QString::number(zToXYRatio, 'g', 6);
 }
 
 struct BlockedSessionManifestLoadResult
@@ -131,7 +131,7 @@ struct BlockedSessionManifestLoadResult
   QString manifestPath;
   QString error;
   std::array<size_t, 3> ratio = {1, 1, 1};
-  double zScale = 1.0;
+  double zToXYRatio = 1.0;
   // {coreX, coreY, coreZ, halo}
   std::array<int64_t, 4> block = {0, 0, 0, 0};
 };
@@ -215,11 +215,11 @@ struct BlockedSessionManifestLoadResult
     }
     res.ratio = {rx, ry, rz};
 
-    const double zScale = json::value_to<double>(requireNumber(jo, "z_scale"));
-    if (!std::isfinite(zScale) || !(zScale > 0.0)) {
-      throw ZException(QStringLiteral("Invalid z_scale: expected a finite number > 0, got %1.").arg(zScale));
+    const double zToXYRatio = json::value_to<double>(requireNumber(jo, "z_scale"));
+    if (!std::isfinite(zToXYRatio) || !(zToXYRatio > 0.0)) {
+      throw ZException(QStringLiteral("Invalid z_scale: expected a finite number > 0, got %1.").arg(zToXYRatio));
     }
-    res.zScale = zScale;
+    res.zToXYRatio = zToXYRatio;
 
     const json::object& block = requireObject(jo, "block");
     const int64_t coreX = json::value_to<int64_t>(requireNumber(block, "core_x"));
@@ -298,44 +298,44 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
 
   layout->addWidget(sourceGroup);
 
-  auto* zScaleGroup = new QGroupBox(tr("Z Scale"), this);
-  auto* zScaleForm = new QFormLayout(zScaleGroup);
-  zScaleForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-  zScaleForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
+  auto* zToXYRatioGroup = new QGroupBox(tr("Z-to-XY Ratio"), this);
+  auto* zToXYRatioForm = new QFormLayout(zToXYRatioGroup);
+  zToXYRatioForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+  zToXYRatioForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
 
-  m_derivedZScaleLabel = new QLabel(zScaleGroup);
-  m_derivedZScaleLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  zScaleForm->addRow(tr("Derived:"), m_derivedZScaleLabel);
+  m_derivedZToXYRatioLabel = new QLabel(zToXYRatioGroup);
+  m_derivedZToXYRatioLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  zToXYRatioForm->addRow(tr("Derived:"), m_derivedZToXYRatioLabel);
 
-  auto* overrideRow = new QWidget(zScaleGroup);
+  auto* overrideRow = new QWidget(zToXYRatioGroup);
   auto* overrideLayout = new QHBoxLayout(overrideRow);
   overrideLayout->setContentsMargins(0, 0, 0, 0);
   overrideLayout->setSpacing(8);
 
-  m_overrideZScaleCheck = new QCheckBox(tr("Use override"), overrideRow);
-  overrideLayout->addWidget(m_overrideZScaleCheck);
+  m_overrideZToXYRatioCheck = new QCheckBox(tr("Use override"), overrideRow);
+  overrideLayout->addWidget(m_overrideZToXYRatioCheck);
 
-  m_overrideZScaleSpin = new QDoubleSpinBox(overrideRow);
-  m_overrideZScaleSpin->setDecimals(6);
-  m_overrideZScaleSpin->setRange(0.000001, 1000000.0);
-  m_overrideZScaleSpin->setSingleStep(0.1);
-  overrideLayout->addWidget(m_overrideZScaleSpin);
+  m_overrideZToXYRatioSpin = new QDoubleSpinBox(overrideRow);
+  m_overrideZToXYRatioSpin->setDecimals(6);
+  m_overrideZToXYRatioSpin->setRange(0.000001, 1000000.0);
+  m_overrideZToXYRatioSpin->setSingleStep(0.1);
+  overrideLayout->addWidget(m_overrideZToXYRatioSpin);
   overrideLayout->addStretch(1);
 
-  zScaleForm->addRow(tr("Override:"), overrideRow);
+  zToXYRatioForm->addRow(tr("Override:"), overrideRow);
 
-  m_effectiveZScaleLabel = new QLabel(zScaleGroup);
-  m_effectiveZScaleLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  zScaleForm->addRow(tr("Effective:"), m_effectiveZScaleLabel);
+  m_effectiveZToXYRatioLabel = new QLabel(zToXYRatioGroup);
+  m_effectiveZToXYRatioLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  zToXYRatioForm->addRow(tr("Effective:"), m_effectiveZToXYRatioLabel);
 
-  auto* zScaleHint =
-    new QLabel(tr("zScale means voxelSizeZ / voxelSizeXY. Atlas derives it from image metadata using voxelSizeXY = "
+  auto* zToXYRatioHint =
+    new QLabel(tr("zToXYRatio = voxelSizeZ / voxelSizeXY. Atlas derives voxelSizeXY as "
                   "(voxelSizeX + voxelSizeY) / 2 after the current downsample ratio unless you override it here."),
-               zScaleGroup);
-  zScaleHint->setWordWrap(true);
-  zScaleForm->addRow(QString(), zScaleHint);
+               zToXYRatioGroup);
+  zToXYRatioHint->setWordWrap(true);
+  zToXYRatioForm->addRow(QString(), zToXYRatioHint);
 
-  layout->addWidget(zScaleGroup);
+  layout->addWidget(zToXYRatioGroup);
 
   auto* optionsGroup = new QGroupBox(tr("Auto Trace"), this);
   auto* optionsLayout = new QVBoxLayout(optionsGroup);
@@ -599,7 +599,7 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
     m_blockedSessionManifestPresent = false;
     m_blockedSessionManifestError.clear();
     m_blockedSessionSignalRatio.reset();
-    m_blockedSessionZScale.reset();
+    m_blockedSessionZToXYRatio.reset();
     m_blockedSessionBlock.reset();
 
     m_blockedSessionInfoLabel->setVisible(false);
@@ -651,7 +651,7 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
     }
 
     m_blockedSessionSignalRatio = manifest.ratio;
-    m_blockedSessionZScale = manifest.zScale;
+    m_blockedSessionZToXYRatio = manifest.zToXYRatio;
     m_blockedSessionBlock = manifest.block;
 
     const bool cubic = (coreX == coreY && coreX == coreZ);
@@ -701,13 +701,13 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
 
     m_blockedSessionInfoLabel->setText(
       tr("Existing blocked tracing session detected in the selected output folder.\n"
-         "Resuming with: ratio=[%1,%2,%3], zScale=%4, core=%5, halo=%6.\n"
+         "Resuming with: ratio=[%1,%2,%3], zToXYRatio=%4, core=%5, halo=%6.\n"
          "These parameters are locked to the session manifest to keep resume deterministic.\n"
          "Choose a different (empty) output folder to start a new session.")
         .arg(static_cast<qulonglong>(manifest.ratio[0]))
         .arg(static_cast<qulonglong>(manifest.ratio[1]))
         .arg(static_cast<qulonglong>(manifest.ratio[2]))
-        .arg(formatZScale(manifest.zScale))
+        .arg(formatZToXYRatio(manifest.zToXYRatio))
         .arg(coreLabel)
         .arg(static_cast<long long>(halo)));
     m_blockedSessionInfoLabel->setVisible(true);
@@ -716,7 +716,7 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
   updateBlockedSessionUi();
   updateDownsampleUi();
   updateOutputUi();
-  updateZScaleUi();
+  updateZToXYRatioUi();
 
   connect(m_imageCombo,
           &QComboBox::currentIndexChanged,
@@ -729,13 +729,13 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
             updateBlockedSessionUi();
             updateDownsampleUi();
             updateOutputUi();
-            updateZScaleUi();
+            updateZToXYRatioUi();
           });
 
   connect(m_channelCombo, &QComboBox::currentIndexChanged, this, [this](int) {
     syncSourceSelectionToTraceSettings();
     rebuildSuggestedOutputs();
-    updateZScaleUi();
+    updateZToXYRatioUi();
   });
 
   connect(m_timeCombo, &QComboBox::currentIndexChanged, this, [this](int) {
@@ -745,17 +745,17 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
   connect(m_downsampleCheck, &QCheckBox::toggled, this, [this, updateDownsampleUi](bool) {
     updateDownsampleUi();
     rebuildSuggestedOutputs();
-    updateZScaleUi();
+    updateZToXYRatioUi();
   });
 
   connect(m_downsampleRatioXYSpin, &QSpinBox::valueChanged, this, [this](int) {
     rebuildSuggestedOutputs();
-    updateZScaleUi();
+    updateZToXYRatioUi();
   });
 
   connect(m_downsampleRatioZSpin, &QSpinBox::valueChanged, this, [this](int) {
     rebuildSuggestedOutputs();
-    updateZScaleUi();
+    updateZToXYRatioUi();
   });
 
   connect(m_blockedTraceCheck,
@@ -767,7 +767,7 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
             updateDownsampleUi();
             updateOutputUi();
             rebuildSuggestedOutputs();
-            updateZScaleUi();
+            updateZToXYRatioUi();
           });
 
   connect(m_blockedTraceBlockSizeSpin, &QSpinBox::valueChanged, this, [this](int) {
@@ -793,7 +793,7 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
             updateBlockedSessionUi();
             updateDownsampleUi();
             updateOutputUi();
-            updateZScaleUi();
+            updateZToXYRatioUi();
           });
 
   connect(m_outputSwcWidget, &ZSelectFileWidget::changed, this, [this]() {
@@ -833,26 +833,26 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
     updateBudgetUi();
   });
 
-  connect(m_overrideZScaleCheck, &QCheckBox::toggled, this, [this](bool checked) {
+  connect(m_overrideZToXYRatioCheck, &QCheckBox::toggled, this, [this](bool checked) {
     if (!checked) {
-      setSelectedZScaleOverride(std::nullopt);
+      setSelectedZToXYRatioOverride(std::nullopt);
     } else {
-      CHECK(m_overrideZScaleSpin != nullptr);
-      setSelectedZScaleOverride(m_overrideZScaleSpin->value());
+      CHECK(m_overrideZToXYRatioSpin != nullptr);
+      setSelectedZToXYRatioOverride(m_overrideZToXYRatioSpin->value());
     }
-    updateZScaleUi();
+    updateZToXYRatioUi();
   });
-  connect(m_overrideZScaleSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double value) {
-    CHECK(m_overrideZScaleCheck != nullptr);
-    if (!m_overrideZScaleCheck->isChecked()) {
+  connect(m_overrideZToXYRatioSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double value) {
+    CHECK(m_overrideZToXYRatioCheck != nullptr);
+    if (!m_overrideZToXYRatioCheck->isChecked()) {
       return;
     }
-    setSelectedZScaleOverride(value);
-    updateZScaleUi();
+    setSelectedZToXYRatioOverride(value);
+    updateZToXYRatioUi();
   });
 
   connect(&m_doc.traceSettings(), &ZTraceSettings::changed, this, [this]() {
-    updateZScaleUi();
+    updateZToXYRatioUi();
   });
 }
 
@@ -881,7 +881,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
   QString outputSwc;
   QString outputLog;
   QString sessionDir;
-  std::optional<double> resumeZScale;
+  std::optional<double> resumeZToXYRatio;
   std::array<int64_t, 4> blockedBlock = {0, 0, 0, 0}; // {coreX, coreY, coreZ, halo}
 
   if (useBlockedRequested) {
@@ -897,7 +897,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
           QStringLiteral("The selected output folder contains an invalid manifest.json:\n%1").arg(manifest.error));
       }
       ratio = manifest.ratio;
-      resumeZScale = manifest.zScale;
+      resumeZToXYRatio = manifest.zToXYRatio;
       blockedBlock = manifest.block;
     } else {
       const int64_t core = static_cast<int64_t>(blockedTraceBlockSize());
@@ -954,9 +954,9 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
   const std::string datasetId = imgPack->imgSource().toString();
 
   const ZImgInfo info = imgPack->imgInfo();
-  const double derivedZScale = preferredZScaleFromImgInfoLegacyLike(info, ratio);
-  const double zScale =
-    resumeZScale.value_or(m_doc.traceSettings().zScaleOverrideForSelection(imgId, sc).value_or(derivedZScale));
+  const double derivedZToXYRatio = preferredZToXYRatioFromImgInfoLegacyLike(info, ratio);
+  const double zToXYRatio = resumeZToXYRatio.value_or(
+    m_doc.traceSettings().zToXYRatioOverrideForSelection(imgId, sc).value_or(derivedZToXYRatio));
   const QString channelLabel =
     (sc < info.channelNames.size()) ? info.displayChannelName(sc) : QStringLiteral("Ch%1").arg(sc + 1);
   const QString timeLabel = QStringLiteral("T%1").arg(t + 1);
@@ -995,7 +995,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
                      ratio,
                      traceCfgPath,
                      traceLevelValue,
-                     zScale,
+                     zToXYRatio,
                      haveAlgoConfig,
                      algoOverrides,
                      doResample,
@@ -1017,7 +1017,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
       worker->setSelectedChannelTime(sc, t);
       worker->setTraceConfigPath(traceCfgPath);
       worker->setTraceLevel(traceLevelValue);
-      worker->setZScale(zScale);
+      worker->setZToXYRatio(zToXYRatio);
       if (haveAlgoConfig) {
         worker->setAlgoConfigOverrides(algoOverrides);
       } else {
@@ -1092,7 +1092,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
     worker->setSelectedChannelTime(sc, t);
     worker->setTraceConfigPath(traceCfgPath);
     worker->setTraceLevel(traceLevelValue);
-    worker->setZScale(zScale);
+    worker->setZToXYRatio(zToXYRatio);
     if (haveAlgoConfig) {
       worker->setAlgoConfigOverrides(algoOverrides);
     } else {
@@ -1240,7 +1240,7 @@ int ZAutoTraceDialog::blockedTracePaddingSize() const
   return m_blockedTracePaddingSpin->value();
 }
 
-std::optional<double> ZAutoTraceDialog::derivedZScale() const
+std::optional<double> ZAutoTraceDialog::derivedZToXYRatio() const
 {
   const std::optional<size_t> imgIdOpt = selectedImageId();
   if (!imgIdOpt.has_value()) {
@@ -1254,12 +1254,12 @@ std::optional<double> ZAutoTraceDialog::derivedZScale() const
 
   const std::shared_ptr<ZImgPack> imgPack = imgDoc.imgPackShared(*imgIdOpt);
   CHECK(imgPack != nullptr);
-  return preferredZScaleFromImgInfoLegacyLike(imgPack->imgInfo(), signalRatio());
+  return preferredZToXYRatioFromImgInfoLegacyLike(imgPack->imgInfo(), signalRatio());
 }
 
-std::optional<double> ZAutoTraceDialog::selectedZScaleOverride() const
+std::optional<double> ZAutoTraceDialog::selectedZToXYRatioOverride() const
 {
-  return m_doc.traceSettings().zScaleOverrideForSelection(selectedImageId(), selectedChannel());
+  return m_doc.traceSettings().zToXYRatioOverrideForSelection(selectedImageId(), selectedChannel());
 }
 
 std::array<size_t, 3> ZAutoTraceDialog::signalRatio() const
@@ -1284,9 +1284,9 @@ void ZAutoTraceDialog::syncSourceSelectionToTraceSettings()
   m_doc.traceSettings().setSourceSelection(selectedImageId(), selectedChannel());
 }
 
-void ZAutoTraceDialog::setSelectedZScaleOverride(std::optional<double> zScale)
+void ZAutoTraceDialog::setSelectedZToXYRatioOverride(std::optional<double> zToXYRatio)
 {
-  if (blockedTraceEnabled() && m_blockedSessionZScale.has_value()) {
+  if (blockedTraceEnabled() && m_blockedSessionZToXYRatio.has_value()) {
     return;
   }
 
@@ -1295,7 +1295,7 @@ void ZAutoTraceDialog::setSelectedZScaleOverride(std::optional<double> zScale)
     return;
   }
 
-  m_doc.traceSettings().setZScaleOverrideForSelection(imgIdOpt, selectedChannel(), zScale);
+  m_doc.traceSettings().setZToXYRatioOverrideForSelection(imgIdOpt, selectedChannel(), zToXYRatio);
 }
 
 void ZAutoTraceDialog::rebuildImageCombo()
@@ -1474,51 +1474,52 @@ void ZAutoTraceDialog::rebuildSuggestedOutputs()
   m_applyingSuggestedOutputs = false;
 }
 
-void ZAutoTraceDialog::updateZScaleUi()
+void ZAutoTraceDialog::updateZToXYRatioUi()
 {
-  CHECK(m_derivedZScaleLabel != nullptr);
-  CHECK(m_overrideZScaleCheck != nullptr);
-  CHECK(m_overrideZScaleSpin != nullptr);
-  CHECK(m_effectiveZScaleLabel != nullptr);
+  CHECK(m_derivedZToXYRatioLabel != nullptr);
+  CHECK(m_overrideZToXYRatioCheck != nullptr);
+  CHECK(m_overrideZToXYRatioSpin != nullptr);
+  CHECK(m_effectiveZToXYRatioLabel != nullptr);
 
   const std::optional<size_t> imgIdOpt = selectedImageId();
-  const std::optional<double> derivedValue = derivedZScale();
-  const std::optional<double> overrideValue = selectedZScaleOverride();
-  const bool lockedToSession = blockedTraceEnabled() && m_blockedSessionZScale.has_value();
+  const std::optional<double> derivedValue = derivedZToXYRatio();
+  const std::optional<double> overrideValue = selectedZToXYRatioOverride();
+  const bool lockedToSession = blockedTraceEnabled() && m_blockedSessionZToXYRatio.has_value();
 
   {
-    const QSignalBlocker blockerCheck(*m_overrideZScaleCheck);
-    const QSignalBlocker blockerSpin(*m_overrideZScaleSpin);
+    const QSignalBlocker blockerCheck(*m_overrideZToXYRatioCheck);
+    const QSignalBlocker blockerSpin(*m_overrideZToXYRatioSpin);
 
-    m_overrideZScaleCheck->setEnabled(imgIdOpt.has_value() && !lockedToSession);
-    m_overrideZScaleCheck->setChecked(overrideValue.has_value());
-    m_overrideZScaleSpin->setValue(overrideValue.value_or(derivedValue.value_or(1.0)));
-    m_overrideZScaleSpin->setEnabled(imgIdOpt.has_value() && overrideValue.has_value() && !lockedToSession);
+    m_overrideZToXYRatioCheck->setEnabled(imgIdOpt.has_value() && !lockedToSession);
+    m_overrideZToXYRatioCheck->setChecked(overrideValue.has_value());
+    m_overrideZToXYRatioSpin->setValue(overrideValue.value_or(derivedValue.value_or(1.0)));
+    m_overrideZToXYRatioSpin->setEnabled(imgIdOpt.has_value() && overrideValue.has_value() && !lockedToSession);
   }
 
   if (derivedValue.has_value()) {
-    m_derivedZScaleLabel->setText(formatZScale(*derivedValue));
+    m_derivedZToXYRatioLabel->setText(formatZToXYRatio(*derivedValue));
   } else {
-    m_derivedZScaleLabel->setText(tr("N/A"));
+    m_derivedZToXYRatioLabel->setText(tr("N/A"));
   }
 
   if (lockedToSession) {
-    CHECK(m_blockedSessionZScale.has_value());
-    m_effectiveZScaleLabel->setText(tr("%1 (resume manifest)").arg(formatZScale(*m_blockedSessionZScale)));
-    m_overrideZScaleCheck->setToolTip(tr("Blocked session resume locks zScale to manifest.json."));
-    m_overrideZScaleSpin->setToolTip(tr("Blocked session resume locks zScale to manifest.json."));
+    CHECK(m_blockedSessionZToXYRatio.has_value());
+    m_effectiveZToXYRatioLabel->setText(tr("%1 (resume manifest)").arg(formatZToXYRatio(*m_blockedSessionZToXYRatio)));
+    m_overrideZToXYRatioCheck->setToolTip(tr("Blocked session resume locks zToXYRatio to manifest.json."));
+    m_overrideZToXYRatioSpin->setToolTip(tr("Blocked session resume locks zToXYRatio to manifest.json."));
     return;
   }
 
-  m_overrideZScaleCheck->setToolTip(tr("Use an explicit tracing zScale instead of the metadata-derived value."));
-  m_overrideZScaleSpin->setToolTip(tr("Explicit tracing zScale override."));
+  m_overrideZToXYRatioCheck->setToolTip(
+    tr("Use an explicit tracing zToXYRatio instead of the metadata-derived value."));
+  m_overrideZToXYRatioSpin->setToolTip(tr("Explicit tracing zToXYRatio override."));
 
   if (overrideValue.has_value()) {
-    m_effectiveZScaleLabel->setText(tr("%1 (override)").arg(formatZScale(*overrideValue)));
+    m_effectiveZToXYRatioLabel->setText(tr("%1 (override)").arg(formatZToXYRatio(*overrideValue)));
   } else if (derivedValue.has_value()) {
-    m_effectiveZScaleLabel->setText(tr("%1 (metadata)").arg(formatZScale(*derivedValue)));
+    m_effectiveZToXYRatioLabel->setText(tr("%1 (metadata)").arg(formatZToXYRatio(*derivedValue)));
   } else {
-    m_effectiveZScaleLabel->setText(tr("N/A"));
+    m_effectiveZToXYRatioLabel->setText(tr("N/A"));
   }
 }
 

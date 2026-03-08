@@ -17,7 +17,7 @@ namespace nim {
 //   matching legacy behavior (caller should not rely on original order after calling).
 // - Returns the traced chains (each owned by a unique_ptr).
 [[nodiscard]] std::vector<std::unique_ptr<LocsegChain>> traceAllSeedsLegacyLike(const ZImg& signal,
-                                                                                double zScale,
+                                                                                double zToXYRatio,
                                                                                 std::vector<LocalNeuroseg>& locsegArray,
                                                                                 std::vector<double>& scores,
                                                                                 TraceWorkspace& tw);

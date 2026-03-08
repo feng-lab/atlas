@@ -387,7 +387,7 @@ json::object ZBlockedAutoTraceSession::toJson(const ZBlockedAutoTraceManifest& v
   ratio.push_back(v.signalDownsampleRatio[1]);
   ratio.push_back(v.signalDownsampleRatio[2]);
   o["signal_downsample_ratio"] = std::move(ratio);
-  o["z_scale"] = v.zScale;
+  o["z_scale"] = v.zToXYRatio;
 
   o["dataset_shape"] = toJson(v.datasetShape);
   o["block"] = toJson(v.block);
@@ -529,8 +529,8 @@ ZBlockedAutoTraceManifest ZBlockedAutoTraceSession::manifestFromJsonOrThrow(cons
   if (out.signalDownsampleRatio[0] == 0 || out.signalDownsampleRatio[1] == 0 || out.signalDownsampleRatio[2] == 0) {
     throw ZException("Invalid signal_downsample_ratio: values must be > 0.");
   }
-  out.zScale = requireNumberOrThrow<double>(o, "z_scale");
-  if (!std::isfinite(out.zScale) || !(out.zScale > 0.0)) {
+  out.zToXYRatio = requireNumberOrThrow<double>(o, "z_scale");
+  if (!std::isfinite(out.zToXYRatio) || !(out.zToXYRatio > 0.0)) {
     throw ZException("Invalid z_scale: expected finite value > 0.");
   }
 
@@ -641,7 +641,7 @@ void ZBlockedAutoTraceSession::ensureCreatedOrThrow(const ZBlockedAutoTraceManif
   if (existing.signalDownsampleRatio != manifest.signalDownsampleRatio) {
     throw ZException("Blocked auto trace: signal_downsample_ratio mismatch with existing session.");
   }
-  if (existing.zScale != manifest.zScale) {
+  if (existing.zToXYRatio != manifest.zToXYRatio) {
     throw ZException("Blocked auto trace: z_scale mismatch with existing session.");
   }
   if (existing.datasetShape.width != manifest.datasetShape.width ||

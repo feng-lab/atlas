@@ -36,16 +36,16 @@ ZTraceSettings::SwcTargetSelection ZTraceSettings::mappedSwcTargetSelection(std:
   return it->second;
 }
 
-std::optional<double> ZTraceSettings::mappedZScaleOverride(std::optional<size_t> sourceImageId,
-                                                           size_t sourceChannel) const
+std::optional<double> ZTraceSettings::mappedZToXYRatioOverride(std::optional<size_t> sourceImageId,
+                                                               size_t sourceChannel) const
 {
   if (!sourceImageId.has_value()) {
     return std::nullopt;
   }
 
   const SourceKey key{*sourceImageId, sourceChannel};
-  const auto it = m_zScaleOverrideBySource.find(key);
-  if (it == m_zScaleOverrideBySource.end()) {
+  const auto it = m_zToXYRatioOverrideBySource.find(key);
+  if (it == m_zToXYRatioOverrideBySource.end()) {
     return std::nullopt;
   }
   return it->second;
@@ -182,45 +182,45 @@ void ZTraceSettings::setSelection(std::optional<size_t> sourceImageId,
   }
 }
 
-std::optional<double> ZTraceSettings::zScaleOverride() const
+std::optional<double> ZTraceSettings::zToXYRatioOverride() const
 {
-  return mappedZScaleOverride(m_sourceImageId, m_sourceChannel);
+  return mappedZToXYRatioOverride(m_sourceImageId, m_sourceChannel);
 }
 
-std::optional<double> ZTraceSettings::zScaleOverrideForSelection(std::optional<size_t> sourceImageId,
-                                                                 size_t sourceChannel) const
+std::optional<double> ZTraceSettings::zToXYRatioOverrideForSelection(std::optional<size_t> sourceImageId,
+                                                                     size_t sourceChannel) const
 {
-  return mappedZScaleOverride(sourceImageId, sourceChannel);
+  return mappedZToXYRatioOverride(sourceImageId, sourceChannel);
 }
 
-void ZTraceSettings::setZScaleOverride(std::optional<double> zScale)
+void ZTraceSettings::setZToXYRatioOverride(std::optional<double> zToXYRatio)
 {
-  setZScaleOverrideForSelection(m_sourceImageId, m_sourceChannel, zScale);
+  setZToXYRatioOverrideForSelection(m_sourceImageId, m_sourceChannel, zToXYRatio);
 }
 
-void ZTraceSettings::setZScaleOverrideForSelection(std::optional<size_t> sourceImageId,
-                                                   size_t sourceChannel,
-                                                   std::optional<double> zScale)
+void ZTraceSettings::setZToXYRatioOverrideForSelection(std::optional<size_t> sourceImageId,
+                                                       size_t sourceChannel,
+                                                       std::optional<double> zToXYRatio)
 {
   if (!sourceImageId.has_value()) {
-    CHECK(!zScale.has_value());
+    CHECK(!zToXYRatio.has_value());
     return;
   }
 
-  if (zScale.has_value()) {
-    CHECK(std::isfinite(*zScale));
-    CHECK(*zScale > 0.0);
+  if (zToXYRatio.has_value()) {
+    CHECK(std::isfinite(*zToXYRatio));
+    CHECK(*zToXYRatio > 0.0);
   }
 
   const SourceKey key{*sourceImageId, sourceChannel};
   bool anyChanged = false;
 
-  if (!zScale.has_value()) {
-    anyChanged = (m_zScaleOverrideBySource.erase(key) > 0);
+  if (!zToXYRatio.has_value()) {
+    anyChanged = (m_zToXYRatioOverrideBySource.erase(key) > 0);
   } else {
-    const auto it = m_zScaleOverrideBySource.find(key);
-    if (it == m_zScaleOverrideBySource.end() || it->second != *zScale) {
-      m_zScaleOverrideBySource[key] = *zScale;
+    const auto it = m_zToXYRatioOverrideBySource.find(key);
+    if (it == m_zToXYRatioOverrideBySource.end() || it->second != *zToXYRatio) {
+      m_zToXYRatioOverrideBySource[key] = *zToXYRatio;
       anyChanged = true;
     }
   }
@@ -304,9 +304,9 @@ void ZTraceSettings::onImageRemoved(size_t imageId)
     ++it;
   }
 
-  for (auto it = m_zScaleOverrideBySource.begin(); it != m_zScaleOverrideBySource.end();) {
+  for (auto it = m_zToXYRatioOverrideBySource.begin(); it != m_zToXYRatioOverrideBySource.end();) {
     if (it->first.imageId == imageId) {
-      it = m_zScaleOverrideBySource.erase(it);
+      it = m_zToXYRatioOverrideBySource.erase(it);
       anyChanged = true;
       continue;
     }

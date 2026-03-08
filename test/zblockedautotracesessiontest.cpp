@@ -41,7 +41,7 @@ TEST(ZBlockedAutoTraceSession, WritesAndResumesSequentialCommits)
   manifest.channel = 0;
   manifest.time = 0;
   manifest.signalDownsampleRatio = {1, 1, 1};
-  manifest.zScale = 2.5;
+  manifest.zToXYRatio = 2.5;
   manifest.datasetShape = {.width = 100, .height = 80, .depth = 60};
   manifest.block = {.coreX = 16, .coreY = 16, .coreZ = 16, .halo = 2};
   manifest.subtractConstant = 0.0;
@@ -166,7 +166,7 @@ TEST(ZBlockedAutoTraceSession, RollingSwcCatchupFromCommits)
   manifest.channel = 0;
   manifest.time = 0;
   manifest.signalDownsampleRatio = {1, 1, 1};
-  manifest.zScale = 2.5;
+  manifest.zToXYRatio = 2.5;
   manifest.datasetShape = {.width = 100, .height = 80, .depth = 60};
   manifest.block = {.coreX = 16, .coreY = 16, .coreZ = 16, .halo = 2};
   manifest.subtractConstant = 0.0;
@@ -264,7 +264,7 @@ TEST(ZBlockedAutoTraceSession, IgnoresIncompleteAndNonContiguousCommits)
   manifest.channel = 0;
   manifest.time = 0;
   manifest.signalDownsampleRatio = {1, 1, 1};
-  manifest.zScale = 2.5;
+  manifest.zToXYRatio = 2.5;
   manifest.datasetShape = {.width = 32, .height = 32, .depth = 16};
   manifest.block = {.coreX = 16, .coreY = 16, .coreZ = 16, .halo = 2};
   manifest.subtractConstant = 0.0;

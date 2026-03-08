@@ -10,6 +10,6 @@ namespace nim {
 int labelForest(ZSwc& tree);
 
 // Port of `Swc_Tree_Reconnect` (connects forest roots using an MST over inter-tree distances).
-void reconnectSwc(ZSwc& tree, double zScale, double distThre);
+void reconnectSwc(ZSwc& tree, double zToXYRatio, double distThre);
 
 } // namespace nim

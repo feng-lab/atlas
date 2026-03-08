@@ -103,9 +103,9 @@ void disableFirstComboRow(QComboBox* combo)
   return channelColor;
 }
 
-[[nodiscard]] QString formatZScale(double zScale)
+[[nodiscard]] QString formatZToXYRatio(double zToXYRatio)
 {
-  return QString::number(zScale, 'g', 6);
+  return QString::number(zToXYRatio, 'g', 6);
 }
 
 } // namespace
@@ -164,44 +164,43 @@ ZTraceSettingsWidget::ZTraceSettingsWidget(ZDoc& doc, QWidget* parent)
 
   layout->addWidget(sourceGroup);
 
-  auto* zScaleGroup = new QGroupBox(tr("Z Scale"), content);
-  auto* zScaleForm = new QFormLayout(zScaleGroup);
-  zScaleForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-  zScaleForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
+  auto* zToXYRatioGroup = new QGroupBox(tr("Z-to-XY Ratio"), content);
+  auto* zToXYRatioForm = new QFormLayout(zToXYRatioGroup);
+  zToXYRatioForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+  zToXYRatioForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
 
-  m_derivedZScaleLabel = new QLabel(zScaleGroup);
-  m_derivedZScaleLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  zScaleForm->addRow(tr("Derived:"), m_derivedZScaleLabel);
+  m_derivedZToXYRatioLabel = new QLabel(zToXYRatioGroup);
+  m_derivedZToXYRatioLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  zToXYRatioForm->addRow(tr("Derived:"), m_derivedZToXYRatioLabel);
 
-  auto* overrideRow = new QWidget(zScaleGroup);
+  auto* overrideRow = new QWidget(zToXYRatioGroup);
   auto* overrideLayout = new QHBoxLayout(overrideRow);
   overrideLayout->setContentsMargins(0, 0, 0, 0);
   overrideLayout->setSpacing(8);
 
-  m_overrideZScaleCheck = new QCheckBox(tr("Use override"), overrideRow);
-  overrideLayout->addWidget(m_overrideZScaleCheck);
+  m_overrideZToXYRatioCheck = new QCheckBox(tr("Use override"), overrideRow);
+  overrideLayout->addWidget(m_overrideZToXYRatioCheck);
 
-  m_overrideZScaleSpin = new QDoubleSpinBox(overrideRow);
-  m_overrideZScaleSpin->setDecimals(6);
-  m_overrideZScaleSpin->setRange(0.000001, 1000000.0);
-  m_overrideZScaleSpin->setSingleStep(0.1);
-  overrideLayout->addWidget(m_overrideZScaleSpin);
+  m_overrideZToXYRatioSpin = new QDoubleSpinBox(overrideRow);
+  m_overrideZToXYRatioSpin->setDecimals(6);
+  m_overrideZToXYRatioSpin->setRange(0.000001, 1000000.0);
+  m_overrideZToXYRatioSpin->setSingleStep(0.1);
+  overrideLayout->addWidget(m_overrideZToXYRatioSpin);
   overrideLayout->addStretch(1);
 
-  zScaleForm->addRow(tr("Override:"), overrideRow);
+  zToXYRatioForm->addRow(tr("Override:"), overrideRow);
 
-  m_effectiveZScaleLabel = new QLabel(zScaleGroup);
-  m_effectiveZScaleLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  zScaleForm->addRow(tr("Effective:"), m_effectiveZScaleLabel);
+  m_effectiveZToXYRatioLabel = new QLabel(zToXYRatioGroup);
+  m_effectiveZToXYRatioLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  zToXYRatioForm->addRow(tr("Effective:"), m_effectiveZToXYRatioLabel);
 
-  auto* zScaleHint =
-    new QLabel(tr("zScale means voxelSizeZ / voxelSizeXY. Atlas derives it from image metadata using voxelSizeXY = "
-                  "(voxelSizeX + voxelSizeY) / 2 unless you override it here."),
-               zScaleGroup);
-  zScaleHint->setWordWrap(true);
-  zScaleForm->addRow(QString(), zScaleHint);
+  auto* zToXYRatioHint = new QLabel(tr("zToXYRatio = voxelSizeZ / voxelSizeXY. Atlas derives voxelSizeXY as "
+                                       "(voxelSizeX + voxelSizeY) / 2 unless you override it here."),
+                                    zToXYRatioGroup);
+  zToXYRatioHint->setWordWrap(true);
+  zToXYRatioForm->addRow(QString(), zToXYRatioHint);
 
-  layout->addWidget(zScaleGroup);
+  layout->addWidget(zToXYRatioGroup);
 
   auto* targetGroup = new QGroupBox(tr("SWC Target"), content);
   auto* targetLayout = new QVBoxLayout(targetGroup);
@@ -350,17 +349,17 @@ ZTraceSettingsWidget::ZTraceSettingsWidget(ZDoc& doc, QWidget* parent)
     pushTargetUiToSettings();
   });
 
-  connect(m_overrideZScaleCheck, &QCheckBox::toggled, this, [this](bool) {
+  connect(m_overrideZToXYRatioCheck, &QCheckBox::toggled, this, [this](bool) {
     if (m_updating) {
       return;
     }
-    pushZScaleUiToSettings();
+    pushZToXYRatioUiToSettings();
   });
-  connect(m_overrideZScaleSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double) {
+  connect(m_overrideZToXYRatioSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double) {
     if (m_updating) {
       return;
     }
-    pushZScaleUiToSettings();
+    pushZToXYRatioUiToSettings();
   });
 
   connect(m_minAutoScoreSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double) {
@@ -658,7 +657,7 @@ void ZTraceSettingsWidget::applySettingsToUi()
   }
 
   updateMappingLabel();
-  updateZScaleUi();
+  updateZToXYRatioUi();
 
   {
     const ZTraceSettings::AlgoConfig cfg = settings.algoConfig();
@@ -742,7 +741,7 @@ void ZTraceSettingsWidget::updateMappingLabel()
   m_mappingLabel->setText(lines.join('\n'));
 }
 
-std::optional<double> ZTraceSettingsWidget::derivedZScaleForCurrentSource() const
+std::optional<double> ZTraceSettingsWidget::derivedZToXYRatioForCurrentSource() const
 {
   const std::optional<size_t> imgIdOpt = currentSourceImageIdFromUi();
   if (!imgIdOpt.has_value()) {
@@ -756,15 +755,15 @@ std::optional<double> ZTraceSettingsWidget::derivedZScaleForCurrentSource() cons
 
   const std::shared_ptr<ZImgPack> imgPack = imgDoc.imgPackShared(*imgIdOpt);
   CHECK(imgPack != nullptr);
-  return preferredZScaleFromImgInfoLegacyLike(imgPack->imgInfo());
+  return preferredZToXYRatioFromImgInfoLegacyLike(imgPack->imgInfo());
 }
 
-void ZTraceSettingsWidget::updateZScaleUi()
+void ZTraceSettingsWidget::updateZToXYRatioUi()
 {
-  CHECK(m_derivedZScaleLabel != nullptr);
-  CHECK(m_overrideZScaleCheck != nullptr);
-  CHECK(m_overrideZScaleSpin != nullptr);
-  CHECK(m_effectiveZScaleLabel != nullptr);
+  CHECK(m_derivedZToXYRatioLabel != nullptr);
+  CHECK(m_overrideZToXYRatioCheck != nullptr);
+  CHECK(m_overrideZToXYRatioSpin != nullptr);
+  CHECK(m_effectiveZToXYRatioLabel != nullptr);
 
   const std::optional<size_t> imgIdOpt = currentSourceImageIdFromUi();
 
@@ -776,32 +775,32 @@ void ZTraceSettingsWidget::updateZScaleUi()
     }
   }
 
-  const std::optional<double> derivedZScale = derivedZScaleForCurrentSource();
-  const std::optional<double> overrideZScale =
-    m_doc.traceSettings().zScaleOverrideForSelection(imgIdOpt, sourceChannel);
+  const std::optional<double> derivedZToXYRatio = derivedZToXYRatioForCurrentSource();
+  const std::optional<double> overrideZToXYRatio =
+    m_doc.traceSettings().zToXYRatioOverrideForSelection(imgIdOpt, sourceChannel);
 
   {
-    const QSignalBlocker blockerCheck(*m_overrideZScaleCheck);
-    const QSignalBlocker blockerSpin(*m_overrideZScaleSpin);
+    const QSignalBlocker blockerCheck(*m_overrideZToXYRatioCheck);
+    const QSignalBlocker blockerSpin(*m_overrideZToXYRatioSpin);
 
-    m_overrideZScaleCheck->setEnabled(imgIdOpt.has_value());
-    m_overrideZScaleCheck->setChecked(overrideZScale.has_value());
-    m_overrideZScaleSpin->setValue(overrideZScale.value_or(derivedZScale.value_or(1.0)));
-    m_overrideZScaleSpin->setEnabled(imgIdOpt.has_value() && overrideZScale.has_value());
+    m_overrideZToXYRatioCheck->setEnabled(imgIdOpt.has_value());
+    m_overrideZToXYRatioCheck->setChecked(overrideZToXYRatio.has_value());
+    m_overrideZToXYRatioSpin->setValue(overrideZToXYRatio.value_or(derivedZToXYRatio.value_or(1.0)));
+    m_overrideZToXYRatioSpin->setEnabled(imgIdOpt.has_value() && overrideZToXYRatio.has_value());
   }
 
-  if (derivedZScale.has_value()) {
-    m_derivedZScaleLabel->setText(formatZScale(*derivedZScale));
+  if (derivedZToXYRatio.has_value()) {
+    m_derivedZToXYRatioLabel->setText(formatZToXYRatio(*derivedZToXYRatio));
   } else {
-    m_derivedZScaleLabel->setText(tr("N/A"));
+    m_derivedZToXYRatioLabel->setText(tr("N/A"));
   }
 
-  if (overrideZScale.has_value()) {
-    m_effectiveZScaleLabel->setText(tr("%1 (override)").arg(formatZScale(*overrideZScale)));
-  } else if (derivedZScale.has_value()) {
-    m_effectiveZScaleLabel->setText(tr("%1 (metadata)").arg(formatZScale(*derivedZScale)));
+  if (overrideZToXYRatio.has_value()) {
+    m_effectiveZToXYRatioLabel->setText(tr("%1 (override)").arg(formatZToXYRatio(*overrideZToXYRatio)));
+  } else if (derivedZToXYRatio.has_value()) {
+    m_effectiveZToXYRatioLabel->setText(tr("%1 (metadata)").arg(formatZToXYRatio(*derivedZToXYRatio)));
   } else {
-    m_effectiveZScaleLabel->setText(tr("N/A"));
+    m_effectiveZToXYRatioLabel->setText(tr("N/A"));
   }
 }
 
@@ -844,7 +843,7 @@ void ZTraceSettingsWidget::pushTargetUiToSettings()
   settings.setTargetSelection(mode, targetSwcId);
 }
 
-void ZTraceSettingsWidget::pushZScaleUiToSettings()
+void ZTraceSettingsWidget::pushZToXYRatioUiToSettings()
 {
   if (m_updating) {
     return;
@@ -863,13 +862,13 @@ void ZTraceSettingsWidget::pushZScaleUiToSettings()
     }
   }
 
-  std::optional<double> zScaleOverride;
-  if (m_overrideZScaleCheck != nullptr && m_overrideZScaleCheck->isChecked()) {
-    CHECK(m_overrideZScaleSpin != nullptr);
-    zScaleOverride = m_overrideZScaleSpin->value();
+  std::optional<double> zToXYRatioOverride;
+  if (m_overrideZToXYRatioCheck != nullptr && m_overrideZToXYRatioCheck->isChecked()) {
+    CHECK(m_overrideZToXYRatioSpin != nullptr);
+    zToXYRatioOverride = m_overrideZToXYRatioSpin->value();
   }
 
-  m_doc.traceSettings().setZScaleOverrideForSelection(sourceImageId, sourceChannel, zScaleOverride);
+  m_doc.traceSettings().setZToXYRatioOverrideForSelection(sourceImageId, sourceChannel, zToXYRatioOverride);
 }
 
 void ZTraceSettingsWidget::pushAlgoUiToSettings()

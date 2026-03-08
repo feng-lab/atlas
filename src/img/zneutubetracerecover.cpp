@@ -194,13 +194,13 @@ namespace {
 
 RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
                                           const TraceConfig& cfg,
-                                          double zScale,
+                                          double zToXYRatio,
                                           const ZImg& mask,
                                           std::optional<ZImg> baseMask,
                                           TraceWorkspace& tw)
 {
-  CHECK(std::isfinite(zScale));
-  CHECK(zScale > 0.0);
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
 
   RecoverResultLegacyLike out;
 
@@ -316,14 +316,14 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
       return out;
   }
   prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Seed, tw);
-  SeedSortResultLegacyLike sorted = sortSeedsLegacyLike(seeds, signal, tw);
+  SeedSortResultLegacyLike sorted = sortSeedsLegacyLike(seeds, signal, zToXYRatio, tw);
 
   // Keep the updated base mask for parity (legacy stores it into m_baseMask).
   out.baseMask = sorted.baseMask;
 
   // Legacy traces with TRACING_AUTO thresholds after sorting seeds.
   prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Auto, tw);
-  out.chains = traceAllSeedsLegacyLike(signal, zScale, sorted.locsegArray, sorted.scoreArray, tw);
+  out.chains = traceAllSeedsLegacyLike(signal, zToXYRatio, sorted.locsegArray, sorted.scoreArray, tw);
   tw.minChainLength = originalMinLength;
 
   return out;

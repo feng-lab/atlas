@@ -5,7 +5,11 @@
 
 #include "zlog.h"
 
+#include <gflags/gflags.h>
+
 #include <limits>
+
+DECLARE_bool(atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
 
 namespace nim {
 
@@ -31,7 +35,7 @@ double locsegChainGeolenLegacyLike(const LocsegChain& chain)
 }
 
 double
-locsegChainAverageScoreLegacyLike(const LocsegChain& chain, const ZImg& stack, double zScale, StackFitOption option)
+locsegChainAverageScoreLegacyLike(const LocsegChain& chain, const ZImg& stack, double zToXYRatio, StackFitOption option)
 {
   if (chain.empty()) {
     return 0.0;
@@ -45,7 +49,7 @@ locsegChainAverageScoreLegacyLike(const LocsegChain& chain, const ZImg& stack, d
   fs.options[0] = static_cast<int>(option);
 
   for (const auto& node : chain) {
-    score += localNeurosegScorePLegacyLike(node.locseg, stack, zScale, &fs);
+    score += localNeurosegScorePLegacyLike(node.locseg, stack, zToXYRatio, &fs);
     ++n;
   }
 
@@ -54,7 +58,7 @@ locsegChainAverageScoreLegacyLike(const LocsegChain& chain, const ZImg& stack, d
 }
 
 double
-locsegChainMinSegScoreLegacyLike(const LocsegChain& chain, const ZImg& stack, double zScale, StackFitOption option)
+locsegChainMinSegScoreLegacyLike(const LocsegChain& chain, const ZImg& stack, double zToXYRatio, StackFitOption option)
 {
   if (chain.empty()) {
     return 0.0;
@@ -67,7 +71,7 @@ locsegChainMinSegScoreLegacyLike(const LocsegChain& chain, const ZImg& stack, do
   fs.options[0] = static_cast<int>(option);
 
   for (const auto& node : chain) {
-    const double score = localNeurosegScorePLegacyLike(node.locseg, stack, zScale, &fs);
+    const double score = localNeurosegScorePLegacyLike(node.locseg, stack, zToXYRatio, &fs);
     if (score < minScore) {
       minScore = score;
     }
@@ -76,14 +80,15 @@ locsegChainMinSegScoreLegacyLike(const LocsegChain& chain, const ZImg& stack, do
   return minScore;
 }
 
-double locsegChainAverageSignalLegacyLike(const LocsegChain& chain, const ZImg& stack, double zScale)
+double locsegChainAverageSignalLegacyLike(const LocsegChain& chain, const ZImg& stack, double zToXYRatio)
 {
-  return locsegChainAverageScoreLegacyLike(chain, stack, zScale, StackFitOption::MeanSignal);
+  return locsegChainAverageScoreLegacyLike(chain, stack, zToXYRatio, StackFitOption::MeanSignal);
 }
 
-double locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zScale, const LocalNeuroseg& testseg)
+double locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zToXYRatio, const LocalNeuroseg& testseg)
 {
-  // Port of tz_locseg_chain.c::locseg_chain_dist_upper_bound(chain, z_scale, testseg).
+  // Chains are already stored in trace space, so this upper-bound check should stay in trace space too.
+  (void)zToXYRatio;
   if (chain.empty()) {
     return 0.0;
   }
@@ -95,7 +100,9 @@ double locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zSca
 
   for (const auto& node : chain) {
     locseg2 = node.locseg;
-    localNeurosegScaleZLegacyLike(locseg2, zScale);
+    if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+      localNeurosegScaleZLegacyLike(locseg2, 1.0);
+    }
     const std::array<double, 3> target = localNeurosegCenterLegacyLike(locseg2);
     const double dist = geo3dDist(source[0], source[1], source[2], target[0], target[1], target[2]);
     if (dist < minDist) {
