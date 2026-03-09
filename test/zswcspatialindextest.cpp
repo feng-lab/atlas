@@ -78,7 +78,7 @@ TEST(ZSwcGeometryMaskVolume, ValueAsDoubleMatchesIndex)
   idx->setZToXYRatio(1.0);
   idx->rebuild(swc);
 
-  nim::ZSwcGeometryMaskVolume mask(idx, /*w*/ 16, /*h*/ 16, /*d*/ 16, /*zScale*/ 1.0);
+  nim::ZSwcGeometryMaskVolume mask(idx, /*w*/ 16, /*h*/ 16, /*d*/ 16);
 
   EXPECT_EQ(mask.valueAsDouble(5, 5, 5), 1.0);
   EXPECT_EQ(mask.valueAsDouble(5, 5, 8), 1.0);
@@ -90,7 +90,7 @@ TEST(ZSwcGeometryMaskVolume, ValueAsDoubleMatchesIndex)
   EXPECT_EQ(mask.valueAsDouble(100, 5, 5), 0.0);
 }
 
-TEST(ZSwcGeometryMaskVolume, ConvertsLegacyMaskZToImageSpace)
+TEST(ZSwcGeometryMaskVolume, AppliesImageSpaceOriginOffset)
 {
   nim::ZSwc swc;
   nim::SwcNode root(/*id*/ 1, /*type*/ 0, /*x*/ 5.0, /*y*/ 5.0, /*z*/ 105.0, /*radius*/ 3.0, /*parentID*/ -1);
@@ -104,31 +104,7 @@ TEST(ZSwcGeometryMaskVolume, ConvertsLegacyMaskZToImageSpace)
                                    /*w*/ 16,
                                    /*h*/ 16,
                                    /*d*/ 64,
-                                   /*zScale*/ 5.0,
-                                   glm::dvec3{0.0, 0.0, 100.0},
-                                   nim::ZSwcGeometryMaskQuerySpace::LegacyScaledMaskSpace);
-
-  EXPECT_EQ(mask.valueAsDouble(5, 5, 25), 1.0);
-  EXPECT_EQ(mask.valueAsDouble(5, 5, 29), 0.0);
-}
-
-TEST(ZSwcGeometryMaskVolume, AcceptsImageSpaceQueries)
-{
-  nim::ZSwc swc;
-  nim::SwcNode root(/*id*/ 1, /*type*/ 0, /*x*/ 5.0, /*y*/ 5.0, /*z*/ 105.0, /*radius*/ 3.0, /*parentID*/ -1);
-  (void)swc.appendRoot(root);
-
-  auto idx = std::make_shared<nim::ZSwcSpatialIndex>();
-  idx->setZToXYRatio(5.0);
-  idx->rebuild(swc);
-
-  nim::ZSwcGeometryMaskVolume mask(idx,
-                                   /*w*/ 16,
-                                   /*h*/ 16,
-                                   /*d*/ 16,
-                                   /*zScale*/ 5.0,
-                                   glm::dvec3{0.0, 0.0, 100.0},
-                                   nim::ZSwcGeometryMaskQuerySpace::ImageSpace);
+                                   glm::dvec3{0.0, 0.0, 100.0});
 
   EXPECT_EQ(mask.valueAsDouble(5, 5, 5), 1.0);
   EXPECT_EQ(mask.valueAsDouble(5, 5, 6), 0.0);

@@ -39,16 +39,21 @@ Entry Points
     input seed/click `z` by `zToXYRatio` when creating locseg geometry, while sampling and mask queries divide by
     `zToXYRatio` to get back to image voxels.
   - Legacy workspace fields named `resolution` remain in a few tracing ports (`TraceWorkspace`, connection-test
-    workspace, stack-graph workspace), but tracing code now treats those as explicit trace-space step lengths derived
-    from the chosen entry `zToXYRatio` rather than re-reading source voxel metadata inside the algorithm.
+    workspace, stack-graph workspace), but in the migrated tracing stack they are not generic voxel-metadata storage.
+    They are explicit normalized step-length metrics, usually `{1, 1, zToXYRatio}`, used by specific legacy branches
+    that need relative Z-vs-XY spacing. `TraceWorkspace::resolution` is especially important: leaving it unset still
+    has distinct legacy semantics, so callers must not populate it blindly.
   - `ZSwcSpatialIndex` stores SWC primitives in image-space coordinates and applies `zToXYRatio` only as the anisotropic
     hit-test metric. `ZSwcGeometryMaskVolume` adapts that index to tracing code: callers can query either in raw
     image-space voxels or in the older legacy mask-space convention where `z` was already multiplied by `zToXYRatio`.
-  - Under `--atlas_trace_use_swc_geometry_mask`, whole-volume auto tracing uses the spatial index instead of a dense
-    traced-region mask during the main multi-seed tracing loop. The inserted primitives represent the same swelled
-    traced-exclusion envelope the legacy dense mask uses (`sratio=1.5`, `sdiff=0`, `slimit=3`) rather than the raw
-    locseg centerline geometry. The legacy recovery stage still materializes a dense binary trace mask because its
-    z-dilate/subtract workflow is volume-based.
+  - Whole-volume auto tracing can use the spatial index instead of a dense traced-region mask during the main
+    multi-seed tracing loop, but it is gated by both:
+    - `--atlas_trace_use_swc_geometry_mask` (shared switch; also used by interactive tracing), and
+    - `--atlas_autotrace_use_swc_geometry_mask` (auto-trace-only switch; defaults to `false` because geometry-mask mode is
+      currently slower in in-memory auto tracing).
+    The inserted primitives represent the same swelled traced-exclusion envelope the legacy dense mask uses
+    (`sratio=1.5`, `sdiff=0`, `slimit=3`) rather than the raw locseg centerline geometry. The legacy recovery stage still
+    materializes a dense binary trace mask because its z-dilate/subtract workflow is volume-based.
   - These functions support two signal backends:
     - `const ZImg&` (fast path for in-memory images; avoids virtual sampling in hot loops).
     - `const ZVoxelVolume&` (random-access virtual volume; used for disk-cached images and future paging work).
@@ -61,7 +66,8 @@ GUI Integration
 
 - Shared state:
   - `ZTraceSettings` (`src/atlas/ztracesettings.*`) stores the trace source (image/channel/time), SWC target mapping,
-    and an optional per-image/channel `zToXYRatio` override.
+    and a per-image/channel `zToXYRatio` override (initialized to `1.0` by default for new selections; users can disable it
+    in the UI to fall back to metadata-derived values).
   - `ZTraceSettingsWidget` (`src/atlas/ztracesettingswidget.*`) exposes this state in a dock panel shared by the 2D and
     3D windows, including the derived/override/effective `zToXYRatio` UI for interactive tracing.
   - `ZAutoTraceDialog` (`src/atlas/zautotracedialog.*`) mirrors the same `zToXYRatio` override model for auto tracing, but

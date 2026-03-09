@@ -273,12 +273,8 @@ template<typename TSignal>
     auto idx = std::make_shared<ZSwcSpatialIndex>();
     idx->setZToXYRatio(zToXYRatio);
     idx->rebuild(*outSwc);
-    tr.tw.traceMaskVolume = std::make_unique<ZSwcGeometryMaskVolume>(std::move(idx),
-                                                                     signal.width(),
-                                                                     signal.height(),
-                                                                     signal.depth(),
-                                                                     zToXYRatio,
-                                                                     ZSwcGeometryMaskQuerySpace::ImageSpace);
+    tr.tw.traceMaskVolume =
+      std::make_unique<ZSwcGeometryMaskVolume>(std::move(idx), signal.width(), signal.height(), signal.depth());
   } else {
     auto swcMask = std::make_unique<ZSparseVoxelMask>(signal.width(), signal.height(), signal.depth());
     swcMask->clearU8(0);

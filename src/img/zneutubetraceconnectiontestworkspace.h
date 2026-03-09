@@ -27,9 +27,9 @@ struct ConnectionTestWorkspaceLegacyLike
 
   // Step lengths used by the optional shortest-path test.
   //
-  // Tracing code treats this as the trace-space resolution, not raw image metadata.
-  // Entry points should set it explicitly from the chosen tracing anisotropy via
-  // `traceResolutionFromZToXYRatioLegacyLike(zToXYRatio)`.
+  // This is a normalized routing metric, not raw image metadata. In tracing code it is usually set to
+  // `{1, 1, zToXYRatio}` via `traceResolutionFromZToXYRatioLegacyLike(zToXYRatio)` so shortest-path edge lengths keep
+  // the caller-selected Z-vs-XY spacing.
   std::array<double, 3> resolution = {1.0, 1.0, 1.0};
   char unit = 'p'; // 'p' pixel, 'u' um
 

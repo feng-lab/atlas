@@ -8,12 +8,6 @@
 
 namespace nim {
 
-enum class ZSwcGeometryMaskQuerySpace
-{
-  ImageSpace,
-  LegacyScaledMaskSpace,
-};
-
 // Read-only ZVoxelVolume adapter backed by a continuous-geometry SWC spatial index.
 //
 // This lets existing tracing helpers (point sampling, hit-mask tests, trace workspace mask accessors)
@@ -22,24 +16,12 @@ enum class ZSwcGeometryMaskQuerySpace
 // Coordinate contract:
 // - The underlying `ZSwcSpatialIndex` operates in image space.
 // - `origin` is always expressed in image-space coordinates.
-// - `querySpace` controls whether incoming voxel queries are already in image space or still
-//   in the older legacy "mask-space" convention where Z is multiplied by `zToXYRatio`.
+// - Incoming voxel queries are expressed in image-space coordinates.
 class ZSwcGeometryMaskVolume final : public ZVoxelMaskMutable
 {
 public:
-  ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index,
-                         size_t w,
-                         size_t h,
-                         size_t d,
-                         double zToXYRatio,
-                         ZSwcGeometryMaskQuerySpace querySpace = ZSwcGeometryMaskQuerySpace::ImageSpace);
-  ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index,
-                         size_t w,
-                         size_t h,
-                         size_t d,
-                         double zToXYRatio,
-                         glm::dvec3 origin,
-                         ZSwcGeometryMaskQuerySpace querySpace = ZSwcGeometryMaskQuerySpace::ImageSpace);
+  ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index, size_t w, size_t h, size_t d);
+  ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index, size_t w, size_t h, size_t d, glm::dvec3 origin);
 
   [[nodiscard]] std::shared_ptr<ZSwcSpatialIndex> sharedIndex() const;
 
@@ -65,9 +47,7 @@ private:
   size_t m_width = 0;
   size_t m_height = 0;
   size_t m_depth = 0;
-  double m_zToXYRatio = 1.0;
   glm::dvec3 m_origin{0.0, 0.0, 0.0};
-  ZSwcGeometryMaskQuerySpace m_querySpace = ZSwcGeometryMaskQuerySpace::ImageSpace;
 };
 
 } // namespace nim

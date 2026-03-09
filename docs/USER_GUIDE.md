@@ -861,10 +861,12 @@ Selection behavior:
 
 In **Trace Settings → Tracing Config**, you can adjust key neuTube tracing parameters (score thresholds, fitting/refit options, crossover tests, etc.).
 
-In **Trace Settings → Z-to-XY Ratio**, Atlas also shows the metadata-derived tracing anisotropy and an optional override:
+In **Trace Settings → Z-to-XY Ratio**, Atlas also shows the metadata-derived tracing anisotropy and a per-image/channel override:
 
 - **Derived** shows the value Atlas computes from the image metadata.
 - **Override** lets you force an explicit tracing value for the selected image/channel pair.
+  - By default, Atlas enables the override and initializes it to `1.0` for a new image/channel selection.
+  - Uncheck **Use override** to fall back to the metadata-derived value.
 - **Effective** shows the exact value that the interactive tracer will use.
 - `zToXYRatio` means `voxelSizeZ / voxelSizeXY`, where Atlas derives `voxelSizeXY` as `(voxelSizeX + voxelSizeY) / 2`.
 
@@ -903,6 +905,8 @@ In the Auto Trace dialog:
 - **Z-to-XY Ratio**
   - **Derived** shows the tracing `zToXYRatio` computed from the selected image metadata and the current downsample ratio.
   - **Override** lets you replace that metadata-derived value with an explicit tracing `zToXYRatio` for the selected image/channel.
+    - By default, Atlas enables the override and initializes it to `1.0` for a new image/channel selection.
+    - Uncheck **Use override** to fall back to the metadata-derived value.
   - **Effective** shows the exact value that Auto Trace will launch with.
   - `zToXYRatio` means `voxelSizeZ / voxelSizeXY`, where Atlas derives `voxelSizeXY` as `(voxelSizeX + voxelSizeY) / 2`.
 - **Computational budget**

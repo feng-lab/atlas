@@ -4301,10 +4301,8 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   }
 }
 
-TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
+void expectDevOnlyAutoTraceMatchesLegacy(const fs::path& input)
 {
-  const fs::path input =
-    fs::path(QDir::homePath().toStdString()) / "Dropbox/atlas_test/slice15/slice15_L34_Sum.lsm_ch2.tif";
   if (!fs::exists(input)) {
     GTEST_SKIP() << "Missing dev-only auto-trace input: " << input.string();
   }
@@ -4313,9 +4311,11 @@ TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
   const DevOnlyAutoTraceConfigPaths cfgPaths = writeDevOnlyAutoTraceConfigFiles(dir);
   const fs::path legacyOut = dir / "legacy_autotrace.swc";
   const fs::path v2Out = dir / "v2_autotrace.swc";
+  const std::string datasetLabel = input.filename().string();
 
   const auto legacyStart = std::chrono::steady_clock::now();
   const int legacyRc = [&]() {
+    ScopedStdoutSilencer silence;
     ArgvBuilder argv({
       "Atlas",
       "--command",
@@ -4333,6 +4333,7 @@ TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
 
   const auto v2Start = std::chrono::steady_clock::now();
   const int v2Rc = [&]() {
+    ScopedStdoutSilencer silence;
     ArgvBuilder argv({
       "Atlas",
       "--command",
@@ -4348,7 +4349,8 @@ TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
   const auto v2Ms =
     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - v2Start).count();
 
-  LOG(INFO) << fmt::format("Slice15 auto-trace runtime: legacy={} ms, v2={} ms (ratio={:.3f}x)",
+  LOG(INFO) << fmt::format("Slice15 auto-trace runtime [{}]: legacy={} ms, v2={} ms (ratio={:.3f}x)",
+                           datasetLabel,
                            legacyMs,
                            v2Ms,
                            legacyMs > 0 ? static_cast<double>(v2Ms) / static_cast<double>(legacyMs) : 0.0);
@@ -4365,8 +4367,9 @@ TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
     const auto [line, col] = lineColFromIndex(legacyText, i);
     const std::string legacyLine = lineAt(legacyText, i);
     const std::string v2Line = lineAt(v2Text, i);
-    ADD_FAILURE() << fmt::format("Auto-trace SWC mismatch at byte {} (line {}, col {}).\nLegacy: {}\nV2: {}\n"
+    ADD_FAILURE() << fmt::format("[{}] Auto-trace SWC mismatch at byte {} (line {}, col {}).\nLegacy: {}\nV2: {}\n"
                                  "Keeping outputs for inspection under: {}",
+                                 datasetLabel,
                                  i,
                                  line,
                                  col,
@@ -4379,6 +4382,20 @@ TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
     std::error_code ec;
     fs::remove_all(dir, ec);
   }
+}
+
+TEST(NeutubeCommand2Parity, AutoTrace_Slice15_LsmCh2Tif_MatchesLegacy_DevOnly)
+{
+  const fs::path input =
+    fs::path(QDir::homePath().toStdString()) / "Dropbox/atlas_test/slice15/slice15_L34_Sum.lsm_ch2.tif";
+  expectDevOnlyAutoTraceMatchesLegacy(input);
+}
+
+TEST(NeutubeCommand2Parity, AutoTrace_Slice15_L11Soma_LsmCh2Tif_MatchesLegacy_DevOnly)
+{
+  const fs::path input =
+    fs::path(QDir::homePath().toStdString()) / "Dropbox/atlas_test/slice15/slice15_L11_Sum.lsm_ch2.tif";
+  expectDevOnlyAutoTraceMatchesLegacy(input);
 }
 
 TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)

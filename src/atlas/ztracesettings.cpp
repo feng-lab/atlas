@@ -63,6 +63,7 @@ void ZTraceSettings::setSourceChannel(size_t sc)
 
 void ZTraceSettings::setSourceSelection(std::optional<size_t> sourceImageId, size_t sourceChannel)
 {
+  const bool sourceChanged = (sourceImageId != m_sourceImageId) || (sourceChannel != m_sourceChannel);
   bool anyChanged = false;
 
   if (sourceImageId != m_sourceImageId) {
@@ -88,6 +89,21 @@ void ZTraceSettings::setSourceSelection(std::optional<size_t> sourceImageId, siz
   if (target.swcId != m_targetSwcId) {
     m_targetSwcId = target.swcId;
     anyChanged = true;
+  }
+
+  // Default tracing z-scale behavior: prefer an isotropic override (1.0) instead of the metadata-derived value.
+  //
+  // This is a per-(image, channel) override and can still be explicitly disabled by the user via the UI.
+  // Only initialize the override when the source selection changes; avoid "re-defaulting" in cases where
+  // callers refresh the current selection (for example on dialog start) after the user has cleared the override.
+  if (sourceChanged && sourceImageId.has_value()) {
+    constexpr double kDefaultZToXYRatioOverride = 1.0;
+    const SourceKey key{*sourceImageId, sourceChannel};
+    const auto it = m_zToXYRatioOverrideBySource.find(key);
+    if (it == m_zToXYRatioOverrideBySource.end()) {
+      m_zToXYRatioOverrideBySource[key] = kDefaultZToXYRatioOverride;
+      anyChanged = true;
+    }
   }
 
   if (anyChanged) {
@@ -146,6 +162,7 @@ void ZTraceSettings::setSelection(std::optional<size_t> sourceImageId,
     targetSwcId = std::nullopt;
   }
 
+  const bool sourceChanged = (sourceImageId != m_sourceImageId) || (sourceChannel != m_sourceChannel);
   bool anyChanged = false;
 
   if (sourceImageId != m_sourceImageId) {
@@ -174,6 +191,16 @@ void ZTraceSettings::setSelection(std::optional<size_t> sourceImageId,
     const auto it = m_swcTargetBySource.find(key);
     if (it == m_swcTargetBySource.end() || !(it->second == selection)) {
       m_swcTargetBySource[key] = selection;
+    }
+  }
+
+  if (sourceChanged && sourceImageId.has_value()) {
+    constexpr double kDefaultZToXYRatioOverride = 1.0;
+    const SourceKey key{*sourceImageId, sourceChannel};
+    const auto it = m_zToXYRatioOverrideBySource.find(key);
+    if (it == m_zToXYRatioOverrideBySource.end()) {
+      m_zToXYRatioOverrideBySource[key] = kDefaultZToXYRatioOverride;
+      anyChanged = true;
     }
   }
 

@@ -27,6 +27,15 @@
 #include <vector>
 
 DECLARE_bool(atlas_trace_use_swc_geometry_mask);
+DEFINE_bool(atlas_autotrace_use_swc_geometry_mask,
+            false,
+            "In-memory auto tracing: allow using the SWC-geometry trace mask (spatial index) when available. "
+            "This is gated by --atlas_trace_use_swc_geometry_mask (shared across tracing modes) but defaults to "
+            "false because it is currently slower in whole-volume auto trace. "
+            "Interactive tracing remains controlled by --atlas_trace_use_swc_geometry_mask.");
+DECLARE_double(atlas_trace_mask_exclusion_swell_ratio);
+DECLARE_double(atlas_trace_mask_exclusion_swell_diff);
+DECLARE_double(atlas_trace_mask_exclusion_swell_limit);
 
 namespace nim {
 
@@ -57,8 +66,9 @@ void materializeTraceMaskFromChainsLegacyLike(const ZImg& signal,
 
   LocsegLabelWorkspaceLegacyLike labelWs;
   labelWs.signal = &signal;
-  labelWs.sratio = 1.5;
-  labelWs.sdiff = 0.0;
+  labelWs.sratio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
+  labelWs.sdiff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
+  labelWs.slimit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
   labelWs.option = 1;
   labelWs.value = 1;
   labelWs.flag = 0;
@@ -116,7 +126,8 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   ctx.tw.refit = cfg.refit;
   ctx.tw.tuneEnd = cfg.tuneEnd;
   ctx.tw.traceMaskUpdating = ctx.maskTracing;
-  ctx.tw.resolution = traceResolutionFromZToXYRatioLegacyLike(zToXYRatio);
+  // Keep the legacy auto-trace first pass behavior here: `TraceWorkspace::resolution` is an opt-in branch
+  // in the locseg trace test, not inert metadata, and the historical auto path leaves it unset.
 
   // Legacy default preprocess: subtract background and optionally invert bright-background images.
   // Bright-background handling is not yet ported (Atlas currently assumes dark background).
@@ -174,7 +185,9 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   LOG(INFO) << fmt::format("Auto trace: trace all seeds done (chains={}).", chains.size());
 
   if (cfg.recover > 0) {
-    if (FLAGS_atlas_trace_use_swc_geometry_mask && !ctx.tw.traceMask && ctx.tw.traceMaskVolume) {
+    const bool useGeometryTraceMask =
+      FLAGS_atlas_trace_use_swc_geometry_mask && FLAGS_atlas_autotrace_use_swc_geometry_mask;
+    if (useGeometryTraceMask && !ctx.tw.traceMask && ctx.tw.traceMaskVolume) {
       LOG(INFO) << "Auto trace: materialize dense trace mask for legacy recovery ...";
       materializeTraceMaskFromChainsLegacyLike(ctx.signal, chains, zToXYRatio, ctx.tw);
     }

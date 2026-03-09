@@ -48,10 +48,11 @@ struct TraceWorkspace
   // Reserved/dynamic variables (legacy behavior depends on routine).
   std::array<double, 5> dyvar = {-1.0, -1.0, -1.0, -1.0, -1.0};
 
-  // Optional trace-space resolution for size-based checks.
+  // Optional normalized step-length metric for resolution-aware size checks.
   //
-  // Current tracing code only uses the XY entries here; tracing entry points should still set the full
-  // `{1, 1, zToXYRatio}` tuple explicitly so the workspace stays aligned with the chosen anisotropy contract.
+  // This is not inert metadata and it is not raw voxel-size storage. Some legacy tracing paths switch behavior as soon
+  // as `resolution[0] > 0`, typically interpreting the tuple as a normalized metric such as `{1, 1, zToXYRatio}`.
+  // Leave it unset (`{-1, -1, -1}`) unless a caller intentionally wants that resolution-aware branch.
   std::array<double, 3> resolution = {-1.0, -1.0, -1.0};
 
   bool addHit = true;

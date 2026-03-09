@@ -117,6 +117,52 @@ size_t ZSwcSpatialIndex::primitiveCount() const
   return m_prims.size();
 }
 
+std::vector<ZSwcSpatialIndex::Segment> ZSwcSpatialIndex::querySegmentsIntersectingBox(glm::dvec3 minCorner,
+                                                                                      glm::dvec3 maxCorner) const
+{
+  if (m_prims.empty()) {
+    return {};
+  }
+
+  if (!isFiniteVec3(minCorner) || !isFiniteVec3(maxCorner)) {
+    return {};
+  }
+
+  if (minCorner.x > maxCorner.x) {
+    std::swap(minCorner.x, maxCorner.x);
+  }
+  if (minCorner.y > maxCorner.y) {
+    std::swap(minCorner.y, maxCorner.y);
+  }
+  if (minCorner.z > maxCorner.z) {
+    std::swap(minCorner.z, maxCorner.z);
+  }
+
+  const double minZScaled = minCorner.z * m_zToXYRatio;
+  const double maxZScaled = maxCorner.z * m_zToXYRatio;
+
+  const Box3 query{Point3(minCorner.x, minCorner.y, minZScaled), Point3(maxCorner.x, maxCorner.y, maxZScaled)};
+
+  std::vector<Segment> out;
+
+  for (auto it = m_rtree.qbegin(bgi::intersects(query)); it != m_rtree.qend(); ++it) {
+    const size_t idx = it->second;
+    if (idx >= m_prims.size()) {
+      CHECK(false) << "ZSwcSpatialIndex: rtree returned invalid primitive index";
+    }
+
+    const Primitive& prim = m_prims[idx];
+    Segment s;
+    s.a = glm::dvec3{prim.a.x, prim.a.y, prim.a.z / m_zToXYRatio};
+    s.b = glm::dvec3{prim.b.x, prim.b.y, prim.b.z / m_zToXYRatio};
+    s.ra = prim.ra;
+    s.rb = prim.rb;
+    out.push_back(s);
+  }
+
+  return out;
+}
+
 bool ZSwcSpatialIndex::containsPoint(double x, double y, double z) const
 {
   return containsPoint(glm::dvec3{x, y, z});

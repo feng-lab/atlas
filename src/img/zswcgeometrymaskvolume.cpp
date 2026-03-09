@@ -6,33 +6,22 @@
 
 namespace nim {
 
-ZSwcGeometryMaskVolume::ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index,
-                                               size_t w,
-                                               size_t h,
-                                               size_t d,
-                                               double zToXYRatio,
-                                               ZSwcGeometryMaskQuerySpace querySpace)
-  : ZSwcGeometryMaskVolume(std::move(index), w, h, d, zToXYRatio, glm::dvec3{0.0, 0.0, 0.0}, querySpace)
+ZSwcGeometryMaskVolume::ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index, size_t w, size_t h, size_t d)
+  : ZSwcGeometryMaskVolume(std::move(index), w, h, d, glm::dvec3{0.0, 0.0, 0.0})
 {}
 
 ZSwcGeometryMaskVolume::ZSwcGeometryMaskVolume(std::shared_ptr<ZSwcSpatialIndex> index,
                                                size_t w,
                                                size_t h,
                                                size_t d,
-                                               double zToXYRatio,
-                                               glm::dvec3 origin,
-                                               ZSwcGeometryMaskQuerySpace querySpace)
+                                               glm::dvec3 origin)
   : m_index(std::move(index))
   , m_width(w)
   , m_height(h)
   , m_depth(d)
-  , m_zToXYRatio(zToXYRatio)
   , m_origin(origin)
-  , m_querySpace(querySpace)
 {
   CHECK(m_index != nullptr);
-  CHECK(std::isfinite(m_zToXYRatio));
-  CHECK(m_zToXYRatio > 0.0);
 }
 
 std::shared_ptr<ZSwcSpatialIndex> ZSwcGeometryMaskVolume::sharedIndex() const
@@ -97,14 +86,9 @@ double ZSwcGeometryMaskVolume::valueAsDouble(int x, int y, int z) const
     return 0.0;
   }
 
-  double queryZ = static_cast<double>(z);
-  if (m_querySpace == ZSwcGeometryMaskQuerySpace::LegacyScaledMaskSpace) {
-    queryZ /= m_zToXYRatio;
-  }
-
   return m_index->containsPoint(static_cast<double>(x) + m_origin.x,
                                 static_cast<double>(y) + m_origin.y,
-                                queryZ + m_origin.z)
+                                static_cast<double>(z) + m_origin.z)
            ? 1.0
            : 0.0;
 }

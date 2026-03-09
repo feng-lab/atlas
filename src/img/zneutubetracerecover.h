@@ -7,15 +7,19 @@
 
 #include "zimg.h"
 
+#include <array>
 #include <memory>
 #include <optional>
 #include <vector>
 
 namespace nim {
 
+using RecoverChainEndStatusLegacyLike = std::array<TraceStatus, 2>;
+
 struct RecoverResultLegacyLike
 {
   std::vector<std::unique_ptr<LocsegChain>> chains;
+  std::vector<RecoverChainEndStatusLegacyLike> chainEndStatuses;
   std::optional<ZImg> baseMask;
 };
 

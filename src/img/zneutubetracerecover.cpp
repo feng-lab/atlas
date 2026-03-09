@@ -323,7 +323,8 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
 
   // Legacy traces with TRACING_AUTO thresholds after sorting seeds.
   prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Auto, tw);
-  out.chains = traceAllSeedsLegacyLike(signal, zToXYRatio, sorted.locsegArray, sorted.scoreArray, tw);
+  out.chains =
+    traceAllSeedsLegacyLike(signal, zToXYRatio, sorted.locsegArray, sorted.scoreArray, tw, &out.chainEndStatuses);
   tw.minChainLength = originalMinLength;
 
   return out;

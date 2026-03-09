@@ -50,6 +50,13 @@ preferredZToXYRatioFromVoxelSizeLegacyLike(double voxelSizeX, double voxelSizeY,
 {
   CHECK(std::isfinite(zToXYRatio));
   CHECK(zToXYRatio > 0.0);
+  // Return a normalized step-length metric, not raw voxel-size metadata.
+  //
+  // The legacy tracing ports that consume `resolution` only need the relative Z-vs-XY spacing, so we keep XY at the
+  // tracing baseline `1` and encode anisotropy in Z as `{1, 1, zToXYRatio}`. This tuple is appropriate for
+  // resolution-aware routing / connection workspaces and for trace workspaces that intentionally opt into their
+  // resolution-aware size checks. It must not be treated as a drop-in replacement for every `TraceWorkspace`
+  // initialization site, because leaving `TraceWorkspace::resolution` unset still has distinct legacy semantics.
   return {1.0, 1.0, zToXYRatio};
 }
 

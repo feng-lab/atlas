@@ -30,9 +30,10 @@ struct StackGraphWorkspaceLegacyLike
 
   // Neighbor step lengths used when converting voxel offsets to edge lengths.
   //
-  // In tracing code this is usually the explicit trace-space resolution `{1, 1, zToXYRatio}`.
-  // Other clients may provide different explicit spacings, but callers must not infer a tracing `zToXYRatio`
-  // from image metadata inside inner loops.
+  // This is a normalized routing metric, not raw voxel metadata. In tracing code it is usually
+  // `{1, 1, zToXYRatio}`, which preserves the caller-selected relative Z-vs-XY spacing while keeping XY in the routing
+  // baseline unit. Other clients may provide different explicit spacings, but callers must not infer a tracing
+  // `zToXYRatio` from image metadata inside inner loops.
   std::array<double, 3> resolution = {1.0, 1.0, 1.0};
   WeightFunc weightFunc = nullptr;
   int spOption = 0;

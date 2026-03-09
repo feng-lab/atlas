@@ -541,7 +541,8 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
     m_blockedTraceCheck->setEnabled(true);
     {
       const QSignalBlocker blocker(*m_blockedTraceCheck);
-      m_blockedTraceCheck->setChecked(m_blockedTracePreferred);
+      // m_blockedTraceCheck->setChecked(m_blockedTracePreferred);
+      m_blockedTraceCheck->setChecked(false);
     }
     m_blockedTraceCheck->setToolTip(tr("Blocked tracing is recommended for large disk-cached / Neuroglancer datasets.\n"
                                        "It supports crash-safe resume via the output folder contents."));
@@ -1490,10 +1491,18 @@ void ZAutoTraceDialog::updateZToXYRatioUi()
     const QSignalBlocker blockerCheck(*m_overrideZToXYRatioCheck);
     const QSignalBlocker blockerSpin(*m_overrideZToXYRatioSpin);
 
-    m_overrideZToXYRatioCheck->setEnabled(imgIdOpt.has_value() && !lockedToSession);
-    m_overrideZToXYRatioCheck->setChecked(overrideValue.has_value());
-    m_overrideZToXYRatioSpin->setValue(overrideValue.value_or(derivedValue.value_or(1.0)));
-    m_overrideZToXYRatioSpin->setEnabled(imgIdOpt.has_value() && overrideValue.has_value() && !lockedToSession);
+    if (lockedToSession) {
+      CHECK(m_blockedSessionZToXYRatio.has_value());
+      m_overrideZToXYRatioCheck->setEnabled(false);
+      m_overrideZToXYRatioCheck->setChecked(true);
+      m_overrideZToXYRatioSpin->setValue(*m_blockedSessionZToXYRatio);
+      m_overrideZToXYRatioSpin->setEnabled(false);
+    } else {
+      m_overrideZToXYRatioCheck->setEnabled(imgIdOpt.has_value());
+      m_overrideZToXYRatioCheck->setChecked(overrideValue.has_value());
+      m_overrideZToXYRatioSpin->setValue(overrideValue.value_or(derivedValue.value_or(1.0)));
+      m_overrideZToXYRatioSpin->setEnabled(imgIdOpt.has_value() && overrideValue.has_value());
+    }
   }
 
   if (derivedValue.has_value()) {

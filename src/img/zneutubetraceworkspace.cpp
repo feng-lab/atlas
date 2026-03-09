@@ -115,6 +115,22 @@ int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array
     return 0;
   }
 
+  if (tw.traceMask) {
+    const ZImg& mask = *tw.traceMask;
+
+    const size_t width = mask.width();
+    const size_t height = mask.height();
+    const size_t depth = mask.depth();
+
+    if (static_cast<size_t>(x) < width && static_cast<size_t>(y) < height && static_cast<size_t>(z) < depth) {
+      const int v =
+        static_cast<int>(*mask.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
+      if (v != 0) {
+        return v;
+      }
+    }
+  }
+
   if (tw.traceMaskVolume) {
     const ZVoxelVolume& mask = *tw.traceMaskVolume;
 
@@ -130,21 +146,7 @@ int traceWorkspaceMaskValueLegacyLike(const TraceWorkspace& tw, const std::array
     return static_cast<int>(v);
   }
 
-  if (!tw.traceMask) {
-    return 0;
-  }
-
-  const ZImg& mask = *tw.traceMask;
-
-  const size_t width = mask.width();
-  const size_t height = mask.height();
-  const size_t depth = mask.depth();
-
-  if (static_cast<size_t>(x) >= width || static_cast<size_t>(y) >= height || static_cast<size_t>(z) >= depth) {
-    return 0;
-  }
-
-  return static_cast<int>(*mask.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z)));
+  return 0;
 }
 
 int traceWorkspaceMaskValueZLegacyLike(const TraceWorkspace& tw, std::array<double, 3> pos, double zToXYRatio)

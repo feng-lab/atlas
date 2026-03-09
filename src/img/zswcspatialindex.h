@@ -41,6 +41,14 @@ class ZSwcSpatialIndex final
 public:
   ZSwcSpatialIndex() = default;
 
+  struct Segment
+  {
+    glm::dvec3 a{};
+    glm::dvec3 b{};
+    double ra = 0.0;
+    double rb = 0.0;
+  };
+
   // zToXYRatio controls how Z is weighted when testing "inside SWC tube?" in image-space coordinates.
   //
   // Legacy NeuTu defines the tracing anisotropy as the voxel-size ratio:
@@ -70,6 +78,14 @@ public:
 
   [[nodiscard]] bool containsPoint(double x, double y, double z) const;
   [[nodiscard]] bool containsPoint(glm::dvec3 p) const;
+
+  // Returns segments whose (radius-expanded) bounding boxes intersect the given image-space AABB.
+  //
+  // Notes:
+  // - Coordinates are in the same image space as SWC node coordinates.
+  // - The returned segments preserve the SWC parent->child direction used during index insertion
+  //   (taper is encoded via ra/rb).
+  [[nodiscard]] std::vector<Segment> querySegmentsIntersectingBox(glm::dvec3 minCorner, glm::dvec3 maxCorner) const;
 
 private:
   struct Primitive

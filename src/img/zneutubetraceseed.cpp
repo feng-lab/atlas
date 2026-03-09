@@ -143,7 +143,7 @@ Geo3dScalarField removeTracedSeedLegacyLike(const Geo3dScalarField& seeds, const
 
   CHECK(seeds.points.size() == seeds.values.size());
 
-  if (!tw.traceMask) {
+  if (!tw.traceMask && !tw.traceMaskVolume) {
     return seeds;
   }
 

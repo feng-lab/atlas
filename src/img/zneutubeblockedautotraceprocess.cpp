@@ -5,9 +5,17 @@
 #include "zblockedautotracebounds.h"
 
 #include "zneutubeimgbinarizer.h"
+#include "zneutubetraceallseeds.h"
 #include "zneutubetracemask.h"
+#include "zneutubetracerecover.h"
 #include "zneutubetraceseed.h"
+#include "zneutubetraceseeder.h"
 #include "zneutubetracescorethresholds.h"
+#include "zneutubetraceswclabelstack.h"
+#include "zneutubetraceswclocseg.h"
+#include "zneutubetracelocseglabel.h"
+#include "zneutubestackfitoptions.h"
+#include "zneutubelocsegchainmetrics.h"
 #include "zneutubelocsegchaintrace.h"
 #include "zneutubemathutils.h"
 #include "zneutubetracezscale.h"
@@ -40,6 +48,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+
+DECLARE_bool(atlas_trace_use_swc_geometry_mask);
+DECLARE_bool(atlas_autotrace_use_swc_geometry_mask);
+DECLARE_double(atlas_trace_mask_exclusion_swell_ratio);
+DECLARE_double(atlas_trace_mask_exclusion_swell_diff);
+DECLARE_double(atlas_trace_mask_exclusion_swell_limit);
 
 DEFINE_uint32(atlas_autotrace_block_core_x, 1024, "Blocked auto trace: core block size in X (voxels).");
 DEFINE_uint32(atlas_autotrace_block_core_y, 1024, "Blocked auto trace: core block size in Y (voxels).");
@@ -262,6 +276,129 @@ struct BlockGrid
                                     .bz = clampBlock(z, block.coreZ, numBlocksZ())};
   }
 };
+
+[[nodiscard]] double swellRadiusForExclusionMaskLegacyLike(double r)
+{
+  if (!std::isfinite(r) || r <= 0.0) {
+    return 0.0;
+  }
+
+  const double ratio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
+  const double diff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
+  const double limit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
+  CHECK(std::isfinite(ratio));
+  CHECK(std::isfinite(diff));
+  CHECK(std::isfinite(limit));
+
+  double out = r * ratio + diff;
+  if (limit > 0.0) {
+    out = std::min(out, r + limit);
+  }
+
+  if (!std::isfinite(out) || out <= 0.0) {
+    return 0.0;
+  }
+  return out;
+}
+
+void labelSwcIndexIntoRoiDenseTraceMaskForRecoveryLegacyLike(const ZSwcSpatialIndex& swcIndex,
+                                                             ZImg& traceMask,
+                                                             const BlockGrid::Bounds& roi,
+                                                             double zToXYRatio)
+{
+  CHECK(std::isfinite(zToXYRatio));
+  CHECK(zToXYRatio > 0.0);
+  if (traceMask.isEmpty()) {
+    return;
+  }
+  CHECK(traceMask.numChannels() == 1);
+  CHECK(traceMask.numTimes() == 1);
+  CHECK(traceMask.isType<uint8_t>()) << traceMask.info();
+
+  const double indexZToXYRatio = swcIndex.zToXYRatio();
+  CHECK(std::abs(indexZToXYRatio - zToXYRatio) < 1e-9)
+    << "labelSwcIndexIntoRoiDenseTraceMaskForRecoveryLegacyLike: swcIndex.zToXYRatio=" << indexZToXYRatio
+    << " does not match zToXYRatio=" << zToXYRatio;
+
+  constexpr int kMaskValue = 1;
+
+  size_t labeledSegments = 0;
+
+  const int64_t roiW = roi.maxX - roi.minX;
+  const int64_t roiH = roi.maxY - roi.minY;
+  const int64_t roiD = roi.maxZ - roi.minZ;
+  CHECK(roiW >= 0);
+  CHECK(roiH >= 0);
+  CHECK(roiD >= 0);
+  CHECK(static_cast<size_t>(roiW) == traceMask.width());
+  CHECK(static_cast<size_t>(roiH) == traceMask.height());
+  CHECK(static_cast<size_t>(roiD) == traceMask.depth());
+
+  const glm::dvec3 minCorner{static_cast<double>(roi.minX),
+                             static_cast<double>(roi.minY),
+                             static_cast<double>(roi.minZ)};
+  const glm::dvec3 maxCorner{static_cast<double>(roi.maxX),
+                             static_cast<double>(roi.maxY),
+                             static_cast<double>(roi.maxZ)};
+
+  const std::vector<ZSwcSpatialIndex::Segment> segments = swcIndex.querySegmentsIntersectingBox(minCorner, maxCorner);
+
+  LocsegLabelWorkspaceLegacyLike labelWs;
+  labelWs.option = 1;
+  labelWs.value = kMaskValue;
+  labelWs.flag = 0;
+  labelWs.sratio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
+  labelWs.sdiff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
+  labelWs.slimit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
+
+  const double roiMinX = static_cast<double>(roi.minX);
+  const double roiMinY = static_cast<double>(roi.minY);
+  const double roiMinZ = static_cast<double>(roi.minZ);
+  const double roiMinTraceZ = roiMinZ * zToXYRatio;
+
+  for (const auto& seg : segments) {
+    const glm::dvec3 ab = seg.b - seg.a;
+    const double ab2 = glm::dot(ab, ab);
+    if (ab2 <= 1e-12) {
+      const double r = swellRadiusForExclusionMaskLegacyLike(seg.ra);
+      if (r <= 0.0) {
+        continue;
+      }
+      geo3dBallLabelStackLegacyLike({seg.a.x - roiMinX, seg.a.y - roiMinY, seg.a.z - roiMinZ},
+                                    r,
+                                    traceMask,
+                                    kMaskValue);
+      ++labeledSegments;
+      continue;
+    }
+
+    LocalNeuroseg locseg;
+    locseg.pos = {seg.a.x - roiMinX, seg.a.y - roiMinY, seg.a.z * zToXYRatio - roiMinTraceZ};
+    const std::array<double, 3> top = {seg.b.x - roiMinX, seg.b.y - roiMinY, seg.b.z * zToXYRatio - roiMinTraceZ};
+    localNeurosegChangeTopLegacyLike(locseg, top);
+
+    locseg.seg.r1 = seg.ra;
+    locseg.seg.scale = 1.0;
+
+    const double adjustedHeight = locseg.seg.h - 1.0;
+    if (adjustedHeight < 0.001) {
+      locseg.seg.c = 1.0;
+    } else {
+      locseg.seg.c = (seg.rb - seg.ra) / adjustedHeight;
+    }
+
+    locseg.seg.alpha = 0.0;
+    locseg.seg.curvature = 0.0;
+
+    localNeurosegLabelWLegacyLike(locseg, traceMask, zToXYRatio, labelWs);
+    ++labeledSegments;
+  }
+
+  VLOG(1) << fmt::format("Blocked auto trace: prefilled ROI dense trace mask from SWC index "
+                         "(segmentsLabeled={}, roi={}).",
+                         labeledSegments,
+                         BlockGrid::boundsToString(roi));
+}
 
 [[nodiscard]] bool pointInBoundsForVoxelSampling(const BlockGrid::Bounds& b, const std::array<double, 3>& p)
 {
@@ -723,6 +860,15 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   swcIndex->setZToXYRatio(state.manifest.zToXYRatio);
   swcIndex->rebuild(state.swc);
 
+  const bool useGeometryTraceMask =
+    FLAGS_atlas_trace_use_swc_geometry_mask && FLAGS_atlas_autotrace_use_swc_geometry_mask;
+  std::shared_ptr<ZSwcSpatialIndex> traceMaskIndex;
+  if (useGeometryTraceMask) {
+    traceMaskIndex = std::make_shared<ZSwcSpatialIndex>();
+    traceMaskIndex->setZToXYRatio(state.manifest.zToXYRatio);
+    traceMaskIndex->rebuild(state.swc);
+  }
+
   LOG(INFO) << fmt::format("Base dataset: {}x{}x{}", baseW, baseH, baseD);
   LOG(INFO) << fmt::format("Tracing dataset: {}x{}x{}", grid.shape.width, grid.shape.height, grid.shape.depth);
   LOG(INFO) << fmt::format("Block core: {}x{}x{}, halo={}",
@@ -1025,14 +1171,18 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     tw.resolution = traceResolutionFromZToXYRatioLegacyLike(state.manifest.zToXYRatio);
     prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Auto, tw);
 
+    std::shared_ptr<ZSwcSpatialIndex> taskSwcMaskIndex = swcIndex;
+    if (useGeometryTraceMask) {
+      CHECK(traceMaskIndex != nullptr);
+      taskSwcMaskIndex = traceMaskIndex;
+    }
+
     tw.traceMaskVolume = std::make_unique<ZSwcGeometryMaskVolume>(
-      swcIndex,
+      taskSwcMaskIndex,
       signal.width(),
       signal.height(),
       signal.depth(),
-      state.manifest.zToXYRatio,
-      glm::dvec3{static_cast<double>(roi.minX), static_cast<double>(roi.minY), static_cast<double>(roi.minZ)},
-      ZSwcGeometryMaskQuerySpace::ImageSpace);
+      glm::dvec3{static_cast<double>(roi.minX), static_cast<double>(roi.minY), static_cast<double>(roi.minZ)});
 
     LocalNeuroseg seedLocseg = task.endLocseg;
     seedLocseg.pos[0] -= static_cast<double>(roi.minX);
@@ -1076,15 +1226,22 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
       if (parentId >= 0) {
         auto pit = state.nodeById.find(parentId);
         CHECK(pit != state.nodeById.end());
-        swcIndex->insertSegment(glm::dvec3{pit->second->x, pit->second->y, pit->second->z},
-                                glm::dvec3{d.x, d.y, d.z},
-                                std::max(0.0, pit->second->radius),
-                                std::max(0.0, d.radius));
+        const glm::dvec3 a{pit->second->x, pit->second->y, pit->second->z};
+        const glm::dvec3 b{d.x, d.y, d.z};
+        const double ra = std::max(0.0, pit->second->radius);
+        const double rb = std::max(0.0, d.radius);
+        swcIndex->insertSegment(a, b, ra, rb);
+        if (traceMaskIndex) {
+          traceMaskIndex->insertSegment(a, b, ra, rb);
+        }
       } else {
-        swcIndex->insertSegment(glm::dvec3{d.x, d.y, d.z},
-                                glm::dvec3{d.x, d.y, d.z},
-                                std::max(0.0, d.radius),
-                                std::max(0.0, d.radius));
+        const glm::dvec3 a{d.x, d.y, d.z};
+        const glm::dvec3 b{d.x, d.y, d.z};
+        const double r = std::max(0.0, d.radius);
+        swcIndex->insertSegment(a, b, r, r);
+        if (traceMaskIndex) {
+          traceMaskIndex->insertSegment(a, b, r, r);
+        }
       }
       return id;
     };
@@ -1373,14 +1530,13 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
                                  blockId.bz,
                                  seeds.size());
 
-        // Filter: exclude halo seeds, then exclude seeds inside already traced SWC geometry.
+        // Filter: exclude halo seeds (we only trace core; halo is padding for boundary continuity).
         std::vector<std::array<double, 3>> keptSeedPts;
         keptSeedPts.reserve(seeds.points.size());
         std::vector<double> keptSeedVals;
         keptSeedVals.reserve(seeds.values.size());
 
         size_t seedsSkippedHalo = 0;
-        size_t seedsSkippedSwcHitInitial = 0;
 
         for (size_t i = 0; i < seeds.points.size(); ++i) {
           const int64_t lx = static_cast<int64_t>(seeds.points[i][0]);
@@ -1397,217 +1553,265 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
             continue; // halo
           }
 
-          if (swcIndex->containsPoint(static_cast<double>(gx), static_cast<double>(gy), static_cast<double>(gz))) {
-            ++seedsSkippedSwcHitInitial;
-            continue;
-          }
-
           keptSeedPts.push_back({static_cast<double>(lx), static_cast<double>(ly), static_cast<double>(lz)});
           keptSeedVals.push_back(seeds.values[i]);
         }
 
-        LOG(INFO) << fmt::format(
-          "Blocked auto trace: block ({},{},{}) kept {} seeds after halo/SWC filter (skippedHalo={}, skippedSwcHitInitial={}).",
-          blockId.bx,
-          blockId.by,
-          blockId.bz,
-          keptSeedPts.size(),
-          seedsSkippedHalo,
-          seedsSkippedSwcHitInitial);
+        Geo3dScalarField keptSeeds;
+        keptSeeds.points = std::move(keptSeedPts);
+        keptSeeds.values = std::move(keptSeedVals);
+        CHECK(keptSeeds.points.size() == keptSeeds.values.size());
 
-        // Trace each seed independently (no dense trace mask).
-        LOG(INFO) << fmt::format("Blocked auto trace: block ({},{},{}) trace kept seeds ...",
-                                 blockId.bx,
-                                 blockId.by,
-                                 blockId.bz);
-
-        const size_t numSeedsToTrace = keptSeedPts.size();
-        size_t seedsTraced = 0;
-        size_t seedsSkippedHitTest = 0;
-        size_t seedsSkippedShortChain = 0;
-        size_t seedsSkippedScoreOrWidth = 0;
-        size_t seedsSkippedOther = 0;
-
-        auto lastProgressLog = std::chrono::steady_clock::now();
-        const auto kProgressInterval = std::chrono::seconds(5);
-
-        for (size_t i = 0; i < keptSeedPts.size(); ++i) {
-          maybeCancel(m_cancellationToken);
-
-          if (VLOG_IS_ON(1)) {
-            const auto now = std::chrono::steady_clock::now();
-            if (i < 3 || (i + 1) == numSeedsToTrace || (now - lastProgressLog) >= kProgressInterval) {
-              VLOG(1) << fmt::format("Blocked auto trace: block ({},{},{}) seed {}/{} (traced={}, swcNodes={})",
-                                     blockId.bx,
-                                     blockId.by,
-                                     blockId.bz,
-                                     i + 1,
-                                     numSeedsToTrace,
-                                     seedsTraced,
-                                     state.swc.size());
-              lastProgressLog = now;
-            }
-          }
-
-          const int x = static_cast<int>(keptSeedPts[i][0]);
-          const int y = static_cast<int>(keptSeedPts[i][1]);
-          const int z = static_cast<int>(keptSeedPts[i][2]);
-
-          if (swcIndex->containsPoint(static_cast<double>(x) + roi.minX,
-                                      static_cast<double>(y) + roi.minY,
-                                      static_cast<double>(z) + roi.minZ)) {
-            ++seedsSkippedHitTest;
-            continue;
-          }
-
+        if (keptSeeds.points.empty()) {
+          LOG(INFO) << fmt::format("Blocked auto trace: block ({},{},{}) no seeds to trace after halo filter.",
+                                   blockId.bx,
+                                   blockId.by,
+                                   blockId.bz);
+        } else {
           const double roiMinTraceZ = static_cast<double>(roi.minZ) * state.manifest.zToXYRatio;
+
           TraceWorkspace tw;
           locsegChainDefaultTraceWorkspaceLegacyLike(tw, signal);
           tw.cancellationToken = m_cancellationToken;
           tw.refit = cfg.refit;
           tw.tuneEnd = cfg.tuneEnd;
-          tw.traceMaskUpdating = false;
+          tw.traceMaskUpdating = true;
           tw.resolution = traceResolutionFromZToXYRatioLegacyLike(state.manifest.zToXYRatio);
-          prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Auto, tw);
 
-          tw.traceMaskVolume = std::make_unique<ZSwcGeometryMaskVolume>(
-            swcIndex,
-            signal.width(),
-            signal.height(),
-            signal.depth(),
-            state.manifest.zToXYRatio,
-            glm::dvec3{static_cast<double>(roi.minX), static_cast<double>(roi.minY), static_cast<double>(roi.minZ)},
-            ZSwcGeometryMaskQuerySpace::ImageSpace);
-
-          LocalNeuroseg seedLocseg;
-          double widthValue = keptSeedVals[i];
-          if (widthValue < 3.0) {
-            widthValue += 0.5;
+          if (useGeometryTraceMask) {
+            CHECK(traceMaskIndex != nullptr);
+            tw.traceMaskVolume = std::make_unique<ZSwcGeometryMaskVolume>(
+              traceMaskIndex,
+              signal.width(),
+              signal.height(),
+              signal.depth(),
+              glm::dvec3{static_cast<double>(roi.minX), static_cast<double>(roi.minY), static_cast<double>(roi.minZ)});
+          } else {
+            // Dense mode: prefill the ROI mask from already-traced global SWC so this block is processed like an
+            // in-memory run on an ROI with pre-existing traced geometry.
+            traceWorkspaceInitTraceMaskLegacyLike(tw, signal, /*clearing*/ true);
+            CHECK(tw.traceMask != nullptr);
+            labelSwcIndexIntoRoiDenseTraceMaskForRecoveryLegacyLike(*swcIndex,
+                                                                    *tw.traceMask,
+                                                                    roi,
+                                                                    state.manifest.zToXYRatio);
           }
-          seedLocseg.seg.r1 = widthValue;
-          seedLocseg.seg.c = 0.0;
-          seedLocseg.seg.h = NeurosegDefaultHLegacyLike;
-          seedLocseg.seg.theta = 0.0;
-          seedLocseg.seg.psi = 0.0;
-          seedLocseg.seg.curvature = 0.0;
-          seedLocseg.seg.alpha = 0.0;
-          seedLocseg.seg.scale = 1.0;
 
-          setNeurosegPositionLegacyLike(
-            seedLocseg,
-            {static_cast<double>(x), static_cast<double>(y), static_cast<double>(z) * state.manifest.zToXYRatio},
-            NeuroposReferenceLegacyLike::Center);
+          const size_t seedsBeforeTracedFilter = keptSeeds.size();
+          keptSeeds = removeTracedSeedLegacyLike(keptSeeds, tw);
+          const size_t seedsSkippedTracedMask = seedsBeforeTracedFilter - keptSeeds.size();
 
-          (void)localNeurosegOptimizeWLegacyLike(seedLocseg,
-                                                 signal,
-                                                 state.manifest.zToXYRatio,
-                                                 /*option*/ 0,
-                                                 tw.fitWorkspace);
-          maybeCancel(m_cancellationToken);
+          LOG(INFO) << fmt::format(
+            "Blocked auto trace: block ({},{},{}) kept {} seeds after halo/trace-mask filter (skippedHalo={}, skippedTracedMask={}).",
+            blockId.bx,
+            blockId.by,
+            blockId.bz,
+            keptSeeds.size(),
+            seedsSkippedHalo,
+            seedsSkippedTracedMask);
 
-          LocsegChain chain;
-          LocsegNode node;
-          node.locseg = seedLocseg;
-          traceRecordReset(node.tr);
-          traceRecordSetDirection(node.tr, TraceDirection::BothDir);
-          (void)chain.addNode(std::move(node), LocsegChainEndLegacyLike::Tail);
-
-          traceWorkspaceSetTraceStatusLegacyLike(tw, TraceStatus::Normal, TraceStatus::Normal);
-          traceLocsegLegacyLike(signal, state.manifest.zToXYRatio, chain, tw);
-          maybeCancel(m_cancellationToken);
-
-          if (chain.length() < 2) {
-            ++seedsSkippedShortChain;
+          if (keptSeeds.points.empty()) {
+            LOG(INFO) << fmt::format(
+              "Blocked auto trace: block ({},{},{}) no seeds to trace after halo/trace-mask filter.",
+              blockId.bx,
+              blockId.by,
+              blockId.bz);
             continue;
           }
 
-          // Append as a new root chain.
-          int64_t parentId = -1;
-          int64_t firstId = -1;
-          int64_t lastId = -1;
-          int idx = 0;
-          for (const auto& cn : chain) {
-            const int64_t id = nextNodeId++;
-            const ZBlockedAutoTraceSwcDeltaNode d = makeDeltaNode(id,
-                                                                  parentId,
-                                                                  cn.locseg,
-                                                                  glm::dvec3{roi.minX, roi.minY, roi.minZ},
-                                                                  state.manifest.zToXYRatio);
-            appendDeltaNodeToSwcOrThrow(d, state.swc, state.nodeById);
-            deltaNodes.push_back(d);
+          LOG(INFO) << fmt::format("Blocked auto trace: block ({},{},{}) sort seeds (in-memory pipeline) ...",
+                                   blockId.bx,
+                                   blockId.by,
+                                   blockId.bz);
+          prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Seed, tw);
+          SeedSortResultLegacyLike sorted = sortSeedsLegacyLike(keptSeeds, signal, state.manifest.zToXYRatio, tw);
+          std::optional<ZImg> baseMask = std::move(sorted.baseMask);
 
-            if (idx == 0) {
-              firstId = id;
+          LOG(INFO) << fmt::format("Blocked auto trace: block ({},{},{}) trace all seeds (in-memory pipeline) ...",
+                                   blockId.bx,
+                                   blockId.by,
+                                   blockId.bz);
+          prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Auto, tw);
+
+          std::vector<TraceAllSeedsEndStatusLegacyLike> chainEnds;
+          std::vector<std::unique_ptr<LocsegChain>> chains = traceAllSeedsLegacyLike(signal,
+                                                                                     state.manifest.zToXYRatio,
+                                                                                     sorted.locsegArray,
+                                                                                     sorted.scoreArray,
+                                                                                     tw,
+                                                                                     &chainEnds);
+          maybeCancel(m_cancellationToken);
+          CHECK(chainEnds.size() == chains.size());
+
+          if (cfg.recover > 0) {
+            if (useGeometryTraceMask && !tw.traceMask && tw.traceMaskVolume) {
+              LOG(INFO) << fmt::format(
+                "Blocked auto trace: block ({},{},{}) materialize dense trace mask for legacy recovery ...",
+                blockId.bx,
+                blockId.by,
+                blockId.bz);
+
+              traceWorkspaceInitTraceMaskLegacyLike(tw, signal, /*clearing*/ true);
+              CHECK(tw.traceMask != nullptr);
+              labelSwcIndexIntoRoiDenseTraceMaskForRecoveryLegacyLike(*swcIndex,
+                                                                      *tw.traceMask,
+                                                                      roi,
+                                                                      state.manifest.zToXYRatio);
+
+              LocsegLabelWorkspaceLegacyLike labelWs;
+              labelWs.signal = &signal;
+              labelWs.sratio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
+              labelWs.sdiff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
+              labelWs.slimit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
+              labelWs.option = 1;
+              labelWs.value = 1;
+              labelWs.flag = 0;
+
+              for (const auto& chain : chains) {
+                if (!chain || chain->empty()) {
+                  continue;
+                }
+                locsegChainLabelWLegacyLike(*chain,
+                                            *tw.traceMask,
+                                            state.manifest.zToXYRatio,
+                                            /*begin*/ 0,
+                                            /*end*/ chain->length() - 1,
+                                            labelWs);
+              }
             }
-            lastId = id;
 
-            if (parentId >= 0) {
-              auto pit = state.nodeById.find(parentId);
-              CHECK(pit != state.nodeById.end());
-              swcIndex->insertSegment(glm::dvec3{pit->second->x, pit->second->y, pit->second->z},
-                                      glm::dvec3{d.x, d.y, d.z},
-                                      std::max(0.0, pit->second->radius),
-                                      std::max(0.0, d.radius));
-            } else {
-              swcIndex->insertSegment(glm::dvec3{d.x, d.y, d.z},
-                                      glm::dvec3{d.x, d.y, d.z},
-                                      std::max(0.0, d.radius),
-                                      std::max(0.0, d.radius));
+            LOG(INFO) << fmt::format("Blocked auto trace: block ({},{},{}) recover (in-memory pipeline) ...",
+                                     blockId.bx,
+                                     blockId.by,
+                                     blockId.bz);
+            RecoverResultLegacyLike recovered =
+              recoverLegacyLike(signal, cfg, state.manifest.zToXYRatio, mask, std::move(baseMask), tw);
+            maybeCancel(m_cancellationToken);
+
+            CHECK(recovered.chains.size() == recovered.chainEndStatuses.size());
+            for (auto& c : recovered.chains) {
+              chains.push_back(std::move(c));
             }
+            for (const auto& e : recovered.chainEndStatuses) {
+              chainEnds.push_back(e);
+            }
+            CHECK(chainEnds.size() == chains.size());
 
-            parentId = id;
-            ++idx;
+            LOG(INFO) << fmt::format(
+              "Blocked auto trace: block ({},{},{}) recover done (chainsFromRecover={}, totalChains={}).",
+              blockId.bx,
+              blockId.by,
+              blockId.bz,
+              recovered.chainEndStatuses.size(),
+              chains.size());
           }
 
-          ++seedsTraced;
+          LOG(INFO) << fmt::format("Blocked auto trace: block ({},{},{}) append traced chains to SWC (chains={}) ...",
+                                   blockId.bx,
+                                   blockId.by,
+                                   blockId.bz,
+                                   chains.size());
 
-          // Emit frontier tasks if this chain reached the ROI boundary.
-          if (tw.traceStatus[0] == TraceStatus::OutOfBound && firstId > 0) {
-            LocalNeuroseg endGlobal = chain.head()->locseg;
-            endGlobal.pos[0] += static_cast<double>(roi.minX);
-            endGlobal.pos[1] += static_cast<double>(roi.minY);
-            endGlobal.pos[2] += roiMinTraceZ;
-            (void)tryAppendContinuationTask(endGlobal,
+          size_t chainsAppended = 0;
+          size_t frontierTasksAdded = 0;
+
+          for (size_t ci = 0; ci < chains.size(); ++ci) {
+            if (!chains[ci] || chains[ci]->empty()) {
+              continue;
+            }
+
+            const TraceAllSeedsEndStatusLegacyLike endStatus = chainEnds[ci];
+            const LocsegChain& chain = *chains[ci];
+
+            // Append as a new root chain.
+            int64_t parentId = -1;
+            int64_t firstId = -1;
+            int64_t lastId = -1;
+            int idx = 0;
+            for (const auto& cn : chain) {
+              const int64_t id = nextNodeId++;
+              const ZBlockedAutoTraceSwcDeltaNode d = makeDeltaNode(id,
+                                                                    parentId,
+                                                                    cn.locseg,
+                                                                    glm::dvec3{roi.minX, roi.minY, roi.minZ},
+                                                                    state.manifest.zToXYRatio);
+              appendDeltaNodeToSwcOrThrow(d, state.swc, state.nodeById);
+              deltaNodes.push_back(d);
+
+              if (idx == 0) {
+                firstId = id;
+              }
+              lastId = id;
+
+              if (parentId >= 0) {
+                auto pit = state.nodeById.find(parentId);
+                CHECK(pit != state.nodeById.end());
+                const glm::dvec3 a{pit->second->x, pit->second->y, pit->second->z};
+                const glm::dvec3 b{d.x, d.y, d.z};
+                const double ra = std::max(0.0, pit->second->radius);
+                const double rb = std::max(0.0, d.radius);
+                swcIndex->insertSegment(a, b, ra, rb);
+                if (traceMaskIndex) {
+                  traceMaskIndex->insertSegment(a, b, ra, rb);
+                }
+              } else {
+                const glm::dvec3 a{d.x, d.y, d.z};
+                const glm::dvec3 b{d.x, d.y, d.z};
+                const double r = std::max(0.0, d.radius);
+                swcIndex->insertSegment(a, b, r, r);
+                if (traceMaskIndex) {
+                  traceMaskIndex->insertSegment(a, b, r, r);
+                }
+              }
+
+              parentId = id;
+              ++idx;
+            }
+
+            ++chainsAppended;
+
+            // Emit frontier tasks if this chain reached the ROI boundary.
+            if (endStatus[0] == TraceStatus::OutOfBound && firstId > 0) {
+              LocalNeuroseg endGlobal = chain.head()->locseg;
+              endGlobal.pos[0] += static_cast<double>(roi.minX);
+              endGlobal.pos[1] += static_cast<double>(roi.minY);
+              endGlobal.pos[2] += roiMinTraceZ;
+              if (tryAppendContinuationTask(endGlobal,
                                             firstId,
                                             TraceDirection::Backward,
                                             blockKey,
                                             "OutOfBlockHalo",
-                                            state.frontier);
-          }
-          if (tw.traceStatus[1] == TraceStatus::OutOfBound && lastId > 0) {
-            LocalNeuroseg endGlobal = chain.tail()->locseg;
-            endGlobal.pos[0] += static_cast<double>(roi.minX);
-            endGlobal.pos[1] += static_cast<double>(roi.minY);
-            endGlobal.pos[2] += roiMinTraceZ;
-            (void)tryAppendContinuationTask(endGlobal,
+                                            state.frontier)) {
+                ++frontierTasksAdded;
+              }
+            }
+            if (endStatus[1] == TraceStatus::OutOfBound && lastId > 0) {
+              LocalNeuroseg endGlobal = chain.tail()->locseg;
+              endGlobal.pos[0] += static_cast<double>(roi.minX);
+              endGlobal.pos[1] += static_cast<double>(roi.minY);
+              endGlobal.pos[2] += roiMinTraceZ;
+              if (tryAppendContinuationTask(endGlobal,
                                             lastId,
                                             TraceDirection::Forward,
                                             blockKey,
                                             "OutOfBlockHalo",
-                                            state.frontier);
+                                            state.frontier)) {
+                ++frontierTasksAdded;
+              }
+            }
           }
-        }
 
-        const size_t deltaNodesAfterSeeds = deltaNodes.size();
-        const size_t deltaNodesFromSeeds = deltaNodesAfterSeeds - deltaNodesAfterPending;
-        LOG(INFO) << fmt::format(
-          "Blocked auto trace: block ({},{},{}) traced seeds done (keptSeeds={}, tracedSeeds={}, skippedHitTest={}, skippedShortChain={}, deltaNodesFromSeeds={}, frontierNow={})",
-          blockId.bx,
-          blockId.by,
-          blockId.bz,
-          numSeedsToTrace,
-          seedsTraced,
-          seedsSkippedHitTest,
-          seedsSkippedShortChain,
-          deltaNodesFromSeeds,
-          state.frontier.size());
-        if (seedsSkippedScoreOrWidth > 0 || seedsSkippedOther > 0) {
-          VLOG(1) << fmt::format("Blocked auto trace: block ({},{},{}) seed skip summary: scoreOrWidth={}, other={}",
-                                 blockId.bx,
-                                 blockId.by,
-                                 blockId.bz,
-                                 seedsSkippedScoreOrWidth,
-                                 seedsSkippedOther);
+          const size_t deltaNodesAfterSeeds = deltaNodes.size();
+          const size_t deltaNodesFromSeeds = deltaNodesAfterSeeds - deltaNodesAfterPending;
+          LOG(INFO) << fmt::format(
+            "Blocked auto trace: block ({},{},{}) traced seeds done (chainsAppended={}, deltaNodesFromSeeds={}, frontierTasksAdded={}, frontierNow={})",
+            blockId.bx,
+            blockId.by,
+            blockId.bz,
+            chainsAppended,
+            deltaNodesFromSeeds,
+            frontierTasksAdded,
+            state.frontier.size());
         }
       } else {
         LOG(INFO) << fmt::format("Blocked auto trace: block ({},{},{}) make mask failed (null mask).",
