@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zimg.h"
 #include "zimgprocess.h"
 
 #include <array>
@@ -12,9 +13,14 @@ class ZSwc;
 class ZNeutubeSkeletonizeProcess final : public ZImgProcess
 {
 public:
+  void setInputImageSource(ZImgSource source)
+  {
+    m_inputImageSource = std::move(source);
+  }
+
   void setInputImagePath(QString path)
   {
-    m_inputImagePath = std::move(path);
+    m_inputImageSource = ZImgSource(std::move(path));
   }
 
   void setSkeletonizeConfigPath(QString path)
@@ -63,7 +69,7 @@ private:
   void writeSwcAtomicOrThrow(ZSwc& tree) const;
 
 private:
-  QString m_inputImagePath;
+  std::optional<ZImgSource> m_inputImageSource;
   QString m_skeletonizeConfigPath;
   std::optional<json::object> m_skeletonizeConfig;
   std::optional<std::array<int, 3>> m_downsampleIntervalOverride;

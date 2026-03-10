@@ -27,6 +27,16 @@ public:
 
   ZNeutubeAutoTraceProcess() = default;
 
+  void setInputImageSource(ZImgSource source)
+  {
+    m_inputImageSource = std::move(source);
+  }
+
+  void setInputImagePath(QString path)
+  {
+    m_inputImageSource = ZImgSource(std::move(path));
+  }
+
   void setSignalProvider(SignalProvider provider)
   {
     m_signalProvider = std::move(provider);
@@ -48,6 +58,16 @@ public:
   void setTraceConfigPath(QString path)
   {
     m_traceConfigPath = std::move(path);
+  }
+
+  void setTraceConfig(json::object cfg)
+  {
+    m_traceConfig = std::move(cfg);
+  }
+
+  void clearTraceConfig()
+  {
+    m_traceConfig.reset();
   }
 
   // 0 means "default" (no per-level override), matching NeuTu semantics.
@@ -116,9 +136,12 @@ private:
 
   [[nodiscard]] TraceConfig buildEffectiveTraceConfigOrThrow() const;
 
+  [[nodiscard]] double effectiveZToXYRatioOrThrow(const ZImgInfo& signalInfo) const;
+
   void writeSwcAtomicOrThrow(ZSwc& tree) const;
 
 private:
+  std::optional<ZImgSource> m_inputImageSource;
   SignalProvider m_signalProvider;
 
   size_t m_selectedChannel = 0;
@@ -126,6 +149,7 @@ private:
   std::optional<double> m_zToXYRatio;
 
   QString m_traceConfigPath;
+  std::optional<json::object> m_traceConfig;
   int m_traceLevel = 0;
 
   bool m_haveAlgoOverrides = false;

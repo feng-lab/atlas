@@ -1,6 +1,7 @@
 #include "zneutubeautotraceprocess.h"
 
 #include "zneutubetraceauto.h"
+#include "zneutubetracezscale.h"
 
 #include "zcancellation.h"
 #include "zexception.h"
@@ -39,16 +40,80 @@ void rescaleSwcInPlace(ZSwc& tree, double scaleX, double scaleY, double scaleZ, 
   }
 }
 
+[[nodiscard]] ZImgRegion selectedChannelTimeRegionOrThrow(const ZImgInfo& info, size_t c, size_t t)
+{
+  if (c >= info.numChannels || t >= info.numTimes) {
+    throw ZException(
+      fmt::format("Auto Trace failed: invalid channel/time selection (c={}, t={}) for signal <{}>.", c, t, info));
+  }
+
+  const auto cStart = static_cast<ZImgRegion::value_type>(c);
+  const auto cEnd = static_cast<ZImgRegion::value_type>(c + 1);
+  const auto tStart = static_cast<ZImgRegion::value_type>(t);
+  const auto tEnd = static_cast<ZImgRegion::value_type>(t + 1);
+  return ZImgRegion(0, -1, 0, -1, 0, -1, cStart, cEnd, tStart, tEnd);
+}
+
+[[nodiscard]] ZImgSource sourceWithRelativeRegion(const ZImgSource& source, const ZImgRegion& subregion)
+{
+  ZImgSource out = source;
+  auto offsetStart = [](ZImgRegion::value_type base, ZImgRegion::value_type rel) -> ZImgRegion::value_type {
+    CHECK(base >= 0);
+    CHECK(rel >= 0);
+    return base + rel;
+  };
+  auto offsetEnd = [](ZImgRegion::value_type baseStart,
+                      ZImgRegion::value_type baseEnd,
+                      ZImgRegion::value_type relEnd) -> ZImgRegion::value_type {
+    if (relEnd == -1) {
+      return baseEnd;
+    }
+    CHECK(baseStart >= 0);
+    CHECK(relEnd >= 0);
+    return baseStart + relEnd;
+  };
+
+  out.region.start.x = offsetStart(source.region.start.x, subregion.start.x);
+  out.region.start.y = offsetStart(source.region.start.y, subregion.start.y);
+  out.region.start.z = offsetStart(source.region.start.z, subregion.start.z);
+  out.region.start.c = offsetStart(source.region.start.c, subregion.start.c);
+  out.region.start.t = offsetStart(source.region.start.t, subregion.start.t);
+
+  out.region.end.x = offsetEnd(source.region.start.x, source.region.end.x, subregion.end.x);
+  out.region.end.y = offsetEnd(source.region.start.y, source.region.end.y, subregion.end.y);
+  out.region.end.z = offsetEnd(source.region.start.z, source.region.end.z, subregion.end.z);
+  out.region.end.c = offsetEnd(source.region.start.c, source.region.end.c, subregion.end.c);
+  out.region.end.t = offsetEnd(source.region.start.t, source.region.end.t, subregion.end.t);
+  return out;
+}
+
 } // namespace
 
 ZImg ZNeutubeAutoTraceProcess::loadSelectedSignalOrThrow() const
 {
-  if (!m_signalProvider) {
-    throw ZException("Auto Trace failed: no signal provider configured.");
+  if (m_signalProvider) {
+    maybeCancel(m_cancellationToken);
+    ZImg signal = m_signalProvider(m_cancellationToken);
+    maybeCancel(m_cancellationToken);
+
+    if (!signal.isEmpty()) {
+      CHECK(signal.numChannels() == 1);
+      CHECK(signal.numTimes() == 1);
+    }
+    return signal;
   }
 
+  if (!m_inputImageSource.has_value()) {
+    throw ZException("Auto Trace failed: no signal provider or input image source configured.");
+  }
+
+  const ZImgInfo info = ZImg::readImgInfo(*m_inputImageSource);
+  const ZImgRegion region = selectedChannelTimeRegionOrThrow(info, m_selectedChannel, m_selectedTime);
+  const ZImgSource signalSource = sourceWithRelativeRegion(*m_inputImageSource, region);
+
   maybeCancel(m_cancellationToken);
-  ZImg signal = m_signalProvider(m_cancellationToken);
+  ZImg signal;
+  signal.load(signalSource, m_signalDownsampleRatio[0], m_signalDownsampleRatio[1], m_signalDownsampleRatio[2]);
   maybeCancel(m_cancellationToken);
 
   if (!signal.isEmpty()) {
@@ -62,7 +127,12 @@ TraceConfig ZNeutubeAutoTraceProcess::buildEffectiveTraceConfigOrThrow() const
 {
   TraceConfig cfg;
 
-  if (!m_traceConfigPath.isEmpty()) {
+  if (m_traceConfig) {
+    const bool ok = loadTraceConfigLegacyLike(*m_traceConfig, cfg);
+    if (!ok) {
+      cfg = TraceConfig{};
+    }
+  } else if (!m_traceConfigPath.isEmpty()) {
     const bool ok = loadTraceConfigLegacyLike(m_traceConfigPath.toStdString(), cfg);
     if (!ok) {
       cfg = TraceConfig{};
@@ -97,6 +167,17 @@ TraceConfig ZNeutubeAutoTraceProcess::buildEffectiveTraceConfigOrThrow() const
   }
 
   return cfg;
+}
+
+double ZNeutubeAutoTraceProcess::effectiveZToXYRatioOrThrow(const ZImgInfo& signalInfo) const
+{
+  if (m_zToXYRatio.has_value()) {
+    return *m_zToXYRatio;
+  }
+  if (signalInfo.isEmpty()) {
+    throw ZException("Auto Trace failed: missing zToXYRatio and signal metadata.");
+  }
+  return preferredZToXYRatioFromImgInfoLegacyLike(signalInfo, m_signalDownsampleRatio);
 }
 
 void ZNeutubeAutoTraceProcess::writeSwcAtomicOrThrow(ZSwc& tree) const
@@ -136,10 +217,6 @@ void ZNeutubeAutoTraceProcess::doWork()
   LOG(INFO) << "Atlas Auto Trace";
   LOG(INFO) << "Selected channel (0-based): " << m_selectedChannel;
   LOG(INFO) << "Selected time (0-based): " << m_selectedTime;
-  if (!m_zToXYRatio.has_value()) {
-    throw ZException("Auto Trace failed: missing zToXYRatio.");
-  }
-  LOG(INFO) << fmt::format("Tracing zToXYRatio: {:.6g}", *m_zToXYRatio);
   LOG(INFO) << "Signal downsample ratio: [" << m_signalDownsampleRatio[0] << "," << m_signalDownsampleRatio[1] << ","
             << m_signalDownsampleRatio[2] << "]";
   LOG(INFO) << "Budget level override (0=default): " << m_traceLevel;
@@ -153,6 +230,8 @@ void ZNeutubeAutoTraceProcess::doWork()
     LOG(INFO) << "Auto Trace: signal is empty.";
     return;
   }
+  const double zToXYRatio = effectiveZToXYRatioOrThrow(signal.info());
+  LOG(INFO) << fmt::format("Tracing zToXYRatio: {:.6g}", zToXYRatio);
 
   TraceConfig cfg = buildEffectiveTraceConfigOrThrow();
 
@@ -175,7 +254,7 @@ void ZNeutubeAutoTraceProcess::doWork()
   maybeCancel(m_cancellationToken);
   std::unique_ptr<ZSwc> swc = traceNeuronAutoLegacyLike(std::move(signal),
                                                         cfg,
-                                                        *m_zToXYRatio,
+                                                        zToXYRatio,
                                                         /*diagnosis=*/false,
                                                         /*verbose=*/false,
                                                         /*doResampleAfterTracing=*/m_doResampleAfterTracing,
@@ -207,11 +286,22 @@ void ZNeutubeAutoTraceProcess::doWork()
 
 void ZNeutubeAutoTraceProcess::read(const json::object& jo)
 {
+  m_inputImageSource.reset();
   if (auto it = jo.find("selected_channel"); it != jo.end()) {
     m_selectedChannel = json::value_to<size_t>(it->value());
   }
   if (auto it = jo.find("selected_time"); it != jo.end()) {
     m_selectedTime = json::value_to<size_t>(it->value());
+  }
+  if (const auto inputImageSourceIt = jo.find("input_image_source"); inputImageSourceIt != jo.end()) {
+    if (inputImageSourceIt->value().is_object()) {
+      m_inputImageSource = json::value_to<ZImgSource>(inputImageSourceIt->value());
+    } else {
+      throw ZException(QStringLiteral("Invalid input_image_source: expected object, got %1")
+                         .arg(QString::fromStdString(jsonTypeName(inputImageSourceIt->value()))));
+    }
+  } else if (const auto inputImagePathIt = jo.find("input_image_path"); inputImagePathIt != jo.end()) {
+    m_inputImageSource = ZImgSource(json::value_to<QString>(inputImagePathIt->value()));
   }
   if (auto it = jo.find("z_scale"); it != jo.end()) {
     setZToXYRatio(json::value_to<double>(it->value()));
@@ -230,6 +320,15 @@ void ZNeutubeAutoTraceProcess::read(const json::object& jo)
   }
   if (auto it = jo.find("trace_config_path"); it != jo.end()) {
     m_traceConfigPath = json::value_to<QString>(it->value());
+  }
+  m_traceConfig.reset();
+  if (auto it = jo.find("trace_config"); it != jo.end()) {
+    if (it->value().is_object()) {
+      m_traceConfig = it->value().as_object();
+    } else {
+      throw ZException(QStringLiteral("Invalid trace_config: expected object, got %1")
+                         .arg(QString::fromStdString(jsonTypeName(it->value()))));
+    }
   }
   if (auto it = jo.find("trace_level"); it != jo.end()) {
     m_traceLevel = json::value_to<int>(it->value());
@@ -297,10 +396,22 @@ void ZNeutubeAutoTraceProcess::read(const json::object& jo)
 
 void ZNeutubeAutoTraceProcess::write(json::object& jo) const
 {
+  if (m_inputImageSource) {
+    jo["input_image_source"] = json::value_from(*m_inputImageSource);
+  }
   jo["selected_channel"] = json::value_from(m_selectedChannel);
   jo["selected_time"] = json::value_from(m_selectedTime);
-  CHECK(m_zToXYRatio.has_value());
-  jo["z_scale"] = json::value_from(*m_zToXYRatio);
+  const auto zToXYRatio = [&]() -> double {
+    if (m_zToXYRatio.has_value()) {
+      return *m_zToXYRatio;
+    }
+    if (m_inputImageSource) {
+      return effectiveZToXYRatioOrThrow(ZImg::readImgInfo(*m_inputImageSource));
+    }
+    throw ZException(
+      "Auto Trace task serialization failed: missing zToXYRatio. Set zToXYRatio explicitly or setInputImageSource().");
+  }();
+  jo["z_scale"] = json::value_from(zToXYRatio);
   {
     json::array a;
     a.push_back(json::value_from(m_signalDownsampleRatio[0]));
@@ -309,6 +420,9 @@ void ZNeutubeAutoTraceProcess::write(json::object& jo) const
     jo["signal_downsample_ratio"] = std::move(a);
   }
   jo["trace_config_path"] = json::value_from(m_traceConfigPath);
+  if (m_traceConfig) {
+    jo["trace_config"] = *m_traceConfig;
+  }
   jo["trace_level"] = json::value_from(m_traceLevel);
   jo["do_resample_after_tracing"] = json::value_from(m_doResampleAfterTracing);
   jo["doc_has_any_swc"] = json::value_from(m_docHasAnySwc);

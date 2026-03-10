@@ -14,6 +14,11 @@
 #include "zchromaticshiftcorrection.h"
 #include "zroimaskrasterizer.h"
 #include "zimgautothreshold.h"
+#include "zneutubeautotraceprocess.h"
+#include "zneutubeblockedautotraceprocess.h"
+#include "zneutubeskeletonizeprocess.h"
+#include "zneutubetraceconfig.h"
+#include "zswcsubtract.h"
 #include "zswc.h"
 #include "zmesh.h"
 #include <nanobind/nanobind.h>
@@ -320,6 +325,76 @@ void validateROIPoints(const std::vector<glm::dvec2>& points, ZROIMaskShapeType 
   }
 
   throw nb::value_error("Unknown ZROIMaskShapeType");
+}
+
+json::value pythonObjectToJsonValue(nb::handle obj)
+{
+  PyObject* ptr = obj.ptr();
+
+  if (ptr == Py_None) {
+    return nullptr;
+  }
+  if (PyBool_Check(ptr)) {
+    return json::value_from(ptr == Py_True);
+  }
+  if (PyLong_Check(ptr)) {
+    int overflow = 0;
+    const long long signedValue = PyLong_AsLongLongAndOverflow(ptr, &overflow);
+    if (!PyErr_Occurred() && overflow == 0) {
+      return json::value_from(static_cast<int64_t>(signedValue));
+    }
+    PyErr_Clear();
+
+    const unsigned long long unsignedValue = PyLong_AsUnsignedLongLong(ptr);
+    if (!PyErr_Occurred()) {
+      return json::value_from(static_cast<uint64_t>(unsignedValue));
+    }
+    PyErr_Clear();
+    throw nb::value_error("Python int is outside the supported JSON integer range");
+  }
+  if (PyFloat_Check(ptr)) {
+    return json::value_from(nb::cast<double>(obj));
+  }
+  if (PyUnicode_Check(ptr)) {
+    return json::value_from(nb::cast<std::string>(obj));
+  }
+  if (PyDict_Check(ptr)) {
+    json::object out;
+    for (auto item : nb::borrow<nb::dict>(obj)) {
+      if (!PyUnicode_Check(item.first.ptr())) {
+        throw nb::type_error("JSON object keys must be strings");
+      }
+      out[nb::cast<std::string>(item.first)] = pythonObjectToJsonValue(item.second);
+    }
+    return out;
+  }
+  if (PyList_Check(ptr) || PyTuple_Check(ptr)) {
+    json::array out;
+    for (nb::handle item : nb::borrow<nb::sequence>(obj)) {
+      out.push_back(pythonObjectToJsonValue(item));
+    }
+    return out;
+  }
+
+  throw nb::type_error("Expected a JSON-compatible Python object");
+}
+
+json::object pythonObjectToJsonObject(nb::handle obj, const char* name)
+{
+  json::value value = pythonObjectToJsonValue(obj);
+  if (!value.is_object()) {
+    throw nb::type_error((std::string(name) + " must be a dict-like JSON object").c_str());
+  }
+  return value.as_object();
+}
+
+template<typename T>
+std::array<T, 3> vectorToArray3(const std::vector<T>& values, const char* name)
+{
+  if (values.size() != 3) {
+    throw nb::value_error((std::string(name) + " must contain exactly 3 elements").c_str());
+  }
+  return {values[0], values[1], values[2]};
 }
 
 } // namespace
@@ -1293,6 +1368,159 @@ See also
     .def("run", &ZPunctaDetection::run)
     .def("__repr__", [](const ZPunctaDetection& v) {
       return fmt::format("<_imgpy.ZPunctaDetection {}>", v.toString());
+    });
+
+  nb::class_<TraceConfig>(m, "TraceConfig")
+    .def(nb::init<>())
+    .def_rw("minAutoScore", &TraceConfig::minAutoScore)
+    .def_rw("minManualScore", &TraceConfig::minManualScore)
+    .def_rw("minSeedScore", &TraceConfig::minSeedScore)
+    .def_rw("min2dScore", &TraceConfig::min2dScore)
+    .def_rw("refit", &TraceConfig::refit)
+    .def_rw("spTest", &TraceConfig::spTest)
+    .def_rw("crossoverTest", &TraceConfig::crossoverTest)
+    .def_rw("tuneEnd", &TraceConfig::tuneEnd)
+    .def_rw("edgePath", &TraceConfig::edgePath)
+    .def_rw("enhanceMask", &TraceConfig::enhanceMask)
+    .def_rw("seedMethod", &TraceConfig::seedMethod)
+    .def_rw("recover", &TraceConfig::recover)
+    .def_rw("chainScreenCount", &TraceConfig::chainScreenCount)
+    .def_rw("maxEucDist", &TraceConfig::maxEucDist)
+    .def("__repr__", [](const TraceConfig& cfg) {
+      return fmt::format("<_imgpy.TraceConfig minAutoScore={} minSeedScore={} seedMethod={} recover={}>",
+                         cfg.minAutoScore,
+                         cfg.minSeedScore,
+                         cfg.seedMethod,
+                         cfg.recover);
+    });
+
+  nb::class_<ZNeutubeSkeletonizeProcess>(m, "ZNeutubeSkeletonize")
+    .def(nb::init<>())
+    .def("setInputImageSource", &ZNeutubeSkeletonizeProcess::setInputImageSource, "imgSource"_a)
+    .def("setInputImagePath", &ZNeutubeSkeletonizeProcess::setInputImagePath, "filename"_a)
+    .def("setInputFile", &ZNeutubeSkeletonizeProcess::setInputImagePath, "filename"_a)
+    .def("setSkeletonizeConfigPath", &ZNeutubeSkeletonizeProcess::setSkeletonizeConfigPath, "filename"_a)
+    .def(
+      "setSkeletonizeConfig",
+      [](ZNeutubeSkeletonizeProcess& self, nb::handle cfg) {
+        self.setSkeletonizeConfig(pythonObjectToJsonObject(cfg, "cfg"));
+      },
+      "cfg"_a)
+    .def(
+      "setDownsampleIntervalOverride",
+      [](ZNeutubeSkeletonizeProcess& self, nb::handle value) {
+        if (value.is_none()) {
+          self.setDownsampleIntervalOverride(std::nullopt);
+          return;
+        }
+        self.setDownsampleIntervalOverride(
+          vectorToArray3<int>(nb::cast<std::vector<int>>(value), "downsampleIntervalOverride"));
+      },
+      "downsampleIntervalOverride"_a)
+    .def("setVerbose", &ZNeutubeSkeletonizeProcess::setVerbose, "v"_a)
+    .def("setOutputSwcPath", &ZNeutubeSkeletonizeProcess::setOutputSwcPath, "filename"_a)
+    .def("outputSwcPath", &ZNeutubeSkeletonizeProcess::outputSwcPath)
+    .def("hasResult", &ZNeutubeSkeletonizeProcess::hasResult)
+    .def("setLogFile", &ZNeutubeSkeletonizeProcess::setLogFile, "logfilename"_a)
+    .def("loadTask", &ZNeutubeSkeletonizeProcess::loadTask, "filename"_a)
+    .def("saveTask", &ZNeutubeSkeletonizeProcess::saveTask, "filename"_a)
+    .def("run", &ZNeutubeSkeletonizeProcess::run)
+    .def("__repr__", [](const ZNeutubeSkeletonizeProcess& v) {
+      return fmt::format("<_imgpy.ZNeutubeSkeletonize {}>", v.toString());
+    });
+
+  nb::class_<ZNeutubeAutoTraceProcess>(m, "ZNeutubeAutoTrace")
+    .def(nb::init<>())
+    .def("setInputImageSource", &ZNeutubeAutoTraceProcess::setInputImageSource, "imgSource"_a)
+    .def("setInputImagePath", &ZNeutubeAutoTraceProcess::setInputImagePath, "filename"_a)
+    .def("setInputFile", &ZNeutubeAutoTraceProcess::setInputImagePath, "filename"_a)
+    .def("setSelectedChannelTime", &ZNeutubeAutoTraceProcess::setSelectedChannelTime, "channel"_a, "time"_a)
+    .def("setZToXYRatio", &ZNeutubeAutoTraceProcess::setZToXYRatio, "zToXYRatio"_a)
+    .def("setTraceConfigPath", &ZNeutubeAutoTraceProcess::setTraceConfigPath, "filename"_a)
+    .def(
+      "setTraceConfig",
+      [](ZNeutubeAutoTraceProcess& self, nb::handle cfg) {
+        self.setTraceConfig(pythonObjectToJsonObject(cfg, "cfg"));
+      },
+      "cfg"_a)
+    .def("clearTraceConfig", &ZNeutubeAutoTraceProcess::clearTraceConfig)
+    .def("setTraceLevel", &ZNeutubeAutoTraceProcess::setTraceLevel, "level"_a)
+    .def("setAlgoConfigOverrides", &ZNeutubeAutoTraceProcess::setAlgoConfigOverrides, "cfg"_a)
+    .def("clearAlgoConfigOverrides", &ZNeutubeAutoTraceProcess::clearAlgoConfigOverrides)
+    .def("setDoResampleAfterTracing", &ZNeutubeAutoTraceProcess::setDoResampleAfterTracing, "enabled"_a)
+    .def(
+      "setSignalDownsampleRatio",
+      [](ZNeutubeAutoTraceProcess& self, const std::vector<size_t>& ratio) {
+        self.setSignalDownsampleRatio(vectorToArray3<size_t>(ratio, "signalDownsampleRatio"));
+      },
+      "ratio"_a)
+    .def("setDocHasAnySwc", &ZNeutubeAutoTraceProcess::setDocHasAnySwc, "v"_a)
+    .def("setOutputSwcPath", &ZNeutubeAutoTraceProcess::setOutputSwcPath, "filename"_a)
+    .def("outputSwcPath", &ZNeutubeAutoTraceProcess::outputSwcPath)
+    .def("hasResult", &ZNeutubeAutoTraceProcess::hasResult)
+    .def("setLogFile", &ZNeutubeAutoTraceProcess::setLogFile, "logfilename"_a)
+    .def("loadTask", &ZNeutubeAutoTraceProcess::loadTask, "filename"_a)
+    .def("saveTask", &ZNeutubeAutoTraceProcess::saveTask, "filename"_a)
+    .def("run", &ZNeutubeAutoTraceProcess::run)
+    .def("__repr__", [](const ZNeutubeAutoTraceProcess& v) {
+      return fmt::format("<_imgpy.ZNeutubeAutoTrace {}>", v.toString());
+    });
+
+  nb::class_<ZNeutubeBlockedAutoTraceProcess>(m, "ZNeutubeBlockedAutoTrace")
+    .def(nb::init<>())
+    .def("setInputImageSource", &ZNeutubeBlockedAutoTraceProcess::setInputImageSource, "imgSource"_a)
+    .def("setInputImagePath", &ZNeutubeBlockedAutoTraceProcess::setInputImagePath, "filename"_a)
+    .def("setInputFile", &ZNeutubeBlockedAutoTraceProcess::setInputImagePath, "filename"_a)
+    .def("setSignalInfo", &ZNeutubeBlockedAutoTraceProcess::setSignalInfo, "imgInfo"_a)
+    .def("setDatasetId", &ZNeutubeBlockedAutoTraceProcess::setDatasetId, "datasetId"_a)
+    .def("setSelectedChannelTime", &ZNeutubeBlockedAutoTraceProcess::setSelectedChannelTime, "channel"_a, "time"_a)
+    .def("setZToXYRatio", &ZNeutubeBlockedAutoTraceProcess::setZToXYRatio, "zToXYRatio"_a)
+    .def(
+      "setSignalDownsampleRatio",
+      [](ZNeutubeBlockedAutoTraceProcess& self, const std::vector<size_t>& ratio) {
+        self.setSignalDownsampleRatio(vectorToArray3<size_t>(ratio, "signalDownsampleRatio"));
+      },
+      "ratio"_a)
+    .def("setBlockCoreSize", &ZNeutubeBlockedAutoTraceProcess::setBlockCoreSize, "voxels"_a)
+    .def("setBlockCoreSizeXYZ", &ZNeutubeBlockedAutoTraceProcess::setBlockCoreSizeXYZ, "coreX"_a, "coreY"_a, "coreZ"_a)
+    .def("setBlockHalo", &ZNeutubeBlockedAutoTraceProcess::setBlockHalo, "voxels"_a)
+    .def("setTraceConfigPath", &ZNeutubeBlockedAutoTraceProcess::setTraceConfigPath, "filename"_a)
+    .def(
+      "setTraceConfig",
+      [](ZNeutubeBlockedAutoTraceProcess& self, nb::handle cfg) {
+        self.setTraceConfig(pythonObjectToJsonObject(cfg, "cfg"));
+      },
+      "cfg"_a)
+    .def("clearTraceConfig", &ZNeutubeBlockedAutoTraceProcess::clearTraceConfig)
+    .def("setTraceLevel", &ZNeutubeBlockedAutoTraceProcess::setTraceLevel, "level"_a)
+    .def("setAlgoConfigOverrides", &ZNeutubeBlockedAutoTraceProcess::setAlgoConfigOverrides, "cfg"_a)
+    .def("clearAlgoConfigOverrides", &ZNeutubeBlockedAutoTraceProcess::clearAlgoConfigOverrides)
+    .def("setDoResampleAfterTracing", &ZNeutubeBlockedAutoTraceProcess::setDoResampleAfterTracing, "enabled"_a)
+    .def("setDocHasAnySwc", &ZNeutubeBlockedAutoTraceProcess::setDocHasAnySwc, "v"_a)
+    .def("setOutputSwcPath", &ZNeutubeBlockedAutoTraceProcess::setOutputSwcPath, "filename"_a)
+    .def("setOutputSessionDir", &ZNeutubeBlockedAutoTraceProcess::setOutputSessionDir, "dirname"_a)
+    .def("outputSwcPath", &ZNeutubeBlockedAutoTraceProcess::outputSwcPath)
+    .def("outputSessionDir", &ZNeutubeBlockedAutoTraceProcess::outputSessionDir)
+    .def("hasResult", &ZNeutubeBlockedAutoTraceProcess::hasResult)
+    .def("setLogFile", &ZNeutubeBlockedAutoTraceProcess::setLogFile, "logfilename"_a)
+    .def("loadTask", &ZNeutubeBlockedAutoTraceProcess::loadTask, "filename"_a)
+    .def("saveTask", &ZNeutubeBlockedAutoTraceProcess::saveTask, "filename"_a)
+    .def("run", &ZNeutubeBlockedAutoTraceProcess::run)
+    .def("__repr__", [](const ZNeutubeBlockedAutoTraceProcess& v) {
+      return fmt::format("<_imgpy.ZNeutubeBlockedAutoTrace {}>", v.toString());
+    });
+
+  nb::class_<ZSwcSubtract>(m, "ZSwcSubtract")
+    .def(nb::init<>())
+    .def("setInputSwcFilename", &ZSwcSubtract::setInputSwcFilename, "filename"_a)
+    .def("setSubtractSwcFilenames", &ZSwcSubtract::setSubtractSwcFilenames, "filenames"_a)
+    .def("setOutputSwcFilename", &ZSwcSubtract::setOutputSwcFilename, "filename"_a)
+    .def("setLogFile", &ZSwcSubtract::setLogFile, "logfilename"_a)
+    .def("loadTask", &ZSwcSubtract::loadTask, "filename"_a)
+    .def("saveTask", &ZSwcSubtract::saveTask, "filename"_a)
+    .def("run", &ZSwcSubtract::run)
+    .def("__repr__", [](const ZSwcSubtract& v) {
+      return fmt::format("<_imgpy.ZSwcSubtract {}>", v.toString());
     });
 
   nb::class_<ZSectionsRegistration>(m, "ZSectionsRegistration")

@@ -54,6 +54,13 @@ void applyTraceConfigOverridesLegacyLike(const json::object& obj, TraceConfig& c
 // On false, `out` is still populated with legacy defaults.
 [[nodiscard]] bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig& out);
 
+// Loads a legacy trace config object (the file root object or an already-extracted
+// wrapper payload) into `out`.
+//
+// Returns true if the object had a legacy-accepted `"tag"` value. On false, `out`
+// is still populated with legacy defaults.
+[[nodiscard]] bool loadTraceConfigLegacyLike(const json::object& traceConfigRoot, TraceConfig& out);
+
 // Selects the per-level override JSON object using the legacy `getLevelJson()` semantics.
 // Returns nullptr if no level overrides are available.
 [[nodiscard]] const json::object* selectTraceLevelOverrideLegacyLike(const TraceConfig& cfg, int level);

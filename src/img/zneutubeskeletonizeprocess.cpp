@@ -152,15 +152,15 @@ void ZNeutubeSkeletonizeProcess::doWork()
 {
   m_hasResult = false;
 
-  if (m_inputImagePath.trimmed().isEmpty()) {
-    throw ZException("Binary -> SWC failed: input image path is empty.");
+  if (!m_inputImageSource.has_value()) {
+    throw ZException("Binary -> SWC failed: input image source is empty.");
   }
   if (m_outputSwcPath.trimmed().isEmpty()) {
     throw ZException("Binary -> SWC failed: output SWC path is empty.");
   }
 
   LOG(INFO) << "Binary -> SWC (skeletonize)";
-  LOG(INFO) << "Input image: " << m_inputImagePath;
+  LOG(INFO) << "Input image: " << m_inputImageSource->toString();
   LOG(INFO) << "Skeletonize config: " << m_skeletonizeConfigPath;
   LOG(INFO) << "Output SWC: " << m_outputSwcPath;
 
@@ -183,7 +183,7 @@ void ZNeutubeSkeletonizeProcess::doWork()
 
   maybeCancel(m_cancellationToken);
 
-  ZImg img(m_inputImagePath);
+  ZImg img(*m_inputImageSource);
 
   maybeCancel(m_cancellationToken);
 
@@ -207,8 +207,16 @@ void ZNeutubeSkeletonizeProcess::doWork()
 
 void ZNeutubeSkeletonizeProcess::read(const json::object& jo)
 {
-  if (auto it = jo.find("input_image_path"); it != jo.end()) {
-    m_inputImagePath = json::value_to<QString>(it->value());
+  m_inputImageSource.reset();
+  if (const auto inputImageSourceIt = jo.find("input_image_source"); inputImageSourceIt != jo.end()) {
+    if (inputImageSourceIt->value().is_object()) {
+      m_inputImageSource = json::value_to<ZImgSource>(inputImageSourceIt->value());
+    } else {
+      throw ZException(QStringLiteral("Invalid input_image_source: expected object, got %1")
+                         .arg(QString::fromStdString(jsonTypeName(inputImageSourceIt->value()))));
+    }
+  } else if (const auto inputImagePathIt = jo.find("input_image_path"); inputImagePathIt != jo.end()) {
+    m_inputImageSource = ZImgSource(json::value_to<QString>(inputImagePathIt->value()));
   }
   if (auto it = jo.find("skeletonize_config_path"); it != jo.end()) {
     m_skeletonizeConfigPath = json::value_to<QString>(it->value());
@@ -242,7 +250,9 @@ void ZNeutubeSkeletonizeProcess::read(const json::object& jo)
 
 void ZNeutubeSkeletonizeProcess::write(json::object& jo) const
 {
-  jo["input_image_path"] = json::value_from(m_inputImagePath);
+  if (m_inputImageSource) {
+    jo["input_image_source"] = json::value_from(*m_inputImageSource);
+  }
   jo["skeletonize_config_path"] = json::value_from(m_skeletonizeConfigPath);
   if (m_skeletonizeConfig) {
     jo["skeletonize_config"] = *m_skeletonizeConfig;

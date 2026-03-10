@@ -56,6 +56,12 @@ endif ()
 
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
 
+get_filename_component(_ZIMG_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+set(_ZIMG_PY_PACKAGE_DIR "${_ZIMG_REPO_ROOT}/python/zimg/src/zimg")
+if (NOT EXISTS "${_ZIMG_PY_PACKAGE_DIR}/__init__.py")
+  message(FATAL_ERROR "Could not find canonical zimg Python package at ${_ZIMG_PY_PACKAGE_DIR}")
+endif ()
+
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMAKE_LINKER: ${CMAKE_LINKER}")
 
@@ -104,7 +110,6 @@ if (NOT TARGET img)
   # build runs in its own CMake project and would normally rebuild `src/img`
   # from scratch. Reuse the already-built `img` target from the main Atlas build
   # directory when available.
-  get_filename_component(_ZIMG_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
   set(_ZIMG_ATLAS_BUILD_DIR "${_ZIMG_REPO_ROOT}/cmake-build-release-ninja")
   if (NOT EXISTS "${_ZIMG_ATLAS_BUILD_DIR}")
     set(_ZIMG_ATLAS_BUILD_DIR "${_ZIMG_REPO_ROOT}/cmake-build-release")
@@ -262,7 +267,7 @@ endif ()
 # target_include_directories(${module_name} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
 
 # install
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/" # source directory
+install(DIRECTORY "${_ZIMG_PY_PACKAGE_DIR}/" # canonical pure-Python package sources
         DESTINATION zimg # target directory (relative so --prefix/DESTDIR work)
         FILES_MATCHING PATTERN "*.py"
         PATTERN "*idea*" EXCLUDE

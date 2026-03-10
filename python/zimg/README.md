@@ -16,6 +16,11 @@ scientific image formats.
 - Sub-block / tile access (`ZImg.readSubBlockLists`, `ZImg.readSubBlock`) for formats that support it.
 - Streaming writers via Python-implemented providers (`ZImg.writeImg` + `ZImgSliceProvider` / `ZImgBlockProvider`).
 - Save images (`ZImg.save`) with optional `ZImgWriteParameters` (compression, etc.).
+- neuTube tracing / skeletonization workers exposed directly to Python:
+  `ZNeutubeSkeletonize`, `ZNeutubeAutoTrace`,
+  `ZNeutubeBlockedAutoTrace`, `ZSwcSubtract`, and `TraceConfig`.
+- Embedded neuTube JSON presets available directly in Python via
+  `zimg.neutube_json`.
 
 ## Installation
 
@@ -35,6 +40,132 @@ print(arr0.shape)  # (C, Z, Y, X)
 print(arr0.dtype)
 
 img.save("out.tif")
+```
+
+## neuTube processing
+
+The package exposes neuTube processing workers directly. They can be configured
+from Python with setter methods, or loaded/saved as task files via
+`loadTask(...)` / `saveTask(...)`.
+
+Available classes:
+
+- `ZNeutubeSkeletonize`: binary image to SWC skeletonization.
+- `ZNeutubeAutoTrace`: whole-volume auto tracing on a selected channel / timepoint.
+- `ZNeutubeBlockedAutoTrace`: blocked auto tracing for large datasets.
+- `ZSwcSubtract`: subtract one or more SWCs from an input SWC.
+- `TraceConfig`: algorithm-override struct for tracing score / behavior knobs.
+
+### `ZImgSource` input model
+
+These tracing workers accept `ZImgSource`, not just a plain filename. This
+matches Atlas' native image-source model and supports:
+
+- single files
+- file lists
+- scene selection
+- ROI selection
+- explicit format hints
+
+For simple single-file use, `setInputImagePath(...)` is still available.
+
+```python
+import zimg
+
+source = zimg.ZImgSource("signal.ome.tif")
+source.scene = 0
+source.region = zimg.ZImgRegion((0, 0, 0, 0, 0), (-1, -1, -1, 1, 1))
+```
+
+### Embedded config presets
+
+Current neuTube tracing / skeletonization presets are embedded directly into the
+Python package as `zimg.neutube_json`.
+
+- Parsed JSON presets are exposed as Python `dict` values such as
+  `zimg.neutube_json.SKELETONIZE`,
+  `zimg.neutube_json.FLYEM_SKELETONIZE`,
+  `zimg.neutube_json.TRACE_CONFIG`, and
+  `zimg.neutube_json.TRACE_CONFIG_BIOCYTIN`.
+- JSON text is also available through `get_preset_text(...)`.
+- `write_preset(...)` can materialize a preset to disk when a file is needed.
+
+The tracing/skeletonization workers accept either:
+
+- a config file path, via `setSkeletonizeConfigPath(...)` or `setTraceConfigPath(...)`
+- an inline Python `dict`, via `setSkeletonizeConfig(...)` or `setTraceConfig(...)`
+
+### Skeletonize a binary image to SWC
+
+```python
+import zimg
+
+proc = zimg.ZNeutubeSkeletonize()
+proc.setInputImageSource(zimg.ZImgSource("binary_mask.tif"))
+proc.setSkeletonizeConfig(zimg.neutube_json.SKELETONIZE)
+proc.setOutputSwcPath("binary_mask.swc")
+proc.run()
+
+print(proc.hasResult(), proc.outputSwcPath())
+```
+
+### Auto trace a signal volume
+
+```python
+import zimg
+
+proc = zimg.ZNeutubeAutoTrace()
+proc.setInputImageSource(zimg.ZImgSource("signal.ome.tif"))
+proc.setSelectedChannelTime(0, 0)
+proc.setTraceConfig(zimg.neutube_json.TRACE_CONFIG)
+proc.setOutputSwcPath("autotrace.swc")
+
+# Optional: override selected tracing parameters only when you already know
+# which fields you want to change for your dataset.
+#
+# overrides = zimg.TraceConfig()
+# overrides.minAutoScore = ...
+# overrides.seedMethod = ...
+# proc.setAlgoConfigOverrides(overrides)
+
+proc.run()
+```
+
+### Blocked auto trace for large datasets
+
+`ZNeutubeBlockedAutoTrace` is intended for larger datasets where tracing
+should run block-by-block instead of materializing the whole volume at once.
+When possible, it derives metadata such as dataset shape and z-scale directly
+from the provided `ZImgSource`.
+
+It also exposes advanced tiling controls such as block core size and halo, but
+those values are workload-specific. If you do not already have tuned settings
+for a dataset, start with the worker defaults instead of guessing block sizes in
+Python.
+
+```python
+import zimg
+
+proc = zimg.ZNeutubeBlockedAutoTrace()
+proc.setInputImageSource(zimg.ZImgSource("large_signal.ome.zarr"))
+proc.setSelectedChannelTime(0, 0)
+proc.setSignalDownsampleRatio([2, 2, 1])
+proc.setTraceConfig(zimg.neutube_json.TRACE_CONFIG)
+proc.setOutputSwcPath("blocked_autotrace.swc")
+proc.setOutputSessionDir("blocked_autotrace_session")
+proc.run()
+```
+
+### Subtract SWCs
+
+```python
+import zimg
+
+proc = zimg.ZSwcSubtract()
+proc.setInputSwcFilename("full_tree.swc")
+proc.setSubtractSwcFilenames(["artifact_1.swc", "artifact_2.swc"])
+proc.setOutputSwcFilename("cleaned_tree.swc")
+proc.run()
 ```
 
 ## Reading a region (ROI)

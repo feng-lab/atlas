@@ -84,6 +84,60 @@ void applyConfigOverridesLegacyLike(const json::object& obj, TraceConfig& cfg)
   }
 }
 
+[[nodiscard]] bool loadTraceConfigObjectLegacyLike(const json::object& root, TraceConfig& out, std::string_view source)
+{
+  out = TraceConfig{};
+
+  // Legacy accepts an optional wrapper object: { "trace": { ... } }.
+  const json::object* configObj = &root;
+  if (auto it = root.find("trace"); it != root.end() && it->value().is_object()) {
+    configObj = &it->value().as_object();
+  }
+
+  const std::string_view tag = [&]() -> std::string_view {
+    if (auto it = configObj->find("tag"); it != configObj->end()) {
+      if (auto s = jsonStringView(it->value())) {
+        return *s;
+      }
+    }
+    return {};
+  }();
+
+  if (!hasAcceptedLegacyTag(tag)) {
+    if (source.empty()) {
+      LOG(WARNING) << "Ignoring trace config object with unexpected tag '" << std::string(tag) << "'.";
+    } else {
+      LOG(WARNING) << "Ignoring trace config with unexpected tag '" << std::string(tag) << "': " << source;
+    }
+    return false;
+  }
+
+  if (auto it = configObj->find("default"); it != configObj->end() && it->value().is_object()) {
+    applyConfigOverridesLegacyLike(it->value().as_object(), out);
+  }
+
+  if (auto it = configObj->find("level"); it != configObj->end() && it->value().is_object()) {
+    const auto& levelObj = it->value().as_object();
+    for (const auto& kv : levelObj) {
+      const std::string_view key = std::string_view(kv.key().data(), kv.key().size());
+      if (key.size() != 1) {
+        continue;
+      }
+      const char c = key[0];
+      if (c < '1' || c > '9') {
+        continue;
+      }
+      const int level = c - '0';
+      if (!kv.value().is_object()) {
+        continue;
+      }
+      out.levelOverrides[static_cast<size_t>(level)] = kv.value().as_object();
+    }
+  }
+
+  return true;
+}
+
 } // namespace
 
 void applyTraceConfigOverridesLegacyLike(const json::object& obj, TraceConfig& cfg)
@@ -113,50 +167,12 @@ bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig& 
     return false;
   }
 
-  // Legacy accepts an optional wrapper object: { "trace": { ... } }.
-  const json::object* configObj = &root;
-  if (auto it = root.find("trace"); it != root.end() && it->value().is_object()) {
-    configObj = &it->value().as_object();
-  }
+  return loadTraceConfigObjectLegacyLike(root, out, traceConfigPath);
+}
 
-  const std::string_view tag = [&]() -> std::string_view {
-    if (auto it = configObj->find("tag"); it != configObj->end()) {
-      if (auto s = jsonStringView(it->value())) {
-        return *s;
-      }
-    }
-    return {};
-  }();
-
-  if (!hasAcceptedLegacyTag(tag)) {
-    LOG(WARNING) << "Ignoring trace config with unexpected tag '" << std::string(tag) << "': " << traceConfigPath;
-    return false;
-  }
-
-  if (auto it = configObj->find("default"); it != configObj->end() && it->value().is_object()) {
-    applyConfigOverridesLegacyLike(it->value().as_object(), out);
-  }
-
-  if (auto it = configObj->find("level"); it != configObj->end() && it->value().is_object()) {
-    const auto& levelObj = it->value().as_object();
-    for (const auto& kv : levelObj) {
-      const std::string_view key = std::string_view(kv.key().data(), kv.key().size());
-      if (key.size() != 1) {
-        continue;
-      }
-      const char c = key[0];
-      if (c < '1' || c > '9') {
-        continue;
-      }
-      const int level = c - '0';
-      if (!kv.value().is_object()) {
-        continue;
-      }
-      out.levelOverrides[static_cast<size_t>(level)] = kv.value().as_object();
-    }
-  }
-
-  return true;
+bool loadTraceConfigLegacyLike(const json::object& traceConfigRoot, TraceConfig& out)
+{
+  return loadTraceConfigObjectLegacyLike(traceConfigRoot, out, {});
 }
 
 const json::object* selectTraceLevelOverrideLegacyLike(const TraceConfig& cfg, int level)

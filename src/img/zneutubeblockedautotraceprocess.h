@@ -63,6 +63,16 @@ public:
 
   ZNeutubeBlockedAutoTraceProcess() = default;
 
+  void setInputImageSource(ZImgSource source)
+  {
+    m_inputImageSource = std::move(source);
+  }
+
+  void setInputImagePath(QString path)
+  {
+    m_inputImageSource = ZImgSource(std::move(path));
+  }
+
   void setSignalInfo(ZImgInfo info)
   {
     m_signalInfo = std::move(info);
@@ -131,6 +141,16 @@ public:
     m_traceConfigPath = std::move(path);
   }
 
+  void setTraceConfig(json::object cfg)
+  {
+    m_traceConfig = std::move(cfg);
+  }
+
+  void clearTraceConfig()
+  {
+    m_traceConfig.reset();
+  }
+
   void setTraceLevel(int level)
   {
     m_traceLevel = level;
@@ -192,9 +212,16 @@ protected:
 private:
   [[nodiscard]] TraceConfig buildEffectiveTraceConfigOrThrow() const;
 
+  [[nodiscard]] ZImgInfo effectiveSignalInfoOrThrow() const;
+
+  [[nodiscard]] std::string effectiveDatasetIdOrThrow() const;
+
+  [[nodiscard]] double effectiveZToXYRatioOrThrow(const ZImgInfo& signalInfo) const;
+
   void writeFinalSwcAtomicOrThrow(ZSwc& tree) const;
 
 private:
+  std::optional<ZImgSource> m_inputImageSource;
   ZImgInfo m_signalInfo;
   std::string m_datasetId;
   RoiSignalProvider m_roiProvider;
@@ -211,6 +238,7 @@ private:
   std::optional<int64_t> m_blockHalo;
 
   QString m_traceConfigPath;
+  std::optional<json::object> m_traceConfig;
   int m_traceLevel = 0;
 
   bool m_haveAlgoOverrides = false;
