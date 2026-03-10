@@ -2184,7 +2184,8 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
                                                                         double displayRangeMin,
                                                                         double displayRangeMax,
                                                                         ZImgReadStatsSink* statsSink,
-                                                                        ZImgReadStatsContext statsContext) const
+                                                                        ZImgReadStatsContext statsContext,
+                                                                        ReadRegionCachePolicy regionCachePolicy) const
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
@@ -2215,44 +2216,48 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
 
   maybeCancel(cancellationToken);
 
-  const ZImgRegionCacheSourceKind sourceKind =
-    m_ngVolume ? ZImgRegionCacheSourceKind::Neuroglancer : ZImgRegionCacheSourceKind::File;
-  const ImageRegionCacheHashKeyType memKey = ImageRegionCacheHashKeyType(datasetFingerprintForCache(),
-                                                                         sourceKind,
-                                                                         xyRatio,
-                                                                         zRatio,
-                                                                         sx,
-                                                                         sy,
-                                                                         sz,
-                                                                         sc,
-                                                                         t,
-                                                                         resInfo.width,
-                                                                         resInfo.height,
-                                                                         resInfo.depth,
-                                                                         resInfo.numChannels,
-                                                                         resInfo.numTimes,
-                                                                         static_cast<uint32_t>(resInfo.bytesPerVoxel),
-                                                                         static_cast<uint32_t>(std::to_underlying(resInfo.voxelFormat)),
-                                                                         static_cast<uint32_t>(resInfo.validBitCount),
-                                                                         displayRangeMin,
-                                                                         displayRangeMax);
-  const auto hit = [&]() {
-    if (statsSink) {
-      ZImgReadStatsScope statsScope(statsSink, statsContext);
-      return ZImgRegionCache::instance().findWithSource(memKey);
-    }
-    return ZImgRegionCache::instance().findWithSource(memKey);
-  }();
+  std::optional<ImageRegionCacheHashKeyType> memKey;
+  if (regionCachePolicy == ReadRegionCachePolicy::Use) {
+    const ZImgRegionCacheSourceKind sourceKind =
+      m_ngVolume ? ZImgRegionCacheSourceKind::Neuroglancer : ZImgRegionCacheSourceKind::File;
+    memKey.emplace(datasetFingerprintForCache(),
+                   sourceKind,
+                   xyRatio,
+                   zRatio,
+                   sx,
+                   sy,
+                   sz,
+                   sc,
+                   t,
+                   resInfo.width,
+                   resInfo.height,
+                   resInfo.depth,
+                   resInfo.numChannels,
+                   resInfo.numTimes,
+                   static_cast<uint32_t>(resInfo.bytesPerVoxel),
+                   static_cast<uint32_t>(std::to_underlying(resInfo.voxelFormat)),
+                   static_cast<uint32_t>(resInfo.validBitCount),
+                   displayRangeMin,
+                   displayRangeMax);
 
-  if (hit.has_value()) {
-    if (statsSink) {
-      const ZImgRegionBlockSource source = (hit->source == ZImgRegionCache::FindSource::Memory)
-                                             ? ZImgRegionBlockSource::MemoryCache
-                                             : ZImgRegionBlockSource::DiskCache;
-      const size_t bytes = hit->value ? hit->value->byteNumber() : 0;
-      statsSink->onImgRegionBlockResolved(statsContext, source, bytes, /*empty=*/false);
+    const auto hit = [&]() {
+      if (statsSink) {
+        ZImgReadStatsScope statsScope(statsSink, statsContext);
+        return ZImgRegionCache::instance().findWithSource(*memKey);
+      }
+      return ZImgRegionCache::instance().findWithSource(*memKey);
+    }();
+
+    if (hit.has_value()) {
+      if (statsSink) {
+        const ZImgRegionBlockSource source = (hit->source == ZImgRegionCache::FindSource::Memory)
+                                               ? ZImgRegionBlockSource::MemoryCache
+                                               : ZImgRegionBlockSource::DiskCache;
+        const size_t bytes = hit->value ? hit->value->byteNumber() : 0;
+        statsSink->onImgRegionBlockResolved(statsContext, source, bytes, /*empty=*/false);
+      }
+      co_return hit->value;
     }
-    co_return hit->value;
   }
 
   maybeCancel(cancellationToken);
@@ -2403,7 +2408,9 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
                                           res ? res->byteNumber() : 0,
                                           /*empty=*/false);
     }
-    ZImgRegionCache::instance().insert(memKey, res);
+    if (memKey.has_value()) {
+      ZImgRegionCache::instance().insert(*memKey, res);
+    }
     co_return res;
   }
 
@@ -2496,7 +2503,9 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
                                         res ? res->byteNumber() : 0,
                                         /*empty=*/false);
   }
-  ZImgRegionCache::instance().insert(memKey, res);
+  if (memKey.has_value()) {
+    ZImgRegionCache::instance().insert(*memKey, res);
+  }
   co_return res;
 }
 

@@ -323,8 +323,17 @@ Blocked auto trace specifics:
   preprocessing mode, and effective trace config.
 - ROI providers for blocked auto trace must distinguish `AllZero` from failure. A valid all-zero ROI can be committed;
   unavailable/network-failed ROIs must throw so the block is retried instead of being marked visited.
-- The resumable session SWC remains append-only in tracing coordinates. Final output reconstruction reconnects the SWC
-  forest into one tree and then applies the legacy SWC postprocess pipeline before writing `result.swc`.
+- Blocked auto trace ROI reads bypass `ZImgRegionCache` on both lookup and insert. The worker preprocesses the returned
+  ROI in place, so this path must only use uncached assembled regions.
+- Blocked recovery seed extraction must apply the same block-local screening rules as the main pass before sorting:
+  remove noisy seeds first, then exclude seeds that land in the halo outside the core block.
+- The resumable session SWC remains append-only in tracing coordinates. Cross-block continuity uses exact
+  `attachSwcNodeId` continuation tasks, while fresh seed-started chains try an ROI-aware interactive-style host attach
+  against the current global SWC. Final output keeps the forest shape and then applies the legacy SWC postprocess
+  pipeline before writing `result.swc`.
+- Each blocked-trace commit directory is self-contained for resume. Besides the commit delta, Atlas persists a full SWC
+  snapshot plus the full visited-block snapshot, so resume can continue from the highest loadable commit even if other
+  commit directories are missing or corrupted.
 
 Lower-level usage:
 - If an operation is not naturally expressed as a `ZImgProcess`, call `startBackgroundJob(ZDoc&, ZBackgroundJobSpec)` directly.

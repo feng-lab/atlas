@@ -10,6 +10,7 @@
 #include "zneutubetracerecover.h"
 #include "zneutubetraceseed.h"
 #include "zneutubetraceseeder.h"
+#include "zneutubetraceconnect.h"
 #include "zneutubetracescorethresholds.h"
 #include "zneutubetraceswclabelstack.h"
 #include "zneutubetraceswclocseg.h"
@@ -19,7 +20,6 @@
 #include "zneutubelocsegchaintrace.h"
 #include "zneutubemathutils.h"
 #include "zneutubetracezscale.h"
-#include "zneutubeswcreconnect.h"
 #include "zswcgeometrymaskvolume.h"
 #include "zswcops.h"
 #include "zswcpostprocess.h"
@@ -176,6 +176,14 @@ struct BlockGrid
            static_cast<uint64_t>(id.bz) * static_cast<uint64_t>(nx) * static_cast<uint64_t>(ny);
   }
 
+  [[nodiscard]] bool containsBlockId(const ZBlockedAutoTraceBlockId& id) const
+  {
+    const int64_t nx = numBlocksX();
+    const int64_t ny = numBlocksY();
+    const int64_t nz = numBlocksZ();
+    return id.bx >= 0 && id.by >= 0 && id.bz >= 0 && id.bx < nx && id.by < ny && id.bz < nz;
+  }
+
   [[nodiscard]] ZBlockedAutoTraceBlockId blockIdFromLinearOrThrow(uint64_t idx) const
   {
     const uint64_t nx = static_cast<uint64_t>(numBlocksX());
@@ -276,6 +284,74 @@ struct BlockGrid
                                     .bz = clampBlock(z, block.coreZ, numBlocksZ())};
   }
 };
+
+[[nodiscard]] Geo3dScalarField filterSeedsToCoreLegacyLike(Geo3dScalarField seeds,
+                                                           const BlockGrid::Bounds& roi,
+                                                           const BlockGrid::Bounds& core,
+                                                           const folly::CancellationToken& cancellationToken,
+                                                           /*nullable*/ size_t* skippedHaloOut = nullptr)
+{
+  if (skippedHaloOut != nullptr) {
+    *skippedHaloOut = 0;
+  }
+  if (seeds.points.empty()) {
+    return seeds;
+  }
+
+  Geo3dScalarField keptSeeds;
+  keptSeeds.points.reserve(seeds.points.size());
+  keptSeeds.values.reserve(seeds.values.size());
+
+  constexpr size_t kCancelCheckEvery = 1u << 20;
+  size_t untilCheck = kCancelCheckEvery;
+  size_t skippedHalo = 0;
+
+  for (size_t i = 0; i < seeds.points.size(); ++i) {
+    if (--untilCheck == 0) {
+      maybeCancel(cancellationToken);
+      untilCheck = kCancelCheckEvery;
+    }
+
+    const int64_t lx = static_cast<int64_t>(seeds.points[i][0]);
+    const int64_t ly = static_cast<int64_t>(seeds.points[i][1]);
+    const int64_t lz = static_cast<int64_t>(seeds.points[i][2]);
+
+    const int64_t gx = lx + roi.minX;
+    const int64_t gy = ly + roi.minY;
+    const int64_t gz = lz + roi.minZ;
+
+    if (gx < core.minX || gy < core.minY || gz < core.minZ || gx >= core.maxX || gy >= core.maxY || gz >= core.maxZ) {
+      ++skippedHalo;
+      continue;
+    }
+
+    keptSeeds.points.push_back({static_cast<double>(lx), static_cast<double>(ly), static_cast<double>(lz)});
+    keptSeeds.values.push_back(seeds.values[i]);
+  }
+
+  if (skippedHaloOut != nullptr) {
+    *skippedHaloOut = skippedHalo;
+  }
+  return keptSeeds;
+}
+
+[[nodiscard]] Geo3dScalarField
+postProcessBlockedRecoverySeedsLegacyLike(Geo3dScalarField seeds,
+                                          ZImg& leftoverMask,
+                                          int seedMethod,
+                                          const BlockGrid::Bounds& roi,
+                                          const BlockGrid::Bounds& core,
+                                          const folly::CancellationToken& cancellationToken)
+{
+  seeds = removeNoisySeedLegacyLike(std::move(seeds),
+                                    leftoverMask,
+                                    seedMethod,
+                                    /*screeningSeed*/ true,
+                                    cancellationToken,
+                                    nullptr);
+  maybeCancel(cancellationToken);
+  return filterSeedsToCoreLegacyLike(std::move(seeds), roi, core, cancellationToken);
+}
 
 [[nodiscard]] double swellRadiusForExclusionMaskLegacyLike(double r)
 {
@@ -526,6 +602,24 @@ makeDeltaNode(int64_t id, int64_t parentId, const LocalNeuroseg& locseg, glm::dv
   return d;
 }
 
+[[nodiscard]] ZBlockedAutoTraceSwcDeltaNode makeDeltaNodeFromSwcNode(ZSwc::SwcTreeNode node)
+{
+  CHECK(!ZSwc::isNull(node));
+  ZBlockedAutoTraceSwcDeltaNode d;
+  d.id = node->id;
+  d.type = node->type;
+  d.x = node->x;
+  d.y = node->y;
+  d.z = node->z;
+  d.radius = node->radius;
+  if (const auto parent = ZSwc::parent(node); !ZSwc::isNull(parent)) {
+    d.parentId = parent->id;
+  } else {
+    d.parentId = -1;
+  }
+  return d;
+}
+
 void appendDeltaNodeToSwcOrThrow(const ZBlockedAutoTraceSwcDeltaNode& d,
                                  ZSwc& swc,
                                  std::unordered_map<int64_t, ZSwc::SwcTreeNode>& nodeById)
@@ -623,23 +717,10 @@ TraceConfig ZNeutubeBlockedAutoTraceProcess::buildEffectiveTraceConfigOrThrow() 
   return cfg;
 }
 
-void ZNeutubeBlockedAutoTraceProcess::writeFinalSwcAtomicOrThrow(ZSwc& tree,
-                                                                 double zToXYRatio,
-                                                                 double reconnectDistThre) const
+void ZNeutubeBlockedAutoTraceProcess::writeFinalSwcAtomicOrThrow(ZSwc& tree) const
 {
   if (m_outputSwcPath.isEmpty()) {
     throw ZException("Blocked auto trace: output SWC path is empty.");
-  }
-
-  if (tree.numRoots() > 1) {
-    LOG(INFO) << fmt::format("Blocked auto trace: reconnecting final SWC forest (roots={}).", tree.numRoots());
-    reconnectSwc(tree, zToXYRatio, reconnectDistThre);
-    if (tree.numRoots() > 1) {
-      LOG(WARNING) << fmt::format(
-        "Blocked auto trace: distance-threshold reconnect left {} roots; retrying without a distance cap.",
-        tree.numRoots());
-      reconnectSwc(tree, zToXYRatio, /*distThre*/ -1.0);
-    }
   }
 
   resortId(tree);
@@ -885,7 +966,8 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   LOG(INFO) << fmt::format("Resume pending tasks: {}", state.frontier.size());
   LOG(INFO) << fmt::format("Seed-scanned blocks: {}/{}", seedScanned.size(), totalBlocks);
 
-  auto commitCounter = state.commitId;
+  auto commitCounter = session.latestCommittedIdOrZero();
+  CHECK(commitCounter >= state.commitId);
 
   auto reportProgressFromSeedScan = [&]() {
     if (totalBlocks == 0) {
@@ -919,6 +1001,12 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     int64_t bMax = static_cast<int64_t>(bMaxD);
     if (bMin < 0) {
       bMin = 0;
+    }
+    if (bMin >= nblocks) {
+      bMin = nblocks - 1;
+    }
+    if (bMax < 0) {
+      bMax = 0;
     }
     if (bMax >= nblocks) {
       bMax = nblocks - 1;
@@ -1027,6 +1115,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     size_t terminatedNoHandoff = 0;
 
     for (auto& t : state.frontier) {
+      const std::array<double, 3> p = BlockGrid::taskAnchorPoint(t.endLocseg, t.direction, state.manifest.zToXYRatio);
       const uint64_t key = grid.linearIndexOrThrow(t.suggestedBlock);
       if (!seedScanned.contains(key)) {
         kept.push_back(std::move(t));
@@ -1036,7 +1125,6 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
       // If a task points to a visited block, we either:
       // - drop it if it's already satisfied by existing SWC geometry, or
       // - reassign it to another unvisited block whose ROI still contains the anchor point.
-      const std::array<double, 3> p = BlockGrid::taskAnchorPoint(t.endLocseg, t.direction, state.manifest.zToXYRatio);
       if (swcIndex->containsPoint(p[0], p[1], p[2])) {
         ++dropped;
         continue;
@@ -1076,6 +1164,12 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
       std::unordered_map<uint64_t, size_t> counts;
       counts.reserve(state.frontier.size());
       for (const auto& t : state.frontier) {
+        CHECK(grid.containsBlockId(t.suggestedBlock))
+          << fmt::format("Blocked auto trace invariant violated: frontier task {} has invalid block id ({},{},{}).",
+                         t.taskId,
+                         t.suggestedBlock.bx,
+                         t.suggestedBlock.by,
+                         t.suggestedBlock.bz);
         const uint64_t key = grid.linearIndexOrThrow(t.suggestedBlock);
         if (seedScanned.contains(key)) {
           continue; // never revisit a block
@@ -1382,23 +1476,26 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
                              blockId.bx,
                              blockId.by,
                              blockId.bz);
-    const RoiSignalResult roiResult =
-      m_roiProvider(roi.minX, roi.minY, roi.minZ, roiW, roiH, roiD, m_cancellationToken);
+    RoiSignalResult roiResult = m_roiProvider(roi.minX, roi.minY, roi.minZ, roiW, roiH, roiD, m_cancellationToken);
     maybeCancel(m_cancellationToken);
     LOG(INFO) << fmt::format("Blocked auto trace: block ({},{},{}) load ROI signal done.",
                              blockId.bx,
                              blockId.by,
                              blockId.bz);
 
-    ZImg signal;
+    std::shared_ptr<ZImg> sharedSignal;
+    std::unique_ptr<ZImg> ownedSignal;
+    ZImg* signalPtr = nullptr;
     if (roiResult.status == RoiSignalResult::Status::Ok) {
       CHECK(roiResult.signal != nullptr);
-      signal = *roiResult.signal;
-      CHECK(signal.numChannels() == 1);
-      CHECK(signal.numTimes() == 1);
-      CHECK(static_cast<int64_t>(signal.width()) == roiW);
-      CHECK(static_cast<int64_t>(signal.height()) == roiH);
-      CHECK(static_cast<int64_t>(signal.depth()) == roiD);
+      // Blocked auto trace bypasses the assembled region cache, so it can preprocess the ROI in place.
+      sharedSignal = std::move(roiResult.signal);
+      signalPtr = sharedSignal.get();
+      CHECK(signalPtr->numChannels() == 1);
+      CHECK(signalPtr->numTimes() == 1);
+      CHECK(static_cast<int64_t>(signalPtr->width()) == roiW);
+      CHECK(static_cast<int64_t>(signalPtr->height()) == roiH);
+      CHECK(static_cast<int64_t>(signalPtr->depth()) == roiD);
     } else {
       CHECK(roiResult.status == RoiSignalResult::Status::AllZero);
       ZImgInfo info(static_cast<size_t>(std::max<int64_t>(roiW, 0)),
@@ -1408,9 +1505,12 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
                     1,
                     m_signalInfo.bytesPerVoxel,
                     m_signalInfo.voxelFormat);
-      signal = ZImg(info);
-      signal.fill(0);
+      ownedSignal = std::make_unique<ZImg>(info);
+      ownedSignal->fill(0);
+      signalPtr = ownedSignal.get();
     }
+    CHECK(signalPtr != nullptr);
+    ZImg& signal = *signalPtr;
 
     // Preprocess the ROI signal (block-local, deterministic).
     if (!signal.isEmpty()) {
@@ -1530,36 +1630,9 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
                                  blockId.bz,
                                  seeds.size());
 
-        // Filter: exclude halo seeds (we only trace core; halo is padding for boundary continuity).
-        std::vector<std::array<double, 3>> keptSeedPts;
-        keptSeedPts.reserve(seeds.points.size());
-        std::vector<double> keptSeedVals;
-        keptSeedVals.reserve(seeds.values.size());
-
         size_t seedsSkippedHalo = 0;
-
-        for (size_t i = 0; i < seeds.points.size(); ++i) {
-          const int64_t lx = static_cast<int64_t>(seeds.points[i][0]);
-          const int64_t ly = static_cast<int64_t>(seeds.points[i][1]);
-          const int64_t lz = static_cast<int64_t>(seeds.points[i][2]);
-
-          const int64_t gx = lx + roi.minX;
-          const int64_t gy = ly + roi.minY;
-          const int64_t gz = lz + roi.minZ;
-
-          if (gx < core.minX || gy < core.minY || gz < core.minZ || gx >= core.maxX || gy >= core.maxY ||
-              gz >= core.maxZ) {
-            ++seedsSkippedHalo;
-            continue; // halo
-          }
-
-          keptSeedPts.push_back({static_cast<double>(lx), static_cast<double>(ly), static_cast<double>(lz)});
-          keptSeedVals.push_back(seeds.values[i]);
-        }
-
-        Geo3dScalarField keptSeeds;
-        keptSeeds.points = std::move(keptSeedPts);
-        keptSeeds.values = std::move(keptSeedVals);
+        Geo3dScalarField keptSeeds =
+          filterSeedsToCoreLegacyLike(std::move(seeds), roi, core, m_cancellationToken, &seedsSkippedHalo);
         CHECK(keptSeeds.points.size() == keptSeeds.values.size());
 
         if (keptSeeds.points.empty()) {
@@ -1685,7 +1758,20 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
                                      blockId.by,
                                      blockId.bz);
             RecoverResultLegacyLike recovered =
-              recoverLegacyLike(signal, cfg, state.manifest.zToXYRatio, mask, std::move(baseMask), tw);
+              recoverLegacyLike(signal,
+                                cfg,
+                                state.manifest.zToXYRatio,
+                                mask,
+                                std::move(baseMask),
+                                tw,
+                                [&](Geo3dScalarField recoveredSeeds, ZImg& leftoverMask) {
+                                  return postProcessBlockedRecoverySeedsLegacyLike(std::move(recoveredSeeds),
+                                                                                   leftoverMask,
+                                                                                   cfg.seedMethod,
+                                                                                   roi,
+                                                                                   core,
+                                                                                   m_cancellationToken);
+                                });
             maybeCancel(m_cancellationToken);
 
             CHECK(recovered.chains.size() == recovered.chainEndStatuses.size());
@@ -1723,10 +1809,16 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
             const TraceAllSeedsEndStatusLegacyLike endStatus = chainEnds[ci];
             const LocsegChain& chain = *chains[ci];
 
-            // Append as a new root chain.
+            // Append as a new root chain, then immediately try to attach that branch
+            // to the existing global SWC in ROI-aware image space.
+            const std::array<double, 3> signalOrigin = {static_cast<double>(roi.minX),
+                                                        static_cast<double>(roi.minY),
+                                                        static_cast<double>(roi.minZ)};
             int64_t parentId = -1;
             int64_t firstId = -1;
             int64_t lastId = -1;
+            std::vector<int64_t> newNodeIds;
+            newNodeIds.reserve(static_cast<size_t>(chain.length()));
             int idx = 0;
             for (const auto& cn : chain) {
               const int64_t id = nextNodeId++;
@@ -1736,15 +1828,46 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
                                                                     glm::dvec3{roi.minX, roi.minY, roi.minZ},
                                                                     state.manifest.zToXYRatio);
               appendDeltaNodeToSwcOrThrow(d, state.swc, state.nodeById);
-              deltaNodes.push_back(d);
+              newNodeIds.push_back(id);
 
               if (idx == 0) {
                 firstId = id;
               }
               lastId = id;
 
-              if (parentId >= 0) {
-                auto pit = state.nodeById.find(parentId);
+              parentId = id;
+              ++idx;
+            }
+
+            ConnectBranchToHostResultLegacyLike connResult;
+            std::vector<ZSwc::SwcTreeNode> hostRoots;
+            if (firstId > 0) {
+              auto branchRootIt = state.nodeById.find(firstId);
+              CHECK(branchRootIt != state.nodeById.end());
+              const ZSwc::SwcTreeNode branchRoot = branchRootIt->second;
+              hostRoots.reserve(state.swc.numRoots());
+              for (auto it = state.swc.beginRoot(); it != state.swc.endRoot(); ++it) {
+                if (it != branchRoot) {
+                  hostRoots.emplace_back(it);
+                }
+              }
+
+              connectBranchToHostLegacyLike(state.swc, hostRoots, branchRoot, signal, signalOrigin, &connResult);
+              if (connResult.removedNodeId > 0) {
+                state.nodeById.erase(connResult.removedNodeId);
+              }
+            }
+
+            for (const int64_t id : newNodeIds) {
+              auto nit = state.nodeById.find(id);
+              if (nit == state.nodeById.end()) {
+                continue;
+              }
+              const ZBlockedAutoTraceSwcDeltaNode d = makeDeltaNodeFromSwcNode(nit->second);
+              deltaNodes.push_back(d);
+
+              if (d.parentId >= 0) {
+                auto pit = state.nodeById.find(d.parentId);
                 CHECK(pit != state.nodeById.end());
                 const glm::dvec3 a{pit->second->x, pit->second->y, pit->second->z};
                 const glm::dvec3 b{d.x, d.y, d.z};
@@ -1763,15 +1886,16 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
                   traceMaskIndex->insertSegment(a, b, r, r);
                 }
               }
-
-              parentId = id;
-              ++idx;
             }
 
             ++chainsAppended;
 
             // Emit frontier tasks if this chain reached the ROI boundary.
-            if (endStatus[0] == TraceStatus::OutOfBound && firstId > 0) {
+            const bool headConnected = connResult.connected && !connResult.hookWasTail;
+            const bool tailConnected = connResult.connected && connResult.hookWasTail;
+
+            if (endStatus[0] == TraceStatus::OutOfBound && !headConnected && firstId > 0 &&
+                state.nodeById.contains(firstId)) {
               LocalNeuroseg endGlobal = chain.head()->locseg;
               endGlobal.pos[0] += static_cast<double>(roi.minX);
               endGlobal.pos[1] += static_cast<double>(roi.minY);
@@ -1785,7 +1909,8 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
                 ++frontierTasksAdded;
               }
             }
-            if (endStatus[1] == TraceStatus::OutOfBound && lastId > 0) {
+            if (endStatus[1] == TraceStatus::OutOfBound && !tailConnected && lastId > 0 &&
+                state.nodeById.contains(lastId)) {
               LocalNeuroseg endGlobal = chain.tail()->locseg;
               endGlobal.pos[0] += static_cast<double>(roi.minX);
               endGlobal.pos[1] += static_cast<double>(roi.minY);
@@ -1826,6 +1951,12 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     // Under the "visit each block once" policy, no frontier task may point to a visited block (including the
     // current one) after we commit this block. Such a task would require revisiting, which is forbidden.
     for (const auto& t : state.frontier) {
+      CHECK(grid.containsBlockId(t.suggestedBlock))
+        << fmt::format("Blocked auto trace invariant violated: frontier task {} has invalid block id ({},{},{}).",
+                       t.taskId,
+                       t.suggestedBlock.bx,
+                       t.suggestedBlock.by,
+                       t.suggestedBlock.bz);
       const uint64_t k = grid.linearIndexOrThrow(t.suggestedBlock);
       CHECK(!seedScanned.contains(k)) << fmt::format(
         "Blocked auto trace invariant violated: frontier task {} targets visited block ({},{},{}).",
@@ -1837,6 +1968,14 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
 
     // Commit checkpoint.
     {
+      std::vector<uint64_t> seedScannedKeys(seedScanned.begin(), seedScanned.end());
+      std::sort(seedScannedKeys.begin(), seedScannedKeys.end());
+      std::vector<ZBlockedAutoTraceBlockId> seedScannedSnapshot;
+      seedScannedSnapshot.reserve(seedScannedKeys.size());
+      for (uint64_t key : seedScannedKeys) {
+        seedScannedSnapshot.push_back(grid.blockIdFromLinearOrThrow(key));
+      }
+
       ZBlockedAutoTraceCommitWrite commit;
       commit.info.formatVersion = kBlockedAutoTraceCommitFormatVersion;
       commit.info.commitId = ++commitCounter;
@@ -1848,7 +1987,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
       commit.frontier = state.frontier;
       commit.scheduler = state.scheduler;
 
-      session.writeCommitOrThrow(commit);
+      session.writeCommitOrThrow(commit, state.swc, seedScannedSnapshot);
 
       // Best-effort rolling SWC artifact (append-only; used for progress inspection and faster resume).
       try {
@@ -1895,9 +2034,10 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   }
 
   LOG(INFO) << "Blocked auto trace: writing final SWC ...";
-  // Write final SWC artifact (optional postprocess).
+  // Write final SWC artifact. Unlike whole-volume auto trace, blocked trace keeps
+  // distinct roots as a forest and does not run a final reconnect-to-one-tree pass.
   ZSwc finalTree = state.swc;
-  writeFinalSwcAtomicOrThrow(finalTree, state.manifest.zToXYRatio, cfg.maxEucDist);
+  writeFinalSwcAtomicOrThrow(finalTree);
   m_hasResult = true;
 
   LOG(INFO) << "Blocked auto trace: finished.";

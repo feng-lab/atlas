@@ -2,7 +2,6 @@
 
 #include "zexception.h"
 #include "zlog.h"
-#include "zstringutils.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -13,15 +12,11 @@
 
 #include <folly/ScopeGuard.h>
 
-#include <absl/strings/ascii.h>
-#include <absl/strings/str_split.h>
-
 #include <algorithm>
 #include <cerrno>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
 #include <limits>
 #include <string_view>
 
@@ -698,6 +693,16 @@ QString ZBlockedAutoTraceSession::swcDeltaName()
   return QStringLiteral("swc_delta.swc");
 }
 
+QString ZBlockedAutoTraceSession::swcFullName()
+{
+  return QStringLiteral("swc_full.swc");
+}
+
+QString ZBlockedAutoTraceSession::seedScannedBlocksName()
+{
+  return QStringLiteral("seed_scanned_blocks.json");
+}
+
 std::vector<ZBlockedAutoTraceSession::CommitDir> ZBlockedAutoTraceSession::listCommittedDirsSortedOrThrow() const
 {
   const QString blocksPath = blocksDirPath();
@@ -735,12 +740,14 @@ std::vector<ZBlockedAutoTraceSession::CommitDir> ZBlockedAutoTraceSession::listC
       if (info.commitId != id) {
         continue;
       }
+      if (info.formatVersion != kBlockedAutoTraceCommitFormatVersion) {
+        continue;
+      }
+      commits.push_back(CommitDir{.id = id, .path = path, .info = info});
     }
     catch (...) {
       continue;
     }
-
-    commits.push_back(CommitDir{.id = id, .path = path});
   }
 
   std::sort(commits.begin(), commits.end(), [](const CommitDir& a, const CommitDir& b) {
@@ -756,60 +763,7 @@ uint64_t ZBlockedAutoTraceSession::latestCommittedIdOrZero() const
     return 0;
   }
 
-  // Require a contiguous chain from 1..N so resume can replay SWC deltas safely.
-  uint64_t expected = 1;
-  uint64_t best = 0;
-  for (const auto& c : commits) {
-    if (c.id != expected) {
-      break;
-    }
-    best = c.id;
-    ++expected;
-  }
-  return best;
-}
-
-std::vector<ZBlockedAutoTraceSwcDeltaNode> ZBlockedAutoTraceSession::readSwcDeltaOrThrow(const QString& filePath)
-{
-  std::ifstream file(filePath.toStdString(), std::ios_base::in);
-  if (!file.is_open()) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to open SWC delta for reading: %1").arg(filePath));
-  }
-
-  std::vector<ZBlockedAutoTraceSwcDeltaNode> out;
-  out.reserve(1024);
-
-  std::string line;
-  while (std::getline(file, line)) {
-    const std::string_view clean = absl::StripAsciiWhitespace(removeComment(line));
-    if (clean.empty()) {
-      continue;
-    }
-
-    const std::vector<std::string_view> fields =
-      absl::StrSplit(clean, absl::ByAnyChar(spaces_literal), absl::SkipEmpty());
-    if (fields.size() < 7) {
-      throw ZException(
-        QStringLiteral("Blocked auto trace: malformed SWC delta line: %1").arg(QString::fromStdString(line)));
-    }
-
-    ZBlockedAutoTraceSwcDeltaNode n;
-    stringToValue(fields[0], n.id);
-    stringToValue(fields[1], n.type);
-    stringToValue(fields[2], n.x);
-    stringToValue(fields[3], n.y);
-    stringToValue(fields[4], n.z);
-    stringToValue(fields[5], n.radius);
-    stringToValue(fields[6], n.parentId);
-
-    out.push_back(n);
-  }
-
-  if (file.bad()) {
-    throw ZException(QStringLiteral("Blocked auto trace: error while reading SWC delta: %1").arg(filePath));
-  }
-
-  return out;
+  return commits.back().id;
 }
 
 void ZBlockedAutoTraceSession::writeSwcDeltaOrThrow(const QString& filePath,
@@ -839,6 +793,39 @@ void ZBlockedAutoTraceSession::writeSwcDeltaOrThrow(const QString& filePath,
     throw ZException(QStringLiteral("Blocked auto trace: failed to close SWC delta: %1").arg(filePath),
                      ZException::Option::CheckErrno);
   }
+}
+
+std::vector<ZBlockedAutoTraceBlockId> ZBlockedAutoTraceSession::readSeedScannedBlocksOrThrow(const QString& filePath)
+{
+  const json::object jo = loadJsonObject(filePath);
+  auto it = jo.find("blocks");
+  if (it == jo.end() || !it->value().is_array()) {
+    throw ZException(QStringLiteral("Blocked auto trace: invalid seed_scanned_blocks.json: %1").arg(filePath));
+  }
+
+  const auto& arr = it->value().as_array();
+  std::vector<ZBlockedAutoTraceBlockId> out;
+  out.reserve(arr.size());
+  for (const auto& value : arr) {
+    if (!value.is_object()) {
+      throw ZException(QStringLiteral("Blocked auto trace: invalid seed_scanned_blocks entry: %1").arg(filePath));
+    }
+    out.push_back(blockIdFromJsonOrThrow(value.as_object()));
+  }
+  return out;
+}
+
+void ZBlockedAutoTraceSession::writeSeedScannedBlocksOrThrow(const QString& filePath,
+                                                             const std::vector<ZBlockedAutoTraceBlockId>& blocks)
+{
+  json::object jo;
+  json::array arr;
+  arr.reserve(blocks.size());
+  for (const auto& block : blocks) {
+    arr.push_back(toJson(block));
+  }
+  jo["blocks"] = std::move(arr);
+  atomicWriteJsonObjectOrThrow(filePath, jo);
 }
 
 namespace {
@@ -891,42 +878,53 @@ void closeFileOrThrow(std::FILE* fp, const QString& filePathForErrors)
   }
 }
 
+void copyFileAtomicOrThrow(const QString& sourcePath, const QString& finalPath)
+{
+  QFile source(sourcePath);
+  if (!source.open(QIODevice::ReadOnly)) {
+    throw ZException(QStringLiteral("Blocked auto trace: failed to open source file: %1").arg(sourcePath));
+  }
+
+  QSaveFile dest(finalPath);
+  if (!dest.open(QIODevice::WriteOnly)) {
+    throw ZException(QStringLiteral("Blocked auto trace: failed to open destination file: %1").arg(finalPath));
+  }
+
+  std::array<char, 1 << 20> buffer{};
+  while (true) {
+    const qint64 nread = source.read(buffer.data(), static_cast<qint64>(buffer.size()));
+    if (nread < 0) {
+      throw ZException(QStringLiteral("Blocked auto trace: failed while reading source file: %1").arg(sourcePath));
+    }
+    if (nread == 0) {
+      break;
+    }
+    const qint64 nwritten = dest.write(buffer.data(), nread);
+    if (nwritten != nread) {
+      throw ZException(QStringLiteral("Blocked auto trace: failed while writing destination file: %1").arg(finalPath));
+    }
+  }
+
+  if (!dest.commit()) {
+    throw ZException(QStringLiteral("Blocked auto trace: failed to commit destination file: %1").arg(finalPath));
+  }
+}
+
 } // namespace
 
-void ZBlockedAutoTraceSession::applySwcDeltaOrThrow(const std::vector<ZBlockedAutoTraceSwcDeltaNode>& delta,
-                                                    ZSwc& swc,
-                                                    std::unordered_map<int64_t, ZSwc::SwcTreeNode>& nodeById)
+void ZBlockedAutoTraceSession::rebuildNodeByIdOrThrow(ZSwc& swc,
+                                                      std::unordered_map<int64_t, ZSwc::SwcTreeNode>& nodeById)
 {
-  if (delta.empty()) {
-    return;
-  }
-
-  std::vector<std::pair<ZSwc::SwcTreeNode, int64_t>> attach;
-  attach.reserve(delta.size());
-
-  for (const auto& n : delta) {
-    if (n.id <= 0) {
-      throw ZException(fmt::format("Blocked auto trace: invalid SWC node id in delta: {}", n.id));
+  nodeById.clear();
+  nodeById.reserve(swc.size() * 2 + 1);
+  for (auto it = swc.begin(); it != swc.end(); ++it) {
+    if (it->id <= 0) {
+      throw ZException(fmt::format("Blocked auto trace: invalid SWC node id in snapshot: {}", it->id));
     }
-    if (nodeById.contains(n.id)) {
-      throw ZException(fmt::format("Blocked auto trace: duplicate SWC node id in replay: {}", n.id));
+    auto [insertedIt, inserted] = nodeById.emplace(it->id, it);
+    if (!inserted) {
+      throw ZException(fmt::format("Blocked auto trace: duplicate SWC node id in snapshot: {}", insertedIt->first));
     }
-
-    SwcNode node(n.id, n.type, n.x, n.y, n.z, n.radius, /*parentID*/ n.parentId);
-    auto it = swc.appendRoot(node);
-    nodeById.emplace(n.id, it);
-    attach.emplace_back(it, n.parentId);
-  }
-
-  for (const auto& [child, parentId] : attach) {
-    if (parentId < 0) {
-      continue;
-    }
-    auto pit = nodeById.find(parentId);
-    if (pit == nodeById.end()) {
-      throw ZException(fmt::format("Blocked auto trace: missing parent id {} while replaying delta", parentId));
-    }
-    swc.appendChild(pit->second, child);
   }
 }
 
@@ -977,31 +975,17 @@ void ZBlockedAutoTraceSession::appendToRollingSwcOrThrow(uint64_t commitId,
     return;
   }
 
-  // If we're missing earlier commits (e.g. resuming a session created before this feature),
-  // catch up from commit deltas on disk so the rolling SWC remains complete.
-  if (state.commitId + 1 < commitId) {
-    const QString blocksPath = blocksDirPath();
-    const QDir blocksDir(blocksPath);
-    std::FILE* fp = openSwcAppendOrThrow(swcPath);
-    auto fpGuard = folly::makeGuard([&]() {
-      try {
-        closeFileOrThrow(fp, swcPath);
-      }
-      catch (...) {
-      }
-    });
+  const QString blocksPath = blocksDirPath();
+  const QDir blocksDir(blocksPath);
+  const QString commitPath = blocksDir.absoluteFilePath(commitDirName(commitId));
+  const QString swcFullPath = QDir(commitPath).absoluteFilePath(swcFullName());
 
-    for (uint64_t i = state.commitId + 1; i < commitId; ++i) {
-      const QString cdir = blocksDir.absoluteFilePath(commitDirName(i));
-      const QString deltaPath = QDir(cdir).absoluteFilePath(swcDeltaName());
-      const std::vector<ZBlockedAutoTraceSwcDeltaNode> delta = readSwcDeltaOrThrow(deltaPath);
-      appendSwcNodesToOpenFileOrThrow(fp, swcPath, delta);
-    }
-
-    fpGuard.dismiss();
-    closeFileOrThrow(fp, swcPath);
-    state.commitId = commitId - 1;
+  if (state.commitId + 1 != commitId) {
+    copyFileAtomicOrThrow(swcFullPath, swcPath);
+    state.commitId = commitId;
     state.byteSize = fileSizeOrZero(swcPath);
+    atomicWriteJsonObjectOrThrow(statePath, rollingSwcStateToJson(state));
+    return;
   }
 
   if (!nodes.empty()) {
@@ -1025,168 +1009,89 @@ void ZBlockedAutoTraceSession::appendToRollingSwcOrThrow(uint64_t commitId,
 
 ZBlockedAutoTraceLoadedState ZBlockedAutoTraceSession::loadLatestOrEmptyOrThrow() const
 {
-  ZBlockedAutoTraceLoadedState out;
-  out.manifest = loadManifestOrThrow();
+  const ZBlockedAutoTraceManifest manifest = loadManifestOrThrow();
+  const std::vector<CommitDir> commits = listCommittedDirsSortedOrThrow();
 
-  const uint64_t latest = latestCommittedIdOrZero();
-  out.commitId = latest;
-
-  // New session: nothing else to load.
-  if (latest == 0) {
+  if (commits.empty()) {
+    ZBlockedAutoTraceLoadedState out;
+    out.manifest = manifest;
     out.scheduler.nextLinearBlockIndex = 0;
     return out;
   }
 
-  const QString blocksPath = blocksDirPath();
-  const QDir blocksDir(blocksPath);
-
-  // Keep the rolling SWC up to date (best-effort). This makes inspection/resume faster, but
-  // canonical resume state remains the per-commit `swc_delta.swc` files.
-  RollingSwcState rolling{};
-  bool rollingOk = true;
-  std::FILE* rollingFp = nullptr;
-  const QString rollingPath = rollingSwcPath();
-  const QString rollingState = rollingSwcStatePath();
-
-  auto rollingFpGuard = folly::makeGuard([&]() {
-    if (rollingFp != nullptr) {
-      try {
-        closeFileOrThrow(rollingFp, rollingPath);
+  auto loadFrontierAndSchedulerOrThrow = [&](const CommitDir& commitDir, ZBlockedAutoTraceLoadedState& state) {
+    const QDir dir(commitDir.path);
+    const QString frontierPath = dir.absoluteFilePath(frontierJsonName());
+    const json::object frontierObj = loadJsonObject(frontierPath);
+    auto it = frontierObj.find("tasks");
+    if (it == frontierObj.end() || !it->value().is_array()) {
+      throw ZException("Blocked auto trace: invalid frontier.json (missing tasks array).");
+    }
+    const auto& arr = it->value().as_array();
+    state.frontier.clear();
+    state.frontier.reserve(arr.size());
+    for (const auto& value : arr) {
+      if (!value.is_object()) {
+        throw ZException("Blocked auto trace: invalid frontier.json task entry (expected object).");
       }
-      catch (...) {
-      }
-    }
-  });
-
-  try {
-    if (auto s = tryLoadRollingSwcStateOrWarn(rollingState)) {
-      rolling = *s;
-    }
-    if (rolling.commitId > latest) {
-      LOG(WARNING) << fmt::format(
-        "Blocked auto trace: rolling SWC state ahead of latest commit (stateCommit={}, latestCommit={}); rebuilding.",
-        rolling.commitId,
-        latest);
-      rolling = RollingSwcState{};
+      state.frontier.push_back(pendingTaskFromJsonOrThrow(value.as_object()));
     }
 
-    const int64_t actual = fileSizeOrZero(rollingPath);
-    if (actual < rolling.byteSize) {
-      LOG(WARNING) << fmt::format(
-        "Blocked auto trace: rolling SWC file smaller than recorded state; rebuilding. fileBytes={}, stateBytes={}",
-        actual,
-        rolling.byteSize);
-      rolling = RollingSwcState{};
-      if (actual > 0) {
-        truncateFileOrThrow(rollingPath, 0);
-      }
-    } else if (actual > rolling.byteSize) {
-      truncateFileOrThrow(rollingPath, rolling.byteSize);
-    }
-  }
-  catch (const std::exception& e) {
-    LOG(WARNING) << fmt::format("Blocked auto trace: rolling SWC repair disabled: {}", e.what());
-    rollingOk = false;
-  }
-  catch (...) {
-    LOG(WARNING) << "Blocked auto trace: rolling SWC repair disabled (unknown error).";
-    rollingOk = false;
-  }
+    const QString schedulerPath = dir.absoluteFilePath(schedulerJsonName());
+    const json::object schedulerObj = loadJsonObject(schedulerPath);
+    state.scheduler = schedulerFromJsonOrThrow(schedulerObj);
+  };
 
-  // Replay SWC deltas from commit_000001..commit_<latest>.
-  for (uint64_t i = 1; i <= latest; ++i) {
-    const QString cdir = blocksDir.absoluteFilePath(commitDirName(i));
-    const QString commitJson = QDir(cdir).absoluteFilePath(commitJsonName());
-    const json::object commitObj = loadJsonObject(commitJson);
-    const ZBlockedAutoTraceCommitInfo info = commitInfoFromJsonOrThrow(commitObj);
-    if (info.commitId != i) {
-      throw ZException("Blocked auto trace: commit id mismatch while replaying.");
+  auto loadSelfContainedCommitOrThrow = [&](const CommitDir& commitDir) {
+    CHECK(commitDir.info.formatVersion == kBlockedAutoTraceCommitFormatVersion);
+
+    ZBlockedAutoTraceLoadedState state;
+    state.manifest = manifest;
+    state.commitId = commitDir.id;
+
+    const QDir dir(commitDir.path);
+    const QString swcFullPath = dir.absoluteFilePath(swcFullName());
+    const QString seedScannedPath = dir.absoluteFilePath(seedScannedBlocksName());
+    if (!QFileInfo::exists(swcFullPath) || !QFileInfo::exists(seedScannedPath) ||
+        !QFileInfo::exists(dir.absoluteFilePath(frontierJsonName())) ||
+        !QFileInfo::exists(dir.absoluteFilePath(schedulerJsonName()))) {
+      throw ZException(
+        QStringLiteral("Blocked auto trace: missing files in self-contained commit: %1").arg(commitDir.path));
     }
 
-    if (info.didSeedScan) {
-      out.seedScannedBlocks.push_back(info.blockId);
-    }
+    state.swc.load(swcFullPath);
+    rebuildNodeByIdOrThrow(state.swc, state.nodeById);
+    state.seedScannedBlocks = readSeedScannedBlocksOrThrow(seedScannedPath);
+    loadFrontierAndSchedulerOrThrow(commitDir, state);
+    return state;
+  };
 
-    const QString deltaPath = QDir(cdir).absoluteFilePath(swcDeltaName());
-    const std::vector<ZBlockedAutoTraceSwcDeltaNode> delta = readSwcDeltaOrThrow(deltaPath);
-    applySwcDeltaOrThrow(delta, out.swc, out.nodeById);
-
-    if (rollingOk && i > rolling.commitId) {
-      // Append missing commits to the rolling file as we replay deltas.
-      if (rollingFp == nullptr) {
-        try {
-          rollingFp = openSwcAppendOrThrow(rollingPath);
-        }
-        catch (const std::exception& e) {
-          LOG(WARNING) << fmt::format("Blocked auto trace: rolling SWC append disabled: {}", e.what());
-          rollingOk = false;
-        }
-      }
-      if (rollingOk && rollingFp != nullptr) {
-        try {
-          appendSwcNodesToOpenFileOrThrow(rollingFp, rollingPath, delta);
-          rolling.commitId = i;
-        }
-        catch (const std::exception& e) {
-          LOG(WARNING) << fmt::format("Blocked auto trace: rolling SWC append disabled: {}", e.what());
-          rollingOk = false;
-        }
-      }
-    }
-
-    if (i == latest) {
-      const QString frontierPath = QDir(cdir).absoluteFilePath(frontierJsonName());
-      const json::object frontierObj = loadJsonObject(frontierPath);
-      auto it = frontierObj.find("tasks");
-      if (it == frontierObj.end() || !it->value().is_array()) {
-        throw ZException("Blocked auto trace: invalid frontier.json (missing tasks array).");
-      }
-      const auto& arr = it->value().as_array();
-      out.frontier.clear();
-      out.frontier.reserve(arr.size());
-      for (const auto& v : arr) {
-        if (!v.is_object()) {
-          throw ZException("Blocked auto trace: invalid frontier.json task entry (expected object).");
-        }
-        out.frontier.push_back(pendingTaskFromJsonOrThrow(v.as_object()));
-      }
-
-      const QString schedulerPath = QDir(cdir).absoluteFilePath(schedulerJsonName());
-      const json::object schedulerObj = loadJsonObject(schedulerPath);
-      out.scheduler = schedulerFromJsonOrThrow(schedulerObj);
-    }
-  }
-
-  if (rollingOk && rolling.commitId < latest) {
-    // If we couldn't append, do not advance the state file.
-    rollingOk = false;
-  }
-  if (rollingOk && rolling.commitId == latest) {
+  bool sawCommittedDir = false;
+  for (auto it = commits.rbegin(); it != commits.rend(); ++it) {
+    sawCommittedDir = true;
     try {
-      if (rollingFp != nullptr) {
-        closeFileOrThrow(rollingFp, rollingPath);
-        rollingFp = nullptr;
-      }
-      rolling.byteSize = fileSizeOrZero(rollingPath);
-      atomicWriteJsonObjectOrThrow(rollingState, rollingSwcStateToJson(rolling));
+      return loadSelfContainedCommitOrThrow(*it);
     }
     catch (const std::exception& e) {
-      LOG(WARNING) << fmt::format("Blocked auto trace: failed to write rolling SWC state: {}", e.what());
+      LOG(WARNING) << fmt::format("Blocked auto trace: ignoring broken commit {} during resume: {}", it->id, e.what());
     }
     catch (...) {
-      LOG(WARNING) << "Blocked auto trace: failed to write rolling SWC state (unknown error).";
+      LOG(WARNING) << fmt::format("Blocked auto trace: ignoring broken commit {} during resume.", it->id);
     }
   }
 
-  return out;
+  CHECK(sawCommittedDir);
+  throw ZException("Blocked auto trace: found commit directories, but none were loadable.");
 }
 
-void ZBlockedAutoTraceSession::writeCommitOrThrow(const ZBlockedAutoTraceCommitWrite& commit)
+void ZBlockedAutoTraceSession::writeCommitOrThrow(const ZBlockedAutoTraceCommitWrite& commit,
+                                                  const ZSwc& swcSnapshot,
+                                                  const std::vector<ZBlockedAutoTraceBlockId>& seedScannedBlocks)
 {
   if (commit.info.commitId == 0) {
     throw ZException("Blocked auto trace: commitId must be > 0.");
   }
-  if (commit.info.formatVersion != 1) {
+  if (commit.info.formatVersion != kBlockedAutoTraceCommitFormatVersion) {
     throw ZException("Blocked auto trace: unsupported commit formatVersion.");
   }
 
@@ -1224,6 +1129,14 @@ void ZBlockedAutoTraceSession::writeCommitOrThrow(const ZBlockedAutoTraceCommitW
   {
     const QString deltaPath = QDir(stagingPath).absoluteFilePath(swcDeltaName());
     writeSwcDeltaOrThrow(deltaPath, commit.swcDeltaNodes);
+  }
+  {
+    const QString swcFullPath = QDir(stagingPath).absoluteFilePath(swcFullName());
+    swcSnapshot.save(swcFullPath);
+  }
+  {
+    const QString seedScannedPath = QDir(stagingPath).absoluteFilePath(seedScannedBlocksName());
+    writeSeedScannedBlocksOrThrow(seedScannedPath, seedScannedBlocks);
   }
   {
     json::object frontierObj;

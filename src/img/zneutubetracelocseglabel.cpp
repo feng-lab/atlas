@@ -134,8 +134,8 @@ void localNeurosegLabelGLegacyLike(const LocalNeuroseg& seg, ZImg& stack, int fl
 
   const bool needZScale = (testZToXYRatioLegacyLike(zToXYRatio) != 0);
   if (needZScale) {
-    c[2] = iroundLegacyLike(bottom[2] / zToXYRatio);
-    offpos[2] = bottom[2] / zToXYRatio - static_cast<double>(c[2]);
+    c[2] = iroundLegacyLike(bottom[2] * (1.0 / zToXYRatio));
+    offpos[2] = bottom[2] * (1.0 / zToXYRatio) - static_cast<double>(c[2]);
   } else {
     c[2] = iroundLegacyLike(bottom[2]);
     offpos[2] = bottom[2] - static_cast<double>(c[2]);

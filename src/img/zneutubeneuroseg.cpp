@@ -238,8 +238,9 @@ void neurosegDistFilterLegacyLikeInto(const Neuroseg& seg,
                                        static_cast<double>(k + coffset[2])};
 
         if (needZScale) {
-          // image space -> physical space
-          coord[2] /= zToXYRatio;
+          // `coord` is iterating image-space stack voxels, while the local neuroseg geometry
+          // is expressed in trace space where Z is expanded by `zToXYRatio`.
+          coord[2] *= zToXYRatio;
         }
 
         if (offpos != nullptr) {

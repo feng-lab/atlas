@@ -71,8 +71,6 @@ void coordinate3dUnitizeLegacyLike(std::array<double, 3>* v)
 [[nodiscard]] double
 locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zToXYRatio, const LocalNeuroseg& testSeg)
 {
-  // Chains are already stored in trace space, so this upper-bound check should stay in trace space too.
-  (void)zToXYRatio;
   const std::array<double, 3> source = localNeurosegCenterLegacyLike(testSeg);
 
   double minDist = std::numeric_limits<double>::infinity();
@@ -123,8 +121,6 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
     tail.seg.h = 2.0;
   }
   if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
-    // Keep the legacy isotropic canonicalization available only for parity tests. The default path should remain the
-    // clearer trace-space geometry model with no extra no-op scale transform.
     localNeurosegScaleZLegacyLike(head, 1.0);
     localNeurosegScaleZLegacyLike(tail, 1.0);
   }
@@ -277,11 +273,18 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
 
         if (hitIndex < 3) {
           stackUtilCoordLegacyLike(off, width, height, &coord[0], &coord[1], &coord[2]);
-          const double hitZ = static_cast<double>(coord[2]) * zToXYRatio;
           if (conn.info[0] == 0) {
-            hitIndex = locsegChainHitTestLegacyLike(chain1, TraceDirection::Forward, coord[0], coord[1], hitZ);
+            hitIndex = locsegChainHitTestLegacyLike(chain1,
+                                                    TraceDirection::Forward,
+                                                    coord[0],
+                                                    coord[1],
+                                                    static_cast<double>(coord[2]));
           } else {
-            hitIndex = locsegChainHitTestLegacyLike(chain1, TraceDirection::Backward, coord[0], coord[1], hitZ);
+            hitIndex = locsegChainHitTestLegacyLike(chain1,
+                                                    TraceDirection::Backward,
+                                                    coord[0],
+                                                    coord[1],
+                                                    static_cast<double>(coord[2]));
           }
         }
 
@@ -316,7 +319,7 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
             stackUtilCoordLegacyLike(path[static_cast<size_t>(i)], width, height, &curPos[0], &curPos[1], &curPos[2]);
             conn.ort[0] += static_cast<double>(prevPos[0] - curPos[0]);
             conn.ort[1] += static_cast<double>(prevPos[1] - curPos[1]);
-            conn.ort[2] += static_cast<double>(prevPos[2] - curPos[2]) * zToXYRatio;
+            conn.ort[2] += static_cast<double>(prevPos[2] - curPos[2]);
             prevPos[0] = curPos[0];
             prevPos[1] = curPos[1];
             prevPos[2] = curPos[2];

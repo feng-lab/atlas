@@ -13,6 +13,15 @@ class ZVoxelVolume;
 
 namespace nim {
 
+struct ConnectBranchToHostResultLegacyLike
+{
+  bool connected = false;
+  bool hookWasTail = false;
+  int64_t hookId = -1;
+  int64_t loopId = -1;
+  int64_t removedNodeId = -1;
+};
+
 // Port of `ZNeuronTracer::findBestTerminalBreak`.
 //
 // Determines how far a terminal node should be retracted toward its neighbor based on intensity sampling.
@@ -41,6 +50,20 @@ void connectBranchToHostLegacyLike(ZSwc& swc,
 void connectBranchToHostLegacyLike(ZSwc& swc,
                                    const std::vector<ZSwc::SwcTreeNode>& hostRoots,
                                    ZSwc::SwcTreeNode branchRoot,
+                                   const ZImg& stack,
+                                   const std::array<double, 3>& stackOrigin,
+                                   /*nullable*/ ConnectBranchToHostResultLegacyLike* result);
+
+void connectBranchToHostLegacyLike(ZSwc& swc,
+                                   const std::vector<ZSwc::SwcTreeNode>& hostRoots,
+                                   ZSwc::SwcTreeNode branchRoot,
                                    const ZVoxelVolume& stack);
+
+void connectBranchToHostLegacyLike(ZSwc& swc,
+                                   const std::vector<ZSwc::SwcTreeNode>& hostRoots,
+                                   ZSwc::SwcTreeNode branchRoot,
+                                   const ZVoxelVolume& stack,
+                                   const std::array<double, 3>& stackOrigin,
+                                   /*nullable*/ ConnectBranchToHostResultLegacyLike* result);
 
 } // namespace nim

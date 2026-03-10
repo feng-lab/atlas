@@ -545,7 +545,7 @@ std::vector<int64_t> locsegChainShortestPathPtLegacyLike(std::array<double, 3> p
     sgw.groupMask->fill(0);
     ws.flag = 0;
     ws.value = 1;
-    locsegChainLabelWLegacyLike(target, *sgw.groupMask, zToXYRatio, startIndex, endIndex, ws);
+    locsegChainLabelWLegacyLike(target, *sgw.groupMask, 1.0, startIndex, endIndex, ws);
     stackGraphWorkspaceSetRangeLegacyLike(sgw,
                                           startPos[0],
                                           ws.range[0],
@@ -631,14 +631,20 @@ std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source
 {
   // Port of tz_locseg_chain.c::Locseg_Chain_Shortest_Path().
   std::array<double, 3> pos{};
-  locsegChainBrightEndLegacyLike(source, LocsegChainEndLegacyLike::Head, signal, zToXYRatio, pos);
+  locsegChainBrightEndLegacyLike(source, LocsegChainEndLegacyLike::Head, signal, 1.0, pos);
+  if (zToXYRatio != 1.0) {
+    pos[2] *= (1.0 / zToXYRatio);
+  }
 
   int segIndex = 0;
   std::array<double, 3> skelPos{};
   double dist = locsegChainPointDistLegacyLike(target, pos, &segIndex, &skelPos);
 
   std::array<double, 3> tmpPos{};
-  locsegChainBrightEndLegacyLike(source, LocsegChainEndLegacyLike::Tail, signal, zToXYRatio, tmpPos);
+  locsegChainBrightEndLegacyLike(source, LocsegChainEndLegacyLike::Tail, signal, 1.0, tmpPos);
+  if (zToXYRatio != 1.0) {
+    tmpPos[2] *= (1.0 / zToXYRatio);
+  }
 
   int tmpSegIndex = 0;
   std::array<double, 3> tmpSkelPos{};
@@ -653,12 +659,7 @@ std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source
     sourceSeg = source.tailSeg();
   }
 
-  std::array<double, 3> imagePos = pos;
-  if (zToXYRatio != 1.0) {
-    imagePos[2] /= zToXYRatio;
-  }
-
-  if (!inCloseRange3(imagePos,
+  if (!inCloseRange3(pos,
                      0,
                      static_cast<int>(signal.width()) - 1,
                      0,
@@ -670,7 +671,7 @@ std::vector<int64_t> locsegChainShortestPathLegacyLike(const LocsegChain& source
 
   CHECK(sourceSeg != nullptr);
 
-  locsegChainUpdateStackGraphWorkspaceLegacyLike(*sourceSeg, target, signal, zToXYRatio, sgw);
+  locsegChainUpdateStackGraphWorkspaceLegacyLike(*sourceSeg, target, signal, 1.0, sgw);
   if (std::isnan(sgw.argv[3])) {
     double tmpc = 0.0;
     double c2 = locsegChainMinSegScoreLegacyLike(source, signal, zToXYRatio, StackFitOption::MeanSignal);

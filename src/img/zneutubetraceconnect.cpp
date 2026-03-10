@@ -22,6 +22,14 @@ struct SwcNodeConnectionLegacyLike
   double dist = std::numeric_limits<double>::infinity();
 };
 
+template<typename StackLike>
+[[nodiscard]] double pointSampleWithOriginLegacyLike(const StackLike& stack,
+                                                     const std::array<double, 3>& pos,
+                                                     const std::array<double, 3>& origin)
+{
+  return pointSampleLegacyLike(stack, pos[0] - origin[0], pos[1] - origin[1], pos[2] - origin[2]);
+}
+
 [[nodiscard]] bool isRegularNodeLegacyLike(const ZSwc::ConstSwcTreeNode& n)
 {
   return !ZSwc::isNull(n) && n->id >= 0;
@@ -109,7 +117,8 @@ template<typename StackLike>
                                                          double terminalRadius,
                                                          const std::array<double, 3>& innerCenter,
                                                          double innerRadius,
-                                                         const StackLike& stack)
+                                                         const StackLike& stack,
+                                                         const std::array<double, 3>& stackOrigin)
 {
   // Port of ZNeuronTracer::findBestTerminalBreak().
   const double dx = terminalCenter[0] - innerCenter[0];
@@ -128,7 +137,7 @@ template<typename StackLike>
     dvec[2] /= norm;
   }
 
-  const double innerIntensity = pointSampleLegacyLike(stack, innerCenter[0], innerCenter[1], innerCenter[2]);
+  const double innerIntensity = pointSampleWithOriginLegacyLike(stack, innerCenter, stackOrigin);
   if (innerIntensity == 0.0) {
     return 1.0;
   }
@@ -140,7 +149,7 @@ template<typename StackLike>
                                               innerCenter[1] + dvec[1] * (d * lambda + radius),
                                               innerCenter[2] + dvec[2] * (d * lambda + radius)};
 
-    const double terminalIntensity = pointSampleLegacyLike(stack, currentEnd[0], currentEnd[1], currentEnd[2]);
+    const double terminalIntensity = pointSampleWithOriginLegacyLike(stack, currentEnd, stackOrigin);
     if (terminalIntensity / innerIntensity > 0.3) {
       break;
     }
@@ -155,7 +164,12 @@ double findBestTerminalBreakLegacyLike(const std::array<double, 3>& terminalCent
                                        double innerRadius,
                                        const ZImg& stack)
 {
-  return findBestTerminalBreakLegacyLikeImpl(terminalCenter, terminalRadius, innerCenter, innerRadius, stack);
+  return findBestTerminalBreakLegacyLikeImpl(terminalCenter,
+                                             terminalRadius,
+                                             innerCenter,
+                                             innerRadius,
+                                             stack,
+                                             /*stackOrigin*/ {0.0, 0.0, 0.0});
 }
 
 double findBestTerminalBreakLegacyLike(const std::array<double, 3>& terminalCenter,
@@ -164,16 +178,26 @@ double findBestTerminalBreakLegacyLike(const std::array<double, 3>& terminalCent
                                        double innerRadius,
                                        const ZVoxelVolume& stack)
 {
-  return findBestTerminalBreakLegacyLikeImpl(terminalCenter, terminalRadius, innerCenter, innerRadius, stack);
+  return findBestTerminalBreakLegacyLikeImpl(terminalCenter,
+                                             terminalRadius,
+                                             innerCenter,
+                                             innerRadius,
+                                             stack,
+                                             /*stackOrigin*/ {0.0, 0.0, 0.0});
 }
 
 template<typename StackLike>
 void connectBranchToHostLegacyLikeImpl(ZSwc& swc,
                                        const std::vector<ZSwc::SwcTreeNode>& hostRoots,
                                        ZSwc::SwcTreeNode branchRoot,
-                                       const StackLike& stack)
+                                       const StackLike& stack,
+                                       const std::array<double, 3>& stackOrigin,
+                                       /*nullable*/ ConnectBranchToHostResultLegacyLike* result)
 {
   // Port of ZNeuronTracer::connectBranch(const ZSwcPath&, ZSwcTree*).
+  if (result != nullptr) {
+    *result = {};
+  }
   if (ZSwc::isNull(branchRoot)) {
     return;
   }
@@ -202,6 +226,16 @@ void connectBranchToHostLegacyLikeImpl(ZSwc& swc,
 
   ZSwc::SwcTreeNode hook = conn.hook;
   ZSwc::SwcTreeNode loop = conn.loop;
+  const bool hookWasTail = !ZSwc::isNull(hook) && hook == tail;
+  if (result != nullptr) {
+    result->hookWasTail = hookWasTail;
+    if (!ZSwc::isNull(hook)) {
+      result->hookId = hook->id;
+    }
+    if (!ZSwc::isNull(loop)) {
+      result->loopId = loop->id;
+    }
+  }
 
   if (!ZSwc::isNull(hook)) {
     bool needAdjust = false;
@@ -235,8 +269,12 @@ void connectBranchToHostLegacyLikeImpl(ZSwc& swc,
       const std::array<double, 3> rootCenter = {branchRoot->x, branchRoot->y, branchRoot->z};
       const std::array<double, 3> nbrCenter = {rootNeighbor->x, rootNeighbor->y, rootNeighbor->z};
 
-      const double lambda =
-        findBestTerminalBreakLegacyLikeImpl(rootCenter, branchRoot->radius, nbrCenter, rootNeighbor->radius, stack);
+      const double lambda = findBestTerminalBreakLegacyLikeImpl(rootCenter,
+                                                                branchRoot->radius,
+                                                                nbrCenter,
+                                                                rootNeighbor->radius,
+                                                                stack,
+                                                                stackOrigin);
 
       if (lambda < 1.0) {
         swcNodeInterpolateLegacyLike(branchRoot, rootNeighbor, lambda, branchRoot);
@@ -251,6 +289,9 @@ void connectBranchToHostLegacyLikeImpl(ZSwc& swc,
         loop = tn;
         const auto newHook = ZSwc::firstChild(hook);
         if (!ZSwc::isNull(newHook)) {
+          if (result != nullptr) {
+            result->removedNodeId = hook->id;
+          }
           swc.erase(hook);
           hook = newHook;
           branchRoot = hook;
@@ -270,7 +311,8 @@ void connectBranchToHostLegacyLikeImpl(ZSwc& swc,
                                                                 terminal->radius,
                                                                 nbrCenter,
                                                                 terminalNeighbor->radius,
-                                                                stack);
+                                                                stack,
+                                                                stackOrigin);
       if (lambda < 1.0) {
         swcNodeInterpolateLegacyLike(terminal, terminalNeighbor, lambda, terminal);
       }
@@ -280,6 +322,11 @@ void connectBranchToHostLegacyLikeImpl(ZSwc& swc,
   if (!ZSwc::isNull(hook)) {
     CHECK(!ZSwc::isNull(loop));
     swc.appendChild(loop, hook);
+    if (result != nullptr) {
+      result->connected = true;
+      result->hookId = hook->id;
+      result->loopId = loop->id;
+    }
   }
 }
 
@@ -288,7 +335,17 @@ void connectBranchToHostLegacyLike(ZSwc& swc,
                                    ZSwc::SwcTreeNode branchRoot,
                                    const ZImg& stack)
 {
-  connectBranchToHostLegacyLikeImpl(swc, hostRoots, branchRoot, stack);
+  connectBranchToHostLegacyLikeImpl(swc, hostRoots, branchRoot, stack, /*stackOrigin*/ {0.0, 0.0, 0.0}, nullptr);
+}
+
+void connectBranchToHostLegacyLike(ZSwc& swc,
+                                   const std::vector<ZSwc::SwcTreeNode>& hostRoots,
+                                   ZSwc::SwcTreeNode branchRoot,
+                                   const ZImg& stack,
+                                   const std::array<double, 3>& stackOrigin,
+                                   /*nullable*/ ConnectBranchToHostResultLegacyLike* result)
+{
+  connectBranchToHostLegacyLikeImpl(swc, hostRoots, branchRoot, stack, stackOrigin, result);
 }
 
 void connectBranchToHostLegacyLike(ZSwc& swc,
@@ -296,7 +353,17 @@ void connectBranchToHostLegacyLike(ZSwc& swc,
                                    ZSwc::SwcTreeNode branchRoot,
                                    const ZVoxelVolume& stack)
 {
-  connectBranchToHostLegacyLikeImpl(swc, hostRoots, branchRoot, stack);
+  connectBranchToHostLegacyLikeImpl(swc, hostRoots, branchRoot, stack, /*stackOrigin*/ {0.0, 0.0, 0.0}, nullptr);
+}
+
+void connectBranchToHostLegacyLike(ZSwc& swc,
+                                   const std::vector<ZSwc::SwcTreeNode>& hostRoots,
+                                   ZSwc::SwcTreeNode branchRoot,
+                                   const ZVoxelVolume& stack,
+                                   const std::array<double, 3>& stackOrigin,
+                                   /*nullable*/ ConnectBranchToHostResultLegacyLike* result)
+{
+  connectBranchToHostLegacyLikeImpl(swc, hostRoots, branchRoot, stack, stackOrigin, result);
 }
 
 } // namespace nim

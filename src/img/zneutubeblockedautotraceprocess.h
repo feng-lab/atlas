@@ -192,7 +192,7 @@ protected:
 private:
   [[nodiscard]] TraceConfig buildEffectiveTraceConfigOrThrow() const;
 
-  void writeFinalSwcAtomicOrThrow(ZSwc& tree, double zToXYRatio, double reconnectDistThre) const;
+  void writeFinalSwcAtomicOrThrow(ZSwc& tree) const;
 
 private:
   ZImgInfo m_signalInfo;

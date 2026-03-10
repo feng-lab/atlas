@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zneutubetraceconfig.h"
+#include "zneutubegeo3dscalarfield.h"
 #include "zneutubetraceworkspace.h"
 
 #include "zneutubelocsegchain.h"
@@ -8,6 +9,7 @@
 #include "zimg.h"
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -23,6 +25,8 @@ struct RecoverResultLegacyLike
   std::optional<ZImg> baseMask;
 };
 
+using RecoverSeedPostProcessLegacyLike = std::function<Geo3dScalarField(Geo3dScalarField, ZImg&)>;
+
 // Port of `ZNeuronTracer::recover(const Stack*)`.
 //
 // Inputs:
@@ -37,6 +41,7 @@ struct RecoverResultLegacyLike
                                                         double zToXYRatio,
                                                         const ZImg& mask,
                                                         std::optional<ZImg> baseMask,
-                                                        TraceWorkspace& tw);
+                                                        TraceWorkspace& tw,
+                                                        const RecoverSeedPostProcessLegacyLike& seedPostProcess = {});
 
 } // namespace nim

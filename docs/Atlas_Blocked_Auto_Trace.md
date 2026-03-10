@@ -203,6 +203,8 @@ The output is a directory with immutable per-block checkpoints.
     commit_000001/   # fully committed checkpoint
       commit.json    # small “done marker”, written last
       swc_delta.swc   # append-only SWC fragment for this commit
+      swc_full.swc    # full SWC snapshot at this commit (tracing voxel coordinates)
+      seed_scanned_blocks.json  # all core blocks already seed-scanned at this commit
       frontier.json
       scheduler.json
     commit_000002/
@@ -220,8 +222,9 @@ Write protocol for commit `N`:
 Resume protocol:
 
 - Scan `blocks/commit_*`.
-- Choose the highest `N` that contains a valid `commit.json` and loads successfully.
+- Choose the highest `N` whose checkpoint directory loads successfully.
 - Ignore any `.staging_*` directories or incomplete commits.
+- A later broken commit does not prevent resuming from an earlier good one.
 
 GUI note:
 - If the user selects an output folder that already contains `manifest.json`, Atlas treats it as an existing blocked
@@ -242,21 +245,22 @@ GUI note:
   - algorithm config (TraceConfig, plus “blocked tracer” parameters)
 - `blocks/commit_*/swc_delta.swc`: SWC node fragments appended at each commit (IDs are global within the session and must
   remain stable; do not resort during the session).
+- `blocks/commit_*/swc_full.swc`: full SWC snapshot for that commit (canonical resume skeleton for that checkpoint).
+- `blocks/commit_*/seed_scanned_blocks.json`: full visited-block snapshot for that commit.
 - `blocks/commit_*/frontier.json`: pending tasks (each with `endLocseg`).
 - `blocks/commit_*/scheduler.json`: minimal scheduling cursor (e.g. next linear scan index) for deterministic resume.
 - `result_tracing.swc` + `result_tracing_state.json`: rolling “full SWC so far” convenience artifacts (append-only SWC +
-  atomic repair state). These are not required for correctness; the commit deltas remain the resume source of truth.
+  atomic repair state). These are not required for correctness; the commit directories are the resume source of truth.
 
-Note: “seed-scanned blocks” are reconstructed by replaying commit history and collecting `commit.json.did_seed_scan`.
+### 4.x Why Commits Now Store Full Snapshots
 
-### 4.x Why We Persist SWC as Deltas (Not Full SWC Per Block)
+Each commit directory is intentionally self-contained:
 
-We persist `swc_delta.swc` per commit and reconstruct the full SWC by replaying deltas on resume.
-This is intentional:
+- Users can resume from the last good commit even if some earlier or later commit directories are missing or corrupted.
+- Resume does not depend on replaying the entire history just to recover the current SWC and visited-block set.
 
-- Persisting a full SWC snapshot inside every `commit_*/` directory would be **O(N²) disk usage** over a long run (each
-  snapshot repeats all previous nodes).
-- Delta replay is **O(N)** in total nodes and keeps the session size linear.
+The trade-off is higher disk usage, because each commit repeats the current SWC and visited-block snapshot. We keep
+`swc_delta.swc` as well because it is still useful for debugging, inspection, and append-only rolling-SWC updates.
 
 To make “current full SWC so far” easy to inspect (and to speed up crash recovery), we also maintain:
 
@@ -264,8 +268,8 @@ To make “current full SWC so far” easy to inspect (and to speed up crash rec
 - `result_tracing_state.json`: a tiny atomic state file (`commit_id`, `byte_size`) so we can truncate partial appends
   after crashes.
 
-These rolling artifacts are convenience/optimization only; the immutable `blocks/commit_*/swc_delta.swc` chain remains
-the resume source of truth.
+These rolling artifacts are convenience/optimization only; the immutable `blocks/commit_*/` self-contained checkpoints
+remain the resume source of truth.
 
 ### 4.2.x Resume Identity Contract
 
@@ -299,13 +303,18 @@ resume source of truth.
 The resumable session SWC stays append-only and may contain multiple roots while tracing is in progress.
 Before Atlas writes the final `result.swc`, it:
 
-- reconnects the blocked SWC forest into a single tree using the legacy SWC reconnect path,
-- retries reconnect without a distance cap if the configured threshold still leaves multiple roots, and
-- applies the same legacy postprocess family used by whole-volume auto trace (zigzag removal, branch tuning, spur
-  removal, close-node merge, overshoot removal, optional optimal resampling, orphan-blob pruning).
+- keeps the traced result as a forest instead of forcing all roots into one tree,
+- uses exact `attachSwcNodeId` continuation tasks to preserve branch continuity across block boundaries, and
+- for fresh seed-started chains, immediately tries the same local host-attachment heuristic used by interactive trace
+  against the current global SWC, using ROI-aware sampling in the current block, before leaving the chain as a new
+  root.
 
-This keeps the final blocked result aligned with the legacy expectation that the delivered SWC is a connected tree,
-while preserving append-only IDs inside the resumable session artifacts.
+After those topology decisions, Atlas applies the same legacy SWC postprocess family used by whole-volume auto trace
+(zigzag removal, branch tuning, spur removal, close-node merge, overshoot removal, optional optimal resampling,
+orphan-blob pruning).
+
+This preserves append-only IDs inside the resumable session artifacts while keeping separate neurons as separate roots
+unless a fresh branch has an explicit local host connection.
 
 ## 5. Implementation Roadmap
 

@@ -11,6 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -20,11 +21,37 @@ namespace {
   return QStringLiteral("commit_%1").arg(static_cast<qulonglong>(commitId), 6, 10, QLatin1Char('0'));
 }
 
-void writeEmptyFileOrThrow(const QString& path)
+void applyDeltaToSwc(const std::vector<nim::ZBlockedAutoTraceSwcDeltaNode>& delta, nim::ZSwc& swc)
 {
-  QFile f(path);
-  ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate)) << path.toStdString();
-  f.close();
+  std::unordered_map<int64_t, nim::ZSwc::SwcTreeNode> nodeById;
+  nodeById.reserve(swc.size() * 2 + delta.size() * 2 + 1);
+  for (auto it = swc.begin(); it != swc.end(); ++it) {
+    nodeById.emplace(it->id, it);
+  }
+
+  std::vector<std::pair<nim::ZSwc::SwcTreeNode, int64_t>> attach;
+  attach.reserve(delta.size());
+  for (const auto& node : delta) {
+    nim::SwcNode swcNode(node.id, node.type, node.x, node.y, node.z, node.radius, node.parentId);
+    auto it = swc.appendRoot(swcNode);
+    nodeById.emplace(node.id, it);
+    attach.emplace_back(it, node.parentId);
+  }
+
+  for (const auto& [child, parentId] : attach) {
+    if (parentId < 0) {
+      continue;
+    }
+    swc.appendChild(nodeById.at(parentId), child);
+  }
+}
+
+void writeCommitWithSnapshotOrThrow(nim::ZBlockedAutoTraceSession& session,
+                                    const nim::ZBlockedAutoTraceCommitWrite& commit,
+                                    const nim::ZSwc& swcSnapshot,
+                                    const std::vector<nim::ZBlockedAutoTraceBlockId>& seedScannedBlocks)
+{
+  ASSERT_NO_THROW(session.writeCommitOrThrow(commit, swcSnapshot, seedScannedBlocks));
 }
 
 TEST(ZBlockedAutoTraceSession, WritesAndResumesSequentialCommits)
@@ -83,7 +110,12 @@ TEST(ZBlockedAutoTraceSession, WritesAndResumesSequentialCommits)
     .parentId = -1,
   });
 
-  ASSERT_NO_THROW(session.writeCommitOrThrow(c1));
+  nim::ZSwc swcAfterC1;
+  applyDeltaToSwc(c1.swcDeltaNodes, swcAfterC1);
+  const std::vector<nim::ZBlockedAutoTraceBlockId> seedScannedAfterC1{
+    {.bx = 0, .by = 0, .bz = 0}
+  };
+  writeCommitWithSnapshotOrThrow(session, c1, swcAfterC1, seedScannedAfterC1);
 
   nim::ZBlockedAutoTraceCommitWrite c2;
   c2.info.formatVersion = nim::kBlockedAutoTraceCommitFormatVersion;
@@ -119,7 +151,9 @@ TEST(ZBlockedAutoTraceSession, WritesAndResumesSequentialCommits)
   task.suggestedBlock = {.bx = 1, .by = 0, .bz = 0};
   c2.frontier.push_back(task);
 
-  ASSERT_NO_THROW(session.writeCommitOrThrow(c2));
+  nim::ZSwc swcAfterC2 = swcAfterC1;
+  applyDeltaToSwc(c2.swcDeltaNodes, swcAfterC2);
+  writeCommitWithSnapshotOrThrow(session, c2, swcAfterC2, seedScannedAfterC1);
 
   const nim::ZBlockedAutoTraceLoadedState state = session.loadLatestOrEmptyOrThrow();
   EXPECT_EQ(state.commitId, 2u);
@@ -152,7 +186,7 @@ TEST(ZBlockedAutoTraceSession, WritesAndResumesSequentialCommits)
   EXPECT_EQ(state.frontier[0].reason, "UnitTest");
 }
 
-TEST(ZBlockedAutoTraceSession, RollingSwcCatchupFromCommits)
+TEST(ZBlockedAutoTraceSession, RollingSwcRebuildsFromSelfContainedCommit)
 {
   QTemporaryDir tmp;
   ASSERT_TRUE(tmp.isValid());
@@ -198,7 +232,12 @@ TEST(ZBlockedAutoTraceSession, RollingSwcCatchupFromCommits)
     .radius = 2.0,
     .parentId = -1,
   });
-  ASSERT_NO_THROW(session.writeCommitOrThrow(c1));
+  nim::ZSwc swcAfterC1;
+  applyDeltaToSwc(c1.swcDeltaNodes, swcAfterC1);
+  const std::vector<nim::ZBlockedAutoTraceBlockId> seedScannedAfterC1{
+    {.bx = 0, .by = 0, .bz = 0}
+  };
+  writeCommitWithSnapshotOrThrow(session, c1, swcAfterC1, seedScannedAfterC1);
 
   nim::ZBlockedAutoTraceCommitWrite c2;
   c2.info.formatVersion = nim::kBlockedAutoTraceCommitFormatVersion;
@@ -215,9 +254,16 @@ TEST(ZBlockedAutoTraceSession, RollingSwcCatchupFromCommits)
     .radius = 1.0,
     .parentId = 2,
   });
-  ASSERT_NO_THROW(session.writeCommitOrThrow(c2));
+  nim::ZSwc swcAfterC2 = swcAfterC1;
+  applyDeltaToSwc(c2.swcDeltaNodes, swcAfterC2);
+  const std::vector<nim::ZBlockedAutoTraceBlockId> seedScannedAfterC2{
+    {.bx = 0, .by = 0, .bz = 0},
+    {.bx = 1, .by = 0, .bz = 0},
+  };
+  writeCommitWithSnapshotOrThrow(session, c2, swcAfterC2, seedScannedAfterC2);
 
-  // Simulate a tracer that only appends rolling SWC starting at commit 2; it must catch up commit 1 from disk.
+  // Simulate a tracer that only starts the rolling artifact at commit 2; it should rebuild from the self-contained
+  // snapshot instead of depending on earlier commit folders.
   ASSERT_NO_THROW(session.appendToRollingSwcOrThrow(2, c2.swcDeltaNodes));
 
   const QString rollingPath = QDir(sessionDir).absoluteFilePath("result_tracing.swc");
@@ -238,8 +284,8 @@ TEST(ZBlockedAutoTraceSession, RollingSwcCatchupFromCommits)
   }
 
   ASSERT_EQ(ids.size(), 3u);
-  EXPECT_EQ(ids[0], 2);
-  EXPECT_EQ(ids[1], 1);
+  EXPECT_EQ(ids[0], 1);
+  EXPECT_EQ(ids[1], 2);
   EXPECT_EQ(ids[2], 3);
 
   const QString statePath = QDir(sessionDir).absoluteFilePath("result_tracing_state.json");
@@ -250,7 +296,7 @@ TEST(ZBlockedAutoTraceSession, RollingSwcCatchupFromCommits)
   EXPECT_EQ(json::value_to<int64_t>(st.at("byte_size")), static_cast<int64_t>(QFileInfo(rollingPath).size()));
 }
 
-TEST(ZBlockedAutoTraceSession, IgnoresIncompleteAndNonContiguousCommits)
+TEST(ZBlockedAutoTraceSession, SelfContainedCommitResumesAfterEarlierDeletionAndLaterCorruption)
 {
   QTemporaryDir tmp;
   ASSERT_TRUE(tmp.isValid());
@@ -278,28 +324,59 @@ TEST(ZBlockedAutoTraceSession, IgnoresIncompleteAndNonContiguousCommits)
   c1.info.blockId = {.bx = 0, .by = 0, .bz = 0};
   c1.info.didSeedScan = true;
   c1.scheduler.nextLinearBlockIndex = 1;
-  ASSERT_NO_THROW(session.writeCommitOrThrow(c1));
+  c1.swcDeltaNodes.push_back(nim::ZBlockedAutoTraceSwcDeltaNode{
+    .id = 1,
+    .type = 0,
+    .x = 0.0,
+    .y = 0.0,
+    .z = 0.0,
+    .radius = 2.0,
+    .parentId = -1,
+  });
+  nim::ZSwc swcAfterC1;
+  applyDeltaToSwc(c1.swcDeltaNodes, swcAfterC1);
+  const std::vector<nim::ZBlockedAutoTraceBlockId> seedScannedAfterC1{
+    {.bx = 0, .by = 0, .bz = 0}
+  };
+  writeCommitWithSnapshotOrThrow(session, c1, swcAfterC1, seedScannedAfterC1);
 
-  // Create an incomplete commit_000002 (no commit.json): must be ignored.
+  nim::ZBlockedAutoTraceCommitWrite c2;
+  c2.info.formatVersion = nim::kBlockedAutoTraceCommitFormatVersion;
+  c2.info.commitId = 2;
+  c2.info.blockId = {.bx = 1, .by = 0, .bz = 0};
+  c2.info.didSeedScan = true;
+  c2.scheduler.nextLinearBlockIndex = 2;
+  c2.swcDeltaNodes.push_back(nim::ZBlockedAutoTraceSwcDeltaNode{
+    .id = 2,
+    .type = 0,
+    .x = 1.0,
+    .y = 0.0,
+    .z = 0.0,
+    .radius = 1.0,
+    .parentId = 1,
+  });
+  nim::ZSwc swcAfterC2 = swcAfterC1;
+  applyDeltaToSwc(c2.swcDeltaNodes, swcAfterC2);
+  const std::vector<nim::ZBlockedAutoTraceBlockId> seedScannedAfterC2{
+    {.bx = 0, .by = 0, .bz = 0},
+    {.bx = 1, .by = 0, .bz = 0},
+  };
+  writeCommitWithSnapshotOrThrow(session, c2, swcAfterC2, seedScannedAfterC2);
+
+  // Simulate a broken later commit directory: it has a valid commit marker but is missing the self-contained snapshot.
   const QString blocksDir = QDir(sessionDir).absoluteFilePath("blocks");
-  const QString incompleteDir = QDir(blocksDir).absoluteFilePath(commitDirName(2));
-  ASSERT_TRUE(QDir().mkpath(incompleteDir));
-  writeEmptyFileOrThrow(QDir(incompleteDir).absoluteFilePath("swc_delta.swc"));
-  // Intentionally omit commit.json.
-
-  // Create a fully-formed commit_000003: should still be ignored since commit_000002 is missing.
   const QString commit3Dir = QDir(blocksDir).absoluteFilePath(commitDirName(3));
   ASSERT_TRUE(QDir().mkpath(commit3Dir));
   {
     json::object info;
-    info["format_version"] = 1;
+    info["format_version"] = nim::kBlockedAutoTraceCommitFormatVersion;
     info["commit_id"] = 3;
     json::object blockId;
-    blockId["bx"] = 0;
+    blockId["bx"] = 2;
     blockId["by"] = 0;
     blockId["bz"] = 0;
     info["block_id"] = std::move(blockId);
-    info["did_seed_scan"] = false;
+    info["did_seed_scan"] = true;
     info["new_swc_nodes"] = 0;
     info["pending_tasks"] = 0;
     nim::saveJsonObject(info, QDir(commit3Dir).absoluteFilePath("commit.json"));
@@ -311,15 +388,26 @@ TEST(ZBlockedAutoTraceSession, IgnoresIncompleteAndNonContiguousCommits)
   }
   {
     json::object scheduler;
-    scheduler["next_linear_block_index"] = 0;
+    scheduler["next_linear_block_index"] = 3;
     nim::saveJsonObject(scheduler, QDir(commit3Dir).absoluteFilePath("scheduler.json"));
   }
-  writeEmptyFileOrThrow(QDir(commit3Dir).absoluteFilePath("swc_delta.swc"));
+  // Intentionally omit swc_full.swc and seed_scanned_blocks.json. `swc_delta.swc` is a debug/rolling artifact and
+  // should not be required for resume either, so we omit it too.
 
-  EXPECT_EQ(session.latestCommittedIdOrZero(), 1u);
+  const nim::ZBlockedAutoTraceLoadedState stateWithBrokenLaterCommit = session.loadLatestOrEmptyOrThrow();
+  EXPECT_EQ(stateWithBrokenLaterCommit.commitId, 2u);
+  EXPECT_EQ(stateWithBrokenLaterCommit.swc.size(), 2u);
+  ASSERT_EQ(stateWithBrokenLaterCommit.seedScannedBlocks.size(), 2u);
 
-  const nim::ZBlockedAutoTraceLoadedState state = session.loadLatestOrEmptyOrThrow();
-  EXPECT_EQ(state.commitId, 1u);
+  // Losing an earlier commit directory must not prevent resume from the latest good self-contained commit.
+  ASSERT_TRUE(QDir(QDir(blocksDir).absoluteFilePath(commitDirName(1))).removeRecursively());
+
+  const nim::ZBlockedAutoTraceLoadedState stateAfterEarlierDeletion = session.loadLatestOrEmptyOrThrow();
+  EXPECT_EQ(stateAfterEarlierDeletion.commitId, 2u);
+  EXPECT_EQ(stateAfterEarlierDeletion.swc.size(), 2u);
+  ASSERT_EQ(stateAfterEarlierDeletion.seedScannedBlocks.size(), 2u);
+  EXPECT_EQ(stateAfterEarlierDeletion.seedScannedBlocks[0].bx, 0);
+  EXPECT_EQ(stateAfterEarlierDeletion.seedScannedBlocks[1].bx, 1);
 }
 
 } // namespace

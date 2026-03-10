@@ -596,8 +596,8 @@ void localNeurosegStackPositionLegacyLike(const std::array<double, 3>& position,
   offpos[1] = position[1] - static_cast<double>(c[1]);
 
   if (testZToXYRatioLegacyLike(zToXYRatio) != 0) {
-    c[2] = iroundLegacyLike(position[2] / zToXYRatio);
-    offpos[2] = position[2] / zToXYRatio - static_cast<double>(c[2]);
+    c[2] = iroundLegacyLike(position[2] * (1.0 / zToXYRatio));
+    offpos[2] = position[2] * (1.0 / zToXYRatio) - static_cast<double>(c[2]);
   } else {
     c[2] = iroundLegacyLike(position[2]);
     offpos[2] = position[2] - static_cast<double>(c[2]);
@@ -860,11 +860,11 @@ localNeurosegTopSampleLegacyLike(const LocalNeuroseg& locseg, const ZImg& stack,
 {
   // Port of tz_local_neuroseg.c::Local_Neuroseg_Top_Sample().
   std::array<double, 3> pos = localNeurosegTopLegacyLike(locseg);
-  double value = pointSampleLegacyLike(stack, pos[0], pos[1], pos[2] / zToXYRatio, c, t);
+  double value = pointSampleLegacyLike(stack, pos[0], pos[1], pos[2] * (1.0 / zToXYRatio), c, t);
 
   for (double lambda = 0.6; lambda < 0.95; lambda += 0.1) {
     pos = localNeurosegAxisPositionLegacyLike(locseg, locseg.seg.h * lambda);
-    const double value2 = pointSampleLegacyLike(stack, pos[0], pos[1], pos[2] / zToXYRatio, c, t);
+    const double value2 = pointSampleLegacyLike(stack, pos[0], pos[1], pos[2] * (1.0 / zToXYRatio), c, t);
     if (value2 > value) {
       value = value2;
     }
@@ -975,11 +975,11 @@ double localNeurosegTopSampleLegacyLike(const LocalNeuroseg& locseg, const ZVoxe
 {
   // Port of tz_local_neuroseg.c::Local_Neuroseg_Top_Sample().
   std::array<double, 3> pos = localNeurosegTopLegacyLike(locseg);
-  double value = pointSampleLegacyLike(stack, pos[0], pos[1], pos[2] / zToXYRatio);
+  double value = pointSampleLegacyLike(stack, pos[0], pos[1], pos[2] * (1.0 / zToXYRatio));
 
   for (double lambda = 0.6; lambda < 0.95; lambda += 0.1) {
     pos = localNeurosegAxisPositionLegacyLike(locseg, locseg.seg.h * lambda);
-    const double value2 = pointSampleLegacyLike(stack, pos[0], pos[1], pos[2] / zToXYRatio);
+    const double value2 = pointSampleLegacyLike(stack, pos[0], pos[1], pos[2] * (1.0 / zToXYRatio));
     if (value2 > value) {
       value = value2;
     }
@@ -1190,11 +1190,11 @@ bool localNeurosegHitMaskLegacyLike(const LocalNeuroseg& locseg, const ZImg& mas
 
           p[0] += bottom[0];
           p[1] += bottom[1];
-          p[2] = (p[2] + bottom[2]) / zToXYRatio;
+          p[2] += bottom[2];
 
           const int ix = iroundLegacyLike(p[0]);
           const int iy = iroundLegacyLike(p[1]);
-          const int iz = iroundLegacyLike(p[2]);
+          const int iz = iroundLegacyLike(p[2] / zToXYRatio);
           if (maskValue(ix, iy, iz) > 0) {
             return true;
           }
@@ -1214,7 +1214,6 @@ bool localNeurosegHitMaskLegacyLike(const LocalNeuroseg& locseg, const ZVoxelVol
   }
   CHECK(std::isfinite(zToXYRatio));
   CHECK(zToXYRatio > 0.0);
-
   const int width = static_cast<int>(mask.width());
   const int height = static_cast<int>(mask.height());
   const int depth = static_cast<int>(mask.depth());
@@ -1270,11 +1269,11 @@ bool localNeurosegHitMaskLegacyLike(const LocalNeuroseg& locseg, const ZVoxelVol
 
         p[0] += bottom[0];
         p[1] += bottom[1];
-        p[2] = (p[2] + bottom[2]) / zToXYRatio;
+        p[2] += bottom[2];
 
         const int ix = iroundLegacyLike(p[0]);
         const int iy = iroundLegacyLike(p[1]);
-        const int iz = iroundLegacyLike(p[2]);
+        const int iz = iroundLegacyLike(p[2] / zToXYRatio);
         if (maskValue(ix, iy, iz) > 0) {
           return true;
         }
@@ -1517,7 +1516,7 @@ void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg,
     const TVoxel* array = stack.timeData<TVoxel>(t);
     for (size_t i = 0; i < fieldScratch.size(); ++i) {
       const auto& p = fieldScratch.points[i];
-      const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] / zToXYRatio);
+      const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] * (1.0 / zToXYRatio));
       fieldScratch.values[i] =
         pointSampleLegacyLikeTypedFast<TVoxel>(array, width, height, depth, channelVoxelNumber, c, p[0], p[1], z);
     }
@@ -1652,7 +1651,7 @@ void localNeurosegPositionAdjustLegacyLike(LocalNeuroseg& locseg, const ZVoxelVo
   fieldScratch.values.resize(fieldScratch.size());
   for (size_t i = 0; i < fieldScratch.size(); ++i) {
     const auto& p = fieldScratch.points[i];
-    const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] / zToXYRatio);
+    const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] * (1.0 / zToXYRatio));
     fieldScratch.values[i] = pointSampleLegacyLike(stack, p[0], p[1], z);
   }
 

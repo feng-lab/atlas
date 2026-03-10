@@ -197,7 +197,8 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
                                           double zToXYRatio,
                                           const ZImg& mask,
                                           std::optional<ZImg> baseMask,
-                                          TraceWorkspace& tw)
+                                          TraceWorkspace& tw,
+                                          const RecoverSeedPostProcessLegacyLike& seedPostProcess)
 {
   CHECK(std::isfinite(zToXYRatio));
   CHECK(zToXYRatio > 0.0);
@@ -315,6 +316,12 @@ RecoverResultLegacyLike recoverLegacyLike(const ZImg& signal,
       out.baseMask = std::move(baseMask);
       return out;
   }
+
+  if (seedPostProcess) {
+    seeds = seedPostProcess(std::move(seeds), leftover);
+    maybeCancel(tw.cancellationToken);
+  }
+
   prepareTraceScoreThresholdLegacyLike(signal, cfg, TracingModeLegacyLike::Seed, tw);
   SeedSortResultLegacyLike sorted = sortSeedsLegacyLike(seeds, signal, zToXYRatio, tw);
 

@@ -215,7 +215,10 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   ctw.spTest = cfg.spTest;
   ctw.crossoverTest = cfg.crossoverTest;
   ctw.distThre = cfg.maxEucDist;
-  ctw.resolution = traceResolutionFromZToXYRatioLegacyLike(zToXYRatio);
+  // Reconstruction runs on chains that are already stored in isotropized tracing
+  // space. Match the zrunneutucommand pipeline and keep chain-connection tests in
+  // that space instead of introducing another anisotropic comparison transform.
+  ctw.resolution = {1.0, 1.0, 1.0};
 
   if (chains.size() > 500) {
     ctw.spTest = false;
@@ -223,7 +226,8 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
 
   CHECK(ctx.maskTracing) << "traceNeuronAutoLegacyLike: maskTracing=false path is not ported yet.";
 
-  NeuronStructureChainsLegacyLike ns = locsegChainCompNeurostructLegacyLike(chains, &ctx.signal, zToXYRatio, ctw);
+  NeuronStructureChainsLegacyLike ns =
+    locsegChainCompNeurostructLegacyLike(chains, &ctx.signal, /*zToXYRatio*/ 1.0, ctw);
   processNeuronStructureLegacyLike(ns);
 
   CHECK(!ctw.crossoverTest) << "traceNeuronAutoLegacyLike: crossoverTest is not ported yet.";

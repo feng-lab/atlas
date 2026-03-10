@@ -82,7 +82,7 @@ std::vector<double> geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarFie
   std::vector<double> signal(field.size(), 0.0);
   for (size_t i = 0; i < field.size(); ++i) {
     const auto& p = field.points[i];
-    const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] / zToXYRatio);
+    const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] * (1.0 / zToXYRatio));
     signal[i] = pointSampleLegacyLike(stack, p[0], p[1], z, c, t);
   }
   return signal;
@@ -96,7 +96,7 @@ geo3dScalarFieldStackSamplingLegacyLike(const Geo3dScalarField& field, const ZVo
   std::vector<double> signal(field.size(), 0.0);
   for (size_t i = 0; i < field.size(); ++i) {
     const auto& p = field.points[i];
-    const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] / zToXYRatio);
+    const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] * (1.0 / zToXYRatio));
     signal[i] = pointSampleLegacyLike(stack, p[0], p[1], z);
   }
   return signal;
@@ -154,7 +154,7 @@ std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dSca
     // Matches Geo3d_Scalar_Field_Stack_Sampling_M() -> Stack_Points_Sampling_Zm().
     for (size_t i = 0; i < field.size(); ++i) {
       const auto& p = field.points[i];
-      const double z = p[2] / zToXYRatio;
+      const double z = p[2] * (1.0 / zToXYRatio);
       if (pointSampleLegacyLike(mask, p[0], p[1], z, c, t) > 0.0) {
         signal[i] = nanValue();
       } else {
@@ -187,7 +187,7 @@ std::vector<double> geo3dScalarFieldStackSamplingMaskedLegacyLike(const Geo3dSca
     // Matches Geo3d_Scalar_Field_Stack_Sampling_M() -> Stack_Points_Sampling_Zm().
     for (size_t i = 0; i < field.size(); ++i) {
       const auto& p = field.points[i];
-      const double z = p[2] / zToXYRatio;
+      const double z = p[2] * (1.0 / zToXYRatio);
       if (pointSampleLegacyLike(mask, p[0], p[1], z) > 0.0) {
         signal[i] = nanValue();
       } else {
@@ -225,7 +225,7 @@ double geo3dScalarFieldStackScoreLegacyLike(const Geo3dScalarField& field,
     const TVoxel* array = stack.timeData<TVoxel>(t);
     for (size_t i = 0; i < field.size(); ++i) {
       const auto& p = field.points[i];
-      const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] / zToXYRatio);
+      const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] * (1.0 / zToXYRatio));
       signalScratch[i] =
         pointSampleLegacyLikeTypedFast<TVoxel>(array, width, height, depth, channelVoxelNumber, c, p[0], p[1], z);
     }
@@ -253,7 +253,7 @@ double geo3dScalarFieldStackScoreLegacyLike(const Geo3dScalarField& field,
   signalScratch.resize(field.size());
   for (size_t i = 0; i < field.size(); ++i) {
     const auto& p = field.points[i];
-    const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] / zToXYRatio);
+    const double z = (zToXYRatio == 1.0) ? p[2] : (p[2] * (1.0 / zToXYRatio));
     signalScratch[i] = pointSampleLegacyLike(stack, p[0], p[1], z);
   }
 
@@ -292,7 +292,7 @@ double geo3dScalarFieldStackScoreMaskedLegacyLike(const Geo3dScalarField& field,
     // Matches Geo3d_Scalar_Field_Stack_Sampling_M() -> Stack_Points_Sampling_Zm().
     for (size_t i = 0; i < field.size(); ++i) {
       const auto& p = field.points[i];
-      const double z = p[2] / zToXYRatio;
+      const double z = p[2] * (1.0 / zToXYRatio);
       if (pointSampleLegacyLike(mask, p[0], p[1], z, c, t) > 0.0) {
         signalScratch[i] = nanValue();
       } else {
@@ -335,7 +335,7 @@ double geo3dScalarFieldStackScoreMaskedLegacyLike(const Geo3dScalarField& field,
     // Matches Geo3d_Scalar_Field_Stack_Sampling_M() -> Stack_Points_Sampling_Zm().
     for (size_t i = 0; i < field.size(); ++i) {
       const auto& p = field.points[i];
-      const double z = p[2] / zToXYRatio;
+      const double z = p[2] * (1.0 / zToXYRatio);
       if (pointSampleLegacyLike(mask, p[0], p[1], z) > 0.0) {
         signalScratch[i] = nanValue();
       } else {

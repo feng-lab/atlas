@@ -66,6 +66,12 @@ public:
     Complete
   };
 
+  enum class ReadRegionCachePolicy
+  {
+    Use,
+    Bypass
+  };
+
   explicit ZImgPack(ZImgSource imgSource,
                     ZImgInfo* pInfo = nullptr,
                     std::vector<std::shared_ptr<ZImgSubBlock>>* pSceneSubBlocks = nullptr);
@@ -319,18 +325,20 @@ public:
                                              ZImgReadStatsSink* statsSink = nullptr,
                                              ZImgReadStatsContext statsContext = {}) const;
 
-  folly::coro::Task<std::shared_ptr<ZImg>> readRegionToImgAsync(index_t xyRatio,
-                                                                index_t zRatio,
-                                                                index_t sx,
-                                                                index_t sy,
-                                                                index_t sz,
-                                                                size_t sc,
-                                                                size_t t,
-                                                                const ZImgInfo& resInfo,
-                                                                double displayRangeMin,
-                                                                double displayRangeMax,
-                                                                ZImgReadStatsSink* statsSink = nullptr,
-                                                                ZImgReadStatsContext statsContext = {}) const;
+  folly::coro::Task<std::shared_ptr<ZImg>>
+  readRegionToImgAsync(index_t xyRatio,
+                       index_t zRatio,
+                       index_t sx,
+                       index_t sy,
+                       index_t sz,
+                       size_t sc,
+                       size_t t,
+                       const ZImgInfo& resInfo,
+                       double displayRangeMin,
+                       double displayRangeMax,
+                       ZImgReadStatsSink* statsSink = nullptr,
+                       ZImgReadStatsContext statsContext = {},
+                       ReadRegionCachePolicy regionCachePolicy = ReadRegionCachePolicy::Use) const;
 
   __forceinline bool isEmptyBlock(index_t xyRatio,
                                   index_t zRatio,

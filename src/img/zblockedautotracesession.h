@@ -19,14 +19,16 @@
 namespace nim {
 
 inline constexpr int kBlockedAutoTraceManifestFormatVersion = 2;
-inline constexpr int kBlockedAutoTraceCommitFormatVersion = 1;
+inline constexpr int kBlockedAutoTraceCommitFormatVersion = 2;
 
 // Crash-safe, append-only checkpoint IO for blocked auto tracing.
 //
 // Design goals:
 // - Never overwrite previously committed results.
 // - Resume from the last fully committed checkpoint, ignoring half-written ones.
-// - Keep the persisted format explicit and versioned (JSON + SWC delta fragments).
+// - Keep each committed checkpoint self-contained so resume can continue from the last good commit even when other
+//   commit directories are missing or corrupted.
+// - Keep the persisted format explicit and versioned (JSON + SWC snapshots/deltas).
 //
 // Note: This is intentionally UI-agnostic; callers provide the exact dataset identity and effective TraceConfig.
 
@@ -175,7 +177,8 @@ public:
 
   void ensureCreatedOrThrow(const ZBlockedAutoTraceManifest& manifest);
 
-  // Finds the highest fully committed commit id, requiring a contiguous chain from 1..N.
+  // Finds the highest fully committed commit id. Commits are self-contained, so earlier gaps do not invalidate a later
+  // valid checkpoint.
   [[nodiscard]] uint64_t latestCommittedIdOrZero() const;
 
   // Loads manifest + state up to latest committed (or empty state for new session).
@@ -185,7 +188,12 @@ public:
   [[nodiscard]] ZBlockedAutoTraceManifest loadManifestOrThrow() const;
 
   // Appends a new commit (must be commitId == latestCommitted+1).
-  void writeCommitOrThrow(const ZBlockedAutoTraceCommitWrite& commit);
+  //
+  // Besides the per-commit delta, each commit directory stores a full SWC snapshot and visited-block snapshot so the
+  // session can resume from that commit alone.
+  void writeCommitOrThrow(const ZBlockedAutoTraceCommitWrite& commit,
+                          const ZSwc& swcSnapshot,
+                          const std::vector<ZBlockedAutoTraceBlockId>& seedScannedBlocks);
 
   // Convenience artifact: an append-only SWC file containing all committed delta nodes so far.
   //
@@ -193,7 +201,7 @@ public:
   // - Coordinates are in the tracing voxel space (after `signal_downsample_ratio`).
   // - Node IDs remain stable and must not be resampled/renumbered.
   //
-  // This file is *not* required for correctness (canonical resume data is the per-commit `swc_delta.swc`),
+  // This file is *not* required for correctness (canonical resume data is the per-commit self-contained checkpoint),
   // but it makes progress inspection and crash recovery faster.
   void appendToRollingSwcOrThrow(uint64_t commitId, const std::vector<ZBlockedAutoTraceSwcDeltaNode>& nodes) const;
 
@@ -227,6 +235,7 @@ private:
   {
     uint64_t id = 0;
     QString path;
+    ZBlockedAutoTraceCommitInfo info{};
   };
 
   [[nodiscard]] std::vector<CommitDir> listCommittedDirsSortedOrThrow() const;
@@ -236,12 +245,14 @@ private:
   [[nodiscard]] static QString frontierJsonName();
   [[nodiscard]] static QString schedulerJsonName();
   [[nodiscard]] static QString swcDeltaName();
+  [[nodiscard]] static QString swcFullName();
+  [[nodiscard]] static QString seedScannedBlocksName();
 
-  [[nodiscard]] static std::vector<ZBlockedAutoTraceSwcDeltaNode> readSwcDeltaOrThrow(const QString& filePath);
   static void writeSwcDeltaOrThrow(const QString& filePath, const std::vector<ZBlockedAutoTraceSwcDeltaNode>& nodes);
-  static void applySwcDeltaOrThrow(const std::vector<ZBlockedAutoTraceSwcDeltaNode>& delta,
-                                   ZSwc& swc,
-                                   std::unordered_map<int64_t, ZSwc::SwcTreeNode>& nodeById);
+  [[nodiscard]] static std::vector<ZBlockedAutoTraceBlockId> readSeedScannedBlocksOrThrow(const QString& filePath);
+  static void writeSeedScannedBlocksOrThrow(const QString& filePath,
+                                            const std::vector<ZBlockedAutoTraceBlockId>& blocks);
+  static void rebuildNodeByIdOrThrow(ZSwc& swc, std::unordered_map<int64_t, ZSwc::SwcTreeNode>& nodeById);
 
 private:
   QString m_sessionDir;

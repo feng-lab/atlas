@@ -1065,18 +1065,22 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
             CHECK(xyRatio > 0);
             CHECK(zRatio > 0);
 
-            return ZNeutubeBlockedAutoTraceProcess::RoiSignalResult::ok(folly::coro::blockingWait(
-              folly::coro::co_withCancellation(token,
-                                               imgPack->readRegionToImgAsync(/*xyRatio*/ xyRatio,
-                                                                             /*zRatio*/ zRatio,
-                                                                             static_cast<index_t>(sx),
-                                                                             static_cast<index_t>(sy),
-                                                                             static_cast<index_t>(sz),
-                                                                             sc,
-                                                                             t,
-                                                                             resInfo,
-                                                                             info.dataRangeMin(),
-                                                                             info.dataRangeMax()))));
+            return ZNeutubeBlockedAutoTraceProcess::RoiSignalResult::ok(
+              folly::coro::blockingWait(folly::coro::co_withCancellation(
+                token,
+                imgPack->readRegionToImgAsync(/*xyRatio*/ xyRatio,
+                                              /*zRatio*/ zRatio,
+                                              static_cast<index_t>(sx),
+                                              static_cast<index_t>(sy),
+                                              static_cast<index_t>(sz),
+                                              sc,
+                                              t,
+                                              resInfo,
+                                              info.dataRangeMin(),
+                                              info.dataRangeMax(),
+                                              nullptr,
+                                              {},
+                                              ZImgPack::ReadRegionCachePolicy::Bypass))));
           }
           catch (const folly::OperationCancelled&) {
             maybeCancel(token);
