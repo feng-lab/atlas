@@ -194,8 +194,7 @@ The output is a directory with immutable per-block checkpoints.
 
 ```
 <session_dir>/
-  result_tracing.swc    # rolling full SWC (tracing voxel coordinates; updated after each block commit)
-  result_tracing_state.json  # rolling-SWC repair state (commit_id + byte_size; written atomically)
+  result_tracing.swc    # rolling full SWC mirror (tracing voxel coordinates; atomically replaced after each block commit)
   result.swc            # final output (base voxel coordinates; written at the end)
   log.txt               # trace log (written during tracing)
   manifest.json
@@ -249,8 +248,8 @@ GUI note:
 - `blocks/commit_*/seed_scanned_blocks.json`: full visited-block snapshot for that commit.
 - `blocks/commit_*/frontier.json`: pending tasks (each with `endLocseg`).
 - `blocks/commit_*/scheduler.json`: minimal scheduling cursor (e.g. next linear scan index) for deterministic resume.
-- `result_tracing.swc` + `result_tracing_state.json`: rolling “full SWC so far” convenience artifacts (append-only SWC +
-  atomic repair state). These are not required for correctness; the commit directories are the resume source of truth.
+- `result_tracing.swc`: rolling “full SWC so far” convenience artifact (an atomic mirror of the latest committed
+  `swc_full.swc`). It is not required for correctness; the commit directories are the resume source of truth.
 
 ### 4.x Why Commits Now Store Full Snapshots
 
@@ -260,13 +259,11 @@ Each commit directory is intentionally self-contained:
 - Resume does not depend on replaying the entire history just to recover the current SWC and visited-block set.
 
 The trade-off is higher disk usage, because each commit repeats the current SWC and visited-block snapshot. We keep
-`swc_delta.swc` as well because it is still useful for debugging, inspection, and append-only rolling-SWC updates.
+`swc_delta.swc` as well because it is still useful for debugging and inspection.
 
 To make “current full SWC so far” easy to inspect (and to speed up crash recovery), we also maintain:
 
-- `result_tracing.swc`: a rolling append-only SWC file containing all committed delta nodes so far.
-- `result_tracing_state.json`: a tiny atomic state file (`commit_id`, `byte_size`) so we can truncate partial appends
-  after crashes.
+- `result_tracing.swc`: an atomic mirror of the latest committed `swc_full.swc`.
 
 These rolling artifacts are convenience/optimization only; the immutable `blocks/commit_*/` self-contained checkpoints
 remain the resume source of truth.

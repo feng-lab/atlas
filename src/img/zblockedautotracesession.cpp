@@ -19,6 +19,7 @@
 #include <cstring>
 #include <limits>
 #include <string_view>
+#include <vector>
 
 namespace nim {
 
@@ -155,85 +156,6 @@ void atomicWriteJsonObjectOrThrow(const QString& finalPath, const json::object& 
   }
 }
 
-struct RollingSwcState
-{
-  int formatVersion = 1;
-  uint64_t commitId = 0;
-  int64_t byteSize = 0;
-};
-
-[[nodiscard]] json::object rollingSwcStateToJson(const RollingSwcState& s)
-{
-  json::object o;
-  o["format_version"] = s.formatVersion;
-  o["commit_id"] = s.commitId;
-  o["byte_size"] = s.byteSize;
-  return o;
-}
-
-[[nodiscard]] RollingSwcState rollingSwcStateFromJsonOrThrow(const json::object& o)
-{
-  RollingSwcState out;
-  out.formatVersion = requireNumberOrThrow<int>(o, "format_version");
-  out.commitId = requireNumberOrThrow<uint64_t>(o, "commit_id");
-  out.byteSize = requireNumberOrThrow<int64_t>(o, "byte_size");
-  return out;
-}
-
-[[nodiscard]] std::optional<RollingSwcState> tryLoadRollingSwcStateOrWarn(const QString& path)
-{
-  if (!QFileInfo::exists(path)) {
-    return std::nullopt;
-  }
-
-  try {
-    const json::object jo = loadJsonObject(path);
-    RollingSwcState s = rollingSwcStateFromJsonOrThrow(jo);
-    if (s.formatVersion != 1) {
-      LOG(WARNING) << fmt::format("Blocked auto trace: ignoring rolling SWC state with unsupported format_version={}.",
-                                  s.formatVersion);
-      return std::nullopt;
-    }
-    if (s.byteSize < 0) {
-      LOG(WARNING) << "Blocked auto trace: ignoring rolling SWC state with negative byte_size.";
-      return std::nullopt;
-    }
-    return s;
-  }
-  catch (const std::exception& e) {
-    LOG(WARNING) << fmt::format("Blocked auto trace: failed to parse rolling SWC state '{}': {}",
-                                path.toStdString(),
-                                e.what());
-    return std::nullopt;
-  }
-  catch (...) {
-    LOG(WARNING) << fmt::format("Blocked auto trace: failed to parse rolling SWC state '{}'.", path.toStdString());
-    return std::nullopt;
-  }
-}
-
-[[nodiscard]] int64_t fileSizeOrZero(const QString& path)
-{
-  const QFileInfo fi(path);
-  if (!fi.exists() || !fi.isFile()) {
-    return 0;
-  }
-  const qint64 n = fi.size();
-  return (n < 0) ? 0 : static_cast<int64_t>(n);
-}
-
-void truncateFileOrThrow(const QString& path, int64_t bytes)
-{
-  CHECK(bytes >= 0);
-  QFile f(path);
-  if (!f.open(QIODevice::ReadWrite)) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to open file for truncation: %1").arg(path));
-  }
-  if (!f.resize(static_cast<qint64>(bytes))) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to truncate file: %1").arg(path));
-  }
-}
-
 [[nodiscard]] LocalNeuroseg localNeurosegFromJsonOrThrow(const json::object& o)
 {
   LocalNeuroseg out;
@@ -327,11 +249,6 @@ QString ZBlockedAutoTraceSession::blocksDirPath() const
 QString ZBlockedAutoTraceSession::rollingSwcPath() const
 {
   return QDir(m_sessionDir).absoluteFilePath(QStringLiteral("result_tracing.swc"));
-}
-
-QString ZBlockedAutoTraceSession::rollingSwcStatePath() const
-{
-  return QDir(m_sessionDir).absoluteFilePath(QStringLiteral("result_tracing_state.json"));
 }
 
 json::object ZBlockedAutoTraceSession::toJson(const ZBlockedAutoTraceBlockSize& v)
@@ -830,54 +747,6 @@ void ZBlockedAutoTraceSession::writeSeedScannedBlocksOrThrow(const QString& file
 
 namespace {
 
-[[nodiscard]] std::FILE* openSwcAppendOrThrow(const QString& filePath)
-{
-  errno = 0;
-  std::FILE* fp = std::fopen(filePath.toStdString().c_str(), "a");
-  if (fp == nullptr) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to open rolling SWC for appending: %1").arg(filePath),
-                     ZException::Option::CheckErrno);
-  }
-  return fp;
-}
-
-void appendSwcNodesToOpenFileOrThrow(std::FILE* fp,
-                                     const QString& filePathForErrors,
-                                     const std::vector<ZBlockedAutoTraceSwcDeltaNode>& nodes)
-{
-  CHECK(fp != nullptr);
-
-  for (const auto& n : nodes) {
-    errno = 0;
-    const int rc = std::fprintf(fp,
-                                "%lld %lld %.17g %.17g %.17g %.17g %lld\n",
-                                static_cast<long long>(n.id),
-                                static_cast<long long>(n.type),
-                                n.x,
-                                n.y,
-                                n.z,
-                                n.radius,
-                                static_cast<long long>(n.parentId));
-    if (rc < 0) {
-      throw ZException(
-        QStringLiteral("Blocked auto trace: failed while appending rolling SWC: %1").arg(filePathForErrors),
-        ZException::Option::CheckErrno);
-    }
-  }
-}
-
-void closeFileOrThrow(std::FILE* fp, const QString& filePathForErrors)
-{
-  if (fp == nullptr) {
-    return;
-  }
-  errno = 0;
-  if (std::fclose(fp) != 0) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to close rolling SWC: %1").arg(filePathForErrors),
-                     ZException::Option::CheckErrno);
-  }
-}
-
 void copyFileAtomicOrThrow(const QString& sourcePath, const QString& finalPath)
 {
   QFile source(sourcePath);
@@ -890,7 +759,7 @@ void copyFileAtomicOrThrow(const QString& sourcePath, const QString& finalPath)
     throw ZException(QStringLiteral("Blocked auto trace: failed to open destination file: %1").arg(finalPath));
   }
 
-  std::array<char, 1 << 20> buffer{};
+  std::vector<char> buffer(1 << 20);
   while (true) {
     const qint64 nread = source.read(buffer.data(), static_cast<qint64>(buffer.size()));
     if (nread < 0) {
@@ -928,83 +797,15 @@ void ZBlockedAutoTraceSession::rebuildNodeByIdOrThrow(ZSwc& swc,
   }
 }
 
-void ZBlockedAutoTraceSession::appendToRollingSwcOrThrow(uint64_t commitId,
-                                                         const std::vector<ZBlockedAutoTraceSwcDeltaNode>& nodes) const
+void ZBlockedAutoTraceSession::updateRollingSwcFromCommitOrThrow(uint64_t commitId) const
 {
   if (commitId == 0) {
-    throw ZException("Blocked auto trace: rolling SWC append requires commitId > 0.");
+    throw ZException("Blocked auto trace: rolling SWC update requires commitId > 0.");
   }
 
-  const uint64_t latest = latestCommittedIdOrZero();
-  if (commitId > latest) {
-    throw ZException(
-      fmt::format("Blocked auto trace: refusing to append rolling SWC for commit {} (latest committed is {}).",
-                  commitId,
-                  latest));
-  }
-
-  const QString swcPath = rollingSwcPath();
-  const QString statePath = rollingSwcStatePath();
-
-  RollingSwcState state{};
-  if (auto s = tryLoadRollingSwcStateOrWarn(statePath)) {
-    state = *s;
-  }
-
-  // Repair/truncate the rolling file based on the last committed state.
-  {
-    const int64_t actual = fileSizeOrZero(swcPath);
-    if (actual < state.byteSize) {
-      LOG(WARNING) << fmt::format(
-        "Blocked auto trace: rolling SWC file smaller than recorded state; rebuilding. fileBytes={}, stateBytes={}",
-        actual,
-        state.byteSize);
-      state.commitId = 0;
-      state.byteSize = 0;
-      if (actual > 0) {
-        truncateFileOrThrow(swcPath, 0);
-      }
-    } else if (actual > state.byteSize) {
-      // Likely a crash during append; truncate back to the last known-good size.
-      truncateFileOrThrow(swcPath, state.byteSize);
-    }
-  }
-
-  // Already up-to-date (or ahead due to manual edits); keep the file stable.
-  if (state.commitId >= commitId) {
-    return;
-  }
-
-  const QString blocksPath = blocksDirPath();
-  const QDir blocksDir(blocksPath);
-  const QString commitPath = blocksDir.absoluteFilePath(commitDirName(commitId));
+  const QString commitPath = QDir(blocksDirPath()).absoluteFilePath(commitDirName(commitId));
   const QString swcFullPath = QDir(commitPath).absoluteFilePath(swcFullName());
-
-  if (state.commitId + 1 != commitId) {
-    copyFileAtomicOrThrow(swcFullPath, swcPath);
-    state.commitId = commitId;
-    state.byteSize = fileSizeOrZero(swcPath);
-    atomicWriteJsonObjectOrThrow(statePath, rollingSwcStateToJson(state));
-    return;
-  }
-
-  if (!nodes.empty()) {
-    std::FILE* fp = openSwcAppendOrThrow(swcPath);
-    auto fpGuard = folly::makeGuard([&]() {
-      try {
-        closeFileOrThrow(fp, swcPath);
-      }
-      catch (...) {
-      }
-    });
-    appendSwcNodesToOpenFileOrThrow(fp, swcPath, nodes);
-    fpGuard.dismiss();
-    closeFileOrThrow(fp, swcPath);
-  }
-
-  state.commitId = commitId;
-  state.byteSize = fileSizeOrZero(swcPath);
-  atomicWriteJsonObjectOrThrow(statePath, rollingSwcStateToJson(state));
+  copyFileAtomicOrThrow(swcFullPath, rollingSwcPath());
 }
 
 ZBlockedAutoTraceLoadedState ZBlockedAutoTraceSession::loadLatestOrEmptyOrThrow() const

@@ -186,7 +186,7 @@ TEST(ZBlockedAutoTraceSession, WritesAndResumesSequentialCommits)
   EXPECT_EQ(state.frontier[0].reason, "UnitTest");
 }
 
-TEST(ZBlockedAutoTraceSession, RollingSwcRebuildsFromSelfContainedCommit)
+TEST(ZBlockedAutoTraceSession, RollingSwcMirrorsLatestSelfContainedCommit)
 {
   QTemporaryDir tmp;
   ASSERT_TRUE(tmp.isValid());
@@ -262,9 +262,8 @@ TEST(ZBlockedAutoTraceSession, RollingSwcRebuildsFromSelfContainedCommit)
   };
   writeCommitWithSnapshotOrThrow(session, c2, swcAfterC2, seedScannedAfterC2);
 
-  // Simulate a tracer that only starts the rolling artifact at commit 2; it should rebuild from the self-contained
-  // snapshot instead of depending on earlier commit folders.
-  ASSERT_NO_THROW(session.appendToRollingSwcOrThrow(2, c2.swcDeltaNodes));
+  // The rolling artifact should mirror the latest committed self-contained snapshot directly.
+  ASSERT_NO_THROW(session.updateRollingSwcFromCommitOrThrow(2));
 
   const QString rollingPath = QDir(sessionDir).absoluteFilePath("result_tracing.swc");
   ASSERT_TRUE(QFileInfo::exists(rollingPath)) << rollingPath.toStdString();
@@ -288,12 +287,12 @@ TEST(ZBlockedAutoTraceSession, RollingSwcRebuildsFromSelfContainedCommit)
   EXPECT_EQ(ids[1], 2);
   EXPECT_EQ(ids[2], 3);
 
+  const QString fullPath = QDir(sessionDir).absoluteFilePath("blocks/commit_000002/swc_full.swc");
+  ASSERT_TRUE(QFileInfo::exists(fullPath)) << fullPath.toStdString();
+  EXPECT_EQ(QFileInfo(rollingPath).size(), QFileInfo(fullPath).size());
+
   const QString statePath = QDir(sessionDir).absoluteFilePath("result_tracing_state.json");
-  ASSERT_TRUE(QFileInfo::exists(statePath)) << statePath.toStdString();
-  const json::object st = nim::loadJsonObject(statePath);
-  EXPECT_EQ(json::value_to<int>(st.at("format_version")), 1);
-  EXPECT_EQ(json::value_to<uint64_t>(st.at("commit_id")), 2u);
-  EXPECT_EQ(json::value_to<int64_t>(st.at("byte_size")), static_cast<int64_t>(QFileInfo(rollingPath).size()));
+  EXPECT_FALSE(QFileInfo::exists(statePath)) << statePath.toStdString();
 }
 
 TEST(ZBlockedAutoTraceSession, SelfContainedCommitResumesAfterEarlierDeletionAndLaterCorruption)

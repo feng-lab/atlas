@@ -937,6 +937,64 @@ When the task finishes:
 - If a trace result is produced, Atlas writes the **output SWC file** and (if enabled) loads it as a **new SWC object**.
 - If no result is produced, the task completes with a “no trace result” message.
 
+#### Step 4: run Auto Trace from the CLI
+
+Atlas also exposes the migrated tracing runner through `--command`. This is useful for reproducible batch runs and for
+running blocked tracing end to end outside the GUI.
+
+Dense in-memory auto trace:
+
+```bash
+./Atlas --command \
+  --trace path/to/input_image.tif \
+  -o path/to/output.swc \
+  --channel 1 \
+  --time 0 \
+  --z_to_xy_ratio 1.0 \
+  --level 1
+```
+
+Blocked auto trace:
+
+```bash
+./Atlas --command \
+  --trace path/to/input_image.nim \
+  -o path/to/output_session_dir \
+  --blocked \
+  --downsample 2 2 1 \
+  --channel 1 \
+  --time 0 \
+  --zscale 1.0 \
+  --level 1
+```
+
+CLI tracing options:
+
+- `--trace <input>`: run the tracing pipeline on the input image.
+- `-o <output>`:
+  - dense tracing writes a final SWC file at this path;
+  - blocked tracing treats this path as the session directory and writes `manifest.json`, `blocks/`, `result_tracing.swc`,
+    `result.swc`, and `log.txt` inside it.
+- `--blocked`: use the blocked large-image/resumable tracing pipeline.
+- `--channel <0-based>`: select the input channel to trace.
+- `--time <0-based>`: select the input time point to trace.
+- `--downsample <x> <y> <z>` or `--intv <x> <y> <z>`: trace on a downsampled signal volume. Dense tracing rescales the
+  output SWC back to the original image coordinates. Blocked tracing uses the same tracing voxel space/session behavior
+  as the GUI blocked worker.
+- `--z_to_xy_ratio <v>` or `--zscale <v>`: override the tracing `zToXYRatio` used by the migrated tracing stack.
+- `--level <n>`: choose the tracing level / computational budget.
+- `--config <command_config.json>`: override the default command configuration file used to locate trace configs.
+- `--verbose`: enable additional CLI logging.
+
+Notes:
+
+- CLI dense auto trace now uses the same `ZNeutubeAutoTraceProcess` wrapper as the GUI, including downsampled tracing and
+  output rescaling.
+- CLI blocked tracing now uses the same downsample-aware blocked worker contract as the GUI. The output session
+  directory is resumable only for the same input source and the same effective tracing settings.
+- `zToXYRatio` means `voxelSizeZ / voxelSizeXY`, matching the UI. `--zscale` is accepted as a CLI alias for
+  compatibility with existing tracing terminology.
+
 ## 6. 3D Workspace Skills
 
 ### 6.1 Opening and Reusing the 3D Window

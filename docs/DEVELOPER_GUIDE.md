@@ -29,6 +29,20 @@ Entry Points
 - CLI:
   - Atlas routes `--command` to the migrated runner in `src/img/zrunneutucommand2.*` (type-safe config parsing via `boost::json`).
   - The `--trace` and `--auto_trace` subcommands use the `src/img/zneutube*` tracing stack.
+  - The migrated trace CLI supports explicit tracing-selection arguments that bypass UI state:
+    - `--channel <0-based>`
+    - `--time <0-based>`
+    - `--z_to_xy_ratio <v>` / `--zscale <v>`
+    - `--downsample <x> <y> <z>` / `--intv <x> <y> <z>`
+    - `--blocked` for the blocked large-image worker
+  - Dense CLI trace writes a final SWC to `-o <path>`. Blocked CLI trace treats `-o <path>` as the session directory
+    and writes `manifest.json`, immutable per-commit checkpoints under `blocks/`, the rolling `result_tracing.swc`,
+    the final `result.swc`, and `log.txt`.
+  - Dense CLI auto trace now goes through `ZNeutubeAutoTraceProcess`, matching the GUI worker contract for downsampled
+    signal loading and SWC rescaling.
+  - Blocked CLI trace sets `signal_downsample_ratio` on `ZNeutubeBlockedAutoTraceProcess` and uses direct
+    `ZImgSource(path, region)` loads with explicit x/y/z downsample ratios so the CLI and GUI blocked workers share the
+    same tracing voxel-space semantics.
 - Seeded trace (interactive-like, single seed):
   - Core API (in-memory, file-free): `nim::traceSeedNewSwcLegacyLike(...)` and `nim::traceSeedIntoHostSwcLegacyLike(...)`
     (`src/img/zneutubetraceinteractive.*`).
@@ -321,6 +335,9 @@ Blocked auto trace specifics:
 - The blocked auto trace manifest is part of the worker contract. Resume is allowed only when `dataset_id` matches the
   exact `ZImgSource` JSON plus the persisted channel/time, downsample ratio, `z_scale`, dataset shape, block geometry,
   preprocessing mode, and effective trace config.
+- The GUI worker and the CLI worker now expose the same blocked tracing contract. For file-backed datasets, the CLI path
+  constructs ROI reads directly from `ZImgSource(path, region)` so blocked tracing can be exercised end to end outside
+  the background-task UI layer.
 - ROI providers for blocked auto trace must distinguish `AllZero` from failure. A valid all-zero ROI can be committed;
   unavailable/network-failed ROIs must throw so the block is retried instead of being marked visited.
 - Blocked auto trace ROI reads bypass `ZImgRegionCache` on both lookup and insert. The worker preprocesses the returned

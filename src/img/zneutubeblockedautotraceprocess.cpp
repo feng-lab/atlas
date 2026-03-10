@@ -1989,9 +1989,9 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
 
       session.writeCommitOrThrow(commit, state.swc, seedScannedSnapshot);
 
-      // Best-effort rolling SWC artifact (append-only; used for progress inspection and faster resume).
+      // Best-effort rolling SWC artifact (atomic mirror of the latest committed full snapshot).
       try {
-        session.appendToRollingSwcOrThrow(commit.info.commitId, commit.swcDeltaNodes);
+        session.updateRollingSwcFromCommitOrThrow(commit.info.commitId);
       }
       catch (const std::exception& e) {
         LOG(WARNING) << fmt::format("Blocked auto trace: failed to update result_tracing.swc for commit {}: {}",

@@ -195,21 +195,20 @@ public:
                           const ZSwc& swcSnapshot,
                           const std::vector<ZBlockedAutoTraceBlockId>& seedScannedBlocks);
 
-  // Convenience artifact: an append-only SWC file containing all committed delta nodes so far.
+  // Convenience artifact: an atomic mirror of the latest committed `swc_full.swc`.
   //
   // - Stored at `<sessionDir>/result_tracing.swc`.
   // - Coordinates are in the tracing voxel space (after `signal_downsample_ratio`).
   // - Node IDs remain stable and must not be resampled/renumbered.
   //
   // This file is *not* required for correctness (canonical resume data is the per-commit self-contained checkpoint),
-  // but it makes progress inspection and crash recovery faster.
-  void appendToRollingSwcOrThrow(uint64_t commitId, const std::vector<ZBlockedAutoTraceSwcDeltaNode>& nodes) const;
+  // but it makes progress inspection easier.
+  void updateRollingSwcFromCommitOrThrow(uint64_t commitId) const;
 
 private:
   [[nodiscard]] QString manifestPath() const;
   [[nodiscard]] QString blocksDirPath() const;
   [[nodiscard]] QString rollingSwcPath() const;
-  [[nodiscard]] QString rollingSwcStatePath() const;
 
   [[nodiscard]] static json::object toJson(const ZBlockedAutoTraceBlockSize& v);
   [[nodiscard]] static json::object toJson(const ZBlockedAutoTraceDatasetShape& v);

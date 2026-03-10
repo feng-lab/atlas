@@ -15,6 +15,7 @@
 #include <gflags/gflags.h>
 
 #include <charconv>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <vector>
@@ -45,9 +46,13 @@ struct Command2Args
 
   int level = 0;
   double scale = 1.0;
+  size_t selectedChannel = 0;
+  size_t selectedTime = 0;
+  std::optional<double> zToXYRatioOverride;
 
   bool isVerbose = false;
   bool diagnosis = false;
+  bool useBlocked = false;
 
   bool runSkeletonize = false;
   bool runTraceNeuron = false;
@@ -250,9 +255,9 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
       continue;
     }
 
-    if (arg == "--intv") {
+    if (arg == "--intv" || arg == "--downsample" || arg == "--downsample_ratio") {
       if (i + 3 >= argc) {
-        LOG(ERROR) << "Missing values for --intv <x> <y> <z>";
+        LOG(ERROR) << "Missing values for " << std::string(arg) << " <x> <y> <z>";
         return false;
       }
       std::array<int, 3> intv{};
@@ -260,7 +265,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
         const std::string_view v(argv[i + 1 + k]);
         const auto parsed = parseInt(v);
         if (!parsed) {
-          LOG(ERROR) << "Invalid --intv value: " << std::string(v);
+          LOG(ERROR) << "Invalid " << std::string(arg) << " value: " << std::string(v);
           return false;
         }
         intv[static_cast<size_t>(k)] = *parsed;
@@ -300,12 +305,61 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
       continue;
     }
 
+    if (arg == "--channel") {
+      if (i + 1 >= argc) {
+        LOG(ERROR) << "Missing value for --channel";
+        return false;
+      }
+      const std::string_view v(argv[++i]);
+      const auto parsed = parseInt(v);
+      if (!parsed || *parsed < 0) {
+        LOG(ERROR) << "Invalid --channel value: " << std::string(v);
+        return false;
+      }
+      out->selectedChannel = static_cast<size_t>(*parsed);
+      continue;
+    }
+
+    if (arg == "--time") {
+      if (i + 1 >= argc) {
+        LOG(ERROR) << "Missing value for --time";
+        return false;
+      }
+      const std::string_view v(argv[++i]);
+      const auto parsed = parseInt(v);
+      if (!parsed || *parsed < 0) {
+        LOG(ERROR) << "Invalid --time value: " << std::string(v);
+        return false;
+      }
+      out->selectedTime = static_cast<size_t>(*parsed);
+      continue;
+    }
+
+    if (arg == "--z_to_xy_ratio" || arg == "--zscale") {
+      if (i + 1 >= argc) {
+        LOG(ERROR) << "Missing value for " << std::string(arg);
+        return false;
+      }
+      const std::string_view v(argv[++i]);
+      const auto parsed = parseDouble(v);
+      if (!parsed || !std::isfinite(*parsed) || *parsed <= 0.0) {
+        LOG(ERROR) << "Invalid " << std::string(arg) << " value: " << std::string(v);
+        return false;
+      }
+      out->zToXYRatioOverride = *parsed;
+      continue;
+    }
+
     if (arg == "--skeletonize") {
       out->runSkeletonize = true;
       continue;
     }
     if (arg == "--trace") {
       out->runTraceNeuron = true;
+      continue;
+    }
+    if (arg == "--blocked") {
+      out->useBlocked = true;
       continue;
     }
     if (arg == "--compare_swc") {
@@ -358,10 +412,12 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
 {
   Command2Args args;
   if (!parseArgs(argc, argv, jsonDirPath, &args)) {
-    LOG(INFO) << "Usage: Atlas --command [<input> ...] [-o <output>] [--config <command_config.json>]"
-                 " [--json_dir <Resources/json>]"
-                 " [--intv x y z] [--skeletonize] [--general <json|path>] [--compare_swc --scale <s>]"
-                 " [--trace --level <n>] [--verbose]";
+    LOG(INFO)
+      << "Usage: Atlas --command [<input> ...] [-o <output>] [--config <command_config.json>]"
+         " [--json_dir <Resources/json>]"
+         " [--downsample x y z|--intv x y z] [--skeletonize] [--general <json|path>] [--compare_swc --scale <s>]"
+         " [--trace --level <n>] [--blocked] [--channel <0-based>] [--time <0-based>]"
+         " [--z_to_xy_ratio <v>|--zscale <v>] [--verbose]";
     return 1;
   }
 
@@ -465,6 +521,64 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
       args.position = pos;
     }
 
+    if (auto it = inputJson.find("channel"); it != inputJson.end() && it->value().is_int64()) {
+      const auto channel = it->value().as_int64();
+      if (channel < 0) {
+        LOG(ERROR) << "Invalid input.channel: expected non-negative integer";
+        return 1;
+      }
+      args.selectedChannel = static_cast<size_t>(channel);
+    }
+
+    if (auto it = inputJson.find("time"); it != inputJson.end() && it->value().is_int64()) {
+      const auto time = it->value().as_int64();
+      if (time < 0) {
+        LOG(ERROR) << "Invalid input.time: expected non-negative integer";
+        return 1;
+      }
+      args.selectedTime = static_cast<size_t>(time);
+    }
+
+    if (auto it = inputJson.find("blocked"); it != inputJson.end() && it->value().is_bool()) {
+      args.useBlocked = it->value().as_bool();
+    }
+
+    if (auto it = inputJson.find("z_to_xy_ratio"); it != inputJson.end() && it->value().is_number()) {
+      args.zToXYRatioOverride = json::value_to<double>(it->value());
+    } else if (auto zscaleIt = inputJson.find("zscale"); zscaleIt != inputJson.end() && zscaleIt->value().is_number()) {
+      args.zToXYRatioOverride = json::value_to<double>(zscaleIt->value());
+    }
+
+    if (auto downsampleIt = inputJson.find("signal_downsample_ratio"); downsampleIt != inputJson.end()) {
+      std::array<int, 3> ratio{};
+      if (!parseArray3Int(downsampleIt->value(), &ratio)) {
+        LOG(ERROR) << "Invalid input.signal_downsample_ratio: expected array[3] of int";
+        return 1;
+      }
+      args.downsampleInterval = ratio;
+    } else if (auto downsampleIt = inputJson.find("downsample_ratio"); downsampleIt != inputJson.end()) {
+      std::array<int, 3> ratio{};
+      if (!parseArray3Int(downsampleIt->value(), &ratio)) {
+        LOG(ERROR) << "Invalid input.downsample_ratio: expected array[3] of int";
+        return 1;
+      }
+      args.downsampleInterval = ratio;
+    } else if (auto downsampleIt = inputJson.find("downsample"); downsampleIt != inputJson.end()) {
+      std::array<int, 3> ratio{};
+      if (!parseArray3Int(downsampleIt->value(), &ratio)) {
+        LOG(ERROR) << "Invalid input.downsample: expected array[3] of int";
+        return 1;
+      }
+      args.downsampleInterval = ratio;
+    } else if (auto downsampleIt = inputJson.find("intv"); downsampleIt != inputJson.end()) {
+      std::array<int, 3> ratio{};
+      if (!parseArray3Int(downsampleIt->value(), &ratio)) {
+        LOG(ERROR) << "Invalid input.intv: expected array[3] of int";
+        return 1;
+      }
+      args.downsampleInterval = ratio;
+    }
+
     if (auto it = inputJson.find("size"); it != inputJson.end()) {
       std::array<int, 3> sz{};
       if (!parseArray3Int(it->value(), &sz)) {
@@ -507,14 +621,31 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
     }
 
     case Command::Trace: {
-      return runTrace(args.input,
-                      args.output,
-                      args.position,
-                      args.level,
-                      args.diagnosis,
-                      traceInclude,
-                      args.jsonDirPath,
-                      args.isVerbose);
+      RunTraceOptions options;
+      options.position = args.position;
+      options.level = args.level;
+      options.diagnosis = args.diagnosis;
+      options.traceConfigPath = traceInclude;
+      options.jsonDirPath = args.jsonDirPath;
+      options.verbose = args.isVerbose;
+      options.useBlocked = args.useBlocked;
+      options.outputSessionDir = args.useBlocked ? args.output : std::string{};
+      options.selectedChannel = args.selectedChannel;
+      options.selectedTime = args.selectedTime;
+      if (args.downsampleInterval.has_value()) {
+        const auto& ratio = *args.downsampleInterval;
+        if (ratio[0] <= 0 || ratio[1] <= 0 || ratio[2] <= 0) {
+          LOG(ERROR) << "Trace: downsample values must be > 0.";
+          return 1;
+        }
+        options.signalDownsampleRatio = {
+          static_cast<size_t>(ratio[0]),
+          static_cast<size_t>(ratio[1]),
+          static_cast<size_t>(ratio[2]),
+        };
+      }
+      options.zToXYRatioOverride = args.zToXYRatioOverride;
+      return runTrace(args.input, args.output, options);
     }
 
     case Command::General: {
