@@ -1913,6 +1913,11 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
 
           size_t chainsAppended = 0;
           size_t frontierTasksAdded = 0;
+          std::vector<ZSwc::SwcTreeNode> attachHostRoots;
+          attachHostRoots.reserve(state.swc.numRoots());
+          for (auto it = state.swc.beginRoot(); it != state.swc.endRoot(); ++it) {
+            attachHostRoots.emplace_back(it);
+          }
 
           for (size_t ci = 0; ci < chains.size(); ++ci) {
             if (!chains[ci] || chains[ci]->empty()) {
@@ -1953,19 +1958,11 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
             }
 
             ConnectBranchToHostResultLegacyLike connResult;
-            std::vector<ZSwc::SwcTreeNode> hostRoots;
-            if (firstId > 0) {
+            if (firstId > 0 && !attachHostRoots.empty()) {
               auto branchRootIt = state.nodeById.find(firstId);
               CHECK(branchRootIt != state.nodeById.end());
               const ZSwc::SwcTreeNode branchRoot = branchRootIt->second;
-              hostRoots.reserve(state.swc.numRoots());
-              for (auto it = state.swc.beginRoot(); it != state.swc.endRoot(); ++it) {
-                if (it != branchRoot) {
-                  hostRoots.emplace_back(it);
-                }
-              }
-
-              connectBranchToHostLegacyLike(state.swc, hostRoots, branchRoot, signal, signalOrigin, &connResult);
+              connectBranchToHostLegacyLike(state.swc, attachHostRoots, branchRoot, signal, signalOrigin, &connResult);
               if (connResult.removedNodeId > 0) {
                 state.nodeById.erase(connResult.removedNodeId);
               }

@@ -16,11 +16,11 @@ namespace nim::neuroglancer {
 }
 
 // Deterministically assigns a pseudo-random color to a segmentation label ID.
-// ID 0 is reserved for "empty/background" and mapped to black.
+// ID 0 is reserved for "empty/background" and is transparent in Neuroglancer overlay rendering.
 [[nodiscard]] inline col4 labelColorForId(uint64_t id, uint8_t alpha = 255_u8)
 {
   if (id == 0) {
-    return col4{0, 0, 0, alpha};
+    return col4{0, 0, 0, 0_u8};
   }
 
   const uint64_t h = splitmix64(id);
@@ -35,4 +35,3 @@ namespace nim::neuroglancer {
 }
 
 } // namespace nim::neuroglancer
-

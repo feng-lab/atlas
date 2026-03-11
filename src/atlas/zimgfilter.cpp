@@ -118,16 +118,28 @@ void persistNeuroglancerSourceOverridesToHistory(const ZImgPack& pack, const QSt
 class ZOverwritePixmapItem : public QGraphicsPixmapItem
 {
 public:
-  using QGraphicsPixmapItem::QGraphicsPixmapItem;
+  explicit ZOverwritePixmapItem(QPainter::CompositionMode compositionMode = QPainter::CompositionMode_Source,
+                                QGraphicsItem* parent = nullptr)
+    : QGraphicsPixmapItem(parent)
+    , m_compositionMode(compositionMode)
+  {}
+
+  void setCompositionMode(QPainter::CompositionMode compositionMode)
+  {
+    m_compositionMode = compositionMode;
+  }
 
   void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override
   {
     CHECK(painter);
     painter->save();
-    painter->setCompositionMode(QPainter::CompositionMode_Source);
+    painter->setCompositionMode(m_compositionMode);
     QGraphicsPixmapItem::paint(painter, option, widget);
     painter->restore();
   }
+
+private:
+  QPainter::CompositionMode m_compositionMode = QPainter::CompositionMode_Source;
 };
 
 struct Neuroglancer2DRenderParams
@@ -742,6 +754,12 @@ void ZImgFilter::viewPrecedenceChanged()
 void ZImgFilter::transformChanged()
 {
   if (m_item) {
+    if (m_imgPack && m_imgPack->isNeuroglancerPrecomputed()) {
+      for (const auto& keyItem : m_ngTiles) {
+        CHECK(keyItem.second);
+        keyItem.second->setTransform(QTransform());
+      }
+    }
     m_item->setTransform(getQTransform());
     if (m_scaleBarItem) {
       m_scaleBarItem->setTransformScale(getTransformScale().x);
@@ -1348,8 +1366,12 @@ void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack, uint64_t epoch, 
     m_view.scene().addItem(m_item.get());
   }
 
+  const QTransform objectTransform = getQTransform();
   m_item->setZValue(m_viewPrecedencePara.get());
-  m_item->setTransform(getQTransform());
+  // Reset the group transform while (re)attaching child tiles. QGraphicsItemGroup::addToGroup()
+  // preserves scene-space geometry, so adding a tile to an already-transformed group leaves an
+  // inverse compensation transform on the child and effectively cancels the parent scale.
+  m_item->setTransform(QTransform());
   m_item->setOpacity(m_opacity.get());
   m_item->setVisible(m_isVisible);
 
@@ -1362,6 +1384,11 @@ void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack, uint64_t epoch, 
     }
     return {loc.x(), loc.y(), static_cast<size_t>(scaleRounded), img.width(), img.height()};
   };
+
+  const bool segmentationSourceOver =
+    m_imgPack->neuroglancerVolumeShared() && m_imgPack->neuroglancerVolumeShared()->isSegmentation();
+  const QPainter::CompositionMode tileCompositionMode =
+    segmentationSourceOver ? QPainter::CompositionMode_SourceOver : QPainter::CompositionMode_Source;
 
   bool appliedAny = false;
   for (size_t i = 0; i < qImagePack.numImages(); ++i) {
@@ -1382,22 +1409,33 @@ void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack, uint64_t epoch, 
     QGraphicsPixmapItem* item = nullptr;
     if (auto it = m_ngTiles.find(key); it != m_ngTiles.end()) {
       item = it->second;
+      if (auto* overwriteItem = dynamic_cast<ZOverwritePixmapItem*>(item); overwriteItem != nullptr) {
+        overwriteItem->setCompositionMode(tileCompositionMode);
+      }
     } else {
-      item = static_cast<QGraphicsPixmapItem*>(new ZOverwritePixmapItem());
+      // Segmentation tiles need SourceOver so transparent label-0 pixels reveal lower-precedence
+      // objects instead of clearing the scene background. Regular image tiles keep Source so finer
+      // progressive tiles fully replace coarser underlays while rendering.
+      item = static_cast<QGraphicsPixmapItem*>(new ZOverwritePixmapItem(tileCompositionMode));
       m_ngTiles.emplace(key, item);
       m_item->addToGroup(item);
     }
 
+    // Child geometry is expressed in the group's local coordinates. Existing tiles may still carry
+    // the inverse compensation transform from a previous addToGroup() under a transformed parent,
+    // so always clear the local transform before updating the tile geometry.
+    item->setTransform(QTransform());
     item->setPixmap(QPixmap::fromImage(img));
     item->setScale(scale);
     item->setPos(QPointF(loc));
     item->setOpacity(1.0);
     item->setVisible(m_isVisible);
-
     const qreal subZ = static_cast<qreal>(1.0 / std::max(1e-12, scale));
     item->setZValue(subZ);
     appliedAny = true;
   }
+
+  m_item->setTransform(objectTransform);
 
   if (appliedAny && isFinalPass) {
     m_ngLastAppliedFinalPass = true;

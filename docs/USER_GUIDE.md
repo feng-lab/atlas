@@ -1036,8 +1036,9 @@ Atlas uses a classical **trackball/orbit** camera controller centered on the cam
 
 1. Select an object in Objects Manager.
 2. In the Object View Setting dock at right, adjust parameters such as visibility, transform (translation, rotation, scale), bounding box style, transfer functions, slice toggles, and per-object clipping.
-3. Use the Global/Per-object tabs to manage render passes.
-4. Changes immediately affect the 3D canvas; for heavy operations (full-resolution volume streaming) watch the progress toolbar.
+3. For EM-style grayscale volumes, use **Apply EM Preset** to rewrite the current transfer functions and slice colormaps so intensity `0` is transparent while non-zero values remain opaque. This is a one-shot adjustment to the live settings, not a persistent mode.
+4. Use the Global/Per-object tabs to manage render passes.
+5. Changes immediately affect the 3D canvas; for heavy operations (full-resolution volume streaming) watch the progress toolbar.
 
 **Quick transform shortcut (selected objects)**
 
@@ -1432,8 +1433,9 @@ This feature is intended for offline/developer scripting and may be omitted from
 
 1. Use Dual Depth Peeling for complex translucent scenes; on Vulkan, Per-Pixel Fragment List (PPLL Exact) gives exact results. Switch to Weighted Blended for faster previews.
 2. Increase sampling rate for smoother DVR at the expense of performance.
-3. Use tiled exports for extremely high resolutions to avoid GPU texture limits.
-4. Enable stereo captures cautiously—eye separation settings live in Global View Setting.
+3. For EM datasets with dark zero-value background, use **Apply EM Preset** in **Object View Setting** so empty areas become transparent in both slice and volume rendering.
+4. Use tiled exports for extremely high resolutions to avoid GPU texture limits.
+5. Enable stereo captures cautiously—eye separation settings live in Global View Setting.
 
 ---
 

@@ -13,9 +13,12 @@
 #include "zimgpack.h"
 #include "z3dscratchresourcepool.h"
 
+#include <QPointer>
 #include <array>
 #include <optional>
 #include <vector>
+
+class QPushButton;
 
 namespace nim {
 
@@ -178,6 +181,7 @@ private:
   void updateRaycasterSamplingRate();
   void updateRaycasterIsoValue();
   void updateRaycasterLocalMIPThreshold();
+  void applyEmVisualizationPreset();
   void onVisibilityChanged(bool visible);
   [[nodiscard]] Z3DRenderTarget& transparentTarget(Z3DEye eye);
   [[nodiscard]] const Z3DScratchResourcePool::RenderTargetLease& transparentLease(Z3DEye eye) const
@@ -244,6 +248,7 @@ private:
   ZFloatParameter m_raycasterLocalMIPThreshold;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
+  QPointer<QPushButton> m_applyEmPresetButton;
   size_t m_numParas;
 
   // ZIntParameter m_interactionDownsample;      // screen space downsample during interaction

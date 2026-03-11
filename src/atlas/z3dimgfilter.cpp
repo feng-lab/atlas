@@ -16,8 +16,10 @@
 #include <folly/ScopeGuard.h>
 #include <glm/ext/matrix_projection.hpp>
 #include <QMenu>
+#include <QPushButton>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -25,6 +27,36 @@
 namespace nim {
 
 // const size_t Z3DImgFilter::m_maxNumOfFullResolutionVolumeSlice = 6;
+
+namespace {
+
+constexpr double kPresetDomainMin = 0.0;
+constexpr double kPresetDomainMax = 1.0;
+constexpr uint32_t kSliceColormapLutWidth = 256u;
+constexpr double kEmPresetOpaqueThreshold = 4.5 / 255.0;
+
+[[nodiscard]] double emPresetOpaqueThreshold(uint32_t lutWidth)
+{
+  (void)lutWidth;
+  return kEmPresetOpaqueThreshold;
+}
+
+[[nodiscard]] glm::col4 emPresetOpaqueColor(const col4& channelColor)
+{
+  return glm::col4(channelColor.r, channelColor.g, channelColor.b, 255);
+}
+
+[[nodiscard]] std::vector<ZColorMapKey> emPresetKeys(uint32_t lutWidth, const glm::col4& channelColor)
+{
+  const double threshold = emPresetOpaqueThreshold(lutWidth);
+  const glm::col4 transparentBlack(0, 0, 0, 0);
+  const glm::col4 opaqueBlack(0, 0, 0, 255);
+  return {ZColorMapKey(kPresetDomainMin, transparentBlack),
+          ZColorMapKey(threshold, transparentBlack, opaqueBlack),
+          ZColorMapKey(kPresetDomainMax, glm::col4(channelColor.r, channelColor.g, channelColor.b, 255))};
+}
+
+} // namespace
 
 Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DBoundedFilter(globalParas, parent)
@@ -502,6 +534,11 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Img", 1);
+    m_applyEmPresetButton = new QPushButton(QStringLiteral("Apply EM Preset"));
+    m_applyEmPresetButton->setToolTip(
+      QStringLiteral("Rewrite the current transfer functions and slice colormaps for EM-style grayscale rendering: "
+                     "intensity 0 becomes transparent and non-zero values become opaque."));
+    connect(m_applyEmPresetButton, &QPushButton::clicked, this, &Z3DImgFilter::applyEmVisualizationPreset);
 
     m_widgetsGroup->addChild(m_visible, 1);
     m_widgetsGroup->addChild(m_stayOnTop, 1);
@@ -511,6 +548,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     for (const auto& para : m_channelVisibleParas) {
       m_widgetsGroup->addChild(*para, 2);
     }
+    m_widgetsGroup->addChild(*m_applyEmPresetButton, 3);
     for (const auto& para : m_doubleChannelRangeParas) {
       m_widgetsGroup->addChild(*para, 3);
     }
@@ -546,6 +584,24 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->setBasicAdvancedCutoff(14);
   }
   return m_widgetsGroup;
+}
+
+void Z3DImgFilter::applyEmVisualizationPreset()
+{
+  if (!m_3dImg) {
+    return;
+  }
+
+  CHECK_EQ(m_transferFuncParas.size(), m_3dImg->numChannels())
+    << "EM preset: transfer-function count does not match image channel count";
+  CHECK_EQ(m_sliceColormaps.size(), m_3dImg->numChannels())
+    << "EM preset: slice-colormap count does not match image channel count";
+
+  for (size_t c = 0; c < m_3dImg->numChannels(); ++c) {
+    const glm::col4 channelColor = emPresetOpaqueColor(m_3dImg->channelColor(c));
+    m_transferFuncParas[c]->get().setKeys(emPresetKeys(m_transferFuncParas[c]->get().dimensions().x, channelColor));
+    m_sliceColormaps[c]->get().setKeys(emPresetKeys(kSliceColormapLutWidth, channelColor));
+  }
 }
 
 bool Z3DImgFilter::isReady(Z3DEye eye) const
