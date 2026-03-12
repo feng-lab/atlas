@@ -536,7 +536,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Img", 1);
     m_applyEmPresetButton = new QPushButton(QStringLiteral("Apply EM Preset"));
     m_applyEmPresetButton->setToolTip(
-      QStringLiteral("Rewrite the current transfer functions and slice colormaps for EM-style grayscale rendering: "
+      QStringLiteral("Rewrite the current transfer functions and slice colormaps for EM-style grayscale rendering, "
+                     "and switch the volume renderer to Direct Volume Rendering: "
                      "intensity 0 becomes transparent and non-zero values become opaque."));
     connect(m_applyEmPresetButton, &QPushButton::clicked, this, &Z3DImgFilter::applyEmVisualizationPreset);
 
@@ -602,6 +603,8 @@ void Z3DImgFilter::applyEmVisualizationPreset()
     m_transferFuncParas[c]->get().setKeys(emPresetKeys(m_transferFuncParas[c]->get().dimensions().x, channelColor));
     m_sliceColormaps[c]->get().setKeys(emPresetKeys(kSliceColormapLutWidth, channelColor));
   }
+
+  m_raycasterCompositingMode.select(QStringLiteral("Direct Volume Rendering"));
 }
 
 bool Z3DImgFilter::isReady(Z3DEye eye) const

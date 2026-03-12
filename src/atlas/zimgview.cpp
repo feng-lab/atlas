@@ -8,6 +8,7 @@
 #include "zneuroglancerprecomputedannotations.h"
 #include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancerprecomputedsegmentproperties.h"
+#include "zneuroglancerstate.h"
 #include "zneuroglancersegmentpropertiesdialog.h"
 #include "zswcdoc.h"
 #include "zswcpack.h"
@@ -26,10 +27,13 @@
 #include <QMetaObject>
 #include <QPointer>
 #include <QRegularExpression>
+#include <QUrl>
 #include <QtConcurrent/QtConcurrentRun>
 
 #include <algorithm>
+#include <chrono>
 #include <limits>
+#include <map>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -72,6 +76,22 @@ struct NeuroglancerAnnotationsLoadResult
   QString tooltip;
   std::shared_ptr<ZPuncta> puncta;
   std::shared_ptr<ZSkeleton> skeleton;
+};
+
+struct ClipboardNeuroglancerMeshStateResult
+{
+  enum class Status
+  {
+    NotState,
+    Matched,
+    Error,
+  };
+
+  Status status = Status::NotState;
+  QString error;
+  QString matchedLayerName;
+  bool layerVisible = true;
+  std::map<uint64_t, bool> desiredSegmentVisibility;
 };
 
 [[nodiscard]] QString formatAnnotationPropertyValue(
@@ -164,6 +184,93 @@ void applyAnnotationPropertiesToPunctum(const ZNeuroglancerPrecomputedAnnotation
     if (vOpt) {
       out.push_back(*vOpt);
     }
+  }
+  return out;
+}
+
+[[nodiscard]] QString normalizedDirUrlForComparison(QString url)
+{
+  url = url.trimmed();
+  if (url.isEmpty()) {
+    return {};
+  }
+  while (url.endsWith('/')) {
+    url.chop(1);
+  }
+  return url + '/';
+}
+
+[[nodiscard]] ClipboardNeuroglancerMeshStateResult
+parseClipboardNeuroglancerMeshStateForDataset(const QString& text, const QString& targetRootUrl)
+{
+  ClipboardNeuroglancerMeshStateResult out;
+  constexpr std::chrono::milliseconds kDefaultTimeout{30000};
+
+  const auto input = ZNeuroglancerState::parseInputText(text, kDefaultTimeout);
+  if (input.status == ZNeuroglancerState::InputStatus::NotRecognized) {
+    out.status = ClipboardNeuroglancerMeshStateResult::Status::NotState;
+    return out;
+  }
+  if (input.status == ZNeuroglancerState::InputStatus::Error) {
+    out.status = ClipboardNeuroglancerMeshStateResult::Status::Error;
+    out.error = input.error;
+    return out;
+  }
+
+  const ZNeuroglancerState::ParseResult parsed = ZNeuroglancerState::parse(input.stateJson);
+  const QString normalizedTargetRoot = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(targetRootUrl);
+
+  std::vector<const ZNeuroglancerState::Layer*> matches;
+  for (const auto& layer : parsed.layers) {
+    if (layer.type != ZNeuroglancerState::LayerType::Segmentation) {
+      continue;
+    }
+    try {
+      if (ZNeuroglancerPrecomputedVolume::normalizeRootUrl(layer.volumeUrl) == normalizedTargetRoot) {
+        matches.push_back(&layer);
+      }
+    }
+    catch (const std::exception&) {
+      continue;
+    }
+  }
+
+  if (matches.empty()) {
+    out.status = ClipboardNeuroglancerMeshStateResult::Status::Error;
+    out.error = QStringLiteral("Clipboard Neuroglancer state does not contain a segmentation layer for:\n%1")
+                  .arg(normalizedTargetRoot);
+    return out;
+  }
+
+  const ZNeuroglancerState::Layer* matchedLayer = nullptr;
+  if (matches.size() == 1) {
+    matchedLayer = matches.front();
+  } else if (!parsed.selectedLayerName.trimmed().isEmpty()) {
+    for (const auto* layer : matches) {
+      if (layer->name == parsed.selectedLayerName) {
+        if (matchedLayer != nullptr) {
+          matchedLayer = nullptr;
+          break;
+        }
+        matchedLayer = layer;
+      }
+    }
+  }
+
+  if (matchedLayer == nullptr) {
+    out.status = ClipboardNeuroglancerMeshStateResult::Status::Error;
+    out.error =
+      QStringLiteral("Clipboard Neuroglancer state has multiple segmentation layers for:\n%1\n\n"
+                     "Select one in Neuroglancer before copying the state, or use a plain segment ID list instead.")
+        .arg(normalizedTargetRoot);
+    return out;
+  }
+
+  out.status = ClipboardNeuroglancerMeshStateResult::Status::Matched;
+  out.matchedLayerName = matchedLayer->name;
+  out.layerVisible = matchedLayer->visible;
+  for (const auto& segment : matchedLayer->segments) {
+    out.desiredSegmentVisibility[segment.id] = segment.visible;
   }
   return out;
 }
@@ -2103,16 +2210,131 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
 
     auto* loadMeshesFromClipboardAct =
       menu.addAction(QString("Load Neuroglancer Meshes for Segment IDs from Clipboard… (%1)").arg(topVol->rootUrl()));
-    connect(loadMeshesFromClipboardAct,
-            &QAction::triggered,
-            this,
-            [topVol, meshSourceDirUrl, startMeshBatchLoad]() {
+    connect(loadMeshesFromClipboardAct, &QAction::triggered, this, [this, topVol, meshSourceDirUrl, startMeshBatchLoad]() {
       const QString text = QApplication::clipboard()->text();
+      const auto stateResult = parseClipboardNeuroglancerMeshStateForDataset(text, topVol->rootUrl());
+      if (stateResult.status == ClipboardNeuroglancerMeshStateResult::Status::Error) {
+        QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), stateResult.error);
+        return;
+      }
+      if (stateResult.status == ClipboardNeuroglancerMeshStateResult::Status::Matched) {
+        CHECK(topVol);
+        ZMeshDoc& meshDoc = m_doc.doc().meshDoc();
+        const QString normalizedRootUrl = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(topVol->rootUrl());
+        const QString normalizedMeshSourceDirUrl = normalizedDirUrlForComparison(meshSourceDirUrl);
+
+        size_t desiredVisibleCount = 0;
+        if (stateResult.layerVisible) {
+          for (const auto& [segmentId, visible] : stateResult.desiredSegmentVisibility) {
+            if (segmentId != 0 && visible) {
+              ++desiredVisibleCount;
+            }
+          }
+        }
+        const size_t desiredHiddenCount = stateResult.desiredSegmentVisibility.size() - desiredVisibleCount;
+
+        std::set<uint64_t> alreadyLoaded;
+        std::vector<std::pair<size_t, bool>> visibilityUpdates;
+        size_t willShow = 0;
+        size_t willHide = 0;
+        for (const size_t meshId : meshDoc.objs()) {
+          const auto keyOpt = parseNeuroglancerMeshExternalSourceKey(meshDoc.jsonValue(meshId));
+          if (!keyOpt) {
+            continue;
+          }
+          if (keyOpt->rootUrl != normalizedRootUrl ||
+              normalizedDirUrlForComparison(keyOpt->meshSourceDirUrl) != normalizedMeshSourceDirUrl) {
+            continue;
+          }
+
+          alreadyLoaded.insert(keyOpt->segmentId);
+          auto it = stateResult.desiredSegmentVisibility.find(keyOpt->segmentId);
+          const bool shouldBeVisible =
+            stateResult.layerVisible && it != stateResult.desiredSegmentVisibility.end() && it->second;
+          if (meshDoc.isObjVisible(meshId) == shouldBeVisible) {
+            continue;
+          }
+          visibilityUpdates.emplace_back(meshId, shouldBeVisible);
+          if (shouldBeVisible) {
+            ++willShow;
+          } else {
+            ++willHide;
+          }
+        }
+
+        std::vector<uint64_t> idsToLoad;
+        if (stateResult.layerVisible) {
+          idsToLoad.reserve(desiredVisibleCount);
+          for (const auto& [segmentId, visible] : stateResult.desiredSegmentVisibility) {
+            if (!visible || segmentId == 0 || alreadyLoaded.contains(segmentId)) {
+              continue;
+            }
+            idsToLoad.push_back(segmentId);
+          }
+        }
+
+        if (visibilityUpdates.empty() && idsToLoad.empty()) {
+          QMessageBox::information(
+            QApplication::activeWindow(),
+            QApplication::applicationName(),
+            QStringLiteral(
+              "Atlas already matches the Neuroglancer state for this dataset. No mesh visibility changes or new mesh loads are needed."));
+          return;
+        }
+
+        const QString layerName = stateResult.matchedLayerName.trimmed().isEmpty()
+                                    ? QStringLiteral("<unnamed>")
+                                    : stateResult.matchedLayerName.trimmed();
+        QString prompt;
+        if (!stateResult.layerVisible) {
+          prompt = QStringLiteral(
+                     "Matched Neuroglancer segmentation layer '%1' is hidden.\n\n"
+                     "Atlas will hide %2 loaded mesh object(s) for this dataset and load no new meshes.\n\nContinue?")
+                     .arg(layerName)
+                     .arg(willHide);
+        } else {
+          prompt =
+            QStringLiteral(
+              "Apply Neuroglancer state for segmentation layer '%1'?\n\n"
+              "Visible segments in state: %2\n"
+              "Hidden segments in state: %3\n"
+              "Loaded meshes to show: %4\n"
+              "Loaded meshes to hide: %5\n"
+              "New visible meshes to load: %6\n\n"
+              "Atlas will update existing mesh visibility to match the state and then load any missing visible meshes.")
+              .arg(layerName)
+              .arg(desiredVisibleCount)
+              .arg(desiredHiddenCount)
+              .arg(willShow)
+              .arg(willHide)
+              .arg(idsToLoad.size());
+        }
+
+        const int response = QMessageBox::question(QApplication::activeWindow(),
+                                                   QApplication::applicationName(),
+                                                   prompt,
+                                                   QMessageBox::Ok | QMessageBox::Cancel,
+                                                   QMessageBox::Cancel);
+        if (response != QMessageBox::Ok) {
+          return;
+        }
+
+        for (const auto& [meshId, visible] : visibilityUpdates) {
+          m_doc.doc().setObjVisible(meshId, visible);
+        }
+        if (!idsToLoad.empty()) {
+          startMeshBatchLoad(topVol, meshSourceDirUrl, std::move(idsToLoad));
+        }
+        return;
+      }
+
       const std::vector<uint64_t> ids = parseUint64ListFromText(text);
       if (ids.empty()) {
-        QMessageBox::information(QApplication::activeWindow(),
-                                 QApplication::applicationName(),
-                                 QStringLiteral("Clipboard does not contain any base-10 uint64 segment IDs."));
+        QMessageBox::information(
+          QApplication::activeWindow(),
+          QApplication::applicationName(),
+          QStringLiteral(
+            "Clipboard does not contain a Neuroglancer state for this dataset or any base-10 uint64 segment IDs."));
         return;
       }
 

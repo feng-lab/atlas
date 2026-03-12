@@ -163,8 +163,9 @@ Neuroglancer Precomputed (HTTP)
   - Chunk decode helpers live in `src/atlas/zneuroglancerprecomputedchunkdecoder.h` and `src/atlas/zneuroglancerprecomputedchunkdecoder.cpp`.
   - Sharded-format helpers are in `src/atlas/zneuroglanceruint64sharding.h` and `src/atlas/zneuroglanceruint64sharding.cpp`.
 - Neuroglancer “viewer state” import (Option A):
-  - Parser: `src/atlas/zneuroglancerstate.h` and `src/atlas/zneuroglancerstate.cpp` extracts only supported precomputed volume layers (image + segmentation) and records warnings for skipped/unsupported layer types.
+  - Parser: `src/atlas/zneuroglancerstate.h` and `src/atlas/zneuroglancerstate.cpp` extracts supported precomputed volume layers (image + segmentation), segmentation `segments` visibility (`!id` means hidden), the top-level `selectedLayer.layer`, and records warnings for skipped/unsupported layer types. Supported volume-source forms currently include direct `precomputed://...` roots and datasource URLs ending in `|neuroglancer-precomputed:`.
   - UI entry point: `ZImgDoc::loadNeuroglancerState()` opens those layers and can also apply per-dataset source overrides (mesh/skeleton/annotations) discovered from the state (configuration only; unsupported layers are not created as objects in Atlas yet).
+  - The same state-input decoder is also used by the 2D clipboard mesh loader: if the clipboard contains a Neuroglancer share link / JSON for the active segmentation dataset, Atlas synchronizes already-loaded mesh object visibility to the parsed `segments` state before loading any missing visible meshes. Plain clipboard ID lists still work as a fallback.
 - Caches (per opened Neuroglancer volume; these are budgets, not preallocated):
   - Chunk cache size is controlled by `--atlas_ng_precomputed_chunk_cache_memory_proportion` (default `0.3`, valid range `[0, 1]`).
   - Sharded minishard-index cache size is controlled by `--atlas_ng_precomputed_minishard_index_cache_memory_proportion` (default `0.05`, valid range `[0, 1]`).

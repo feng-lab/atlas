@@ -1700,13 +1700,6 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
                                                            static_cast<uint32_t>(visibleIdxs.size()));
 
     if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-      // If there is only one visible channel, the progressive path draws directly to the
-      // final framebuffer (no layer-array merge), so we can just show the normal fast preview.
-      if (visibleIdxs.size() <= 1) {
-        render3DImageFast(eye, visibleIdxs);
-        return 0.5;
-      }
-
       CHECK(m_progressiveLayerLease.hasGLRenderTarget())
         << "Progressive layer lease missing GL render target during fast preview seeding.";
       CHECK(m_scRaycasterShader != nullptr);
@@ -1831,31 +1824,23 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     CHECK(lastTarget);
     CHECK(lastTarget->size() == m_outputSize) << lastTarget->size();
 
-    if (visibleIdxs.size() == 1) {
-      m_copyTextureShader->bind();
-      m_copyTextureShader->bindTexture("color_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
-      m_copyTextureShader->bindTexture("depth_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
-      renderScreenQuad(*m_VAO, *m_copyTextureShader);
-      m_copyTextureShader->release();
-    } else {
-      m_progressiveLayerLease.renderTarget->attachSlice(m_channelIdx[eye]);
-      m_progressiveLayerLease.renderTarget->bind();
-      // Vulkan parity: preserve the seeded preview (or previously refined pixels) for fragments
-      // that the copy shader discards, so we don't flash black holes while paging/refining.
-      // Use depth compare Always to ensure valid fragments overwrite existing slice contents.
-      glDepthFunc(GL_ALWAYS);
-      auto depthFuncGuard = folly::makeGuard([]() {
-        glDepthFunc(GL_LESS);
-      });
+    m_progressiveLayerLease.renderTarget->attachSlice(m_channelIdx[eye]);
+    m_progressiveLayerLease.renderTarget->bind();
+    // Preserve the seeded preview (or previously refined pixels) for fragments
+    // that the copy shader discards, so progressive full-res updates overlay the
+    // stable fast preview instead of exposing cleared holes.
+    glDepthFunc(GL_ALWAYS);
+    auto depthFuncGuard = folly::makeGuard([]() {
+      glDepthFunc(GL_LESS);
+    });
 
-      m_copyTextureShader->bind();
-      m_copyTextureShader->bindTexture("color_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
-      m_copyTextureShader->bindTexture("depth_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
-      renderScreenQuad(*m_VAO, *m_copyTextureShader);
-      m_copyTextureShader->release();
+    m_copyTextureShader->bind();
+    m_copyTextureShader->bindTexture("color_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
+    m_copyTextureShader->bindTexture("depth_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
+    renderScreenQuad(*m_VAO, *m_copyTextureShader);
+    m_copyTextureShader->release();
 
-      m_progressiveLayerLease.renderTarget->release();
-    }
+    m_progressiveLayerLease.renderTarget->release();
 
     if (lastRound) {
       ++m_channelIdx[eye];
@@ -1960,7 +1945,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 
   processEventsAndMaybeCancel(cancellationToken);
 
-  if (visibleIdxs.size() > 1) {
+  if (progressive || visibleIdxs.size() > 1) {
     const Z3DTexture* mergeColor = nullptr;
     const Z3DTexture* mergeDepth = nullptr;
     if (progressive) {

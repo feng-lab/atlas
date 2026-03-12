@@ -318,7 +318,9 @@ Steps to load and manage images:
           - **Copy Neuroglancer Segment ID Under Cursor**
           - **Load Neuroglancer Mesh for Segment Under Cursor**
           - **Load Neuroglancer Mesh for Segment ID…** (manual ID entry; clipboard auto‑prefill if it contains a single uint64)
-          - **Load Neuroglancer Meshes for Segment IDs from Clipboard…** (extracts IDs, de‑duplicates, and loads them)
+          - **Load Neuroglancer Meshes for Segment IDs from Clipboard…**
+            - If the clipboard contains a Neuroglancer share link / state JSON for the same segmentation dataset, Atlas parses the segmentation layer `segments` state first, updates already-loaded mesh visibility to match Neuroglancer (`!id` becomes hidden), and loads any missing visible meshes.
+            - Otherwise Atlas falls back to extracting base-10 segment IDs from the clipboard text, de-duplicates them, and loads them.
           - **Load Neuroglancer Meshes for Visible Segments (cached)…** (collects segment IDs from cached tiles in the current viewport *at the target LOD for the current zoom*; coarse fallback tiles are ignored. ID 0 is treated as background and ignored.)
           - **Load Neuroglancer Meshes for All Segments (segment_properties)…** (can be very slow and memory heavy)
           - **Load Neuroglancer Skeleton for Segment Under Cursor**
@@ -368,7 +370,7 @@ Steps to load and manage images:
       - a Neuroglancer share link (contains `#!{...}`), or
       - a URL to a state `.json` file, or
       - raw state JSON text.
-   3. Atlas opens only the supported layer types (**image** and **segmentation**) that reference a `precomputed://...` volume source. Unsupported layer types are ignored (Atlas will show a warning list at the end if anything was skipped).
+   3. Atlas opens only the supported layer types (**image** and **segmentation**) that reference a Neuroglancer precomputed volume source. This includes direct `precomputed://...` roots and datasource URLs such as `s3://...|neuroglancer-precomputed:`. Unsupported layer types are ignored (Atlas will show a warning list at the end if anything was skipped).
    4. If the state contains annotation layers linked to a segmentation layer, Atlas does not create annotation objects yet, but it will use that information to configure the segmentation dataset’s **Annotations Source Override** (so the existing right‑click import actions can work without additional URL prompting).
    5. Any datasets opened from the state are recorded into the same history list used by **Load Neuroglancer (Precomputed)**.
 4. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
@@ -1042,7 +1044,7 @@ Atlas uses a classical **trackball/orbit** camera controller centered on the cam
 
 1. Select an object in Objects Manager.
 2. In the Object View Setting dock at right, adjust parameters such as visibility, transform (translation, rotation, scale), bounding box style, transfer functions, slice toggles, and per-object clipping.
-3. For EM-style grayscale volumes, use **Apply EM Preset** to rewrite the current transfer functions and slice colormaps so intensity `0` is transparent while non-zero values remain opaque. This is a one-shot adjustment to the live settings, not a persistent mode.
+3. For EM-style grayscale volumes, use **Apply EM Preset** to rewrite the current transfer functions and slice colormaps so intensity `0` is transparent while non-zero values remain opaque, and switch volume rendering to **Direct Volume Rendering**. This is a one-shot adjustment to the live settings, not a persistent mode.
 4. Use the Global/Per-object tabs to manage render passes.
 5. Changes immediately affect the 3D canvas; for heavy operations (full-resolution volume streaming) watch the progress toolbar.
 
@@ -1439,7 +1441,7 @@ This feature is intended for offline/developer scripting and may be omitted from
 
 1. Use Dual Depth Peeling for complex translucent scenes; on Vulkan, Per-Pixel Fragment List (PPLL Exact) gives exact results. Switch to Weighted Blended for faster previews.
 2. Increase sampling rate for smoother DVR at the expense of performance.
-3. For EM datasets with dark zero-value background, use **Apply EM Preset** in **Object View Setting** so empty areas become transparent in both slice and volume rendering.
+3. For EM datasets with dark zero-value background, use **Apply EM Preset** in **Object View Setting** so empty areas become transparent in both slice and volume rendering, and the 3D image object switches to **Direct Volume Rendering**.
 4. Use tiled exports for extremely high resolutions to avoid GPU texture limits.
 5. Enable stereo captures cautiously—eye separation settings live in Global View Setting.
 

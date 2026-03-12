@@ -3,11 +3,16 @@
 #include "zexception.h"
 #include "zjson.h"
 #include "zlog.h"
+#include "zproxygenhttpclient.h"
 
 #include <boost/json.hpp>
+#include <folly/coro/BlockingWait.h>
 
 #include <algorithm>
 #include <set>
+
+#include <QByteArray>
+#include <QUrl>
 
 namespace nim {
 namespace json = boost::json;
@@ -20,6 +25,62 @@ namespace {
     return std::nullopt;
   }
   return json::value_to<QString>(v).trimmed();
+}
+
+[[nodiscard]] std::optional<QString> asQStringIfScalar(const json::value& v)
+{
+  if (v.is_string()) {
+    return json::value_to<QString>(v).trimmed();
+  }
+  if (v.is_int64()) {
+    return QString::number(v.as_int64());
+  }
+  if (v.is_uint64()) {
+    return QString::number(v.as_uint64());
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] std::optional<QString> decodeSupportedPrecomputedSourceUrl(QString url)
+{
+  QString s = url.trimmed();
+  if (s.isEmpty()) {
+    return std::nullopt;
+  }
+
+  if (s.startsWith("precomputed://", Qt::CaseInsensitive)) {
+    return s;
+  }
+
+  // Newer Neuroglancer datasource URLs may wrap a precomputed root as:
+  //   s3://bucket/path|neuroglancer-precomputed:
+  // Keep support narrow and explicit: strip only the known provider suffix and
+  // return the underlying dataset root URL that Atlas already knows how to open.
+  static const QString kNgPrecomputedSuffix = QStringLiteral("|neuroglancer-precomputed:");
+  if (s.endsWith(kNgPrecomputedSuffix, Qt::CaseInsensitive)) {
+    s.chop(kNgPrecomputedSuffix.size());
+    s = s.trimmed();
+    if (!s.isEmpty()) {
+      return s;
+    }
+  }
+
+  return std::nullopt;
+}
+
+[[nodiscard]] std::optional<uint64_t> parseUint64Base10(const QString& text)
+{
+  const QString trimmed = text.trimmed();
+  if (trimmed.isEmpty()) {
+    return std::nullopt;
+  }
+
+  bool ok = false;
+  const uint64_t value = trimmed.toULongLong(&ok, 10);
+  if (!ok) {
+    return std::nullopt;
+  }
+  return value;
 }
 
 [[nodiscard]] bool asBoolOrDefault(const json::object& o, const char* key, bool defaultValue)
@@ -80,10 +141,11 @@ void collectSourceUrls(const json::value& v, QStringList* out)
 [[nodiscard]] std::optional<QString> pickPrecomputedVolumeUrl(const QStringList& urls)
 {
   for (const QString& u0 : urls) {
-    const QString u = u0.trimmed();
-    if (!u.startsWith("precomputed://", Qt::CaseInsensitive)) {
+    const auto decodedOpt = decodeSupportedPrecomputedSourceUrl(u0);
+    if (!decodedOpt) {
       continue;
     }
+    const QString u = decodedOpt->trimmed();
     // Exclude explicit non-volume subtypes like precomputed mesh sources.
     if (u.contains("#type=", Qt::CaseInsensitive)) {
       continue;
@@ -164,6 +226,99 @@ void collectSourceUrls(const json::value& v, QStringList* out)
   return out;
 }
 
+[[nodiscard]] QString mapCloudUrlToHttps(QString url)
+{
+  QString s = url.trimmed();
+  if (s.startsWith("gs://", Qt::CaseInsensitive)) {
+    const QString rest = s.mid(QStringLiteral("gs://").size());
+    return QStringLiteral("https://storage.googleapis.com/") + rest;
+  }
+  if (s.startsWith("s3://", Qt::CaseInsensitive)) {
+    const QString rest = s.mid(QStringLiteral("s3://").size());
+    const int slash = rest.indexOf('/');
+    const QString bucket = (slash < 0) ? rest : rest.left(slash);
+    const QString key = (slash < 0) ? QString{} : rest.mid(slash + 1);
+    if (bucket.isEmpty()) {
+      return s;
+    }
+
+    // Prefer virtual-hosted-style URLs for compatibility with newer AWS regions, but fall back to
+    // path-style when the bucket name contains dots (TLS wildcard mismatch with e.g. "a.b.s3.amazonaws.com").
+    const bool bucketHasDot = bucket.contains('.');
+    if (bucketHasDot) {
+      QString out = QStringLiteral("https://s3.amazonaws.com/") + bucket;
+      if (!key.isEmpty()) {
+        out += '/';
+        out += key;
+      }
+      return out;
+    }
+    QString out = QStringLiteral("https://") + bucket + QStringLiteral(".s3.amazonaws.com");
+    if (!key.isEmpty()) {
+      out += '/';
+      out += key;
+    }
+    return out;
+  }
+  return s;
+}
+
+[[nodiscard]] std::optional<QString> tryExtractJsonFromUrlFragment(QString urlText)
+{
+  const QUrl url(urlText.trimmed());
+  if (!url.isValid()) {
+    return std::nullopt;
+  }
+  QString fragment = url.fragment(QUrl::FullyDecoded).trimmed();
+  if (fragment.isEmpty()) {
+    return std::nullopt;
+  }
+  if (fragment.startsWith('!')) {
+    fragment = fragment.mid(1).trimmed();
+  }
+  if (!fragment.startsWith('{') && !fragment.startsWith('[') && fragment.contains('%')) {
+    fragment = QString::fromUtf8(QByteArray::fromPercentEncoding(fragment.toUtf8())).trimmed();
+  }
+  if (fragment.startsWith('{') || fragment.startsWith('[')) {
+    return fragment;
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] std::vector<ZNeuroglancerState::Layer::Segment> parseSegments(const json::object& layer)
+{
+  std::vector<ZNeuroglancerState::Layer::Segment> out;
+  auto it = layer.find("segments");
+  if (it == layer.end() || !it->value().is_array()) {
+    return out;
+  }
+
+  const auto& arr = it->value().as_array();
+  out.reserve(arr.size());
+  for (const auto& entry : arr) {
+    auto textOpt = asQStringIfScalar(entry);
+    if (!textOpt) {
+      continue;
+    }
+    QString text = textOpt->trimmed();
+    bool visible = true;
+    if (text.startsWith('!')) {
+      visible = false;
+      text = text.mid(1).trimmed();
+    }
+    const auto idOpt = parseUint64Base10(text);
+    if (!idOpt) {
+      continue;
+    }
+    ZNeuroglancerState::Layer::Segment segment;
+    segment.id = *idOpt;
+    segment.visible = visible;
+    out.push_back(segment);
+  }
+
+  return out;
+}
+
 } // namespace
 
 ZNeuroglancerState::ParseResult ZNeuroglancerState::parse(const json::value& stateJson)
@@ -175,6 +330,16 @@ ZNeuroglancerState::ParseResult ZNeuroglancerState::parse(const json::value& sta
     return out;
   }
   const auto& root = stateJson.as_object();
+
+  if (auto selectedLayerIt = root.find("selectedLayer");
+      selectedLayerIt != root.end() && selectedLayerIt->value().is_object()) {
+    const auto& selectedObj = selectedLayerIt->value().as_object();
+    if (auto layerNameIt = selectedObj.find("layer"); layerNameIt != selectedObj.end()) {
+      if (const auto selectedName = asQStringIfString(layerNameIt->value())) {
+        out.selectedLayerName = *selectedName;
+      }
+    }
+  }
 
   auto layersIt = root.find("layers");
   if (layersIt == root.end()) {
@@ -235,6 +400,8 @@ ZNeuroglancerState::ParseResult ZNeuroglancerState::parse(const json::value& sta
       l.opacity = opacity;
 
       if (l.type == LayerType::Segmentation) {
+        l.segments = parseSegments(layer);
+
         // Opportunistically capture external sources from the same layer.
         if (const auto skelOpt = pickSkeletonSourceOverride(sourceUrls, l.volumeUrl)) {
           l.skeletonSourceOverrideUrl = *skelOpt;
@@ -268,6 +435,63 @@ ZNeuroglancerState::ParseResult ZNeuroglancerState::parse(const json::value& sta
     }
   }
 
+  return out;
+}
+
+ZNeuroglancerState::InputParseResult ZNeuroglancerState::parseInputText(const QString& text,
+                                                                        std::chrono::milliseconds timeout)
+{
+  InputParseResult out;
+  const QString trimmed = text.trimmed();
+  if (trimmed.isEmpty()) {
+    return out;
+  }
+
+  try {
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      out.stateJson = boost::json::parse(trimmed.toStdString());
+      out.status = InputStatus::Parsed;
+      return out;
+    }
+
+    if (const auto fragmentJson = tryExtractJsonFromUrlFragment(trimmed)) {
+      out.stateJson = boost::json::parse(fragmentJson->toStdString());
+      out.status = InputStatus::Parsed;
+      return out;
+    }
+
+    if (trimmed.contains("://") || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
+        trimmed.startsWith("s3://", Qt::CaseInsensitive)) {
+      const QString url = mapCloudUrlToHttps(trimmed);
+      auto responseOpt =
+        folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(url.toStdString(), timeout));
+      if (!responseOpt) {
+        out.status = InputStatus::Error;
+        out.error =
+          QStringLiteral("Failed to fetch Neuroglancer state JSON (HTTP 404 or network failure):\n%1").arg(url);
+        return out;
+      }
+      if (responseOpt->status != 200) {
+        out.status = InputStatus::Error;
+        out.error = QStringLiteral("Failed to fetch Neuroglancer state JSON:\n%1\n\nHTTP status: %2")
+                      .arg(url)
+                      .arg(responseOpt->status);
+        return out;
+      }
+
+      const std::string jsonText(reinterpret_cast<const char*>(responseOpt->body.data()), responseOpt->body.size());
+      out.stateJson = boost::json::parse(jsonText);
+      out.status = InputStatus::Parsed;
+      return out;
+    }
+  }
+  catch (const std::exception& e) {
+    out.status = InputStatus::Error;
+    out.error = QStringLiteral("Failed to parse Neuroglancer state JSON:\n%1").arg(QString::fromUtf8(e.what()));
+    return out;
+  }
+
+  out.status = InputStatus::NotRecognized;
   return out;
 }
 

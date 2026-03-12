@@ -9,7 +9,6 @@
 #include "zneuroglancerprecomputeddatasetlist.h"
 #include "zneuroglancerstate.h"
 #include "zlog.h"
-#include "zproxygenhttpclient.h"
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
 #include "zautotracedialog.h"
@@ -29,9 +28,7 @@
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QSettings>
-#include <QUrl>
 #include <boost/json.hpp>
-#include <folly/coro/BlockingWait.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -623,105 +620,20 @@ void ZImgDoc::loadNeuroglancerState()
   }
 
   constexpr std::chrono::milliseconds kDefaultTimeout{30000};
-
-  auto mapCloudUrlToHttps = [](QString u) -> QString {
-    QString s = u.trimmed();
-    if (s.startsWith("gs://", Qt::CaseInsensitive)) {
-      const QString rest = s.mid(QStringLiteral("gs://").size());
-      return QStringLiteral("https://storage.googleapis.com/") + rest;
-    }
-    if (s.startsWith("s3://", Qt::CaseInsensitive)) {
-      const QString rest = s.mid(QStringLiteral("s3://").size());
-      const int slash = rest.indexOf('/');
-      const QString bucket = (slash < 0) ? rest : rest.left(slash);
-      const QString key = (slash < 0) ? QString{} : rest.mid(slash + 1);
-      if (bucket.isEmpty()) {
-        return s;
-      }
-
-      // Prefer virtual-hosted-style URLs for compatibility with newer AWS regions, but fall back to
-      // path-style when the bucket name contains dots (TLS wildcard mismatch with e.g. "a.b.s3.amazonaws.com").
-      const bool bucketHasDot = bucket.contains('.');
-      if (bucketHasDot) {
-        QString out = QStringLiteral("https://s3.amazonaws.com/") + bucket;
-        if (!key.isEmpty()) {
-          out += '/';
-          out += key;
-        }
-        return out;
-      }
-      QString out = QStringLiteral("https://") + bucket + QStringLiteral(".s3.amazonaws.com");
-      if (!key.isEmpty()) {
-        out += '/';
-        out += key;
-      }
-      return out;
-    }
-    return s;
-  };
-
-  auto tryExtractJsonFromUrlFragment = [](QString u) -> std::optional<QString> {
-    const QUrl url(u.trimmed());
-    if (!url.isValid()) {
-      return std::nullopt;
-    }
-    QString frag = url.fragment(QUrl::FullyDecoded).trimmed();
-    if (frag.isEmpty()) {
-      return std::nullopt;
-    }
-    if (frag.startsWith('!')) {
-      frag = frag.mid(1).trimmed();
-    }
-    if (!frag.startsWith('{') && !frag.startsWith('[') && frag.contains('%')) {
-      frag = QString::fromUtf8(QByteArray::fromPercentEncoding(frag.toUtf8())).trimmed();
-    }
-    if (frag.startsWith('{') || frag.startsWith('[')) {
-      return frag;
-    }
-    return std::nullopt;
-  };
-
-  // Load/parse state JSON.
-  boost::json::value stateJson;
-  try {
-    if (userText.startsWith('{') || userText.startsWith('[')) {
-      stateJson = boost::json::parse(userText.toStdString());
-    } else if (const auto fragOpt = tryExtractJsonFromUrlFragment(userText)) {
-      stateJson = boost::json::parse(fragOpt->toStdString());
-    } else if (userText.contains("://") || userText.startsWith("gs://", Qt::CaseInsensitive)) {
-      const QString urlStr = mapCloudUrlToHttps(userText);
-      auto resOpt = folly::coro::blockingWait(
-        ZProxygenHttpClient::instance().getBytes(urlStr.toStdString(), kDefaultTimeout));
-      if (!resOpt) {
-        QMessageBox::information(QApplication::activeWindow(),
-                                 QApplication::applicationName(),
-                                 QStringLiteral("Failed to fetch Neuroglancer state JSON (HTTP 404 or network failure):\n%1")
-                                   .arg(urlStr));
-        return;
-      }
-      if (resOpt->status != 200) {
-        QMessageBox::information(QApplication::activeWindow(),
-                                 QApplication::applicationName(),
-                                 QStringLiteral("Failed to fetch Neuroglancer state JSON:\n%1\n\nHTTP status: %2")
-                                   .arg(urlStr)
-                                   .arg(resOpt->status));
-        return;
-      }
-      const std::string text(reinterpret_cast<const char*>(resOpt->body.data()), resOpt->body.size());
-      stateJson = boost::json::parse(text);
-    } else {
-      QMessageBox::information(QApplication::activeWindow(),
-                               QApplication::applicationName(),
-                               QStringLiteral("Unrecognized input. Paste a Neuroglancer share link, a JSON URL, or raw JSON."));
-      return;
-    }
-  }
-  catch (const std::exception& e) {
-    QMessageBox::information(QApplication::activeWindow(),
-                             QApplication::applicationName(),
-                             QStringLiteral("Failed to parse Neuroglancer state JSON:\n%1").arg(QString::fromUtf8(e.what())));
+  const ZNeuroglancerState::InputParseResult input = ZNeuroglancerState::parseInputText(userText, kDefaultTimeout);
+  if (input.status == ZNeuroglancerState::InputStatus::NotRecognized) {
+    QMessageBox::information(
+      QApplication::activeWindow(),
+      QApplication::applicationName(),
+      QStringLiteral("Unrecognized input. Paste a Neuroglancer share link, a JSON URL, or raw JSON."));
     return;
   }
+  if (input.status == ZNeuroglancerState::InputStatus::Error) {
+    QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), input.error);
+    return;
+  }
+  CHECK(input.status == ZNeuroglancerState::InputStatus::Parsed);
+  const boost::json::value& stateJson = input.stateJson;
 
   const ZNeuroglancerState::ParseResult parsed = ZNeuroglancerState::parse(stateJson);
   if (parsed.layers.empty()) {
