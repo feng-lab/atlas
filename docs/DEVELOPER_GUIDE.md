@@ -173,7 +173,13 @@ Neuroglancer Precomputed (HTTP)
   - 2D Neuroglancer rendering is progressive: cache-only (best-effort from cached chunks) → preview (fetch coarsest XY to fill holes) → final (fetch best-for-scale after debounce). Preview is skipped if coarsest XY coverage is already cached.
 - Neuroglancer segmentation extras:
   - Segment properties (`segment_properties/`) are supported via `ZNeuroglancerPrecomputedSegmentProperties` (`src/atlas/zneuroglancerprecomputedsegmentproperties.*`) and are loaded on demand by mesh/tooling paths (no explicit per-object button required).
-  - Precomputed meshes (`mesh/`) are supported via `ZNeuroglancerPrecomputedMeshSource` (`src/atlas/zneuroglancerprecomputedmesh.*`). Mesh import is initiated from the 2D right-click context menu and adds a normal `ZMesh` object to `ZMeshDoc`. Atlas loads a coarse LOD first, then refines to the finest available LOD by replacing mesh geometry in-place (`ZMeshDoc::replaceMeshGeometry` + `meshChanged` signal).
+  - Precomputed meshes (`mesh/`) are supported via `ZNeuroglancerPrecomputedMeshSource` (`src/atlas/zneuroglancerprecomputedmesh.*`).
+    - `neuroglancer_multilod_draco` manifests are parsed completely, including clip bounds, per-row offsets, LOD scales, and the octree needed for view-guided chunk selection.
+    - 2D right-click mesh import still creates a normal `ZMesh` object in `ZMeshDoc`, but Atlas now stores the imported coarse geometry plus normalized Neuroglancer external-source metadata (`src/atlas/zneuroglancerexternalsource.*`) instead of immediately replacing the mesh with a whole-object finest decode.
+    - Runtime LOD now lives in `Z3DMeshFilter`: the 3D filter opens the multiscale mesh source on demand, keeps a coarse base working set loaded, chooses visible rows from the current camera/viewport, requests missing rows asynchronously, and swaps the rendered mesh list between loaded chunk partitions without mutating document geometry during interaction.
+    - Interaction is intentionally biased toward responsiveness: while the camera is moving, Atlas uses a looser detail cutoff; after a short idle debounce it requests finer visible chunks. Legacy non-multiscale mesh sources stay on the static import path.
+    - 3D screenshots/export reuse the same runtime LOD source, but before capture Atlas now synchronously loads the fine visible rows for the full export view and freezes that mesh working set for the duration of the capture (including tiled exports). This keeps exported mesh detail stable instead of capturing whichever async rows happened to be loaded at that moment.
+    - Saving/exporting an external-source Neuroglancer mesh materializes the finest mesh into the document before writing, clears the external-source JSON, and emits `meshChanged` so 3D views drop runtime LOD and treat the mesh as an ordinary local object.
   - Precomputed skeletons (`skeletons/`) are supported via `ZNeuroglancerPrecomputedSkeletonSource` (`src/atlas/zneuroglancerprecomputedskeleton.*`) and are imported into `ZSkeletonDoc` for SWC-like rendering.
   - Precomputed annotations collections are supported via `ZNeuroglancerPrecomputedAnnotationsSource` (`src/atlas/zneuroglancerprecomputedannotations.*`):
     - Relationship index loads (segment/object id → annotations) are used for “Load Neuroglancer Annotations for Segment …” actions.
@@ -183,6 +189,7 @@ Neuroglancer Precomputed (HTTP)
   - Mesh/skeleton source resolution:
     - If the segmentation `info` declares `mesh`/`skeletons` keys, Atlas uses those directory URLs.
     - Otherwise, users can configure per-dataset overrides on the `ZImgPack` (UI: Object View Setting → “Neuroglancer Sources”). These overrides are serialized in `.scene` files and used by the right-click import actions (Atlas does not prompt for source URLs in the context menu).
+    - For meshes, Atlas also persists the resolved mesh source URL plus the segmentation base resolution/voxel offset in the external-source JSON so restored scenes can reactivate runtime 3D LOD without reopening the original segmentation picker workflow.
 
 Testing (Linking Atlas Code)
 

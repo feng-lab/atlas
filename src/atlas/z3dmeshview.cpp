@@ -13,6 +13,7 @@ Z3DMeshView::Z3DMeshView(ZMeshDoc& doc, Z3DRenderingEngine& engine)
       return;
     }
     it->second->setData(m_doc.meshList(id));
+    it->second->setExternalSourceJson(m_doc.jsonValue(id));
   });
 }
 
@@ -22,6 +23,7 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
     for (auto id : objs) {
       auto viewControl = new Z3DMeshFilter(m_engine.globalParas(), nullptr, this);
       viewControl->setData(m_doc.meshList(id));
+      viewControl->setExternalSourceJson(m_doc.jsonValue(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
@@ -55,6 +57,7 @@ void Z3DMeshView::docMeshAdded(size_t id)
   try {
     auto viewControl = new Z3DMeshFilter(m_engine.globalParas(), nullptr, this);
     viewControl->setData(m_doc.meshList(id));
+    viewControl->setExternalSourceJson(m_doc.jsonValue(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);

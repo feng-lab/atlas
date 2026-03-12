@@ -326,7 +326,13 @@ Steps to load and manage images:
           - **Load Neuroglancer Skeletons for Segment IDs from Clipboard…**
           - **Load Neuroglancer Skeletons for Visible Segments (cached)…**
           - **Load Neuroglancer Skeletons for All Segments (segment_properties)…**
-        - Mesh import is progressive: Atlas loads a coarse mesh first, then refines to the finest available LOD by replacing mesh geometry in-place.
+        - Mesh import is progressive:
+          - Atlas loads a coarse mesh first so the object appears quickly.
+          - For Neuroglancer multiscale meshes (`neuroglancer_multilod_draco`), the 3D view then refines only the visible parts of the mesh based on the current camera and viewport instead of replacing the whole object with a single finest-resolution mesh.
+          - While you are actively orbiting/panning/zooming, Atlas favors coarser visible chunks to keep interaction responsive; after motion settles, it fills in finer visible chunks automatically.
+          - Moving to a different part of the object can therefore change the drawn mesh detail again. This is expected and is how Atlas now keeps large EM segment meshes interactive.
+          - 3D screenshots use the full capture view to preload and freeze the visible mesh LOD before rendering, so the saved image does not depend on whatever async mesh rows happened to be loaded during interaction.
+          - If you later save/export that mesh as a standalone mesh file, Atlas materializes the finest available geometry into the exported object.
         - Note: these actions only pick IDs from already visible/cached tiles and will not trigger additional chunk downloads just to resolve a segment ID. If multiple segmentation layers are visible, Atlas uses the top-most layer (highest view precedence) under the cursor (and for dataset‑scoped actions, the top-most visible segmentation layer).
       - **Annotations** (precomputed annotations collections) load as point annotations for `POINT` / `ELLIPSOID` data or line-based annotations for `LINE` / `POLYLINE` data:
         - Unlike meshes/skeletons, annotation datasets are separate roots and are not discoverable from the segmentation `info` by default.
@@ -1189,7 +1195,7 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 2. Choose mono or stereo (Half / Full side-by-side) output.
 3. Set window or custom size. For large outputs enable tiling (tile size and border).
 4. Optionally configure rotation sequences (axis, direction, duration, frame rate) for dynamic captures.
-5. Click **Capture**. The engine renders the frame(s) and stores them in the target folder.
+5. Click **Capture**. The engine renders the frame(s) and stores them in the target folder. For runtime Neuroglancer multiscale meshes, Atlas first freezes the fine visible mesh working set for the full capture view so tiled screenshots keep mesh detail consistent across tiles.
 6. Monitor the Progress toolbar; cancel if necessary.
 ![3D capture dock](images/3DCapture.png)
 

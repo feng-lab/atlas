@@ -651,6 +651,7 @@ set(SOURCES
     zimgpackvoxelvolume.h
     zimgpackdisplay.h zimgpackdisplay.cpp
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
+    zneuroglancerexternalsource.h zneuroglancerexternalsource.cpp
     zneuroglancerstate.h zneuroglancerstate.cpp
     zneuroglancerprecomputedannotations.h zneuroglancerprecomputedannotations.cpp
     zneuroglancerprecomputedmesh.h zneuroglancerprecomputedmesh.cpp

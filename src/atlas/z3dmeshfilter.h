@@ -6,9 +6,17 @@
 #include "znumericparameter.h"
 #include "z3dmeshrenderer.h"
 #include "zeventlistenerparameter.h"
+#include "zneuroglancerexternalsource.h"
+#include "zneuroglancerprecomputedmesh.h"
+#include "zjson.h"
 #include <QObject>
 #include <QPoint>
+#include <QTimer>
 #include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <unordered_map>
 #include <vector>
 
 namespace nim {
@@ -47,8 +55,14 @@ public:
   }
 
   double process(Z3DEye eye) override;
+  void setProgressiveRenderingMode(bool v) override;
 
   void setData(std::vector<ZMesh*>* meshList);
+  void setExternalSourceJson(json::value sourceJson);
+  void setViewport(glm::uvec2 viewport) override;
+  void setViewport(glm::uvec4 viewport) override;
+  void beginExportMeshLod(const glm::uvec2& fullViewport);
+  void endExportMeshLod();
 
   void setSelectedMeshes(std::set<ZMesh*>* list)
   {
@@ -106,6 +120,24 @@ protected:
   void updateMeshVisibleState();
 
 private:
+  void resetRuntimeNeuroglancerLodState();
+
+  void markRuntimeNeuroglancerLodDirty();
+
+  void onRuntimeNeuroglancerCameraChanged();
+
+  void onRuntimeNeuroglancerIdleTimeout();
+
+  void startRuntimeNeuroglancerOpen();
+
+  void requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& rows);
+
+  void applyRuntimeNeuroglancerSelection();
+
+  [[nodiscard]] bool hasRuntimeNeuroglancerLod() const;
+
+  [[nodiscard]] bool isSameRuntimeNeuroglancerSource(const ZNeuroglancerMeshExternalSourceKey& key) const;
+
   // get visible data from m_origMeshList put into m_meshList
   void getVisibleData();
 
@@ -145,6 +177,25 @@ private:
   bool m_dataIsInvalid;
 
   std::vector<ZMesh*> m_origMeshList;
+
+  json::value m_externalSourceJson;
+  std::optional<ZNeuroglancerMeshExternalSourceKey> m_runtimeNgSourceKey;
+  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> m_runtimeNgSource;
+  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest> m_runtimeNgManifest;
+  std::vector<uint32_t> m_runtimeNgBaseRows;
+  std::unordered_map<uint32_t, std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
+    m_runtimeNgLoadedRows;
+  std::set<uint32_t> m_runtimeNgRowsInFlight;
+  std::set<uint32_t> m_runtimeNgFailedRows;
+  std::vector<ZMesh*> m_runtimeNgVisibleMeshes;
+  std::vector<ZMesh*> m_runtimeNgFrozenVisibleMeshes;
+  QTimer m_runtimeNgIdleTimer;
+  uint64_t m_runtimeNgEpoch = 0;
+  bool m_runtimeNgBaseReady = false;
+  bool m_runtimeNgInteractionActive = false;
+  bool m_runtimeNgSelectionDirty = false;
+  bool m_runtimeNgProgressiveRendering = true;
+  bool m_runtimeNgExportActive = false;
 
   const RegionNode* m_regionNode = nullptr;
 };

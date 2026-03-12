@@ -299,7 +299,116 @@ ZMesh decodeLegacyNgMesh(std::span<const uint8_t> bytes)
   return mesh;
 }
 
-ZMesh decodeDracoMesh(std::span<const uint8_t> bytes)
+constexpr std::uint8_t kFirstBitLookupTable[256] = {
+  0, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 5, 0, 1, 0, 2,
+  0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 6, 0, 1, 0, 2, 0, 1, 0, 3, 0,
+  1, 0, 2, 0, 1, 0, 4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1,
+  0, 4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 7, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 4, 0, 1, 0,
+  2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 4, 0, 1, 0, 2, 0, 1, 0, 3,
+  0, 1, 0, 2, 0, 1, 0, 6, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0,
+  1, 0, 5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+};
+
+struct DecodedPartitionedDracoMesh
+{
+  std::vector<glm::vec3> vertices;
+  std::vector<std::vector<uint32_t>> partitionIndices;
+};
+
+[[nodiscard]] bool lessMsb(uint32_t a, uint32_t b)
+{
+  return a < b && a < (a ^ b);
+}
+
+[[nodiscard]] bool zorder3LessThan(uint32_t x0, uint32_t y0, uint32_t z0, uint32_t x1, uint32_t y1, uint32_t z1)
+{
+  uint32_t mostSignificant0 = z0;
+  uint32_t mostSignificant1 = z1;
+
+  if (lessMsb(mostSignificant0 ^ mostSignificant1, y0 ^ y1)) {
+    mostSignificant0 = y0;
+    mostSignificant1 = y1;
+  }
+  if (lessMsb(mostSignificant0 ^ mostSignificant1, x0 ^ x1)) {
+    mostSignificant0 = x0;
+    mostSignificant1 = x1;
+  }
+
+  return mostSignificant0 < mostSignificant1;
+}
+
+[[nodiscard]] uint32_t getOctreeChildIndex(uint32_t x, uint32_t y, uint32_t z)
+{
+  return (x & 1U) | ((y << 1U) & 2U) | ((z << 2U) & 4U);
+}
+
+void appendMeshGeometry(const ZMesh& frag, std::vector<glm::vec3>& mergedVertices, std::vector<uint32_t>& mergedIndices)
+{
+  const size_t base = mergedVertices.size();
+  CHECK(base <= static_cast<size_t>(std::numeric_limits<uint32_t>::max()));
+  const uint32_t base32 = static_cast<uint32_t>(base);
+
+  mergedVertices.insert(mergedVertices.end(), frag.vertices().begin(), frag.vertices().end());
+  mergedIndices.reserve(mergedIndices.size() + frag.indices().size());
+  for (const uint32_t idx : frag.indices()) {
+    CHECK(idx <= std::numeric_limits<uint32_t>::max() - base32);
+    mergedIndices.push_back(idx + base32);
+  }
+}
+
+std::shared_ptr<ZMesh> mergeMeshes(const std::vector<std::shared_ptr<ZMesh>>& meshes)
+{
+  std::vector<glm::vec3> mergedVertices;
+  std::vector<uint32_t> mergedIndices;
+  for (const auto& mesh : meshes) {
+    if (!mesh || mesh->empty()) {
+      continue;
+    }
+    appendMeshGeometry(*mesh, mergedVertices, mergedIndices);
+  }
+
+  auto out = std::make_shared<ZMesh>(ZMesh::Type::TRIANGLES);
+  out->setVertices(mergedVertices);
+  out->setIndices(mergedIndices);
+  if (!out->empty()) {
+    out->generateNormals();
+  }
+  return out;
+}
+
+std::shared_ptr<ZMesh> buildCompactMesh(const std::vector<glm::vec3>& vertices, const std::vector<uint32_t>& indices)
+{
+  if (indices.empty()) {
+    return nullptr;
+  }
+
+  std::vector<uint32_t> remap(vertices.size(), std::numeric_limits<uint32_t>::max());
+  std::vector<glm::vec3> compactVertices;
+  compactVertices.reserve(std::min(vertices.size(), indices.size()));
+
+  std::vector<uint32_t> compactIndices;
+  compactIndices.reserve(indices.size());
+
+  for (const uint32_t idx : indices) {
+    CHECK(idx < vertices.size());
+    uint32_t mapped = remap[idx];
+    if (mapped == std::numeric_limits<uint32_t>::max()) {
+      mapped = static_cast<uint32_t>(compactVertices.size());
+      remap[idx] = mapped;
+      compactVertices.push_back(vertices[idx]);
+    }
+    compactIndices.push_back(mapped);
+  }
+
+  auto mesh = std::make_shared<ZMesh>(ZMesh::Type::TRIANGLES);
+  mesh->setVertices(compactVertices);
+  mesh->setIndices(compactIndices);
+  mesh->generateNormals();
+  return mesh;
+}
+
+DecodedPartitionedDracoMesh
+decodePartitionedDracoMesh(std::span<const uint8_t> bytes, int vertexQuantizationBits, bool partition)
 {
   if (bytes.empty()) {
     throw ZException("Invalid draco fragment: empty");
@@ -317,15 +426,14 @@ ZMesh decodeDracoMesh(std::span<const uint8_t> bytes)
   }
 
   draco::Decoder decoder;
+  decoder.SetSkipAttributeTransform(draco::GeometryAttribute::POSITION);
   auto meshStatus = decoder.DecodeMeshFromBuffer(&buffer);
   if (!meshStatus.ok()) {
     throw ZException(fmt::format("Failed to decode draco mesh: {}", meshStatus.status().error_msg()));
   }
 
   std::unique_ptr<draco::Mesh> dmesh = std::move(meshStatus).value();
-  if (!dmesh) {
-    throw ZException("Failed to decode draco mesh: null mesh");
-  }
+  CHECK(dmesh);
 
   const draco::PointAttribute* const pos = dmesh->GetNamedAttribute(draco::GeometryAttribute::POSITION);
   if (pos == nullptr || pos->size() == 0) {
@@ -334,41 +442,200 @@ ZMesh decodeDracoMesh(std::span<const uint8_t> bytes)
   if (pos->num_components() != 3) {
     throw ZException("Failed to decode draco mesh: POSITION must have 3 components");
   }
-
-  std::vector<glm::vec3> vertices;
-  vertices.resize(dmesh->num_points());
-  for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
-    glm::vec3 v(0.0F);
-    if (!pos->ConvertValue<float, 3>(pos->mapped_index(i), &v[0])) {
-      throw ZException("Failed to decode draco mesh: ConvertValue(POSITION) failed");
-    }
-    vertices[i.value()] = v;
+  if (pos->data_type() != draco::DT_INT32 && pos->data_type() != draco::DT_FLOAT32) {
+    throw ZException("Failed to decode draco mesh: unsupported POSITION data type");
+  }
+  if (dmesh->GetAttributeElementType(pos->unique_id()) != draco::MESH_CORNER_ATTRIBUTE) {
+    throw ZException("Failed to decode draco mesh: POSITION must use corner attributes");
+  }
+  if (static_cast<size_t>(pos->size()) != static_cast<size_t>(dmesh->num_points())) {
+    throw ZException("Failed to decode draco mesh: POSITION count mismatch");
   }
 
-  std::vector<uint32_t> indices;
-  indices.resize(static_cast<size_t>(dmesh->num_faces()) * 3);
+  std::vector<uint32_t> indices(static_cast<size_t>(dmesh->num_faces()) * 3U);
   for (draco::FaceIndex fi(0); fi < dmesh->num_faces(); ++fi) {
     const draco::Mesh::Face& face = dmesh->face(fi);
-    indices[fi.value() * 3 + 0] = face[0].value();
-    indices[fi.value() * 3 + 1] = face[1].value();
-    indices[fi.value() * 3 + 2] = face[2].value();
+    indices[fi.value() * 3U + 0U] = face[0].value();
+    indices[fi.value() * 3U + 1U] = face[1].value();
+    indices[fi.value() * 3U + 2U] = face[2].value();
   }
 
-  ZMesh mesh(ZMesh::Type::TRIANGLES);
-  mesh.setVertices(vertices);
-  mesh.setIndices(indices);
-  return mesh;
+  if (!pos->is_mapping_identity()) {
+    for (size_t i = 0; i < indices.size(); ++i) {
+      indices[i] = pos->mapped_index(draco::PointIndex(indices[i])).value();
+    }
+  }
+
+  DecodedPartitionedDracoMesh out;
+  out.vertices.resize(dmesh->num_points());
+
+  if (pos->data_type() == draco::DT_INT32) {
+    const auto* raw = reinterpret_cast<const int32_t*>(pos->GetAddress(draco::AttributeValueIndex(0)));
+    CHECK(raw);
+    for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
+      const size_t base = static_cast<size_t>(i.value()) * 3U;
+      out.vertices[i.value()] = glm::vec3(static_cast<float>(raw[base + 0U]),
+                                          static_cast<float>(raw[base + 1U]),
+                                          static_cast<float>(raw[base + 2U]));
+    }
+  } else {
+    const auto* raw = reinterpret_cast<const float*>(pos->GetAddress(draco::AttributeValueIndex(0)));
+    CHECK(raw);
+    for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
+      const size_t base = static_cast<size_t>(i.value()) * 3U;
+      out.vertices[i.value()] = glm::vec3(raw[base + 0U], raw[base + 1U], raw[base + 2U]);
+    }
+  }
+
+  out.partitionIndices.resize(partition ? 8U : 1U);
+  if (!partition) {
+    out.partitionIndices[0] = std::move(indices);
+    return out;
+  }
+
+  CHECK(vertexQuantizationBits == 10 || vertexQuantizationBits == 16);
+  const uint32_t partitionPoint = ((std::numeric_limits<uint32_t>::max() >> (32 - vertexQuantizationBits)) / 2U) + 1U;
+
+  auto vertexMask = [&](const glm::vec3& v) -> uint32_t {
+    uint32_t mask = 0xFFU;
+    if (v.x < static_cast<float>(partitionPoint)) {
+      mask &= 0b01010101U;
+    } else if (v.x > static_cast<float>(partitionPoint)) {
+      mask &= 0b10101010U;
+    }
+    if (v.y < static_cast<float>(partitionPoint)) {
+      mask &= 0b00110011U;
+    } else if (v.y > static_cast<float>(partitionPoint)) {
+      mask &= 0b11001100U;
+    }
+    if (v.z < static_cast<float>(partitionPoint)) {
+      mask &= 0b00001111U;
+    } else if (v.z > static_cast<float>(partitionPoint)) {
+      mask &= 0b11110000U;
+    }
+    return mask;
+  };
+
+  for (size_t i = 0; i < indices.size(); i += 3U) {
+    uint32_t mask = 0xFFU;
+    for (size_t j = 0; j < 3U; ++j) {
+      mask &= vertexMask(out.vertices[indices[i + j]]);
+    }
+    const uint32_t partitionIndex = kFirstBitLookupTable[mask];
+    out.partitionIndices[partitionIndex].push_back(indices[i + 0U]);
+    out.partitionIndices[partitionIndex].push_back(indices[i + 1U]);
+    out.partitionIndices[partitionIndex].push_back(indices[i + 2U]);
+  }
+
+  return out;
+}
+
+void computeOctreeChildOffsets(std::vector<ZNeuroglancerPrecomputedMeshSource::MultiLodOctreeNode>& octree,
+                               uint32_t childStart,
+                               uint32_t childEnd,
+                               uint32_t parentEnd)
+{
+  uint32_t childNode = childStart;
+  for (uint32_t parentNode = childEnd; parentNode < parentEnd; ++parentNode) {
+    const uint32_t parentX = octree[parentNode].gridPosition.x;
+    const uint32_t parentY = octree[parentNode].gridPosition.y;
+    const uint32_t parentZ = octree[parentNode].gridPosition.z;
+    while (childNode < childEnd) {
+      const uint32_t childX = octree[childNode].gridPosition.x >> 1U;
+      const uint32_t childY = octree[childNode].gridPosition.y >> 1U;
+      const uint32_t childZ = octree[childNode].gridPosition.z >> 1U;
+      if (!zorder3LessThan(childX, childY, childZ, parentX, parentY, parentZ)) {
+        break;
+      }
+      ++childNode;
+    }
+    octree[parentNode].childBegin = childNode;
+    while (childNode < childEnd) {
+      const uint32_t childX = octree[childNode].gridPosition.x >> 1U;
+      const uint32_t childY = octree[childNode].gridPosition.y >> 1U;
+      const uint32_t childZ = octree[childNode].gridPosition.z >> 1U;
+      if (childX != parentX || childY != parentY || childZ != parentZ) {
+        break;
+      }
+      ++childNode;
+    }
+    octree[parentNode].childEndAndEmpty += childNode;
+  }
+}
+
+uint32_t generateHigherOctreeLevel(std::vector<ZNeuroglancerPrecomputedMeshSource::MultiLodOctreeNode>& octree,
+                                   uint32_t priorStart,
+                                   uint32_t priorEnd)
+{
+  uint32_t curEnd = priorEnd;
+  octree[curEnd].gridPosition = glm::uvec3(octree[priorStart].gridPosition.x >> 1U,
+                                           octree[priorStart].gridPosition.y >> 1U,
+                                           octree[priorStart].gridPosition.z >> 1U);
+  octree[curEnd].childBegin = priorStart;
+  for (uint32_t i = priorStart + 1U; i < priorEnd; ++i) {
+    const glm::uvec3 parentPos(octree[i].gridPosition.x >> 1U,
+                               octree[i].gridPosition.y >> 1U,
+                               octree[i].gridPosition.z >> 1U);
+    if (parentPos != octree[curEnd].gridPosition) {
+      octree[curEnd].childEndAndEmpty = i;
+      ++curEnd;
+      octree[curEnd].gridPosition = parentPos;
+      octree[curEnd].childBegin = i;
+      octree[curEnd].childEndAndEmpty = 0;
+    }
+  }
+  octree[curEnd].childEndAndEmpty = priorEnd;
+  return curEnd + 1U;
+}
+
+[[nodiscard]] QString meshSourceCacheKey(const QUrl& meshDirUrl,
+                                         const std::array<double, 3>& baseResolutionNm,
+                                         const std::array<int64_t, 3>& baseVoxelOffset)
+{
+  return QStringLiteral("%1|%2,%3,%4|%5,%6,%7")
+    .arg(meshDirUrl.toString())
+    .arg(QString::number(baseResolutionNm[0], 'g', 17))
+    .arg(QString::number(baseResolutionNm[1], 'g', 17))
+    .arg(QString::number(baseResolutionNm[2], 'g', 17))
+    .arg(baseVoxelOffset[0])
+    .arg(baseVoxelOffset[1])
+    .arg(baseVoxelOffset[2]);
+}
+
+std::mutex& openedMeshSourcesMutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+
+std::unordered_map<QString, std::weak_ptr<ZNeuroglancerPrecomputedMeshSource>>& openedMeshSources()
+{
+  static std::unordered_map<QString, std::weak_ptr<ZNeuroglancerPrecomputedMeshSource>> cache;
+  return cache;
 }
 
 } // namespace
 
+std::optional<uint32_t> ZNeuroglancerPrecomputedMeshSource::MultiLodManifest::coarsestStoredLod() const
+{
+  for (size_t i = lodScales.size(); i > 0; --i) {
+    if (lodScales[i - 1] != 0.0F) {
+      return static_cast<uint32_t>(i - 1);
+    }
+  }
+  return std::nullopt;
+}
+
 uint64_t ZNeuroglancerPrecomputedMeshSource::MultiLodManifest::totalFragmentBytes() const
 {
-  uint64_t total = 0;
-  for (const uint64_t b : lodTotalSizes) {
-    total += b;
-  }
-  return total;
+  return offsets.empty() ? 0ULL : offsets.back();
+}
+
+bool ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh::empty() const
+{
+  return std::ranges::none_of(subMeshes, [](const auto& mesh) {
+    return mesh && !mesh->empty();
+  });
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedMeshSource::open(
@@ -377,11 +644,28 @@ std::shared_ptr<ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedMesh
   std::array<int64_t, 3> baseVoxelOffset,
   std::chrono::milliseconds timeout)
 {
-  auto out = std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>(new ZNeuroglancerPrecomputedMeshSource());
-  out->m_meshDirUrl = meshDirUrl;
-  if (!out->m_meshDirUrl.toString().endsWith('/')) {
-    out->m_meshDirUrl = QUrl(out->m_meshDirUrl.toString() + "/");
+  QUrl normalizedMeshDirUrl = meshDirUrl;
+  if (!normalizedMeshDirUrl.toString().endsWith('/')) {
+    normalizedMeshDirUrl = QUrl(normalizedMeshDirUrl.toString() + "/");
   }
+
+  const QString cacheKey = meshSourceCacheKey(normalizedMeshDirUrl, baseResolutionNm, baseVoxelOffset);
+  {
+    std::lock_guard<std::mutex> lock(openedMeshSourcesMutex());
+    auto& cache = openedMeshSources();
+    if (auto it = cache.find(cacheKey); it != cache.end()) {
+      if (auto existing = it->second.lock()) {
+        if (timeout.count() > 0 && timeout > existing->m_timeout) {
+          existing->m_timeout = timeout;
+        }
+        return existing;
+      }
+      cache.erase(it);
+    }
+  }
+
+  auto out = std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>(new ZNeuroglancerPrecomputedMeshSource());
+  out->m_meshDirUrl = normalizedMeshDirUrl;
   out->m_baseResolutionNm = baseResolutionNm;
   out->m_baseVoxelOffset = baseVoxelOffset;
   out->m_timeout = timeout.count() > 0 ? timeout : out->m_timeout;
@@ -432,6 +716,36 @@ std::shared_ptr<ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedMesh
 
   out->m_meshType = MeshType::MultiLodDraco;
   out->m_multiLodInfo = info;
+
+  {
+    std::lock_guard<std::mutex> lock(openedMeshSourcesMutex());
+    openedMeshSources()[cacheKey] = out;
+  }
+  return out;
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest>
+ZNeuroglancerPrecomputedMeshSource::loadManifestBlocking(uint64_t segmentId) const
+{
+  CHECK(supportsRuntimeLod());
+  return folly::coro::blockingWait(loadCachedManifestAsync(segmentId))->manifest;
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>
+ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId, uint32_t row) const
+{
+  CHECK(supportsRuntimeLod());
+  return folly::coro::blockingWait(loadMultiLodChunkMeshAsync(segmentId, row));
+}
+
+std::vector<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
+ZNeuroglancerPrecomputedMeshSource::loadChunkMeshesBlocking(uint64_t segmentId, const std::vector<uint32_t>& rows) const
+{
+  std::vector<std::shared_ptr<const MultiLodChunkMesh>> out;
+  out.reserve(rows.size());
+  for (const uint32_t row : rows) {
+    out.push_back(loadChunkMeshBlocking(segmentId, row));
+  }
   return out;
 }
 
@@ -570,14 +884,11 @@ folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::lo
   co_return out;
 }
 
-folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedMeshSource::getShardedManifestBytesAsync(
+folly::coro::Task<std::optional<ZNeuroglancerPrecomputedMeshSource::ShardedManifestBytes>>
+ZNeuroglancerPrecomputedMeshSource::getShardedManifestBytesAsync(
   uint64_t segmentId,
-  uint64_t* manifestStart,
   const ZNeuroglancerPrecomputedVolume::Scale::Sharding& sharding) const
 {
-  CHECK(manifestStart);
-  *manifestStart = 0;
-
   // Chunk identifier for meshes is simply the segment ID.
   const uint64_t chunkId = segmentId;
   const uint64_t shiftedChunkId = chunkId >> sharding.preshiftBits;
@@ -684,14 +995,16 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedM
     co_return std::nullopt;
   }
 
-  *manifestStart = start;
   auto manifestBytesOpt = co_await getHttpRangeBytesAsync(entry.dataUrl, start, end - start);
   if (!manifestBytesOpt) {
     co_return std::nullopt;
   }
 
-  auto decodedManifestBytes = decodeShardedBytes(std::move(*manifestBytesOpt), sharding.dataEncoding);
-  co_return decodedManifestBytes;
+  ShardedManifestBytes out;
+  out.manifestBytes = decodeShardedBytes(std::move(*manifestBytesOpt), sharding.dataEncoding);
+  out.manifestStart = start;
+  out.dataUrl = entry.dataUrl;
+  co_return out;
 }
 
 ZNeuroglancerPrecomputedMeshSource::MultiLodManifest ZNeuroglancerPrecomputedMeshSource::parseMultiLodManifest(
@@ -718,72 +1031,156 @@ ZNeuroglancerPrecomputedMeshSource::MultiLodManifest ZNeuroglancerPrecomputedMes
     return v;
   };
 
-  MultiLodManifest m{};
-  m.chunkShape = glm::vec3(readF(), readF(), readF());
-  m.gridOrigin = glm::vec3(readF(), readF(), readF());
-  const uint32_t numLods = readU32();
-  if (numLods == 0) {
+  MultiLodManifest manifest{};
+  manifest.chunkShape = glm::vec3(readF(), readF(), readF());
+  manifest.gridOrigin = glm::vec3(readF(), readF(), readF());
+  const uint32_t numStoredLods = readU32();
+  if (numStoredLods == 0) {
     throw ZException("Invalid neuroglancer multi-LOD mesh manifest: num_lods must be > 0");
   }
 
-  m.lodScales.resize(numLods);
-  for (uint32_t i = 0; i < numLods; ++i) {
-    m.lodScales[i] = static_cast<float>(static_cast<double>(readF()) * info.lodScaleMultiplier);
+  std::vector<float> storedLodScales(numStoredLods);
+  for (uint32_t i = 0; i < numStoredLods; ++i) {
+    storedLodScales[i] = static_cast<float>(static_cast<double>(readF()) * info.lodScaleMultiplier);
   }
 
-  m.vertexOffsets.resize(numLods);
-  for (uint32_t i = 0; i < numLods; ++i) {
-    m.vertexOffsets[i] = glm::vec3(readF(), readF(), readF());
+  manifest.vertexOffsets.resize(numStoredLods);
+  for (uint32_t i = 0; i < numStoredLods; ++i) {
+    manifest.vertexOffsets[i] = glm::vec3(readF(), readF(), readF());
   }
 
-  std::vector<uint32_t> numFragments(numLods);
-  for (uint32_t i = 0; i < numLods; ++i) {
-    numFragments[i] = readU32();
+  std::vector<uint32_t> numFragmentsPerLod(numStoredLods);
+  for (uint32_t i = 0; i < numStoredLods; ++i) {
+    numFragmentsPerLod[i] = readU32();
   }
 
-  m.fragmentPositions.resize(numLods);
-  m.fragmentSizes.resize(numLods);
-  m.lodStartOffsets.resize(numLods);
-  m.lodTotalSizes.resize(numLods);
-
-  uint64_t cumulative = 0;
-  for (uint32_t lod = 0; lod < numLods; ++lod) {
-    const uint32_t n = numFragments[lod];
-    m.lodStartOffsets[lod] = cumulative;
-
-    std::vector<uint32_t> xs(n), ys(n), zs(n);
-    for (uint32_t i = 0; i < n; ++i) {
-      xs[i] = readU32();
-    }
-    for (uint32_t i = 0; i < n; ++i) {
-      ys[i] = readU32();
-    }
-    for (uint32_t i = 0; i < n; ++i) {
-      zs[i] = readU32();
-    }
-
-    m.fragmentPositions[lod].resize(n);
-    for (uint32_t i = 0; i < n; ++i) {
-      m.fragmentPositions[lod][i] = glm::uvec3(xs[i], ys[i], zs[i]);
-    }
-
-    m.fragmentSizes[lod].resize(n);
-    uint64_t lodBytes = 0;
-    for (uint32_t i = 0; i < n; ++i) {
-      const uint32_t sz = readU32();
-      m.fragmentSizes[lod][i] = sz;
-      lodBytes += sz;
-    }
-    m.lodTotalSizes[lod] = lodBytes;
-    cumulative += lodBytes;
+  uint64_t totalFragments = 0;
+  for (const uint32_t value : numFragmentsPerLod) {
+    totalFragments += value;
+  }
+  if (bytes.size() != off + totalFragments * 16ULL) {
+    throw ZException(
+      fmt::format("Invalid neuroglancer multi-LOD mesh manifest size: {} bytes for {} lods and {} fragments",
+                  bytes.size(),
+                  numStoredLods,
+                  totalFragments));
   }
 
-  if (off != bytes.size()) {
-    // Ignore trailing bytes to be tolerant, but warn in debug builds.
-    VLOG(1) << fmt::format("Neuroglancer multi-LOD mesh manifest has {} trailing bytes", bytes.size() - off);
+  std::vector<uint32_t> fragmentInfo(totalFragments * 4ULL);
+  for (uint64_t i = 0; i < fragmentInfo.size(); ++i) {
+    fragmentInfo[i] = readU32();
   }
 
-  return m;
+  glm::vec3 clipLower(std::numeric_limits<float>::infinity());
+  glm::vec3 clipUpper(-std::numeric_limits<float>::infinity());
+  uint32_t numLods = std::max(1U, numStoredLods);
+  {
+    size_t fragmentBase = 0;
+    for (uint32_t lodIndex = 0; lodIndex < numStoredLods; ++lodIndex) {
+      const uint32_t numFragments = numFragmentsPerLod[lodIndex];
+      for (size_t axis = 0; axis < 3; ++axis) {
+        uint32_t lowerBoundValue = std::numeric_limits<uint32_t>::max();
+        uint32_t upperBoundValue = 0;
+        const size_t base = fragmentBase + static_cast<size_t>(numFragments) * axis;
+        for (uint32_t j = 0; j < numFragments; ++j) {
+          const uint32_t value = fragmentInfo[base + j];
+          lowerBoundValue = std::min(lowerBoundValue, value);
+          upperBoundValue = std::max(upperBoundValue, value);
+        }
+        if (numFragments != 0) {
+          while ((upperBoundValue >> (numLods - lodIndex - 1U)) != (lowerBoundValue >> (numLods - lodIndex - 1U))) {
+            ++numLods;
+          }
+          if (lodIndex == 0) {
+            clipLower[axis] = std::min(clipLower[axis], static_cast<float>(lowerBoundValue));
+            clipUpper[axis] = std::max(clipUpper[axis], static_cast<float>(upperBoundValue + 1U));
+          }
+        }
+      }
+      fragmentBase += static_cast<size_t>(numFragments) * 4ULL;
+    }
+  }
+
+  if (!std::isfinite(clipLower.x) || !std::isfinite(clipLower.y) || !std::isfinite(clipLower.z) ||
+      !std::isfinite(clipUpper.x) || !std::isfinite(clipUpper.y) || !std::isfinite(clipUpper.z)) {
+    clipLower = glm::vec3(0.0F);
+    clipUpper = glm::vec3(0.0F);
+  }
+
+  uint32_t maxFragments = 0;
+  {
+    uint32_t prevNumFragments = 0;
+    uint32_t prevLodIndex = 0;
+    for (uint32_t lodIndex = 0; lodIndex < numStoredLods; ++lodIndex) {
+      const uint32_t numFragments = numFragmentsPerLod[lodIndex];
+      maxFragments += prevNumFragments * (lodIndex - prevLodIndex);
+      prevLodIndex = lodIndex;
+      prevNumFragments = numFragments;
+      maxFragments += numFragments;
+    }
+    maxFragments += (numLods - 1U - prevLodIndex) * prevNumFragments;
+  }
+
+  std::vector<MultiLodOctreeNode> octreeTemp(static_cast<size_t>(std::max<uint32_t>(maxFragments, 1U)));
+  std::vector<uint64_t> offsetsTemp(static_cast<size_t>(std::max<uint32_t>(maxFragments + 1U, 1U)), 0ULL);
+  std::vector<uint32_t> rowLodsTemp(static_cast<size_t>(std::max<uint32_t>(maxFragments, 1U)), 0U);
+
+  {
+    uint32_t priorStart = 0;
+    uint32_t baseRow = 0;
+    uint64_t dataOffset = 0;
+    size_t fragmentBase = 0;
+    for (uint32_t lodIndex = 0; lodIndex < numStoredLods; ++lodIndex) {
+      const uint32_t numFragments = numFragmentsPerLod[lodIndex];
+      for (uint32_t j = 0; j < numFragments; ++j) {
+        const size_t row = static_cast<size_t>(baseRow + j);
+        octreeTemp[row].gridPosition = glm::uvec3(fragmentInfo[fragmentBase + j],
+                                                  fragmentInfo[fragmentBase + numFragments + j],
+                                                  fragmentInfo[fragmentBase + numFragments * 2ULL + j]);
+        const uint32_t dataSize = fragmentInfo[fragmentBase + numFragments * 3ULL + j];
+        dataOffset += dataSize;
+        offsetsTemp[row + 1ULL] = dataOffset;
+        octreeTemp[row].childBegin = 0;
+        octreeTemp[row].childEndAndEmpty = (dataSize == 0U) ? 0x80000000U : 0U;
+        rowLodsTemp[row] = lodIndex;
+      }
+
+      fragmentBase += static_cast<size_t>(numFragments) * 4ULL;
+
+      if (lodIndex != 0U) {
+        computeOctreeChildOffsets(octreeTemp, priorStart, baseRow, baseRow + numFragments);
+      }
+
+      priorStart = baseRow;
+      baseRow += numFragments;
+      while (lodIndex + 1U < numLods &&
+             (lodIndex + 1U >= storedLodScales.size() || storedLodScales[lodIndex + 1U] == 0.0F)) {
+        const uint32_t curEnd = generateHigherOctreeLevel(octreeTemp, priorStart, baseRow);
+        std::fill(offsetsTemp.begin() + static_cast<ptrdiff_t>(baseRow) + 1,
+                  offsetsTemp.begin() + static_cast<ptrdiff_t>(curEnd) + 1,
+                  dataOffset);
+        std::fill(rowLodsTemp.begin() + static_cast<ptrdiff_t>(baseRow),
+                  rowLodsTemp.begin() + static_cast<ptrdiff_t>(curEnd),
+                  lodIndex + 1U);
+        priorStart = baseRow;
+        baseRow = curEnd;
+        ++lodIndex;
+      }
+    }
+    manifest.octreeNodes.assign(octreeTemp.begin(), octreeTemp.begin() + static_cast<ptrdiff_t>(baseRow));
+    manifest.offsets.assign(offsetsTemp.begin(), offsetsTemp.begin() + static_cast<ptrdiff_t>(baseRow) + 1);
+    manifest.rowLods.assign(rowLodsTemp.begin(), rowLodsTemp.begin() + static_cast<ptrdiff_t>(baseRow));
+  }
+
+  manifest.lodScales.assign(numLods, 0.0F);
+  for (uint32_t i = 0; i < numStoredLods; ++i) {
+    manifest.lodScales[i] = storedLodScales[i];
+  }
+
+  manifest.clipLowerBound = manifest.gridOrigin + clipLower * manifest.chunkShape;
+  manifest.clipUpperBound = manifest.gridOrigin + clipUpper * manifest.chunkShape;
+
+  return manifest;
 }
 
 void ZNeuroglancerPrecomputedMeshSource::convertLegacyMeshVerticesNmToLocalVoxel(ZMesh& mesh) const
@@ -803,11 +1200,11 @@ void ZNeuroglancerPrecomputedMeshSource::convertLegacyMeshVerticesNmToLocalVoxel
   mesh.transformVerticesByMatrix(voxelFromNm);
 }
 
-void ZNeuroglancerPrecomputedMeshSource::convertMultiLodFragmentToLocalVoxel(ZMesh& fragment,
-                                                                            size_t lod,
-                                                                            const glm::uvec3& fragmentPos,
-                                                                            const MultiLodManifest& manifest,
-                                                                            const MultiLodInfo& info) const
+void ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std::vector<glm::vec3>& vertices,
+                                                                             size_t lod,
+                                                                             const glm::uvec3& fragmentPos,
+                                                                             const MultiLodManifest& manifest,
+                                                                             const MultiLodInfo& info) const
 {
   CHECK(info.vertexQuantizationBits == 10 || info.vertexQuantizationBits == 16);
   const float maxQuant = static_cast<float>((1ULL << info.vertexQuantizationBits) - 1ULL);
@@ -837,29 +1234,319 @@ void ZNeuroglancerPrecomputedMeshSource::convertMultiLodFragmentToLocalVoxel(ZMe
   voxelFromModel = glm::translate(voxelFromModel, -voxelOffset);
   voxelFromModel = glm::scale(voxelFromModel, invRes);
 
-  fragment.transformVerticesByMatrix(voxelFromModel * modelFromQuant);
+  const glm::mat4 transform = voxelFromModel * modelFromQuant;
+  for (glm::vec3& vertex : vertices) {
+    vertex = glm::applyMatrix(transform, vertex);
+  }
 }
 
-folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::loadMultiLodMeshAsync(uint64_t segmentId,
-                                                                                                    LodPolicy lodPolicy) const
+std::array<float, 24> ZNeuroglancerPrecomputedMeshSource::getFrustumPlanes(const glm::mat4& modelViewProjection)
+{
+  std::array<float, 24> out{};
+  const float* m = glm::value_ptr(modelViewProjection);
+  const float m00 = m[0];
+  const float m10 = m[1];
+  const float m20 = m[2];
+  const float m30 = m[3];
+  const float m01 = m[4];
+  const float m11 = m[5];
+  const float m21 = m[6];
+  const float m31 = m[7];
+  const float m02 = m[8];
+  const float m12 = m[9];
+  const float m22 = m[10];
+  const float m32 = m[11];
+  const float m03 = m[12];
+  const float m13 = m[13];
+  const float m23 = m[14];
+  const float m33 = m[15];
+
+  out[0] = m30 + m00;
+  out[1] = m31 + m01;
+  out[2] = m32 + m02;
+  out[3] = m33 + m03;
+
+  out[4] = m30 - m00;
+  out[5] = m31 - m01;
+  out[6] = m32 - m02;
+  out[7] = m33 - m03;
+
+  out[8] = m30 + m10;
+  out[9] = m31 + m11;
+  out[10] = m32 + m12;
+  out[11] = m33 + m13;
+
+  out[12] = m30 - m10;
+  out[13] = m31 - m11;
+  out[14] = m32 - m12;
+  out[15] = m33 - m13;
+
+  const float nearA = m30 + m20;
+  const float nearB = m31 + m21;
+  const float nearC = m32 + m22;
+  const float nearD = m33 + m23;
+  const float farA = m30 - m20;
+  const float farB = m31 - m21;
+  const float farC = m32 - m22;
+  const float farD = m33 - m23;
+
+  const float nearNorm = std::sqrt(nearA * nearA + nearB * nearB + nearC * nearC);
+  CHECK(nearNorm > 0.0F);
+  out[16] = nearA / nearNorm;
+  out[17] = nearB / nearNorm;
+  out[18] = nearC / nearNorm;
+  out[19] = nearD / nearNorm;
+
+  const float farNorm = std::sqrt(farA * farA + farB * farB + farC * farC);
+  CHECK(farNorm > 0.0F);
+  out[20] = farA / farNorm;
+  out[21] = farB / farNorm;
+  out[22] = farC / farNorm;
+  out[23] = farD / farNorm;
+
+  return out;
+}
+
+std::vector<ZNeuroglancerPrecomputedMeshSource::MultiLodDesiredChunk>
+ZNeuroglancerPrecomputedMeshSource::desiredChunksForView(const MultiLodManifest& manifest,
+                                                         const glm::mat4& modelViewProjection,
+                                                         const std::array<float, 24>& clippingPlanes,
+                                                         float detailCutoff,
+                                                         uint32_t viewportWidth,
+                                                         uint32_t viewportHeight)
+{
+  if (manifest.octreeNodes.empty() || viewportWidth == 0U || viewportHeight == 0U) {
+    return {};
+  }
+
+  const float* m = glm::value_ptr(modelViewProjection);
+  const float m00 = m[0];
+  const float m01 = m[4];
+  const float m02 = m[8];
+  const float m10 = m[1];
+  const float m11 = m[5];
+  const float m12 = m[9];
+  const float m30 = m[3];
+  const float m31 = m[7];
+  const float m32 = m[11];
+  const float m33 = m[15];
+
+  const float minWXCoeff = m30 > 0.0F ? 0.0F : 1.0F;
+  const float minWYCoeff = m31 > 0.0F ? 0.0F : 1.0F;
+  const float minWZCoeff = m32 > 0.0F ? 0.0F : 1.0F;
+
+  const float nearA = clippingPlanes[16];
+  const float nearB = clippingPlanes[17];
+  const float nearC = clippingPlanes[18];
+  const float nearD = clippingPlanes[19];
+
+  auto pointW = [&](float x, float y, float z) {
+    return m30 * x + m31 * y + m32 * z + m33;
+  };
+  auto boxW = [&](float xLower, float yLower, float zLower, float xUpper, float yUpper, float zUpper) {
+    return pointW(xLower + minWXCoeff * (xUpper - xLower),
+                  yLower + minWYCoeff * (yUpper - yLower),
+                  zLower + minWZCoeff * (zUpper - zLower));
+  };
+  auto aabbVisible = [&](float xLower, float yLower, float zLower, float xUpper, float yUpper, float zUpper) {
+    for (size_t i = 0; i < 6; ++i) {
+      const float a = clippingPlanes[i * 4U + 0U];
+      const float b = clippingPlanes[i * 4U + 1U];
+      const float c = clippingPlanes[i * 4U + 2U];
+      const float d = clippingPlanes[i * 4U + 3U];
+      const float sum =
+        std::max(a * xLower, a * xUpper) + std::max(b * yLower, b * yUpper) + std::max(c * zLower, c * zUpper) + d;
+      if (sum < 0.0F) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const float minWClip = pointW(-nearD * nearA, -nearD * nearB, -nearD * nearC);
+
+  const float xScale =
+    std::sqrt((m00 * static_cast<float>(viewportWidth)) * (m00 * static_cast<float>(viewportWidth)) +
+              (m10 * static_cast<float>(viewportHeight)) * (m10 * static_cast<float>(viewportHeight)));
+  const float yScale =
+    std::sqrt((m01 * static_cast<float>(viewportWidth)) * (m01 * static_cast<float>(viewportWidth)) +
+              (m11 * static_cast<float>(viewportHeight)) * (m11 * static_cast<float>(viewportHeight)));
+  const float zScale =
+    std::sqrt((m02 * static_cast<float>(viewportWidth)) * (m02 * static_cast<float>(viewportWidth)) +
+              (m12 * static_cast<float>(viewportHeight)) * (m12 * static_cast<float>(viewportHeight)));
+  const float scaleFactor = std::max({xScale, yScale, zScale});
+  if (scaleFactor <= 0.0F) {
+    return {};
+  }
+
+  std::vector<MultiLodDesiredChunk> out;
+  const uint32_t maxLod = manifest.rowLods.at(manifest.rootRow());
+
+  std::function<void(uint32_t, uint32_t, float)> handleChunk;
+  handleChunk = [&](uint32_t lod, uint32_t row, float priorLodScale) {
+    const float size = std::ldexp(1.0F, static_cast<int>(lod));
+    const auto& node = manifest.octreeNodes.at(row);
+    float xLower = static_cast<float>(node.gridPosition.x) * size * manifest.chunkShape.x + manifest.gridOrigin.x;
+    float yLower = static_cast<float>(node.gridPosition.y) * size * manifest.chunkShape.y + manifest.gridOrigin.y;
+    float zLower = static_cast<float>(node.gridPosition.z) * size * manifest.chunkShape.z + manifest.gridOrigin.z;
+    float xUpper = xLower + size * manifest.chunkShape.x;
+    float yUpper = yLower + size * manifest.chunkShape.y;
+    float zUpper = zLower + size * manifest.chunkShape.z;
+
+    xLower = std::max(xLower, manifest.clipLowerBound.x);
+    yLower = std::max(yLower, manifest.clipLowerBound.y);
+    zLower = std::max(zLower, manifest.clipLowerBound.z);
+    xUpper = std::min(xUpper, manifest.clipUpperBound.x);
+    yUpper = std::min(yUpper, manifest.clipUpperBound.y);
+    zUpper = std::min(zUpper, manifest.clipUpperBound.z);
+
+    if (!aabbVisible(xLower, yLower, zLower, xUpper, yUpper, zUpper)) {
+      return;
+    }
+
+    const float minW = std::max(minWClip, boxW(xLower, yLower, zLower, xUpper, yUpper, zUpper));
+    const float pixelSize = minW / scaleFactor;
+    if (priorLodScale != 0.0F && pixelSize * detailCutoff >= priorLodScale) {
+      return;
+    }
+
+    const float lodScale = manifest.lodScales.at(lod);
+    if (lodScale != 0.0F) {
+      out.push_back({lod, row, lodScale / pixelSize, node.empty()});
+    }
+
+    if (lod > 0U && (lodScale == 0.0F || pixelSize * detailCutoff < lodScale)) {
+      const float nextPriorLodScale = lodScale == 0.0F ? priorLodScale : lodScale;
+      for (uint32_t childRow = node.childBegin; childRow < node.childEnd(); ++childRow) {
+        handleChunk(lod - 1U, childRow, nextPriorLodScale);
+      }
+    }
+  };
+
+  handleChunk(maxLod, manifest.rootRow(), 0.0F);
+  return out;
+}
+
+std::vector<ZNeuroglancerPrecomputedMeshSource::MultiLodDrawChunk>
+ZNeuroglancerPrecomputedMeshSource::chunksToDrawForView(
+  const MultiLodManifest& manifest,
+  const glm::mat4& modelViewProjection,
+  const std::array<float, 24>& clippingPlanes,
+  float detailCutoff,
+  uint32_t viewportWidth,
+  uint32_t viewportHeight,
+  const std::function<bool(uint32_t lod, uint32_t row, float renderScale)>& hasChunk)
+{
+  CHECK(hasChunk);
+
+  uint32_t maxLod = 0;
+  while (maxLod + 1U < manifest.lodScales.size() && manifest.lodScales[maxLod + 1U] != 0.0F) {
+    ++maxLod;
+  }
+
+  struct StackEntry
+  {
+    int32_t row = -1;
+    uint32_t parentSubChunkIndex = 0;
+    float renderScale = 0.0F;
+  };
+
+  std::vector<MultiLodDrawChunk> out;
+  std::vector<StackEntry> stack;
+  stack.reserve(maxLod + 1U);
+  uint32_t priorSubChunkIndex = 0;
+
+  auto emitChunksUpTo = [&](uint32_t targetStackIndex, uint32_t subChunkIndex) {
+    while (true) {
+      if (stack.empty()) {
+        return;
+      }
+
+      const uint32_t stackIndex = static_cast<uint32_t>(stack.size() - 1U);
+      const uint32_t entryLod = maxLod - stackIndex;
+      const StackEntry entry = stack.back();
+      const uint32_t numSubChunks = entryLod == 0U ? 1U : 8U;
+
+      if (targetStackIndex == stack.size()) {
+        const uint32_t endSubChunk = subChunkIndex & (numSubChunks - 1U);
+        if (priorSubChunkIndex != endSubChunk && entry.row != -1) {
+          out.push_back(
+            {entryLod, static_cast<uint32_t>(entry.row), priorSubChunkIndex, endSubChunk, entry.renderScale});
+        }
+        priorSubChunkIndex = endSubChunk + 1U;
+        return;
+      }
+
+      if (priorSubChunkIndex != numSubChunks && entry.row != -1) {
+        out.push_back(
+          {entryLod, static_cast<uint32_t>(entry.row), priorSubChunkIndex, numSubChunks, entry.renderScale});
+      }
+      priorSubChunkIndex = entry.parentSubChunkIndex + 1U;
+      stack.pop_back();
+    }
+  };
+
+  uint32_t priorMissingLod = 0;
+  const auto desiredChunks =
+    desiredChunksForView(manifest, modelViewProjection, clippingPlanes, detailCutoff, viewportWidth, viewportHeight);
+  for (const MultiLodDesiredChunk& desired : desiredChunks) {
+    if (!desired.empty && !hasChunk(desired.lod, desired.row, desired.renderScale)) {
+      priorMissingLod = std::max(priorMissingLod, desired.lod);
+      continue;
+    }
+    if (desired.lod < priorMissingLod) {
+      continue;
+    }
+    priorMissingLod = 0;
+
+    const auto& node = manifest.octreeNodes.at(desired.row);
+    const uint32_t subChunkIndex = getOctreeChildIndex(node.gridPosition.x, node.gridPosition.y, node.gridPosition.z);
+    const uint32_t stackIndex = maxLod - desired.lod;
+    emitChunksUpTo(stackIndex, subChunkIndex);
+    if (stack.size() <= stackIndex) {
+      stack.resize(stackIndex + 1U);
+    }
+    stack[stackIndex] = {desired.empty ? -1 : static_cast<int32_t>(desired.row), subChunkIndex, desired.renderScale};
+    priorSubChunkIndex = 0;
+  }
+
+  emitChunksUpTo(0U, 0U);
+  return out;
+}
+
+folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::CachedMultiLodManifest>>
+ZNeuroglancerPrecomputedMeshSource::loadCachedManifestAsync(uint64_t segmentId) const
 {
   CHECK(m_meshType == MeshType::MultiLodDraco);
   CHECK(m_multiLodInfo);
+
+  {
+    std::lock_guard<std::mutex> lock(m_manifestCacheMutex);
+    if (auto it = m_manifestCache.find(segmentId); it != m_manifestCache.end()) {
+      if (auto cached = it->second.lock()) {
+        co_return cached;
+      }
+      m_manifestCache.erase(it);
+    }
+  }
+
   const MultiLodInfo& info = *m_multiLodInfo;
+  auto cached = std::make_shared<CachedMultiLodManifest>();
 
-  const QString base = m_meshDirUrl.toString();
-  const QString segStr = QString::number(segmentId);
-
-  uint64_t manifestStart = 0;
   std::vector<uint8_t> manifestBytes;
+  uint64_t manifestStart = 0;
 
   if (info.sharding) {
-    auto bytesOpt = co_await getShardedManifestBytesAsync(segmentId, &manifestStart, *info.sharding);
+    auto bytesOpt = co_await getShardedManifestBytesAsync(segmentId, *info.sharding);
     if (!bytesOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer multi-LOD mesh manifest not found for segment {}", segmentId));
     }
-    manifestBytes = std::move(*bytesOpt);
+    manifestBytes = std::move(bytesOpt->manifestBytes);
+    manifestStart = bytesOpt->manifestStart;
+    cached->fragmentDataUrl = std::move(bytesOpt->dataUrl);
   } else {
+    const QString base = m_meshDirUrl.toString();
+    const QString segStr = QString::number(segmentId);
     const std::string indexUrl = toStdString(base + segStr + ".index");
     auto bytesOpt = co_await getHttpBytesAsync(indexUrl);
     if (!bytesOpt) {
@@ -869,105 +1556,131 @@ folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::lo
                     indexUrl));
     }
     manifestBytes = std::move(*bytesOpt);
+    cached->fragmentDataUrl = toStdString(base + segStr);
   }
 
-  const MultiLodManifest manifest = parseMultiLodManifest(std::span<const uint8_t>(manifestBytes.data(), manifestBytes.size()), info);
-  const size_t numLods = manifest.lodScales.size();
-  CHECK(numLods > 0);
-
-  const size_t lod = (lodPolicy == LodPolicy::Finest) ? 0 : (numLods - 1);
-  const uint64_t lodOffset = manifest.lodStartOffsets.at(lod);
-  const uint64_t lodBytes = manifest.lodTotalSizes.at(lod);
-
-  std::vector<uint8_t> fragBytes;
-
-  if (lodBytes == 0) {
-    throw ZException(fmt::format("Neuroglancer multi-LOD mesh has no data at LOD {} for segment {}", lod, segmentId));
-  }
-
+  cached->manifest = std::make_shared<MultiLodManifest>(
+    parseMultiLodManifest(std::span<const uint8_t>(manifestBytes.data(), manifestBytes.size()), info));
   if (info.sharding) {
-    const uint64_t totalFragBytes = manifest.totalFragmentBytes();
-    if (manifestStart < totalFragBytes) {
+    if (manifestStart < cached->manifest->totalFragmentBytes()) {
       throw ZException("Invalid neuroglancer multi-LOD sharded mesh: manifestStart precedes fragment data");
     }
-    const uint64_t fragDataStart = manifestStart - totalFragBytes;
-    const uint64_t lodDataStart = fragDataStart + lodOffset;
-
-    // Sharded format uses the shard file as the data source for both manifest and fragments.
-    // Recompute the data URL using the same sharding mapping.
-    // (We keep this simple by requesting the fragment data range via the sharded manifest helper.)
-    // Note: getShardedManifestBytesAsync returns the manifest, but we also need the shard URL; recompute directly.
-    const auto& sharding = *info.sharding;
-    const uint64_t shiftedChunkId = segmentId >> sharding.preshiftBits;
-    const uint64_t hashCode = (sharding.hash == ZNeuroglancerPrecomputedVolume::Scale::Sharding::Hash::Identity)
-                                ? shiftedChunkId
-                                : ZNeuroglancerUint64Sharding::murmurHash3X86_128Hash64Bits(shiftedChunkId, /*seed=*/0);
-    const uint64_t shardAndMinishard = hashCode & sharding.shardAndMinishardMask;
-    const uint64_t shard = (shardAndMinishard >> sharding.minishardBits) & sharding.shardMask;
-    const QString shardHex = shardHexString(shard, sharding.shardHexDigits);
-    const QUrl shardUrl = m_meshDirUrl.resolved(QUrl(shardHex + ".shard"));
-    const QUrl dataUrl = m_meshDirUrl.resolved(QUrl(shardHex + ".data"));
-
-    const int mode = sharding.shardFileMode.load();
-    const std::string dataUrlStr =
-      (mode == 2) ? toStdString(dataUrl.toString()) : toStdString(shardUrl.toString());
-
-    auto bytesOpt = co_await getHttpRangeBytesAsync(dataUrlStr, lodDataStart, lodBytes);
-    if (!bytesOpt) {
-      throw ZNotFoundException("Failed to read sharded mesh fragment data");
-    }
-    fragBytes = std::move(*bytesOpt);
-  } else {
-    const std::string fragUrl = toStdString(base + segStr);
-    auto bytesOpt = co_await getHttpRangeBytesAsync(fragUrl, lodOffset, lodBytes);
-    if (!bytesOpt) {
-      throw ZNotFoundException(
-        fmt::format("Neuroglancer multi-LOD mesh fragment data not found for segment {}", segmentId));
-    }
-    fragBytes = std::move(*bytesOpt);
+    cached->fragmentDataBaseOffset = manifestStart - cached->manifest->totalFragmentBytes();
   }
 
-  std::vector<glm::vec3> mergedVertices;
-  std::vector<uint32_t> mergedIndices;
-
-  auto appendFragment = [&](const ZMesh& frag) {
-    const size_t base = mergedVertices.size();
-    CHECK(base <= static_cast<size_t>(std::numeric_limits<uint32_t>::max()));
-    const uint32_t base32 = static_cast<uint32_t>(base);
-
-    mergedVertices.insert(mergedVertices.end(), frag.vertices().begin(), frag.vertices().end());
-    mergedIndices.reserve(mergedIndices.size() + frag.indices().size());
-    for (const uint32_t idx : frag.indices()) {
-      CHECK(idx <= std::numeric_limits<uint32_t>::max() - base32);
-      mergedIndices.push_back(idx + base32);
+  {
+    std::lock_guard<std::mutex> lock(m_manifestCacheMutex);
+    if (auto it = m_manifestCache.find(segmentId); it != m_manifestCache.end()) {
+      if (auto existing = it->second.lock()) {
+        co_return existing;
+      }
     }
-  };
+    m_manifestCache[segmentId] = cached;
+  }
 
-  size_t cursor = 0;
-  const auto& sizes = manifest.fragmentSizes.at(lod);
-  const auto& positions = manifest.fragmentPositions.at(lod);
-  CHECK(sizes.size() == positions.size());
+  co_return cached;
+}
 
-  for (size_t i = 0; i < sizes.size(); ++i) {
-    const uint32_t sz = sizes[i];
-    if (sz == 0) {
+folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
+ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentId, uint32_t row) const
+{
+  CHECK(m_meshType == MeshType::MultiLodDraco);
+  CHECK(m_multiLodInfo);
+
+  const ChunkCacheKey cacheKey{segmentId, row};
+  {
+    std::lock_guard<std::mutex> lock(m_chunkCacheMutex);
+    if (auto it = m_chunkCache.find(cacheKey); it != m_chunkCache.end()) {
+      if (auto cached = it->second.lock()) {
+        co_return cached;
+      }
+      m_chunkCache.erase(it);
+    }
+  }
+
+  const std::shared_ptr<const CachedMultiLodManifest> cachedManifest = co_await loadCachedManifestAsync(segmentId);
+  CHECK(cachedManifest);
+  CHECK(cachedManifest->manifest);
+  const MultiLodManifest& manifest = *cachedManifest->manifest;
+  CHECK(row < manifest.octreeNodes.size());
+  CHECK(row + 1U < manifest.offsets.size());
+
+  const uint32_t lod = manifest.rowLods.at(row);
+  auto chunkMesh = std::make_shared<MultiLodChunkMesh>();
+  chunkMesh->subMeshes.resize(lod == 0U ? 1U : 8U);
+
+  if (manifest.octreeNodes[row].empty() || manifest.offsets[row + 1U] <= manifest.offsets[row]) {
+    std::lock_guard<std::mutex> lock(m_chunkCacheMutex);
+    m_chunkCache[cacheKey] = chunkMesh;
+    co_return chunkMesh;
+  }
+
+  const uint64_t startOffset = cachedManifest->fragmentDataBaseOffset + manifest.offsets[row];
+  const uint64_t length = manifest.offsets[row + 1U] - manifest.offsets[row];
+  auto fragBytesOpt = co_await getHttpRangeBytesAsync(cachedManifest->fragmentDataUrl, startOffset, length);
+  if (!fragBytesOpt) {
+    throw ZNotFoundException(
+      fmt::format("Neuroglancer multi-LOD mesh fragment data not found for segment {} row {}", segmentId, row));
+  }
+
+  DecodedPartitionedDracoMesh decoded =
+    decodePartitionedDracoMesh(std::span<const uint8_t>(fragBytesOpt->data(), fragBytesOpt->size()),
+                               m_multiLodInfo->vertexQuantizationBits,
+                               lod != 0U);
+  convertMultiLodVerticesToLocalVoxel(decoded.vertices,
+                                      lod,
+                                      manifest.octreeNodes[row].gridPosition,
+                                      manifest,
+                                      *m_multiLodInfo);
+  for (size_t i = 0; i < decoded.partitionIndices.size(); ++i) {
+    chunkMesh->subMeshes[i] = buildCompactMesh(decoded.vertices, decoded.partitionIndices[i]);
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(m_chunkCacheMutex);
+    if (auto it = m_chunkCache.find(cacheKey); it != m_chunkCache.end()) {
+      if (auto existing = it->second.lock()) {
+        co_return existing;
+      }
+    }
+    m_chunkCache[cacheKey] = chunkMesh;
+  }
+
+  co_return chunkMesh;
+}
+
+folly::coro::Task<std::shared_ptr<ZMesh>>
+ZNeuroglancerPrecomputedMeshSource::loadMultiLodMeshAsync(uint64_t segmentId, LodPolicy lodPolicy) const
+{
+  CHECK(m_meshType == MeshType::MultiLodDraco);
+  const std::shared_ptr<const CachedMultiLodManifest> cachedManifest = co_await loadCachedManifestAsync(segmentId);
+  CHECK(cachedManifest);
+  CHECK(cachedManifest->manifest);
+  const MultiLodManifest& manifest = *cachedManifest->manifest;
+
+  const uint32_t lod = (lodPolicy == LodPolicy::Finest) ? 0U : manifest.coarsestStoredLod().value_or(0U);
+
+  std::vector<std::shared_ptr<ZMesh>> meshes;
+  for (uint32_t row = 0; row < manifest.octreeNodes.size(); ++row) {
+    if (manifest.rowLods[row] != lod) {
       continue;
     }
-    const size_t szBytes = static_cast<size_t>(sz);
-    if (cursor + szBytes > fragBytes.size()) {
-      throw ZException("Invalid neuroglancer multi-LOD mesh fragment data: truncated");
+    if (manifest.octreeNodes[row].empty() || manifest.offsets[row + 1U] <= manifest.offsets[row]) {
+      continue;
     }
-    const uint8_t* fragData = fragBytes.data() + cursor;
-    ZMesh fragMesh = decodeDracoMesh(std::span<const uint8_t>(fragData, szBytes));
-    convertMultiLodFragmentToLocalVoxel(fragMesh, lod, positions[i], manifest, info);
-    appendFragment(fragMesh);
-    cursor += szBytes;
+    const std::shared_ptr<const MultiLodChunkMesh> chunkMesh = co_await loadMultiLodChunkMeshAsync(segmentId, row);
+    CHECK(chunkMesh);
+    for (const auto& subMesh : chunkMesh->subMeshes) {
+      if (subMesh && !subMesh->empty()) {
+        meshes.push_back(subMesh);
+      }
+    }
   }
 
-  auto out = std::make_shared<ZMesh>(ZMesh::Type::TRIANGLES);
-  out->setVertices(mergedVertices);
-  out->setIndices(mergedIndices);
-  out->generateNormals();
+  auto out = mergeMeshes(meshes);
+  if (!out || out->empty()) {
+    throw ZException(fmt::format("Neuroglancer multi-LOD mesh has no data at LOD {} for segment {}", lod, segmentId));
+  }
   co_return out;
 }
 

@@ -29,6 +29,7 @@ class CancellationToken;
 namespace nim {
 
 class Z3DFilter;
+class Z3DMeshFilter;
 
 class Z3DCanvas;
 
@@ -439,6 +440,9 @@ private:
   // towards sources, using the engine's output size as the global target.
   void updateAllFilterSizes();
 
+  void prepareMeshFiltersForExport(const glm::uvec2& exportSize);
+  void finishMeshFiltersForExport();
+
 private:
   struct ScratchPoolDeleter
   {
@@ -476,6 +480,7 @@ private:
 
   // Linearized filter execution order: all object filters, then compositor.
   std::vector<Z3DFilter*> m_pipeline;
+  std::vector<Z3DMeshFilter*> m_exportPreparedMeshFilters;
 
   // Global render target size for the 3D pipeline (canvas/screenshot size).
   glm::uvec2 m_outputSize{32u, 32u};

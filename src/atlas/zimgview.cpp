@@ -3,6 +3,7 @@
 #include "zmeshdoc.h"
 #include "zpunctadoc.h"
 #include "zskeletondoc.h"
+#include "zneuroglancerexternalsource.h"
 #include "zneuroglancerprecomputedmesh.h"
 #include "zneuroglancerprecomputedannotations.h"
 #include "zneuroglancerprecomputedskeleton.h"
@@ -72,44 +73,6 @@ struct NeuroglancerAnnotationsLoadResult
   std::shared_ptr<ZPuncta> puncta;
   std::shared_ptr<ZSkeleton> skeleton;
 };
-
-struct NeuroglancerMeshSourceKey
-{
-  QString rootUrl;
-  QString meshSourceDirUrl;
-  uint64_t segmentId = 0;
-};
-
-struct NeuroglancerSkeletonSourceKey
-{
-  QString rootUrl;
-  QString skeletonSourceDirUrl;
-  uint64_t segmentId = 0;
-};
-
-[[nodiscard]] QString neuroglancerMeshKeyString(const QString& rootUrl, const QString& meshSourceDirUrl, uint64_t segmentId)
-{
-  return QString("%1|%2|%3").arg(rootUrl).arg(meshSourceDirUrl).arg(segmentId);
-}
-
-[[nodiscard]] QString neuroglancerSkeletonKeyString(const QString& rootUrl, const QString& skeletonSourceDirUrl, uint64_t segmentId)
-{
-  return QString("%1|%2|%3").arg(rootUrl).arg(skeletonSourceDirUrl).arg(segmentId);
-}
-
-[[nodiscard]] std::optional<uint64_t> parseUint64Base10(const QString& s)
-{
-  const QString trimmed = s.trimmed();
-  if (trimmed.isEmpty()) {
-    return std::nullopt;
-  }
-  bool ok = false;
-  const uint64_t v = trimmed.toULongLong(&ok, 10);
-  if (!ok) {
-    return std::nullopt;
-  }
-  return v;
-}
 
 [[nodiscard]] QString formatAnnotationPropertyValue(
   const ZNeuroglancerPrecomputedAnnotationsSource::Annotation::PropertyValue& v)
@@ -197,131 +160,11 @@ void applyAnnotationPropertiesToPunctum(const ZNeuroglancerPrecomputedAnnotation
   auto it = re.globalMatch(text);
   while (it.hasNext()) {
     const auto m = it.next();
-    const auto vOpt = parseUint64Base10(m.captured(1));
+    const auto vOpt = parseNeuroglancerUint64Base10(m.captured(1));
     if (vOpt) {
       out.push_back(*vOpt);
     }
   }
-  return out;
-}
-
-[[nodiscard]] std::optional<NeuroglancerMeshSourceKey> parseNeuroglancerMeshSourceKey(const json::value& v)
-{
-  if (!v.is_object()) {
-    return std::nullopt;
-  }
-  const auto& o = v.as_object();
-  auto itType = o.find("type");
-  if (itType == o.end() || !itType->value().is_string()) {
-    return std::nullopt;
-  }
-  const QString type = json::value_to<QString>(itType->value()).trimmed();
-  if (type != "neuroglancer_precomputed_mesh") {
-    return std::nullopt;
-  }
-
-  auto itRoot = o.find("segmentation_root_url");
-  auto itSeg = o.find("segment_id");
-  if (itRoot == o.end() || !itRoot->value().is_string() || itSeg == o.end() || !itSeg->value().is_string()) {
-    return std::nullopt;
-  }
-
-  QString root = json::value_to<QString>(itRoot->value());
-  try {
-    root = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(root));
-  }
-  catch (...) {
-    return std::nullopt;
-  }
-
-  const QString segStr = json::value_to<QString>(itSeg->value());
-  const auto segOpt = parseUint64Base10(segStr);
-  if (!segOpt) {
-    return std::nullopt;
-  }
-
-  QString meshSourceDirUrl;
-  if (auto itUrl = o.find("mesh_source_url"); itUrl != o.end() && itUrl->value().is_string()) {
-    meshSourceDirUrl = json::value_to<QString>(itUrl->value()).trimmed();
-  } else if (auto itMeshKey = o.find("mesh_key"); itMeshKey != o.end() && itMeshKey->value().is_string()) {
-    QString meshKey = json::value_to<QString>(itMeshKey->value()).trimmed();
-    if (!meshKey.endsWith('/')) {
-      meshKey += '/';
-    }
-    const QUrl meshDirUrl = QUrl(root).resolved(QUrl(meshKey));
-    meshSourceDirUrl = meshDirUrl.toString(QUrl::StripTrailingSlash);
-  }
-  if (!meshSourceDirUrl.isEmpty() && !meshSourceDirUrl.endsWith('/')) {
-    meshSourceDirUrl += '/';
-  }
-  if (meshSourceDirUrl.isEmpty()) {
-    return std::nullopt;
-  }
-
-  NeuroglancerMeshSourceKey out;
-  out.rootUrl = std::move(root);
-  out.meshSourceDirUrl = std::move(meshSourceDirUrl);
-  out.segmentId = *segOpt;
-  return out;
-}
-
-[[nodiscard]] std::optional<NeuroglancerSkeletonSourceKey> parseNeuroglancerSkeletonSourceKey(const json::value& v)
-{
-  if (!v.is_object()) {
-    return std::nullopt;
-  }
-  const auto& o = v.as_object();
-  auto itType = o.find("type");
-  if (itType == o.end() || !itType->value().is_string()) {
-    return std::nullopt;
-  }
-  const QString type = json::value_to<QString>(itType->value()).trimmed();
-  if (type != "neuroglancer_precomputed_skeleton") {
-    return std::nullopt;
-  }
-
-  auto itRoot = o.find("segmentation_root_url");
-  auto itSeg = o.find("segment_id");
-  if (itRoot == o.end() || !itRoot->value().is_string() || itSeg == o.end() || !itSeg->value().is_string()) {
-    return std::nullopt;
-  }
-
-  QString root = json::value_to<QString>(itRoot->value());
-  try {
-    root = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(root));
-  }
-  catch (...) {
-    return std::nullopt;
-  }
-
-  const QString segStr = json::value_to<QString>(itSeg->value());
-  const auto segOpt = parseUint64Base10(segStr);
-  if (!segOpt) {
-    return std::nullopt;
-  }
-
-  QString skeletonSourceDirUrl;
-  if (auto itUrl = o.find("skeleton_source_url"); itUrl != o.end() && itUrl->value().is_string()) {
-    skeletonSourceDirUrl = json::value_to<QString>(itUrl->value()).trimmed();
-  } else if (auto itKey = o.find("skeleton_key"); itKey != o.end() && itKey->value().is_string()) {
-    QString skeletonKey = json::value_to<QString>(itKey->value()).trimmed();
-    if (!skeletonKey.endsWith('/')) {
-      skeletonKey += '/';
-    }
-    const QUrl skelDirUrl = QUrl(root).resolved(QUrl(skeletonKey));
-    skeletonSourceDirUrl = skelDirUrl.toString(QUrl::StripTrailingSlash);
-  }
-  if (!skeletonSourceDirUrl.isEmpty() && !skeletonSourceDirUrl.endsWith('/')) {
-    skeletonSourceDirUrl += '/';
-  }
-  if (skeletonSourceDirUrl.isEmpty()) {
-    return std::nullopt;
-  }
-
-  NeuroglancerSkeletonSourceKey out;
-  out.rootUrl = std::move(root);
-  out.skeletonSourceDirUrl = std::move(skeletonSourceDirUrl);
-  out.segmentId = *segOpt;
   return out;
 }
 
@@ -1435,12 +1278,14 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     meshSourceDirUrl = meshSourceDirUrl.trimmed();
     CHECK(!meshSourceDirUrl.isEmpty());
 
-    json::object sourceObj;
-    sourceObj["type"] = "neuroglancer_precomputed_mesh";
-    sourceObj["segmentation_root_url"] = json::value_from(vol->rootUrl());
-    sourceObj["segment_id"] = json::value_from(QString::number(segmentId));
-    sourceObj["mesh_source_url"] = json::value_from(meshSourceDirUrl);
-    const json::value sourceJson = sourceObj;
+    const json::value sourceJson =
+      makeNeuroglancerMeshExternalSourceJson(vol->rootUrl(),
+                                             meshSourceDirUrl,
+                                             segmentId,
+                                             std::array<double, 3>{vol->baseImgInfo().voxelSizeX,
+                                                                   vol->baseImgInfo().voxelSizeY,
+                                                                   vol->baseImgInfo().voxelSizeZ},
+                                             vol->baseVoxelOffset());
 
     // If already loaded, do not re-fetch.
     if (m_doc.doc().meshDoc().findMeshByExternalSource(sourceJson)) {
@@ -1471,60 +1316,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                                                                                        coarse.displayName,
                                                                                        coarse.tooltip,
                                                                                        coarse.sourceJson);
-
-              auto* fineWatcher = new QFutureWatcher<NeuroglancerMeshLoadResult>(this);
-              connect(fineWatcher,
-                      &QFutureWatcher<NeuroglancerMeshLoadResult>::finished,
-                      this,
-                      [this, fineWatcher, meshObjId]() {
-                        const NeuroglancerMeshLoadResult fine = fineWatcher->result();
-                        fineWatcher->deleteLater();
-
-                        if (!fine.error.isEmpty()) {
-                          // Keep the coarse mesh; refinement failures should not be fatal.
-                          VLOG(1) << fmt::format("Neuroglancer mesh refinement failed: {}", fine.error);
-                          return;
-                        }
-                        if (!fine.mesh || fine.mesh->empty()) {
-                          return;
-                        }
-                        if (!m_doc.doc().meshDoc().hasObjWithID(meshObjId)) {
-                          return;
-                        }
-                        m_doc.doc().meshDoc().replaceMeshGeometry(meshObjId, *fine.mesh);
-                      });
-
-              fineWatcher->setFuture(
-                QtConcurrent::run([vol, segmentId, coarse, meshSourceDirUrl]() -> NeuroglancerMeshLoadResult {
-                NeuroglancerMeshLoadResult out;
-                // Reuse metadata (sourceJson/displayName/tooltip) from coarse for consistency.
-                out.sourceJson = coarse.sourceJson;
-                out.displayName = coarse.displayName;
-                out.tooltip = coarse.tooltip;
-                try {
-                  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source =
-                    ZNeuroglancerPrecomputedMeshSource::open(QUrl(meshSourceDirUrl),
-                                                            {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
-                                                            vol->baseVoxelOffset(),
-                                                            vol->defaultTimeout());
-                  CHECK(source);
-                  out.mesh = source->loadMeshBlocking(segmentId, ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest);
-                  if (!out.mesh || out.mesh->empty()) {
-                    out.error =
-                      QString("Neuroglancer mesh refinement returned an empty mesh for segment %1").arg(segmentId);
-                  }
-                }
-                catch (const ZNotFoundException&) {
-                  // Fine LOD missing: keep the coarse mesh.
-                }
-                catch (const ZException& e) {
-                  out.error = QString::fromUtf8(e.what());
-                }
-                catch (const std::exception& e) {
-                  out.error = QString::fromUtf8(e.what());
-                }
-                return out;
-              }));
+              Q_UNUSED(meshObjId);
             });
 
     coarseWatcher->setFuture(
@@ -1604,7 +1396,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
 
     std::set<QString> existingKeys;
     for (const size_t meshId : meshDoc->objs()) {
-      const auto keyOpt = parseNeuroglancerMeshSourceKey(meshDoc->jsonValue(meshId));
+      const auto keyOpt = parseNeuroglancerMeshExternalSourceKey(meshDoc->jsonValue(meshId));
       if (!keyOpt) {
         continue;
       }
@@ -1711,12 +1503,14 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
           tooltip += QString("\nDescription: %1").arg(description);
         }
 
-        json::object sourceObj;
-        sourceObj["type"] = "neuroglancer_precomputed_mesh";
-        sourceObj["segmentation_root_url"] = json::value_from(rootUrl);
-        sourceObj["segment_id"] = json::value_from(QString::number(segmentId));
-        sourceObj["mesh_source_url"] = json::value_from(meshSourceDirUrl);
-        const json::value sourceJson = sourceObj;
+        const json::value sourceJson =
+          makeNeuroglancerMeshExternalSourceJson(rootUrl,
+                                                 meshSourceDirUrl,
+                                                 segmentId,
+                                                 std::array<double, 3>{vol->baseImgInfo().voxelSizeX,
+                                                                       vol->baseImgInfo().voxelSizeY,
+                                                                       vol->baseImgInfo().voxelSizeZ},
+                                                 vol->baseVoxelOffset());
 
         enqueueToUi([meshDocPtr, coarse, displayName, tooltip, sourceJson]() mutable {
           if (QCoreApplication::closingDown() || !meshDocPtr) {
@@ -1731,33 +1525,6 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
 
         existingKeys.insert(keyStr);
         ++loaded;
-
-        // Refine to the highest-detail LOD (best effort).
-        std::shared_ptr<ZMesh> fine;
-        try {
-          fine = source->loadMeshBlocking(segmentId, ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest);
-        }
-        catch (const ZNotFoundException&) {
-          continue;
-        }
-        catch (const std::exception& e) {
-          VLOG(1) << fmt::format("Neuroglancer mesh refinement failed for segment {}: {}", segmentId, e.what());
-          continue;
-        }
-        if (!fine || fine->empty()) {
-          continue;
-        }
-
-        enqueueToUi([meshDocPtr, fine, sourceJson]() mutable {
-          if (QCoreApplication::closingDown() || !meshDocPtr) {
-            return;
-          }
-          const auto idOpt = meshDocPtr->findMeshByExternalSource(sourceJson);
-          if (!idOpt) {
-            return;
-          }
-          meshDocPtr->replaceMeshGeometry(*idOpt, *fine);
-        });
       }
 
       if (loaded == 0 && missing == 0 && skipped == 0 && errors == 0) {
@@ -1892,7 +1659,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
 
     std::set<QString> existingKeys;
     for (const size_t skelId : skeletonDoc->objs()) {
-      const auto keyOpt = parseNeuroglancerSkeletonSourceKey(skeletonDoc->jsonValue(skelId));
+      const auto keyOpt = parseNeuroglancerSkeletonExternalSourceKey(skeletonDoc->jsonValue(skelId));
       if (!keyOpt) {
         continue;
       }
@@ -2256,7 +2023,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         menu.addAction(QString("Load Neuroglancer Annotations for Segment ID… (%1)").arg(topVol->rootUrl()));
       connect(loadAnnByIdAct, &QAction::triggered, this, [topVol, annotationsRootUrl, startAnnotationsLoad]() {
         QString prefill;
-        if (const auto clipOpt = parseUint64Base10(QApplication::clipboard()->text())) {
+        if (const auto clipOpt = parseNeuroglancerUint64Base10(QApplication::clipboard()->text())) {
           prefill = QString::number(*clipOpt);
         }
         const QString s = QInputDialog::getText(QApplication::activeWindow(),
@@ -2268,7 +2035,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         if (s.isEmpty()) {
           return;
         }
-        const auto idOpt = parseUint64Base10(s);
+        const auto idOpt = parseNeuroglancerUint64Base10(s);
         if (!idOpt) {
           QMessageBox::information(QApplication::activeWindow(),
                                    QApplication::applicationName(),
@@ -2312,7 +2079,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         menu.addAction(QString("Load Neuroglancer Mesh for Segment ID… (%1)").arg(topVol->rootUrl()));
     connect(loadMeshByIdAct, &QAction::triggered, this, [topVol, meshSourceDirUrl, startMeshLoad]() {
       QString prefill;
-      if (const auto clipOpt = parseUint64Base10(QApplication::clipboard()->text())) {
+      if (const auto clipOpt = parseNeuroglancerUint64Base10(QApplication::clipboard()->text())) {
         prefill = QString::number(*clipOpt);
       }
       const QString s = QInputDialog::getText(QApplication::activeWindow(),
@@ -2324,7 +2091,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
       if (s.isEmpty()) {
         return;
       }
-      const auto idOpt = parseUint64Base10(s);
+      const auto idOpt = parseNeuroglancerUint64Base10(s);
       if (!idOpt) {
         QMessageBox::information(QApplication::activeWindow(),
                                  QApplication::applicationName(),
@@ -2513,7 +2280,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
               this,
               [topVol, skeletonSourceDirUrl, startSkeletonLoad]() {
         QString prefill;
-        if (const auto clipOpt = parseUint64Base10(QApplication::clipboard()->text())) {
+        if (const auto clipOpt = parseNeuroglancerUint64Base10(QApplication::clipboard()->text())) {
           prefill = QString::number(*clipOpt);
         }
         const QString s = QInputDialog::getText(QApplication::activeWindow(),
@@ -2525,7 +2292,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
         if (s.isEmpty()) {
           return;
         }
-        const auto idOpt = parseUint64Base10(s);
+        const auto idOpt = parseNeuroglancerUint64Base10(s);
         if (!idOpt) {
           QMessageBox::information(QApplication::activeWindow(),
                                    QApplication::applicationName(),
@@ -2772,7 +2539,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
 
         if (meshDocPtr) {
           for (const size_t meshId : meshDocPtr->objs()) {
-            const auto srcOpt = parseNeuroglancerMeshSourceKey(meshDocPtr->jsonValue(meshId));
+            const auto srcOpt = parseNeuroglancerMeshExternalSourceKey(meshDocPtr->jsonValue(meshId));
             if (!srcOpt) {
               continue;
             }
@@ -2808,7 +2575,7 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
 
         if (skeletonDocPtr) {
           for (const size_t skelId : skeletonDocPtr->objs()) {
-            const auto srcOpt = parseNeuroglancerSkeletonSourceKey(skeletonDocPtr->jsonValue(skelId));
+            const auto srcOpt = parseNeuroglancerSkeletonExternalSourceKey(skeletonDocPtr->jsonValue(skelId));
             if (!srcOpt) {
               continue;
             }

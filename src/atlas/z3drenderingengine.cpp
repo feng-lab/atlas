@@ -28,6 +28,7 @@
 #include "z3dgpuinfo.h"
 #include "z3dgl.h"
 #include "z3dfilter.h"
+#include "z3dmeshfilter.h"
 #include "zcancellation.h"
 #include "z3dperfcollector.h"
 #include "zqtexecutor.h"
@@ -1553,6 +1554,29 @@ ZImg Z3DRenderingEngine::localColorBufferToRGBAImg(const Z3DLocalColorBuffer& bu
   return res;
 }
 
+void Z3DRenderingEngine::prepareMeshFiltersForExport(const glm::uvec2& exportSize)
+{
+  finishMeshFiltersForExport();
+  for (auto* filter : m_pipeline) {
+    auto* meshFilter = dynamic_cast<Z3DMeshFilter*>(filter);
+    if (!meshFilter) {
+      continue;
+    }
+    meshFilter->beginExportMeshLod(exportSize);
+    m_exportPreparedMeshFilters.push_back(meshFilter);
+  }
+}
+
+void Z3DRenderingEngine::finishMeshFiltersForExport()
+{
+  for (auto* meshFilter : m_exportPreparedMeshFilters) {
+    if (meshFilter) {
+      meshFilter->endExportMeshLod();
+    }
+  }
+  m_exportPreparedMeshFilters.clear();
+}
+
 void Z3DRenderingEngine::beginScene3DApply()
 {
   // Reset apply session
@@ -1972,6 +1996,12 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
 
     takeScreenShotPrivate(filename, sst);
   } else {
+    m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
+    prepareMeshFiltersForExport(glm::uvec2(width, height));
+    auto meshExportGuard = folly::makeGuard([this]() {
+      finishMeshFiltersForExport();
+    });
+
     // Guard against leaving a tile frustum / compositor rendering region active
     // if the render is cancelled or throws (Vulkan path can propagate cancellation
     // exceptions via linear-script flush). A stale tile frustum can look like a
@@ -2084,6 +2114,12 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   CHECK(width > tileSize || height > tileSize);
   tileBorder = std::max(tileBorder, 16);
 
+  m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
+  prepareMeshFiltersForExport(glm::uvec2(width, height));
+  auto meshExportGuard = folly::makeGuard([this]() {
+    finishMeshFiltersForExport();
+  });
+
   int left = tileStartX;
   int right = std::min(tileStartX + tileSize, width);
   int bottom = tileStartY;
@@ -2146,6 +2182,11 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
     m_isRendering = false;
+  });
+
+  prepareMeshFiltersForExport(m_outputSize);
+  auto meshExportGuard = folly::makeGuard([this]() {
+    finishMeshFiltersForExport();
   });
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());

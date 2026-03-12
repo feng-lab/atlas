@@ -912,7 +912,12 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     CHECK(attemptResult.hasException());
     folly::exception_wrapper error = std::move(attemptResult).exception();
 
-    if (error.is_compatible_with<folly::OperationCancelled>()) {
+    // A superseded render can cancel the request while proxygen is still reading
+    // the response body. In that case some stacks surface a transport/read error
+    // instead of folly::OperationCancelled. Once the request token is cancelled,
+    // treat any failure as cancellation so higher layers reschedule rendering
+    // rather than aborting the whole progressive frame.
+    if (cancellationToken.isCancellationRequested() || error.is_compatible_with<folly::OperationCancelled>()) {
       // Folly coroutines report cancellation via OperationCancelled.
       // Convert to our cancellation type so callers treat it as expected control-flow.
       throw ZCancellationException();

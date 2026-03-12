@@ -3,6 +3,7 @@
 #include "zexception.h"
 #include "zimgdoc.h"
 #include "zlog.h"
+#include "zneuroglancerexternalsource.h"
 #include "zneuroglancerprecomputed.h"
 #include "zneuroglancerprecomputedmesh.h"
 #include "ztheme.h"
@@ -13,6 +14,66 @@
 #include <set>
 
 namespace nim {
+
+namespace {
+
+struct ResolvedNeuroglancerMeshSource
+{
+  QString normalizedRootUrl;
+  QString meshSourceDirUrlForJson;
+  uint64_t segmentId = 0;
+  std::array<double, 3> baseResolutionNm{};
+  std::array<int64_t, 3> baseVoxelOffset{};
+  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source;
+};
+
+[[nodiscard]] ResolvedNeuroglancerMeshSource
+resolveNeuroglancerMeshSource(ZDoc& doc, const ZNeuroglancerMeshExternalSourceKey& key)
+{
+  ResolvedNeuroglancerMeshSource out;
+  out.normalizedRootUrl = key.rootUrl;
+  out.segmentId = key.segmentId;
+
+  std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol;
+  for (const size_t imgId : doc.objsOfDoc(&doc.imgDoc())) {
+    const ZImgPack& pack = doc.imgDoc().imgPack(imgId);
+    if (!pack.isNeuroglancerPrecomputed()) {
+      continue;
+    }
+    if (pack.neuroglancerRootUrl() == out.normalizedRootUrl && pack.neuroglancerVolumeShared()->isSegmentation()) {
+      vol = pack.neuroglancerVolumeShared();
+      break;
+    }
+  }
+  if (!vol) {
+    constexpr std::chrono::milliseconds timeout{30000};
+    vol = ZNeuroglancerPrecomputedVolume::open(out.normalizedRootUrl, timeout);
+  }
+  CHECK(vol);
+
+  if (!key.meshSourceDirUrl.isEmpty()) {
+    out.meshSourceDirUrlForJson = key.meshSourceDirUrl;
+  } else {
+    if (!vol->hasMeshDirectory()) {
+      throw ZException("Neuroglancer volume does not specify a mesh directory");
+    }
+    out.meshSourceDirUrlForJson = vol->meshDirUrl().toString(QUrl::StripTrailingSlash) + "/";
+  }
+
+  out.baseResolutionNm = key.baseResolutionNm.value_or(
+    std::array<double, 3>{vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ});
+  out.baseVoxelOffset = key.baseVoxelOffset.value_or(vol->baseVoxelOffset());
+
+  constexpr std::chrono::milliseconds timeout{30000};
+  out.source = ZNeuroglancerPrecomputedMeshSource::open(QUrl(out.meshSourceDirUrlForJson),
+                                                        out.baseResolutionNm,
+                                                        out.baseVoxelOffset,
+                                                        timeout);
+  CHECK(out.source);
+  return out;
+}
+
+} // namespace
 
 ZMeshDoc::ZMeshDoc(ZDoc& doc)
   : ZObjDoc(doc)
@@ -52,8 +113,8 @@ void ZMeshDoc::replaceMeshGeometry(size_t id, ZMesh& mesh)
   auto& pack = m_idToMeshPacks.at(id);
   pack->mesh.swap(mesh);
   pack->updateDerivedData();
-  m_doc.updateObjInfo(id);
-  Q_EMIT meshChanged(id);
+  packInfoUpdated(pack.get());
+  packGeometryUpdated(pack.get());
 }
 
 void ZMeshDoc::updateExternalMeshMetadata(size_t id, QString displayName, QString tooltip)
@@ -188,35 +249,13 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
         return 0;
       }
 
-      auto rootIt = jo.find("segmentation_root_url");
-      if (rootIt == jo.end() || !rootIt->value().is_string()) {
-        errorMsg = QString("Invalid neuroglancer mesh JSON: missing string field 'segmentation_root_url'");
+      const auto keyOpt = parseNeuroglancerMeshExternalSourceKey(jValue);
+      if (!keyOpt) {
+        errorMsg = QString("Invalid neuroglancer mesh JSON");
         return 0;
       }
-      const QString normalizedRootUrl =
-        ZNeuroglancerPrecomputedVolume::normalizeRootUrl(json::value_to<QString>(rootIt->value()));
-
-      auto segIt = jo.find("segment_id");
-      if (segIt == jo.end() || !segIt->value().is_string()) {
-        errorMsg = QString("Invalid neuroglancer mesh JSON: missing string field 'segment_id'");
-        return 0;
-      }
-      const QString segStr = json::value_to<QString>(segIt->value()).trimmed();
-      bool ok = false;
-      const uint64_t segId = segStr.toULongLong(&ok, 10);
-      if (!ok) {
-        errorMsg = QString("Invalid neuroglancer mesh JSON: segment_id must be base-10 uint64");
-        return 0;
-      }
-
-      QString meshSourceUserText;
-      if (auto itUrl = jo.find("mesh_source_url"); itUrl != jo.end() && itUrl->value().is_string()) {
-        meshSourceUserText = json::value_to<QString>(itUrl->value()).trimmed();
-      } else if (auto itKey = jo.find("mesh_key"); itKey != jo.end() && itKey->value().is_string()) {
-        meshSourceUserText = json::value_to<QString>(itKey->value()).trimmed();
-      }
-
-      const auto lodPolicy = ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest;
+      const auto& key = *keyOpt;
+      const uint64_t segId = key.segmentId;
 
       // Deduplicate before performing any network work.
       for (const auto& idPack : m_idToMeshPacks) {
@@ -225,80 +264,29 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
         }
       }
 
-      // Try to reuse an already-opened segmentation volume.
-      std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol;
-      for (const size_t imgId : m_doc.objsOfDoc(&m_doc.imgDoc())) {
-        const ZImgPack& pack = m_doc.imgDoc().imgPack(imgId);
-        if (!pack.isNeuroglancerPrecomputed()) {
-          continue;
-        }
-        if (pack.neuroglancerRootUrl() == normalizedRootUrl && pack.neuroglancerVolumeShared()->isSegmentation()) {
-          vol = pack.neuroglancerVolumeShared();
-          break;
-        }
-      }
-      if (!vol) {
-        constexpr std::chrono::milliseconds timeout{30000};
-        vol = ZNeuroglancerPrecomputedVolume::open(normalizedRootUrl, timeout);
-      }
-
-      std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source;
-      QString meshSourceDirUrlForJson;
-      if (!meshSourceUserText.isEmpty()) {
-        QString s = meshSourceUserText.trimmed();
-        if (s.contains("://") || s.startsWith("gs://")) {
-          try {
-            s = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(s));
-          }
-          catch (const std::exception&) {
-            errorMsg = QString("Invalid neuroglancer mesh JSON: mesh_source_url is not a valid URL");
-            return 0;
-          }
-        } else {
-          if (!s.endsWith('/')) {
-            s += '/';
-          }
-          const QUrl dirUrl = QUrl(vol->rootUrl()).resolved(QUrl(s));
-          s = dirUrl.toString(QUrl::StripTrailingSlash);
-        }
-        if (!s.endsWith('/')) {
-          s += '/';
-        }
-        meshSourceDirUrlForJson = s;
-
-        constexpr std::chrono::milliseconds timeout{30000};
-        std::array<double, 3> baseRes{vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ};
-        source = ZNeuroglancerPrecomputedMeshSource::open(QUrl(meshSourceDirUrlForJson), baseRes, vol->baseVoxelOffset(), timeout);
-      } else if (vol->hasMeshDirectory()) {
-        source = vol->loadMeshSourceBlocking();
-        meshSourceDirUrlForJson = vol->meshDirUrl().toString(QUrl::StripTrailingSlash) + "/";
-      } else {
-        errorMsg = QString("Neuroglancer volume does not specify a mesh directory");
-        return 0;
-      }
-
-      CHECK(source);
-      std::shared_ptr<ZMesh> mesh = source->loadMeshBlocking(segId, lodPolicy);
+      const ResolvedNeuroglancerMeshSource resolved = resolveNeuroglancerMeshSource(m_doc, key);
+      const auto lodPolicy = resolved.source->supportsRuntimeLod()
+                               ? ZNeuroglancerPrecomputedMeshSource::LodPolicy::Coarsest
+                               : ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest;
+      std::shared_ptr<ZMesh> mesh = resolved.source->loadMeshBlocking(segId, lodPolicy);
       if (!mesh || mesh->empty()) {
         errorMsg = QString("Loaded neuroglancer mesh is empty");
         return 0;
       }
 
       // Normalize persisted JSON to keep it stable across save/load cycles.
-      json::object normalized;
-      normalized["type"] = "neuroglancer_precomputed_mesh";
-      normalized["segmentation_root_url"] = json::value_from(normalizedRootUrl);
-      normalized["segment_id"] = json::value_from(QString::number(segId));
-      if (!meshSourceDirUrlForJson.isEmpty()) {
-        normalized["mesh_source_url"] = json::value_from(meshSourceDirUrlForJson);
-      }
+      const json::value normalized = makeNeuroglancerMeshExternalSourceJson(resolved.normalizedRootUrl,
+                                                                            resolved.meshSourceDirUrlForJson,
+                                                                            segId,
+                                                                            resolved.baseResolutionNm,
+                                                                            resolved.baseVoxelOffset);
 
       return addMeshFromExternalSource(*mesh,
-                                      QString("NG Mesh %1").arg(segId),
-                                      QString("Neuroglancer precomputed mesh\nSegmentation: %1\nSegment: %2")
-                                        .arg(normalizedRootUrl)
-                                        .arg(segId),
-                                      normalized);
+                                       QString("NG Mesh %1").arg(segId),
+                                       QString("Neuroglancer precomputed mesh\nSegmentation: %1\nSegment: %2")
+                                         .arg(resolved.normalizedRootUrl)
+                                         .arg(segId),
+                                       normalized);
     }
 
     if (asQString(jValue).trimmed().isEmpty()) {
@@ -443,53 +431,11 @@ bool ZMeshDoc::isSameObj(const json::value& v1, const json::value& v2) const
   }
 
   if (v1.is_object() && v2.is_object()) {
-    auto keyFor = [](const json::object& o) -> std::optional<QString> {
-      auto itType = o.find("type");
-      if (itType == o.end() || !itType->value().is_string()) {
-        return std::nullopt;
-      }
-      const QString type = json::value_to<QString>(itType->value()).trimmed();
-      if (type != "neuroglancer_precomputed_mesh") {
-        return std::nullopt;
-      }
-
-      auto itRoot = o.find("segmentation_root_url");
-      auto itSeg = o.find("segment_id");
-      if (itRoot == o.end() || !itRoot->value().is_string() || itSeg == o.end() || !itSeg->value().is_string()) {
-        return std::nullopt;
-      }
-
-      QString root = json::value_to<QString>(itRoot->value());
-      try {
-        root = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(root));
-      }
-      catch (...) {
-        return std::nullopt;
-      }
-
-      const QString seg = json::value_to<QString>(itSeg->value()).trimmed();
-
-      QString meshSourceDirUrl;
-      if (auto itUrl = o.find("mesh_source_url"); itUrl != o.end() && itUrl->value().is_string()) {
-        meshSourceDirUrl = json::value_to<QString>(itUrl->value()).trimmed();
-      } else if (auto itMeshKey = o.find("mesh_key"); itMeshKey != o.end() && itMeshKey->value().is_string()) {
-        QString meshKey = json::value_to<QString>(itMeshKey->value()).trimmed();
-        if (!meshKey.endsWith('/')) {
-          meshKey += '/';
-        }
-        const QUrl meshDirUrl = QUrl(root).resolved(QUrl(meshKey));
-        meshSourceDirUrl = meshDirUrl.toString(QUrl::StripTrailingSlash);
-      }
-      if (!meshSourceDirUrl.isEmpty() && !meshSourceDirUrl.endsWith('/')) {
-        meshSourceDirUrl += '/';
-      }
-
-      return QString("%1|%2|%3|%4").arg(type, root, seg, meshSourceDirUrl);
-    };
-
-    const auto k1 = keyFor(v1.as_object());
-    const auto k2 = keyFor(v2.as_object());
-    return k1 && k2 && *k1 == *k2;
+    const auto k1 = parseNeuroglancerMeshExternalSourceKey(v1);
+    const auto k2 = parseNeuroglancerMeshExternalSourceKey(v2);
+    return k1 && k2 &&
+           neuroglancerMeshKeyString(k1->rootUrl, k1->meshSourceDirUrl, k1->segmentId) ==
+             neuroglancerMeshKeyString(k2->rootUrl, k2->meshSourceDirUrl, k2->segmentId);
   }
 
   return false;
@@ -632,7 +578,27 @@ void ZMeshDoc::createActions()
 bool ZMeshDoc::saveMesh(MeshPack* pack, const QString& fileName, QString& errorMsg, const std::string& format)
 {
   try {
-    pack->mesh.save(fileName, format);
+    std::optional<ZMesh> materializedMesh;
+    if (!pack->sourceJson.is_null()) {
+      if (const auto keyOpt = parseNeuroglancerMeshExternalSourceKey(pack->sourceJson)) {
+        const ResolvedNeuroglancerMeshSource resolved = resolveNeuroglancerMeshSource(m_doc, *keyOpt);
+        std::shared_ptr<ZMesh> fullMesh =
+          resolved.source->loadMeshBlocking(resolved.segmentId, ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest);
+        if (!fullMesh || fullMesh->empty()) {
+          throw ZException("Loaded neuroglancer mesh is empty");
+        }
+        materializedMesh.emplace();
+        materializedMesh->swap(*fullMesh);
+      }
+    }
+
+    if (materializedMesh) {
+      materializedMesh->save(fileName, format);
+      pack->mesh.swap(*materializedMesh);
+    } else {
+      pack->mesh.save(fileName, format);
+    }
+
     pack->path = QFileInfo(fileName).canonicalFilePath();
     pack->sourceJson = {};
     pack->displayNameOverride.clear();
@@ -642,6 +608,8 @@ bool ZMeshDoc::saveMesh(MeshPack* pack, const QString& fileName, QString& errorM
 
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
+    packInfoUpdated(pack);
+    packGeometryUpdated(pack);
     return true;
   }
   catch (const ZException& e) {
@@ -655,6 +623,15 @@ void ZMeshDoc::packInfoUpdated(MeshPack* pack)
   for (const auto& idPack : m_idToMeshPacks) {
     if (idPack.second.get() == pack) {
       m_doc.updateObjInfo(idPack.first);
+    }
+  }
+}
+
+void ZMeshDoc::packGeometryUpdated(MeshPack* pack)
+{
+  for (const auto& idPack : m_idToMeshPacks) {
+    if (idPack.second.get() == pack) {
+      Q_EMIT meshChanged(idPack.first);
     }
   }
 }

@@ -146,6 +146,8 @@ private:
   // notify obj manager about the update
   void packInfoUpdated(MeshPack* pack);
 
+  void packGeometryUpdated(MeshPack* pack);
+
 private:
   std::map<size_t, std::shared_ptr<MeshPack>> m_idToMeshPacks;
 

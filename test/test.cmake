@@ -105,6 +105,7 @@ endif ()
 add_atlas_vulkan_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_core_gtest_executable(zneuroglanceruint64shardingtest)
 add_atlas_core_gtest_executable(zneuroglancerstatetest)
+add_atlas_vulkan_gtest_executable(zneuroglancerprecomputedmeshtest)
 
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
 # the large atlas_lib link cost multiple times. This currently includes:
