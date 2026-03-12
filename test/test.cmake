@@ -103,8 +103,6 @@ endif ()
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
 add_atlas_vulkan_gtest_executable(zvulkanpipelinecontexttest)
-add_atlas_core_gtest_executable(zneuroglanceruint64shardingtest)
-add_atlas_vulkan_gtest_executable(zneuroglancerprecomputedmeshtest)
 
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
 # the large atlas_lib link cost multiple times. This currently includes:
@@ -134,6 +132,8 @@ else ()
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedskeletontest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputede2etest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerstatetest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedmeshtest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglanceruint64shardingtest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zimgdiskcacheentrytest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
   # This test suite does not depend on Vulkan. Avoid linking atlas_vulkan to keep
