@@ -26,6 +26,14 @@ class Z3DMainWindow : public QMainWindow
   Q_OBJECT
 
 public:
+  struct CanvasSizeInfo
+  {
+    int logicalWidth = 0;
+    int logicalHeight = 0;
+    int physicalWidth = 0;
+    int physicalHeight = 0;
+  };
+
   explicit Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView = false, QWidget* parent = nullptr);
 
   ~Z3DMainWindow() override;
@@ -39,6 +47,10 @@ public:
   {
     return m_engine;
   }
+
+  [[nodiscard]] CanvasSizeInfo canvasSizeInfo() const;
+
+  [[nodiscard]] CanvasSizeInfo setCanvasLogicalSize(int logicalWidth, int logicalHeight);
 
   void openEditWidget(size_t id);
 

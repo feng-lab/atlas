@@ -2434,6 +2434,52 @@ class SceneClient:
             out["error"] = err
         return out
 
+    def set_3d_canvas_size(
+        self,
+        *,
+        logical_width: int,
+        logical_height: int,
+    ) -> dict[str, Any]:
+        """Resize the live 3D canvas in logical Qt pixels.
+
+        Returns:
+          {
+            "ok": bool,
+            "logical_width": int,
+            "logical_height": int,
+            "physical_width": int,
+            "physical_height": int,
+            "error"?: str,
+          }
+        """
+
+        self.ensure_view()
+
+        if self._stub is None or not hasattr(self._stub, "Set3DCanvasSize"):
+            raise RuntimeError("Set3DCanvasSize is not supported by this Atlas version")
+
+        req = self._pb2.Set3DCanvasSizeRequest(
+            logical_width=int(logical_width),
+            logical_height=int(logical_height),
+        )
+        resp = self._stub.Set3DCanvasSize(
+            req, timeout=float(DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC)
+        )
+        self._log_rpc("Set3DCanvasSize", req, resp)
+
+        ok = bool(getattr(resp, "ok", False))
+        out: dict[str, Any] = {
+            "ok": ok,
+            "logical_width": int(getattr(resp, "logical_width", 0) or 0),
+            "logical_height": int(getattr(resp, "logical_height", 0) or 0),
+            "physical_width": int(getattr(resp, "physical_width", 0) or 0),
+            "physical_height": int(getattr(resp, "physical_height", 0) or 0),
+        }
+        err = str(getattr(resp, "error", "") or "")
+        if (not ok) and err:
+            out["error"] = err
+        return out
+
     # Cuts
     def cut_set_box(
         self,

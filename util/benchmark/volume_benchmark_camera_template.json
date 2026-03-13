@@ -1,0 +1,89 @@
+{
+  "viewport": {
+               "width": 2000,
+               "height": 1500
+  },
+  "states": {
+               "open": {
+      "projection": "Perspective",
+      "eye": [
+        0.0,
+        0.0,
+        600.0
+      ],
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "up": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "field_of_view_degrees": 30.0
+    }, "rotate_end": {
+      "projection": "Perspective",
+      "eye": [
+        180.0,
+        100.0,
+        520.0
+      ],
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "up": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "field_of_view_degrees": 30.0
+    }, "zoom_end": {
+      "projection": "Perspective",
+      "eye": [
+        180.0,
+        100.0,
+        220.0
+      ],
+      "center": [
+        30.0,
+        20.0,
+        0.0
+      ],
+      "up": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "field_of_view_degrees": 30.0
+    }
+  },
+  "actions": [
+    {
+               "name": "open",
+               "kind": "jump",
+               "state": "open",
+               "settle_seconds": 2.0
+    },
+    {
+               "name": "rotate",
+               "kind": "interpolate",
+               "from_state": "open",
+               "to_state": "rotate_end",
+               "duration_seconds": 0.5,
+               "steps": 30,
+               "settle_seconds": 2.0
+    },
+    {
+               "name": "zoom",
+               "kind": "interpolate",
+               "from_state": "rotate_end",
+               "to_state": "zoom_end",
+               "duration_seconds": 0.5,
+               "steps": 30,
+               "settle_seconds": 2.0
+    }
+  ]
+}

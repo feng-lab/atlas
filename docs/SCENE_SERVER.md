@@ -34,6 +34,11 @@ The Atlas GUI hosts the gRPC service `atlas.rpc.Scene` for live control.
   - `ok=true` when the 3D rendering engine is initialized and ready.
 - `Ensure3DWindow() -> { ok }`
   - Opens a 3D window/canvas when needed so the rendering engine can initialize.
+- `Set3DCanvasSize({ logical_width, logical_height }) -> { ok, logical_width, logical_height, physical_width, physical_height, error? }`
+  - Resizes the live 3D canvas in logical Qt pixels and returns the actual logical/physical size after layout.
+  - This controls the on-screen render size of the 3D window.
+  - On Retina/HiDPI displays, `physical_*` is typically `logical_* * device_pixel_ratio`.
+  - Example: on a 2x Retina display, request `1000 x 750` logical to get about `2000 x 1500` physical rendering.
 - `GetStatus({ ids?, include_all_objects? }) -> { ok, doc_ready, engine_ready, has_3d_window, objects[] }`
   - A structured readiness snapshot intended for deterministic agent orchestration.
   - `doc_ready` indicates the GUI document is registered with the RPC service.
@@ -188,6 +193,10 @@ Use these to edit base scene state (no time/easing; **does not** write keyframes
   - If `path` is omitted/empty, the server writes a `.png` into the OS temp directory.
   - If `path` is provided, the output format is inferred from the file extension (PNG recommended for LLM visual verification).
   - Does **not** create an animation or write keyframes (preferred for verification screenshots).
+- `Set3DCanvasSize { logical_width, logical_height } -> { ok, logical_width, logical_height, physical_width, physical_height, error? }`
+  - Resizes the live 3D window’s central `Z3DCanvas`.
+  - Unlike `TakeScreenshot3D`, this affects interactive rendering, timer logs, and benchmarked live-window behavior.
+  - The returned `physical_*` values let clients confirm the true render size on HiDPI screens.
 - `SetVisibility { ids, on } -> { ok }`
 - `RemoveObjects { ids, allow_unsaved? } -> { ok }`
   - By default, fails if any object has unsaved changes (no modal prompts in RPC).

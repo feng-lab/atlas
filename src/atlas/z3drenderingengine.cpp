@@ -41,6 +41,7 @@
 #include <QMetaObject>
 #include <QTimer>
 #include <QThread>
+#include <chrono>
 #include <memory>
 
 DEFINE_bool(atlas_debug_opengl,
@@ -53,6 +54,10 @@ DEFINE_string(atlas_default_render_backend,
               "opengl",
               "Default 3D rendering backend at startup. Values: opengl, vulkan. "
               "This sets the initial value of the 'Render Backend' global parameter; it can be changed in the UI.");
+
+DEFINE_bool(atlas_log_benchmark_render_timings,
+            false,
+            "Log simple deterministic benchmark timings at fast-preview and final-render completion.");
 
 DECLARE_string(output_image_name_prefix);
 DECLARE_int32(output_image_name_field_width);
@@ -1865,6 +1870,7 @@ void Z3DRenderingEngine::getGLFocus()
 
 void Z3DRenderingEngine::renderFast(bool stereo)
 {
+  const auto benchmarkStart = std::chrono::steady_clock::now();
   if (m_isRendering) {
     LOG(INFO) << "in fast rendering, schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
@@ -1919,6 +1925,17 @@ void Z3DRenderingEngine::renderFast(bool stereo)
     LOG(INFO) << e.what();
   }
 
+  if (FLAGS_atlas_log_benchmark_render_timings) {
+    const double elapsedMs =
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - benchmarkStart).count();
+    LOG(INFO) << "ATLAS_BENCHMARK_FAST_PREVIEW_DONE"
+              << " elapsed_ms=" << elapsedMs << " progress=" << m_progress;
+    if (m_progress >= 1.0) {
+      LOG(INFO) << "ATLAS_BENCHMARK_RENDER_FINISHED"
+                << " elapsed_ms=" << elapsedMs << " progress=" << m_progress << " source=renderFast";
+    }
+  }
+
   Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
   if (m_progress < 1.) {
     QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
@@ -1929,6 +1946,7 @@ void Z3DRenderingEngine::renderFast(bool stereo)
 
 void Z3DRenderingEngine::render(bool stereo)
 {
+  const auto benchmarkStart = std::chrono::steady_clock::now();
   CHECK(!m_isRendering);
   CHECK(!Z3DRenderGlobalState::instance().hasCancellationSource());
 
@@ -1958,6 +1976,12 @@ void Z3DRenderingEngine::render(bool stereo)
   }
   catch (const ZException& e) {
     LOG(INFO) << e.what();
+  }
+  if (FLAGS_atlas_log_benchmark_render_timings && m_progress >= 1.0) {
+    const double elapsedMs =
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - benchmarkStart).count();
+    LOG(INFO) << "ATLAS_BENCHMARK_RENDER_FINISHED"
+              << " elapsed_ms=" << elapsedMs << " progress=" << m_progress << " source=render";
   }
   Q_EMIT progressChanged(100);
   Z3DRenderGlobalState::instance().resetCancellationSource();

@@ -219,6 +219,50 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::ensure3DWindow()
   return out;
 }
 
+ZRpcUiDispatcher::CanvasSizeResult ZRpcUiDispatcher::set3DCanvasSize(int logicalWidth, int logicalHeight)
+{
+  CanvasSizeResult out;
+
+  if (logicalWidth <= 0 || logicalHeight <= 0) {
+    out.ok = false;
+    out.errorKind = ErrorKind::InvalidArgument;
+    out.error = "set_3d_canvas_size: logical_width and logical_height must be > 0";
+    return out;
+  }
+
+  const BoolResult ensured = ensure3DWindow();
+  if (!ensured.ok) {
+    out.ok = false;
+    out.errorKind = ensured.errorKind;
+    out.error = ensured.error.empty() ? "set_3d_canvas_size: failed to ensure 3D window" : ensured.error;
+    return out;
+  }
+
+  ZMainWindow* mainWin = mainWindowUi();
+  if (!mainWin) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "set_3d_canvas_size: main window not ready";
+    return out;
+  }
+
+  Z3DMainWindow* w3d = mainWin->get3DWindow();
+  if (!w3d) {
+    out.ok = false;
+    out.errorKind = ErrorKind::FailedPrecondition;
+    out.error = "set_3d_canvas_size: 3D window not ready";
+    return out;
+  }
+
+  const Z3DMainWindow::CanvasSizeInfo sizeInfo = w3d->setCanvasLogicalSize(logicalWidth, logicalHeight);
+  out.ok = true;
+  out.logicalWidth = sizeInfo.logicalWidth;
+  out.logicalHeight = sizeInfo.logicalHeight;
+  out.physicalWidth = sizeInfo.physicalWidth;
+  out.physicalHeight = sizeInfo.physicalHeight;
+  return out;
+}
+
 bool ZRpcUiDispatcher::engineReady() const
 {
   CHECK(QCoreApplication::instance());

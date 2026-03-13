@@ -241,6 +241,9 @@ service Scene {
   rpc EngineReady (Empty) returns (Bool);
   // Ensure a 3D window/canvas is open so the rendering engine can initialize.
   rpc Ensure3DWindow (Empty) returns (Bool);
+  // Resize the live 3D canvas in logical Qt pixels and return the actual
+  // logical and physical size after layout.
+  rpc Set3DCanvasSize(Set3DCanvasSizeRequest) returns (Set3DCanvasSizeResponse);
   // Return basic readiness state for the RPC server, document, and 3D engine.
   // Optionally includes per-object readiness (view bound) for deterministic tool use.
   rpc GetStatus (GetStatusRequest) returns (GetStatusResponse);
@@ -378,6 +381,24 @@ message ScreenshotResponse {
   bool ok = 1;
   string path = 2;
   string error = 3;
+}
+
+message Set3DCanvasSizeRequest
+{
+  // Requested live 3D canvas size in logical Qt pixels. On HiDPI displays the
+  // actual physical render size is logical_size * device_pixel_ratio.
+  uint32 logical_width = 1;
+  uint32 logical_height = 2;
+}
+
+message Set3DCanvasSizeResponse
+{
+  bool ok = 1;
+  uint32 logical_width = 2;
+  uint32 logical_height = 3;
+  uint32 physical_width = 4;
+  uint32 physical_height = 5;
+  string error = 6;
 }
 
 // Camera helper messages

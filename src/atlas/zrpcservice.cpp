@@ -115,6 +115,8 @@ using atlas::rpc::GetParamValuesResponse;
 using atlas::rpc::SaveSceneRequest;
 using atlas::rpc::ScreenshotRequest;
 using atlas::rpc::ScreenshotResponse;
+using atlas::rpc::Set3DCanvasSizeRequest;
+using atlas::rpc::Set3DCanvasSizeResponse;
 using atlas::rpc::ClearKeysRequest;
 using atlas::rpc::RemoveKeyRequest;
 using atlas::rpc::BatchSetKey;
@@ -1179,6 +1181,48 @@ public:
     }
 
     reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status Set3DCanvasSize(ServerContext* grpcContext,
+                         const Set3DCanvasSizeRequest* req,
+                         Set3DCanvasSizeResponse* reply) override
+  {
+    CHECK(req);
+    CHECK(reply);
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      reply->set_ok(false);
+      reply->set_error("set_3d_canvas_size: ui dispatcher not ready");
+      return Status::OK;
+    }
+
+    const int logicalWidth = static_cast<int>(req->logical_width());
+    const int logicalHeight = static_cast<int>(req->logical_height());
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, logicalWidth, logicalHeight]() {
+        return disp->set3DCanvasSize(logicalWidth, logicalHeight);
+      },
+      "set_3d_canvas_size");
+    if (!inv.ok) {
+      reply->set_ok(false);
+      reply->set_error(inv.error);
+      return Status::OK;
+    }
+
+    const auto& r = inv.value;
+    reply->set_ok(r.ok);
+    reply->set_logical_width(static_cast<uint32_t>(std::max(r.logicalWidth, 0)));
+    reply->set_logical_height(static_cast<uint32_t>(std::max(r.logicalHeight, 0)));
+    reply->set_physical_width(static_cast<uint32_t>(std::max(r.physicalWidth, 0)));
+    reply->set_physical_height(static_cast<uint32_t>(std::max(r.physicalHeight, 0)));
+    if (!r.error.empty()) {
+      reply->set_error(r.error);
+    }
     return Status::OK;
   }
 

@@ -58,6 +58,19 @@ public:
 
   [[nodiscard]] BoolResult ensure3DWindow();
 
+  struct CanvasSizeResult
+  {
+    bool ok = false;
+    ErrorKind errorKind = ErrorKind::FailedPrecondition;
+    std::string error;
+    int logicalWidth = 0;
+    int logicalHeight = 0;
+    int physicalWidth = 0;
+    int physicalHeight = 0;
+  };
+
+  [[nodiscard]] CanvasSizeResult set3DCanvasSize(int logicalWidth, int logicalHeight);
+
   // Returns true when a 3D window exists and its rendering engine thread is running.
   // This does NOT create a 3D window; use ensure3DWindow() for that.
   [[nodiscard]] bool engineReady() const;

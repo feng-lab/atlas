@@ -118,6 +118,46 @@ Z3DMainWindow::~Z3DMainWindow()
   }
 }
 
+Z3DMainWindow::CanvasSizeInfo Z3DMainWindow::canvasSizeInfo() const
+{
+  CHECK(m_canvas);
+  const glm::uvec2 logical = m_canvas->logicalSize();
+  const glm::uvec2 physical = m_canvas->physicalSize();
+  CanvasSizeInfo out;
+  out.logicalWidth = static_cast<int>(logical.x);
+  out.logicalHeight = static_cast<int>(logical.y);
+  out.physicalWidth = static_cast<int>(physical.x);
+  out.physicalHeight = static_cast<int>(physical.y);
+  return out;
+}
+
+Z3DMainWindow::CanvasSizeInfo Z3DMainWindow::setCanvasLogicalSize(int logicalWidth, int logicalHeight)
+{
+  CHECK(m_canvas);
+  CHECK(logicalWidth > 0);
+  CHECK(logicalHeight > 0);
+  CHECK(QThread::currentThread() == thread());
+
+  showNormal();
+  raise();
+  activateWindow();
+
+  const QSize targetCanvas(logicalWidth, logicalHeight);
+  for (int attempt = 0; attempt < 3; ++attempt) {
+    const QSize currentCanvas = m_canvas->size();
+    if (currentCanvas == targetCanvas) {
+      break;
+    }
+
+    const QSize currentWindow = size();
+    const QSize targetWindow(currentWindow.width() + (targetCanvas.width() - currentCanvas.width()),
+                             currentWindow.height() + (targetCanvas.height() - currentCanvas.height()));
+    resize(targetWindow);
+  }
+
+  return canvasSizeInfo();
+}
+
 void Z3DMainWindow::openEditWidget(size_t id)
 {
   ZObjDoc* doc = m_doc.idToDoc(id);
