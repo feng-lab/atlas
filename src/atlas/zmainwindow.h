@@ -172,8 +172,6 @@ private:
 
   void writeSettings();
 
-  bool maybeSave();
-
   // void loadWorkspace(const QString &fileName);
   // bool saveFile(const QString &fileName);
   // void setCurrentFile(const QString &fileName);

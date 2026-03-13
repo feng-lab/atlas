@@ -58,6 +58,7 @@
 #include <QDir>
 #include <QCoreApplication>
 #include <QProcess>
+#include <QPushButton>
 #include <QSignalBlocker>
 #include <QSignalSpy>
 #include <QTimer>
@@ -225,23 +226,21 @@ void ZMainWindow::closeEvent(QCloseEvent* event)
     return;
   }
 
+  if (m_doc != nullptr && !m_doc->canClose(this)) {
+    event->ignore();
+    return;
+  }
+
   delete m_3dWindow.data();
   m_3dWindow.clear();
 
-  if (maybeSave()) {
-    if (m_doc) {
-      m_doc->cancelAllBackgroundTasksAndWait();
-    }
-    delete m_editObjDockWidget;
-    writeSettings();
-    event->accept();
-    // otherwise it is very slow to close the application
-    m_view.reset();
-    m_doc.reset();
-    m_isClosed = true;
-  } else {
-    event->ignore();
-  }
+  delete m_editObjDockWidget;
+  writeSettings();
+  event->accept();
+  // otherwise it is very slow to close the application
+  m_view.reset();
+  m_doc.reset();
+  m_isClosed = true;
 }
 
 void ZMainWindow::dragEnterEvent(QDragEnterEvent* event)
@@ -1017,11 +1016,6 @@ void ZMainWindow::writeSettings()
   QSettings settings;
   settings.setValue("pos", pos());
   settings.setValue("size", size());
-}
-
-bool ZMainWindow::maybeSave()
-{
-  return m_doc->saveOrDiscard(m_doc->objs());
 }
 
 // void ZMainWindow::loadWorkspace(const QString &fileName)

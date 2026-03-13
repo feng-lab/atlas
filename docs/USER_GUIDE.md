@@ -939,6 +939,8 @@ In the Auto Trace dialog:
 2. Atlas opens the **Tasks** dock (right side) and shows the running background task with:
    - A progress bar (estimated for tracing tasks)
    - A **Cancel** button (Auto Trace cancellation is supported; it stops at safe points in the algorithm)
+3. If you try to quit Atlas while background tasks are still active, Atlas asks whether to
+   **Cancel Tasks and Quit** or **Keep Atlas Open** so the tasks can continue running.
 
 When the task finishes:
 

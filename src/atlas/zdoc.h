@@ -267,9 +267,9 @@ public:
     return *m_backgroundTaskManager;
   }
 
-  // Called during application shutdown: request cancellation for all tracked background tasks and
-  // wait for their work to finish before tearing down core objects.
-  void cancelAllBackgroundTasksAndWait();
+  // Called during application shutdown. Handles unsaved-change prompts and active background-task
+  // cancellation prompts. Returns false when shutdown should be aborted.
+  bool canClose(QWidget* parent);
 
   void hideAnimation3DView();
 
@@ -350,6 +350,11 @@ private:
   void create2DAnimation();
 
   void create3DAnimation();
+
+  // Called during application shutdown after the user has confirmed Atlas may close: request
+  // cancellation for all tracked background tasks and wait for their work to finish before core
+  // objects are torn down.
+  void cancelAllBackgroundTasksAndWait();
 
 private:
   struct DocPack

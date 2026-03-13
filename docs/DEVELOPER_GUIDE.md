@@ -101,6 +101,9 @@ Background Tasks and Cancellation
 - Long-running operations (including Auto Trace) run as background tasks so the UI stays responsive:
   - Task management: `ZBackgroundTaskManager` (`src/atlas/zbackgroundtaskmanager.*`)
   - UI: `ZBackgroundTaskManagerWidget` (`src/atlas/zbackgroundtaskmanagerwidget.*`)
+  - Application shutdown prompt: `ZDoc::canClose(...)` owns the close-time unsaved-change prompt,
+    background-task prompt, and shutdown drain so the main window does not need direct
+    task-manager logic.
 - Cancellation is threaded through tracing code using `folly::CancellationToken` and checked at safe points (see `maybeCancel(...)` in
   `src/img/zcancellation.*` and the tracing loops in `src/img/zneutubetrace*.cpp`).
   - Auto-trace seed sorting now prepares per-seed fits with a bounded rolling window on `folly::getGlobalCPUExecutor()`, then

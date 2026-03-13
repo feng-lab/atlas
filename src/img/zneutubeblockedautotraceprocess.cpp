@@ -653,6 +653,21 @@ makeDeltaNode(int64_t id, int64_t parentId, const LocalNeuroseg& locseg, glm::dv
   return d;
 }
 
+void rebuildNodeByIdFromSwcOrThrow(ZSwc& swc, std::unordered_map<int64_t, ZSwc::SwcTreeNode>& nodeById)
+{
+  nodeById.clear();
+  nodeById.reserve(swc.size() * 2 + 1);
+  for (auto it = swc.begin(); it != swc.end(); ++it) {
+    if (it->id <= 0) {
+      throw ZException(fmt::format("Blocked auto trace: invalid SWC node id in live state: {}", it->id));
+    }
+    auto [insertedIt, inserted] = nodeById.emplace(it->id, it);
+    if (!inserted) {
+      throw ZException(fmt::format("Blocked auto trace: duplicate SWC node id in live state: {}", insertedIt->first));
+    }
+  }
+}
+
 void appendDeltaNodeToSwcOrThrow(const ZBlockedAutoTraceSwcDeltaNode& d,
                                  ZSwc& swc,
                                  std::unordered_map<int64_t, ZSwc::SwcTreeNode>& nodeById)
@@ -1963,8 +1978,11 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
               CHECK(branchRootIt != state.nodeById.end());
               const ZSwc::SwcTreeNode branchRoot = branchRootIt->second;
               connectBranchToHostLegacyLike(state.swc, attachHostRoots, branchRoot, signal, signalOrigin, &connResult);
-              if (connResult.removedNodeId > 0) {
-                state.nodeById.erase(connResult.removedNodeId);
+              if (connResult.hookId > 0 || connResult.removedNodeId > 0) {
+                // Branch attachment can re-root the branch and erase the original hook node.
+                // Refresh the live id->node cache from the current SWC before we read back the
+                // just-appended nodes into deltaNodes / geometry indices.
+                rebuildNodeByIdFromSwcOrThrow(state.swc, state.nodeById);
               }
             }
 

@@ -33,6 +33,7 @@
 #include <QDir>
 #include <QMenu>
 #include <QClipboard>
+#include <QPushButton>
 
 namespace nim {
 
@@ -44,6 +45,40 @@ bool looksLikeNetworkUrl(const QString& s)
   return trimmed.startsWith("precomputed://", Qt::CaseInsensitive) || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
          trimmed.startsWith("s3://", Qt::CaseInsensitive) ||
          trimmed.startsWith("http://", Qt::CaseInsensitive) || trimmed.startsWith("https://", Qt::CaseInsensitive);
+}
+
+[[nodiscard]] size_t countActiveBackgroundTasks(const ZBackgroundTaskManager& manager)
+{
+  size_t activeTaskCount = 0;
+  for (const ZBackgroundTask* task : manager.tasks()) {
+    if (task != nullptr && !task->isTerminal()) {
+      ++activeTaskCount;
+    }
+  }
+  return activeTaskCount;
+}
+
+[[nodiscard]] bool confirmCancelBackgroundTasksForClose(QWidget* parent, ZBackgroundTaskManager& manager)
+{
+  const size_t activeTaskCount = countActiveBackgroundTasks(manager);
+  if (activeTaskCount == 0) {
+    return true;
+  }
+
+  QMessageBox box(parent);
+  box.setIcon(QMessageBox::Warning);
+  box.setWindowTitle(QObject::tr("Cancel Background Tasks?"));
+  box.setText(
+    QObject::tr("Atlas has %n background task still in progress.", nullptr, static_cast<int>(activeTaskCount)));
+  box.setInformativeText(QObject::tr("If you quit now, Atlas will cancel the active tasks and then close. "
+                                     "Choose Keep Atlas Open to let them continue running."));
+  auto* cancelTasksAndQuitButton = box.addButton(QObject::tr("Cancel Tasks and Quit"), QMessageBox::AcceptRole);
+  auto* keepAtlasOpenButton = box.addButton(QObject::tr("Keep Atlas Open"), QMessageBox::RejectRole);
+  box.setDefaultButton(keepAtlasOpenButton);
+  box.setEscapeButton(keepAtlasOpenButton);
+  box.exec();
+
+  return box.clickedButton() == cancelTasksAndQuitButton;
 }
 
 } // namespace
@@ -91,6 +126,22 @@ ZDoc::ZDoc(QObject* parent)
 
   m_traceSettings = new ZTraceSettings(*this, this);
   m_backgroundTaskManager = new ZBackgroundTaskManager(this);
+}
+
+bool ZDoc::canClose(QWidget* parent)
+{
+  CHECK(m_backgroundTaskManager != nullptr);
+
+  if (!saveOrDiscard(objs())) {
+    return false;
+  }
+
+  if (!confirmCancelBackgroundTasksForClose(parent, *m_backgroundTaskManager)) {
+    return false;
+  }
+
+  cancelAllBackgroundTasksAndWait();
+  return true;
 }
 
 void ZDoc::cancelAllBackgroundTasksAndWait()
