@@ -25,6 +25,24 @@ session set.
 Warm-up sections below are single-run results, so `count = 1` and `std = n/a`
 for those tables.
 
+## Atlas Cross-Dataset Snapshot
+
+Measured steady-state means for the retained Atlas sessions across all completed
+datasets. `Rotate/Zoom release/final` uses the last-step `preview -> final`
+settle interval so the values match the detailed Atlas sections later in this
+document.
+
+| Dataset | Mode | Open first preview | Open final | Rotate preview | Rotate release/final | Zoom preview | Zoom release/final | Peak RSS |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `slice15_ch2` | `Maximum Intensity Projection` | `1057.494 ms` | `1648.462 ms` | `28.560 ms` | `133.723 ms` | `28.768 ms` | `654.791 ms` | `3.674 GiB` |
+| `slice15_ch2` | `Direct Volume Rendering` | `1120.548 ms` | `1787.644 ms` | `30.466 ms` | `136.012 ms` | `31.925 ms` | `676.605 ms` | `5.615 GiB` |
+| `slice15_ch2_gpufit_1024x1024x980` | `Maximum Intensity Projection` | `8119.536 ms` | `8119.561 ms` | `46.233 ms` | `0.000 ms` | `67.763 ms` | `0.000 ms` | `3.345 GiB` |
+| `slice15_ch2_gpufit_1024x1024x980` | `Direct Volume Rendering` | `8289.513 ms` | `8289.545 ms` | `52.739 ms` | `0.000 ms` | `88.085 ms` | `0.000 ms` | `3.392 GiB` |
+| `slice15_ch2_x2z` | `Maximum Intensity Projection` | `3322.114 ms` | `3643.508 ms` | `37.006 ms` | `113.781 ms` | `38.463 ms` | `1127.208 ms` | `8.564 GiB` |
+| `slice15_ch2_x2z` | `Direct Volume Rendering` | `3357.746 ms` | `3593.807 ms` | `39.085 ms` | `124.365 ms` | `43.987 ms` | `1171.357 ms` | `9.374 GiB` |
+| `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | `Maximum Intensity Projection` | `4071.009 ms` | `4420.345 ms` | `35.940 ms` | `112.519 ms` | `41.128 ms` | `1032.147 ms` | `10.290 GiB` |
+| `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | `Direct Volume Rendering` | `4465.727 ms` | `4832.279 ms` | `37.062 ms` | `122.712 ms` | `45.618 ms` | `1071.328 ms` | `16.238 GiB` |
+
 ## Cross-Session Snapshot
 
 Measured steady-state means for the final five `slice15_ch2` sessions. For
@@ -1022,6 +1040,165 @@ Artifacts:
 | Peak RSS | `7` | `10064986697 bytes` (`9.374 GiB`) | `10030759936 bytes` (`9.342 GiB`) | `216531612 bytes` | `10348531712 bytes` (`9.638 GiB`) | Aggregate memory summary across measured runs. |
 | Full-run wall time | `7` | `121.901 s` | `121.904 s` | `0.089 s` | `122.002 s` | Entire deterministic script duration per measured run. |
 
+# Deterministic Benchmark Sessions: `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um`
+
+This section summarizes the final retained deterministic benchmark sessions for the
+`high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` dataset. On this machine,
+the retained benchmark set is Atlas-only. ParaView GPU and ParaView OSPRay do not
+have retained sessions for this dataset here; the reasons are documented in
+`Additional Experiment Notes`.
+
+## Shared Setup
+
+| Item | Value |
+| --- | --- |
+| Camera spec | `/Users/feng/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json` |
+| Viewport convention | `2000 x 1500` physical pixels (`1000 x 750` logical Retina canvas in Atlas) |
+| Action sequence | `open`, then `rotate`, then `zoom` |
+| Rotate action | `0.5 s`, `30` interpolated steps, followed by settle |
+| Zoom action | `0.5 s`, `30` interpolated steps, followed by settle |
+| Deterministic method | Internal Atlas benchmark markers plus live Atlas render-log parsing |
+| Benchmark cleanup flags | `--hide-background --hide-axis --hide-bound-box` |
+| ParaView retained sessions | None on this machine for this dataset |
+| Atlas dataset | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
+| Dataset format | Dense `.nim` |
+| Dataset size | `25395 x 19459 x 169`, single channel |
+| Dataset spacing | `0.1 x 0.1 x 2.0 um` |
+| Reference blocked ParaView export | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.vtpd` (`500` blocks) |
+
+For the Atlas rows below:
+- `Open total -> first preview` and `Open total -> final` are measured from action start.
+- `Rotate/Zoom release/final` uses the last-step `preview -> final` settle interval.
+
+## Cross-Session Snapshot
+
+| Session | Input | Compositing | Open first preview | Open final | Rotate preview | Rotate release/final | Zoom preview | Zoom release/final | Peak RSS |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `4071.009 ms` | `4420.345 ms` | `35.940 ms` | `112.519 ms` | `41.128 ms` | `1032.147 ms` | `10.290 GiB` |
+| Atlas DVR | Dense `.nim` | `Direct Volume Rendering` | `4465.727 ms` | `4832.279 ms` | `37.062 ms` | `122.712 ms` | `45.618 ms` | `1071.328 ms` | `16.238 GiB` |
+
+## Session 16: Atlas Dense Input, MIP
+
+Artifacts:
+- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_mip_v1`
+- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | Atlas (local build from this repository) |
+| Rendering mode | Default Atlas behavior for this dataset |
+| Compositing mode | `Maximum Intensity Projection` |
+| Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
+| Dataset | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
+| Dataset format | Dense `.nim` |
+| Dataset size | `25395 x 19459 x 169`, single channel |
+| Dataset spacing | `0.1 x 0.1 x 2.0 um` |
+| Benchmark cleanup flags | `--hide-background --hide-axis --hide-bound-box` |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Open total -> first preview | `3986.488 ms` |
+| Open total -> final | `4477.006 ms` |
+| Open target view -> first preview | `5.939 ms` |
+| Open target view -> final | `496.457 ms` |
+| Open target view preview -> final | `490.518 ms` |
+| Rotate preview step mean | `35.681 ms` |
+| Rotate step 1 preview | `33.144 ms` |
+| Rotate step 30 preview | `37.752 ms` |
+| Rotate step 30 preview -> final | `112.865 ms` |
+| Zoom preview step mean | `38.380 ms` |
+| Zoom step 1 preview | `37.104 ms` |
+| Zoom step 30 preview | `38.324 ms` |
+| Zoom step 30 preview -> final | `1361.982 ms` |
+| Peak RSS | `7754129408 bytes` (`7.222 GiB`) |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open total -> first preview | `7` | `4071.009` | `4078.505` | `77.033` | `4149.301` | Client-observed open latency to the first preview marker. |
+| Open total -> final | `7` | `4420.345` | `4424.883` | `77.043` | `4496.342` | Client-observed open latency to the first final marker. |
+| Open target view -> first preview | `7` | `12.997` | `15.038` | `3.878` | `15.889` | Latency after the intended benchmark camera/state was requested. |
+| Open target view -> final | `7` | `362.333` | `360.188` | `5.440` | `369.123` | Final-view latency after the intended benchmark camera/state was requested. |
+| Open target view preview -> final | `7` | `349.336` | `349.397` | `3.301` | `353.288` | Settle interval from the intended target-view preview to the first final marker. |
+| Rotate preview step duration | `210` | `35.940` | `35.921` | `2.055` | `39.295` | Per-step preview completion over all measured rotate steps. |
+| Rotate step 1 preview duration | `7` | `34.327` | `34.606` | `1.365` | `35.672` | First requested rotate step across measured runs. |
+| Rotate step 30 preview duration | `7` | `39.272` | `39.632` | `1.207` | `40.311` | Last requested rotate step across measured runs. |
+| Rotate preview service FPS | `210` | `27.824` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Rotate step 30 preview -> final duration | `7` | `112.519` | `111.238` | `2.431` | `115.413` | Last-step final-view latency after the last rotate preview step. |
+| Zoom preview step duration | `210` | `41.128` | `40.424` | `5.804` | `43.945` | Per-step preview completion over all measured zoom steps. |
+| Zoom step 1 preview duration | `7` | `38.878` | `39.129` | `1.737` | `40.722` | First requested zoom step across measured runs. |
+| Zoom step 30 preview duration | `7` | `39.538` | `39.723` | `1.269` | `40.878` | Last requested zoom step across measured runs. |
+| Zoom preview service FPS | `210` | `24.314` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Zoom step 30 preview -> final duration | `7` | `1032.147` | `1031.822` | `2.462` | `1034.731` | Last-step final-view latency after the last zoom preview step. |
+| Peak RSS | `7` | `11048315173 bytes` (`10.290 GiB`) | `11055112192 bytes` (`10.296 GiB`) | `1734590189 bytes` | `13210313114 bytes` (`12.303 GiB`) | Aggregate memory summary across measured runs. |
+| Full-run wall time | `7` | `122.787 s` | `122.788 s` | `0.101 s` | `122.900 s` | Entire deterministic script duration per measured run. |
+
+## Session 17: Atlas Dense Input, DVR
+
+Artifacts:
+- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_dvr_v1`
+- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | Atlas (local build from this repository) |
+| Rendering mode | Default Atlas behavior for this dataset |
+| Compositing mode | `Direct Volume Rendering` |
+| Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
+| Dataset | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
+| Dataset format | Dense `.nim` |
+| Dataset size | `25395 x 19459 x 169`, single channel |
+| Dataset spacing | `0.1 x 0.1 x 2.0 um` |
+| Benchmark cleanup flags | `--hide-background --hide-axis --hide-bound-box` |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Open total -> first preview | `4200.538 ms` |
+| Open total -> final | `4568.694 ms` |
+| Open target view -> first preview | `17.725 ms` |
+| Open target view -> final | `385.881 ms` |
+| Open target view preview -> final | `368.156 ms` |
+| Rotate preview step mean | `37.175 ms` |
+| Rotate step 1 preview | `35.500 ms` |
+| Rotate step 30 preview | `40.505 ms` |
+| Rotate step 30 preview -> final | `123.036 ms` |
+| Zoom preview step mean | `46.757 ms` |
+| Zoom step 1 preview | `39.200 ms` |
+| Zoom step 30 preview | `50.209 ms` |
+| Zoom step 30 preview -> final | `1073.860 ms` |
+| Peak RSS | `14240514048 bytes` (`13.263 GiB`) |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open total -> first preview | `7` | `4465.727` | `4404.405` | `182.277` | `4684.670` | Client-observed open latency to the first preview marker. |
+| Open total -> final | `7` | `4832.279` | `4774.965` | `180.578` | `5049.306` | Client-observed open latency to the first final marker. |
+| Open target view -> first preview | `7` | `13.609` | `15.969` | `4.488` | `17.671` | Latency after the intended benchmark camera/state was requested. |
+| Open target view -> final | `7` | `380.162` | `382.987` | `8.599` | `390.299` | Final-view latency after the intended benchmark camera/state was requested. |
+| Open target view preview -> final | `7` | `366.552` | `365.209` | `5.367` | `373.675` | Settle interval from the intended target-view preview to the first final marker. |
+| Rotate preview step duration | `210` | `37.062` | `36.511` | `4.937` | `40.778` | Per-step preview completion over all measured rotate steps. |
+| Rotate step 1 preview duration | `7` | `34.996` | `35.425` | `1.083` | `36.206` | First requested rotate step across measured runs. |
+| Rotate step 30 preview duration | `7` | `41.078` | `42.090` | `2.301` | `43.095` | Last requested rotate step across measured runs. |
+| Rotate preview service FPS | `210` | `26.982` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Rotate step 30 preview -> final duration | `7` | `122.712` | `122.302` | `1.714` | `124.857` | Last-step final-view latency after the last rotate preview step. |
+| Zoom preview step duration | `210` | `45.618` | `44.986` | `6.469` | `50.727` | Per-step preview completion over all measured zoom steps. |
+| Zoom step 1 preview duration | `7` | `40.203` | `40.419` | `1.104` | `41.698` | First requested zoom step across measured runs. |
+| Zoom step 30 preview duration | `7` | `49.849` | `49.020` | `2.847` | `53.808` | Last requested zoom step across measured runs. |
+| Zoom preview service FPS | `210` | `21.921` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Zoom step 30 preview -> final duration | `7` | `1071.328` | `1069.903` | `6.132` | `1078.914` | Last-step final-view latency after the last zoom preview step. |
+| Peak RSS | `7` | `17435769710 bytes` (`16.238 GiB`) | `17427472384 bytes` (`16.231 GiB`) | `1720481274 bytes` | `19588741939 bytes` (`18.243 GiB`) | Aggregate memory summary across measured runs. |
+| Full-run wall time | `7` | `123.291 s` | `123.288 s` | `0.187 s` | `123.502 s` | Entire deterministic script duration per measured run. |
+
 # Additional Experiment Notes
 
 These exploratory runs were useful for planning and interpreting the retained benchmark
@@ -1032,4 +1209,4 @@ sessions, but they were not kept as final benchmark results.
 | `slice15_ch2` | ParaView GPU, single-file dense input | Dense `.mhd/.zraw` (`slice15_ch2_dense_atlasscenespace.mhd`) | The rendered image was visibly wrong: the volume content was recognizable, but the image arrangement was corrupted. It was also much slower than the retained blocked `.vtpd` path. | No | Possible large-single-texture or driver issue on this system, but not confirmed. Final ParaView GPU results for `slice15_ch2` use the blocked scene-space dataset. |
 | `slice15_ch2_x2z` | ParaView GPU, single-file dense input | Dense `.mhd/.zraw` (`slice15_ch2_x2z_scenespace.mhd`) | ParaView kept allocating toward and past system memory during load/render, so the run was killed instead of being allowed to continue. | No | Final ParaView GPU results for `slice15_ch2_x2z` use the blocked scene-space dataset [slice15_ch2_x2z_grid_atlasscenespace.vtpd](/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd). |
 | `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | ParaView GPU | Prepared ParaView dataset | ParaView attempted to allocate well beyond host memory; the observed footprint exceeded about `100 GiB` on a machine with `64 GiB` RAM, so the run was killed. | No | This is currently treated as a non-viable ParaView GPU benchmark path for this dataset. |
-| `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | ParaView OSPRay | Not yet benchmarked | No retained OSPRay result exists yet. | No | Blocked `.vtpd` input is not a valid OSPRay volume path in this ParaView build, and there is no dense `.mhd/.zraw` export for this dataset yet. A meaningful OSPRay test would require generating a dense MetaImage export first. |
+| `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | ParaView OSPRay | Skipped dense-input path | Not run. The dense MetaImage path would first allocate a full resident `vtkImageData` and then hand that resident scalar buffer to OSPRay, so it has the same fundamental host-memory requirement as the failed dense GPU path. For this dataset shape (`25395 x 19459 x 169`), that is about `77.78 GiB` even at `uint8`, before reader and renderer overhead. | No | Blocked `.vtpd` input is not a valid OSPRay volume path in this ParaView build. ParaView `vtkMetaImageReader::ExecuteDataWithInformation()` allocates the full output image and reads the full file into `data->GetScalarPointer()`, and `vtkOSPRayVolumeMapperNode` only accepts direct `vtkImageData` input and builds a `structuredRegular` OSPRay volume from that resident scalar array. |
