@@ -330,6 +330,23 @@ Important details:
 5. Run the application driver.
 6. Read the observer summary JSON for the published benchmark numbers.
 
+## Summary CSV Export
+
+After the retained benchmark sessions are complete, export the compact cross-session CSV snapshots with:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/export_benchmark_snapshot_csv.py
+```
+
+This writes:
+
+- `/Users/feng/code/atlas/util/benchmark/benchmark_cross_session_snapshot.csv`
+- `/Users/feng/code/atlas/util/benchmark/benchmark_atlas_cross_dataset_snapshot.csv`
+
+The exporter reads the retained session aggregate `summary.json` files directly, so the CSV values stay
+aligned with the authoritative benchmark artifacts rather than depending on manual copy/paste from the
+markdown summary.
+
 ## Retina Viewports
 
 For the current Atlas vs ParaView comparison on macOS Retina, the shared benchmark viewport is
