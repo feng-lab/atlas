@@ -181,7 +181,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--atlas-log-path",
         required=True,
-        help="Path to the active Atlas application log file that contains the benchmark lines",
+        help=(
+            "Path to the active Atlas application log file, or the Atlas log directory. "
+            "If a directory is given, the newest atlas_info_*_log.txt is used."
+        ),
     )
     parser.add_argument(
         "--address", default="localhost:50051", help="Atlas Scene RPC address"
@@ -230,6 +233,18 @@ def _parse_args() -> argparse.Namespace:
             "Fixed delay between successive camera commands for interpolate actions. "
             "Use a value large enough for Atlas to finish preview/final before the next step."
         ),
+    )
+    parser.add_argument(
+        "--preview-timeout-seconds",
+        type=float,
+        default=900.0,
+        help="Timeout while waiting for each Atlas preview marker.",
+    )
+    parser.add_argument(
+        "--final-timeout-seconds",
+        type=float,
+        default=3600.0,
+        help="Timeout while waiting for each Atlas final marker.",
     )
     parser.add_argument(
         "--sample-rss",
@@ -310,6 +325,20 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
             continue
         rows.append(json.loads(line))
     return rows
+
+
+def _resolve_atlas_log_path(path: str | Path) -> Path:
+    candidate = Path(path).resolve()
+    if candidate.is_file():
+        return candidate
+    if not candidate.is_dir():
+        raise FileNotFoundError(f"Atlas log path does not exist: {candidate}")
+    log_files = sorted(candidate.glob("**/atlas_info_*_log.txt"))
+    if not log_files:
+        raise FileNotFoundError(
+            f"Could not find any atlas_info_*_log.txt under {candidate}"
+        )
+    return log_files[-1]
 
 
 def _glog_line_time_ns(line: str, fallback_year: int) -> int | None:
@@ -623,7 +652,7 @@ def _run_command(
     stdout_path = run_dir / "stdout.log"
     stderr_path = run_dir / "stderr.log"
 
-    log_path = Path(args.atlas_log_path).resolve()
+    log_path = _resolve_atlas_log_path(args.atlas_log_path)
     start_offset = log_path.stat().st_size if log_path.exists() else 0
 
     command = [
@@ -645,6 +674,14 @@ def _run_command(
         str(float(args.pre_action_delay_seconds)),
         "--step-hold-seconds",
         str(float(args.step_hold_seconds)),
+        "--atlas-log-path",
+        str(log_path),
+        "--log-year",
+        str(int(args.log_year)),
+        "--preview-timeout-seconds",
+        str(float(args.preview_timeout_seconds)),
+        "--final-timeout-seconds",
+        str(float(args.final_timeout_seconds)),
     ]
     if (args.canvas_logical_width is None) != (args.canvas_logical_height is None):
         raise ValueError(
@@ -746,6 +783,7 @@ def _aggregate_runs(
 ) -> None:
     aggregate_dir = root / "aggregate"
     aggregate_dir.mkdir(parents=True, exist_ok=True)
+    resolved_log_path = _resolve_atlas_log_path(args.atlas_log_path)
 
     measured_runs = [run for run in runs if not run.warmup]
     warmup_runs = [run for run in runs if run.warmup]
@@ -754,11 +792,13 @@ def _aggregate_runs(
         "driver_script": str(Path(args.driver_script).resolve()),
         "dataset": str(Path(args.dataset).resolve()),
         "camera_spec": str(Path(args.camera_spec).resolve()),
-        "atlas_log_path": str(Path(args.atlas_log_path).resolve()),
+        "atlas_log_path": str(resolved_log_path),
         "address": args.address,
         "warmup_runs": args.warmup_runs,
         "measured_runs": args.measured_runs,
         "step_hold_seconds": float(args.step_hold_seconds),
+        "preview_timeout_seconds": float(args.preview_timeout_seconds),
+        "final_timeout_seconds": float(args.final_timeout_seconds),
         "run_count_total": len(runs),
         "run_labels": [run.label for run in runs],
         "warmup_labels": [run.label for run in warmup_runs],
@@ -1037,7 +1077,7 @@ def _aggregate_runs(
         "",
         f"- Dataset: `{Path(args.dataset).resolve()}`",
         f"- Camera spec: `{Path(args.camera_spec).resolve()}`",
-        f"- Atlas log: `{Path(args.atlas_log_path).resolve()}`",
+        f"- Atlas log: `{resolved_log_path}`",
         f"- Runs: `{args.warmup_runs}` warm-up + `{args.measured_runs}` measured",
         f"- Step hold: `{float(args.step_hold_seconds):.3f} s`",
         f"- Compositing mode: `{args.compositing_mode or 'unchanged'}`",
@@ -1114,12 +1154,14 @@ def main() -> int:
     args = _parse_args()
     root = Path(args.output_root).resolve()
     root.mkdir(parents=True, exist_ok=True)
+    resolved_log_path = _resolve_atlas_log_path(args.atlas_log_path)
+    args.atlas_log_path = str(resolved_log_path)
 
     config = {
         "driver_script": str(Path(args.driver_script).resolve()),
         "dataset": str(Path(args.dataset).resolve()),
         "camera_spec": str(Path(args.camera_spec).resolve()),
-        "atlas_log_path": str(Path(args.atlas_log_path).resolve()),
+        "atlas_log_path": str(resolved_log_path),
         "address": args.address,
         "warmup_runs": int(args.warmup_runs),
         "measured_runs": int(args.measured_runs),

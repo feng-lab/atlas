@@ -685,3 +685,351 @@ Artifacts:
 | Zoom step 30 preview -> final duration | `7` | `0.000` | `0.000` | `0.000` | `0.000` | Preview and final are the same render pass for this dataset. |
 | Peak RSS | `7` | `3642284910 bytes` (`3.392 GiB`) | `3650013184 bytes` (`3.399 GiB`) | `24131928 bytes` | `3672610483 bytes` (`3.421 GiB`) | Aggregate memory summary across measured runs. |
 | Full-run wall time | `7` | `130.750 s` | `130.795 s` | `0.355 s` | `131.145 s` | Entire deterministic script duration per measured run. |
+
+# Deterministic Benchmark Sessions: `slice15_ch2_x2z`
+
+This section summarizes the final deterministic benchmark sessions for the doubled-depth
+`slice15_ch2_x2z` dataset. The raw artifacts under each benchmark root remain the
+authoritative source.
+
+## Shared Methodology
+
+| Item | Value |
+| --- | --- |
+| Source scene | `/Users/feng/Downloads/test_slice15_ch2_2x.scene` |
+| Camera spec | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_scene_camera_exact_2000x1500_v2.json` |
+| Output render size | `2000 x 1500` physical pixels |
+| Atlas live 3D canvas size | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
+| Deterministic action sequence | `open`, `rotate`, `zoom` |
+| Interpolated actions | `30` requested camera steps per action |
+| Warm-up / measured runs | `1` warm-up run, `7` measured runs |
+| ParaView dense scene-space header | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_scenespace.mhd` (`1 x 1 x 5.0472259521484375`) |
+| ParaView blocked scene-space dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd` (`1 x 1 x 5.0472259521484375`) |
+| Atlas dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z.nim` (`0.10378322750329971 x 0.10378322750329971 x 0.52381742000579834 um`) |
+| Notes | ParaView GPU sessions use the blocked scene-space `.vtpd` export because the dense GPU smoke run kept allocating toward system memory and was not practical. ParaView `OSPRay Based` uses the dense scene-space `.mhd/.zraw` path because blocked OSPRay input renders blank in this ParaView build. |
+
+## Cross-Session Snapshot
+
+For this snapshot, ParaView uses `release -> first still` for the settle metric, while
+Atlas uses the last-step `preview -> final` settle interval.
+
+| Session | Input | Render mode | Open first preview | Open final | Rotate preview | Rotate release/final | Zoom preview | Zoom release/final | Peak RSS | Full-run wall |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ParaView GPU MIP | Blocked `.vtpd` | `GPU Based` + `maximum-intensity` | n/a | `26649.038 ms` | `2358.539 ms` | `2565.902 ms` | `2079.501 ms` | `1811.688 ms` | `21.035 GiB` | `181.118 s` |
+| ParaView GPU Composite | Blocked `.vtpd` | `GPU Based` + `composite` | n/a | `26693.039 ms` | `2362.393 ms` | `2553.504 ms` | `2108.934 ms` | `1937.154 ms` | `21.035 GiB` | `182.395 s` |
+| ParaView OSPRay Composite | Dense `.mhd/.zraw` | `OSPRay Based` + `composite` | n/a | `82665.091 ms` | `3196.924 ms` | `3581.389 ms` | `4782.539 ms` | `5029.514 ms` | `13.730 GiB` | `348.358 s` |
+| Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `3322.114 ms` | `3643.508 ms` | `37.006 ms` | `113.781 ms` | `38.463 ms` | `1127.208 ms` | `8.564 GiB` | `121.948 s` |
+| Atlas DVR | Dense `.nim` | `Direct Volume Rendering` | `3357.746 ms` | `3593.807 ms` | `39.085 ms` | `124.365 ms` | `43.987 ms` | `1171.357 ms` | `9.374 GiB` | `121.901 s` |
+
+## Session 11: ParaView GPU, Blocked Input, MIP
+
+Artifacts:
+- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1`
+- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | ParaView 6.1.0-RC1 |
+| Representation mode | `GPU Based` |
+| Blend mode | `maximum-intensity` |
+| Deterministic mode | `interactive-plus-final` |
+| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd` |
+| Dataset format | Blocked `.vtpd` |
+| Dataset size | `9216 x 6144 x 196`, single channel |
+| Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
+| Scalar array | `channels`, component `0` |
+| Color ramp | black -> red over `0 .. 255` |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Open final complete from action start | `26719.774 ms` |
+| Open still-render total | `12664.219 ms` |
+| Rotate preview frame mean | `2351.840 ms` |
+| Rotate first preview complete | `2901.991 ms` |
+| Rotate release -> first still | `2542.947 ms` |
+| Rotate final complete from action start | `73522.154 ms` |
+| Zoom preview frame mean | `2076.030 ms` |
+| Zoom first preview complete | `2818.430 ms` |
+| Zoom release -> first still | `1834.261 ms` |
+| Zoom final complete from action start | `64590.836 ms` |
+| Peak RSS | `22582480896 bytes` (`21.032 GiB`) |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open final complete from action start | `7` | `26649.038` | `26618.090` | `169.793` | `26859.649` | First and final render are the same for `open` in this run shape. |
+| Open still-render total | `7` | `12938.515` | `12919.084` | `153.493` | `13159.819` | Blocked final render cost after the dataset is in place. |
+| Rotate preview frame duration | `210` | `2358.539` | `2356.757` | `112.487` | `2478.312` | Pooled `Interactive Render` frames. |
+| Rotate frame 1 preview duration | `7` | `2721.626` | `2729.996` | `35.047` | `2760.107` | First preview frame across measured runs. |
+| Rotate frame 30 preview duration | `7` | `2401.024` | `2401.250` | `7.291` | `2410.166` | Last preview frame across measured runs. |
+| Rotate preview service FPS | `210` | `0.424` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Rotate release -> first still | `7` | `2565.902` | `2560.593` | `15.396` | `2588.249` | Final-view latency after the last interactive step. |
+| Rotate final complete from action start | `7` | `73758.524` | `73766.688` | `101.695` | `73889.993` | End-to-end action duration to the first final still. |
+| Zoom preview frame duration | `210` | `2079.501` | `2087.081` | `214.351` | `2426.899` | Pooled `Interactive Render` frames. |
+| Zoom frame 1 preview duration | `7` | `2625.627` | `2620.847` | `28.013` | `2667.603` | First preview frame across measured runs. |
+| Zoom frame 30 preview duration | `7` | `1773.365` | `1769.835` | `6.675` | `1784.055` | Last preview frame across measured runs. |
+| Zoom preview service FPS | `210` | `0.481` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Zoom release -> first still | `7` | `1811.688` | `1809.565` | `16.262` | `1836.645` | Final-view latency after the last interactive step. |
+| Zoom final complete from action start | `7` | `64632.985` | `64606.988` | `85.156` | `64737.080` | End-to-end action duration to the first final still. |
+| Peak RSS | `7` | `22585819721 bytes` (`21.035 GiB`) | `22584086528 bytes` (`21.033 GiB`) | `3993845 bytes` | `22591339315 bytes` (`21.040 GiB`) | Aggregate memory summary across measured runs. |
+| Full-run wall time | `7` | `181.118 s` | `181.120 s` | `0.264 s` | `181.466 s` | Entire deterministic script duration per measured run. |
+
+## Session 12: ParaView GPU, Blocked Input, Composite
+
+Artifacts:
+- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_composite_v1`
+- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | ParaView 6.1.0-RC1 |
+| Representation mode | `GPU Based` |
+| Blend mode | `composite` |
+| Deterministic mode | `interactive-plus-final` |
+| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd` |
+| Dataset format | Blocked `.vtpd` |
+| Dataset size | `9216 x 6144 x 196`, single channel |
+| Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
+| Scalar array | `channels`, component `0` |
+| Color ramp | black -> red over `0 .. 255` |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Open final complete from action start | `26521.045 ms` |
+| Open still-render total | `12741.269 ms` |
+| Rotate preview frame mean | `2368.523 ms` |
+| Rotate first preview complete | `2955.198 ms` |
+| Rotate release -> first still | `2566.749 ms` |
+| Rotate final complete from action start | `74054.162 ms` |
+| Zoom preview frame mean | `2108.154 ms` |
+| Zoom first preview complete | `2833.235 ms` |
+| Zoom release -> first still | `1938.867 ms` |
+| Zoom final complete from action start | `65613.427 ms` |
+| Peak RSS | `22590259200 bytes` (`21.039 GiB`) |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open final complete from action start | `7` | `26693.039` | `26663.732` | `69.973` | `26794.542` | First and final render are the same for `open` in this run shape. |
+| Open still-render total | `7` | `12802.965` | `12786.549` | `146.031` | `13004.357` | Blocked final render cost after the dataset is in place. |
+| Rotate preview frame duration | `210` | `2362.393` | `2364.618` | `117.137` | `2472.596` | Pooled `Interactive Render` frames. |
+| Rotate frame 1 preview duration | `7` | `2766.145` | `2760.020` | `24.856` | `2795.526` | First preview frame across measured runs. |
+| Rotate frame 30 preview duration | `7` | `2399.230` | `2404.419` | `10.563` | `2410.081` | Last preview frame across measured runs. |
+| Rotate preview service FPS | `210` | `0.423` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Rotate release -> first still | `7` | `2553.504` | `2553.452` | `22.626` | `2582.849` | Final-view latency after the last interactive step. |
+| Rotate final complete from action start | `7` | `73867.320` | `73895.437` | `84.238` | `73969.788` | End-to-end action duration to the first final still. |
+| Zoom preview frame duration | `210` | `2108.934` | `2108.293` | `209.364` | `2456.557` | Pooled `Interactive Render` frames. |
+| Zoom frame 1 preview duration | `7` | `2647.693` | `2647.319` | `12.925` | `2666.868` | First preview frame across measured runs. |
+| Zoom frame 30 preview duration | `7` | `1788.724` | `1790.753` | `5.467` | `1793.375` | Last preview frame across measured runs. |
+| Zoom preview service FPS | `210` | `0.474` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Zoom release -> first still | `7` | `1937.154` | `1933.340` | `16.641` | `1959.532` | Final-view latency after the last interactive step. |
+| Zoom final complete from action start | `7` | `65634.206` | `65650.952` | `82.384` | `65729.928` | End-to-end action duration to the first final still. |
+| Peak RSS | `7` | `22586001701 bytes` (`21.035 GiB`) | `22586335232 bytes` (`21.036 GiB`) | `2616124 bytes` | `22589043917 bytes` (`21.038 GiB`) | Aggregate memory summary across measured runs. |
+| Full-run wall time | `7` | `182.395 s` | `182.432 s` | `0.147 s` | `182.535 s` | Entire deterministic script duration per measured run. |
+
+## Session 13: ParaView OSPRay, Dense Input, Composite
+
+Artifacts:
+- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1`
+- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | ParaView 6.1.0-RC1 |
+| Launch path | `/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh` |
+| View ray tracing | Disabled (`EnableRayTracing = 0`) |
+| Representation mode | `OSPRay Based` |
+| Blend mode | `composite` |
+| Deterministic mode | `interactive-plus-final` |
+| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_scenespace.mhd` |
+| Dataset format | Dense `.mhd/.zraw` |
+| Dataset size | `9216 x 6144 x 196`, single channel |
+| Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
+| Scalar array | `MetaImage`, component `0` |
+| Color ramp | black -> red over `0 .. 255` |
+| Notes | These macOS OSPRay runs exited with `SIGSEGV` after writing complete artifacts; the batch accepted them because `session_end` was `ok` and all expected outputs were present. |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Open final complete from action start | `80998.738 ms` |
+| Open still-render total | `25370.720 ms` |
+| Rotate preview frame mean | `2787.157 ms` |
+| Rotate first preview complete | `2660.361 ms` |
+| Rotate release -> first still | `3193.102 ms` |
+| Rotate final complete from action start | `87496.225 ms` |
+| Zoom preview frame mean | `4131.503 ms` |
+| Zoom first preview complete | `3640.816 ms` |
+| Zoom release -> first still | `4708.675 ms` |
+| Zoom final complete from action start | `129368.041 ms` |
+| Peak RSS | `14730981376 bytes` (`13.719 GiB`) |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open final complete from action start | `7` | `82665.091` | `82796.452` | `1295.953` | `84309.358` | First and final render are the same for `open` in this run shape. |
+| Open still-render total | `7` | `27017.632` | `27107.226` | `692.710` | `27569.995` | Dense final render cost after the dataset is in place. |
+| Rotate preview frame duration | `210` | `3196.924` | `3242.572` | `370.880` | `3726.070` | Pooled `Interactive Render` frames. |
+| Rotate frame 1 preview duration | `7` | `2559.952` | `2523.300` | `149.654` | `2773.388` | First preview frame across measured runs. |
+| Rotate frame 30 preview duration | `7` | `3591.772` | `3576.740` | `142.815` | `3733.278` | Last preview frame across measured runs. |
+| Rotate preview service FPS | `210` | `0.313` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Rotate release -> first still | `7` | `3581.389` | `3608.436` | `209.256` | `3768.365` | Final-view latency after the last interactive step. |
+| Rotate final complete from action start | `7` | `100153.472` | `101823.384` | `4748.610` | `102965.784` | End-to-end action duration to the first final still. |
+| Zoom preview frame duration | `210` | `4782.539` | `4999.179` | `565.683` | `5377.263` | Pooled `Interactive Render` frames. |
+| Zoom frame 1 preview duration | `7` | `3510.437` | `3510.325` | `111.356` | `3663.055` | First preview frame across measured runs. |
+| Zoom frame 30 preview duration | `7` | `5035.696` | `5056.314` | `148.026` | `5179.414` | Last preview frame across measured runs. |
+| Zoom preview service FPS | `210` | `0.209` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Zoom release -> first still | `7` | `5029.514` | `5060.279` | `154.306` | `5175.664` | Final-view latency after the last interactive step. |
+| Zoom final complete from action start | `7` | `149189.963` | `151331.732` | `4260.233` | `152211.241` | End-to-end action duration to the first final still. |
+| Peak RSS | `7` | `14742307401 bytes` (`13.730 GiB`) | `14743097344 bytes` (`13.730 GiB`) | `2433188 bytes` | `14744906957 bytes` (`13.732 GiB`) | Aggregate memory summary across measured runs. |
+| Full-run wall time | `7` | `348.358 s` | `351.317 s` | `8.359 s` | `354.015 s` | Entire deterministic script duration per measured run. |
+
+## Session 14: Atlas Dense Input, MIP
+
+Artifacts:
+- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1`
+- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | Atlas (local build from this repository) |
+| Rendering mode | Default Atlas behavior for this dataset |
+| Compositing mode | `Maximum Intensity Projection` |
+| Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
+| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z.nim` |
+| Dataset format | Dense `.nim` |
+| Dataset size | `9216 x 6144 x 196`, single channel |
+| Dataset spacing | `0.10378322750329971 x 0.10378322750329971 x 0.52381742000579834 um` |
+| Benchmark cleanup flags | `--hide-background --hide-axis --hide-bound-box` |
+| Effective scene-space Z/X ratio | `5.0472259521484375` |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Open total -> first preview | `3417.543 ms` |
+| Open total -> final | `3819.736 ms` |
+| Open target view -> first preview | `16.498 ms` |
+| Open target view -> final | `418.691 ms` |
+| Open target view preview -> final | `402.193 ms` |
+| Rotate preview step mean | `35.312 ms` |
+| Rotate step 1 preview | `36.235 ms` |
+| Rotate step 30 preview | `35.035 ms` |
+| Rotate step 30 preview -> final | `102.563 ms` |
+| Zoom preview step mean | `37.684 ms` |
+| Zoom step 1 preview | `30.702 ms` |
+| Zoom step 30 preview | `38.701 ms` |
+| Zoom step 30 preview -> final | `5395.752 ms` |
+| Peak RSS | `8643321856 bytes` (`8.050 GiB`) |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open total -> first preview | `7` | `3322.114` | `3355.671` | `191.528` | `3543.089` | Client-observed open latency to the first preview marker. |
+| Open total -> final | `7` | `3643.508` | `3633.893` | `195.671` | `3875.067` | Client-observed open latency to the first final marker. |
+| Open target view -> first preview | `7` | `13.075` | `13.125` | `7.660` | `23.879` | Latency after the intended benchmark camera/state was requested. |
+| Open target view -> final | `7` | `334.469` | `333.277` | `15.870` | `350.519` | Final-view latency after the intended benchmark camera/state was requested. |
+| Open target view preview -> final | `7` | `321.394` | `317.332` | `23.272` | `344.353` | Settle interval from the intended target-view preview to the first final marker. |
+| Rotate preview step duration | `210` | `37.006` | `36.729` | `1.804` | `39.129` | Per-step preview completion over all measured rotate steps. |
+| Rotate step 1 preview duration | `7` | `36.276` | `36.448` | `1.515` | `37.910` | First requested rotate step across measured runs. |
+| Rotate step 30 preview duration | `7` | `36.888` | `37.330` | `2.122` | `39.277` | Last requested rotate step across measured runs. |
+| Rotate preview service FPS | `210` | `27.022` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Rotate step 30 preview -> final duration | `7` | `113.781` | `114.374` | `3.729` | `117.973` | Last-step final-view latency after the last rotate preview step. |
+| Zoom preview step duration | `210` | `38.463` | `38.170` | `4.031` | `40.952` | Per-step preview completion over all measured zoom steps. |
+| Zoom step 1 preview duration | `7` | `37.339` | `37.936` | `2.142` | `39.598` | First requested zoom step across measured runs. |
+| Zoom step 30 preview duration | `7` | `38.118` | `38.327` | `2.430` | `40.990` | Last requested zoom step across measured runs. |
+| Zoom preview service FPS | `210` | `26.000` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Zoom step 30 preview -> final duration | `7` | `1127.208` | `1124.854` | `10.731` | `1143.559` | Last-step final-view latency after the last zoom preview step. |
+| Peak RSS | `7` | `9195952421 bytes` (`8.564 GiB`) | `9235755008 bytes` (`8.601 GiB`) | `231517789 bytes` | `9471777997 bytes` (`8.821 GiB`) | Aggregate memory summary across measured runs. |
+| Full-run wall time | `7` | `121.948 s` | `121.896 s` | `0.253 s` | `122.261 s` | Entire deterministic script duration per measured run. |
+
+## Session 15: Atlas Dense Input, DVR
+
+Artifacts:
+- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_dvr_v1`
+- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | Atlas (local build from this repository) |
+| Rendering mode | Default Atlas behavior for this dataset |
+| Compositing mode | `Direct Volume Rendering` |
+| Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
+| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z.nim` |
+| Dataset format | Dense `.nim` |
+| Dataset size | `9216 x 6144 x 196`, single channel |
+| Dataset spacing | `0.10378322750329971 x 0.10378322750329971 x 0.52381742000579834 um` |
+| Benchmark cleanup flags | `--hide-background --hide-axis --hide-bound-box` |
+| Effective scene-space Z/X ratio | `5.0472259521484375` |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Open total -> first preview | `3164.535 ms` |
+| Open total -> final | `3516.079 ms` |
+| Open target view -> first preview | `8.666 ms` |
+| Open target view -> final | `360.210 ms` |
+| Open target view preview -> final | `351.544 ms` |
+| Rotate preview step mean | `39.500 ms` |
+| Rotate step 1 preview | `36.863 ms` |
+| Rotate step 30 preview | `36.859 ms` |
+| Rotate step 30 preview -> final | `123.319 ms` |
+| Zoom preview step mean | `47.011 ms` |
+| Zoom step 1 preview | `39.972 ms` |
+| Zoom step 30 preview | `45.951 ms` |
+| Zoom step 30 preview -> final | `1181.550 ms` |
+| Peak RSS | `9643327488 bytes` (`8.981 GiB`) |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open total -> first preview | `7` | `3357.746` | `3405.316` | `122.993` | `3446.181` | Client-observed open latency to the first preview marker. |
+| Open total -> final | `7` | `3593.807` | `3607.924` | `70.558` | `3652.342` | Client-observed open latency to the first final marker. |
+| Open target view -> first preview | `7` | `120.825` | `162.711` | `76.636` | `172.825` | Latency after the intended benchmark camera/state was requested. |
+| Open target view -> final | `7` | `356.886` | `354.720` | `11.123` | `372.902` | Final-view latency after the intended benchmark camera/state was requested. |
+| Open target view preview -> final | `7` | `236.061` | `191.977` | `74.417` | `347.831` | Settle interval from the intended target-view preview to the first final marker. |
+| Rotate preview step duration | `210` | `39.085` | `39.258` | `1.649` | `41.846` | Per-step preview completion over all measured rotate steps. |
+| Rotate step 1 preview duration | `7` | `39.057` | `39.169` | `0.791` | `39.726` | First requested rotate step across measured runs. |
+| Rotate step 30 preview duration | `7` | `38.522` | `38.911` | `1.079` | `39.671` | Last requested rotate step across measured runs. |
+| Rotate preview service FPS | `210` | `25.586` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Rotate step 30 preview -> final duration | `7` | `124.365` | `123.881` | `1.193` | `126.237` | Last-step final-view latency after the last rotate preview step. |
+| Zoom preview step duration | `210` | `43.987` | `43.769` | `4.952` | `48.453` | Per-step preview completion over all measured zoom steps. |
+| Zoom step 1 preview duration | `7` | `39.356` | `39.686` | `1.394` | `40.618` | First requested zoom step across measured runs. |
+| Zoom step 30 preview duration | `7` | `46.206` | `45.999` | `1.708` | `48.201` | Last requested zoom step across measured runs. |
+| Zoom preview service FPS | `210` | `22.734` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Zoom step 30 preview -> final duration | `7` | `1171.357` | `1168.754` | `8.792` | `1183.155` | Last-step final-view latency after the last zoom preview step. |
+| Peak RSS | `7` | `10064986697 bytes` (`9.374 GiB`) | `10030759936 bytes` (`9.342 GiB`) | `216531612 bytes` | `10348531712 bytes` (`9.638 GiB`) | Aggregate memory summary across measured runs. |
+| Full-run wall time | `7` | `121.901 s` | `121.904 s` | `0.089 s` | `122.002 s` | Entire deterministic script duration per measured run. |
+
+# Additional Experiment Notes
+
+These exploratory runs were useful for planning and interpreting the retained benchmark
+sessions, but they were not kept as final benchmark results.
+
+| Dataset | Attempted path | Input | Observed behavior | Retained in final benchmark? | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `slice15_ch2` | ParaView GPU, single-file dense input | Dense `.mhd/.zraw` (`slice15_ch2_dense_atlasscenespace.mhd`) | The rendered image was visibly wrong: the volume content was recognizable, but the image arrangement was corrupted. It was also much slower than the retained blocked `.vtpd` path. | No | Possible large-single-texture or driver issue on this system, but not confirmed. Final ParaView GPU results for `slice15_ch2` use the blocked scene-space dataset. |
+| `slice15_ch2_x2z` | ParaView GPU, single-file dense input | Dense `.mhd/.zraw` (`slice15_ch2_x2z_scenespace.mhd`) | ParaView kept allocating toward and past system memory during load/render, so the run was killed instead of being allowed to continue. | No | Final ParaView GPU results for `slice15_ch2_x2z` use the blocked scene-space dataset [slice15_ch2_x2z_grid_atlasscenespace.vtpd](/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd). |
+| `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | ParaView GPU | Prepared ParaView dataset | ParaView attempted to allocate well beyond host memory; the observed footprint exceeded about `100 GiB` on a machine with `64 GiB` RAM, so the run was killed. | No | This is currently treated as a non-viable ParaView GPU benchmark path for this dataset. |
+| `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | ParaView OSPRay | Not yet benchmarked | No retained OSPRay result exists yet. | No | Blocked `.vtpd` input is not a valid OSPRay volume path in this ParaView build, and there is no dense `.mhd/.zraw` export for this dataset yet. A meaningful OSPRay test would require generating a dense MetaImage export first. |

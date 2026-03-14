@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +45,157 @@ COMPOSITING_MODE_CHOICES = (
     "ISO Surface",
     "X Ray",
 )
+
+LOG_TIMESTAMP_RE = re.compile(
+    r"^[IWEF](?:(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})|(?P<month2>\d{2})(?P<day2>\d{2})) "
+    r"(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})\.(?P<fraction>\d+)"
+)
+FAST_RE = re.compile(
+    r"ATLAS_BENCHMARK_FAST_PREVIEW_DONE(?:\s+elapsed_ms=(?P<elapsed>[-+0-9.eE]+))?"
+    r"(?:\s+progress=(?P<progress>[-+0-9.eE]+))?"
+)
+FINAL_RE = re.compile(
+    r"ATLAS_BENCHMARK_RENDER_FINISHED(?:\s+elapsed_ms=(?P<elapsed>[-+0-9.eE]+))?"
+    r"(?:\s+progress=(?P<progress>[-+0-9.eE]+))?"
+    r"(?:\s+source=(?P<source>\S+))?"
+)
+
+
+def _glog_line_time_ns(line: str, fallback_year: int) -> int | None:
+    match = LOG_TIMESTAMP_RE.match(line)
+    if not match:
+        return None
+    if match.group("year") is not None:
+        year = int(match.group("year"))
+        month = int(match.group("month"))
+        day = int(match.group("day"))
+    else:
+        year = int(fallback_year)
+        month = int(match.group("month2"))
+        day = int(match.group("day2"))
+    hour = int(match.group("hour"))
+    minute = int(match.group("minute"))
+    second = int(match.group("second"))
+    fraction = match.group("fraction")
+    fraction_ns = int((fraction + "000000000")[:9])
+    base = datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
+    return int(base.timestamp()) * 1_000_000_000 + fraction_ns
+
+
+def _parse_render_log_entries(text: str, fallback_year: int) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        kind = None
+        match = FAST_RE.search(line)
+        if match is not None:
+            kind = "preview"
+        else:
+            match = FINAL_RE.search(line)
+            if match is not None:
+                kind = "final"
+        if kind is None or match is None:
+            continue
+        wall_time_ns = _glog_line_time_ns(line, fallback_year)
+        if wall_time_ns is None:
+            continue
+        elapsed_ms = match.groupdict().get("elapsed")
+        progress = match.groupdict().get("progress")
+        source = match.groupdict().get("source")
+        entries.append(
+            {
+                "kind": kind,
+                "wall_time_ns": wall_time_ns,
+                "elapsed_ms": float(elapsed_ms) if elapsed_ms is not None else None,
+                "progress": float(progress) if progress is not None else None,
+                "source": source,
+                "line": line,
+            }
+        )
+    entries.sort(key=lambda entry: int(entry["wall_time_ns"]))
+    return entries
+
+
+class AtlasRenderLogFollower:
+    def __init__(self, path: str | Path, *, fallback_year: int) -> None:
+        self.path = Path(path)
+        self.fallback_year = int(fallback_year)
+        self._offset = self.path.stat().st_size if self.path.exists() else 0
+        self._pending: list[dict[str, Any]] = []
+
+    def _refresh(self) -> None:
+        if not self.path.exists():
+            return
+        size = self.path.stat().st_size
+        if size < self._offset:
+            self._offset = 0
+            self._pending.clear()
+        if size == self._offset:
+            return
+        with self.path.open("rb") as stream:
+            stream.seek(self._offset)
+            chunk = stream.read(size - self._offset)
+        self._offset = size
+        text = chunk.decode("utf-8", errors="replace")
+        self._pending.extend(_parse_render_log_entries(text, self.fallback_year))
+        self._pending.sort(key=lambda entry: int(entry["wall_time_ns"]))
+
+    def wait_for_next_marker(
+        self,
+        *,
+        kind: str,
+        start_ns: int,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        deadline = time.monotonic() + max(0.0, float(timeout_seconds))
+        while True:
+            self._refresh()
+            kept: list[dict[str, Any]] = []
+            selected: dict[str, Any] | None = None
+            for entry in self._pending:
+                entry_time_ns = int(entry["wall_time_ns"])
+                if entry_time_ns < start_ns:
+                    continue
+                if selected is None and entry["kind"] == kind:
+                    selected = entry
+                    continue
+                kept.append(entry)
+            self._pending = kept
+            if selected is not None:
+                return selected
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Timed out waiting for Atlas {kind} marker after {timeout_seconds:.3f}s "
+                    f"from wall_time_ns={start_ns} in {self.path}"
+                )
+            time.sleep(0.05)
+
+
+def _log_render_marker(
+    logger: EventLogger,
+    *,
+    event_name: str,
+    action_name: str,
+    start_record: dict[str, Any],
+    marker: dict[str, Any],
+    step_index: int | None = None,
+    total_steps: int | None = None,
+) -> None:
+    marker_wall_time_ns = int(marker["wall_time_ns"])
+    start_wall_time_ns = int(start_record["wall_time_ns"])
+    logger.log(
+        event_name,
+        action=action_name,
+        step=step_index,
+        steps=total_steps,
+        start_wall_time_ns=start_wall_time_ns,
+        marker_wall_time_ns=marker_wall_time_ns,
+        client_ms=max(0.0, (marker_wall_time_ns - start_wall_time_ns) / 1_000_000.0),
+        engine_elapsed_ms=marker.get("elapsed_ms"),
+        progress=marker.get("progress"),
+        source=marker.get("source"),
+        marker_kind=marker.get("kind"),
+        line=marker.get("line"),
+    )
 
 
 def _loaded_ids(task_status: dict[str, Any]) -> list[int]:
@@ -325,6 +478,9 @@ def _run_action(
     capture_screenshots: bool,
     pre_action_delay_seconds: float,
     step_hold_seconds: float | None,
+    log_follower: AtlasRenderLogFollower | None,
+    preview_timeout_seconds: float,
+    final_timeout_seconds: float,
 ) -> None:
     logger.log(
         "action_start",
@@ -349,7 +505,7 @@ def _run_action(
     for step_index, camera in enumerate(cameras, start=1):
         if step_index > 1 and interval_ns > 0:
             sleep_until(start_monotonic_ns + (step_index - 1) * interval_ns)
-        logger.log(
+        step_record = logger.log(
             "action_step",
             action=action.name,
             step=step_index,
@@ -357,9 +513,38 @@ def _run_action(
             camera=camera.to_json(),
         )
         _apply_camera(client, camera.to_atlas_typed_value())
+        if log_follower is not None:
+            preview_marker = log_follower.wait_for_next_marker(
+                kind="preview",
+                start_ns=int(step_record["wall_time_ns"]),
+                timeout_seconds=preview_timeout_seconds,
+            )
+            _log_render_marker(
+                logger,
+                event_name="action_step_preview_complete",
+                action_name=action.name,
+                start_record=step_record,
+                marker=preview_marker,
+                step_index=step_index,
+                total_steps=len(cameras),
+            )
+            final_marker = log_follower.wait_for_next_marker(
+                kind="final",
+                start_ns=int(step_record["wall_time_ns"]),
+                timeout_seconds=final_timeout_seconds,
+            )
+            _log_render_marker(
+                logger,
+                event_name="action_step_final_complete",
+                action_name=action.name,
+                start_record=step_record,
+                marker=final_marker,
+                step_index=step_index,
+                total_steps=len(cameras),
+            )
 
     logger.log("action_end", action=action.name)
-    if action.settle_seconds > 0:
+    if log_follower is None and action.settle_seconds > 0:
         time.sleep(action.settle_seconds)
     logger.log("action_settle_complete", action=action.name)
 
@@ -389,6 +574,9 @@ def _run_open_action(
     enable_full_resolution: bool,
     compositing_mode: str | None,
     hide_bound_box: bool,
+    log_follower: AtlasRenderLogFollower | None,
+    preview_timeout_seconds: float,
+    final_timeout_seconds: float,
 ) -> list[int]:
     logger.log(
         "action_start",
@@ -444,16 +632,41 @@ def _run_open_action(
     cameras = interpolate_action_cameras(spec, action)
     if len(cameras) != 1:
         raise RuntimeError("open action must resolve to exactly one camera state")
-    logger.log(
+    open_target_record = logger.log(
         "open_target_view_requested",
         app="atlas",
         camera=cameras[0].to_json(),
     )
     _apply_camera(client, cameras[0].to_atlas_typed_value())
+    if log_follower is not None:
+        preview_marker = log_follower.wait_for_next_marker(
+            kind="preview",
+            start_ns=int(open_target_record["wall_time_ns"]),
+            timeout_seconds=preview_timeout_seconds,
+        )
+        _log_render_marker(
+            logger,
+            event_name="open_preview_complete",
+            action_name=action.name,
+            start_record=open_target_record,
+            marker=preview_marker,
+        )
+        final_marker = log_follower.wait_for_next_marker(
+            kind="final",
+            start_ns=int(open_target_record["wall_time_ns"]),
+            timeout_seconds=final_timeout_seconds,
+        )
+        _log_render_marker(
+            logger,
+            event_name="open_final_complete",
+            action_name=action.name,
+            start_record=open_target_record,
+            marker=final_marker,
+        )
 
     logger.log("dataset_load_done", app="atlas", ids=ids)
     logger.log("action_end", action=action.name)
-    if action.settle_seconds > 0:
+    if log_follower is None and action.settle_seconds > 0:
         time.sleep(action.settle_seconds)
     logger.log("action_settle_complete", action=action.name)
 
@@ -574,6 +787,34 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--atlas-log-path",
+        default="",
+        help=(
+            "Optional Atlas application log file containing "
+            "ATLAS_BENCHMARK_FAST_PREVIEW_DONE / ATLAS_BENCHMARK_RENDER_FINISHED. "
+            "When provided, the driver waits for those markers instead of relying on "
+            "--step-hold-seconds and action settle sleeps."
+        ),
+    )
+    parser.add_argument(
+        "--log-year",
+        type=int,
+        default=datetime.now().year,
+        help="Fallback year for Atlas glog timestamps when the log omits the year.",
+    )
+    parser.add_argument(
+        "--preview-timeout-seconds",
+        type=float,
+        default=900.0,
+        help="Timeout while waiting for the next Atlas preview marker.",
+    )
+    parser.add_argument(
+        "--final-timeout-seconds",
+        type=float,
+        default=3600.0,
+        help="Timeout while waiting for the next Atlas final marker.",
+    )
+    parser.add_argument(
         "--sample-rss",
         action="store_true",
         help="Sample RSS during the run. Requires --rss-target-pid for the Atlas process.",
@@ -603,6 +844,7 @@ def main() -> int:
     memory_sampler = None
     memory_summary_path = output_dir / "atlas_memory_summary.json"
     loaded_ids: list[int] = []
+    log_follower: AtlasRenderLogFollower | None = None
 
     try:
         if args.sample_rss and not args.rss_target_pid:
@@ -613,6 +855,16 @@ def main() -> int:
             raise ValueError(
                 "--canvas-logical-width and --canvas-logical-height must be provided together"
             )
+        if args.atlas_log_path:
+            atlas_log_path = Path(args.atlas_log_path).resolve()
+            if not atlas_log_path.exists():
+                raise FileNotFoundError(
+                    f"--atlas-log-path does not exist: {atlas_log_path}"
+                )
+            log_follower = AtlasRenderLogFollower(
+                atlas_log_path, fallback_year=int(args.log_year)
+            )
+        render_wait_mode = "log-markers" if log_follower is not None else "fixed-delay"
 
         logger.log(
             "session_start",
@@ -629,6 +881,14 @@ def main() -> int:
                 }
             ),
             step_hold_seconds=args.step_hold_seconds,
+            render_wait_mode=render_wait_mode,
+            atlas_log_path=(
+                str(Path(args.atlas_log_path).resolve())
+                if args.atlas_log_path
+                else None
+            ),
+            preview_timeout_seconds=float(args.preview_timeout_seconds),
+            final_timeout_seconds=float(args.final_timeout_seconds),
             compositing_mode=args.compositing_mode,
             hide_background=bool(args.hide_background),
             hide_axis=bool(args.hide_axis),
@@ -697,6 +957,9 @@ def main() -> int:
                 not args.disable_full_resolution,
                 args.compositing_mode,
                 args.hide_bound_box,
+                log_follower,
+                args.preview_timeout_seconds,
+                args.final_timeout_seconds,
             )
             actions = actions[1:]
         else:
@@ -762,6 +1025,9 @@ def main() -> int:
                 args.capture_screenshots,
                 args.pre_action_delay_seconds,
                 args.step_hold_seconds,
+                log_follower,
+                args.preview_timeout_seconds,
+                args.final_timeout_seconds,
             )
 
         logger.log("session_end", app="atlas", ok=True)

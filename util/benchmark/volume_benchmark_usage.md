@@ -63,7 +63,9 @@ Notes:
 - Atlas RPC tasks persist after completion until `DeleteTask`; the driver explicitly deletes the finished load task so it does not leave stale task metadata behind.
 - If the first action in the camera spec is named `open`, the driver measures dataset load plus the first rendered view as the `open` action.
 - Both drivers support `--pre-action-delay-seconds` so the capture observer can sample a clean baseline frame before each action starts changing the image.
-- For simple deterministic Atlas timing, launch Atlas with `--atlas_log_benchmark_render_timings` and use `--step-hold-seconds` in the driver so each camera state has time to finish before the next command is sent. The log then emits `ATLAS_BENCHMARK_FAST_PREVIEW_DONE` and, when applicable, `ATLAS_BENCHMARK_RENDER_FINISHED`.
+- For deterministic Atlas timing, launch Atlas with `--atlas_log_benchmark_render_timings`. If you also pass `--atlas-log-path`, the driver follows the live Atlas log and waits for `ATLAS_BENCHMARK_FAST_PREVIEW_DONE` and `ATLAS_BENCHMARK_RENDER_FINISHED` after each requested state. This is the recommended mode for large or out-of-core datasets because it removes the need to guess `--step-hold-seconds`.
+- `--step-hold-seconds` remains available as a fallback when no Atlas log path is provided.
+- Use `--preview-timeout-seconds` and `--final-timeout-seconds` to control how long the driver waits for each preview/final marker in log-driven mode.
 - `--canvas-logical-width/--canvas-logical-height` resizes the live 3D canvas itself. On macOS Retina, `1000x750` logical typically produces `2000x1500` physical rendering.
 - By default the Atlas driver enables the object parameter `Full Resolution Rendering` on any loaded object that exposes it. Pass `--disable-full-resolution` to benchmark Atlas's fast/downsampled path instead.
 - Pass `--hide-background`, `--hide-axis`, and `--hide-bound-box` to disable Atlas's background gradient, axis pseudo-object, and image bound-box overlay during the benchmark. This is recommended when comparing against ParaView volume renders that do not show equivalent overlays.
@@ -74,7 +76,7 @@ For repeated deterministic Atlas runs with persisted open/step metrics and aggre
 
 ```bash
 python /Users/feng/code/atlas/util/benchmark/atlas_deterministic_batch.py \
-  --atlas-log-path /path/to/atlas.log \
+  --atlas-log-path /Users/feng/Library/Logs/Atlas/ \
   --atlas-pid <atlas_pid> \
   --output-root /Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_manual \
   --canvas-logical-width 1000 \
@@ -82,6 +84,8 @@ python /Users/feng/code/atlas/util/benchmark/atlas_deterministic_batch.py \
   --hide-background \
   --hide-axis \
   --hide-bound-box \
+  --preview-timeout-seconds 900 \
+  --final-timeout-seconds 3600 \
   --sample-rss
 ```
 
@@ -94,6 +98,10 @@ That produces:
 - `aggregate/action_step_stats.json`: pooled per-step preview/final timing statistics by action
 - `aggregate/step_index_stats.json`: statistics for step 1, step 2, ... across measured runs
 - `aggregate/all_measured_steps.jsonl`: every measured Atlas step with parsed preview/final timing fields
+
+If `--atlas-log-path` points to a directory, the batch runner automatically picks the newest
+`atlas_info_*_log.txt` file under that directory and passes the resolved file path down to the
+driver.
 
 Important Atlas open metrics:
 
