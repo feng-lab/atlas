@@ -66,7 +66,9 @@ Notes:
 - For simple deterministic Atlas timing, launch Atlas with `--atlas_log_benchmark_render_timings` and use `--step-hold-seconds` in the driver so each camera state has time to finish before the next command is sent. The log then emits `ATLAS_BENCHMARK_FAST_PREVIEW_DONE` and, when applicable, `ATLAS_BENCHMARK_RENDER_FINISHED`.
 - `--canvas-logical-width/--canvas-logical-height` resizes the live 3D canvas itself. On macOS Retina, `1000x750` logical typically produces `2000x1500` physical rendering.
 - By default the Atlas driver enables the object parameter `Full Resolution Rendering` on any loaded object that exposes it. Pass `--disable-full-resolution` to benchmark Atlas's fast/downsampled path instead.
+- Pass `--hide-background`, `--hide-axis`, and `--hide-bound-box` to disable Atlas's background gradient, axis pseudo-object, and image bound-box overlay during the benchmark. This is recommended when comparing against ParaView volume renders that do not show equivalent overlays.
 - The driver reapplies the requested canvas size after loading the dataset, because object dock/layout changes can otherwise shrink the central 3D canvas after the initial resize.
+- For `open`, the Atlas driver now logs an explicit `open_target_view_requested` event immediately before the final camera apply. The batch parser uses that marker, when available, to distinguish the intended target-view render from earlier preview work triggered by load-time parameter changes.
 
 For repeated deterministic Atlas runs with persisted open/step metrics and aggregate summaries:
 
@@ -77,6 +79,9 @@ python /Users/feng/code/atlas/util/benchmark/atlas_deterministic_batch.py \
   --output-root /Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_manual \
   --canvas-logical-width 1000 \
   --canvas-logical-height 750 \
+  --hide-background \
+  --hide-axis \
+  --hide-bound-box \
   --sample-rss
 ```
 
@@ -89,6 +94,21 @@ That produces:
 - `aggregate/action_step_stats.json`: pooled per-step preview/final timing statistics by action
 - `aggregate/step_index_stats.json`: statistics for step 1, step 2, ... across measured runs
 - `aggregate/all_measured_steps.jsonl`: every measured Atlas step with parsed preview/final timing fields
+
+Important Atlas open metrics:
+
+- `open_total_to_first_preview_ms`: action start to the first preview of the intended target view
+- `open_total_to_final_ms`: action start to the first final frame of the intended target view
+- `open_target_view_to_first_preview_ms`: target-view request to first preview
+- `open_target_view_to_final_ms`: target-view request to first final frame
+- `open_target_view_preview_to_final_ms`: derived preview-to-final settle interval for the intended target view. If the final marker has `source=renderFast`, Atlas finished in the fast pass and this interval is reported as `0`.
+- `open_postload_to_*`: load-and-camera completion to the next render marker; useful, but in historical runs these can miss a preview if the render thread beat the client-side `dataset_load_done` log by a few milliseconds
+
+Important Atlas per-step metrics:
+
+- `preview_client_ms`: step start to the first `ATLAS_BENCHMARK_FAST_PREVIEW_DONE`
+- `final_client_ms`: step start to the first `ATLAS_BENCHMARK_RENDER_FINISHED`
+- `preview_to_final_client_ms`: `final_marker - preview_marker` for the same step. If the final marker has `source=renderFast`, Atlas finished in the fast pass and this interval is reported as `0`.
 
 ## ParaView
 
@@ -126,6 +146,29 @@ applies `Scale Vec3 = [1, 1, 5.0472259521484375]`, so the ParaView benchmark sho
   --capture-screenshots
 ```
 
+### OSPRay Launch Fix On macOS
+
+The ParaView 6.1.0 RC1 macOS app bundle in `/Applications` is missing the unversioned
+`libopenvkl_module_cpu_device.dylib` filename that OpenVKL tries to load for OSPRay volume
+rendering. The benchmark utilities include a small launch wrapper that adds a shim directory with
+that missing name and prepends it to `DYLD_LIBRARY_PATH`.
+
+Launch the GUI with:
+
+```bash
+/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh paraview
+```
+
+Launch `pvpython` with:
+
+```bash
+/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh pvpython \
+  /Users/feng/code/atlas/util/benchmark/paraview_volume_benchmark.py --help
+```
+
+Without that wrapper, `OSPRay Based` volume rendering can fail with OpenVKL device-loader errors
+even though ParaView reports OSPRay support.
+
 Supported ParaView channel modes:
 
 - `component`: render one selected component with one transfer function
@@ -152,6 +195,59 @@ That produces:
 - `aggregate/pooled_frame_stats.json`: pooled interactive/still frame statistics across measured runs
 - `aggregate/frame_index_stats.json`: statistics for frame 1, frame 2, ... across measured runs
 - `aggregate/all_measured_frames.jsonl`: every measured internal render frame with run labels
+
+To run the deterministic batch with ParaView's stock `OSPRay Based` volume representation on macOS,
+launch through the OpenVKL wrapper and keep view-level ray tracing disabled:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/paraview_deterministic_batch.py \
+  --launch-wrapper /Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh \
+  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense_atlasscenespace.mhd \
+  --array-name MetaImage \
+  --volume-rendering-mode ospray \
+  --blend-mode composite \
+  --deterministic-mode interactive-plus-final \
+  --output-root /Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_ospray_deterministic_interactive_plus_final_2000x1500
+```
+
+That batch preserves the same per-run and aggregate artifacts as the default runner, while also
+recording the wrapper path and effective OSPRay settings in the benchmark config and summary.
+
+If you want to benchmark ParaView's separate view-level ray-tracing path explicitly, the driver can
+still lock and log those controls:
+
+```bash
+/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh pvpython \
+  /Users/feng/code/atlas/util/benchmark/paraview_volume_benchmark.py \
+  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.mhd \
+  --camera-spec /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
+  --output-dir /tmp/paraview_ospray_singlepass \
+  --array-name MetaImage \
+  --blend-mode composite \
+  --enable-ray-tracing \
+  --ray-tracing-backend "OSPRay raycaster" \
+  --samples-per-pixel 1 \
+  --progressive-passes 1 \
+  --ambient-samples 0 \
+  --denoise 0
+```
+
+The resulting `paraview_events.jsonl` and `paraview_timer_summary.json` both record the effective
+view-level ray-tracing settings. That is a different benchmark path from the stock
+`VolumeRenderingMode = OSPRay Based` representation and should be reported separately.
+
+For the stock deterministic OSPRay volume benchmark that aligns with the existing ParaView/Atlas
+deterministic runs, use:
+
+- dense `.mhd/.zraw` input, not blocked `.vtpd`
+- `VolumeRenderingMode = OSPRay Based`
+- `EnableRayTracing = 0`
+- `blend-mode = composite`
+
+If you explicitly benchmark view-level ray tracing instead, `ProgressivePasses > 1` changes the
+semantics: `t_to_final_view` becomes the completion of the last progressive pass rather than the
+first still render, and ParaView warns that iterative refinement requires the global
+`Enable Streaming` preference.
 
 Supported ParaView blend modes:
 

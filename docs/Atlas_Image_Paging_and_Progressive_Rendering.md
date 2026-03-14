@@ -164,7 +164,7 @@ SVG Diagrams
 Image Management
 
 - Source and scaling
-  - Z3DImg wraps a `ZImgPack` source and determines an on‑GPU working resolution that respects hardware limits. 3D inputs are downsampled so each side ≤ 512 when needed; 2D uses `Z3DGpuInfo::getDataScaleForTexture(...)`.
+  - Z3DImg wraps a `ZImgPack` source and determines an on‑GPU working resolution that respects hardware limits via `Z3DGpuInfo::getDataScaleForTexture(...)`. Inputs are downsampled only when they exceed the current GPU texture-size or memory constraints.
     - Constructor and scaling: src/atlas/z3dimg.cpp:70
   - Effective working volume and spacing are recorded as `m_volumeDimension` and `m_volumeSpacing`. Downsampled status governs fast vs. progressive path.
 - Channels and textures

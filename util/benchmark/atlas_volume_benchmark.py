@@ -27,6 +27,22 @@ from volume_benchmark_common import (
 
 CAMERA_JSON_KEY = "Camera 3DCamera"
 FULL_RESOLUTION_JSON_KEY = "Full Resolution Rendering Bool"
+COMPOSITING_JSON_KEY = "Compositing StringIntOption"
+BOUND_BOX_JSON_KEY = "Bound Box StringIntOption"
+NO_BOUND_BOX_VALUE = "No Bound Box"
+BACKGROUND_SCOPE_ID = 1
+AXIS_SCOPE_ID = 2
+SHOW_BACKGROUND_JSON_KEY = "Show Background Bool"
+SHOW_AXIS_JSON_KEY = "Show Axis Bool"
+COMPOSITING_MODE_CHOICES = (
+    "Direct Volume Rendering",
+    "Maximum Intensity Projection",
+    "MIP Opaque",
+    "Local MIP",
+    "Local MIP Opaque",
+    "ISO Surface",
+    "X Ray",
+)
 
 
 def _loaded_ids(task_status: dict[str, Any]) -> list[int]:
@@ -139,6 +155,148 @@ def _enable_full_resolution(
     return target_ids
 
 
+def _set_compositing_mode(
+    client: SceneClient,
+    ids: list[int],
+    logger: EventLogger,
+    compositing_mode: str,
+) -> list[int]:
+    target_ids: list[int] = []
+    for obj_id in ids:
+        params = client.list_params(id=int(obj_id))
+        for param in getattr(params, "params", []) or []:
+            if str(getattr(param, "json_key", "") or "") == COMPOSITING_JSON_KEY:
+                target_ids.append(int(obj_id))
+                break
+
+    if not target_ids:
+        logger.log(
+            "compositing_mode_not_supported",
+            app="atlas",
+            ids=ids,
+            json_key=COMPOSITING_JSON_KEY,
+            requested_value=compositing_mode,
+        )
+        return []
+
+    ok = client.apply_params(
+        [
+            {
+                "id": int(obj_id),
+                "json_key": COMPOSITING_JSON_KEY,
+                "value": compositing_mode,
+            }
+            for obj_id in target_ids
+        ]
+    )
+    if not ok:
+        raise RuntimeError(
+            "ApplySceneParams failed while setting Atlas compositing mode"
+        )
+    logger.log(
+        "compositing_mode_applied",
+        app="atlas",
+        ids=target_ids,
+        json_key=COMPOSITING_JSON_KEY,
+        value=compositing_mode,
+    )
+    return target_ids
+
+
+def _set_bound_box_mode(
+    client: SceneClient,
+    ids: list[int],
+    logger: EventLogger,
+    bound_box_mode: str,
+) -> list[int]:
+    target_ids: list[int] = []
+    for obj_id in ids:
+        params = client.list_params(id=int(obj_id))
+        for param in getattr(params, "params", []) or []:
+            if str(getattr(param, "json_key", "") or "") == BOUND_BOX_JSON_KEY:
+                target_ids.append(int(obj_id))
+                break
+
+    if not target_ids:
+        logger.log(
+            "bound_box_mode_not_supported",
+            app="atlas",
+            ids=ids,
+            json_key=BOUND_BOX_JSON_KEY,
+            requested_value=bound_box_mode,
+        )
+        return []
+
+    ok = client.apply_params(
+        [
+            {
+                "id": int(obj_id),
+                "json_key": BOUND_BOX_JSON_KEY,
+                "value": bound_box_mode,
+            }
+            for obj_id in target_ids
+        ]
+    )
+    if not ok:
+        raise RuntimeError("ApplySceneParams failed while setting Atlas bound box mode")
+    logger.log(
+        "bound_box_mode_applied",
+        app="atlas",
+        ids=target_ids,
+        json_key=BOUND_BOX_JSON_KEY,
+        value=bound_box_mode,
+    )
+    return target_ids
+
+
+def _set_scope_bool_param(
+    client: SceneClient,
+    scope_id: int,
+    json_key: str,
+    value: bool,
+    logger: EventLogger,
+    *,
+    event_name: str,
+    unsupported_event_name: str,
+) -> bool:
+    params = client.list_params(id=int(scope_id))
+    supported = any(
+        str(getattr(param, "json_key", "") or "") == json_key
+        for param in getattr(params, "params", []) or []
+    )
+    if not supported:
+        logger.log(
+            unsupported_event_name,
+            app="atlas",
+            scope_id=int(scope_id),
+            json_key=json_key,
+            requested_value=bool(value),
+        )
+        return False
+
+    ok = client.apply_params(
+        [
+            {
+                "id": int(scope_id),
+                "json_key": json_key,
+                "value": bool(value),
+            }
+        ]
+    )
+    if not ok:
+        raise RuntimeError(
+            f"ApplySceneParams failed while setting scope {scope_id} parameter {json_key!r}"
+        )
+    logger.log(
+        event_name,
+        app="atlas",
+        scope_id=int(scope_id),
+        json_key=json_key,
+        value=bool(value),
+    )
+    return True
+
+
 def _write_screenshot(
     client: SceneClient,
     output_dir: Path,
@@ -229,6 +387,8 @@ def _run_open_action(
     canvas_logical_width: int | None,
     canvas_logical_height: int | None,
     enable_full_resolution: bool,
+    compositing_mode: str | None,
+    hide_bound_box: bool,
 ) -> list[int]:
     logger.log(
         "action_start",
@@ -269,6 +429,10 @@ def _run_open_action(
 
     if enable_full_resolution:
         _enable_full_resolution(client, ids, logger)
+    if compositing_mode is not None:
+        _set_compositing_mode(client, ids, logger, compositing_mode)
+    if hide_bound_box:
+        _set_bound_box_mode(client, ids, logger, NO_BOUND_BOX_VALUE)
     _set_canvas_size(
         client,
         logger,
@@ -280,6 +444,11 @@ def _run_open_action(
     cameras = interpolate_action_cameras(spec, action)
     if len(cameras) != 1:
         raise RuntimeError("open action must resolve to exactly one camera state")
+    logger.log(
+        "open_target_view_requested",
+        app="atlas",
+        camera=cameras[0].to_json(),
+    )
     _apply_camera(client, cameras[0].to_atlas_typed_value())
 
     logger.log("dataset_load_done", app="atlas", ids=ids)
@@ -343,6 +512,30 @@ def parse_args() -> argparse.Namespace:
             "Do not enable Atlas 'Full Resolution Rendering' on loaded image objects. "
             "By default the benchmark enables it when the parameter is available."
         ),
+    )
+    parser.add_argument(
+        "--compositing-mode",
+        choices=COMPOSITING_MODE_CHOICES,
+        default=None,
+        help=(
+            "Optional Atlas volume compositing mode applied to loaded image objects, "
+            "for example 'MIP Opaque' or 'Direct Volume Rendering'."
+        ),
+    )
+    parser.add_argument(
+        "--hide-background",
+        action="store_true",
+        help="Hide the Atlas background pseudo-object during benchmark runs.",
+    )
+    parser.add_argument(
+        "--hide-axis",
+        action="store_true",
+        help="Hide the Atlas axis pseudo-object during benchmark runs.",
+    )
+    parser.add_argument(
+        "--hide-bound-box",
+        action="store_true",
+        help="Set loaded Atlas image objects to 'No Bound Box' during benchmark runs.",
     )
     parser.add_argument(
         "--task-timeout-seconds",
@@ -436,6 +629,10 @@ def main() -> int:
                 }
             ),
             step_hold_seconds=args.step_hold_seconds,
+            compositing_mode=args.compositing_mode,
+            hide_background=bool(args.hide_background),
+            hide_axis=bool(args.hide_axis),
+            hide_bound_box=bool(args.hide_bound_box),
         )
 
         if args.sample_rss:
@@ -454,6 +651,26 @@ def main() -> int:
 
         client.ensure_view()
         logger.log("engine_ready", app="atlas")
+        if args.hide_background:
+            _set_scope_bool_param(
+                client,
+                BACKGROUND_SCOPE_ID,
+                SHOW_BACKGROUND_JSON_KEY,
+                False,
+                logger,
+                event_name="background_hidden",
+                unsupported_event_name="background_hide_not_supported",
+            )
+        if args.hide_axis:
+            _set_scope_bool_param(
+                client,
+                AXIS_SCOPE_ID,
+                SHOW_AXIS_JSON_KEY,
+                False,
+                logger,
+                event_name="axis_hidden",
+                unsupported_event_name="axis_hide_not_supported",
+            )
         _set_canvas_size(
             client,
             logger,
@@ -478,6 +695,8 @@ def main() -> int:
                 args.canvas_logical_width,
                 args.canvas_logical_height,
                 not args.disable_full_resolution,
+                args.compositing_mode,
+                args.hide_bound_box,
             )
             actions = actions[1:]
         else:
@@ -519,6 +738,10 @@ def main() -> int:
 
             if not args.disable_full_resolution:
                 _enable_full_resolution(client, ids, logger)
+            if args.compositing_mode is not None:
+                _set_compositing_mode(client, ids, logger, args.compositing_mode)
+            if args.hide_bound_box:
+                _set_bound_box_mode(client, ids, logger, NO_BOUND_BOX_VALUE)
             _set_canvas_size(
                 client,
                 logger,

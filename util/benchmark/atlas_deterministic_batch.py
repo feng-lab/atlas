@@ -19,8 +19,12 @@ OPEN_METRICS = (
     "open_load_and_camera_ms",
     "open_total_to_first_preview_ms",
     "open_total_to_final_ms",
+    "open_target_view_to_first_preview_ms",
+    "open_target_view_to_final_ms",
+    "open_target_view_preview_to_final_ms",
     "open_postload_to_first_preview_ms",
     "open_postload_to_final_ms",
+    "open_postload_preview_to_final_ms",
     "open_preview_engine_elapsed_ms",
     "open_final_engine_elapsed_ms",
 )
@@ -30,10 +34,12 @@ STEP_METRICS = (
     "preview_engine_elapsed_ms",
     "final_client_ms",
     "final_engine_elapsed_ms",
+    "preview_to_final_client_ms",
 )
 
 FAST_PATTERN = "ATLAS_BENCHMARK_FAST_PREVIEW_DONE"
 FINAL_PATTERN = "ATLAS_BENCHMARK_RENDER_FINISHED"
+OPEN_TARGET_VIEW_LOOKBACK_NS = 50_000_000
 
 LOG_TIMESTAMP_RE = re.compile(
     r"^[IWEF](?:(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})|(?P<month2>\d{2})(?P<day2>\d{2})) "
@@ -123,6 +129,20 @@ def _stats(values: list[float]) -> dict[str, float | int | None]:
         if p25 is not None and p75 is not None
         else None,
     }
+
+
+def _preview_to_final_client_ms(
+    preview_entry: dict[str, Any] | None, final_entry: dict[str, Any] | None
+) -> float | None:
+    if preview_entry is None or final_entry is None:
+        return None
+    if final_entry.get("source") == "renderFast":
+        return 0.0
+    return max(
+        0.0,
+        (int(final_entry["wall_time_ns"]) - int(preview_entry["wall_time_ns"]))
+        / 1_000_000.0,
+    )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -234,6 +254,38 @@ def _parse_args() -> argparse.Namespace:
         "--disable-full-resolution",
         action="store_true",
         help="Do not enable Atlas 'Full Resolution Rendering' during the benchmark runs",
+    )
+    parser.add_argument(
+        "--compositing-mode",
+        choices=(
+            "Direct Volume Rendering",
+            "Maximum Intensity Projection",
+            "MIP Opaque",
+            "Local MIP",
+            "Local MIP Opaque",
+            "ISO Surface",
+            "X Ray",
+        ),
+        default=None,
+        help=(
+            "Optional Atlas compositing mode applied through "
+            "'Compositing StringIntOption' on loaded image objects."
+        ),
+    )
+    parser.add_argument(
+        "--hide-background",
+        action="store_true",
+        help="Hide the Atlas background pseudo-object during each benchmark run.",
+    )
+    parser.add_argument(
+        "--hide-axis",
+        action="store_true",
+        help="Hide the Atlas axis pseudo-object during each benchmark run.",
+    )
+    parser.add_argument(
+        "--hide-bound-box",
+        action="store_true",
+        help="Set loaded Atlas image objects to 'No Bound Box' during each benchmark run.",
     )
     parser.add_argument(
         "--log-year",
@@ -378,59 +430,111 @@ def _extract_run_metrics(
     )
     if open_start_ns is not None and dataset_load_done is not None:
         dataset_load_done_ns = int(dataset_load_done["wall_time_ns"])
+        target_view_event = next(
+            (
+                event
+                for event in events
+                if event.get("event") == "open_target_view_requested"
+            ),
+            None,
+        )
+        if target_view_event is not None:
+            target_view_request_ns = int(target_view_event["wall_time_ns"])
+            target_view_request_source = "event"
+        else:
+            target_view_request_ns = max(
+                open_start_ns, dataset_load_done_ns - OPEN_TARGET_VIEW_LOOKBACK_NS
+            )
+            target_view_request_source = "dataset_load_done_lookback"
         boundary_ns = next_action_start_ns.get("open", session_end_ns)
-        preview_entry = _first_matching(
+        preview_entry_target = _first_matching(
+            log_entries,
+            kind="preview",
+            start_ns=target_view_request_ns,
+            end_ns=boundary_ns,
+        )
+        preview_entry_postload = _first_matching(
             log_entries,
             kind="preview",
             start_ns=dataset_load_done_ns,
             end_ns=boundary_ns,
         )
-        final_entry = _first_matching(
+        final_entry_target = _first_matching(
+            log_entries,
+            kind="final",
+            start_ns=target_view_request_ns,
+            end_ns=boundary_ns,
+        )
+        final_entry_postload = _first_matching(
             log_entries, kind="final", start_ns=dataset_load_done_ns, end_ns=boundary_ns
         )
         open_metrics.update(
             {
                 "open_start_ns": open_start_ns,
                 "dataset_load_done_ns": dataset_load_done_ns,
+                "target_view_request_ns": target_view_request_ns,
+                "target_view_request_source": target_view_request_source,
                 "window_end_ns": boundary_ns,
                 "open_load_and_camera_ms": (dataset_load_done_ns - open_start_ns)
                 / 1_000_000.0,
-                "preview_found": preview_entry is not None,
-                "final_found": final_entry is not None,
+                "preview_found": preview_entry_target is not None,
+                "final_found": final_entry_target is not None,
                 "open_total_to_first_preview_ms": (
-                    (int(preview_entry["wall_time_ns"]) - open_start_ns) / 1_000_000.0
-                    if preview_entry is not None
+                    (int(preview_entry_target["wall_time_ns"]) - open_start_ns)
+                    / 1_000_000.0
+                    if preview_entry_target is not None
                     else None
                 ),
                 "open_total_to_final_ms": (
-                    (int(final_entry["wall_time_ns"]) - open_start_ns) / 1_000_000.0
-                    if final_entry is not None
+                    (int(final_entry_target["wall_time_ns"]) - open_start_ns)
+                    / 1_000_000.0
+                    if final_entry_target is not None
                     else None
                 ),
-                "open_postload_to_first_preview_ms": (
-                    (int(preview_entry["wall_time_ns"]) - dataset_load_done_ns)
+                "open_target_view_to_first_preview_ms": (
+                    (int(preview_entry_target["wall_time_ns"]) - target_view_request_ns)
                     / 1_000_000.0
-                    if preview_entry is not None
+                    if preview_entry_target is not None
+                    else None
+                ),
+                "open_target_view_to_final_ms": (
+                    (int(final_entry_target["wall_time_ns"]) - target_view_request_ns)
+                    / 1_000_000.0
+                    if final_entry_target is not None
+                    else None
+                ),
+                "open_target_view_preview_to_final_ms": _preview_to_final_client_ms(
+                    preview_entry_target, final_entry_target
+                ),
+                "open_postload_to_first_preview_ms": (
+                    (int(preview_entry_postload["wall_time_ns"]) - dataset_load_done_ns)
+                    / 1_000_000.0
+                    if preview_entry_postload is not None
                     else None
                 ),
                 "open_postload_to_final_ms": (
-                    (int(final_entry["wall_time_ns"]) - dataset_load_done_ns)
+                    (int(final_entry_postload["wall_time_ns"]) - dataset_load_done_ns)
                     / 1_000_000.0
-                    if final_entry is not None
+                    if final_entry_postload is not None
                     else None
                 ),
+                "open_postload_preview_to_final_ms": _preview_to_final_client_ms(
+                    preview_entry_postload, final_entry_postload
+                ),
                 "open_preview_engine_elapsed_ms": (
-                    float(preview_entry["elapsed_ms"])
-                    if preview_entry is not None
+                    float(preview_entry_target["elapsed_ms"])
+                    if preview_entry_target is not None
                     else None
                 ),
                 "open_final_engine_elapsed_ms": (
-                    float(final_entry["elapsed_ms"])
-                    if final_entry is not None
+                    float(final_entry_target["elapsed_ms"])
+                    if final_entry_target is not None
                     else None
                 ),
-                "preview_log_entry": preview_entry,
-                "final_log_entry": final_entry,
+                "preview_log_entry": preview_entry_target,
+                "final_log_entry": final_entry_target,
+                "preview_log_entry_postload": preview_entry_postload,
+                "final_log_entry_postload": final_entry_postload,
             }
         )
 
@@ -487,6 +591,9 @@ def _extract_run_metrics(
                         float(final_entry["elapsed_ms"])
                         if final_entry is not None
                         else None
+                    ),
+                    "preview_to_final_client_ms": _preview_to_final_client_ms(
+                        preview_entry, final_entry
                     ),
                     "preview_source": preview_entry.get("source")
                     if preview_entry is not None
@@ -556,6 +663,14 @@ def _run_command(
         command.append("--capture-screenshots")
     if args.disable_full_resolution:
         command.append("--disable-full-resolution")
+    if args.compositing_mode is not None:
+        command.extend(["--compositing-mode", args.compositing_mode])
+    if args.hide_background:
+        command.append("--hide-background")
+    if args.hide_axis:
+        command.append("--hide-axis")
+    if args.hide_bound_box:
+        command.append("--hide-bound-box")
     if args.sample_rss:
         if not args.atlas_pid:
             raise ValueError("--sample-rss requires --atlas-pid")
@@ -648,6 +763,9 @@ def _aggregate_runs(
         "run_labels": [run.label for run in runs],
         "warmup_labels": [run.label for run in warmup_runs],
         "measured_labels": [run.label for run in measured_runs],
+        "hide_background": bool(args.hide_background),
+        "hide_axis": bool(args.hide_axis),
+        "hide_bound_box": bool(args.hide_bound_box),
     }
     (aggregate_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
@@ -845,6 +963,10 @@ def _aggregate_runs(
             "final_engine_elapsed_ms_median",
             "final_engine_elapsed_ms_p95",
             "final_engine_elapsed_ms_stdev",
+            "preview_to_final_client_ms_mean",
+            "preview_to_final_client_ms_median",
+            "preview_to_final_client_ms_p95",
+            "preview_to_final_client_ms_stdev",
         ],
     )
 
@@ -883,6 +1005,9 @@ def _aggregate_runs(
             "final_engine_elapsed_ms_mean",
             "final_engine_elapsed_ms_median",
             "final_engine_elapsed_ms_p95",
+            "preview_to_final_client_ms_mean",
+            "preview_to_final_client_ms_median",
+            "preview_to_final_client_ms_p95",
         ],
     )
 
@@ -915,6 +1040,7 @@ def _aggregate_runs(
         f"- Atlas log: `{Path(args.atlas_log_path).resolve()}`",
         f"- Runs: `{args.warmup_runs}` warm-up + `{args.measured_runs}` measured",
         f"- Step hold: `{float(args.step_hold_seconds):.3f} s`",
+        f"- Compositing mode: `{args.compositing_mode or 'unchanged'}`",
         f"- Output root: `{root}`",
         "",
         "## Open",
@@ -924,8 +1050,10 @@ def _aggregate_runs(
         "open_load_and_camera_ms",
         "open_total_to_first_preview_ms",
         "open_total_to_final_ms",
+        "open_target_view_preview_to_final_ms",
         "open_postload_to_first_preview_ms",
         "open_postload_to_final_ms",
+        "open_postload_preview_to_final_ms",
     ):
         stats = open_metric_stats.get(metric_name)
         if stats and stats["count"]:
@@ -996,6 +1124,7 @@ def main() -> int:
         "warmup_runs": int(args.warmup_runs),
         "measured_runs": int(args.measured_runs),
         "step_hold_seconds": float(args.step_hold_seconds),
+        "compositing_mode": args.compositing_mode,
         "task_timeout_seconds": float(args.task_timeout_seconds),
         "ready_timeout_seconds": float(args.ready_timeout_seconds),
         "pre_action_delay_seconds": float(args.pre_action_delay_seconds),

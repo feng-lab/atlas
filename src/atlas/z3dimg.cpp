@@ -109,14 +109,11 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vecto
     VLOG(1) << dr;
   }
   const ZImgInfo& info = m_imgPack.imgInfo();
-  if (info.depth > 1) {
-    m_widthScale = info.width <= 512_uz ? 1.0 : 512.0 / info.width;
-    m_heightScale = info.height <= 512_uz ? 1.0 : 512.0 / info.height;
-    m_depthScale = info.depth <= 512_uz ? 1.0 : 512.0 / info.depth;
-  } else {
-    Z3DGpuInfo::instance()
-      .getDataScaleForTexture(info.width, info.height, info.depth, m_widthScale, m_heightScale, m_depthScale);
-  }
+  // The preview volume should be downsampled only when it actually exceeds the current
+  // backend's texture-size / memory limits. A fixed 512^3 cap incorrectly forces paging
+  // for datasets that fit the GPU natively.
+  Z3DGpuInfo::instance()
+    .getDataScaleForTexture(info.width, info.height, info.depth, m_widthScale, m_heightScale, m_depthScale);
   m_isVolumeDownsampled = m_widthScale != 1.0 || m_heightScale != 1.0 || m_depthScale != 1.0;
 
   m_volumeDimension = glm::uvec3(info.width * m_widthScale, info.height * m_heightScale, info.depth * m_depthScale);

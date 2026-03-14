@@ -28,6 +28,12 @@ BLEND_MODE_VALUES = {
     "isosurface": 5,
     "slice": 6,
 }
+VOLUME_RENDER_MODE_VALUES = {
+    "smart": 0,
+    "ray-cast-only": 1,
+    "gpu-based": 2,
+    "ospray-based": 3,
+}
 DETERMINISTIC_MODES = (
     "interactive-plus-final",
     "direct-final",
@@ -93,6 +99,13 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _parse_optional_int_env(name: str) -> int | None:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return None
+    return int(value)
+
+
 def _parse_rgb_triplet_text(value: str | None) -> tuple[float, float, float] | None:
     if value is None:
         return None
@@ -143,6 +156,22 @@ def _parse_args() -> argparse.Namespace:
     rss_sample_interval_default = float(
         os.environ.get("PARAVIEW_BENCHMARK_RSS_SAMPLE_INTERVAL_SECONDS", "0.1")
     )
+    enable_ray_tracing_default = _env_bool(
+        "PARAVIEW_BENCHMARK_ENABLE_RAY_TRACING", default=False
+    )
+    ray_tracing_backend_default = os.environ.get(
+        "PARAVIEW_BENCHMARK_RAY_TRACING_BACKEND"
+    )
+    samples_per_pixel_default = _parse_optional_int_env(
+        "PARAVIEW_BENCHMARK_SAMPLES_PER_PIXEL"
+    )
+    progressive_passes_default = _parse_optional_int_env(
+        "PARAVIEW_BENCHMARK_PROGRESSIVE_PASSES"
+    )
+    ambient_samples_default = _parse_optional_int_env(
+        "PARAVIEW_BENCHMARK_AMBIENT_SAMPLES"
+    )
+    denoise_default = _parse_optional_int_env("PARAVIEW_BENCHMARK_DENOISE")
 
     parser = argparse.ArgumentParser(
         description=(
@@ -218,6 +247,15 @@ def _parse_args() -> argparse.Namespace:
         help="Volume blend mode. maximum-intensity matches Atlas MIP scenes.",
     )
     parser.add_argument(
+        "--volume-rendering-mode",
+        choices=tuple(VOLUME_RENDER_MODE_VALUES.keys()),
+        default=os.environ.get("PARAVIEW_BENCHMARK_VOLUME_RENDERING_MODE", "smart"),
+        help=(
+            "Explicit ParaView volume rendering mode. Use 'ospray-based' for the "
+            "stock OSPRay volume-mapper path."
+        ),
+    )
+    parser.add_argument(
         "--data-range-min",
         type=float,
         default=float(data_range_min_default)
@@ -276,6 +314,42 @@ def _parse_args() -> argparse.Namespace:
         default=rss_sample_interval_default,
         help="Sampling interval for --sample-rss.",
     )
+    parser.add_argument(
+        "--enable-ray-tracing",
+        action="store_true",
+        default=enable_ray_tracing_default,
+        help="Enable ParaView view-level ray tracing for OSPRay/ANARI controls.",
+    )
+    parser.add_argument(
+        "--ray-tracing-backend",
+        default=ray_tracing_backend_default,
+        help="Optional view-level ray tracing back end, e.g. 'OSPRay raycaster' or 'OSPRay pathtracer'.",
+    )
+    parser.add_argument(
+        "--samples-per-pixel",
+        type=int,
+        default=samples_per_pixel_default,
+        help="Optional view-level SamplesPerPixel override for ray tracing.",
+    )
+    parser.add_argument(
+        "--progressive-passes",
+        type=int,
+        default=progressive_passes_default,
+        help="Optional view-level ProgressivePasses override for ray tracing.",
+    )
+    parser.add_argument(
+        "--ambient-samples",
+        type=int,
+        default=ambient_samples_default,
+        help="Optional view-level AmbientSamples override for the OSPRay raycaster back end.",
+    )
+    parser.add_argument(
+        "--denoise",
+        type=int,
+        choices=(0, 1),
+        default=denoise_default,
+        help="Optional view-level denoise toggle for ray tracing.",
+    )
     return parser.parse_args()
 
 
@@ -293,12 +367,15 @@ def _configure_display(
     channel_mode: str,
     component: int,
     blend_mode: str,
+    volume_rendering_mode: str,
     data_range_min: float | None,
     data_range_max: float | None,
     color_min_rgb: tuple[float, float, float] | list[float] | None,
     color_max_rgb: tuple[float, float, float] | list[float] | None,
 ) -> None:
     display.SetRepresentationType("Volume")
+    if hasattr(display, "VolumeRenderingMode"):
+        display.VolumeRenderingMode = VOLUME_RENDER_MODE_VALUES[volume_rendering_mode]
     ColorBy(display, ("POINTS", array_name))
     display.BlendMode = BLEND_MODE_VALUES[blend_mode]
     if hasattr(display, "OpacityArrayName"):
@@ -363,6 +440,54 @@ def _write_screenshot(
         view,
         ImageResolution=[spec.viewport_width, spec.viewport_height],
     )
+
+
+def _maybe_get_view_property(view, name: str):
+    try:
+        value = getattr(view, name)
+    except Exception:
+        return None
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return str(value)
+
+
+def _configure_view_ray_tracing(view, args) -> dict[str, object]:
+    if args.enable_ray_tracing:
+        view.EnableRayTracing = 1
+    if args.ray_tracing_backend is not None:
+        view.BackEnd = str(args.ray_tracing_backend)
+    if args.samples_per_pixel is not None:
+        view.SamplesPerPixel = int(args.samples_per_pixel)
+    if args.progressive_passes is not None:
+        view.ProgressivePasses = int(args.progressive_passes)
+    if args.ambient_samples is not None:
+        view.AmbientSamples = int(args.ambient_samples)
+    if args.denoise is not None:
+        view.Denoise = int(args.denoise)
+
+    return {
+        "EnableRayTracing": _maybe_get_view_property(view, "EnableRayTracing"),
+        "BackEnd": _maybe_get_view_property(view, "BackEnd"),
+        "SamplesPerPixel": _maybe_get_view_property(view, "SamplesPerPixel"),
+        "ProgressivePasses": _maybe_get_view_property(view, "ProgressivePasses"),
+        "AmbientSamples": _maybe_get_view_property(view, "AmbientSamples"),
+        "Denoise": _maybe_get_view_property(view, "Denoise"),
+    }
+
+
+def _display_info(display, array_name: str) -> dict[str, object]:
+    return {
+        "Representation": _maybe_get_view_property(display, "Representation"),
+        "VolumeRenderingMode": _maybe_get_view_property(display, "VolumeRenderingMode"),
+        "BlendMode": _maybe_get_view_property(display, "BlendMode"),
+        "MapScalars": _maybe_get_view_property(display, "MapScalars"),
+        "MultiComponentsMapping": _maybe_get_view_property(
+            display, "MultiComponentsMapping"
+        ),
+        "ColorArrayName": _maybe_get_view_property(display, "ColorArrayName"),
+        "array_name": array_name,
+    }
 
 
 def _resolve_action_cameras(
@@ -541,6 +666,7 @@ def _write_timer_log_artifacts(
     runtime_mode: str,
     requested_view_size: list[int],
     actual_render_window_size: list[int],
+    ray_tracing_view_settings: dict[str, object] | None = None,
 ) -> None:
     timer_log_path = output_dir / "paraview_timer_log.txt"
     timer_log_standalone_path = output_dir / "paraview_timer_log_standalone.txt"
@@ -645,6 +771,7 @@ def _write_timer_log_artifacts(
         "runtime_mode": runtime_mode,
         "requested_view_size": requested_view_size,
         "actual_render_window_size": actual_render_window_size,
+        "ray_tracing_view_settings": ray_tracing_view_settings,
         "timer_log_path": str(timer_log_path),
         "timer_log_format": "indented_scopes_from_raw_events",
         "timer_log_standalone_path": str(timer_log_standalone_path),
@@ -731,10 +858,12 @@ def _run_open_action(
     logger: EventLogger,
     output_dir: Path,
     capture_screenshots: bool,
+    runtime_mode: str,
     requested_array_name: str,
     channel_mode: str,
     component: int,
     blend_mode: str,
+    volume_rendering_mode: str,
     data_range_min: float | None,
     data_range_max: float | None,
     color_min_rgb: tuple[float, float, float] | list[float] | None,
@@ -764,10 +893,17 @@ def _run_open_action(
             channel_mode,
             component,
             blend_mode,
+            volume_rendering_mode,
             data_range_min,
             data_range_max,
             color_min_rgb,
             color_max_rgb,
+        )
+        logger.log(
+            "display_info",
+            app="paraview",
+            runtime_mode=runtime_mode,
+            display_info=_display_info(display, resolved_array_name),
         )
         HideUnusedScalarBars(view=view)
 
@@ -814,6 +950,15 @@ def main() -> int:
             blend_mode=args.blend_mode,
             runtime_mode=runtime_mode,
             deterministic_mode=args.deterministic_mode,
+            requested_ray_tracing_view_settings={
+                "enable_ray_tracing": bool(args.enable_ray_tracing),
+                "ray_tracing_backend": args.ray_tracing_backend,
+                "samples_per_pixel": args.samples_per_pixel,
+                "progressive_passes": args.progressive_passes,
+                "ambient_samples": args.ambient_samples,
+                "denoise": args.denoise,
+            },
+            requested_volume_rendering_mode=args.volume_rendering_mode,
         )
 
         if args.sample_rss:
@@ -842,6 +987,7 @@ def main() -> int:
         view = GetActiveViewOrCreate("RenderView")
         view.ViewSize = [spec.viewport_width, spec.viewport_height]
         view.OrientationAxesVisibility = 0
+        ray_tracing_view_settings = _configure_view_ray_tracing(view, args)
         render_window = view.GetRenderWindow()
         actual_render_window_size = [int(v) for v in render_window.GetSize()]
         logger.log(
@@ -850,6 +996,7 @@ def main() -> int:
             runtime_mode=runtime_mode,
             requested_view_size=[int(spec.viewport_width), int(spec.viewport_height)],
             actual_render_window_size=actual_render_window_size,
+            ray_tracing_view_settings=ray_tracing_view_settings,
         )
         _reset_timer_log()
         actions = list(spec.actions)
@@ -864,10 +1011,12 @@ def main() -> int:
                 logger,
                 output_dir,
                 args.capture_screenshots,
+                runtime_mode,
                 args.array_name,
                 args.channel_mode,
                 args.component,
                 args.blend_mode,
+                args.volume_rendering_mode,
                 args.data_range_min,
                 args.data_range_max,
                 args.color_min_rgb,
@@ -887,10 +1036,17 @@ def main() -> int:
                 args.channel_mode,
                 args.component,
                 args.blend_mode,
+                args.volume_rendering_mode,
                 args.data_range_min,
                 args.data_range_max,
                 args.color_min_rgb,
                 args.color_max_rgb,
+            )
+            logger.log(
+                "display_info",
+                app="paraview",
+                runtime_mode=runtime_mode,
+                display_info=_display_info(display, resolved_array_name),
             )
             HideUnusedScalarBars(view=view)
             view.StillRender()
@@ -915,6 +1071,7 @@ def main() -> int:
             runtime_mode=runtime_mode,
             requested_view_size=[int(spec.viewport_width), int(spec.viewport_height)],
             actual_render_window_size=actual_render_window_size,
+            ray_tracing_view_settings=ray_tracing_view_settings,
         )
         logger.log("session_end", app="paraview", ok=True)
         return 0

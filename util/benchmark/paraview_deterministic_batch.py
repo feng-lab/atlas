@@ -38,9 +38,35 @@ class RunRecord:
     warmup: bool
     output_dir: Path
     elapsed_wall_seconds: float
+    process_returncode: int
+    accepted_postrun_crash: bool
     timer_summary: dict[str, Any]
     frame_timeline: list[dict[str, Any]]
     memory_summary: dict[str, Any] | None
+
+
+def _load_session_end_ok(events_path: Path) -> bool:
+    if not events_path.exists():
+        return False
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("event") == "session_end":
+            return bool(event.get("ok"))
+    return False
+
+
+def _artifacts_complete(run_dir: Path) -> bool:
+    required = (
+        run_dir / "paraview_events.jsonl",
+        run_dir / "paraview_timer_summary.json",
+        run_dir / "paraview_internal_frame_timeline.json",
+    )
+    return all(path.exists() for path in required)
 
 
 def _quantile(values: list[float], q: float) -> float | None:
@@ -133,6 +159,14 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--pvpython", default=DEFAULT_PVTHON, help="Path to pvpython")
     parser.add_argument(
+        "--launch-wrapper",
+        default="",
+        help=(
+            "Optional launcher placed before pvpython, for example "
+            "launch_paraview_with_ospray_fix.sh."
+        ),
+    )
+    parser.add_argument(
         "--benchmark-script",
         default=str(script_dir / "paraview_volume_benchmark.py"),
         help="Path to the ParaView benchmark driver script",
@@ -183,6 +217,12 @@ def _parse_args() -> argparse.Namespace:
         ),
         default="maximum-intensity",
         help="Volume blend mode",
+    )
+    parser.add_argument(
+        "--volume-rendering-mode",
+        choices=("smart", "ray-cast-only", "gpu-based", "ospray-based"),
+        default="smart",
+        help="Explicit ParaView volume rendering mode.",
     )
     parser.add_argument(
         "--data-range-min",
@@ -243,6 +283,41 @@ def _parse_args() -> argparse.Namespace:
         help="Optional initial delay inside each ParaView run",
     )
     parser.add_argument(
+        "--enable-ray-tracing",
+        action="store_true",
+        help="Enable ParaView view-level ray tracing for the benchmark runs.",
+    )
+    parser.add_argument(
+        "--ray-tracing-backend",
+        default="",
+        help="Optional view-level ray tracing backend, e.g. 'OSPRay raycaster'.",
+    )
+    parser.add_argument(
+        "--samples-per-pixel",
+        type=int,
+        default=None,
+        help="Optional view-level SamplesPerPixel override.",
+    )
+    parser.add_argument(
+        "--progressive-passes",
+        type=int,
+        default=None,
+        help="Optional view-level ProgressivePasses override.",
+    )
+    parser.add_argument(
+        "--ambient-samples",
+        type=int,
+        default=None,
+        help="Optional view-level AmbientSamples override.",
+    )
+    parser.add_argument(
+        "--denoise",
+        type=int,
+        choices=(0, 1),
+        default=None,
+        help="Optional view-level denoise toggle.",
+    )
+    parser.add_argument(
         "--extra-arg",
         action="append",
         default=[],
@@ -259,38 +334,47 @@ def _run_command(
     stdout_path = run_dir / "stdout.log"
     stderr_path = run_dir / "stderr.log"
 
-    command = [
-        str(Path(args.pvpython).resolve()),
-        str(Path(args.benchmark_script).resolve()),
-        "--dataset",
-        str(Path(args.dataset).resolve()),
-        "--camera-spec",
-        str(Path(args.camera_spec).resolve()),
-        "--output-dir",
-        str(run_dir.resolve()),
-        "--array-name",
-        args.array_name,
-        "--channel-mode",
-        args.channel_mode,
-        "--component",
-        str(int(args.component)),
-        "--blend-mode",
-        args.blend_mode,
-        "--data-range-min",
-        str(float(args.data_range_min)),
-        "--data-range-max",
-        str(float(args.data_range_max)),
-        "--color-min-rgb",
-        *(str(float(v)) for v in args.color_min_rgb),
-        "--color-max-rgb",
-        *(str(float(v)) for v in args.color_max_rgb),
-        "--deterministic-mode",
-        args.deterministic_mode,
-        "--pre-action-delay-seconds",
-        str(float(args.pre_action_delay_seconds)),
-        "--start-delay-seconds",
-        str(float(args.start_delay_seconds)),
-    ]
+    command: list[str] = []
+    if args.launch_wrapper:
+        command.extend([str(Path(args.launch_wrapper).resolve()), "pvpython"])
+    else:
+        command.append(str(Path(args.pvpython).resolve()))
+
+    command.extend(
+        [
+            str(Path(args.benchmark_script).resolve()),
+            "--dataset",
+            str(Path(args.dataset).resolve()),
+            "--camera-spec",
+            str(Path(args.camera_spec).resolve()),
+            "--output-dir",
+            str(run_dir.resolve()),
+            "--array-name",
+            args.array_name,
+            "--channel-mode",
+            args.channel_mode,
+            "--component",
+            str(int(args.component)),
+            "--blend-mode",
+            args.blend_mode,
+            "--volume-rendering-mode",
+            args.volume_rendering_mode,
+            "--data-range-min",
+            str(float(args.data_range_min)),
+            "--data-range-max",
+            str(float(args.data_range_max)),
+            "--color-min-rgb",
+            *(str(float(v)) for v in args.color_min_rgb),
+            "--color-max-rgb",
+            *(str(float(v)) for v in args.color_max_rgb),
+            "--deterministic-mode",
+            args.deterministic_mode,
+            "--pre-action-delay-seconds",
+            str(float(args.pre_action_delay_seconds)),
+            "--start-delay-seconds",
+            str(float(args.start_delay_seconds)),
+        ]
+    )
     if args.sample_rss:
         command.extend(
             [
@@ -299,6 +383,18 @@ def _run_command(
                 str(float(args.rss_sample_interval_seconds)),
             ]
         )
+    if args.enable_ray_tracing:
+        command.append("--enable-ray-tracing")
+    if args.ray_tracing_backend:
+        command.extend(["--ray-tracing-backend", args.ray_tracing_backend])
+    if args.samples_per_pixel is not None:
+        command.extend(["--samples-per-pixel", str(int(args.samples_per_pixel))])
+    if args.progressive_passes is not None:
+        command.extend(["--progressive-passes", str(int(args.progressive_passes))])
+    if args.ambient_samples is not None:
+        command.extend(["--ambient-samples", str(int(args.ambient_samples))])
+    if args.denoise is not None:
+        command.extend(["--denoise", str(int(args.denoise))])
     for extra_arg in args.extra_arg:
         command.append(extra_arg)
 
@@ -315,11 +411,16 @@ def _run_command(
             command, stdout=stdout_stream, stderr=stderr_stream, check=False
         )
     elapsed_wall_seconds = time.monotonic() - start
+    accepted_postrun_crash = False
     if completed.returncode != 0:
-        raise RuntimeError(
-            f"ParaView benchmark run {label} failed with exit code {completed.returncode}. "
-            f"See {stdout_path} and {stderr_path}."
-        )
+        if completed.returncode == -11 and _artifacts_complete(run_dir):
+            if _load_session_end_ok(run_dir / "paraview_events.jsonl"):
+                accepted_postrun_crash = True
+        if not accepted_postrun_crash:
+            raise RuntimeError(
+                f"ParaView benchmark run {label} failed with exit code {completed.returncode}. "
+                f"See {stdout_path} and {stderr_path}."
+            )
 
     timer_summary_path = run_dir / "paraview_timer_summary.json"
     frame_timeline_path = run_dir / "paraview_internal_frame_timeline.json"
@@ -336,6 +437,8 @@ def _run_command(
         warmup=warmup,
         output_dir=run_dir,
         elapsed_wall_seconds=elapsed_wall_seconds,
+        process_returncode=int(completed.returncode),
+        accepted_postrun_crash=accepted_postrun_crash,
         timer_summary=timer_summary,
         frame_timeline=frame_timeline,
         memory_summary=memory_summary,
@@ -361,16 +464,31 @@ def _aggregate_runs(
 
     manifest = {
         "pvpython": str(Path(args.pvpython).resolve()),
+        "launch_wrapper": (
+            str(Path(args.launch_wrapper).resolve()) if args.launch_wrapper else None
+        ),
         "benchmark_script": str(Path(args.benchmark_script).resolve()),
         "dataset": str(Path(args.dataset).resolve()),
         "camera_spec": str(Path(args.camera_spec).resolve()),
         "deterministic_mode": args.deterministic_mode,
+        "volume_rendering_mode": args.volume_rendering_mode,
         "warmup_runs": args.warmup_runs,
         "measured_runs": args.measured_runs,
         "run_count_total": len(runs),
         "run_labels": [run.label for run in runs],
         "warmup_labels": [run.label for run in warmup_runs],
         "measured_labels": [run.label for run in measured_runs],
+        "accepted_postrun_crash_labels": [
+            run.label for run in runs if run.accepted_postrun_crash
+        ],
+        "ray_tracing": {
+            "enable_ray_tracing": bool(args.enable_ray_tracing),
+            "backend": args.ray_tracing_backend or None,
+            "samples_per_pixel": args.samples_per_pixel,
+            "progressive_passes": args.progressive_passes,
+            "ambient_samples": args.ambient_samples,
+            "denoise": args.denoise,
+        },
     }
     (aggregate_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
@@ -382,6 +500,8 @@ def _aggregate_runs(
             "warmup": run.warmup,
             "output_dir": str(run.output_dir),
             "elapsed_wall_seconds": run.elapsed_wall_seconds,
+            "process_returncode": run.process_returncode,
+            "accepted_postrun_crash": run.accepted_postrun_crash,
             "timer_summary_path": str(run.output_dir / "paraview_timer_summary.json"),
             "frame_timeline_path": str(
                 run.output_dir / "paraview_internal_frame_timeline.json"
@@ -625,12 +745,27 @@ def _aggregate_runs(
         f"- Dataset: `{Path(args.dataset).resolve()}`",
         f"- Camera spec: `{Path(args.camera_spec).resolve()}`",
         f"- Mode: `{args.deterministic_mode}`",
+        f"- Volume rendering mode: `{args.volume_rendering_mode}`",
         f"- Runs: `{args.warmup_runs}` warm-up + `{args.measured_runs}` measured",
         f"- Output root: `{root}`",
         "",
-        "## Key results",
-        "",
     ]
+    accepted_postrun_crashes = [run for run in runs if run.accepted_postrun_crash]
+    if accepted_postrun_crashes:
+        lines.extend(
+            [
+                "- Note: some runs exited with `SIGSEGV` after writing complete artifacts and were "
+                "accepted as successful post-run teardown crashes.",
+                f"- Accepted post-run crash labels: `{', '.join(run.label for run in accepted_postrun_crashes)}`",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Key results",
+            "",
+        ]
+    )
     for action_name in sorted(pooled_frame_stats.keys()):
         lines.append(f"### {action_name}")
         interactive_entry = pooled_frame_stats[action_name].get("interactive")
@@ -713,6 +848,9 @@ def main() -> int:
 
     config = {
         "pvpython": str(Path(args.pvpython).resolve()),
+        "launch_wrapper": (
+            str(Path(args.launch_wrapper).resolve()) if args.launch_wrapper else None
+        ),
         "benchmark_script": str(Path(args.benchmark_script).resolve()),
         "dataset": str(Path(args.dataset).resolve()),
         "camera_spec": str(Path(args.camera_spec).resolve()),
@@ -723,6 +861,7 @@ def main() -> int:
         "channel_mode": args.channel_mode,
         "component": int(args.component),
         "blend_mode": args.blend_mode,
+        "volume_rendering_mode": args.volume_rendering_mode,
         "data_range_min": float(args.data_range_min),
         "data_range_max": float(args.data_range_max),
         "color_min_rgb": [float(v) for v in args.color_min_rgb],
@@ -731,6 +870,12 @@ def main() -> int:
         "sample_rss": bool(args.sample_rss),
         "rss_sample_interval_seconds": float(args.rss_sample_interval_seconds),
         "start_delay_seconds": float(args.start_delay_seconds),
+        "enable_ray_tracing": bool(args.enable_ray_tracing),
+        "ray_tracing_backend": args.ray_tracing_backend or None,
+        "samples_per_pixel": args.samples_per_pixel,
+        "progressive_passes": args.progressive_passes,
+        "ambient_samples": args.ambient_samples,
+        "denoise": args.denoise,
         "extra_args": list(args.extra_arg),
     }
     (root / "config.json").write_text(
