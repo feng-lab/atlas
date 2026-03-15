@@ -169,10 +169,16 @@ def main() -> int:
         )
 
     default_threshold = None
+    default_fraction_threshold = None
     for frame in frames:
         threshold = frame.get("pixel_threshold")
         if threshold is not None:
             default_threshold = float(threshold)
+            break
+    for frame in frames:
+        threshold = frame.get("changed_fraction_threshold")
+        if threshold is not None:
+            default_fraction_threshold = float(threshold)
             break
     pixel_threshold = (
         float(args.pixel_threshold)
@@ -194,12 +200,21 @@ def main() -> int:
         window_frames = [
             frame for frame in frames if start_ns <= frame_time_ns(frame) <= end_ns
         ]
-        changed_frames = [
-            frame
-            for frame in window_frames
-            if frame.get("diff_prev") is not None
-            and float(frame["diff_prev"]) > pixel_threshold
-        ]
+        if any(
+            frame.get("significant_change_prev") is not None for frame in window_frames
+        ):
+            changed_frames = [
+                frame
+                for frame in window_frames
+                if bool(frame.get("significant_change_prev"))
+            ]
+        else:
+            changed_frames = [
+                frame
+                for frame in window_frames
+                if frame.get("diff_prev") is not None
+                and float(frame["diff_prev"]) > pixel_threshold
+            ]
         changed_times_ns = [frame_time_ns(frame) for frame in changed_frames]
         changed_intervals_ms = [
             (cur - prev) / 1e6
@@ -207,8 +222,12 @@ def main() -> int:
         ]
         duration_ms = (end_ns - start_ns) / 1e6
         changed_count = len(changed_frames)
+        sample_count = len(window_frames)
         changed_fps = (
             (changed_count * 1000.0 / duration_ms) if duration_ms > 0.0 else None
+        )
+        capture_samples_per_second = (
+            (sample_count * 1000.0 / duration_ms) if duration_ms > 0.0 else None
         )
         interval_stats = _stats(changed_intervals_ms)
 
@@ -227,7 +246,9 @@ def main() -> int:
             "end_wall_ns": end_ns,
             "duration_ms": duration_ms,
             "pixel_threshold": pixel_threshold,
-            "sample_count_in_window": len(window_frames),
+            "changed_fraction_threshold": default_fraction_threshold,
+            "sample_count_in_window": sample_count,
+            "capture_samples_per_second": capture_samples_per_second,
             "changed_sample_count": changed_count,
             "changed_samples_per_second": changed_fps,
             "changed_interval_ms": interval_stats,

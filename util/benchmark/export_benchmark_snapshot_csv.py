@@ -205,7 +205,7 @@ RETAINED_GUI_SESSIONS: tuple[GuiSessionSpec, ...] = (
         render_mode="GPU Based + maximum-intensity",
         drag_duration_seconds=0.5,
         aggregate_summary_path=SLICE15_ROOT
-        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v2_centered/aggregate/summary.json",
+        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v3_centercrop/aggregate/summary.json",
     ),
     GuiSessionSpec(
         suite="short_rotate_0p5s",
@@ -216,29 +216,29 @@ RETAINED_GUI_SESSIONS: tuple[GuiSessionSpec, ...] = (
         render_mode="Maximum Intensity Projection",
         drag_duration_seconds=0.5,
         aggregate_summary_path=SLICE15_ROOT
-        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_v3_centered/aggregate/summary.json",
+        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_v4_centercrop/aggregate/summary.json",
     ),
     GuiSessionSpec(
-        suite="sustained_rotate_2p0s",
+        suite="sustained_rotate_5p0s",
         dataset="slice15_ch2",
         session="ParaView GUI Rotate",
         software="ParaView",
         input_desc="Blocked .vtpd",
         render_mode="GPU Based + maximum-intensity",
-        drag_duration_seconds=2.0,
+        drag_duration_seconds=5.0,
         aggregate_summary_path=SLICE15_ROOT
-        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate2s_v5_centered/aggregate/summary.json",
+        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate5s_v2_centercrop/aggregate/summary.json",
     ),
     GuiSessionSpec(
-        suite="sustained_rotate_2p0s",
+        suite="sustained_rotate_5p0s",
         dataset="slice15_ch2",
         session="Atlas GUI Rotate",
         software="Atlas",
         input_desc="Dense .nim",
         render_mode="Maximum Intensity Projection",
-        drag_duration_seconds=2.0,
+        drag_duration_seconds=5.0,
         aggregate_summary_path=SLICE15_ROOT
-        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate2s_v1_centered/aggregate/summary.json",
+        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate5s_v2_centercrop/aggregate/summary.json",
     ),
 )
 

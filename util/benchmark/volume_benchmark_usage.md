@@ -462,8 +462,10 @@ Use that to identify the target application window. Then create a calibration JS
 
 Important calibration fields:
 
-- `capture_region`: the render-pane rectangle used by the capture observer
+- `capture_region`: the render-area rectangle used by the ScreenCaptureKit observer
 - `input_region`: the Quartz input rectangle used for mouse injection
+- `analysis_region_norm`: optional normalized subregion inside `capture_region`; use this when a
+  centered ROI is enough to represent visible render changes
 - `region_coordinate_space`: `absolute` or `window-relative`
 - `actions`: the drag path(s), expressed as normalized coordinates inside `input_region`
 
@@ -476,6 +478,11 @@ If you want the calibration to survive app relaunches or minor window-position d
 
 - `region_coordinate_space: "window-relative"`
 - `capture_region` and `input_region` expressed relative to the matched top-level window origin
+
+For the retained GUI benchmark, `capture_region` should cover only the real render area. Do not
+include toolbars, overlays, or unrelated parts of the window. If the visible response is dominated
+by the center of the volume, you can set `analysis_region_norm` to a centered ROI and keep
+`input_region` larger for the actual drag path.
 
 ### 2. Build The ScreenCaptureKit Helper
 
@@ -491,15 +498,22 @@ CAPTURE_BIN=$(/Users/feng/code/atlas/util/benchmark/build_macos_window_capture_s
   --events /tmp/gui_benchmark/gui_events.jsonl \
   --output /tmp/gui_benchmark/capture_summary.json \
   --sample-hz 60 \
-  --pixel-threshold 0.1 \
+  --pixel-threshold 0 \
+  --changed-fraction-threshold 0 \
   --stable-frames 5 \
   --timeout-seconds 20
 ```
 
 The helper captures the matched window with ScreenCaptureKit and uses WindowServer frame status plus
-dirty-rect intersection with the calibrated `capture_region` to derive frame changes. It writes the
-same `capture_summary.json` and `capture_summary_frames.jsonl` artifacts expected by the existing
-summarizer.
+the calibrated `capture_region` as the actual ScreenCaptureKit `sourceRect`. It then derives
+visible changes from exact pixel differences inside the capture ROI, with timing anchored to
+`drag_start`/`drag_end` when those markers are present. The helper keeps the captured render-area
+frames in memory during the session and performs the pixel-difference analysis afterward so the
+capture callback stays lightweight. It writes the same `capture_summary.json` and
+`capture_summary_frames.jsonl` artifacts expected by the existing summarizer.
+
+Use a short still period before motion so the capture helper records a clean pre-drag baseline. The
+injector supports this with `pre_drag_still_seconds` in the calibration action.
 
 Use a timeout that comfortably covers:
 
@@ -540,11 +554,13 @@ python /Users/feng/code/atlas/util/benchmark/summarize_gui_capture_fps.py \
 The output summary reports:
 
 - action duration anchored to `drag_start` / `drag_end` when available
+- raw capture sample count and samples-per-second during the drag window
 - changed-sample count during the drag window
 - visible changed-samples-per-second
 - changed-frame interval statistics
 - derived visible FPS from the mean changed-frame interval
-- first-visible / final-stable timings copied from the capture summary when present
+- first substantial render-area change from the captured pre-drag baseline
+- final-stable timings copied from the capture summary when present
 
 The summarizer automatically calibrates ScreenCaptureKit's monotonic frame timestamps back into the
 event wall-clock domain, so it works with both:
@@ -583,6 +599,10 @@ The runner:
 - writes `gui_fps_summary.json` for each run
 - writes aggregate `summary.json` and `summary.md` under `aggregate/`
 
+For long drags or high-FPS exact-pixel captures, the ScreenCaptureKit helper can spend much longer
+in post-capture analysis than in the live capture itself. Use `--capture-process-wait-seconds` to
+raise the batch runner's wait budget when needed.
+
 ### Atlas GUI Batch Runner
 
 Use the Atlas batch runner when you want repeated real-GUI rotate measurements while keeping the
@@ -618,6 +638,10 @@ The runner:
 - writes `gui_fps_summary.json` for each run
 - writes aggregate `summary.json` and `summary.md` under `aggregate/`
 
+For long drags or high-FPS exact-pixel captures, the ScreenCaptureKit helper can spend much longer
+in post-capture analysis than in the live capture itself. Use `--capture-process-wait-seconds` to
+raise the batch runner's wait budget when needed.
+
 This Atlas GUI runner is intended for steady-state interaction benchmarking. It does not relaunch
 Atlas between measured runs. Instead it resets the camera back to the `open` benchmark state and
 waits for Atlas preview/final markers before starting the next capture.
@@ -632,7 +656,7 @@ python /Users/feng/code/atlas/util/benchmark/volume_benchmark_capture.py \
   --output /tmp/gui_benchmark/capture_summary.json \
   --x 100 --y 100 --width 2000 --height 1500 \
   --sample-hz 60 \
-  --pixel-threshold 1.0 \
+  --pixel-threshold 0 \
   --stable-frames 5
 ```
 

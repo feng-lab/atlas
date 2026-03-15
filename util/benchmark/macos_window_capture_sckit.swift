@@ -32,6 +32,7 @@ struct Calibration: Codable {
     let windowNameSubstring: String?
     let regionCoordinateSpace: String?
     let captureRegion: Region?
+    let analysisRegionNorm: Region?
 
     enum CodingKeys: String, CodingKey {
         case app
@@ -40,6 +41,7 @@ struct Calibration: Codable {
         case windowNameSubstring = "window_name_substring"
         case regionCoordinateSpace = "region_coordinate_space"
         case captureRegion = "capture_region"
+        case analysisRegionNorm = "analysis_region_norm"
     }
 }
 
@@ -50,10 +52,11 @@ struct Options {
     var outputPath: String?
     var framesOutputPath: String?
     var sampleHz = 60.0
-    var pixelThreshold = 1.0
+    var pixelThreshold = 0.0
+    var changedFractionThreshold = 0.0
     var stableFrames = 5
     var timeoutSeconds = 300.0
-    var queueDepth = 4
+    var queueDepth = 8
     var windowOwnerName: String?
     var windowTitleSubstring: String?
 }
@@ -71,8 +74,11 @@ struct ResolvedWindow {
     let ownerName: String
     let title: String
     let pointPixelScale: Double
+    let sourceRectAbsolute: CGRect
     let cropPoints: CGRect
     let cropPixels: CGRect
+    let analysisPoints: CGRect
+    let analysisPixels: CGRect
     let outputWidth: Int
     let outputHeight: Int
 }
@@ -196,6 +202,7 @@ func parseArgs() throws -> Options {
               --frames-output PATH
               --sample-hz N
               --pixel-threshold N
+              --changed-fraction-threshold N
               --stable-frames N
               --timeout-seconds N
               --queue-depth N
@@ -216,6 +223,11 @@ func parseArgs() throws -> Options {
             options.sampleHz = Double(try requireValue(arg)) ?? options.sampleHz
         case "--pixel-threshold":
             options.pixelThreshold = Double(try requireValue(arg)) ?? options.pixelThreshold
+        case "--changed-fraction-threshold":
+            options.changedFractionThreshold = max(
+                0.0,
+                min(1.0, Double(try requireValue(arg)) ?? options.changedFractionThreshold)
+            )
         case "--stable-frames":
             options.stableFrames = max(1, Int(try requireValue(arg)) ?? options.stableFrames)
         case "--timeout-seconds":
@@ -338,12 +350,98 @@ func stats(_ values: [Double]) -> [String: Any?] {
     ]
 }
 
+func normalizedSubregion(_ normalized: CGRect, within rect: CGRect) -> CGRect {
+    CGRect(
+        x: rect.origin.x + rect.width * normalized.origin.x,
+        y: rect.origin.y + rect.height * normalized.origin.y,
+        width: rect.width * normalized.width,
+        height: rect.height * normalized.height
+    )
+}
+
+func copyAnalysisFrameBGRA32(
+    pixelBuffer: CVPixelBuffer,
+    analysisRect: CGRect
+) -> [UInt32]? {
+    let integralRect = analysisRect.integral
+    guard integralRect.width > 0.0, integralRect.height > 0.0 else {
+        return nil
+    }
+
+    CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+
+    guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else {
+        return nil
+    }
+
+    let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
+    let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+    let bytesPerPixel = 4
+
+    let clampedRect = integralRect.intersection(
+        CGRect(x: 0, y: 0, width: bufferWidth, height: bufferHeight)
+    )
+    guard clampedRect.width > 0.0, clampedRect.height > 0.0 else {
+        return nil
+    }
+
+    let sourceWidth = Int(clampedRect.width)
+    let sourceHeight = Int(clampedRect.height)
+    let startX = Int(clampedRect.origin.x)
+    let startY = Int(clampedRect.origin.y)
+    let copyBytesPerRow = sourceWidth * bytesPerPixel
+    let rawPointer = baseAddress.assumingMemoryBound(to: UInt8.self)
+    var result = [UInt32](repeating: 0, count: sourceWidth * sourceHeight)
+    result.withUnsafeMutableBytes { destination in
+        guard let destBase = destination.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+            return
+        }
+        for row in 0..<sourceHeight {
+            let src = rawPointer.advanced(by: (startY + row) * bytesPerRow + startX * bytesPerPixel)
+            let dst = destBase.advanced(by: row * copyBytesPerRow)
+            dst.update(from: src, count: copyBytesPerRow)
+        }
+    }
+
+    return result
+}
+
+func diffMetrics(
+    current: [UInt32],
+    reference: [UInt32]
+) -> (meanAbsNormalized: Double?, changedFraction: Double) {
+    guard !current.isEmpty, current.count == reference.count else {
+        return (nil, 0.0)
+    }
+
+    var changedCount = 0
+    for (lhs, rhs) in zip(current, reference) {
+        if lhs != rhs {
+            changedCount += 1
+        }
+    }
+
+    let pixelCount = Double(current.count)
+    return (
+        meanAbsNormalized: nil,
+        changedFraction: Double(changedCount) / pixelCount
+    )
+}
+
 final class ActionTracker {
     let name: String
-    let startWallNs: UInt64
-    let startMonotonicNs: UInt64
-    var endWallNs: UInt64?
-    var endMonotonicNs: UInt64?
+    let actionStartWallNs: UInt64
+    let actionStartMonotonicNs: UInt64
+    var dragStartWallNs: UInt64?
+    var dragStartMonotonicNs: UInt64?
+    var dragEndWallNs: UInt64?
+    var dragEndMonotonicNs: UInt64?
+    var actionEndWallNs: UInt64?
+    var actionEndMonotonicNs: UInt64?
+    var baselineAnalysisFrame: [UInt32]?
+    var baselineFrameMonotonicNs: UInt64?
     var firstVisibleMonotonicNs: UInt64?
     var stableMonotonicNs: UInt64?
     var stableStreak = 0
@@ -351,13 +449,42 @@ final class ActionTracker {
 
     init(
         name: String,
-        startWallNs: UInt64,
-        startMonotonicNs: UInt64
+        actionStartWallNs: UInt64,
+        actionStartMonotonicNs: UInt64
     ) {
         self.name = name
-        self.startWallNs = startWallNs
-        self.startMonotonicNs = startMonotonicNs
+        self.actionStartWallNs = actionStartWallNs
+        self.actionStartMonotonicNs = actionStartMonotonicNs
     }
+
+    var startWallNs: UInt64 {
+        dragStartWallNs ?? actionStartWallNs
+    }
+
+    var startMonotonicNs: UInt64 {
+        dragStartMonotonicNs ?? actionStartMonotonicNs
+    }
+
+    var endWallNs: UInt64? {
+        dragEndWallNs ?? actionEndWallNs
+    }
+
+    var endMonotonicNs: UInt64? {
+        dragEndMonotonicNs ?? actionEndMonotonicNs
+    }
+}
+
+struct CapturedFrame {
+    let frameIndex: Int
+    let status: SCFrameStatus
+    let statusRaw: Int
+    let wallTimeNs: UInt64
+    let monotonicNs: UInt64
+    let displayMonotonicNs: UInt64
+    let analysisWidth: Int
+    let analysisHeight: Int
+    let analysisSampleCount: Int
+    let analysisFrame: [UInt32]
 }
 
 final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
@@ -367,6 +494,7 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
     private let framesOutputPath: String
     private let sampleHz: Double
     private let pixelThreshold: Double
+    private let changedFractionThreshold: Double
     private let stableFrames: Int
     private let timeoutSeconds: Double
     private let queueDepth: Int
@@ -381,8 +509,8 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
     private var timeoutTimer: DispatchSourceTimer?
     private var processedEventCount = 0
 
-    private var frameIntervalsMs: [Double] = []
-    private var lastFrameTimestampNs: UInt64?
+    private var writtenFrameTimestampsNs: [UInt64] = []
+    private var capturedFrames: [CapturedFrame] = []
     private var frameCount = 0
     private var appName: String?
     private var sessionEnded = false
@@ -398,6 +526,7 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
         framesOutputPath: String,
         sampleHz: Double,
         pixelThreshold: Double,
+        changedFractionThreshold: Double,
         stableFrames: Int,
         timeoutSeconds: Double,
         queueDepth: Int
@@ -408,6 +537,7 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
         self.framesOutputPath = framesOutputPath
         self.sampleHz = sampleHz
         self.pixelThreshold = pixelThreshold
+        self.changedFractionThreshold = changedFractionThreshold
         self.stableFrames = stableFrames
         self.timeoutSeconds = timeoutSeconds
         self.queueDepth = queueDepth
@@ -442,6 +572,10 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
         config.queueDepth = queueDepth
         config.scalesToFit = false
         config.ignoreShadowsSingleWindow = true
+        if #available(macOS 14.0, *) {
+            config.captureResolution = .nominal
+        }
+        config.sourceRect = resolvedWindow.sourceRectAbsolute
 
         let filter = SCContentFilter(desktopIndependentWindow: resolvedWindow.scWindow)
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
@@ -522,16 +656,35 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
             }
             currentAction = ActionTracker(
                 name: actionName,
-                startWallNs: uint64(record["wall_time_ns"]),
-                startMonotonicNs: uint64(record["monotonic_ns"])
+                actionStartWallNs: uint64(record["wall_time_ns"]),
+                actionStartMonotonicNs: uint64(record["monotonic_ns"])
             )
+        case "drag_start":
+            guard let actionName = record["action"] as? String,
+                  let action = currentAction,
+                  action.name == actionName else {
+                return
+            }
+            action.dragStartWallNs = uint64(record["wall_time_ns"])
+            action.dragStartMonotonicNs = uint64(record["monotonic_ns"])
+        case "drag_end":
+            guard let actionName = record["action"] as? String,
+                  let action = currentAction,
+                  action.name == actionName else {
+                return
+            }
+            action.dragEndWallNs = uint64(record["wall_time_ns"])
+            action.dragEndMonotonicNs = uint64(record["monotonic_ns"])
         case "action_end":
             guard let actionName = record["action"] as? String else {
                 return
             }
             if let action = currentAction, action.name == actionName {
-                action.endWallNs = uint64(record["wall_time_ns"])
-                action.endMonotonicNs = uint64(record["monotonic_ns"])
+                action.actionEndWallNs = uint64(record["wall_time_ns"])
+                action.actionEndMonotonicNs = uint64(record["monotonic_ns"])
+                completedActions.append(action)
+                currentAction = nil
+                requestStopIfNeededLocked()
                 return
             }
         case "session_end":
@@ -558,83 +711,33 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
 
         let displayHostTime = (attachments[.displayTime] as? UInt64) ?? 0
         let displayMonotonicNs = displayHostTime > 0 ? hostTimeToNanoseconds(displayHostTime) : callbackMonotonicNs
-        if let previousTimestamp = lastFrameTimestampNs, displayMonotonicNs > previousTimestamp {
-            frameIntervalsMs.append(Double(displayMonotonicNs - previousTimestamp) / 1e6)
-        }
-        lastFrameTimestampNs = displayMonotonicNs
-
-        let dirtyRects = attachments[.dirtyRects] as? [NSValue] ?? []
-        let cropRect = resolvedWindow.cropPixels.integral
-        let changedInCrop = frameTouchesCrop(
-            status: status,
-            dirtyRects: dirtyRects,
-            cropRect: cropRect
-        )
-
-        let diffPrev = changedInCrop ? 255.0 : 0.0
-
-        var diffBaseline: Double?
-        var firstVisibleTriggered = false
-        var stableTriggered = false
-        let activeActionName = currentAction?.name
-
-        if let action = currentAction {
-            diffBaseline = changedInCrop ? 255.0 : 0.0
-            if action.firstVisibleMonotonicNs == nil,
-               displayMonotonicNs >= action.startMonotonicNs,
-               changedInCrop {
-                action.firstVisibleMonotonicNs = displayMonotonicNs
-                firstVisibleTriggered = true
-            }
-
-            if action.endMonotonicNs != nil {
-                if !changedInCrop {
-                    if action.stableStreak == 0 {
-                        action.stableStartMonotonicNs = displayMonotonicNs
-                    }
-                    action.stableStreak += 1
-                    if action.stableStreak >= stableFrames {
-                        action.stableMonotonicNs = action.stableStartMonotonicNs
-                        stableTriggered = true
-                    }
-                } else {
-                    action.stableStreak = 0
-                    action.stableStartMonotonicNs = nil
-                }
-            }
-
-            if action.endMonotonicNs != nil, action.stableMonotonicNs != nil {
-                completedActions.append(action)
-                currentAction = nil
-                requestStopIfNeededLocked()
-            }
-        }
-
-        do {
-            try framesWriter.write([
-                "frame_index": frameCount,
-                "status": frameStatusName(status),
-                "status_raw": status.rawValue,
-                "wall_time_ns": callbackWallNs,
-                "monotonic_ns": callbackMonotonicNs,
-                "display_monotonic_ns": displayMonotonicNs,
-                "active_action": activeActionName as Any,
-                "active_action_end_monotonic_ns": currentAction?.endMonotonicNs as Any,
-                "diff_prev": diffPrev,
-                "diff_action_baseline": diffBaseline as Any,
-                "first_visible_triggered": firstVisibleTriggered,
-                "stable_triggered": stableTriggered,
-                "stable_frames_required": stableFrames,
-                "pixel_threshold": pixelThreshold,
-                "dirty_rect_count": dirtyRects.count,
-                "crop_width": Int(cropRect.width),
-                "crop_height": Int(cropRect.height),
-            ])
-        } catch {
-            failLocked(error)
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             return
         }
+        let analysisRect = resolvedWindow.analysisPixels.integral
+        guard let analysisFrame = copyAnalysisFrameBGRA32(
+            pixelBuffer: pixelBuffer,
+            analysisRect: analysisRect
+        ) else {
+            return
+        }
+
+        capturedFrames.append(
+            CapturedFrame(
+                frameIndex: frameCount,
+                status: status,
+                statusRaw: status.rawValue,
+                wallTimeNs: callbackWallNs,
+                monotonicNs: callbackMonotonicNs,
+                displayMonotonicNs: displayMonotonicNs,
+                analysisWidth: Int(analysisRect.width),
+                analysisHeight: Int(analysisRect.height),
+                analysisSampleCount: analysisFrame.count,
+                analysisFrame: analysisFrame
+            )
+        )
         frameCount += 1
+        writtenFrameTimestampsNs.append(displayMonotonicNs)
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
@@ -644,10 +747,9 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
     }
 
     private func requestStopIfNeededLocked() {
-        guard sessionEnded, currentAction == nil else {
-            return
+        if sessionEnded {
+            stopLocked()
         }
-        stopLocked()
     }
 
     private func stopLocked() {
@@ -666,6 +768,10 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
 
     private func finishLocked() {
         do {
+            let frameRecords = analyzeFramesLocked()
+            for record in frameRecords {
+                try framesWriter.write(record)
+            }
             try framesWriter.close()
             try summaryWriter.write(summaryPayload())
             finishContinuation?.resume()
@@ -690,27 +796,179 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
         finishContinuation = nil
     }
 
+    private func actionOwningFrame(_ frameTimeNs: UInt64, actions: [ActionTracker]) -> ActionTracker? {
+        guard !actions.isEmpty else {
+            return nil
+        }
+        for (index, action) in actions.enumerated() {
+            let nextStartNs = index + 1 < actions.count ? actions[index + 1].actionStartMonotonicNs : nil
+            if frameTimeNs < action.actionStartMonotonicNs {
+                continue
+            }
+            if let nextStartNs, frameTimeNs >= nextStartNs {
+                continue
+            }
+            return action
+        }
+        return nil
+    }
+
+    private func analyzeFramesLocked() -> [[String: Any]] {
+        let actions = completedActions.sorted { $0.actionStartMonotonicNs < $1.actionStartMonotonicNs }
+        let useAnyPixelChange = pixelThreshold <= 0.0 && changedFractionThreshold <= 0.0
+
+        for action in actions {
+            let baselineAnchorNs = action.dragStartMonotonicNs ?? action.startMonotonicNs
+            if let baselineFrame = capturedFrames.last(where: { $0.displayMonotonicNs < baselineAnchorNs }) {
+                action.baselineAnalysisFrame = baselineFrame.analysisFrame
+                action.baselineFrameMonotonicNs = baselineFrame.displayMonotonicNs
+            } else if let firstFrame = capturedFrames.first(where: { $0.displayMonotonicNs >= baselineAnchorNs }) {
+                action.baselineAnalysisFrame = firstFrame.analysisFrame
+                action.baselineFrameMonotonicNs = firstFrame.displayMonotonicNs
+            }
+            action.firstVisibleMonotonicNs = nil
+            action.stableMonotonicNs = nil
+            action.stableStartMonotonicNs = nil
+            action.stableStreak = 0
+        }
+
+        var previousFrame: CapturedFrame?
+        var frameRecords: [[String: Any]] = []
+        frameRecords.reserveCapacity(capturedFrames.count)
+
+        for frame in capturedFrames {
+            let owningAction = actionOwningFrame(frame.displayMonotonicNs, actions: actions)
+            let prevMetrics = previousFrame.flatMap {
+                diffMetrics(current: frame.analysisFrame, reference: $0.analysisFrame)
+            }
+            let diffPrev = prevMetrics?.changedFraction
+            let meanAbsDiffPrev = prevMetrics?.meanAbsNormalized
+            let significantPrevChange = useAnyPixelChange
+                ? (prevMetrics?.changedFraction ?? 0.0) > 0.0
+                : (prevMetrics?.changedFraction ?? 0.0) >= changedFractionThreshold
+
+            var diffBaseline: Double?
+            var meanAbsDiffBaseline: Double?
+            var significantBaselineChange = false
+            var firstVisibleTriggered = false
+            var stableTriggered = false
+            let activeActionName = owningAction?.name
+            let activeActionEndMonotonicNs = owningAction?.endMonotonicNs
+
+            if let action = owningAction {
+                let visibleAnchorNs = action.dragStartMonotonicNs ?? action.startMonotonicNs
+                if let baselineFrame = action.baselineAnalysisFrame, frame.displayMonotonicNs >= visibleAnchorNs {
+                    let baselineMetrics = diffMetrics(
+                        current: frame.analysisFrame,
+                        reference: baselineFrame
+                    )
+                    diffBaseline = baselineMetrics.changedFraction
+                    meanAbsDiffBaseline = baselineMetrics.meanAbsNormalized
+                    significantBaselineChange = useAnyPixelChange
+                        ? baselineMetrics.changedFraction > 0.0
+                        : baselineMetrics.changedFraction >= changedFractionThreshold
+                    if action.firstVisibleMonotonicNs == nil, significantBaselineChange {
+                        action.firstVisibleMonotonicNs = frame.displayMonotonicNs
+                        firstVisibleTriggered = true
+                    }
+                }
+
+                if let endNs = action.endMonotonicNs, frame.displayMonotonicNs >= endNs {
+                    if !significantPrevChange {
+                        if action.stableStreak == 0 {
+                            action.stableStartMonotonicNs = frame.displayMonotonicNs
+                        }
+                        action.stableStreak += 1
+                        if action.stableMonotonicNs == nil, action.stableStreak >= stableFrames {
+                            action.stableMonotonicNs = action.stableStartMonotonicNs
+                            stableTriggered = true
+                        }
+                    } else {
+                        action.stableStreak = 0
+                        action.stableStartMonotonicNs = nil
+                    }
+                }
+            }
+
+            frameRecords.append([
+                "frame_index": frame.frameIndex,
+                "status": frameStatusName(frame.status),
+                "status_raw": frame.statusRaw,
+                "wall_time_ns": frame.wallTimeNs,
+                "monotonic_ns": frame.monotonicNs,
+                "display_monotonic_ns": frame.displayMonotonicNs,
+                "active_action": activeActionName as Any,
+                "active_action_end_monotonic_ns": activeActionEndMonotonicNs as Any,
+                "diff_prev": diffPrev as Any,
+                "diff_action_baseline": diffBaseline as Any,
+                "mean_abs_diff_prev": meanAbsDiffPrev as Any,
+                "mean_abs_diff_action_baseline": meanAbsDiffBaseline as Any,
+                "significant_change_prev": significantPrevChange,
+                "significant_change_action_baseline": significantBaselineChange,
+                "first_visible_triggered": firstVisibleTriggered,
+                "stable_triggered": stableTriggered,
+                "stable_frames_required": stableFrames,
+                "pixel_threshold": pixelThreshold,
+                "changed_fraction_threshold": changedFractionThreshold,
+                "analysis_width": frame.analysisWidth,
+                "analysis_height": frame.analysisHeight,
+                "analysis_sample_count": frame.analysisSampleCount,
+            ])
+            previousFrame = frame
+        }
+
+        return frameRecords
+    }
+
     private func summaryPayload() -> [String: Any] {
-        var actions: [[String: Any]] = []
-        for action in completedActions {
+        func actionEntry(_ action: ActionTracker, completed: Bool) -> [String: Any] {
+            let anchorStartMonotonicNs = action.startMonotonicNs
+            let anchorStartWallNs = action.startWallNs
+            let anchorEndMonotonicNs = action.endMonotonicNs
+            let anchorEndWallNs = action.endWallNs
             var entry: [String: Any] = [
                 "action": action.name,
-                "start_wall_ns": action.startWallNs,
-                "start_monotonic_ns": action.startMonotonicNs,
-                "end_wall_ns": action.endWallNs as Any,
-                "end_monotonic_ns": action.endMonotonicNs as Any,
+                "completed": completed,
+                "anchor_start": action.dragStartMonotonicNs != nil ? "drag_start" : "action_start",
+                "anchor_end": action.dragEndMonotonicNs != nil ? "drag_end" : "action_end",
+                "action_start_wall_ns": action.actionStartWallNs,
+                "action_start_monotonic_ns": action.actionStartMonotonicNs,
+                "drag_start_wall_ns": action.dragStartWallNs as Any,
+                "drag_start_monotonic_ns": action.dragStartMonotonicNs as Any,
+                "drag_end_wall_ns": action.dragEndWallNs as Any,
+                "drag_end_monotonic_ns": action.dragEndMonotonicNs as Any,
+                "action_end_wall_ns": action.actionEndWallNs as Any,
+                "action_end_monotonic_ns": action.actionEndMonotonicNs as Any,
+                "start_wall_ns": anchorStartWallNs,
+                "start_monotonic_ns": anchorStartMonotonicNs,
+                "end_wall_ns": anchorEndWallNs as Any,
+                "end_monotonic_ns": anchorEndMonotonicNs as Any,
+                "baseline_frame_monotonic_ns": action.baselineFrameMonotonicNs as Any,
                 "first_visible_monotonic_ns": action.firstVisibleMonotonicNs as Any,
                 "stable_monotonic_ns": action.stableMonotonicNs as Any,
             ]
             if let firstVisible = action.firstVisibleMonotonicNs {
-                entry["first_visible_ms_from_start"] = Double(firstVisible - action.startMonotonicNs) / 1e6
+                entry["first_visible_ms_from_start"] = Double(firstVisible - anchorStartMonotonicNs) / 1e6
             }
-            if let end = action.endMonotonicNs, let stable = action.stableMonotonicNs {
+            if let end = anchorEndMonotonicNs, let stable = action.stableMonotonicNs {
                 entry["stable_ms_from_end"] = Double(stable - end) / 1e6
-                entry["stable_ms_from_start"] = Double(stable - action.startMonotonicNs) / 1e6
+                entry["stable_ms_from_start"] = Double(stable - anchorStartMonotonicNs) / 1e6
             }
-            actions.append(entry)
+            return entry
         }
+
+        var actions: [[String: Any]] = []
+        for action in completedActions {
+            actions.append(actionEntry(action, completed: true))
+        }
+        if let action = currentAction,
+           action.dragStartMonotonicNs != nil || action.firstVisibleMonotonicNs != nil {
+            actions.append(actionEntry(action, completed: false))
+        }
+
+        let writtenFrameIntervalsMs = zip(
+            writtenFrameTimestampsNs, writtenFrameTimestampsNs.dropFirst()
+        ).map { Double($1 - $0) / 1e6 }
 
         return [
             "app": appName as Any,
@@ -727,6 +985,12 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
                     "height": resolvedWindow.bounds.height,
                 ],
             ],
+            "capture_source_rect_absolute_points": [
+                "x": resolvedWindow.sourceRectAbsolute.origin.x,
+                "y": resolvedWindow.sourceRectAbsolute.origin.y,
+                "width": resolvedWindow.sourceRectAbsolute.width,
+                "height": resolvedWindow.sourceRectAbsolute.height,
+            ],
             "capture_region_points": [
                 "x": resolvedWindow.cropPoints.origin.x,
                 "y": resolvedWindow.cropPoints.origin.y,
@@ -739,14 +1003,31 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
                 "width": resolvedWindow.cropPixels.width,
                 "height": resolvedWindow.cropPixels.height,
             ],
+            "analysis_region_points": [
+                "x": resolvedWindow.analysisPoints.origin.x,
+                "y": resolvedWindow.analysisPoints.origin.y,
+                "width": resolvedWindow.analysisPoints.width,
+                "height": resolvedWindow.analysisPoints.height,
+            ],
+            "analysis_region_pixels": [
+                "x": resolvedWindow.analysisPixels.origin.x,
+                "y": resolvedWindow.analysisPixels.origin.y,
+                "width": resolvedWindow.analysisPixels.width,
+                "height": resolvedWindow.analysisPixels.height,
+            ],
             "frames_output": framesOutputPath,
             "frame_count": frameCount,
             "sample_hz_requested": sampleHz,
             "pixel_threshold": pixelThreshold,
+            "changed_fraction_threshold": changedFractionThreshold,
             "stable_frames": stableFrames,
             "timestamp_domain": "display_monotonic_ns",
-            "observed_sample_interval_ms": stats(frameIntervalsMs),
-            "observed_sample_hz": (frameIntervalsMs.isEmpty ? nil : (1000.0 / (frameIntervalsMs.reduce(0.0, +) / Double(frameIntervalsMs.count)))) as Any,
+            "observed_sample_interval_ms": stats(writtenFrameIntervalsMs),
+            "observed_sample_hz": (
+                writtenFrameIntervalsMs.isEmpty
+                ? nil
+                : (1000.0 / (writtenFrameIntervalsMs.reduce(0.0, +) / Double(writtenFrameIntervalsMs.count)))
+            ) as Any,
             "actions": actions,
         ]
     }
@@ -766,27 +1047,6 @@ func uint64(_ value: Any?) -> UInt64 {
         return parsed
     }
     return 0
-}
-
-func frameTouchesCrop(status: SCFrameStatus, dirtyRects: [NSValue], cropRect: CGRect) -> Bool {
-    switch status {
-    case .idle, .blank, .suspended, .stopped:
-        return false
-    case .started:
-        return true
-    case .complete:
-        if dirtyRects.isEmpty {
-            return true
-        }
-        for value in dirtyRects {
-            if value.rectValue.intersects(cropRect) {
-                return true
-            }
-        }
-        return false
-    @unknown default:
-        return true
-    }
 }
 
 func resolveWindow(options: Options, calibration: Calibration?) async throws -> ResolvedWindow {
@@ -841,10 +1101,29 @@ func resolveWindow(options: Options, calibration: Calibration?) async throws -> 
         height: cropAbsolute.height
     )
     let cropPixels = CGRect(
-        x: round(cropPoints.origin.x * scale),
-        y: round(cropPoints.origin.y * scale),
+        x: 0.0,
+        y: 0.0,
         width: round(cropPoints.width * scale),
         height: round(cropPoints.height * scale)
+    )
+    let analysisRegionNorm = calibration?.analysisRegionNorm?.cgRect ?? CGRect(x: 0, y: 0, width: 1, height: 1)
+    let normalizedAnalysis = CGRect(
+        x: min(max(analysisRegionNorm.origin.x, 0.0), 1.0),
+        y: min(max(analysisRegionNorm.origin.y, 0.0), 1.0),
+        width: min(max(analysisRegionNorm.width, 0.0), 1.0),
+        height: min(max(analysisRegionNorm.height, 0.0), 1.0)
+    )
+    let localCapturePoints = CGRect(x: 0.0, y: 0.0, width: cropPoints.width, height: cropPoints.height)
+    let analysisPoints = normalizedSubregion(normalizedAnalysis, within: localCapturePoints)
+        .intersection(localCapturePoints)
+    guard !analysisPoints.isNull, analysisPoints.width > 0.0, analysisPoints.height > 0.0 else {
+        throw CaptureError.invalidCalibration("analysis region does not intersect the selected capture region")
+    }
+    let analysisPixels = CGRect(
+        x: round(analysisPoints.origin.x * scale),
+        y: round(analysisPoints.origin.y * scale),
+        width: round(analysisPoints.width * scale),
+        height: round(analysisPoints.height * scale)
     )
 
     return ResolvedWindow(
@@ -853,10 +1132,13 @@ func resolveWindow(options: Options, calibration: Calibration?) async throws -> 
         ownerName: matchedCGWindow.ownerName,
         title: matchedCGWindow.title,
         pointPixelScale: scale,
+        sourceRectAbsolute: cropAbsolute,
         cropPoints: cropPoints,
         cropPixels: cropPixels,
-        outputWidth: max(1, Int(round(matchedCGWindow.bounds.width * scale))),
-        outputHeight: max(1, Int(round(matchedCGWindow.bounds.height * scale)))
+        analysisPoints: analysisPoints,
+        analysisPixels: analysisPixels,
+        outputWidth: max(1, Int(round(cropPoints.width * scale))),
+        outputHeight: max(1, Int(round(cropPoints.height * scale)))
     )
 }
 
@@ -915,6 +1197,7 @@ struct ScreenCaptureKitCaptureTool {
                 framesOutputPath: framesOutputPath,
                 sampleHz: options.sampleHz,
                 pixelThreshold: options.pixelThreshold,
+                changedFractionThreshold: options.changedFractionThreshold,
                 stableFrames: options.stableFrames,
                 timeoutSeconds: options.timeoutSeconds,
                 queueDepth: options.queueDepth

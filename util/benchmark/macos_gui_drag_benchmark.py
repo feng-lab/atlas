@@ -69,6 +69,7 @@ class DragAction:
     button: str
     start_norm: tuple[float, float]
     end_norm: tuple[float, float]
+    pre_drag_still_seconds: float
     duration_seconds: float
     steps: int
     settle_seconds: float
@@ -91,6 +92,9 @@ class DragAction:
             button=button,
             start_norm=(float(start_norm[0]), float(start_norm[1])),
             end_norm=(float(end_norm[0]), float(end_norm[1])),
+            pre_drag_still_seconds=max(
+                0.0, float(payload.get("pre_drag_still_seconds", 0.25))
+            ),
             duration_seconds=max(0.0, float(payload.get("duration_seconds", 0.5))),
             steps=max(1, int(payload.get("steps", 30))),
             settle_seconds=max(0.0, float(payload.get("settle_seconds", 2.0))),
@@ -102,6 +106,7 @@ class DragAction:
             "button": self.button,
             "start_norm": list(self.start_norm),
             "end_norm": list(self.end_norm),
+            "pre_drag_still_seconds": self.pre_drag_still_seconds,
             "duration_seconds": self.duration_seconds,
             "steps": self.steps,
             "settle_seconds": self.settle_seconds,
@@ -337,19 +342,6 @@ def _run_drag_action(
     start_xy = _point_from_norm(input_region, action.start_norm)
     end_xy = _point_from_norm(input_region, action.end_norm)
 
-    logger.log(
-        "action_start",
-        app=calibration.app,
-        action=action.name,
-        kind="drag",
-        button=action.button,
-        duration_seconds=action.duration_seconds,
-        steps=action.steps,
-        settle_seconds=action.settle_seconds,
-        start_point=start_xy,
-        end_point=end_xy,
-    )
-
     _post_mouse_event(kCGEventMouseMoved, start_xy, action.button)
     injection_logger.log(
         "mouse_move",
@@ -358,6 +350,23 @@ def _run_drag_action(
         x=start_xy[0],
         y=start_xy[1],
     )
+
+    logger.log(
+        "action_start",
+        app=calibration.app,
+        action=action.name,
+        kind="drag",
+        button=action.button,
+        pre_drag_still_seconds=action.pre_drag_still_seconds,
+        duration_seconds=action.duration_seconds,
+        steps=action.steps,
+        settle_seconds=action.settle_seconds,
+        start_point=start_xy,
+        end_point=end_xy,
+    )
+
+    if action.pre_drag_still_seconds > 0.0:
+        time.sleep(action.pre_drag_still_seconds)
 
     _post_mouse_event(down_type, start_xy, action.button, click_state=1)
     injection_logger.log(

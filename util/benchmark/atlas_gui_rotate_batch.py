@@ -95,9 +95,19 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--window-x", type=int, default=100)
     parser.add_argument("--window-y", type=int, default=95)
     parser.add_argument("--sample-hz", type=float, default=60.0)
-    parser.add_argument("--pixel-threshold", type=float, default=0.1)
+    parser.add_argument("--pixel-threshold", type=float, default=0.0)
+    parser.add_argument("--changed-fraction-threshold", type=float, default=0.0)
     parser.add_argument("--stable-frames", type=int, default=5)
     parser.add_argument("--capture-timeout-seconds", type=float, default=25.0)
+    parser.add_argument(
+        "--capture-process-wait-seconds",
+        type=float,
+        default=300.0,
+        help=(
+            "Maximum wall time to wait for the ScreenCaptureKit helper process, "
+            "including post-capture exact-pixel analysis."
+        ),
+    )
     parser.add_argument("--launch-timeout-seconds", type=float, default=120.0)
     parser.add_argument("--preview-timeout-seconds", type=float, default=30.0)
     parser.add_argument("--final-timeout-seconds", type=float, default=30.0)
@@ -520,6 +530,8 @@ def _run_capture_and_injection(
             str(args.sample_hz),
             "--pixel-threshold",
             str(args.pixel_threshold),
+            "--changed-fraction-threshold",
+            str(args.changed_fraction_threshold),
             "--stable-frames",
             str(args.stable_frames),
             "--timeout-seconds",
@@ -548,7 +560,7 @@ def _run_capture_and_injection(
             check=True,
             text=True,
         )
-        capture_process.wait(timeout=max(5.0, args.capture_timeout_seconds + 5.0))
+        capture_process.wait(timeout=max(30.0, args.capture_process_wait_seconds))
     finally:
         if capture_process.poll() is None:
             capture_process.terminate()
