@@ -22,6 +22,18 @@ class SessionSpec:
     kind: str  # "paraview" or "atlas"
 
 
+@dataclass(frozen=True)
+class GuiSessionSpec:
+    suite: str
+    dataset: str
+    session: str
+    software: str
+    input_desc: str
+    render_mode: str
+    drag_duration_seconds: float
+    aggregate_summary_path: Path
+
+
 SLICE15_ROOT = Path("/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks")
 LARGE_ROOT = Path("/Users/feng/code/atlas/large_test_image/benchmarks")
 
@@ -183,6 +195,54 @@ RETAINED_SESSIONS: tuple[SessionSpec, ...] = (
 )
 
 
+RETAINED_GUI_SESSIONS: tuple[GuiSessionSpec, ...] = (
+    GuiSessionSpec(
+        suite="short_rotate_0p5s",
+        dataset="slice15_ch2",
+        session="ParaView GUI Rotate",
+        software="ParaView",
+        input_desc="Blocked .vtpd",
+        render_mode="GPU Based + maximum-intensity",
+        drag_duration_seconds=0.5,
+        aggregate_summary_path=SLICE15_ROOT
+        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v2_centered/aggregate/summary.json",
+    ),
+    GuiSessionSpec(
+        suite="short_rotate_0p5s",
+        dataset="slice15_ch2",
+        session="Atlas GUI Rotate",
+        software="Atlas",
+        input_desc="Dense .nim",
+        render_mode="Maximum Intensity Projection",
+        drag_duration_seconds=0.5,
+        aggregate_summary_path=SLICE15_ROOT
+        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_v3_centered/aggregate/summary.json",
+    ),
+    GuiSessionSpec(
+        suite="sustained_rotate_2p0s",
+        dataset="slice15_ch2",
+        session="ParaView GUI Rotate",
+        software="ParaView",
+        input_desc="Blocked .vtpd",
+        render_mode="GPU Based + maximum-intensity",
+        drag_duration_seconds=2.0,
+        aggregate_summary_path=SLICE15_ROOT
+        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate2s_v5_centered/aggregate/summary.json",
+    ),
+    GuiSessionSpec(
+        suite="sustained_rotate_2p0s",
+        dataset="slice15_ch2",
+        session="Atlas GUI Rotate",
+        software="Atlas",
+        input_desc="Dense .nim",
+        render_mode="Maximum Intensity Projection",
+        drag_duration_seconds=2.0,
+        aggregate_summary_path=SLICE15_ROOT
+        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate2s_v1_centered/aggregate/summary.json",
+    ),
+)
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -296,6 +356,60 @@ def _atlas_row(spec: SessionSpec, summary: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _gui_metric_mean(summary: dict[str, Any], metric_name: str) -> float | None:
+    metrics = summary.get("metrics")
+    if not isinstance(metrics, dict):
+        return None
+    metric = metrics.get(metric_name)
+    if not isinstance(metric, dict):
+        return None
+    return _mean(metric)
+
+
+def _gui_metric_count(summary: dict[str, Any], metric_name: str) -> int | None:
+    metrics = summary.get("metrics")
+    if not isinstance(metrics, dict):
+        return None
+    metric = metrics.get(metric_name)
+    if not isinstance(metric, dict):
+        return None
+    count = metric.get("count")
+    return int(count) if count is not None else None
+
+
+def _gui_row(spec: GuiSessionSpec, summary: dict[str, Any]) -> dict[str, str]:
+    return {
+        "suite": spec.suite,
+        "dataset": spec.dataset,
+        "session": spec.session,
+        "software": spec.software,
+        "input": spec.input_desc,
+        "render_mode": spec.render_mode,
+        "drag_duration_s": _format_float(spec.drag_duration_seconds, digits=1),
+        "measured_run_count": str(int(summary.get("measured_run_count", 0))),
+        "first_visible_ms": _format_float(
+            _gui_metric_mean(summary, "capture_first_visible_ms_from_start")
+        ),
+        "first_visible_count": str(
+            _gui_metric_count(summary, "capture_first_visible_ms_from_start") or 0
+        ),
+        "changed_sample_count": _format_float(
+            _gui_metric_mean(summary, "changed_sample_count")
+        ),
+        "changed_samples_per_second": _format_float(
+            _gui_metric_mean(summary, "changed_samples_per_second")
+        ),
+        "visible_fps": _format_float(
+            _gui_metric_mean(summary, "visible_fps_from_mean_interval")
+        ),
+        "stable_after_end_ms": _format_float(
+            _gui_metric_mean(summary, "capture_stable_ms_from_end")
+        ),
+        "capture_hz": _format_float(_gui_metric_mean(summary, "observed_sample_hz")),
+        "aggregate_summary_path": str(spec.aggregate_summary_path),
+    }
+
+
 def _write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as f:
@@ -307,6 +421,7 @@ def _write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) ->
 def main() -> int:
     all_rows: list[dict[str, str]] = []
     atlas_rows: list[dict[str, str]] = []
+    gui_rows: list[dict[str, str]] = []
 
     for spec in RETAINED_SESSIONS:
         summary = _load_json(spec.aggregate_summary_path)
@@ -316,6 +431,9 @@ def main() -> int:
             row = _atlas_row(spec, summary)
             atlas_rows.append(row.copy())
         all_rows.append(row)
+
+    for spec in RETAINED_GUI_SESSIONS:
+        gui_rows.append(_gui_row(spec, _load_json(spec.aggregate_summary_path)))
 
     common_fields = [
         "dataset",
@@ -344,9 +462,32 @@ def main() -> int:
         atlas_rows,
         common_fields,
     )
+    _write_csv(
+        SCRIPT_DIR / "benchmark_gui_rotate_snapshot.csv",
+        gui_rows,
+        [
+            "suite",
+            "dataset",
+            "session",
+            "software",
+            "input",
+            "render_mode",
+            "drag_duration_s",
+            "measured_run_count",
+            "first_visible_ms",
+            "first_visible_count",
+            "changed_sample_count",
+            "changed_samples_per_second",
+            "visible_fps",
+            "stable_after_end_ms",
+            "capture_hz",
+            "aggregate_summary_path",
+        ],
+    )
 
     print(f"Wrote {SCRIPT_DIR / 'benchmark_cross_session_snapshot.csv'}")
     print(f"Wrote {SCRIPT_DIR / 'benchmark_atlas_cross_dataset_snapshot.csv'}")
+    print(f"Wrote {SCRIPT_DIR / 'benchmark_gui_rotate_snapshot.csv'}")
     return 0
 
 

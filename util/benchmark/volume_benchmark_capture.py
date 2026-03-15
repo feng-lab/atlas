@@ -275,7 +275,6 @@ def main() -> int:
                     "pixel_threshold": float(args.pixel_threshold),
                 }
                 frame_stream.write(json.dumps(frame_record, sort_keys=True) + "\n")
-                frame_stream.flush()
                 frame_count += 1
 
                 previous_frame = frame

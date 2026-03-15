@@ -1210,3 +1210,223 @@ sessions, but they were not kept as final benchmark results.
 | `slice15_ch2_x2z` | ParaView GPU, single-file dense input | Dense `.mhd/.zraw` (`slice15_ch2_x2z_scenespace.mhd`) | ParaView kept allocating toward and past system memory during load/render, so the run was killed instead of being allowed to continue. | No | Final ParaView GPU results for `slice15_ch2_x2z` use the blocked scene-space dataset [slice15_ch2_x2z_grid_atlasscenespace.vtpd](/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd). |
 | `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | ParaView GPU | Prepared ParaView dataset | ParaView attempted to allocate well beyond host memory; the observed footprint exceeded about `100 GiB` on a machine with `64 GiB` RAM, so the run was killed. | No | This is currently treated as a non-viable ParaView GPU benchmark path for this dataset. |
 | `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | ParaView OSPRay | Skipped dense-input path | Not run. The dense MetaImage path would first allocate a full resident `vtkImageData` and then hand that resident scalar buffer to OSPRay, so it has the same fundamental host-memory requirement as the failed dense GPU path. For this dataset shape (`25395 x 19459 x 169`), that is about `77.78 GiB` even at `uint8`, before reader and renderer overhead. | No | Blocked `.vtpd` input is not a valid OSPRay volume path in this ParaView build. ParaView `vtkMetaImageReader::ExecuteDataWithInformation()` allocates the full output image and reads the full file into `data->GetScalarPointer()`, and `vtkOSPRayVolumeMapperNode` only accepts direct `vtkImageData` input and builds a `structuredRegular` OSPRay volume from that resident scalar array. |
+
+# Real GUI Rotate Benchmarks: `slice15_ch2`
+
+These sessions measure real on-screen interaction rather than internal timer events.
+They use WindowServer capture plus injected mouse drag input and should be interpreted
+as user-visible interaction benchmarks, not engine-only service-time benchmarks.
+
+## Shared GUI Methodology
+
+| Item | Value |
+| --- | --- |
+| Dataset focus | `slice15_ch2` |
+| Capture backend | `ScreenCaptureKit` via `macos_window_capture_sckit.swift` |
+| Input path | Quartz `CGEvent` drag injection via `macos_gui_drag_benchmark.py` |
+| Capture cadence target | `60 Hz` |
+| Capture crop | `600 x 600` window-relative region inside the render pane |
+| Drag path | horizontal left-button drag from `45%` to `75%` of the calibrated input region width |
+| Warm-up / measured runs | `1` warm-up run, `7` measured runs |
+| ParaView GUI prep | Applies the benchmark camera, then recenters `CameraFocalPoint` and `CenterOfRotation` to the data center before each run so GUI rotation stays centered on the object |
+| Atlas GUI prep | Loads the dataset once, applies the benchmark camera, then resets back to the `open` camera and waits for Atlas preview/final markers before each run |
+| Retained render modes | ParaView GPU MIP and Atlas MIP |
+| Notes | GUI metrics are capture-derived. `changed_samples_per_second` and `visible_fps_from_mean_interval` are based on observed changed frames in the capture stream, not app-internal render timers. |
+
+## GUI Snapshot: Short Rotate (`0.5 s`)
+
+Measured steady-state means for the retained centered `0.5 s` rotate sessions.
+
+| Session | Input | Render mode | First visible | Changed samples during drag | Changed samples / second | Visible FPS | Stable after drag end | Capture Hz |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ParaView GPU MIP | Blocked `.vtpd` | `GPU Based` + `maximum-intensity` | `56.684 ms` | `1.000` | `1.997` | n/a | `14.569 ms` | `55.292 Hz` |
+| Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `60.538 ms` | `22.571` | `45.069` | `48.873 fps` | `244.129 ms` | `55.024 Hz` |
+
+## GUI Snapshot: Sustained Rotate (`2.0 s`)
+
+Measured steady-state means for the retained centered `2.0 s` rotate sessions.
+
+| Session | Input | Render mode | First visible | Changed samples during drag | Changed samples / second | Visible FPS | Stable after drag end | Capture Hz |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ParaView GPU MIP | Blocked `.vtpd` | `GPU Based` + `maximum-intensity` | `52.816 ms` | `4.429` | `2.206` | `1.902 fps` | `36.192 ms` | `53.264 Hz` |
+| Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `63.039 ms` | `90.286` | `44.936` | `45.735 fps` | `230.298 ms` | `53.382 Hz` |
+
+## GUI Session 1: ParaView GPU MIP, Centered Rotate, `0.5 s`
+
+Artifacts:
+- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v2_centered`
+- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v2_centered/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | ParaView 6.1.0-RC1 |
+| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
+| Dataset format | Blocked `.vtpd` with `.vti` pieces |
+| Dataset size | `9216 x 6144 x 98`, single channel |
+| Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
+| Render mode | `GPU Based` + `maximum-intensity` |
+| Camera / rotation center | Benchmark camera from `slice15_scene_camera_exact_2000x1500.json`, then recentered to the data bounds center for GUI rotation parity |
+| Drag duration / steps | `0.5 s`, `30` injected drag samples |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Changed samples during drag | `1` |
+| Changed samples / second | `1.995` |
+| Visible FPS from mean interval | n/a |
+| First visible from drag start | `59.997 ms` |
+| Stable from drag start | `522.999 ms` |
+| Stable from drag end | `12.272 ms` |
+| Drag duration | `501.371 ms` |
+| Observed capture Hz | `56.763 Hz` |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Changed samples during drag | `7` | `1.000` | `1.000` | `0.000` | `1.000` | Exactly one visible changed frame was observed during each `0.5 s` drag. |
+| Changed samples / second | `7` | `1.997` | `1.997` | `0.001` | `1.998` | Primary short-drag cadence metric for ParaView in this suite. |
+| Visible FPS from mean interval | `0` | n/a | n/a | n/a | n/a | Undefined here because each run produced only one visible changed frame during the drag, so there is no interval series to average. |
+| First visible from drag start | `7` | `56.684 ms` | `56.084 ms` | `14.681 ms` | `78.766 ms` | Time to the first visible captured change after drag motion begins. |
+| Stable from drag start | `7` | `529.579 ms` | `528.353 ms` | `9.237 ms` | `544.008 ms` | Total time until the captured region reaches the stable state. |
+| Stable from drag end | `7` | `14.569 ms` | `15.302 ms` | `5.362 ms` | `22.692 ms` | Post-release settle time in the capture stream. |
+| Drag duration | `7` | `500.875 ms` | `500.755 ms` | `0.365 ms` | `501.461 ms` | Measured from injected `drag_start` to `drag_end`. |
+| Observed capture Hz | `7` | `55.292 Hz` | `55.833 Hz` | `2.050 Hz` | `57.206 Hz` | Actual ScreenCaptureKit sample cadence during the runs. |
+
+## GUI Session 2: Atlas MIP, Rotate, `0.5 s`
+
+Artifacts:
+- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_v3_centered`
+- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_v3_centered/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | Atlas build `v1.0.7-23-g43291dd4` |
+| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim` |
+| Dataset format | Dense `.nim` |
+| Live 3D canvas | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
+| Render mode | `Maximum Intensity Projection` |
+| View parity settings | Background hidden, axis hidden, bound box set to `No Bound Box`, full-resolution rendering enabled |
+| Camera reset | Benchmark `open` camera from `slice15_scene_camera_exact_2000x1500.json`, reapplied before every run |
+| Drag duration / steps | `0.5 s`, `30` injected drag samples |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Changed samples during drag | `22` |
+| Changed samples / second | `43.122` |
+| Visible FPS from mean interval | `45.241 fps` |
+| First visible from drag start | `53.928 ms` |
+| Stable from drag start | `773.043 ms` |
+| Stable from drag end | `253.015 ms` |
+| Drag duration | `510.180 ms` |
+| Observed capture Hz | `53.403 Hz` |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Changed samples during drag | `7` | `22.571` | `23.000` | `0.904` | `23.700` | Atlas shows many visible updates during the short drag, unlike ParaView's single-update behavior in the same suite. |
+| Changed samples / second | `7` | `45.069` | `45.846` | `1.822` | `47.370` | Primary short-drag cadence metric for Atlas in this suite. |
+| Visible FPS from mean interval | `7` | `48.873 fps` | `49.377 fps` | `1.633 fps` | `50.532 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `60.538 ms` | `60.910 ms` | `4.748 ms` | `67.307 ms` | Time to the first visible captured change after drag motion begins. |
+| Stable from drag start | `7` | `757.202 ms` | `755.734 ms` | `137.289 ms` | `969.960 ms` | Total time until the captured region reaches the stable state. |
+| Stable from drag end | `7` | `244.129 ms` | `245.021 ms` | `139.155 ms` | `458.794 ms` | Post-release settle time in the capture stream. |
+| Drag duration | `7` | `500.830 ms` | `500.822 ms` | `0.475 ms` | `501.551 ms` | Measured from injected `drag_start` to `drag_end`. |
+| Observed capture Hz | `7` | `55.024 Hz` | `55.795 Hz` | `2.064 Hz` | `56.856 Hz` | Actual ScreenCaptureKit sample cadence during the runs. |
+
+## GUI Session 3: ParaView GPU MIP, Centered Rotate, `2.0 s`
+
+Artifacts:
+- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate2s_v5_centered`
+- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate2s_v5_centered/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | ParaView 6.1.0-RC1 |
+| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
+| Dataset format | Blocked `.vtpd` with `.vti` pieces |
+| Dataset size | `9216 x 6144 x 98`, single channel |
+| Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
+| Render mode | `GPU Based` + `maximum-intensity` |
+| Camera / rotation center | Benchmark camera from `slice15_scene_camera_exact_2000x1500.json`, then recentered to the data bounds center for GUI rotation parity |
+| Drag duration / steps | `2.0 s`, `120` injected drag samples |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Changed samples during drag | `4` |
+| Changed samples / second | `1.992` |
+| Visible FPS from mean interval | `1.661 fps` |
+| First visible from drag start | `55.696 ms` |
+| Stable from drag start | `2035.817 ms` |
+| Stable from drag end | `17.037 ms` |
+| Drag duration | `2007.639 ms` |
+| Observed capture Hz | `46.995 Hz` |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Changed samples during drag | `7` | `4.429` | `4.000` | `0.495` | `5.000` | Only about four to five visible changed frames were observed over the full `2 s` rotate drag. |
+| Changed samples / second | `7` | `2.206` | `1.999` | `0.247` | `2.499` | Primary sustained-drag cadence metric for ParaView in this suite. |
+| Visible FPS from mean interval | `7` | `1.902 fps` | `1.667 fps` | `0.280 fps` | `2.234 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `52.816 ms` | `55.192 ms` | `5.782 ms` | `58.877 ms` | Time to the first visible captured change after drag motion begins. |
+| Stable from drag start | `7` | `2054.805 ms` | `2036.604 ms` | `49.332 ms` | `2137.079 ms` | Total time until the captured region reaches the stable state. |
+| Stable from drag end | `7` | `36.192 ms` | `16.966 ms` | `51.739 ms` | `122.667 ms` | Post-release settle time in the capture stream. |
+| Drag duration | `7` | `2007.286 ms` | `2005.756 ms` | `6.914 ms` | `2017.721 ms` | Measured from injected `drag_start` to `drag_end`. |
+| Observed capture Hz | `7` | `53.264 Hz` | `53.501 Hz` | `2.657 Hz` | `56.831 Hz` | Actual ScreenCaptureKit sample cadence during the runs. |
+
+## GUI Session 4: Atlas MIP, Rotate, `2.0 s`
+
+Artifacts:
+- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate2s_v1_centered`
+- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate2s_v1_centered/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | Atlas build `v1.0.7-23-g43291dd4` |
+| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim` |
+| Dataset format | Dense `.nim` |
+| Live 3D canvas | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
+| Render mode | `Maximum Intensity Projection` |
+| View parity settings | Background hidden, axis hidden, bound box set to `No Bound Box`, full-resolution rendering enabled |
+| Camera reset | Benchmark `open` camera from `slice15_scene_camera_exact_2000x1500.json`, reapplied before every run |
+| Drag duration / steps | `2.0 s`, `120` injected drag samples |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Changed samples during drag | `87` |
+| Changed samples / second | `43.491` |
+| Visible FPS from mean interval | `43.998 fps` |
+| First visible from drag start | `57.035 ms` |
+| Stable from drag start | `2130.240 ms` |
+| Stable from drag end | `117.814 ms` |
+| Drag duration | `2000.407 ms` |
+| Observed capture Hz | `50.668 Hz` |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Changed samples during drag | `7` | `90.286` | `91.000` | `1.979` | `92.700` | Atlas maintains visible updates through nearly the entire sustained drag window. |
+| Changed samples / second | `7` | `44.936` | `45.144` | `0.874` | `46.016` | Primary sustained-drag cadence metric for Atlas in this suite. |
+| Visible FPS from mean interval | `7` | `45.735 fps` | `45.691 fps` | `0.965 fps` | `46.752 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `63.039 ms` | `59.068 ms` | `11.824 ms` | `82.853 ms` | Time to the first visible captured change after drag motion begins. |
+| Stable from drag start | `7` | `2259.730 ms` | `2249.729 ms` | `152.683 ms` | `2506.513 ms` | Total time until the captured region reaches the stable state. |
+| Stable from drag end | `7` | `230.298 ms` | `230.778 ms` | `150.376 ms` | `470.055 ms` | Post-release settle time in the capture stream. |
+| Drag duration | `7` | `2009.105 ms` | `2009.710 ms` | `5.663 ms` | `2016.304 ms` | Measured from injected `drag_start` to `drag_end`. |
+| Observed capture Hz | `7` | `53.382 Hz` | `54.347 Hz` | `2.272 Hz` | `55.890 Hz` | Actual ScreenCaptureKit sample cadence during the runs. |

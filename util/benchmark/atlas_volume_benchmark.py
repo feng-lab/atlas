@@ -704,6 +704,14 @@ def parse_args() -> argparse.Namespace:
         "--address", default="localhost:50051", help="Atlas Scene RPC address"
     )
     parser.add_argument(
+        "--atlas-dir",
+        default="",
+        help=(
+            "Optional Atlas install/build directory passed to SceneClient. "
+            "Use this on machines where Atlas is not installed in the default location."
+        ),
+    )
+    parser.add_argument(
         "--canvas-logical-width",
         type=int,
         default=None,
@@ -840,7 +848,10 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     spec = load_benchmark_spec(args.camera_spec)
     logger = EventLogger(output_dir / "atlas_events.jsonl")
-    client = SceneClient(address=args.address)
+    client = SceneClient(
+        address=args.address,
+        atlas_dir=(args.atlas_dir.strip() or None),
+    )
     memory_sampler = None
     memory_summary_path = output_dir / "atlas_memory_summary.json"
     loaded_ids: list[int] = []
@@ -871,6 +882,9 @@ def main() -> int:
             app="atlas",
             dataset=str(Path(args.dataset).resolve()),
             camera_spec=str(Path(args.camera_spec).resolve()),
+            atlas_dir=(
+                str(Path(args.atlas_dir).resolve()) if args.atlas_dir.strip() else None
+            ),
             viewport={"width": spec.viewport_width, "height": spec.viewport_height},
             canvas_logical_size=(
                 None

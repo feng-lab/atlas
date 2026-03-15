@@ -53,6 +53,7 @@ python /Users/feng/code/atlas/util/benchmark/atlas_volume_benchmark.py \
   --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim \
   --camera-spec /Users/feng/code/atlas/util/benchmark/volume_benchmark_camera_template.json \
   --output-dir /tmp/atlas_benchmark \
+  --atlas-dir /Applications/fenglab/Atlas.app \
   --canvas-logical-width 1000 \
   --canvas-logical-height 750
 ```
@@ -78,6 +79,7 @@ For repeated deterministic Atlas runs with persisted open/step metrics and aggre
 python /Users/feng/code/atlas/util/benchmark/atlas_deterministic_batch.py \
   --atlas-log-path /Users/feng/Library/Logs/Atlas/ \
   --atlas-pid <atlas_pid> \
+  --atlas-dir /Applications/fenglab/Atlas.app \
   --output-root /Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_manual \
   --canvas-logical-width 1000 \
   --canvas-logical-height 750 \
@@ -221,6 +223,66 @@ python /Users/feng/code/atlas/util/benchmark/paraview_deterministic_batch.py \
 That batch preserves the same per-run and aggregate artifacts as the default runner, while also
 recording the wrapper path and effective OSPRay settings in the benchmark config and summary.
 
+## Windows Deterministic Runs
+
+The deterministic scripted-camera benchmarks are designed to run on Windows as well. The macOS GUI
+drag tools are still macOS-only, but the Atlas and ParaView deterministic runners are portable if
+you pass explicit Windows paths.
+
+Recommended Windows workflow:
+
+- Copy the prepared benchmark datasets and camera JSON files to the Windows machine.
+- Pass explicit `--dataset`, `--camera-spec`, and `--output-root` instead of relying on the macOS
+  defaults embedded in the scripts.
+- Pass explicit `--pvpython` for ParaView.
+- Pass explicit `--atlas-dir` and `--atlas-log-path` for Atlas.
+- Use the same Python environment to launch the batch runner and its per-run driver. The Atlas
+  batch now relaunches the driver with `sys.executable`, so Windows no longer depends on a
+  `python3` command being available on `PATH`.
+- RSS sampling now works on Windows too. The shared sampler uses WinAPI
+  `GetProcessMemoryInfo(WorkingSetSize)` on Windows and `ps` on POSIX.
+
+Example Atlas deterministic run on Windows:
+
+```powershell
+py -3 util/benchmark/atlas_deterministic_batch.py `
+  --driver-script util/benchmark/atlas_volume_benchmark.py `
+  --dataset D:\atlas_bench\slice15_ch2_dense.nim `
+  --camera-spec D:\atlas_bench\slice15_scene_camera_exact_2000x1500.json `
+  --output-root D:\atlas_bench\results\atlas_slice15 `
+  --atlas-dir "C:\Program Files\fenglab\Atlas" `
+  --atlas-log-path "$env:LOCALAPPDATA\Atlas\Logs" `
+  --atlas-pid <atlas_pid> `
+  --canvas-logical-width 1000 `
+  --canvas-logical-height 750 `
+  --sample-rss
+```
+
+Example ParaView deterministic run on Windows:
+
+```powershell
+py -3 util/benchmark/paraview_deterministic_batch.py `
+  --pvpython "C:\Program Files\ParaView 6.1.0-RC1\bin\pvpython.exe" `
+  --benchmark-script util/benchmark/paraview_volume_benchmark.py `
+  --dataset D:\atlas_bench\slice15_ch2_grid_atlasscenespace.vtpd `
+  --camera-spec D:\atlas_bench\slice15_scene_camera_exact_2000x1500.json `
+  --output-root D:\atlas_bench\results\paraview_slice15 `
+  --array-name channels `
+  --channel-mode component `
+  --component 0 `
+  --blend-mode maximum-intensity `
+  --deterministic-mode interactive-plus-final `
+  --sample-rss
+```
+
+Notes:
+
+- The macOS OSPRay wrapper `launch_paraview_with_ospray_fix.sh` is macOS-specific. Do not use it on
+  Windows unless a Windows-specific OSPRay workaround becomes necessary.
+- If you want one place to change all Windows paths, the simplest current approach is a small
+  PowerShell wrapper script that sets the shared dataset/camera/output variables and then invokes
+  the existing Python batch runners.
+
 If you want to benchmark ParaView's separate view-level ray-tracing path explicitly, the driver can
 still lock and log those controls:
 
@@ -342,10 +404,239 @@ This writes:
 
 - `/Users/feng/code/atlas/util/benchmark/benchmark_cross_session_snapshot.csv`
 - `/Users/feng/code/atlas/util/benchmark/benchmark_atlas_cross_dataset_snapshot.csv`
+- `/Users/feng/code/atlas/util/benchmark/benchmark_gui_rotate_snapshot.csv`
 
 The exporter reads the retained session aggregate `summary.json` files directly, so the CSV values stay
 aligned with the authoritative benchmark artifacts rather than depending on manual copy/paste from the
 markdown summary.
+
+## Real GUI Drag Benchmark (macOS)
+
+For black-box GUI interaction benchmarking on macOS, use real Quartz mouse input plus window
+capture. This is separate from the deterministic scripted-camera benchmarks above.
+
+Required Python packages:
+
+```bash
+source /Users/feng/miniconda3/etc/profile.d/conda.sh
+conda activate pt12
+python -m pip install pyobjc
+```
+
+Required macOS permissions for the terminal you use to launch the scripts:
+
+- `Accessibility`
+- `Screen Recording`
+
+The basic components are:
+
+- `/Users/feng/code/atlas/util/benchmark/macos_gui_drag_benchmark.py`
+- `/Users/feng/code/atlas/util/benchmark/macos_window_capture_sckit.swift`
+- `/Users/feng/code/atlas/util/benchmark/build_macos_window_capture_sckit.sh`
+- `/Users/feng/code/atlas/util/benchmark/volume_benchmark_capture.py`
+- `/Users/feng/code/atlas/util/benchmark/summarize_gui_capture_fps.py`
+- `/Users/feng/code/atlas/util/benchmark/gui_drag_benchmark_calibration_template.json`
+- `/Users/feng/code/atlas/util/benchmark/paraview_gui_rotate_batch.py`
+- `/Users/feng/code/atlas/util/benchmark/atlas_gui_rotate_batch.py`
+
+Preferred capture backend on macOS:
+
+- `ScreenCaptureKit` via `macos_window_capture_sckit.swift`
+
+Fallback capture backend:
+
+- `volume_benchmark_capture.py` using `mss`
+
+Use the ScreenCaptureKit helper when you need accurate GUI FPS on Atlas. The Python `mss` path is
+still useful as a fallback, but it was too slow to resolve Atlas's real visible frame cadence
+cleanly.
+
+### 1. List Windows For Calibration
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/macos_gui_drag_benchmark.py --list-windows
+```
+
+Use that to identify the target application window. Then create a calibration JSON derived from
+`gui_drag_benchmark_calibration_template.json`.
+
+Important calibration fields:
+
+- `capture_region`: the render-pane rectangle used by the capture observer
+- `input_region`: the Quartz input rectangle used for mouse injection
+- `region_coordinate_space`: `absolute` or `window-relative`
+- `actions`: the drag path(s), expressed as normalized coordinates inside `input_region`
+
+On Retina displays, `capture_region` and `input_region` may intentionally differ. A common pattern is:
+
+- `capture_region`: `2000 x 1500` physical pixels
+- `input_region`: `1000 x 750` logical Quartz points
+
+If you want the calibration to survive app relaunches or minor window-position drift, prefer:
+
+- `region_coordinate_space: "window-relative"`
+- `capture_region` and `input_region` expressed relative to the matched top-level window origin
+
+### 2. Build The ScreenCaptureKit Helper
+
+```bash
+CAPTURE_BIN=$(/Users/feng/code/atlas/util/benchmark/build_macos_window_capture_sckit.sh)
+```
+
+### 3. Start Capture
+
+```bash
+"${CAPTURE_BIN}" \
+  --calibration /path/to/gui_calibration.json \
+  --events /tmp/gui_benchmark/gui_events.jsonl \
+  --output /tmp/gui_benchmark/capture_summary.json \
+  --sample-hz 60 \
+  --pixel-threshold 0.1 \
+  --stable-frames 5 \
+  --timeout-seconds 20
+```
+
+The helper captures the matched window with ScreenCaptureKit and uses WindowServer frame status plus
+dirty-rect intersection with the calibrated `capture_region` to derive frame changes. It writes the
+same `capture_summary.json` and `capture_summary_frames.jsonl` artifacts expected by the existing
+summarizer.
+
+Use a timeout that comfortably covers:
+
+- helper startup
+- the injector's `--initial-delay-seconds`
+- drag duration
+- settle time
+
+### 4. Inject Real Mouse Drag Input
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/macos_gui_drag_benchmark.py \
+  --calibration /path/to/gui_calibration.json \
+  --output-dir /tmp/gui_benchmark \
+  --action rotate \
+  --initial-delay-seconds 1.0
+```
+
+That writes:
+
+- `/tmp/gui_benchmark/gui_events.jsonl`
+- `/tmp/gui_benchmark/injected_mouse_events.jsonl`
+
+The injector logs the same `session_start` / `action_start` / `action_end` / `session_end` markers
+used by the capture observer, plus additional `drag_start` / `drag_end` markers and per-event mouse
+records for debugging.
+
+### 5. Summarize Visible FPS
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/summarize_gui_capture_fps.py \
+  --events /tmp/gui_benchmark/gui_events.jsonl \
+  --frames /tmp/gui_benchmark/capture_summary_frames.jsonl \
+  --capture-summary /tmp/gui_benchmark/capture_summary.json \
+  --output /tmp/gui_benchmark/gui_fps_summary.json
+```
+
+The output summary reports:
+
+- action duration anchored to `drag_start` / `drag_end` when available
+- changed-sample count during the drag window
+- visible changed-samples-per-second
+- changed-frame interval statistics
+- derived visible FPS from the mean changed-frame interval
+- first-visible / final-stable timings copied from the capture summary when present
+
+The summarizer automatically calibrates ScreenCaptureKit's monotonic frame timestamps back into the
+event wall-clock domain, so it works with both:
+
+- `capture_summary_frames.jsonl` from `macos_window_capture_sckit.swift`
+- `capture_summary_frames.jsonl` from `volume_benchmark_capture.py`
+
+Recommended first benchmark shape:
+
+- use `slice15_ch2`
+- start with `rotate` only
+- capture at `60 Hz`
+- run one ParaView trial and one Atlas trial before expanding to repeated measurements
+
+### ParaView GUI Batch Runner
+
+Use the batch runner when you want repeated real-GUI ParaView rotate measurements with a fresh
+prepared GUI instance on every run:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/paraview_gui_rotate_batch.py \
+  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd \
+  --camera-spec /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
+  --calibration /path/to/paraview_gui_calibration.json \
+  --output-root /tmp/paraview_gui_rotate_slice15 \
+  --warmup-runs 1 \
+  --measured-runs 7
+```
+
+The runner:
+
+- launches a fresh ParaView GUI process for each run with `prepare_paraview_gui_benchmark.py`
+- waits for the startup script to report that the benchmark scene is ready
+- starts the ScreenCaptureKit helper
+- injects the real rotate drag
+- writes `gui_fps_summary.json` for each run
+- writes aggregate `summary.json` and `summary.md` under `aggregate/`
+
+### Atlas GUI Batch Runner
+
+Use the Atlas batch runner when you want repeated real-GUI rotate measurements while keeping the
+same prepared Atlas scene alive across warm-up and measured runs:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/atlas_gui_rotate_batch.py \
+  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim \
+  --camera-spec /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
+  --calibration /path/to/atlas_gui_calibration.json \
+  --output-root /tmp/atlas_gui_rotate_slice15 \
+  --warmup-runs 1 \
+  --measured-runs 7 \
+  --compositing-mode "Maximum Intensity Projection"
+```
+
+The runner:
+
+- launches the requested Atlas build once for the batch
+- waits for the scene-server RPC port to become free before launch so it does not collide with a
+  previous Atlas instance on `localhost:50051`
+- prepares the 3D scene through RPC:
+  - hides background / axis
+  - sets `No Bound Box`
+  - resizes the live 3D canvas
+  - loads the dataset
+  - enables full-resolution rendering when supported
+  - applies the requested compositing mode
+  - applies the benchmark camera
+- uses Atlas benchmark render markers only to wait for the reset camera to settle between runs
+- starts the ScreenCaptureKit helper
+- injects the real rotate drag
+- writes `gui_fps_summary.json` for each run
+- writes aggregate `summary.json` and `summary.md` under `aggregate/`
+
+This Atlas GUI runner is intended for steady-state interaction benchmarking. It does not relaunch
+Atlas between measured runs. Instead it resets the camera back to the `open` benchmark state and
+waits for Atlas preview/final markers before starting the next capture.
+
+### Optional Fallback: Python Region Capture
+
+If ScreenCaptureKit is unavailable, you can still use the older Python observer:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/volume_benchmark_capture.py \
+  --events /tmp/gui_benchmark/gui_events.jsonl \
+  --output /tmp/gui_benchmark/capture_summary.json \
+  --x 100 --y 100 --width 2000 --height 1500 \
+  --sample-hz 60 \
+  --pixel-threshold 1.0 \
+  --stable-frames 5
+```
+
+That path is simpler, but on this machine it was too slow for reliable Atlas GUI FPS measurement.
 
 ## Retina Viewports
 

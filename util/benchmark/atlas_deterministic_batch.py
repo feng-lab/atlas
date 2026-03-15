@@ -7,6 +7,7 @@ import math
 import re
 import statistics
 import subprocess
+import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -188,6 +189,14 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--address", default="localhost:50051", help="Atlas Scene RPC address"
+    )
+    parser.add_argument(
+        "--atlas-dir",
+        default="",
+        help=(
+            "Optional Atlas install/build directory forwarded to SceneClient in the driver. "
+            "Use this on machines where Atlas is not installed in the default location."
+        ),
     )
     parser.add_argument(
         "--canvas-logical-width",
@@ -656,7 +665,7 @@ def _run_command(
     start_offset = log_path.stat().st_size if log_path.exists() else 0
 
     command = [
-        "python3",
+        sys.executable,
         str(Path(args.driver_script).resolve()),
         "--dataset",
         str(Path(args.dataset).resolve()),
@@ -683,6 +692,8 @@ def _run_command(
         "--final-timeout-seconds",
         str(float(args.final_timeout_seconds)),
     ]
+    if args.atlas_dir.strip():
+        command.extend(["--atlas-dir", args.atlas_dir])
     if (args.canvas_logical_width is None) != (args.canvas_logical_height is None):
         raise ValueError(
             "--canvas-logical-width and --canvas-logical-height must be provided together"
@@ -794,6 +805,9 @@ def _aggregate_runs(
         "camera_spec": str(Path(args.camera_spec).resolve()),
         "atlas_log_path": str(resolved_log_path),
         "address": args.address,
+        "atlas_dir": (
+            str(Path(args.atlas_dir).resolve()) if args.atlas_dir.strip() else None
+        ),
         "warmup_runs": args.warmup_runs,
         "measured_runs": args.measured_runs,
         "step_hold_seconds": float(args.step_hold_seconds),
@@ -1163,6 +1177,9 @@ def main() -> int:
         "camera_spec": str(Path(args.camera_spec).resolve()),
         "atlas_log_path": str(resolved_log_path),
         "address": args.address,
+        "atlas_dir": (
+            str(Path(args.atlas_dir).resolve()) if args.atlas_dir.strip() else None
+        ),
         "warmup_runs": int(args.warmup_runs),
         "measured_runs": int(args.measured_runs),
         "step_hold_seconds": float(args.step_hold_seconds),

@@ -1,0 +1,33 @@
+{
+  "app": "atlas",
+  "bundle_identifier": "",
+  "window_owner_name": "Atlas",
+  "window_name_substring": "",
+  "region_coordinate_space": "absolute",
+  "activate_app": true,
+  "capture_region": {
+                     "x": 0,
+                     "y": 0,
+                     "width": 2000,
+                     "height": 1500
+  },
+  "input_region": {
+                     "x": 0,
+                     "y": 0,
+                     "width": 1000,
+                     "height": 750
+  },
+  "actions": [
+    {
+                     "name": "rotate",
+                     "button": "left",
+                     "start_norm": [
+        0.45, 0.55
+      ], "end_norm": [
+        0.75, 0.55
+      ], "duration_seconds": 0.5,
+                     "steps": 30,
+                     "settle_seconds": 2.0
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 import subprocess
@@ -8,9 +9,74 @@ import time
 from pathlib import Path
 
 
+def _sample_rss_bytes_windows(pid: int) -> int | None:
+    try:
+        from ctypes import wintypes
+    except ImportError:
+        return None
+
+    process_query_information = 0x0400
+    process_vm_read = 0x0010
+    process_query_limited_information = 0x1000
+
+    class ProcessMemoryCountersEx(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD),
+            ("PageFaultCount", wintypes.DWORD),
+            ("PeakWorkingSetSize", ctypes.c_size_t),
+            ("WorkingSetSize", ctypes.c_size_t),
+            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+            ("PagefileUsage", ctypes.c_size_t),
+            ("PeakPagefileUsage", ctypes.c_size_t),
+            ("PrivateUsage", ctypes.c_size_t),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    psapi = ctypes.WinDLL("psapi", use_last_error=True)
+    open_process = kernel32.OpenProcess
+    open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    open_process.restype = wintypes.HANDLE
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = [wintypes.HANDLE]
+    close_handle.restype = wintypes.BOOL
+    get_process_memory_info = psapi.GetProcessMemoryInfo
+    get_process_memory_info.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(ProcessMemoryCountersEx),
+        wintypes.DWORD,
+    ]
+    get_process_memory_info.restype = wintypes.BOOL
+
+    handle = open_process(
+        process_query_limited_information | process_vm_read, False, int(pid)
+    )
+    if not handle:
+        handle = open_process(
+            process_query_information | process_vm_read, False, int(pid)
+        )
+    if not handle:
+        return None
+
+    try:
+        counters = ProcessMemoryCountersEx()
+        counters.cb = ctypes.sizeof(ProcessMemoryCountersEx)
+        ok = get_process_memory_info(handle, ctypes.byref(counters), counters.cb)
+        if not ok:
+            return None
+        return int(counters.WorkingSetSize)
+    finally:
+        close_handle(handle)
+
+
 def sample_rss_bytes(pid: int) -> int | None:
     if pid <= 0:
         return None
+
+    if os.name == "nt":
+        return _sample_rss_bytes_windows(pid)
 
     if os.name != "posix":
         return None
