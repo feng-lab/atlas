@@ -192,6 +192,24 @@ RETAINED_SESSIONS: tuple[SessionSpec, ...] = (
         / "atlas_high_res_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json",
         kind="atlas",
     ),
+    SessionSpec(
+        dataset="largeimgmergeoutput_large_all_uint8_4",
+        session="Atlas MIP",
+        input_desc="Dense .nim (external drive)",
+        render_mode="Maximum Intensity Projection",
+        aggregate_summary_path=LARGE_ROOT
+        / "atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json",
+        kind="atlas",
+    ),
+    SessionSpec(
+        dataset="largeimgmergeoutput_large_all_uint8_4",
+        session="Atlas DVR",
+        input_desc="Dense .nim (external drive)",
+        render_mode="Direct Volume Rendering",
+        aggregate_summary_path=LARGE_ROOT
+        / "atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json",
+        kind="atlas",
+    ),
 )
 
 

@@ -669,3 +669,111 @@ For the current Atlas vs ParaView comparison on macOS Retina, the shared benchma
 Use the same `2000x1500` benchmark camera spec for Atlas and ParaView so both applications render to
 the same effective pixel size. For Atlas live-window benchmarking, set the canvas to `1000x750`
 logical with `Set3DCanvasSize` or the benchmark driver flags above.
+
+## Fidelity Validation ROI Export
+
+For the full-resolution fidelity-validation workflow, the retained ROI datasets are exported as
+standalone `.nim` files rather than blocked ParaView datasets. The current retained setup uses the
+existing high-resolution Atlas dataset and writes, for each ROI:
+
+- `fullres.nim`: native-resolution resident-GPU reference candidate
+- `level1.nim`: XY downsampled by `2x`, physical extent preserved
+- `level2.nim`: XY downsampled by `4x`, physical extent preserved
+- `metadata.json`: exact ROI bounds plus saved output metadata
+
+The exporter is:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/export_high_res_fidelity_rois.py
+```
+
+By default it uses:
+
+- source dataset:
+  `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim`
+- output root:
+  `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v1`
+- ROI size:
+  `2048 x 2048 x 169`
+- retained ROI centers:
+  - `(16800, 4300)`
+  - `(13600, 7100)`
+  - `(23300, 8700)`
+  - `(4100, 10000)`
+
+The exporter writes a top-level `manifest.json` and `README.md` under the output root so the later
+render / analysis step can consume the retained ROI set without recomputing the crop bounds.
+
+## Fidelity Validation Render + Analysis
+
+Use the render driver to compare, for each ROI and mode:
+
+- `reference`: resident native-resolution ROI render
+- `adaptive`: the original large dataset rendered with Atlas full-resolution enabled and clipped to
+  the same ROI bounds
+- `coarse_l1`: resident ROI downsampled by `2x` in XY, upscaled back to the native scene footprint
+- `coarse_l2`: resident ROI downsampled by `4x` in XY, upscaled back to the native scene footprint
+
+Launch Atlas with benchmark render markers enabled first:
+
+```bash
+/Users/feng/code/atlas/build/Release/src/atlas/Atlas.app/Contents/MacOS/Atlas \
+  --atlas_log_benchmark_render_timings
+```
+
+Then run the retained render suite:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/atlas_fidelity_render.py \
+  --roi-manifest /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v1/manifest.json \
+  --adaptive-dataset /Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim \
+  --base-camera-spec /Users/feng/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json \
+  --output-root /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_v1 \
+  --atlas-log-path /Users/feng/Library/Logs/Atlas \
+  --overwrite
+```
+
+Important details:
+
+- The driver derives one local ROI camera for the resident reference/coarse controls and one global
+  scene-space camera for the large adaptive dataset.
+- `--camera-distance-scale < 1.0` zooms in beyond the fit view while preserving the fitted camera
+  direction. This is useful when the fit view still leaves `coarse_l1` screen-space sufficient.
+- The adaptive case applies local `X/Y/Z` cuts matching the ROI bounds so MIP/DVR comparisons do
+  not include out-of-ROI content from the surrounding large volume.
+- The coarse resident controls apply `Coord Transform 3DTransform` so their rendered world footprint
+  matches the native-resolution ROI footprint even though the coarse `.nim` files are smaller.
+- `--coarse-sampling-rate` can decouple the coarse-control sampling rate from the resident reference
+  sampling rate. For LOD-choice comparisons, prefer matching coarse sampling to the adaptive
+  sampling rate and keeping the reference sampling rate higher.
+- `--transfer-function-overrides <json>` applies per-ROI/per-mode transfer-function overrides. The
+  retained example for roi03 background suppression is:
+  [high_res_20220219_transfer_function_overrides_roi03_threshold20_v1.json](/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_transfer_function_overrides_roi03_threshold20_v1.json)
+- The current retained compositing modes are:
+  - `MIP Opaque`
+  - `Direct Volume Rendering`
+
+After rendering, run the analysis pass:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/analyze_fidelity_validation.py \
+  --render-manifest /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_v1/manifest.json
+```
+
+That writes:
+
+- `analysis/summary.csv`
+- `analysis/summary.json`
+- `analysis/details.json`
+- `analysis/summary.md`
+- per-comparison `analysis/<roi>/<mode>/<condition>/difference_heatmap.png`
+
+Current fidelity metrics:
+
+- grayscale SSIM against the resident native-resolution reference
+- masked mean / median / p95 / max absolute difference
+- reference-derived foreground mask with largest-connected-component filtering
+
+The current retained analysis is image-based only. The planned screen-space sufficiency audit
+(`selected voxel size <= desired pixel-footprint voxel size`) still requires engine-side audit
+plumbing and is not part of the current retained output yet.

@@ -42,6 +42,8 @@ document.
 | `slice15_ch2_x2z` | `Direct Volume Rendering` | `3357.746 ms` | `3593.807 ms` | `39.085 ms` | `124.365 ms` | `43.987 ms` | `1171.357 ms` | `9.374 GiB` |
 | `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | `Maximum Intensity Projection` | `4071.009 ms` | `4420.345 ms` | `35.940 ms` | `112.519 ms` | `41.128 ms` | `1032.147 ms` | `10.290 GiB` |
 | `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | `Direct Volume Rendering` | `4465.727 ms` | `4832.279 ms` | `37.062 ms` | `122.712 ms` | `45.618 ms` | `1071.328 ms` | `16.238 GiB` |
+| `largeimgmergeoutput_large_all_uint8_4 (external drive)` | `Maximum Intensity Projection` | `211452.270 ms` | `212012.365 ms` | `55.416 ms` | `135.392 ms` | `68.001 ms` | `40225.622 ms` | `40.341 GiB` |
+| `largeimgmergeoutput_large_all_uint8_4 (external drive)` | `Direct Volume Rendering` | `303831.956 ms` | `305678.759 ms` | `115.072 ms` | `379.193 ms` | `139.241 ms` | `18204.087 ms` | `36.975 GiB` |
 
 ## Cross-Session Snapshot
 
@@ -1199,6 +1201,168 @@ Artifacts:
 | Peak RSS | `7` | `17435769710 bytes` (`16.238 GiB`) | `17427472384 bytes` (`16.231 GiB`) | `1720481274 bytes` | `19588741939 bytes` (`18.243 GiB`) | Aggregate memory summary across measured runs. |
 | Full-run wall time | `7` | `123.291 s` | `123.288 s` | `0.187 s` | `123.502 s` | Entire deterministic script duration per measured run. |
 
+# Deterministic Benchmark Sessions: `largeimgmergeoutput_large_all_uint8_4`
+
+This section summarizes the retained Atlas deterministic benchmark sessions for
+`largeimgmergeoutput_large_all_uint8_4`. The dataset file lives on an external
+drive, so these results include external-drive I/O behavior and should not be
+treated as directly comparable to the earlier internal-disk Atlas datasets.
+
+## Shared Setup
+
+| Item | Value |
+| --- | --- |
+| Camera spec | `/Users/feng/code/atlas/large_test_image/largeimgmerge_scene_camera_exact_2000x1500.json` |
+| Viewport convention | `2000 x 1500` physical pixels (`1000 x 750` logical Retina canvas in Atlas) |
+| Action sequence | `open`, then `rotate`, then `zoom` |
+| Rotate action | `0.5 s`, `30` interpolated steps, followed by settle |
+| Zoom action | `0.5 s`, `30` interpolated steps, followed by settle |
+| Deterministic method | Internal Atlas benchmark markers plus live Atlas render-log parsing |
+| Benchmark cleanup flags | `--hide-background --hide-axis --hide-bound-box` |
+| ParaView retained sessions | None for this dataset in this summary |
+| Atlas dataset | `/Volumes/T7 Shield/largeimgmergeoutput_large_all_uint8_4.nim` |
+| Dataset format | Dense `.nim` on external SSD |
+| Dataset size | `16866 x 10127 x 7436`, single channel |
+| Dataset spacing | `1 x 1 x 1` (file metadata; `VoxelSizeUnit.none`) |
+| File size on disk | About `328 GiB` |
+| Raw voxel payload | `1,270,083,538,152` voxels, about `1.27 TB` at `uint8` (`~1.16 TiB`) |
+| Storage note | The benchmark file is on `/Volumes/T7 Shield`, so open and paging-heavy final renders include external-drive latency and bandwidth effects. |
+
+For the Atlas rows below:
+- `Open total -> first preview` and `Open total -> final` are measured from action start.
+- `Rotate/Zoom release/final` uses the last-step `preview -> final` settle interval.
+
+## Cross-Session Snapshot
+
+| Session | Input | Compositing | Open first preview | Open final | Rotate preview | Rotate release/final | Zoom preview | Zoom release/final | Peak RSS | Full-run wall |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Atlas MIP | Dense `.nim` (external drive) | `Maximum Intensity Projection` | `211452.270 ms` | `212012.365 ms` | `55.416 ms` | `135.392 ms` | `68.001 ms` | `40225.622 ms` | `40.341 GiB` | `597.663 s` |
+| Atlas DVR | Dense `.nim` (external drive) | `Direct Volume Rendering` | `303831.956 ms` | `305678.759 ms` | `115.072 ms` | `379.193 ms` | `139.241 ms` | `18204.087 ms` | `36.975 GiB` | `811.201 s` |
+
+## Session 18: Atlas Dense Input, MIP
+
+Artifacts:
+- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_mip_v1`
+- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | Atlas (local build from this repository) |
+| Rendering mode | Default Atlas behavior for this dataset |
+| Compositing mode | `Maximum Intensity Projection` |
+| Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
+| Dataset | `/Volumes/T7 Shield/largeimgmergeoutput_large_all_uint8_4.nim` |
+| Dataset format | Dense `.nim` on external SSD |
+| Dataset size | `16866 x 10127 x 7436`, single channel |
+| Dataset spacing | `1 x 1 x 1` (file metadata; `VoxelSizeUnit.none`) |
+| Storage note | The dataset file is on `/Volumes/T7 Shield`, so open and deep zoom final times include external-drive I/O effects. |
+| Benchmark cleanup flags | `--hide-background --hide-axis --hide-bound-box` |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Open total -> first preview | `33459.331 ms` |
+| Open total -> final | `34306.152 ms` |
+| Open target view -> first preview | `32.567 ms` |
+| Open target view -> final | `879.388 ms` |
+| Open target view preview -> final | `846.821 ms` |
+| Rotate preview step mean | `54.332 ms` |
+| Rotate step 1 preview | `59.467 ms` |
+| Rotate step 30 preview | `55.547 ms` |
+| Rotate step 30 preview -> final | `134.856 ms` |
+| Zoom preview step mean | `68.196 ms` |
+| Zoom step 1 preview | `55.921 ms` |
+| Zoom step 30 preview | `68.736 ms` |
+| Zoom step 30 preview -> final | `100153.530 ms` |
+| Peak RSS | `10194698240 bytes` (`9.495 GiB`) |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open total -> first preview | `7` | `211452.270` | `209482.515` | `5046.332` | `219099.086` | Client-observed open latency to the first preview marker. |
+| Open total -> final | `7` | `212012.365` | `210042.998` | `5032.962` | `219624.854` | Client-observed open latency to the first final marker. |
+| Open target view -> first preview | `7` | `26.477` | `25.970` | `2.418` | `29.473` | Latency after the intended benchmark camera/state was requested. |
+| Open target view -> final | `7` | `586.572` | `588.862` | `32.372` | `622.631` | Final-view latency after the intended benchmark camera/state was requested. |
+| Open target view preview -> final | `7` | `560.096` | `560.483` | `31.500` | `597.256` | Settle interval from the intended target-view preview to the first final marker. |
+| Rotate preview step duration | `210` | `55.416` | `54.806` | `7.194` | `57.711` | Per-step preview completion over all measured rotate steps. |
+| Rotate step 1 preview duration | `7` | `51.913` | `51.827` | `1.775` | `54.553` | First requested rotate step across measured runs. |
+| Rotate step 30 preview duration | `7` | `56.536` | `55.958` | `1.450` | `58.434` | Last requested rotate step across measured runs. |
+| Rotate preview service FPS | `210` | `18.046` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Rotate step 30 preview -> final duration | `7` | `135.392` | `135.723` | `2.348` | `137.854` | Last-step final-view latency after the last rotate preview step. |
+| Zoom preview step duration | `210` | `68.001` | `68.540` | `10.014` | `76.180` | Per-step preview completion over all measured zoom steps. |
+| Zoom step 1 preview duration | `7` | `56.712` | `56.266` | `1.035` | `58.032` | First requested zoom step across measured runs. |
+| Zoom step 30 preview duration | `7` | `84.806` | `75.687` | `18.460` | `113.941` | Last requested zoom step across measured runs. |
+| Zoom preview service FPS | `210` | `14.706` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Zoom step 30 preview -> final duration | `7` | `40225.622` | `36256.655` | `9221.169` | `54521.353` | Last-step final-view latency after the last zoom preview step. |
+| Peak RSS | `7` | `43315508955 bytes` (`40.341 GiB`) | `43894411264 bytes` (`40.880 GiB`) | `1074783265 bytes` | `44161131315 bytes` (`41.128 GiB`) | Aggregate memory summary across measured runs. |
+| Full-run wall time | `7` | `597.663 s` | `574.125 s` | `69.671 s` | `702.500 s` | Entire deterministic script duration per measured run. |
+
+## Session 19: Atlas Dense Input, DVR
+
+Artifacts:
+- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_dvr_v1`
+- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | Atlas (local build from this repository) |
+| Rendering mode | Default Atlas behavior for this dataset |
+| Compositing mode | `Direct Volume Rendering` |
+| Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
+| Dataset | `/Volumes/T7 Shield/largeimgmergeoutput_large_all_uint8_4.nim` |
+| Dataset format | Dense `.nim` on external SSD |
+| Dataset size | `16866 x 10127 x 7436`, single channel |
+| Dataset spacing | `1 x 1 x 1` (file metadata; `VoxelSizeUnit.none`) |
+| Storage note | The dataset file is on `/Volumes/T7 Shield`, so open and deep zoom final times include external-drive I/O effects. |
+| Benchmark cleanup flags | `--hide-background --hide-axis --hide-bound-box` |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Open total -> first preview | `249011.905 ms` |
+| Open total -> final | `250053.771 ms` |
+| Open target view -> first preview | `35.080 ms` |
+| Open target view -> final | `1076.946 ms` |
+| Open target view preview -> final | `1041.866 ms` |
+| Rotate preview step mean | `79.400 ms` |
+| Rotate step 1 preview | `70.474 ms` |
+| Rotate step 30 preview | `83.903 ms` |
+| Rotate step 30 preview -> final | `255.304 ms` |
+| Zoom preview step mean | `122.846 ms` |
+| Zoom step 1 preview | `80.877 ms` |
+| Zoom step 30 preview | `322.960 ms` |
+| Zoom step 30 preview -> final | `32389.343 ms` |
+| Peak RSS | `35023290368 bytes` (`32.618 GiB`) |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open total -> first preview | `7` | `303831.956` | `374285.045` | `107856.393` | `406181.903` | Client-observed open latency to the first preview marker. |
+| Open total -> final | `7` | `305678.759` | `377386.774` | `109059.769` | `408949.123` | Client-observed open latency to the first final marker. |
+| Open target view -> first preview | `7` | `76.004` | `46.722` | `122.328` | `259.866` | Latency after the intended benchmark camera/state was requested. |
+| Open target view -> final | `7` | `1922.807` | `2252.004` | `1206.494` | `3115.811` | Final-view latency after the intended benchmark camera/state was requested. |
+| Open target view preview -> final | `7` | `1846.803` | `2246.784` | `1257.619` | `3068.289` | Settle interval from the intended target-view preview to the first final marker. |
+| Rotate preview step duration | `210` | `115.072` | `109.055` | `51.511` | `200.155` | Per-step preview completion over all measured rotate steps. |
+| Rotate step 1 preview duration | `7` | `128.612` | `112.512` | `73.237` | `237.146` | First requested rotate step across measured runs. |
+| Rotate step 30 preview duration | `7` | `113.756` | `108.340` | `50.904` | `183.679` | Last requested rotate step across measured runs. |
+| Rotate preview service FPS | `210` | `8.690` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Rotate step 30 preview -> final duration | `7` | `379.193` | `457.344` | `206.023` | `597.523` | Last-step final-view latency after the last rotate preview step. |
+| Zoom preview step duration | `210` | `139.241` | `118.345` | `61.667` | `267.861` | Per-step preview completion over all measured zoom steps. |
+| Zoom step 1 preview duration | `7` | `107.625` | `114.057` | `41.454` | `159.848` | First requested zoom step across measured runs. |
+| Zoom step 30 preview duration | `7` | `127.703` | `104.245` | `35.250` | `179.178` | Last requested zoom step across measured runs. |
+| Zoom preview service FPS | `210` | `7.182` | n/a | `n/a (derived)` | n/a | Computed as `1000 / mean_preview_ms`. |
+| Zoom step 30 preview -> final duration | `7` | `18204.087` | `9832.811` | `12223.510` | `35811.488` | Last-step final-view latency after the last zoom preview step. |
+| Peak RSS | `7` | `39701996105 bytes` (`36.975 GiB`) | `38061592576 bytes` (`35.448 GiB`) | `4323526308 bytes` | `45962110157 bytes` (`42.806 GiB`) | Aggregate memory summary across measured runs. |
+| Full-run wall time | `7` | `811.201 s` | `853.333 s` | `374.563 s` | `1202.466 s` | Entire deterministic script duration per measured run. |
+
 # Additional Experiment Notes
 
 These exploratory runs were useful for planning and interpreting the retained benchmark
@@ -1411,3 +1575,72 @@ Artifacts:
 | Visible FPS from mean interval | `7` | `21.922 fps` | `21.756 fps` | `0.914 fps` | `23.124 fps` | Interval-derived visible cadence from changed-frame timestamps. |
 | First visible from drag start | `7` | `51.478 ms` | `53.966 ms` | `7.291 ms` | `60.776 ms` | Time to the first visible render-area change after drag motion begins. |
 | Drag duration | `7` | `5000.943 ms` | `5000.781 ms` | `0.406 ms` | `5001.564 ms` | Measured from injected `drag_start` to `drag_end`. |
+
+# Fidelity Validation: `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um`
+
+This section records the retained image-based fidelity validation for Atlas
+`Direct Volume Rendering` on memory-fit ROIs cut from the retained
+`high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` dataset. This is a
+supplementary quality audit, not a throughput benchmark.
+
+Artifacts:
+- ROI family: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2`
+- Retained DVR render suite: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_v1`
+- Retained DVR analysis summary: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_v1/analysis/summary.json`
+
+## Fidelity Protocol
+
+| Item | Value |
+| --- | --- |
+| Source dataset | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
+| Source shape | `25395 x 19459 x 169`, single channel |
+| Source voxel size | `0.1 x 0.1 x 2.0 um` |
+| ROI export script | `/Users/feng/code/atlas/util/benchmark/export_high_res_fidelity_rois.py` |
+| ROI family | `high_res_20220219_roi_validation_v2` |
+| ROI crop shape | `2048 x 2048 x 169` |
+| Retained ROI centers | `(16800, 4300)`, `(13600, 7100)`, `(10500, 10000)`, `(4100, 10000)` |
+| ROI variants | `fullres.nim`, `level1.nim`, `level2.nim` |
+| Camera seed | `/Users/feng/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json` |
+| Camera policy | Fit each ROI box, then apply `camera-distance-scale = 0.6` to zoom in past the `L1` comfort zone |
+| Output render size | `2000 x 1500` physical pixels |
+| Atlas live 3D canvas size | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
+| View cleanup | Background hidden, axis hidden, bound box set to `No Bound Box` |
+| Transfer function | Default Atlas transfer function captured from the bootstrap mode preset |
+| Display range | Fixed `0 .. 255` |
+| Conditions | `reference`, `adaptive`, `coarse_l1`, `coarse_l2` |
+| `reference` | Resident `fullres.nim`, local ROI camera, sampling rate `8.0` |
+| `adaptive` | Original large dataset with full-resolution rendering enabled, ROI `X/Y/Z Cut` applied, sampling rate `2.0` |
+| `coarse_l1` | Resident `level1.nim`, scaled back to native ROI footprint with `Coord Transform`, sampling rate `2.0` |
+| `coarse_l2` | Resident `level2.nim`, scaled back to native ROI footprint with `Coord Transform`, sampling rate `2.0` |
+| Analysis script | `/Users/feng/code/atlas/util/benchmark/analyze_fidelity_validation.py` |
+| Current fidelity metrics | Grayscale SSIM, masked mean abs diff, masked P95 abs diff, difference heatmaps |
+| Mask policy | Reference-derived foreground mask from the rendered reference image |
+| Current limitation | Image-based only. The planned screen-space sufficiency audit is still pending engine-side instrumentation. |
+
+## Retained DVR Result
+
+Aggregate across the retained `v2` ROI family:
+
+| Condition | Count | Mean SSIM | Mean abs diff | Mean P95 abs diff | Mean max abs diff |
+| --- | --- | --- | --- | --- | --- |
+| `adaptive` | `4` | `0.996834` | `0.252` | `1.250` | `36.750` |
+| `coarse_l1` | `4` | `0.961353` | `2.450` | `10.250` | `78.250` |
+| `coarse_l2` | `4` | `0.901613` | `4.463` | `18.250` | `123.500` |
+
+Per-ROI retained DVR result:
+
+| ROI | `adaptive` SSIM | `adaptive` mean abs diff | `adaptive` P95 abs diff | `coarse_l1` SSIM | `coarse_l1` mean abs diff | `coarse_l1` P95 abs diff | `coarse_l2` SSIM | `coarse_l2` mean abs diff | `coarse_l2` P95 abs diff |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `roi01_cx16800_cy4300` | `0.993273` | `0.395` | `1.000` | `0.978200` | `1.159` | `4.000` | `0.948754` | `2.146` | `7.000` |
+| `roi02_cx13600_cy7100` | `0.997153` | `0.339` | `2.000` | `0.950269` | `4.093` | `19.000` | `0.862628` | `7.383` | `34.000` |
+| `roi03_cx10500_cy10000` | `0.997588` | `0.162` | `1.000` | `0.955193` | `1.991` | `7.000` | `0.897722` | `3.344` | `12.000` |
+| `roi04_cx4100_cy10000` | `0.999322` | `0.111` | `1.000` | `0.961751` | `2.558` | `11.000` | `0.897348` | `4.977` | `20.000` |
+
+Interpretation:
+
+- Under this zoomed-in DVR view, Atlas adaptive output is consistently much closer
+  to the resident native-resolution reference than either forced coarse control.
+- This result supports the claim that Atlas adaptive full-resolution DVR is
+  selecting detail levels that are substantially closer to the native resident
+  render than globally forced coarse levels, at least for this retained ROI set
+  and this zoomed screen-space demand.
