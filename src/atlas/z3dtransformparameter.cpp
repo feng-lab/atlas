@@ -4,6 +4,7 @@
 #include "zlog.h"
 #include <QWidget>
 #include <QGroupBox>
+#include <QScopedValueRollback>
 #include <QPushButton>
 
 namespace {
@@ -297,6 +298,9 @@ void Z3DTransformParameter::interpolate(const ZParameter& prev, double progress,
 
 void Z3DTransformParameter::updateMatrix()
 {
+  if (m_blockSubParameterSignals) {
+    return;
+  }
   glm::mat4 trans1 = glm::translate(glm::mat4(1.f), -m_center.get() * m_scale.get());
   glm::mat4 trans = glm::translate(glm::mat4(1.f), m_translation.get() + m_center.get() * m_scale.get());
   glm::mat4 scale = glm::scale(glm::mat4(1.f), m_scale.get());
@@ -378,14 +382,20 @@ json::value Z3DTransformParameter::jsonValue() const
 
 void Z3DTransformParameter::readValue(const json::value& jsonValue)
 {
-  if (jsonValue.is_object()) {
+  if (!jsonValue.is_object()) {
+    return;
+  }
+  // readValue is used at system boundaries (RPC, serialization). Treat nested parameter reads
+  // as an atomic update: avoid re-entrant updateMatrix() signals while fields are still parsing.
+  {
+    QScopedValueRollback<bool> guard(m_blockSubParameterSignals, true);
     const auto& obj = jsonValue.as_object();
     m_scale.read(obj);
     m_translation.read(obj);
     m_rotation.read(obj);
     m_center.read(obj);
-    updateMatrix();
   }
+  updateMatrix();
 }
 
 } // namespace nim

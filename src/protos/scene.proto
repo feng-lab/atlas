@@ -276,6 +276,11 @@ service Scene {
   // Render a single-frame screenshot of the current 3D scene (no animation export).
   // Returns the written image path (typically in the OS temp directory unless a path is provided).
   rpc TakeScreenshot3D (ScreenshotRequest) returns (ScreenshotResponse);
+  // Export the scalar raw-MIP image for a single Image object in a MIP-family mode.
+  rpc ExportRawMIP3D(RawMIPRequest) returns (RawMIPResponse);
+  // Export aggregate screen-space sufficiency counts for a single Image object.
+  rpc ExportScreenSpaceSufficiencyAudit3D(ScreenSpaceSufficiencyAuditRequest)
+    returns (ScreenSpaceSufficiencyAuditResponse);
   rpc EnsureAnimation (EnsureAnimationRequest) returns (EnsureAnimationResponse);
   rpc SetDuration (SetDurationRequest) returns (Bool);
   rpc SetKey (SetKeyRequest) returns (Bool);
@@ -380,6 +385,52 @@ message ScreenshotRequest {
 message ScreenshotResponse {
   bool ok = 1;
   string path = 2;
+  string error = 3;
+}
+
+message RawMIPRequest
+{
+  uint64 id = 1;
+  // Optional output path. When empty, Atlas chooses a temp file path.
+  string path = 2;
+  // When false and the output file already exists, the call fails.
+  bool overwrite = 3;
+}
+
+message RawMIPResponse
+{
+  bool ok = 1;
+  string path = 2;
+  string error = 3;
+}
+
+message ScreenSpaceSufficiencyAuditRequest
+{
+  uint64 id = 1;
+}
+
+message ScreenSpaceSufficiencyAudit
+{
+  uint64 contributing_samples = 1;
+  uint64 sufficient_samples = 2;
+  uint64 contributing_pixels = 3;
+  uint64 sufficient_pixels = 4;
+  double sufficient_sample_fraction = 5;
+  double sufficient_pixel_fraction = 6;
+  uint64 level0_samples = 7;
+  uint64 level0_limited_samples = 8;
+  uint64 level0_pixels = 9;
+  uint64 level0_limited_pixels = 10;
+  double level0_sample_fraction = 11;
+  double level0_limited_sample_fraction = 12;
+  double level0_pixel_fraction = 13;
+  double level0_limited_pixel_fraction = 14;
+}
+
+message ScreenSpaceSufficiencyAuditResponse
+{
+  bool ok = 1;
+  ScreenSpaceSufficiencyAudit audit = 2;
   string error = 3;
 }
 

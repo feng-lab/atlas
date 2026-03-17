@@ -46,6 +46,10 @@ DEFAULT_ENGINE_READY_RPC_TIMEOUT_SEC = 10.0
 DEFAULT_ENGINE_OP_RPC_TIMEOUT_SEC = 30.0
 # Screenshot rendering can be slower than most single-shot engine ops.
 DEFAULT_SCREENSHOT_RPC_TIMEOUT_SEC = 60.0
+# Raw MIP export renders a frame and writes a float image to disk.
+DEFAULT_RAW_MIP_RPC_TIMEOUT_SEC = 60.0
+# Screen-space sufficiency audit renders a frame and aggregates counters on the engine thread.
+DEFAULT_SCREEN_SPACE_AUDIT_RPC_TIMEOUT_SEC = 60.0
 
 
 def _expand_path(s: str) -> str:
@@ -2429,6 +2433,131 @@ class SceneClient:
 
         ok = bool(getattr(resp, "ok", False))
         out: dict[str, Any] = {"ok": ok, "path": str(getattr(resp, "path", "") or "")}
+        err = str(getattr(resp, "error", "") or "")
+        if (not ok) and err:
+            out["error"] = err
+        return out
+
+    def export_raw_mip_3d(
+        self,
+        *,
+        id: int,
+        path: Path | None = None,
+        overwrite: bool = True,
+    ) -> dict[str, Any]:
+        """Export the scalar raw-MIP image for a single Image object.
+
+        Returns: {"ok": bool, "path": str, "error"?: str}
+        """
+
+        self.ensure_view()
+
+        if self._stub is None or not hasattr(self._stub, "ExportRawMIP3D"):
+            raise RuntimeError("ExportRawMIP3D is not supported by this Atlas version")
+
+        out_path = str(path) if path is not None else ""
+        req = self._pb2.RawMIPRequest(
+            id=int(id),
+            path=out_path,
+            overwrite=bool(overwrite),
+        )
+        resp = self._stub.ExportRawMIP3D(
+            req, timeout=float(DEFAULT_RAW_MIP_RPC_TIMEOUT_SEC)
+        )
+        self._log_rpc("ExportRawMIP3D", req, resp)
+
+        ok = bool(getattr(resp, "ok", False))
+        out: dict[str, Any] = {"ok": ok, "path": str(getattr(resp, "path", "") or "")}
+        err = str(getattr(resp, "error", "") or "")
+        if (not ok) and err:
+            out["error"] = err
+        return out
+
+    def export_screen_space_sufficiency_audit_3d(
+        self,
+        *,
+        id: int,
+    ) -> dict[str, Any]:
+        """Export aggregate screen-space sufficiency counts for a single Image object.
+
+        Returns:
+          {
+            "ok": bool,
+            "audit"?: {
+              "contributing_samples": int,
+              "sufficient_samples": int,
+              "contributing_pixels": int,
+              "sufficient_pixels": int,
+              "sufficient_sample_fraction": float,
+              "sufficient_pixel_fraction": float,
+              "level0_samples": int,
+              "level0_limited_samples": int,
+              "level0_pixels": int,
+              "level0_limited_pixels": int,
+              "level0_sample_fraction": float,
+              "level0_limited_sample_fraction": float,
+              "level0_pixel_fraction": float,
+              "level0_limited_pixel_fraction": float,
+            },
+            "error"?: str,
+          }
+        """
+
+        self.ensure_view()
+
+        if self._stub is None or not hasattr(
+            self._stub, "ExportScreenSpaceSufficiencyAudit3D"
+        ):
+            raise RuntimeError(
+                "ExportScreenSpaceSufficiencyAudit3D is not supported by this Atlas version"
+            )
+
+        req = self._pb2.ScreenSpaceSufficiencyAuditRequest(id=int(id))
+        resp = self._stub.ExportScreenSpaceSufficiencyAudit3D(
+            req, timeout=float(DEFAULT_SCREEN_SPACE_AUDIT_RPC_TIMEOUT_SEC)
+        )
+        self._log_rpc("ExportScreenSpaceSufficiencyAudit3D", req, resp)
+
+        ok = bool(getattr(resp, "ok", False))
+        out: dict[str, Any] = {"ok": ok}
+        if ok and getattr(resp, "audit", None) is not None:
+            audit = resp.audit
+            out["audit"] = {
+                "contributing_samples": int(
+                    getattr(audit, "contributing_samples", 0) or 0
+                ),
+                "sufficient_samples": int(getattr(audit, "sufficient_samples", 0) or 0),
+                "contributing_pixels": int(
+                    getattr(audit, "contributing_pixels", 0) or 0
+                ),
+                "sufficient_pixels": int(getattr(audit, "sufficient_pixels", 0) or 0),
+                "sufficient_sample_fraction": float(
+                    getattr(audit, "sufficient_sample_fraction", 1.0) or 0.0
+                ),
+                "sufficient_pixel_fraction": float(
+                    getattr(audit, "sufficient_pixel_fraction", 1.0) or 0.0
+                ),
+                "level0_samples": int(getattr(audit, "level0_samples", 0) or 0),
+                "level0_limited_samples": int(
+                    getattr(audit, "level0_limited_samples", 0) or 0
+                ),
+                "level0_pixels": int(getattr(audit, "level0_pixels", 0) or 0),
+                "level0_limited_pixels": int(
+                    getattr(audit, "level0_limited_pixels", 0) or 0
+                ),
+                "level0_sample_fraction": float(
+                    getattr(audit, "level0_sample_fraction", 0.0) or 0.0
+                ),
+                "level0_limited_sample_fraction": float(
+                    getattr(audit, "level0_limited_sample_fraction", 0.0) or 0.0
+                ),
+                "level0_pixel_fraction": float(
+                    getattr(audit, "level0_pixel_fraction", 0.0) or 0.0
+                ),
+                "level0_limited_pixel_fraction": float(
+                    getattr(audit, "level0_limited_pixel_fraction", 0.0) or 0.0
+                ),
+            }
         err = str(getattr(resp, "error", "") or "")
         if (not ok) and err:
             out["error"] = err

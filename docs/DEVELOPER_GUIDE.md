@@ -913,7 +913,11 @@ Notes
   - Vulkan orchestration: `Z3DImgFilter::process()` builds a per-eye `ZVulkanLinearScript`, then delegates node population to the image renderers (`Z3DImgRaycasterRenderer::recordVulkanStagesToScript`, `Z3DImgSliceRenderer::recordVulkanStagesToScript`) with the filter optionally inserting a bound-box overlay node. Each `script.raster(...)` node captures one logical pass / attachment set, so the backend can optimize/coalesce submissions later without touching filter call sites.
 
 - Fast vs Full-Resolution
-  - On load, large volumes are downsampled to fit GPU constraints. `Z3DImg::isVolumeDownsampled()` indicates this.
+  - On load, Atlas first decides whether the source fits GPU-resident rendering by calling `Z3DGpuInfo::getDataScaleForTexture(...)`.
+    `Z3DImg::isVolumeDownsampled()` reflects that GPU-fit decision only.
+  - When paging is required for a 3D volume, `Z3DImg::readVolumes()` uses a separate fast-preview cap policy instead of
+    reusing the GPU-fit scale. The preview cap is controlled by `--atlas_3d_preview_max_dimension` (default `512`) and
+    does not change whether the volume is treated as paged.
   - The UI toggle “Full Resolution Rendering” switches the filter/renderer into a progressive mode that:
     1) Renders a fast result first (downsampled path) for instant feedback.
     2) Iteratively fills a GPU cache of full-res blocks and accumulates a refined image across rounds per channel.

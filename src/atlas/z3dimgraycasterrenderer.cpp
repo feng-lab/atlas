@@ -21,6 +21,7 @@
 #include <tbb/concurrent_unordered_set.h>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <optional>
 
 DEFINE_uint32(atlas_volume_rendering_maximum_round,
@@ -33,6 +34,16 @@ DEFINE_uint32(atlas_volume_rendering_progressive_blockid_effective_attachments,
               "Lower values reduce per-round latency (more frequent refinement updates) but may require more rounds "
               "to converge. Set to 0 to disable the cap and use all available attachments.");
 
+DEFINE_bool(atlas_enable_benchmark_raw_mip_export,
+            false,
+            "Enable benchmark-only raw MIP export support. Disabled by default so the normal rendering path "
+            "does not compile or use the benchmark export shaders.");
+
+DEFINE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit,
+            false,
+            "Enable benchmark-only screen-space sufficiency audit support. Disabled by default so the normal "
+            "rendering path does not compile or use the benchmark audit shaders.");
+
 DECLARE_bool(atlas_log_3d_paging_frame_stats);
 DECLARE_bool(atlas_log_3d_paging_round_stats);
 
@@ -41,6 +52,48 @@ DEFINE_bool(atlas_debug_texture_output, false, "produce debug intermediate textu
 #endif
 
 namespace nim {
+
+namespace {
+
+[[nodiscard]] std::vector<size_t> visibleChannelIndices(const std::vector<bool>& visibilities)
+{
+  std::vector<size_t> visibleChannels;
+  visibleChannels.reserve(visibilities.size());
+  for (size_t i = 0; i < visibilities.size(); ++i) {
+    if (visibilities[i]) {
+      visibleChannels.push_back(i);
+    }
+  }
+  return visibleChannels;
+}
+
+[[nodiscard]] bool isMIPFamilyMode(ImgCompositingMode mode)
+{
+  switch (mode) {
+    case ImgCompositingMode::MaximumIntensityProjection:
+    case ImgCompositingMode::MIPOpaque:
+    case ImgCompositingMode::LocalMIP:
+    case ImgCompositingMode::LocalMIPOpaque:
+      return true;
+    case ImgCompositingMode::DirectVolumeRendering:
+    case ImgCompositingMode::IsoSurface:
+    case ImgCompositingMode::XRay:
+      return false;
+  }
+  return false;
+}
+
+[[nodiscard]] bool benchmarkRawMIPExportEnabled()
+{
+  return FLAGS_atlas_enable_benchmark_raw_mip_export;
+}
+
+[[nodiscard]] bool benchmarkScreenSpaceAuditEnabled()
+{
+  return FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit;
+}
+
+} // namespace
 
 Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -1057,6 +1110,20 @@ void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader
   shader.setLogUniformLocationError(true);
 }
 
+void Z3DImgRaycasterRenderer::bindVolumeOnly(Z3DShaderProgram& shader, size_t idx) const
+{
+  shader.setLogUniformLocationError(false);
+
+  auto* texture = m_img->channelTexture(idx);
+  CHECK(texture != nullptr) << "Missing OpenGL texture for channel " << idx;
+  shader.bindTexture(m_volumeUniformNames[0], texture);
+  shader.setUniform(m_volumeDimensionNames[0], glm::vec3(m_img->channelDimensions(idx)));
+
+  CHECK_GL_ERROR
+
+  shader.setLogUniformLocationError(true);
+}
+
 void Z3DImgRaycasterRenderer::compile()
 {
   if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
@@ -1071,11 +1138,21 @@ void Z3DImgRaycasterRenderer::compile()
   DCHECK(m_image3DRaycasterShader != nullptr);
   DCHECK(m_mergeChannelShader != nullptr);
   DCHECK(m_copyTextureShader != nullptr);
+  if (benchmarkRawMIPExportEnabled()) {
+    DCHECK(m_scBenchmarkRawMIPShader != nullptr);
+    DCHECK(m_image3DBenchmarkRawMIPShader != nullptr);
+  }
+  if (benchmarkScreenSpaceAuditEnabled()) {
+    DCHECK(m_scBenchmarkScreenSpaceAuditShader != nullptr);
+    DCHECK(m_image3DBenchmarkScreenSpaceAuditShader != nullptr);
+  }
   //  m_raycasterShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   //  m_2dImageShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   //  m_volumeSliceWithTransferfunShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 
   const std::string headerSource = m_rendererBase.generateHeader() + generateHeader();
+  const std::string rawMIPHeaderSource = headerSource + "#define RAW_MIP_OUTPUT\n";
+  const std::string screenSpaceAuditHeaderSource = headerSource + "#define SCREEN_SPACE_AUDIT_OUTPUT\n";
   m_scRaycasterShader->setHeaderAndRebuild(headerSource);
   m_sc2dImageShader->setHeaderAndRebuild(headerSource);
   m_scVolumeSliceWithTransferfunShader->setHeaderAndRebuild(headerSource);
@@ -1085,6 +1162,18 @@ void Z3DImgRaycasterRenderer::compile()
   m_image3DRaycasterShader->setHeaderAndRebuild(headerSource);
   m_mergeChannelShader->setHeaderAndRebuild(headerSource);
   m_copyTextureShader->setHeaderAndRebuild(headerSource);
+  if (benchmarkRawMIPExportEnabled()) {
+    CHECK(m_scBenchmarkRawMIPShader != nullptr);
+    CHECK(m_image3DBenchmarkRawMIPShader != nullptr);
+    m_scBenchmarkRawMIPShader->setHeaderAndRebuild(rawMIPHeaderSource);
+    m_image3DBenchmarkRawMIPShader->setHeaderAndRebuild(rawMIPHeaderSource);
+  }
+  if (benchmarkScreenSpaceAuditEnabled()) {
+    CHECK(m_scBenchmarkScreenSpaceAuditShader != nullptr);
+    CHECK(m_image3DBenchmarkScreenSpaceAuditShader != nullptr);
+    m_scBenchmarkScreenSpaceAuditShader->setHeaderAndRebuild(screenSpaceAuditHeaderSource);
+    m_image3DBenchmarkScreenSpaceAuditShader->setHeaderAndRebuild(screenSpaceAuditHeaderSource);
+  }
 }
 
 void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flipped, Z3DEye eye, const glm::uvec2& size)
@@ -1817,7 +1906,9 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
                                               ze_to_zw_a,
                                               ze_to_zw_b,
                                               ze_to_screen_pixel_voxel_size,
-                                              visibleIdxs.size());
+                                              visibleIdxs.size(),
+                                              *m_image3DRaycasterShader,
+                                              RaycastExportMode::Display);
     processEventsAndMaybeCancel(cancellationToken);
 
     auto* lastTarget = m_lastRaycastAccum[eye].renderTarget;
@@ -1892,7 +1983,9 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
                                                   ze_to_zw_a,
                                                   ze_to_zw_b,
                                                   ze_to_screen_pixel_voxel_size,
-                                                  visibleIdxs.size());
+                                                  visibleIdxs.size(),
+                                                  *m_image3DRaycasterShader,
+                                                  RaycastExportMode::Display);
 #if defined(__linux__)
         if (FLAGS_atlas_debug_texture_output) {
           auto* debugTarget = m_lastRaycastAccum[eye].renderTarget;
@@ -2000,7 +2093,9 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
                                                        float ze_to_zw_a,
                                                        float ze_to_zw_b,
                                                        float ze_to_screen_pixel_voxel_size,
-                                                       size_t totalChannels)
+                                                       size_t totalChannels,
+                                                       Z3DShaderProgram& raycasterShader,
+                                                       RaycastExportMode exportMode)
 {
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
   auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
@@ -2167,45 +2262,47 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   }
 
   // render channels one by one
-  m_image3DRaycasterShader->bind();
+  raycasterShader.bind();
 
-  m_image3DRaycasterShader->setUniform("ze_to_zw_b", ze_to_zw_b);
-  m_image3DRaycasterShader->setUniform("ze_to_zw_a", ze_to_zw_a);
-  m_image3DRaycasterShader->setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
+  raycasterShader.setUniform("ze_to_zw_b", ze_to_zw_b);
+  raycasterShader.setUniform("ze_to_zw_a", ze_to_zw_a);
+  raycasterShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
   // entry exit points
-  m_image3DRaycasterShader->bindTexture("ray_entry_exit_tex_coord",
-                                        m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  raycasterShader.bindTexture("ray_entry_exit_tex_coord",
+                              m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
 
-  m_image3DRaycasterShader->bindTexture("last_color", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
-  m_image3DRaycasterShader->bindTexture("last_ray_depth", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
+  raycasterShader.bindTexture("last_color", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
+  raycasterShader.bindTexture("last_ray_depth", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
 
   if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
-    m_image3DRaycasterShader->setUniform("iso_value", m_isoValue);
+    raycasterShader.setUniform("iso_value", m_isoValue);
   }
 
   if (m_compositingModeValue == ImgCompositingMode::LocalMIP ||
       m_compositingModeValue == ImgCompositingMode::LocalMIPOpaque) {
-    m_image3DRaycasterShader->setUniform("local_MIP_threshold", m_localMIPThreshold);
+    raycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold);
   }
 
-  m_image3DRaycasterShader->setUniform("sampling_rate", m_samplingRateValue);
+  raycasterShader.setUniform("sampling_rate", m_samplingRateValue);
 
   currentTarget->bind();
   glDrawBuffers(2, g_drawBuffers);
   currentTarget->clear();
 
-  m_img->bindFullResRenderShader(*m_image3DRaycasterShader, c);
-  CHECK(c < m_transferFunctions.size());
-  CHECK(m_transferFunctions[c] != nullptr);
-  if (auto* tex = transferTextureGL(*m_transferFunctions[c])) {
-    m_image3DRaycasterShader->bindTexture("transfer_function", tex);
+  m_img->bindFullResRenderShader(raycasterShader, c);
+  if (exportMode != RaycastExportMode::RawMIP) {
+    CHECK(c < m_transferFunctions.size());
+    CHECK(m_transferFunctions[c] != nullptr);
+    if (auto* tex = transferTextureGL(*m_transferFunctions[c])) {
+      raycasterShader.bindTexture("transfer_function", tex);
+    }
   }
-  renderScreenQuad(*m_VAO, *m_image3DRaycasterShader);
+  renderScreenQuad(*m_VAO, raycasterShader);
 
   currentTarget->release();
 
-  m_image3DRaycasterShader->release();
+  raycasterShader.release();
   // glFinish();
   bt.recordEvent("render image");
   STOP_AND_VLOG(bt)
@@ -2322,6 +2419,321 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vecto
   CHECK_GL_ERROR
 }
 
+bool Z3DImgRaycasterRenderer::render3DImageFastRawMIP(Z3DEye /*eye*/,
+                                                      const std::vector<size_t>& visibleIdxs,
+                                                      const QString& path,
+                                                      std::string& error)
+{
+  if (visibleIdxs.size() != 1u) {
+    error = fmt::format("raw MIP export requires exactly one visible channel, got {}", visibleIdxs.size());
+    return false;
+  }
+  if (!m_scBenchmarkRawMIPShader) {
+    error = "raw MIP export shader is not initialized";
+    return false;
+  }
+  if (!m_entryExitLease || m_entryExitLease.renderTarget == nullptr) {
+    error = "raw MIP export requires prepared entry/exit geometry";
+    return false;
+  }
+
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto exportLease =
+    scratchPool.acquireTempRenderTarget2D(m_outputSize, ScratchFormat::RGBA32F, ScratchFormat::Depth32F);
+  CHECK(exportLease.renderTarget != nullptr);
+
+  exportLease.renderTarget->bind();
+  auto releaseGuard = folly::makeGuard([&exportLease]() {
+    exportLease.renderTarget->release();
+  });
+  exportLease.renderTarget->clear();
+
+  const auto& viewState = m_rendererBase.viewState();
+  const float n = viewState.nearClip;
+  const float f = viewState.farClip;
+  // http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+  //  zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+  const float a = f * n / (f - n);
+  const float b = 0.5f * (f + n) / (f - n) + 0.5f;
+
+  m_scBenchmarkRawMIPShader->bind();
+  m_scBenchmarkRawMIPShader->setUniform("ze_to_zw_b", b);
+  m_scBenchmarkRawMIPShader->setUniform("ze_to_zw_a", a);
+  m_scBenchmarkRawMIPShader->bindTexture("ray_entry_exit_tex_coord",
+                                         m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+
+  if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
+    m_scBenchmarkRawMIPShader->setUniform("iso_value", m_isoValue);
+  }
+
+  if (m_compositingModeValue == ImgCompositingMode::LocalMIP ||
+      m_compositingModeValue == ImgCompositingMode::LocalMIPOpaque) {
+    m_scBenchmarkRawMIPShader->setUniform("local_MIP_threshold", m_localMIPThreshold);
+  }
+
+  m_scBenchmarkRawMIPShader->setUniform("sampling_rate", m_samplingRateValue);
+  bindVolumeOnly(*m_scBenchmarkRawMIPShader, visibleIdxs[0]);
+  renderScreenQuad(*m_VAO, *m_scBenchmarkRawMIPShader);
+  m_scBenchmarkRawMIPShader->release();
+
+  releaseGuard.dismiss();
+  exportLease.renderTarget->release();
+  exportLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBFloatImage(path);
+  return true;
+}
+
+ScreenSpaceSufficiencyAudit Z3DImgRaycasterRenderer::aggregateScreenSpaceAudit(const Z3DTexture& texture) const
+{
+  CHECK_EQ(texture.numPixels() * 4u, texture.width() * texture.height() * texture.depth() * 4u);
+  std::vector<float> texels(texture.numPixels() * 4u, 0.0f);
+  texture.downloadTextureToBuffer(GL_RGBA, GL_FLOAT, texels.data());
+
+  ScreenSpaceSufficiencyAudit audit;
+  for (size_t i = 0; i + 3 < texels.size(); i += 4) {
+    const uint64_t contributingSamples = static_cast<uint64_t>(std::llround(std::max(0.0f, texels[i + 0])));
+    const uint64_t insufficientSamples = static_cast<uint64_t>(std::llround(std::max(0.0f, texels[i + 1])));
+    const uint64_t level0Samples = static_cast<uint64_t>(std::llround(std::max(0.0f, texels[i + 2])));
+    const uint64_t level0LimitedSamples = static_cast<uint64_t>(std::llround(std::max(0.0f, texels[i + 3])));
+
+    audit.contributingSamples += contributingSamples;
+    audit.insufficientSamples += insufficientSamples;
+    audit.level0Samples += level0Samples;
+    audit.level0LimitedSamples += level0LimitedSamples;
+    audit.contributingPixels += contributingSamples > 0u ? 1u : 0u;
+    audit.insufficientPixels += insufficientSamples > 0u ? 1u : 0u;
+    audit.level0Pixels += level0Samples > 0u ? 1u : 0u;
+    audit.level0LimitedPixels += level0LimitedSamples > 0u ? 1u : 0u;
+  }
+
+  return audit;
+}
+
+float Z3DImgRaycasterRenderer::benchmarkSelectedVoxelWorldSize() const
+{
+  if (m_img && !m_img->voxelWorldSizesLevels().empty()) {
+    return m_img->voxelWorldSizesLevels().front();
+  }
+  CHECK(m_benchmarkSelectedVoxelWorldSizeHint.has_value())
+    << "Benchmark screen-space audit requires a selected voxel world size hint for resident volumes.";
+  const float value = *m_benchmarkSelectedVoxelWorldSizeHint;
+  CHECK(std::isfinite(value) && value > 0.0f) << value;
+  return value;
+}
+
+bool Z3DImgRaycasterRenderer::render3DImageFastScreenSpaceAudit(Z3DEye /*eye*/,
+                                                                const std::vector<size_t>& visibleIdxs,
+                                                                ScreenSpaceSufficiencyAudit& audit,
+                                                                std::string& error)
+{
+  if (visibleIdxs.size() != 1u) {
+    error = fmt::format("screen-space audit requires exactly one visible channel, got {}", visibleIdxs.size());
+    return false;
+  }
+  if (!m_scBenchmarkScreenSpaceAuditShader) {
+    error = "screen-space audit shader is not initialized";
+    return false;
+  }
+  if (!m_entryExitLease || m_entryExitLease.renderTarget == nullptr) {
+    error = "screen-space audit requires prepared entry/exit geometry";
+    return false;
+  }
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto exportLease =
+    scratchPool.acquireTempRenderTarget2D(m_outputSize, ScratchFormat::RGBA32F, ScratchFormat::Depth32F);
+  CHECK(exportLease.renderTarget != nullptr);
+
+  exportLease.renderTarget->bind();
+  auto releaseGuard = folly::makeGuard([&exportLease]() {
+    exportLease.renderTarget->release();
+  });
+  exportLease.renderTarget->clear();
+
+  const auto& sceneState = m_rendererBase.sceneState();
+  const auto& viewState = m_rendererBase.viewState();
+  const float n = viewState.nearClip;
+  const float f = viewState.farClip;
+  const auto& monoEyeState = viewState.eyes[MonoEye];
+  const glm::vec2 pixelEyeSpaceSize = monoEyeState.frustumNearPlaneSize / glm::vec2(m_outputSize);
+  const float a = f * n / (f - n);
+  const float b = 0.5f * (f + n) / (f - n) + 0.5f;
+  const float zeToScreenPixelVoxelSize =
+    -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * sceneState.devicePixelRatio;
+
+  m_scBenchmarkScreenSpaceAuditShader->bind();
+  m_scBenchmarkScreenSpaceAuditShader->setUniform("ze_to_zw_b", b);
+  m_scBenchmarkScreenSpaceAuditShader->setUniform("ze_to_zw_a", a);
+  m_scBenchmarkScreenSpaceAuditShader->setUniform("ze_to_screen_pixel_voxel_size", zeToScreenPixelVoxelSize);
+  m_scBenchmarkScreenSpaceAuditShader->setUniform("selected_voxel_world_size", benchmarkSelectedVoxelWorldSize());
+  m_scBenchmarkScreenSpaceAuditShader->bindTexture("ray_entry_exit_tex_coord",
+                                                   m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+
+  if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
+    m_scBenchmarkScreenSpaceAuditShader->setUniform("iso_value", m_isoValue);
+  }
+
+  if (m_compositingModeValue == ImgCompositingMode::LocalMIP ||
+      m_compositingModeValue == ImgCompositingMode::LocalMIPOpaque) {
+    m_scBenchmarkScreenSpaceAuditShader->setUniform("local_MIP_threshold", m_localMIPThreshold);
+  }
+
+  m_scBenchmarkScreenSpaceAuditShader->setUniform("sampling_rate", m_samplingRateValue);
+  bindVolumeAndTransferFunc(*m_scBenchmarkScreenSpaceAuditShader, visibleIdxs[0]);
+  renderScreenQuad(*m_VAO, *m_scBenchmarkScreenSpaceAuditShader);
+  m_scBenchmarkScreenSpaceAuditShader->release();
+
+  audit = aggregateScreenSpaceAudit(*exportLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  return true;
+}
+
+bool Z3DImgRaycasterRenderer::saveRawMIPImage(Z3DEye eye, const QString& path, std::string& error)
+{
+  if (!benchmarkRawMIPExportEnabled()) {
+    error = "raw MIP export is disabled; relaunch Atlas with --atlas_enable_benchmark_raw_mip_export";
+    return false;
+  }
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    error = "raw MIP export is currently only supported for the OpenGL backend";
+    return false;
+  }
+  if (!m_img) {
+    error = "raw MIP export requires an active image";
+    return false;
+  }
+  if (!hasVisibleRendering()) {
+    error = "raw MIP export requires a visible image channel";
+    return false;
+  }
+  if (!isMIPFamilyMode(m_compositingModeValue)) {
+    error = "raw MIP export requires a MIP-family compositing mode";
+    return false;
+  }
+  if (m_outputSize.x == 0u || m_outputSize.y == 0u) {
+    error = "raw MIP export requires a non-zero output size";
+    return false;
+  }
+
+  const std::vector<size_t> visibleIdxs = visibleChannelIndices(m_channelVisibilities);
+  if (visibleIdxs.size() != 1u) {
+    error = fmt::format("raw MIP export requires exactly one visible channel, got {}", visibleIdxs.size());
+    return false;
+  }
+
+  if (m_fastRendering || !m_img->isVolumeDownsampled()) {
+    return render3DImageFastRawMIP(eye, visibleIdxs, path, error);
+  }
+
+  const auto& sceneState = m_rendererBase.sceneState();
+  const auto& viewState = m_rendererBase.viewState();
+  const auto& monoEyeState = viewState.eyes[MonoEye];
+  const float n = viewState.nearClip;
+  const float f = viewState.farClip;
+  const glm::vec2 pixelEyeSpaceSize = monoEyeState.frustumNearPlaneSize / glm::vec2(m_outputSize);
+  // http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+  //  zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+  const float ze_to_zw_a = f * n / (f - n);
+  const float ze_to_zw_b = 0.5f * (f + n) / (f - n) + 0.5f;
+  const float ze_to_screen_pixel_voxel_size =
+    -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * sceneState.devicePixelRatio;
+
+  ensureRaycastAccumulators(eye);
+  for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
+    const bool lastRound = render3DImageForOneRound(eye,
+                                                    visibleIdxs[0],
+                                                    round,
+                                                    /*progressive=*/false,
+                                                    ze_to_zw_a,
+                                                    ze_to_zw_b,
+                                                    ze_to_screen_pixel_voxel_size,
+                                                    visibleIdxs.size(),
+                                                    *m_image3DBenchmarkRawMIPShader,
+                                                    RaycastExportMode::RawMIP);
+    if (lastRound) {
+      break;
+    }
+  }
+
+  auto* lastTarget = m_lastRaycastAccum[eye].renderTarget;
+  if (lastTarget == nullptr) {
+    error = "raw MIP export missing final raycast accumulator";
+    return false;
+  }
+  lastTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBFloatImage(path);
+  return true;
+}
+
+bool Z3DImgRaycasterRenderer::screenSpaceSufficiencyAudit(Z3DEye eye,
+                                                          ScreenSpaceSufficiencyAudit& audit,
+                                                          std::string& error)
+{
+  if (!benchmarkScreenSpaceAuditEnabled()) {
+    error = "screen-space sufficiency audit is disabled; relaunch Atlas with "
+            "--atlas_enable_benchmark_screen_space_sufficiency_audit";
+    return false;
+  }
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    error = "screen-space audit is currently only supported for the OpenGL backend";
+    return false;
+  }
+  if (!m_img) {
+    error = "screen-space audit requires an active image";
+    return false;
+  }
+  if (!hasVisibleRendering()) {
+    error = "screen-space audit requires a visible image channel";
+    return false;
+  }
+  if (m_outputSize.x == 0u || m_outputSize.y == 0u) {
+    error = "screen-space audit requires a non-zero output size";
+    return false;
+  }
+
+  const std::vector<size_t> visibleIdxs = visibleChannelIndices(m_channelVisibilities);
+  if (visibleIdxs.size() != 1u) {
+    error = fmt::format("screen-space audit requires exactly one visible channel, got {}", visibleIdxs.size());
+    return false;
+  }
+
+  if (m_fastRendering || !m_img->isVolumeDownsampled()) {
+    return render3DImageFastScreenSpaceAudit(eye, visibleIdxs, audit, error);
+  }
+
+  const auto& sceneState = m_rendererBase.sceneState();
+  const auto& viewState = m_rendererBase.viewState();
+  const auto& monoEyeState = viewState.eyes[MonoEye];
+  const float n = viewState.nearClip;
+  const float f = viewState.farClip;
+  const glm::vec2 pixelEyeSpaceSize = monoEyeState.frustumNearPlaneSize / glm::vec2(m_outputSize);
+  const float ze_to_zw_a = f * n / (f - n);
+  const float ze_to_zw_b = 0.5f * (f + n) / (f - n) + 0.5f;
+  const float ze_to_screen_pixel_voxel_size =
+    -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * sceneState.devicePixelRatio;
+
+  ensureRaycastAccumulators(eye);
+  const bool lastRound = render3DImageForOneRound(eye,
+                                                  visibleIdxs[0],
+                                                  /*round=*/0,
+                                                  /*progressive=*/false,
+                                                  ze_to_zw_a,
+                                                  ze_to_zw_b,
+                                                  ze_to_screen_pixel_voxel_size,
+                                                  visibleIdxs.size(),
+                                                  *m_image3DBenchmarkScreenSpaceAuditShader,
+                                                  RaycastExportMode::ScreenSpaceAudit);
+  if (!lastRound) {
+    error =
+      "screen-space audit requires a warm page cache and single-round completion, but additional paging rounds were needed";
+    return false;
+  }
+
+  auto* lastTarget = m_lastRaycastAccum[eye].renderTarget;
+  if (lastTarget == nullptr) {
+    error = "screen-space audit missing final raycast accumulator";
+    return false;
+  }
+  audit = aggregateScreenSpaceAudit(*lastTarget->attachment(GL_COLOR_ATTACHMENT0));
+  return true;
+}
+
 void Z3DImgRaycasterRenderer::createResources(RenderBackend backend)
 {
   if (backend != RenderBackend::OpenGL) {
@@ -2336,6 +2748,14 @@ void Z3DImgRaycasterRenderer::createResources(RenderBackend backend)
   m_image3DRaycasterShader = std::make_unique<Z3DShaderProgram>();
   m_mergeChannelShader = std::make_unique<Z3DShaderProgram>();
   m_copyTextureShader = std::make_unique<Z3DShaderProgram>();
+  if (benchmarkRawMIPExportEnabled()) {
+    m_scBenchmarkRawMIPShader = std::make_unique<Z3DShaderProgram>();
+    m_image3DBenchmarkRawMIPShader = std::make_unique<Z3DShaderProgram>();
+  }
+  if (benchmarkScreenSpaceAuditEnabled()) {
+    m_scBenchmarkScreenSpaceAuditShader = std::make_unique<Z3DShaderProgram>();
+    m_image3DBenchmarkScreenSpaceAuditShader = std::make_unique<Z3DShaderProgram>();
+  }
   const std::string headerSource = m_rendererBase.generateHeader() + generateHeader();
   m_scRaycasterShader->loadFromSourceFile("pass.vert", "volume_raycaster_single_channel.frag", headerSource);
   m_sc2dImageShader->loadFromSourceFile("transform_with_2dtexture.vert",
@@ -2354,6 +2774,26 @@ void Z3DImgRaycasterRenderer::createResources(RenderBackend backend)
   m_image3DRaycasterShader->loadFromSourceFile("pass.vert", "image3d_raycaster.frag", headerSource);
   m_mergeChannelShader->loadFromSourceFile("pass.vert", "image2d_array_compositor.frag", headerSource);
   m_copyTextureShader->loadFromSourceFile("pass.vert", "copy_raycaster_image.frag", headerSource);
+  if (benchmarkRawMIPExportEnabled()) {
+    CHECK(m_scBenchmarkRawMIPShader != nullptr);
+    CHECK(m_image3DBenchmarkRawMIPShader != nullptr);
+    m_scBenchmarkRawMIPShader->loadFromSourceFile("pass.vert",
+                                                  "volume_raycaster_single_channel_benchmark.frag",
+                                                  headerSource + "#define RAW_MIP_OUTPUT\n");
+    m_image3DBenchmarkRawMIPShader->loadFromSourceFile("pass.vert",
+                                                       "image3d_raycaster_benchmark.frag",
+                                                       headerSource + "#define RAW_MIP_OUTPUT\n");
+  }
+  if (benchmarkScreenSpaceAuditEnabled()) {
+    CHECK(m_scBenchmarkScreenSpaceAuditShader != nullptr);
+    CHECK(m_image3DBenchmarkScreenSpaceAuditShader != nullptr);
+    m_scBenchmarkScreenSpaceAuditShader->loadFromSourceFile("pass.vert",
+                                                            "volume_raycaster_single_channel_benchmark.frag",
+                                                            headerSource + "#define SCREEN_SPACE_AUDIT_OUTPUT\n");
+    m_image3DBenchmarkScreenSpaceAuditShader->loadFromSourceFile("pass.vert",
+                                                                 "image3d_raycaster_benchmark.frag",
+                                                                 headerSource + "#define SCREEN_SPACE_AUDIT_OUTPUT\n");
+  }
   m_VAO = std::make_unique<Z3DVertexArrayObject>(1);
   CHECK_GL_ERROR
 }
@@ -2361,12 +2801,16 @@ void Z3DImgRaycasterRenderer::createResources(RenderBackend backend)
 void Z3DImgRaycasterRenderer::destroyResources()
 {
   m_scRaycasterShader.reset();
+  m_scBenchmarkRawMIPShader.reset();
+  m_scBenchmarkScreenSpaceAuditShader.reset();
   m_sc2dImageShader.reset();
   m_scVolumeSliceWithTransferfunShader.reset();
   m_image3DSliceWithTransferfunBlockIDsShader.reset();
   m_image3DSliceWithTransferfunShader.reset();
   m_image3DRaycasterBlockIDsShader.reset();
   m_image3DRaycasterShader.reset();
+  m_image3DBenchmarkRawMIPShader.reset();
+  m_image3DBenchmarkScreenSpaceAuditShader.reset();
   m_mergeChannelShader.reset();
   m_copyTextureShader.reset();
   m_VAO.reset();

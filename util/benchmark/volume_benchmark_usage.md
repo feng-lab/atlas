@@ -692,13 +692,13 @@ By default it uses:
 - source dataset:
   `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim`
 - output root:
-  `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v1`
+  `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2`
 - ROI size:
   `2048 x 2048 x 169`
 - retained ROI centers:
   - `(16800, 4300)`
   - `(13600, 7100)`
-  - `(23300, 8700)`
+  - `(10500, 10000)`
   - `(4100, 10000)`
 
 The exporter writes a top-level `manifest.json` and `README.md` under the output root so the later
@@ -714,22 +714,35 @@ Use the render driver to compare, for each ROI and mode:
 - `coarse_l1`: resident ROI downsampled by `2x` in XY, upscaled back to the native scene footprint
 - `coarse_l2`: resident ROI downsampled by `4x` in XY, upscaled back to the native scene footprint
 
-Launch Atlas with benchmark render markers enabled first:
+Launch Atlas first:
 
 ```bash
 /Users/feng/code/atlas/build/Release/src/atlas/Atlas.app/Contents/MacOS/Atlas \
-  --atlas_log_benchmark_render_timings
+  --atlas_log_benchmark_render_timings \
+  --atlas_enable_benchmark_raw_mip_export \
+  --atlas_enable_benchmark_screen_space_sufficiency_audit
 ```
+
+The fidelity driver no longer depends on benchmark render markers for synchronization.
+It uses Atlas's fixed-size screenshot export and raw-MIP export directly, because those
+APIs already perform the final export render internally. The benchmark-log flag is still
+fine to keep on while Atlas is running, but it is no longer required for this workflow.
+The raw-MIP export and screen-space audit flags are required because those benchmark-only
+paths are disabled in the normal Atlas render path by default.
 
 Then run the retained render suite:
 
 ```bash
 python /Users/feng/code/atlas/util/benchmark/atlas_fidelity_render.py \
-  --roi-manifest /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v1/manifest.json \
+  --roi-manifest /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2/manifest.json \
   --adaptive-dataset /Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim \
   --base-camera-spec /Users/feng/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json \
-  --output-root /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_v1 \
-  --atlas-log-path /Users/feng/Library/Logs/Atlas \
+  --output-root /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_mip_zoom06_v2_coarse2_rawmip_v1 \
+  --mode "MIP Opaque" \
+  --camera-distance-scale 0.6 \
+  --reference-sampling-rate 8.0 \
+  --adaptive-sampling-rate 2.0 \
+  --coarse-sampling-rate 2.0 \
   --overwrite
 ```
 
@@ -746,9 +759,21 @@ Important details:
 - `--coarse-sampling-rate` can decouple the coarse-control sampling rate from the resident reference
   sampling rate. For LOD-choice comparisons, prefer matching coarse sampling to the adaptive
   sampling rate and keeping the reference sampling rate higher.
-- `--transfer-function-overrides <json>` applies per-ROI/per-mode transfer-function overrides. The
-  retained example for roi03 background suppression is:
-  [high_res_20220219_transfer_function_overrides_roi03_threshold20_v1.json](/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_transfer_function_overrides_roi03_threshold20_v1.json)
+- For `MIP Opaque`, the driver also exports `raw_mip.tif` for every condition via `ExportRawMIP3D`.
+  That scalar image is available as an optional developer cross-check, while the default retained
+  analysis uses the final rendered screenshots for both DVR and MIP.
+- The driver also exports a screen-space audit for every condition via
+  `ExportScreenSpaceSufficiencyAudit3D`. That audit records:
+  - contributing sample/pixel counts
+  - sufficient sample/pixel counts
+  - `level 0` sample/pixel counts
+  - `level-0-limited` sample/pixel counts
+- For adaptive Atlas, binary sufficiency is expected by construction unless even
+  `level 0` is too coarse for the current view. The informative adaptive audit
+  outputs are therefore the `level 0` and `level-0-limited` fractions, not just
+  the binary sufficient/insufficient totals.
+- `--transfer-function-overrides <json>` is still available, but the retained quantitative suites
+  use the default Atlas transfer function captured from the bootstrap mode preset.
 - The current retained compositing modes are:
   - `MIP Opaque`
   - `Direct Volume Rendering`
@@ -757,7 +782,16 @@ After rendering, run the analysis pass:
 
 ```bash
 python /Users/feng/code/atlas/util/benchmark/analyze_fidelity_validation.py \
-  --render-manifest /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_v1/manifest.json
+  --render-manifest /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_mip_zoom06_v2_coarse2_rawmip_v1/manifest.json
+```
+
+This now defaults to screenshot-space analysis for both DVR and MIP, so the reported
+metrics come from final rendered pixels by default.
+
+To run the optional MIP-specific scalar cross-check instead, add:
+
+```bash
+  --analysis-domain raw_mip_scalar
 ```
 
 That writes:
@@ -768,12 +802,74 @@ That writes:
 - `analysis/summary.md`
 - per-comparison `analysis/<roi>/<mode>/<condition>/difference_heatmap.png`
 
+Analysis behavior:
+
+- `Direct Volume Rendering` uses the saved screenshot RGB images, converted to grayscale for SSIM.
+- `MIP Opaque` also defaults to the saved screenshot RGB images, converted to grayscale for SSIM.
+- `raw_mip.tif` is still exported and can be analyzed with `--analysis-domain raw_mip_scalar`
+  as an optional MIP-specific scalar cross-check.
+- DVR difference heatmaps now include an embedded color bar. The saved DVR heatmaps share the
+  same `inferno` colormap and the same fixed normalization within a run, controlled by
+  `--rgb-heatmap-max-diff` (default `64.0`).
+- Screenshot-space heatmaps use the same display-space path for DVR and MIP.
+- Raw-MIP heatmaps remain plain image-only outputs for the optional scalar cross-check.
+
+To inspect one concrete high-difference screenshot case interactively in Atlas, use:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/load_fidelity_diff_inspection_scene.py \
+  --address localhost:50051 \
+  --output-dir /Users/feng/code/atlas/large_test_image/fidelity_validation/inspection/roi03_mip_adaptive_maxdiff_v1
+```
+
+That helper:
+
+- loads the retained `reference`, `adaptive`, `coarse_l1`, and `coarse_l2` datasets for one ROI
+  into the same global ROI coordinates
+- applies the exact retained benchmark camera and per-object render settings
+- saves an inspection `.scene` plus annotated screenshots and a crop grid around the max-difference
+  hotspot
+- leaves only the `reference` object visible by default so you can toggle the other conditions in
+  the Atlas object list without overdraw confusion
+
+To localize the depth of one hotspot in screenshot space, use:
+
+```bash
+python /Users/feng/code/atlas/util/benchmark/sweep_fidelity_hotspot_zcut.py \
+  --address localhost:50051 \
+  --inspection-summary /Users/feng/code/atlas/large_test_image/fidelity_validation/inspection/roi03_mip_adaptive_maxdiff_v1/inspection_summary.json \
+  --output-dir /Users/feng/code/atlas/large_test_image/fidelity_validation/inspection/roi03_mip_adaptive_maxdiff_v3/zcut_sweep_reference_v1
+```
+
+That helper:
+
+- sweeps the lower `Z Cut` bound on the loaded `reference` object
+- keeps the retained benchmark camera and logical canvas convention (`1000 x 750` logical,
+  `2000 x 1500` screenshot) so the hotspot pixel coordinates remain valid
+- records the exact hotspot pixel (`1x1`) first, then `3x3` and `5x5` window statistics
+- uses a coarse depth sweep plus local single-slice refinement around the largest drop region
+- writes:
+  - `summary.json`
+  - `zcut_sweep.csv`
+  - `selected_screenshots/zcut_*.png`
+
 Current fidelity metrics:
 
 - grayscale SSIM against the resident native-resolution reference
 - masked mean / median / p95 / max absolute difference
 - reference-derived foreground mask with largest-connected-component filtering
+- screen-space audit summaries from `ExportScreenSpaceSufficiencyAudit3D`
 
-The current retained analysis is image-based only. The planned screen-space sufficiency audit
-(`selected voxel size <= desired pixel-footprint voxel size`) still requires engine-side audit
-plumbing and is not part of the current retained output yet.
+Current screen-space audit interpretation:
+
+- `sufficient_*` metrics are most useful for forced coarse controls (`coarse_l1`,
+  `coarse_l2`), where they directly show how often the chosen source resolution
+  is too coarse for the current view.
+- For adaptive Atlas, the more informative metrics are:
+  - `level0_sample_fraction`
+  - `level0_pixel_fraction`
+  - `level0_limited_sample_fraction`
+  - `level0_limited_pixel_fraction`
+- `level0_limited_*` tells you when the current view is asking for more detail
+  than the native source can provide, which is a hard source-resolution limit
+  rather than an adaptive-level-selection failure.

@@ -407,7 +407,8 @@ private:
 
   size_t m_blockUploadingBatchSize = 100;
 
-  // scale for downsampled volumes
+  // Preview-volume scales used by readVolumes(). These may be smaller than the GPU-fit
+  // threshold when paging is active so the interactive preview stays cheap to build.
   double m_widthScale = 1.0;
   double m_heightScale = 1.0;
   double m_depthScale = 1.0;

@@ -15,11 +15,65 @@
 #include <string>
 #include <vector>
 
+class QString;
+
 namespace nim {
 
 class Z3DImg;
 class Z3DRendererBase;
 class Z3DImgPagingFrameStats;
+
+struct ScreenSpaceSufficiencyAudit
+{
+  uint64_t contributingSamples = 0;
+  uint64_t insufficientSamples = 0;
+  uint64_t level0Samples = 0;
+  uint64_t level0LimitedSamples = 0;
+  uint64_t contributingPixels = 0;
+  uint64_t insufficientPixels = 0;
+  uint64_t level0Pixels = 0;
+  uint64_t level0LimitedPixels = 0;
+
+  [[nodiscard]] uint64_t sufficientSamples() const
+  {
+    return contributingSamples >= insufficientSamples ? contributingSamples - insufficientSamples : 0;
+  }
+
+  [[nodiscard]] uint64_t sufficientPixels() const
+  {
+    return contributingPixels >= insufficientPixels ? contributingPixels - insufficientPixels : 0;
+  }
+
+  [[nodiscard]] double sufficientSampleFraction() const
+  {
+    return contributingSamples == 0 ? 1.0 : static_cast<double>(sufficientSamples()) / contributingSamples;
+  }
+
+  [[nodiscard]] double sufficientPixelFraction() const
+  {
+    return contributingPixels == 0 ? 1.0 : static_cast<double>(sufficientPixels()) / contributingPixels;
+  }
+
+  [[nodiscard]] double level0SampleFraction() const
+  {
+    return contributingSamples == 0 ? 0.0 : static_cast<double>(level0Samples) / contributingSamples;
+  }
+
+  [[nodiscard]] double level0PixelFraction() const
+  {
+    return contributingPixels == 0 ? 0.0 : static_cast<double>(level0Pixels) / contributingPixels;
+  }
+
+  [[nodiscard]] double level0LimitedSampleFraction() const
+  {
+    return contributingSamples == 0 ? 0.0 : static_cast<double>(level0LimitedSamples) / contributingSamples;
+  }
+
+  [[nodiscard]] double level0LimitedPixelFraction() const
+  {
+    return contributingPixels == 0 ? 0.0 : static_cast<double>(level0LimitedPixels) / contributingPixels;
+  }
+};
 
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions
@@ -102,6 +156,16 @@ public:
   // This is primarily used by the Vulkan filter path, where completion can be inferred from
   // progressiveProgress() even if the renderer hasn't observed a "lastRound" sentinel.
   void finalizePagingStatsIfDone(Z3DEye eye);
+
+  // Benchmark-only export: save the scalar MIP field before transfer-function mapping.
+  // This is only supported for single-channel MIP-family OpenGL rendering.
+  [[nodiscard]] bool saveRawMIPImage(Z3DEye eye, const QString& path, std::string& error);
+  // Benchmark-only export: aggregate a screen-space sufficiency audit over contributing samples/pixels.
+  [[nodiscard]] bool screenSpaceSufficiencyAudit(Z3DEye eye, ScreenSpaceSufficiencyAudit& audit, std::string& error);
+  void setBenchmarkSelectedVoxelWorldSizeHint(float value)
+  {
+    m_benchmarkSelectedVoxelWorldSizeHint = value;
+  }
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 
@@ -222,6 +286,8 @@ public:
 protected:
   void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader) const;
 
+  void bindVolumeOnly(Z3DShaderProgram& shader, size_t idx) const;
+
   void bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx) const;
 
   [[nodiscard]] std::string generateHeader();
@@ -231,6 +297,13 @@ protected:
   void renderPicking(Z3DEye) override;
 
 private:
+  enum class RaycastExportMode : uint8_t
+  {
+    Display,
+    RawMIP,
+    ScreenSpaceAudit,
+  };
+
   void render2DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
 
   double render2DSliceOf3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs, bool progressive = false);
@@ -247,9 +320,19 @@ private:
                                 float ze_to_zw_a,
                                 float ze_to_zw_b,
                                 float ze_to_screen_pixel_voxel_size,
-                                size_t totalChannels);
+                                size_t totalChannels,
+                                Z3DShaderProgram& raycasterShader,
+                                RaycastExportMode exportMode = RaycastExportMode::Display);
 
   void render3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
+  [[nodiscard]] bool
+  render3DImageFastRawMIP(Z3DEye eye, const std::vector<size_t>& visibleIdxs, const QString& path, std::string& error);
+  [[nodiscard]] bool render3DImageFastScreenSpaceAudit(Z3DEye eye,
+                                                       const std::vector<size_t>& visibleIdxs,
+                                                       ScreenSpaceSufficiencyAudit& audit,
+                                                       std::string& error);
+  [[nodiscard]] ScreenSpaceSufficiencyAudit aggregateScreenSpaceAudit(const Z3DTexture& texture) const;
+  [[nodiscard]] float benchmarkSelectedVoxelWorldSize() const;
 
   void ensureRaycastAccumulators(Z3DEye eye);
   void releaseRaycastAccumulators(Z3DEye eye);
@@ -266,12 +349,16 @@ protected:
   void destroyResources() override;
 
   std::unique_ptr<Z3DShaderProgram> m_scRaycasterShader;
+  std::unique_ptr<Z3DShaderProgram> m_scBenchmarkRawMIPShader;
+  std::unique_ptr<Z3DShaderProgram> m_scBenchmarkScreenSpaceAuditShader;
   std::unique_ptr<Z3DShaderProgram> m_sc2dImageShader;
   std::unique_ptr<Z3DShaderProgram> m_scVolumeSliceWithTransferfunShader;
   std::unique_ptr<Z3DShaderProgram> m_image3DSliceWithTransferfunBlockIDsShader;
   std::unique_ptr<Z3DShaderProgram> m_image3DSliceWithTransferfunShader;
   std::unique_ptr<Z3DShaderProgram> m_image3DRaycasterBlockIDsShader;
   std::unique_ptr<Z3DShaderProgram> m_image3DRaycasterShader;
+  std::unique_ptr<Z3DShaderProgram> m_image3DBenchmarkRawMIPShader;
+  std::unique_ptr<Z3DShaderProgram> m_image3DBenchmarkScreenSpaceAuditShader;
   std::unique_ptr<Z3DShaderProgram> m_mergeChannelShader;
   std::unique_ptr<Z3DShaderProgram> m_copyTextureShader;
 
@@ -327,6 +414,7 @@ private:
 
   // Output size provided via ensureInternalTargets()
   glm::uvec2 m_outputSize{32, 32};
+  std::optional<float> m_benchmarkSelectedVoxelWorldSizeHint;
 
   // Owned GL resources (moved from filter)
   // GL LUT cache for transfer functions

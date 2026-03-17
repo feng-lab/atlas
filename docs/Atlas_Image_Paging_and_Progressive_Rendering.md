@@ -164,9 +164,10 @@ SVG Diagrams
 Image Management
 
 - Source and scaling
-  - Z3DImg wraps a `ZImgPack` source and determines an on‑GPU working resolution that respects hardware limits via `Z3DGpuInfo::getDataScaleForTexture(...)`. Inputs are downsampled only when they exceed the current GPU texture-size or memory constraints.
+  - `Z3DImg` wraps a `ZImgPack` source and first determines whether the full dataset fits GPU-resident rendering via `Z3DGpuInfo::getDataScaleForTexture(...)`. Inputs are treated as downsampled/paged only when they exceed the current GPU texture-size or memory constraints.
     - Constructor and scaling: src/atlas/z3dimg.cpp:70
-  - Effective working volume and spacing are recorded as `m_volumeDimension` and `m_volumeSpacing`. Downsampled status governs fast vs. progressive path.
+  - For paged 3D volumes, the fast preview volume uses a separate preview-cap policy instead of reusing the GPU-fit scale so `Z3DImg::readVolumes()` stays cheap to build. This preview cap is controlled by `--atlas_3d_preview_max_dimension` (default `512`) and does not affect `Z3DImg::isVolumeDownsampled()`.
+  - Effective preview volume dimensions and spacing are recorded as `m_volumeDimension` and `m_volumeSpacing`. Downsampled status governs fast vs. progressive path.
 - Channels and textures
   - Channels are capped by hardware limits (array layers). Per‑channel GL textures are created lazily in `channelTexture(...)` and use R8/R16/R32F to match source type.
     - Channel texture creation: src/atlas/z3dimg.cpp:195

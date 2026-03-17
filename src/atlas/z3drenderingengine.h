@@ -15,12 +15,14 @@
 #include <cstdint>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 class QOffscreenSurface;
 class QTimer;
+class QString;
 
 namespace folly {
 class CancellationToken;
@@ -48,6 +50,7 @@ class ZVulkanContext;
 class ZVulkanDevice;
 class ZQtExecutor;
 class ZSwcPack;
+struct ScreenSpaceSufficiencyAudit;
 
 // Vulkan compositor forward decl removed (classification phase)
 
@@ -108,6 +111,12 @@ public:
                                Z3DScreenShotType sst = Z3DScreenShotType::MonoView);
 
   void takeScreenShot(const QString& filename, Z3DScreenShotType sst);
+
+  // Benchmark-only helper: export the scalar MIP field before transfer-function mapping
+  // for a rendered image object.
+  [[nodiscard]] bool saveRawMIPImageForObject(size_t id, const QString& path, std::string& error);
+  [[nodiscard]] bool
+  screenSpaceSufficiencyAuditForObject(size_t id, ScreenSpaceSufficiencyAudit& audit, std::string& error);
 
   void exportFixedSize3DAnimation(const ZAnimation* animation,
                                   const QString& fn,

@@ -48,6 +48,9 @@
 --atlas_disk_cache_imgpreview_max_bytes=5368709120
 # Async write queue budget in bytes (default 1024 MiB; min 256 MiB). When full, writes are dropped (best-effort).
 --atlas_disk_cache_imgpreview_async_max_pending_bytes=1073741824
+# Maximum per-axis dimension of the fast 3D preview volume when paging is active.
+# This does not affect the resident-vs-paged decision, which still follows GPU-fit limits.
+--atlas_3d_preview_max_dimension=512
 
 # Root directory for the Atlas persistent disk cache (empty = auto-chosen Atlas cache/config directory).
 --atlas_disk_cache_dir=

@@ -10,6 +10,7 @@
 #include <QString>
 #include <QStringList>
 #include <map>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -140,6 +141,44 @@ public:
   };
 
   [[nodiscard]] Screenshot3DResult takeScreenshot3D(const Screenshot3DRequest& req);
+
+  struct RawMIPRequest
+  {
+    size_t id = 0;
+    QString path; // may be empty => auto-generated temp path
+    bool overwrite = false;
+  };
+
+  struct RawMIPResult
+  {
+    bool ok = false;
+    QString path;
+    std::string error;
+  };
+
+  [[nodiscard]] RawMIPResult exportRawMIP3D(const RawMIPRequest& req);
+
+  struct ScreenSpaceSufficiencyAuditResult
+  {
+    bool ok = false;
+    uint64_t contributingSamples = 0;
+    uint64_t sufficientSamples = 0;
+    uint64_t level0Samples = 0;
+    uint64_t level0LimitedSamples = 0;
+    uint64_t contributingPixels = 0;
+    uint64_t sufficientPixels = 0;
+    uint64_t level0Pixels = 0;
+    uint64_t level0LimitedPixels = 0;
+    double sufficientSampleFraction = 1.0;
+    double sufficientPixelFraction = 1.0;
+    double level0SampleFraction = 0.0;
+    double level0LimitedSampleFraction = 0.0;
+    double level0PixelFraction = 0.0;
+    double level0LimitedPixelFraction = 0.0;
+    std::string error;
+  };
+
+  [[nodiscard]] ScreenSpaceSufficiencyAuditResult exportScreenSpaceSufficiencyAudit3D(size_t id);
 
   struct GetParamValuesResult
   {

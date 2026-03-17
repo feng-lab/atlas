@@ -21,9 +21,8 @@ from atlas_agent.scene_rpc import SceneClient
 from atlas_volume_benchmark import (
     AXIS_SCOPE_ID,
     BACKGROUND_SCOPE_ID,
+    CAMERA_JSON_KEY,
     NO_BOUND_BOX_VALUE,
-    AtlasRenderLogFollower,
-    _apply_camera,
     _loaded_ids,
     _set_canvas_size,
     _set_scope_bool_param,
@@ -38,7 +37,7 @@ DEFAULT_ROI_MANIFEST = (
     REPO_ROOT
     / "large_test_image"
     / "fidelity_validation"
-    / "high_res_20220219_roi_validation_v1"
+    / "high_res_20220219_roi_validation_v2"
     / "manifest.json"
 )
 DEFAULT_BASE_CAMERA = (
@@ -53,7 +52,7 @@ DEFAULT_OUTPUT_ROOT = (
     REPO_ROOT
     / "large_test_image"
     / "fidelity_validation"
-    / "high_res_20220219_fidelity_render_v1"
+    / "high_res_20220219_fidelity_render_v2"
 )
 COMPOSITING_MODES = ("MIP Opaque", "Direct Volume Rendering")
 
@@ -80,6 +79,7 @@ class RenderCase:
     dataset_path: Path
     camera: GenericCamera
     screenshot_path: Path
+    raw_mip_path: Path | None
     metadata_path: Path
     sampling_rate: float
     enable_full_resolution: bool
@@ -104,7 +104,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--address", default="localhost:50051")
     parser.add_argument("--atlas-dir", default="")
-    parser.add_argument("--atlas-log-path", default="/Users/feng/Library/Logs/Atlas")
+    parser.add_argument(
+        "--atlas-log-path",
+        default="/Users/feng/Library/Logs/Atlas",
+        help=(
+            "Deprecated compatibility flag. Fidelity renders now synchronize on the "
+            "fixed-size screenshot/raw-MIP export calls instead of benchmark log markers."
+        ),
+    )
     parser.add_argument(
         "--mode",
         action="append",
@@ -140,7 +147,8 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Optional sampling rate for the standalone coarse L1/L2 controls. "
-            "Defaults to the reference sampling rate for backward compatibility."
+            "Defaults to the adaptive sampling rate so the coarse controls isolate "
+            "spatial resolution instead of also changing ray-integration density."
         ),
     )
     parser.add_argument(
@@ -186,13 +194,13 @@ def _parse_args() -> argparse.Namespace:
         "--preview-timeout-seconds",
         type=float,
         default=120.0,
-        help="Timeout while waiting for each preview marker.",
+        help="Deprecated compatibility flag; no longer used by the export-based fidelity driver.",
     )
     parser.add_argument(
         "--final-timeout-seconds",
         type=float,
         default=600.0,
-        help="Timeout while waiting for each final marker.",
+        help="Deprecated compatibility flag; no longer used by the export-based fidelity driver.",
     )
     parser.add_argument(
         "--hide-background",
@@ -231,6 +239,10 @@ def _parse_args() -> argparse.Namespace:
 
 def _slug(text: str) -> str:
     return text.strip().lower().replace(" ", "_").replace("-", "_").replace("/", "_")
+
+
+def _is_mip_mode(mode: str) -> bool:
+    return "MIP" in mode
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -576,26 +588,25 @@ def _load_dataset(
     return ids
 
 
-def _resolve_atlas_log_path(path: str | Path) -> Path:
-    candidate = Path(path).resolve()
-    if candidate.is_file():
-        return candidate
-    if not candidate.is_dir():
-        raise FileNotFoundError(f"Atlas log path does not exist: {candidate}")
-    log_files = sorted(candidate.glob("**/atlas_info_*_log.txt"))
-    if not log_files:
-        raise FileNotFoundError(
-            f"Could not find any atlas_info_*_log.txt under {candidate}"
-        )
-    return log_files[-1]
-
-
 def _remove_objects_if_needed(client: SceneClient, ids: list[int]) -> None:
     if not ids:
         return
     ok = client.remove_objects([int(obj_id) for obj_id in ids], allow_unsaved=True)
     if not ok:
         raise RuntimeError(f"Failed to remove previous Atlas objects: {ids}")
+
+
+def _clear_existing_scene_objects(client: SceneClient) -> None:
+    resp = client.list_objects()
+    objects = getattr(resp, "objects", []) or []
+    ids = [
+        int(getattr(obj, "id", 0)) for obj in objects if int(getattr(obj, "id", 0)) > 0
+    ]
+    if not ids:
+        return
+    ok = client.remove_objects(ids, allow_unsaved=True)
+    if not ok:
+        raise RuntimeError(f"Failed to clear existing Atlas scene objects: {ids}")
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -658,27 +669,8 @@ def _render_anchor(logger: EventLogger, *, case: RenderCase) -> dict[str, Any]:
         enable_full_resolution=case.enable_full_resolution,
         camera=case.camera.to_json(),
         screenshot=str(case.screenshot_path),
+        raw_mip=(str(case.raw_mip_path) if case.raw_mip_path is not None else None),
     )
-
-
-def _wait_for_render_complete(
-    *,
-    log_follower: AtlasRenderLogFollower,
-    anchor_record: dict[str, Any],
-    preview_timeout_seconds: float,
-    final_timeout_seconds: float,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    preview_marker = log_follower.wait_for_next_marker(
-        kind="preview",
-        start_ns=int(anchor_record["wall_time_ns"]),
-        timeout_seconds=float(preview_timeout_seconds),
-    )
-    final_marker = log_follower.wait_for_next_marker(
-        kind="final",
-        start_ns=int(anchor_record["wall_time_ns"]),
-        timeout_seconds=float(final_timeout_seconds),
-    )
-    return preview_marker, final_marker
 
 
 def _current_wall_ns() -> int:
@@ -701,8 +693,12 @@ def _configure_loaded_dataset(
     coord_transform_payload: dict[str, Any] | None,
     local_cut_spans: dict[str, list[float]] | None,
 ) -> None:
-    _apply_camera(client, camera.to_atlas_typed_value())
     set_params: list[dict[str, Any]] = [
+        {
+            "id": 0,
+            "json_key": CAMERA_JSON_KEY,
+            "value": camera.to_atlas_typed_value(),
+        },
         {
             "id": int(obj_id),
             "json_key": param_keys.compositing,
@@ -775,7 +771,6 @@ def _bootstrap_mode_preset(
     *,
     client: SceneClient,
     logger: EventLogger,
-    log_follower: AtlasRenderLogFollower,
     bootstrap_dataset: Path,
     bootstrap_camera: GenericCamera,
     mode: str,
@@ -783,8 +778,6 @@ def _bootstrap_mode_preset(
     display_range_max: float,
     task_timeout_seconds: float,
     ready_timeout_seconds: float,
-    preview_timeout_seconds: float,
-    final_timeout_seconds: float,
     canvas_logical_width: int,
     canvas_logical_height: int,
     hide_bound_box: bool,
@@ -810,6 +803,11 @@ def _bootstrap_mode_preset(
     param_keys = _discover_param_keys(client, obj_id)
     bootstrap_params: list[dict[str, Any]] = [
         {
+            "id": 0,
+            "json_key": CAMERA_JSON_KEY,
+            "value": bootstrap_camera.to_atlas_typed_value(),
+        },
+        {
             "id": obj_id,
             "json_key": param_keys.compositing,
             "value": mode,
@@ -820,7 +818,6 @@ def _bootstrap_mode_preset(
             "value": [float(display_range_min), float(display_range_max)],
         },
     ]
-    _apply_camera(client, bootstrap_camera.to_atlas_typed_value())
     if hide_bound_box and param_keys.bound_box:
         bootstrap_params.append(
             {
@@ -838,19 +835,11 @@ def _bootstrap_mode_preset(
     ok = client.apply_params(bootstrap_params)
     if not ok:
         raise RuntimeError(f"ApplySceneParams failed during mode bootstrap for {mode}")
-    preview_marker, final_marker = _wait_for_render_complete(
-        log_follower=log_follower,
-        anchor_record=anchor_record,
-        preview_timeout_seconds=preview_timeout_seconds,
-        final_timeout_seconds=final_timeout_seconds,
-    )
     logger.log(
         "mode_preset_bootstrap_complete",
         mode=mode,
-        preview_wall_time_ns=int(preview_marker["wall_time_ns"]),
-        final_wall_time_ns=int(final_marker["wall_time_ns"]),
-        preview_engine_elapsed_ms=preview_marker.get("elapsed_ms"),
-        final_engine_elapsed_ms=final_marker.get("elapsed_ms"),
+        applied_wall_time_ns=_current_wall_ns(),
+        request_wall_time_ns=int(anchor_record["wall_time_ns"]),
     )
     values = client.get_param_values(
         id=obj_id, json_keys=[param_keys.transfer_function]
@@ -881,6 +870,40 @@ def _screenshot(
         raise RuntimeError(
             f"TakeScreenshot3D failed for {screenshot_path}: {result.get('error', '')}"
         )
+
+
+def _export_raw_mip(
+    client: SceneClient,
+    *,
+    obj_id: int,
+    raw_mip_path: Path,
+) -> None:
+    result = client.export_raw_mip_3d(
+        id=int(obj_id),
+        path=raw_mip_path,
+        overwrite=True,
+    )
+    if not result.get("ok", False):
+        raise RuntimeError(
+            f"ExportRawMIP3D failed for object {obj_id} -> {raw_mip_path}: {result.get('error', '')}"
+        )
+
+
+def _export_screen_space_sufficiency_audit(
+    client: SceneClient, *, obj_id: int
+) -> dict[str, Any]:
+    result = client.export_screen_space_sufficiency_audit_3d(id=int(obj_id))
+    if not result.get("ok", False):
+        raise RuntimeError(
+            "ExportScreenSpaceSufficiencyAudit3D failed "
+            f"for object {obj_id}: {result.get('error', '')}"
+        )
+    audit = result.get("audit")
+    if not isinstance(audit, dict):
+        raise RuntimeError(
+            f"ExportScreenSpaceSufficiencyAudit3D returned no audit payload for object {obj_id}"
+        )
+    return json.loads(json.dumps(audit))
 
 
 def _build_cases(
@@ -953,6 +976,11 @@ def _build_cases(
                     dataset_path=Path(str(output_by_level[0]["path"])),
                     camera=local_camera,
                     screenshot_path=base_dir / "reference" / "screenshot.png",
+                    raw_mip_path=(
+                        base_dir / "reference" / "raw_mip.tif"
+                        if _is_mip_mode(mode)
+                        else None
+                    ),
                     metadata_path=base_dir / "reference" / "render.json",
                     sampling_rate=float(reference_sampling_rate),
                     enable_full_resolution=False,
@@ -976,6 +1004,11 @@ def _build_cases(
                     dataset_path=adaptive_dataset,
                     camera=adaptive_camera,
                     screenshot_path=base_dir / "adaptive" / "screenshot.png",
+                    raw_mip_path=(
+                        base_dir / "adaptive" / "raw_mip.tif"
+                        if _is_mip_mode(mode)
+                        else None
+                    ),
                     metadata_path=base_dir / "adaptive" / "render.json",
                     sampling_rate=float(adaptive_sampling_rate),
                     enable_full_resolution=True,
@@ -998,6 +1031,11 @@ def _build_cases(
                         screenshot_path=base_dir
                         / f"coarse_l{coarse_level}"
                         / "screenshot.png",
+                        raw_mip_path=(
+                            base_dir / f"coarse_l{coarse_level}" / "raw_mip.tif"
+                            if _is_mip_mode(mode)
+                            else None
+                        ),
                         metadata_path=base_dir
                         / f"coarse_l{coarse_level}"
                         / "render.json",
@@ -1064,7 +1102,7 @@ def main() -> int:
         coarse_sampling_rate=float(
             args.coarse_sampling_rate
             if args.coarse_sampling_rate is not None
-            else args.reference_sampling_rate
+            else args.adaptive_sampling_rate
         ),
         camera_distance_scale=float(args.camera_distance_scale),
     )
@@ -1090,7 +1128,7 @@ def main() -> int:
             "coarse_sampling_rate": float(
                 args.coarse_sampling_rate
                 if args.coarse_sampling_rate is not None
-                else args.reference_sampling_rate
+                else args.adaptive_sampling_rate
             ),
             "display_range": [
                 float(args.display_range_min),
@@ -1116,11 +1154,6 @@ def main() -> int:
         address=args.address,
         atlas_dir=(args.atlas_dir.strip() or None),
     )
-    atlas_log_path = _resolve_atlas_log_path(args.atlas_log_path)
-    log_follower = AtlasRenderLogFollower(
-        atlas_log_path, fallback_year=time.gmtime().tm_year
-    )
-
     active_ids: list[int] = []
     render_records: list[dict[str, Any]] = []
     mode_presets: dict[str, dict[str, Any]] = {}
@@ -1135,6 +1168,7 @@ def main() -> int:
             modes=modes,
             roi_labels=[str(roi["label"]) for roi in rois],
         )
+        _clear_existing_scene_objects(client)
         _prepare_scene_once(
             client,
             logger,
@@ -1149,7 +1183,6 @@ def main() -> int:
             param_keys, transfer_payload = _bootstrap_mode_preset(
                 client=client,
                 logger=logger,
-                log_follower=log_follower,
                 bootstrap_dataset=bootstrap_case.dataset_path,
                 bootstrap_camera=bootstrap_case.camera,
                 mode=mode,
@@ -1157,8 +1190,6 @@ def main() -> int:
                 display_range_max=float(args.display_range_max),
                 task_timeout_seconds=float(args.task_timeout_seconds),
                 ready_timeout_seconds=float(args.ready_timeout_seconds),
-                preview_timeout_seconds=float(args.preview_timeout_seconds),
-                final_timeout_seconds=float(args.final_timeout_seconds),
                 canvas_logical_width=int(args.canvas_logical_width),
                 canvas_logical_height=int(args.canvas_logical_height),
                 hide_bound_box=bool(args.hide_bound_box),
@@ -1252,12 +1283,7 @@ def main() -> int:
                 coord_transform_payload=case.coord_transform_payload,
                 local_cut_spans=case.local_cut_spans,
             )
-            preview_marker, final_marker = _wait_for_render_complete(
-                log_follower=log_follower,
-                anchor_record=anchor_record,
-                preview_timeout_seconds=float(args.preview_timeout_seconds),
-                final_timeout_seconds=float(args.final_timeout_seconds),
-            )
+            export_start_wall_time_ns = _current_wall_ns()
             case.screenshot_path.parent.mkdir(parents=True, exist_ok=True)
             _screenshot(
                 client,
@@ -1265,12 +1291,31 @@ def main() -> int:
                 height=int(args.viewport_height),
                 screenshot_path=case.screenshot_path,
             )
+            if case.raw_mip_path is not None:
+                case.raw_mip_path.parent.mkdir(parents=True, exist_ok=True)
+                _export_raw_mip(
+                    client,
+                    obj_id=obj_id,
+                    raw_mip_path=case.raw_mip_path,
+                )
+            screen_space_sufficiency_audit = _export_screen_space_sufficiency_audit(
+                client, obj_id=obj_id
+            )
+            export_finish_wall_time_ns = _current_wall_ns()
             record = {
                 "roi_label": case.roi_label,
                 "mode": case.mode,
                 "condition": case.condition,
                 "dataset_path": str(case.dataset_path),
                 "screenshot_path": str(case.screenshot_path),
+                "raw_mip_path": (
+                    str(case.raw_mip_path) if case.raw_mip_path is not None else None
+                ),
+                "analysis_domain": (
+                    "raw_mip_scalar"
+                    if case.raw_mip_path is not None
+                    else "screenshot_rgb"
+                ),
                 "sampling_rate": float(case.sampling_rate),
                 "enable_full_resolution": bool(case.enable_full_resolution),
                 "display_range": [
@@ -1281,27 +1326,15 @@ def main() -> int:
                 "camera": case.camera.to_json(),
                 "coord_transform": case.coord_transform_payload,
                 "local_cut_spans": case.local_cut_spans,
-                "preview_wall_time_ns": int(preview_marker["wall_time_ns"]),
-                "final_wall_time_ns": int(final_marker["wall_time_ns"]),
-                "preview_client_ms": max(
+                "screen_space_sufficiency_audit": screen_space_sufficiency_audit,
+                "render_request_wall_time_ns": int(anchor_record["wall_time_ns"]),
+                "export_start_wall_time_ns": int(export_start_wall_time_ns),
+                "export_finish_wall_time_ns": int(export_finish_wall_time_ns),
+                "export_client_ms": max(
                     0.0,
-                    (
-                        int(preview_marker["wall_time_ns"])
-                        - int(anchor_record["wall_time_ns"])
-                    )
+                    (int(export_finish_wall_time_ns) - int(export_start_wall_time_ns))
                     / 1_000_000.0,
                 ),
-                "final_client_ms": max(
-                    0.0,
-                    (
-                        int(final_marker["wall_time_ns"])
-                        - int(anchor_record["wall_time_ns"])
-                    )
-                    / 1_000_000.0,
-                ),
-                "preview_engine_elapsed_ms": preview_marker.get("elapsed_ms"),
-                "final_engine_elapsed_ms": final_marker.get("elapsed_ms"),
-                "final_source": final_marker.get("source"),
                 "roi_metadata": case.roi_metadata,
                 "rendered_wall_time_ns": _current_wall_ns(),
             }
@@ -1313,8 +1346,16 @@ def main() -> int:
                 mode=case.mode,
                 condition=case.condition,
                 screenshot=str(case.screenshot_path),
-                final_client_ms=record["final_client_ms"],
-                final_source=record["final_source"],
+                raw_mip=(
+                    str(case.raw_mip_path) if case.raw_mip_path is not None else None
+                ),
+                screen_space_sufficient_samples=screen_space_sufficiency_audit.get(
+                    "sufficient_samples"
+                ),
+                screen_space_sufficient_pixels=screen_space_sufficiency_audit.get(
+                    "sufficient_pixels"
+                ),
+                export_client_ms=record["export_client_ms"],
             )
 
         _write_json(

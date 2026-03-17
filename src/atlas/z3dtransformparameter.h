@@ -126,6 +126,7 @@ protected:
   void updateWidget(const glm::mat4& value);
 
 private:
+  bool m_blockSubParameterSignals = false;
   ZVec3Parameter m_scale;
   ZVec3Parameter m_translation;
   ZVec4Parameter m_rotation; // angle in degree and axis

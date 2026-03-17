@@ -38,6 +38,9 @@
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
 #include <QCoreApplication>
+
+DECLARE_bool(atlas_enable_benchmark_raw_mip_export);
+DECLARE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit);
 #include <QMetaObject>
 #include <QTimer>
 #include <QThread>
@@ -1355,6 +1358,53 @@ void Z3DRenderingEngine::setSeedTraceUiState(bool enabled,
                                            m_seedTraceSourceChannel);
     }
   }
+}
+
+bool Z3DRenderingEngine::saveRawMIPImageForObject(size_t id, const QString& path, std::string& error)
+{
+  if (!FLAGS_atlas_enable_benchmark_raw_mip_export) {
+    error = "raw MIP export is disabled; relaunch Atlas with --atlas_enable_benchmark_raw_mip_export";
+    return false;
+  }
+  for (auto& objView : m_3dObjViews) {
+    auto* imgView = dynamic_cast<Z3DImgView*>(objView.get());
+    if (imgView == nullptr) {
+      continue;
+    }
+    auto it = imgView->idToFilter().find(id);
+    if (it == imgView->idToFilter().end() || it->second == nullptr) {
+      continue;
+    }
+    return it->second->saveRawMIPImage(path, error);
+  }
+
+  error = fmt::format("raw MIP export could not find an Image filter for object {}", id);
+  return false;
+}
+
+bool Z3DRenderingEngine::screenSpaceSufficiencyAuditForObject(size_t id,
+                                                              ScreenSpaceSufficiencyAudit& audit,
+                                                              std::string& error)
+{
+  if (!FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit) {
+    error = "screen-space audit is disabled; relaunch Atlas with "
+            "--atlas_enable_benchmark_screen_space_sufficiency_audit";
+    return false;
+  }
+  for (auto& objView : m_3dObjViews) {
+    auto* imgView = dynamic_cast<Z3DImgView*>(objView.get());
+    if (imgView == nullptr) {
+      continue;
+    }
+    auto it = imgView->idToFilter().find(id);
+    if (it == imgView->idToFilter().end() || it->second == nullptr) {
+      continue;
+    }
+    return it->second->screenSpaceSufficiencyAudit(audit, error);
+  }
+
+  error = fmt::format("screen-space audit could not find an Image filter for object {}", id);
+  return false;
 }
 
 glm::uvec2 Z3DRenderingEngine::outputSize() const

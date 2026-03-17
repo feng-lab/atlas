@@ -45,6 +45,12 @@ DEFINE_uint32(atlas_number_of_blocks_to_use_PBO_threashold,
               0,
               "Use PBO when number of blocks to upload is larger than this threshold, default is 0");
 
+DEFINE_uint32(atlas_3d_preview_max_dimension,
+              512,
+              "Maximum per-axis dimension of the preloaded 3D preview volume when paging is active. "
+              "This does not affect whether a volume is considered GPU-fit; that decision still uses "
+              "getDataScaleForTexture().");
+
 DEFINE_uint32(
   atlas_image_block_size,
   64,
@@ -99,6 +105,12 @@ std::array<size_t, 3> bestRatioAtMost(const std::vector<std::array<size_t, 3>>& 
   return best;
 }
 
+double cappedAxisScale(size_t dim, uint32_t maxDim)
+{
+  CHECK_GT(maxDim, 0u) << "atlas_3d_preview_max_dimension must be > 0";
+  return dim <= maxDim ? 1.0 : static_cast<double>(maxDim) / static_cast<double>(dim);
+}
+
 } // namespace
 
 Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vector<glm::dvec2>& displayRanges)
@@ -109,12 +121,30 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vecto
     VLOG(1) << dr;
   }
   const ZImgInfo& info = m_imgPack.imgInfo();
-  // The preview volume should be downsampled only when it actually exceeds the current
-  // backend's texture-size / memory limits. A fixed 512^3 cap incorrectly forces paging
-  // for datasets that fit the GPU natively.
+  double fitWidthScale = 1.0;
+  double fitHeightScale = 1.0;
+  double fitDepthScale = 1.0;
+  // Keep the resident-vs-paged decision tied to actual GPU-fit limits, not the preview heuristic.
   Z3DGpuInfo::instance()
-    .getDataScaleForTexture(info.width, info.height, info.depth, m_widthScale, m_heightScale, m_depthScale);
-  m_isVolumeDownsampled = m_widthScale != 1.0 || m_heightScale != 1.0 || m_depthScale != 1.0;
+    .getDataScaleForTexture(info.width, info.height, info.depth, fitWidthScale, fitHeightScale, fitDepthScale);
+  m_isVolumeDownsampled = fitWidthScale != 1.0 || fitHeightScale != 1.0 || fitDepthScale != 1.0;
+
+  m_widthScale = fitWidthScale;
+  m_heightScale = fitHeightScale;
+  m_depthScale = fitDepthScale;
+  if (m_isVolumeDownsampled && info.depth > 1) {
+    // For paged 3D data, keep the preview policy separate from the resident-fit decision.
+    // The fit scales answer "does the full volume fit the GPU natively?".
+    // The preview scales answer "how large should the fast preview volume be?".
+    // Reusing fitScale for preview can make extreme-aspect volumes unnecessarily tiny.
+    m_widthScale = cappedAxisScale(info.width, FLAGS_atlas_3d_preview_max_dimension);
+    m_heightScale = cappedAxisScale(info.height, FLAGS_atlas_3d_preview_max_dimension);
+    m_depthScale = cappedAxisScale(info.depth, FLAGS_atlas_3d_preview_max_dimension);
+  }
+
+  VLOG(1) << "3D image fit scales: (" << fitWidthScale << ", " << fitHeightScale << ", " << fitDepthScale
+          << "), preview scales: (" << m_widthScale << ", " << m_heightScale << ", " << m_depthScale
+          << "), paged=" << m_isVolumeDownsampled;
 
   m_volumeDimension = glm::uvec3(info.width * m_widthScale, info.height * m_heightScale, info.depth * m_depthScale);
   m_volumeSpacing = glm::vec3(1.f / m_widthScale, 1.f / m_heightScale, 1.f / m_depthScale);

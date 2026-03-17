@@ -694,7 +694,7 @@ NB_MODULE(_imgpy, m)
       },
       "Returns a string representation of the image source.");
 
-  nb::class_<ZImg>(m, "ZImg", R"doc(
+  nb::class_<ZImg>(m, "ZImg", nb::dynamic_attr(), R"doc(
 ZImg — multidimensional image container with fast CPU array interop.
 
 Overview
@@ -1153,13 +1153,13 @@ See also
          &ZImg::secureDivideBy,
          "rhs"_a,
          "Safely divide this image by another image 'rhs' (elementwise), guarding against division pitfalls.")
-    // MSVC (cl) emits spurious C4686 warnings for nanobind's operator
-    // placeholders (nb::self ...), which are implemented via templated
-    // helper UDTs in nanobind::detail. The warning complains about a
-    // possible change in behavior due to UDT return calling convention,
-    // but there is no actual ABI or behavioral issue here; it's a false
-    // positive triggered by the placeholder expression templates.
-    // Suppress it narrowly for this block on MSVC only.
+  // MSVC (cl) emits spurious C4686 warnings for nanobind's operator
+  // placeholders (nb::self ...), which are implemented via templated
+  // helper UDTs in nanobind::detail. The warning complains about a
+  // possible change in behavior due to UDT return calling convention,
+  // but there is no actual ABI or behavioral issue here; it's a false
+  // positive triggered by the placeholder expression templates.
+  // Suppress it narrowly for this block on MSVC only.
 #if defined(_MSC_VER)
 #  pragma warning(push)
 #  pragma warning(disable : 4686)

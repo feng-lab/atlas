@@ -839,6 +839,22 @@ double Z3DCompositor::processGL(Z3DEye eye)
 {
   syncRendererState();
 
+  const GLboolean prevDepthTest = glIsEnabled(GL_DEPTH_TEST);
+  GLboolean prevDepthMask = GL_TRUE;
+  GLint prevDepthFuncInt = static_cast<GLint>(GL_LESS);
+  glGetBooleanv(GL_DEPTH_WRITEMASK, &prevDepthMask);
+  glGetIntegerv(GL_DEPTH_FUNC, &prevDepthFuncInt);
+  const GLenum prevDepthFunc = static_cast<GLenum>(prevDepthFuncInt);
+  auto depthStateGuard = folly::makeGuard([prevDepthTest, prevDepthMask, prevDepthFunc]() {
+    if (prevDepthTest == GL_TRUE) {
+      glEnable(GL_DEPTH_TEST);
+    } else {
+      glDisable(GL_DEPTH_TEST);
+    }
+    glDepthMask(prevDepthMask);
+    glDepthFunc(prevDepthFunc);
+  });
+
   const auto& filters = m_geometryFilters;
   const auto& vFilters = m_volumeFilters;
   // VLOG(1) << filters.size() << " " << vFilters.size();

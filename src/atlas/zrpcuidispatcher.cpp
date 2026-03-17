@@ -5,6 +5,7 @@
 #include "z3dcameraparameter.h"
 #include "z3dmainwindow.h"
 #include "z3dobjview.h"
+#include "z3dimgraycasterrenderer.h"
 #include "z3drenderingengine.h"
 #include "zcameraparameteranimation.h"
 #include "zdoc.h"
@@ -30,6 +31,9 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+
+DECLARE_bool(atlas_enable_benchmark_raw_mip_export);
+DECLARE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit);
 
 namespace nim {
 
@@ -837,6 +841,208 @@ ZRpcUiDispatcher::Screenshot3DResult ZRpcUiDispatcher::takeScreenshot3D(const Sc
       return r;
     },
     "take_screenshot_3d");
+
+  if (!inv.ok) {
+    out.ok = false;
+    out.error = inv.error;
+    return out;
+  }
+
+  return inv.value;
+}
+
+ZRpcUiDispatcher::RawMIPResult ZRpcUiDispatcher::exportRawMIP3D(const RawMIPRequest& req)
+{
+  RawMIPResult out;
+
+  if (!FLAGS_atlas_enable_benchmark_raw_mip_export) {
+    out.ok = false;
+    out.error = "export_raw_mip_3d is disabled; relaunch Atlas with --atlas_enable_benchmark_raw_mip_export";
+    return out;
+  }
+
+  if (req.id <= kZRpcScopeGlobal) {
+    out.ok = false;
+    out.error = "export_raw_mip_3d: id must refer to an Image object";
+    return out;
+  }
+
+  ZMainWindow* mainWin = mainWindowUi();
+  if (!mainWin) {
+    out.ok = false;
+    out.error = "export_raw_mip_3d: main window not ready";
+    return out;
+  }
+  ZDoc* doc = mainWin->doc();
+  if (!doc || !doc->idToDoc(req.id)) {
+    out.ok = false;
+    out.error = "export_raw_mip_3d: object id not found";
+    return out;
+  }
+  auto* w3d = mainWin->get3DWindow();
+  if (!w3d) {
+    out.ok = false;
+    out.error = "export_raw_mip_3d: 3D window not ready";
+    return out;
+  }
+  auto* engine = w3d->engine();
+  if (!engine || !engine->thread() || !engine->thread()->isRunning() || engine->thread()->isFinished()) {
+    out.ok = false;
+    out.error = "export_raw_mip_3d: engine not ready";
+    return out;
+  }
+
+  QString outPath = req.path.trimmed();
+  if (outPath.isEmpty()) {
+    const QString ts = QDateTime::currentDateTimeUtc().toString("yyyyMMdd_HHmmss_zzz");
+    const QString uid = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    const QString fn = QString("atlas_scene_rawmip3d_%1_%2.tif").arg(ts, uid);
+    outPath = QDir(QDir::tempPath()).filePath(fn);
+  } else {
+    QFileInfo fi(outPath);
+    if (fi.isRelative()) {
+      outPath = QDir::current().filePath(outPath);
+      fi = QFileInfo(outPath);
+    }
+    if (fi.exists() && !req.overwrite) {
+      out.ok = false;
+      out.path = outPath;
+      out.error = QString("export_raw_mip_3d: file already exists (overwrite=false): %1").arg(outPath).toStdString();
+      return out;
+    }
+  }
+
+  QDir dir(QFileInfo(outPath).absolutePath());
+  if (!dir.exists()) {
+    if (!dir.mkpath(".")) {
+      out.ok = false;
+      out.path = outPath;
+      out.error =
+        QString("export_raw_mip_3d: failed to create output folder: %1").arg(dir.absolutePath()).toStdString();
+      return out;
+    }
+  }
+
+  if (QFileInfo(outPath).exists() && req.overwrite) {
+    if (!QFile::remove(outPath)) {
+      out.ok = false;
+      out.path = outPath;
+      out.error = QString("export_raw_mip_3d: failed to replace existing file: %1").arg(outPath).toStdString();
+      return out;
+    }
+  }
+
+  out.path = outPath;
+
+  auto inv = invokeOnObjectThreadWait(
+    engine,
+    [engine, outPath, id = req.id]() -> RawMIPResult {
+      RawMIPResult r;
+      r.path = outPath;
+
+      std::string error;
+      if (!engine->saveRawMIPImageForObject(id, outPath, error)) {
+        r.ok = false;
+        r.error = error.empty()
+                    ? QString("export_raw_mip_3d: export failed (no output file): %1").arg(outPath).toStdString()
+                    : error;
+        return r;
+      }
+
+      if (QFileInfo(outPath).exists()) {
+        r.ok = true;
+        return r;
+      }
+
+      r.ok = false;
+      r.error =
+        QString("export_raw_mip_3d: export succeeded but no output file was written: %1").arg(outPath).toStdString();
+      return r;
+    },
+    "export_raw_mip_3d");
+
+  if (!inv.ok) {
+    out.ok = false;
+    out.error = inv.error;
+    return out;
+  }
+
+  return inv.value;
+}
+
+ZRpcUiDispatcher::ScreenSpaceSufficiencyAuditResult ZRpcUiDispatcher::exportScreenSpaceSufficiencyAudit3D(size_t id)
+{
+  ScreenSpaceSufficiencyAuditResult out;
+
+  if (!FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit) {
+    out.ok = false;
+    out.error = "export_screen_space_sufficiency_audit_3d is disabled; relaunch Atlas with "
+                "--atlas_enable_benchmark_screen_space_sufficiency_audit";
+    return out;
+  }
+
+  if (id <= kZRpcScopeGlobal) {
+    out.ok = false;
+    out.error = "export_screen_space_sufficiency_audit_3d: id must refer to an Image object";
+    return out;
+  }
+
+  ZMainWindow* mainWin = mainWindowUi();
+  if (!mainWin) {
+    out.ok = false;
+    out.error = "export_screen_space_sufficiency_audit_3d: main window not ready";
+    return out;
+  }
+  ZDoc* doc = mainWin->doc();
+  if (!doc || !doc->idToDoc(id)) {
+    out.ok = false;
+    out.error = "export_screen_space_sufficiency_audit_3d: object id not found";
+    return out;
+  }
+  auto* w3d = mainWin->get3DWindow();
+  if (!w3d) {
+    out.ok = false;
+    out.error = "export_screen_space_sufficiency_audit_3d: 3D window not ready";
+    return out;
+  }
+  auto* engine = w3d->engine();
+  if (!engine || !engine->thread() || !engine->thread()->isRunning() || engine->thread()->isFinished()) {
+    out.ok = false;
+    out.error = "export_screen_space_sufficiency_audit_3d: engine not ready";
+    return out;
+  }
+
+  auto inv = invokeOnObjectThreadWait(
+    engine,
+    [engine, id]() -> ScreenSpaceSufficiencyAuditResult {
+      ScreenSpaceSufficiencyAuditResult r;
+
+      ScreenSpaceSufficiencyAudit audit;
+      std::string error;
+      if (!engine->screenSpaceSufficiencyAuditForObject(id, audit, error)) {
+        r.ok = false;
+        r.error = error.empty() ? "export_screen_space_sufficiency_audit_3d: audit failed" : error;
+        return r;
+      }
+
+      r.ok = true;
+      r.contributingSamples = audit.contributingSamples;
+      r.sufficientSamples = audit.sufficientSamples();
+      r.level0Samples = audit.level0Samples;
+      r.level0LimitedSamples = audit.level0LimitedSamples;
+      r.contributingPixels = audit.contributingPixels;
+      r.sufficientPixels = audit.sufficientPixels();
+      r.level0Pixels = audit.level0Pixels;
+      r.level0LimitedPixels = audit.level0LimitedPixels;
+      r.sufficientSampleFraction = audit.sufficientSampleFraction();
+      r.sufficientPixelFraction = audit.sufficientPixelFraction();
+      r.level0SampleFraction = audit.level0SampleFraction();
+      r.level0LimitedSampleFraction = audit.level0LimitedSampleFraction();
+      r.level0PixelFraction = audit.level0PixelFraction();
+      r.level0LimitedPixelFraction = audit.level0LimitedPixelFraction();
+      return r;
+    },
+    "export_screen_space_sufficiency_audit_3d");
 
   if (!inv.ok) {
     out.ok = false;

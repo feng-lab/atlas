@@ -24,6 +24,9 @@
 #include <optional>
 #include <utility>
 
+DECLARE_bool(atlas_enable_benchmark_raw_mip_export);
+DECLARE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit);
+
 namespace nim {
 
 // const size_t Z3DImgFilter::m_maxNumOfFullResolutionVolumeSlice = 6;
@@ -1452,6 +1455,65 @@ bool Z3DImgFilter::hasImage() const
          m_yCut.upperValue() > m_yCut.minimum() && m_zCut.upperValue() > m_zCut.minimum() &&
          m_xCut.lowerValue() < m_xCut.maximum() && m_yCut.lowerValue() < m_yCut.maximum() &&
          m_zCut.lowerValue() < m_zCut.maximum();
+}
+
+bool Z3DImgFilter::saveRawMIPImage(const QString& path, std::string& error)
+{
+  if (!FLAGS_atlas_enable_benchmark_raw_mip_export) {
+    error = "raw MIP export is disabled; relaunch Atlas with --atlas_enable_benchmark_raw_mip_export";
+    return false;
+  }
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    error = "raw MIP export is currently only supported for the OpenGL backend";
+    return false;
+  }
+  if (!m_3dImg) {
+    error = "raw MIP export requires an active image";
+    return false;
+  }
+  if (!hasImage()) {
+    error = "raw MIP export requires a visible volume render";
+    return false;
+  }
+
+  Z3DRenderTarget& currentTarget = transparentTarget(MonoEye);
+  m_imgRaycasterRenderer.resetProgress(MonoEye);
+  prepareRaycasterInputs(MonoEye, currentTarget.size());
+  const bool ok = m_imgRaycasterRenderer.saveRawMIPImage(MonoEye, path, error);
+  m_imgRaycasterRenderer.resetProgress(MonoEye);
+  return ok;
+}
+
+bool Z3DImgFilter::screenSpaceSufficiencyAudit(ScreenSpaceSufficiencyAudit& audit, std::string& error)
+{
+  if (!FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit) {
+    error = "screen-space audit is disabled; relaunch Atlas with "
+            "--atlas_enable_benchmark_screen_space_sufficiency_audit";
+    return false;
+  }
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    error = "screen-space audit is currently only supported for the OpenGL backend";
+    return false;
+  }
+  if (!m_3dImg) {
+    error = "screen-space audit requires an active image";
+    return false;
+  }
+  if (!hasImage()) {
+    error = "screen-space audit requires a visible volume render";
+    return false;
+  }
+
+  Z3DRenderTarget& currentTarget = transparentTarget(MonoEye);
+  m_imgRaycasterRenderer.resetProgress(MonoEye);
+  prepareRaycasterInputs(MonoEye, currentTarget.size());
+  const glm::vec3 scale = glm::abs(m_rendererParameters.coordTransform.scale());
+  const float selectedVoxelWorldSize = std::min(std::min(scale.x, scale.y), scale.z);
+  CHECK(std::isfinite(selectedVoxelWorldSize) && selectedVoxelWorldSize > 0.0f) << selectedVoxelWorldSize;
+  m_imgRaycasterRenderer.setBenchmarkSelectedVoxelWorldSizeHint(selectedVoxelWorldSize);
+  const bool ok = m_imgRaycasterRenderer.screenSpaceSufficiencyAudit(MonoEye, audit, error);
+  m_imgRaycasterRenderer.resetProgress(MonoEye);
+  return ok;
 }
 
 void Z3DImgFilter::prepareRaycasterInputs(Z3DEye eye, const glm::uvec2& outputSize)

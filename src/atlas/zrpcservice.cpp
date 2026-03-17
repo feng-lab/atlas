@@ -115,6 +115,10 @@ using atlas::rpc::GetParamValuesResponse;
 using atlas::rpc::SaveSceneRequest;
 using atlas::rpc::ScreenshotRequest;
 using atlas::rpc::ScreenshotResponse;
+using atlas::rpc::RawMIPRequest;
+using atlas::rpc::RawMIPResponse;
+using atlas::rpc::ScreenSpaceSufficiencyAuditRequest;
+using atlas::rpc::ScreenSpaceSufficiencyAuditResponse;
 using atlas::rpc::Set3DCanvasSizeRequest;
 using atlas::rpc::Set3DCanvasSizeResponse;
 using atlas::rpc::ClearKeysRequest;
@@ -3388,6 +3392,98 @@ public:
     const auto& r = inv.value;
     reply->set_ok(r.ok);
     reply->set_path(r.path.toStdString());
+    if (!r.error.empty()) {
+      reply->set_error(r.error);
+    }
+    return Status::OK;
+  }
+
+  Status ExportRawMIP3D(ServerContext* grpcContext, const RawMIPRequest* req, RawMIPResponse* reply) override
+  {
+    CHECK(req);
+    CHECK(reply);
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      reply->set_ok(false);
+      reply->set_error("export_raw_mip_3d: ui dispatcher not ready");
+      return Status::OK;
+    }
+
+    ZRpcUiDispatcher::RawMIPRequest dr;
+    dr.id = static_cast<size_t>(req->id());
+    dr.path = QString::fromStdString(req->path());
+    dr.overwrite = req->overwrite();
+
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, dr = std::move(dr)]() {
+        return disp->exportRawMIP3D(dr);
+      },
+      "export_raw_mip_3d");
+    if (!inv.ok) {
+      reply->set_ok(false);
+      reply->set_error(inv.error);
+      return Status::OK;
+    }
+
+    const auto& r = inv.value;
+    reply->set_ok(r.ok);
+    reply->set_path(r.path.toStdString());
+    if (!r.error.empty()) {
+      reply->set_error(r.error);
+    }
+    return Status::OK;
+  }
+
+  Status ExportScreenSpaceSufficiencyAudit3D(ServerContext* grpcContext,
+                                             const ScreenSpaceSufficiencyAuditRequest* req,
+                                             ScreenSpaceSufficiencyAuditResponse* reply) override
+  {
+    CHECK(req);
+    CHECK(reply);
+
+    ZRpcUiDispatcher* disp = uiDispatcher();
+    if (!disp) {
+      reply->set_ok(false);
+      reply->set_error("export_screen_space_sufficiency_audit_3d: ui dispatcher not ready");
+      return Status::OK;
+    }
+
+    const auto id = static_cast<size_t>(req->id());
+    auto inv = invokeOnObjectThread(
+      grpcContext,
+      disp,
+      [disp, id]() {
+        return disp->exportScreenSpaceSufficiencyAudit3D(id);
+      },
+      "export_screen_space_sufficiency_audit_3d");
+    if (!inv.ok) {
+      reply->set_ok(false);
+      reply->set_error(inv.error);
+      return Status::OK;
+    }
+
+    const auto& r = inv.value;
+    reply->set_ok(r.ok);
+    if (r.ok) {
+      auto* audit = reply->mutable_audit();
+      audit->set_contributing_samples(r.contributingSamples);
+      audit->set_sufficient_samples(r.sufficientSamples);
+      audit->set_contributing_pixels(r.contributingPixels);
+      audit->set_sufficient_pixels(r.sufficientPixels);
+      audit->set_sufficient_sample_fraction(r.sufficientSampleFraction);
+      audit->set_sufficient_pixel_fraction(r.sufficientPixelFraction);
+      audit->set_level0_samples(r.level0Samples);
+      audit->set_level0_limited_samples(r.level0LimitedSamples);
+      audit->set_level0_pixels(r.level0Pixels);
+      audit->set_level0_limited_pixels(r.level0LimitedPixels);
+      audit->set_level0_sample_fraction(r.level0SampleFraction);
+      audit->set_level0_limited_sample_fraction(r.level0LimitedSampleFraction);
+      audit->set_level0_pixel_fraction(r.level0PixelFraction);
+      audit->set_level0_limited_pixel_fraction(r.level0LimitedPixelFraction);
+    }
     if (!r.error.empty()) {
       reply->set_error(r.error);
     }

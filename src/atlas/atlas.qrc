@@ -150,9 +150,11 @@
         <file>Resources/shader/render_3dtexture_coordinate_and_eye_coordinate.frag</file>
         <file>Resources/shader/transform_with_3dtexture_and_eye_coordinate.vert</file>
         <file>Resources/shader/image3d_raycaster.frag</file>
+        <file>Resources/shader/image3d_raycaster_benchmark.frag</file>
         <file>Resources/shader/image2d_array_compositor.frag</file>
         <file>Resources/shader/image2d_with_transfun_single_channel.frag</file>
         <file>Resources/shader/volume_raycaster_single_channel.frag</file>
+        <file>Resources/shader/volume_raycaster_single_channel_benchmark.frag</file>
         <file>Resources/shader/volume_slice_with_transfun_single_channel.frag</file>
         <file>Resources/shader/image2d_with_colormap_single_channel.frag</file>
         <file>Resources/shader/volume_slice_with_colormap_single_channel.frag</file>

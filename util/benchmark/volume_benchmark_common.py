@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any
 
 
+DEFAULT_FIELD_OF_VIEW_DEGREES = 45.0
+
+
 def _vec3(value: Any, *, field_name: str) -> tuple[float, float, float]:
     if not isinstance(value, (list, tuple)) or len(value) != 3:
         raise ValueError(f"{field_name} must be a 3-element array")
@@ -76,7 +79,7 @@ class GenericCamera:
         if field_of_view_degrees is None:
             field_of_view_degrees = payload.get("Field of View Float")
         if field_of_view_degrees is None:
-            field_of_view_degrees = 30.0
+            field_of_view_degrees = DEFAULT_FIELD_OF_VIEW_DEGREES
 
         eye_separation_angle_degrees = payload.get("eye_separation_angle_degrees")
         if eye_separation_angle_degrees is None:

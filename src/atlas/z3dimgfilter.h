@@ -16,6 +16,7 @@
 #include <QPointer>
 #include <array>
 #include <optional>
+#include <string>
 #include <vector>
 
 class QPushButton;
@@ -86,6 +87,10 @@ public:
   glm::vec3 get3DPosition(int x, int y, int width, int height, bool& success);
 
   void setProgressiveRenderingMode(bool v) override;
+
+  // Benchmark-only export: save the scalar MIP field before transfer-function mapping.
+  [[nodiscard]] bool saveRawMIPImage(const QString& path, std::string& error);
+  [[nodiscard]] bool screenSpaceSufficiencyAudit(ScreenSpaceSufficiencyAudit& audit, std::string& error);
 
   void enterSubregionView(float x, float y, float z);
 

@@ -1578,15 +1578,16 @@ Artifacts:
 
 # Fidelity Validation: `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um`
 
-This section records the retained image-based fidelity validation for Atlas
-`Direct Volume Rendering` on memory-fit ROIs cut from the retained
+This section records the retained fidelity validation for Atlas on memory-fit
+ROIs cut from the retained
 `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` dataset. This is a
 supplementary quality audit, not a throughput benchmark.
 
 Artifacts:
 - ROI family: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2`
-- Retained DVR render suite: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_v1`
-- Retained DVR analysis summary: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_v1/analysis/summary.json`
+- Retained DVR render suite: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_audit_v1`
+- Retained DVR analysis summary: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_audit_v1/analysis/summary.json`
+- Retained MIP analysis summary: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_mip_zoom06_v2_screenshot_summary_v1/summary.json`
 
 ## Fidelity Protocol
 
@@ -1607,25 +1608,36 @@ Artifacts:
 | View cleanup | Background hidden, axis hidden, bound box set to `No Bound Box` |
 | Transfer function | Default Atlas transfer function captured from the bootstrap mode preset |
 | Display range | Fixed `0 .. 255` |
+| Capture path | Atlas fixed-size screenshot export for display-space captures; `ExportScreenSpaceSufficiencyAudit3D` for screen-space audit counters |
 | Conditions | `reference`, `adaptive`, `coarse_l1`, `coarse_l2` |
 | `reference` | Resident `fullres.nim`, local ROI camera, sampling rate `8.0` |
 | `adaptive` | Original large dataset with full-resolution rendering enabled, ROI `X/Y/Z Cut` applied, sampling rate `2.0` |
 | `coarse_l1` | Resident `level1.nim`, scaled back to native ROI footprint with `Coord Transform`, sampling rate `2.0` |
 | `coarse_l2` | Resident `level2.nim`, scaled back to native ROI footprint with `Coord Transform`, sampling rate `2.0` |
 | Analysis script | `/Users/feng/code/atlas/util/benchmark/analyze_fidelity_validation.py` |
-| Current fidelity metrics | Grayscale SSIM, masked mean abs diff, masked P95 abs diff, difference heatmaps |
-| Mask policy | Reference-derived foreground mask from the rendered reference image |
-| Current limitation | Image-based only. The planned screen-space sufficiency audit is still pending engine-side instrumentation. |
+| DVR metric basis | Final screenshot RGB, converted to grayscale SSIM plus masked absolute-difference metrics |
+| MIP metric basis | Final screenshot RGB, converted to grayscale SSIM plus masked absolute-difference metrics, consistent with DVR |
+| Screen-space audit basis | Contributing sample/pixel counts, sufficient sample/pixel counts, `level 0` sample/pixel counts, and `level-0-limited` sample/pixel counts exported from the Atlas raycaster |
+| Mask policy | Reference-derived foreground mask from the retained reference screenshot artifact |
+| Current limitation | The current audit distinguishes `level 0` usage and `level-0-limited` insufficiency, but it does not yet export a full per-level histogram beyond that split. |
 
 ## Retained DVR Result
 
-Aggregate across the retained `v2` ROI family:
+Aggregate across the retained ROI family:
 
 | Condition | Count | Mean SSIM | Mean abs diff | Mean P95 abs diff | Mean max abs diff |
 | --- | --- | --- | --- | --- | --- |
 | `adaptive` | `4` | `0.996834` | `0.252` | `1.250` | `36.750` |
 | `coarse_l1` | `4` | `0.961353` | `2.450` | `10.250` | `78.250` |
 | `coarse_l2` | `4` | `0.901613` | `4.463` | `18.250` | `123.500` |
+
+Retained DVR screen-space sufficiency audit, aggregate across the same ROI family:
+
+| Condition | Mean sample sufficiency | Mean pixel sufficiency | Mean `level 0` sample frac | Mean `level-0-limited` sample frac |
+| --- | --- | --- | --- | --- |
+| `adaptive` | `1.000000` | `1.000000` | `0.995913` | `0.000000` |
+| `coarse_l1` | `0.838051` | `0.038210` | `1.000000` | `0.161949` |
+| `coarse_l2` | `0.077649` | `0.000000` | `1.000000` | `0.922351` |
 
 Per-ROI retained DVR result:
 
@@ -1644,3 +1656,49 @@ Interpretation:
   selecting detail levels that are substantially closer to the native resident
   render than globally forced coarse levels, at least for this retained ROI set
   and this zoomed screen-space demand.
+- The audit numbers are consistent with that image-based result:
+  - `adaptive` is screen-space sufficient across the retained ROIs and is almost
+    entirely using `level 0` at this zoom (`0.995913` mean `level 0` sample fraction).
+  - `coarse_l1` and especially `coarse_l2` remain locked to their own source
+    `level 0`, and large fractions of those contributing samples are
+    `level-0-limited` under the same screen-space demand.
+
+## Retained MIP Result
+
+This retained MIP result is a secondary zoomed-in native-data check. It is not
+the planned primary MIP validation. The next primary MIP experiment should be a
+phantom-based minification / phase-stability test, because screenshot-space
+similarity against a forced `level 0` reference still does not fully capture
+MIP aliasing and continuity behavior under minification.
+
+Aggregate across the retained ROI family, using final screenshot pixels as the
+metric basis:
+
+| Condition | Count | Mean SSIM | Mean abs diff | Mean P95 abs diff | Mean max abs diff |
+| --- | --- | --- | --- | --- | --- |
+| `adaptive` | `4` | `0.797618` | `17.609` | `60.750` | `201.500` |
+| `coarse_l1` | `4` | `0.779350` | `21.307` | `61.750` | `165.250` |
+| `coarse_l2` | `4` | `0.501413` | `40.917` | `111.250` | `207.500` |
+
+Per-ROI retained MIP result:
+
+| ROI | `adaptive` SSIM | `adaptive` mean abs diff | `adaptive` P95 abs diff | `coarse_l1` SSIM | `coarse_l1` mean abs diff | `coarse_l1` P95 abs diff | `coarse_l2` SSIM | `coarse_l2` mean abs diff | `coarse_l2` P95 abs diff |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `roi01_cx16800_cy4300` | `0.781703` | `16.464` | `58.000` | `0.792878` | `16.525` | `54.000` | `0.521412` | `30.249` | `106.000` |
+| `roi02_cx13600_cy7100` | `0.799548` | `13.372` | `46.000` | `0.781035` | `16.340` | `46.000` | `0.510550` | `31.353` | `82.000` |
+| `roi03_cx10500_cy10000` | `0.770531` | `22.190` | `71.000` | `0.730745` | `28.841` | `75.000` | `0.396985` | `52.982` | `127.000` |
+| `roi04_cx4100_cy10000` | `0.838690` | `18.409` | `68.000` | `0.812740` | `23.523` | `72.000` | `0.576705` | `49.085` | `130.000` |
+
+Interpretation:
+
+- This screenshot-space MIP check is user-facing and consistent with the DVR
+  presentation. `adaptive` is better than both forced coarse controls on the
+  aggregate, and much better than `coarse_l2`.
+- `roi01_cx16800_cy4300` remains a near-tie case: `coarse_l1` is slightly ahead
+  on SSIM and P95 abs diff there, while mean abs diff is essentially equal.
+- `roi02_cx13600_cy7100` and `roi04_cx4100_cy10000` favor `adaptive`.
+- `roi03_cx10500_cy10000` also favors `adaptive` clearly under the screenshot
+  metric.
+- This is why the retained MIP result should be treated as a secondary check,
+  while the primary MIP validation should move to a phantom-based minification /
+  phase-stability experiment.
