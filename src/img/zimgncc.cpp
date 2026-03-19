@@ -114,9 +114,9 @@ void normXCorr(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOver
   numberOfOverlapVoxelsImg =
     numberOfOverlapVoxelsImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth());
 
-  // fixedImg.write("/Users/feng/Downloads/test_xcorr_fixedImg.tif");
-  // movingImg.write("/Users/feng/Downloads/test_xcorr_movingImg.tif");
-  // numberOfOverlapPixels.write("/Users/feng/Downloads/test_xcorr_overlap.tif");
+  // fixedImg.write("~/Downloads/test_xcorr_fixedImg.tif");
+  // movingImg.write("~/Downloads/test_xcorr_movingImg.tif");
+  // numberOfOverlapPixels.write("~/Downloads/test_xcorr_overlap.tif");
 
   ZImg localSumFixed = fixedImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth()); // 2
   ZImg localSumMoving = movingImg.blockSum(fixedImg.width(), fixedImg.height(), fixedImg.depth()); // 3
@@ -131,7 +131,7 @@ void normXCorr(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOver
   numberOfOverlapVoxelsImg.clear(); // 3
 
   nccImg = xCorrFFT(fixedImg, movingImg, false); // 4
-  // numerator.write("/Users/feng/Downloads/test_xcorr_afterfftcorr.tif");
+  // numerator.write("~/Downloads/test_xcorr_afterfftcorr.tif");
   nccImg -= numeratorPart;
   numeratorPart.clear(); // 3
 
@@ -159,9 +159,9 @@ void normXCorr(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOver
   denom *= denomFixed;
   denomFixed.clear(); // 2
 
-  // denom.write("/Users/feng/Downloads/test_xcorr_denom.tif");
+  // denom.write("~/Downloads/test_xcorr_denom.tif");
 
-  // numerator.write("/Users/feng/Downloads/test_xcorr_numerator.tif");
+  // numerator.write("~/Downloads/test_xcorr_numerator.tif");
   nccImg.typedBinaryOperation<double, double>(denom, secureDivideSqrt2);
   denom.clear(); // 1
 
@@ -191,7 +191,7 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
 
   // VLOG(1) << "1";
   nccImg = xCorrFFT(fixedImg, movingImg, false); // 1, I think peak is 3
-  // numerator.write(QString("/Users/feng/Downloads/test_xcorr_fftxcorr%1.tif").arg(m_fixedImg.width()));
+  // numerator.write(QString("~/Downloads/test_xcorr_fftxcorr%1.tif").arg(m_fixedImg.width()));
   // VLOG(1) << "2";
   ZImg numeratorPart = fixedImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth()); // 2
   // VLOG(1) << "3";
@@ -211,7 +211,7 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
   nccImg -= numeratorPart;
   // VLOG(1) << "2";
   numeratorPart.clear(); // 2
-  // numerator.write(QString("/Users/feng/Downloads/test_xcorr_numerator%1.tif").arg(m_fixedImg.width()));
+  // numerator.write(QString("~/Downloads/test_xcorr_numerator%1.tif").arg(m_fixedImg.width()));
 
   // VLOG(1) << "3";
   ZImg localSumFixed = fixedImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth()); // 3
@@ -232,7 +232,7 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
   localSumFixed.clear(); // 2
   denomFixed.typedUnaryOperation<double>(removeNegative);
 
-  // denomFixed.write(QString("/Users/feng/Downloads/test_xcorr_df%1.tif").arg(m_fixedImg.width()));
+  // denomFixed.write(QString("~/Downloads/test_xcorr_df%1.tif").arg(m_fixedImg.width()));
   nccImg.typedBinaryOperation<double, double>(denomFixed, secureDivideSqrt);
   // VLOG(1) << "1";
   denomFixed.clear(); // 1
@@ -266,12 +266,12 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
   size_t movingImgDepth = movingImg.depth();
   movingImg.clear();
 
-  // denom.write(QString("/Users/feng/Downloads/test_xcorr_dm%1.tif").arg(m_fixedImg.width()));
+  // denom.write(QString("~/Downloads/test_xcorr_dm%1.tif").arg(m_fixedImg.width()));
   nccImg.typedBinaryOperation<double, double>(denom, secureDivideSqrt2);
   // VLOG(1) << "1";
   denom.clear(); // 1
 
-  // numerator.write("/Users/feng/Downloads/test_xcorr_res.tif");
+  // numerator.write("~/Downloads/test_xcorr_res.tif");
 
   // VLOG(1) << "2";
   numberOfOverlapVoxelsImg = ZImg(info); // 2
@@ -335,10 +335,10 @@ void normXCorrPart(ZImg& fixedImg,
   //  ZImgRegion rgn(xStart, xEnd, yStart, yEnd, zStart, zEnd);
   //  nop = nop.crop(rgn);
 
-  // fixedImg.write("/Users/feng/Downloads/test_xcorr_fixedImg.tif");
-  // movingImg.write("/Users/feng/Downloads/test_xcorr_movingImg.tif");
-  // numberOfOverlapPixels.write("/Users/feng/Downloads/test_xcorr_overlap.tif");
-  // nop.write("/Users/feng/Downloads/test_xcorr_overlap1.tif");
+  // fixedImg.write("~/Downloads/test_xcorr_fixedImg.tif");
+  // movingImg.write("~/Downloads/test_xcorr_movingImg.tif");
+  // numberOfOverlapPixels.write("~/Downloads/test_xcorr_overlap.tif");
+  // nop.write("~/Downloads/test_xcorr_overlap1.tif");
 
   ZImg localSumFixed = fixedImg.blockSumPart(movingImg.width(),
                                              movingImg.height(),
@@ -360,7 +360,7 @@ void normXCorrPart(ZImg& fixedImg,
   localSumMoving *= localSumMoving;
   localSumMoving /= numberOfOverlapVoxelsImg;
 
-  // numerator.write("/Users/feng/Downloads/test_xcorr_afterfftcorr.tif");
+  // numerator.write("~/Downloads/test_xcorr_afterfftcorr.tif");
   nccImg -= numeratorPart;
   numeratorPart.clear(); //
 
@@ -398,9 +398,9 @@ void normXCorrPart(ZImg& fixedImg,
   denom *= denomFixed;
   denomFixed.clear(); //
 
-  // denom.write("/Users/feng/Downloads/test_xcorr_denom.tif");
+  // denom.write("~/Downloads/test_xcorr_denom.tif");
 
-  // numerator.write("/Users/feng/Downloads/test_xcorr_numerator.tif");
+  // numerator.write("~/Downloads/test_xcorr_numerator.tif");
   nccImg.typedBinaryOperation<double, double>(denom, secureDivideSqrt2);
 }
 
@@ -418,17 +418,17 @@ ZImg xCorrFFT(const ZImg& fixedImg, ZImg& movingImg, bool reflectMovingImg)
   ZComplexImg cfixed = fft(fixedImg, optimalWidth, optimalHeight, optimalDepth);
   // ZImg img;
   // img.mapData(reinterpret_cast<double*>(cfixed.rawData()), cfixed.width()*2, cfixed.height(), cfixed.depth());
-  // img.write("/Users/feng/Downloads/test_xcorr_fixedfft.tif");
+  // img.write("~/Downloads/test_xcorr_fixedfft.tif");
   if (reflectMovingImg) {
     cfixed *= fft(movingImg.reflect(), optimalWidth, optimalHeight, optimalDepth);
     movingImg.reflect();
   } else {
     //    ZComplexImg tmp = fft(movingImg, optimalWidth, optimalHeight, optimalDepth);
     //    img.mapData(reinterpret_cast<double*>(tmp.rawData()), tmp.width()*2, tmp.height(), tmp.depth());
-    //    img.write("/Users/feng/Downloads/test_xcorr_movingfft.tif");
+    //    img.write("~/Downloads/test_xcorr_movingfft.tif");
     cfixed *= fft(movingImg, optimalWidth, optimalHeight, optimalDepth);
     // img.mapData(reinterpret_cast<double*>(cfixed.rawData()), cfixed.width()*2, cfixed.height(), cfixed.depth());
-    // img.write("/Users/feng/Downloads/test_xcorr_fixedmovingfft.tif");
+    // img.write("~/Downloads/test_xcorr_fixedmovingfft.tif");
   }
   return ifft(cfixed, optimalWidth, outWidth, outHeight, outDepth);
 }

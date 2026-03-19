@@ -639,7 +639,7 @@ void image3DFilter(const TPixel* img,
              boundaryValue);
   // bt.stopAndPrint();
 
-  // image3DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
+  // image3DWrite(padImg.data(), desWidth, desHeight, "~/Downloads/padImg.tif");
 
   std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedKernel;
   alignedKernel.insert(alignedKernel.end(), kernel, kernel + kernelWidth * kernelHeight * kernelDepth);
@@ -710,7 +710,7 @@ void image3DFilter(const TPixel* img,
              boundaryValue);
   // bt.stopAndPrint();
 
-  // image3DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
+  // image3DWrite(padImg.data(), desWidth, desHeight, "~/Downloads/padImg.tif");
 
   std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedRowKernel;
   std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedColKernel;

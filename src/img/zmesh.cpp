@@ -1406,7 +1406,7 @@ void ZMesh::createSwcMesh(const ZSwc& tree,
     }
     meshes.push_back(createTubeMesh(line, radius));
     //    if (i < 20) {
-    //      meshes[meshes.size()-1].save(QString("/Users/feng/Downloads/tubetest%1.obj").arg(i++));
+    //      meshes[meshes.size()-1].save(QString("~/Downloads/tubetest%1.obj").arg(i++));
     //    }
     //    VLOG(1) << branch[0]->type;
   }
@@ -1426,12 +1426,12 @@ void ZMesh::createSwcMesh(const ZSwc& tree,
   //    prop = meshes[i].properties();
   //    logProperties(prop);
   //    sumVolume += prop.volume;
-  ////    meshes[i].save("/Users/feng/Downloads/curtest.obj");
-  ////    meshes[i-1].save("/Users/feng/Downloads/prevtest.obj");
+  ////    meshes[i].save("~/Downloads/curtest.obj");
+  ////    meshes[i-1].save("~/Downloads/prevtest.obj");
   //    res = unite(res, meshes[i]);
   //    prop = res.properties();
   //    logProperties(prop, "Merge Result");
-  //    res.save("/Users/feng/Downloads/combtest.obj");
+  //    res.save("~/Downloads/combtest.obj");
   //  }
   //  VLOG(1) << sumVolume;
   //  return res;

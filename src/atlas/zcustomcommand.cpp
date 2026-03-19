@@ -35,12 +35,21 @@
 #include <QApplication>
 #include <tbb/global_control.h>
 
+namespace {
+
+QString homePath(const char* suffix)
+{
+  return QDir::homePath() + QString::fromUtf8(suffix);
+}
+
+} // namespace
+
 namespace nim {
 
 void zoomPVRawImages()
 {
   QDir dir("/Volumes/lq/pvdata/");
-  QString outFolder("/Users/feng/Documents/image/High_LowPV_ipsi_contra/");
+  QString outFolder(homePath("/Documents/image/High_LowPV_ipsi_contra/"));
   QStringList filters;
   filters << "*.raw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -54,8 +63,8 @@ void zoomPVRawImages()
 
 void zoomRefBrainSlices()
 {
-  QDir dir("/Users/feng/Documents/image/sua/From AxioScan/5xbrain/");
-  QString outFolder("/Users/feng/Documents/image/sua/From AxioScan/ds/");
+  QDir dir(homePath("/Documents/image/sua/From AxioScan/5xbrain/"));
+  QString outFolder(homePath("/Documents/image/sua/From AxioScan/ds/"));
   QStringList filters;
   filters << "*.ome.tiff";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -69,8 +78,8 @@ void zoomRefBrainSlices()
 
 void zoomRefBrainSlices2()
 {
-  QDir dir("/Users/feng/Documents/image/sua/5xbrain2/");
-  QString outFolder("/Users/feng/Documents/image/sua/ds2/");
+  QDir dir(homePath("/Documents/image/sua/5xbrain2/"));
+  QString outFolder(homePath("/Documents/image/sua/ds2/"));
   QStringList filters;
   filters << "*.ome.tiff";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -96,7 +105,7 @@ void resliceImg()
   tfm.setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant));
   ZAffine3D tform(R[0][0], R[1][0], R[2][0], 0, R[0][1], R[1][1], R[2][1], 0, R[0][2], R[1][2], R[2][2], 0);
   tfm.setTransform(tform);
-  ZImg img("/Users/feng/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/inj.tif");
+  ZImg img(homePath("/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/inj.tif"));
   double xMin, xMax, yMin, yMax, zMin, zMax;
   tfm.transformRange(0, img.width() - 1, 0, img.height() - 1, 0, img.depth() - 1, xMin, xMax, yMin, yMax, zMin, zMax);
   tfm.setTransform(tform);
@@ -117,7 +126,7 @@ void resliceImg()
                      std::floor(zMin),
                      std::ceil(zMax) + 1);
   imgOut.save(
-    "/Users/feng/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/resliced_inj_red.tif");
+    homePath("/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/resliced_inj_red.tif"));
 
   imgOut = ZImg(ZImgInfo(std::ceil(xMax) - std::floor(xMin) + 1,
                          std::ceil(yMax) - std::floor(yMin) + 1,
@@ -135,13 +144,13 @@ void resliceImg()
                      std::floor(zMin),
                      std::ceil(zMax) + 1);
   imgOut.save(
-    "/Users/feng/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/resliced_inj_green.tif");
+    homePath("/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/resliced_inj_green.tif"));
 }
 
 void atlasStep23()
 {
-  ZImg fixedImg("/Users/feng/Documents/image/allen/prealign_mask.tif");
-  ZImg movingImg("/Users/feng/Documents/image/allen/averageTemplate_cor_mask.tif");
+  ZImg fixedImg(homePath("/Documents/image/allen/prealign_mask.tif"));
+  ZImg movingImg(homePath("/Documents/image/allen/averageTemplate_cor_mask.tif"));
 
   ZImageToImageMetric metric;
   metric.setType(ZImageToImageMetric::Type::MeanSquaredDifferences);
@@ -179,13 +188,13 @@ void atlasStep23()
                            fixedImg.height(),
                            0,
                            fixedImg.depth());
-  res.save("/Users/feng/Documents/image/allen/averageTemplate_cor_mask_to_prealign.tif");
+  res.save(homePath("/Documents/image/allen/averageTemplate_cor_mask_to_prealign.tif"));
 }
 
 void convertImages()
 {
   QDir dir("/Volumes/lq/image/OsungImage/compressed_raw");
-  QString outFolder("/Users/feng/Documents/image/ipsi/");
+  QString outFolder(homePath("/Documents/image/ipsi/"));
   QStringList filters;
   filters << "*.tif";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -201,9 +210,9 @@ void convertImages()
 
 void downsampleImage()
 {
-  ZImg img("/Users/feng/Documents/image/bigimage_new/0515_3to33.raw", ZImgRegion(0, -1, 0, -1, 0, -1, 1, 2));
+  ZImg img(homePath("/Documents/image/bigimage_new/0515_3to33.raw"), ZImgRegion(0, -1, 0, -1, 0, -1, 1, 2));
   img.zoom(0.5, 0.5);
-  img.save("/Users/feng/Documents/image/bigimage_new/0515_3to33_ds.raw", FileFormat::Vaa3DRaw);
+  img.save(homePath("/Documents/image/bigimage_new/0515_3to33_ds.raw"), FileFormat::Vaa3DRaw);
 }
 
 void extractNeuronChannel()
@@ -211,7 +220,7 @@ void extractNeuronChannel()
   //  QDir dir("/Volumes/lq/image/mCA3_CA1_raw");
   //  QString outFolder("/Volumes/Jinny/");
   QDir dir("/Volumes/PVPY/Py");
-  QString outFolder("/Users/feng/Downloads/PyNeurons/");
+  QString outFolder(homePath("/Downloads/PyNeurons/"));
   QStringList filters;
   filters << "*.raw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -289,9 +298,9 @@ void convertImagesFormat()
 
 void testSWC()
 {
-  ZSwc swc("/Users/feng/Documents/image/bigimage_new/020910_B09ATbgsub.swc");
+  ZSwc swc(homePath("/Documents/image/bigimage_new/020910_B09ATbgsub.swc"));
   swc.labelSomaAndOthers(30);
-  swc.save("/Users/feng/Documents/image/bigimage_new/020910_B09ATbgsub_2.swc");
+  swc.save(homePath("/Documents/image/bigimage_new/020910_B09ATbgsub_2.swc"));
 }
 
 void resizeInjectionCoreImgs()
@@ -315,12 +324,12 @@ void resizeInjectionCoreImgs()
 
 void transfromMesh()
 {
-  QDir dir("/Users/feng/Downloads/all_obj/pial_Full");
+  QDir dir(homePath("/Downloads/all_obj/pial_Full"));
   QStringList filters;
   filters << "*.obj";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  list.append(QDir("/Users/feng/Downloads/all_obj").entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
-  QString outFolder = "/Users/feng/code/Neural-Network/models";
+  list.append(QDir(homePath("/Downloads/all_obj")).entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+  QString outFolder = homePath("/code/Neural-Network/models");
   glm::mat4 mat;
   nim::toVal("[1.03, 0, 0, 0; 0, 6.13928e-08, 1.03, 0; 0, -1.03, 6.13928e-08, 0; 0, 0, 0, 1]"sv, mat);
 
@@ -339,13 +348,13 @@ void transfromMesh()
 
 void transfromMesh2()
 {
-  QDir dir(
-    "/Users/feng/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain Common Coordinate Framework/Spaces/P56/Meshes");
+  QDir dir(homePath(
+    "/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain Common Coordinate Framework/Spaces/P56/Meshes"));
   QStringList filters;
   filters << "*.msh";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  list.append(QDir("/Users/feng/Downloads/all_obj").entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
-  QString outFolder = "/Users/feng/Downloads/gpe_stn_traj_mesh";
+  list.append(QDir(homePath("/Downloads/all_obj")).entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+  QString outFolder = homePath("/Downloads/gpe_stn_traj_mesh");
   glm::mat4 mat;
   nim::toVal("[5.96047e-09, 0, -0.1, 490.6; 0, 0.1, 0, -355.6; 0.1, 0, 5.96047e-09, -513.4; 0, 0, 0, 1]"sv, mat);
 
@@ -365,17 +374,17 @@ void transfromMesh2()
 void stnTrajectory()
 {
   std::set<QString> expBaseNames;
-  QDir dir("/Users/feng/Downloads/allen_stn_grid");
+  QDir dir(homePath("/Downloads/allen_stn_grid"));
   QStringList filters;
   filters << "*.nrrd";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_energy");
+  QDir outFolder(homePath("/Downloads/allen_stn_grid_traj_energy"));
   QString resolution = "50";
   tbb::global_control gc(tbb::global_control::max_allowed_parallelism, 8);
 
   ZTree<RegionNode> ontology;
   readMouseBrainAtlasOntology(ontology);
-  ZImg annotation(QString("/Users/feng/Documents/allen/CCFv3/ccf_2015/annotation_%1.nrrd").arg(resolution));
+  ZImg annotation(QString(homePath("/Documents/allen/CCFv3/ccf_2015/annotation_%1.nrrd")).arg(resolution));
   ZImg isoCortexMask(ZImgInfo(annotation.width(), annotation.height(), annotation.depth()));
   uint32_t stnID = idOfRegionAbbreviation("STN", ontology);
   std::vector<int64_t> cortexIDs = allIDsWithinRegionAbbreviation("Isocortex", ontology);
@@ -569,11 +578,11 @@ void stnTrajectory()
 
 void mergeTraces()
 {
-  QDir dir("/Users/feng/Downloads/allen_stn_grid_traj_1");
+  QDir dir(homePath("/Downloads/allen_stn_grid_traj_1"));
   QStringList filters;
   filters << "*.swc";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_clean");
+  QDir outFolder(homePath("/Downloads/allen_stn_grid_traj_clean"));
 
   for (const auto& fileInfo : list) {
     QString fileName = fileInfo.fileName();
@@ -632,8 +641,8 @@ void mergeTraces()
 
 void calcSwcVolume()
 {
-  QDir dir("/Users/feng/Documents/PV/AnalysisTextFiles");
-  QDir outFolder("/Users/feng/Documents/PV/mesh");
+  QDir dir(homePath("/Documents/PV/AnalysisTextFiles"));
+  QDir outFolder(homePath("/Documents/PV/mesh"));
   QStringList filters;
   QFileInfoList dirlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks | QDir::NoDotAndDotDot);
   // LOG(INFO) << dirlist.size() << " " << dirlist.at(0).absolutePath();
@@ -660,10 +669,10 @@ void calcSwcVolume()
 
 void changeImgCompressionType()
 {
-  // QDir dir("/Users/feng/Documents/PY/py_axonregion");
-  // QString outFolder("/Users/feng/Documents/PY/py_ar/");
-  QDir dir("/Users/feng/Documents/PV/pv_axonregion");
-  QString outFolder("/Users/feng/Documents/PV/pv_ar/");
+  // QDir dir(homePath("/Documents/PY/py_axonregion"));
+  // QString outFolder(homePath("/Documents/PY/py_ar/"));
+  QDir dir(homePath("/Documents/PV/pv_axonregion"));
+  QString outFolder(homePath("/Documents/PV/pv_ar/"));
   QStringList filters;
   filters << "*.tif";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -680,8 +689,8 @@ void changeImgCompressionType()
 
 void makeSWCPyramidal()
 {
-  QDir dir("/Users/feng/Documents/PY/PySWC");
-  QString outFolder("/Users/feng/Documents/PY/PySWC/");
+  QDir dir(homePath("/Documents/PY/PySWC"));
+  QString outFolder(homePath("/Documents/PY/PySWC/"));
   QStringList filters;
   filters << "*c.swc";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -888,7 +897,7 @@ void moveObjectToCorrectLocation(const QString& fn,
 void createCellTable()
 {
   QList<QStringList> metaData =
-    QtCSV::Reader::readToList("/Users/feng/code/mgrasp-analysis/pv_figs/orig_cell_props.csv");
+    QtCSV::Reader::readToList(homePath("/code/mgrasp-analysis/pv_figs/orig_cell_props.csv"));
   metaData.removeFirst();
 
   std::map<QString, int> somaLocationMap;
@@ -905,7 +914,7 @@ void createCellTable()
     }
   }
 
-  auto loadObj = loadJsonObject("/Users/feng/Downloads/template_cell.scene");
+  auto loadObj = loadJsonObject(homePath("/Downloads/template_cell.scene"));
   if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
     return;
   }
@@ -931,8 +940,8 @@ void createCellTable()
     cells[std::make_tuple(cellType, somaLocationOrder, AP, ML, cellName)] = std::make_tuple(somaLocation, r2);
 
     continue;
-    QString swcName = QString("/Users/feng/Documents/PV/PVSWC/%1_layer.swc").arg(cellName);
-    QString punctaName = QString("/Users/feng/Documents/PV/PVSWC/%1_neurite.nimp").arg(cellName);
+    QString swcName = QString(homePath("/Documents/PV/PVSWC/%1_layer.swc")).arg(cellName);
+    QString punctaName = QString(homePath("/Documents/PV/PVSWC/%1_neurite.nimp")).arg(cellName);
 
     for (auto& [key, value] : docObject) {
       QString qkey = QString::fromUtf8(key.data(), key.size());
@@ -949,7 +958,7 @@ void createCellTable()
       sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Y Cut FloatSpan");
       sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Z Cut FloatSpan");
     }
-    QString scnName = QString("/Users/feng/Downloads/cell_table/%1.scene").arg(cellName);
+    QString scnName = QString(homePath("/Downloads/cell_table/%1.scene")).arg(cellName);
 
     json::object saveObj;
     saveObj["Scene"] = sceneObj;
@@ -965,7 +974,7 @@ void createCellTable()
     view3d->zoomIn();
     view3d->zoomIn();
     QApplication::processEvents();
-    QString imgName = QString("/Users/feng/Downloads/cell_table/%1.tif").arg(cellName);
+    QString imgName = QString(homePath("/Downloads/cell_table/%1.tif")).arg(cellName);
     view3d->takeFixedSizeScreenShot(imgName, 512, 512, Z3DScreenShotType::MonoView);
     QApplication::processEvents();
   }
@@ -1006,7 +1015,7 @@ void checkSWC()
   }
   ZView* view = mainWin->view();
 
-  ZSwc swc("/Users/feng/Documents/bigimage_new/0515_15Py.swc");
+  ZSwc swc(homePath("/Documents/bigimage_new/0515_15Py.swc"));
 
   for (auto node : swc) {
     view->gotoPosition(node.x, node.y, node.z);
@@ -1076,20 +1085,20 @@ void fixImg()
   ZImgRegion rgn1;
   rgn1.start.z = 0;
   rgn1.end.z = 76;
-  ZImg img1("/Users/feng/Downloads/ChaehyunImage/c_fix.tif", rgn1);
+  ZImg img1(homePath("/Downloads/ChaehyunImage/c_fix.tif"), rgn1);
   ZImgRegion rgn2;
   rgn2.start.z = 76;
-  ZImg img2("/Users/feng/Downloads/ChaehyunImage/c_fix.tif", rgn2);
+  ZImg img2(homePath("/Downloads/ChaehyunImage/c_fix.tif"), rgn2);
   ZImg img = ZImg::cat(std::vector<const ZImg*>{&img2, &img1}, Dimension::Z);
-  img.save("/Users/feng/Downloads/ChaehyunImage/c_fix2.tif");
+  img.save(homePath("/Downloads/ChaehyunImage/c_fix2.tif"));
 }
 
 void qFileInfoTest()
 {
-  QString fn("/Users/feng/Downloads/non-ext.tif");
-  QString fon("/Users/feng/Downloads/non-exist/");
-  QString fon1("/Users/feng/Downloads/");
-  QString fon2("/Users/feng/Downloads");
+  QString fn(homePath("/Downloads/non-ext.tif"));
+  QString fon(homePath("/Downloads/non-exist/"));
+  QString fon1(homePath("/Downloads/"));
+  QString fon2(homePath("/Downloads"));
   LOG(INFO) << QFileInfo(fn).canonicalPath();
   LOG(INFO) << QFileInfo(fn).canonicalFilePath();
   LOG(INFO) << QFileInfo(fn).absolutePath();
@@ -1189,7 +1198,7 @@ void detectPuncta()
 
 void changeDapifileType()
 {
-  QDir dir("/Users/feng/Documents/dapi_detection_dataset/JK575-1_RNAscope_PV-Gria1-Gabra1/");
+  QDir dir(homePath("/Documents/dapi_detection_dataset/JK575-1_RNAscope_PV-Gria1-Gabra1/"));
 
   QStringList filters;
   filters << "JK575-*";
@@ -1303,7 +1312,7 @@ void convertPYRawToNim()
 
 void channelCalibration()
 {
-  QDir dir("/Users/feng/Google Drive/confocal calibration");
+  QDir dir(homePath("/Google Drive/confocal calibration"));
   QStringList filters;
   filters << "*.lsm";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -1323,12 +1332,12 @@ void channelCalibration()
 
 void createPunctaMesh()
 {
-  ZPuncta pun("/Users/feng/Documents/PY/PySWC/Py0515_s15_1_1_1c_puncta.apo");
+  ZPuncta pun(homePath("/Documents/PY/PySWC/Py0515_s15_1_1_1c_puncta.apo"));
   ZMesh mesh;
   glm::mat4 tfm(1.f);
   tfm[2][2] = 5.f;
   ZMesh::createPunctaMesh(pun, mesh, 8, tfm);
-  mesh.save("/Users/feng/Google Drive/eeum/scene/Py0515_s15_1_1_1c_puncta.stl");
+  mesh.save(homePath("/Google Drive/eeum/scene/Py0515_s15_1_1_1c_puncta.stl"));
 }
 
 void createGlanceThumbnails()
@@ -1345,14 +1354,14 @@ void createGlanceThumbnails()
   templateName.emplace_back("pc_thumbnail_template.scene");
   templateName.emplace_back("pv_thumbnail_template.scene");
   std::vector<QString> swcDirs;
-  swcDirs.emplace_back("/Users/feng/Documents/PY/PySWC");
-  swcDirs.emplace_back("/Users/feng/Documents/PV/PVSWC");
+  swcDirs.emplace_back(homePath("/Documents/PY/PySWC"));
+  swcDirs.emplace_back(homePath("/Documents/PV/PVSWC"));
   std::vector<QString> punctaSuffix;
   punctaSuffix.emplace_back("_puncta.apo");
   punctaSuffix.emplace_back("_neurite.nimp");
 
   for (size_t ti = 0; ti < templateName.size(); ++ti) {
-    auto loadObj = loadJsonObject(QString("/Users/feng/Google Drive/eeum/raw/%1").arg(templateName[ti]));
+    auto loadObj = loadJsonObject(QString(homePath("/Google Drive/eeum/raw/%1")).arg(templateName[ti]));
     if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
       return;
     }
@@ -1389,7 +1398,7 @@ void createGlanceThumbnails()
         sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Y Cut FloatSpan");
         sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Z Cut FloatSpan");
       }
-      QString scnName = QString("/Users/feng/Google Drive/eeum/raw/thumbnails/%1.scene").arg(cellName);
+      QString scnName = QString(homePath("/Google Drive/eeum/raw/thumbnails/%1.scene")).arg(cellName);
 
       json::object saveObj;
       saveObj["Scene"] = sceneObj;
@@ -1404,7 +1413,7 @@ void createGlanceThumbnails()
       view3d->zoomIn();
       // view3d->zoomInAction()->trigger();
       QApplication::processEvents();
-      QString imgName = QString("/Users/feng/Google Drive/eeum/raw/thumbnails/%1.tif").arg(cellName);
+      QString imgName = QString(homePath("/Google Drive/eeum/raw/thumbnails/%1.tif")).arg(cellName);
       view3d->takeFixedSizeScreenShot(imgName, 1024, 1024, Z3DScreenShotType::MonoView);
       QApplication::processEvents();
     }
@@ -1434,7 +1443,7 @@ void exportSceneForGlance()
         LOG(INFO) << doc->objName(id);
         LOG(INFO) << filter->coordTransform();
         auto meshList = doc->meshList(id);
-        QString name = QString("/Users/feng/Google Drive/eeum/static/data/%1.vtp").arg(doc->objName(id));
+        QString name = QString(homePath("/Google Drive/eeum/static/data/%1.vtp")).arg(doc->objName(id));
         ZMesh mesh = *meshList->at(0);
         mesh.transformVerticesByMatrix(filter->coordTransform());
         mesh.generateNormals();
@@ -1458,9 +1467,9 @@ void exportSceneForGlance()
         rootMesh.generateNormals();
         somaMesh.generateNormals();
         branchMesh.generateNormals();
-        rootMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_root.vtp").arg(doc->objName(id)));
-        somaMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_soma.vtp").arg(doc->objName(id)));
-        branchMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.vtp").arg(doc->objName(id)));
+        rootMesh.save(QString(homePath("/Google Drive/eeum/static/data/%1_root.vtp")).arg(doc->objName(id)));
+        somaMesh.save(QString(homePath("/Google Drive/eeum/static/data/%1_soma.vtp")).arg(doc->objName(id)));
+        branchMesh.save(QString(homePath("/Google Drive/eeum/static/data/%1_neurite.vtp")).arg(doc->objName(id)));
         QString cellname = doc->objName(id);
         cellnames.push_back(cellname);
       }
@@ -1477,7 +1486,7 @@ void exportSceneForGlance()
         ZMesh mesh;
         ZMesh::createPunctaMesh(puncta.puncta(), mesh, 8, filter->coordTransform());
         mesh.generateNormals();
-        mesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1.vtp").arg(doc->objName(id)));
+        mesh.save(QString(homePath("/Google Drive/eeum/static/data/%1.vtp")).arg(doc->objName(id)));
       }
     }
   }
@@ -1485,13 +1494,13 @@ void exportSceneForGlance()
   json::array allObjs;
   for (auto cellname : cellnames) {
     QStringList fileList;
-    QString somaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_soma.vtp").arg(cellname);
+    QString somaMeshName = QString(homePath("/Google Drive/eeum/static/data/%1_soma.vtp")).arg(cellname);
     fileList.push_back(somaMeshName);
     QString somaMeshFileName = QString("%1_soma.vtp").arg(cellname);
-    QString branchMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.vtp").arg(cellname);
+    QString branchMeshName = QString(homePath("/Google Drive/eeum/static/data/%1_neurite.vtp")).arg(cellname);
     fileList.push_back(branchMeshName);
     QString branchMeshFileName = QString("%1_neurite.vtp").arg(cellname);
-    QString rootMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_root.vtp").arg(cellname);
+    QString rootMeshName = QString(homePath("/Google Drive/eeum/static/data/%1_root.vtp")).arg(cellname);
     QString rootMeshFileName = QString("%1_root.vtp").arg(cellname);
     LOG(INFO) << cellname;
     auto truncatePos = cellname.indexOf("_layer.swc", Qt::CaseInsensitive);
@@ -1501,10 +1510,10 @@ void exportSceneForGlance()
     LOG(INFO) << truncatePos;
     cellname.truncate(truncatePos);
     LOG(INFO) << cellname;
-    QString punctaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_puncta.apo.vtp").arg(cellname);
+    QString punctaMeshName = QString(homePath("/Google Drive/eeum/static/data/%1_puncta.apo.vtp")).arg(cellname);
     QString punctaMeshFileName = QString("%1_puncta.apo.vtp").arg(cellname);
     if (!QFile::exists(punctaMeshName)) {
-      punctaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.nimp.vtp").arg(cellname);
+      punctaMeshName = QString(homePath("/Google Drive/eeum/static/data/%1_neurite.nimp.vtp")).arg(cellname);
       punctaMeshFileName = QString("%1_neurite.nimp.vtp").arg(cellname);
     }
     CHECK(QFile::exists(punctaMeshName)) << punctaMeshName;
@@ -1543,7 +1552,7 @@ void exportSceneForGlance()
     allObjs.push_back(obj);
   }
 
-  QString scnName = QString("/Users/feng/Google Drive/eeum/raw/meshes/allObjs.json");
+  QString scnName = QString(homePath("/Google Drive/eeum/raw/meshes/allObjs.json"));
 
   saveJsonArray(allObjs, scnName);
 }
@@ -1666,14 +1675,14 @@ void stitchAndDetectPuncta()
 
 void testDetectPuncta()
 {
-  ZPunctaDetection pd("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw", 0);
-  pd.setLogFile("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.log");
-  pd.setResultPunctaFilename("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.nimp");
+  ZPunctaDetection pd(homePath("/Documents/bigimage_new/0515_3to33_crop.raw"), 0);
+  pd.setLogFile(homePath("/Documents/bigimage_new/0515_3to33_crop.raw_puncta.log"));
+  pd.setResultPunctaFilename(homePath("/Documents/bigimage_new/0515_3to33_crop.raw_puncta.nimp"));
   pd.run();
 
-  ZPunctaDetection pd2("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw", 0);
-  pd2.setLogFile("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.log");
-  pd2.setResultPunctaFilename("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.nimp");
+  ZPunctaDetection pd2(homePath("/Documents/bigimage_new/0515_3to33_crop.raw"), 0);
+  pd2.setLogFile(homePath("/Documents/bigimage_new/0515_3to33_crop.raw_puncta.log"));
+  pd2.setResultPunctaFilename(homePath("/Documents/bigimage_new/0515_3to33_crop.raw_puncta.nimp"));
   pd2.run();
 
   LOG(WARNING) << "abc";
@@ -1696,8 +1705,8 @@ void cutZeroRegion()
 
 void swapMeshXY()
 {
-  QDir dir(
-    "/Users/feng/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain Common Coordinate Framework/Spaces/P56/Meshes");
+  QDir dir(homePath(
+    "/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain Common Coordinate Framework/Spaces/P56/Meshes"));
   QStringList filters;
   filters << "*.msh";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -1714,7 +1723,7 @@ void swapMeshXY()
 void createPCCellTable()
 {
   QList<QStringList> metaData =
-    QtCSV::Reader::readToList("/Users/feng/code/mgrasp-analysis/pv_figs_1.0/orig_cell_props.csv");
+    QtCSV::Reader::readToList(homePath("/code/mgrasp-analysis/pv_figs_1.0/orig_cell_props.csv"));
   metaData.removeFirst();
 
   std::map<QString, int> somaLocationMap;
@@ -1731,7 +1740,7 @@ void createPCCellTable()
     }
   }
 
-  auto loadObj = loadJsonObject("/Users/feng/Downloads/template_cell.scene");
+  auto loadObj = loadJsonObject(homePath("/Downloads/template_cell.scene"));
   if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
     return;
   }
@@ -1773,7 +1782,7 @@ void createPCCellTable()
       sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Y Cut FloatSpan");
       sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Z Cut FloatSpan");
     }
-    QString scnName = QString("/Users/feng/Desktop/cell_table_pc/%1.scene").arg(cellName);
+    QString scnName = QString(homePath("/Desktop/cell_table_pc/%1.scene")).arg(cellName);
 
     json::object saveObj;
     saveObj["Scene"] = sceneObj;
@@ -1788,7 +1797,7 @@ void createPCCellTable()
     view3d->zoomIn();
     view3d->zoomIn();
     QApplication::processEvents();
-    QString imgName = QString("/Users/feng/Desktop/cell_table_pc/%1.tif").arg(cellName);
+    QString imgName = QString(homePath("/Desktop/cell_table_pc/%1.tif")).arg(cellName);
     view3d->takeFixedSizeScreenShot(imgName, 512, 512, Z3DScreenShotType::MonoView);
     QApplication::processEvents();
   }
@@ -1866,7 +1875,7 @@ void createEeumIndexImages()
   for (size_t ti = 0; ti < 180; ++ti) {
     mainWin->view()->slicePara().set(ti);
     QApplication::processEvents();
-    auto imgName = QString("/Users/feng/code/eeum/static/slices/slice_%1.png").arg(ti);
+    auto imgName = QString(homePath("/code/eeum/static/slices/slice_%1.png")).arg(ti);
     mainWin->view()->takeFixedSizeScreenShot(imgName, 512, 512);
     QApplication::processEvents();
   }

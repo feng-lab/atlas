@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+HOME = Path.home()
+
 
 OPEN_METRICS = (
     "open_load_and_camera_ms",
@@ -149,7 +151,10 @@ def _preview_to_final_client_ms(
 def _parse_args() -> argparse.Namespace:
     script_dir = Path(__file__).resolve().parent
     default_output_root = (
-        Path("/Users/feng/Dropbox/atlas_test/slice15_paraview")
+        HOME
+        / "Dropbox"
+        / "atlas_test"
+        / "slice15_paraview"
         / "benchmarks"
         / f"atlas_deterministic_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     )
@@ -166,12 +171,24 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset",
-        default="/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim",
+        default=str(
+            HOME
+            / "Dropbox"
+            / "atlas_test"
+            / "slice15_paraview"
+            / "slice15_ch2_dense.nim"
+        ),
         help="Atlas dataset path",
     )
     parser.add_argument(
         "--camera-spec",
-        default="/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json",
+        default=str(
+            HOME
+            / "Dropbox"
+            / "atlas_test"
+            / "slice15_paraview"
+            / "slice15_scene_camera_exact_2000x1500.json"
+        ),
         help="Shared benchmark camera spec",
     )
     parser.add_argument(

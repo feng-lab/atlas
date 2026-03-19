@@ -10,6 +10,7 @@ from typing import Any
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+HOME = Path.home()
 
 
 @dataclass(frozen=True)
@@ -34,8 +35,8 @@ class GuiSessionSpec:
     aggregate_summary_path: Path
 
 
-SLICE15_ROOT = Path("/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks")
-LARGE_ROOT = Path("/Users/feng/code/atlas/large_test_image/benchmarks")
+SLICE15_ROOT = HOME / "Dropbox" / "atlas_test" / "slice15_paraview" / "benchmarks"
+LARGE_ROOT = HOME / "code" / "atlas" / "large_test_image" / "benchmarks"
 
 
 RETAINED_SESSIONS: tuple[SessionSpec, ...] = (
@@ -223,7 +224,7 @@ RETAINED_GUI_SESSIONS: tuple[GuiSessionSpec, ...] = (
         render_mode="GPU Based + maximum-intensity",
         drag_duration_seconds=0.5,
         aggregate_summary_path=SLICE15_ROOT
-        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v3_centercrop/aggregate/summary.json",
+        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v4_centercrop_120hzinput/aggregate/summary.json",
     ),
     GuiSessionSpec(
         suite="short_rotate_0p5s",
@@ -233,8 +234,8 @@ RETAINED_GUI_SESSIONS: tuple[GuiSessionSpec, ...] = (
         input_desc="Dense .nim",
         render_mode="Maximum Intensity Projection",
         drag_duration_seconds=0.5,
-        aggregate_summary_path=SLICE15_ROOT
-        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_v4_centercrop/aggregate/summary.json",
+        aggregate_summary_path=LARGE_ROOT
+        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_v7_centercrop_120hzinput_cancelcheckv2/aggregate/summary.json",
     ),
     GuiSessionSpec(
         suite="sustained_rotate_5p0s",
@@ -245,7 +246,7 @@ RETAINED_GUI_SESSIONS: tuple[GuiSessionSpec, ...] = (
         render_mode="GPU Based + maximum-intensity",
         drag_duration_seconds=5.0,
         aggregate_summary_path=SLICE15_ROOT
-        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate5s_v2_centercrop/aggregate/summary.json",
+        / "paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate5s_v3_centercrop_120hzinput/aggregate/summary.json",
     ),
     GuiSessionSpec(
         suite="sustained_rotate_5p0s",
@@ -255,8 +256,8 @@ RETAINED_GUI_SESSIONS: tuple[GuiSessionSpec, ...] = (
         input_desc="Dense .nim",
         render_mode="Maximum Intensity Projection",
         drag_duration_seconds=5.0,
-        aggregate_summary_path=SLICE15_ROOT
-        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate5s_v2_centercrop/aggregate/summary.json",
+        aggregate_summary_path=LARGE_ROOT
+        / "atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate5s_v6_centercrop_120hzinput_cancelcheckv3_rerun2/aggregate/summary.json",
     ),
 )
 
@@ -284,6 +285,13 @@ def _format_float(value: float | None, digits: int = 3) -> str:
     return f"{value:.{digits}f}"
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return f"~/{path.resolve().relative_to(HOME.resolve())}"
+    except ValueError:
+        return str(path)
+
+
 def _paraview_row(spec: SessionSpec, summary: dict[str, Any]) -> dict[str, str]:
     action_metric_stats = summary["action_metric_stats"]
     pooled_frame_stats = summary["pooled_frame_stats"]
@@ -294,7 +302,7 @@ def _paraview_row(spec: SessionSpec, summary: dict[str, Any]) -> dict[str, str]:
         "software": "ParaView",
         "input": spec.input_desc,
         "render_mode": spec.render_mode,
-        "aggregate_summary_path": str(spec.aggregate_summary_path),
+        "aggregate_summary_path": _display_path(spec.aggregate_summary_path),
         "open_first_preview_ms": "",
         "open_final_ms": _format_float(
             _mean(
@@ -346,7 +354,7 @@ def _atlas_row(spec: SessionSpec, summary: dict[str, Any]) -> dict[str, str]:
         "software": "Atlas",
         "input": spec.input_desc,
         "render_mode": spec.render_mode,
-        "aggregate_summary_path": str(spec.aggregate_summary_path),
+        "aggregate_summary_path": _display_path(spec.aggregate_summary_path),
         "open_first_preview_ms": _format_float(
             _mean(open_metric_stats["open_total_to_first_preview_ms"])
         ),
@@ -424,7 +432,7 @@ def _gui_row(spec: GuiSessionSpec, summary: dict[str, Any]) -> dict[str, str]:
             _gui_metric_mean(summary, "capture_stable_ms_from_end")
         ),
         "capture_hz": _format_float(_gui_metric_mean(summary, "observed_sample_hz")),
-        "aggregate_summary_path": str(spec.aggregate_summary_path),
+        "aggregate_summary_path": _display_path(spec.aggregate_summary_path),
     }
 
 

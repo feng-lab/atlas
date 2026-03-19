@@ -1,9 +1,11 @@
 # Volume Benchmark Scripts
 
-These scripts under `/Users/feng/code/atlas/util/benchmark/` provide a shared benchmark workflow for Atlas and ParaView:
+These scripts under `~/code/atlas/util/benchmark/` provide a shared benchmark workflow for Atlas, ParaView, and napari:
 
 - `atlas_volume_benchmark.py`: drives Atlas through Scene RPC
 - `atlas_deterministic_batch.py`: runs 1 warm-up + N measured deterministic Atlas runs and aggregates stats
+- `napari_volume_benchmark.py`: drives napari from a conda environment and captures fixed-size screenshots
+- `napari_deterministic_batch.py`: runs repeated deterministic napari runs and aggregates the exported step timings
 - `paraview_volume_benchmark.py`: drives ParaView through `pvpython`
 - `paraview_deterministic_batch.py`: runs 1 warm-up + N measured deterministic ParaView runs and aggregates stats
 - `volume_benchmark_capture.py`: captures a fixed screen region and computes first-visible / final-stable timings
@@ -14,6 +16,7 @@ These scripts under `/Users/feng/code/atlas/util/benchmark/` provide a shared be
 Each driver writes a JSONL event log:
 
 - Atlas: `atlas_events.jsonl`
+- napari: `napari_events.jsonl`
 - ParaView: `paraview_events.jsonl`
 
 The capture observer reads one of those files and writes a timing summary JSON.
@@ -47,11 +50,11 @@ The same file is accepted by both Atlas and ParaView. Atlas-specific typed camer
 Start Atlas with the Scene RPC server available, then run:
 
 ```bash
-source /Users/feng/miniconda3/etc/profile.d/conda.sh
+source ~/miniconda3/etc/profile.d/conda.sh
 conda activate pt12
-python /Users/feng/code/atlas/util/benchmark/atlas_volume_benchmark.py \
-  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim \
-  --camera-spec /Users/feng/code/atlas/util/benchmark/volume_benchmark_camera_template.json \
+python ~/code/atlas/util/benchmark/atlas_volume_benchmark.py \
+  --dataset ~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim \
+  --camera-spec ~/code/atlas/util/benchmark/volume_benchmark_camera_template.json \
   --output-dir /tmp/atlas_benchmark \
   --atlas-dir /Applications/fenglab/Atlas.app \
   --canvas-logical-width 1000 \
@@ -76,11 +79,11 @@ Notes:
 For repeated deterministic Atlas runs with persisted open/step metrics and aggregate summaries:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/atlas_deterministic_batch.py \
-  --atlas-log-path /Users/feng/Library/Logs/Atlas/ \
+python ~/code/atlas/util/benchmark/atlas_deterministic_batch.py \
+  --atlas-log-path ~/Library/Logs/Atlas/ \
   --atlas-pid <atlas_pid> \
   --atlas-dir /Applications/fenglab/Atlas.app \
-  --output-root /Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_manual \
+  --output-root ~/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_manual \
   --canvas-logical-width 1000 \
   --canvas-logical-height 750 \
   --hide-background \
@@ -125,9 +128,9 @@ Important Atlas per-step metrics:
 Run the ParaView driver with `pvpython`:
 
 ```bash
-pvpython /Users/feng/code/atlas/util/benchmark/paraview_volume_benchmark.py \
-  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd \
-  --camera-spec /Users/feng/code/atlas/util/benchmark/volume_benchmark_camera_template.json \
+pvpython ~/code/atlas/util/benchmark/paraview_volume_benchmark.py \
+  --dataset ~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd \
+  --camera-spec ~/code/atlas/util/benchmark/volume_benchmark_camera_template.json \
   --output-dir /tmp/paraview_benchmark \
   --array-name channels \
   --channel-mode component \
@@ -135,15 +138,15 @@ pvpython /Users/feng/code/atlas/util/benchmark/paraview_volume_benchmark.py \
 ```
 
 For Atlas scene-matching benchmarks, use the same anisotropy-corrected coordinate space that the
-scene uses for 3D image display. In `/Users/feng/Downloads/test_benchmark.scene`, the image object
+scene uses for 3D image display. In `~/Downloads/test_benchmark.scene`, the image object
 applies `Scale Vec3 = [1, 1, 5.0472259521484375]`, so the ParaView benchmark should use the
 `*_atlasscenespace.*` export rather than the physical-spacing export:
 
 ```bash
 /Applications/ParaView-6.1.0-RC1.app/Contents/bin/pvpython \
-  /Users/feng/code/atlas/util/benchmark/paraview_volume_benchmark.py \
-  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd \
-  --camera-spec /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
+  ~/code/atlas/util/benchmark/paraview_volume_benchmark.py \
+  --dataset ~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd \
+  --camera-spec ~/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
   --output-dir /tmp/paraview_benchmark_ch2_scene \
   --array-name channels \
   --channel-mode component \
@@ -166,14 +169,14 @@ that missing name and prepends it to `DYLD_LIBRARY_PATH`.
 Launch the GUI with:
 
 ```bash
-/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh paraview
+~/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh paraview
 ```
 
 Launch `pvpython` with:
 
 ```bash
-/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh pvpython \
-  /Users/feng/code/atlas/util/benchmark/paraview_volume_benchmark.py --help
+~/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh pvpython \
+  ~/code/atlas/util/benchmark/paraview_volume_benchmark.py --help
 ```
 
 Without that wrapper, `OSPRay Based` volume rendering can fail with OpenVKL device-loader errors
@@ -191,8 +194,8 @@ For deterministic internal benchmarking without screen capture, use the batch ru
 per-run timer artifact, every internal frame timing, and aggregate statistics under one benchmark root:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/paraview_deterministic_batch.py \
-  --output-root /Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_deterministic_manual \
+python ~/code/atlas/util/benchmark/paraview_deterministic_batch.py \
+  --output-root ~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_deterministic_manual \
   --deterministic-mode interactive-plus-final
 ```
 
@@ -210,14 +213,14 @@ To run the deterministic batch with ParaView's stock `OSPRay Based` volume repre
 launch through the OpenVKL wrapper and keep view-level ray tracing disabled:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/paraview_deterministic_batch.py \
-  --launch-wrapper /Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh \
-  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense_atlasscenespace.mhd \
+python ~/code/atlas/util/benchmark/paraview_deterministic_batch.py \
+  --launch-wrapper ~/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh \
+  --dataset ~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense_atlasscenespace.mhd \
   --array-name MetaImage \
   --volume-rendering-mode ospray \
   --blend-mode composite \
   --deterministic-mode interactive-plus-final \
-  --output-root /Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_ospray_deterministic_interactive_plus_final_2000x1500
+  --output-root ~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_ospray_deterministic_interactive_plus_final_2000x1500
 ```
 
 That batch preserves the same per-run and aggregate artifacts as the default runner, while also
@@ -287,10 +290,10 @@ If you want to benchmark ParaView's separate view-level ray-tracing path explici
 still lock and log those controls:
 
 ```bash
-/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh pvpython \
-  /Users/feng/code/atlas/util/benchmark/paraview_volume_benchmark.py \
-  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.mhd \
-  --camera-spec /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
+~/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh pvpython \
+  ~/code/atlas/util/benchmark/paraview_volume_benchmark.py \
+  --dataset ~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.mhd \
+  --camera-spec ~/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
   --output-dir /tmp/paraview_ospray_singlepass \
   --array-name MetaImage \
   --blend-mode composite \
@@ -331,6 +334,61 @@ Supported ParaView blend modes:
 
 If the first action in the camera spec is named `open`, the ParaView driver measures dataset load plus the first rendered view as the `open` action.
 
+## Napari
+
+Run the napari driver inside the dedicated conda environment:
+
+```bash
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate napari
+python ~/code/atlas/util/benchmark/napari_volume_benchmark.py \
+  --dataset ~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif \
+  --dataset-loader tifffile-array \
+  --camera-spec ~/code/atlas/large_test_image/slice15_ch2_gpufit_scene_camera_exact_2000x1500.json \
+  --output-dir /tmp/napari_gpufit \
+  --rendering mip
+```
+
+Notes:
+
+- The retained deterministic napari path now loads the GPU-fit TIFF stack directly from disk through `tifffile`, then adds that array to the viewer. The `.nim`/`zimg` path remains available for diagnostics, but it is not the retained cross-tool path.
+- On this machine, the napari viewer must be created with a shown window for `viewer.screenshot(size=...)` to render the full requested frame. A hidden viewer keeps a stale small canvas and produces incorrect lower-left-corner screenshots.
+- The driver therefore uses a shown viewer and pre-sizes the live napari render surface to the benchmark target before capture. Screenshots then read back the current canvas instead of forcing a per-capture resize.
+- Camera matching uses the logical capture height after Retina device-pixel-ratio scaling. For a `2000x1500` physical screenshot at DPR `2.0`, the napari camera zoom is calibrated against a logical height of `750`, which matches ParaView framing much more closely than using the physical height directly.
+- On Retina/HiDPI displays, napari/VisPy render in physical pixels. On this machine the live scene reports `pixel_scale = 2.0`, so a physical `2000x1500` target corresponds to a logical canvas of about `1000x750`.
+- The driver forces napari's 3D camera orientation to `('towards', 'down', 'left')` and flips the converted horizontal component of the `view_direction` / `up_direction` vectors fed into `set_view_direction(...)`. Napari's 3D camera basis otherwise mirrors the oblique shared Atlas/ParaView cameras horizontally even though the stored camera numbers appear to match.
+- The resulting outputs include `napari_events.jsonl`, `napari_timer_summary.json`, and `screenshots/open.png`, `screenshots/rotate.png`, `screenshots/zoom.png`.
+- `--screenshot-reference-every-step` is the retained napari reference mode for the current GPU-fit cross-tool comparison. In that mode the driver does not pre-wait on `frameSwapped` settle before each capture, because that would inflate the camera-apply-to-screenshot timing.
+- `step_camera_apply_to_screenshot_capture_upper_bound_ms` is the primary retained napari reference metric. It measures wall time from applying the benchmark camera to the end of napari's internal screenshot QImage stage. It is an upper bound because it includes the forced screenshot draw plus the `grabFramebuffer()` / `glReadPixels` readback barrier that cannot be cleanly separated from render completion.
+- `screenshot_capture_upper_bound_ms` is the narrower screenshot-only upper bound. It starts inside napari's internal screenshot path and ends once the QImage has been produced, excluding later NumPy conversion and file save.
+- `step_render_wall_ms_excluding_quiet_and_capture` and `action_render_wall_ms_excluding_quiet_and_capture` remain available as auxiliary timing breakdowns, but they are not the retained napari reference numbers because Qt/VisPy presentation coalescing makes swap/settle-derived timing harder to interpret than the screenshot-synchronized upper bound.
+- `--save-screenshot-reference-images` can be paired with `--screenshot-reference-every-step` to persist the intermediate `rotate_stepXX.png` / `zoom_stepXX.png` images for visual inspection.
+- `first_frame_swap_sync_ms` is retained as a secondary responsiveness metric. It measures the wall time from applying the benchmark camera to the first Qt `frameSwapped` signal, which is the first presented image the user can actually see.
+- `frame_settle_sync_ms` is kept as a diagnostic settle metric. It measures the wall time from applying the benchmark camera until the settle wait returns after the last observed Qt `frameSwapped` signal in the post-update burst.
+- `frame_swap_count` records how many presented frames were observed in that burst.
+- `screenshot_sync_ms` is kept separately as the synchronization/readback cost from the forced `viewer.screenshot(...)` call. Treat it as a capture barrier metric, not as napari's internal frame-render time.
+- `screenshot_post_quiet_sync_ms` records the extra quiet-drain wait after the final screenshot on each action. It is diagnostic only and is excluded from the retained render-wall metric above.
+- Raw swap counts are not stable enough to serve as the primary benchmark metric. Across repeated zoom traces, the steps with 4-5 swaps moved around between runs even though the overall zoom workload stayed the same. The stable metric was the render-wall value above, which matched napari's own `NAPARI_PERFMON` `UpdateRequest` completion timing once the fixed quiet window and screenshot capture were removed.
+- Napari also has an optional perf/trace system via `NAPARI_PERFMON`. That trace path is useful for validating the benchmark metric, but the retained deterministic benchmark uses the explicit render-wall timings above so the output stays simple and directly comparable across runs.
+- The current tested dataset support on this machine is:
+  - `slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif`: works and produces correct `2000x1500` screenshots.
+  - `slice15_ch2_dense.nim`: fails during `glTexSubImage3D(... 9216 x 6144 x 98 ...)` with `GL_OUT_OF_MEMORY`.
+  - `slice15_ch2_x2z.nim`: fails during `glTexSubImage3D(... 9216 x 6144 x 196 ...)` with `GL_OUT_OF_MEMORY`.
+- That means the retained deterministic napari benchmark should currently use the GPU-fit dataset only.
+
+For repeated deterministic napari runs:
+
+```bash
+python ~/code/atlas/util/benchmark/napari_deterministic_batch.py \
+  --dataset ~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif \
+  --dataset-loader tifffile-array \
+  --camera-spec ~/code/atlas/large_test_image/slice15_ch2_gpufit_scene_camera_exact_2000x1500.json \
+  --output-root /tmp/napari_gpufit_batch \
+  --warmup-runs 1 \
+  --measured-runs 7 \
+  --rendering mip
+```
+
 ### Always-On Timer Log
 
 ParaView's `Tools > Timer Log` dialog stores the `Enable` checkbox in settings, but it only reapplies
@@ -339,7 +397,7 @@ process startup without opening the dialog manually, launch ParaView with the he
 
 ```bash
 /Applications/ParaView-6.1.0-RC1.app/Contents/MacOS/paraview \
-  --script /Users/feng/code/atlas/util/benchmark/paraview_enable_timer_log.py
+  --script ~/code/atlas/util/benchmark/paraview_enable_timer_log.py
 ```
 
 That script uses the same `misc/TimerLog` proxy as the UI and sets:
@@ -355,9 +413,9 @@ setting a larger buffer length is enough.
 Run the capture script before or alongside the driver so it can watch the event file:
 
 ```bash
-source /Users/feng/miniconda3/etc/profile.d/conda.sh
+source ~/miniconda3/etc/profile.d/conda.sh
 conda activate pt12
-python /Users/feng/code/atlas/util/benchmark/volume_benchmark_capture.py \
+python ~/code/atlas/util/benchmark/volume_benchmark_capture.py \
   --events /tmp/atlas_benchmark/atlas_events.jsonl \
   --output /tmp/atlas_benchmark/summary.json \
   --x 100 --y 100 --width 1920 --height 1080
@@ -397,14 +455,14 @@ Important details:
 After the retained benchmark sessions are complete, export the compact cross-session CSV snapshots with:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/export_benchmark_snapshot_csv.py
+python ~/code/atlas/util/benchmark/export_benchmark_snapshot_csv.py
 ```
 
 This writes:
 
-- `/Users/feng/code/atlas/util/benchmark/benchmark_cross_session_snapshot.csv`
-- `/Users/feng/code/atlas/util/benchmark/benchmark_atlas_cross_dataset_snapshot.csv`
-- `/Users/feng/code/atlas/util/benchmark/benchmark_gui_rotate_snapshot.csv`
+- `~/code/atlas/util/benchmark/benchmark_cross_session_snapshot.csv`
+- `~/code/atlas/util/benchmark/benchmark_atlas_cross_dataset_snapshot.csv`
+- `~/code/atlas/util/benchmark/benchmark_gui_rotate_snapshot.csv`
 
 The exporter reads the retained session aggregate `summary.json` files directly, so the CSV values stay
 aligned with the authoritative benchmark artifacts rather than depending on manual copy/paste from the
@@ -418,7 +476,7 @@ capture. This is separate from the deterministic scripted-camera benchmarks abov
 Required Python packages:
 
 ```bash
-source /Users/feng/miniconda3/etc/profile.d/conda.sh
+source ~/miniconda3/etc/profile.d/conda.sh
 conda activate pt12
 python -m pip install pyobjc
 ```
@@ -430,14 +488,14 @@ Required macOS permissions for the terminal you use to launch the scripts:
 
 The basic components are:
 
-- `/Users/feng/code/atlas/util/benchmark/macos_gui_drag_benchmark.py`
-- `/Users/feng/code/atlas/util/benchmark/macos_window_capture_sckit.swift`
-- `/Users/feng/code/atlas/util/benchmark/build_macos_window_capture_sckit.sh`
-- `/Users/feng/code/atlas/util/benchmark/volume_benchmark_capture.py`
-- `/Users/feng/code/atlas/util/benchmark/summarize_gui_capture_fps.py`
-- `/Users/feng/code/atlas/util/benchmark/gui_drag_benchmark_calibration_template.json`
-- `/Users/feng/code/atlas/util/benchmark/paraview_gui_rotate_batch.py`
-- `/Users/feng/code/atlas/util/benchmark/atlas_gui_rotate_batch.py`
+- `~/code/atlas/util/benchmark/macos_gui_drag_benchmark.py`
+- `~/code/atlas/util/benchmark/macos_window_capture_sckit.swift`
+- `~/code/atlas/util/benchmark/build_macos_window_capture_sckit.sh`
+- `~/code/atlas/util/benchmark/volume_benchmark_capture.py`
+- `~/code/atlas/util/benchmark/summarize_gui_capture_fps.py`
+- `~/code/atlas/util/benchmark/gui_drag_benchmark_calibration_template.json`
+- `~/code/atlas/util/benchmark/paraview_gui_rotate_batch.py`
+- `~/code/atlas/util/benchmark/atlas_gui_rotate_batch.py`
 
 Preferred capture backend on macOS:
 
@@ -454,7 +512,7 @@ cleanly.
 ### 1. List Windows For Calibration
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/macos_gui_drag_benchmark.py --list-windows
+python ~/code/atlas/util/benchmark/macos_gui_drag_benchmark.py --list-windows
 ```
 
 Use that to identify the target application window. Then create a calibration JSON derived from
@@ -487,7 +545,7 @@ by the center of the volume, you can set `analysis_region_norm` to a centered RO
 ### 2. Build The ScreenCaptureKit Helper
 
 ```bash
-CAPTURE_BIN=$(/Users/feng/code/atlas/util/benchmark/build_macos_window_capture_sckit.sh)
+CAPTURE_BIN=$(~/code/atlas/util/benchmark/build_macos_window_capture_sckit.sh)
 ```
 
 ### 3. Start Capture
@@ -525,7 +583,7 @@ Use a timeout that comfortably covers:
 ### 4. Inject Real Mouse Drag Input
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/macos_gui_drag_benchmark.py \
+python ~/code/atlas/util/benchmark/macos_gui_drag_benchmark.py \
   --calibration /path/to/gui_calibration.json \
   --output-dir /tmp/gui_benchmark \
   --action rotate \
@@ -544,7 +602,7 @@ records for debugging.
 ### 5. Summarize Visible FPS
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/summarize_gui_capture_fps.py \
+python ~/code/atlas/util/benchmark/summarize_gui_capture_fps.py \
   --events /tmp/gui_benchmark/gui_events.jsonl \
   --frames /tmp/gui_benchmark/capture_summary_frames.jsonl \
   --capture-summary /tmp/gui_benchmark/capture_summary.json \
@@ -581,9 +639,9 @@ Use the batch runner when you want repeated real-GUI ParaView rotate measurement
 prepared GUI instance on every run:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/paraview_gui_rotate_batch.py \
-  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd \
-  --camera-spec /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
+python ~/code/atlas/util/benchmark/paraview_gui_rotate_batch.py \
+  --dataset ~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd \
+  --camera-spec ~/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
   --calibration /path/to/paraview_gui_calibration.json \
   --output-root /tmp/paraview_gui_rotate_slice15 \
   --warmup-runs 1 \
@@ -609,9 +667,9 @@ Use the Atlas batch runner when you want repeated real-GUI rotate measurements w
 same prepared Atlas scene alive across warm-up and measured runs:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/atlas_gui_rotate_batch.py \
-  --dataset /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim \
-  --camera-spec /Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
+python ~/code/atlas/util/benchmark/atlas_gui_rotate_batch.py \
+  --dataset ~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim \
+  --camera-spec ~/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json \
   --calibration /path/to/atlas_gui_calibration.json \
   --output-root /tmp/atlas_gui_rotate_slice15 \
   --warmup-runs 1 \
@@ -646,12 +704,69 @@ This Atlas GUI runner is intended for steady-state interaction benchmarking. It 
 Atlas between measured runs. Instead it resets the camera back to the `open` benchmark state and
 waits for Atlas preview/final markers before starting the next capture.
 
+### Napari GUI Prep + Batch Runner
+
+Use the prep launcher when you want a manual napari GUI interaction session with the benchmark
+camera already applied:
+
+```bash
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate napari
+python ~/code/atlas/util/benchmark/prepare_napari_gui_benchmark.py \
+  --dataset ~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif \
+  --dataset-loader tifffile-array \
+  --camera-spec ~/code/atlas/large_test_image/slice15_ch2_gpufit_scene_camera_exact_2000x1500.json \
+  --output-dir /tmp/napari_gui_prep \
+  --window-title "napari GUI Benchmark"
+```
+
+That opens a shown napari window with:
+
+- the GPU-fit TIFF loaded from disk
+- live render surface pre-sized to the benchmark `2000x1500` physical target
+- the shared benchmark `open` camera already applied
+- a deterministic top-level window title for ScreenCaptureKit calibration and lookup
+- `napari_gui_geometry.json` and `napari_gui_calibration.json` written into the prep output dir
+
+Add `--show-fps-overlay` only for manual inspection. Leave it off for exact-pixel GUI capture
+benchmarks, because the changing text overlay itself counts as visible updates.
+
+Use the batch runner when you want repeated real-GUI napari rotate measurements with the same
+ScreenCaptureKit + Quartz drag path used by Atlas and ParaView:
+
+```bash
+python3 ~/code/atlas/util/benchmark/napari_gui_rotate_batch.py \
+  --dataset ~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif \
+  --dataset-loader tifffile-array \
+  --camera-spec ~/code/atlas/large_test_image/slice15_ch2_gpufit_scene_camera_exact_2000x1500.json \
+  --napari-python ~/miniconda3/envs/napari/bin/python \
+  --capture-target display \
+  --output-root /tmp/napari_gui_rotate_gpufit \
+  --warmup-runs 1 \
+  --measured-runs 7
+```
+
+The napari GUI runner:
+
+- launches a fresh prepared napari GUI process for each run
+- waits for `prepare_napari_gui_benchmark.py` to report readiness
+- uses the auto-generated prep calibration by default; `--calibration` is only needed for an override
+- defaults to ScreenCaptureKit display capture plus `sourceRect` crop for better area-capture cadence
+- uses the same ScreenCaptureKit helper and Quartz drag injector as the Atlas/ParaView GUI tests
+- writes `gui_fps_summary.json` for each run
+- writes aggregate `summary.json` and `summary.md` under `aggregate/`
+
+This GUI-visible FPS path is useful as a real interaction indicator for napari. It is intentionally
+separate from the retained deterministic screenshot-reference benchmark, and its numbers should not
+be mixed with the Atlas/ParaView deterministic timing tables unless the dataset, window geometry,
+and input script are explicitly matched.
+
 ### Optional Fallback: Python Region Capture
 
 If ScreenCaptureKit is unavailable, you can still use the older Python observer:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/volume_benchmark_capture.py \
+python ~/code/atlas/util/benchmark/volume_benchmark_capture.py \
   --events /tmp/gui_benchmark/gui_events.jsonl \
   --output /tmp/gui_benchmark/capture_summary.json \
   --x 100 --y 100 --width 2000 --height 1500 \
@@ -684,15 +799,15 @@ existing high-resolution Atlas dataset and writes, for each ROI:
 The exporter is:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/export_high_res_fidelity_rois.py
+python ~/code/atlas/util/benchmark/export_high_res_fidelity_rois.py
 ```
 
 By default it uses:
 
 - source dataset:
-  `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim`
+  `~/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim`
 - output root:
-  `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2`
+  `~/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2`
 - ROI size:
   `2048 x 2048 x 169`
 - retained ROI centers:
@@ -717,7 +832,7 @@ Use the render driver to compare, for each ROI and mode:
 Launch Atlas first:
 
 ```bash
-/Users/feng/code/atlas/build/Release/src/atlas/Atlas.app/Contents/MacOS/Atlas \
+~/code/atlas/build/Release/src/atlas/Atlas.app/Contents/MacOS/Atlas \
   --atlas_log_benchmark_render_timings \
   --atlas_enable_benchmark_raw_mip_export \
   --atlas_enable_benchmark_screen_space_sufficiency_audit
@@ -733,11 +848,11 @@ paths are disabled in the normal Atlas render path by default.
 Then run the retained render suite:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/atlas_fidelity_render.py \
-  --roi-manifest /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2/manifest.json \
-  --adaptive-dataset /Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim \
-  --base-camera-spec /Users/feng/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json \
-  --output-root /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_mip_zoom06_v2_coarse2_rawmip_v1 \
+python ~/code/atlas/util/benchmark/atlas_fidelity_render.py \
+  --roi-manifest ~/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2/manifest.json \
+  --adaptive-dataset ~/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim \
+  --base-camera-spec ~/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json \
+  --output-root ~/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_mip_zoom06_v2_coarse2_rawmip_v1 \
   --mode "MIP Opaque" \
   --camera-distance-scale 0.6 \
   --reference-sampling-rate 8.0 \
@@ -781,8 +896,8 @@ Important details:
 After rendering, run the analysis pass:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/analyze_fidelity_validation.py \
-  --render-manifest /Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_mip_zoom06_v2_coarse2_rawmip_v1/manifest.json
+python ~/code/atlas/util/benchmark/analyze_fidelity_validation.py \
+  --render-manifest ~/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_mip_zoom06_v2_coarse2_rawmip_v1/manifest.json
 ```
 
 This now defaults to screenshot-space analysis for both DVR and MIP, so the reported
@@ -817,9 +932,9 @@ Analysis behavior:
 To inspect one concrete high-difference screenshot case interactively in Atlas, use:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/load_fidelity_diff_inspection_scene.py \
+python ~/code/atlas/util/benchmark/load_fidelity_diff_inspection_scene.py \
   --address localhost:50051 \
-  --output-dir /Users/feng/code/atlas/large_test_image/fidelity_validation/inspection/roi03_mip_adaptive_maxdiff_v1
+  --output-dir ~/code/atlas/large_test_image/fidelity_validation/inspection/roi03_mip_adaptive_maxdiff_v1
 ```
 
 That helper:
@@ -835,10 +950,10 @@ That helper:
 To localize the depth of one hotspot in screenshot space, use:
 
 ```bash
-python /Users/feng/code/atlas/util/benchmark/sweep_fidelity_hotspot_zcut.py \
+python ~/code/atlas/util/benchmark/sweep_fidelity_hotspot_zcut.py \
   --address localhost:50051 \
-  --inspection-summary /Users/feng/code/atlas/large_test_image/fidelity_validation/inspection/roi03_mip_adaptive_maxdiff_v1/inspection_summary.json \
-  --output-dir /Users/feng/code/atlas/large_test_image/fidelity_validation/inspection/roi03_mip_adaptive_maxdiff_v3/zcut_sweep_reference_v1
+  --inspection-summary ~/code/atlas/large_test_image/fidelity_validation/inspection/roi03_mip_adaptive_maxdiff_v1/inspection_summary.json \
+  --output-dir ~/code/atlas/large_test_image/fidelity_validation/inspection/roi03_mip_adaptive_maxdiff_v3/zcut_sweep_reference_v1
 ```
 
 That helper:

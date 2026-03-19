@@ -206,8 +206,8 @@ TEST(cluster, KMeans)
 
   // std::cout << "clamp matrix: " << ZEigenUtils::clampMatrix(mat, 6, 20) << std::endl;
 
-  //  QDir dir("/Users/feng/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain
-  //  Atlas/Spaces/P56/Meshes/"); QString outFolder("/Users/feng/Documents/image/P56Meshes/"); QStringList filters;
+  //  QDir dir("~/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain
+  //  Atlas/Spaces/P56/Meshes/"); QString outFolder("~/Documents/image/P56Meshes/"); QStringList filters;
   //  filters << "*.msh";
   //  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   //  int nSuc = 0;
@@ -221,18 +221,18 @@ TEST(cluster, KMeans)
   //  }
   //  std::cout << "convert " << list.size() << " files, " << list.size()-nSuc << " failed." << std::endl;
   // QStringList list;
-  // list.push_back("/Users/feng/code/grey.obj");
-  // list.push_back("/Users/feng/code/CA3.obj");
-  // std::cout << ZMesh::convertWavefrontObjToHxSurface(list[0], "/Users/feng/code/grey1.surf") << std::endl;
-  // std::cout << ZMesh::convertWavefrontObjToHxSurface(list[1], "/Users/feng/code/CA31.surf") << std::endl;
-  // list.push_back("/Users/feng/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain
-  // Atlas/Spaces/P56/Meshes/grey.msh"); list.push_back("/Users/feng/Library/Application Support/Brain Explorer
-  // 2/Atlases/Allen Mouse Brain Atlas/Spaces/P56/Meshes/CA3.msh"); list.push_back("/Users/feng/Library/Application
+  // list.push_back("~/code/grey.obj");
+  // list.push_back("~/code/CA3.obj");
+  // std::cout << ZMesh::convertWavefrontObjToHxSurface(list[0], "~/code/grey1.surf") << std::endl;
+  // std::cout << ZMesh::convertWavefrontObjToHxSurface(list[1], "~/code/CA31.surf") << std::endl;
+  // list.push_back("~/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain
+  // Atlas/Spaces/P56/Meshes/grey.msh"); list.push_back("~/Library/Application Support/Brain Explorer
+  // 2/Atlases/Allen Mouse Brain Atlas/Spaces/P56/Meshes/CA3.msh"); list.push_back("~/Library/Application
   // Support/Brain Explorer 2/Atlases/Allen Mouse Brain Atlas/Spaces/P56/Meshes/CA1.msh"); std::cout <<
-  // ZMesh::convertAllenAtlasMeshToHxSurface(list, "/Users/feng/code/combine.surf") << std::endl; std::cout <<
-  // ZMesh::convertAllenAtlasMeshToHxSurface(list[0], "/Users/feng/code/grey.surf") << std::endl; std::cout <<
-  // ZMesh::convertAllenAtlasMeshToHxSurface(list[1], "/Users/feng/code/CA3.surf") << std::endl; std::cout <<
-  // ZMesh::convertAllenAtlasMeshToHxSurface(list[2], "/Users/feng/code/CA1.surf") << std::endl;
+  // ZMesh::convertAllenAtlasMeshToHxSurface(list, "~/code/combine.surf") << std::endl; std::cout <<
+  // ZMesh::convertAllenAtlasMeshToHxSurface(list[0], "~/code/grey.surf") << std::endl; std::cout <<
+  // ZMesh::convertAllenAtlasMeshToHxSurface(list[1], "~/code/CA3.surf") << std::endl; std::cout <<
+  // ZMesh::convertAllenAtlasMeshToHxSurface(list[2], "~/code/CA1.surf") << std::endl;
 }
 
 TEST(cluster, GMM)

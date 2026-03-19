@@ -1893,7 +1893,7 @@ void ZImgZeissCZI::dumpSubBlockSegment(std::ifstream& inputFileStream, std::stri
   fmt::format_to(std::back_inserter(str), "{}Metadata: {}\n", ind, std::string_view(xmlBuffer.data(), sb.metaDataSize));
   // followed by data and attachment
 
-  //  QString filename = "/Users/feng/Downloads/czi_tile_dump_2.tif";
+  //  QString filename = "~/Downloads/czi_tile_dump_2.tif";
   //  if (!QFile::exists(filename)) {
   //    std::vector<uint8_t> fileBuf(sb.dataSize);
   //    readStream(inputFileStream, fileBuf.data(), sb.dataSize);

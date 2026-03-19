@@ -342,10 +342,10 @@ void ZSectionsRegistration::alignSection(const ZCachedImg& srcImg,
                         0.0,
                         m_useMultithreading);
 
-  //  image2DWrite(fixedImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fim.tif");
-  //  image2DWrite(movingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/mim.tif");
-  //  image2DWrite(filteredFixedImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/ffim.tif");
-  //  image2DWrite(filteredMovingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fmim.tif");
+  //  image2DWrite(fixedImageData.data(), m_stack.width(), m_stack.height(), "~/Downloads/fim.tif");
+  //  image2DWrite(movingImageData.data(), m_stack.width(), m_stack.height(), "~/Downloads/mim.tif");
+  //  image2DWrite(filteredFixedImageData.data(), m_stack.width(), m_stack.height(), "~/Downloads/ffim.tif");
+  //  image2DWrite(filteredMovingImageData.data(), m_stack.width(), m_stack.height(), "~/Downloads/fmim.tif");
 
   ZImageToImageMetric metric;
   if (m_metric == "Mean Differences") {

@@ -10,12 +10,23 @@ from pathlib import Path
 
 import zimg
 
+HOME = Path.home()
+
 
 DEFAULT_INPUT = Path(
-    "/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim"
+    HOME
+    / "code"
+    / "atlas"
+    / "large_test_image"
+    / "high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim"
 )
 DEFAULT_OUTPUT_ROOT = Path(
-    "/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v1"
+    HOME
+    / "code"
+    / "atlas"
+    / "large_test_image"
+    / "fidelity_validation"
+    / "high_res_20220219_roi_validation_v1"
 )
 DEFAULT_CENTERS = [
     (16800, 4300),

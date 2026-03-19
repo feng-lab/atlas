@@ -3,7 +3,7 @@
 Use this with the ParaView GUI:
 
     /Applications/ParaView-6.1.0-RC1.app/Contents/MacOS/paraview \
-      --script /Users/feng/code/atlas/util/benchmark/paraview_enable_timer_log.py
+      --script ~/code/atlas/util/benchmark/paraview_enable_timer_log.py
 
 This uses the same "misc/TimerLog" proxy as Tools > Timer Log, so it affects
 the client and any connected server processes for the active session.

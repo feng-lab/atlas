@@ -97,7 +97,7 @@ double ZImgRegistration::run()
     //          //}
     //        }
     //      }
-    //      img.save("/Users/feng/Downloads/gridres.tif");
+    //      img.save("~/Downloads/gridres.tif");
     //      //parameters = bestParams;
     //      LOG(INFO) << bestParams[0] << " " << bestParams[1] << " " << bestParams[2];
     //    }

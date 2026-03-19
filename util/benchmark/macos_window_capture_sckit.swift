@@ -57,6 +57,7 @@ struct Options {
     var stableFrames = 5
     var timeoutSeconds = 300.0
     var queueDepth = 8
+    var captureTarget = "window"
     var windowOwnerName: String?
     var windowTitleSubstring: String?
 }
@@ -69,11 +70,16 @@ struct CGWindowCandidate {
 }
 
 struct ResolvedWindow {
-    let scWindow: SCWindow
+    let contentFilter: SCContentFilter
+    let matchedWindowID: CGWindowID
     let bounds: CGRect
     let ownerName: String
     let title: String
+    let captureTarget: String
+    let displayID: CGDirectDisplayID?
+    let displayBounds: CGRect?
     let pointPixelScale: Double
+    let configSourceRect: CGRect
     let sourceRectAbsolute: CGRect
     let cropPoints: CGRect
     let cropPixels: CGRect
@@ -206,6 +212,7 @@ func parseArgs() throws -> Options {
               --stable-frames N
               --timeout-seconds N
               --queue-depth N
+              --capture-target window|display
               --window-owner-name NAME
               --window-title-substring TEXT
             """)
@@ -234,6 +241,12 @@ func parseArgs() throws -> Options {
             options.timeoutSeconds = max(1.0, Double(try requireValue(arg)) ?? options.timeoutSeconds)
         case "--queue-depth":
             options.queueDepth = max(1, min(8, Int(try requireValue(arg)) ?? options.queueDepth))
+        case "--capture-target":
+            let value = try requireValue(arg).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard value == "window" || value == "display" else {
+                throw CaptureError.usage("--capture-target must be 'window' or 'display'")
+            }
+            options.captureTarget = value
         case "--window-owner-name":
             options.windowOwnerName = try requireValue(arg)
         case "--window-title-substring":
@@ -499,8 +512,14 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
     private let timeoutSeconds: Double
     private let queueDepth: Int
 
-    private let processingQueue = DispatchQueue(label: "atlas.sckit.capture")
-    private let controlQueue = DispatchQueue(label: "atlas.sckit.capture.control")
+    private let processingQueue = DispatchQueue(
+        label: "atlas.sckit.capture",
+        qos: .userInteractive
+    )
+    private let controlQueue = DispatchQueue(
+        label: "atlas.sckit.capture.control",
+        qos: .userInitiated
+    )
     private let framesWriter: JsonLineWriter
     private let summaryWriter: JsonWriter
 
@@ -571,14 +590,19 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
         config.showsCursor = false
         config.queueDepth = queueDepth
         config.scalesToFit = false
-        config.ignoreShadowsSingleWindow = true
+        if resolvedWindow.captureTarget == "window" {
+            config.ignoreShadowsSingleWindow = true
+        }
         if #available(macOS 14.0, *) {
             config.captureResolution = .nominal
         }
-        config.sourceRect = resolvedWindow.sourceRectAbsolute
+        config.sourceRect = resolvedWindow.configSourceRect
 
-        let filter = SCContentFilter(desktopIndependentWindow: resolvedWindow.scWindow)
-        let stream = SCStream(filter: filter, configuration: config, delegate: self)
+        let stream = SCStream(
+            filter: resolvedWindow.contentFilter,
+            configuration: config,
+            delegate: self
+        )
         self.stream = stream
 
         do {
@@ -976,7 +1000,9 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
             "window": [
                 "owner_name": resolvedWindow.ownerName,
                 "title": resolvedWindow.title,
-                "window_id": Int(resolvedWindow.scWindow.windowID),
+                "window_id": Int(resolvedWindow.matchedWindowID),
+                "capture_target": resolvedWindow.captureTarget,
+                "display_id": resolvedWindow.displayID.map { Int($0) } as Any,
                 "point_pixel_scale": resolvedWindow.pointPixelScale,
                 "bounds": [
                     "x": resolvedWindow.bounds.origin.x,
@@ -984,6 +1010,20 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
                     "width": resolvedWindow.bounds.width,
                     "height": resolvedWindow.bounds.height,
                 ],
+            ],
+            "display_bounds_points": resolvedWindow.displayBounds.map { bounds in
+                [
+                    "x": bounds.origin.x,
+                    "y": bounds.origin.y,
+                    "width": bounds.width,
+                    "height": bounds.height,
+                ]
+            } as Any,
+            "config_source_rect_points": [
+                "x": resolvedWindow.configSourceRect.origin.x,
+                "y": resolvedWindow.configSourceRect.origin.y,
+                "width": resolvedWindow.configSourceRect.width,
+                "height": resolvedWindow.configSourceRect.height,
             ],
             "capture_source_rect_absolute_points": [
                 "x": resolvedWindow.sourceRectAbsolute.origin.x,
@@ -1049,6 +1089,29 @@ func uint64(_ value: Any?) -> UInt64 {
     return 0
 }
 
+struct MatchedDisplay {
+    let scDisplay: SCDisplay
+    let bounds: CGRect
+}
+
+func resolvedDisplay(
+    for cropAbsolute: CGRect,
+    shareableContent: SCShareableContent
+) -> MatchedDisplay? {
+    var best: MatchedDisplay?
+    var bestArea = 0.0
+    for display in shareableContent.displays {
+        let bounds = CGDisplayBounds(display.displayID)
+        let overlap = cropAbsolute.intersection(bounds)
+        let area = overlap.isNull ? 0.0 : overlap.width * overlap.height
+        if area > bestArea {
+            bestArea = area
+            best = MatchedDisplay(scDisplay: display, bounds: bounds)
+        }
+    }
+    return best
+}
+
 func resolveWindow(options: Options, calibration: Calibration?) async throws -> ResolvedWindow {
     let ownerMatch = (options.windowOwnerName ?? calibration?.windowOwnerName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     let titleMatch = (options.windowTitleSubstring ?? calibration?.windowNameSubstring ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -1067,9 +1130,7 @@ func resolveWindow(options: Options, calibration: Calibration?) async throws -> 
         throw CaptureError.windowNotFound("ScreenCaptureKit could not resolve window id \(matchedCGWindow.windowID)")
     }
 
-    let filter = SCContentFilter(desktopIndependentWindow: matchedSCWindow)
-    let pointPixelScale = Double(filter.pointPixelScale)
-    let scale = pointPixelScale > 0.0 ? pointPixelScale : 1.0
+    let windowFilter = SCContentFilter(desktopIndependentWindow: matchedSCWindow)
     let regionCoordinateSpace = (
         calibration?.regionCoordinateSpace?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         ?? "absolute"
@@ -1093,6 +1154,41 @@ func resolveWindow(options: Options, calibration: Calibration?) async throws -> 
     guard !cropAbsolute.isNull, cropAbsolute.width > 0.0, cropAbsolute.height > 0.0 else {
         throw CaptureError.invalidCalibration("capture region does not intersect the selected window")
     }
+
+    let captureTarget = options.captureTarget
+    let contentFilter: SCContentFilter
+    let configSourceRect: CGRect
+    let displayID: CGDirectDisplayID?
+    let displayBounds: CGRect?
+    if captureTarget == "display" {
+        guard let matchedDisplay = resolvedDisplay(
+            for: cropAbsolute,
+            shareableContent: shareableContent
+        ) else {
+            throw CaptureError.windowNotFound(
+                "could not resolve a display for capture rect \(cropAbsolute.debugDescription)"
+            )
+        }
+        contentFilter = SCContentFilter(
+            display: matchedDisplay.scDisplay,
+            excludingWindows: []
+        )
+        configSourceRect = CGRect(
+            x: cropAbsolute.origin.x - matchedDisplay.bounds.origin.x,
+            y: cropAbsolute.origin.y - matchedDisplay.bounds.origin.y,
+            width: cropAbsolute.width,
+            height: cropAbsolute.height
+        )
+        displayID = matchedDisplay.scDisplay.displayID
+        displayBounds = matchedDisplay.bounds
+    } else {
+        contentFilter = windowFilter
+        configSourceRect = cropAbsolute
+        displayID = nil
+        displayBounds = nil
+    }
+    let pointPixelScale = Double(contentFilter.pointPixelScale)
+    let scale = pointPixelScale > 0.0 ? pointPixelScale : 1.0
 
     let cropPoints = CGRect(
         x: cropAbsolute.origin.x - matchedCGWindow.bounds.origin.x,
@@ -1127,11 +1223,16 @@ func resolveWindow(options: Options, calibration: Calibration?) async throws -> 
     )
 
     return ResolvedWindow(
-        scWindow: matchedSCWindow,
+        contentFilter: contentFilter,
+        matchedWindowID: matchedCGWindow.windowID,
         bounds: matchedCGWindow.bounds,
         ownerName: matchedCGWindow.ownerName,
         title: matchedCGWindow.title,
+        captureTarget: captureTarget,
+        displayID: displayID,
+        displayBounds: displayBounds,
         pointPixelScale: scale,
+        configSourceRect: configSourceRect,
         sourceRectAbsolute: cropAbsolute,
         cropPoints: cropPoints,
         cropPixels: cropPixels,

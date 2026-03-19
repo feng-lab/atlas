@@ -9,7 +9,7 @@ session set.
 
 | Item | Value |
 | --- | --- |
-| Camera spec | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json` |
+| Camera spec | `~/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json` |
 | Output render size | `2000 x 1500` physical pixels |
 | Atlas live 3D canvas size | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
 | Deterministic action sequence | `open`, `rotate`, `zoom` |
@@ -63,8 +63,8 @@ snapshot matches the detailed sections below.
 ## Session 1: ParaView GPU, Blocked Input, MIP
 
 Artifacts:
-- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_deterministic_interactive_plus_final_2000x1500`
-- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_deterministic_interactive_plus_final_2000x1500/aggregate/summary.json`
+- Root: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_deterministic_interactive_plus_final_2000x1500`
+- Aggregate summary: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_deterministic_interactive_plus_final_2000x1500/aggregate/summary.json`
 
 ### Setup
 
@@ -74,7 +74,7 @@ Artifacts:
 | Representation mode | `GPU Based` |
 | Blend mode | `maximum-intensity` |
 | Deterministic mode | `interactive-plus-final` |
-| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
+| Dataset | `~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
 | Dataset format | Blocked `.vtpd` with `.vti` pieces |
 | Dataset size | `9216 x 6144 x 98`, single channel |
 | Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
@@ -121,8 +121,8 @@ Artifacts:
 ## Session 2: ParaView GPU, Blocked Input, Composite
 
 Artifacts:
-- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gpu_deterministic_interactive_plus_final_2000x1500_composite_v1`
-- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gpu_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
+- Root: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gpu_deterministic_interactive_plus_final_2000x1500_composite_v1`
+- Aggregate summary: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gpu_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -132,7 +132,7 @@ Artifacts:
 | Representation mode | `GPU Based` |
 | Blend mode | `composite` |
 | Deterministic mode | `interactive-plus-final` |
-| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
+| Dataset | `~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
 | Dataset format | Blocked `.vtpd` with `.vti` pieces |
 | Dataset size | `9216 x 6144 x 98`, single channel |
 | Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
@@ -179,20 +179,20 @@ Artifacts:
 ## Session 3: ParaView OSPRay, Dense Input, Composite
 
 Artifacts:
-- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_ospray_deterministic_interactive_plus_final_2000x1500_composite_v3`
-- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_ospray_deterministic_interactive_plus_final_2000x1500_composite_v3/aggregate/summary.json`
+- Root: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_ospray_deterministic_interactive_plus_final_2000x1500_composite_v3`
+- Aggregate summary: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_ospray_deterministic_interactive_plus_final_2000x1500_composite_v3/aggregate/summary.json`
 
 ### Setup
 
 | Item | Value |
 | --- | --- |
 | Software | ParaView 6.1.0-RC1 |
-| Launch path | `/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh` |
+| Launch path | `~/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh` |
 | Representation mode | `OSPRay Based` |
 | Blend mode | `composite` |
 | View ray tracing | Disabled (`EnableRayTracing = 0`) |
 | Deterministic mode | `interactive-plus-final` |
-| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense_atlasscenespace.mhd` |
+| Dataset | `~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense_atlasscenespace.mhd` |
 | Dataset format | Dense `.mhd/.zraw` |
 | Dataset size | `9216 x 6144 x 98`, single channel |
 | Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
@@ -240,8 +240,8 @@ Artifacts:
 ## Session 4: Atlas Dense Input, MIP
 
 Artifacts:
-- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_interactive_plus_final_2000x1500_mip_v5_parity`
-- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_interactive_plus_final_2000x1500_mip_v5_parity/aggregate/summary.json`
+- Root: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_interactive_plus_final_2000x1500_mip_v5_parity`
+- Aggregate summary: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_interactive_plus_final_2000x1500_mip_v5_parity/aggregate/summary.json`
 
 ### Setup
 
@@ -251,7 +251,7 @@ Artifacts:
 | Rendering mode | Full-resolution image rendering enabled |
 | Compositing mode | `Maximum Intensity Projection` |
 | Deterministic mode | `interactive-plus-final` with a fixed `2.0 s` hold between camera commands |
-| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim` |
+| Dataset | `~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim` |
 | Dataset format | Dense `.nim` |
 | Dataset size | `9216 x 6144 x 98`, single channel |
 | Dataset spacing | `0.10378322750329971 x 0.10378322750329971 x 0.5238174200057983 um` |
@@ -306,8 +306,8 @@ Artifacts:
 ## Session 5: Atlas Dense Input, DVR
 
 Artifacts:
-- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_interactive_plus_final_2000x1500_dvr_v2_parity`
-- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_interactive_plus_final_2000x1500_dvr_v2_parity/aggregate/summary.json`
+- Root: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_interactive_plus_final_2000x1500_dvr_v2_parity`
+- Aggregate summary: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_deterministic_interactive_plus_final_2000x1500_dvr_v2_parity/aggregate/summary.json`
 
 ### Setup
 
@@ -317,7 +317,7 @@ Artifacts:
 | Rendering mode | Full-resolution image rendering enabled |
 | Compositing mode | `Direct Volume Rendering` |
 | Deterministic mode | `interactive-plus-final` with a fixed `2.0 s` hold between camera commands |
-| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim` |
+| Dataset | `~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim` |
 | Dataset format | Dense `.nim` |
 | Dataset size | `9216 x 6144 x 98`, single channel |
 | Dataset spacing | `0.10378322750329971 x 0.10378322750329971 x 0.5238174200057983 um` |
@@ -379,15 +379,15 @@ remain the authoritative source.
 
 | Item | Value |
 | --- | --- |
-| Source scene | `/Users/feng/Downloads/test_gpufit.scene` |
-| Camera spec | `/Users/feng/code/atlas/large_test_image/slice15_ch2_gpufit_scene_camera_exact_2000x1500.json` |
+| Source scene | `~/Downloads/test_gpufit.scene` |
+| Camera spec | `~/code/atlas/large_test_image/slice15_ch2_gpufit_scene_camera_exact_2000x1500.json` |
 | Output render size | `2000 x 1500` physical pixels |
 | Atlas live 3D canvas size | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
 | Deterministic action sequence | `open`, `rotate`, `zoom` |
 | Interpolated actions | `30` requested camera steps per action |
 | Warm-up / measured runs | `1` warm-up run, `7` measured runs |
-| ParaView dense scene-space header | `/Users/feng/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_scenespace.mhd` (`1 x 1 x 1`) |
-| Atlas dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.nim` (`0.1 x 0.1 x 0.1 um`) |
+| ParaView dense scene-space header | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_scenespace.mhd` (`1 x 1 x 1`) |
+| Atlas dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.nim` (`0.1 x 0.1 x 0.1 um`) |
 | Notes | Atlas uses its default current behavior for this GPU-fit dataset. Preview and final are the same render pass here, so the Atlas preview-to-final settle metric is `0`. |
 
 ## Cross-Session Snapshot
@@ -403,8 +403,8 @@ remain the authoritative source.
 ## Session 6: ParaView GPU, Dense Input, MIP
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_gpufit_deterministic_interactive_plus_final_2000x1500_mip_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_gpufit_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/paraview_gpufit_deterministic_interactive_plus_final_2000x1500_mip_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/paraview_gpufit_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -414,7 +414,7 @@ Artifacts:
 | Representation mode | `GPU Based` |
 | Blend mode | `maximum-intensity` |
 | Deterministic mode | `interactive-plus-final` |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_scenespace.mhd` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_scenespace.mhd` |
 | Dataset format | Dense `.mhd/.zraw` |
 | Dataset size | `1024 x 1024 x 980`, single channel |
 | Dataset spacing | `1 x 1 x 1` scene-space units |
@@ -461,8 +461,8 @@ Artifacts:
 ## Session 7: ParaView GPU, Dense Input, Composite
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_gpufit_deterministic_interactive_plus_final_2000x1500_composite_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_gpufit_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/paraview_gpufit_deterministic_interactive_plus_final_2000x1500_composite_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/paraview_gpufit_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -472,7 +472,7 @@ Artifacts:
 | Representation mode | `GPU Based` |
 | Blend mode | `composite` |
 | Deterministic mode | `interactive-plus-final` |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_scenespace.mhd` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_scenespace.mhd` |
 | Dataset format | Dense `.mhd/.zraw` |
 | Dataset size | `1024 x 1024 x 980`, single channel |
 | Dataset spacing | `1 x 1 x 1` scene-space units |
@@ -519,20 +519,20 @@ Artifacts:
 ## Session 8: ParaView OSPRay, Dense Input, Composite
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_gpufit_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_gpufit_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/paraview_gpufit_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/paraview_gpufit_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
 
 ### Setup
 
 | Item | Value |
 | --- | --- |
 | Software | ParaView 6.1.0-RC1 |
-| Launch path | `/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh` |
+| Launch path | `~/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh` |
 | View ray tracing | Disabled (`EnableRayTracing = 0`) |
 | Representation mode | `OSPRay Based` |
 | Blend mode | `composite` |
 | Deterministic mode | `interactive-plus-final` |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_scenespace.mhd` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_scenespace.mhd` |
 | Dataset format | Dense `.mhd/.zraw` |
 | Dataset size | `1024 x 1024 x 980`, single channel |
 | Dataset spacing | `1 x 1 x 1` scene-space units |
@@ -579,8 +579,8 @@ Artifacts:
 ## Session 9: Atlas Dense Input, MIP
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_gpufit_deterministic_interactive_plus_final_2000x1500_mip_v2_clean`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_gpufit_deterministic_interactive_plus_final_2000x1500_mip_v2_clean/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_gpufit_deterministic_interactive_plus_final_2000x1500_mip_v2_clean`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_gpufit_deterministic_interactive_plus_final_2000x1500_mip_v2_clean/aggregate/summary.json`
 
 ### Setup
 
@@ -590,7 +590,7 @@ Artifacts:
 | Rendering mode | Default Atlas behavior for this dataset |
 | Compositing mode | `Maximum Intensity Projection` |
 | Deterministic mode | `interactive-plus-final` with a fixed `2.0 s` hold between camera commands |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.nim` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.nim` |
 | Dataset format | Dense `.nim` |
 | Dataset size | `1024 x 1024 x 980`, single channel |
 | Dataset spacing | `0.1 x 0.1 x 0.1 um` |
@@ -644,8 +644,8 @@ Artifacts:
 ## Session 10: Atlas Dense Input, DVR
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_gpufit_deterministic_interactive_plus_final_2000x1500_dvr_v1_clean`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_gpufit_deterministic_interactive_plus_final_2000x1500_dvr_v1_clean/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_gpufit_deterministic_interactive_plus_final_2000x1500_dvr_v1_clean`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_gpufit_deterministic_interactive_plus_final_2000x1500_dvr_v1_clean/aggregate/summary.json`
 
 ### Setup
 
@@ -655,7 +655,7 @@ Artifacts:
 | Rendering mode | Default Atlas behavior for this dataset |
 | Compositing mode | `Direct Volume Rendering` |
 | Deterministic mode | `interactive-plus-final` with a fixed `2.0 s` hold between camera commands |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.nim` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.nim` |
 | Dataset format | Dense `.nim` |
 | Dataset size | `1024 x 1024 x 980`, single channel |
 | Dataset spacing | `0.1 x 0.1 x 0.1 um` |
@@ -716,16 +716,16 @@ authoritative source.
 
 | Item | Value |
 | --- | --- |
-| Source scene | `/Users/feng/Downloads/test_slice15_ch2_2x.scene` |
-| Camera spec | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_scene_camera_exact_2000x1500_v2.json` |
+| Source scene | `~/Downloads/test_slice15_ch2_2x.scene` |
+| Camera spec | `~/code/atlas/large_test_image/slice15_ch2_x2z_scene_camera_exact_2000x1500_v2.json` |
 | Output render size | `2000 x 1500` physical pixels |
 | Atlas live 3D canvas size | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
 | Deterministic action sequence | `open`, `rotate`, `zoom` |
 | Interpolated actions | `30` requested camera steps per action |
 | Warm-up / measured runs | `1` warm-up run, `7` measured runs |
-| ParaView dense scene-space header | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_scenespace.mhd` (`1 x 1 x 5.0472259521484375`) |
-| ParaView blocked scene-space dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd` (`1 x 1 x 5.0472259521484375`) |
-| Atlas dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z.nim` (`0.10378322750329971 x 0.10378322750329971 x 0.52381742000579834 um`) |
+| ParaView dense scene-space header | `~/code/atlas/large_test_image/slice15_ch2_x2z_scenespace.mhd` (`1 x 1 x 5.0472259521484375`) |
+| ParaView blocked scene-space dataset | `~/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd` (`1 x 1 x 5.0472259521484375`) |
+| Atlas dataset | `~/code/atlas/large_test_image/slice15_ch2_x2z.nim` (`0.10378322750329971 x 0.10378322750329971 x 0.52381742000579834 um`) |
 | Notes | ParaView GPU sessions use the blocked scene-space `.vtpd` export because the dense GPU smoke run kept allocating toward system memory and was not practical. ParaView `OSPRay Based` uses the dense scene-space `.mhd/.zraw` path because blocked OSPRay input renders blank in this ParaView build. |
 
 ## Cross-Session Snapshot
@@ -744,8 +744,8 @@ Atlas uses the last-step `preview -> final` settle interval.
 ## Session 11: ParaView GPU, Blocked Input, MIP
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -755,7 +755,7 @@ Artifacts:
 | Representation mode | `GPU Based` |
 | Blend mode | `maximum-intensity` |
 | Deterministic mode | `interactive-plus-final` |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd` |
 | Dataset format | Blocked `.vtpd` |
 | Dataset size | `9216 x 6144 x 196`, single channel |
 | Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
@@ -802,8 +802,8 @@ Artifacts:
 ## Session 12: ParaView GPU, Blocked Input, Composite
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_composite_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_composite_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/paraview_x2z_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -813,7 +813,7 @@ Artifacts:
 | Representation mode | `GPU Based` |
 | Blend mode | `composite` |
 | Deterministic mode | `interactive-plus-final` |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd` |
 | Dataset format | Blocked `.vtpd` |
 | Dataset size | `9216 x 6144 x 196`, single channel |
 | Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
@@ -860,20 +860,20 @@ Artifacts:
 ## Session 13: ParaView OSPRay, Dense Input, Composite
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/paraview_x2z_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/paraview_x2z_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/paraview_x2z_ospray_deterministic_interactive_plus_final_2000x1500_composite_v1/aggregate/summary.json`
 
 ### Setup
 
 | Item | Value |
 | --- | --- |
 | Software | ParaView 6.1.0-RC1 |
-| Launch path | `/Users/feng/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh` |
+| Launch path | `~/code/atlas/util/benchmark/launch_paraview_with_ospray_fix.sh` |
 | View ray tracing | Disabled (`EnableRayTracing = 0`) |
 | Representation mode | `OSPRay Based` |
 | Blend mode | `composite` |
 | Deterministic mode | `interactive-plus-final` |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_scenespace.mhd` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_x2z_scenespace.mhd` |
 | Dataset format | Dense `.mhd/.zraw` |
 | Dataset size | `9216 x 6144 x 196`, single channel |
 | Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
@@ -921,8 +921,8 @@ Artifacts:
 ## Session 14: Atlas Dense Input, MIP
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -932,7 +932,7 @@ Artifacts:
 | Rendering mode | Default Atlas behavior for this dataset |
 | Compositing mode | `Maximum Intensity Projection` |
 | Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z.nim` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_x2z.nim` |
 | Dataset format | Dense `.nim` |
 | Dataset size | `9216 x 6144 x 196`, single channel |
 | Dataset spacing | `0.10378322750329971 x 0.10378322750329971 x 0.52381742000579834 um` |
@@ -983,8 +983,8 @@ Artifacts:
 ## Session 15: Atlas Dense Input, DVR
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_dvr_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_dvr_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_x2z_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -994,7 +994,7 @@ Artifacts:
 | Rendering mode | Default Atlas behavior for this dataset |
 | Compositing mode | `Direct Volume Rendering` |
 | Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
-| Dataset | `/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z.nim` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_x2z.nim` |
 | Dataset format | Dense `.nim` |
 | Dataset size | `9216 x 6144 x 196`, single channel |
 | Dataset spacing | `0.10378322750329971 x 0.10378322750329971 x 0.52381742000579834 um` |
@@ -1054,7 +1054,7 @@ have retained sessions for this dataset here; the reasons are documented in
 
 | Item | Value |
 | --- | --- |
-| Camera spec | `/Users/feng/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json` |
+| Camera spec | `~/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json` |
 | Viewport convention | `2000 x 1500` physical pixels (`1000 x 750` logical Retina canvas in Atlas) |
 | Action sequence | `open`, then `rotate`, then `zoom` |
 | Rotate action | `0.5 s`, `30` interpolated steps, followed by settle |
@@ -1062,11 +1062,11 @@ have retained sessions for this dataset here; the reasons are documented in
 | Deterministic method | Internal Atlas benchmark markers plus live Atlas render-log parsing |
 | Benchmark cleanup flags | `--hide-background --hide-axis --hide-bound-box` |
 | ParaView retained sessions | None on this machine for this dataset |
-| Atlas dataset | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
+| Atlas dataset | `~/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
 | Dataset format | Dense `.nim` |
 | Dataset size | `25395 x 19459 x 169`, single channel |
 | Dataset spacing | `0.1 x 0.1 x 2.0 um` |
-| Reference blocked ParaView export | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.vtpd` (`500` blocks) |
+| Reference blocked ParaView export | `~/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.vtpd` (`500` blocks) |
 
 For the Atlas rows below:
 - `Open total -> first preview` and `Open total -> final` are measured from action start.
@@ -1082,8 +1082,8 @@ For the Atlas rows below:
 ## Session 16: Atlas Dense Input, MIP
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_mip_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_mip_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -1093,7 +1093,7 @@ Artifacts:
 | Rendering mode | Default Atlas behavior for this dataset |
 | Compositing mode | `Maximum Intensity Projection` |
 | Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
-| Dataset | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
+| Dataset | `~/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
 | Dataset format | Dense `.nim` |
 | Dataset size | `25395 x 19459 x 169`, single channel |
 | Dataset spacing | `0.1 x 0.1 x 2.0 um` |
@@ -1143,8 +1143,8 @@ Artifacts:
 ## Session 17: Atlas Dense Input, DVR
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_dvr_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_dvr_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_high_res_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -1154,7 +1154,7 @@ Artifacts:
 | Rendering mode | Default Atlas behavior for this dataset |
 | Compositing mode | `Direct Volume Rendering` |
 | Deterministic mode | `interactive-plus-final` with log-driven preview/final waits from Atlas benchmark markers |
-| Dataset | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
+| Dataset | `~/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
 | Dataset format | Dense `.nim` |
 | Dataset size | `25395 x 19459 x 169`, single channel |
 | Dataset spacing | `0.1 x 0.1 x 2.0 um` |
@@ -1212,7 +1212,7 @@ treated as directly comparable to the earlier internal-disk Atlas datasets.
 
 | Item | Value |
 | --- | --- |
-| Camera spec | `/Users/feng/code/atlas/large_test_image/largeimgmerge_scene_camera_exact_2000x1500.json` |
+| Camera spec | `~/code/atlas/large_test_image/largeimgmerge_scene_camera_exact_2000x1500.json` |
 | Viewport convention | `2000 x 1500` physical pixels (`1000 x 750` logical Retina canvas in Atlas) |
 | Action sequence | `open`, then `rotate`, then `zoom` |
 | Rotate action | `0.5 s`, `30` interpolated steps, followed by settle |
@@ -1242,8 +1242,8 @@ For the Atlas rows below:
 ## Session 18: Atlas Dense Input, MIP
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_mip_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_mip_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_mip_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -1304,8 +1304,8 @@ Artifacts:
 ## Session 19: Atlas Dense Input, DVR
 
 Artifacts:
-- Root: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_dvr_v1`
-- Aggregate summary: `/Users/feng/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_dvr_v1`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_largeimgmerge_externaldrive_deterministic_interactive_plus_final_2000x1500_dvr_v1/aggregate/summary.json`
 
 ### Setup
 
@@ -1371,7 +1371,7 @@ sessions, but they were not kept as final benchmark results.
 | Dataset | Attempted path | Input | Observed behavior | Retained in final benchmark? | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `slice15_ch2` | ParaView GPU, single-file dense input | Dense `.mhd/.zraw` (`slice15_ch2_dense_atlasscenespace.mhd`) | The rendered image was visibly wrong: the volume content was recognizable, but the image arrangement was corrupted. It was also much slower than the retained blocked `.vtpd` path. | No | Possible large-single-texture or driver issue on this system, but not confirmed. Final ParaView GPU results for `slice15_ch2` use the blocked scene-space dataset. |
-| `slice15_ch2_x2z` | ParaView GPU, single-file dense input | Dense `.mhd/.zraw` (`slice15_ch2_x2z_scenespace.mhd`) | ParaView kept allocating toward and past system memory during load/render, so the run was killed instead of being allowed to continue. | No | Final ParaView GPU results for `slice15_ch2_x2z` use the blocked scene-space dataset [slice15_ch2_x2z_grid_atlasscenespace.vtpd](/Users/feng/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd). |
+| `slice15_ch2_x2z` | ParaView GPU, single-file dense input | Dense `.mhd/.zraw` (`slice15_ch2_x2z_scenespace.mhd`) | ParaView kept allocating toward and past system memory during load/render, so the run was killed instead of being allowed to continue. | No | Final ParaView GPU results for `slice15_ch2_x2z` use the blocked scene-space dataset [slice15_ch2_x2z_grid_atlasscenespace.vtpd](~/code/atlas/large_test_image/slice15_ch2_x2z_grid_atlasscenespace.vtpd). |
 | `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | ParaView GPU | Prepared ParaView dataset | ParaView attempted to allocate well beyond host memory; the observed footprint exceeded about `100 GiB` on a machine with `64 GiB` RAM, so the run was killed. | No | This is currently treated as a non-viable ParaView GPU benchmark path for this dataset. |
 | `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um` | ParaView OSPRay | Skipped dense-input path | Not run. The dense MetaImage path would first allocate a full resident `vtkImageData` and then hand that resident scalar buffer to OSPRay, so it has the same fundamental host-memory requirement as the failed dense GPU path. For this dataset shape (`25395 x 19459 x 169`), that is about `77.78 GiB` even at `uint8`, before reader and renderer overhead. | No | Blocked `.vtpd` input is not a valid OSPRay volume path in this ParaView build. ParaView `vtkMetaImageReader::ExecuteDataWithInformation()` allocates the full output image and reads the full file into `data->GetScalarPointer()`, and `vtkOSPRayVolumeMapperNode` only accepts direct `vtkImageData` input and builds a `structuredRegular` OSPRay volume from that resident scalar array. |
 
@@ -1391,7 +1391,7 @@ as user-visible interaction benchmarks, not engine-only service-time benchmarks.
 | Detector | Exact pixel comparison inside the captured render-area ROI; any pixel change counts |
 | Capture crop | Centered `400 x 300` window-relative region inside the render pane |
 | Drag path | Horizontal left-button drag from `45%` to `75%` of the calibrated input region width |
-| Retained drags | Short rotate `0.5 s` (`30` injected samples) and sustained rotate `5.0 s` (`300` injected samples) |
+| Retained drags | Short rotate `0.5 s` (`60` injected samples, `120 Hz`) and sustained rotate `5.0 s` (`600` injected samples, `120 Hz`) |
 | Warm-up / measured runs | `1` warm-up run, `7` measured runs |
 | ParaView GUI prep | Applies the benchmark camera, then recenters `CameraFocalPoint` and `CenterOfRotation` to the data center before each run so GUI rotation stays centered on the object |
 | Atlas GUI prep | Loads the dataset once, applies the benchmark camera, then resets back to the `open` camera and waits for Atlas preview/final markers before each run |
@@ -1404,8 +1404,8 @@ Measured steady-state means for the retained centered `0.5 s` rotate sessions.
 
 | Session | Input | Render mode | First visible from drag start | Changed samples during drag | Changed samples / second | Visible FPS |
 | --- | --- | --- | --- | --- | --- | --- |
-| ParaView GPU MIP | Blocked `.vtpd` | `GPU Based` + `maximum-intensity` | `1832.200 ms` | `0.000` | `0.000` | n/a |
-| Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `50.569 ms` | `9.571` | `19.103` | `20.729 fps` |
+| ParaView GPU MIP | Blocked `.vtpd` | `GPU Based` + `maximum-intensity` | `2007.321 ms` | `0.000` | `0.000` | n/a |
+| Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `54.144 ms` | `10.143` | `20.253` | `22.181 fps` |
 
 ## GUI Snapshot: Sustained Rotate (`5.0 s`)
 
@@ -1413,28 +1413,28 @@ Measured steady-state means for the retained centered `5.0 s` rotate sessions.
 
 | Session | Input | Render mode | First visible from drag start | Changed samples during drag | Changed samples / second | Visible FPS |
 | --- | --- | --- | --- | --- | --- | --- |
-| ParaView GPU MIP | Blocked `.vtpd` | `GPU Based` + `maximum-intensity` | `1890.684 ms` | `2.000` | `0.400` | `0.553 fps` |
-| Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `51.478 ms` | `108.857` | `21.767` | `21.922 fps` |
+| ParaView GPU MIP | Blocked `.vtpd` | `GPU Based` + `maximum-intensity` | `1969.282 ms` | `2.000` | `0.400` | `0.554 fps` |
+| Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `44.721 ms` | `113.286` | `22.652` | `22.794 fps` |
 
 ## GUI Session 1: ParaView GPU MIP, Centered Rotate, `0.5 s`
 
 Artifacts:
-- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v3_centercrop`
-- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v3_centercrop/aggregate/summary.json`
+- Root: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v4_centercrop_120hzinput`
+- Aggregate summary: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_v4_centercrop_120hzinput/aggregate/summary.json`
 
 ### Setup
 
 | Item | Value |
 | --- | --- |
 | Software | ParaView 6.1.0-RC1 |
-| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
+| Dataset | `~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
 | Dataset format | Blocked `.vtpd` with `.vti` pieces |
 | Dataset size | `9216 x 6144 x 98`, single channel |
 | Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
 | Render mode | `GPU Based` + `maximum-intensity` |
 | Camera / rotation center | Benchmark camera from `slice15_scene_camera_exact_2000x1500.json`, then recentered to the data bounds center for GUI rotation parity |
 | Capture ROI | Centered `400 x 300` window-relative crop inside the render pane |
-| Drag duration / steps | `0.5 s`, `30` injected drag samples |
+| Drag duration / steps | `0.5 s`, `60` injected drag samples (`120 Hz`) |
 
 ### Warm-up
 
@@ -1443,8 +1443,8 @@ Artifacts:
 | Changed samples during drag | `0` |
 | Changed samples / second | `0.000` |
 | Visible FPS from mean interval | n/a |
-| First visible from drag start | `1788.228 ms` |
-| Drag duration | `501.348 ms` |
+| First visible from drag start | `1957.010 ms` |
+| Drag duration | `502.204 ms` |
 
 ### Measured Steady State
 
@@ -1453,68 +1453,68 @@ Artifacts:
 | Changed samples during drag | `7` | `0.000` | `0.000` | `0.000` | `0.000` | No visible render-area change was observed during any retained `0.5 s` drag. |
 | Changed samples / second | `7` | `0.000` | `0.000` | `0.000` | `0.000` | Primary short-drag cadence metric for ParaView in this exact-pixel suite. |
 | Visible FPS from mean interval | `0` | n/a | n/a | n/a | n/a | Undefined because there were no visible changed frames during the drag window. |
-| First visible from drag start | `7` | `1832.200 ms` | `1838.849 ms` | `35.883 ms` | `1874.407 ms` | The first visible render-area change consistently arrived well after the short drag had already ended. |
-| Drag duration | `7` | `501.172 ms` | `501.164 ms` | `0.464 ms` | `501.812 ms` | Measured from injected `drag_start` to `drag_end`. |
+| First visible from drag start | `7` | `2007.321 ms` | `2022.408 ms` | `31.044 ms` | `2036.915 ms` | The first visible render-area change consistently arrived well after the short drag had already ended. |
+| Drag duration | `7` | `501.032 ms` | `501.023 ms` | `0.513 ms` | `501.695 ms` | Measured from injected `drag_start` to `drag_end`. |
 
 ## GUI Session 2: Atlas MIP, Centered Rotate, `0.5 s`
 
 Artifacts:
-- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_v4_centercrop`
-- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_v4_centercrop/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_v7_centercrop_120hzinput_cancelcheckv2`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_v7_centercrop_120hzinput_cancelcheckv2/aggregate/summary.json`
 
 ### Setup
 
 | Item | Value |
 | --- | --- |
-| Software | Atlas build `v1.0.7-23-g43291dd4` |
-| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim` |
+| Software | Atlas build `v1.0.7-29-gb1cf2f5f` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_dense.nim` |
 | Dataset format | Dense `.nim` |
 | Live 3D canvas | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
 | Render mode | `Maximum Intensity Projection` |
 | View parity settings | Background hidden, axis hidden, bound box set to `No Bound Box`, full-resolution rendering enabled |
 | Camera reset | Benchmark `open` camera from `slice15_scene_camera_exact_2000x1500.json`, reapplied before every run |
 | Capture ROI | Centered `400 x 300` window-relative crop inside the 3D canvas |
-| Drag duration / steps | `0.5 s`, `30` injected drag samples |
+| Drag duration / steps | `0.5 s`, `60` injected drag samples (`120 Hz`) |
 
 ### Warm-up
 
 | Metric | Warm-up value |
 | --- | --- |
-| Changed samples during drag | `7` |
-| Changed samples / second | `13.861` |
-| Visible FPS from mean interval | `13.784 fps` |
-| First visible from drag start | `36.786 ms` |
-| Drag duration | `505.017 ms` |
+| Changed samples during drag | `8` |
+| Changed samples / second | `15.892` |
+| Visible FPS from mean interval | `21.326 fps` |
+| First visible from drag start | `157.573 ms` |
+| Drag duration | `503.397 ms` |
 
 ### Measured Steady State
 
 | Metric | Count | Mean | Median | Std | p95 | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Changed samples during drag | `7` | `9.571` | `9.000` | `1.050` | `11.000` | Atlas still shows multiple visible updates inside the short drag window even with the smaller centered ROI. |
-| Changed samples / second | `7` | `19.103` | `17.964` | `2.108` | `21.975` | Primary short-drag cadence metric for Atlas in this exact-pixel suite. |
-| Visible FPS from mean interval | `7` | `20.729 fps` | `20.016 fps` | `2.044 fps` | `23.698 fps` | Interval-derived visible cadence from changed-frame timestamps. |
-| First visible from drag start | `7` | `50.569 ms` | `50.342 ms` | `11.609 ms` | `68.394 ms` | Time to the first visible render-area change after drag motion begins. |
-| Drag duration | `7` | `501.084 ms` | `501.122 ms` | `0.474 ms` | `501.687 ms` | Measured from injected `drag_start` to `drag_end`. |
+| Changed samples during drag | `7` | `10.143` | `10.000` | `0.833` | `11.000` | Atlas still shows multiple visible updates inside the short drag window with the centered `120 Hz` capture setup. |
+| Changed samples / second | `7` | `20.253` | `19.978` | `1.670` | `21.987` | Primary short-drag cadence metric for Atlas in this exact-pixel suite. |
+| Visible FPS from mean interval | `7` | `22.181 fps` | `22.453 fps` | `2.578 fps` | `25.987 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `54.144 ms` | `54.168 ms` | `4.908 ms` | `58.761 ms` | Time to the first visible render-area change after drag motion begins. |
+| Drag duration | `7` | `500.824 ms` | `500.553 ms` | `0.572 ms` | `501.744 ms` | Measured from injected `drag_start` to `drag_end`. |
 
 ## GUI Session 3: ParaView GPU MIP, Centered Rotate, `5.0 s`
 
 Artifacts:
-- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate5s_v2_centercrop`
-- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate5s_v2_centercrop/aggregate/summary.json`
+- Root: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate5s_v3_centercrop_120hzinput`
+- Aggregate summary: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate5s_v3_centercrop_120hzinput/aggregate/summary.json`
 
 ### Setup
 
 | Item | Value |
 | --- | --- |
 | Software | ParaView 6.1.0-RC1 |
-| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
+| Dataset | `~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
 | Dataset format | Blocked `.vtpd` with `.vti` pieces |
 | Dataset size | `9216 x 6144 x 98`, single channel |
 | Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
 | Render mode | `GPU Based` + `maximum-intensity` |
 | Camera / rotation center | Benchmark camera from `slice15_scene_camera_exact_2000x1500.json`, then recentered to the data bounds center for GUI rotation parity |
 | Capture ROI | Centered `400 x 300` window-relative crop inside the render pane |
-| Drag duration / steps | `5.0 s`, `300` injected drag samples |
+| Drag duration / steps | `5.0 s`, `600` injected drag samples (`120 Hz`) |
 
 ### Warm-up
 
@@ -1522,9 +1522,9 @@ Artifacts:
 | --- | --- |
 | Changed samples during drag | `2` |
 | Changed samples / second | `0.400` |
-| Visible FPS from mean interval | `0.553 fps` |
-| First visible from drag start | `1873.220 ms` |
-| Drag duration | `5001.103 ms` |
+| Visible FPS from mean interval | `0.557 fps` |
+| First visible from drag start | `1967.760 ms` |
+| Drag duration | `5000.627 ms` |
 
 ### Measured Steady State
 
@@ -1532,49 +1532,49 @@ Artifacts:
 | --- | --- | --- | --- | --- | --- | --- |
 | Changed samples during drag | `7` | `2.000` | `2.000` | `0.000` | `2.000` | Exactly two visible render-area updates were observed in every retained `5 s` drag. |
 | Changed samples / second | `7` | `0.400` | `0.400` | `0.001` | `0.400` | Primary sustained-drag cadence metric for ParaView in this exact-pixel suite. |
-| Visible FPS from mean interval | `7` | `0.553 fps` | `0.554 fps` | `0.005 fps` | `0.561 fps` | Interval-derived visible cadence from changed-frame timestamps. |
-| First visible from drag start | `7` | `1890.684 ms` | `1897.453 ms` | `19.084 ms` | `1913.220 ms` | The first visible render-area change arrives around `1.9 s` into the sustained drag. |
-| Drag duration | `7` | `5003.727 ms` | `5001.234 ms` | `6.277 ms` | `5013.801 ms` | Measured from injected `drag_start` to `drag_end`. |
+| Visible FPS from mean interval | `7` | `0.554 fps` | `0.550 fps` | `0.008 fps` | `0.566 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `1969.282 ms` | `1978.934 ms` | `20.235 ms` | `1990.410 ms` | The first visible render-area change arrives around `2.0 s` into the sustained drag. |
+| Drag duration | `7` | `5001.161 ms` | `5000.867 ms` | `0.736 ms` | `5002.235 ms` | Measured from injected `drag_start` to `drag_end`. |
 
 ## GUI Session 4: Atlas MIP, Centered Rotate, `5.0 s`
 
 Artifacts:
-- Root: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate5s_v2_centercrop`
-- Aggregate summary: `/Users/feng/Dropbox/atlas_test/slice15_paraview/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate5s_v2_centercrop/aggregate/summary.json`
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate5s_v6_centercrop_120hzinput_cancelcheckv3_rerun2`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate5s_v6_centercrop_120hzinput_cancelcheckv3_rerun2/aggregate/summary.json`
 
 ### Setup
 
 | Item | Value |
 | --- | --- |
-| Software | Atlas build `v1.0.7-23-g43291dd4` |
-| Dataset | `/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim` |
+| Software | Atlas build `v1.0.7-29-gb1cf2f5f` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_dense.nim` |
 | Dataset format | Dense `.nim` |
 | Live 3D canvas | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
 | Render mode | `Maximum Intensity Projection` |
 | View parity settings | Background hidden, axis hidden, bound box set to `No Bound Box`, full-resolution rendering enabled |
 | Camera reset | Benchmark `open` camera from `slice15_scene_camera_exact_2000x1500.json`, reapplied before every run |
 | Capture ROI | Centered `400 x 300` window-relative crop inside the 3D canvas |
-| Drag duration / steps | `5.0 s`, `300` injected drag samples |
+| Drag duration / steps | `5.0 s`, `600` injected drag samples (`120 Hz`) |
 
 ### Warm-up
 
 | Metric | Warm-up value |
 | --- | --- |
-| Changed samples during drag | `109` |
-| Changed samples / second | `21.794` |
-| Visible FPS from mean interval | `21.848 fps` |
-| First visible from drag start | `42.576 ms` |
-| Drag duration | `5001.356 ms` |
+| Changed samples during drag | `112` |
+| Changed samples / second | `22.396` |
+| Visible FPS from mean interval | `22.539 fps` |
+| First visible from drag start | `56.722 ms` |
+| Drag duration | `5000.862 ms` |
 
 ### Measured Steady State
 
 | Metric | Count | Mean | Median | Std | p95 | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Changed samples during drag | `7` | `108.857` | `108.000` | `4.611` | `115.100` | Atlas keeps visible updates flowing through nearly the entire `5 s` drag window. |
-| Changed samples / second | `7` | `21.767` | `21.598` | `0.922` | `23.014` | Primary sustained-drag cadence metric for Atlas in this exact-pixel suite. |
-| Visible FPS from mean interval | `7` | `21.922 fps` | `21.756 fps` | `0.914 fps` | `23.124 fps` | Interval-derived visible cadence from changed-frame timestamps. |
-| First visible from drag start | `7` | `51.478 ms` | `53.966 ms` | `7.291 ms` | `60.776 ms` | Time to the first visible render-area change after drag motion begins. |
-| Drag duration | `7` | `5000.943 ms` | `5000.781 ms` | `0.406 ms` | `5001.564 ms` | Measured from injected `drag_start` to `drag_end`. |
+| Changed samples during drag | `7` | `113.286` | `113.000` | `4.199` | `118.700` | Atlas keeps visible updates flowing through nearly the entire `5 s` drag window. |
+| Changed samples / second | `7` | `22.652` | `22.589` | `0.839` | `23.736` | Primary sustained-drag cadence metric for Atlas in this exact-pixel suite. |
+| Visible FPS from mean interval | `7` | `22.794 fps` | `22.712 fps` | `0.764 fps` | `23.803 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `44.721 ms` | `44.852 ms` | `8.928 ms` | `56.716 ms` | Time to the first visible render-area change after drag motion begins. |
+| Drag duration | `7` | `5001.170 ms` | `5000.870 ms` | `0.734 ms` | `5002.314 ms` | Measured from injected `drag_start` to `drag_end`. |
 
 # Fidelity Validation: `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um`
 
@@ -1584,24 +1584,24 @@ ROIs cut from the retained
 supplementary quality audit, not a throughput benchmark.
 
 Artifacts:
-- ROI family: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2`
-- Retained DVR render suite: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_audit_v1`
-- Retained DVR analysis summary: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_audit_v1/analysis/summary.json`
-- Retained MIP analysis summary: `/Users/feng/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_mip_zoom06_v2_screenshot_summary_v1/summary.json`
+- ROI family: `~/code/atlas/large_test_image/fidelity_validation/high_res_20220219_roi_validation_v2`
+- Retained DVR render suite: `~/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_audit_v1`
+- Retained DVR analysis summary: `~/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_dvr_zoom06_v2_coarse2_audit_v1/analysis/summary.json`
+- Retained MIP analysis summary: `~/code/atlas/large_test_image/fidelity_validation/high_res_20220219_fidelity_render_mip_zoom06_v2_screenshot_summary_v1/summary.json`
 
 ## Fidelity Protocol
 
 | Item | Value |
 | --- | --- |
-| Source dataset | `/Users/feng/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
+| Source dataset | `~/code/atlas/large_test_image/high_res_20220219_stitched_all_spacing_0p1_0p1_2_um.nim` |
 | Source shape | `25395 x 19459 x 169`, single channel |
 | Source voxel size | `0.1 x 0.1 x 2.0 um` |
-| ROI export script | `/Users/feng/code/atlas/util/benchmark/export_high_res_fidelity_rois.py` |
+| ROI export script | `~/code/atlas/util/benchmark/export_high_res_fidelity_rois.py` |
 | ROI family | `high_res_20220219_roi_validation_v2` |
 | ROI crop shape | `2048 x 2048 x 169` |
 | Retained ROI centers | `(16800, 4300)`, `(13600, 7100)`, `(10500, 10000)`, `(4100, 10000)` |
 | ROI variants | `fullres.nim`, `level1.nim`, `level2.nim` |
-| Camera seed | `/Users/feng/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json` |
+| Camera seed | `~/code/atlas/large_test_image/high_res_scene_camera_exact_2000x1500.json` |
 | Camera policy | Fit each ROI box, then apply `camera-distance-scale = 0.6` to zoom in past the `L1` comfort zone |
 | Output render size | `2000 x 1500` physical pixels |
 | Atlas live 3D canvas size | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
@@ -1614,7 +1614,7 @@ Artifacts:
 | `adaptive` | Original large dataset with full-resolution rendering enabled, ROI `X/Y/Z Cut` applied, sampling rate `2.0` |
 | `coarse_l1` | Resident `level1.nim`, scaled back to native ROI footprint with `Coord Transform`, sampling rate `2.0` |
 | `coarse_l2` | Resident `level2.nim`, scaled back to native ROI footprint with `Coord Transform`, sampling rate `2.0` |
-| Analysis script | `/Users/feng/code/atlas/util/benchmark/analyze_fidelity_validation.py` |
+| Analysis script | `~/code/atlas/util/benchmark/analyze_fidelity_validation.py` |
 | DVR metric basis | Final screenshot RGB, converted to grayscale SSIM plus masked absolute-difference metrics |
 | MIP metric basis | Final screenshot RGB, converted to grayscale SSIM plus masked absolute-difference metrics, consistent with DVR |
 | Screen-space audit basis | Contributing sample/pixel counts, sufficient sample/pixel counts, `level 0` sample/pixel counts, and `level-0-limited` sample/pixel counts exported from the Atlas raycaster |

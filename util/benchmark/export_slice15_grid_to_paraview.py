@@ -28,8 +28,8 @@ GRID_LAYOUT = [
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 ]
 
-DEFAULT_INPUT_DIR = Path("/Users/feng/Dropbox/atlas_test/slice15")
-DEFAULT_OUTPUT_DIR = Path("/Users/feng/Dropbox/atlas_test/slice15_paraview")
+DEFAULT_INPUT_DIR = HOME / "Dropbox" / "atlas_test" / "slice15"
+DEFAULT_OUTPUT_DIR = HOME / "Dropbox" / "atlas_test" / "slice15_paraview"
 DEFAULT_PATTERN = "slice15_L{tile_id}_Sum.lsm"
 
 
@@ -537,3 +537,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+HOME = Path.home()

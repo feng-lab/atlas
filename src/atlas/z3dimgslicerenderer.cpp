@@ -921,7 +921,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       layerLease.renderTarget->attachSlice(i);
 
       //        if (i == 1) {
-      //        m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd_b.tif");
+      //        m_layerTarget->saveAsColorImage("~/Downloads/abcd_b.tif");
       //        }
 
       layerLease.renderTarget->bind();
@@ -938,7 +938,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       layerLease.renderTarget->release();
 
       // if (i == 1) {
-      // m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd.tif");
+      // m_layerTarget->saveAsColorImage("~/Downloads/abcd.tif");
       // }
     }
 

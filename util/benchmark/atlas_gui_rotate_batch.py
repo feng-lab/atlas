@@ -46,6 +46,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 INJECT_SCRIPT = SCRIPT_DIR / "macos_gui_drag_benchmark.py"
 SUMMARIZE_SCRIPT = SCRIPT_DIR / "summarize_gui_capture_fps.py"
 BUILD_CAPTURE_SCRIPT = SCRIPT_DIR / "build_macos_window_capture_sckit.sh"
+HOME = Path.home()
 
 
 @dataclass(frozen=True)
@@ -66,11 +67,23 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset",
-        default="/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_dense.nim",
+        default=str(
+            HOME
+            / "Dropbox"
+            / "atlas_test"
+            / "slice15_paraview"
+            / "slice15_ch2_dense.nim"
+        ),
     )
     parser.add_argument(
         "--camera-spec",
-        default="/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json",
+        default=str(
+            HOME
+            / "Dropbox"
+            / "atlas_test"
+            / "slice15_paraview"
+            / "slice15_scene_camera_exact_2000x1500.json"
+        ),
     )
     parser.add_argument("--calibration", required=True)
     parser.add_argument("--output-root", required=True)
@@ -89,7 +102,9 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--address", default="localhost:50051")
-    parser.add_argument("--atlas-log-path", default="/Users/feng/Library/Logs/Atlas")
+    parser.add_argument(
+        "--atlas-log-path", default=str(HOME / "Library" / "Logs" / "Atlas")
+    )
     parser.add_argument("--warmup-runs", type=int, default=1)
     parser.add_argument("--measured-runs", type=int, default=7)
     parser.add_argument("--window-x", type=int, default=100)

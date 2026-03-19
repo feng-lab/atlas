@@ -106,7 +106,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--atlas-dir", default="")
     parser.add_argument(
         "--atlas-log-path",
-        default="/Users/feng/Library/Logs/Atlas",
+        default=str(Path.home() / "Library" / "Logs" / "Atlas"),
         help=(
             "Deprecated compatibility flag. Fidelity renders now synchronize on the "
             "fixed-size screenshot/raw-MIP export calls instead of benchmark log markers."

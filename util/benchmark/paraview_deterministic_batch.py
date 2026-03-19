@@ -16,6 +16,7 @@ from typing import Any
 
 
 DEFAULT_PVTHON = "/Applications/ParaView-6.1.0-RC1.app/Contents/bin/pvpython"
+HOME = Path.home()
 
 ACTION_METRICS = (
     "scope_duration_ms",
@@ -146,7 +147,10 @@ def _fps_summary(values_ms: list[float]) -> dict[str, float | None]:
 def _parse_args() -> argparse.Namespace:
     script_dir = Path(__file__).resolve().parent
     default_output_root = (
-        Path("/Users/feng/Dropbox/atlas_test/slice15_paraview")
+        HOME
+        / "Dropbox"
+        / "atlas_test"
+        / "slice15_paraview"
         / "benchmarks"
         / f"paraview_deterministic_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     )
@@ -173,12 +177,24 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset",
-        default="/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd",
+        default=str(
+            HOME
+            / "Dropbox"
+            / "atlas_test"
+            / "slice15_paraview"
+            / "slice15_ch2_grid_atlasscenespace.vtpd"
+        ),
         help="ParaView dataset path",
     )
     parser.add_argument(
         "--camera-spec",
-        default="/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json",
+        default=str(
+            HOME
+            / "Dropbox"
+            / "atlas_test"
+            / "slice15_paraview"
+            / "slice15_scene_camera_exact_2000x1500.json"
+        ),
         help="Shared benchmark camera spec",
     )
     parser.add_argument(

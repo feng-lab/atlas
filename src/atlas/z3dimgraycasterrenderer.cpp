@@ -1100,9 +1100,9 @@ void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader
     shader.bindTexture(m_transferFuncUniformNames[0], tex);
   }
 
-  // m_transferFunctions[idx]->texture()->saveAsColorImage("/Users/feng/Downloads/abcd_tf.tif");
+  // m_transferFunctions[idx]->texture()->saveAsColorImage("~/Downloads/abcd_tf.tif");
   // if (auto* tex = m_img->channelTexture(idx)) {
-  //   tex->saveAsColorImage("/Users/feng/Downloads/abcd_v.tif");
+  //   tex->saveAsColorImage("~/Downloads/abcd_v.tif");
   // }
 
   CHECK_GL_ERROR
@@ -2099,7 +2099,15 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 {
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
   auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
-
+  const bool firstProgressiveRound = progressive && round == 0 && c == 0;
+  auto maybeCancelFirstProgressiveRound = [&]() {
+    // Once the fast preview is already on screen, the first full-res round is
+    // the most important place to abort stale work before expensive readback
+    // and paging stages begin.
+    if (firstProgressiveRound && cancellationToken.isCancellationRequested()) {
+      throw ZCancellationException();
+    }
+  };
   LOG(INFO) << "channel " << c << " round " << round;
   ZBenchTimer bt(fmt::format("render 3D image channel {} round {}", c, round));
 
@@ -2109,6 +2117,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   CHECK(lastTarget);
   CHECK(currentTarget);
 
+  maybeCancelFirstProgressiveRound();
   processEventsAndMaybeCancel(cancellationToken);
 
   m_image3DRaycasterBlockIDsShader->bind();
@@ -2168,6 +2177,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   // glFinish();
   bt.recordEvent("render blockids");
 
+  maybeCancelFirstProgressiveRound();
   processEventsAndMaybeCancel(cancellationToken);
 
   // check missed blocks and upload
@@ -2176,16 +2186,18 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     m_blockIDs.resize(missingBlockIDsTexture->numPixels() * 4);
     VLOG(1) << m_blockIDs.size();
   }
+  maybeCancelFirstProgressiveRound();
   missingBlockIDsTexture->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+  maybeCancelFirstProgressiveRound();
 
 #if 0
-          if (!QFileInfo("/Users/feng/Downloads/test_missid.tif").exists()) {
+          if (!QFileInfo("~/Downloads/test_missid.tif").exists()) {
             ZImg img;
             img.wrapData(m_blockIDs.data(), missingBlockIDsTexture->width(), missingBlockIDsTexture->height(), 1, 4);
             ZImg outImg = img;
             ZImgFormat::CXYZtoXYZC(img, outImg);
             outImg.flip(Dimension::Y);
-            outImg.save("/Users/feng/Downloads/test_missid.tif");
+            outImg.save("~/Downloads/test_missid.tif");
           }
 #endif
 
@@ -2196,6 +2208,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
                       ccSet.insert(range.begin(), range.end()); // inserts a sequence
                     });
 
+  maybeCancelFirstProgressiveRound();
   processEventsAndMaybeCancel(cancellationToken);
 
   CHECK(!ccSet.empty());
@@ -2213,8 +2226,10 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
     for (auto att = 1u; !hasEnoughMissingIDs && !lastRound && att < effectiveAttachments; ++att) {
       auto numberBlock = ccSet.size();
+      maybeCancelFirstProgressiveRound();
       blockLease.renderTarget->attachment(g_drawBuffers[att])
         ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+      maybeCancelFirstProgressiveRound();
 
       tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
                         [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
@@ -2231,6 +2246,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
         VLOG(1) << "last att: " << att;
       }
 
+      maybeCancelFirstProgressiveRound();
       processEventsAndMaybeCancel(cancellationToken);
     }
 
@@ -2254,10 +2270,12 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     // VLOG(1) << missingBlockIDs.size() << " " << usedBlockIDs.size();
     bt.recordEvent("collect blockids");
 
+    maybeCancelFirstProgressiveRound();
     processEventsAndMaybeCancel(cancellationToken);
 
     lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, round) && lastRound;
 
+    maybeCancelFirstProgressiveRound();
     processEventsAndMaybeCancel(cancellationToken);
   }
 
@@ -2369,7 +2387,7 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vecto
   // entry exit points
   m_scRaycasterShader->bindTexture("ray_entry_exit_tex_coord",
                                    m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
-  // m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("/Users/feng/Downloads/abcd_entryexit.tif");
+  // m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("~/Downloads/abcd_entryexit.tif");
 
   if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
     m_scRaycasterShader->setUniform("iso_value", m_isoValue);
@@ -2402,7 +2420,7 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vecto
 
       layerLease.renderTarget->release();
     }
-    // layerLease.renderTarget->colorTexture()->saveAsColorImage("/Users/feng/Downloads/abcd_b.tif");
+    // layerLease.renderTarget->colorTexture()->saveAsColorImage("~/Downloads/abcd_b.tif");
   }
 
   m_scRaycasterShader->release();

@@ -21,7 +21,7 @@ do
     #echo "$var"
     #echo "   "
     stackfn="";
-    imagefolder="/Users/feng/Documents/image/mCA3_CA1_raw/"
+    imagefolder="${HOME}/Documents/image/mCA3_CA1_raw/"
     case "$var" in
         0515_15*)
             stackfn="$imagefolder"0515_15.raw

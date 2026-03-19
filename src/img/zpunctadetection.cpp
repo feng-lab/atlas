@@ -999,8 +999,8 @@ MatrixXi ZPunctaDetection::detectSomaPuncta(const Image3DType *preprocessedImage
 
   typename Image3DType::Pointer somaPunctaImage = cropITKImage(preprocessedImage, minLoc, size);
 
-  //writeITKImage(somaPunctaImage.GetPointer(), "/Users/feng/Downloads/test_itk.tif");
-  //writeITKImage(somaArea.GetPointer(), "/Users/feng/Downloads/test_itk2.tif");
+  //writeITKImage(somaPunctaImage.GetPointer(), "~/Downloads/test_itk.tif");
+  //writeITKImage(somaArea.GetPointer(), "~/Downloads/test_itk2.tif");
 
   using MaskFilterType = itk::MaskImageFilter<Uint8Image3DType, Image3DType>;
   typename MaskFilterType::Pointer maskFilter = MaskFilterType::New();

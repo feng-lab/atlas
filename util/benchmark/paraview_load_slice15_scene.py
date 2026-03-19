@@ -27,6 +27,8 @@ from paraview.simple import (  # noqa: E402
 import paraview_volume_benchmark as pvb  # noqa: E402
 from volume_benchmark_common import load_benchmark_spec  # noqa: E402
 
+HOME = Path.home()
+
 
 def _parse_rgb_env(
     name: str, default: tuple[float, float, float]
@@ -43,11 +45,23 @@ def _parse_rgb_env(
 def main() -> int:
     dataset = os.environ.get(
         "PARAVIEW_SETUP_DATASET",
-        "/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd",
+        str(
+            HOME
+            / "Dropbox"
+            / "atlas_test"
+            / "slice15_paraview"
+            / "slice15_ch2_grid_atlasscenespace.vtpd"
+        ),
     )
     camera_spec = os.environ.get(
         "PARAVIEW_SETUP_CAMERA_SPEC",
-        "/Users/feng/Dropbox/atlas_test/slice15_paraview/slice15_scene_camera_exact_2000x1500.json",
+        str(
+            HOME
+            / "Dropbox"
+            / "atlas_test"
+            / "slice15_paraview"
+            / "slice15_scene_camera_exact_2000x1500.json"
+        ),
     )
     array_name = os.environ.get("PARAVIEW_SETUP_ARRAY_NAME", "channels")
     channel_mode = os.environ.get("PARAVIEW_SETUP_CHANNEL_MODE", "component")

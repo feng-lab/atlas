@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "utilities.h"
 #include "tz_string.h"
@@ -25,13 +26,18 @@
 
 int main(int argc, char *argv[])
 {
-  Stack *stack = Read_Raw_Stack_C("/Users/feng/enhanced.raw", 0);
+  const char* home = getenv("HOME");
+  char input_path[1024];
+  char output_path[1024];
+  snprintf(input_path, sizeof(input_path), "%s/%s", home ? home : ".", "enhanced.raw");
+  snprintf(output_path, sizeof(output_path), "%s/%s", home ? home : ".", "enhanced1.raw");
+
+  Stack* stack = Read_Raw_Stack_C(input_path, 0);
   size_t start = (size_t)stack->height * stack->width * stack->kind * 85;
   for (; start < (size_t)stack->height * stack->width * stack->kind * 95; start++) {
     if (*(uint8*)(stack->array+start)  != 0)
       printf("%d\n",*(uint8*)(stack->array+start) );
   }
-  Write_Stack_U("/Users/feng/enhanced1.raw", stack, NULL);
+  Write_Stack_U(output_path, stack, NULL);
   return 0;
-  
 }

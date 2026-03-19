@@ -2571,7 +2571,7 @@ void ZTest::test(MainWindow *host)
 
 #if 0
   ZStack stack;
-  stack.load("/Users/feng/Downloads/For_Programming.lsm");
+  stack.load("~/Downloads/For_Programming.lsm");
   stack.logLSMInfo();
 #endif
 
