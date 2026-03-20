@@ -349,7 +349,7 @@ std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource> ZNeuroglancerPrecomputed
 
   auto bytesOpt = folly::coro::blockingWait(getHttpBytesAsync(infoUrlStr, timeout));
   if (!bytesOpt) {
-    throw ZException(fmt::format("Neuroglancer skeleton info not found (HTTP 404) at '{}'", infoUrlStr));
+    throw ZException(fmt::format("Neuroglancer skeleton info not found (HTTP 403/404) at '{}'", infoUrlStr));
   }
   const std::string infoText(reinterpret_cast<const char*>(bytesOpt->data()), bytesOpt->size());
   return parseInfoJsonText(skeletonDirUrl, infoText, baseResolutionNm, baseVoxelOffset, timeout);
@@ -624,7 +624,7 @@ std::shared_ptr<ZSkeleton> ZNeuroglancerPrecomputedSkeletonSource::loadSkeletonB
     const std::string urlStr = toStdString(url.toString());
     auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(urlStr, m_timeout));
     if (!resOpt) {
-      throw ZNotFoundException(fmt::format("Neuroglancer skeleton not found for segment {} (HTTP 404)", segmentId));
+      throw ZNotFoundException(fmt::format("Neuroglancer skeleton not found for segment {} (HTTP 403/404)", segmentId));
     }
     if (resOpt->status != 200) {
       throw ZException(fmt::format("Failed to fetch neuroglancer skeleton from '{}' (HTTP {})", urlStr, resOpt->status));

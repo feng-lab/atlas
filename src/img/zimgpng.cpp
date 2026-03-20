@@ -4,25 +4,66 @@
 #include "zioutils.h"
 #include "zbenchtimer.h"
 #include <png.h>
-#include <folly/ScopeGuard.h>
+#include <csetjmp>
 
 namespace {
 
 using namespace nim;
 
-struct PngPack
+struct PngReadPack
 {
   png_structp pngPtr = nullptr;
   png_infop infoPtr = nullptr;
   png_infop endPtr = nullptr;
+
+  ~PngReadPack()
+  {
+    if (pngPtr) {
+      png_destroy_read_struct(&pngPtr, &infoPtr, &endPtr);
+    }
+  }
 };
 
-void pngReadErrorFunction(png_structp, const char* message)
+struct PngWritePack
 {
-  throw ZException(fmt::format("Libpng error: {}", message), ZException::Option::CheckErrno);
+  png_structp pngPtr = nullptr;
+  png_infop infoPtr = nullptr;
+
+  ~PngWritePack()
+  {
+    if (pngPtr) {
+      png_destroy_write_struct(&pngPtr, &infoPtr);
+    }
+  }
+};
+
+struct PngReadContext
+{
+  PngReadPack png;
+  std::string errorMessage;
+  ZImgInfo info;
+  std::vector<png_byte, boost::alignment::aligned_allocator<png_byte, 64>> outRaw;
+  std::vector<png_bytep> rowPointers;
+  ZImg imgTmp;
+};
+
+struct PngWriteContext
+{
+  PngWritePack png;
+  std::string errorMessage;
+  ZImg tmp;
+};
+
+void pngErrorFunction(png_structp pngPtr, const char* message)
+{
+  auto* errorMessage = static_cast<std::string*>(png_get_error_ptr(pngPtr));
+  if (errorMessage) {
+    *errorMessage = fmt::format("Libpng error: {}", message ? message : "<unknown>");
+  }
+  longjmp(png_jmpbuf(pngPtr), 1);
 }
 
-void pngReadWarningFunction(png_structp, const char* message)
+void pngWarningFunction(png_structp, const char* message)
 {
   LOG(WARNING) << "Libpng warning: " << message;
 }
@@ -232,42 +273,43 @@ void ZImgPng::readInfo(const QString& filename,
   // bt.start();
   auto infile = openFile(filename, "rb");
 
-  PngPack png;
-  png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
-  if (png.pngPtr) {
-    png.infoPtr = png_create_info_struct(png.pngPtr);
-    png.endPtr = png_create_info_struct(png.pngPtr);
+  auto png = std::make_unique<PngReadContext>();
+  png->png.pngPtr =
+    png_create_read_struct(PNG_LIBPNG_VER_STRING, &png->errorMessage, pngErrorFunction, pngWarningFunction);
+  if (png->png.pngPtr) {
+    png->png.infoPtr = png_create_info_struct(png->png.pngPtr);
+    png->png.endPtr = png_create_info_struct(png->png.pngPtr);
   }
-  if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
-    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
+  if (!png->png.pngPtr || !png->png.infoPtr || !png->png.endPtr) {
     throw ZException("Libpng read error", ZException::Option::CheckErrno);
   }
+  if (setjmp(png_jmpbuf(png->png.pngPtr))) {
+    throw ZException(png->errorMessage.empty() ? "Libpng read error" : png->errorMessage,
+                     ZException::Option::CheckErrno);
+  }
 
-  auto guard1 = folly::makeGuard([&png]() {
-    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
-  });
+  png_init_io(png->png.pngPtr, infile.get());
+  png_set_crc_action(png->png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
 
-  png_init_io(png.pngPtr, infile.get());
-  png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
-
-  png_set_read_user_chunk_fn(png.pngPtr, nullptr, skipIDATiDOTChunk);
-  png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, nullptr, 0);
+  png_set_read_user_chunk_fn(png->png.pngPtr, nullptr, skipIDATiDOTChunk);
+  png_set_keep_unknown_chunks(png->png.pngPtr, PNG_HANDLE_CHUNK_NEVER, nullptr, 0);
   unsigned char name[] = "IDAT";
-  png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name, 1);
+  png_set_keep_unknown_chunks(png->png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name, 1);
   // unsigned char name1[] = "iDOT";
-  // png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name1, 1);
+  // png_set_keep_unknown_chunks(png->png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name1, 1);
 
-  png_read_info(png.pngPtr, png.infoPtr);
-  png_read_end(png.pngPtr, png.endPtr);
+  png_read_info(png->png.pngPtr, png->png.infoPtr);
+  png_read_end(png->png.pngPtr, png->png.endPtr);
 
   infos.resize(1);
-  readInfoFromBuf(png.pngPtr, png.infoPtr, infos[0]);
+  readInfoFromBuf(png->png.pngPtr, png->png.infoPtr, infos[0]);
   // looking for resolution at end part if we don't have it
-  if (infos[0].voxelSizeUnit == VoxelSizeUnit::none && png_get_x_pixels_per_meter(png.pngPtr, png.endPtr) > 0 &&
-      png_get_y_pixels_per_meter(png.pngPtr, png.endPtr) > 0) {
+  if (infos[0].voxelSizeUnit == VoxelSizeUnit::none &&
+      png_get_x_pixels_per_meter(png->png.pngPtr, png->png.endPtr) > 0 &&
+      png_get_y_pixels_per_meter(png->png.pngPtr, png->png.endPtr) > 0) {
     infos[0].voxelSizeUnit = VoxelSizeUnit::m;
-    infos[0].voxelSizeX = 1.0 / png_get_x_pixels_per_meter(png.pngPtr, png.endPtr);
-    infos[0].voxelSizeY = 1.0 / png_get_y_pixels_per_meter(png.pngPtr, png.endPtr);
+    infos[0].voxelSizeX = 1.0 / png_get_x_pixels_per_meter(png->png.pngPtr, png->png.endPtr);
+    infos[0].voxelSizeY = 1.0 / png_get_y_pixels_per_meter(png->png.pngPtr, png->png.endPtr);
   }
 
   createDefaultSubBlocks(filename, infos, subBlocks);
@@ -281,35 +323,35 @@ void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t s
 
   auto infile = openFile(filename, "rb");
 
-  PngPack png;
-  png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
-  if (png.pngPtr) {
-    png.infoPtr = png_create_info_struct(png.pngPtr);
-    png.endPtr = png_create_info_struct(png.pngPtr);
+  auto png = std::make_unique<PngReadContext>();
+  png->png.pngPtr =
+    png_create_read_struct(PNG_LIBPNG_VER_STRING, &png->errorMessage, pngErrorFunction, pngWarningFunction);
+  if (png->png.pngPtr) {
+    png->png.infoPtr = png_create_info_struct(png->png.pngPtr);
+    png->png.endPtr = png_create_info_struct(png->png.pngPtr);
   }
-  if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
-    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
+  if (!png->png.pngPtr || !png->png.infoPtr || !png->png.endPtr) {
     throw ZException("Libpng read error", ZException::Option::CheckErrno);
   }
+  if (setjmp(png_jmpbuf(png->png.pngPtr))) {
+    throw ZException(png->errorMessage.empty() ? "Libpng read error" : png->errorMessage,
+                     ZException::Option::CheckErrno);
+  }
 
-  auto guard1 = folly::makeGuard([&png]() {
-    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
-  });
+  png_init_io(png->png.pngPtr, infile.get());
+  png_set_crc_action(png->png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
 
-  png_init_io(png.pngPtr, infile.get());
-  png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
-
-  png_set_read_user_chunk_fn(png.pngPtr, nullptr, skipIDATiDOTChunk);
-  png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, nullptr, 0);
+  png_set_read_user_chunk_fn(png->png.pngPtr, nullptr, skipIDATiDOTChunk);
+  png_set_keep_unknown_chunks(png->png.pngPtr, PNG_HANDLE_CHUNK_NEVER, nullptr, 0);
   unsigned char name[] = "IDAT";
-  png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name, 1);
+  png_set_keep_unknown_chunks(png->png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name, 1);
   // unsigned char name1[] = "iDOT";
-  // png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name1, 1);
+  // png_set_keep_unknown_chunks(png->png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name1, 1);
 
-  png_read_info(png.pngPtr, png.infoPtr);
-  png_read_end(png.pngPtr, png.endPtr);
+  png_read_info(png->png.pngPtr, png->png.infoPtr);
+  png_read_end(png->png.pngPtr, png->png.endPtr);
 
-  readMetaDataFromState(png.pngPtr, png.infoPtr, png.endPtr, meta);
+  readMetaDataFromState(png->png.pngPtr, png->png.infoPtr, png->png.endPtr, meta);
 }
 
 void ZImgPng::readThumbnail(const QString& /*filename*/,
@@ -330,76 +372,76 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
 
   auto infile = openFile(filename, "rb");
 
-  PngPack png;
-  png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
-  if (png.pngPtr) {
-    png.infoPtr = png_create_info_struct(png.pngPtr);
-    png.endPtr = png_create_info_struct(png.pngPtr);
+  auto png = std::make_unique<PngReadContext>();
+  png->png.pngPtr =
+    png_create_read_struct(PNG_LIBPNG_VER_STRING, &png->errorMessage, pngErrorFunction, pngWarningFunction);
+  if (png->png.pngPtr) {
+    png->png.infoPtr = png_create_info_struct(png->png.pngPtr);
+    png->png.endPtr = png_create_info_struct(png->png.pngPtr);
   }
-  if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
-    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
+  if (!png->png.pngPtr || !png->png.infoPtr || !png->png.endPtr) {
     throw ZException("Libpng read error", ZException::Option::CheckErrno);
   }
-
-  auto guard1 = folly::makeGuard([&png]() {
-    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
-  });
-
-  png_init_io(png.pngPtr, infile.get());
-  png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
-
-  png_read_info(png.pngPtr, png.infoPtr);
-
-  ZImgInfo info;
-  readInfoFromBuf(png.pngPtr, png.infoPtr, info);
-
-  if (region.isEmpty() || !region.isValid(info)) {
-    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", info, region));
+  if (setjmp(png_jmpbuf(png->png.pngPtr))) {
+    throw ZException(png->errorMessage.empty() ? "Libpng read error" : png->errorMessage,
+                     ZException::Option::CheckErrno);
   }
 
-  png_byte colorType = png_get_color_type(png.pngPtr, png.infoPtr);
-  png_byte bitDepth = png_get_bit_depth(png.pngPtr, png.infoPtr);
+  png_init_io(png->png.pngPtr, infile.get());
+  png_set_crc_action(png->png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
+
+  png_read_info(png->png.pngPtr, png->png.infoPtr);
+
+  readInfoFromBuf(png->png.pngPtr, png->png.infoPtr, png->info);
+
+  if (region.isEmpty() || !region.isValid(png->info)) {
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", png->info, region));
+  }
+
+  png_byte colorType = png_get_color_type(png->png.pngPtr, png->png.infoPtr);
+  png_byte bitDepth = png_get_bit_depth(png->png.pngPtr, png->png.infoPtr);
   if (colorType == PNG_COLOR_TYPE_PALETTE) {
-    png_set_palette_to_rgb(png.pngPtr);
+    png_set_palette_to_rgb(png->png.pngPtr);
   }
-  if (png_get_valid(png.pngPtr, png.infoPtr, PNG_INFO_tRNS) && colorType != PNG_COLOR_TYPE_GRAY_ALPHA &&
+  if (png_get_valid(png->png.pngPtr, png->png.infoPtr, PNG_INFO_tRNS) && colorType != PNG_COLOR_TYPE_GRAY_ALPHA &&
       colorType != PNG_COLOR_TYPE_RGB_ALPHA) {
-    png_set_tRNS_to_alpha(png.pngPtr); // will 1 2 4-bit image value to range 0-255
+    png_set_tRNS_to_alpha(png->png.pngPtr); // will 1 2 4-bit image value to range 0-255
   }
   if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8) {
-    // png_set_expand_gray_1_2_4_to_8(png.pngPtr);  // will scale value to range 0-255
-    png_set_packing(png.pngPtr);
+    // png_set_expand_gray_1_2_4_to_8(png->png.pngPtr);  // will scale value to range 0-255
+    png_set_packing(png->png.pngPtr);
   }
   // if (bitDepth == 16) {     // we do it later with separateChannel
-  // png_set_swap(png.pngPtr);
+  // png_set_swap(png->png.pngPtr);
   // }
-  png_set_interlace_handling(png.pngPtr);
-  png_read_update_info(png.pngPtr, png.infoPtr);
+  png_set_interlace_handling(png->png.pngPtr);
+  png_read_update_info(png->png.pngPtr, png->png.infoPtr);
 
-  size_t rowBytes = png_get_rowbytes(png.pngPtr, png.infoPtr);
-  if (rowBytes * info.height != info.byteNumber()) {
+  size_t rowBytes = png_get_rowbytes(png->png.pngPtr, png->png.infoPtr);
+  if (rowBytes * png->info.height != png->info.byteNumber()) {
     throw ZException("fatal png read error", ZException::Option::CheckErrno);
   }
-  std::vector<png_byte, boost::alignment::aligned_allocator<png_byte, 64>> outRaw(info.byteNumber());
-  std::vector<png_bytep> rowPointers(info.height);
-  for (size_t i = 0; i < rowPointers.size(); ++i) {
-    rowPointers[i] = outRaw.data() + i * rowBytes;
+  png->outRaw.resize(png->info.byteNumber());
+  png->rowPointers.resize(png->info.height);
+  for (size_t i = 0; i < png->rowPointers.size(); ++i) {
+    png->rowPointers[i] = png->outRaw.data() + i * rowBytes;
   }
-  png_read_image(png.pngPtr, rowPointers.data());
-  png_read_end(png.pngPtr, png.endPtr);
+  png_read_image(png->png.pngPtr, png->rowPointers.data());
+  png_read_end(png->png.pngPtr, png->png.endPtr);
 
-  ZImg imgTmp(region.clip(info));
-  separateChannel(outRaw.data(), info, region, imgTmp);
+  png->imgTmp = ZImg(region.clip(png->info));
+  separateChannel(png->outRaw.data(), png->info, region, png->imgTmp);
 
-  readMetaDataFromState(png.pngPtr, png.infoPtr, png.endPtr, imgTmp.metadataRef());
+  readMetaDataFromState(png->png.pngPtr, png->png.infoPtr, png->png.endPtr, png->imgTmp.metadataRef());
   // looking for resolution at end part if we don't have it
-  if (imgTmp.infoRef().voxelSizeUnit == VoxelSizeUnit::none && png_get_x_pixels_per_meter(png.pngPtr, png.endPtr) > 0 &&
-      png_get_y_pixels_per_meter(png.pngPtr, png.endPtr) > 0) {
-    imgTmp.infoRef().voxelSizeUnit = VoxelSizeUnit::m;
-    imgTmp.infoRef().voxelSizeX = 1.0 / png_get_x_pixels_per_meter(png.pngPtr, png.endPtr);
-    imgTmp.infoRef().voxelSizeY = 1.0 / png_get_y_pixels_per_meter(png.pngPtr, png.endPtr);
+  if (png->imgTmp.infoRef().voxelSizeUnit == VoxelSizeUnit::none &&
+      png_get_x_pixels_per_meter(png->png.pngPtr, png->png.endPtr) > 0 &&
+      png_get_y_pixels_per_meter(png->png.pngPtr, png->png.endPtr) > 0) {
+    png->imgTmp.infoRef().voxelSizeUnit = VoxelSizeUnit::m;
+    png->imgTmp.infoRef().voxelSizeX = 1.0 / png_get_x_pixels_per_meter(png->png.pngPtr, png->png.endPtr);
+    png->imgTmp.infoRef().voxelSizeY = 1.0 / png_get_y_pixels_per_meter(png->png.pngPtr, png->png.endPtr);
   }
-  imgTmp.swap(img);
+  png->imgTmp.swap(img);
 }
 
 void ZImgPng::checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras)
@@ -425,23 +467,23 @@ void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWrite
 
   auto outfile = openFile(filename, "wb");
 
-  PngPack png;
-  png.pngPtr = png_create_write_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
-  if (png.pngPtr) {
-    png.infoPtr = png_create_info_struct(png.pngPtr);
+  auto png = std::make_unique<PngWriteContext>();
+  png->png.pngPtr =
+    png_create_write_struct(PNG_LIBPNG_VER_STRING, &png->errorMessage, pngErrorFunction, pngWarningFunction);
+  if (png->png.pngPtr) {
+    png->png.infoPtr = png_create_info_struct(png->png.pngPtr);
   }
-  if (!png.pngPtr || !png.infoPtr) {
-    png_destroy_write_struct(&png.pngPtr, &png.infoPtr);
+  if (!png->png.pngPtr || !png->png.infoPtr) {
     throw ZException("can not create Libpng write struct", ZException::Option::CheckErrno);
   }
+  if (setjmp(png_jmpbuf(png->png.pngPtr))) {
+    throw ZException(png->errorMessage.empty() ? "Libpng write error" : png->errorMessage,
+                     ZException::Option::CheckErrno);
+  }
 
-  auto guard1 = folly::makeGuard([&png]() {
-    png_destroy_write_struct(&png.pngPtr, &png.infoPtr);
-  });
+  png_init_io(png->png.pngPtr, outfile.get());
 
-  png_init_io(png.pngPtr, outfile.get());
-
-  png_set_compression_level(png.pngPtr, paras.zlibCompressionLevel);
+  png_set_compression_level(png->png.pngPtr, paras.zlibCompressionLevel);
 
   int colorType = PNG_COLOR_TYPE_RGB_ALPHA;
   if (img.info().numChannels == 1) {
@@ -455,8 +497,8 @@ void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWrite
     CHECK(img.info().lastChannelIsAlphaChannel && img.info().numChannels == 4);
   }
 
-  png_set_IHDR(png.pngPtr,
-               png.infoPtr,
+  png_set_IHDR(png->png.pngPtr,
+               png->png.infoPtr,
                img.width(),
                img.height(),
                8 * img.bytesPerVoxel(),
@@ -470,17 +512,18 @@ void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWrite
   text[num_text].key = const_cast<char*>("Description");
   text[num_text].text = const_cast<char*>("Created by zimg");
   ++num_text;
-  png_set_text(png.pngPtr, png.infoPtr, text, num_text);
+  png_set_text(png->png.pngPtr, png->png.infoPtr, text, num_text);
 
-  png_write_info(png.pngPtr, png.infoPtr);
+  png_write_info(png->png.pngPtr, png->png.infoPtr);
 
-  ZImg tmp(img.info());
-  CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info();
-  ZImgFormat::XYZCtoCXYZ(img, tmp);
-  for (size_t r = 0; r < tmp.height(); ++r) {
-    png_write_row(png.pngPtr, tmp.channelData<uint8_t>(0) + r * tmp.rowByteNumber() * tmp.numChannels());
+  png->tmp = ZImg(img.info());
+  CHECK(png->tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info();
+  ZImgFormat::XYZCtoCXYZ(img, png->tmp);
+  for (size_t r = 0; r < png->tmp.height(); ++r) {
+    png_write_row(png->png.pngPtr,
+                  png->tmp.channelData<uint8_t>(0) + r * png->tmp.rowByteNumber() * png->tmp.numChannels());
   }
-  png_write_end(png.pngPtr, nullptr);
+  png_write_end(png->png.pngPtr, nullptr);
 }
 
 bool ZImgPng::supportRead() const

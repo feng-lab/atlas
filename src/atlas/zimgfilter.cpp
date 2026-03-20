@@ -9,6 +9,7 @@
 #include "zlog.h"
 #include "zmessageboxhelpers.h"
 #include "znumericparameter.h"
+#include "zexception.h"
 #include "zwidgetsgroup.h"
 #include "ztheme.h"
 #include "zgraphicsview.h"
@@ -23,6 +24,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QWindow>
+#include <folly/OperationCancelled.h>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QtConcurrent/QtConcurrentMap>
 #include <algorithm>
@@ -286,6 +288,11 @@ Neuroglancer2DRenderResult renderNeuroglancer2D(Neuroglancer2DRenderParams param
   return epochAtomic->load(std::memory_order_relaxed) == epoch;
 }
 
+[[nodiscard]] bool isBestEffortNeuroglancer2DPass(Neuroglancer2DRenderParams::Pass pass)
+{
+  return pass != Neuroglancer2DRenderParams::Pass::Final;
+}
+
 Neuroglancer2DTileResult renderNeuroglancer2DTile(Neuroglancer2DTileTask task)
 {
   Neuroglancer2DTileResult out;
@@ -350,7 +357,19 @@ Neuroglancer2DTileResult renderNeuroglancer2DTile(Neuroglancer2DTileTask task)
                                          task.shared->colorizationMode);
     return out;
   }
+  catch (const ZCancellationException&) {
+    // Superseded/cancelled renders should vanish quietly rather than surfacing
+    // as tile errors.
+    return out;
+  }
+  catch (const folly::OperationCancelled&) {
+    return out;
+  }
   catch (const std::exception& e) {
+    if (isBestEffortNeuroglancer2DPass(task.shared->pass)) {
+      VLOG(1) << "Neuroglancer 2D best-effort tile render skipped: " << e.what();
+      return out;
+    }
     out.error = QString::fromUtf8(e.what());
     return out;
   }

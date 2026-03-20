@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <csetjmp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -67,9 +68,38 @@ struct PngReadState
   size_t offset = 0;
 };
 
-void pngReadErrorFunction(png_structp, const char* message)
+struct PngDecodeState;
+
+struct PngReadPack
 {
-  throw ZException(fmt::format("Libpng error: {}", message));
+  png_structp pngPtr = nullptr;
+  png_infop infoPtr = nullptr;
+  png_infop endPtr = nullptr;
+
+  ~PngReadPack()
+  {
+    if (pngPtr) {
+      png_destroy_read_struct(&pngPtr, &infoPtr, &endPtr);
+    }
+  }
+};
+
+struct PngDecodeState
+{
+  PngReadPack png;
+  PngReadState readState;
+  std::string errorMessage;
+  std::vector<uint8_t> interleaved;
+  std::vector<png_bytep> rowPointers;
+};
+
+void pngReadErrorFunction(png_structp pngPtr, const char* message)
+{
+  auto* state = static_cast<PngDecodeState*>(png_get_error_ptr(pngPtr));
+  if (state) {
+    state->errorMessage = fmt::format("Libpng error: {}", message ? message : "<unknown>");
+  }
+  longjmp(png_jmpbuf(pngPtr), 1);
 }
 
 void pngReadWarningFunction(png_structp, const char* message)
@@ -93,20 +123,6 @@ void pngReadCallback(png_structp pngPtr, png_bytep outBytes, png_size_t byteCoun
   st->offset += static_cast<size_t>(byteCountToRead);
 }
 
-struct PngReadPack
-{
-  png_structp pngPtr = nullptr;
-  png_infop infoPtr = nullptr;
-  png_infop endPtr = nullptr;
-
-  ~PngReadPack()
-  {
-    if (pngPtr) {
-      png_destroy_read_struct(&pngPtr, &infoPtr, &endPtr);
-    }
-  }
-};
-
 } // namespace
 
 std::vector<uint8_t> ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t> pngBytes,
@@ -127,26 +143,30 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::s
     throw ZException("Invalid PNG chunk: empty payload");
   }
 
-  PngReadPack png;
-  png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, pngReadErrorFunction, pngReadWarningFunction);
-  if (png.pngPtr) {
-    png.infoPtr = png_create_info_struct(png.pngPtr);
-    png.endPtr = png_create_info_struct(png.pngPtr);
+  auto decodeState = std::make_unique<PngDecodeState>();
+  decodeState->png.pngPtr =
+    png_create_read_struct(PNG_LIBPNG_VER_STRING, decodeState.get(), pngReadErrorFunction, pngReadWarningFunction);
+  if (decodeState->png.pngPtr) {
+    decodeState->png.infoPtr = png_create_info_struct(decodeState->png.pngPtr);
+    decodeState->png.endPtr = png_create_info_struct(decodeState->png.pngPtr);
   }
-  if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
+  if (!decodeState->png.pngPtr || !decodeState->png.infoPtr || !decodeState->png.endPtr) {
     throw ZException("Libpng: failed to create read struct");
   }
+  if (setjmp(png_jmpbuf(decodeState->png.pngPtr))) {
+    const std::string message = decodeState->errorMessage.empty() ? "Libpng decode failed" : decodeState->errorMessage;
+    throw ZException(message);
+  }
 
-  PngReadState state;
-  state.data = pngBytes.data();
-  state.size = pngBytes.size();
-  state.offset = 0;
+  decodeState->readState.data = pngBytes.data();
+  decodeState->readState.size = pngBytes.size();
+  decodeState->readState.offset = 0;
 
-  png_set_read_fn(png.pngPtr, &state, pngReadCallback);
-  png_read_info(png.pngPtr, png.infoPtr);
+  png_set_read_fn(decodeState->png.pngPtr, &decodeState->readState, pngReadCallback);
+  png_read_info(decodeState->png.pngPtr, decodeState->png.infoPtr);
 
-  const png_uint_32 widthU32 = png_get_image_width(png.pngPtr, png.infoPtr);
-  const png_uint_32 heightU32 = png_get_image_height(png.pngPtr, png.infoPtr);
+  const png_uint_32 widthU32 = png_get_image_width(decodeState->png.pngPtr, decodeState->png.infoPtr);
+  const png_uint_32 heightU32 = png_get_image_height(decodeState->png.pngPtr, decodeState->png.infoPtr);
   if (widthU32 == 0 || heightU32 == 0) {
     throw ZException(fmt::format("Invalid PNG chunk dimensions: width={}, height={}", widthU32, heightU32));
   }
@@ -161,8 +181,8 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::s
                                  expectedVoxelCount));
   }
 
-  const png_byte bitDepth = png_get_bit_depth(png.pngPtr, png.infoPtr);
-  const png_byte colorType = png_get_color_type(png.pngPtr, png.infoPtr);
+  const png_byte bitDepth = png_get_bit_depth(decodeState->png.pngPtr, decodeState->png.infoPtr);
+  const png_byte colorType = png_get_color_type(decodeState->png.pngPtr, decodeState->png.infoPtr);
 
   if (!(bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8 || bitDepth == 16)) {
     throw ZException(fmt::format("Invalid PNG bit depth: {}", static_cast<int>(bitDepth)));
@@ -211,35 +231,35 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::s
   }
 
   if (colorType == PNG_COLOR_TYPE_PALETTE) {
-    png_set_palette_to_rgb(png.pngPtr);
+    png_set_palette_to_rgb(decodeState->png.pngPtr);
   }
   if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8) {
-    png_set_packing(png.pngPtr);
+    png_set_packing(decodeState->png.pngPtr);
   }
   if (bitDepth == 16) {
     // PNG stores 16-bit samples in big-endian order. Neuroglancer expects little-endian raw data.
-    png_set_swap(png.pngPtr);
+    png_set_swap(decodeState->png.pngPtr);
   }
-  png_set_interlace_handling(png.pngPtr);
-  png_read_update_info(png.pngPtr, png.infoPtr);
+  png_set_interlace_handling(decodeState->png.pngPtr);
+  png_read_update_info(decodeState->png.pngPtr, decodeState->png.infoPtr);
 
-  const size_t rowBytes = static_cast<size_t>(png_get_rowbytes(png.pngPtr, png.infoPtr));
+  const size_t rowBytes = static_cast<size_t>(png_get_rowbytes(decodeState->png.pngPtr, decodeState->png.infoPtr));
   const size_t expectedRowBytes = checkedMul(checkedMul(width, expectedChannels, "PNG row pixels"), bytesPerVoxel, "PNG row bytes");
   if (rowBytes != expectedRowBytes) {
     throw ZException(fmt::format("PNG chunk row byte mismatch: decoded rowBytes={}, expected {}", rowBytes, expectedRowBytes));
   }
 
-  std::vector<uint8_t> interleaved(checkedMul(rowBytes, height, "PNG decoded bytes"));
-  std::vector<png_bytep> rowPointers(height);
+  decodeState->interleaved.resize(checkedMul(rowBytes, height, "PNG decoded bytes"));
+  decodeState->rowPointers.resize(height);
   for (size_t y = 0; y < height; ++y) {
-    rowPointers[y] = interleaved.data() + y * rowBytes;
+    decodeState->rowPointers[y] = decodeState->interleaved.data() + y * rowBytes;
   }
 
-  png_read_image(png.pngPtr, rowPointers.data());
-  png_read_end(png.pngPtr, png.endPtr);
+  png_read_image(decodeState->png.pngPtr, decodeState->rowPointers.data());
+  png_read_end(decodeState->png.pngPtr, decodeState->png.endPtr);
 
   if (expectedChannels == 1) {
-    return interleaved;
+    return std::move(decodeState->interleaved);
   }
 
   std::vector<uint8_t> planar(checkedMul(checkedMul(area, expectedChannels, "PNG planar elements"), bytesPerVoxel, "PNG planar bytes"));
@@ -247,7 +267,7 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::s
     for (size_t c = 0; c < expectedChannels; ++c) {
       const size_t srcOffset = (i * expectedChannels + c) * bytesPerVoxel;
       const size_t dstOffset = (c * area + i) * bytesPerVoxel;
-      std::memcpy(planar.data() + dstOffset, interleaved.data() + srcOffset, bytesPerVoxel);
+      std::memcpy(planar.data() + dstOffset, decodeState->interleaved.data() + srcOffset, bytesPerVoxel);
     }
   }
   return planar;

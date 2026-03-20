@@ -153,7 +153,7 @@ std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecompu
 
   auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(infoUrlStr, timeout));
   if (!resOpt) {
-    throw ZException(fmt::format("Segment properties info not found (HTTP 404) at '{}'", infoUrlStr));
+    throw ZException(fmt::format("Segment properties info not found (HTTP 403/404) at '{}'", infoUrlStr));
   }
   if (resOpt->status != 200) {
     throw ZException(fmt::format("Failed to fetch segment properties info from '{}' (HTTP {})", infoUrlStr, resOpt->status));

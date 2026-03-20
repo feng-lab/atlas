@@ -551,7 +551,7 @@ std::shared_ptr<ZNeuroglancerPrecomputedVolume> ZNeuroglancerPrecomputedVolume::
     folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(infoUrlStr, vol->m_defaultTimeout));
   if (!infoResOpt) {
     throw ZException(fmt::format(
-      "Neuroglancer precomputed info not found (HTTP 404) at '{}'. Ensure the URL points to a precomputed dataset root (directory containing an 'info' file).",
+      "Neuroglancer precomputed info not found (HTTP 403/404) at '{}'. Ensure the URL points to a precomputed dataset root (directory containing an 'info' file).",
       infoUrlStr));
   }
   if (infoResOpt->status != 200) {
@@ -1336,7 +1336,13 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChu
       chunkDebugUrl = urlStr;
       auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(urlStr, m_defaultTimeout);
       if (!resOpt) {
+        // Missing unsharded chunk objects are a soft miss in Neuroglancer.
+        // Sparse datasets may omit all-zero chunks entirely, and getBytes()
+        // normalizes both HTTP 403 and 404 to "not found" for parity.
         co_return std::shared_ptr<ZImg>();
+      }
+      if (resOpt->status != 200) {
+        throw ZException(fmt::format("Failed to fetch neuroglancer chunk from '{}' (HTTP {})", urlStr, resOpt->status));
       }
       if (statsSink) {
         switch (resOpt->source) {

@@ -766,9 +766,6 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedM
   if (!resOpt) {
     co_return std::nullopt;
   }
-  if (resOpt->status == 404) {
-    co_return std::nullopt;
-  }
   if (resOpt->status != 200) {
     throw ZException(fmt::format("HTTP GET failed for '{}' (status {})", url, resOpt->status));
   }
@@ -789,9 +786,6 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedM
     m_timeout,
     {{"range", fmt::format("bytes={}-{}", offset, endInclusive)}});
   if (!resOpt) {
-    co_return std::nullopt;
-  }
-  if (resOpt->status == 404) {
     co_return std::nullopt;
   }
   if (resOpt->status != 206 && resOpt->status != 200) {

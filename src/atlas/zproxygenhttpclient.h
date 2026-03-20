@@ -54,6 +54,9 @@ class ZProxygenHttpClient
 public:
   static ZProxygenHttpClient& instance();
 
+  // Returns std::nullopt for missing resources. For Neuroglancer parity, both
+  // HTTP 403 and 404 are normalized to "not found" because some object stores
+  // report absent objects as 403.
   folly::coro::Task<std::optional<ZHttpGetBytesResult>> getBytes(std::string url,
                                                                  std::chrono::milliseconds timeout,
                                                                  std::vector<std::pair<std::string, std::string>> requestHeaders = {});

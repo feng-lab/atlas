@@ -488,7 +488,7 @@ std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> ZNeuroglancerPrecompu
 
   auto bytesOpt = folly::coro::blockingWait(getHttpBytesAsync(infoUrlStr, timeout));
   if (!bytesOpt) {
-    throw ZException(fmt::format("Neuroglancer annotations info not found (HTTP 404) at '{}'", infoUrlStr));
+    throw ZException(fmt::format("Neuroglancer annotations info not found (HTTP 403/404) at '{}'", infoUrlStr));
   }
   const std::string infoText(reinterpret_cast<const char*>(bytesOpt->data()), bytesOpt->size());
   return parseInfoJsonText(rootUrl, infoText, baseResolutionNm, baseVoxelOffset, timeout);
@@ -738,7 +738,8 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryBl
     const std::string urlStr = toStdString(url.toString());
     auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(urlStr, m_timeout));
     if (!resOpt) {
-      throw ZNotFoundException(fmt::format("Neuroglancer annotations index entry not found for key {} (HTTP 404)", key));
+      throw ZNotFoundException(
+        fmt::format("Neuroglancer annotations index entry not found for key {} (HTTP 403/404)", key));
     }
     if (resOpt->status != 200) {
       throw ZException(fmt::format("Failed to fetch neuroglancer annotations index entry from '{}' (HTTP {})", urlStr, resOpt->status));

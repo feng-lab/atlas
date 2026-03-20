@@ -121,6 +121,14 @@ std::vector<uint8_t> iobufToBytes(/*nullable*/ const folly::IOBuf* buf)
   return true;
 }
 
+[[nodiscard]] bool isMissingResourceHttpStatus(uint16_t status)
+{
+  // Match Neuroglancer's HTTP-store semantics: object stores and proxies may
+  // report an absent object as 403 rather than 404, and both are treated as a
+  // soft "not found" at the read layer.
+  return status == 403 || status == 404;
+}
+
 std::vector<uint8_t> brotliDecompress(folly::StringPiece encoded)
 {
   struct StateDeleter
@@ -903,6 +911,9 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
 
     if (attemptResult.hasValue()) {
       ZHttpGetBytesResult value = std::move(attemptResult).value();
+      if (isMissingResourceHttpStatus(value.status)) {
+        co_return std::nullopt;
+      }
       if (m_diskCache && m_diskCache->isEnabled()) {
         m_diskCache->put(url, requestHeaders, value);
       }
@@ -924,8 +935,11 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     }
 
     if (const auto* httpErr = error.get_exception<proxygen::coro::HTTPError>(); httpErr != nullptr) {
-      if (httpErr->httpMessage && httpErr->httpMessage->getStatusCode() == 404) {
-        co_return std::nullopt;
+      if (httpErr->httpMessage) {
+        const uint16_t status = httpErr->httpMessage->getStatusCode();
+        if (isMissingResourceHttpStatus(status)) {
+          co_return std::nullopt;
+        }
       }
 
       const bool retryable = isRetryableHttpError(*httpErr);

@@ -1,5 +1,6 @@
 #include "zneuroglancerprecomputedchunkdecoder.h"
 #include "zneuroglancerprecomputed.h"
+#include "zexception.h"
 
 #include <gtest/gtest.h>
 
@@ -171,6 +172,43 @@ TEST(ZNeuroglancerPrecomputedChunkDecoder, DecodePngRgb8ToRawPlanar)
     3, 6, 9, 12,
   };
   EXPECT_EQ(raw, expectedPlanar);
+}
+
+TEST(ZNeuroglancerPrecomputedChunkDecoder, DecodePngRejectsInvalidPayload)
+{
+  const std::vector<uint8_t> notPng = {'n', 'o', 't', '-', 'p', 'n', 'g'};
+  EXPECT_THROW(
+    {
+      (void)ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t>(notPng.data(), notPng.size()),
+                                                                 /*expectedVoxelCount=*/1,
+                                                                 /*expectedChannels=*/1,
+                                                                 /*bytesPerVoxel=*/1);
+    },
+    ZException);
+}
+
+TEST(ZNeuroglancerPrecomputedChunkDecoder, DecodePngRejectsTruncatedPayloadAfterHeader)
+{
+  const size_t width = 4;
+  const size_t height = 4;
+  std::vector<uint8_t> interleaved(width * height * 3);
+  for (size_t i = 0; i < interleaved.size(); ++i) {
+    interleaved[i] = static_cast<uint8_t>(i);
+  }
+
+  auto pngBytes = encodeRgb8PngToMemory(width, height, interleaved);
+  ASSERT_GT(pngBytes.size(), 16u);
+  pngBytes.resize(pngBytes.size() - 16);
+
+  EXPECT_THROW(
+    {
+      (void)ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(
+        std::span<const uint8_t>(pngBytes.data(), pngBytes.size()),
+        /*expectedVoxelCount=*/width * height,
+        /*expectedChannels=*/3,
+        /*bytesPerVoxel=*/1);
+    },
+    ZException);
 }
 
 TEST(ZNeuroglancerPrecomputedChunkDecoder, DecodeCompressoMinimalConstantChunk)

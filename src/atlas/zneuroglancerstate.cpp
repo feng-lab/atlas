@@ -467,8 +467,7 @@ ZNeuroglancerState::InputParseResult ZNeuroglancerState::parseInputText(const QS
         folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(url.toStdString(), timeout));
       if (!responseOpt) {
         out.status = InputStatus::Error;
-        out.error =
-          QStringLiteral("Failed to fetch Neuroglancer state JSON (HTTP 404 or network failure):\n%1").arg(url);
+        out.error = QStringLiteral("Failed to fetch Neuroglancer state JSON (HTTP 403/404):\n%1").arg(url);
         return out;
       }
       if (responseOpt->status != 200) {
