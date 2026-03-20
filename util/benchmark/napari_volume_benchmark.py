@@ -17,6 +17,7 @@ import napari
 import numpy as np
 from napari.qt import get_qapp
 from napari.utils import perf
+from qtpy import QtCore
 from qtpy.QtCore import QCoreApplication
 from qtpy.QtWidgets import QApplication
 
@@ -187,6 +188,38 @@ def _parse_args() -> argparse.Namespace:
             "When --screenshot-reference-every-step is enabled, also save the "
             "intermediate step screenshots to disk for visual inspection."
         ),
+    )
+    parser.add_argument(
+        "--window-title",
+        default=None,
+        help=(
+            "Optional top-level napari window title. Useful when another tool "
+            "needs to match the deterministic benchmark window for capture."
+        ),
+    )
+    parser.add_argument(
+        "--window-x",
+        type=int,
+        default=None,
+        help="Optional top-level napari window X position in points.",
+    )
+    parser.add_argument(
+        "--window-y",
+        type=int,
+        default=None,
+        help="Optional top-level napari window Y position in points.",
+    )
+    parser.add_argument(
+        "--window-width",
+        type=int,
+        default=None,
+        help="Optional top-level napari window width in points.",
+    )
+    parser.add_argument(
+        "--window-height",
+        type=int,
+        default=None,
+        help="Optional top-level napari window height in points.",
     )
     return parser.parse_args()
 
@@ -684,6 +717,150 @@ def _configure_live_render_surface(
     }
 
 
+def _configure_window_layout(
+    viewer: napari.Viewer,
+    *,
+    x: int | None,
+    y: int | None,
+    width: int | None,
+    height: int | None,
+    title: str | None,
+) -> None:
+    qt_window = viewer.window._qt_window
+    if title is not None:
+        viewer.title = str(title)
+        qt_window.setWindowTitle(str(title))
+    geometry = qt_window.geometry()
+    target_x = int(x) if x is not None else int(geometry.x())
+    target_y = int(y) if y is not None else int(geometry.y())
+    target_width = int(width) if width is not None else int(geometry.width())
+    target_height = int(height) if height is not None else int(geometry.height())
+    qt_window.setGeometry(target_x, target_y, target_width, target_height)
+
+
+def _region_payload(
+    *, x: float, y: float, width: float, height: float
+) -> dict[str, float]:
+    return {
+        "x": float(x),
+        "y": float(y),
+        "width": float(width),
+        "height": float(height),
+    }
+
+
+def _widget_geometry_payload(
+    widget: Any,
+    *,
+    top_level_window: Any,
+) -> dict[str, Any]:
+    local_top_left = QtCore.QPoint(0, 0)
+    global_top_left = widget.mapToGlobal(local_top_left)
+    frame_geometry = top_level_window.frameGeometry()
+    geometry = widget.geometry()
+    absolute_points = _region_payload(
+        x=float(global_top_left.x()),
+        y=float(global_top_left.y()),
+        width=float(geometry.width()),
+        height=float(geometry.height()),
+    )
+    window_relative_points = _region_payload(
+        x=float(global_top_left.x() - frame_geometry.x()),
+        y=float(global_top_left.y() - frame_geometry.y()),
+        width=float(geometry.width()),
+        height=float(geometry.height()),
+    )
+    dpr = float(widget.devicePixelRatioF())
+    absolute_pixels = _region_payload(
+        x=float(round(absolute_points["x"] * dpr)),
+        y=float(round(absolute_points["y"] * dpr)),
+        width=float(round(absolute_points["width"] * dpr)),
+        height=float(round(absolute_points["height"] * dpr)),
+    )
+    window_relative_pixels = _region_payload(
+        x=float(round(window_relative_points["x"] * dpr)),
+        y=float(round(window_relative_points["y"] * dpr)),
+        width=float(round(window_relative_points["width"] * dpr)),
+        height=float(round(window_relative_points["height"] * dpr)),
+    )
+    return {
+        "class_name": type(widget).__name__,
+        "device_pixel_ratio": dpr,
+        "absolute_points": absolute_points,
+        "window_relative_points": window_relative_points,
+        "absolute_pixels": absolute_pixels,
+        "window_relative_pixels": window_relative_pixels,
+    }
+
+
+def _write_gui_geometry_and_calibration(
+    *,
+    output_dir: Path,
+    viewer: napari.Viewer,
+    window_title: str | None,
+) -> tuple[Path, Path]:
+    qt_window = viewer.window._qt_window
+    qt_viewer = viewer.window._qt_viewer
+    canvas_native = qt_viewer.canvas.native
+    frame_geometry = qt_window.frameGeometry()
+    qt_window_geometry = qt_window.geometry()
+    canvas_geometry = _widget_geometry_payload(
+        canvas_native,
+        top_level_window=qt_window,
+    )
+    qt_viewer_geometry = _widget_geometry_payload(
+        qt_viewer,
+        top_level_window=qt_window,
+    )
+    geometry_payload = {
+        "window_title": str(window_title or qt_window.windowTitle()),
+        "window_owner_name_guess": Path(sys.executable).name,
+        "qt_window": {
+            "geometry": _region_payload(
+                x=float(qt_window_geometry.x()),
+                y=float(qt_window_geometry.y()),
+                width=float(qt_window_geometry.width()),
+                height=float(qt_window_geometry.height()),
+            ),
+            "frame_geometry": _region_payload(
+                x=float(frame_geometry.x()),
+                y=float(frame_geometry.y()),
+                width=float(frame_geometry.width()),
+                height=float(frame_geometry.height()),
+            ),
+        },
+        "qt_viewer": qt_viewer_geometry,
+        "canvas_native": canvas_geometry,
+    }
+    calibration_payload = {
+        "app": "napari",
+        "bundle_identifier": "",
+        "window_owner_name": Path(sys.executable).name,
+        "window_name_substring": str(window_title or qt_window.windowTitle()),
+        "region_coordinate_space": "window-relative",
+        "activate_app": True,
+        "capture_region": canvas_geometry["window_relative_points"],
+        "analysis_region_norm": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 1.0,
+            "height": 1.0,
+        },
+        "input_region": canvas_geometry["window_relative_points"],
+    }
+    geometry_path = output_dir / "napari_gui_geometry.json"
+    calibration_path = output_dir / "napari_gui_calibration.json"
+    geometry_path.write_text(
+        json.dumps(geometry_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    calibration_path.write_text(
+        json.dumps(calibration_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return geometry_path, calibration_path
+
+
 def main() -> int:
     args = _parse_args()
     output_dir = Path(args.output_dir).resolve()
@@ -755,7 +932,26 @@ def main() -> int:
         # lower-left subregion. Keep the viewer shown so the Qt/VisPy canvas
         # adopts the requested size before capture.
         viewer = napari.Viewer(show=True)
-        viewer.window.resize(int(spec.viewport_width), int(spec.viewport_height))
+        if any(
+            value is not None
+            for value in (
+                args.window_title,
+                args.window_x,
+                args.window_y,
+                args.window_width,
+                args.window_height,
+            )
+        ):
+            _configure_window_layout(
+                viewer,
+                x=args.window_x,
+                y=args.window_y,
+                width=args.window_width,
+                height=args.window_height,
+                title=args.window_title,
+            )
+        else:
+            viewer.window.resize(int(spec.viewport_width), int(spec.viewport_height))
         _process_events(app, max(12, int(args.process_events_count)))
         frame_swap_tracker = _FrameSwapTracker(viewer)
 
@@ -882,6 +1078,15 @@ def main() -> int:
             "native_canvas_device_pixel_ratio": native_canvas_device_pixel_ratio,
             "capture_logical_height": capture_logical_height,
             "live_render_surface": live_render_surface,
+        }
+        geometry_path, calibration_path = _write_gui_geometry_and_calibration(
+            output_dir=output_dir,
+            viewer=viewer,
+            window_title=args.window_title,
+        )
+        summary["gui_capture"] = {
+            "geometry_path": str(geometry_path),
+            "calibration_path": str(calibration_path),
         }
         frame_swap_tracker.wait_for_quiet(
             app,

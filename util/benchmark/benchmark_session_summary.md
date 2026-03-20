@@ -400,6 +400,14 @@ remain the authoritative source.
 | Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `8119.536 ms` | `8119.561 ms` | `46.233 ms` | `0.000 ms` | `67.763 ms` | `0.000 ms` | `3.345 GiB` | `130.595 s` |
 | Atlas DVR | Dense `.nim` | `Direct Volume Rendering` | `8289.513 ms` | `8289.545 ms` | `52.739 ms` | `0.000 ms` | `88.085 ms` | `0.000 ms` | `3.392 GiB` | `130.750 s` |
 
+Napari is summarized separately below. The retained napari deterministic result
+uses a different metric basis: user-visible `first display from step start`
+matched from ScreenCaptureKit frames against reusable per-step screenshot
+references, with the screenshot-based deterministic capture kept as a
+conservative upper bound. That is not the same as the internal ParaView/Atlas
+preview/final timer basis used in the cross-session table above, so it is not
+mixed into that snapshot.
+
 ## Session 6: ParaView GPU, Dense Input, MIP
 
 Artifacts:
@@ -705,6 +713,49 @@ Artifacts:
 | Zoom step 30 preview -> final duration | `7` | `0.000` | `0.000` | `0.000` | `0.000` | Preview and final are the same render pass for this dataset. |
 | Peak RSS | `7` | `3642284910 bytes` (`3.392 GiB`) | `3650013184 bytes` (`3.399 GiB`) | `24131928 bytes` | `3672610483 bytes` (`3.421 GiB`) | Aggregate memory summary across measured runs. |
 | Full-run wall time | `7` | `130.750 s` | `130.795 s` | `0.355 s` | `131.145 s` | Entire deterministic script duration per measured run. |
+
+## Napari Deterministic Screen-Visible Reference
+
+Artifacts:
+- Screenshot upper-bound batch: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_deterministic_tiff_screenshotref_2000x1500_mip_v4_live_surface_nosize_aligned/aggregate/summary.json`
+- Screen-visible validation batch root: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_deterministic_screenvisible_match_v2`
+- Screen-visible validation aggregate: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_deterministic_screenvisible_match_v2/aggregate/summary.json`
+- Reusable screenshot reference: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_deterministic_screenvisible_match_v2/reference`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | napari `0.6.6` |
+| Rendering mode | `mip` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif` |
+| Dataset format | Dense single-file TIFF |
+| Dataset size | `1024 x 1024 x 980`, single channel |
+| Dataset spacing | `0.1 x 0.1 x 0.1 um` |
+| Live render surface | `2000 x 1500` physical pixels (`1000 x 750` logical Retina canvas) |
+| Trusted visible metric | First matched on-screen display from deterministic step start |
+| Reference basis | Reusable per-step screenshot-reference images built once under the retained screen-visible batch root |
+| Observed basis | `1` warm-up + `7` measured non-screenshot deterministic runs matched against ScreenCaptureKit frames |
+| Observed frame artifacts | Changed observed analysis frames saved as `.png` for direct inspection |
+| Notes | The screenshot upper bound includes explicit framebuffer readback and remains a conservative deterministic ceiling. The screen-visible numbers below are the trusted napari presentation metrics. |
+
+### Retained Screen-Visible Summary
+
+| View | Unique displayed steps | First display from step start | P95 first display | Mean matched frames / step | Mean delta vs last swap | Screenshot upper bound |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `open` | `1 / 1` | `495.966 ms` | `553.914 ms` | `2.286` | `472.434 ms` | `78.528 ms` |
+| `rotate` | `30 / 30` | `23.243 ms` | `33.396 ms` | `1.424` | `6.802 ms` | `39.261 ms` |
+| `zoom` | `30 / 30` | `23.571 ms` | `33.516 ms` | `1.376` | `6.812 ms` | `57.884 ms` |
+
+Notes:
+
+- The retained screen-visible validation matched all `30 / 30` rotate steps in all
+  `7 / 7` measured runs and all `30 / 30` zoom steps in all `7 / 7` measured runs.
+- Mean first-match similarity across the measured batch was `0.994801` for `rotate`
+  and `0.989905` for `zoom`.
+- `open` is a single displayed step and includes full dataset-to-first-visible
+  presentation, so it is less directly comparable to the per-step `rotate` and
+  `zoom` rows.
 
 # Deterministic Benchmark Sessions: `slice15_ch2_x2z`
 
@@ -1390,8 +1441,8 @@ as user-visible interaction benchmarks, not engine-only service-time benchmarks.
 | Input path | Quartz `CGEvent` drag injection via `macos_gui_drag_benchmark.py` |
 | Detector | Exact pixel comparison inside the captured render-area ROI; any pixel change counts |
 | Capture crop | Centered `400 x 300` window-relative region inside the render pane |
-| Drag path | Horizontal left-button drag from `45%` to `75%` of the calibrated input region width |
-| Retained drags | Short rotate `0.5 s` (`60` injected samples, `120 Hz`) and sustained rotate `5.0 s` (`600` injected samples, `120 Hz`) |
+| Drag path | One-way retained path: horizontal left-button drag from `45%` to `75%` of the calibrated input region width. Ping-pong retained path: `45% -> 75% -> 45% -> 75%` over the same centered input span. |
+| Retained drags | Short rotate `0.5 s` (`60` injected samples, `120 Hz`), sustained one-way rotate `5.0 s` (`600` injected samples, `120 Hz`), and sustained ping-pong rotate `5.0 s` (`600` injected samples, `120 Hz`) |
 | Warm-up / measured runs | `1` warm-up run, `7` measured runs |
 | ParaView GUI prep | Applies the benchmark camera, then recenters `CameraFocalPoint` and `CenterOfRotation` to the data center before each run so GUI rotation stays centered on the object |
 | Atlas GUI prep | Loads the dataset once, applies the benchmark camera, then resets back to the `open` camera and waits for Atlas preview/final markers before each run |
@@ -1415,6 +1466,15 @@ Measured steady-state means for the retained centered `5.0 s` rotate sessions.
 | --- | --- | --- | --- | --- | --- | --- |
 | ParaView GPU MIP | Blocked `.vtpd` | `GPU Based` + `maximum-intensity` | `1969.282 ms` | `2.000` | `0.400` | `0.554 fps` |
 | Atlas MIP | Dense `.nim` | `Maximum Intensity Projection` | `44.721 ms` | `113.286` | `22.652` | `22.794 fps` |
+
+## GUI Snapshot: Sustained Ping-Pong Rotate (`5.0 s`)
+
+Measured steady-state means for the retained centered `5.0 s` ping-pong rotate sessions.
+
+| Session | Input | Render mode | First visible from drag start | Changed samples during drag | Changed samples / second | Visible FPS |
+| --- | --- | --- | --- | --- | --- | --- |
+| ParaView GPU MIP Ping-Pong | Blocked `.vtpd` | `GPU Based` + `maximum-intensity` | `1824.783 ms` | `2.571` | `0.514` | `0.629 fps` |
+| Atlas MIP Ping-Pong | Dense `.nim` | `Maximum Intensity Projection` | `51.640 ms` | `114.571` | `22.912` | `23.068 fps` |
 
 ## GUI Session 1: ParaView GPU MIP, Centered Rotate, `0.5 s`
 
@@ -1575,6 +1635,240 @@ Artifacts:
 | Visible FPS from mean interval | `7` | `22.794 fps` | `22.712 fps` | `0.764 fps` | `23.803 fps` | Interval-derived visible cadence from changed-frame timestamps. |
 | First visible from drag start | `7` | `44.721 ms` | `44.852 ms` | `8.928 ms` | `56.716 ms` | Time to the first visible render-area change after drag motion begins. |
 | Drag duration | `7` | `5001.170 ms` | `5000.870 ms` | `0.734 ms` | `5002.314 ms` | Measured from injected `drag_start` to `drag_end`. |
+
+## GUI Session 5: ParaView GPU MIP, Centered Ping-Pong Rotate, `5.0 s`
+
+Artifacts:
+- Root: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate5s_v4_centercrop_120hzinput_pingpong`
+- Aggregate summary: `~/Dropbox/atlas_test/slice15_paraview/benchmarks/paraview_gui_rotate_slice15_ch2_gpu_mip_2000x1500_rotate5s_v4_centercrop_120hzinput_pingpong/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | ParaView 6.1.0-RC1 |
+| Dataset | `~/Dropbox/atlas_test/slice15_paraview/slice15_ch2_grid_atlasscenespace.vtpd` |
+| Dataset format | Blocked `.vtpd` with `.vti` pieces |
+| Dataset size | `9216 x 6144 x 98`, single channel |
+| Dataset spacing | `1 x 1 x 5.0472259521484375` scene-space units |
+| Render mode | `GPU Based` + `maximum-intensity` |
+| Camera / rotation center | Benchmark camera from `slice15_scene_camera_exact_2000x1500.json`, then recentered to the data bounds center for GUI rotation parity |
+| Capture ROI | Centered `400 x 300` window-relative crop inside the render pane |
+| Drag duration / steps | `5.0 s`, `600` injected drag samples (`120 Hz`) on a centered ping-pong path (`45% -> 75% -> 45% -> 75%` of input width) |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Changed samples during drag | `3` |
+| Changed samples / second | `0.600` |
+| Visible FPS from mean interval | `0.625 fps` |
+| First visible from drag start | `1794.387 ms` |
+| Drag duration | `5002.202 ms` |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Changed samples during drag | `7` | `2.571` | `3.000` | `0.495` | `3.000` | Ping-pong interaction adds a third visible render-area update in several retained ParaView runs, but the overall cadence remains very low. |
+| Changed samples / second | `7` | `0.514` | `0.600` | `0.099` | `0.600` | Primary sustained ping-pong cadence metric for ParaView in this exact-pixel suite. |
+| Visible FPS from mean interval | `7` | `0.629 fps` | `0.628 fps` | `0.018 fps` | `0.656 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `1824.783 ms` | `1816.733 ms` | `25.620 ms` | `1863.594 ms` | The first visible render-area change still arrives well into the `5 s` ping-pong drag. |
+| Drag duration | `7` | `5001.349 ms` | `5000.964 ms` | `0.891 ms` | `5002.532 ms` | Measured from injected `drag_start` to `drag_end`. |
+
+## GUI Session 6: Atlas MIP, Centered Ping-Pong Rotate, `5.0 s`
+
+Artifacts:
+- Root: `~/code/atlas/large_test_image/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate5s_v7_centercrop_120hzinput_pingpong`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/atlas_gui_rotate_slice15_ch2_mip_2000x1500_rotate5s_v7_centercrop_120hzinput_pingpong/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | Atlas build `v1.0.7-29-gb1cf2f5f` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_dense.nim` |
+| Dataset format | Dense `.nim` |
+| Live 3D canvas | `1000 x 750` logical Qt pixels on Retina, yielding about `2000 x 1500` physical pixels |
+| Render mode | `Maximum Intensity Projection` |
+| View parity settings | Background hidden, axis hidden, bound box set to `No Bound Box`, full-resolution rendering enabled |
+| Camera reset | Benchmark `open` camera from `slice15_scene_camera_exact_2000x1500.json`, reapplied before every run |
+| Capture ROI | Centered `400 x 300` window-relative crop inside the 3D canvas |
+| Drag duration / steps | `5.0 s`, `600` injected drag samples (`120 Hz`) on a centered ping-pong path (`45% -> 75% -> 45% -> 75%` of input width) |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Changed samples during drag | `112` |
+| Changed samples / second | `22.396` |
+| Visible FPS from mean interval | `22.416 fps` |
+| First visible from drag start | `42.459 ms` |
+| Drag duration | `5000.845 ms` |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Changed samples during drag | `7` | `114.571` | `116.000` | `4.135` | `119.100` | Atlas keeps visible updates flowing across the full `5 s` ping-pong drag, with counts nearly identical to the one-way sustained run. |
+| Changed samples / second | `7` | `22.912` | `23.196` | `0.827` | `23.810` | Primary sustained ping-pong cadence metric for Atlas in this exact-pixel suite. |
+| Visible FPS from mean interval | `7` | `23.068 fps` | `23.352 fps` | `0.858 fps` | `24.051 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `51.640 ms` | `55.274 ms` | `5.587 ms` | `57.640 ms` | Time to the first visible render-area change after ping-pong drag motion begins. |
+| Drag duration | `7` | `5000.571 ms` | `5001.058 ms` | `1.978 ms` | `5002.173 ms` | Measured from injected `drag_start` to `drag_end`. |
+
+# Real GUI Rotate Reference Benchmarks: `slice15_ch2_gpufit_1024x1024x980`
+
+These sessions measure real on-screen napari interaction on the retained
+TIFF-only GPU-fit dataset path. They are reference-only and are not directly
+comparable to the Atlas/ParaView `slice15_ch2` GUI results above because the
+dataset and data-loading path are different.
+
+## Shared GUI Methodology
+
+| Item | Value |
+| --- | --- |
+| Software | napari `0.6.6` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif` |
+| Dataset format | Dense single-file TIFF |
+| Dataset size | `1024 x 1024 x 980`, single channel |
+| Dataset spacing | `0.1 x 0.1 x 0.1 um` |
+| Camera spec | `~/code/atlas/large_test_image/slice15_ch2_gpufit_scene_camera_exact_2000x1500.json` |
+| Live render surface | `2000 x 1500` physical pixels (`1000 x 750` logical Retina canvas) |
+| Capture backend | `ScreenCaptureKit` via `macos_window_capture_sckit.swift` |
+| Capture target | `window` |
+| Input path | Quartz `CGEvent` drag injection via `macos_gui_drag_benchmark.py` |
+| Capture ROI | Centered `400 x 300` window-relative crop inside the napari canvas |
+| Input region | Full `1000 x 750` window-relative napari canvas |
+| Retained drags | Short rotate `0.5 s` (`60` injected samples, `120 Hz`), sustained one-way rotate `5.0 s` (`600` injected samples, `120 Hz`), and sustained ping-pong rotate `5.0 s` (`600` injected samples, `120 Hz`) |
+| Warm-up / measured runs | `1` warm-up run, `7` measured runs |
+| Notes | Reference only. This napari GUI suite uses the TIFF path napari supports reliably, so it is intentionally not mixed into the Atlas/ParaView `slice15_ch2` GUI comparison tables. |
+
+## GUI Reference Snapshot
+
+Measured steady-state means for the retained napari centered-ROI rotate sessions.
+
+| Session | Drag duration | First visible from drag start | Changed samples during drag | Changed samples / second | Visible FPS |
+| --- | --- | --- | --- | --- | --- |
+| Napari GUI Rotate | `0.5 s` | `76.915 ms` | `9.286` | `18.533` | `24.933 fps` |
+| Napari GUI Rotate | `5.0 s` | `73.751 ms` | `64.571` | `12.911` | `13.291 fps` |
+| Napari GUI Rotate Ping-Pong | `5.0 s` | `82.978 ms` | `100.143` | `20.022` | `20.787 fps` |
+
+## Napari GUI Reference Session 1: MIP, Centered Rotate, `0.5 s`
+
+Artifacts:
+- Root: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_gui_rotate_2000x1500_v2_centercrop_120hzinput`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_gui_rotate_2000x1500_v2_centercrop_120hzinput/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | napari `0.6.6` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif` |
+| Dataset format | Dense single-file TIFF |
+| Live render surface | `2000 x 1500` physical pixels (`1000 x 750` logical Retina canvas) |
+| Render mode | `mip` |
+| Camera reset | Benchmark `open` camera from `slice15_ch2_gpufit_scene_camera_exact_2000x1500.json`, reapplied before every run |
+| Capture ROI | Centered `400 x 300` window-relative crop inside the napari canvas |
+| Drag duration / steps | `0.5 s`, `60` injected drag samples (`120 Hz`) |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Changed samples during drag | `9` |
+| Changed samples / second | `17.949` |
+| Visible FPS from mean interval | `22.349 fps` |
+| First visible from drag start | `71.313 ms` |
+| Drag duration | `501.428 ms` |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Changed samples during drag | `7` | `9.286` | `9.000` | `0.700` | `10.000` | Reference-only napari short-drag exact-pixel cadence on the retained TIFF path. |
+| Changed samples / second | `7` | `18.533` | `17.992` | `1.399` | `19.979` | Primary short-drag cadence metric for the napari GUI reference suite. |
+| Visible FPS from mean interval | `7` | `24.933 fps` | `24.929 fps` | `2.460 fps` | `27.996 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `76.915 ms` | `69.706 ms` | `12.037 ms` | `97.221 ms` | Time to the first visible render-area change after drag motion begins. |
+| Drag duration | `7` | `501.034 ms` | `500.964 ms` | `0.655 ms` | `502.010 ms` | Measured from injected `drag_start` to `drag_end`. |
+
+## Napari GUI Reference Session 2: MIP, Centered Rotate, `5.0 s`
+
+Artifacts:
+- Root: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_gui_rotate_2000x1500_rotate5s_v1_centercrop_120hzinput`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_gui_rotate_2000x1500_rotate5s_v1_centercrop_120hzinput/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | napari `0.6.6` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif` |
+| Dataset format | Dense single-file TIFF |
+| Live render surface | `2000 x 1500` physical pixels (`1000 x 750` logical Retina canvas) |
+| Render mode | `mip` |
+| Camera reset | Benchmark `open` camera from `slice15_ch2_gpufit_scene_camera_exact_2000x1500.json`, reapplied before every run |
+| Capture ROI | Centered `400 x 300` window-relative crop inside the napari canvas |
+| Drag duration / steps | `5.0 s`, `600` injected drag samples (`120 Hz`) |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Changed samples during drag | `71` |
+| Changed samples / second | `14.199` |
+| Visible FPS from mean interval | `14.457 fps` |
+| First visible from drag start | `86.898 ms` |
+| Drag duration | `5000.362 ms` |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Changed samples during drag | `7` | `64.571` | `63.000` | `2.665` | `69.100` | Napari continues to present visible updates through the sustained drag window on the retained TIFF path. |
+| Changed samples / second | `7` | `12.911` | `12.598` | `0.533` | `13.816` | Primary sustained-drag cadence metric for the napari GUI reference suite. |
+| Visible FPS from mean interval | `7` | `13.291 fps` | `13.094 fps` | `0.543 fps` | `14.213 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `73.751 ms` | `69.390 ms` | `7.520 ms` | `85.719 ms` | Time to the first visible render-area change after drag motion begins. |
+| Drag duration | `7` | `5001.360 ms` | `5001.512 ms` | `0.509 ms` | `5001.850 ms` | Measured from injected `drag_start` to `drag_end`. |
+
+## Napari GUI Reference Session 3: MIP, Centered Ping-Pong Rotate, `5.0 s`
+
+Artifacts:
+- Root: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_gui_rotate_2000x1500_rotate5s_v2_centercrop_120hzinput_pingpong`
+- Aggregate summary: `~/code/atlas/large_test_image/benchmarks/napari_gpufit_gui_rotate_2000x1500_rotate5s_v2_centercrop_120hzinput_pingpong/aggregate/summary.json`
+
+### Setup
+
+| Item | Value |
+| --- | --- |
+| Software | napari `0.6.6` |
+| Dataset | `~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif` |
+| Dataset format | Dense single-file TIFF |
+| Live render surface | `2000 x 1500` physical pixels (`1000 x 750` logical Retina canvas) |
+| Render mode | `mip` |
+| Camera reset | Benchmark `open` camera from `slice15_ch2_gpufit_scene_camera_exact_2000x1500.json`, reapplied before every run |
+| Capture ROI | Centered `400 x 300` window-relative crop inside the napari canvas |
+| Drag duration / steps | `5.0 s`, `600` injected drag samples (`120 Hz`) on a centered ping-pong path (`45% -> 75% -> 45% -> 75%` of input width) |
+
+### Warm-up
+
+| Metric | Warm-up value |
+| --- | --- |
+| Changed samples during drag | `43` |
+| Changed samples / second | `8.596` |
+| Visible FPS from mean interval | `13.625 fps` |
+| First visible from drag start | `1746.253 ms` |
+| Drag duration | `5002.132 ms` |
+
+### Measured Steady State
+
+| Metric | Count | Mean | Median | Std | p95 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Changed samples during drag | `7` | `100.143` | `98.000` | `7.918` | `109.700` | The centered ping-pong path gives napari a much denser sustained visible-update stream than the one-way `5 s` sweep on the same TIFF path. |
+| Changed samples / second | `7` | `20.022` | `19.592` | `1.583` | `21.932` | Primary sustained ping-pong cadence metric for the napari GUI reference suite. |
+| Visible FPS from mean interval | `7` | `20.787 fps` | `20.258 fps` | `1.665 fps` | `22.737 fps` | Interval-derived visible cadence from changed-frame timestamps. |
+| First visible from drag start | `7` | `82.978 ms` | `83.583 ms` | `6.514 ms` | `91.299 ms` | Time to the first visible render-area change after ping-pong drag motion begins. |
+| Drag duration | `7` | `5001.600 ms` | `5001.944 ms` | `0.751 ms` | `5002.330 ms` | Measured from injected `drag_start` to `drag_end`. |
 
 # Fidelity Validation: `high_res_20220219_stitched_all_spacing_0p1_0p1_2_um`
 

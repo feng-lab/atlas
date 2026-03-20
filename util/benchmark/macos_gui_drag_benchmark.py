@@ -69,6 +69,7 @@ class DragAction:
     button: str
     start_norm: tuple[float, float]
     end_norm: tuple[float, float]
+    path_norm: tuple[tuple[float, float], ...]
     pre_drag_still_seconds: float
     duration_seconds: float
     steps: int
@@ -84,6 +85,25 @@ class DragAction:
             raise ValueError("action.start_norm must be a 2-element array")
         if not isinstance(end_norm, list | tuple) or len(end_norm) != 2:
             raise ValueError("action.end_norm must be a 2-element array")
+        path_norm_raw = payload.get("path_norm")
+        if path_norm_raw is None:
+            path_norm = (
+                (float(start_norm[0]), float(start_norm[1])),
+                (float(end_norm[0]), float(end_norm[1])),
+            )
+        else:
+            if not isinstance(path_norm_raw, list | tuple) or len(path_norm_raw) < 2:
+                raise ValueError(
+                    "action.path_norm must be an array of at least 2 points"
+                )
+            path_points: list[tuple[float, float]] = []
+            for point in path_norm_raw:
+                if not isinstance(point, list | tuple) or len(point) != 2:
+                    raise ValueError(
+                        "each action.path_norm point must be a 2-element array"
+                    )
+                path_points.append((float(point[0]), float(point[1])))
+            path_norm = tuple(path_points)
         button = str(payload.get("button", "left")).lower()
         if button not in {"left", "right"}:
             raise ValueError(f"unsupported button {button!r}")
@@ -92,6 +112,7 @@ class DragAction:
             button=button,
             start_norm=(float(start_norm[0]), float(start_norm[1])),
             end_norm=(float(end_norm[0]), float(end_norm[1])),
+            path_norm=path_norm,
             pre_drag_still_seconds=max(
                 0.0, float(payload.get("pre_drag_still_seconds", 0.25))
             ),
@@ -106,6 +127,7 @@ class DragAction:
             "button": self.button,
             "start_norm": list(self.start_norm),
             "end_norm": list(self.end_norm),
+            "path_norm": [list(point) for point in self.path_norm],
             "pre_drag_still_seconds": self.pre_drag_still_seconds,
             "duration_seconds": self.duration_seconds,
             "steps": self.steps,
@@ -295,6 +317,27 @@ def _lerp_point(
     )
 
 
+def _path_points(
+    region: Region, path_norm: tuple[tuple[float, float], ...]
+) -> list[tuple[float, float]]:
+    return [_point_from_norm(region, point) for point in path_norm]
+
+
+def _point_on_polyline(
+    points: list[tuple[float, float]], t: float
+) -> tuple[float, float]:
+    if len(points) == 1:
+        return points[0]
+    clamped_t = max(0.0, min(1.0, t))
+    segment_count = len(points) - 1
+    if clamped_t >= 1.0:
+        return points[-1]
+    scaled = clamped_t * segment_count
+    segment_index = min(int(scaled), segment_count - 1)
+    segment_t = scaled - segment_index
+    return _lerp_point(points[segment_index], points[segment_index + 1], segment_t)
+
+
 def _mouse_constants(button: str) -> tuple[int, int, int, int]:
     if button == "left":
         return (
@@ -339,8 +382,9 @@ def _run_drag_action(
     up_type: int
     _, down_type, drag_type, up_type = _mouse_constants(action.button)
 
-    start_xy = _point_from_norm(input_region, action.start_norm)
-    end_xy = _point_from_norm(input_region, action.end_norm)
+    path_points = _path_points(input_region, action.path_norm)
+    start_xy = path_points[0]
+    end_xy = path_points[-1]
 
     _post_mouse_event(kCGEventMouseMoved, start_xy, action.button)
     injection_logger.log(
@@ -363,6 +407,7 @@ def _run_drag_action(
         settle_seconds=action.settle_seconds,
         start_point=start_xy,
         end_point=end_xy,
+        path_points=path_points,
     )
 
     if action.pre_drag_still_seconds > 0.0:
@@ -388,7 +433,7 @@ def _run_drag_action(
     duration_ns = int(action.duration_seconds * 1e9)
     for step in range(1, action.steps + 1):
         t = step / action.steps
-        point_xy = _lerp_point(start_xy, end_xy, t)
+        point_xy = _point_on_polyline(path_points, t)
         target_ns = drag_start_ns + (duration_ns * step) // action.steps
         _post_mouse_event(drag_type, point_xy, action.button, click_state=1)
         injection_logger.log(

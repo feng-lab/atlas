@@ -3,6 +3,7 @@ import ScreenCaptureKit
 import CoreMedia
 import CoreVideo
 import ApplicationServices
+import AppKit
 import Darwin
 
 struct Region: Codable {
@@ -51,10 +52,12 @@ struct Options {
     var eventsPath: String?
     var outputPath: String?
     var framesOutputPath: String?
+    var analysisFramesDirPath: String?
     var sampleHz = 60.0
     var pixelThreshold = 0.0
     var changedFractionThreshold = 0.0
     var stableFrames = 5
+    var skipFrameDiffAnalysis = false
     var timeoutSeconds = 300.0
     var queueDepth = 8
     var captureTarget = "window"
@@ -206,10 +209,12 @@ func parseArgs() throws -> Options {
               --events PATH
               --output PATH
               --frames-output PATH
+              --analysis-frames-dir PATH
               --sample-hz N
               --pixel-threshold N
               --changed-fraction-threshold N
               --stable-frames N
+              --skip-frame-diff-analysis
               --timeout-seconds N
               --queue-depth N
               --capture-target window|display
@@ -226,6 +231,8 @@ func parseArgs() throws -> Options {
             options.outputPath = try requireValue(arg)
         case "--frames-output":
             options.framesOutputPath = try requireValue(arg)
+        case "--analysis-frames-dir":
+            options.analysisFramesDirPath = try requireValue(arg)
         case "--sample-hz":
             options.sampleHz = Double(try requireValue(arg)) ?? options.sampleHz
         case "--pixel-threshold":
@@ -237,6 +244,8 @@ func parseArgs() throws -> Options {
             )
         case "--stable-frames":
             options.stableFrames = max(1, Int(try requireValue(arg)) ?? options.stableFrames)
+        case "--skip-frame-diff-analysis":
+            options.skipFrameDiffAnalysis = true
         case "--timeout-seconds":
             options.timeoutSeconds = max(1.0, Double(try requireValue(arg)) ?? options.timeoutSeconds)
         case "--queue-depth":
@@ -421,6 +430,84 @@ func copyAnalysisFrameBGRA32(
     return result
 }
 
+func writeAnalysisFrameRawBGRA32(
+    frame: [UInt32],
+    width: Int,
+    height: Int,
+    path: String
+) throws {
+    guard width > 0, height > 0, frame.count == width * height else {
+        throw CaptureError.streamSetup(
+            "invalid analysis frame dimensions \(width)x\(height) for \(frame.count) pixels"
+        )
+    }
+
+    let url = URL(fileURLWithPath: path)
+    try FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    let byteCount = frame.count * MemoryLayout<UInt32>.size
+    let data = frame.withUnsafeBufferPointer { buffer in
+        Data(buffer: UnsafeBufferPointer<UInt8>(
+            start: UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: UInt8.self),
+            count: byteCount
+        ))
+    }
+    try data.write(to: url, options: .atomic)
+}
+
+func writeAnalysisFramePNG(
+    frame: [UInt32],
+    width: Int,
+    height: Int,
+    path: String
+) throws {
+    guard width > 0, height > 0, frame.count == width * height else {
+        throw CaptureError.streamSetup(
+            "invalid analysis frame dimensions \(width)x\(height) for \(frame.count) pixels"
+        )
+    }
+
+    let url = URL(fileURLWithPath: path)
+    try FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    let byteCount = frame.count * MemoryLayout<UInt32>.size
+    let data = frame.withUnsafeBufferPointer { buffer in
+        Data(buffer: UnsafeBufferPointer<UInt8>(
+            start: UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: UInt8.self),
+            count: byteCount
+        ))
+    }
+    let provider = CGDataProvider(data: data as CFData)
+    let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.first.rawValue)
+        .union(.byteOrder32Little)
+    guard let provider,
+          let image = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo,
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+          )
+    else {
+        throw CaptureError.streamSetup("failed to create analysis PNG image")
+    }
+    let bitmap = NSBitmapImageRep(cgImage: image)
+    guard let pngData = bitmap.representation(using: NSBitmapImageRep.FileType.png, properties: [:]) else {
+        throw CaptureError.streamSetup("failed to encode analysis PNG")
+    }
+    try pngData.write(to: url, options: Data.WritingOptions.atomic)
+}
+
 func diffMetrics(
     current: [UInt32],
     reference: [UInt32]
@@ -505,10 +592,12 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
     private let eventsPath: String
     private let outputPath: String
     private let framesOutputPath: String
+    private let analysisFramesDirPath: String?
     private let sampleHz: Double
     private let pixelThreshold: Double
     private let changedFractionThreshold: Double
     private let stableFrames: Int
+    private let skipFrameDiffAnalysis: Bool
     private let timeoutSeconds: Double
     private let queueDepth: Int
 
@@ -543,10 +632,12 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
         eventsPath: String,
         outputPath: String,
         framesOutputPath: String,
+        analysisFramesDirPath: String?,
         sampleHz: Double,
         pixelThreshold: Double,
         changedFractionThreshold: Double,
         stableFrames: Int,
+        skipFrameDiffAnalysis: Bool,
         timeoutSeconds: Double,
         queueDepth: Int
     ) throws {
@@ -554,14 +645,22 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
         self.eventsPath = eventsPath
         self.outputPath = outputPath
         self.framesOutputPath = framesOutputPath
+        self.analysisFramesDirPath = analysisFramesDirPath
         self.sampleHz = sampleHz
         self.pixelThreshold = pixelThreshold
         self.changedFractionThreshold = changedFractionThreshold
         self.stableFrames = stableFrames
+        self.skipFrameDiffAnalysis = skipFrameDiffAnalysis
         self.timeoutSeconds = timeoutSeconds
         self.queueDepth = queueDepth
         self.framesWriter = try JsonLineWriter(path: framesOutputPath)
         self.summaryWriter = JsonWriter(path: outputPath)
+        if let analysisFramesDirPath {
+            try FileManager.default.createDirectory(
+                at: URL(fileURLWithPath: analysisFramesDirPath),
+                withIntermediateDirectories: true
+            )
+        }
     }
 
     func run() async throws {
@@ -841,35 +940,44 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
         let actions = completedActions.sorted { $0.actionStartMonotonicNs < $1.actionStartMonotonicNs }
         let useAnyPixelChange = pixelThreshold <= 0.0 && changedFractionThreshold <= 0.0
 
-        for action in actions {
-            let baselineAnchorNs = action.dragStartMonotonicNs ?? action.startMonotonicNs
-            if let baselineFrame = capturedFrames.last(where: { $0.displayMonotonicNs < baselineAnchorNs }) {
-                action.baselineAnalysisFrame = baselineFrame.analysisFrame
-                action.baselineFrameMonotonicNs = baselineFrame.displayMonotonicNs
-            } else if let firstFrame = capturedFrames.first(where: { $0.displayMonotonicNs >= baselineAnchorNs }) {
-                action.baselineAnalysisFrame = firstFrame.analysisFrame
-                action.baselineFrameMonotonicNs = firstFrame.displayMonotonicNs
+        if !skipFrameDiffAnalysis {
+            for action in actions {
+                let baselineAnchorNs = action.dragStartMonotonicNs ?? action.startMonotonicNs
+                if let baselineFrame = capturedFrames.last(where: { $0.displayMonotonicNs < baselineAnchorNs }) {
+                    action.baselineAnalysisFrame = baselineFrame.analysisFrame
+                    action.baselineFrameMonotonicNs = baselineFrame.displayMonotonicNs
+                } else if let firstFrame = capturedFrames.first(where: { $0.displayMonotonicNs >= baselineAnchorNs }) {
+                    action.baselineAnalysisFrame = firstFrame.analysisFrame
+                    action.baselineFrameMonotonicNs = firstFrame.displayMonotonicNs
+                }
+                action.firstVisibleMonotonicNs = nil
+                action.stableMonotonicNs = nil
+                action.stableStartMonotonicNs = nil
+                action.stableStreak = 0
             }
-            action.firstVisibleMonotonicNs = nil
-            action.stableMonotonicNs = nil
-            action.stableStartMonotonicNs = nil
-            action.stableStreak = 0
         }
 
         var previousFrame: CapturedFrame?
+        let analysisFrameDigits = max(4, String(max(0, capturedFrames.count - 1)).count)
         var frameRecords: [[String: Any]] = []
         frameRecords.reserveCapacity(capturedFrames.count)
 
         for frame in capturedFrames {
             let owningAction = actionOwningFrame(frame.displayMonotonicNs, actions: actions)
-            let prevMetrics = previousFrame.flatMap {
-                diffMetrics(current: frame.analysisFrame, reference: $0.analysisFrame)
-            }
+            let prevMetrics = skipFrameDiffAnalysis
+                ? nil
+                : previousFrame.flatMap {
+                    diffMetrics(current: frame.analysisFrame, reference: $0.analysisFrame)
+                }
             let diffPrev = prevMetrics?.changedFraction
             let meanAbsDiffPrev = prevMetrics?.meanAbsNormalized
-            let significantPrevChange = useAnyPixelChange
-                ? (prevMetrics?.changedFraction ?? 0.0) > 0.0
-                : (prevMetrics?.changedFraction ?? 0.0) >= changedFractionThreshold
+            let significantPrevChange = skipFrameDiffAnalysis
+                ? false
+                : (
+                    useAnyPixelChange
+                    ? (prevMetrics?.changedFraction ?? 0.0) > 0.0
+                    : (prevMetrics?.changedFraction ?? 0.0) >= changedFractionThreshold
+                )
 
             var diffBaseline: Double?
             var meanAbsDiffBaseline: Double?
@@ -879,7 +987,7 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
             let activeActionName = owningAction?.name
             let activeActionEndMonotonicNs = owningAction?.endMonotonicNs
 
-            if let action = owningAction {
+            if !skipFrameDiffAnalysis, let action = owningAction {
                 let visibleAnchorNs = action.dragStartMonotonicNs ?? action.startMonotonicNs
                 if let baselineFrame = action.baselineAnalysisFrame, frame.displayMonotonicNs >= visibleAnchorNs {
                     let baselineMetrics = diffMetrics(
@@ -914,7 +1022,7 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
                 }
             }
 
-            frameRecords.append([
+            var frameRecord: [String: Any] = [
                 "frame_index": frame.frameIndex,
                 "status": frameStatusName(frame.status),
                 "status_raw": frame.statusRaw,
@@ -937,7 +1045,32 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
                 "analysis_width": frame.analysisWidth,
                 "analysis_height": frame.analysisHeight,
                 "analysis_sample_count": frame.analysisSampleCount,
-            ])
+            ]
+            if let analysisFramesDirPath,
+               owningAction != nil,
+               (skipFrameDiffAnalysis || significantBaselineChange) {
+                let pngPath = URL(fileURLWithPath: analysisFramesDirPath)
+                    .appendingPathComponent(
+                        String(
+                            format: "frame_%0\(analysisFrameDigits)d.png",
+                            frame.frameIndex
+                        )
+                    )
+                    .path
+                do {
+                    try writeAnalysisFramePNG(
+                        frame: frame.analysisFrame,
+                        width: frame.analysisWidth,
+                        height: frame.analysisHeight,
+                        path: pngPath
+                    )
+                    frameRecord["analysis_frame_png"] = pngPath
+                } catch {
+                    failLocked(error)
+                    return frameRecords
+                }
+            }
+            frameRecords.append(frameRecord)
             previousFrame = frame
         }
 
@@ -1056,6 +1189,7 @@ final class CaptureController: NSObject, SCStreamOutput, SCStreamDelegate, @unch
                 "height": resolvedWindow.analysisPixels.height,
             ],
             "frames_output": framesOutputPath,
+            "analysis_frames_dir": analysisFramesDirPath as Any,
             "frame_count": frameCount,
             "sample_hz_requested": sampleHz,
             "pixel_threshold": pixelThreshold,
@@ -1154,6 +1288,12 @@ func resolveWindow(options: Options, calibration: Calibration?) async throws -> 
     guard !cropAbsolute.isNull, cropAbsolute.width > 0.0, cropAbsolute.height > 0.0 else {
         throw CaptureError.invalidCalibration("capture region does not intersect the selected window")
     }
+    let cropPoints = CGRect(
+        x: cropAbsolute.origin.x - matchedCGWindow.bounds.origin.x,
+        y: cropAbsolute.origin.y - matchedCGWindow.bounds.origin.y,
+        width: cropAbsolute.width,
+        height: cropAbsolute.height
+    )
 
     let captureTarget = options.captureTarget
     let contentFilter: SCContentFilter
@@ -1183,19 +1323,14 @@ func resolveWindow(options: Options, calibration: Calibration?) async throws -> 
         displayBounds = matchedDisplay.bounds
     } else {
         contentFilter = windowFilter
-        configSourceRect = cropAbsolute
+        // Window capture expects sourceRect in window-local points, not absolute screen points.
+        configSourceRect = cropPoints
         displayID = nil
         displayBounds = nil
     }
     let pointPixelScale = Double(contentFilter.pointPixelScale)
     let scale = pointPixelScale > 0.0 ? pointPixelScale : 1.0
 
-    let cropPoints = CGRect(
-        x: cropAbsolute.origin.x - matchedCGWindow.bounds.origin.x,
-        y: cropAbsolute.origin.y - matchedCGWindow.bounds.origin.y,
-        width: cropAbsolute.width,
-        height: cropAbsolute.height
-    )
     let cropPixels = CGRect(
         x: 0.0,
         y: 0.0,
@@ -1296,10 +1431,12 @@ struct ScreenCaptureKitCaptureTool {
                 eventsPath: options.eventsPath!,
                 outputPath: outputPath,
                 framesOutputPath: framesOutputPath,
+                analysisFramesDirPath: options.analysisFramesDirPath,
                 sampleHz: options.sampleHz,
                 pixelThreshold: options.pixelThreshold,
                 changedFractionThreshold: options.changedFractionThreshold,
                 stableFrames: options.stableFrames,
+                skipFrameDiffAnalysis: options.skipFrameDiffAnalysis,
                 timeoutSeconds: options.timeoutSeconds,
                 queueDepth: options.queueDepth
             )

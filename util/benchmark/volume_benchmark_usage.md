@@ -389,6 +389,59 @@ python ~/code/atlas/util/benchmark/napari_deterministic_batch.py \
   --rendering mip
 ```
 
+### Napari Swap vs Screen Validator
+
+Use `napari_swap_screen_validator.py` when you want to compare the deterministic swap-based
+timestamps against real on-screen presented frames.
+
+Important notes:
+
+- The screenshot-reference pass is reusable. Pass `--reference-dir` to reuse an existing
+  screenshot-reference run with saved per-step images instead of rerunning it.
+- The observed pass is also reusable. Pass `--observed-dir` to reanalyze an existing observed
+  deterministic run plus ScreenCaptureKit capture without relaunching napari.
+- New observed runs save changed analysis frames as inspectable `.png` files. The validator still
+  supports older retained `.bgra` frame directories for backward compatibility.
+- On this Retina window-capture path, the saved observed analysis frames can be a downsampled
+  logical-window image rather than a direct pixel-for-pixel crop of the reference screenshot.
+  The validator therefore derives an effective reference crop from `capture_summary.json` before
+  matching frames, instead of assuming the requested normalized crop applies unchanged.
+
+Example reanalysis using the retained screenshot reference and an existing observed capture:
+
+```bash
+python ~/code/atlas/util/benchmark/napari_swap_screen_validator.py \
+  --dataset ~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif \
+  --dataset-loader tifffile-array \
+  --camera-spec ~/code/atlas/large_test_image/slice15_ch2_gpufit_scene_camera_exact_2000x1500.json \
+  --output-root /tmp/napari_swap_reanalysis \
+  --reference-dir ~/code/atlas/large_test_image/benchmarks/napari_gpufit_deterministic_screenvisible_match_v2/reference \
+  --observed-dir ~/code/atlas/large_test_image/benchmarks/napari_gpufit_deterministic_screenvisible_match_v2/measured/run01/observed
+```
+
+That writes:
+
+- `analysis/swap_screen_match_report.json`
+- `analysis/swap_screen_match_report.md`
+
+Retained `1 + 7` batch rerun using the reusable screenshot reference:
+
+```bash
+python ~/code/atlas/util/benchmark/napari_swap_screen_validator_batch.py \
+  --dataset ~/code/atlas/large_test_image/slice15_ch2_gpufit_1024x1024x980_iso0p1um.tif \
+  --dataset-loader tifffile-array \
+  --camera-spec ~/code/atlas/large_test_image/slice15_ch2_gpufit_scene_camera_exact_2000x1500.json \
+  --reference-dir ~/code/atlas/large_test_image/benchmarks/napari_gpufit_deterministic_screenvisible_match_v2/reference \
+  --output-root /tmp/napari_gpufit_deterministic_screenvisible_rerun
+```
+
+That writes:
+
+- `warmup/run01/...`
+- `measured/run01/...` through `measured/run07/...`
+- `aggregate/summary.json`
+- `aggregate/summary.md`
+
 ### Always-On Timer Log
 
 ParaView's `Tools > Timer Log` dialog stores the `Enable` checkbox in settings, but it only reapplies
@@ -526,6 +579,9 @@ Important calibration fields:
   centered ROI is enough to represent visible render changes
 - `region_coordinate_space`: `absolute` or `window-relative`
 - `actions`: the drag path(s), expressed as normalized coordinates inside `input_region`
+- `actions[*].start_norm` / `end_norm`: required compatibility endpoints for a simple one-segment drag
+- `actions[*].path_norm`: optional polyline override for multi-segment drags such as ping-pong sweeps;
+  if present, the injector interpolates across the listed normalized points over the action duration
 
 On Retina displays, `capture_region` and `input_region` may intentionally differ. A common pattern is:
 

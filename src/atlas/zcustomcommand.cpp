@@ -1,5 +1,16 @@
 #include "zcustomcommand.h"
 
+#include "zconcurrentlrucache.h"
+#include "zthreadsafescalablecache.h"
+#include "zlogqtgui.h"
+
+#include <atomic>
+#include <chrono>
+#include <random>
+#include <thread>
+#include <vector>
+
+#if 0
 #include "zimg.h"
 #include "zglmutils.h"
 #include "zimagematrix3dtransform.h"
@@ -1908,6 +1919,10 @@ void someTest()
 {
   // printStruct<EventListSegment>();
 }
+
+#endif
+
+namespace nim {
 
 template<typename CacheType>
 void concurrent_insert(CacheType& cache, int thread_id, int num_operations, int key_range)
