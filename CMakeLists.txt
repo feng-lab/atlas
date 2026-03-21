@@ -92,6 +92,17 @@ if (ATLAS_DEBUG_VERSION)
 endif ()
 message(STATUS "ATLAS_DEBUG_VERSION: ${ATLAS_DEBUG_VERSION}")
 
+option(ATLAS_ENABLE_RELEASE_PDB
+       "Emit PDBs for optimized Release builds on MSVC-compatible Windows toolchains."
+       OFF)
+if (MSVC AND ATLAS_ENABLE_RELEASE_PDB)
+  # Keep the Release configuration while asking MSVC/clang-cl to emit PDB-backed
+  # compile debug info. This is intentionally separate from ATLAS_DEBUG_VERSION,
+  # which also disables Release IPO/LTO for faster local relinks.
+  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Release>:ProgramDatabase>")
+endif ()
+message(STATUS "ATLAS_ENABLE_RELEASE_PDB: ${ATLAS_ENABLE_RELEASE_PDB}")
+
 # Keep local debug-version builds fast to relink by disabling Release IPO/LTO.
 # Production-style Release builds (ATLAS_DEBUG_VERSION=OFF) still keep IPO enabled.
 set(ATLAS_ENABLE_RELEASE_IPO ON)

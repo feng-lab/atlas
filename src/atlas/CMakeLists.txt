@@ -1051,8 +1051,14 @@ if (WIN32)
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
   set_source_files_properties(${PROTO_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
 
-  if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # to create an output file whether or not LINK finds more than one definition for a symbol.
+  if (ATLAS_ENABLE_RELEASE_PDB)
+    # `/DEBUG` would otherwise flip the linker defaults to `/OPT:NOREF,NOICF`.
+    # Restate the Release linker optimizations explicitly so enabling PDB output
+    # does not change the optimized codegen/link behavior.
+    target_link_options(${APP_NAME} PUBLIC /DEBUG /OPT:REF /OPT:ICF /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
+  elseif (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # Keep the default Release build free of linker debug info unless the
+    # dedicated optimized Release+PDB option is requested.
     target_link_options(${APP_NAME} PUBLIC /DEBUG:NONE /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
   endif ()
 

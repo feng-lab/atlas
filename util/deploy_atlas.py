@@ -342,7 +342,8 @@ def _macos_run_codesign_checked(cmd: list[str], *, cwd: Optional[str] = None) ->
 
             delay = min(
                 _MACOS_CODESIGN_TIMESTAMP_RETRY_MAX_DELAY_SECONDS,
-                _MACOS_CODESIGN_TIMESTAMP_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)),
+                _MACOS_CODESIGN_TIMESTAMP_RETRY_BASE_DELAY_SECONDS
+                * (2 ** (attempt - 1)),
             )
             logger.warning(
                 "codesign failed because the timestamp service is not available; retrying in %.1fs (%d/%d)",
@@ -453,7 +454,8 @@ def _macos_notarytool_submit_wait_checked(
                 break
             delay = min(
                 _MACOS_NOTARYTOOL_SUBMIT_RETRY_MAX_DELAY_SECONDS,
-                _MACOS_NOTARYTOOL_SUBMIT_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)),
+                _MACOS_NOTARYTOOL_SUBMIT_RETRY_BASE_DELAY_SECONDS
+                * (2 ** (attempt - 1)),
             )
             logger.warning(
                 "notarytool submit failed due to a transient Apple/network error; retrying in %.1fs (%d/%d)",
@@ -943,7 +945,14 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
             )
         except subprocess.CalledProcessError:
             safe_cmd = _macos_format_command_for_logging(
-                ["xcrun", "notarytool", "log", submission_id, "<output-path>", *auth_args]
+                [
+                    "xcrun",
+                    "notarytool",
+                    "log",
+                    submission_id,
+                    "<output-path>",
+                    *auth_args,
+                ]
             )
             raise RuntimeError(
                 "Notarization failed and fetching the notarization log also failed.\n"
@@ -1014,7 +1023,9 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
         if spctl_output:
             for line in spctl_output.splitlines():
                 logger.error("%s", line)
-        raise subprocess.CalledProcessError(proc.returncode, spctl_cmd, output=spctl_output)
+        raise subprocess.CalledProcessError(
+            proc.returncode, spctl_cmd, output=spctl_output
+        )
     if spctl_verbose and spctl_output:
         for line in spctl_output.splitlines():
             logger.info("%s", line)
@@ -1027,7 +1038,9 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
 
 
 def _macos_qtifw_archivegen_path() -> str:
-    archivegen = os.path.join(common_dirs.qt_installer_framework_bin_dir(), "archivegen")
+    archivegen = os.path.join(
+        common_dirs.qt_installer_framework_bin_dir(), "archivegen"
+    )
     if not os.path.exists(archivegen):
         raise RuntimeError(
             "Qt Installer Framework `archivegen` was not found at the configured QtIFW location.\n"
@@ -1162,14 +1175,18 @@ def _macos_notarize_qtifw_package_dir(package_dir: str) -> None:
         logger.info("Processing QtIFW payload: %s", archive_path)
         before_hash = _macos_sha256(archive_path)
 
-        with tempfile.TemporaryDirectory(prefix="atlas-qtifw-", dir=data_dir) as tmp_dir:
+        with tempfile.TemporaryDirectory(
+            prefix="atlas-qtifw-", dir=data_dir
+        ) as tmp_dir:
             extract_dir = os.path.join(tmp_dir, "extract")
             os.makedirs(extract_dir, exist_ok=True)
 
             common_dirs.unpack_file_to_folder(archive_path, extract_dir)
 
             app_paths: list[str] = []
-            for dirpath, dirnames, _filenames in os.walk(extract_dir, followlinks=False):
+            for dirpath, dirnames, _filenames in os.walk(
+                extract_dir, followlinks=False
+            ):
                 dirnames[:] = [
                     name
                     for name in dirnames
@@ -1267,7 +1284,9 @@ def _is_license_filename(name: str) -> bool:
     return any(s in lower for s in _THIRD_PARTY_LICENSE_FILENAME_SUBSTRINGS)
 
 
-def _collect_third_party_license_files_for_component(component_dir: str) -> list[tuple[str, str]]:
+def _collect_third_party_license_files_for_component(
+    component_dir: str,
+) -> list[tuple[str, str]]:
     """Collect license-like files for a single component directory.
 
     Returns a list of (src_path, rel_path) where rel_path is relative to component_dir.
@@ -1330,6 +1349,7 @@ def _download_runtime_licenses(dst_runtime_dir: str) -> None:
 
     This avoids storing large, versioned license registries in the repository.
     """
+
     def download(url: str, dst_path: str) -> None:
         os.makedirs(os.path.dirname(dst_path), exist_ok=True)
         if not download_utils.download_file_with_resume(url, "", dst_path):
@@ -1365,13 +1385,13 @@ def _copy_runtime_redistribution_licenses_to_resources(resources_dir: str) -> No
 
 
 def get_bak_file_name(orig_file: str):
-    return orig_file + '.bak'
+    return orig_file + ".bak"
 
 
 def update_pacakge_xml_version(template_file: str, file: str):
     tree = eTree.parse(template_file)
-    tree.find('Version').text = '{0:%Y.%m.%d.%H}'.format(datetime.datetime.now())
-    tree.find('ReleaseDate').text = '{0:%Y-%m-%d}'.format(datetime.datetime.now())
+    tree.find("Version").text = "{0:%Y.%m.%d.%H}".format(datetime.datetime.now())
+    tree.find("ReleaseDate").text = "{0:%Y-%m-%d}".format(datetime.datetime.now())
     # Write back to file
     tree.write(file, encoding="utf-8", xml_declaration=True)
 
@@ -1386,27 +1406,37 @@ def update_maintenance_pacakge_xml_version(template_file: str, file: str):
     tree.write(file, encoding="utf-8", xml_declaration=True)
 
 
-def build_atlas_package(is_debug_version: bool = False):
-    logger.info(f'current interpreter: {sys.executable}')
+def build_atlas_package(is_debug_version: bool = False, release_pdb: bool = False):
+    logger.info(f"current interpreter: {sys.executable}")
 
     binary_dir = common_dirs.atlas_binary_dir()
-    logger.info(f'binaryDIR: {binary_dir}')
-    logger.info(f'deployTargetDIR: {common_dirs.deploy_target_dir()}')
-    logger.info(f'qtBaseDIR: {common_dirs.qt_base_dir()}')
+    logger.info(f"binaryDIR: {binary_dir}")
+    logger.info(f"deployTargetDIR: {common_dirs.deploy_target_dir()}")
+    logger.info(f"qtBaseDIR: {common_dirs.qt_base_dir()}")
 
     if common_dirs.is_mac():
-        app_name = 'Atlas.app'
+        app_name = "Atlas.app"
 
-        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), app_name), ignore_errors=True)
+        shutil.rmtree(
+            os.path.join(common_dirs.deploy_target_dir(), app_name), ignore_errors=True
+        )
 
         if os.path.exists(os.path.join(binary_dir, app_name)):
-            shutil.copytree(os.path.join(binary_dir, app_name),
-                            os.path.join(common_dirs.deploy_target_dir(), app_name),
-                            symlinks=True)
-            subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
-                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+            shutil.copytree(
+                os.path.join(binary_dir, app_name),
+                os.path.join(common_dirs.deploy_target_dir(), app_name),
+                symlinks=True,
+            )
+            subprocess.run(
+                [os.path.join(common_dirs.qt_bin_dir(), "macdeployqt"), app_name],
+                cwd=common_dirs.deploy_target_dir(),
+                shell=False,
+                check=True,
+            )
         else:
-            raise RuntimeError("Atlas.app was not found in the build output; run `python util/build_atlas.py` first.")
+            raise RuntimeError(
+                "Atlas.app was not found in the build output; run `python util/build_atlas.py` first."
+            )
 
         # Ensure LLM docs are generated in repo and copied into the .app.
         repo_root = Path(common_dirs.atlas_repository_dir())
@@ -1417,14 +1447,25 @@ def build_atlas_package(is_debug_version: bool = False):
             force_schema_dump=True,
         )
         # Copy repo docs into the deployed app
-        target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'Resources', 'json', 'atlas')
+        target_llm_dir = os.path.join(
+            common_dirs.deploy_target_dir(),
+            app_name,
+            "Contents",
+            "Resources",
+            "json",
+            "atlas",
+        )
         os.makedirs(target_llm_dir, exist_ok=True)
         shutil.copytree(repo_llm_dir, target_llm_dir, dirs_exist_ok=True)
         _copy_third_party_licenses_to_resources(
-            os.path.join(common_dirs.deploy_target_dir(), app_name, "Contents", "Resources")
+            os.path.join(
+                common_dirs.deploy_target_dir(), app_name, "Contents", "Resources"
+            )
         )
         _copy_runtime_redistribution_licenses_to_resources(
-            os.path.join(common_dirs.deploy_target_dir(), app_name, "Contents", "Resources")
+            os.path.join(
+                common_dirs.deploy_target_dir(), app_name, "Contents", "Resources"
+            )
         )
 
         deployed_app_path = os.path.join(common_dirs.deploy_target_dir(), app_name)
@@ -1437,68 +1478,123 @@ def build_atlas_package(is_debug_version: bool = False):
     elif common_dirs.is_linux():
         app_name = "Atlas"
 
-        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'), ignore_errors=True)
+        shutil.rmtree(
+            os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir"),
+            ignore_errors=True,
+        )
 
         if os.path.exists(os.path.join(binary_dir, app_name)):
-            linuxdeployqt.linuxdeployqt(os.path.join(binary_dir, app_name),
-                                        os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
-                                        common_dirs.qt_base_dir(),
-                                        is_debug_version=is_debug_version)
+            linuxdeployqt.linuxdeployqt(
+                os.path.join(binary_dir, app_name),
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir"),
+                common_dirs.qt_base_dir(),
+                is_debug_version=is_debug_version,
+            )
             # Ensure LLM docs are generated in repo and copied into AppDir.
             repo_root = Path(common_dirs.atlas_repository_dir())
             repo_llm_dir = atlas_llm_docs.repo_schema_dir(repo_root)
             atlas_llm_docs.ensure_llm_schema_docs(
-                atlas_dir=Path(os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir")),
+                atlas_dir=Path(
+                    os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir")
+                ),
                 out_dir=repo_llm_dir,
                 force_schema_dump=True,
             )
-            target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Resources', 'json', 'atlas')
+            target_llm_dir = os.path.join(
+                common_dirs.deploy_target_dir(),
+                "Atlas.AppDir",
+                "Resources",
+                "json",
+                "atlas",
+            )
             os.makedirs(target_llm_dir, exist_ok=True)
             shutil.copytree(repo_llm_dir, target_llm_dir, dirs_exist_ok=True)
             _copy_third_party_licenses_to_resources(
-                os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir", "Resources")
+                os.path.join(
+                    common_dirs.deploy_target_dir(), "Atlas.AppDir", "Resources"
+                )
             )
             _copy_runtime_redistribution_licenses_to_resources(
-                os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir", "Resources")
+                os.path.join(
+                    common_dirs.deploy_target_dir(), "Atlas.AppDir", "Resources"
+                )
             )
         else:
-            logger.critical('atlas is not built yet')
+            logger.critical("atlas is not built yet")
     else:
-        app_name = 'Atlas.exe'
+        app_name = "Atlas.exe"
+        pdb_name = "Atlas.pdb"
 
-        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), ignore_errors=True)
+        shutil.rmtree(
+            os.path.join(common_dirs.deploy_target_dir(), "Atlas"), ignore_errors=True
+        )
 
         if os.path.exists(os.path.join(binary_dir, app_name)):
-            os.mkdir(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
-            shutil.copy2(os.path.join(binary_dir, app_name),
-                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
-            shutil.copytree(os.path.join(binary_dir, 'Resources'),
-                            os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Resources'),
-                            symlinks=True)
-            shutil.copytree(os.path.join(binary_dir, 'vulkan'),
-                            os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'vulkan'),
-                            symlinks=True)
+            pdb_path = os.path.join(binary_dir, pdb_name)
+            if release_pdb and not os.path.exists(pdb_path):
+                raise RuntimeError(
+                    "Atlas.pdb was requested for deployment but was not found in the build output; "
+                    "rebuild with `--release-pdb` and ensure the link step completed successfully."
+                )
+
+            os.mkdir(os.path.join(common_dirs.deploy_target_dir(), "Atlas"))
+            shutil.copy2(
+                os.path.join(binary_dir, app_name),
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+            )
+            if release_pdb:
+                # Keep the exact executable/PDB pair together for internal crash
+                # triage and postmortem dump symbolication.
+                shutil.copy2(
+                    pdb_path, os.path.join(common_dirs.deploy_target_dir(), "Atlas")
+                )
+            shutil.copytree(
+                os.path.join(binary_dir, "Resources"),
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas", "Resources"),
+                symlinks=True,
+            )
+            shutil.copytree(
+                os.path.join(binary_dir, "vulkan"),
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas", "vulkan"),
+                symlinks=True,
+            )
             # build_ext_libs.glob_copy(os.path.join(common_dirs.assimp_redist_dir(), 'assimp*.dll'),
             #                          os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
-            build_ext_libs.glob_copy(os.path.join(common_dirs.freeimage_redist_dir(), '*.dll'),
-                                     os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            build_ext_libs.glob_copy(
+                os.path.join(common_dirs.freeimage_redist_dir(), "*.dll"),
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+            )
             # build_ext_libs.glob_copy(os.path.join(common_dirs.ext_build_dir(), 'bin', 'vtktoken-*.dll'),
             #                          os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
-            shutil.copy2(os.path.join(common_dirs.tbb_redist_dir(), 'tbb12.dll'),
-                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            shutil.copy2(
+                os.path.join(common_dirs.tbb_redist_dir(), "tbb12.dll"),
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+            )
             build_ext_libs.glob_copy(
-                os.path.join(common_dirs.vc_CRT_redist_dir(), '*.dll'),
-                os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+                os.path.join(common_dirs.vc_CRT_redist_dir(), "*.dll"),
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+            )
             build_ext_libs.glob_copy(
-                os.path.join(common_dirs.vc_CXXAMP_redist_dir(), '*.dll'),
-                os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+                os.path.join(common_dirs.vc_CXXAMP_redist_dir(), "*.dll"),
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+            )
             build_ext_libs.glob_copy(
-                os.path.join(common_dirs.vc_OpenMP_redist_dir(), '*.dll'),
-                os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+                os.path.join(common_dirs.vc_OpenMP_redist_dir(), "*.dll"),
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+            )
 
             env = build_ext_libs.get_vcvars_environment()
-            subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), '--no-translations', app_name],
-                           cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
+            subprocess.run(
+                [
+                    os.path.join(common_dirs.qt_bin_dir(), "windeployqt"),
+                    "--no-translations",
+                    app_name,
+                ],
+                cwd=os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+                shell=False,
+                check=True,
+                env=env,
+            )
             # Ensure LLM docs are generated in repo and copied into deploy folder.
             repo_root = Path(common_dirs.atlas_repository_dir())
             repo_llm_dir = atlas_llm_docs.repo_schema_dir(repo_root)
@@ -1507,7 +1603,9 @@ def build_atlas_package(is_debug_version: bool = False):
                 out_dir=repo_llm_dir,
                 force_schema_dump=True,
             )
-            target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Resources', 'json', 'atlas')
+            target_llm_dir = os.path.join(
+                common_dirs.deploy_target_dir(), "Atlas", "Resources", "json", "atlas"
+            )
             os.makedirs(target_llm_dir, exist_ok=True)
             shutil.copytree(repo_llm_dir, target_llm_dir, dirs_exist_ok=True)
             _copy_third_party_licenses_to_resources(
@@ -1517,20 +1615,20 @@ def build_atlas_package(is_debug_version: bool = False):
                 os.path.join(common_dirs.deploy_target_dir(), "Atlas", "Resources")
             )
         else:
-            logger.critical('atlas is not built yet')
+            logger.critical("atlas is not built yet")
 
 
 def pack_atlas_package():
     version_token = atlas_version.version_token_for_filename()
 
     if common_dirs.is_mac():
-        app_name = 'Atlas.app'
+        app_name = "Atlas.app"
         suffix = "macOS"
     elif common_dirs.is_linux():
         app_name = "Atlas.AppDir"
         suffix = "Linux"
     else:
-        app_name = 'Atlas'
+        app_name = "Atlas"
         suffix = "Windows"
 
     zip_name = f"atlas-{suffix}-{version_token}.zip"
@@ -1566,60 +1664,82 @@ def pack_atlas_package():
 def build_atlas_installer():
 
     if common_dirs.is_mac():
-        suffix = 'macOS'
-        app_name = 'Atlas.app'
-        repo_package_name = 'atlas.7z'
-        mt_app_name = 'MaintenanceTool.app'
-        mt_repo_package_name = 'MaintenanceTool.7z'
-        installer_base_name = 'AtlasInstaller'
-        installer_app_name = 'AtlasInstaller.app'
+        suffix = "macOS"
+        app_name = "Atlas.app"
+        repo_package_name = "atlas.7z"
+        mt_app_name = "MaintenanceTool.app"
+        mt_repo_package_name = "MaintenanceTool.7z"
+        installer_base_name = "AtlasInstaller"
+        installer_app_name = "AtlasInstaller.app"
         installer_zip_name = f"AtlasInstaller-{suffix}.zip"
     elif common_dirs.is_linux():
-        suffix = 'Linux'
-        app_name = 'Atlas.AppDir'
-        repo_package_name = 'atlas.7z'
-        mt_app_name = '.tempMaintenanceTool'
-        mt_repo_package_name = 'MaintenanceTool.7z'
-        installer_base_name = 'AtlasInstaller'
-        installer_app_name = 'AtlasInstaller'
+        suffix = "Linux"
+        app_name = "Atlas.AppDir"
+        repo_package_name = "atlas.7z"
+        mt_app_name = ".tempMaintenanceTool"
+        mt_repo_package_name = "MaintenanceTool.7z"
+        installer_base_name = "AtlasInstaller"
+        installer_app_name = "AtlasInstaller"
         installer_zip_name = f"AtlasInstaller-{suffix}.zip"
     else:
-        suffix = 'Windows'
-        app_name = 'Atlas'
-        repo_package_name = 'atlas.7z'
-        mt_app_name = 'tempMaintenanceTool.exe'
-        mt_repo_package_name = 'MaintenanceTool.7z'
-        installer_base_name = 'AtlasInstaller'
-        installer_app_name = 'AtlasInstaller.exe'
+        suffix = "Windows"
+        app_name = "Atlas"
+        repo_package_name = "atlas.7z"
+        mt_app_name = "tempMaintenanceTool.exe"
+        mt_repo_package_name = "MaintenanceTool.7z"
+        installer_base_name = "AtlasInstaller"
+        installer_app_name = "AtlasInstaller.exe"
         installer_zip_name = f"AtlasInstaller-{suffix}.zip"
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), repo_package_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), repo_package_name))
-    shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=True)
+    shutil.rmtree(
+        os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=True
+    )
     if os.path.exists(
         os.path.join(common_dirs.deploy_target_dir(), installer_zip_name)
     ):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name))
 
     if common_dirs.is_mac():
-        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=True)
-    elif os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_app_name)):
+        shutil.rmtree(
+            os.path.join(common_dirs.deploy_target_dir(), installer_app_name),
+            ignore_errors=True,
+        )
+    elif os.path.exists(
+        os.path.join(common_dirs.deploy_target_dir(), installer_app_name)
+    ):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_app_name))
 
-    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube')):
-        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'),
-                      ignore_errors=False, onexc=common_dirs.handleRemoveReadonly)
-    shutil.copytree(os.path.join(common_dirs.ext_build_dir(), 'packages-' + suffix, 'fenglab.neutube'),
-                    os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'))
+    if os.path.exists(
+        os.path.join(common_dirs.deploy_target_dir(), "packages", "fenglab.neutube")
+    ):
+        shutil.rmtree(
+            os.path.join(
+                common_dirs.deploy_target_dir(), "packages", "fenglab.neutube"
+            ),
+            ignore_errors=False,
+            onexc=common_dirs.handleRemoveReadonly,
+        )
+    shutil.copytree(
+        os.path.join(
+            common_dirs.ext_build_dir(), "packages-" + suffix, "fenglab.neutube"
+        ),
+        os.path.join(common_dirs.deploy_target_dir(), "packages", "fenglab.neutube"),
+    )
 
     mt_app_path = os.path.join(common_dirs.deploy_target_dir(), mt_app_name)
     if common_dirs.is_mac():
         if os.path.exists(mt_app_path):
-            shutil.rmtree(mt_app_path, ignore_errors=False, onexc=common_dirs.handleRemoveReadonly)
+            shutil.rmtree(
+                mt_app_path, ignore_errors=False, onexc=common_dirs.handleRemoveReadonly
+            )
 
         subprocess.run(
             [
-                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "binarycreator"),
+                os.path.join(
+                    common_dirs.qt_installer_framework_bin_dir(), "binarycreator"
+                ),
                 "-c",
                 os.path.join("config", "config-macOS.xml"),
                 "--mt",
@@ -1643,7 +1763,9 @@ def build_atlas_installer():
 
         subprocess.run(
             [
-                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "archivegen"),
+                os.path.join(
+                    common_dirs.qt_installer_framework_bin_dir(), "archivegen"
+                ),
                 "--compression",
                 "5",
                 mt_repo_package_name,
@@ -1653,23 +1775,31 @@ def build_atlas_installer():
             shell=False,
             check=True,
         )
-        shutil.rmtree(mt_app_path, ignore_errors=False, onexc=common_dirs.handleRemoveReadonly)
+        shutil.rmtree(
+            mt_app_path, ignore_errors=False, onexc=common_dirs.handleRemoveReadonly
+        )
     else:
         if os.path.exists(mt_app_path):
             os.remove(mt_app_path)
         if common_dirs.is_windows():
             shutil.copy(
-                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "installerbase.exe"),
+                os.path.join(
+                    common_dirs.qt_installer_framework_bin_dir(), "installerbase.exe"
+                ),
                 os.path.join(common_dirs.deploy_target_dir(), mt_app_name),
             )
         else:
             shutil.copy(
-                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "installerbase"),
+                os.path.join(
+                    common_dirs.qt_installer_framework_bin_dir(), "installerbase"
+                ),
                 mt_app_path,
             )
         subprocess.run(
             [
-                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "archivegen"),
+                os.path.join(
+                    common_dirs.qt_installer_framework_bin_dir(), "archivegen"
+                ),
                 mt_repo_package_name,
                 mt_app_path,
             ],
@@ -1678,40 +1808,90 @@ def build_atlas_installer():
             check=True,
         )
         os.remove(mt_app_path)
-    repo_package_folder = os.path.join(common_dirs.deploy_target_dir(),
-                                       'packages', 'fenglab.maintenance', 'data')
+    repo_package_folder = os.path.join(
+        common_dirs.deploy_target_dir(), "packages", "fenglab.maintenance", "data"
+    )
     if os.path.exists(os.path.join(repo_package_folder, mt_repo_package_name)):
         os.remove(os.path.join(repo_package_folder, mt_repo_package_name))
-    shutil.move(os.path.join(common_dirs.deploy_target_dir(), mt_repo_package_name), repo_package_folder)
-    update_maintenance_pacakge_xml_version(os.path.join(common_dirs.deploy_target_dir(), 'maintenance_package.xml'),
-                                           os.path.join(common_dirs.deploy_target_dir(),
-                                                        'packages', 'fenglab.maintenance', 'meta', 'package.xml'))
+    shutil.move(
+        os.path.join(common_dirs.deploy_target_dir(), mt_repo_package_name),
+        repo_package_folder,
+    )
+    update_maintenance_pacakge_xml_version(
+        os.path.join(common_dirs.deploy_target_dir(), "maintenance_package.xml"),
+        os.path.join(
+            common_dirs.deploy_target_dir(),
+            "packages",
+            "fenglab.maintenance",
+            "meta",
+            "package.xml",
+        ),
+    )
 
-    subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'archivegen'),
-                    '--compression', '5',
-                    repo_package_name, app_name],
-                   cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+    subprocess.run(
+        [
+            os.path.join(common_dirs.qt_installer_framework_bin_dir(), "archivegen"),
+            "--compression",
+            "5",
+            repo_package_name,
+            app_name,
+        ],
+        cwd=common_dirs.deploy_target_dir(),
+        shell=False,
+        check=True,
+    )
 
-    repo_package_folder = os.path.join(common_dirs.deploy_target_dir(),
-                                       'packages', 'fenglab.atlas', 'data')
+    repo_package_folder = os.path.join(
+        common_dirs.deploy_target_dir(), "packages", "fenglab.atlas", "data"
+    )
     if os.path.exists(os.path.join(repo_package_folder, repo_package_name)):
         os.remove(os.path.join(repo_package_folder, repo_package_name))
-    shutil.move(os.path.join(common_dirs.deploy_target_dir(), repo_package_name), repo_package_folder)
-    update_pacakge_xml_version(os.path.join(common_dirs.deploy_target_dir(), 'atlas_package.xml'),
-                               os.path.join(common_dirs.deploy_target_dir(),
-                                            'packages', 'fenglab.atlas', 'meta', 'package.xml'))
+    shutil.move(
+        os.path.join(common_dirs.deploy_target_dir(), repo_package_name),
+        repo_package_folder,
+    )
+    update_pacakge_xml_version(
+        os.path.join(common_dirs.deploy_target_dir(), "atlas_package.xml"),
+        os.path.join(
+            common_dirs.deploy_target_dir(),
+            "packages",
+            "fenglab.atlas",
+            "meta",
+            "package.xml",
+        ),
+    )
 
-    subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'repogen'),
-                    '-p', 'packages', './' + suffix],
-                   cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+    subprocess.run(
+        [
+            os.path.join(common_dirs.qt_installer_framework_bin_dir(), "repogen"),
+            "-p",
+            "packages",
+            "./" + suffix,
+        ],
+        cwd=common_dirs.deploy_target_dir(),
+        shell=False,
+        check=True,
+    )
 
-    subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'binarycreator'),
-                    '--online-only', '-c', 'config/config-' + suffix + '.xml', '-p', 'packages',
-                    installer_base_name],
-                   cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+    subprocess.run(
+        [
+            os.path.join(common_dirs.qt_installer_framework_bin_dir(), "binarycreator"),
+            "--online-only",
+            "-c",
+            "config/config-" + suffix + ".xml",
+            "-p",
+            "packages",
+            installer_base_name,
+        ],
+        cwd=common_dirs.deploy_target_dir(),
+        shell=False,
+        check=True,
+    )
 
     if common_dirs.is_mac():
-        installer_app_path = os.path.join(common_dirs.deploy_target_dir(), installer_app_name)
+        installer_app_path = os.path.join(
+            common_dirs.deploy_target_dir(), installer_app_name
+        )
         if _macos_signing_disabled():
             _macos_codesign_bundle(installer_app_path, identity_override="-")
         else:
@@ -1719,18 +1899,35 @@ def build_atlas_installer():
             _macos_notarize_and_staple_bundle(installer_app_path)
 
     if common_dirs.is_windows():
-        zipfile.ZipFile(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name), mode='w') \
-            .write(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), arcname=installer_app_name)
+        zipfile.ZipFile(
+            os.path.join(common_dirs.deploy_target_dir(), installer_zip_name), mode="w"
+        ).write(
+            os.path.join(common_dirs.deploy_target_dir(), installer_app_name),
+            arcname=installer_app_name,
+        )
     else:
-        subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', installer_zip_name, installer_app_name],
-                       cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+        subprocess.run(
+            [
+                "zip",
+                "--quiet",
+                "--recurse-paths",
+                "--symlinks",
+                installer_zip_name,
+                installer_app_name,
+            ],
+            cwd=common_dirs.deploy_target_dir(),
+            shell=False,
+            check=True,
+        )
 
     if common_dirs.is_my_computer():
         if common_dirs.is_mac():
             out_folder = common_dirs.static_deploy_folder()
-            shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
-                         os.path.join(out_folder, 'installers', installer_zip_name))
-            target_folder = os.path.join(out_folder, 'packages')
+            shutil.copy2(
+                os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
+                os.path.join(out_folder, "installers", installer_zip_name),
+            )
+            target_folder = os.path.join(out_folder, "packages")
             if os.path.exists(os.path.join(target_folder, suffix)):
                 shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
             shutil.copytree(
@@ -1740,12 +1937,17 @@ def build_atlas_installer():
             )
         elif common_dirs.is_windows():
             out_folder = common_dirs.static_deploy_folder()
-            shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
-                         os.path.join(out_folder, 'installers', installer_zip_name))
-            target_folder = os.path.join(out_folder, 'packages')
+            shutil.copy2(
+                os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
+                os.path.join(out_folder, "installers", installer_zip_name),
+            )
+            target_folder = os.path.join(out_folder, "packages")
             if os.path.exists(os.path.join(target_folder, suffix)):
-                shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False,
-                              onexc=common_dirs.handleRemoveReadonly)
+                shutil.rmtree(
+                    os.path.join(target_folder, suffix),
+                    ignore_errors=False,
+                    onexc=common_dirs.handleRemoveReadonly,
+                )
             shutil.copytree(
                 os.path.join(common_dirs.deploy_target_dir(), suffix),
                 os.path.join(target_folder, suffix),
@@ -1753,8 +1955,8 @@ def build_atlas_installer():
             )
 
 
-def deploy_atlas(is_debug_version: bool = False):
-    build_atlas_package(is_debug_version=is_debug_version)
+def deploy_atlas(is_debug_version: bool = False, release_pdb: bool = False):
+    build_atlas_package(is_debug_version=is_debug_version, release_pdb=release_pdb)
     if not is_debug_version:
         pack_atlas_package()
         build_atlas_installer()
@@ -1768,11 +1970,16 @@ if __name__ == "__main__":
         epilog="""
 Examples:
 
-python deploy_atlas.py [--debug-version]
+python deploy_atlas.py [--debug-version] [--release-pdb]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--debug-version", action='store_true', help="debug version")
+    parser.add_argument("--debug-version", action="store_true", help="debug version")
+    parser.add_argument(
+        "--release-pdb",
+        action="store_true",
+        help="copy Atlas.pdb into the Windows deploy package; requires a build produced with --release-pdb",
+    )
     parser.add_argument(
         "--notarize-qtifw-package",
         metavar="DIR",
@@ -1784,4 +1991,4 @@ python deploy_atlas.py [--debug-version]
         _macos_notarize_qtifw_package_dir(args.notarize_qtifw_package)
         sys.exit(0)
 
-    deploy_atlas(is_debug_version=args.debug_version)
+    deploy_atlas(is_debug_version=args.debug_version, release_pdb=args.release_pdb)

@@ -107,6 +107,8 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
     python util/build_ext_libs.py all
     # build atlas
     python util/build_and_deploy_atlas.py [--skip-test|--run-test]
+    # Windows: keep Release optimization and also emit Atlas.pdb
+    python util/build_and_deploy_atlas.py --release-pdb [--skip-test|--run-test]
     # Note: tests run by default, except for clean release-tag builds (vX.Y[.Z...])
     # where tests are skipped by default. Use --run-test to force tests on tags.
     # or build CMakeLists.txt

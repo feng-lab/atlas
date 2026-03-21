@@ -140,6 +140,7 @@ def build_atlas(
     use_asan: bool = False,
     skip_test: bool | None = None,
     debug_version: bool = False,
+    release_pdb: bool = False,
     enable_network_tests: bool = False,
 ):
     logger.info(f"srcDIR: {common_dirs.atlas_repository_dir()}")
@@ -158,6 +159,7 @@ def build_atlas(
             "-DBUILD_TESTING:BOOL=" + ("OFF" if skip_test else "ON"),
             "-DATLAS_SANITIZE_ADDRESS:BOOL=" + ("ON" if use_asan else "OFF"),
             "-DATLAS_DEBUG_VERSION:BOOL=" + ("ON" if debug_version else "OFF"),
+            "-DATLAS_ENABLE_RELEASE_PDB:BOOL=" + ("ON" if release_pdb else "OFF"),
             # Developer-only tool; keep it out of deployed builds by default.
             "-DATLAS_ENABLE_CUSTOM_COMMAND:BOOL=" + ("ON" if debug_version else "OFF"),
         ]
@@ -275,7 +277,7 @@ if __name__ == "__main__":
         epilog="""
 Examples:
 
-python build_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-version]
+python build_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-version] [--release-pdb]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -296,6 +298,11 @@ python build_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-version]
     parser.set_defaults(skip_test=None)
     parser.add_argument("--debug-version", action="store_true", help="debug version")
     parser.add_argument(
+        "--release-pdb",
+        action="store_true",
+        help="emit PDBs for optimized Release builds on Windows without disabling Release IPO/LTO",
+    )
+    parser.add_argument(
         "--enable-network-tests",
         action="store_true",
         help="enable network-dependent tests (disabled by default for CI/firewalled environments)",
@@ -306,5 +313,6 @@ python build_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-version]
         use_asan=args.use_asan,
         skip_test=args.skip_test,
         debug_version=args.debug_version,
+        release_pdb=args.release_pdb,
         enable_network_tests=args.enable_network_tests,
     )
