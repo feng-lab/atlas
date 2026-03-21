@@ -18,9 +18,6 @@
 #include <unordered_set>
 #include <type_traits>
 
-#include <fmt/format.h>
-#include <fmt/ranges.h>
-
 DEFINE_bool(atlas_vk_linear_script_validate_batch_metadata,
             false,
             "Enable expensive CHECK-based validation of Vulkan batch metadata in ZVulkanLinearScript before executing");

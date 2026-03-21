@@ -7,7 +7,6 @@
 #include <QKeyCombination>
 #endif
 
-#include <fmt/format.h>
 #include <ostream>
 #include <string_view>
 

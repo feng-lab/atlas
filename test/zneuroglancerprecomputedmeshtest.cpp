@@ -164,6 +164,46 @@ TEST(ZNeuroglancerPrecomputedMeshTest, ExternalSourceJsonRoundTripsBaseGeometry)
   ASSERT_TRUE(keyOpt->baseVoxelOffset.has_value());
   EXPECT_EQ(*keyOpt->baseResolutionNm, (std::array<double, 3>{8.0, 8.0, 30.0}));
   EXPECT_EQ(*keyOpt->baseVoxelOffset, (std::array<int64_t, 3>{1, 2, 3}));
+
+  const QString keyWithGeometry = neuroglancerMeshKeyString(keyOpt->rootUrl,
+                                                            keyOpt->meshSourceDirUrl,
+                                                            keyOpt->segmentId,
+                                                            keyOpt->baseResolutionNm,
+                                                            keyOpt->baseVoxelOffset);
+  const QString keyWithoutGeometry =
+    neuroglancerMeshKeyString(keyOpt->rootUrl, keyOpt->meshSourceDirUrl, keyOpt->segmentId);
+  EXPECT_NE(keyWithGeometry, keyWithoutGeometry);
+}
+
+TEST(ZNeuroglancerPrecomputedMeshTest, ExternalSourceCompatTreatsMissingGeometryAsSameObject)
+{
+  const json::value legacy =
+    makeNeuroglancerMeshExternalSourceJson(QStringLiteral("precomputed://gs://bucket/seg"),
+                                           QStringLiteral("precomputed://gs://bucket/seg/mesh/"),
+                                           42);
+  const json::value normalized =
+    makeNeuroglancerMeshExternalSourceJson(QStringLiteral("precomputed://gs://bucket/seg"),
+                                           QStringLiteral("precomputed://gs://bucket/seg/mesh/"),
+                                           42,
+                                           std::array<double, 3>{8.0, 8.0, 30.0},
+                                           std::array<int64_t, 3>{1, 2, 3});
+  const json::value differentGeometry =
+    makeNeuroglancerMeshExternalSourceJson(QStringLiteral("precomputed://gs://bucket/seg"),
+                                           QStringLiteral("precomputed://gs://bucket/seg/mesh/"),
+                                           42,
+                                           std::array<double, 3>{16.0, 16.0, 30.0},
+                                           std::array<int64_t, 3>{1, 2, 3});
+
+  const auto legacyKey = parseNeuroglancerMeshExternalSourceKey(legacy);
+  const auto normalizedKey = parseNeuroglancerMeshExternalSourceKey(normalized);
+  const auto differentGeometryKey = parseNeuroglancerMeshExternalSourceKey(differentGeometry);
+  ASSERT_TRUE(legacyKey.has_value());
+  ASSERT_TRUE(normalizedKey.has_value());
+  ASSERT_TRUE(differentGeometryKey.has_value());
+
+  EXPECT_TRUE(sameNeuroglancerMeshSourceCompat(*legacyKey, *normalizedKey));
+  EXPECT_TRUE(sameNeuroglancerMeshSourceCompat(*normalizedKey, *legacyKey));
+  EXPECT_FALSE(sameNeuroglancerMeshSourceCompat(*normalizedKey, *differentGeometryKey));
 }
 
 } // namespace

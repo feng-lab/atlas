@@ -299,9 +299,20 @@ def ensure_windows_curl_sdk() -> str:
         os.path.getmtime(import_lib_path) < os.path.getmtime(def_path)
     ):
         env = get_vcvars_environment()
+        lib_exe = shutil.which("lib.exe", path=env.get("PATH")) or shutil.which(
+            "lib", path=env.get("PATH")
+        )
+        if lib_exe is None:
+            raise RuntimeError(
+                "MSVC environment setup failed: `lib.exe` not found on PATH after vcvarsall.\n"
+                "The Windows curl SDK import library must be generated with MSVC tools. "
+                "Ensure Visual Studio is installed and `util/common_dirs.py:vs_install_dir()` "
+                "points to it."
+            )
+        logger.info(f"Generating libcurl import library with {lib_exe}")
         subprocess.run(
             [
-                "lib",
+                lib_exe,
                 f"/def:{def_path}",
                 "/machine:x64",
                 f"/name:{os.path.basename(dll_path)}",

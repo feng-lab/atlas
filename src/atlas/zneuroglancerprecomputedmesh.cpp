@@ -1,9 +1,10 @@
 #include "zneuroglancerprecomputedmesh.h"
 
+#include "zneuroglancerremotecontext.h"
+#include "zneuroglancershardedreader.h"
 #include "zneuroglanceruint64sharding.h"
 #include "zexception.h"
 #include "zlog.h"
-#include "zhttpclient.h"
 
 #include "zmesh.h"
 
@@ -14,8 +15,6 @@
 #include <draco/attributes/point_attribute.h>
 
 #include <folly/coro/BlockingWait.h>
-#include <folly/compression/Compression.h>
-
 #include <boost/json.hpp>
 
 #include <algorithm>
@@ -194,40 +193,6 @@ ZNeuroglancerPrecomputedVolume::Scale::Sharding parseShardingSpec(const json::ob
   sharding.shardHexDigits = static_cast<int>((sharding.shardBits + 3) / 4);
 
   return sharding;
-}
-
-QString shardHexString(uint64_t shard, int digits)
-{
-  QString s = QString::number(shard, 16);
-  if (digits > 0) {
-    s = s.rightJustified(digits, QChar('0'));
-  }
-  return s;
-}
-
-std::vector<uint8_t> decompressGzipBytes(std::vector<uint8_t> bytes)
-{
-  if (bytes.empty()) {
-    return bytes;
-  }
-  auto codec = folly::compression::getCodec(folly::compression::CodecType::GZIP);
-  auto uncompressed =
-    codec->uncompress(folly::StringPiece(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
-  std::vector<uint8_t> out(uncompressed.size());
-  std::memcpy(out.data(), uncompressed.data(), out.size());
-  return out;
-}
-
-std::vector<uint8_t> decodeShardedBytes(std::vector<uint8_t> bytes,
-                                        ZNeuroglancerPrecomputedVolume::Scale::Sharding::DataEncoding enc)
-{
-  switch (enc) {
-  case ZNeuroglancerPrecomputedVolume::Scale::Sharding::DataEncoding::Raw:
-    return bytes;
-  case ZNeuroglancerPrecomputedVolume::Scale::Sharding::DataEncoding::Gzip:
-    return decompressGzipBytes(std::move(bytes));
-  }
-  throw ZException("Invalid sharded data encoding");
 }
 
 template<typename T>
@@ -590,28 +555,25 @@ uint32_t generateHigherOctreeLevel(std::vector<ZNeuroglancerPrecomputedMeshSourc
 
 [[nodiscard]] QString meshSourceCacheKey(const QUrl& meshDirUrl,
                                          const std::array<double, 3>& baseResolutionNm,
-                                         const std::array<int64_t, 3>& baseVoxelOffset)
+                                         const std::array<int64_t, 3>& baseVoxelOffset,
+                                         const ZRemoteObjectStore& objectStore)
 {
-  return QStringLiteral("%1|%2,%3,%4|%5,%6,%7")
+  return QStringLiteral("%1|%2,%3,%4|%5,%6,%7|scope:%8")
     .arg(meshDirUrl.toString())
     .arg(QString::number(baseResolutionNm[0], 'g', 17))
     .arg(QString::number(baseResolutionNm[1], 'g', 17))
     .arg(QString::number(baseResolutionNm[2], 'g', 17))
     .arg(baseVoxelOffset[0])
     .arg(baseVoxelOffset[1])
-    .arg(baseVoxelOffset[2]);
+    .arg(baseVoxelOffset[2])
+    .arg(
+      QString::number(static_cast<qulonglong>(reinterpret_cast<uintptr_t>(objectStore.contentCacheScopeToken())), 16));
 }
 
 std::mutex& openedMeshSourcesMutex()
 {
   static std::mutex mutex;
   return mutex;
-}
-
-std::unordered_map<QString, std::weak_ptr<ZNeuroglancerPrecomputedMeshSource>>& openedMeshSources()
-{
-  static std::unordered_map<QString, std::weak_ptr<ZNeuroglancerPrecomputedMeshSource>> cache;
-  return cache;
 }
 
 } // namespace
@@ -638,90 +600,119 @@ bool ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh::empty() const
   });
 }
 
-std::shared_ptr<ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedMeshSource::open(
-  const QUrl& meshDirUrl,
-  std::array<double, 3> baseResolutionNm,
-  std::array<int64_t, 3> baseVoxelOffset,
-  std::chrono::milliseconds timeout)
+std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>
+ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
+                                         std::array<double, 3> baseResolutionNm,
+                                         std::array<int64_t, 3> baseVoxelOffset,
+                                         std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
 {
+  CHECK(remoteContext);
+  using SharedMeshInfoCache = std::unordered_map<QString, std::weak_ptr<const SharedMeshInfo>>;
+  static SharedMeshInfoCache sharedMeshInfoCache;
+
   QUrl normalizedMeshDirUrl = meshDirUrl;
   if (!normalizedMeshDirUrl.toString().endsWith('/')) {
     normalizedMeshDirUrl = QUrl(normalizedMeshDirUrl.toString() + "/");
   }
 
-  const QString cacheKey = meshSourceCacheKey(normalizedMeshDirUrl, baseResolutionNm, baseVoxelOffset);
+  const QString cacheKey =
+    meshSourceCacheKey(normalizedMeshDirUrl, baseResolutionNm, baseVoxelOffset, remoteContext->objectStore());
+  std::shared_ptr<const SharedMeshInfo> sharedMeshInfo;
   {
     std::lock_guard<std::mutex> lock(openedMeshSourcesMutex());
-    auto& cache = openedMeshSources();
-    if (auto it = cache.find(cacheKey); it != cache.end()) {
+    if (auto it = sharedMeshInfoCache.find(cacheKey); it != sharedMeshInfoCache.end()) {
       if (auto existing = it->second.lock()) {
-        if (timeout.count() > 0 && timeout > existing->m_timeout) {
-          existing->m_timeout = timeout;
-        }
-        return existing;
+        sharedMeshInfo = std::move(existing);
+      } else {
+        sharedMeshInfoCache.erase(it);
       }
-      cache.erase(it);
+    }
+  }
+
+  if (!sharedMeshInfo) {
+    auto parsedMeshInfo = std::make_shared<SharedMeshInfo>();
+    parsedMeshInfo->meshDirUrl = normalizedMeshDirUrl;
+    parsedMeshInfo->baseResolutionNm = baseResolutionNm;
+    parsedMeshInfo->baseVoxelOffset = baseVoxelOffset;
+
+    const QUrl infoUrl = parsedMeshInfo->meshDirUrl.resolved(QUrl("info"));
+    const std::string infoUrlStr = toStdString(infoUrl.toString());
+    auto resOpt = folly::coro::blockingWait(remoteContext->getResponseAsync(infoUrlStr));
+    if (resOpt) {
+      if (resOpt->status != 200) {
+        throw ZException(
+          fmt::format("Failed to fetch neuroglancer mesh info from '{}' (HTTP {})", infoUrlStr, resOpt->status));
+      }
+
+      const std::string infoText(reinterpret_cast<const char*>(resOpt->body.data()), resOpt->body.size());
+      json::value jv = json::parse(infoText);
+      if (!jv.is_object()) {
+        throw ZException("Neuroglancer mesh info is not a JSON object");
+      }
+      const auto& root = jv.as_object();
+
+      const QString type = optionalString(root, "@type", "neuroglancer_legacy_mesh").trimmed();
+      if (type == "neuroglancer_legacy_mesh") {
+        parsedMeshInfo->meshType = MeshType::Legacy;
+      } else {
+        if (type != "neuroglancer_multilod_draco") {
+          throw ZException(fmt::format("Unsupported neuroglancer mesh '@type': '{}'", toStdString(type)));
+        }
+
+        MultiLodInfo info{};
+        info.lodScaleMultiplier = requireDouble(root, "lod_scale_multiplier");
+        info.vertexQuantizationBits = static_cast<int>(requireUint64(root, "vertex_quantization_bits"));
+        if (info.vertexQuantizationBits != 10 && info.vertexQuantizationBits != 16) {
+          throw ZException("Neuroglancer multi-LOD draco mesh requires vertex_quantization_bits to be 10 or 16");
+        }
+        info.transform = parseTransform(root);
+
+        auto shardingIt = root.find("sharding");
+        if (shardingIt != root.end() && !shardingIt->value().is_null()) {
+          if (!shardingIt->value().is_object()) {
+            throw ZException("Invalid neuroglancer mesh sharding: expected object");
+          }
+          info.sharding = parseShardingSpec(shardingIt->value().as_object());
+        }
+
+        parsedMeshInfo->meshType = MeshType::MultiLodDraco;
+        parsedMeshInfo->multiLodInfo = std::move(info);
+      }
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(openedMeshSourcesMutex());
+      if (auto it = sharedMeshInfoCache.find(cacheKey); it != sharedMeshInfoCache.end()) {
+        if (auto existing = it->second.lock()) {
+          sharedMeshInfo = std::move(existing);
+        } else {
+          sharedMeshInfoCache.erase(it);
+        }
+      }
+      if (!sharedMeshInfo) {
+        sharedMeshInfo = std::move(parsedMeshInfo);
+        sharedMeshInfoCache[cacheKey] = sharedMeshInfo;
+      }
     }
   }
 
   auto out = std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>(new ZNeuroglancerPrecomputedMeshSource());
-  out->m_meshDirUrl = normalizedMeshDirUrl;
-  out->m_baseResolutionNm = baseResolutionNm;
-  out->m_baseVoxelOffset = baseVoxelOffset;
-  out->m_timeout = timeout.count() > 0 ? timeout : out->m_timeout;
-
-  const QUrl infoUrl = out->m_meshDirUrl.resolved(QUrl("info"));
-  const std::string infoUrlStr = toStdString(infoUrl.toString());
-  auto resOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(infoUrlStr, out->m_timeout));
-  if (!resOpt) {
-    // No info file -> legacy mesh.
-    out->m_meshType = MeshType::Legacy;
-    return out;
-  }
-  if (resOpt->status != 200) {
-    throw ZException(fmt::format("Failed to fetch neuroglancer mesh info from '{}' (HTTP {})", infoUrlStr, resOpt->status));
-  }
-
-  const std::string infoText(reinterpret_cast<const char*>(resOpt->body.data()), resOpt->body.size());
-  json::value jv = json::parse(infoText);
-  if (!jv.is_object()) {
-    throw ZException("Neuroglancer mesh info is not a JSON object");
-  }
-  const auto& root = jv.as_object();
-
-  const QString type = optionalString(root, "@type", "neuroglancer_legacy_mesh").trimmed();
-  if (type == "neuroglancer_legacy_mesh") {
-    out->m_meshType = MeshType::Legacy;
-    return out;
-  }
-  if (type != "neuroglancer_multilod_draco") {
-    throw ZException(fmt::format("Unsupported neuroglancer mesh '@type': '{}'", toStdString(type)));
-  }
-
-  MultiLodInfo info{};
-  info.lodScaleMultiplier = requireDouble(root, "lod_scale_multiplier");
-  info.vertexQuantizationBits = static_cast<int>(requireUint64(root, "vertex_quantization_bits"));
-  if (info.vertexQuantizationBits != 10 && info.vertexQuantizationBits != 16) {
-    throw ZException("Neuroglancer multi-LOD draco mesh requires vertex_quantization_bits to be 10 or 16");
-  }
-  info.transform = parseTransform(root);
-
-  auto shardingIt = root.find("sharding");
-  if (shardingIt != root.end() && !shardingIt->value().is_null()) {
-    if (!shardingIt->value().is_object()) {
-      throw ZException("Invalid neuroglancer mesh sharding: expected object");
-    }
-    info.sharding = parseShardingSpec(shardingIt->value().as_object());
-  }
-
-  out->m_meshType = MeshType::MultiLodDraco;
-  out->m_multiLodInfo = info;
-
-  {
-    std::lock_guard<std::mutex> lock(openedMeshSourcesMutex());
-    openedMeshSources()[cacheKey] = out;
-  }
+  out->m_sharedMeshInfo = std::move(sharedMeshInfo);
+  out->m_remoteContext = std::move(remoteContext);
   return out;
+}
+
+std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>
+ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
+                                         std::array<double, 3> baseResolutionNm,
+                                         std::array<int64_t, 3> baseVoxelOffset,
+                                         std::chrono::milliseconds timeout,
+                                         std::shared_ptr<const ZRemoteObjectStore> objectStore)
+{
+  return open(meshDirUrl,
+              baseResolutionNm,
+              baseVoxelOffset,
+              ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
 }
 
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest>
@@ -751,25 +742,18 @@ ZNeuroglancerPrecomputedMeshSource::loadChunkMeshesBlocking(uint64_t segmentId, 
 
 std::shared_ptr<ZMesh> ZNeuroglancerPrecomputedMeshSource::loadMeshBlocking(uint64_t segmentId, LodPolicy lodPolicy) const
 {
-  switch (m_meshType) {
-  case MeshType::Legacy:
-    return folly::coro::blockingWait(loadLegacyMeshAsync(segmentId));
-  case MeshType::MultiLodDraco:
-    return folly::coro::blockingWait(loadMultiLodMeshAsync(segmentId, lodPolicy));
+  switch (meshType()) {
+    case MeshType::Legacy:
+      return folly::coro::blockingWait(loadLegacyMeshAsync(segmentId));
+    case MeshType::MultiLodDraco:
+      return folly::coro::blockingWait(loadMultiLodMeshAsync(segmentId, lodPolicy));
   }
   throw ZException("Invalid mesh type");
 }
 
 folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedMeshSource::getHttpBytesAsync(const std::string& url) const
 {
-  auto resOpt = co_await ZHttpClient::instance().getBytes(url, m_timeout);
-  if (!resOpt) {
-    co_return std::nullopt;
-  }
-  if (resOpt->status != 200) {
-    throw ZException(fmt::format("HTTP GET failed for '{}' (status {})", url, resOpt->status));
-  }
-  co_return std::move(resOpt->body);
+  co_return co_await m_remoteContext->getBytesAsync(url);
 }
 
 folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedMeshSource::getHttpRangeBytesAsync(
@@ -777,42 +761,17 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedM
   uint64_t offset,
   uint64_t length) const
 {
-  if (length == 0) {
-    co_return std::vector<uint8_t>{};
-  }
-  const uint64_t endInclusive = offset + length - 1;
-  auto resOpt =
-    co_await ZHttpClient::instance().getBytes(url,
-                                              m_timeout,
-                                              {
-                                                {"range", fmt::format("bytes={}-{}", offset, endInclusive)}
-  });
-  if (!resOpt) {
-    co_return std::nullopt;
-  }
-  if (resOpt->status != 206 && resOpt->status != 200) {
-    throw ZException(fmt::format("HTTP range GET failed for '{}' (status {})", url, resOpt->status));
-  }
-  if (resOpt->body.size() == length) {
-    co_return std::move(resOpt->body);
-  }
-  // Some servers ignore range and return the full file with 200; accept if we can slice it.
-  if (resOpt->status == 200 && resOpt->body.size() >= offset + length) {
-    std::vector<uint8_t> out(length);
-    std::memcpy(out.data(), resOpt->body.data() + offset, length);
-    co_return out;
-  }
-  throw ZException(fmt::format("HTTP range GET size mismatch for '{}': got {} bytes, expected {} bytes",
-                               url,
-                               resOpt->body.size(),
-                               length));
+  co_return co_await m_remoteContext->getRangeBytesAsync(url,
+                                                         offset,
+                                                         length,
+                                                         ZRemoteRangeReadPolicy::AllowFullResponseSlice);
 }
 
 folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::loadLegacyMeshAsync(uint64_t segmentId) const
 {
-  CHECK(m_meshType == MeshType::Legacy);
+  CHECK(meshType() == MeshType::Legacy);
 
-  const QString base = m_meshDirUrl.toString();
+  const QString base = meshDirUrl().toString();
   const QString metaRel = QString::number(segmentId) + ":0";
   const std::string metaUrl = toStdString(base + metaRel);
 
@@ -860,7 +819,7 @@ folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::lo
       throw ZException("Invalid neuroglancer legacy mesh metadata: fragments must be strings");
     }
     const QString fragName = json::value_to<QString>(v);
-    const QUrl fragUrl = m_meshDirUrl.resolved(QUrl(fragName));
+    const QUrl fragUrl = meshDirUrl().resolved(QUrl(fragName));
     const std::string fragUrlStr = toStdString(fragUrl.toString());
 
     auto fragBytesOpt = co_await getHttpBytesAsync(fragUrlStr);
@@ -895,111 +854,48 @@ ZNeuroglancerPrecomputedMeshSource::getShardedManifestBytesAsync(
   const uint64_t minishard = shardAndMinishard & sharding.minishardMask;
   const uint64_t shard = (shardAndMinishard >> sharding.minishardBits) & sharding.shardMask;
 
-  const QString shardHex = shardHexString(shard, sharding.shardHexDigits);
-  const QUrl shardUrl = m_meshDirUrl.resolved(QUrl(shardHex + ".shard"));
-  const QUrl indexUrl = m_meshDirUrl.resolved(QUrl(shardHex + ".index"));
-  const QUrl dataUrl = m_meshDirUrl.resolved(QUrl(shardHex + ".data"));
-
-  const uint64_t shardIndexEntryOffset = minishard << 4;
-
-  struct ShardedShardIndexEntry
-  {
-    std::string dataUrl;
-    uint64_t baseDataOffset = 0;
-    uint64_t minishardIndexStart = 0; // relative to end of shard index
-    uint64_t minishardIndexEnd = 0;   // relative to end of shard index
-  };
-
-  auto readEntryFrom = [&](const QUrl& url) -> folly::coro::Task<std::optional<std::vector<uint8_t>>> {
-    co_return co_await getHttpRangeBytesAsync(toStdString(url.toString()), shardIndexEntryOffset, 16);
-  };
-
-  auto parseEntry = [&](std::vector<uint8_t> bytes, bool useSplit) -> ShardedShardIndexEntry {
-    CHECK(bytes.size() == 16);
-    ShardedShardIndexEntry out{};
-    out.minishardIndexStart = ZNeuroglancerUint64Sharding::readU64LE(bytes.data());
-    out.minishardIndexEnd = ZNeuroglancerUint64Sharding::readU64LE(bytes.data() + 8);
-    if (useSplit) {
-      out.dataUrl = toStdString(dataUrl.toString());
-      out.baseDataOffset = 0;
-    } else {
-      out.dataUrl = toStdString(shardUrl.toString());
-      out.baseDataOffset = sharding.shardIndexSize;
-    }
-    return out;
-  };
-
-  std::optional<ShardedShardIndexEntry> entryOpt;
-
-  const int mode = sharding.shardFileMode.load();
-  if (mode == 1) {
-    auto bytesOpt = co_await readEntryFrom(shardUrl);
-    if (!bytesOpt) {
-      co_return std::nullopt;
-    }
-    entryOpt = parseEntry(std::move(*bytesOpt), /*useSplit=*/false);
-  } else if (mode == 2) {
-    auto bytesOpt = co_await readEntryFrom(indexUrl);
-    if (!bytesOpt) {
-      co_return std::nullopt;
-    }
-    entryOpt = parseEntry(std::move(*bytesOpt), /*useSplit=*/true);
-  } else {
-    auto bytesOpt = co_await readEntryFrom(shardUrl);
-    if (bytesOpt) {
-      sharding.shardFileMode.store(1);
-      entryOpt = parseEntry(std::move(*bytesOpt), /*useSplit=*/false);
-    } else {
-      auto legacyBytesOpt = co_await readEntryFrom(indexUrl);
-      if (legacyBytesOpt) {
-        sharding.shardFileMode.store(2);
-        entryOpt = parseEntry(std::move(*legacyBytesOpt), /*useSplit=*/true);
-      } else {
-        co_return std::nullopt;
-      }
-    }
-  }
-
-  CHECK(entryOpt);
-  const ShardedShardIndexEntry& entry = *entryOpt;
-  if (entry.minishardIndexEnd <= entry.minishardIndexStart) {
+  auto entryOpt = co_await getNeuroglancerShardIndexEntryAsync(*m_remoteContext,
+                                                               meshDirUrl(),
+                                                               sharding,
+                                                               shard,
+                                                               minishard,
+                                                               ZRemoteRangeReadPolicy::AllowFullResponseSlice);
+  if (!entryOpt) {
     co_return std::nullopt;
   }
 
-  const uint64_t minishardLen = entry.minishardIndexEnd - entry.minishardIndexStart;
-  auto minishardBytesOpt = co_await getHttpRangeBytesAsync(entry.dataUrl, entry.baseDataOffset + entry.minishardIndexStart, minishardLen);
-  if (!minishardBytesOpt) {
+  auto decodedOpt = co_await getNeuroglancerDecodedMinishardIndexAsync(*m_remoteContext,
+                                                                       *entryOpt,
+                                                                       sharding,
+                                                                       ZRemoteRangeReadPolicy::AllowFullResponseSlice);
+  if (!decodedOpt) {
     co_return std::nullopt;
   }
 
-  auto decodedMinishardBytes = decodeShardedBytes(std::move(*minishardBytesOpt), sharding.minishardIndexEncoding);
-  auto decoded =
-    ZNeuroglancerUint64Sharding::decodeMinishardIndex(std::span<const uint8_t>(decodedMinishardBytes.data(), decodedMinishardBytes.size()),
-                                                     entry.baseDataOffset);
+  const auto& decoded = *decodedOpt;
   if (decoded.keys.empty()) {
     co_return std::nullopt;
   }
 
-  auto it = std::lower_bound(decoded.keys.begin(), decoded.keys.end(), chunkId);
-  if (it == decoded.keys.end() || *it != chunkId) {
-    co_return std::nullopt;
-  }
-  const size_t idx = static_cast<size_t>(it - decoded.keys.begin());
-  const uint64_t start = decoded.starts[idx];
-  const uint64_t end = decoded.ends[idx];
-  if (end <= start) {
+  auto locationOpt = findNeuroglancerShardedPayloadLocation(decoded, chunkId);
+  if (!locationOpt) {
     co_return std::nullopt;
   }
 
-  auto manifestBytesOpt = co_await getHttpRangeBytesAsync(entry.dataUrl, start, end - start);
-  if (!manifestBytesOpt) {
+  auto payloadOpt =
+    co_await getNeuroglancerDecodedShardedPayloadBytesAsync(*m_remoteContext,
+                                                            entryOpt->dataUrl,
+                                                            *locationOpt,
+                                                            sharding,
+                                                            ZRemoteRangeReadPolicy::AllowFullResponseSlice);
+  if (!payloadOpt) {
     co_return std::nullopt;
   }
 
   ShardedManifestBytes out;
-  out.manifestBytes = decodeShardedBytes(std::move(*manifestBytesOpt), sharding.dataEncoding);
-  out.manifestStart = start;
-  out.dataUrl = entry.dataUrl;
+  out.manifestBytes = std::move(payloadOpt->bytes);
+  out.manifestStart = payloadOpt->start;
+  out.dataUrl = entryOpt->dataUrl;
   co_return out;
 }
 
@@ -1181,12 +1077,13 @@ ZNeuroglancerPrecomputedMeshSource::MultiLodManifest ZNeuroglancerPrecomputedMes
 
 void ZNeuroglancerPrecomputedMeshSource::convertLegacyMeshVerticesNmToLocalVoxel(ZMesh& mesh) const
 {
-  const glm::vec3 invRes(static_cast<float>(1.0 / m_baseResolutionNm[0]),
-                         static_cast<float>(1.0 / m_baseResolutionNm[1]),
-                         static_cast<float>(1.0 / m_baseResolutionNm[2]));
-  const glm::vec3 voxelOffset(static_cast<float>(m_baseVoxelOffset[0]),
-                              static_cast<float>(m_baseVoxelOffset[1]),
-                              static_cast<float>(m_baseVoxelOffset[2]));
+  const auto& shared = sharedMeshInfo();
+  const glm::vec3 invRes(static_cast<float>(1.0 / shared.baseResolutionNm[0]),
+                         static_cast<float>(1.0 / shared.baseResolutionNm[1]),
+                         static_cast<float>(1.0 / shared.baseResolutionNm[2]));
+  const glm::vec3 voxelOffset(static_cast<float>(shared.baseVoxelOffset[0]),
+                              static_cast<float>(shared.baseVoxelOffset[1]),
+                              static_cast<float>(shared.baseVoxelOffset[2]));
 
   // stored-model vertices are in nanometer units in the global frame:
   // voxel = nm / baseResolutionNm - baseVoxelOffset
@@ -1206,12 +1103,13 @@ void ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std
   const float maxQuant = static_cast<float>((1ULL << info.vertexQuantizationBits) - 1ULL);
   CHECK(maxQuant > 0.0F);
 
-  const glm::vec3 invRes(static_cast<float>(1.0 / m_baseResolutionNm[0]),
-                         static_cast<float>(1.0 / m_baseResolutionNm[1]),
-                         static_cast<float>(1.0 / m_baseResolutionNm[2]));
-  const glm::vec3 voxelOffset(static_cast<float>(m_baseVoxelOffset[0]),
-                              static_cast<float>(m_baseVoxelOffset[1]),
-                              static_cast<float>(m_baseVoxelOffset[2]));
+  const auto& shared = sharedMeshInfo();
+  const glm::vec3 invRes(static_cast<float>(1.0 / shared.baseResolutionNm[0]),
+                         static_cast<float>(1.0 / shared.baseResolutionNm[1]),
+                         static_cast<float>(1.0 / shared.baseResolutionNm[2]));
+  const glm::vec3 voxelOffset(static_cast<float>(shared.baseVoxelOffset[0]),
+                              static_cast<float>(shared.baseVoxelOffset[1]),
+                              static_cast<float>(shared.baseVoxelOffset[2]));
 
   const float lodScale = std::ldexp(1.0F, static_cast<int>(lod));
   const glm::vec3 scaledChunkShape = manifest.chunkShape * lodScale;
@@ -1513,8 +1411,8 @@ ZNeuroglancerPrecomputedMeshSource::chunksToDrawForView(
 folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::CachedMultiLodManifest>>
 ZNeuroglancerPrecomputedMeshSource::loadCachedManifestAsync(uint64_t segmentId) const
 {
-  CHECK(m_meshType == MeshType::MultiLodDraco);
-  CHECK(m_multiLodInfo);
+  CHECK(meshType() == MeshType::MultiLodDraco);
+  CHECK(sharedMeshInfo().multiLodInfo);
 
   {
     std::lock_guard<std::mutex> lock(m_manifestCacheMutex);
@@ -1526,7 +1424,7 @@ ZNeuroglancerPrecomputedMeshSource::loadCachedManifestAsync(uint64_t segmentId) 
     }
   }
 
-  const MultiLodInfo& info = *m_multiLodInfo;
+  const MultiLodInfo& info = *sharedMeshInfo().multiLodInfo;
   auto cached = std::make_shared<CachedMultiLodManifest>();
 
   std::vector<uint8_t> manifestBytes;
@@ -1541,7 +1439,7 @@ ZNeuroglancerPrecomputedMeshSource::loadCachedManifestAsync(uint64_t segmentId) 
     manifestStart = bytesOpt->manifestStart;
     cached->fragmentDataUrl = std::move(bytesOpt->dataUrl);
   } else {
-    const QString base = m_meshDirUrl.toString();
+    const QString base = meshDirUrl().toString();
     const QString segStr = QString::number(segmentId);
     const std::string indexUrl = toStdString(base + segStr + ".index");
     auto bytesOpt = co_await getHttpBytesAsync(indexUrl);
@@ -1580,8 +1478,8 @@ ZNeuroglancerPrecomputedMeshSource::loadCachedManifestAsync(uint64_t segmentId) 
 folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
 ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentId, uint32_t row) const
 {
-  CHECK(m_meshType == MeshType::MultiLodDraco);
-  CHECK(m_multiLodInfo);
+  CHECK(meshType() == MeshType::MultiLodDraco);
+  CHECK(sharedMeshInfo().multiLodInfo);
 
   const ChunkCacheKey cacheKey{segmentId, row};
   {
@@ -1621,13 +1519,13 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
 
   DecodedPartitionedDracoMesh decoded =
     decodePartitionedDracoMesh(std::span<const uint8_t>(fragBytesOpt->data(), fragBytesOpt->size()),
-                               m_multiLodInfo->vertexQuantizationBits,
+                               sharedMeshInfo().multiLodInfo->vertexQuantizationBits,
                                lod != 0U);
   convertMultiLodVerticesToLocalVoxel(decoded.vertices,
                                       lod,
                                       manifest.octreeNodes[row].gridPosition,
                                       manifest,
-                                      *m_multiLodInfo);
+                                      *sharedMeshInfo().multiLodInfo);
   for (size_t i = 0; i < decoded.partitionIndices.size(); ++i) {
     chunkMesh->subMeshes[i] = buildCompactMesh(decoded.vertices, decoded.partitionIndices[i]);
   }
@@ -1648,7 +1546,7 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
 folly::coro::Task<std::shared_ptr<ZMesh>>
 ZNeuroglancerPrecomputedMeshSource::loadMultiLodMeshAsync(uint64_t segmentId, LodPolicy lodPolicy) const
 {
-  CHECK(m_meshType == MeshType::MultiLodDraco);
+  CHECK(meshType() == MeshType::MultiLodDraco);
   const std::shared_ptr<const CachedMultiLodManifest> cachedManifest = co_await loadCachedManifestAsync(segmentId);
   CHECK(cachedManifest);
   CHECK(cachedManifest->manifest);

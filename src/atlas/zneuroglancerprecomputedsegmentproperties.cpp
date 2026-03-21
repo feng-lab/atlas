@@ -1,8 +1,8 @@
 #include "zneuroglancerprecomputedsegmentproperties.h"
 
+#include "zneuroglancerremotecontext.h"
 #include "zexception.h"
 #include "zjson.h"
-#include "zhttpclient.h"
 #include "zlog.h"
 
 #include <folly/coro/BlockingWait.h>
@@ -144,14 +144,15 @@ std::string joinKeys(const json::object& obj)
 
 } // namespace
 
-std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecomputedSegmentProperties::open(
-  const QUrl& dirUrl,
-  std::chrono::milliseconds timeout)
+std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>
+ZNeuroglancerPrecomputedSegmentProperties::open(const QUrl& dirUrl,
+                                                std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
 {
+  CHECK(remoteContext);
   QUrl infoUrl = dirUrl.resolved(QUrl("info"));
   const std::string infoUrlStr = toStdString(infoUrl.toString());
 
-  auto resOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(infoUrlStr, timeout));
+  auto resOpt = folly::coro::blockingWait(remoteContext->getResponseAsync(infoUrlStr));
   if (!resOpt) {
     throw ZException(fmt::format("Segment properties info not found (HTTP 403/404) at '{}'", infoUrlStr));
   }
@@ -161,6 +162,14 @@ std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecompu
 
   const std::string infoText(reinterpret_cast<const char*>(resOpt->body.data()), resOpt->body.size());
   return parseInfoJsonText(dirUrl, infoText);
+}
+
+std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>
+ZNeuroglancerPrecomputedSegmentProperties::open(const QUrl& dirUrl,
+                                                std::chrono::milliseconds timeout,
+                                                std::shared_ptr<const ZRemoteObjectStore> objectStore)
+{
+  return open(dirUrl, ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecomputedSegmentProperties::parseInfoJsonText(

@@ -3,7 +3,6 @@
 #include "zexception.h"
 #include "zlog.h"
 
-#include <fmt/format.h>
 #include <png.h>
 #include <turbojpeg.h>
 

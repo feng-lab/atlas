@@ -237,7 +237,7 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
         auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(normalizedAnnRootUrl),
                                                                       baseResNm,
                                                                       vol->baseVoxelOffset(),
-                                                                      vol->defaultTimeout());
+                                                                      vol->sharedRemoteContext());
         CHECK(source);
 
         if (source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Line &&
@@ -389,8 +389,10 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
 
         std::array<double, 3> baseResNm{
           vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ};
-        auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(
-          QUrl(normalizedAnnRootUrl), baseResNm, vol->baseVoxelOffset(), vol->defaultTimeout());
+        auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(normalizedAnnRootUrl),
+                                                                      baseResNm,
+                                                                      vol->baseVoxelOffset(),
+                                                                      vol->sharedRemoteContext());
         CHECK(source);
 
         if (source->spatialLevels().empty()) {
@@ -532,11 +534,11 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
         }
         skeletonSourceDirUrlForJson = s;
 
-        source =
-          ZNeuroglancerPrecomputedSkeletonSource::open(QUrl(skeletonSourceDirUrlForJson),
-                                                      {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
-                                                      vol->baseVoxelOffset(),
-                                                      vol->defaultTimeout());
+        source = ZNeuroglancerPrecomputedSkeletonSource::open(
+          QUrl(skeletonSourceDirUrlForJson),
+          {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
+          vol->baseVoxelOffset(),
+          vol->sharedRemoteContext());
       } else if (vol->hasSkeletonDirectory()) {
         source = vol->loadSkeletonSourceBlocking();
         skeletonSourceDirUrlForJson = vol->skeletonDirUrl().toString(QUrl::StripTrailingSlash) + "/";

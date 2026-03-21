@@ -18,20 +18,41 @@
 
 namespace nim {
 
+class ZRemoteObjectStore;
+class ZNeuroglancerRemoteContext;
+
 class ZNeuroglancerPrecomputedSkeletonSource
 {
 public:
-  static std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource> open(const QUrl& skeletonDirUrl,
-                                                                      std::array<double, 3> baseResolutionNm,
-                                                                      std::array<int64_t, 3> baseVoxelOffset,
-                                                                      std::chrono::milliseconds timeout);
+  static std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>
+  open(const QUrl& skeletonDirUrl,
+       std::array<double, 3> baseResolutionNm,
+       std::array<int64_t, 3> baseVoxelOffset,
+       std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
+
+  static std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>
+  open(const QUrl& skeletonDirUrl,
+       std::array<double, 3> baseResolutionNm,
+       std::array<int64_t, 3> baseVoxelOffset,
+       std::chrono::milliseconds timeout,
+       std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
 
   // Exposed for unit tests: parses a skeletons/info JSON without performing network I/O.
-  static std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource> parseInfoJsonText(const QUrl& skeletonDirUrl,
-                                                                                   const std::string& infoText,
-                                                                                   std::array<double, 3> baseResolutionNm,
-                                                                                   std::array<int64_t, 3> baseVoxelOffset,
-                                                                                   std::chrono::milliseconds timeout);
+  static std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>
+  parseInfoJsonText(const QUrl& skeletonDirUrl,
+                    const std::string& infoText,
+                    std::array<double, 3> baseResolutionNm,
+                    std::array<int64_t, 3> baseVoxelOffset,
+                    std::chrono::milliseconds timeout,
+                    std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
+
+  // Internal reader-facing overload: use an existing remote context instead of rebuilding timeout/store state.
+  static std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>
+  parseInfoJsonText(const QUrl& skeletonDirUrl,
+                    const std::string& infoText,
+                    std::array<double, 3> baseResolutionNm,
+                    std::array<int64_t, 3> baseVoxelOffset,
+                    std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext = nullptr);
 
   [[nodiscard]] const QUrl& skeletonDirUrl() const
   {
@@ -77,8 +98,7 @@ private:
   std::array<double, 3> m_baseResolutionNm{};
   std::array<int64_t, 3> m_baseVoxelOffset{};
 
-  std::chrono::milliseconds m_timeout{30000};
+  std::shared_ptr<const ZNeuroglancerRemoteContext> m_remoteContext;
 };
 
 } // namespace nim
-

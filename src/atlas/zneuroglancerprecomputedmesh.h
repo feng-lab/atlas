@@ -22,6 +22,8 @@
 namespace nim {
 
 class ZMesh;
+class ZRemoteObjectStore;
+class ZNeuroglancerRemoteContext;
 
 class ZNeuroglancerPrecomputedMeshSource
 {
@@ -38,20 +40,29 @@ public:
     Finest,
   };
 
-  static std::shared_ptr<ZNeuroglancerPrecomputedMeshSource> open(
-    const QUrl& meshDirUrl,
-    std::array<double, 3> baseResolutionNm,
-    std::array<int64_t, 3> baseVoxelOffset,
-    std::chrono::milliseconds timeout);
+  static std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>
+  open(const QUrl& meshDirUrl,
+       std::array<double, 3> baseResolutionNm,
+       std::array<int64_t, 3> baseVoxelOffset,
+       std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
+
+  static std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>
+  open(const QUrl& meshDirUrl,
+       std::array<double, 3> baseResolutionNm,
+       std::array<int64_t, 3> baseVoxelOffset,
+       std::chrono::milliseconds timeout,
+       std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
 
   [[nodiscard]] const QUrl& meshDirUrl() const
   {
-    return m_meshDirUrl;
+    CHECK(m_sharedMeshInfo);
+    return m_sharedMeshInfo->meshDirUrl;
   }
 
   [[nodiscard]] MeshType meshType() const
   {
-    return m_meshType;
+    CHECK(m_sharedMeshInfo);
+    return m_sharedMeshInfo->meshType;
   }
 
   struct MultiLodOctreeNode
@@ -120,7 +131,7 @@ public:
 
   [[nodiscard]] bool supportsRuntimeLod() const
   {
-    return m_meshType == MeshType::MultiLodDraco;
+    return meshType() == MeshType::MultiLodDraco;
   }
 
   [[nodiscard]] std::shared_ptr<const MultiLodManifest> loadManifestBlocking(uint64_t segmentId) const;
@@ -160,6 +171,22 @@ private:
     std::optional<ZNeuroglancerPrecomputedVolume::Scale::Sharding> sharding;
   };
 
+  // Immutable mesh-source metadata keyed by dataset identity plus remote-store content scope.
+  //
+  // This is the data that may be shared across opens through different remote
+  // contexts only when the underlying store declares that they expose the same
+  // content for a given URL. A live ZNeuroglancerPrecomputedMeshSource still owns its own
+  // remote context and row/manifest caches, so global reuse stays store-agnostic
+  // without aliasing one caller's transport state into another caller's source.
+  struct SharedMeshInfo
+  {
+    QUrl meshDirUrl;
+    MeshType meshType = MeshType::Legacy;
+    std::optional<MultiLodInfo> multiLodInfo;
+    std::array<double, 3> baseResolutionNm{};
+    std::array<int64_t, 3> baseVoxelOffset{};
+  };
+
   struct CachedMultiLodManifest
   {
     std::shared_ptr<const MultiLodManifest> manifest;
@@ -191,6 +218,12 @@ private:
   };
 
 private:
+  [[nodiscard]] const SharedMeshInfo& sharedMeshInfo() const
+  {
+    CHECK(m_sharedMeshInfo);
+    return *m_sharedMeshInfo;
+  }
+
   [[nodiscard]] folly::coro::Task<std::shared_ptr<ZMesh>> loadLegacyMeshAsync(uint64_t segmentId) const;
   [[nodiscard]] folly::coro::Task<std::shared_ptr<ZMesh>> loadMultiLodMeshAsync(uint64_t segmentId, LodPolicy lodPolicy) const;
   [[nodiscard]] folly::coro::Task<std::shared_ptr<const CachedMultiLodManifest>>
@@ -218,14 +251,8 @@ private:
                                            const MultiLodInfo& info) const;
 
 private:
-  QUrl m_meshDirUrl;
-  MeshType m_meshType = MeshType::Legacy;
-  std::optional<MultiLodInfo> m_multiLodInfo;
-
-  std::array<double, 3> m_baseResolutionNm{};
-  std::array<int64_t, 3> m_baseVoxelOffset{};
-
-  std::chrono::milliseconds m_timeout{30000};
+  std::shared_ptr<const SharedMeshInfo> m_sharedMeshInfo;
+  std::shared_ptr<const ZNeuroglancerRemoteContext> m_remoteContext;
 
   mutable std::mutex m_manifestCacheMutex;
   mutable std::unordered_map<uint64_t, std::weak_ptr<const CachedMultiLodManifest>> m_manifestCache;

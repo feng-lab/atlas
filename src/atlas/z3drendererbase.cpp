@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <optional>
 #include <utility>
-#include <fmt/format.h>
 
 namespace nim {
 

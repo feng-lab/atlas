@@ -22,7 +22,6 @@
 #include <vector>
 #include <optional>
 
-#include <fmt/format.h>
 #include <gflags/gflags.h>
 
 #if !defined(_WIN32)

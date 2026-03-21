@@ -910,7 +910,10 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
       try {
         CHECK(vol);
         std::array<double, 3> baseResNm{vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ};
-        out.source = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(annRootUrl), baseResNm, vol->baseVoxelOffset(), vol->defaultTimeout());
+        out.source = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(annRootUrl),
+                                                                     baseResNm,
+                                                                     vol->baseVoxelOffset(),
+                                                                     vol->sharedRemoteContext());
         CHECK(out.source);
         for (const auto& rel : out.source->relationships()) {
           if (!rel.id.trimmed().isEmpty()) {
@@ -1363,8 +1366,10 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
           CHECK(vol);
           std::array<double, 3> baseResNm{
             vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ};
-          out.source = ZNeuroglancerPrecomputedAnnotationsSource::open(
-            QUrl(annRootUrl), baseResNm, vol->baseVoxelOffset(), vol->defaultTimeout());
+          out.source = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(annRootUrl),
+                                                                       baseResNm,
+                                                                       vol->baseVoxelOffset(),
+                                                                       vol->sharedRemoteContext());
           CHECK(out.source);
           for (const auto& rel : out.source->relationships()) {
             if (!rel.id.trimmed().isEmpty()) {
@@ -1422,7 +1427,8 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
               const size_t meshObjId = m_doc.doc().meshDoc().addMeshFromExternalSource(*coarse.mesh,
                                                                                        coarse.displayName,
                                                                                        coarse.tooltip,
-                                                                                       coarse.sourceJson);
+                                                                                       coarse.sourceJson,
+                                                                                       vol->sharedRemoteContext());
               Q_UNUSED(meshObjId);
             });
 
@@ -1431,11 +1437,11 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
       NeuroglancerMeshLoadResult out;
       out.sourceJson = sourceJson;
       try {
-        std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source =
-          ZNeuroglancerPrecomputedMeshSource::open(QUrl(meshSourceDirUrl),
-                                                  {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
-                                                  vol->baseVoxelOffset(),
-                                                  vol->defaultTimeout());
+        std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source = ZNeuroglancerPrecomputedMeshSource::open(
+          QUrl(meshSourceDirUrl),
+          {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
+          vol->baseVoxelOffset(),
+          vol->sharedRemoteContext());
         CHECK(source);
         out.mesh = source->loadMeshBlocking(segmentId, ZNeuroglancerPrecomputedMeshSource::LodPolicy::Coarsest);
         if (!out.mesh || out.mesh->empty()) {
@@ -1501,14 +1507,13 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     CHECK(meshDocPtr);
     ZMeshDoc* meshDoc = meshDocPtr.data();
 
-    std::set<QString> existingKeys;
+    std::vector<ZNeuroglancerMeshExternalSourceKey> existingKeys;
     for (const size_t meshId : meshDoc->objs()) {
       const auto keyOpt = parseNeuroglancerMeshExternalSourceKey(meshDoc->jsonValue(meshId));
       if (!keyOpt) {
         continue;
       }
-      existingKeys.insert(
-        neuroglancerMeshKeyString(keyOpt->rootUrl, keyOpt->meshSourceDirUrl, keyOpt->segmentId));
+      existingKeys.push_back(*keyOpt);
     }
 
     auto* watcher = new QFutureWatcher<QString>(this);
@@ -1542,10 +1547,11 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
 
       std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source;
       try {
-        source = ZNeuroglancerPrecomputedMeshSource::open(QUrl(meshSourceDirUrl),
-                                                          {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
-                                                          vol->baseVoxelOffset(),
-                                                          vol->defaultTimeout());
+        source = ZNeuroglancerPrecomputedMeshSource::open(
+          QUrl(meshSourceDirUrl),
+          {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
+          vol->baseVoxelOffset(),
+          vol->sharedRemoteContext());
       }
       catch (const std::exception& e) {
         return QString("Failed to load neuroglancer mesh source: %1").arg(QString::fromUtf8(e.what()));
@@ -1562,8 +1568,18 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
           break;
         }
 
-        const QString keyStr = neuroglancerMeshKeyString(rootUrl, meshSourceKey, segmentId);
-        if (existingKeys.contains(keyStr)) {
+        const ZNeuroglancerMeshExternalSourceKey key{
+          .rootUrl = rootUrl,
+          .meshSourceDirUrl = meshSourceKey,
+          .segmentId = segmentId,
+          .baseResolutionNm = std::array<double, 3>{vol->baseImgInfo().voxelSizeX,
+                                                    vol->baseImgInfo().voxelSizeY,
+                                                    vol->baseImgInfo().voxelSizeZ},
+          .baseVoxelOffset = vol->baseVoxelOffset(),
+        };
+        if (std::ranges::any_of(existingKeys, [&](const auto& existingKey) {
+              return sameNeuroglancerMeshSourceCompat(existingKey, key);
+            })) {
           ++skipped;
           continue;
         }
@@ -1619,7 +1635,8 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
                                                                        vol->baseImgInfo().voxelSizeZ},
                                                  vol->baseVoxelOffset());
 
-        enqueueToUi([meshDocPtr, coarse, displayName, tooltip, sourceJson]() mutable {
+        const auto remoteContext = vol->sharedRemoteContext();
+        enqueueToUi([meshDocPtr, coarse, displayName, tooltip, sourceJson, remoteContext]() mutable {
           if (QCoreApplication::closingDown() || !meshDocPtr) {
             return;
           }
@@ -1627,10 +1644,10 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
           if (meshDocPtr->findMeshByExternalSource(sourceJson)) {
             return;
           }
-          (void)meshDocPtr->addMeshFromExternalSource(*coarse, displayName, tooltip, sourceJson);
+          (void)meshDocPtr->addMeshFromExternalSource(*coarse, displayName, tooltip, sourceJson, remoteContext);
         });
 
-        existingKeys.insert(keyStr);
+        existingKeys.push_back(key);
         ++loaded;
       }
 
@@ -1694,10 +1711,11 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
       out.sourceJson = sourceJson;
       try {
         std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> source =
-          ZNeuroglancerPrecomputedSkeletonSource::open(QUrl(skeletonSourceDirUrl),
-                                                       {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
-                                                       vol->baseVoxelOffset(),
-                                                       vol->defaultTimeout());
+          ZNeuroglancerPrecomputedSkeletonSource::open(
+            QUrl(skeletonSourceDirUrl),
+            {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
+            vol->baseVoxelOffset(),
+            vol->sharedRemoteContext());
         CHECK(source);
         out.skeleton = source->loadSkeletonBlocking(segmentId);
         if (!out.skeleton || out.skeleton->empty()) {
@@ -1808,10 +1826,11 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
 
       std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> source;
       try {
-        source = ZNeuroglancerPrecomputedSkeletonSource::open(QUrl(skeletonSourceDirUrl),
-                                                              {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
-                                                              vol->baseVoxelOffset(),
-                                                              vol->defaultTimeout());
+        source = ZNeuroglancerPrecomputedSkeletonSource::open(
+          QUrl(skeletonSourceDirUrl),
+          {vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ},
+          vol->baseVoxelOffset(),
+          vol->sharedRemoteContext());
       }
       catch (const std::exception& e) {
         return QString("Failed to load neuroglancer skeleton source: %1").arg(QString::fromUtf8(e.what()));

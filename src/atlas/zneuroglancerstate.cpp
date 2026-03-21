@@ -1,9 +1,10 @@
 #include "zneuroglancerstate.h"
 
+#include "zneuroglancerremotecontext.h"
+#include "zneuroglancerurl.h"
 #include "zexception.h"
 #include "zjson.h"
 #include "zlog.h"
-#include "zhttpclient.h"
 
 #include <boost/json.hpp>
 #include <folly/coro/BlockingWait.h>
@@ -38,33 +39,6 @@ namespace {
   if (v.is_uint64()) {
     return QString::number(v.as_uint64());
   }
-  return std::nullopt;
-}
-
-[[nodiscard]] std::optional<QString> decodeSupportedPrecomputedSourceUrl(QString url)
-{
-  QString s = url.trimmed();
-  if (s.isEmpty()) {
-    return std::nullopt;
-  }
-
-  if (s.startsWith("precomputed://", Qt::CaseInsensitive)) {
-    return s;
-  }
-
-  // Newer Neuroglancer datasource URLs may wrap a precomputed root as:
-  //   s3://bucket/path|neuroglancer-precomputed:
-  // Keep support narrow and explicit: strip only the known provider suffix and
-  // return the underlying dataset root URL that Atlas already knows how to open.
-  static const QString kNgPrecomputedSuffix = QStringLiteral("|neuroglancer-precomputed:");
-  if (s.endsWith(kNgPrecomputedSuffix, Qt::CaseInsensitive)) {
-    s.chop(kNgPrecomputedSuffix.size());
-    s = s.trimmed();
-    if (!s.isEmpty()) {
-      return s;
-    }
-  }
-
   return std::nullopt;
 }
 
@@ -141,7 +115,7 @@ void collectSourceUrls(const json::value& v, QStringList* out)
 [[nodiscard]] std::optional<QString> pickPrecomputedVolumeUrl(const QStringList& urls)
 {
   for (const QString& u0 : urls) {
-    const auto decodedOpt = decodeSupportedPrecomputedSourceUrl(u0);
+    const auto decodedOpt = decodeSupportedNeuroglancerPrecomputedSourceUrl(u0);
     if (!decodedOpt) {
       continue;
     }
@@ -155,20 +129,10 @@ void collectSourceUrls(const json::value& v, QStringList* out)
   return std::nullopt;
 }
 
-[[nodiscard]] QString normalizePrecomputedUrlDropFragment(QString url)
-{
-  QString s = url.trimmed();
-  const int hash = s.indexOf('#');
-  if (hash >= 0) {
-    s = s.left(hash);
-  }
-  return s.trimmed();
-}
-
 [[nodiscard]] std::optional<QString> pickSkeletonSourceOverride(const QStringList& urls, const QString& volumeUrl)
 {
   for (const QString& u0 : urls) {
-    const QString u = normalizePrecomputedUrlDropFragment(u0);
+    const QString u = normalizeNeuroglancerUrlDropFragment(u0);
     if (u.isEmpty() || u == volumeUrl) {
       continue;
     }
@@ -192,7 +156,7 @@ void collectSourceUrls(const json::value& v, QStringList* out)
     }
     // Neuroglancer mesh sources are often encoded as "precomputed://.../mesh#type=mesh".
     if (u.contains("#type=mesh", Qt::CaseInsensitive)) {
-      return normalizePrecomputedUrlDropFragment(u);
+      return normalizeNeuroglancerUrlDropFragment(u);
     }
   }
   return std::nullopt;
@@ -224,43 +188,6 @@ void collectSourceUrls(const json::value& v, QStringList* out)
     out.push_back(s);
   }
   return out;
-}
-
-[[nodiscard]] QString mapCloudUrlToHttps(QString url)
-{
-  QString s = url.trimmed();
-  if (s.startsWith("gs://", Qt::CaseInsensitive)) {
-    const QString rest = s.mid(QStringLiteral("gs://").size());
-    return QStringLiteral("https://storage.googleapis.com/") + rest;
-  }
-  if (s.startsWith("s3://", Qt::CaseInsensitive)) {
-    const QString rest = s.mid(QStringLiteral("s3://").size());
-    const int slash = rest.indexOf('/');
-    const QString bucket = (slash < 0) ? rest : rest.left(slash);
-    const QString key = (slash < 0) ? QString{} : rest.mid(slash + 1);
-    if (bucket.isEmpty()) {
-      return s;
-    }
-
-    // Prefer virtual-hosted-style URLs for compatibility with newer AWS regions, but fall back to
-    // path-style when the bucket name contains dots (TLS wildcard mismatch with e.g. "a.b.s3.amazonaws.com").
-    const bool bucketHasDot = bucket.contains('.');
-    if (bucketHasDot) {
-      QString out = QStringLiteral("https://s3.amazonaws.com/") + bucket;
-      if (!key.isEmpty()) {
-        out += '/';
-        out += key;
-      }
-      return out;
-    }
-    QString out = QStringLiteral("https://") + bucket + QStringLiteral(".s3.amazonaws.com");
-    if (!key.isEmpty()) {
-      out += '/';
-      out += key;
-    }
-    return out;
-  }
-  return s;
 }
 
 [[nodiscard]] std::optional<QString> tryExtractJsonFromUrlFragment(QString urlText)
@@ -438,14 +365,18 @@ ZNeuroglancerState::ParseResult ZNeuroglancerState::parse(const json::value& sta
   return out;
 }
 
-ZNeuroglancerState::InputParseResult ZNeuroglancerState::parseInputText(const QString& text,
-                                                                        std::chrono::milliseconds timeout)
+ZNeuroglancerState::InputParseResult
+ZNeuroglancerState::parseInputText(const QString& text,
+                                   std::chrono::milliseconds timeout,
+                                   std::shared_ptr<const ZRemoteObjectStore> objectStore)
 {
   InputParseResult out;
   const QString trimmed = text.trimmed();
   if (trimmed.isEmpty()) {
     return out;
   }
+
+  const auto remoteContext = ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore));
 
   try {
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
@@ -462,8 +393,8 @@ ZNeuroglancerState::InputParseResult ZNeuroglancerState::parseInputText(const QS
 
     if (trimmed.contains("://") || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
         trimmed.startsWith("s3://", Qt::CaseInsensitive)) {
-      const QString url = mapCloudUrlToHttps(trimmed);
-      auto responseOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(url.toStdString(), timeout));
+      const QString url = mapCloudStorageUrlToHttps(trimmed);
+      auto responseOpt = folly::coro::blockingWait(remoteContext->getResponseAsync(url.toStdString()));
       if (!responseOpt) {
         out.status = InputStatus::Error;
         out.error = QStringLiteral("Failed to fetch Neuroglancer state JSON (HTTP 403/404):\n%1").arg(url);

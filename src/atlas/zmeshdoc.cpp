@@ -6,6 +6,7 @@
 #include "zneuroglancerexternalsource.h"
 #include "zneuroglancerprecomputed.h"
 #include "zneuroglancerprecomputedmesh.h"
+#include "zneuroglancerremotecontext.h"
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
 #include <QFileDialog>
@@ -24,15 +25,19 @@ struct ResolvedNeuroglancerMeshSource
   uint64_t segmentId = 0;
   std::array<double, 3> baseResolutionNm{};
   std::array<int64_t, 3> baseVoxelOffset{};
+  std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext;
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source;
 };
 
 [[nodiscard]] ResolvedNeuroglancerMeshSource
-resolveNeuroglancerMeshSource(ZDoc& doc, const ZNeuroglancerMeshExternalSourceKey& key)
+resolveNeuroglancerMeshSource(ZDoc& doc,
+                              const ZNeuroglancerMeshExternalSourceKey& key,
+                              std::shared_ptr<const ZNeuroglancerRemoteContext> preferredRemoteContext = nullptr)
 {
   ResolvedNeuroglancerMeshSource out;
   out.normalizedRootUrl = key.rootUrl;
   out.segmentId = key.segmentId;
+  out.remoteContext = std::move(preferredRemoteContext);
 
   std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol;
   for (const size_t imgId : doc.objsOfDoc(&doc.imgDoc())) {
@@ -46,10 +51,16 @@ resolveNeuroglancerMeshSource(ZDoc& doc, const ZNeuroglancerMeshExternalSourceKe
     }
   }
   if (!vol) {
-    constexpr std::chrono::milliseconds timeout{30000};
-    vol = ZNeuroglancerPrecomputedVolume::open(out.normalizedRootUrl, timeout);
+    const std::chrono::milliseconds timeout =
+      out.remoteContext ? out.remoteContext->timeout() : std::chrono::milliseconds{30000};
+    const auto objectStore = out.remoteContext ? out.remoteContext->sharedObjectStore() : nullptr;
+    vol = ZNeuroglancerPrecomputedVolume::open(out.normalizedRootUrl, timeout, objectStore);
   }
   CHECK(vol);
+  if (!out.remoteContext) {
+    out.remoteContext = vol->sharedRemoteContext();
+  }
+  CHECK(out.remoteContext);
 
   if (!key.meshSourceDirUrl.isEmpty()) {
     out.meshSourceDirUrlForJson = key.meshSourceDirUrl;
@@ -64,11 +75,10 @@ resolveNeuroglancerMeshSource(ZDoc& doc, const ZNeuroglancerMeshExternalSourceKe
     std::array<double, 3>{vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ});
   out.baseVoxelOffset = key.baseVoxelOffset.value_or(vol->baseVoxelOffset());
 
-  constexpr std::chrono::milliseconds timeout{30000};
   out.source = ZNeuroglancerPrecomputedMeshSource::open(QUrl(out.meshSourceDirUrlForJson),
                                                         out.baseResolutionNm,
                                                         out.baseVoxelOffset,
-                                                        timeout);
+                                                        out.remoteContext);
   CHECK(out.source);
   return out;
 }
@@ -81,16 +91,28 @@ ZMeshDoc::ZMeshDoc(ZDoc& doc)
   createActions();
 }
 
-size_t ZMeshDoc::addMeshFromExternalSource(ZMesh& mesh, QString displayName, QString tooltip, json::value sourceJson)
+size_t ZMeshDoc::addMeshFromExternalSource(ZMesh& mesh,
+                                           QString displayName,
+                                           QString tooltip,
+                                           json::value sourceJson,
+                                           std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
 {
   for (const auto& idPack : m_idToMeshPacks) {
     if (isSameObj(sourceJson, jsonValue(idPack.first))) {
+      if (remoteContext && idPack.second->runtimeRemoteContext != remoteContext) {
+        idPack.second->runtimeRemoteContext = std::move(remoteContext);
+        packGeometryUpdated(idPack.second.get());
+      }
       return idPack.first;
     }
   }
 
   size_t id = m_doc.getNewObjId();
-  m_idToMeshPacks[id] = std::make_shared<MeshPack>(mesh, std::move(displayName), std::move(tooltip), std::move(sourceJson));
+  m_idToMeshPacks[id] = std::make_shared<MeshPack>(mesh,
+                                                   std::move(displayName),
+                                                   std::move(tooltip),
+                                                   std::move(sourceJson),
+                                                   std::move(remoteContext));
   m_doc.registerNewObj(id, *this);
 
   Q_EMIT objAdded(id, this);
@@ -105,6 +127,12 @@ std::optional<size_t> ZMeshDoc::findMeshByExternalSource(const json::value& sour
     }
   }
   return std::nullopt;
+}
+
+std::shared_ptr<const ZNeuroglancerRemoteContext> ZMeshDoc::externalRemoteContext(size_t id) const
+{
+  CHECK(m_idToMeshPacks.contains(id));
+  return m_idToMeshPacks.at(id)->runtimeRemoteContext;
 }
 
 void ZMeshDoc::replaceMeshGeometry(size_t id, ZMesh& mesh)
@@ -286,7 +314,8 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
                                        QString("Neuroglancer precomputed mesh\nSegmentation: %1\nSegment: %2")
                                          .arg(resolved.normalizedRootUrl)
                                          .arg(segId),
-                                       normalized);
+                                       normalized,
+                                       resolved.remoteContext);
     }
 
     if (asQString(jValue).trimmed().isEmpty()) {
@@ -433,9 +462,7 @@ bool ZMeshDoc::isSameObj(const json::value& v1, const json::value& v2) const
   if (v1.is_object() && v2.is_object()) {
     const auto k1 = parseNeuroglancerMeshExternalSourceKey(v1);
     const auto k2 = parseNeuroglancerMeshExternalSourceKey(v2);
-    return k1 && k2 &&
-           neuroglancerMeshKeyString(k1->rootUrl, k1->meshSourceDirUrl, k1->segmentId) ==
-             neuroglancerMeshKeyString(k2->rootUrl, k2->meshSourceDirUrl, k2->segmentId);
+    return k1 && k2 && sameNeuroglancerMeshSourceCompat(*k1, *k2);
   }
 
   return false;
@@ -499,8 +526,13 @@ ZMeshDoc::MeshPack::MeshPack(ZMesh& imesh, const QString& path_)
   updateDerivedData();
 }
 
-ZMeshDoc::MeshPack::MeshPack(ZMesh& imesh, QString displayName, QString tooltip, json::value sourceJson_)
+ZMeshDoc::MeshPack::MeshPack(ZMesh& imesh,
+                             QString displayName,
+                             QString tooltip,
+                             json::value sourceJson_,
+                             std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
   : sourceJson(std::move(sourceJson_))
+  , runtimeRemoteContext(std::move(remoteContext))
   , displayNameOverride(std::move(displayName))
   , tooltipOverride(std::move(tooltip))
 {
@@ -581,7 +613,8 @@ bool ZMeshDoc::saveMesh(MeshPack* pack, const QString& fileName, QString& errorM
     std::optional<ZMesh> materializedMesh;
     if (!pack->sourceJson.is_null()) {
       if (const auto keyOpt = parseNeuroglancerMeshExternalSourceKey(pack->sourceJson)) {
-        const ResolvedNeuroglancerMeshSource resolved = resolveNeuroglancerMeshSource(m_doc, *keyOpt);
+        const ResolvedNeuroglancerMeshSource resolved =
+          resolveNeuroglancerMeshSource(m_doc, *keyOpt, pack->runtimeRemoteContext);
         std::shared_ptr<ZMesh> fullMesh =
           resolved.source->loadMeshBlocking(resolved.segmentId, ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest);
         if (!fullMesh || fullMesh->empty()) {
@@ -601,6 +634,7 @@ bool ZMeshDoc::saveMesh(MeshPack* pack, const QString& fileName, QString& errorM
 
     pack->path = QFileInfo(fileName).canonicalFilePath();
     pack->sourceJson = {};
+    pack->runtimeRemoteContext.reset();
     pack->displayNameOverride.clear();
     pack->tooltipOverride.clear();
     pack->hasUnsavedChange = false;

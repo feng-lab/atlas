@@ -286,8 +286,10 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
         std::array<double, 3> baseResNm{segVol->baseImgInfo().voxelSizeX,
                                         segVol->baseImgInfo().voxelSizeY,
                                         segVol->baseImgInfo().voxelSizeZ};
-        auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(
-          QUrl(normalizedAnnRootUrl), baseResNm, segVol->baseVoxelOffset(), kDefaultTimeout);
+        auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(normalizedAnnRootUrl),
+                                                                      baseResNm,
+                                                                      segVol->baseVoxelOffset(),
+                                                                      segVol->sharedRemoteContext());
         CHECK(source);
 
         if (source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Point &&
@@ -423,8 +425,10 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
       std::array<double, 3> baseResNm{segVol->baseImgInfo().voxelSizeX,
                                       segVol->baseImgInfo().voxelSizeY,
                                       segVol->baseImgInfo().voxelSizeZ};
-      auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(
-        QUrl(normalizedAnnRootUrl), baseResNm, segVol->baseVoxelOffset(), kDefaultTimeout);
+      auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(normalizedAnnRootUrl),
+                                                                    baseResNm,
+                                                                    segVol->baseVoxelOffset(),
+                                                                    segVol->sharedRemoteContext());
       CHECK(source);
 
       if (source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Point &&

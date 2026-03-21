@@ -1,7 +1,5 @@
 #include "zlogqtgui.h"
 
-#include <fmt/core.h>
-
 namespace nim {
 namespace {
 

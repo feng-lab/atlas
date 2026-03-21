@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zneuroglancerremotecontext.h"
 #include "zimg.h"
 #include "zimgreadstats.h"
 
@@ -22,6 +23,7 @@
 
 namespace nim {
 
+class ZRemoteObjectStore;
 class ZNeuroglancerPrecomputedVolume
 {
 public:
@@ -196,7 +198,8 @@ public:
     std::array<size_t, 3> targetRatio{1, 1, 1};
   };
 
-  static std::shared_ptr<ZNeuroglancerPrecomputedVolume> open(QString url, std::chrono::milliseconds timeout);
+  static std::shared_ptr<ZNeuroglancerPrecomputedVolume>
+  open(QString url, std::chrono::milliseconds timeout, std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
 
   // Normalizes a dataset root URL for Neuroglancer precomputed volumes:
   // - Accepts optional "precomputed://" prefix.
@@ -218,7 +221,17 @@ public:
 
   [[nodiscard]] std::chrono::milliseconds defaultTimeout() const
   {
-    return m_defaultTimeout;
+    CHECK(m_remoteContext);
+    return m_remoteContext->timeout();
+  }
+
+  // Reader-facing remote I/O policy for this volume and any child Neuroglancer sources reopened from it.
+  // Callers that already hold a live volume should pass this context onward rather than rebuilding child
+  // readers from timeout only, otherwise any non-default store/backend/session carried by the volume is lost.
+  [[nodiscard]] const std::shared_ptr<const ZNeuroglancerRemoteContext>& sharedRemoteContext() const
+  {
+    CHECK(m_remoteContext);
+    return m_remoteContext;
   }
 
   [[nodiscard]] const QString& dataTypeString() const
@@ -387,7 +400,7 @@ private:
   std::vector<Scale> m_scales;
   std::map<std::array<size_t, 3>, size_t> m_ratioToScaleIndex;
 
-  std::chrono::milliseconds m_defaultTimeout{30000};
+  std::shared_ptr<const ZNeuroglancerRemoteContext> m_remoteContext;
   mutable std::unique_ptr<ChunkCache> m_chunkCache;
 
   QString m_segmentPropertiesKey;

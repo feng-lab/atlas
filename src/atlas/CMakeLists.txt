@@ -135,7 +135,41 @@ if (WIN32)
                         IMPORTED_LOCATION "${_atlas_curl_dll}"
                         INTERFACE_INCLUDE_DIRECTORIES "${_atlas_curl_include_dir}")
 else ()
-  find_package(CURL REQUIRED)
+  if (UNIX AND NOT APPLE)
+    # The top-level build globally prefers archive libraries so vendored dependencies resolve statically.
+    # libcurl is the Linux exception: Atlas intentionally uses the shared system libcurl so we do not drag
+    # optional static curl backends (for example libssh) into every link. Force FindCURL's module-mode
+    # discovery to search shared libraries first instead of rewriting CURL::libcurl after the fact.
+    set(_atlas_saved_find_library_suffixes "${CMAKE_FIND_LIBRARY_SUFFIXES}")
+    set(CMAKE_FIND_LIBRARY_SUFFIXES "${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    find_package(CURL MODULE REQUIRED)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES "${_atlas_saved_find_library_suffixes}")
+
+    set(_atlas_curl_imported_locations)
+    foreach(_atlas_curl_prop IMPORTED_LOCATION IMPORTED_LOCATION_RELEASE IMPORTED_LOCATION_DEBUG)
+      get_target_property(_atlas_curl_imported_location CURL::libcurl "${_atlas_curl_prop}")
+      if (_atlas_curl_imported_location)
+        list(APPEND _atlas_curl_imported_locations "${_atlas_curl_imported_location}")
+      endif ()
+    endforeach ()
+
+    if (NOT _atlas_curl_imported_locations)
+      message(FATAL_ERROR
+              "FindCURL did not report an imported libcurl location. "
+              "Atlas on Linux requires the shared system libcurl.")
+    endif ()
+
+    foreach(_atlas_curl_imported_location IN LISTS _atlas_curl_imported_locations)
+      if (NOT _atlas_curl_imported_location MATCHES "\\.so($|\\.)")
+        message(FATAL_ERROR
+                "FindCURL resolved non-shared libcurl at '${_atlas_curl_imported_location}'. "
+                "Atlas on Linux requires the shared system libcurl to avoid dragging "
+                "optional static curl backends (for example libssh) into every link.")
+      endif ()
+    endforeach ()
+  else ()
+    find_package(CURL REQUIRED)
+  endif ()
 endif ()
 print_target_properties(CURL::libcurl)
 
@@ -699,6 +733,9 @@ set(SOURCES
     zimgpackvoxelvolume.h
     zimgpackdisplay.h zimgpackdisplay.cpp
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
+    zneuroglancerurl.h zneuroglancerurl.cpp
+    zneuroglancershardedreader.h zneuroglancershardedreader.cpp
+    zneuroglancerremotecontext.h zneuroglancerremotecontext.cpp
     zneuroglancerexternalsource.h zneuroglancerexternalsource.cpp
     zneuroglancerstate.h zneuroglancerstate.cpp
     zneuroglancerprecomputedannotations.h zneuroglancerprecomputedannotations.cpp
@@ -711,6 +748,8 @@ set(SOURCES
     zneuroglanceruint64sharding.h zneuroglanceruint64sharding.cpp
     zhttpdiskcache.h zhttpdiskcache.cpp
     zhttpclient.h zhttpclient.cpp
+    zremoteobjectstore.h zremoteobjectstore.cpp
+    zremoteobjectreader.h zremoteobjectreader.cpp
     zhttpsystemproxy.h zhttpsystemproxy.cpp
     zhttpretrypolicy.h zhttpretrypolicy.cpp
     zhttptruststore.h zhttptruststore.cpp

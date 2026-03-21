@@ -7,10 +7,13 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <vector>
 
 namespace nim {
+
+class ZRemoteObjectStore;
 
 class ZNeuroglancerState
 {
@@ -91,7 +94,8 @@ public:
   // - NotRecognized if the input does not look like a Neuroglancer state
   // - Error if it looks like a state input but fetch/decode/parse fails
   static InputParseResult parseInputText(const QString& text,
-                                         std::chrono::milliseconds timeout = std::chrono::milliseconds{30000});
+                                         std::chrono::milliseconds timeout = std::chrono::milliseconds{30000},
+                                         std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
 };
 
 } // namespace nim

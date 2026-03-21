@@ -1,13 +1,12 @@
 #include "zneuroglancerprecomputedannotations.h"
 
+#include "zneuroglancerremotecontext.h"
+#include "zneuroglancershardedreader.h"
 #include "zneuroglanceruint64sharding.h"
 #include "zexception.h"
 #include "zlog.h"
-#include "zhttpclient.h"
 
 #include <folly/coro/BlockingWait.h>
-#include <folly/compression/Compression.h>
-
 #include <boost/json.hpp>
 
 #include <algorithm>
@@ -277,31 +276,6 @@ ZNeuroglancerPrecomputedVolume::Scale::Sharding parseShardingSpec(const json::ob
   return sharding;
 }
 
-std::vector<uint8_t> decompressGzipBytes(std::vector<uint8_t> bytes)
-{
-  if (bytes.empty()) {
-    return bytes;
-  }
-  auto codec = folly::compression::getCodec(folly::compression::CodecType::GZIP);
-  auto uncompressed =
-    codec->uncompress(folly::StringPiece(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
-  std::vector<uint8_t> out(uncompressed.size());
-  std::memcpy(out.data(), uncompressed.data(), out.size());
-  return out;
-}
-
-std::vector<uint8_t> decodeShardedBytes(std::vector<uint8_t> bytes,
-                                        ZNeuroglancerPrecomputedVolume::Scale::Sharding::DataEncoding enc)
-{
-  switch (enc) {
-  case ZNeuroglancerPrecomputedVolume::Scale::Sharding::DataEncoding::Raw:
-    return bytes;
-  case ZNeuroglancerPrecomputedVolume::Scale::Sharding::DataEncoding::Gzip:
-    return decompressGzipBytes(std::move(bytes));
-  }
-  throw ZException("Invalid sharded data encoding");
-}
-
 template<typename T>
 T readLE(const uint8_t* p);
 
@@ -345,142 +319,15 @@ float readLE<float>(const uint8_t* p)
   return f;
 }
 
-folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpBytesAsync(const std::string& url,
-                                                                         std::chrono::milliseconds timeout)
-{
-  auto resOpt = co_await ZHttpClient::instance().getBytes(url, timeout);
-  if (!resOpt) {
-    co_return std::nullopt;
-  }
-  if (resOpt->status != 200) {
-    throw ZException(fmt::format("HTTP GET failed for '{}' (status {})", url, resOpt->status));
-  }
-  co_return std::move(resOpt->body);
-}
-
-folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpRangeBytesAsync(const std::string& url,
-                                                                              std::chrono::milliseconds timeout,
-                                                                              uint64_t offset,
-                                                                              uint64_t length)
-{
-  if (length == 0) {
-    co_return std::vector<uint8_t>{};
-  }
-  const uint64_t endInclusive = offset + length - 1;
-  auto resOpt =
-    co_await ZHttpClient::instance().getBytes(url,
-                                              timeout,
-                                              {
-                                                {"range", fmt::format("bytes={}-{}", offset, endInclusive)}
-  });
-  if (!resOpt) {
-    co_return std::nullopt;
-  }
-  if (resOpt->status != 206 && resOpt->status != 200) {
-    throw ZException(fmt::format("HTTP range GET failed for '{}' (status {})", url, resOpt->status));
-  }
-  if (resOpt->body.size() != length) {
-    throw ZException(fmt::format("HTTP range GET size mismatch for '{}': got {} bytes, expected {} bytes",
-                                 url,
-                                 resOpt->body.size(),
-                                 length));
-  }
-  co_return std::move(resOpt->body);
-}
-
-QString shardHexString(uint64_t shard, int digits)
-{
-  QString s = QString::number(shard, 16);
-  if (digits > 0) {
-    s = s.rightJustified(digits, QChar('0'));
-  }
-  return s;
-}
-
-struct ShardedShardIndexEntry
-{
-  std::string dataUrl;
-  uint64_t baseDataOffset = 0;
-  uint64_t minishardIndexStart = 0; // relative to end of shard index
-  uint64_t minishardIndexEnd = 0;   // relative to end of shard index
-};
-
-folly::coro::Task<std::optional<ShardedShardIndexEntry>> getShardIndexEntry(const QUrl& baseUrl,
-                                                                           const ZNeuroglancerPrecomputedVolume::Scale::Sharding& sharding,
-                                                                           std::chrono::milliseconds timeout,
-                                                                           uint64_t shard,
-                                                                           uint64_t minishard)
-{
-  const QString shardHex = shardHexString(shard, sharding.shardHexDigits);
-
-  const QUrl shardUrl = baseUrl.resolved(QUrl(shardHex + ".shard"));
-  const QUrl indexUrl = baseUrl.resolved(QUrl(shardHex + ".index"));
-  const QUrl dataUrl = baseUrl.resolved(QUrl(shardHex + ".data"));
-
-  const uint64_t shardIndexEntryOffset = minishard << 4;
-
-  auto readFrom = [&](const QUrl& url) -> folly::coro::Task<std::optional<std::vector<uint8_t>>> {
-    co_return co_await getHttpRangeBytesAsync(toStdString(url.toString()), timeout, shardIndexEntryOffset, 16);
-  };
-
-  auto parseEntry = [&](std::vector<uint8_t> bytes, bool useSplit) -> ShardedShardIndexEntry {
-    CHECK(bytes.size() == 16);
-    ShardedShardIndexEntry out{};
-    out.minishardIndexStart = ZNeuroglancerUint64Sharding::readU64LE(bytes.data());
-    out.minishardIndexEnd = ZNeuroglancerUint64Sharding::readU64LE(bytes.data() + 8);
-    if (useSplit) {
-      out.dataUrl = toStdString(dataUrl.toString());
-      out.baseDataOffset = 0;
-    } else {
-      out.dataUrl = toStdString(shardUrl.toString());
-      out.baseDataOffset = sharding.shardIndexSize;
-    }
-    return out;
-  };
-
-  std::optional<ShardedShardIndexEntry> entryOpt;
-
-  int mode = sharding.shardFileMode.load();
-  if (mode == 1) {
-    auto bytesOpt = co_await readFrom(shardUrl);
-    if (!bytesOpt) {
-      co_return std::nullopt;
-    }
-    entryOpt = parseEntry(std::move(*bytesOpt), /*useSplit=*/false);
-  } else if (mode == 2) {
-    auto bytesOpt = co_await readFrom(indexUrl);
-    if (!bytesOpt) {
-      co_return std::nullopt;
-    }
-    entryOpt = parseEntry(std::move(*bytesOpt), /*useSplit=*/true);
-  } else {
-    auto bytesOpt = co_await readFrom(shardUrl);
-    if (bytesOpt) {
-      sharding.shardFileMode.store(1);
-      entryOpt = parseEntry(std::move(*bytesOpt), /*useSplit=*/false);
-    } else {
-      auto legacyBytesOpt = co_await readFrom(indexUrl);
-      if (legacyBytesOpt) {
-        sharding.shardFileMode.store(2);
-        entryOpt = parseEntry(std::move(*legacyBytesOpt), /*useSplit=*/true);
-      } else {
-        co_return std::nullopt;
-      }
-    }
-  }
-
-  CHECK(entryOpt);
-  co_return entryOpt;
-}
-
 } // namespace
 
-std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> ZNeuroglancerPrecomputedAnnotationsSource::open(
-  const QUrl& annotationRootUrl,
-  std::array<double, 3> baseResolutionNm,
-  std::array<int64_t, 3> baseVoxelOffset,
-  std::chrono::milliseconds timeout)
+std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
+ZNeuroglancerPrecomputedAnnotationsSource::open(const QUrl& annotationRootUrl,
+                                                std::array<double, 3> baseResolutionNm,
+                                                std::array<int64_t, 3> baseVoxelOffset,
+                                                std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
 {
+  CHECK(remoteContext);
   QUrl rootUrl = annotationRootUrl;
   if (!rootUrl.toString().endsWith('/')) {
     rootUrl = QUrl(rootUrl.toString() + "/");
@@ -489,12 +336,40 @@ std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> ZNeuroglancerPrecompu
   const QUrl infoUrl = rootUrl.resolved(QUrl("info"));
   const std::string infoUrlStr = toStdString(infoUrl.toString());
 
-  auto bytesOpt = folly::coro::blockingWait(getHttpBytesAsync(infoUrlStr, timeout));
+  auto bytesOpt = folly::coro::blockingWait(remoteContext->getBytesAsync(infoUrlStr));
   if (!bytesOpt) {
     throw ZException(fmt::format("Neuroglancer annotations info not found (HTTP 403/404) at '{}'", infoUrlStr));
   }
   const std::string infoText(reinterpret_cast<const char*>(bytesOpt->data()), bytesOpt->size());
-  return parseInfoJsonText(rootUrl, infoText, baseResolutionNm, baseVoxelOffset, timeout);
+  return parseInfoJsonText(rootUrl, infoText, baseResolutionNm, baseVoxelOffset, std::move(remoteContext));
+}
+
+std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
+ZNeuroglancerPrecomputedAnnotationsSource::open(const QUrl& annotationRootUrl,
+                                                std::array<double, 3> baseResolutionNm,
+                                                std::array<int64_t, 3> baseVoxelOffset,
+                                                std::chrono::milliseconds timeout,
+                                                std::shared_ptr<const ZRemoteObjectStore> objectStore)
+{
+  return open(annotationRootUrl,
+              baseResolutionNm,
+              baseVoxelOffset,
+              ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
+}
+
+std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
+ZNeuroglancerPrecomputedAnnotationsSource::parseInfoJsonText(const QUrl& annotationRootUrl,
+                                                             const std::string& infoText,
+                                                             std::array<double, 3> baseResolutionNm,
+                                                             std::array<int64_t, 3> baseVoxelOffset,
+                                                             std::chrono::milliseconds timeout,
+                                                             std::shared_ptr<const ZRemoteObjectStore> objectStore)
+{
+  return parseInfoJsonText(annotationRootUrl,
+                           infoText,
+                           baseResolutionNm,
+                           baseVoxelOffset,
+                           ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> ZNeuroglancerPrecomputedAnnotationsSource::parseInfoJsonText(
@@ -502,8 +377,12 @@ std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> ZNeuroglancerPrecompu
   const std::string& infoText,
   std::array<double, 3> baseResolutionNm,
   std::array<int64_t, 3> baseVoxelOffset,
-  std::chrono::milliseconds timeout)
+  std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
 {
+  if (!remoteContext) {
+    remoteContext = ZNeuroglancerRemoteContext::create(std::chrono::milliseconds{30000});
+  }
+
   auto out = std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>(new ZNeuroglancerPrecomputedAnnotationsSource());
   out->m_rootUrl = annotationRootUrl;
   if (!out->m_rootUrl.toString().endsWith('/')) {
@@ -512,7 +391,7 @@ std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> ZNeuroglancerPrecompu
 
   out->m_baseResolutionNm = baseResolutionNm;
   out->m_baseVoxelOffset = baseVoxelOffset;
-  out->m_timeout = timeout;
+  out->m_remoteContext = std::move(remoteContext);
 
   json::value jv;
   try {
@@ -739,7 +618,7 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryBl
   if (!shardingOpt) {
     const QUrl url = dirUrl.resolved(QUrl(QString::number(key)));
     const std::string urlStr = toStdString(url.toString());
-    auto resOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(urlStr, m_timeout));
+    auto resOpt = folly::coro::blockingWait(m_remoteContext->getResponseAsync(urlStr));
     if (!resOpt) {
       throw ZNotFoundException(
         fmt::format("Neuroglancer annotations index entry not found for key {} (HTTP 403/404)", key));
@@ -760,49 +639,34 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryBl
     const uint64_t minishard = shardAndMinishard & sharding.minishardMask;
     const uint64_t shard = (shardAndMinishard >> sharding.minishardBits) & sharding.shardMask;
 
-    auto entryOpt = folly::coro::blockingWait(getShardIndexEntry(dirUrl, sharding, m_timeout, shard, minishard));
+    auto entryOpt = folly::coro::blockingWait(
+      getNeuroglancerShardIndexEntryAsync(*m_remoteContext, dirUrl, sharding, shard, minishard));
     if (!entryOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer annotations shard index not found for key {}", key));
     }
 
-    const ShardedShardIndexEntry& entry = *entryOpt;
-    if (entry.minishardIndexEnd <= entry.minishardIndexStart) {
-      throw ZNotFoundException(fmt::format("Neuroglancer annotations index entry not found for key {}", key));
-    }
-
-    const uint64_t minishardLen = entry.minishardIndexEnd - entry.minishardIndexStart;
-    auto minishardBytesOpt = folly::coro::blockingWait(
-      getHttpRangeBytesAsync(entry.dataUrl, m_timeout, entry.baseDataOffset + entry.minishardIndexStart, minishardLen));
-    if (!minishardBytesOpt) {
+    auto decodedOpt =
+      folly::coro::blockingWait(getNeuroglancerDecodedMinishardIndexAsync(*m_remoteContext, *entryOpt, sharding));
+    if (!decodedOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer annotations minishard not found for key {}", key));
     }
 
-    auto decodedMinishardBytes = decodeShardedBytes(std::move(*minishardBytesOpt), sharding.minishardIndexEncoding);
-    auto decoded =
-      ZNeuroglancerUint64Sharding::decodeMinishardIndex(std::span<const uint8_t>(decodedMinishardBytes.data(), decodedMinishardBytes.size()),
-                                                       entry.baseDataOffset);
+    const auto& decoded = *decodedOpt;
     if (decoded.keys.empty()) {
       throw ZNotFoundException(fmt::format("Neuroglancer annotations index entry not found for key {}", key));
     }
 
-    auto it = std::lower_bound(decoded.keys.begin(), decoded.keys.end(), chunkId);
-    if (it == decoded.keys.end() || *it != chunkId) {
-      throw ZNotFoundException(fmt::format("Neuroglancer annotations index entry not found for key {}", key));
-    }
-    const size_t idx = static_cast<size_t>(it - decoded.keys.begin());
-    const uint64_t start = decoded.starts[idx];
-    const uint64_t end = decoded.ends[idx];
-    if (end <= start) {
+    auto locationOpt = findNeuroglancerShardedPayloadLocation(decoded, chunkId);
+    if (!locationOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer annotations index entry not found for key {}", key));
     }
 
-    auto payloadBytesOpt =
-      folly::coro::blockingWait(getHttpRangeBytesAsync(entry.dataUrl, m_timeout, start, end - start));
-    if (!payloadBytesOpt) {
+    auto payloadOpt = folly::coro::blockingWait(
+      getNeuroglancerDecodedShardedPayloadBytesAsync(*m_remoteContext, entryOpt->dataUrl, *locationOpt, sharding));
+    if (!payloadOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer annotations payload not found for key {}", key));
     }
-    auto decodedPayloadBytes = decodeShardedBytes(std::move(*payloadBytesOpt), sharding.dataEncoding);
-    bytesOpt = std::move(decodedPayloadBytes);
+    bytesOpt = std::move(payloadOpt->bytes);
   }
 
   CHECK(bytesOpt);
@@ -844,7 +708,7 @@ std::optional<std::vector<uint8_t>> ZNeuroglancerPrecomputedAnnotationsSource::l
     const QString filename = QString("%1_%2_%3").arg(cell[0]).arg(cell[1]).arg(cell[2]);
     const QUrl url = level.indexDirUrl.resolved(QUrl(filename));
     const std::string urlStr = toStdString(url.toString());
-    auto resOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(urlStr, m_timeout));
+    auto resOpt = folly::coro::blockingWait(m_remoteContext->getResponseAsync(urlStr));
     if (!resOpt) {
       return std::nullopt;
     }

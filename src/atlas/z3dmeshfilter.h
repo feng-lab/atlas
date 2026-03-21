@@ -59,6 +59,7 @@ public:
 
   void setData(std::vector<ZMesh*>* meshList);
   void setExternalSourceJson(json::value sourceJson);
+  void setExternalSourceState(json::value sourceJson, std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
   void setViewport(glm::uvec2 viewport) override;
   void setViewport(glm::uvec4 viewport) override;
   void beginExportMeshLod(const glm::uvec2& fullViewport);
@@ -179,6 +180,7 @@ private:
   std::vector<ZMesh*> m_origMeshList;
 
   json::value m_externalSourceJson;
+  std::shared_ptr<const ZNeuroglancerRemoteContext> m_runtimeNgRemoteContext;
   std::optional<ZNeuroglancerMeshExternalSourceKey> m_runtimeNgSourceKey;
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> m_runtimeNgSource;
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest> m_runtimeNgManifest;

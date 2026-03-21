@@ -5,8 +5,6 @@
 #include "zimgregionalextrema.h"
 #include "zbenchtimer.h"
 
-#include <fmt/format.h>
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>

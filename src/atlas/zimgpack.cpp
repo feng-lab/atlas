@@ -736,9 +736,9 @@ std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZImgPack::loadNeurogla
   const std::array<double, 3> baseResolutionNm{info.voxelSizeX, info.voxelSizeY, info.voxelSizeZ};
 
   auto loaded = ZNeuroglancerPrecomputedMeshSource::open(QUrl(overrideUrl),
-                                                        baseResolutionNm,
-                                                        m_ngVolume->baseVoxelOffset(),
-                                                        m_ngVolume->defaultTimeout());
+                                                         baseResolutionNm,
+                                                         m_ngVolume->baseVoxelOffset(),
+                                                         m_ngVolume->sharedRemoteContext());
   CHECK(loaded);
 
   const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
@@ -770,9 +770,9 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZImgPack::loadNeur
   const std::array<double, 3> baseResolutionNm{info.voxelSizeX, info.voxelSizeY, info.voxelSizeZ};
 
   auto loaded = ZNeuroglancerPrecomputedSkeletonSource::open(QUrl(overrideUrl),
-                                                            baseResolutionNm,
-                                                            m_ngVolume->baseVoxelOffset(),
-                                                            m_ngVolume->defaultTimeout());
+                                                             baseResolutionNm,
+                                                             m_ngVolume->baseVoxelOffset(),
+                                                             m_ngVolume->sharedRemoteContext());
   CHECK(loaded);
 
   const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
@@ -804,7 +804,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedAnnotationsSource> ZImgPack::loadN
   auto loaded = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(overrideUrl),
                                                                 baseResolutionNm,
                                                                 m_ngVolume->baseVoxelOffset(),
-                                                                m_ngVolume->defaultTimeout());
+                                                                m_ngVolume->sharedRemoteContext());
   CHECK(loaded);
 
   const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);

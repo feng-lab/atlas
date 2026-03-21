@@ -1,9 +1,6 @@
 #include "zneuroglanceruint64sharding.h"
 
-#include "zexception.h"
-
-#include <fmt/format.h>
-#include <glog/logging.h>
+#include "zlog.h"
 
 #include <cstring>
 

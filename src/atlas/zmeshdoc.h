@@ -7,6 +7,8 @@
 
 namespace nim {
 
+class ZNeuroglancerRemoteContext;
+
 class ZMeshDoc : public ZObjDoc
 {
   Q_OBJECT
@@ -23,10 +25,22 @@ public:
   void askToSave(const ZMesh& msh, const QString& title = "");
 
   // Add a mesh that does not come from a local file path (e.g. network-backed Neuroglancer mesh).
-  // The `sourceJson` is stored in the scene file so the mesh can be reloaded on restore.
-  size_t addMeshFromExternalSource(ZMesh& mesh, QString displayName, QString tooltip, json::value sourceJson);
+  // The `sourceJson` is stored in the scene file so the mesh can be reloaded on restore. `remoteContext`
+  // is runtime-only sidecar state used by live views and is intentionally not serialized.
+  size_t addMeshFromExternalSource(ZMesh& mesh,
+                                   QString displayName,
+                                   QString tooltip,
+                                   json::value sourceJson,
+                                   std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext = nullptr);
 
   [[nodiscard]] std::optional<size_t> findMeshByExternalSource(const json::value& sourceJson) const;
+
+  // Runtime-only remote context sidecar for external-source meshes.
+  //
+  // This is intentionally not serialized into scene JSON. It lets live views
+  // reuse the same remote backend/session as the volume that resolved the mesh
+  // source while keeping transport state out of the persisted source identity.
+  [[nodiscard]] std::shared_ptr<const ZNeuroglancerRemoteContext> externalRemoteContext(size_t id) const;
 
   // Replace the geometry of an existing mesh object and notify 3D views.
   // Intended for progressive refinement (e.g. Neuroglancer mesh LOD refinement).
@@ -102,7 +116,11 @@ private:
   struct MeshPack
   { // mesh and its associated data
     MeshPack(ZMesh& imesh, const QString& path_);
-    MeshPack(ZMesh& imesh, QString displayName, QString tooltip, json::value sourceJson);
+    MeshPack(ZMesh& imesh,
+             QString displayName,
+             QString tooltip,
+             json::value sourceJson,
+             std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
 
     ~MeshPack();
 
@@ -126,6 +144,8 @@ private:
     std::vector<ZMesh*> meshList;
     QString path;
     json::value sourceJson;
+    // Runtime-only transport/session state for external-source meshes.
+    std::shared_ptr<const ZNeuroglancerRemoteContext> runtimeRemoteContext;
     QString displayNameOverride;
     QString tooltipOverride;
     bool hasUnsavedChange = false;

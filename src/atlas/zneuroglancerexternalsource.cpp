@@ -91,9 +91,53 @@ std::optional<uint64_t> parseNeuroglancerUint64Base10(const QString& s)
   return v;
 }
 
-QString neuroglancerMeshKeyString(const QString& rootUrl, const QString& meshSourceDirUrl, uint64_t segmentId)
+QString neuroglancerMeshKeyString(const QString& rootUrl,
+                                  const QString& meshSourceDirUrl,
+                                  uint64_t segmentId,
+                                  std::optional<std::array<double, 3>> baseResolutionNm,
+                                  std::optional<std::array<int64_t, 3>> baseVoxelOffset)
 {
-  return QString("%1|%2|%3").arg(rootUrl).arg(meshSourceDirUrl).arg(segmentId);
+  auto appendDoubleArray = [](QString& out, const std::optional<std::array<double, 3>>& values) {
+    if (!values) {
+      out += QStringLiteral("|res:<none>");
+      return;
+    }
+    out += QStringLiteral("|res:%1,%2,%3")
+             .arg(QString::number((*values)[0], 'g', 17))
+             .arg(QString::number((*values)[1], 'g', 17))
+             .arg(QString::number((*values)[2], 'g', 17));
+  };
+  auto appendIntArray = [](QString& out, const std::optional<std::array<int64_t, 3>>& values) {
+    if (!values) {
+      out += QStringLiteral("|off:<none>");
+      return;
+    }
+    out += QStringLiteral("|off:%1,%2,%3").arg((*values)[0]).arg((*values)[1]).arg((*values)[2]);
+  };
+
+  QString out = QString("%1|%2|%3").arg(rootUrl).arg(meshSourceDirUrl).arg(segmentId);
+  appendDoubleArray(out, baseResolutionNm);
+  appendIntArray(out, baseVoxelOffset);
+  return out;
+}
+
+bool sameNeuroglancerMeshSourceCompat(const ZNeuroglancerMeshExternalSourceKey& a,
+                                      const ZNeuroglancerMeshExternalSourceKey& b)
+{
+  if (a.rootUrl != b.rootUrl || a.meshSourceDirUrl != b.meshSourceDirUrl || a.segmentId != b.segmentId) {
+    return false;
+  }
+
+  const bool aHasGeometry = a.baseResolutionNm.has_value() && a.baseVoxelOffset.has_value();
+  const bool bHasGeometry = b.baseResolutionNm.has_value() && b.baseVoxelOffset.has_value();
+  if (aHasGeometry && bHasGeometry) {
+    return *a.baseResolutionNm == *b.baseResolutionNm && *a.baseVoxelOffset == *b.baseVoxelOffset;
+  }
+
+  // Older scene entries may omit base geometry entirely. Treat those as the
+  // same external mesh source so mixed old/new JSON still deduplicates, while
+  // keeping normalized new/new comparisons strict when both sides provide it.
+  return true;
 }
 
 QString neuroglancerSkeletonKeyString(const QString& rootUrl, const QString& skeletonSourceDirUrl, uint64_t segmentId)

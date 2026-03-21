@@ -132,6 +132,9 @@ else ()
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedskeletontest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputede2etest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerstatetest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerurltest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zremoteobjectreadertest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancershardedreadertest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedmeshtest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglanceruint64shardingtest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zhttpretrypolicytest.cpp

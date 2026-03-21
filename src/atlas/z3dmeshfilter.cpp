@@ -4,6 +4,7 @@
 #include "z3dtextureglowrenderer.h"
 #include "zlog.h"
 #include "zmesh.h"
+#include "zneuroglancerremotecontext.h"
 #include "zrandom.h"
 #include "zregionannotation.h"
 
@@ -82,18 +83,24 @@ collectRuntimeNeuroglancerBaseRows(const ZNeuroglancerPrecomputedMeshSource::Mul
   return baseRows;
 }
 
-[[nodiscard]] RuntimeNeuroglancerOpenResult openRuntimeNeuroglancerSource(uint64_t epoch,
-                                                                          const ZNeuroglancerMeshExternalSourceKey& key)
+[[nodiscard]] RuntimeNeuroglancerOpenResult
+openRuntimeNeuroglancerSource(uint64_t epoch,
+                              const ZNeuroglancerMeshExternalSourceKey& key,
+                              std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
 {
   RuntimeNeuroglancerOpenResult out;
   out.epoch = epoch;
   try {
     CHECK(key.baseResolutionNm);
     CHECK(key.baseVoxelOffset);
-    const auto source = ZNeuroglancerPrecomputedMeshSource::open(QUrl(key.meshSourceDirUrl),
-                                                                 *key.baseResolutionNm,
-                                                                 *key.baseVoxelOffset,
-                                                                 std::chrono::milliseconds(30000));
+    const auto source = remoteContext ? ZNeuroglancerPrecomputedMeshSource::open(QUrl(key.meshSourceDirUrl),
+                                                                                 *key.baseResolutionNm,
+                                                                                 *key.baseVoxelOffset,
+                                                                                 std::move(remoteContext))
+                                      : ZNeuroglancerPrecomputedMeshSource::open(QUrl(key.meshSourceDirUrl),
+                                                                                 *key.baseResolutionNm,
+                                                                                 *key.baseVoxelOffset,
+                                                                                 std::chrono::milliseconds(30000));
     CHECK(source);
     if (!source->supportsRuntimeLod()) {
       out.error = QStringLiteral("dataset does not support multiscale mesh LOD");
@@ -249,7 +256,7 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
 
   if (!m_runtimeNgSource || !m_runtimeNgManifest) {
     const RuntimeNeuroglancerOpenResult openResult =
-      openRuntimeNeuroglancerSource(m_runtimeNgEpoch, *m_runtimeNgSourceKey);
+      openRuntimeNeuroglancerSource(m_runtimeNgEpoch, *m_runtimeNgSourceKey, m_runtimeNgRemoteContext);
     if (!openResult.error.isEmpty()) {
       LOG(WARNING) << fmt::format("Mesh export LOD preload skipped: {}", openResult.error);
       return;
@@ -379,9 +386,15 @@ void Z3DMeshFilter::setData(std::vector<ZMesh*>* meshList)
 
 void Z3DMeshFilter::setExternalSourceJson(json::value sourceJson)
 {
+  setExternalSourceState(std::move(sourceJson), nullptr);
+}
+
+void Z3DMeshFilter::setExternalSourceState(json::value sourceJson,
+                                           std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
+{
   const auto keyOpt = parseNeuroglancerMeshExternalSourceKey(sourceJson);
   if (!keyOpt || keyOpt->meshSourceDirUrl.isEmpty() || !keyOpt->baseResolutionNm || !keyOpt->baseVoxelOffset) {
-    if (!m_runtimeNgSourceKey && m_externalSourceJson == sourceJson) {
+    if (!m_runtimeNgSourceKey && m_externalSourceJson == sourceJson && m_runtimeNgRemoteContext == remoteContext) {
       return;
     }
     m_externalSourceJson = std::move(sourceJson);
@@ -389,12 +402,14 @@ void Z3DMeshFilter::setExternalSourceJson(json::value sourceJson)
     return;
   }
 
-  if (isSameRuntimeNeuroglancerSource(*keyOpt) && m_externalSourceJson == sourceJson) {
+  if (isSameRuntimeNeuroglancerSource(*keyOpt) && m_externalSourceJson == sourceJson &&
+      m_runtimeNgRemoteContext == remoteContext) {
     return;
   }
 
   m_externalSourceJson = std::move(sourceJson);
   resetRuntimeNeuroglancerLodState();
+  m_runtimeNgRemoteContext = std::move(remoteContext);
   m_runtimeNgSourceKey = *keyOpt;
   startRuntimeNeuroglancerOpen();
 }
@@ -695,6 +710,7 @@ void Z3DMeshFilter::resetRuntimeNeuroglancerLodState()
   ++m_runtimeNgEpoch;
   m_runtimeNgIdleTimer.stop();
   m_runtimeNgSourceKey.reset();
+  m_runtimeNgRemoteContext.reset();
   m_runtimeNgSource.reset();
   m_runtimeNgManifest.reset();
   m_runtimeNgBaseRows.clear();
@@ -747,6 +763,7 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
 
   const uint64_t epoch = m_runtimeNgEpoch;
   const ZNeuroglancerMeshExternalSourceKey key = *m_runtimeNgSourceKey;
+  const auto remoteContext = m_runtimeNgRemoteContext;
 
   auto* watcher = new QFutureWatcher<RuntimeNeuroglancerOpenResult>(this);
   connect(watcher, &QFutureWatcher<RuntimeNeuroglancerOpenResult>::finished, this, [this, watcher, epoch]() {
@@ -772,8 +789,8 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
     }
   });
 
-  watcher->setFuture(QtConcurrent::run([epoch, key]() -> RuntimeNeuroglancerOpenResult {
-    return openRuntimeNeuroglancerSource(epoch, key);
+  watcher->setFuture(QtConcurrent::run([epoch, key, remoteContext]() -> RuntimeNeuroglancerOpenResult {
+    return openRuntimeNeuroglancerSource(epoch, key, remoteContext);
   }));
 }
 

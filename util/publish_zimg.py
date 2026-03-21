@@ -561,7 +561,7 @@ def main() -> int:
             if cl_path is None:
                 raise RuntimeError(
                     "MSVC environment setup failed: `cl.exe` not found on PATH after vcvarsall.\n"
-                    "This wheel must be built with MSVC (not MinGW). Ensure Visual Studio 2022 "
+                    "This wheel must be built with MSVC (not MinGW). Ensure Visual Studio "
                     "is installed and `util/common_dirs.py:vs_install_dir()` points to it."
                 )
             logger.info("Using MSVC toolchain for wheel build (cl=%s)", cl_path)

@@ -20,6 +20,9 @@
 
 namespace nim {
 
+class ZRemoteObjectStore;
+class ZNeuroglancerRemoteContext;
+
 class ZNeuroglancerPrecomputedAnnotationsSource
 {
 public:
@@ -100,17 +103,35 @@ public:
     std::vector<PropertyValue> propertyValues;
   };
 
-  static std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> open(const QUrl& annotationRootUrl,
-                                                                         std::array<double, 3> baseResolutionNm,
-                                                                         std::array<int64_t, 3> baseVoxelOffset,
-                                                                         std::chrono::milliseconds timeout);
+  static std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
+  open(const QUrl& annotationRootUrl,
+       std::array<double, 3> baseResolutionNm,
+       std::array<int64_t, 3> baseVoxelOffset,
+       std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
+
+  static std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
+  open(const QUrl& annotationRootUrl,
+       std::array<double, 3> baseResolutionNm,
+       std::array<int64_t, 3> baseVoxelOffset,
+       std::chrono::milliseconds timeout,
+       std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
 
   // Exposed for unit tests: parses an annotations/info JSON without performing network I/O.
-  static std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> parseInfoJsonText(const QUrl& annotationRootUrl,
-                                                                                      const std::string& infoText,
-                                                                                      std::array<double, 3> baseResolutionNm,
-                                                                                      std::array<int64_t, 3> baseVoxelOffset,
-                                                                                      std::chrono::milliseconds timeout);
+  static std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
+  parseInfoJsonText(const QUrl& annotationRootUrl,
+                    const std::string& infoText,
+                    std::array<double, 3> baseResolutionNm,
+                    std::array<int64_t, 3> baseVoxelOffset,
+                    std::chrono::milliseconds timeout,
+                    std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
+
+  // Internal reader-facing overload: use an existing remote context instead of rebuilding timeout/store state.
+  static std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
+  parseInfoJsonText(const QUrl& annotationRootUrl,
+                    const std::string& infoText,
+                    std::array<double, 3> baseResolutionNm,
+                    std::array<int64_t, 3> baseVoxelOffset,
+                    std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext = nullptr);
 
   [[nodiscard]] const QUrl& rootUrl() const
   {
@@ -211,7 +232,7 @@ private:
   std::vector<RelationshipSpec> m_relationships;
   std::optional<IndexSpec> m_byId;
 
-  std::chrono::milliseconds m_timeout{30000};
+  std::shared_ptr<const ZNeuroglancerRemoteContext> m_remoteContext;
 };
 
 } // namespace nim
