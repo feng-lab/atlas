@@ -3,7 +3,7 @@
 #include "zneuroglanceruint64sharding.h"
 #include "zexception.h"
 #include "zlog.h"
-#include "zproxygenhttpclient.h"
+#include "zhttpclient.h"
 
 #include "zmesh.h"
 
@@ -672,7 +672,7 @@ std::shared_ptr<ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedMesh
 
   const QUrl infoUrl = out->m_meshDirUrl.resolved(QUrl("info"));
   const std::string infoUrlStr = toStdString(infoUrl.toString());
-  auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(infoUrlStr, out->m_timeout));
+  auto resOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(infoUrlStr, out->m_timeout));
   if (!resOpt) {
     // No info file -> legacy mesh.
     out->m_meshType = MeshType::Legacy;
@@ -762,7 +762,7 @@ std::shared_ptr<ZMesh> ZNeuroglancerPrecomputedMeshSource::loadMeshBlocking(uint
 
 folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedMeshSource::getHttpBytesAsync(const std::string& url) const
 {
-  auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(url, m_timeout);
+  auto resOpt = co_await ZHttpClient::instance().getBytes(url, m_timeout);
   if (!resOpt) {
     co_return std::nullopt;
   }
@@ -781,10 +781,12 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedM
     co_return std::vector<uint8_t>{};
   }
   const uint64_t endInclusive = offset + length - 1;
-  auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(
-    url,
-    m_timeout,
-    {{"range", fmt::format("bytes={}-{}", offset, endInclusive)}});
+  auto resOpt =
+    co_await ZHttpClient::instance().getBytes(url,
+                                              m_timeout,
+                                              {
+                                                {"range", fmt::format("bytes={}-{}", offset, endInclusive)}
+  });
   if (!resOpt) {
     co_return std::nullopt;
   }

@@ -6,7 +6,7 @@
 #include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancerprecomputedsegmentproperties.h"
 #include "zneuroglanceruint64sharding.h"
-#include "zproxygenhttpclient.h"
+#include "zhttpclient.h"
 #include "zlog.h"
 #include "zconcurrentlrucache.h"
 
@@ -274,9 +274,12 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpRangeBytes(const s
     co_return std::vector<uint8_t>{};
   }
   const uint64_t endInclusive = offset + length - 1;
-  auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(url,
-                                                                  timeout,
-                                                                  {{"range", fmt::format("bytes={}-{}", offset, endInclusive)}});
+  auto resOpt =
+    co_await ZHttpClient::instance().getBytes(url,
+                                              timeout,
+                                              {
+                                                {"range", fmt::format("bytes={}-{}", offset, endInclusive)}
+  });
   if (!resOpt) {
     co_return std::nullopt;
   }
@@ -547,8 +550,7 @@ std::shared_ptr<ZNeuroglancerPrecomputedVolume> ZNeuroglancerPrecomputedVolume::
   }
 
   const std::string infoUrlStr = toStdString(vol->infoUrl().toString());
-  auto infoResOpt =
-    folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(infoUrlStr, vol->m_defaultTimeout));
+  auto infoResOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(infoUrlStr, vol->m_defaultTimeout));
   if (!infoResOpt) {
     throw ZException(fmt::format(
       "Neuroglancer precomputed info not found (HTTP 403/404) at '{}'. Ensure the URL points to a precomputed dataset root (directory containing an 'info' file).",
@@ -1334,7 +1336,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChu
     } else {
       const std::string urlStr = toStdString(chunkUrl(chunk).toString());
       chunkDebugUrl = urlStr;
-      auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(urlStr, m_defaultTimeout);
+      auto resOpt = co_await ZHttpClient::instance().getBytes(urlStr, m_defaultTimeout);
       if (!resOpt) {
         // Missing unsharded chunk objects are a soft miss in Neuroglancer.
         // Sparse datasets may omit all-zero chunks entirely, and getBytes()

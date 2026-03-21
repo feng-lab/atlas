@@ -87,9 +87,57 @@ message(STATUS "Using gRPC ${gRPC_VERSION}")
 print_target_properties(gRPC::grpc++)
 print_target_properties(gRPC::grpc_cpp_plugin)
 
+if (TARGET zstd::libzstd_static AND NOT TARGET zstd)
+  # Vendored Proxygen exports a plain `zstd` dependency instead of the namespaced
+  # zstd package target. Provide a compatibility target here so its link interface
+  # resolves to our bundled static libzstd rather than a host `-lzstd`.
+  add_library(zstd INTERFACE)
+  target_link_libraries(zstd INTERFACE zstd::libzstd_static)
+endif ()
+
 find_package(proxygen CONFIG REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(proxygen::proxygen)
+
+if (WIN32)
+  file(GLOB _atlas_curl_roots LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/curl-*win*")
+  list(FILTER _atlas_curl_roots INCLUDE REGEX ".+")
+  list(LENGTH _atlas_curl_roots _atlas_curl_root_count)
+  if (_atlas_curl_root_count EQUAL 0)
+    message(FATAL_ERROR "Windows curl SDK not found under src/3rdparty/build. Run `python util/build_ext_libs.py curl` first.")
+  endif ()
+  if (NOT _atlas_curl_root_count EQUAL 1)
+    message(FATAL_ERROR "Expected exactly one unpacked Windows curl SDK under src/3rdparty/build, found: ${_atlas_curl_roots}")
+  endif ()
+  list(GET _atlas_curl_roots 0 _atlas_curl_root)
+
+  set(_atlas_curl_include_dir "${_atlas_curl_root}/include")
+  set(_atlas_curl_import_lib "${_atlas_curl_root}/lib/libcurl.lib")
+  set(_atlas_curl_dll "${_atlas_curl_root}/bin/libcurl-x64.dll")
+  set(_atlas_curl_ca_bundle "${_atlas_curl_root}/bin/curl-ca-bundle.crt")
+
+  if (NOT EXISTS "${_atlas_curl_include_dir}/curl/curl.h")
+    message(FATAL_ERROR "libcurl headers not found under '${_atlas_curl_root}'.")
+  endif ()
+  if (NOT EXISTS "${_atlas_curl_import_lib}")
+    message(FATAL_ERROR "libcurl import library not found at '${_atlas_curl_import_lib}'. Run `python util/build_ext_libs.py curl` first.")
+  endif ()
+  if (NOT EXISTS "${_atlas_curl_dll}")
+    message(FATAL_ERROR "libcurl runtime DLL not found at '${_atlas_curl_dll}'.")
+  endif ()
+  if (NOT EXISTS "${_atlas_curl_ca_bundle}")
+    message(FATAL_ERROR "curl CA bundle not found at '${_atlas_curl_ca_bundle}'.")
+  endif ()
+
+  add_library(CURL::libcurl SHARED IMPORTED GLOBAL)
+  set_target_properties(CURL::libcurl PROPERTIES
+                        IMPORTED_IMPLIB "${_atlas_curl_import_lib}"
+                        IMPORTED_LOCATION "${_atlas_curl_dll}"
+                        INTERFACE_INCLUDE_DIRECTORIES "${_atlas_curl_include_dir}")
+else ()
+  find_package(CURL REQUIRED)
+endif ()
+print_target_properties(CURL::libcurl)
 
 # Brotli does not install a CMake package config; link it via its installed static libraries.
 find_path(BROTLI_INCLUDE_DIR
@@ -662,6 +710,9 @@ set(SOURCES
     zneuroglancerprecomputedchunkdecoder.h zneuroglancerprecomputedchunkdecoder.cpp
     zneuroglanceruint64sharding.h zneuroglanceruint64sharding.cpp
     zhttpdiskcache.h zhttpdiskcache.cpp
+    zhttpclient.h zhttpclient.cpp
+    zhttpretrypolicy.h zhttpretrypolicy.cpp
+    zcurlhttpclient.h zcurlhttpclient.cpp
     zsqlitelrucache.h zsqlitelrucache.cpp
     zdiskcacheutils.h zdiskcacheutils.cpp
     zproxygenhttpclient.h zproxygenhttpclient.cpp
@@ -884,6 +935,7 @@ if (MSVC)
     Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
     Qt6::CorePrivate Qt6::Test
     Brotli::brotlidec
+    CURL::libcurl
     proxygen::proxygen
     VTK::sqlite
     assimp::draco
@@ -986,6 +1038,7 @@ else ()
     Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
     Qt6::CorePrivate Qt6::Test
     Brotli::brotlidec
+    CURL::libcurl
     proxygen::proxygen
     VTK::sqlite
     assimp::draco
@@ -1082,6 +1135,14 @@ if (WIN32)
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls.exe"
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_atlas_curl_dll}"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>/")
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_atlas_curl_ca_bundle}"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>/")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/settings_flagfile.txt"

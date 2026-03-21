@@ -2,6 +2,7 @@ import errno
 import glob
 import logging
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -414,6 +415,26 @@ def freeimage_redist_dir() -> str:
     return res
 
 
+def _curl_version_sort_key(path: str):
+    basename = os.path.basename(path)
+    match = re.search(
+        r"curl-([0-9]+(?:\.[0-9]+)*)(?:[_-]([0-9]+))?-win",
+        basename,
+        re.IGNORECASE,
+    )
+    if not match:
+        return (version.parse("0"), -1, basename.lower())
+    patch_rev = int(match.group(2)) if match.group(2) else 0
+    return (version.parse(match.group(1)), patch_rev, basename.lower())
+
+
+def _find_latest_curl_match(files: str):
+    file_list = glob.glob(files)
+    if len(file_list) == 0:
+        raise Exception("Can not find matching package with pattern: " + files)
+    return sorted(file_list, key=_curl_version_sort_key)[-1]
+
+
 def find_src_package_with_glob(files: str):
     file_list = glob.glob(files)
     if len(file_list) == 1:
@@ -430,6 +451,14 @@ def remove_old_src_folder_with_glob(folder: str):
         shutil.rmtree(folder_list[0], ignore_errors=False)
     elif len(folder_list) > 1:
         raise Exception("Find more than one matching folders with pattern: " + folder)
+
+
+def remove_old_src_folders_with_glob(folder: str):
+    for existing in glob.glob(folder):
+        if os.path.isdir(existing):
+            shutil.rmtree(existing, ignore_errors=False, onexc=handleRemoveReadonly)
+        else:
+            os.remove(existing)
 
 
 def get_7za_binary() -> str:
@@ -624,6 +653,51 @@ def install_ffmpeg():
             os.path.join(ext_build_dir(), "ffmpeg"),
             stat.S_IRWXU or stat.S_IXGRP or stat.S_IRGRP or stat.S_IROTH,
         )
+
+
+def find_latest_windows_curl_package() -> str:
+    assert is_windows()
+    return _find_latest_curl_match(os.path.join(src_package_dir(), "curl-*win64-*.zip"))
+
+
+def curl_root_dir() -> str:
+    assert is_windows()
+    root = _find_latest_curl_match(os.path.join(ext_build_dir(), "curl-*win*"))
+    assert os.path.isdir(root)
+    return root
+
+
+def curl_bin_dir() -> str:
+    assert is_windows()
+    res = os.path.join(curl_root_dir(), "bin")
+    assert os.path.exists(res)
+    return res
+
+
+def curl_dll_path() -> str:
+    assert is_windows()
+    res = os.path.join(curl_bin_dir(), "libcurl-x64.dll")
+    assert os.path.exists(res)
+    return res
+
+
+def curl_ca_bundle_path() -> str:
+    assert is_windows()
+    res = os.path.join(curl_bin_dir(), "curl-ca-bundle.crt")
+    assert os.path.exists(res)
+    return res
+
+
+def curl_def_path() -> str:
+    assert is_windows()
+    res = os.path.join(curl_bin_dir(), "libcurl-x64.def")
+    assert os.path.exists(res)
+    return res
+
+
+def curl_import_lib_path() -> str:
+    assert is_windows()
+    return os.path.join(curl_root_dir(), "lib", "libcurl.lib")
 
 
 def get_cmake_binary() -> str:

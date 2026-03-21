@@ -14,9 +14,15 @@ from pathlib import Path
 
 from common_dirs import (
     atlas_repository_dir,
+    curl_ca_bundle_path,
+    curl_def_path,
+    curl_dll_path,
+    curl_import_lib_path,
+    curl_root_dir,
     ext_build_dir,
     ext_dir,
     find_src_package_with_glob,
+    find_latest_windows_curl_package,
     get_cmake_binary,
     get_ffmpeg_binary,
     get_gperf_dir,
@@ -35,6 +41,7 @@ from common_dirs import (
     qt_installer_framework_bin_dir,
     qt_ver,
     remove_old_src_folder_with_glob,
+    remove_old_src_folders_with_glob,
     rm_tree,
     src_package_dir,
     tbb_dir,
@@ -262,6 +269,51 @@ def glob_remove(files: str):
         else:
             os.remove(file)
         logger.info(f"{file} removed")
+
+
+def _curl_root_dir_from_package(package_name: str) -> str:
+    package_folder = get_package_top_level_folder(package_name)
+    if package_folder:
+        return os.path.join(ext_build_dir(), package_folder)
+    return os.path.join(
+        ext_build_dir(), os.path.splitext(os.path.basename(package_name))[0]
+    )
+
+
+def ensure_windows_curl_sdk() -> str:
+    assert is_windows()
+
+    package_name = find_latest_windows_curl_package()
+    package_unpack_folder = _curl_root_dir_from_package(package_name)
+    logger.info(f"curl package unpack folder: {package_unpack_folder}")
+    if not os.path.exists(package_unpack_folder):
+        remove_old_src_folders_with_glob(os.path.join(ext_build_dir(), "curl-*win*"))
+        unpack_file_to_folder(package_name, ext_build_dir())
+        assert os.path.exists(package_unpack_folder)
+
+    dll_path = curl_dll_path()
+    def_path = curl_def_path()
+    import_lib_path = curl_import_lib_path()
+    os.makedirs(os.path.dirname(import_lib_path), exist_ok=True)
+    if (not os.path.exists(import_lib_path)) or (
+        os.path.getmtime(import_lib_path) < os.path.getmtime(def_path)
+    ):
+        env = get_vcvars_environment()
+        subprocess.run(
+            [
+                "lib",
+                f"/def:{def_path}",
+                "/machine:x64",
+                f"/name:{os.path.basename(dll_path)}",
+                f"/out:{import_lib_path}",
+            ],
+            shell=False,
+            check=True,
+            env=env,
+        )
+    assert os.path.exists(import_lib_path)
+    assert os.path.exists(curl_ca_bundle_path())
+    return curl_root_dir()
 
 
 def remove_installed_dynamic_library(install_dir: str, libnames: list):
@@ -3966,7 +4018,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == "curl":
             if is_windows():
-                unpack_tool_to_target_dir(src_package_dir(), "curl*win*")
+                ensure_windows_curl_sdk()
 
         if lib_name == "gperf":
             if is_windows():

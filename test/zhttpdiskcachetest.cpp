@@ -1,5 +1,5 @@
 #include "zhttpdiskcache.h"
-#include "zproxygenhttpclient.h"
+#include "zhttpclient.h"
 #include "zdiskcacheutils.h"
 
 #include <gtest/gtest.h>

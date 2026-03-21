@@ -1,11 +1,17 @@
 #include "zneuroglancerprecomputed.h"
 
+#include <QCoreApplication>
+
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
 #include <cstdlib>
 #include <string>
+
+DECLARE_string(atlas_http_backend);
+DECLARE_uint64(atlas_disk_cache_http_max_bytes);
 
 namespace nim {
 namespace {
@@ -20,13 +26,35 @@ bool envFlagEnabled(const char* name)
   return s == "1" || s == "true" || s == "TRUE" || s == "yes" || s == "YES";
 }
 
-} // namespace
+class ScopedQtCoreApplication
+{
+public:
+  ScopedQtCoreApplication()
+  {
+    if (QCoreApplication::instance() != nullptr) {
+      return;
+    }
 
-TEST(ZNeuroglancerPrecomputed, E2ESmokePublicDatasets)
+    static int argc = 1;
+    static char arg0[] = "zneuroglancerprecomputede2etest";
+    static char* argv[] = {arg0, nullptr};
+    m_app = std::make_unique<QCoreApplication>(argc, argv);
+  }
+
+private:
+  std::unique_ptr<QCoreApplication> m_app;
+};
+
+void runPublicDatasetSmokeTest(const char* backend)
 {
   if (!envFlagEnabled("ATLAS_ENABLE_NETWORK_TESTS")) {
     GTEST_SKIP() << "Set ATLAS_ENABLE_NETWORK_TESTS=1 to run network E2E tests.";
   }
+
+  ScopedQtCoreApplication qtApp;
+  gflags::FlagSaver flagSaver;
+  FLAGS_atlas_http_backend = backend;
+  FLAGS_atlas_disk_cache_http_max_bytes = 0;
 
   using namespace std::chrono_literals;
   constexpr auto timeout = 30s;
@@ -43,6 +71,7 @@ TEST(ZNeuroglancerPrecomputed, E2ESmokePublicDatasets)
   };
 
   for (const auto& c : cases) {
+    SCOPED_TRACE(backend);
     SCOPED_TRACE(c.name);
 
     auto vol = ZNeuroglancerPrecomputedVolume::open(QString::fromUtf8(c.url), timeout);
@@ -59,5 +88,16 @@ TEST(ZNeuroglancerPrecomputed, E2ESmokePublicDatasets)
   }
 }
 
-} // namespace nim
+} // namespace
 
+TEST(ZNeuroglancerPrecomputed, E2ESmokePublicDatasets)
+{
+  runPublicDatasetSmokeTest("proxygen");
+}
+
+TEST(ZNeuroglancerPrecomputed, E2ESmokePublicDatasetsCurl)
+{
+  runPublicDatasetSmokeTest("curl");
+}
+
+} // namespace nim

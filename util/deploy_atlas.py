@@ -1548,6 +1548,18 @@ def build_atlas_package(is_debug_version: bool = False, release_pdb: bool = Fals
                 shutil.copy2(
                     pdb_path, os.path.join(common_dirs.deploy_target_dir(), "Atlas")
                 )
+            if common_dirs.is_windows() and os.path.exists(common_dirs.curl_dll_path()):
+                shutil.copy2(
+                    common_dirs.curl_dll_path(),
+                    os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+                )
+            if common_dirs.is_windows() and os.path.exists(
+                common_dirs.curl_ca_bundle_path()
+            ):
+                shutil.copy2(
+                    common_dirs.curl_ca_bundle_path(),
+                    os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+                )
             shutil.copytree(
                 os.path.join(binary_dir, "Resources"),
                 os.path.join(common_dirs.deploy_target_dir(), "Atlas", "Resources"),

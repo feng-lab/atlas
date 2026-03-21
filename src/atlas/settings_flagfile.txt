@@ -18,6 +18,10 @@
 
 # HTTP / Network settings for remote datasets (Neuroglancer, etc.)
 
+# HTTP backend implementation for remote datasets.
+# Values: proxygen, curl
+--atlas_http_backend=proxygen
+
 # Path to a PEM CA bundle for HTTPS requests (empty = auto-detect; also respects env SSL_CERT_FILE).
 --atlas_http_ca_bundle=
 

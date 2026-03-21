@@ -1,6 +1,5 @@
 #include "zhttpdiskcache.h"
 
-#include "zproxygenhttpclient.h"
 #include "zlog.h"
 #include "zsqlitediskcachebucket.h"
 #include "zstructutils.h"

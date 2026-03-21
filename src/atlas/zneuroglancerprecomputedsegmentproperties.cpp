@@ -2,7 +2,7 @@
 
 #include "zexception.h"
 #include "zjson.h"
-#include "zproxygenhttpclient.h"
+#include "zhttpclient.h"
 #include "zlog.h"
 
 #include <folly/coro/BlockingWait.h>
@@ -151,7 +151,7 @@ std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecompu
   QUrl infoUrl = dirUrl.resolved(QUrl("info"));
   const std::string infoUrlStr = toStdString(infoUrl.toString());
 
-  auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(infoUrlStr, timeout));
+  auto resOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(infoUrlStr, timeout));
   if (!resOpt) {
     throw ZException(fmt::format("Segment properties info not found (HTTP 403/404) at '{}'", infoUrlStr));
   }

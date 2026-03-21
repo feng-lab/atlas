@@ -3,7 +3,7 @@
 #include "zneuroglanceruint64sharding.h"
 #include "zexception.h"
 #include "zlog.h"
-#include "zproxygenhttpclient.h"
+#include "zhttpclient.h"
 
 #include <folly/coro/BlockingWait.h>
 #include <folly/compression/Compression.h>
@@ -214,7 +214,7 @@ float readLE<float>(const uint8_t* p)
 folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpBytesAsync(const std::string& url,
                                                                          std::chrono::milliseconds timeout)
 {
-  auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(url, timeout);
+  auto resOpt = co_await ZHttpClient::instance().getBytes(url, timeout);
   if (!resOpt) {
     co_return std::nullopt;
   }
@@ -233,9 +233,12 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpRangeBytesAsync(co
     co_return std::vector<uint8_t>{};
   }
   const uint64_t endInclusive = offset + length - 1;
-  auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(url,
-                                                                  timeout,
-                                                                  {{"range", fmt::format("bytes={}-{}", offset, endInclusive)}});
+  auto resOpt =
+    co_await ZHttpClient::instance().getBytes(url,
+                                              timeout,
+                                              {
+                                                {"range", fmt::format("bytes={}-{}", offset, endInclusive)}
+  });
   if (!resOpt) {
     co_return std::nullopt;
   }
@@ -622,7 +625,7 @@ std::shared_ptr<ZSkeleton> ZNeuroglancerPrecomputedSkeletonSource::loadSkeletonB
   if (!m_sharding) {
     const QUrl url = m_skeletonDirUrl.resolved(QUrl(QString::number(segmentId)));
     const std::string urlStr = toStdString(url.toString());
-    auto resOpt = folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(urlStr, m_timeout));
+    auto resOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(urlStr, m_timeout));
     if (!resOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer skeleton not found for segment {} (HTTP 403/404)", segmentId));
     }

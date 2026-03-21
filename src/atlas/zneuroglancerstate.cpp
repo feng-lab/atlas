@@ -3,7 +3,7 @@
 #include "zexception.h"
 #include "zjson.h"
 #include "zlog.h"
-#include "zproxygenhttpclient.h"
+#include "zhttpclient.h"
 
 #include <boost/json.hpp>
 #include <folly/coro/BlockingWait.h>
@@ -463,8 +463,7 @@ ZNeuroglancerState::InputParseResult ZNeuroglancerState::parseInputText(const QS
     if (trimmed.contains("://") || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
         trimmed.startsWith("s3://", Qt::CaseInsensitive)) {
       const QString url = mapCloudUrlToHttps(trimmed);
-      auto responseOpt =
-        folly::coro::blockingWait(ZProxygenHttpClient::instance().getBytes(url.toStdString(), timeout));
+      auto responseOpt = folly::coro::blockingWait(ZHttpClient::instance().getBytes(url.toStdString(), timeout));
       if (!responseOpt) {
         out.status = InputStatus::Error;
         out.error = QStringLiteral("Failed to fetch Neuroglancer state JSON (HTTP 403/404):\n%1").arg(url);

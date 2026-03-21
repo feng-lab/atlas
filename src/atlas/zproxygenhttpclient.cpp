@@ -2,7 +2,9 @@
 
 #include "zdiskcacheutils.h"
 #include "zhttpdiskcache.h"
+#include "zhttpretrypolicy.h"
 #include "zcancellation.h"
+#include "zqobjectthreadinvoker.h"
 
 #include <brotli/decode.h>
 #include <folly/Optional.h>
@@ -362,6 +364,22 @@ std::vector<std::string> resolveHostToIpAddrsSystem(const std::string& host)
   return out;
 }
 
+std::vector<std::string> resolveHostToIpAddrsSystemViaQtThread(const std::string& host, QObject* lookupInvoker)
+{
+  CHECK(lookupInvoker);
+
+  const auto res = invokeOnObjectThreadWait(
+    lookupInvoker,
+    [host]() {
+      return resolveHostToIpAddrsSystem(host);
+    },
+    fmt::format("QHostInfo::fromName('{}')", host));
+  if (!res.ok) {
+    throw ZException(res.error);
+  }
+  return res.value;
+}
+
 struct ProxyEndpoint
 {
   std::string host;
@@ -603,56 +621,6 @@ bool isRetryableHttpError(const proxygen::coro::HTTPError& e)
   }
 }
 
-bool isRetryableExceptionMessage(std::string_view message)
-{
-  // Heuristic for transient socket/TLS/proxy issues surfaced as std::exception.
-  // Keep this conservative, but include common "direct path is blocked; proxy required" cases.
-  std::string m(message);
-  folly::toLowerAscii(m);
-
-  auto contains = [&](std::string_view needle) -> bool {
-    return m.find(needle) != std::string::npos;
-  };
-
-  // TLS / transport
-  if (contains("handshake") || contains("network error") || contains("tls") || contains("ssl") || contains("eof")) {
-    return true;
-  }
-
-  // Connect / route failures (often fixed by retrying via system proxy in auto mode).
-  if (contains("connect failed") || contains("connect error") || contains("connection refused") ||
-      contains("no route to host") || contains("network is unreachable") || contains("host is down") ||
-      contains("connection reset") || contains("broken pipe")) {
-    return true;
-  }
-
-  // DNS / name resolution
-  if (contains("temporary failure in name resolution") || contains("name or service not known") ||
-      contains("nodename nor servname provided") || contains("unknown host") || contains("host not found")) {
-    return true;
-  }
-
-  // Timeout variants (some surfaces as generic exceptions, not HTTPErrorCode::READ_TIMEOUT/WRITE_TIMEOUT).
-  if (contains("timeout") || contains("timed out")) {
-    return true;
-  }
-
-  return false;
-}
-
-std::chrono::milliseconds retryBackoffForAttempt(uint32_t attempt)
-{
-  const uint32_t initial = FLAGS_atlas_http_retry_backoff_initial_ms;
-  const uint32_t maxDelay = std::max<uint32_t>(initial, FLAGS_atlas_http_retry_backoff_max_ms);
-  uint64_t delay = initial;
-  // Exponential backoff: initial * 2^attempt
-  delay <<= std::min<uint32_t>(attempt, 20u);
-  if (delay > maxDelay) {
-    delay = maxDelay;
-  }
-  return std::chrono::milliseconds(static_cast<int64_t>(delay));
-}
-
 } // namespace
 
 ZProxygenHttpClient& ZProxygenHttpClient::instance()
@@ -665,6 +633,14 @@ ZProxygenHttpClient::ZProxygenHttpClient()
   : m_eventBaseThread("atlas_proxygen_http")
   , m_sslContext(makeClientSslContext(m_caBundlePath))
 {
+  m_hostLookupThread = std::make_unique<QThread>();
+  m_hostLookupThread->setObjectName(QStringLiteral("atlas_qhostinfo_lookup"));
+  m_hostLookupThread->start();
+  CHECK(m_hostLookupThread->isRunning());
+
+  m_hostLookupInvoker = new QObject();
+  m_hostLookupInvoker->moveToThread(m_hostLookupThread.get());
+
   folly::EventBase* evb = m_eventBaseThread.getEventBase();
   CHECK(evb);
 
@@ -680,6 +656,24 @@ ZProxygenHttpClient::ZProxygenHttpClient()
   }
 
   m_directConnCache = std::make_unique<proxygen::coro::HTTPClientConnectionCache>(*evb);
+}
+
+ZProxygenHttpClient::~ZProxygenHttpClient()
+{
+  if (m_hostLookupInvoker != nullptr) {
+    if (m_hostLookupThread && m_hostLookupThread->isRunning()) {
+      const bool invokeOk = QMetaObject::invokeMethod(m_hostLookupInvoker, &QObject::deleteLater, Qt::QueuedConnection);
+      CHECK(invokeOk);
+    } else {
+      delete m_hostLookupInvoker;
+    }
+    m_hostLookupInvoker = nullptr;
+  }
+
+  if (m_hostLookupThread) {
+    m_hostLookupThread->quit();
+    CHECK(m_hostLookupThread->wait(5000));
+  }
 }
 
 folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBytes(
@@ -838,7 +832,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
           auto it = m_directDnsCache.find(host);
           if (it == m_directDnsCache.end() || it->second.addresses.empty()) {
             DirectDnsCacheEntry entry{};
-            entry.addresses = resolveHostToIpAddrsSystem(host);
+            entry.addresses = resolveHostToIpAddrsSystemViaQtThread(host, m_hostLookupInvoker);
             entry.nextIndex = 0;
             it = m_directDnsCache.emplace(host, std::move(entry)).first;
           }
@@ -914,6 +908,21 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
       if (isMissingResourceHttpStatus(value.status)) {
         co_return std::nullopt;
       }
+      if (isRetryableHttpStatus(value.status)) {
+        if (attempt < maxRetries) {
+          VLOG(1) << fmt::format("HTTP GET transient status (attempt {}/{}): '{}' (status {})",
+                                 attempt + 1,
+                                 maxRetries + 1,
+                                 url,
+                                 value.status);
+          co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
+          continue;
+        }
+        throw ZException(fmt::format("HTTP GET failed for '{}' (status {}): exhausted retries", url, value.status));
+      }
+      if (value.status >= 400) {
+        throw ZException(fmt::format("HTTP GET failed for '{}' (status {})", url, value.status));
+      }
       if (m_diskCache && m_diskCache->isEnabled()) {
         m_diskCache->put(url, requestHeaders, value);
       }
@@ -949,7 +958,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
                                maxRetries + 1,
                                url,
                                httpErr->describe());
-        co_await folly::coro::sleepReturnEarlyOnCancel(retryBackoffForAttempt(attempt));
+        co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
         continue;
       }
 
@@ -963,15 +972,15 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
 
     // Fall back to message-based retry heuristics for non-proxygen errors.
     std::string msg(error.what().toStdString());
-    const bool retryable =
-      error.is_compatible_with<proxygen::coro::HTTPCoroSessionPool::Exception>() || isRetryableExceptionMessage(msg);
+    const bool retryable = error.is_compatible_with<proxygen::coro::HTTPCoroSessionPool::Exception>() ||
+                           isRetryableHttpExceptionMessage(msg);
     if (attempt < maxRetries && retryable) {
       VLOG(1) << fmt::format("HTTP GET transient exception (attempt {}/{}): '{}' ({})",
                              attempt + 1,
                              maxRetries + 1,
                              url,
                              msg);
-      co_await folly::coro::sleepReturnEarlyOnCancel(retryBackoffForAttempt(attempt));
+      co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
       continue;
     }
 

@@ -345,20 +345,21 @@ Steps to load and manage images:
           - **Load Neuroglancer Annotations for Segment ID…** (manual segment/object ID entry)
           - **Load Neuroglancer Annotations in View (spatial index)…** (queries the current viewport region at the current slice; does not require a segment ID)
         - Ellipsoid annotations preserve anisotropic radii and render as true ellipsoids in 3D.
-   9. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
-   10. Optional: enable the persistent HTTP disk cache to speed up repeated Neuroglancer sessions (and reduce duplicated downloads):
+   9. If a remote dataset behaves differently across platforms or crashes in one HTTP stack, restart Atlas with `--atlas_http_backend=curl` or `--atlas_http_backend=proxygen` and compare behavior.
+   10. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows curl deployments ship `curl-ca-bundle.crt`, but the flag can be used to override it).
+   11. Optional: enable the persistent HTTP disk cache to speed up repeated Neuroglancer sessions (and reduce duplicated downloads):
        - `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable; tune e.g. 10–50 GiB depending on disk space)
        - `--atlas_disk_cache_http_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued background cache writes; when full, writes are dropped on a best-effort basis)
        - `--atlas_disk_cache_dir=<path>` (optional override; default is auto-chosen Atlas cache/config directory)
        - The cache is stored in a single database file at `<dir>/atlas_disk_cache_v1/http.sqlite`.
        - Multiple Atlas instances can share the same disk cache; under heavy write contention, cache writes may be dropped (best-effort).
-   11. Optional: enable the persistent image-region disk cache to persist computed full-resolution blocks for file-backed datasets:
+   12. Optional: enable the persistent image-region disk cache to persist computed full-resolution blocks for file-backed datasets:
        - `--atlas_disk_cache_imgregion_max_bytes=<N>` (default 20 GiB; set to 0 to disable; tune depending on disk space)
        - `--atlas_disk_cache_imgregion_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued background cache writes; when full, writes are dropped on a best-effort basis)
        - `--atlas_disk_cache_dir=<path>` (shared root with the HTTP cache; defaults to an auto-chosen Atlas cache/config directory)
        - The cache is stored in a single database file at `<dir>/atlas_disk_cache_v1/imgregion.sqlite`.
        - Multiple Atlas instances can share the same disk cache; under heavy write contention, cache writes may be dropped (best-effort).
-   12. Optional: enable the persistent image-preview disk cache to persist the downsampled 3D “fast preview” volume for file-backed datasets:
+   13. Optional: enable the persistent image-preview disk cache to persist the downsampled 3D “fast preview” volume for file-backed datasets:
        - `--atlas_disk_cache_imgpreview_max_bytes=<N>` (default 5 GiB; set to 0 to disable; tune depending on disk space)
        - `--atlas_disk_cache_imgpreview_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued background cache writes; when full, writes are dropped on a best-effort basis)
        - `--atlas_disk_cache_dir=<path>` (shared root with the other disk caches; defaults to an auto-chosen Atlas cache/config directory)
@@ -1381,6 +1382,9 @@ Examples
 # Choose default 3D renderer backend (OpenGL default; Vulkan is experimental)
 --atlas_default_render_backend=vulkan
 
+# Switch remote Neuroglancer HTTP transport for comparison/debugging
+--atlas_http_backend=curl
+
 # Vulkan validation/diagnostics
 --atlas_debug_vulkan=true
 
@@ -1489,6 +1493,8 @@ This feature is intended for offline/developer scripting and may be omitted from
 | --- | --- |
 | `--atlas_block_scene_3d_apply` | Block scene loading until 3D view settings finish applying. |
 | `--run_export_3d_animation` | Enter headless animation export mode; requires accompanying export flags. |
+| `--atlas_http_backend` | Select remote-dataset HTTP transport: `proxygen` or `curl`. |
+| `--atlas_http_ca_bundle` | Override the PEM CA bundle used for HTTPS remote-dataset requests. |
 | `--filename` | Path to `.animation3d` file for CLI export. |
 | `--output_filename` | Output video path (mp4, etc.). |
 | `--output_fps`, `--output_start_frame`, `--output_end_frame` | Output frame timing. |

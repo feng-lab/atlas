@@ -135,6 +135,7 @@ else ()
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerstatetest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedmeshtest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglanceruint64shardingtest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zhttpretrypolicytest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zimgdiskcacheentrytest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
   # This test suite does not depend on Vulkan. Avoid linking atlas_vulkan to keep

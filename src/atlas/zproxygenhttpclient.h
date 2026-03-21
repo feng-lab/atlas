@@ -1,8 +1,8 @@
 #pragma once
 
+#include "zhttpclient.h"
 #include "zlog.h"
 
-#include <folly/coro/Task.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <proxygen/lib/http/coro/client/HTTPClientConnectionCache.h>
 
@@ -17,6 +17,9 @@
 #include <utility>
 #include <vector>
 
+class QObject;
+class QThread;
+
 namespace folly {
 class SSLContext;
 }
@@ -24,30 +27,6 @@ class SSLContext;
 namespace nim {
 
 class ZHttpDiskCache;
-
-enum class ZHttpGetBytesSource : std::uint8_t
-{
-  Unknown = 0,
-  Network = 1,
-  DiskCache = 2,
-};
-
-struct ZHttpGetBytesResult
-{
-  uint16_t status = 0;
-  std::string contentType;
-  std::string contentEncoding;
-  std::vector<uint8_t> body;
-
-  // Size (in bytes) of the HTTP response body as received over the wire, before
-  // applying Content-Encoding decompression. For disk-cache hits, this is 0
-  // because no network I/O was performed.
-  uint64_t encodedBodyBytes = 0;
-
-  // Where the bytes were served from. This is primarily intended for telemetry
-  // and debugging; core logic should use HTTP status codes and content fields.
-  ZHttpGetBytesSource source = ZHttpGetBytesSource::Unknown;
-};
 
 class ZProxygenHttpClient
 {
@@ -63,6 +42,7 @@ public:
 
 private:
   ZProxygenHttpClient();
+  ~ZProxygenHttpClient();
 
   folly::coro::Task<std::optional<ZHttpGetBytesResult>> getBytesOnEventBase(
     std::string url,
@@ -85,6 +65,9 @@ private:
   std::unique_ptr<proxygen::coro::HTTPClientConnectionCache> m_directConnCache;
   std::unordered_map<std::string, std::unique_ptr<proxygen::coro::HTTPClientConnectionCache>> m_proxyConnCaches;
   std::unordered_map<std::string, DirectDnsCacheEntry> m_directDnsCache;
+
+  std::unique_ptr<::QThread> m_hostLookupThread;
+  ::QObject* m_hostLookupInvoker = nullptr;
 };
 
 } // namespace nim

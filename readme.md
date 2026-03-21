@@ -65,12 +65,12 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
     ```
 * install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3): https://vulkan.lunarg.com/home/welcome
 * install golang: https://golang.org, add to path
-* install perl: https://strawberryperl.com/, add to path
 
 ### Linux:
 * install some required packages
     ```bash
     sudo apt install zip unrar p7zip-full git nasm golang patchelf libxcursor-dev build-essential libglfw3-dev \
+         libcurl4-openssl-dev \
          libxcb-xinerama0 libxkbcommon0 libfontconfig1 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 \
          libxcb-render-util0 libxcb-shape0 libxcb-xkb1 libxkbcommon-x11-0
     ```

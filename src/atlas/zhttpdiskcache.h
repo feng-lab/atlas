@@ -1,5 +1,7 @@
 #pragma once
 
+#include "zhttpclient.h"
+
 #include <QString>
 
 #include <chrono>
@@ -12,7 +14,6 @@
 
 namespace nim {
 
-struct ZHttpGetBytesResult;
 class ZSqliteDiskCacheBucket;
 
 // Simple persistent on-disk cache for HTTP GET results (SQLite-backed).

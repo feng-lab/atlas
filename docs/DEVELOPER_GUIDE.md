@@ -134,11 +134,17 @@ Neuroglancer Precomputed (HTTP)
   - `encoding: "compresso"` — requires an unsigned `data_type` with 1/2/4/8 bytes/voxel and `num_channels = 1` (segmentation-style labels).
   - `encoding: "compressed_segmentation"` — requires `data_type` ∈ {`"uint32"`, `"uint64"`} and `compressed_segmentation_block_size`.
   - Sharded volumes require HTTP `Range` support; Atlas supports `minishard_index_encoding` and `data_encoding` of `raw` or `gzip` as specified in Neuroglancer’s sharded format. (Sharding `data_encoding` is applied first, then the per-scale chunk `encoding` is decoded.)
-  - Networking is implemented with proxygen/folly: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
-    - For non-`Range` requests, Atlas advertises `Accept-Encoding: br, gzip, zstd` and transparently decodes `Content-Encoding` (`br`/`gzip`/`deflate`/`zstd`) before returning bytes to callers.
-    - For `Range` requests, Atlas forces `Accept-Encoding: identity` and rejects encoded responses to preserve byte-exact range semantics (required by sharded Neuroglancer formats).
-    - For direct connections (no proxy), Atlas resolves hostnames via the OS system resolver and passes the resolved IP to Proxygen (bypassing Proxygen’s c-ares coroutine DNS path). This is a stability workaround for reproducible SIGSEGV crashes observed under heavy timeout churn with some unstable servers.
-  - Optional persistent HTTP disk cache (SQLite-backed, cross-OS) is implemented in `src/atlas/zhttpdiskcache.h`, `src/atlas/zhttpdiskcache.cpp`, and `src/atlas/zsqlitelrucache.h` / `src/atlas/zsqlitelrucache.cpp` and is integrated into `ZProxygenHttpClient::getBytesOnEventBase()` (cache lookup before network; store after successful 200/206).
+  - Networking is routed through `src/atlas/zhttpclient.h` and `src/atlas/zhttpclient.cpp`, with the runtime backend selected by `--atlas_http_backend=proxygen|curl`.
+    - `proxygen`: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
+      - For non-`Range` requests, Atlas advertises `Accept-Encoding: br, gzip, zstd` and transparently decodes `Content-Encoding` (`br`/`gzip`/`deflate`/`zstd`) before returning bytes to callers.
+      - For `Range` requests, Atlas forces `Accept-Encoding: identity` and rejects encoded responses to preserve byte-exact range semantics (required by sharded Neuroglancer formats).
+      - For direct connections (no proxy), Atlas resolves hostnames via the OS system resolver and passes the resolved IP to Proxygen (bypassing Proxygen’s c-ares coroutine DNS path). This is a stability workaround for reproducible SIGSEGV crashes observed under heavy timeout churn with some unstable servers.
+    - `curl`: `src/atlas/zcurlhttpclient.h` and `src/atlas/zcurlhttpclient.cpp`.
+      - Matches the same higher-level Neuroglancer semantics as the Proxygen path: non-`Range` requests allow transparent content decoding, `Range` requests force identity encoding, and `403`/`404` are normalized to soft-miss for missing remote objects.
+      - Uses the same OS proxy strategy flag (`--atlas_http_proxy_strategy`) and the same HTTP disk cache (`src/atlas/zhttpdiskcache.*`), so backend switches do not require format-layer changes.
+      - Retry policy is shared in `src/atlas/zhttpretrypolicy.*`: transport exceptions use shared unstable-network heuristics, `403/404` remain soft misses, and transient response statuses (`408`, `421`, `425`, `429`, `500`, `502`, `503`, `504`) re-enter the retry/backoff loop instead of being cached as completed responses.
+      - Build/dependency model: Windows uses the curl SDK unpacked under `src/3rdparty/build`; macOS and Linux use `find_package(CURL)` against the system libcurl.
+  - Optional persistent HTTP disk cache (SQLite-backed, cross-OS) is implemented in `src/atlas/zhttpdiskcache.h`, `src/atlas/zhttpdiskcache.cpp`, and `src/atlas/zsqlitelrucache.h` / `src/atlas/zsqlitelrucache.cpp` and is integrated into both HTTP backends before/after network fetches (cache lookup before network; store only after non-missing, non-retryable completed responses).
     - Enable with `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable).
     - Async write queue: `--atlas_disk_cache_http_async_max_pending_bytes=<N>` bounds queued SQLite writes (touch/put/erase). Values smaller than 256 MiB are clamped to 256 MiB. When the queue is full, disk writes are dropped (best-effort cache semantics).
     - Read path: synchronous point lookups using per-thread read-only SQLite connections (so concurrent readers do not block each other); LRU touches happen asynchronously.
@@ -217,6 +223,7 @@ Testing (Linking Atlas Code)
 - GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.
 - Neuroglancer precomputed E2E tests:
   - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
+  - The same test file exercises both HTTP backends. Atlas test binaries use `GTest::gtest_main` rather than the app main, so backend selection is set inside the test with gflags instead of relying on test-binary command-line flag parsing.
 - Developer-only tooling:
   - `ATLAS_ENABLE_CUSTOM_COMMAND` controls whether Atlas includes the **Help → Run Custom Command** menu item (`ZCustomCommand`). Deployed builds should set this OFF.
 
