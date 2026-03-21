@@ -711,7 +711,9 @@ set(SOURCES
     zneuroglanceruint64sharding.h zneuroglanceruint64sharding.cpp
     zhttpdiskcache.h zhttpdiskcache.cpp
     zhttpclient.h zhttpclient.cpp
+    zhttpsystemproxy.h zhttpsystemproxy.cpp
     zhttpretrypolicy.h zhttpretrypolicy.cpp
+    zhttptruststore.h zhttptruststore.cpp
     zcurlhttpclient.h zcurlhttpclient.cpp
     zsqlitelrucache.h zsqlitelrucache.cpp
     zdiskcacheutils.h zdiskcacheutils.cpp

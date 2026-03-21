@@ -32,6 +32,7 @@ private:
 
 private:
   std::string m_caBundlePath;
+  std::string m_trustSourceDescription;
   std::unique_ptr<ZHttpDiskCache> m_diskCache;
 };
 

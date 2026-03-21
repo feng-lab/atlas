@@ -3,21 +3,15 @@
 #include "zcancellation.h"
 #include "zdiskcacheutils.h"
 #include "zhttpdiskcache.h"
+#include "zhttpsystemproxy.h"
 #include "zhttpretrypolicy.h"
+#include "zhttptruststore.h"
 #include "zfolly.h"
 #include "zlog.h"
 
 #include <gflags/gflags.h>
 
 #include <curl/curl.h>
-
-#include <QCoreApplication>
-#include <QDir>
-#include <QFileInfo>
-#include <QNetworkProxy>
-#include <QNetworkProxyFactory>
-#include <QNetworkProxyQuery>
-#include <QUrl>
 
 #include <folly/CancellationToken.h>
 #include <folly/String.h>
@@ -31,13 +25,11 @@
 #include <chrono>
 #include <cstring>
 #include <exception>
-#include <fstream>
 #include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string_view>
 
-DECLARE_string(atlas_http_ca_bundle);
 DECLARE_string(atlas_http_proxy_strategy);
 DECLARE_uint32(atlas_http_max_redirect_hops);
 DECLARE_uint32(atlas_http_max_retries);
@@ -46,17 +38,17 @@ DECLARE_uint64(atlas_disk_cache_http_max_bytes);
 namespace nim {
 namespace {
 
-struct ProxyEndpoint
-{
-  std::string host;
-  uint16_t port = 0;
-};
-
 enum class ProxyStrategy
 {
   Auto,
   NoProxy,
   ProxyIfAvailable,
+};
+
+constexpr ZHttpProxySupport kCurlProxySupport{
+  .supportsHttp = true,
+  .supportsSocks5 = true,
+  .supportsAuthentication = true,
 };
 
 class CurlRequestException : public std::runtime_error
@@ -80,33 +72,6 @@ struct CurlProgressState
 {
   std::atomic_bool cancelled{false};
 };
-
-std::optional<std::string> envVarString(const char* key)
-{
-  if (!key) {
-    return std::nullopt;
-  }
-  const char* v = std::getenv(key);
-  if (!v) {
-    return std::nullopt;
-  }
-  std::string s(v);
-  const auto trimmed = folly::trimWhitespace(folly::StringPiece(s));
-  s.assign(trimmed.data(), trimmed.size());
-  if (s.empty()) {
-    return std::nullopt;
-  }
-  return s;
-}
-
-bool isReadableFile(const std::string& path)
-{
-  if (path.empty()) {
-    return false;
-  }
-  std::ifstream f(path);
-  return f.good();
-}
 
 std::vector<std::string> parseContentEncodings(std::string_view contentEncoding)
 {
@@ -229,57 +194,24 @@ std::string curlProtocolSummary(const curl_version_info_data* info)
   return joinNonEmpty(protocols, ",");
 }
 
-std::vector<std::string> caBundleCandidates()
+std::string proxyKindName(ZHttpProxyKind kind)
 {
-  std::vector<std::string> paths;
-
-  if (!FLAGS_atlas_http_ca_bundle.empty()) {
-    paths.emplace_back(FLAGS_atlas_http_ca_bundle);
-    return paths;
+  switch (kind) {
+    case ZHttpProxyKind::Http:
+      return "http";
+    case ZHttpProxyKind::Socks5:
+      return "socks5";
   }
-
-  if (auto v = envVarString("SSL_CERT_FILE")) {
-    paths.emplace_back(std::move(*v));
-  }
-  if (auto v = envVarString("REQUESTS_CA_BUNDLE")) {
-    paths.emplace_back(std::move(*v));
-  }
-  if (auto v = envVarString("CURL_CA_BUNDLE")) {
-    paths.emplace_back(std::move(*v));
-  }
-
-  if (QCoreApplication::instance() != nullptr) {
-    const QString appBundlePath =
-      QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("curl-ca-bundle.crt"));
-    if (QFileInfo::exists(appBundlePath)) {
-      paths.emplace_back(appBundlePath.toStdString());
-    }
-  }
-
-  if (auto condaPrefix = envVarString("CONDA_PREFIX")) {
-    paths.emplace_back(*condaPrefix + "/ssl/cert.pem");
-  }
-
-  paths.emplace_back("/etc/ssl/cert.pem");
-  paths.emplace_back("/etc/ssl/certs/ca-certificates.crt");
-  paths.emplace_back("/etc/pki/tls/cert.pem");
-  paths.emplace_back("/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem");
-  paths.emplace_back("/etc/ssl/certs/ca-bundle.crt");
-  paths.emplace_back("/usr/local/etc/openssl@3/cert.pem");
-  paths.emplace_back("/opt/homebrew/etc/openssl@3/cert.pem");
-  paths.emplace_back("/usr/local/etc/openssl/cert.pem");
-
-  return paths;
+  return "unknown";
 }
 
-std::optional<std::string> findCaBundlePath()
+std::string proxyDescription(const ZHttpProxyEndpoint& proxy)
 {
-  for (const auto& path : caBundleCandidates()) {
-    if (isReadableFile(path)) {
-      return path;
-    }
-  }
-  return std::nullopt;
+  return fmt::format("{}://{}:{} auth={}",
+                     proxyKindName(proxy.kind),
+                     proxy.host,
+                     proxy.port,
+                     (!proxy.username.empty() || !proxy.password.empty()) ? "present" : "none");
 }
 
 ProxyStrategy proxyStrategyFromFlag()
@@ -300,53 +232,38 @@ ProxyStrategy proxyStrategyFromFlag()
                 FLAGS_atlas_http_proxy_strategy));
 }
 
-std::optional<ProxyEndpoint> systemHttpProxyForUrl(const std::string& url)
-{
-  if (QCoreApplication::instance() == nullptr) {
-    return std::nullopt;
-  }
-
-  const QUrl qurl(QString::fromStdString(url));
-  if (!qurl.isValid()) {
-    return std::nullopt;
-  }
-
-  const QNetworkProxyQuery query(qurl);
-  const QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(query);
-  if (proxies.isEmpty()) {
-    return std::nullopt;
-  }
-
-  for (const QNetworkProxy& candidate : proxies) {
-    if (candidate.type() == QNetworkProxy::HttpProxy || candidate.type() == QNetworkProxy::HttpCachingProxy) {
-      const QString host = candidate.hostName();
-      const int port = candidate.port();
-      if (host.isEmpty() || port <= 0 || port > 65535) {
-        continue;
-      }
-
-      ProxyEndpoint out{};
-      out.host = host.toStdString();
-      out.port = static_cast<uint16_t>(port);
-      return out;
-    }
-
-    if (candidate.type() != QNetworkProxy::NoProxy) {
-      VLOG(1) << fmt::format("Ignoring unsupported system proxy type {} for URL '{}'",
-                             static_cast<int>(candidate.type()),
-                             url);
-    }
-  }
-
-  return std::nullopt;
-}
-
 bool looksLikeTlsTrustStoreError(std::string_view message)
 {
   std::string m(message);
   folly::toLowerAscii(m);
   return m.find("certificate") != std::string::npos || m.find("ca cert") != std::string::npos ||
          m.find("ssl") != std::string::npos || m.find("tls") != std::string::npos;
+}
+
+void configureCurlProxy(CURL* handle, const ZHttpProxyEndpoint& proxy)
+{
+  CHECK(handle);
+
+  const std::string proxyTarget = fmt::format("{}:{}", proxy.host, proxy.port);
+  long proxyType = CURLPROXY_HTTP;
+  switch (proxy.kind) {
+    case ZHttpProxyKind::Http:
+      proxyType = CURLPROXY_HTTP;
+      break;
+    case ZHttpProxyKind::Socks5:
+      proxyType = CURLPROXY_SOCKS5_HOSTNAME;
+      break;
+  }
+
+  curl_easy_setopt(handle, CURLOPT_PROXYTYPE, proxyType);
+  curl_easy_setopt(handle, CURLOPT_PROXY, proxyTarget.c_str());
+  if (!proxy.username.empty() || !proxy.password.empty()) {
+    curl_easy_setopt(handle, CURLOPT_PROXYUSERNAME, proxy.username.c_str());
+    curl_easy_setopt(handle, CURLOPT_PROXYPASSWORD, proxy.password.c_str());
+    if (proxy.kind == ZHttpProxyKind::Http) {
+      curl_easy_setopt(handle, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
+    }
+  }
 }
 
 bool isRetryableCurlCode(CURLcode code)
@@ -471,7 +388,7 @@ int transferProgressCallback(void* clientp, curl_off_t, curl_off_t, curl_off_t, 
 ZHttpGetBytesResult performCurlRequestBlocking(const std::string& url,
                                                std::chrono::milliseconds timeout,
                                                const std::vector<std::pair<std::string, std::string>>& requestHeaders,
-                                               const std::optional<ProxyEndpoint>& proxy,
+                                               const std::optional<ZHttpProxyEndpoint>& proxy,
                                                bool useProxy,
                                                const std::string& caBundlePath,
                                                const folly::CancellationToken& cancellationToken)
@@ -549,9 +466,8 @@ ZHttpGetBytesResult performCurlRequestBlocking(const std::string& url,
 
   if (useProxy) {
     CHECK(proxy.has_value());
-    const std::string proxyUrl = fmt::format("http://{}:{}", proxy->host, proxy->port);
-    curl_easy_setopt(handle.get(), CURLOPT_PROXY, proxyUrl.c_str());
-    VLOG(1) << fmt::format("Using system HTTP proxy via curl: {}", proxyUrl);
+    configureCurlProxy(handle.get(), *proxy);
+    VLOG(1) << fmt::format("Using system proxy via curl: {}", proxyDescription(*proxy));
   } else {
     curl_easy_setopt(handle.get(), CURLOPT_PROXY, "");
   }
@@ -612,23 +528,18 @@ ZCurlHttpClient::ZCurlHttpClient()
   const curl_version_info_data* curlInfo = curl_version_info(CURLVERSION_NOW);
   CHECK(curlInfo);
 
-  if (!FLAGS_atlas_http_ca_bundle.empty()) {
-    if (!isReadableFile(FLAGS_atlas_http_ca_bundle)) {
-      throw ZException(
-        fmt::format("--atlas_http_ca_bundle points to an unreadable file: '{}'", FLAGS_atlas_http_ca_bundle));
-    }
-    m_caBundlePath = FLAGS_atlas_http_ca_bundle;
-  } else if (auto caPathOpt = findCaBundlePath()) {
-    m_caBundlePath = *caPathOpt;
-  }
+  const ZHttpTrustStoreConfig trustStore = resolveHttpTrustStoreConfig(ZHttpTrustBackend::Curl);
+  m_caBundlePath = trustStore.caBundlePath;
+  m_trustSourceDescription = trustStore.sourceDescription;
 
   LOG(INFO) << fmt::format(
-    "curl backend runtime: libcurl='{}' ssl='{}' libz='{}' features='{}' protocols='{}' caBundle='{}'",
+    "curl backend runtime: libcurl='{}' ssl='{}' libz='{}' features='{}' protocols='{}' trustSource='{}' caBundle='{}'",
     curlInfo->version != nullptr ? curlInfo->version : "<unknown>",
     curlInfo->ssl_version != nullptr ? curlInfo->ssl_version : "<unknown>",
     curlInfo->libz_version != nullptr ? curlInfo->libz_version : "<none>",
     curlFeatureSummary(curlInfo),
     curlProtocolSummary(curlInfo),
+    m_trustSourceDescription,
     m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
 
   if (FLAGS_atlas_disk_cache_http_max_bytes > 0) {
@@ -666,8 +577,18 @@ ZCurlHttpClient::getBytes(std::string url,
   }
 
   const ProxyStrategy proxyStrategy = proxyStrategyFromFlag();
-  const std::optional<ProxyEndpoint> systemProxy =
-    (proxyStrategy == ProxyStrategy::NoProxy) ? std::nullopt : systemHttpProxyForUrl(url);
+  std::optional<ZHttpProxyEndpoint> systemProxy;
+  if (proxyStrategy != ProxyStrategy::NoProxy) {
+    const ZSystemHttpProxyResolution proxyResolution = querySystemHttpProxyForUrl(url, kCurlProxySupport);
+    if (proxyResolution.error) {
+      throw ZException(fmt::format("curl backend: {}", *proxyResolution.error));
+    }
+    for (const auto& warning : proxyResolution.warnings) {
+      LOG(WARNING) << "curl backend: " << warning
+                   << " Proceeding with direct connection because the OS proxy settings explicitly allow DIRECT.";
+    }
+    systemProxy = proxyResolution.endpoint;
+  }
 
   const uint32_t maxRetries = FLAGS_atlas_http_max_retries;
   for (uint32_t attempt = 0; attempt <= maxRetries; ++attempt) {
@@ -734,8 +655,9 @@ ZCurlHttpClient::getBytes(std::string url,
 
       std::string msg(curlErr->what());
       if (looksLikeTlsTrustStoreError(msg)) {
-        msg += fmt::format(" (CA bundle: '{}'; override with --atlas_http_ca_bundle=... or env SSL_CERT_FILE)",
-                           m_caBundlePath.empty() ? "<auto>" : m_caBundlePath);
+        msg += fmt::format(" (trust source: '{}'; CA bundle: '{}'; override with --atlas_http_ca_bundle=...)",
+                           m_trustSourceDescription,
+                           m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
       }
       throw ZException(msg);
     }
@@ -753,8 +675,9 @@ ZCurlHttpClient::getBytes(std::string url,
     }
 
     if (looksLikeTlsTrustStoreError(msg)) {
-      msg += fmt::format(" (CA bundle: '{}'; override with --atlas_http_ca_bundle=... or env SSL_CERT_FILE)",
-                         m_caBundlePath.empty() ? "<auto>" : m_caBundlePath);
+      msg += fmt::format(" (trust source: '{}'; CA bundle: '{}'; override with --atlas_http_ca_bundle=...)",
+                         m_trustSourceDescription,
+                         m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
     }
     throw ZException(fmt::format("HTTP GET failed for '{}': {}", url, msg));
   }

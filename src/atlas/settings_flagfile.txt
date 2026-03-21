@@ -22,8 +22,13 @@
 # Values: proxygen, curl
 --atlas_http_backend=proxygen
 
-# Path to a PEM CA bundle for HTTPS requests (empty = auto-detect; also respects env SSL_CERT_FILE).
+# Path to a PEM CA bundle for HTTPS requests (empty = auto-detect).
 --atlas_http_ca_bundle=
+
+# Windows-only default HTTPS trust source for remote datasets when no explicit PEM bundle is set.
+# Values: auto (prefer exported Windows trust store, then fall back to PEM bundle),
+#         windows_store, bundled_pem
+--atlas_http_windows_trust_source=auto
 
 # Outbound HTTP proxy strategy using OS system proxy settings only (no proxy URL flags).
 # Values: auto (alternate direct/proxy between retries), no_proxy (always direct),

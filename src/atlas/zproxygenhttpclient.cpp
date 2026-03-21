@@ -2,7 +2,9 @@
 
 #include "zdiskcacheutils.h"
 #include "zhttpdiskcache.h"
+#include "zhttpsystemproxy.h"
 #include "zhttpretrypolicy.h"
+#include "zhttptruststore.h"
 #include "zcancellation.h"
 #include "zqobjectthreadinvoker.h"
 
@@ -24,12 +26,8 @@
 
 #include <gflags/gflags.h>
 
-#include <QCoreApplication>
 #include <QHostAddress>
 #include <QHostInfo>
-#include <QNetworkProxy>
-#include <QNetworkProxyFactory>
-#include <QNetworkProxyQuery>
 #include <QUrl>
 
 #include <array>
@@ -37,19 +35,12 @@
 #include <cstdlib>
 #include <algorithm>
 #include <exception>
-#include <fstream>
 #include <memory>
 #include <stdexcept>
 
-#if defined(_WIN32)
-#include <wincrypt.h>
-#endif
-
 DECLARE_uint64(atlas_disk_cache_http_max_bytes);
 
-DEFINE_string(atlas_http_ca_bundle,
-              "",
-              "Path to a PEM CA bundle for HTTPS requests (overrides auto-detect; also respects env SSL_CERT_FILE).");
+DEFINE_string(atlas_http_ca_bundle, "", "Path to a PEM CA bundle for HTTPS requests (overrides auto-detect).");
 
 DEFINE_string(atlas_http_proxy_strategy,
               "auto",
@@ -252,79 +243,6 @@ std::vector<uint8_t> decompressIfNeeded(std::vector<uint8_t> body, std::string& 
   return body;
 }
 
-std::optional<std::string> envVarString(const char* key)
-{
-  if (!key) {
-    return std::nullopt;
-  }
-  const char* v = std::getenv(key);
-  if (!v) {
-    return std::nullopt;
-  }
-  std::string s(v);
-  auto trimmed = folly::trimWhitespace(folly::StringPiece(s));
-  s.assign(trimmed.data(), trimmed.size());
-  if (s.empty()) {
-    return std::nullopt;
-  }
-  return s;
-}
-
-bool isReadableFile(const std::string& path)
-{
-  if (path.empty()) {
-    return false;
-  }
-  std::ifstream f(path);
-  return f.good();
-}
-
-std::vector<std::string> caBundleCandidates()
-{
-  std::vector<std::string> paths;
-
-  if (!FLAGS_atlas_http_ca_bundle.empty()) {
-    paths.emplace_back(FLAGS_atlas_http_ca_bundle);
-    return paths;
-  }
-
-  if (auto v = envVarString("SSL_CERT_FILE")) {
-    paths.emplace_back(std::move(*v));
-  }
-  if (auto v = envVarString("REQUESTS_CA_BUNDLE")) {
-    paths.emplace_back(std::move(*v));
-  }
-  if (auto v = envVarString("CURL_CA_BUNDLE")) {
-    paths.emplace_back(std::move(*v));
-  }
-
-  if (auto condaPrefix = envVarString("CONDA_PREFIX")) {
-    paths.emplace_back(*condaPrefix + "/ssl/cert.pem");
-  }
-
-  // Common system locations (Linux/macOS/Homebrew).
-  paths.emplace_back("/etc/ssl/cert.pem");
-  paths.emplace_back("/etc/ssl/certs/ca-certificates.crt");
-  paths.emplace_back("/etc/pki/tls/cert.pem");
-  paths.emplace_back("/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem");
-  paths.emplace_back("/etc/ssl/certs/ca-bundle.crt");
-  paths.emplace_back("/usr/local/etc/openssl@3/cert.pem");
-  paths.emplace_back("/opt/homebrew/etc/openssl@3/cert.pem");
-  paths.emplace_back("/usr/local/etc/openssl/cert.pem");
-
-  return paths;
-}
-
-std::optional<std::string> findCaBundlePath()
-{
-  for (const auto& path : caBundleCandidates()) {
-    if (isReadableFile(path)) {
-      return path;
-    }
-  }
-  return std::nullopt;
-}
-
 std::vector<std::string> resolveHostToIpAddrsSystem(const std::string& host)
 {
   CHECK(!host.empty());
@@ -380,17 +298,15 @@ std::vector<std::string> resolveHostToIpAddrsSystemViaQtThread(const std::string
   return res.value;
 }
 
-struct ProxyEndpoint
-{
-  std::string host;
-  uint16_t port = 0;
-};
-
 enum class ProxyStrategy
 {
   Auto,
   NoProxy,
   ProxyIfAvailable,
+};
+
+constexpr ZHttpProxySupport kProxygenProxySupport{
+  .supportsHttp = true,
 };
 
 ProxyStrategy proxyStrategyFromFlag()
@@ -449,59 +365,7 @@ std::string resolveRedirectUrl(const std::string& baseUrl, const std::string& lo
   return resolved.toString(QUrl::FullyEncoded).toStdString();
 }
 
-std::optional<ProxyEndpoint> systemHttpProxyForUrl(const std::string& url)
-{
-  if (QCoreApplication::instance() == nullptr) {
-    return std::nullopt;
-  }
-
-  const QUrl qurl(QString::fromStdString(url));
-  if (!qurl.isValid()) {
-    return std::nullopt;
-  }
-
-  // systemProxyForQuery() returns proxies in the order they should be tried.
-  const QNetworkProxyQuery query(qurl);
-  const QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(query);
-  if (proxies.isEmpty()) {
-    return std::nullopt;
-  }
-
-  // Scan for the first supported HTTP proxy in the ordered list.
-  // Note: proxy auto-config (PAC) can legitimately return DIRECT first, followed by
-  //       one or more PROXY fallbacks. We still want to detect that a proxy is
-  //       available so --atlas_http_proxy_strategy=auto can retry via proxy.
-  // This handles environments where the OS provides multiple proxy candidates
-  // (e.g. PAC) without introducing custom proxy config in Atlas.
-  for (const QNetworkProxy& candidate : proxies) {
-    if (candidate.type() == QNetworkProxy::HttpProxy || candidate.type() == QNetworkProxy::HttpCachingProxy) {
-      const QString host = candidate.hostName();
-      const int port = candidate.port();
-      if (host.isEmpty() || port <= 0 || port > 65535) {
-        continue;
-      }
-
-      ProxyEndpoint out{};
-      out.host = host.toStdString();
-      out.port = static_cast<uint16_t>(port);
-      return out;
-    }
-
-    // If the system provided a non-HTTP proxy first (e.g. SOCKS), we can't use it
-    // with Proxygen's HTTP CONNECT proxy support. We'll keep scanning for an HTTP
-    // proxy candidate and fall back to direct if none exist.
-    if (candidate.type() != QNetworkProxy::NoProxy) {
-      VLOG(1) << fmt::format(
-        "Ignoring unsupported system proxy type {} for URL '{}'",
-        static_cast<int>(candidate.type()),
-        url);
-    }
-  }
-
-  return std::nullopt;
-}
-
-proxygen::coro::HTTPClientConnectionCache::ProxyParams makeConnectProxyParams(const ProxyEndpoint& endpoint)
+proxygen::coro::HTTPClientConnectionCache::ProxyParams makeConnectProxyParams(const ZHttpProxyEndpoint& endpoint)
 {
   proxygen::coro::HTTPClientConnectionCache::ProxyParams params{};
   params.server = endpoint.host;
@@ -515,84 +379,20 @@ proxygen::coro::HTTPClientConnectionCache::ProxyParams makeConnectProxyParams(co
   return params;
 }
 
-#if defined(_WIN32)
-bool tryAddWindowsSystemCertStoreTo(/*inout*/ folly::SSLContext& ctx, const char* storeName, int& addedCerts, int& failedCerts)
+std::shared_ptr<folly::SSLContext> makeClientSslContext(const ZHttpTrustStoreConfig& trustStore)
 {
-  CHECK(storeName);
-
-  // CertOpenSystemStoreA takes an integral "legacy crypto provider" handle.
-  // Use 0 to indicate the default provider (nullptr is not implicitly convertible on MSVC).
-  HCERTSTORE storeHandle = CertOpenSystemStoreA(static_cast<HCRYPTPROV_LEGACY>(0), storeName);
-  if (!storeHandle) {
-    return false;
-  }
-
-  SSL_CTX* sslCtx = ctx.getSSLCtx();
-  CHECK(sslCtx);
-  X509_STORE* x509Store = SSL_CTX_get_cert_store(sslCtx);
-  CHECK(x509Store);
-
-  PCCERT_CONTEXT certCtx = nullptr;
-  while ((certCtx = CertEnumCertificatesInStore(storeHandle, certCtx)) != nullptr) {
-    const unsigned char* encoded = reinterpret_cast<const unsigned char*>(certCtx->pbCertEncoded);
-    folly::ssl::X509UniquePtr x509(d2i_X509(nullptr, &encoded, static_cast<long>(certCtx->cbCertEncoded)));
-    if (!x509) {
-      ++failedCerts;
-      ERR_clear_error();
-      continue;
-    }
-
-    if (X509_STORE_add_cert(x509Store, x509.get()) == 1) {
-      ++addedCerts;
-    } else {
-      ++failedCerts;
-      ERR_clear_error();
-    }
-  }
-
-  CertCloseStore(storeHandle, /*dwFlags=*/0);
-  return true;
-}
-#endif
-
-std::shared_ptr<folly::SSLContext> makeClientSslContext(/*out*/ std::string& caBundlePath)
-{
-  caBundlePath.clear();
-
   auto ctx = std::make_shared<folly::SSLContext>();
   ctx->setAdvertisedNextProtocols({"h2", "http/1.1"});
   ctx->setVerificationOption(folly::SSLContext::SSLVerifyPeerEnum::VERIFY);
   ctx->authenticate(/*checkPeerCert=*/true, /*checkPeerName=*/true);
 
-  if (!FLAGS_atlas_http_ca_bundle.empty()) {
-    if (!isReadableFile(FLAGS_atlas_http_ca_bundle)) {
-      throw ZException(fmt::format("--atlas_http_ca_bundle points to an unreadable file: '{}'", FLAGS_atlas_http_ca_bundle));
-    }
-    ctx->loadTrustedCertificates(FLAGS_atlas_http_ca_bundle.c_str());
-    caBundlePath = FLAGS_atlas_http_ca_bundle;
-    return ctx;
+  if (!trustStore.caBundlePath.empty()) {
+    ctx->loadTrustedCertificates(trustStore.caBundlePath.c_str());
   }
-
-  if (auto caPathOpt = findCaBundlePath()) {
-    ctx->loadTrustedCertificates(caPathOpt->c_str());
-    caBundlePath = *caPathOpt;
-  }
-
-#if defined(_WIN32)
-  if (caBundlePath.empty()) {
-    int added = 0;
-    int failed = 0;
-    const bool triedRoot = tryAddWindowsSystemCertStoreTo(*ctx, "ROOT", added, failed);
-    const bool triedCA = tryAddWindowsSystemCertStoreTo(*ctx, "CA", added, failed);
-    if ((triedRoot || triedCA) && added > 0) {
-      caBundlePath = fmt::format("<win_system_store: added={}, failed={}>", added, failed);
-    }
-  }
-#endif
 
   // If we didn't find a bundle, rely on the OpenSSL defaults. If those are misconfigured
   // (common when building against an OpenSSL with Linux-centric defaults on macOS), the
-  // request will fail with a message that points to --atlas_http_ca_bundle/SSL_CERT_FILE.
+  // request will fail with a message that points to --atlas_http_ca_bundle.
   return ctx;
 }
 
@@ -631,8 +431,12 @@ ZProxygenHttpClient& ZProxygenHttpClient::instance()
 
 ZProxygenHttpClient::ZProxygenHttpClient()
   : m_eventBaseThread("atlas_proxygen_http")
-  , m_sslContext(makeClientSslContext(m_caBundlePath))
 {
+  const ZHttpTrustStoreConfig trustStore = resolveHttpTrustStoreConfig(ZHttpTrustBackend::Proxygen);
+  m_caBundlePath = trustStore.caBundlePath;
+  m_trustSourceDescription = trustStore.sourceDescription;
+  m_sslContext = makeClientSslContext(trustStore);
+
   m_hostLookupThread = std::make_unique<QThread>();
   m_hostLookupThread->setObjectName(QStringLiteral("atlas_qhostinfo_lookup"));
   m_hostLookupThread->start();
@@ -656,6 +460,9 @@ ZProxygenHttpClient::ZProxygenHttpClient()
   }
 
   m_directConnCache = std::make_unique<proxygen::coro::HTTPClientConnectionCache>(*evb);
+  LOG(INFO) << fmt::format("proxygen backend trust source: '{}' caBundle='{}'",
+                           m_trustSourceDescription,
+                           m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
 }
 
 ZProxygenHttpClient::~ZProxygenHttpClient()
@@ -712,9 +519,20 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
   }
 
   const ProxyStrategy proxyStrategy = proxyStrategyFromFlag();
-  const std::optional<ProxyEndpoint> systemProxy = (proxyStrategy == ProxyStrategy::NoProxy) ? std::nullopt : systemHttpProxyForUrl(url);
+  std::optional<ZHttpProxyEndpoint> systemProxy;
+  if (proxyStrategy != ProxyStrategy::NoProxy) {
+    const ZSystemHttpProxyResolution proxyResolution = querySystemHttpProxyForUrl(url, kProxygenProxySupport);
+    if (proxyResolution.error) {
+      throw ZException(fmt::format("proxygen backend: {}", *proxyResolution.error));
+    }
+    for (const auto& warning : proxyResolution.warnings) {
+      LOG(WARNING) << "proxygen backend: " << warning
+                   << " Proceeding with direct connection because the OS proxy settings explicitly allow DIRECT.";
+    }
+    systemProxy = proxyResolution.endpoint;
+  }
 
-  auto getOrCreateProxyCache = [&](const ProxyEndpoint& endpoint) -> proxygen::coro::HTTPClientConnectionCache* {
+  auto getOrCreateProxyCache = [&](const ZHttpProxyEndpoint& endpoint) -> proxygen::coro::HTTPClientConnectionCache* {
     const std::string key = fmt::format("{}:{}", endpoint.host, endpoint.port);
     auto it = m_proxyConnCaches.find(key);
     if (it != m_proxyConnCaches.end()) {
@@ -964,8 +782,9 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
 
       std::string msg(httpErr->what());
       if (looksLikeTlsTrustStoreError(msg)) {
-        msg += fmt::format(" (CA bundle: '{}'; override with --atlas_http_ca_bundle=... or env SSL_CERT_FILE)",
-                           m_caBundlePath.empty() ? "<auto>" : m_caBundlePath);
+        msg += fmt::format(" (trust source: '{}'; CA bundle: '{}'; override with --atlas_http_ca_bundle=...)",
+                           m_trustSourceDescription,
+                           m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
       }
       throw ZException(fmt::format("HTTP GET failed for '{}': {}", url, msg));
     }
@@ -985,8 +804,9 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     }
 
     if (looksLikeTlsTrustStoreError(msg)) {
-      msg += fmt::format(" (CA bundle: '{}'; override with --atlas_http_ca_bundle=... or env SSL_CERT_FILE)",
-                         m_caBundlePath.empty() ? "<auto>" : m_caBundlePath);
+      msg += fmt::format(" (trust source: '{}'; CA bundle: '{}'; override with --atlas_http_ca_bundle=...)",
+                         m_trustSourceDescription,
+                         m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
     }
     throw ZException(fmt::format("HTTP GET failed for '{}': {}", url, msg));
   }

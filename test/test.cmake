@@ -88,7 +88,6 @@ add_gtest_executable(zstructutilstest)
 add_gtest_executable(zenumtest)
 add_gtest_executable(zstringutilstest)
 add_gtest_executable(ztupleliketest)
-
 # Atlas-side tests
 
 # Policy for heavy Atlas-linked tests:
@@ -136,6 +135,8 @@ else ()
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedmeshtest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zneuroglanceruint64shardingtest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zhttpretrypolicytest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zhttpsystemproxytest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zhttptruststoretest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zimgdiskcacheentrytest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
   # This test suite does not depend on Vulkan. Avoid linking atlas_vulkan to keep

@@ -59,6 +59,7 @@ private:
   folly::ScopedEventBaseThread m_eventBaseThread;
   std::shared_ptr<const folly::SSLContext> m_sslContext;
   std::string m_caBundlePath;
+  std::string m_trustSourceDescription;
 
   std::unique_ptr<ZHttpDiskCache> m_diskCache;
 
