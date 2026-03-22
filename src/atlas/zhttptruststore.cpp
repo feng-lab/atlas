@@ -23,6 +23,8 @@
 #include <vector>
 
 #if defined(_WIN32)
+#include "zwindowsheader.h"
+
 #include <wincrypt.h>
 
 #include <openssl/bio.h>
