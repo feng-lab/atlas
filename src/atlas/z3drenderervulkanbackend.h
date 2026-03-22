@@ -112,7 +112,16 @@ struct UniformArenaBudgetTraits<MeshPayload>
     const bool drawWireframe = payload.wireframeMode != MeshPayload::WireframeMode::NoWireframe;
     const size_t drawsPerMesh = static_cast<size_t>(drawSurface) + static_cast<size_t>(drawWireframe);
     const size_t meshes = payload.meshes.size();
-    return szObject + (meshes * drawsPerMesh * szMaterial);
+    const bool hasPerMeshTransforms =
+      !payload.perMeshPosTransforms.empty() || !payload.perMeshPosTransformNormalMatrices.empty();
+
+    // Mesh path:
+    // - Legacy: one object-transform UBO per batch, plus one material UBO per mesh draw.
+    // - Per-mesh transforms: Vulkan allocates object transforms per draw (dynamic offset varies per draw),
+    //   so budget an object slice for every mesh draw too.
+    const size_t objectBytes = hasPerMeshTransforms ? (meshes * drawsPerMesh * szObject) : szObject;
+    const size_t materialBytes = meshes * drawsPerMesh * szMaterial;
+    return objectBytes + materialBytes;
   }
 };
 

@@ -386,6 +386,7 @@ private:
                          const glm::vec4& fallbackColor,
                          bool pickingPass,
                          bool wireframe,
+                         bool usePersistentTransforms,
                          Z3DRendererBase::ShaderHookType shaderHook);
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;

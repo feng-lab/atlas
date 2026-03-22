@@ -266,7 +266,8 @@ void ZVulkanResidencyManager::releaseOwner(const void* owner)
       ++it;
       continue;
     }
-    CHECK(it->second.pinCount == 0u) << "Attempted to release managed textures while pinned (in-flight use)";
+    CHECK(it->second.pinCount == 0u) << "Attempted to release managed textures while pinned (in-flight use); "
+                                        "callers must flushForTeardown()/waitForAllInFlight before releaseOwner";
     if (it->second.texture) {
       m_reverse.erase(it->second.texture.get());
     }

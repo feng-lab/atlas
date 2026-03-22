@@ -318,14 +318,34 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = batch.shaderHook.type;
 
+  const bool hasPerMeshTransforms =
+    !payload.perMeshPosTransforms.empty() || !payload.perMeshPosTransformNormalMatrices.empty();
+  if (hasPerMeshTransforms) {
+    CHECK(!payload.perMeshPosTransforms.empty()) << "Per-mesh transforms require perMeshPosTransforms";
+    CHECK(!payload.perMeshPosTransformNormalMatrices.empty())
+      << "Per-mesh transforms require perMeshPosTransformNormalMatrices";
+    CHECK(payload.perMeshPosTransforms.size() == payload.meshes.size())
+      << "perMeshPosTransforms must match meshes.size()";
+    CHECK(payload.perMeshPosTransformNormalMatrices.size() == payload.meshes.size())
+      << "perMeshPosTransformNormalMatrices must match meshes.size()";
+  }
+
   // Match OpenGL: lighting can be disabled per-renderer even when the scene has lights.
   m_dynLightingOffset = (payload.pickingPass || !payload.wantsLighting) ? m_backend.framePickingLightingOffset()
                                                                         : m_backend.frameSharedLightingOffset();
-  updateTransformUBO(renderer, batch, payload);
+  // When per-mesh transforms are present we allocate object transforms per draw
+  // from the per-frame uniform arena (no persistent offsets / secondary caching).
+  const bool usePersistentTransforms = (!hasPerMeshTransforms && payload.streamKey != 0);
+  if (!hasPerMeshTransforms) {
+    updateTransformUBO(renderer, batch, payload);
+  } else {
+    CHECK(payload.paramsCaptured) << "Mesh payload missing params";
+    m_dynFrameTransformsOffset = m_backend.frameTransformsOffset(batch.eye);
+    m_dynObjectTransformsOffset = 0;
+  }
   // No OIT UBO; set 3 carries only the DDP flag.
   // Descriptor sets are primed by the backend in beginRender(); avoid record-time rewrites.
   const vk::DescriptorSet dsLighting = m_backend.sharedLightingDescriptorSet();
-  const bool usePersistentTransforms = (payload.streamKey != 0);
   const vk::DescriptorSet dsTransforms = usePersistentTransforms ? m_backend.sharedTransformsDescriptorSetPersistent()
                                                                  : m_backend.sharedTransformsDescriptorSetUniform();
   CHECK(dsLighting && dsTransforms) << "Mesh pipeline shared descriptor sets missing (lighting/transforms)";
@@ -382,6 +402,34 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   baseExtraBinds[0] = oitBind;
   const uint32_t baseExtraBindCount = 1;
   const uint32_t expectedSetCount = std::max<uint32_t>(1u, vkbind::kSetOIT + 1u);
+
+  glm::mat4 perMeshCoordMat(1.0f);
+  glm::mat3 perMeshCoordNormalMat(1.0f);
+  float perMeshSizeScale = 1.0f;
+  if (hasPerMeshTransforms) {
+    perMeshCoordMat = payload.followCoordTransform ? payload.params.coordTransform : glm::mat4(1.0f);
+    perMeshCoordNormalMat = glm::transpose(glm::inverse(glm::mat3(perMeshCoordMat)));
+    perMeshSizeScale = payload.followSizeScale ? payload.params.sizeScale : 1.0f;
+  }
+
+  auto updatePerMeshTransformUBO = [&](size_t meshIndex) {
+    if (!hasPerMeshTransforms) {
+      return;
+    }
+    CHECK(meshIndex < payload.perMeshPosTransforms.size());
+    CHECK(meshIndex < payload.perMeshPosTransformNormalMatrices.size());
+
+    ObjectTransformsUBOStd140 transforms{};
+    transforms.pos_transform = perMeshCoordMat * payload.perMeshPosTransforms[meshIndex];
+    const glm::mat3 normalMatrix = perMeshCoordNormalMat * payload.perMeshPosTransformNormalMatrices[meshIndex];
+    transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
+    transforms.parameters = glm::vec4(perMeshSizeScale, 0.0f, 0.0f, 0.0f);
+    vulkan::applyBatchClipPlanesToTransforms(batch, transforms);
+
+    auto slice = m_backend.suballocateUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
+    std::memcpy(slice.mapped, &transforms, sizeof(transforms));
+    m_dynObjectTransformsOffset = slice.offset;
+  };
 
   // Group draws by pipeline instance and prepare a common vertex-binding helper
   const bool drawSurface = payload.wireframeMode != MeshPayload::WireframeMode::OnlyWireframe;
@@ -608,6 +656,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
         for (const auto& entry : draws) {
           const MeshDraw& draw = *entry.draw;
+          updatePerMeshTransformUBO(draw.payloadMeshIndex);
           if (entry.wireframe) {
             updateMaterialUBO(renderer,
                               payload,
@@ -616,6 +665,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
                               entry.wireColor,
                               pickingPass,
                               true,
+                              usePersistentTransforms,
                               shaderHook);
           } else {
             updateMaterialUBO(renderer,
@@ -625,6 +675,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
                               draw.fallbackColor,
                               pickingPass,
                               false,
+                              usePersistentTransforms,
                               shaderHook);
           }
 
@@ -713,6 +764,58 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       continue;
     }
 
+    if (hasPerMeshTransforms) {
+      // Per-mesh transforms require per-draw object transforms offsets. Record directly into the
+      // primary command buffer (no secondary caching) so dynamic UBO offsets can vary per draw.
+      recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& cb) {
+        bindCommonBuffers(cb);
+        const vk::PipelineLayout layoutHandle = pipeline.pipeline->pipelineLayout();
+
+        cb.pushConstants<MeshBindlessPushConstants>(layoutHandle, vk::ShaderStageFlagBits::eFragment, 0, bindlessPC);
+
+        for (const auto& entry : draws) {
+          const MeshDraw& draw = *entry.draw;
+          updatePerMeshTransformUBO(draw.payloadMeshIndex);
+
+          if (entry.wireframe) {
+            updateMaterialUBO(renderer,
+                              payload,
+                              draw.payloadMeshIndex,
+                              true,
+                              entry.wireColor,
+                              pickingPass,
+                              /*wireframe*/ true,
+                              usePersistentTransforms,
+                              shaderHook);
+          } else {
+            updateMaterialUBO(renderer,
+                              payload,
+                              draw.payloadMeshIndex,
+                              draw.useFallbackColor,
+                              draw.fallbackColor,
+                              pickingPass,
+                              /*wireframe*/ false,
+                              usePersistentTransforms,
+                              shaderHook);
+          }
+
+          std::array<vk::DescriptorSet, 2> dynSets{dsLighting, dsTransforms};
+          std::array<uint32_t, 4> dynOff{static_cast<uint32_t>(m_dynLightingOffset),
+                                         static_cast<uint32_t>(m_dynFrameTransformsOffset),
+                                         static_cast<uint32_t>(m_dynObjectTransformsOffset),
+                                         static_cast<uint32_t>(m_dynMaterialOffset)};
+          cb.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layoutHandle, 1, dynSets, dynOff);
+
+          if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
+            cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
+          } else {
+            cb.draw(draw.vertexCount, 1, draw.firstVertex, 0);
+          }
+        }
+      });
+      continue;
+    }
+
     std::vector<SecondarySignature::Draw> drawCalls;
     drawCalls.reserve(draws.size());
     for (const auto& entry : draws) {
@@ -725,6 +828,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
                           entry.wireColor,
                           pickingPass,
                           /*wireframe*/ true,
+                          usePersistentTransforms,
                           shaderHook);
       } else {
         updateMaterialUBO(renderer,
@@ -734,6 +838,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
                           draw.fallbackColor,
                           pickingPass,
                           /*wireframe*/ false,
+                          usePersistentTransforms,
                           shaderHook);
       }
 
@@ -1026,6 +1131,7 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
                                                    const glm::vec4& fallbackColor,
                                                    bool pickingPass,
                                                    bool wireframe,
+                                                   bool usePersistentTransforms,
                                                    Z3DRendererBase::ShaderHookType shaderHook)
 {
   (void)renderer;
@@ -1067,7 +1173,7 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
 
   void* frameKey = m_backend.activeFrameKey();
   CHECK(frameKey != nullptr) << "Mesh updateMaterialUBO called without an active Vulkan frame-slot key";
-  if (payload.streamKey != 0) {
+  if (usePersistentTransforms && payload.streamKey != 0) {
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     StreamUboCache& streamCache = frameCache.byStream[payload.streamKey];
 

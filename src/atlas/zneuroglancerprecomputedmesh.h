@@ -2,6 +2,7 @@
 
 #include "zneuroglancerprecomputed.h"
 #include "zglmutils.h"
+#include "zbbox.h"
 
 #include <QUrl>
 #include <QString>
@@ -40,6 +41,18 @@ public:
   {
     Coarsest,
     Finest,
+  };
+
+  // Controls the coordinate space of chunk meshes returned by loadChunkMeshBlocking().
+  //
+  // - LocalVoxel: vertices are converted into Atlas local-voxel coordinates on CPU (legacy behavior).
+  // - Quantized: vertices remain in Neuroglancer's stored quantized fragment coordinate space.
+  //   The returned chunk mesh carries a per-submesh transform that maps these stored vertices to
+  //   Atlas local-voxel space. Callers must apply it at render time.
+  enum class ChunkVertexSpace
+  {
+    LocalVoxel,
+    Quantized,
   };
 
   static std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>
@@ -129,8 +142,17 @@ public:
   struct MultiLodChunkMesh
   {
     std::vector<std::shared_ptr<ZMesh>> subMeshes;
+    // Optional per-submesh transform from the mesh's stored vertex space to Atlas local-voxel space.
+    // When empty, vertices are already in local-voxel space.
+    std::vector<glm::mat4> vertexToLocalVoxelTransforms;
+    std::vector<glm::mat3> vertexToLocalVoxelNormalMatrices;
 
     [[nodiscard]] bool empty() const;
+
+    [[nodiscard]] bool hasVertexToLocalVoxelTransforms() const
+    {
+      return !vertexToLocalVoxelTransforms.empty();
+    }
   };
 
   [[nodiscard]] bool supportsRuntimeLod() const
@@ -143,10 +165,29 @@ public:
 
   [[nodiscard]] std::shared_ptr<const MultiLodManifest> loadManifestBlocking(uint64_t segmentId) const;
 
+  // Return the full clip bounds (AABB) of a runtime multi-LOD mesh in Atlas local-voxel coordinates.
+  //
+  // This is derived from the manifest's clipLowerBound/clipUpperBound (computed from LOD0 fragment grid coverage)
+  // and the dataset's voxelFromStored transform, and does not require chunk vertices to be CPU-transformed.
+  //
+  // Intended use:
+  // - camera framing / clipping range when the mesh is the only visible object
+  // - selection/bound-box rendering for runtime-NG meshes whose vertices remain quantized
+  [[nodiscard]] ZBBox<glm::dvec3> multiLodClipBoundsLocalVoxel(const MultiLodManifest& manifest) const;
+
   [[nodiscard]] std::shared_ptr<const MultiLodChunkMesh>
   loadChunkMeshBlocking(uint64_t segmentId, uint32_t row, const folly::CancellationToken& cancellationToken) const;
 
   [[nodiscard]] std::shared_ptr<const MultiLodChunkMesh> loadChunkMeshBlocking(uint64_t segmentId, uint32_t row) const;
+
+  [[nodiscard]] std::shared_ptr<const MultiLodChunkMesh>
+  loadChunkMeshBlocking(uint64_t segmentId,
+                        uint32_t row,
+                        ChunkVertexSpace vertexSpace,
+                        const folly::CancellationToken& cancellationToken) const;
+
+  [[nodiscard]] std::shared_ptr<const MultiLodChunkMesh>
+  loadChunkMeshBlocking(uint64_t segmentId, uint32_t row, ChunkVertexSpace vertexSpace) const;
 
   [[nodiscard]] std::vector<std::shared_ptr<const MultiLodChunkMesh>>
   loadChunkMeshesBlocking(uint64_t segmentId, const std::vector<uint32_t>& rows) const;
@@ -224,6 +265,7 @@ private:
   {
     uint64_t segmentId = 0;
     uint32_t row = 0;
+    ChunkVertexSpace vertexSpace = ChunkVertexSpace::LocalVoxel;
 
     bool operator==(const ChunkCacheKey& other) const = default;
   };
@@ -232,7 +274,10 @@ private:
   {
     size_t operator()(const ChunkCacheKey& key) const noexcept
     {
-      return std::hash<uint64_t>{}(key.segmentId) ^ (static_cast<size_t>(key.row) << 1U);
+      const size_t h0 = std::hash<uint64_t>{}(key.segmentId);
+      const size_t h1 = static_cast<size_t>(key.row) << 1U;
+      const size_t h2 = static_cast<size_t>(static_cast<uint8_t>(key.vertexSpace)) << 24U;
+      return h0 ^ h1 ^ h2;
     }
   };
 
@@ -248,7 +293,7 @@ private:
   [[nodiscard]] folly::coro::Task<std::shared_ptr<const CachedMultiLodManifest>>
   loadCachedManifestAsync(uint64_t segmentId) const;
   [[nodiscard]] folly::coro::Task<std::shared_ptr<const MultiLodChunkMesh>>
-  loadMultiLodChunkMeshAsync(uint64_t segmentId, uint32_t row) const;
+  loadMultiLodChunkMeshAsync(uint64_t segmentId, uint32_t row, ChunkVertexSpace vertexSpace) const;
 
   [[nodiscard]] folly::coro::Task<std::optional<std::vector<uint8_t>>> getHttpBytesAsync(const std::string& url) const;
 
@@ -263,6 +308,17 @@ private:
   [[nodiscard]] MultiLodManifest parseMultiLodManifest(std::span<const uint8_t> bytes, const MultiLodInfo& info) const;
 
   void convertLegacyMeshVerticesNmToLocalVoxel(ZMesh& mesh) const;
+
+  struct VertexToLocalVoxelTransform
+  {
+    glm::mat4 vertexToLocalVoxel{1.0F};
+    glm::mat3 vertexToLocalVoxelNormalMatrix{1.0F};
+  };
+
+  [[nodiscard]] VertexToLocalVoxelTransform computeMultiLodVertexToLocalVoxelTransform(size_t lod,
+                                                                                       const glm::uvec3& fragmentPos,
+                                                                                       const MultiLodManifest& manifest,
+                                                                                       const MultiLodInfo& info) const;
   // Converts multi-LOD vertices from stored quantized coordinates into Atlas local-voxel coordinates.
   //
   // If |normals| is non-null, it is assumed to be in the same pre-transform space as |vertices|

@@ -18,6 +18,7 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace nim {
@@ -92,6 +93,8 @@ public:
 
   void renderTransparent(Z3DEye eye) override;
 
+  void switchRendererBackend(RenderBackend backend) override;
+
 Q_SIGNALS:
   void meshSelected(ZMesh*, bool append);
 
@@ -125,6 +128,13 @@ protected:
   void updateMeshVisibleState();
 
 private:
+  enum class RuntimeNeuroglancerRequestFrontierMode
+  {
+    None,
+    BaseWarmup,
+    ViewDriven
+  };
+
   void resetRuntimeNeuroglancerLodState();
 
   void markRuntimeNeuroglancerLodDirty();
@@ -135,7 +145,15 @@ private:
 
   void startRuntimeNeuroglancerOpen();
 
-  void requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& rows);
+  void clearRuntimeNeuroglancerRequestFrontier();
+
+  void setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode mode, std::vector<uint32_t> rows);
+
+  void updateRuntimeNeuroglancerRefinementState();
+
+  [[nodiscard]] size_t requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& rows);
+
+  [[nodiscard]] size_t pumpRuntimeNeuroglancerRequests();
 
   void applyRuntimeNeuroglancerSelection();
 
@@ -173,6 +191,10 @@ private:
 
   std::vector<glm::vec4> m_meshColors;
   std::vector<glm::vec4> m_meshPickingColors;
+  // Optional per-mesh transforms for the active m_meshList. When populated,
+  // these are applied before the renderer's global coordTransform.
+  std::vector<glm::mat4> m_meshPosTransforms;
+  std::vector<glm::mat3> m_meshPosTransformNormalMatrices;
 
   ZEventListenerParameter m_selectMeshEvent;
   glm::ivec2 m_startCoord{};
@@ -193,6 +215,9 @@ private:
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> m_runtimeNgSource;
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest> m_runtimeNgManifest;
   std::vector<uint32_t> m_runtimeNgBaseRows;
+  RuntimeNeuroglancerRequestFrontierMode m_runtimeNgRequestFrontierMode = RuntimeNeuroglancerRequestFrontierMode::None;
+  std::vector<uint32_t> m_runtimeNgRequestFrontierRows;
+  std::unordered_set<uint32_t> m_runtimeNgRequestFrontierRowSet;
   std::unordered_map<uint32_t, std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
     m_runtimeNgLoadedRows;
   std::set<uint32_t> m_runtimeNgRowsInFlight;
@@ -203,7 +228,11 @@ private:
   bool m_runtimeNgCancelObsoleteInFlight = false;
   std::set<uint32_t> m_runtimeNgFailedRows;
   std::vector<ZMesh*> m_runtimeNgVisibleMeshes;
+  std::vector<glm::mat4> m_runtimeNgVisiblePosTransforms;
+  std::vector<glm::mat3> m_runtimeNgVisiblePosTransformNormalMatrices;
   std::vector<ZMesh*> m_runtimeNgFrozenVisibleMeshes;
+  std::vector<glm::mat4> m_runtimeNgFrozenVisiblePosTransforms;
+  std::vector<glm::mat3> m_runtimeNgFrozenVisiblePosTransformNormalMatrices;
   QTimer m_runtimeNgIdleTimer;
   uint64_t m_runtimeNgEpoch = 0;
   bool m_runtimeNgBaseReady = false;

@@ -486,23 +486,11 @@ Z3DImgSliceRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
       const bool paging =
         stagePayload.image != nullptr && stagePayload.image->isVolumeDownsampled() && !stagePayload.fastPathOnly;
 
-      if (writesOutput) {
-        m_rendererBase.frameState().updateViewportData(outputLease.descriptor.size);
-        m_rendererBase.setActiveSurfaceWithLoadStore(outputLease,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store);
-        markOutputSurfaceSampled();
-
-        RenderBatch batch;
-        batch.eye = eye;
-        batch.geometry = stagePayload;
-        m_rendererBase.appendBatch(std::move(batch));
-        return;
-      }
-
       if (stagePayload.stage == ImgSlicePayload::Stage::MergeLayers) {
+        // MergeLayers is the one stage that both writes the output surface and
+        // *samples* the layer-array render target. For Vulkan this needs to be
+        // represented in pass.externalImageUses so the linear script can
+        // pre-register bindless sampled-image indices before recording begins.
         m_rendererBase.frameState().updateViewportData(outputLease.descriptor.size);
         m_rendererBase.setActiveSurfaceWithLoadStore(outputLease,
                                                      LoadOp::Clear,
@@ -522,6 +510,22 @@ Z3DImgSliceRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
         for (const auto& h : layerDepths) {
           addExternalUse(batch, h, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth);
         }
+        m_rendererBase.appendBatch(std::move(batch));
+        return;
+      }
+
+      if (writesOutput) {
+        m_rendererBase.frameState().updateViewportData(outputLease.descriptor.size);
+        m_rendererBase.setActiveSurfaceWithLoadStore(outputLease,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store,
+                                                     LoadOp::Clear,
+                                                     StoreOp::Store);
+        markOutputSurfaceSampled();
+
+        RenderBatch batch;
+        batch.eye = eye;
+        batch.geometry = stagePayload;
         m_rendererBase.appendBatch(std::move(batch));
         return;
       }

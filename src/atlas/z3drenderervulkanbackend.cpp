@@ -120,7 +120,8 @@ size_t UniformArenaBudgetTraits<ImgRaycasterPayload>::estimateAdditionalBytes(co
   // per-frame uniform arena before recording begins.
   const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
   const bool planarGeometry = !hasIndices;
-  const size_t szIndices = alignUp(sizeof(uint32_t) * 4u, uniformAlignment); // 16B std140 padded
+  // Shared image indices descriptor set has a fixed 32B std140 range.
+  const size_t szIndices = alignUp(sizeof(uint32_t) * 8u, uniformAlignment); // 32B std140 padded
 
   auto estimatePageDataBytes = [&]() -> size_t {
     if (!payload.image) {
@@ -153,8 +154,11 @@ size_t UniformArenaBudgetTraits<ImgSlicePayload>::estimateAdditionalBytes(const 
 {
   // Slice renderer allocates:
   // - A small dynamic UBO slice for bindless texture indices in fast draws.
-  // - A larger PageData std140 UBO in paged slice rendering and block-ID discovery.
-  const size_t szIndices = alignUp(sizeof(uint32_t) * 4u, uniformAlignment); // 16B std140 padded
+  // - A paged bindless-indices UBO plus a larger PageData std140 UBO in paged
+  //   slice rendering and block-ID discovery.
+  // Shared image indices descriptor set has a fixed 32B std140 range.
+  const size_t szFastIndices = alignUp(sizeof(uint32_t) * 8u, uniformAlignment); // 32B std140 padded
+  const size_t szPagedIndices = alignUp(sizeof(uint32_t) * 8u, uniformAlignment); // 32B std140 padded
 
   auto estimatePageDataBytes = [&]() -> size_t {
     if (!payload.image) {
@@ -173,10 +177,10 @@ size_t UniformArenaBudgetTraits<ImgSlicePayload>::estimateAdditionalBytes(const 
       // Paged draws only happen in round 1+ (round 0 uses fast preview + BlockIdDiscovery).
       const bool usePaging = (!payload.fastPathOnly && payload.image && payload.image->isVolumeDownsampled());
       const bool pagingDraw = (usePaging && payload.channelIndexRaw >= 0 && payload.roundIndexRaw > 0);
-      return pagingDraw ? estimatePageDataBytes() : szIndices;
+      return pagingDraw ? (estimatePageDataBytes() + szPagedIndices) : szFastIndices;
     }
     case ImgSlicePayload::Stage::BlockIdDiscovery:
-      return estimatePageDataBytes();
+      return estimatePageDataBytes() + szPagedIndices;
     default:
       return 0u;
   }
@@ -5242,8 +5246,10 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorSetsOnFrame(FrameResources&
     << "Shared OIT descriptor set ring index out of range while priming";
   primeOITDescriptorSet(*frame.sharedOITByRing[oitRingIndex]);
 
-  // Image helpers: indices + page-data UBO views over the uniform arena.
-  constexpr vk::DeviceSize kIndicesRange = sizeof(uint32_t) * 4u; // std140 padded (16B)
+  // Image helpers: indices + page-data UBO views over the uniform arena. Fast
+  // image draws use a 16B std140 prefix, while paged slice paths require the
+  // full 32B bindless-indices block.
+  constexpr vk::DeviceSize kIndicesRange = sizeof(uint32_t) * 8u; // std140 padded (32B)
   frame.sharedImgIndices->updateUniformBufferDynamic(0, uniformArenaBuffer(), kIndicesRange);
 
   const auto limits = device().context().physicalDevice().getProperties().limits;

@@ -49,6 +49,18 @@ public:
 
   void setDataPickingColors(std::vector<glm::vec4>* meshPickingColorsInput = nullptr);
 
+  // Optional: provide an additional per-mesh transform that should be applied to vertices
+  // before the renderer's global coordTransform.
+  //
+  // This is primarily used by runtime Neuroglancer mesh LOD to avoid CPU vertex transforms:
+  // chunk meshes keep vertices in stored quantized coordinates, and the renderer applies a
+  // per-chunk affine matrix at draw time.
+  //
+  // If set, both vectors must either be null, or have the same size as the mesh list passed to setData().
+  // normalMatrices should contain the inverse-transpose of the linear part of the corresponding transform.
+  void setPerMeshPosTransforms(std::vector<glm::mat4>* meshPosTransformsInput,
+                               std::vector<glm::mat3>* meshPosTransformNormalMatricesInput);
+
   // One of "MeshColor", "Mesh1DTexture", "Mesh2DTexture", "Mesh3DTexture", "CustomColor"
   void setColorSource(MeshColorSource source);
 
@@ -117,6 +129,8 @@ protected:
   std::vector<ZMesh*>* m_origMeshPt;
   std::vector<glm::vec4>* m_origMeshColorsPt;
   std::vector<glm::vec4>* m_origMeshPickingColorsPt;
+  std::vector<glm::mat4>* m_origMeshPosTransformsPt = nullptr;
+  std::vector<glm::mat3>* m_origMeshPosTransformNormalMatricesPt = nullptr;
 
   Z3DTexture* m_texture;
   SampledImageHandle m_textureHandle{};
@@ -126,6 +140,8 @@ private:
   std::vector<ZMesh*> m_splitMeshesWrapper;
   std::vector<glm::vec4> m_splitMeshesColors;
   std::vector<glm::vec4> m_splitMeshesPickingColors;
+  std::vector<glm::mat4> m_splitMeshesPosTransforms;
+  std::vector<glm::mat3> m_splitMeshesPosTransformNormalMatrices;
   bool m_meshNeedSplit = false;
   std::vector<size_t> m_splitCount;
   bool m_meshColorReady;
@@ -140,6 +156,10 @@ private:
   std::unique_ptr<Z3DVertexArrayObject> m_pickingVAOs;
   std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_VBOs;
   std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_pickingVBOs;
+
+  // Optional per-mesh transforms (post-split). When non-null, sizes must match m_meshPt.
+  std::vector<glm::mat4>* m_meshPosTransformsPt = nullptr;
+  std::vector<glm::mat3>* m_meshPosTransformNormalMatricesPt = nullptr;
 
   WireframeMode m_wireframeModeValue = WireframeMode::NoWireframe;
   glm::vec4 m_wireframeColorValue{1.f};

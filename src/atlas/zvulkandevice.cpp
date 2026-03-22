@@ -132,6 +132,18 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
 
 ZVulkanDevice::~ZVulkanDevice()
 {
+  if (m_frameExecutor != nullptr) {
+    // Drain all fence-gated completions while the residency manager and VMA
+    // allocator are still alive. This flushes deferred unpins and any teardown
+    // callbacks that would otherwise outlive the allocator.
+    m_frameExecutor->waitForAllInFlight();
+  }
+
+  // Managed textures owned by the residency manager destroy VkImages via VMA,
+  // so they must be released before the allocator/pools are torn down.
+  m_residencyManager.reset();
+  m_frameExecutor.reset();
+
   if (m_uploadTransientPool != nullptr) {
     vmaDestroyPool(m_allocator, m_uploadTransientPool);
     m_uploadTransientPool = nullptr;

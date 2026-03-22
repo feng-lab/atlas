@@ -871,14 +871,75 @@ ZNeuroglancerPrecomputedMeshSource::loadManifestBlocking(uint64_t segmentId) con
   return folly::coro::blockingWait(loadCachedManifestAsync(segmentId))->manifest;
 }
 
+ZBBox<glm::dvec3>
+ZNeuroglancerPrecomputedMeshSource::multiLodClipBoundsLocalVoxel(const MultiLodManifest& manifest) const
+{
+  CHECK(supportsRuntimeLod());
+  CHECK(sharedMeshInfo().multiLodInfo) << "Runtime multi-LOD clip bounds require multiLodInfo";
+
+  // Manifest clip bounds are expressed in the mesh's stored coordinate space (before voxelFromStored).
+  // The runtime vertex transform uses:
+  //   stored = gridOrigin + vertexOffsets[lod] + chunkShape * (2^lod) * gridPos + quantizedVertex *
+  //   (chunkShape*2^lod/maxQuant)
+  //
+  // clipLower/clipUpper are derived from the LOD0 gridPos coverage (clipUpper is exclusive, +1 applied).
+  // Include the lod0 vertex offset so the bound encloses all chunks.
+  glm::dvec3 lowerStored(manifest.clipLowerBound);
+  glm::dvec3 upperStored(manifest.clipUpperBound);
+  if (!manifest.vertexOffsets.empty()) {
+    const glm::dvec3 lod0Offset(manifest.vertexOffsets[0]);
+    lowerStored += lod0Offset;
+    upperStored += lod0Offset;
+  }
+
+  ZBBox<glm::dvec3> out;
+  if (lowerStored.x > upperStored.x || lowerStored.y > upperStored.y || lowerStored.z > upperStored.z) {
+    return out;
+  }
+
+  const glm::dmat4 voxelFromStored(sharedMeshInfo().multiLodInfo->voxelFromStored);
+  auto expandCorner = [&](double x, double y, double z) {
+    const glm::dvec4 p = voxelFromStored * glm::dvec4(x, y, z, 1.0);
+    out.expand(glm::dvec3(p));
+  };
+
+  const glm::dvec3 lo = lowerStored;
+  const glm::dvec3 hi = upperStored;
+  expandCorner(lo.x, lo.y, lo.z);
+  expandCorner(lo.x, lo.y, hi.z);
+  expandCorner(lo.x, hi.y, lo.z);
+  expandCorner(lo.x, hi.y, hi.z);
+  expandCorner(hi.x, lo.y, lo.z);
+  expandCorner(hi.x, lo.y, hi.z);
+  expandCorner(hi.x, hi.y, lo.z);
+  expandCorner(hi.x, hi.y, hi.z);
+  return out;
+}
+
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>
 ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId,
                                                           uint32_t row,
                                                           const folly::CancellationToken& cancellationToken) const
 {
+  return loadChunkMeshBlocking(segmentId, row, ChunkVertexSpace::LocalVoxel, cancellationToken);
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>
+ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId, uint32_t row) const
+{
+  return loadChunkMeshBlocking(segmentId, row, ChunkVertexSpace::LocalVoxel);
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>
+ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId,
+                                                          uint32_t row,
+                                                          ChunkVertexSpace vertexSpace,
+                                                          const folly::CancellationToken& cancellationToken) const
+{
   CHECK(supportsRuntimeLod());
   try {
-    auto task = folly::coro::co_withCancellation(cancellationToken, loadMultiLodChunkMeshAsync(segmentId, row));
+    auto task =
+      folly::coro::co_withCancellation(cancellationToken, loadMultiLodChunkMeshAsync(segmentId, row, vertexSpace));
     return folly::coro::blockingWait(std::move(task));
   }
   catch (const folly::OperationCancelled&) {
@@ -889,10 +950,12 @@ ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId,
 }
 
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>
-ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId, uint32_t row) const
+ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId,
+                                                          uint32_t row,
+                                                          ChunkVertexSpace vertexSpace) const
 {
   CHECK(supportsRuntimeLod());
-  return folly::coro::blockingWait(loadMultiLodChunkMeshAsync(segmentId, row));
+  return folly::coro::blockingWait(loadMultiLodChunkMeshAsync(segmentId, row, vertexSpace));
 }
 
 std::vector<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
@@ -1248,12 +1311,11 @@ void ZNeuroglancerPrecomputedMeshSource::convertLegacyMeshVerticesNmToLocalVoxel
   mesh.transformVerticesByMatrix(sharedMeshInfo().voxelFromModel);
 }
 
-bool ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std::vector<glm::vec3>& vertices,
-                                                                             std::vector<glm::vec3>* normals,
-                                                                             size_t lod,
-                                                                             const glm::uvec3& fragmentPos,
-                                                                             const MultiLodManifest& manifest,
-                                                                             const MultiLodInfo& info) const
+ZNeuroglancerPrecomputedMeshSource::VertexToLocalVoxelTransform
+ZNeuroglancerPrecomputedMeshSource::computeMultiLodVertexToLocalVoxelTransform(size_t lod,
+                                                                               const glm::uvec3& fragmentPos,
+                                                                               const MultiLodManifest& manifest,
+                                                                               const MultiLodInfo& info) const
 {
   CHECK(info.vertexQuantizationBits == 10 || info.vertexQuantizationBits == 16);
   const float maxQuant = static_cast<float>((1ULL << info.vertexQuantizationBits) - 1ULL);
@@ -1278,6 +1340,30 @@ bool ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std
   quantToVoxelLinear[1] *= quantScale.y;
   quantToVoxelLinear[2] *= quantScale.z;
 
+  VertexToLocalVoxelTransform out;
+  // Build an affine matrix that implements: base + quantToVoxelLinear * v
+  out.vertexToLocalVoxel = glm::mat4(1.0F);
+  out.vertexToLocalVoxel[0] = glm::vec4(quantToVoxelLinear[0], 0.0F);
+  out.vertexToLocalVoxel[1] = glm::vec4(quantToVoxelLinear[1], 0.0F);
+  out.vertexToLocalVoxel[2] = glm::vec4(quantToVoxelLinear[2], 0.0F);
+  out.vertexToLocalVoxel[3] = glm::vec4(base, 1.0F);
+
+  out.vertexToLocalVoxelNormalMatrix = glm::transpose(glm::inverse(quantToVoxelLinear));
+  return out;
+}
+
+bool ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std::vector<glm::vec3>& vertices,
+                                                                             std::vector<glm::vec3>* normals,
+                                                                             size_t lod,
+                                                                             const glm::uvec3& fragmentPos,
+                                                                             const MultiLodManifest& manifest,
+                                                                             const MultiLodInfo& info) const
+{
+  const VertexToLocalVoxelTransform tf = computeMultiLodVertexToLocalVoxelTransform(lod, fragmentPos, manifest, info);
+
+  const glm::vec3 base(tf.vertexToLocalVoxel[3]);
+  const glm::mat3 quantToVoxelLinear(tf.vertexToLocalVoxel);
+
   for (glm::vec3& vertex : vertices) {
     vertex = base + quantToVoxelLinear * vertex;
   }
@@ -1290,7 +1376,7 @@ bool ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std
   }
 
   // Transform normals with the correct normal matrix.
-  const glm::mat3 normalMatrix = glm::transpose(glm::inverse(quantToVoxelLinear));
+  const glm::mat3 normalMatrix = tf.vertexToLocalVoxelNormalMatrix;
   for (glm::vec3& n : *normals) {
     const glm::vec3 tn = normalMatrix * n;
     const float len2 = glm::dot(tn, tn);
@@ -1645,7 +1731,9 @@ ZNeuroglancerPrecomputedMeshSource::loadCachedManifestAsync(uint64_t segmentId) 
 }
 
 folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
-ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentId, uint32_t row) const
+ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentId,
+                                                               uint32_t row,
+                                                               ChunkVertexSpace vertexSpace) const
 {
   CHECK(meshType() == MeshType::MultiLodDraco);
   CHECK(sharedMeshInfo().multiLodInfo);
@@ -1653,7 +1741,7 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
   const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
 
-  const ChunkCacheKey cacheKey{segmentId, row};
+  const ChunkCacheKey cacheKey{.segmentId = segmentId, .row = row, .vertexSpace = vertexSpace};
   {
     std::lock_guard<std::mutex> lock(m_chunkCacheMutex);
     if (auto it = m_chunkCache.find(cacheKey); it != m_chunkCache.end()) {
@@ -1676,6 +1764,10 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
   const uint32_t lod = manifest.rowLods.at(row);
   auto chunkMesh = std::make_shared<MultiLodChunkMesh>();
   chunkMesh->subMeshes.resize(lod == 0U ? 1U : 8U);
+  if (vertexSpace == ChunkVertexSpace::Quantized) {
+    chunkMesh->vertexToLocalVoxelTransforms.resize(chunkMesh->subMeshes.size(), glm::mat4(1.0F));
+    chunkMesh->vertexToLocalVoxelNormalMatrices.resize(chunkMesh->subMeshes.size(), glm::mat3(1.0F));
+  }
 
   if (manifest.octreeNodes[row].empty() || manifest.offsets[row + 1U] <= manifest.offsets[row]) {
     std::lock_guard<std::mutex> lock(m_chunkCacheMutex);
@@ -1698,14 +1790,26 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
                                sharedMeshInfo().multiLodInfo->vertexQuantizationBits,
                                lod != 0U);
   maybeCancel(cancellationToken);
-  const bool normalsOk = convertMultiLodVerticesToLocalVoxel(decoded.vertices,
-                                                             decoded.normals ? &(*decoded.normals) : nullptr,
-                                                             lod,
-                                                             manifest.octreeNodes[row].gridPosition,
-                                                             manifest,
-                                                             *sharedMeshInfo().multiLodInfo);
-  if (!normalsOk) {
-    decoded.normals.reset();
+  if (vertexSpace == ChunkVertexSpace::LocalVoxel) {
+    const bool normalsOk = convertMultiLodVerticesToLocalVoxel(decoded.vertices,
+                                                               decoded.normals ? &(*decoded.normals) : nullptr,
+                                                               lod,
+                                                               manifest.octreeNodes[row].gridPosition,
+                                                               manifest,
+                                                               *sharedMeshInfo().multiLodInfo);
+    if (!normalsOk) {
+      decoded.normals.reset();
+    }
+  } else {
+    const VertexToLocalVoxelTransform tf =
+      computeMultiLodVertexToLocalVoxelTransform(lod,
+                                                 manifest.octreeNodes[row].gridPosition,
+                                                 manifest,
+                                                 *sharedMeshInfo().multiLodInfo);
+    for (size_t i = 0; i < chunkMesh->subMeshes.size(); ++i) {
+      chunkMesh->vertexToLocalVoxelTransforms[i] = tf.vertexToLocalVoxel;
+      chunkMesh->vertexToLocalVoxelNormalMatrices[i] = tf.vertexToLocalVoxelNormalMatrix;
+    }
   }
   maybeCancel(cancellationToken);
   for (size_t i = 0; i < decoded.partitionIndices.size(); ++i) {
@@ -1745,7 +1849,8 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodMeshAsync(uint64_t segmentId, Lo
     if (manifest.octreeNodes[row].empty() || manifest.offsets[row + 1U] <= manifest.offsets[row]) {
       continue;
     }
-    const std::shared_ptr<const MultiLodChunkMesh> chunkMesh = co_await loadMultiLodChunkMeshAsync(segmentId, row);
+    const std::shared_ptr<const MultiLodChunkMesh> chunkMesh =
+      co_await loadMultiLodChunkMeshAsync(segmentId, row, ChunkVertexSpace::LocalVoxel);
     CHECK(chunkMesh);
     for (const auto& subMesh : chunkMesh->subMeshes) {
       if (subMesh && !subMesh->empty()) {

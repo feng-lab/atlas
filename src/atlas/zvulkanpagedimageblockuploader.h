@@ -4,6 +4,7 @@
 
 #include "zglmutils.h"
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -61,7 +62,7 @@ private:
   ZVulkanDevice& m_device;
   mutable std::mutex m_mutex;
   std::unordered_map<const Z3DImg*, ImageResources> m_resources;
-  std::shared_ptr<bool> m_aliveFlag;
+  std::shared_ptr<std::atomic_bool> m_aliveFlag;
 };
 
 } // namespace nim

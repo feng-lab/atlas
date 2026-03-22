@@ -582,6 +582,14 @@ struct MeshPayload
   std::span<ZMesh* const> meshes;
   std::span<const glm::vec4> meshColors;
   std::span<const glm::vec4> meshPickingColors;
+  // Optional per-mesh transform applied to vertices before the renderer's global coordTransform.
+  //
+  // When provided, these spans must either be empty, or have size == meshes.size().
+  // The intended use is runtime Neuroglancer multi-LOD chunks whose vertices remain in their
+  // stored quantized fragment coordinate space; renderers can apply this transform on GPU
+  // rather than CPU-transforming every vertex.
+  std::span<const glm::mat4> perMeshPosTransforms;
+  std::span<const glm::mat3> perMeshPosTransformNormalMatrices;
 
   enum class ColorSource
   {

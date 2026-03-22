@@ -43,6 +43,14 @@ void Z3DMeshRenderer::setData(std::vector<ZMesh*>* meshInput)
   // Invalidate cached color/picking spans; they will be rebuilt on demand.
   m_meshColorsPt = nullptr;
   m_meshPickingColorsPt = nullptr;
+  // Per-mesh transforms are tied to the current mesh pointer list; clear them
+  // so callers must explicitly re-provide matching arrays after setData().
+  m_origMeshPosTransformsPt = nullptr;
+  m_origMeshPosTransformNormalMatricesPt = nullptr;
+  m_meshPosTransformsPt = nullptr;
+  m_meshPosTransformNormalMatricesPt = nullptr;
+  m_splitMeshesPosTransforms.clear();
+  m_splitMeshesPosTransformNormalMatrices.clear();
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
@@ -87,6 +95,50 @@ void Z3DMeshRenderer::setDataPickingColors(std::vector<glm::vec4>* meshPickingCo
   invalidateOpenglPickingRenderer();
 #endif
   m_pickingDataChanged = true;
+}
+
+void Z3DMeshRenderer::setPerMeshPosTransforms(std::vector<glm::mat4>* meshPosTransformsInput,
+                                              std::vector<glm::mat3>* meshPosTransformNormalMatricesInput)
+{
+  if (meshPosTransformsInput == nullptr || meshPosTransformNormalMatricesInput == nullptr) {
+    m_origMeshPosTransformsPt = nullptr;
+    m_origMeshPosTransformNormalMatricesPt = nullptr;
+    m_meshPosTransformsPt = nullptr;
+    m_meshPosTransformNormalMatricesPt = nullptr;
+    m_splitMeshesPosTransforms.clear();
+    m_splitMeshesPosTransformNormalMatrices.clear();
+    return;
+  }
+
+  CHECK(meshPosTransformsInput->size() == meshPosTransformNormalMatricesInput->size())
+    << "Per-mesh transform and normal-matrix arrays must have the same size";
+  if (m_origMeshPt != nullptr) {
+    CHECK(meshPosTransformsInput->size() == m_origMeshPt->size())
+      << "Per-mesh transform arrays must match the mesh list size";
+  }
+
+  m_origMeshPosTransformsPt = meshPosTransformsInput;
+  m_origMeshPosTransformNormalMatricesPt = meshPosTransformNormalMatricesInput;
+  m_meshPosTransformsPt = meshPosTransformsInput;
+  m_meshPosTransformNormalMatricesPt = meshPosTransformNormalMatricesInput;
+
+  if (m_meshNeedSplit) {
+    CHECK(m_splitCount.size() == meshPosTransformsInput->size()) << "Mesh split-count metadata mismatch";
+    m_splitMeshesPosTransforms.clear();
+    m_splitMeshesPosTransformNormalMatrices.clear();
+    m_splitMeshesPosTransforms.reserve(m_meshPt ? m_meshPt->size() : 0U);
+    m_splitMeshesPosTransformNormalMatrices.reserve(m_splitMeshesPosTransforms.capacity());
+    for (size_t i = 0; i < m_splitCount.size(); ++i) {
+      for (size_t j = 0; j < m_splitCount[i]; ++j) {
+        m_splitMeshesPosTransforms.push_back((*meshPosTransformsInput)[i]);
+        m_splitMeshesPosTransformNormalMatrices.push_back((*meshPosTransformNormalMatricesInput)[i]);
+      }
+    }
+    CHECK(m_meshPt != nullptr);
+    CHECK(m_splitMeshesPosTransforms.size() == m_meshPt->size());
+    m_meshPosTransformsPt = &m_splitMeshesPosTransforms;
+    m_meshPosTransformNormalMatricesPt = &m_splitMeshesPosTransformNormalMatrices;
+  }
 }
 
 void Z3DMeshRenderer::setColorSource(MeshColorSource source)
@@ -232,6 +284,8 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
   if (m_meshPickingColorReady) {
     payload.meshPickingColors = spanOrEmpty(m_meshPickingColorsPt);
   }
+  payload.perMeshPosTransforms = spanOrEmpty(m_meshPosTransformsPt);
+  payload.perMeshPosTransformNormalMatrices = spanOrEmpty(m_meshPosTransformNormalMatricesPt);
   payload.textureHandle = m_textureHandle;
   payload.meshNeedsSplit = m_meshNeedSplit;
   payload.meshColorReady = m_meshColorReady;
@@ -586,6 +640,33 @@ void Z3DMeshRenderer::render(Z3DEye eye)
   auto attr_normal = shader.normalAttributeLocation();
   auto attr_color = shader.colorAttributeLocation();
 
+  const bool hasPerMeshTransforms =
+    (m_meshPosTransformsPt != nullptr && m_meshPosTransformNormalMatricesPt != nullptr && m_meshPt != nullptr &&
+     m_meshPosTransformsPt->size() == m_meshPt->size() &&
+     m_meshPosTransformNormalMatricesPt->size() == m_meshPt->size());
+
+  glm::mat4 coordMat(1.0f);
+  glm::mat3 viewCoordNormalMat(1.0f);
+  if (hasPerMeshTransforms) {
+    coordMat = m_followCoordTransform ? coordTransform() : glm::mat4(1.0f);
+    if (shader.hasPosTransformNormalMatrixUniform()) {
+      const glm::mat4 viewMat = m_rendererBase.viewState().eyes[eye].viewMatrix;
+      // Match GL backend: pos_transform_normal_matrix is in eye space (inverse-transpose of view*model).
+      viewCoordNormalMat = glm::transpose(glm::inverse(glm::mat3(viewMat * coordMat)));
+    }
+  }
+
+  auto applyPerMeshTransform = [&](size_t meshIndex) {
+    if (!hasPerMeshTransforms) {
+      return;
+    }
+    const glm::mat4 modelMat = coordMat * (*m_meshPosTransformsPt)[meshIndex];
+    shader.setPosTransformUniform(modelMat);
+    if (shader.hasPosTransformNormalMatrixUniform()) {
+      shader.setPosTransformNormalMatrixUniform(viewCoordNormalMat * (*m_meshPosTransformNormalMatricesPt)[meshIndex]);
+    }
+  };
+
   if (m_useVAO) {
     if (m_dataChanged) {
       m_VAOs->resize(m_meshPt->size());
@@ -681,6 +762,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
 
     if (drawSurface) {
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
+        applyPerMeshTransform(i);
         if (m_colorSource == MeshColorSource::CustomColor) {
           shader.setUseCustomColorUniform(true);
           shader.setCustomColorUniform((*m_meshColorsPt)[i]);
@@ -713,6 +795,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       // draw the wireframe
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
+        applyPerMeshTransform(i);
         shader.setUseCustomColorUniform(true);
         shader.setCustomColorUniform(m_wireframeColorValue);
 
@@ -752,6 +835,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     }
 
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
+      applyPerMeshTransform(i);
       if (m_colorSource == MeshColorSource::CustomColor) {
         shader.setUseCustomColorUniform(true);
         shader.setCustomColorUniform((*m_meshColorsPt)[i]);
@@ -922,6 +1006,32 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
   auto attr_vertex = shader.vertexAttributeLocation();
   auto attr_normal = shader.normalAttributeLocation();
 
+  const bool hasPerMeshTransforms =
+    (m_meshPosTransformsPt != nullptr && m_meshPosTransformNormalMatricesPt != nullptr && m_meshPt != nullptr &&
+     m_meshPosTransformsPt->size() == m_meshPt->size() &&
+     m_meshPosTransformNormalMatricesPt->size() == m_meshPt->size());
+
+  glm::mat4 coordMat(1.0f);
+  glm::mat3 viewCoordNormalMat(1.0f);
+  if (hasPerMeshTransforms) {
+    coordMat = m_followCoordTransform ? coordTransform() : glm::mat4(1.0f);
+    if (shader.hasPosTransformNormalMatrixUniform()) {
+      const glm::mat4 viewMat = m_rendererBase.viewState().eyes[eye].viewMatrix;
+      viewCoordNormalMat = glm::transpose(glm::inverse(glm::mat3(viewMat * coordMat)));
+    }
+  }
+
+  auto applyPerMeshTransform = [&](size_t meshIndex) {
+    if (!hasPerMeshTransforms) {
+      return;
+    }
+    const glm::mat4 modelMat = coordMat * (*m_meshPosTransformsPt)[meshIndex];
+    shader.setPosTransformUniform(modelMat);
+    if (shader.hasPosTransformNormalMatrixUniform()) {
+      shader.setPosTransformNormalMatrixUniform(viewCoordNormalMat * (*m_meshPosTransformNormalMatricesPt)[meshIndex]);
+    }
+  };
+
   if (m_useVAO) {
     if (m_pickingDataChanged) {
       m_pickingVAOs->resize(m_meshPt->size());
@@ -993,6 +1103,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     }
 
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
+      applyPerMeshTransform(i);
       shader.setCustomColorUniform((*m_meshPickingColorsPt)[i]);
 
       auto type = toGLType((*m_meshPt)[i]->type());
@@ -1039,6 +1150,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     }
 
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
+      applyPerMeshTransform(i);
       shader.setCustomColorUniform((*m_meshPickingColorsPt)[i]);
 
       const auto& vertices = (*m_meshPt)[i]->vertices();

@@ -173,10 +173,14 @@ struct RaycasterSingleChannelBindlessUBOStd140
   uint32_t transfer_function_1 = 0u;
   uint32_t _pad0 = 0u;
   uint32_t _pad1 = 0u;
+  uint32_t _pad2 = 0u;
+  uint32_t _pad3 = 0u;
+  uint32_t _pad4 = 0u;
+  uint32_t _pad5 = 0u;
 };
 
-static_assert(sizeof(RaycasterSingleChannelBindlessUBOStd140) == 16u,
-              "Bindless indices UBO must match GLSL std140 layout (4 uints)");
+static_assert(sizeof(RaycasterSingleChannelBindlessUBOStd140) == 32u,
+              "Bindless indices UBO must match backend-shared imgIndices descriptor range (8 uints / 32B)");
 
 // Block-ID compaction table parameters (must match GLSL)
 constexpr uint32_t kEmptyBlockID = 0xFFFFFFFFu;

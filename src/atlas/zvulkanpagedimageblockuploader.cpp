@@ -71,14 +71,36 @@ std::unique_ptr<ZVulkanTexture> createUint3DTexture(ZVulkanDevice& device, glm::
 
 ZVulkanPagedImageBlockUploader::ZVulkanPagedImageBlockUploader(ZVulkanDevice& device)
   : m_device(device)
-  , m_aliveFlag(std::make_shared<bool>(true))
+  , m_aliveFlag(std::make_shared<std::atomic_bool>(true))
 {}
 
 ZVulkanPagedImageBlockUploader::~ZVulkanPagedImageBlockUploader()
 {
-  *m_aliveFlag = false;
-  std::scoped_lock lock(m_mutex);
-  m_resources.clear();
+  std::vector<const Z3DImg*> owners;
+  {
+    std::scoped_lock lock(m_mutex);
+    owners.reserve(m_resources.size());
+    for (const auto& [image, _] : m_resources) {
+      owners.push_back(image);
+    }
+
+    // Mark callbacks inactive before dropping the uploader so late Z3DImg
+    // destruction callbacks do not touch this uploader after it is gone.
+    m_aliveFlag->store(false, std::memory_order_relaxed);
+    m_resources.clear();
+  }
+
+  // The residency manager owns the paged image-cache textures. If we are being
+  // destroyed during a Vulkan -> OpenGL backend switch, the corresponding Z3DImg
+  // objects may outlive this uploader, so their destruction callbacks can no
+  // longer be relied upon to release residency-managed textures.
+  //
+  // Invariant: backend-switch / teardown paths must have drained Vulkan work
+  // first via preBackendSwitch()/flushForTeardown(), so no managed cache owned
+  // by these images remains pinned when releaseOwner() runs below.
+  for (const Z3DImg* owner : owners) {
+    m_device.residencyManager().releaseOwner(owner);
+  }
 }
 
 void ZVulkanPagedImageBlockUploader::ensureImageResources(Z3DImg& image)
@@ -316,12 +338,12 @@ ZVulkanPagedImageBlockUploader::ensureImageResourcesLocked(Z3DImg& image)
   }
 
   if (!it->second.destructionRegistered) {
-    std::weak_ptr<bool> alive = m_aliveFlag;
+    std::weak_ptr<std::atomic_bool> alive = m_aliveFlag;
     ZVulkanPagedImageBlockUploader* self = this;
     ZVulkanDevice* dev = &m_device;
     image.addDestructionCallback([alive, self, dev, key = &image]() {
       auto alivePtr = alive.lock();
-      if (!alivePtr || !*alivePtr) {
+      if (!alivePtr || !alivePtr->load(std::memory_order_relaxed)) {
         return;
       }
       if (dev) {

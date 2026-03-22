@@ -57,6 +57,12 @@ DEFINE_uint32(
   32,
   "Runtime NG mesh LOD: max encoded fragment bytes in flight per CPU thread when idle (0 disables byte budgeting)");
 
+DEFINE_bool(
+  atlas_ng_mesh_runtime_lod_gpu_transform,
+  true,
+  "Runtime NG mesh LOD: keep chunk vertices in Neuroglancer's stored quantized fragment coordinates and apply the "
+  "per-chunk vertex transform on GPU (OpenGL + Vulkan) instead of CPU-transforming every vertex.");
+
 struct RuntimeNeuroglancerOpenResult
 {
   uint64_t epoch = 0;
@@ -392,12 +398,15 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
   rowsToLoad.erase(std::unique(rowsToLoad.begin(), rowsToLoad.end()), rowsToLoad.end());
 
   QString firstError;
+  const auto vertexSpace = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform
+                             ? ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::Quantized
+                             : ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::LocalVoxel;
   for (const uint32_t row : rowsToLoad) {
     if (m_runtimeNgLoadedRows.contains(row)) {
       continue;
     }
     try {
-      auto chunkMesh = m_runtimeNgSource->loadChunkMeshBlocking(m_runtimeNgSourceKey->segmentId, row);
+      auto chunkMesh = m_runtimeNgSource->loadChunkMeshBlocking(m_runtimeNgSourceKey->segmentId, row, vertexSpace);
       CHECK(chunkMesh);
       m_runtimeNgLoadedRows[row] = std::move(chunkMesh);
     }
@@ -429,6 +438,9 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
     });
 
   std::vector<ZMesh*> frozenVisibleMeshes;
+  std::vector<glm::mat4> frozenVisiblePosTransforms;
+  std::vector<glm::mat3> frozenVisiblePosTransformNormalMatrices;
+  const bool wantGpuTransform = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform;
   for (const auto& drawChunk : drawChunks) {
     auto it = m_runtimeNgLoadedRows.find(drawChunk.row);
     if (it == m_runtimeNgLoadedRows.end()) {
@@ -436,17 +448,29 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
     }
     const auto& chunkMesh = it->second;
     CHECK(chunkMesh);
+    if (wantGpuTransform) {
+      CHECK(chunkMesh->hasVertexToLocalVoxelTransforms())
+        << "Runtime NG GPU transform requires chunk meshes to supply vertex->local transforms";
+      CHECK(chunkMesh->vertexToLocalVoxelTransforms.size() == chunkMesh->subMeshes.size());
+      CHECK(chunkMesh->vertexToLocalVoxelNormalMatrices.size() == chunkMesh->subMeshes.size());
+    }
     CHECK(drawChunk.subChunkBegin <= drawChunk.subChunkEnd);
     CHECK(drawChunk.subChunkEnd <= chunkMesh->subMeshes.size());
     for (uint32_t i = drawChunk.subChunkBegin; i < drawChunk.subChunkEnd; ++i) {
       const auto& subMesh = chunkMesh->subMeshes[i];
       if (subMesh && !subMesh->empty()) {
         frozenVisibleMeshes.push_back(subMesh.get());
+        if (wantGpuTransform) {
+          frozenVisiblePosTransforms.push_back(chunkMesh->vertexToLocalVoxelTransforms[i]);
+          frozenVisiblePosTransformNormalMatrices.push_back(chunkMesh->vertexToLocalVoxelNormalMatrices[i]);
+        }
       }
     }
   }
 
   m_runtimeNgFrozenVisibleMeshes = std::move(frozenVisibleMeshes);
+  m_runtimeNgFrozenVisiblePosTransforms = std::move(frozenVisiblePosTransforms);
+  m_runtimeNgFrozenVisiblePosTransformNormalMatrices = std::move(frozenVisiblePosTransformNormalMatrices);
   m_runtimeNgExportActive = true;
   getVisibleData();
   m_dataIsInvalid = true;
@@ -461,6 +485,8 @@ void Z3DMeshFilter::endExportMeshLod()
 
   m_runtimeNgExportActive = false;
   m_runtimeNgFrozenVisibleMeshes.clear();
+  m_runtimeNgFrozenVisiblePosTransforms.clear();
+  m_runtimeNgFrozenVisiblePosTransformNormalMatrices.clear();
   m_runtimeNgSelectionDirty = true;
   getVisibleData();
   m_dataIsInvalid = true;
@@ -514,7 +540,18 @@ void Z3DMeshFilter::setExternalSourceState(json::value sourceJson,
 
 bool Z3DMeshFilter::isReady(Z3DEye eye) const
 {
-  return Z3DGeometryFilter::isReady(eye) && m_visible.get() && !m_origMeshList.empty();
+  if (!Z3DGeometryFilter::isReady(eye) || !m_visible.get()) {
+    return false;
+  }
+
+  // Runtime Neuroglancer multi-LOD meshes may have no imported coarse mesh geometry.
+  // Even when no vertices are currently visible (e.g. while opening/loading), the
+  // filter must still be allowed to process() so it can drive async LOD streaming.
+  if (m_runtimeNgSourceKey) {
+    return true;
+  }
+
+  return !m_meshList.empty();
 }
 
 std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroup()
@@ -615,6 +652,25 @@ void Z3DMeshFilter::renderPicking(Z3DEye eye)
   }
 }
 
+void Z3DMeshFilter::switchRendererBackend(RenderBackend backendRequest)
+{
+  if (m_runtimeNgSourceKey && !m_runtimeNgExportActive) {
+    // Backend switching should not trigger repaints or pipeline invalidations
+    // from within the filter. We only request cancellation so in-flight row
+    // loads will not post results back mid-switch, and then re-solve the
+    // selection on the next process() call.
+    m_runtimeNgSelectionDirty = true;
+    for (const auto& [row, source] : m_runtimeNgRowCancellationSources) {
+      (void)row;
+      if (source) {
+        source->requestCancellation();
+      }
+    }
+  }
+
+  Z3DBoundedFilter::switchRendererBackend(backendRequest);
+}
+
 void Z3DMeshFilter::setViewport(glm::uvec2 viewport)
 {
   Z3DBoundedFilter::setViewport(viewport);
@@ -657,6 +713,14 @@ void Z3DMeshFilter::prepareData()
   deregisterPickingObjects();
 
   m_triangleListRenderer.setData(&m_meshList);
+  if (!m_meshPosTransforms.empty()) {
+    CHECK(m_meshPosTransforms.size() == m_meshPosTransformNormalMatrices.size())
+      << "Per-mesh transform arrays must match in size";
+    CHECK(m_meshPosTransforms.size() == m_meshList.size()) << "Per-mesh transforms must match mesh list size";
+    m_triangleListRenderer.setPerMeshPosTransforms(&m_meshPosTransforms, &m_meshPosTransformNormalMatrices);
+  } else {
+    m_triangleListRenderer.setPerMeshPosTransforms(nullptr, nullptr);
+  }
   prepareColor();
   adjustWidgets();
   m_dataIsInvalid = false;
@@ -711,6 +775,9 @@ ZBBox<glm::dvec3> Z3DMeshFilter::meshBound(ZMesh* p)
 void Z3DMeshFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox.reset();
+  if (m_runtimeNgSourceKey && m_runtimeNgManifest && m_runtimeNgSource) {
+    m_notTransformedBoundBox.expand(m_runtimeNgSource->multiLodClipBoundsLocalVoxel(*m_runtimeNgManifest));
+  }
   for (auto& mesh : m_origMeshList) {
     m_notTransformedBoundBox.expand(mesh->boundBox());
   }
@@ -855,18 +922,50 @@ void Z3DMeshFilter::resetRuntimeNeuroglancerLodState()
   m_runtimeNgSource.reset();
   m_runtimeNgManifest.reset();
   m_runtimeNgBaseRows.clear();
+  clearRuntimeNeuroglancerRequestFrontier();
   m_runtimeNgLoadedRows.clear();
   m_runtimeNgRowsInFlight.clear();
   m_runtimeNgFailedRows.clear();
   m_runtimeNgVisibleMeshes.clear();
+  m_runtimeNgVisiblePosTransforms.clear();
+  m_runtimeNgVisiblePosTransformNormalMatrices.clear();
   m_runtimeNgFrozenVisibleMeshes.clear();
+  m_runtimeNgFrozenVisiblePosTransforms.clear();
+  m_runtimeNgFrozenVisiblePosTransformNormalMatrices.clear();
   m_runtimeNgBaseReady = false;
   m_runtimeNgInteractionActive = false;
   m_runtimeNgSelectionDirty = false;
   m_runtimeNgExportActive = false;
   getVisibleData();
+  updateBoundBox();
+  initializeRotationCenterIfDefault();
   m_dataIsInvalid = true;
   invalidateResult();
+}
+
+void Z3DMeshFilter::clearRuntimeNeuroglancerRequestFrontier()
+{
+  m_runtimeNgRequestFrontierMode = RuntimeNeuroglancerRequestFrontierMode::None;
+  m_runtimeNgRequestFrontierRows.clear();
+  m_runtimeNgRequestFrontierRowSet.clear();
+  updateRuntimeNeuroglancerRefinementState();
+}
+
+void Z3DMeshFilter::setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode mode,
+                                                          std::vector<uint32_t> rows)
+{
+  CHECK(mode != RuntimeNeuroglancerRequestFrontierMode::None)
+    << "Use clearRuntimeNeuroglancerRequestFrontier() to clear the frontier";
+
+  m_runtimeNgRequestFrontierMode = mode;
+  m_runtimeNgRequestFrontierRows = std::move(rows);
+  m_runtimeNgRequestFrontierRowSet.clear();
+  m_runtimeNgRequestFrontierRowSet.reserve(m_runtimeNgRequestFrontierRows.size());
+  for (const uint32_t row : m_runtimeNgRequestFrontierRows) {
+    CHECK(m_runtimeNgRequestFrontierRowSet.insert(row).second)
+      << "Runtime Neuroglancer request frontier must not contain duplicate rows";
+  }
+  updateRuntimeNeuroglancerRefinementState();
 }
 
 void Z3DMeshFilter::markRuntimeNeuroglancerLodDirty()
@@ -878,6 +977,35 @@ void Z3DMeshFilter::markRuntimeNeuroglancerLodDirty()
   m_runtimeNgCancelObsoleteInFlight = true;
   m_runtimeNgSelectionDirty = true;
   invalidateResult();
+}
+
+void Z3DMeshFilter::updateRuntimeNeuroglancerRefinementState()
+{
+  if (m_runtimeNgRequestFrontierMode != RuntimeNeuroglancerRequestFrontierMode::ViewDriven) {
+    if (m_runtimeNgRefinementActive) {
+      logRuntimeNeuroglancerRefinementFinished("view-driven frontier cleared");
+      m_runtimeNgRefinementActive = false;
+    }
+    return;
+  }
+
+  size_t remainingDesiredRows = 0;
+  for (const uint32_t row : m_runtimeNgRequestFrontierRows) {
+    if (m_runtimeNgLoadedRows.contains(row) || m_runtimeNgFailedRows.contains(row)) {
+      continue;
+    }
+    ++remainingDesiredRows;
+  }
+
+  if (remainingDesiredRows > 0U) {
+    if (!m_runtimeNgRefinementActive) {
+      m_runtimeNgRefinementActive = true;
+      logRuntimeNeuroglancerRefinementStarted(remainingDesiredRows);
+    }
+  } else if (m_runtimeNgRefinementActive) {
+    logRuntimeNeuroglancerRefinementFinished("current view reached target detail");
+    m_runtimeNgRefinementActive = false;
+  }
 }
 
 void Z3DMeshFilter::onRuntimeNeuroglancerCameraChanged()
@@ -926,6 +1054,8 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
     m_runtimeNgManifest = result.manifest;
     m_runtimeNgBaseRows = result.baseRows;
     m_runtimeNgBaseReady = m_runtimeNgBaseRows.empty();
+    updateBoundBox();
+    initializeRotationCenterIfDefault();
     if (!m_runtimeNgBaseReady) {
       // Hybrid policy: stream the full coarsest working set first while the
       // imported coarse mesh remains visible. Once base rows are complete we
@@ -942,7 +1072,10 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
           maxTasksInFlight,
           maxBytesInFlight / (1024ULL * 1024ULL));
       }
-      requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
+      setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode::BaseWarmup, m_runtimeNgBaseRows);
+      (void)pumpRuntimeNeuroglancerRequests();
+    } else {
+      clearRuntimeNeuroglancerRequestFrontier();
     }
     m_runtimeNgSelectionDirty = true;
     invalidateResult();
@@ -954,10 +1087,10 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
     }));
 }
 
-void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& rows)
+size_t Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& rows)
 {
   if (!m_runtimeNgSourceKey || !m_runtimeNgSource || rows.empty()) {
-    return;
+    return 0U;
   }
 
   const bool interactionActive = m_runtimeNgInteractionActive;
@@ -968,7 +1101,7 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
   const size_t availableTaskSlots =
     maxTasksInFlight > m_runtimeNgRowsInFlight.size() ? (maxTasksInFlight - m_runtimeNgRowsInFlight.size()) : 0U;
   if (availableTaskSlots == 0U) {
-    return;
+    return 0U;
   }
 
   struct RowLoadSpec
@@ -1018,13 +1151,16 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
     }
   }
   if (rowsToLoad.empty()) {
-    return;
+    return 0U;
   }
 
   const uint64_t epoch = m_runtimeNgEpoch;
   const uint64_t segmentId = m_runtimeNgSourceKey->segmentId;
   const auto source = m_runtimeNgSource;
   CHECK(source);
+  const auto vertexSpace = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform
+                             ? ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::Quantized
+                             : ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::LocalVoxel;
 
   for (const RowLoadSpec& spec : rowsToLoad) {
     const uint32_t row = spec.row;
@@ -1039,6 +1175,16 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
         return;
       }
 
+      // Cancellation is cooperative and may arrive after the worker finished.
+      // Treat cancellation requested at completion time as "cancelled" so the
+      // filter does not apply results or trigger invalidation from obsolete
+      // tasks (e.g. during backend switches or view changes).
+      bool cancellationRequested = false;
+      if (auto it = m_runtimeNgRowCancellationSources.find(result.row); it != m_runtimeNgRowCancellationSources.end()) {
+        cancellationRequested = it->second && it->second->getToken().isCancellationRequested();
+      }
+      const bool cancelled = result.cancelled || cancellationRequested;
+
       const bool baseWasReady = m_runtimeNgBaseReady;
       m_runtimeNgRowsInFlight.erase(result.row);
       if (auto it = m_runtimeNgRowBytesInFlight.find(result.row); it != m_runtimeNgRowBytesInFlight.end()) {
@@ -1052,10 +1198,13 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
       }
       m_runtimeNgRowCancellationSources.erase(result.row);
 
-      if (result.cancelled) {
+      if (cancelled) {
+        updateRuntimeNeuroglancerRefinementState();
+        (void)pumpRuntimeNeuroglancerRequests();
         if (VLOG_IS_ON(2)) {
           VLOG(2) << fmt::format("Runtime Neuroglancer mesh LOD chunk load cancelled: row={}", result.row);
         }
+        return;
       } else if (result.chunk) {
         m_runtimeNgLoadedRows[result.row] = result.chunk;
       } else {
@@ -1073,13 +1222,15 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
         });
       }
 
+      updateRuntimeNeuroglancerRefinementState();
+      (void)pumpRuntimeNeuroglancerRequests();
+
       if (!m_runtimeNgBaseReady) {
         // Keep streaming the coarsest working set without spending render
         // frames on intermediate partial coverage when an imported coarse mesh
         // is still visible. If the mesh was deferred (no imported geometry),
         // we still need to repaint as chunks arrive so the user can see
         // progressive fill.
-        requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
         if (!hasImportedMeshGeometry(m_origMeshList)) {
           m_runtimeNgSelectionDirty = true;
           invalidateResult();
@@ -1096,9 +1247,9 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
       invalidateResult();
     });
 
-    watcher->setFuture(
-      QtConcurrent::run([source, segmentId, row, epoch, encodedBytes = spec.encodedBytes, cancellationToken]()
-                          -> RuntimeNeuroglancerChunkLoadResult {
+    watcher->setFuture(QtConcurrent::run(
+      [source, segmentId, row, vertexSpace, epoch, encodedBytes = spec.encodedBytes, cancellationToken]()
+        -> RuntimeNeuroglancerChunkLoadResult {
         RuntimeNeuroglancerChunkLoadResult out;
         out.epoch = epoch;
         out.row = row;
@@ -1106,7 +1257,7 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
         CHECK(source);
         try {
           maybeCancel(cancellationToken);
-          auto chunkMesh = source->loadChunkMeshBlocking(segmentId, row, cancellationToken);
+          auto chunkMesh = source->loadChunkMeshBlocking(segmentId, row, vertexSpace, cancellationToken);
           CHECK(chunkMesh);
           out.chunk = std::move(chunkMesh);
         }
@@ -1122,6 +1273,29 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
         return out;
       }));
   }
+
+  return rowsToLoad.size();
+}
+
+size_t Z3DMeshFilter::pumpRuntimeNeuroglancerRequests()
+{
+  if (!m_runtimeNgSourceKey || !m_runtimeNgSource || m_runtimeNgExportActive) {
+    return 0U;
+  }
+  if (m_runtimeNgRequestFrontierMode == RuntimeNeuroglancerRequestFrontierMode::None ||
+      m_runtimeNgRequestFrontierRows.empty()) {
+    return 0U;
+  }
+
+  // View-driven frontiers are only authoritative after the current selection
+  // solve runs. If the filter is dirty, pumping the previous view's frontier
+  // would re-enqueue obsolete work while the new selection is pending.
+  if (m_runtimeNgRequestFrontierMode == RuntimeNeuroglancerRequestFrontierMode::ViewDriven &&
+      m_runtimeNgSelectionDirty) {
+    return 0U;
+  }
+
+  return requestRuntimeNeuroglancerRows(m_runtimeNgRequestFrontierRows);
 }
 
 void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
@@ -1143,9 +1317,12 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     return;
   }
 
+  const bool wantGpuTransform = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform;
+
   m_runtimeNgSelectionDirty = false;
   if (!m_runtimeNgBaseReady) {
-    requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
+    setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode::BaseWarmup, m_runtimeNgBaseRows);
+    (void)pumpRuntimeNeuroglancerRequests();
     if (hasImportedMeshGeometry(m_origMeshList)) {
       return;
     }
@@ -1170,6 +1347,12 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
       });
 
     std::vector<ZMesh*> newVisibleMeshes;
+    std::vector<glm::mat4> newVisiblePosTransforms;
+    std::vector<glm::mat3> newVisiblePosTransformNormalMatrices;
+    if (wantGpuTransform) {
+      newVisiblePosTransforms.reserve(drawChunks.size());
+      newVisiblePosTransformNormalMatrices.reserve(drawChunks.size());
+    }
     for (const auto& drawChunk : drawChunks) {
       auto it = m_runtimeNgLoadedRows.find(drawChunk.row);
       if (it == m_runtimeNgLoadedRows.end()) {
@@ -1177,18 +1360,33 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
       }
       const auto& chunkMesh = it->second;
       CHECK(chunkMesh);
+      if (wantGpuTransform) {
+        CHECK(chunkMesh->hasVertexToLocalVoxelTransforms())
+          << "Runtime NG GPU transform requires chunk meshes to supply vertex->local transforms";
+        CHECK(chunkMesh->vertexToLocalVoxelTransforms.size() == chunkMesh->subMeshes.size());
+        CHECK(chunkMesh->vertexToLocalVoxelNormalMatrices.size() == chunkMesh->subMeshes.size());
+      }
       CHECK(drawChunk.subChunkBegin <= drawChunk.subChunkEnd);
       CHECK(drawChunk.subChunkEnd <= chunkMesh->subMeshes.size());
       for (uint32_t i = drawChunk.subChunkBegin; i < drawChunk.subChunkEnd; ++i) {
         const auto& subMesh = chunkMesh->subMeshes[i];
         if (subMesh && !subMesh->empty()) {
           newVisibleMeshes.push_back(subMesh.get());
+          if (wantGpuTransform) {
+            newVisiblePosTransforms.push_back(chunkMesh->vertexToLocalVoxelTransforms[i]);
+            newVisiblePosTransformNormalMatrices.push_back(chunkMesh->vertexToLocalVoxelNormalMatrices[i]);
+          }
         }
       }
     }
 
-    if (newVisibleMeshes != m_runtimeNgVisibleMeshes) {
+    const bool visibleChanged = (newVisibleMeshes != m_runtimeNgVisibleMeshes) ||
+                                (newVisiblePosTransforms != m_runtimeNgVisiblePosTransforms) ||
+                                (newVisiblePosTransformNormalMatrices != m_runtimeNgVisiblePosTransformNormalMatrices);
+    if (visibleChanged) {
       m_runtimeNgVisibleMeshes = std::move(newVisibleMeshes);
+      m_runtimeNgVisiblePosTransforms = std::move(newVisiblePosTransforms);
+      m_runtimeNgVisiblePosTransformNormalMatrices = std::move(newVisiblePosTransformNormalMatrices);
       getVisibleData();
       m_dataIsInvalid = true;
       invalidateResult();
@@ -1209,42 +1407,32 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
                                                                                     sceneViewport.x,
                                                                                     sceneViewport.y);
 
+  std::vector<uint32_t> desiredFrontierRows;
+  desiredFrontierRows.reserve(desiredRows.size());
   std::unordered_set<uint32_t> desiredRowSet;
   desiredRowSet.reserve(desiredRows.size());
-
-  std::vector<uint32_t> rowsToLoad;
-  rowsToLoad.reserve(desiredRows.size());
   size_t remainingDesiredRows = 0;
   for (const auto& desired : desiredRows) {
     if (desired.empty) {
       continue;
     }
-    desiredRowSet.insert(desired.row);
+    if (!desiredRowSet.insert(desired.row).second) {
+      continue;
+    }
+    desiredFrontierRows.push_back(desired.row);
     const bool loaded = m_runtimeNgLoadedRows.contains(desired.row);
-    const bool inFlight = m_runtimeNgRowsInFlight.contains(desired.row);
     const bool failed = m_runtimeNgFailedRows.contains(desired.row);
     if (!loaded && !failed) {
       ++remainingDesiredRows;
     }
-    if (loaded || inFlight || failed) {
-      continue;
-    }
-    rowsToLoad.push_back(desired.row);
   }
-  if (remainingDesiredRows > 0U) {
-    if (!m_runtimeNgRefinementActive) {
-      m_runtimeNgRefinementActive = true;
-      logRuntimeNeuroglancerRefinementStarted(remainingDesiredRows);
-    }
-  } else if (m_runtimeNgRefinementActive) {
-    logRuntimeNeuroglancerRefinementFinished("current view reached target detail");
-    m_runtimeNgRefinementActive = false;
-  }
+  setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode::ViewDriven,
+                                        std::move(desiredFrontierRows));
 
   if (m_runtimeNgCancelObsoleteInFlight && !m_runtimeNgRowsInFlight.empty()) {
     size_t cancelled = 0;
     for (const uint32_t row : m_runtimeNgRowsInFlight) {
-      if (desiredRowSet.contains(row)) {
+      if (m_runtimeNgRequestFrontierRowSet.contains(row)) {
         continue;
       }
       auto it = m_runtimeNgRowCancellationSources.find(row);
@@ -1266,9 +1454,7 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
   }
   m_runtimeNgCancelObsoleteInFlight = false;
 
-  if (!rowsToLoad.empty()) {
-    requestRuntimeNeuroglancerRows(rowsToLoad);
-  }
+  const size_t rowsToLoadNow = pumpRuntimeNeuroglancerRequests();
 
   const auto drawChunks = ZNeuroglancerPrecomputedMeshSource::chunksToDrawForView(
     *m_runtimeNgManifest,
@@ -1282,6 +1468,12 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     });
 
   std::vector<ZMesh*> newVisibleMeshes;
+  std::vector<glm::mat4> newVisiblePosTransforms;
+  std::vector<glm::mat3> newVisiblePosTransformNormalMatrices;
+  if (wantGpuTransform) {
+    newVisiblePosTransforms.reserve(drawChunks.size());
+    newVisiblePosTransformNormalMatrices.reserve(drawChunks.size());
+  }
   for (const auto& drawChunk : drawChunks) {
     auto it = m_runtimeNgLoadedRows.find(drawChunk.row);
     if (it == m_runtimeNgLoadedRows.end()) {
@@ -1289,30 +1481,42 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     }
     const auto& chunkMesh = it->second;
     CHECK(chunkMesh);
+    if (wantGpuTransform) {
+      CHECK(chunkMesh->hasVertexToLocalVoxelTransforms())
+        << "Runtime NG GPU transform requires chunk meshes to supply vertex->local transforms";
+      CHECK(chunkMesh->vertexToLocalVoxelTransforms.size() == chunkMesh->subMeshes.size());
+      CHECK(chunkMesh->vertexToLocalVoxelNormalMatrices.size() == chunkMesh->subMeshes.size());
+    }
     CHECK(drawChunk.subChunkBegin <= drawChunk.subChunkEnd);
     CHECK(drawChunk.subChunkEnd <= chunkMesh->subMeshes.size());
     for (uint32_t i = drawChunk.subChunkBegin; i < drawChunk.subChunkEnd; ++i) {
       const auto& subMesh = chunkMesh->subMeshes[i];
       if (subMesh && !subMesh->empty()) {
         newVisibleMeshes.push_back(subMesh.get());
+        if (wantGpuTransform) {
+          newVisiblePosTransforms.push_back(chunkMesh->vertexToLocalVoxelTransforms[i]);
+          newVisiblePosTransformNormalMatrices.push_back(chunkMesh->vertexToLocalVoxelNormalMatrices[i]);
+        }
       }
     }
   }
 
-  const bool visibleChanged = (newVisibleMeshes != m_runtimeNgVisibleMeshes);
-  if (VLOG_IS_ON(2) && m_runtimeNgSourceKey && (visibleChanged || !rowsToLoad.empty())) {
+  const bool visibleChanged = (newVisibleMeshes != m_runtimeNgVisibleMeshes) ||
+                              (newVisiblePosTransforms != m_runtimeNgVisiblePosTransforms) ||
+                              (newVisiblePosTransformNormalMatrices != m_runtimeNgVisiblePosTransformNormalMatrices);
+  if (VLOG_IS_ON(2) && m_runtimeNgSourceKey && (visibleChanged || rowsToLoadNow > 0U)) {
     const uint64_t maxBytesInFlight = runtimeNgMaxEncodedBytesInFlight(m_runtimeNgInteractionActive);
     const bool byteBudgetEnabled = (maxBytesInFlight != std::numeric_limits<uint64_t>::max());
     VLOG(2) << fmt::format(
       "Runtime Neuroglancer mesh LOD solve: segment={} mesh='{}' desiredRows={} remainingDesiredRows={} "
       "rowsToFetchNow={} loadedRows={} rowsInFlight={} failedRows={} encodedBytesInFlight={} "
       "maxEncodedBytesInFlight={} byteBudgetEnabled={} detailCutoff={} interactionActive={} visibleSubMeshes={}->{} "
-      "visibleChanged={}",
+      "gpuTransformEnabled={} visibleChanged={}",
       m_runtimeNgSourceKey->segmentId,
       m_runtimeNgSourceKey->meshSourceDirUrl,
       desiredRows.size(),
       remainingDesiredRows,
-      rowsToLoad.size(),
+      rowsToLoadNow,
       m_runtimeNgLoadedRows.size(),
       m_runtimeNgRowsInFlight.size(),
       m_runtimeNgFailedRows.size(),
@@ -1323,11 +1527,14 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
       m_runtimeNgInteractionActive,
       m_runtimeNgVisibleMeshes.size(),
       newVisibleMeshes.size(),
+      wantGpuTransform,
       visibleChanged);
   }
 
   if (visibleChanged) {
     m_runtimeNgVisibleMeshes = std::move(newVisibleMeshes);
+    m_runtimeNgVisiblePosTransforms = std::move(newVisiblePosTransforms);
+    m_runtimeNgVisiblePosTransformNormalMatrices = std::move(newVisiblePosTransformNormalMatrices);
     getVisibleData();
     m_dataIsInvalid = true;
     invalidateResult();
@@ -1396,12 +1603,19 @@ bool Z3DMeshFilter::isSameRuntimeNeuroglancerSource(const ZNeuroglancerMeshExter
 
 void Z3DMeshFilter::getVisibleData()
 {
+  m_meshPosTransforms.clear();
+  m_meshPosTransformNormalMatrices.clear();
+
   if (m_runtimeNgExportActive) {
     m_meshList = m_runtimeNgFrozenVisibleMeshes;
+    m_meshPosTransforms = m_runtimeNgFrozenVisiblePosTransforms;
+    m_meshPosTransformNormalMatrices = m_runtimeNgFrozenVisiblePosTransformNormalMatrices;
     return;
   }
   if (hasRuntimeNeuroglancerLod()) {
     m_meshList = m_runtimeNgVisibleMeshes;
+    m_meshPosTransforms = m_runtimeNgVisiblePosTransforms;
+    m_meshPosTransformNormalMatrices = m_runtimeNgVisiblePosTransformNormalMatrices;
     return;
   }
   m_meshList = m_origMeshList;

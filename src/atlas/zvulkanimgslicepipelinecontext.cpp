@@ -213,22 +213,30 @@ struct SliceSingleChannelBindlessUBOStd140
   uint32_t colormap_1 = 0u;
   uint32_t _pad0 = 0u;
   uint32_t _pad1 = 0u;
+  uint32_t _pad2 = 0u;
+  uint32_t _pad3 = 0u;
+  uint32_t _pad4 = 0u;
+  uint32_t _pad5 = 0u;
 };
 
-static_assert(sizeof(SliceSingleChannelBindlessUBOStd140) == 16u,
-              "Slice bindless indices UBO must match GLSL std140 layout (4 uints)");
+static_assert(sizeof(SliceSingleChannelBindlessUBOStd140) == 32u,
+              "Slice bindless indices UBO must match backend-shared imgIndices descriptor range (8 uints / 32B)");
 
-struct SlicePagedBindlessPushConstants
+// Paged-slice bindless texture indices (matches shader std140 packing).
+struct SlicePagedBindlessUBOStd140
 {
   uint32_t page_directory = 0u;
   uint32_t page_table_cache = 0u;
   uint32_t image_cache = 0u;
   uint32_t volume = 0u;
   uint32_t colormap = 0u;
+  uint32_t _pad0 = 0u;
+  uint32_t _pad1 = 0u;
+  uint32_t _pad2 = 0u;
 };
 
-static_assert(sizeof(SlicePagedBindlessPushConstants) == 20u,
-              "Slice paged push constants must match GLSL packing (5 uints)");
+static_assert(sizeof(SlicePagedBindlessUBOStd140) == 32u,
+              "Slice paged bindless indices UBO must match GLSL std140 packing (5 uints + padding)");
 
 struct Image2DArrayCompositorPushConstants
 {
@@ -238,28 +246,6 @@ struct Image2DArrayCompositorPushConstants
 
 static_assert(sizeof(Image2DArrayCompositorPushConstants) == 8u,
               "Image2DArrayCompositor push constants must match GLSL packing (2 uints)");
-
-// Matches src/atlas/Resources/shader/vulkan/include/raycaster_common.glslinc push-constant layout.
-struct RaycasterProgressivePushConstants
-{
-  float sampling_rate = 1.0f;
-  float iso_value = 0.5f;
-  float local_MIP_threshold = 0.8f;
-  float ze_to_zw_a = 0.0f;
-  float ze_to_zw_b = 0.0f;
-
-  uint32_t page_directory = 0u;
-  uint32_t page_table_cache = 0u;
-  uint32_t image_cache = 0u;
-  uint32_t volume = 0u;
-  uint32_t transfer_function = 0u;
-  uint32_t ray_entry_exit_tex_coord = 0u;
-  uint32_t last_ray_depth_tex = 0u;
-  uint32_t last_color_tex = 0u;
-};
-
-static_assert(sizeof(RaycasterProgressivePushConstants) == 52u,
-              "Raycaster common push constants must match GLSL packing (5 floats + 8 uints)");
 
 } // namespace
 
@@ -601,10 +587,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
         m_imageBlockUploader->uploadPageCaches(*payload.image, channelIndex, uploadTimer);
       }
 
-      const vk::DescriptorSet dsEmpty = m_backend.sharedEmptyDescriptorSet();
+      const vk::DescriptorSet dsIndices = m_backend.sharedImgIndicesDescriptorSet();
       const vk::DescriptorSet dsPageData = m_backend.sharedImgPageDataDescriptorSet();
-      CHECK(dsEmpty && dsPageData)
-        << "Slice BlockIdDiscovery missing backend-shared page-data descriptor sets (unexpected)";
+      CHECK(dsIndices && dsPageData)
+        << "Slice BlockIdDiscovery missing backend-shared descriptor sets (indices/page-data)";
 
       const auto formats = vulkan::extractAttachmentFormats(batch);
       CHECK(!formats.colorFormats.empty()) << "Slice BlockIdDiscovery batch missing color attachment formats";
@@ -627,17 +613,17 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       BlockIdPipelineKey blockKey{levelCount, blockFormat};
       auto& blockPipeline = ensureBlockIdPipeline(blockKey, blockFormat);
 
-      RaycasterProgressivePushConstants pcFrag{};
-      pcFrag.page_directory =
+      SlicePagedBindlessUBOStd140 bindless{};
+      bindless.page_directory =
         m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.pageDirectory, "slice_blockid_page_directory");
-      pcFrag.page_table_cache =
+      bindless.page_table_cache =
         m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.pageTable, "slice_blockid_page_table");
-      const auto* bytes = reinterpret_cast<const std::uint8_t*>(&pcFrag);
-      vk::ArrayProxy<const std::uint8_t> payloadBytes(sizeof(pcFrag), bytes);
-      cmd.pushConstants(blockPipeline.pipeline->pipelineLayoutHandle(),
-                        vk::ShaderStageFlagBits::eFragment,
-                        /*offset=*/0,
-                        payloadBytes);
+      const auto indicesSlice = m_backend.suballocateUniformFor(payload, sizeof(bindless));
+      CHECK(indicesSlice.mapped != nullptr) << "Slice BlockIdDiscovery indices uniform slice mapping missing";
+      std::memcpy(indicesSlice.mapped, &bindless, sizeof(bindless));
+      CHECK(indicesSlice.offset <= std::numeric_limits<uint32_t>::max())
+        << "Slice BlockIdDiscovery indices dynamic offset exceeds uint32 range: " << indicesSlice.offset;
+      const uint32_t indicesDynOffset = static_cast<uint32_t>(indicesSlice.offset);
 
       struct SlicePushConstant
       {
@@ -657,9 +643,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       drawSpec.pipelineLayoutHandle = blockPipeline.pipeline->pipelineLayoutHandle();
       drawSpec.descriptorSetFirst = 0;
       const std::array<vk::DescriptorSet, 3> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
-                                                            dsEmpty,
+                                                            dsIndices,
                                                             dsPageData};
-      const std::array<uint32_t, 1> dynamicOffsets{pageDynOffset};
+      const std::array<uint32_t, 2> dynamicOffsets{indicesDynOffset, pageDynOffset};
       drawSpec.descriptorSets = descriptorSets;
       drawSpec.dynamicOffsets = dynamicOffsets;
       drawSpec.expectedDescriptorSetCount = 3;
@@ -1067,9 +1053,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
         m_imageBlockUploader->uploadPageCaches(*payload.image, channelIndex, uploadTimer);
       }
 
-      const vk::DescriptorSet dsEmpty = m_backend.sharedEmptyDescriptorSet();
+      const vk::DescriptorSet dsIndices = m_backend.sharedImgIndicesDescriptorSet();
       const vk::DescriptorSet dsPageData = m_backend.sharedImgPageDataDescriptorSet();
-      CHECK(dsEmpty && dsPageData) << "Slice paging draw missing backend-shared page-data descriptor sets (unexpected)";
+      CHECK(dsIndices && dsPageData) << "Slice paging draw missing backend-shared descriptor sets (indices/page-data)";
 
       const uint32_t devCap = deviceLevelCap(m_backend.device());
       const uint32_t levelCount = static_cast<uint32_t>(std::min<size_t>(payload.image->numLevels(), devCap));
@@ -1090,23 +1076,26 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
       drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
 
-      SlicePagedBindlessPushConstants pcFrag{};
-      pcFrag.page_directory =
+      SlicePagedBindlessUBOStd140 bindless{};
+      bindless.page_directory =
         m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.pageDirectory, "slice_paged_page_directory");
-      pcFrag.page_table_cache =
+      bindless.page_table_cache =
         m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.pageTable, "slice_paged_page_table");
-      pcFrag.image_cache =
+      bindless.image_cache =
         m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.imageCache, "slice_paged_image_cache");
-      pcFrag.volume = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.volume, "slice_paged_volume");
-      pcFrag.colormap = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.colormap, "slice_paged_colormap");
-      const auto* bytes = reinterpret_cast<const std::uint8_t*>(&pcFrag);
-      vk::ArrayProxy<const std::uint8_t> payloadBytes(sizeof(pcFrag), bytes);
-      cmd.pushConstants(drawSpec.pipelineLayoutHandle, vk::ShaderStageFlagBits::eFragment, /*offset=*/0, payloadBytes);
+      bindless.volume = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.volume, "slice_paged_volume");
+      bindless.colormap = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.colormap, "slice_paged_colormap");
+      const auto indicesSlice = m_backend.suballocateUniformFor(payload, sizeof(bindless));
+      CHECK(indicesSlice.mapped != nullptr) << "Slice paging indices uniform slice mapping missing";
+      std::memcpy(indicesSlice.mapped, &bindless, sizeof(bindless));
+      CHECK(indicesSlice.offset <= std::numeric_limits<uint32_t>::max())
+        << "Slice paging indices dynamic offset exceeds uint32 range: " << indicesSlice.offset;
+      const uint32_t indicesDynOffset = static_cast<uint32_t>(indicesSlice.offset);
 
       const std::array<vk::DescriptorSet, 3> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
-                                                            dsEmpty,
+                                                            dsIndices,
                                                             dsPageData};
-      const std::array<uint32_t, 1> dynamicOffsets{pageDynOffset};
+      const std::array<uint32_t, 2> dynamicOffsets{indicesDynOffset, pageDynOffset};
       drawSpec.descriptorSets = descriptorSets;
       drawSpec.dynamicOffsets = dynamicOffsets;
       drawSpec.expectedDescriptorSetCount = 3;
@@ -1610,8 +1599,6 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
 
   const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
   CHECK(bindlessLayout) << "Slice pipeline requires backend bindless descriptor set layout";
-  const vk::DescriptorSetLayout emptyLayout = m_backend.emptyDescriptorSetLayout();
-  CHECK(emptyLayout) << "Slice pipeline requires backend empty descriptor set layout";
 
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
@@ -1629,9 +1616,11 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
   auto vertexState = makeSliceVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexState, vk::PrimitiveTopology::eTriangleList);
   if (paged) {
+    const vk::DescriptorSetLayout indicesLayout = m_backend.imgIndicesDescriptorSetLayout();
+    CHECK(indicesLayout) << "Slice paged pipeline requires backend indices descriptor set layout";
     const vk::DescriptorSetLayout pageDataLayout = m_backend.imgPageDataDescriptorSetLayout();
     CHECK(pageDataLayout) << "Slice paged pipeline requires backend page-data descriptor set layout";
-    instance.pipeline->setDescriptorSetLayouts({bindlessLayout, emptyLayout, pageDataLayout});
+    instance.pipeline->setDescriptorSetLayouts({bindlessLayout, indicesLayout, pageDataLayout});
   } else {
     const vk::DescriptorSetLayout indicesLayout = m_backend.imgIndicesDescriptorSetLayout();
     CHECK(indicesLayout) << "Slice fast pipeline requires backend indices descriptor set layout";
@@ -1649,14 +1638,9 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
   vk::PushConstantRange vsRange{.stageFlags = vk::ShaderStageFlagBits::eVertex,
                                 .offset = 0,
                                 .size = static_cast<uint32_t>(sizeof(glm::mat4) * 2)};
-  if (paged) {
-    vk::PushConstantRange fsRange{.stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                  .offset = 0,
-                                  .size = static_cast<uint32_t>(sizeof(SlicePagedBindlessPushConstants))};
-    instance.pipeline->setPushConstantRanges({vsRange, fsRange});
-  } else {
-    instance.pipeline->setPushConstantRanges({vsRange});
-  }
+  // Paged slice shaders read bindless indices from a UBO (set=1) to avoid
+  // overlapping push-constant ranges across stages.
+  instance.pipeline->setPushConstantRanges({vsRange});
 
   vk::PipelineColorBlendAttachmentState blend{};
   blend.blendEnable = VK_TRUE;
@@ -1756,8 +1740,8 @@ ZVulkanImgSlicePipelineContext::ensureBlockIdPipeline(const BlockIdPipelineKey& 
 
   const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
   CHECK(bindlessLayout) << "Slice Block-ID pipeline requires backend bindless descriptor set layout";
-  const vk::DescriptorSetLayout emptyLayout = m_backend.emptyDescriptorSetLayout();
-  CHECK(emptyLayout) << "Slice Block-ID pipeline requires backend empty descriptor set layout";
+  const vk::DescriptorSetLayout indicesLayout = m_backend.imgIndicesDescriptorSetLayout();
+  CHECK(indicesLayout) << "Slice Block-ID pipeline requires backend indices descriptor set layout";
   const vk::DescriptorSetLayout pageDataLayout = m_backend.imgPageDataDescriptorSetLayout();
   CHECK(pageDataLayout) << "Slice Block-ID pipeline requires backend page-data descriptor set layout";
 
@@ -1772,7 +1756,7 @@ ZVulkanImgSlicePipelineContext::ensureBlockIdPipeline(const BlockIdPipelineKey& 
 
   auto vertexState = makeSliceVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexState, vk::PrimitiveTopology::eTriangleList);
-  instance.pipeline->setDescriptorSetLayouts({bindlessLayout, emptyLayout, pageDataLayout});
+  instance.pipeline->setDescriptorSetLayouts({bindlessLayout, indicesLayout, pageDataLayout});
   instance.pipeline->setAttachmentFormats({colorFormat}, std::nullopt);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
@@ -1784,10 +1768,7 @@ ZVulkanImgSlicePipelineContext::ensureBlockIdPipeline(const BlockIdPipelineKey& 
   vk::PushConstantRange vsRange{.stageFlags = vk::ShaderStageFlagBits::eVertex,
                                 .offset = 0,
                                 .size = static_cast<uint32_t>(sizeof(glm::mat4) * 2)};
-  vk::PushConstantRange fsRange{.stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                .offset = 0,
-                                .size = static_cast<uint32_t>(sizeof(RaycasterProgressivePushConstants))};
-  instance.pipeline->setPushConstantRanges({vsRange, fsRange});
+  instance.pipeline->setPushConstantRanges({vsRange});
 
   vk::PipelineColorBlendAttachmentState blend{};
   blend.blendEnable = VK_FALSE;
