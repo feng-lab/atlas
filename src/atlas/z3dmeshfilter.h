@@ -107,6 +107,8 @@ protected:
 
   void renderPicking(Z3DEye eye) override;
 
+  void updateSize(const glm::uvec2& targetSize) override;
+
   void prepareData();
 
   void registerPickingObjects() override;
@@ -134,6 +136,10 @@ private:
   void requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& rows);
 
   void applyRuntimeNeuroglancerSelection();
+
+  void logRuntimeNeuroglancerRefinementStarted(size_t remainingDesiredRows);
+
+  void logRuntimeNeuroglancerRefinementFinished(const char* reason);
 
   [[nodiscard]] bool hasRuntimeNeuroglancerLod() const;
 
@@ -196,6 +202,7 @@ private:
   bool m_runtimeNgBaseReady = false;
   bool m_runtimeNgInteractionActive = false;
   bool m_runtimeNgSelectionDirty = false;
+  bool m_runtimeNgRefinementActive = false;
   bool m_runtimeNgProgressiveRendering = true;
   bool m_runtimeNgExportActive = false;
 

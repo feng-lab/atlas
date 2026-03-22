@@ -32,6 +32,12 @@ namespace {
 constexpr float kRuntimeNgInteractionDetailCutoff = 4.0F;
 constexpr float kRuntimeNgIdleDetailCutoff = 1.0F;
 constexpr int kRuntimeNgIdleDelayMs = 180;
+// Runtime mesh LOD must stay visually responsive when many external meshes are
+// present. We therefore stream visible rows in small batches instead of
+// queueing every desired row for one mesh in a single long-running task. This
+// preserves full eventual refinement while avoiding multi-minute "nothing
+// changes until the whole batch finishes" behavior.
+constexpr size_t kRuntimeNgMaxRowsInFlightPerFilter = 2;
 
 struct RuntimeNeuroglancerOpenResult
 {
@@ -520,13 +526,34 @@ void Z3DMeshFilter::renderPicking(Z3DEye eye)
 void Z3DMeshFilter::setViewport(glm::uvec2 viewport)
 {
   Z3DBoundedFilter::setViewport(viewport);
-  markRuntimeNeuroglancerLodDirty();
+  // Runtime Neuroglancer mesh LOD uses the stable scene/output size propagated
+  // from the rendering engine via updateSize(). The compositor temporarily
+  // overrides per-filter viewports for intermediate passes; those must not
+  // dirtify LOD.
 }
 
 void Z3DMeshFilter::setViewport(glm::uvec4 viewport)
 {
   Z3DBoundedFilter::setViewport(viewport);
-  markRuntimeNeuroglancerLodDirty();
+  // See setViewport(glm::uvec2).
+}
+
+void Z3DMeshFilter::updateSize(const glm::uvec2& targetSize)
+{
+  const bool sizeChanged = (targetSize != m_lastUpdateSize);
+  Z3DGeometryFilter::updateSize(targetSize);
+  if (!sizeChanged) {
+    return;
+  }
+
+  // A real output size change should trigger a re-solve of the runtime NG LOD
+  // selection (it is screen-space). This is intentionally keyed off the engine
+  // output size update rather than compositor-internal per-pass viewports.
+  if (!m_runtimeNgSourceKey || m_runtimeNgExportActive) {
+    return;
+  }
+  m_runtimeNgFailedRows.clear();
+  m_runtimeNgSelectionDirty = true;
 }
 
 void Z3DMeshFilter::prepareData()
@@ -707,6 +734,10 @@ void Z3DMeshFilter::updateMeshVisibleState()
 
 void Z3DMeshFilter::resetRuntimeNeuroglancerLodState()
 {
+  if (m_runtimeNgRefinementActive) {
+    logRuntimeNeuroglancerRefinementFinished("state reset");
+    m_runtimeNgRefinementActive = false;
+  }
   ++m_runtimeNgEpoch;
   m_runtimeNgIdleTimer.stop();
   m_runtimeNgSourceKey.reset();
@@ -781,12 +812,22 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
     m_runtimeNgManifest = result.manifest;
     m_runtimeNgBaseRows = result.baseRows;
     m_runtimeNgBaseReady = m_runtimeNgBaseRows.empty();
-    m_runtimeNgSelectionDirty = true;
-    if (!m_runtimeNgBaseRows.empty()) {
+    if (!m_runtimeNgBaseReady) {
+      // Hybrid policy: stream the full coarsest working set first while the
+      // imported coarse mesh remains visible. Once base rows are complete we
+      // switch to runtime chunks and start refining.
+      if (m_runtimeNgSourceKey) {
+        VLOG(1) << fmt::format(
+          "Runtime Neuroglancer mesh base rows stream start: segment={} mesh='{}' baseRows={} maxRowsInFlight={}",
+          m_runtimeNgSourceKey->segmentId,
+          m_runtimeNgSourceKey->meshSourceDirUrl,
+          m_runtimeNgBaseRows.size(),
+          kRuntimeNgMaxRowsInFlightPerFilter);
+      }
       requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
-    } else {
-      invalidateResult();
     }
+    m_runtimeNgSelectionDirty = true;
+    invalidateResult();
   });
 
   watcher->setFuture(QtConcurrent::run([epoch, key, remoteContext]() -> RuntimeNeuroglancerOpenResult {
@@ -802,6 +843,12 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
 
   std::vector<uint32_t> rowsToLoad;
   rowsToLoad.reserve(rows.size());
+  const size_t availableSlots = kRuntimeNgMaxRowsInFlightPerFilter > m_runtimeNgRowsInFlight.size()
+                                  ? (kRuntimeNgMaxRowsInFlightPerFilter - m_runtimeNgRowsInFlight.size())
+                                  : 0U;
+  if (availableSlots == 0U) {
+    return;
+  }
   for (const uint32_t row : rows) {
     if (m_runtimeNgLoadedRows.contains(row) || m_runtimeNgRowsInFlight.contains(row) ||
         m_runtimeNgFailedRows.contains(row)) {
@@ -809,6 +856,9 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
     }
     m_runtimeNgRowsInFlight.insert(row);
     rowsToLoad.push_back(row);
+    if (rowsToLoad.size() >= availableSlots) {
+      break;
+    }
   }
   if (rowsToLoad.empty()) {
     return;
@@ -827,6 +877,7 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
       return;
     }
 
+    const bool baseWasReady = m_runtimeNgBaseReady;
     for (const uint32_t row : result.loadedRows) {
       m_runtimeNgRowsInFlight.erase(row);
     }
@@ -851,6 +902,18 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
       });
     }
 
+    if (!m_runtimeNgBaseReady) {
+      // Keep streaming the coarsest working set without spending render
+      // frames on intermediate partial coverage.
+      requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
+      return;
+    }
+    if (!baseWasReady && m_runtimeNgBaseReady) {
+      VLOG(1) << fmt::format("Runtime Neuroglancer mesh base rows complete: segment={} mesh='{}' baseRowsLoaded={}",
+                             m_runtimeNgSourceKey ? m_runtimeNgSourceKey->segmentId : 0U,
+                             m_runtimeNgSourceKey ? m_runtimeNgSourceKey->meshSourceDirUrl : QString(),
+                             m_runtimeNgBaseRows.size());
+    }
     m_runtimeNgSelectionDirty = true;
     invalidateResult();
   });
@@ -887,19 +950,18 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     return;
   }
 
-  m_runtimeNgSelectionDirty = false;
-
-  if (!m_runtimeNgBaseReady) {
-    getVisibleData();
-    if (m_meshList != m_origMeshList) {
-      m_dataIsInvalid = true;
-      invalidateResult();
-    }
+  // Runtime mesh LOD is driven by the stable scene/output viewport size pushed
+  // in from the rendering engine via updateSize(). Compositor passes
+  // temporarily override per-filter viewports for intermediate targets; those
+  // must not affect LOD selection.
+  const glm::uvec2 sceneViewport = m_lastUpdateSize;
+  if (sceneViewport.x == 0U || sceneViewport.y == 0U) {
     return;
   }
 
-  const glm::uvec4 currentViewport = viewport();
-  if (currentViewport.z == 0U || currentViewport.w == 0U) {
+  m_runtimeNgSelectionDirty = false;
+  if (!m_runtimeNgBaseReady) {
+    requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
     return;
   }
 
@@ -913,17 +975,35 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
                                                                                     modelViewProjection,
                                                                                     clippingPlanes,
                                                                                     detailCutoff,
-                                                                                    currentViewport.z,
-                                                                                    currentViewport.w);
+                                                                                    sceneViewport.x,
+                                                                                    sceneViewport.y);
 
   std::vector<uint32_t> rowsToLoad;
   rowsToLoad.reserve(desiredRows.size());
+  size_t remainingDesiredRows = 0;
   for (const auto& desired : desiredRows) {
-    if (desired.empty || m_runtimeNgLoadedRows.contains(desired.row) || m_runtimeNgRowsInFlight.contains(desired.row) ||
-        m_runtimeNgFailedRows.contains(desired.row)) {
+    if (desired.empty) {
+      continue;
+    }
+    const bool loaded = m_runtimeNgLoadedRows.contains(desired.row);
+    const bool inFlight = m_runtimeNgRowsInFlight.contains(desired.row);
+    const bool failed = m_runtimeNgFailedRows.contains(desired.row);
+    if (!loaded && !failed) {
+      ++remainingDesiredRows;
+    }
+    if (loaded || inFlight || failed) {
       continue;
     }
     rowsToLoad.push_back(desired.row);
+  }
+  if (remainingDesiredRows > 0U) {
+    if (!m_runtimeNgRefinementActive) {
+      m_runtimeNgRefinementActive = true;
+      logRuntimeNeuroglancerRefinementStarted(remainingDesiredRows);
+    }
+  } else if (m_runtimeNgRefinementActive) {
+    logRuntimeNeuroglancerRefinementFinished("current view reached target detail");
+    m_runtimeNgRefinementActive = false;
   }
   if (!rowsToLoad.empty()) {
     requestRuntimeNeuroglancerRows(rowsToLoad);
@@ -934,8 +1014,8 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     modelViewProjection,
     clippingPlanes,
     detailCutoff,
-    currentViewport.z,
-    currentViewport.w,
+    sceneViewport.x,
+    sceneViewport.y,
     [this](uint32_t /*lod*/, uint32_t row, float /*renderScale*/) {
       return m_runtimeNgLoadedRows.contains(row);
     });
@@ -958,7 +1038,28 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     }
   }
 
-  if (newVisibleMeshes != m_runtimeNgVisibleMeshes) {
+  const bool visibleChanged = (newVisibleMeshes != m_runtimeNgVisibleMeshes);
+  if (VLOG_IS_ON(2) && m_runtimeNgSourceKey && (visibleChanged || !rowsToLoad.empty())) {
+    VLOG(2) << fmt::format(
+      "Runtime Neuroglancer mesh LOD solve: segment={} mesh='{}' desiredRows={} remainingDesiredRows={} "
+      "rowsToFetchNow={} loadedRows={} rowsInFlight={} failedRows={} detailCutoff={} interactionActive={} "
+      "visibleSubMeshes={}->{} visibleChanged={}",
+      m_runtimeNgSourceKey->segmentId,
+      m_runtimeNgSourceKey->meshSourceDirUrl,
+      desiredRows.size(),
+      remainingDesiredRows,
+      rowsToLoad.size(),
+      m_runtimeNgLoadedRows.size(),
+      m_runtimeNgRowsInFlight.size(),
+      m_runtimeNgFailedRows.size(),
+      detailCutoff,
+      m_runtimeNgInteractionActive,
+      m_runtimeNgVisibleMeshes.size(),
+      newVisibleMeshes.size(),
+      visibleChanged);
+  }
+
+  if (visibleChanged) {
     m_runtimeNgVisibleMeshes = std::move(newVisibleMeshes);
     getVisibleData();
     m_dataIsInvalid = true;
@@ -968,7 +1069,42 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
 
 bool Z3DMeshFilter::hasRuntimeNeuroglancerLod() const
 {
-  return m_runtimeNgSource != nullptr && m_runtimeNgManifest != nullptr && m_runtimeNgBaseReady;
+  return m_runtimeNgSource != nullptr && m_runtimeNgManifest != nullptr && m_runtimeNgBaseReady &&
+         !m_runtimeNgVisibleMeshes.empty();
+}
+
+void Z3DMeshFilter::logRuntimeNeuroglancerRefinementStarted(size_t remainingDesiredRows)
+{
+  if (!m_runtimeNgSourceKey) {
+    return;
+  }
+  VLOG(1) << fmt::format(
+    "Runtime Neuroglancer mesh refinement started: segment={} mesh='{}' remainingDesiredRows={} loadedRows={} "
+    "rowsInFlight={} failedRows={} visibleSubMeshes={}",
+    m_runtimeNgSourceKey->segmentId,
+    m_runtimeNgSourceKey->meshSourceDirUrl,
+    remainingDesiredRows,
+    m_runtimeNgLoadedRows.size(),
+    m_runtimeNgRowsInFlight.size(),
+    m_runtimeNgFailedRows.size(),
+    m_runtimeNgVisibleMeshes.size());
+}
+
+void Z3DMeshFilter::logRuntimeNeuroglancerRefinementFinished(const char* reason)
+{
+  if (!m_runtimeNgSourceKey) {
+    return;
+  }
+  VLOG(1) << fmt::format(
+    "Runtime Neuroglancer mesh refinement finished: segment={} mesh='{}' reason='{}' loadedRows={} rowsInFlight={} "
+    "failedRows={} visibleSubMeshes={}",
+    m_runtimeNgSourceKey->segmentId,
+    m_runtimeNgSourceKey->meshSourceDirUrl,
+    reason,
+    m_runtimeNgLoadedRows.size(),
+    m_runtimeNgRowsInFlight.size(),
+    m_runtimeNgFailedRows.size(),
+    m_runtimeNgVisibleMeshes.size());
 }
 
 bool Z3DMeshFilter::isSameRuntimeNeuroglancerSource(const ZNeuroglancerMeshExternalSourceKey& key) const
