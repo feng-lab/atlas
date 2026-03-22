@@ -8,6 +8,9 @@
 
 #include <boost/hash2/sha2.hpp>
 
+#include <folly/coro/CurrentExecutor.h>
+#include <folly/executors/GlobalExecutor.h>
+
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -233,9 +236,9 @@ ZHttpDiskCache::Blob ZHttpDiskCache::serializeEntry(const ZHttpGetBytesResult& r
   return out;
 }
 
-std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(
-  const std::string& url,
-  const std::vector<std::pair<std::string, std::string>>& requestHeaders)
+std::optional<ZHttpGetBytesResult>
+ZHttpDiskCache::tryGet(const std::string& url,
+                       const std::vector<std::pair<std::string, std::string>>& requestHeaders) const
 {
   if (!isEnabled()) {
     return std::nullopt;
@@ -275,6 +278,23 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(
                                    std::chrono::seconds(5));
 
   return resOpt;
+}
+
+folly::coro::Task<std::optional<ZHttpGetBytesResult>>
+ZHttpDiskCache::tryGetAsync(std::string url, std::vector<std::pair<std::string, std::string>> requestHeaders) const
+{
+  if (!isEnabled()) {
+    co_return std::nullopt;
+  }
+
+  co_return co_await folly::coro::co_withExecutor(
+    folly::getGlobalCPUExecutor(),
+    [this,
+     url = std::move(url),
+     requestHeaders = std::move(requestHeaders)]() -> folly::coro::Task<std::optional<ZHttpGetBytesResult>> {
+      co_await folly::coro::co_reschedule_on_current_executor;
+      co_return tryGet(url, requestHeaders);
+    }());
 }
 
 void ZHttpDiskCache::put(const std::string& url,

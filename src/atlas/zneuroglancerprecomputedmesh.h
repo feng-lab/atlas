@@ -6,6 +6,8 @@
 #include <QUrl>
 #include <QString>
 
+#include <folly/CancellationToken.h>
+
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -44,14 +46,16 @@ public:
   open(const QUrl& meshDirUrl,
        std::array<double, 3> baseResolutionNm,
        std::array<int64_t, 3> baseVoxelOffset,
-       std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
+       std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext,
+       const folly::CancellationToken& cancellationToken = {});
 
   static std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>
   open(const QUrl& meshDirUrl,
        std::array<double, 3> baseResolutionNm,
        std::array<int64_t, 3> baseVoxelOffset,
        std::chrono::milliseconds timeout,
-       std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
+       std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr,
+       const folly::CancellationToken& cancellationToken = {});
 
   [[nodiscard]] const QUrl& meshDirUrl() const
   {
@@ -134,7 +138,13 @@ public:
     return meshType() == MeshType::MultiLodDraco;
   }
 
+  [[nodiscard]] std::shared_ptr<const MultiLodManifest>
+  loadManifestBlocking(uint64_t segmentId, const folly::CancellationToken& cancellationToken) const;
+
   [[nodiscard]] std::shared_ptr<const MultiLodManifest> loadManifestBlocking(uint64_t segmentId) const;
+
+  [[nodiscard]] std::shared_ptr<const MultiLodChunkMesh>
+  loadChunkMeshBlocking(uint64_t segmentId, uint32_t row, const folly::CancellationToken& cancellationToken) const;
 
   [[nodiscard]] std::shared_ptr<const MultiLodChunkMesh> loadChunkMeshBlocking(uint64_t segmentId, uint32_t row) const;
 
@@ -168,6 +178,11 @@ private:
     double lodScaleMultiplier = 1.0;
     int vertexQuantizationBits = 10;
     glm::mat4 transform{1.0F};
+    // Precomputed constant transform that maps from stored-model coordinates to
+    // Atlas local-voxel coordinates.
+    //
+    // This equals: voxelFromModel(baseResolutionNm/baseVoxelOffset) * transform.
+    glm::mat4 voxelFromStored{1.0F};
     std::optional<ZNeuroglancerPrecomputedVolume::Scale::Sharding> sharding;
   };
 
@@ -185,6 +200,10 @@ private:
     std::optional<MultiLodInfo> multiLodInfo;
     std::array<double, 3> baseResolutionNm{};
     std::array<int64_t, 3> baseVoxelOffset{};
+
+    // Precomputed constant transform from model (nanometer) coordinates to
+    // Atlas local-voxel coordinates. Matches the legacy mesh conversion.
+    glm::mat4 voxelFromModel{1.0F};
   };
 
   struct CachedMultiLodManifest
@@ -244,11 +263,18 @@ private:
   [[nodiscard]] MultiLodManifest parseMultiLodManifest(std::span<const uint8_t> bytes, const MultiLodInfo& info) const;
 
   void convertLegacyMeshVerticesNmToLocalVoxel(ZMesh& mesh) const;
-  void convertMultiLodVerticesToLocalVoxel(std::vector<glm::vec3>& vertices,
-                                           size_t lod,
-                                           const glm::uvec3& fragmentPos,
-                                           const MultiLodManifest& manifest,
-                                           const MultiLodInfo& info) const;
+  // Converts multi-LOD vertices from stored quantized coordinates into Atlas local-voxel coordinates.
+  //
+  // If |normals| is non-null, it is assumed to be in the same pre-transform space as |vertices|
+  // and will be transformed using the correct normal matrix (inverse-transpose of the vertex
+  // linear transform). If the normals are malformed or become invalid, returns false and the
+  // caller should treat them as absent and fall back to CPU normal generation.
+  [[nodiscard]] bool convertMultiLodVerticesToLocalVoxel(std::vector<glm::vec3>& vertices,
+                                                         std::vector<glm::vec3>* normals,
+                                                         size_t lod,
+                                                         const glm::uvec3& fragmentPos,
+                                                         const MultiLodManifest& manifest,
+                                                         const MultiLodInfo& info) const;
 
 private:
   std::shared_ptr<const SharedMeshInfo> m_sharedMeshInfo;

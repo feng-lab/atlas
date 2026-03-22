@@ -568,7 +568,11 @@ ZCurlHttpClient::getBytes(std::string url,
   maybeCancel(cancellationToken);
 
   if (m_diskCache && m_diskCache->isEnabled()) {
-    if (auto cached = m_diskCache->tryGet(url, requestHeaders)) {
+    maybeCancel(cancellationToken);
+    auto cachedTry = co_await folly::coro::co_awaitTry(m_diskCache->tryGetAsync(url, requestHeaders));
+    maybeCancel(cancellationToken);
+    if (cachedTry.hasValue() && cachedTry.value().has_value()) {
+      auto cached = std::move(cachedTry).value();
       VLOG(2) << "HTTP disk cache hit: " << url;
       cached->source = ZHttpGetBytesSource::DiskCache;
       cached->encodedBodyBytes = 0;

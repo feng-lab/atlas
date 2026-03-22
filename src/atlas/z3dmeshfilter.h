@@ -12,6 +12,7 @@
 #include <QObject>
 #include <QPoint>
 #include <QTimer>
+#include <folly/CancellationToken.h>
 #include <map>
 #include <memory>
 #include <optional>
@@ -31,6 +32,7 @@ public:
   explicit Z3DMeshFilter(Z3DGlobalParameters& globalParas,
                          const RegionNode* regionNode = nullptr,
                          QObject* parent = nullptr);
+  ~Z3DMeshFilter() override;
 
   void setMeshColor(const glm::vec4& col)
   {
@@ -194,6 +196,11 @@ private:
   std::unordered_map<uint32_t, std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
     m_runtimeNgLoadedRows;
   std::set<uint32_t> m_runtimeNgRowsInFlight;
+  std::unordered_map<uint32_t, uint64_t> m_runtimeNgRowBytesInFlight;
+  uint64_t m_runtimeNgBytesInFlight = 0;
+  std::shared_ptr<folly::CancellationSource> m_runtimeNgCancellationSource;
+  std::unordered_map<uint32_t, std::shared_ptr<folly::CancellationSource>> m_runtimeNgRowCancellationSources;
+  bool m_runtimeNgCancelObsoleteInFlight = false;
   std::set<uint32_t> m_runtimeNgFailedRows;
   std::vector<ZMesh*> m_runtimeNgVisibleMeshes;
   std::vector<ZMesh*> m_runtimeNgFrozenVisibleMeshes;

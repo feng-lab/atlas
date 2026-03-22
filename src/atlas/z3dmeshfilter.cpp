@@ -2,18 +2,26 @@
 
 #include "z3dmeshrenderer.h"
 #include "z3dtextureglowrenderer.h"
+#include "zcancellation.h"
 #include "zlog.h"
 #include "zmesh.h"
 #include "zneuroglancerremotecontext.h"
 #include "zrandom.h"
 #include "zregionannotation.h"
 
+#include <gflags/gflags.h>
+
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QThreadPool>
 #include <QtConcurrent>
 
+#include <folly/OperationCancelled.h>
+
 #include <algorithm>
+#include <limits>
 #include <ranges>
+#include <unordered_set>
 
 namespace nim {
 
@@ -33,11 +41,21 @@ constexpr float kRuntimeNgInteractionDetailCutoff = 4.0F;
 constexpr float kRuntimeNgIdleDetailCutoff = 1.0F;
 constexpr int kRuntimeNgIdleDelayMs = 180;
 // Runtime mesh LOD must stay visually responsive when many external meshes are
-// present. We therefore stream visible rows in small batches instead of
-// queueing every desired row for one mesh in a single long-running task. This
-// preserves full eventual refinement while avoiding multi-minute "nothing
-// changes until the whole batch finishes" behavior.
-constexpr size_t kRuntimeNgMaxRowsInFlightPerFilter = 2;
+// present. We therefore cap per-filter parallel chunk loads so one mesh cannot
+// monopolize CPU/network resources. When interaction settles we can raise the
+// cap to converge to the idle detail target faster.
+constexpr size_t kRuntimeNgMaxTasksMultiplierInteraction = 4;
+constexpr size_t kRuntimeNgMaxTasksMultiplierIdle = 8;
+
+DEFINE_uint32(
+  atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_interaction,
+  8,
+  "Runtime NG mesh LOD: max encoded fragment bytes in flight per CPU thread while interacting (0 disables byte budgeting)");
+
+DEFINE_uint32(
+  atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_idle,
+  32,
+  "Runtime NG mesh LOD: max encoded fragment bytes in flight per CPU thread when idle (0 disables byte budgeting)");
 
 struct RuntimeNeuroglancerOpenResult
 {
@@ -48,13 +66,14 @@ struct RuntimeNeuroglancerOpenResult
   std::vector<uint32_t> baseRows;
 };
 
-struct RuntimeNeuroglancerChunkBatchResult
+struct RuntimeNeuroglancerChunkLoadResult
 {
   uint64_t epoch = 0;
+  uint32_t row = 0;
+  uint64_t encodedBytes = 0;
+  bool cancelled = false;
   QString error;
-  std::vector<uint32_t> loadedRows;
-  std::vector<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>> loadedChunks;
-  std::vector<uint32_t> failedRows;
+  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh> chunk;
 };
 
 [[nodiscard]] bool sameOptionalArray(const std::optional<std::array<double, 3>>& lhs,
@@ -89,24 +108,76 @@ collectRuntimeNeuroglancerBaseRows(const ZNeuroglancerPrecomputedMeshSource::Mul
   return baseRows;
 }
 
+[[nodiscard]] size_t runtimeNgWorkerThreadCount()
+{
+  QThreadPool* pool = QThreadPool::globalInstance();
+  const int threads = pool ? pool->maxThreadCount() : 1;
+  return std::max<size_t>(1, static_cast<size_t>(threads));
+}
+
+[[nodiscard]] size_t runtimeNgMaxTasksInFlight(bool interactionActive)
+{
+  const size_t threads = runtimeNgWorkerThreadCount();
+  const size_t multiplier =
+    interactionActive ? kRuntimeNgMaxTasksMultiplierInteraction : kRuntimeNgMaxTasksMultiplierIdle;
+  return std::max<size_t>(1, threads * multiplier);
+}
+
+[[nodiscard]] uint64_t runtimeNgMaxEncodedBytesInFlight(bool interactionActive)
+{
+  const size_t threads = runtimeNgWorkerThreadCount();
+  const uint32_t mbPerThread = interactionActive ? FLAGS_atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_interaction
+                                                 : FLAGS_atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_idle;
+  if (mbPerThread == 0U) {
+    return std::numeric_limits<uint64_t>::max();
+  }
+  return static_cast<uint64_t>(mbPerThread) * threads * 1024ULL * 1024ULL;
+}
+
+[[nodiscard]] uint64_t encodedBytesForManifestRow(const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest& manifest,
+                                                  uint32_t row)
+{
+  if (row + 1U >= manifest.offsets.size()) {
+    return 0;
+  }
+  const uint64_t begin = manifest.offsets[row];
+  const uint64_t end = manifest.offsets[row + 1U];
+  return end > begin ? (end - begin) : 0;
+}
+
+[[nodiscard]] bool hasImportedMeshGeometry(const std::vector<ZMesh*>& meshes)
+{
+  for (const ZMesh* mesh : meshes) {
+    if (mesh != nullptr && !mesh->empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 [[nodiscard]] RuntimeNeuroglancerOpenResult
 openRuntimeNeuroglancerSource(uint64_t epoch,
                               const ZNeuroglancerMeshExternalSourceKey& key,
-                              std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
+                              std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext,
+                              folly::CancellationToken cancellationToken)
 {
   RuntimeNeuroglancerOpenResult out;
   out.epoch = epoch;
   try {
+    maybeCancel(cancellationToken);
     CHECK(key.baseResolutionNm);
     CHECK(key.baseVoxelOffset);
     const auto source = remoteContext ? ZNeuroglancerPrecomputedMeshSource::open(QUrl(key.meshSourceDirUrl),
                                                                                  *key.baseResolutionNm,
                                                                                  *key.baseVoxelOffset,
-                                                                                 std::move(remoteContext))
+                                                                                 std::move(remoteContext),
+                                                                                 cancellationToken)
                                       : ZNeuroglancerPrecomputedMeshSource::open(QUrl(key.meshSourceDirUrl),
                                                                                  *key.baseResolutionNm,
                                                                                  *key.baseVoxelOffset,
-                                                                                 std::chrono::milliseconds(30000));
+                                                                                 std::chrono::milliseconds(30000),
+                                                                                 nullptr,
+                                                                                 cancellationToken);
     CHECK(source);
     if (!source->supportsRuntimeLod()) {
       out.error = QStringLiteral("dataset does not support multiscale mesh LOD");
@@ -114,9 +185,15 @@ openRuntimeNeuroglancerSource(uint64_t epoch,
     }
 
     out.source = source;
-    out.manifest = source->loadManifestBlocking(key.segmentId);
+    out.manifest = source->loadManifestBlocking(key.segmentId, cancellationToken);
     CHECK(out.manifest);
     out.baseRows = collectRuntimeNeuroglancerBaseRows(*out.manifest);
+  }
+  catch (const ZCancellationException&) {
+    out.error = QStringLiteral("cancelled");
+  }
+  catch (const folly::OperationCancelled&) {
+    out.error = QStringLiteral("cancelled");
   }
   catch (const std::exception& e) {
     out.error = QString::fromUtf8(e.what());
@@ -226,7 +303,22 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
           this,
           &Z3DMeshFilter::markRuntimeNeuroglancerLodDirty);
 
+  m_runtimeNgCancellationSource = std::make_shared<folly::CancellationSource>();
+
   adjustWidgets();
+}
+
+Z3DMeshFilter::~Z3DMeshFilter()
+{
+  if (m_runtimeNgCancellationSource) {
+    m_runtimeNgCancellationSource->requestCancellation();
+  }
+  for (const auto& [row, source] : m_runtimeNgRowCancellationSources) {
+    (void)row;
+    if (source) {
+      source->requestCancellation();
+    }
+  }
 }
 
 QString Z3DMeshFilter::regionName() const
@@ -262,7 +354,7 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
 
   if (!m_runtimeNgSource || !m_runtimeNgManifest) {
     const RuntimeNeuroglancerOpenResult openResult =
-      openRuntimeNeuroglancerSource(m_runtimeNgEpoch, *m_runtimeNgSourceKey, m_runtimeNgRemoteContext);
+      openRuntimeNeuroglancerSource(m_runtimeNgEpoch, *m_runtimeNgSourceKey, m_runtimeNgRemoteContext, {});
     if (!openResult.error.isEmpty()) {
       LOG(WARNING) << fmt::format("Mesh export LOD preload skipped: {}", openResult.error);
       return;
@@ -738,6 +830,24 @@ void Z3DMeshFilter::resetRuntimeNeuroglancerLodState()
     logRuntimeNeuroglancerRefinementFinished("state reset");
     m_runtimeNgRefinementActive = false;
   }
+
+  // Ensure any in-flight row loads stop promptly (e.g. when closing a scene or
+  // quitting the app). QtConcurrent cannot preempt threads, so background tasks
+  // must cooperate via cancellation tokens.
+  if (m_runtimeNgCancellationSource) {
+    m_runtimeNgCancellationSource->requestCancellation();
+  }
+  for (const auto& [row, source] : m_runtimeNgRowCancellationSources) {
+    (void)row;
+    if (source) {
+      source->requestCancellation();
+    }
+  }
+  m_runtimeNgCancellationSource = std::make_shared<folly::CancellationSource>();
+  m_runtimeNgRowCancellationSources.clear();
+  m_runtimeNgRowBytesInFlight.clear();
+  m_runtimeNgBytesInFlight = 0;
+
   ++m_runtimeNgEpoch;
   m_runtimeNgIdleTimer.stop();
   m_runtimeNgSourceKey.reset();
@@ -765,6 +875,7 @@ void Z3DMeshFilter::markRuntimeNeuroglancerLodDirty()
     return;
   }
   m_runtimeNgFailedRows.clear();
+  m_runtimeNgCancelObsoleteInFlight = true;
   m_runtimeNgSelectionDirty = true;
   invalidateResult();
 }
@@ -776,6 +887,7 @@ void Z3DMeshFilter::onRuntimeNeuroglancerCameraChanged()
   }
   m_runtimeNgInteractionActive = true;
   m_runtimeNgIdleTimer.start(kRuntimeNgIdleDelayMs);
+  m_runtimeNgCancelObsoleteInFlight = true;
   markRuntimeNeuroglancerLodDirty();
 }
 
@@ -795,6 +907,8 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
   const uint64_t epoch = m_runtimeNgEpoch;
   const ZNeuroglancerMeshExternalSourceKey key = *m_runtimeNgSourceKey;
   const auto remoteContext = m_runtimeNgRemoteContext;
+  const folly::CancellationToken cancellationToken =
+    m_runtimeNgCancellationSource ? m_runtimeNgCancellationSource->getToken() : folly::CancellationToken();
 
   auto* watcher = new QFutureWatcher<RuntimeNeuroglancerOpenResult>(this);
   connect(watcher, &QFutureWatcher<RuntimeNeuroglancerOpenResult>::finished, this, [this, watcher, epoch]() {
@@ -817,12 +931,16 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
       // imported coarse mesh remains visible. Once base rows are complete we
       // switch to runtime chunks and start refining.
       if (m_runtimeNgSourceKey) {
+        const size_t maxTasksInFlight = runtimeNgMaxTasksInFlight(m_runtimeNgInteractionActive);
+        const uint64_t maxBytesInFlight = runtimeNgMaxEncodedBytesInFlight(m_runtimeNgInteractionActive);
         VLOG(1) << fmt::format(
-          "Runtime Neuroglancer mesh base rows stream start: segment={} mesh='{}' baseRows={} maxRowsInFlight={}",
+          "Runtime Neuroglancer mesh base rows stream start: segment={} mesh='{}' baseRows={} maxTasksInFlight={} "
+          "maxEncodedBytesInFlightMiB={}",
           m_runtimeNgSourceKey->segmentId,
           m_runtimeNgSourceKey->meshSourceDirUrl,
           m_runtimeNgBaseRows.size(),
-          kRuntimeNgMaxRowsInFlightPerFilter);
+          maxTasksInFlight,
+          maxBytesInFlight / (1024ULL * 1024ULL));
       }
       requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
     }
@@ -830,9 +948,10 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
     invalidateResult();
   });
 
-  watcher->setFuture(QtConcurrent::run([epoch, key, remoteContext]() -> RuntimeNeuroglancerOpenResult {
-    return openRuntimeNeuroglancerSource(epoch, key, remoteContext);
-  }));
+  watcher->setFuture(
+    QtConcurrent::run([epoch, key, remoteContext, cancellationToken]() -> RuntimeNeuroglancerOpenResult {
+      return openRuntimeNeuroglancerSource(epoch, key, remoteContext, cancellationToken);
+    }));
 }
 
 void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& rows)
@@ -841,22 +960,60 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
     return;
   }
 
-  std::vector<uint32_t> rowsToLoad;
-  rowsToLoad.reserve(rows.size());
-  const size_t availableSlots = kRuntimeNgMaxRowsInFlightPerFilter > m_runtimeNgRowsInFlight.size()
-                                  ? (kRuntimeNgMaxRowsInFlightPerFilter - m_runtimeNgRowsInFlight.size())
-                                  : 0U;
-  if (availableSlots == 0U) {
+  const bool interactionActive = m_runtimeNgInteractionActive;
+  const size_t maxTasksInFlight = runtimeNgMaxTasksInFlight(interactionActive);
+  const uint64_t maxEncodedBytesInFlight = runtimeNgMaxEncodedBytesInFlight(interactionActive);
+  const bool byteBudgetEnabled = (maxEncodedBytesInFlight != std::numeric_limits<uint64_t>::max());
+
+  const size_t availableTaskSlots =
+    maxTasksInFlight > m_runtimeNgRowsInFlight.size() ? (maxTasksInFlight - m_runtimeNgRowsInFlight.size()) : 0U;
+  if (availableTaskSlots == 0U) {
     return;
   }
+
+  struct RowLoadSpec
+  {
+    uint32_t row = 0;
+    uint64_t encodedBytes = 0;
+    std::shared_ptr<folly::CancellationSource> cancellationSource;
+  };
+
+  const auto manifest = m_runtimeNgManifest;
+  std::vector<RowLoadSpec> rowsToLoad;
+  rowsToLoad.reserve(std::min(rows.size(), availableTaskSlots));
+
   for (const uint32_t row : rows) {
     if (m_runtimeNgLoadedRows.contains(row) || m_runtimeNgRowsInFlight.contains(row) ||
         m_runtimeNgFailedRows.contains(row)) {
       continue;
     }
+
+    const uint64_t rowBytes = manifest ? encodedBytesForManifestRow(*manifest, row) : 0;
+    const bool atByteBudget = byteBudgetEnabled && rowBytes > 0 &&
+                              m_runtimeNgBytesInFlight >= maxEncodedBytesInFlight && !m_runtimeNgRowsInFlight.empty();
+    if (atByteBudget) {
+      continue;
+    }
+
+    auto rowCancelSource = std::make_shared<folly::CancellationSource>();
+    CHECK(rowCancelSource);
+
     m_runtimeNgRowsInFlight.insert(row);
-    rowsToLoad.push_back(row);
-    if (rowsToLoad.size() >= availableSlots) {
+    m_runtimeNgRowBytesInFlight[row] = rowBytes;
+    if (std::numeric_limits<uint64_t>::max() - m_runtimeNgBytesInFlight < rowBytes) {
+      m_runtimeNgBytesInFlight = std::numeric_limits<uint64_t>::max();
+    } else {
+      m_runtimeNgBytesInFlight += rowBytes;
+    }
+    m_runtimeNgRowCancellationSources[row] = rowCancelSource;
+
+    rowsToLoad.push_back({
+      .row = row,
+      .encodedBytes = rowBytes,
+      .cancellationSource = std::move(rowCancelSource),
+    });
+
+    if (rowsToLoad.size() >= availableTaskSlots) {
       break;
     }
   }
@@ -867,77 +1024,104 @@ void Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& 
   const uint64_t epoch = m_runtimeNgEpoch;
   const uint64_t segmentId = m_runtimeNgSourceKey->segmentId;
   const auto source = m_runtimeNgSource;
+  CHECK(source);
 
-  auto* watcher = new QFutureWatcher<RuntimeNeuroglancerChunkBatchResult>(this);
-  connect(watcher, &QFutureWatcher<RuntimeNeuroglancerChunkBatchResult>::finished, this, [this, watcher, epoch]() {
-    const RuntimeNeuroglancerChunkBatchResult result = watcher->result();
-    watcher->deleteLater();
+  for (const RowLoadSpec& spec : rowsToLoad) {
+    const uint32_t row = spec.row;
+    CHECK(spec.cancellationSource);
+    const folly::CancellationToken cancellationToken = spec.cancellationSource->getToken();
+    auto* watcher = new QFutureWatcher<RuntimeNeuroglancerChunkLoadResult>(this);
+    connect(watcher, &QFutureWatcher<RuntimeNeuroglancerChunkLoadResult>::finished, this, [this, watcher, epoch]() {
+      const RuntimeNeuroglancerChunkLoadResult result = watcher->result();
+      watcher->deleteLater();
 
-    if (result.epoch != epoch || epoch != m_runtimeNgEpoch) {
-      return;
-    }
-
-    const bool baseWasReady = m_runtimeNgBaseReady;
-    for (const uint32_t row : result.loadedRows) {
-      m_runtimeNgRowsInFlight.erase(row);
-    }
-    for (const uint32_t row : result.failedRows) {
-      m_runtimeNgRowsInFlight.erase(row);
-    }
-
-    for (size_t i = 0; i < result.loadedRows.size(); ++i) {
-      m_runtimeNgLoadedRows[result.loadedRows[i]] = result.loadedChunks[i];
-    }
-    for (const uint32_t row : result.failedRows) {
-      m_runtimeNgFailedRows.insert(row);
-    }
-
-    if (!result.error.isEmpty()) {
-      VLOG(1) << fmt::format("Runtime Neuroglancer mesh LOD chunk load had failures: {}", result.error);
-    }
-
-    if (!m_runtimeNgBaseReady) {
-      m_runtimeNgBaseReady = std::ranges::all_of(m_runtimeNgBaseRows, [this](uint32_t row) {
-        return m_runtimeNgLoadedRows.contains(row);
-      });
-    }
-
-    if (!m_runtimeNgBaseReady) {
-      // Keep streaming the coarsest working set without spending render
-      // frames on intermediate partial coverage.
-      requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
-      return;
-    }
-    if (!baseWasReady && m_runtimeNgBaseReady) {
-      VLOG(1) << fmt::format("Runtime Neuroglancer mesh base rows complete: segment={} mesh='{}' baseRowsLoaded={}",
-                             m_runtimeNgSourceKey ? m_runtimeNgSourceKey->segmentId : 0U,
-                             m_runtimeNgSourceKey ? m_runtimeNgSourceKey->meshSourceDirUrl : QString(),
-                             m_runtimeNgBaseRows.size());
-    }
-    m_runtimeNgSelectionDirty = true;
-    invalidateResult();
-  });
-
-  watcher->setFuture(QtConcurrent::run([source, segmentId, rowsToLoad, epoch]() -> RuntimeNeuroglancerChunkBatchResult {
-    RuntimeNeuroglancerChunkBatchResult out;
-    out.epoch = epoch;
-    CHECK(source);
-    for (const uint32_t row : rowsToLoad) {
-      try {
-        auto chunkMesh = source->loadChunkMeshBlocking(segmentId, row);
-        CHECK(chunkMesh);
-        out.loadedRows.push_back(row);
-        out.loadedChunks.push_back(std::move(chunkMesh));
+      if (result.epoch != epoch || epoch != m_runtimeNgEpoch) {
+        return;
       }
-      catch (const std::exception& e) {
-        out.failedRows.push_back(row);
-        if (out.error.isEmpty()) {
-          out.error = QString::fromUtf8(e.what());
+
+      const bool baseWasReady = m_runtimeNgBaseReady;
+      m_runtimeNgRowsInFlight.erase(result.row);
+      if (auto it = m_runtimeNgRowBytesInFlight.find(result.row); it != m_runtimeNgRowBytesInFlight.end()) {
+        const uint64_t bytes = it->second;
+        if (m_runtimeNgBytesInFlight >= bytes) {
+          m_runtimeNgBytesInFlight -= bytes;
+        } else {
+          m_runtimeNgBytesInFlight = 0;
+        }
+        m_runtimeNgRowBytesInFlight.erase(it);
+      }
+      m_runtimeNgRowCancellationSources.erase(result.row);
+
+      if (result.cancelled) {
+        if (VLOG_IS_ON(2)) {
+          VLOG(2) << fmt::format("Runtime Neuroglancer mesh LOD chunk load cancelled: row={}", result.row);
+        }
+      } else if (result.chunk) {
+        m_runtimeNgLoadedRows[result.row] = result.chunk;
+      } else {
+        m_runtimeNgFailedRows.insert(result.row);
+        if (!result.error.isEmpty()) {
+          VLOG(1) << fmt::format("Runtime Neuroglancer mesh LOD chunk load failed: {}", result.error);
+        } else {
+          VLOG(1) << "Runtime Neuroglancer mesh LOD chunk load failed with no error message.";
         }
       }
-    }
-    return out;
-  }));
+
+      if (!m_runtimeNgBaseReady) {
+        m_runtimeNgBaseReady = std::ranges::all_of(m_runtimeNgBaseRows, [this](uint32_t row) {
+          return m_runtimeNgLoadedRows.contains(row);
+        });
+      }
+
+      if (!m_runtimeNgBaseReady) {
+        // Keep streaming the coarsest working set without spending render
+        // frames on intermediate partial coverage when an imported coarse mesh
+        // is still visible. If the mesh was deferred (no imported geometry),
+        // we still need to repaint as chunks arrive so the user can see
+        // progressive fill.
+        requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
+        if (!hasImportedMeshGeometry(m_origMeshList)) {
+          m_runtimeNgSelectionDirty = true;
+          invalidateResult();
+        }
+        return;
+      }
+      if (!baseWasReady && m_runtimeNgBaseReady) {
+        VLOG(1) << fmt::format("Runtime Neuroglancer mesh base rows complete: segment={} mesh='{}' baseRowsLoaded={}",
+                               m_runtimeNgSourceKey ? m_runtimeNgSourceKey->segmentId : 0U,
+                               m_runtimeNgSourceKey ? m_runtimeNgSourceKey->meshSourceDirUrl : QString(),
+                               m_runtimeNgBaseRows.size());
+      }
+      m_runtimeNgSelectionDirty = true;
+      invalidateResult();
+    });
+
+    watcher->setFuture(
+      QtConcurrent::run([source, segmentId, row, epoch, encodedBytes = spec.encodedBytes, cancellationToken]()
+                          -> RuntimeNeuroglancerChunkLoadResult {
+        RuntimeNeuroglancerChunkLoadResult out;
+        out.epoch = epoch;
+        out.row = row;
+        out.encodedBytes = encodedBytes;
+        CHECK(source);
+        try {
+          maybeCancel(cancellationToken);
+          auto chunkMesh = source->loadChunkMeshBlocking(segmentId, row, cancellationToken);
+          CHECK(chunkMesh);
+          out.chunk = std::move(chunkMesh);
+        }
+        catch (const ZCancellationException&) {
+          out.cancelled = true;
+        }
+        catch (const folly::OperationCancelled&) {
+          out.cancelled = true;
+        }
+        catch (const std::exception& e) {
+          out.error = QString::fromUtf8(e.what());
+        }
+        return out;
+      }));
+  }
 }
 
 void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
@@ -962,6 +1146,53 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
   m_runtimeNgSelectionDirty = false;
   if (!m_runtimeNgBaseReady) {
     requestRuntimeNeuroglancerRows(m_runtimeNgBaseRows);
+    if (hasImportedMeshGeometry(m_origMeshList)) {
+      return;
+    }
+
+    // Mesh was deferred (no imported coarse mesh). Render whatever coarsest
+    // chunks we have so far while we continue streaming the full base working
+    // set in the background.
+    const float detailCutoff = kRuntimeNgInteractionDetailCutoff;
+    const glm::mat4 modelViewProjection =
+      m_globalParameters.camera.get().projectionViewMatrix(MonoEye) * coordTransform();
+    const auto clippingPlanes = ZNeuroglancerPrecomputedMeshSource::getFrustumPlanes(modelViewProjection);
+
+    const auto drawChunks = ZNeuroglancerPrecomputedMeshSource::chunksToDrawForView(
+      *m_runtimeNgManifest,
+      modelViewProjection,
+      clippingPlanes,
+      detailCutoff,
+      sceneViewport.x,
+      sceneViewport.y,
+      [this](uint32_t /*lod*/, uint32_t row, float /*renderScale*/) {
+        return m_runtimeNgLoadedRows.contains(row);
+      });
+
+    std::vector<ZMesh*> newVisibleMeshes;
+    for (const auto& drawChunk : drawChunks) {
+      auto it = m_runtimeNgLoadedRows.find(drawChunk.row);
+      if (it == m_runtimeNgLoadedRows.end()) {
+        continue;
+      }
+      const auto& chunkMesh = it->second;
+      CHECK(chunkMesh);
+      CHECK(drawChunk.subChunkBegin <= drawChunk.subChunkEnd);
+      CHECK(drawChunk.subChunkEnd <= chunkMesh->subMeshes.size());
+      for (uint32_t i = drawChunk.subChunkBegin; i < drawChunk.subChunkEnd; ++i) {
+        const auto& subMesh = chunkMesh->subMeshes[i];
+        if (subMesh && !subMesh->empty()) {
+          newVisibleMeshes.push_back(subMesh.get());
+        }
+      }
+    }
+
+    if (newVisibleMeshes != m_runtimeNgVisibleMeshes) {
+      m_runtimeNgVisibleMeshes = std::move(newVisibleMeshes);
+      getVisibleData();
+      m_dataIsInvalid = true;
+      invalidateResult();
+    }
     return;
   }
 
@@ -978,6 +1209,9 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
                                                                                     sceneViewport.x,
                                                                                     sceneViewport.y);
 
+  std::unordered_set<uint32_t> desiredRowSet;
+  desiredRowSet.reserve(desiredRows.size());
+
   std::vector<uint32_t> rowsToLoad;
   rowsToLoad.reserve(desiredRows.size());
   size_t remainingDesiredRows = 0;
@@ -985,6 +1219,7 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     if (desired.empty) {
       continue;
     }
+    desiredRowSet.insert(desired.row);
     const bool loaded = m_runtimeNgLoadedRows.contains(desired.row);
     const bool inFlight = m_runtimeNgRowsInFlight.contains(desired.row);
     const bool failed = m_runtimeNgFailedRows.contains(desired.row);
@@ -1005,6 +1240,32 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     logRuntimeNeuroglancerRefinementFinished("current view reached target detail");
     m_runtimeNgRefinementActive = false;
   }
+
+  if (m_runtimeNgCancelObsoleteInFlight && !m_runtimeNgRowsInFlight.empty()) {
+    size_t cancelled = 0;
+    for (const uint32_t row : m_runtimeNgRowsInFlight) {
+      if (desiredRowSet.contains(row)) {
+        continue;
+      }
+      auto it = m_runtimeNgRowCancellationSources.find(row);
+      if (it == m_runtimeNgRowCancellationSources.end() || !it->second) {
+        continue;
+      }
+      it->second->requestCancellation();
+      ++cancelled;
+    }
+    if (cancelled > 0U && VLOG_IS_ON(2) && m_runtimeNgSourceKey) {
+      VLOG(2) << fmt::format(
+        "Runtime Neuroglancer mesh LOD cancelled obsolete in-flight rows: segment={} mesh='{}' cancelledRows={} "
+        "rowsInFlight={}",
+        m_runtimeNgSourceKey->segmentId,
+        m_runtimeNgSourceKey->meshSourceDirUrl,
+        cancelled,
+        m_runtimeNgRowsInFlight.size());
+    }
+  }
+  m_runtimeNgCancelObsoleteInFlight = false;
+
   if (!rowsToLoad.empty()) {
     requestRuntimeNeuroglancerRows(rowsToLoad);
   }
@@ -1040,10 +1301,13 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
 
   const bool visibleChanged = (newVisibleMeshes != m_runtimeNgVisibleMeshes);
   if (VLOG_IS_ON(2) && m_runtimeNgSourceKey && (visibleChanged || !rowsToLoad.empty())) {
+    const uint64_t maxBytesInFlight = runtimeNgMaxEncodedBytesInFlight(m_runtimeNgInteractionActive);
+    const bool byteBudgetEnabled = (maxBytesInFlight != std::numeric_limits<uint64_t>::max());
     VLOG(2) << fmt::format(
       "Runtime Neuroglancer mesh LOD solve: segment={} mesh='{}' desiredRows={} remainingDesiredRows={} "
-      "rowsToFetchNow={} loadedRows={} rowsInFlight={} failedRows={} detailCutoff={} interactionActive={} "
-      "visibleSubMeshes={}->{} visibleChanged={}",
+      "rowsToFetchNow={} loadedRows={} rowsInFlight={} failedRows={} encodedBytesInFlight={} "
+      "maxEncodedBytesInFlight={} byteBudgetEnabled={} detailCutoff={} interactionActive={} visibleSubMeshes={}->{} "
+      "visibleChanged={}",
       m_runtimeNgSourceKey->segmentId,
       m_runtimeNgSourceKey->meshSourceDirUrl,
       desiredRows.size(),
@@ -1052,6 +1316,9 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
       m_runtimeNgLoadedRows.size(),
       m_runtimeNgRowsInFlight.size(),
       m_runtimeNgFailedRows.size(),
+      m_runtimeNgBytesInFlight,
+      maxBytesInFlight,
+      byteBudgetEnabled,
       detailCutoff,
       m_runtimeNgInteractionActive,
       m_runtimeNgVisibleMeshes.size(),
@@ -1069,8 +1336,17 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
 
 bool Z3DMeshFilter::hasRuntimeNeuroglancerLod() const
 {
-  return m_runtimeNgSource != nullptr && m_runtimeNgManifest != nullptr && m_runtimeNgBaseReady &&
-         !m_runtimeNgVisibleMeshes.empty();
+  if (m_runtimeNgSource == nullptr || m_runtimeNgManifest == nullptr || m_runtimeNgVisibleMeshes.empty()) {
+    return false;
+  }
+
+  if (m_runtimeNgBaseReady) {
+    return true;
+  }
+
+  // When there is no imported coarse mesh (deferred scene-load), show partial
+  // runtime chunks immediately instead of waiting for the full base working set.
+  return !hasImportedMeshGeometry(m_origMeshList);
 }
 
 void Z3DMeshFilter::logRuntimeNeuroglancerRefinementStarted(size_t remainingDesiredRows)

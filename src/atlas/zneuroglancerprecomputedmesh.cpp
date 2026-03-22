@@ -3,6 +3,7 @@
 #include "zneuroglancerremotecontext.h"
 #include "zneuroglancershardedreader.h"
 #include "zneuroglanceruint64sharding.h"
+#include "zcancellation.h"
 #include "zexception.h"
 #include "zlog.h"
 
@@ -14,7 +15,10 @@
 #include <draco/point_cloud/point_cloud.h>
 #include <draco/attributes/point_attribute.h>
 
+#include <folly/OperationCancelled.h>
 #include <folly/coro/BlockingWait.h>
+#include <folly/coro/CurrentExecutor.h>
+#include <folly/coro/WithCancellation.h>
 #include <boost/json.hpp>
 
 #include <algorithm>
@@ -277,6 +281,7 @@ constexpr std::uint8_t kFirstBitLookupTable[256] = {
 struct DecodedPartitionedDracoMesh
 {
   std::vector<glm::vec3> vertices;
+  std::optional<std::vector<glm::vec3>> normals;
   std::vector<std::vector<uint32_t>> partitionIndices;
 };
 
@@ -307,13 +312,20 @@ struct DecodedPartitionedDracoMesh
   return (x & 1U) | ((y << 1U) & 2U) | ((z << 2U) & 4U);
 }
 
-void appendMeshGeometry(const ZMesh& frag, std::vector<glm::vec3>& mergedVertices, std::vector<uint32_t>& mergedIndices)
+void appendMeshGeometry(const ZMesh& frag,
+                        std::vector<glm::vec3>& mergedVertices,
+                        std::vector<glm::vec3>* mergedNormals,
+                        std::vector<uint32_t>& mergedIndices)
 {
   const size_t base = mergedVertices.size();
   CHECK(base <= static_cast<size_t>(std::numeric_limits<uint32_t>::max()));
   const uint32_t base32 = static_cast<uint32_t>(base);
 
   mergedVertices.insert(mergedVertices.end(), frag.vertices().begin(), frag.vertices().end());
+  if (mergedNormals != nullptr) {
+    CHECK(frag.normals().size() == frag.vertices().size());
+    mergedNormals->insert(mergedNormals->end(), frag.normals().begin(), frag.normals().end());
+  }
   mergedIndices.reserve(mergedIndices.size() + frag.indices().size());
   for (const uint32_t idx : frag.indices()) {
     CHECK(idx <= std::numeric_limits<uint32_t>::max() - base32);
@@ -324,24 +336,44 @@ void appendMeshGeometry(const ZMesh& frag, std::vector<glm::vec3>& mergedVertice
 std::shared_ptr<ZMesh> mergeMeshes(const std::vector<std::shared_ptr<ZMesh>>& meshes)
 {
   std::vector<glm::vec3> mergedVertices;
+  std::vector<glm::vec3> mergedNormals;
   std::vector<uint32_t> mergedIndices;
+
+  bool mergeNormals = true;
   for (const auto& mesh : meshes) {
     if (!mesh || mesh->empty()) {
       continue;
     }
-    appendMeshGeometry(*mesh, mergedVertices, mergedIndices);
+    if (mesh->normals().size() != mesh->vertices().size()) {
+      mergeNormals = false;
+      break;
+    }
+  }
+
+  for (const auto& mesh : meshes) {
+    if (!mesh || mesh->empty()) {
+      continue;
+    }
+    appendMeshGeometry(*mesh, mergedVertices, mergeNormals ? &mergedNormals : nullptr, mergedIndices);
   }
 
   auto out = std::make_shared<ZMesh>(ZMesh::Type::TRIANGLES);
   out->setVertices(mergedVertices);
   out->setIndices(mergedIndices);
+  if (mergeNormals) {
+    out->setNormals(mergedNormals);
+  }
   if (!out->empty()) {
-    out->generateNormals();
+    if (!mergeNormals) {
+      out->generateNormals();
+    }
   }
   return out;
 }
 
-std::shared_ptr<ZMesh> buildCompactMesh(const std::vector<glm::vec3>& vertices, const std::vector<uint32_t>& indices)
+std::shared_ptr<ZMesh> buildCompactMesh(const std::vector<glm::vec3>& vertices,
+                                        const std::vector<uint32_t>& indices,
+                                        const std::vector<glm::vec3>* normals)
 {
   if (indices.empty()) {
     return nullptr;
@@ -350,6 +382,12 @@ std::shared_ptr<ZMesh> buildCompactMesh(const std::vector<glm::vec3>& vertices, 
   std::vector<uint32_t> remap(vertices.size(), std::numeric_limits<uint32_t>::max());
   std::vector<glm::vec3> compactVertices;
   compactVertices.reserve(std::min(vertices.size(), indices.size()));
+
+  const bool useNormals = (normals != nullptr && normals->size() == vertices.size());
+  std::vector<glm::vec3> compactNormals;
+  if (useNormals) {
+    compactNormals.reserve(compactVertices.capacity());
+  }
 
   std::vector<uint32_t> compactIndices;
   compactIndices.reserve(indices.size());
@@ -361,6 +399,9 @@ std::shared_ptr<ZMesh> buildCompactMesh(const std::vector<glm::vec3>& vertices, 
       mapped = static_cast<uint32_t>(compactVertices.size());
       remap[idx] = mapped;
       compactVertices.push_back(vertices[idx]);
+      if (useNormals) {
+        compactNormals.push_back((*normals)[idx]);
+      }
     }
     compactIndices.push_back(mapped);
   }
@@ -368,7 +409,11 @@ std::shared_ptr<ZMesh> buildCompactMesh(const std::vector<glm::vec3>& vertices, 
   auto mesh = std::make_shared<ZMesh>(ZMesh::Type::TRIANGLES);
   mesh->setVertices(compactVertices);
   mesh->setIndices(compactIndices);
-  mesh->generateNormals();
+  if (useNormals) {
+    mesh->setNormals(compactNormals);
+  } else {
+    mesh->generateNormals();
+  }
   return mesh;
 }
 
@@ -417,6 +462,30 @@ decodePartitionedDracoMesh(std::span<const uint8_t> bytes, int vertexQuantizatio
     throw ZException("Failed to decode draco mesh: POSITION count mismatch");
   }
 
+  const draco::PointAttribute* const normal = dmesh->GetNamedAttribute(draco::GeometryAttribute::NORMAL);
+  bool hasValidNormals = false;
+  if (normal != nullptr && normal->size() != 0U) {
+    hasValidNormals = true;
+    if (normal->num_components() != 3) {
+      hasValidNormals = false;
+    }
+    if (hasValidNormals && dmesh->GetAttributeElementType(normal->unique_id()) != draco::MESH_CORNER_ATTRIBUTE) {
+      hasValidNormals = false;
+    }
+    // We index vertices by AttributeValueIndex (same as Neuroglancer), so normals must match.
+    if (hasValidNormals && static_cast<size_t>(normal->size()) != static_cast<size_t>(pos->size())) {
+      hasValidNormals = false;
+    }
+    if (hasValidNormals) {
+      for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
+        if (pos->mapped_index(i).value() != normal->mapped_index(i).value()) {
+          hasValidNormals = false;
+          break;
+        }
+      }
+    }
+  }
+
   std::vector<uint32_t> indices(static_cast<size_t>(dmesh->num_faces()) * 3U);
   for (draco::FaceIndex fi(0); fi < dmesh->num_faces(); ++fi) {
     const draco::Mesh::Face& face = dmesh->face(fi);
@@ -433,6 +502,10 @@ decodePartitionedDracoMesh(std::span<const uint8_t> bytes, int vertexQuantizatio
 
   DecodedPartitionedDracoMesh out;
   out.vertices.resize(dmesh->num_points());
+  if (hasValidNormals) {
+    out.normals.emplace();
+    out.normals->resize(dmesh->num_points());
+  }
 
   if (pos->data_type() == draco::DT_INT32) {
     const auto* raw = reinterpret_cast<const int32_t*>(pos->GetAddress(draco::AttributeValueIndex(0)));
@@ -449,6 +522,34 @@ decodePartitionedDracoMesh(std::span<const uint8_t> bytes, int vertexQuantizatio
     for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
       const size_t base = static_cast<size_t>(i.value()) * 3U;
       out.vertices[i.value()] = glm::vec3(raw[base + 0U], raw[base + 1U], raw[base + 2U]);
+    }
+  }
+
+  if (hasValidNormals) {
+    // Decode in AttributeValueIndex order (same indexing as vertices/indices).
+    // If the normals turn out to be malformed (non-finite or degenerate), drop them and fall
+    // back to CPU normal generation later.
+    bool ok = true;
+    for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
+      float tmp[3] = {0.0F, 0.0F, 0.0F};
+      if (!normal->ConvertValue<float>(draco::AttributeValueIndex(i.value()), 3, tmp)) {
+        ok = false;
+        break;
+      }
+      if (!std::isfinite(tmp[0]) || !std::isfinite(tmp[1]) || !std::isfinite(tmp[2])) {
+        ok = false;
+        break;
+      }
+      const glm::vec3 n(tmp[0], tmp[1], tmp[2]);
+      const float len2 = glm::dot(n, n);
+      if (!(len2 > 0.0F) || !std::isfinite(len2)) {
+        ok = false;
+        break;
+      }
+      (*out.normals)[i.value()] = n * (1.0F / std::sqrt(len2));
+    }
+    if (!ok) {
+      out.normals.reset();
     }
   }
 
@@ -604,9 +705,13 @@ std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>
 ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
                                          std::array<double, 3> baseResolutionNm,
                                          std::array<int64_t, 3> baseVoxelOffset,
-                                         std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
+                                         std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext,
+                                         const folly::CancellationToken& cancellationToken)
 {
   CHECK(remoteContext);
+  if (cancellationToken.isCancellationRequested()) {
+    throw ZCancellationException();
+  }
   using SharedMeshInfoCache = std::unordered_map<QString, std::weak_ptr<const SharedMeshInfo>>;
   static SharedMeshInfoCache sharedMeshInfoCache;
 
@@ -635,9 +740,31 @@ ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
     parsedMeshInfo->baseResolutionNm = baseResolutionNm;
     parsedMeshInfo->baseVoxelOffset = baseVoxelOffset;
 
+    {
+      const glm::vec3 invRes(static_cast<float>(1.0 / parsedMeshInfo->baseResolutionNm[0]),
+                             static_cast<float>(1.0 / parsedMeshInfo->baseResolutionNm[1]),
+                             static_cast<float>(1.0 / parsedMeshInfo->baseResolutionNm[2]));
+      const glm::vec3 voxelOffset(static_cast<float>(parsedMeshInfo->baseVoxelOffset[0]),
+                                  static_cast<float>(parsedMeshInfo->baseVoxelOffset[1]),
+                                  static_cast<float>(parsedMeshInfo->baseVoxelOffset[2]));
+
+      // voxel = nm / baseResolutionNm - baseVoxelOffset
+      glm::mat4 voxelFromModel(1.0F);
+      voxelFromModel = glm::translate(voxelFromModel, -voxelOffset);
+      voxelFromModel = glm::scale(voxelFromModel, invRes);
+      parsedMeshInfo->voxelFromModel = voxelFromModel;
+    }
+
     const QUrl infoUrl = parsedMeshInfo->meshDirUrl.resolved(QUrl("info"));
     const std::string infoUrlStr = toStdString(infoUrl.toString());
-    auto resOpt = folly::coro::blockingWait(remoteContext->getResponseAsync(infoUrlStr));
+    std::optional<ZHttpGetBytesResult> resOpt;
+    try {
+      auto task = folly::coro::co_withCancellation(cancellationToken, remoteContext->getResponseAsync(infoUrlStr));
+      resOpt = folly::coro::blockingWait(std::move(task));
+    }
+    catch (const folly::OperationCancelled&) {
+      throw ZCancellationException();
+    }
     if (resOpt) {
       if (resOpt->status != 200) {
         throw ZException(
@@ -666,6 +793,7 @@ ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
           throw ZException("Neuroglancer multi-LOD draco mesh requires vertex_quantization_bits to be 10 or 16");
         }
         info.transform = parseTransform(root);
+        info.voxelFromStored = parsedMeshInfo->voxelFromModel * info.transform;
 
         auto shardingIt = root.find("sharding");
         if (shardingIt != root.end() && !shardingIt->value().is_null()) {
@@ -707,12 +835,33 @@ ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
                                          std::array<double, 3> baseResolutionNm,
                                          std::array<int64_t, 3> baseVoxelOffset,
                                          std::chrono::milliseconds timeout,
-                                         std::shared_ptr<const ZRemoteObjectStore> objectStore)
+                                         std::shared_ptr<const ZRemoteObjectStore> objectStore,
+                                         const folly::CancellationToken& cancellationToken)
 {
   return open(meshDirUrl,
               baseResolutionNm,
               baseVoxelOffset,
-              ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
+              ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)),
+              cancellationToken);
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest>
+ZNeuroglancerPrecomputedMeshSource::loadManifestBlocking(uint64_t segmentId,
+                                                         const folly::CancellationToken& cancellationToken) const
+{
+  CHECK(supportsRuntimeLod());
+  try {
+    auto task = folly::coro::co_withCancellation(cancellationToken, loadCachedManifestAsync(segmentId));
+    const std::shared_ptr<const CachedMultiLodManifest> cached = folly::coro::blockingWait(std::move(task));
+    CHECK(cached);
+    CHECK(cached->manifest);
+    return cached->manifest;
+  }
+  catch (const folly::OperationCancelled&) {
+    // co_withCancellation reports cancellation via folly::OperationCancelled.
+    // Translate to Atlas' cancellation type so callers can unwind consistently.
+    throw ZCancellationException();
+  }
 }
 
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest>
@@ -720,6 +869,23 @@ ZNeuroglancerPrecomputedMeshSource::loadManifestBlocking(uint64_t segmentId) con
 {
   CHECK(supportsRuntimeLod());
   return folly::coro::blockingWait(loadCachedManifestAsync(segmentId))->manifest;
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>
+ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId,
+                                                          uint32_t row,
+                                                          const folly::CancellationToken& cancellationToken) const
+{
+  CHECK(supportsRuntimeLod());
+  try {
+    auto task = folly::coro::co_withCancellation(cancellationToken, loadMultiLodChunkMeshAsync(segmentId, row));
+    return folly::coro::blockingWait(std::move(task));
+  }
+  catch (const folly::OperationCancelled&) {
+    // co_withCancellation reports cancellation via folly::OperationCancelled.
+    // Translate to Atlas' cancellation type so callers can unwind consistently.
+    throw ZCancellationException();
+  }
 }
 
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>
@@ -1077,23 +1243,13 @@ ZNeuroglancerPrecomputedMeshSource::MultiLodManifest ZNeuroglancerPrecomputedMes
 
 void ZNeuroglancerPrecomputedMeshSource::convertLegacyMeshVerticesNmToLocalVoxel(ZMesh& mesh) const
 {
-  const auto& shared = sharedMeshInfo();
-  const glm::vec3 invRes(static_cast<float>(1.0 / shared.baseResolutionNm[0]),
-                         static_cast<float>(1.0 / shared.baseResolutionNm[1]),
-                         static_cast<float>(1.0 / shared.baseResolutionNm[2]));
-  const glm::vec3 voxelOffset(static_cast<float>(shared.baseVoxelOffset[0]),
-                              static_cast<float>(shared.baseVoxelOffset[1]),
-                              static_cast<float>(shared.baseVoxelOffset[2]));
-
-  // stored-model vertices are in nanometer units in the global frame:
+  // Legacy stored-model vertices are in nanometer units in the global frame:
   // voxel = nm / baseResolutionNm - baseVoxelOffset
-  glm::mat4 voxelFromNm(1.0F);
-  voxelFromNm = glm::translate(voxelFromNm, -voxelOffset);
-  voxelFromNm = glm::scale(voxelFromNm, invRes);
-  mesh.transformVerticesByMatrix(voxelFromNm);
+  mesh.transformVerticesByMatrix(sharedMeshInfo().voxelFromModel);
 }
 
-void ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std::vector<glm::vec3>& vertices,
+bool ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std::vector<glm::vec3>& vertices,
+                                                                             std::vector<glm::vec3>* normals,
                                                                              size_t lod,
                                                                              const glm::uvec3& fragmentPos,
                                                                              const MultiLodManifest& manifest,
@@ -1103,14 +1259,6 @@ void ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std
   const float maxQuant = static_cast<float>((1ULL << info.vertexQuantizationBits) - 1ULL);
   CHECK(maxQuant > 0.0F);
 
-  const auto& shared = sharedMeshInfo();
-  const glm::vec3 invRes(static_cast<float>(1.0 / shared.baseResolutionNm[0]),
-                         static_cast<float>(1.0 / shared.baseResolutionNm[1]),
-                         static_cast<float>(1.0 / shared.baseResolutionNm[2]));
-  const glm::vec3 voxelOffset(static_cast<float>(shared.baseVoxelOffset[0]),
-                              static_cast<float>(shared.baseVoxelOffset[1]),
-                              static_cast<float>(shared.baseVoxelOffset[2]));
-
   const float lodScale = std::ldexp(1.0F, static_cast<int>(lod));
   const glm::vec3 scaledChunkShape = manifest.chunkShape * lodScale;
 
@@ -1118,20 +1266,41 @@ void ZNeuroglancerPrecomputedMeshSource::convertMultiLodVerticesToLocalVoxel(std
     manifest.gridOrigin + manifest.vertexOffsets.at(lod) + scaledChunkShape * glm::vec3(fragmentPos);
   const glm::vec3 quantScale = scaledChunkShape / maxQuant;
 
-  glm::mat4 localFromQuant(1.0F);
-  localFromQuant = glm::translate(localFromQuant, fragmentTranslation);
-  localFromQuant = glm::scale(localFromQuant, quantScale);
+  // The full transform is affine and has w=1, so use the cheaper affine form
+  // (avoids per-vertex vec4 multiply and divide).
+  const glm::mat3 storedToVoxelLinear(info.voxelFromStored);
+  const glm::vec3 storedToVoxelTranslation(info.voxelFromStored[3]);
 
-  glm::mat4 modelFromQuant = info.transform * localFromQuant;
+  const glm::vec3 base = storedToVoxelLinear * fragmentTranslation + storedToVoxelTranslation;
 
-  glm::mat4 voxelFromModel(1.0F);
-  voxelFromModel = glm::translate(voxelFromModel, -voxelOffset);
-  voxelFromModel = glm::scale(voxelFromModel, invRes);
+  glm::mat3 quantToVoxelLinear = storedToVoxelLinear;
+  quantToVoxelLinear[0] *= quantScale.x;
+  quantToVoxelLinear[1] *= quantScale.y;
+  quantToVoxelLinear[2] *= quantScale.z;
 
-  const glm::mat4 transform = voxelFromModel * modelFromQuant;
   for (glm::vec3& vertex : vertices) {
-    vertex = glm::applyMatrix(transform, vertex);
+    vertex = base + quantToVoxelLinear * vertex;
   }
+
+  if (normals == nullptr) {
+    return true;
+  }
+  if (normals->size() != vertices.size()) {
+    return false;
+  }
+
+  // Transform normals with the correct normal matrix.
+  const glm::mat3 normalMatrix = glm::transpose(glm::inverse(quantToVoxelLinear));
+  for (glm::vec3& n : *normals) {
+    const glm::vec3 tn = normalMatrix * n;
+    const float len2 = glm::dot(tn, tn);
+    if (!std::isfinite(tn.x) || !std::isfinite(tn.y) || !std::isfinite(tn.z) || !(len2 > 0.0F) ||
+        !std::isfinite(len2)) {
+      return false;
+    }
+    n = tn * (1.0F / std::sqrt(len2));
+  }
+  return true;
 }
 
 std::array<float, 24> ZNeuroglancerPrecomputedMeshSource::getFrustumPlanes(const glm::mat4& modelViewProjection)
@@ -1481,6 +1650,9 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
   CHECK(meshType() == MeshType::MultiLodDraco);
   CHECK(sharedMeshInfo().multiLodInfo);
 
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
+
   const ChunkCacheKey cacheKey{segmentId, row};
   {
     std::lock_guard<std::mutex> lock(m_chunkCacheMutex);
@@ -1498,6 +1670,8 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
   const MultiLodManifest& manifest = *cachedManifest->manifest;
   CHECK(row < manifest.octreeNodes.size());
   CHECK(row + 1U < manifest.offsets.size());
+
+  maybeCancel(cancellationToken);
 
   const uint32_t lod = manifest.rowLods.at(row);
   auto chunkMesh = std::make_shared<MultiLodChunkMesh>();
@@ -1517,17 +1691,26 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
       fmt::format("Neuroglancer multi-LOD mesh fragment data not found for segment {} row {}", segmentId, row));
   }
 
+  maybeCancel(cancellationToken);
+
   DecodedPartitionedDracoMesh decoded =
     decodePartitionedDracoMesh(std::span<const uint8_t>(fragBytesOpt->data(), fragBytesOpt->size()),
                                sharedMeshInfo().multiLodInfo->vertexQuantizationBits,
                                lod != 0U);
-  convertMultiLodVerticesToLocalVoxel(decoded.vertices,
-                                      lod,
-                                      manifest.octreeNodes[row].gridPosition,
-                                      manifest,
-                                      *sharedMeshInfo().multiLodInfo);
+  maybeCancel(cancellationToken);
+  const bool normalsOk = convertMultiLodVerticesToLocalVoxel(decoded.vertices,
+                                                             decoded.normals ? &(*decoded.normals) : nullptr,
+                                                             lod,
+                                                             manifest.octreeNodes[row].gridPosition,
+                                                             manifest,
+                                                             *sharedMeshInfo().multiLodInfo);
+  if (!normalsOk) {
+    decoded.normals.reset();
+  }
+  maybeCancel(cancellationToken);
   for (size_t i = 0; i < decoded.partitionIndices.size(); ++i) {
-    chunkMesh->subMeshes[i] = buildCompactMesh(decoded.vertices, decoded.partitionIndices[i]);
+    chunkMesh->subMeshes[i] =
+      buildCompactMesh(decoded.vertices, decoded.partitionIndices[i], decoded.normals ? &(*decoded.normals) : nullptr);
   }
 
   {

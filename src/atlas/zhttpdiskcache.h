@@ -46,8 +46,14 @@ public:
   }
 
   // Returns cached bytes for the request if present (otherwise std::nullopt).
-  [[nodiscard]] std::optional<ZHttpGetBytesResult> tryGet(const std::string& url,
-                                                          const std::vector<std::pair<std::string, std::string>>& requestHeaders);
+  [[nodiscard]] std::optional<ZHttpGetBytesResult>
+  tryGet(const std::string& url, const std::vector<std::pair<std::string, std::string>>& requestHeaders) const;
+
+  // Async wrapper around tryGet() that offloads synchronous SQLite reads onto a
+  // CPU executor. This prevents callers like the Proxygen EventBase thread from
+  // serializing all concurrent requests on disk-cache hits.
+  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>>
+  tryGetAsync(std::string url, std::vector<std::pair<std::string, std::string>> requestHeaders) const;
 
   // Stores a successful response in the cache. No-op if disabled.
   void put(const std::string& url,

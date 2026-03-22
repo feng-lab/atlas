@@ -293,14 +293,6 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
       }
 
       const ResolvedNeuroglancerMeshSource resolved = resolveNeuroglancerMeshSource(m_doc, key);
-      const auto lodPolicy = resolved.source->supportsRuntimeLod()
-                               ? ZNeuroglancerPrecomputedMeshSource::LodPolicy::Coarsest
-                               : ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest;
-      std::shared_ptr<ZMesh> mesh = resolved.source->loadMeshBlocking(segId, lodPolicy);
-      if (!mesh || mesh->empty()) {
-        errorMsg = QString("Loaded neuroglancer mesh is empty");
-        return 0;
-      }
 
       // Normalize persisted JSON to keep it stable across save/load cycles.
       const json::value normalized = makeNeuroglancerMeshExternalSourceJson(resolved.normalizedRootUrl,
@@ -308,6 +300,36 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
                                                                             segId,
                                                                             resolved.baseResolutionNm,
                                                                             resolved.baseVoxelOffset);
+
+      if (resolved.source->supportsRuntimeLod()) {
+        // Multi-LOD datasets can stream mesh chunks at runtime. Avoid blocking
+        // scene load on coarse mesh materialization; instead register an
+        // external-source placeholder and let Z3DMeshFilter drive progressive
+        // refinement once the 3D view is up.
+        if (VLOG_IS_ON(1)) {
+          VLOG(1) << fmt::format("Scene load: deferring Neuroglancer mesh materialization: segment={} mesh='{}'",
+                                 segId,
+                                 resolved.meshSourceDirUrlForJson);
+        }
+        ZMesh placeholderMesh;
+        return addMeshFromExternalSource(
+          placeholderMesh,
+          QString("NG Mesh %1").arg(segId),
+          QString("Neuroglancer precomputed mesh (deferred)\nSegmentation: %1\nSegment: %2")
+            .arg(resolved.normalizedRootUrl)
+            .arg(segId),
+          normalized,
+          resolved.remoteContext);
+      }
+
+      // Legacy (non-multi-LOD) precomputed meshes have no runtime chunking path,
+      // so we must materialize geometry at load time.
+      std::shared_ptr<ZMesh> mesh =
+        resolved.source->loadMeshBlocking(segId, ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest);
+      if (!mesh || mesh->empty()) {
+        errorMsg = QString("Loaded neuroglancer mesh is empty");
+        return 0;
+      }
 
       return addMeshFromExternalSource(*mesh,
                                        QString("NG Mesh %1").arg(segId),
@@ -571,7 +593,14 @@ void ZMeshDoc::MeshPack::updateDerivedData()
 const QString& ZMeshDoc::MeshPack::info() const
 {
   if (m_info.isEmpty()) {
-    m_info = QString("%1 vertices, %2 triangles").arg(mesh.numVertices()).arg(mesh.numTriangles());
+    if (!sourceJson.is_null() && mesh.empty()) {
+      // External-source meshes (e.g. runtime Neuroglancer LOD) may be registered
+      // as placeholders during scene load. Avoid showing misleading "0 vertices"
+      // in the object manager when the geometry has simply been deferred.
+      m_info = QStringLiteral("Deferred external mesh (runtime LOD)");
+    } else {
+      m_info = QString("%1 vertices, %2 triangles").arg(mesh.numVertices()).arg(mesh.numTriangles());
+    }
   }
   return m_info;
 }
@@ -579,6 +608,12 @@ const QString& ZMeshDoc::MeshPack::info() const
 const QString& ZMeshDoc::MeshPack::detailedInfo() const
 {
   if (m_detailedInfo.isEmpty()) {
+    if (!sourceJson.is_null() && mesh.empty()) {
+      m_detailedInfo = QStringLiteral("Deferred external mesh (runtime LOD)\n"
+                                      "Geometry is streamed when a 3D view is active.");
+      return m_detailedInfo;
+    }
+
     QStringList info;
     ZMeshProperties prop = mesh.properties();
     info << QString("Number of Vertices: %1").arg(prop.numVertices);
