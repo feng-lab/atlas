@@ -113,8 +113,10 @@ namespace vulkan {
 size_t UniformArenaBudgetTraits<ImgRaycasterPayload>::estimateAdditionalBytes(const ImgRaycasterPayload& payload,
                                                                               size_t uniformAlignment)
 {
-  // Raycaster allocates small dynamic UBO slices for bindless texture indices in
-  // planar stages, and a larger PageData std140 UBO in progressive paging.
+  // Raycaster allocates 32B dynamic UBO slices for the backend-shared image
+  // indices descriptor set in planar stages, and a larger PageData std140 UBO
+  // in progressive paging. Fast shaders may only consume the leading fields,
+  // but the binding contract is the full 32B shared descriptor range.
   //
   // Keep this conservative: higher-level schedulers rely on it to pre-size the
   // per-frame uniform arena before recording begins.
@@ -153,7 +155,9 @@ size_t UniformArenaBudgetTraits<ImgSlicePayload>::estimateAdditionalBytes(const 
                                                                           size_t uniformAlignment)
 {
   // Slice renderer allocates:
-  // - A small dynamic UBO slice for bindless texture indices in fast draws.
+  // - A 32B dynamic UBO slice for the backend-shared image indices descriptor
+  //   set in fast draws. Fast shaders may only consume the leading fields, but
+  //   the binding contract is the full 32B shared descriptor range.
   // - A paged bindless-indices UBO plus a larger PageData std140 UBO in paged
   //   slice rendering and block-ID discovery.
   // Shared image indices descriptor set has a fixed 32B std140 range.
@@ -5246,9 +5250,10 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorSetsOnFrame(FrameResources&
     << "Shared OIT descriptor set ring index out of range while priming";
   primeOITDescriptorSet(*frame.sharedOITByRing[oitRingIndex]);
 
-  // Image helpers: indices + page-data UBO views over the uniform arena. Fast
-  // image draws use a 16B std140 prefix, while paged slice paths require the
-  // full 32B bindless-indices block.
+  // Image helpers: indices + page-data UBO views over the uniform arena. All
+  // users of the backend-shared image-indices descriptor bind through one 32B
+  // std140 dynamic UBO range. Some fast shaders only read the leading fields,
+  // but suballocations and budgets must still satisfy the full 32B range.
   constexpr vk::DeviceSize kIndicesRange = sizeof(uint32_t) * 8u; // std140 padded (32B)
   frame.sharedImgIndices->updateUniformBufferDynamic(0, uniformArenaBuffer(), kIndicesRange);
 
