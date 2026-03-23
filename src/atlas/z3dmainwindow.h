@@ -89,8 +89,6 @@ private:
 
   void openScreenshotPanel();
 
-  void openHelpPanel();
-
   void raiseViewSettingDockWidget();
 
   void raiseGlobalSettingDockWidget();
@@ -129,8 +127,6 @@ private:
 
   void onRenderingError(const QString& error);
 
-  static QWidget* createHelpWidget();
-
   void onProgressChanged(int v);
 
   void zoomIn();
@@ -153,7 +149,7 @@ private:
   QToolBar* m_fileToolBar = nullptr;
   QToolBar* m_editToolBar = nullptr;
   QToolBar* m_viewToolBar = nullptr;
-  QToolBar* m_helpToolBar = nullptr;
+  QToolBar* m_shortcutsToolBar = nullptr;
   QToolBar* m_progressToolBar = nullptr;
 
   QAction* m_openAction = nullptr;
@@ -174,7 +170,6 @@ private:
   QDockWidget* m_objectDetailedInfoDockWidget = nullptr;
   QDockWidget* m_globalSettingDockWidget = nullptr;
   QDockWidget* m_captureDockWidget = nullptr;
-  QDockWidget* m_helpDockWidget = nullptr;
   QDockWidget* m_backgroundDockWidget = nullptr;
   QDockWidget* m_axisDockWidget = nullptr;
   QDockWidget* m_traceDockWidget = nullptr;
@@ -187,7 +182,6 @@ private:
   QAction* m_changeBackgroundAction = nullptr;
   QAction* m_changeAxisAction = nullptr;
   QAction* m_screenShotAction = nullptr;
-  QAction* m_helpAction = nullptr;
   QAction* m_traceToolAction = nullptr;
   QProgressBar* m_progressBarWidget = nullptr;
   QAction* m_progressBarAction = nullptr;

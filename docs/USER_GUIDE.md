@@ -45,7 +45,7 @@ Atlas User Guide
   - [6.2 Camera Navigation](#62-camera-navigation)
   - [6.3 Object View Settings in 3D](#63-object-view-settings-in-3d)
   - [6.4 Global View Settings in 3D](#64-global-view-settings-in-3d)
-  - [6.5 Background, Axis, and Help Panels](#65-background-axis-and-help-panels)
+  - [6.5 Background, Axis, and Shortcuts Reference](#65-background-axis-and-shortcuts-reference)
   - [6.6 The Progress Toolbar and Rendering Queue](#66-the-progress-toolbar-and-rendering-queue)
 - [7. Scene Management](#7-scene-management)
   - [7.1 Saving Your Workspace](#71-saving-your-workspace)
@@ -65,8 +65,7 @@ Atlas User Guide
 - [10. Configuration, Logs, and Maintenance](#10-configuration-logs-and-maintenance)
   - [10.1 Configuration Files and Flags](#101-configuration-files-and-flags)
   - [10.2 Log Files and Diagnostics](#102-log-files-and-diagnostics)
-  - [10.3 Custom Commands](#103-custom-commands)
-  - [10.4 Updating and Multiple Instances](#104-updating-and-multiple-instances)
+  - [10.3 Updating and Multiple Instances](#103-updating-and-multiple-instances)
 - [11. Troubleshooting and FAQ](#11-troubleshooting-and-faq)
   - [11.1 Common Errors and Fixes](#111-common-errors-and-fixes)
   - [11.2 Performance Tuning](#112-performance-tuning)
@@ -144,8 +143,8 @@ Perform the following steps the first time you open Atlas:
 1. **Start Atlas**. The 2D main window appears.
 2. **Confirm GPU initialization**. In the console or log window, look for messages showing that the OpenGL or Vulkan renderer initialized successfully. When Vulkan is enabled, Atlas may present the 3D view with a small display latency because frames are read back asynchronously.
 3. **Open the 3D window** via **View → Open 3D Window** once to confirm that 3D rendering is working correctly. Close it again if you prefer to start in 2D.
-4. **Open the Help dock** and skim navigation shortcuts.
-5. **Generate configuration file** if you require custom flags: **Help → Generate Config File** copies the default `settings_flagfile.txt` into your config directory. You can edit the new `user_settings_flagfile.txt` afterwards.
+4. **Open the Shortcuts reference** from **Help → Shortcuts** and skim the navigation shortcuts. In both the 2D and 3D windows, this opens the User Guide directly to the keyboard-and-mouse shortcuts section.
+5. **Open Settings...** if you want to customize runtime defaults: **Edit → Settings...** opens the structured settings editor and creates `user_settings_flagfile.txt` when you save for the first time. On macOS, the same action may appear in the standard application menu instead of Edit. Use the dialog’s **Edit Config Flag File...** button if you prefer to work directly in a text editor.
 6. **Set your default working folders** by loading an image to seed the recent-files list and default directory history.
 
 ### 2.3 Understanding the Atlas File Layout
@@ -154,7 +153,7 @@ Atlas keeps runtime files in a few key locations:
 
 - **Installation directory**: contains the executable and bundled application resources.
 - **Log directory**: runtime logs, including 3D engine diagnostics.
-- **Config directory**: user settings, generated flag files, and animation defaults.
+- **Config directory**: user settings, the saved `user_settings_flagfile.txt`, and animation defaults.
 - **Scene files** (`*.scene`): stored wherever you save them; contain the saved workspace state and view settings.
 - **Animation files** (`*.animation3d`, `*.animation2d`): saved alongside your data or in project folders.
 
@@ -172,10 +171,10 @@ Atlas keeps runtime files in a few key locations:
 Key regions:
 
 1. **Menu bar** (top): global commands grouped by theme (File, Edit, View, Animation, Window, Help).
-2. **Toolbars** (top rows): quick access to open, save, zoom, view mode toggles, ROI tools, help).
+2. **Toolbars** (top rows): quick access to open, save, zoom, view mode toggles, ROI tools, and shortcuts.
 3. **Objects Manager** (right dock): tree of all loaded objects with visibility and lock controls.
 4. **Central 2D View**: renders images and overlays; responds to navigation and editing gestures.
-5. **Dock widgets** (right, bottom, and floating): object and global view settings, detailed metadata, capture panels, edit widgets, help text.
+5. **Dock widgets** (right, bottom, and floating): object and global view settings, detailed metadata, capture panels, and edit widgets.
 6. **Status bar** (bottom): short messages like “Ready” or “scene saved as ...”.
 
 ### 3.2 Menus in Detail
@@ -197,6 +196,7 @@ Below is an expanded description of each menu. Some menu items appear only when 
 
 1. **Undo / Redo** – applies to the active editor or selected object when that content supports undo history.
 2. **Copy / Paste** – operate on 2D selections, ROI shapes, or annotation data depending on current tool.
+3. **Settings...** – opens the structured runtime-settings editor for the curated gflags subset. On macOS, this may appear in the standard application menu instead of Edit.
 
 #### View
 
@@ -219,11 +219,9 @@ Below is an expanded description of each menu. Some menu items appear only when 
 
 1. **About Atlas / About Qt** – application and Qt version info.
 2. **Check for Updates** – launches Qt’s MaintenanceTool.
-3. **Help** – raises the Help dock.
+3. **Shortcuts** – opens the User Guide directly to the keyboard and mouse shortcuts reference.
 4. **Create Desktop Entry** (Linux) – writes a `.desktop` file under `~/.local/share/applications`.
-5. **Open Log Folder / Open Config Folder** – opens respective directories in the OS file browser.
-6. **Generate Config File** – copies `settings_flagfile.txt` from resources to the config directory.
-7. **Run Custom Command** – launches the optional custom-command feature for local automation or scripting workflows (see section 10.3).
+5. **Open Log Folder / Open Disk Cache Folder** – opens those directories in the OS file browser.
 
 ### 3.3 Toolbars and Quick Controls
 
@@ -234,7 +232,7 @@ Toolbars mirror frequently used menu actions:
 - **View Toolbar** – Zoom controls, the current scale display, view style toggles, a 3D window shortcut, and screenshot access.
 - **Drag Mode Toolbar** – toggles between Scroll Hand Drag and Rubber Band Drag; integrates ROI sculpting actions (spline, polygon, rectangle, ellipse, cut).
 - **ROI Toolbar** – drop-down ROI tool selector plus ROI mode switch (RegionAnnotation vs ROI).
-- **Help Toolbar** – quick access to the Help dock.
+- **Shortcuts Toolbar** – quick access to the shortcuts reference in the User Guide.
 
 Toolbars can be rearranged or floated like standard application toolbars. Right-click a toolbar area to toggle visibility.
 
@@ -247,7 +245,6 @@ Dock widgets provide specialized interfaces. You can anchor them to any side, ta
 - **Global View Setting** – controls for global plane cuts, camera defaults, fog, transparency mode, lighting and stereo parameters.
 - **Object Detailed Info** – read-only metadata such as voxel sizes, mesh statistics, and ROI metrics.
 - **Capture** – controls for saving 2D output.
-- **Help** – static reminder of navigation shortcuts; can float for quick reference.
 - **Edit and Output** – hosts a tab per active editor, such as ROI editing, animation timelines, or puncta detection. It also contains a persistent “Log Output” tab for system logs.
 
 <!-- > 📸 **Screenshot to add:** Objects Manager context menu showing Show/Hide, Lock/Unlock, Save, Save As, Make Alias.-->
@@ -263,7 +260,7 @@ Dock widgets provide specialized interfaces. You can anchor them to any side, ta
 
 1. Resize docks and arrange toolbars to fit your workflow. Atlas remembers your workspace layout between launches.
 2. Tabify related docks (e.g., Object View Setting and Global View Setting) to save space.
-3. Float the Help dock or Capture dock onto a secondary monitor if desired.
+3. Float the Capture dock or keep the Shortcuts reference dialog open on a secondary monitor if desired.
 4. If you have multiple monitors, drag the 3D window to a dedicated display and Atlas will remember the position (3D window geometry is saved separately).
 
 ---
@@ -298,7 +295,7 @@ Steps to load and manage images:
    2. Enter a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `s3://`, `http://`, `https://`. (Note: Neuroglancer viewer state `.json` URLs are not dataset roots; use **File → Load Neuroglancer (State JSON)...** for share links / state JSON.)
    3. Use the **History** tab to re-open previously loaded datasets; optionally assign friendly names (editable in the dialog).
    4. Use the **Examples** tab for a small built-in list of public datasets.
-   5. The history is stored in the user config folder as `neuroglancer_precomputed_history.json` (open via **Help → Open Config Folder**).
+   5. The history is stored in the user config folder as `neuroglancer_precomputed_history.json` (open **Edit → Settings...**, then use **Open Config Folder**).
    6. Current limitations: read-only dataset. Supported chunk encodings are `raw`, `jpeg` (uint8, 1 or 3 channels), `png` (unsigned 1–2 bytes/voxel, 1–4 channels), `compresso` (unsigned 1/2/4/8 bytes/voxel, 1 channel), and `compressed_segmentation` (uint32/uint64 segmentation). Sharded volumes require an HTTP server that supports `Range` requests.
    7. Segmentation datasets (`type=segmentation`) default to **Voxel Display → Segmentation Labels** (stable pseudo‑random colors per label ID). You can switch back to intensity rendering via the Object View Setting dock.
    8. For segmentation datasets, Atlas also supports optional Neuroglancer metadata and derived objects:
@@ -653,8 +650,8 @@ Atlas is designed to stay responsive on **large-scale images**. The 2D view is v
 
 1. **Zoom (keyboard / toolbar)**
    - Use **View → Zoom In / Zoom Out**, the toolbar zoom icons, or:
-     - Zoom in: `Ctrl/Cmd` + `=` (or `+`)
-     - Zoom out: `Ctrl/Cmd` + `-`
+     - Zoom in: `Ctrl/Cmd` + `=` (or `+`); `=` / `+` also work when the 2D window has focus
+     - Zoom out: `Ctrl/Cmd` + `-`; `-` also works when the 2D window has focus
    - **Zoom to the mouse cursor (highly useful on large images):**
      1. Move the mouse over the feature/area you care about.
      2. Press the zoom shortcut (or click the zoom toolbar buttons).
@@ -1032,7 +1029,7 @@ Atlas uses a classical **trackball/orbit** camera controller centered on the cam
 - **Rotate**: `Ctrl` + arrow keys *(may require a numeric keypad on some keyboards/layouts)*.
 - **Pan**: `Shift` + arrow keys *(same note as above)*.
 - **Roll**: `Alt` + Left/Right *(same note as above)*.
-- **Zoom in/out**: `Ctrl/Cmd` + `=`/`-` (the standard Zoom In/Out menu shortcuts in the 3D window).
+- **Zoom in/out**: `Ctrl/Cmd` + `=`/`-`; `=` / `+` / `-` also trigger the 3D window zoom actions.
 
 **Reset / framing**
 
@@ -1127,11 +1124,11 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 - Defaults: Track Edges with both toggles ON (shows full range and follows edges).
 - Tips: Track Edges to keep “show all” or pin sides while the other stays fixed; Absolute to lock a fixed window; Normalized to keep a proportional window (e.g., 0.1→0.9).
 
-### 6.5 Background, Axis, and Help Panels
+### 6.5 Background, Axis, and Shortcuts Reference
 
 - **Background dock** – select gradient colors, environment maps, or background images.
 - **Axis dock** – expose axis gizmo parameters.
-- **Help dock** – duplicates navigation shortcuts for quick reference.
+- **Shortcuts** – opens this guide directly to Section 12.1 for a quick keyboard-and-mouse reference.
 
 ### 6.6 The Progress Toolbar and Rendering Queue
 
@@ -1366,10 +1363,13 @@ For automation or cluster rendering:
 
 Atlas supports a flag-based configuration file that lets you tweak performance, memory, and debugging behavior without rebuilding the application.
 
-- Generate file: use **Help → Generate Config File**. This copies the template into your config directory as `user_settings_flagfile.txt`.
-- Open location: use **Help → Open Config Folder** to open the directory in your file browser.
-- Edit format: open `user_settings_flagfile.txt` in a text editor. Use one flag per line with `--name=value`. Lines starting with `#` are comments; blank lines are allowed.
-- Apply changes: save the file and restart Atlas. Flags are read at startup. If a value is invalid or misspelled, it will not be applied—check the startup logs for any parse errors.
+- Structured editor: use **Edit → Settings...** to edit the supported settings in a GUI. On macOS, this action may appear in the standard application menu instead of Edit. Saving creates `user_settings_flagfile.txt` if it does not already exist.
+- Open location: use **Edit → Settings...**, then click **Open Config Folder**.
+- Direct text editing: use **Edit → Settings...**, then click **Edit Config Flag File...** to open `user_settings_flagfile.txt` in your default external editor.
+- Edit format: use one flag per line with `--name=value`. Lines starting with `#` are comments; blank lines are allowed.
+- Custom unmanaged flags: Atlas Settings preserves the dedicated manual block in the file. Put custom flags there if Atlas does not expose them in the dialog.
+- Reset to defaults: in **Edit → Settings...**, use **Reset to Defaults** and then **Save** to rewrite the managed settings back to their compiled defaults. On macOS, open the same dialog from the standard application menu if Settings is not shown under Edit.
+- Apply changes: use **Save and Restart** in the Settings dialog, or save and restart Atlas manually. Flags are read at startup. If a value is invalid or misspelled, it will not be applied—check the startup logs for any parse errors.
 
 Examples
 
@@ -1407,16 +1407,7 @@ Tips
 2. **Increase verbosity**: launch Atlas with `--v=1` or set environment variable `GLOG_v=1` for detailed logging.
 3. **Debug-oriented builds** may provide additional diagnostic lines beyond the standard release logs.
 
-### 10.3 Custom Commands
-
-This feature is intended for offline/developer scripting and may be omitted from deployed builds.
-
-1. If the menu item is present, configure the custom command to point to your script or executable.
-2. Run **Help → Run Custom Command** to execute the script within Atlas. Useful for data preprocessing or invoking external pipelines.
-3. Monitor log output for command status.
-4. If the menu item is not present, your installation does not include this optional feature.
-
-### 10.4 Updating and Multiple Instances
+### 10.3 Updating and Multiple Instances
 
 - **Updates**: **Help → Check for Updates** opens the installed update tool if that feature is available on your platform.
 - **Multiple instances (macOS)**: from the dock icon, choose **Open Additional Instance of Atlas**.
@@ -1458,10 +1449,12 @@ This feature is intended for offline/developer scripting and may be omitted from
 
 ### 12.1 Keyboard and Mouse Shortcuts
 
+Use **Help → Shortcuts** in either the 2D or 3D window to open this section directly.
+
 | Context | Action | Shortcut |
 | --- | --- | --- |
-| 2D | Zoom in (around cursor when mouse is over view) | `Ctrl/Cmd` + `=` (or `+`) |
-| 2D | Zoom out (around cursor when mouse is over view) | `Ctrl/Cmd` + `-` |
+| 2D | Zoom in (around cursor when mouse is over view) | `Ctrl/Cmd` + `=` (or `+`); `=` / `+` also work when the 2D window has focus |
+| 2D | Zoom out (around cursor when mouse is over view) | `Ctrl/Cmd` + `-`; `-` also works when the 2D window has focus |
 | 2D | Fit into window | View → Fit Into Window (toolbar; no default shortcut) |
 | 2D | Pan / scroll | Mouse wheel scroll, or Scroll Hand Drag mode + left-drag |
 | 2D | Slice step (Normal View only) | `Left` / `Right` |
@@ -1476,7 +1469,7 @@ This feature is intended for offline/developer scripting and may be omitted from
 | 3D | Orbit (trackball rotate) | Left drag (or `Ctrl` + left drag) |
 | 3D | Pan (trackball shift) | `Shift` + left drag |
 | 3D | Dolly (trackball zoom) | Mouse wheel scroll |
-| 3D | Zoom in/out (menu) | `Ctrl/Cmd` + `=` / `-` |
+| 3D | Zoom in/out (menu) | `Ctrl/Cmd` + `=` / `-`; `=` / `+` / `-` also trigger the window zoom actions |
 | 3D | Roll | `Alt` + left drag |
 | 3D | Rotate (keyboard nudge) | `Ctrl` + arrow keys *(may require numeric keypad)* |
 | 3D | Pan (keyboard nudge) | `Shift` + arrow keys *(may require numeric keypad)* |

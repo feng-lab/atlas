@@ -141,6 +141,8 @@ else ()
     ${CMAKE_CURRENT_LIST_DIR}/zhttpsystemproxytest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zhttptruststoretest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zimgdiskcacheentrytest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zmarkdownbrowsertest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/zflagfiledocumenttest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
   # This test suite does not depend on Vulkan. Avoid linking atlas_vulkan to keep
   # the link step lighter (especially on Windows CI and developer machines).

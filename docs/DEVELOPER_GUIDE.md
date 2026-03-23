@@ -235,9 +235,6 @@ Testing (Linking Atlas Code)
 - Neuroglancer precomputed E2E tests:
   - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
   - The same test file exercises both HTTP backends. Atlas test binaries use `GTest::gtest_main` rather than the app main, so backend selection is set inside the test with gflags instead of relying on test-binary command-line flag parsing.
-- Developer-only tooling:
-  - `ATLAS_ENABLE_CUSTOM_COMMAND` controls whether Atlas includes the **Help → Run Custom Command** menu item (`ZCustomCommand`). Deployed builds should set this OFF.
-
 Agents: Preview Screenshots
 
 - The Python agent tools expose a headless preview renderer for 3D animation verification.
@@ -837,15 +834,23 @@ Renderer Base surface logs (vlog(1))
 
 Runtime Flags and Config Flagfile
 
-- Atlas supports runtime configuration via a gflags-compatible flagfile. At startup, if present in the user config directory, Atlas reads `user_settings_flagfile.txt` (created from the template) and applies the flags for that session.
-- Template path (in repo): `src/atlas/settings_flagfile.txt`. This file enumerates user-facing flags with short comments and their default values.
-- Users create and edit their local copy via the UI:
-  - Help → Generate Config File — copies the template into the config directory as `user_settings_flagfile.txt`.
-  - Help → Open Config Folder — opens the directory so the user can edit the file in a text editor.
+- Atlas supports runtime configuration via a gflags-compatible flagfile. At startup, if present in the user config directory, Atlas reads `user_settings_flagfile.txt` and applies the flags for that session.
+- Atlas now generates and edits that file through the UI instead of shipping a static template:
+  - Edit → Settings... opens the structured editor for the curated user-facing flag subset.
+    On macOS, the action uses Qt's preferences role and may be moved into the standard application menu.
+  - The dialog includes **Save and Restart**, which saves the flagfile and then goes through the app-wide restart path.
+  - The dialog itself exposes **Edit Config Flag File...** to open the same `user_settings_flagfile.txt` in an external editor.
+  - The dialog also exposes **Open Config Folder** for manual inspection or backup.
+- The structured editor remains a thin layer over the flagfile. Persistence still lives entirely in `user_settings_flagfile.txt`; there is no second config store for these settings.
+- The dialog is backed by three pieces:
+  - `src/atlas/zflagsettingsregistry.cpp` defines the curated GUI-visible subset of flags, category ordering, and editor choices.
+  - `src/atlas/zflagfiledocument.cpp` loads the current flagfile, tracks duplicate managed flags, preserves the manual block, and writes the normalized managed section back atomically.
+  - `src/atlas/zflagsettingsdialog.cpp` builds the GUI. It uses `ZBoolParameter` and `ZStringParameter` for ordinary checkbox/text fields, and custom combo boxes for finite-choice flags so invalid saved values can still be surfaced to the user instead of silently normalized.
 - File format is standard gflags:
   - One flag per line, `--name=value`.
   - `#` begins a comment; blank lines are allowed.
   - Booleans use `true/false`; numeric flags use integers or decimals as appropriate.
+- Atlas Settings rewrites the managed section on save and preserves the dedicated manual block for custom flags that are not exposed in the dialog. Users who edit the file directly should place non-GUI flags in that preserved block.
 - Apply on restart: changes take effect the next time Atlas starts. Advise users to check startup logs for any flag parse errors.
 
 Adding or updating flags for users
@@ -853,13 +858,13 @@ Adding or updating flags for users
 - Prefer exposing options that are safe to tweak without recompiling: performance limits, memory sizing, debug toggles, rendering heuristics that don’t alter file formats or scene serialization.
 - When you add a new gflag intended for users:
   - Define the flag in code with a sensible default and a clear description.
-  - Add it to `src/atlas/settings_flagfile.txt` with a brief, user-friendly comment. The default shown in the template must match the compiled default.
+  - Add a curated entry to `src/atlas/zflagsettingsregistry.cpp` with a clear label, category, and editor type. The GUI uses gflags reflection for compiled defaults and descriptions, so do not duplicate those values elsewhere.
   - Keep naming consistent with existing prefixes: `atlas_*` for app/platform/runtime behavior, `zimg_*` for image/FFT stack, `atlas_debug_vulkan` for Vulkan.
   - Group related flags and avoid leaking internal or unsafe toggles (e.g., experimental invariants, crash-on-warning). If a flag is debug-only, make that clear in its comment.
   - Update documentation: briefly mention new user-togglable flags in `docs/USER_GUIDE.md` (configuration section) if they are likely useful to end users.
 - Do not introduce telemetry or logging that could leak user data. Follow the security/privacy guidance in AGENTS.md.
 
-Common examples in the template
+Common examples in the generated settings file / dialog
 
 - `--atlas_image_cache_memory_proportion` and `--atlas_image_region_cache_memory_proportion` — tune memory usage.
 - `--atlas_debug_opengl` / `--atlas_debug_vulkan` — enable GL/Vulkan debugging aids.

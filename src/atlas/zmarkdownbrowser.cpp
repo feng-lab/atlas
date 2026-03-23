@@ -15,8 +15,117 @@
 #include <QTextImageFormat>
 #include <QTextLength>
 #include <QUrl>
+#include <QTimer>
 
 namespace {
+
+[[nodiscard]] QString stripOptionalClosingHashes(const QString& headingText)
+{
+  QString text = headingText.trimmed();
+  static const QRegularExpression trailingHashesRe(QStringLiteral(R"(\s+#+\s*$)"));
+  text.remove(trailingHashesRe);
+  return text.trimmed();
+}
+
+[[nodiscard]] QString slugifyMarkdownHeading(const QString& headingText, QHash<QString, int>* duplicateCount)
+{
+  QString baseSlug;
+  baseSlug.reserve(headingText.size());
+
+  bool lastWasDash = false;
+  for (const QChar ch : headingText) {
+    if (ch.isLetterOrNumber()) {
+      baseSlug.append(ch.toCaseFolded());
+      lastWasDash = false;
+      continue;
+    }
+
+    if ((ch.isSpace() || ch == QChar::fromLatin1('-')) && !baseSlug.isEmpty() && !lastWasDash) {
+      baseSlug.append(QChar::fromLatin1('-'));
+      lastWasDash = true;
+    }
+  }
+
+  while (baseSlug.endsWith(QChar::fromLatin1('-'))) {
+    baseSlug.chop(1);
+  }
+
+  if (baseSlug.isEmpty()) {
+    baseSlug = QStringLiteral("section");
+  }
+
+  if (duplicateCount == nullptr) {
+    return baseSlug;
+  }
+
+  const int seenCount = duplicateCount->value(baseSlug, 0);
+  duplicateCount->insert(baseSlug, seenCount + 1);
+  if (seenCount == 0) {
+    return baseSlug;
+  }
+  return QStringLiteral("%1-%2").arg(baseSlug).arg(seenCount);
+}
+
+[[nodiscard]] QStringList collectMarkdownHeadingSlugs(const QString& markdown)
+{
+  static const QRegularExpression headingRe(QStringLiteral(R"(^\s{0,3}(#{1,6})\s+(.+?)\s*$)"));
+
+  QStringList slugs;
+  bool inCodeFence = false;
+  QHash<QString, int> duplicateCount;
+
+  int pos = 0;
+  while (pos <= markdown.size()) {
+    const int nextNewline = markdown.indexOf('\n', pos);
+    const int lineEnd = (nextNewline < 0) ? markdown.size() : nextNewline;
+    const QString line = markdown.mid(pos, lineEnd - pos);
+    const QString trimmed = line.trimmed();
+
+    if (trimmed.startsWith(QStringLiteral("```")) || trimmed.startsWith(QStringLiteral("~~~"))) {
+      inCodeFence = !inCodeFence;
+    } else if (!inCodeFence) {
+      const QRegularExpressionMatch match = headingRe.match(line);
+      if (match.hasMatch()) {
+        const QString headingText = stripOptionalClosingHashes(match.captured(2));
+        slugs.push_back(slugifyMarkdownHeading(headingText, &duplicateCount));
+      }
+    }
+
+    if (nextNewline < 0) {
+      break;
+    }
+    pos = nextNewline + 1;
+  }
+
+  return slugs;
+}
+
+[[nodiscard]] QString injectHeadingAnchors(const QString& html, const QStringList& headingSlugs)
+{
+  static const QRegularExpression headingTagRe(QStringLiteral(R"(<h[1-6][^>]*>)"),
+                                               QRegularExpression::CaseInsensitiveOption);
+
+  QString output;
+  output.reserve(html.size() + headingSlugs.size() * 32);
+
+  int last = 0;
+  int headingIndex = 0;
+  auto it = headingTagRe.globalMatch(html);
+  while (it.hasNext()) {
+    const QRegularExpressionMatch match = it.next();
+    output += html.mid(last, match.capturedStart() - last);
+    output += match.captured(0);
+    if (headingIndex < headingSlugs.size()) {
+      const QString escapedSlug = headingSlugs.at(headingIndex).toHtmlEscaped();
+      output += QStringLiteral("<a name=\"%1\" id=\"%1\"></a>").arg(escapedSlug);
+    }
+    last = match.capturedEnd();
+    ++headingIndex;
+  }
+
+  output += html.mid(last);
+  return output;
+}
 
 QUrl baseUrlForResource(const QTextBrowser& browser)
 {
@@ -177,6 +286,13 @@ void positionDocument(QTextBrowser& browser, const QString& fragment)
   }
 }
 
+void schedulePositionDocument(QTextBrowser& browser, const QString& fragment)
+{
+  QTimer::singleShot(0, &browser, [&browser, fragment]() {
+    positionDocument(browser, fragment);
+  });
+}
+
 } // namespace
 
 namespace nim {
@@ -289,10 +405,11 @@ QString markdownToHtmlWithImages(const QString& markdown)
 {
   std::vector<MarkdownImageRef> images;
   const QString preprocessed = preprocessMarkdownForImages(markdown, &images);
+  const QStringList headingSlugs = collectMarkdownHeadingSlugs(markdown);
 
   QTextDocument doc;
   doc.setMarkdown(preprocessed, QTextDocument::MarkdownDialectGitHub);
-  QString html = doc.toHtml();
+  QString html = injectHeadingAnchors(doc.toHtml(), headingSlugs);
 
   for (const MarkdownImageRef& img : images) {
     QString src = img.src;
@@ -413,10 +530,10 @@ void ZMarkdownBrowser::renderUrl(const QUrl& url)
     setHtml(markdownToHtmlWithImages(markdown));
     document()->setBaseUrl(baseDir);
     applyImageMaximumWidth(document());
-    positionDocument(*this, fragment);
+    schedulePositionDocument(*this, fragment);
   } else {
     QTextBrowser::setSource(m_currentSource);
-    positionDocument(*this, fragment);
+    schedulePositionDocument(*this, fragment);
   }
 }
 

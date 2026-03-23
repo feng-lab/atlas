@@ -80,9 +80,14 @@ public:
     return m_openLogFolderAction;
   }
 
-  QAction* openConfigFolderAction()
+  QAction* openSettingsAction()
   {
-    return m_openConfigFolderAction;
+    return m_openSettingsAction;
+  }
+
+  QAction* restartAction()
+  {
+    return m_restartAction;
   }
 
   QAction* openDiskCacheFolderAction()
@@ -93,6 +98,11 @@ public:
   QAction* userGuideAction()
   {
     return m_userGuideAction;
+  }
+
+  QAction* shortcutsAction()
+  {
+    return m_shortcutsAction;
   }
 
   QAction* developerGuideAction()
@@ -132,7 +142,7 @@ private:
 
   void openScreenshotPanel();
 
-  void openHelpPanel();
+  void openShortcutsReference();
 
   void raiseViewSettingDockWidget();
 
@@ -140,11 +150,9 @@ private:
 
   static void openLogFolder();
 
-  static void openConfigFolder();
-
   static void openDiskCacheFolder();
 
-  static void generateConfigFile();
+  void openSettingsDialog();
 
   static void runCustomCommand();
 
@@ -201,7 +209,7 @@ private:
   QToolBar* m_viewToolBar = nullptr;
   QToolBar* m_dragModeToolBar = nullptr;
   QToolBar* m_roiToolBar = nullptr;
-  QToolBar* m_helpToolBar = nullptr;
+  QToolBar* m_shortcutsToolBar = nullptr;
 
   // QAction *m_newAction = nullptr;
   QAction* m_openAction = nullptr;
@@ -220,9 +228,9 @@ private:
 #endif
 
   QAction* m_openLogFolderAction = nullptr;
-  QAction* m_openConfigFolderAction = nullptr;
+  QAction* m_openSettingsAction = nullptr;
+  QAction* m_restartAction = nullptr;
   QAction* m_openDiskCacheFolderAction = nullptr;
-  QAction* m_generateConfigFileAction = nullptr;
   QAction* m_runCustomCommandAction = nullptr;
 
   QAction* m_separatorAction = nullptr;
@@ -230,7 +238,7 @@ private:
 
   QAction* m_open3DViewAction = nullptr;
   QAction* m_screenShotAction = nullptr;
-  QAction* m_helpAction = nullptr;
+  QAction* m_shortcutsAction = nullptr;
   QAction* m_traceToolAction = nullptr;
 
   QAction* m_userGuideAction = nullptr;
@@ -244,7 +252,6 @@ private:
   QDockWidget* m_objectDetailedInfoDockWidget = nullptr;
   QDockWidget* m_globalSettingDockWidget = nullptr;
   QDockWidget* m_captureDockWidget = nullptr;
-  QDockWidget* m_helpDockWidget = nullptr;
   QDockWidget* m_editObjDockWidget = nullptr;
   QDockWidget* m_traceDockWidget = nullptr;
   QDockWidget* m_tasksDockWidget = nullptr;

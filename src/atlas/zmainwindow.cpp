@@ -31,8 +31,10 @@
 #include "ztheme.h"
 #include "ztracesettings.h"
 #include "ztracesettingswidget.h"
+#include "zapprestartcontroller.h"
 #include "zbackgroundtaskmanagerwidget.h"
 #include "zdiskcacheutils.h"
+#include "zflagsettingsdialog.h"
 
 #include <gflags/gflags.h>
 
@@ -70,6 +72,12 @@ DEFINE_bool(atlas_block_scene_3d_apply,
             "If true, block scene loading until all 3D settings have been applied by the rendering engine");
 
 namespace nim {
+
+namespace {
+
+constexpr auto kShortcutsDocRef = "USER_GUIDE.md#121-keyboard-and-mouse-shortcuts";
+
+} // namespace
 
 ZMainWindow::ZMainWindow(QString versionStr)
   : m_versionString(std::move(versionStr))
@@ -226,7 +234,7 @@ void ZMainWindow::closeEvent(QCloseEvent* event)
     return;
   }
 
-  if (m_doc != nullptr && !m_doc->canClose(this)) {
+  if (!ZAppRestartController::isRestartShutdownInProgress() && m_doc != nullptr && !m_doc->canClose(this)) {
     event->ignore();
     return;
   }
@@ -341,12 +349,9 @@ void ZMainWindow::openScreenshotPanel()
   m_captureDockWidget->raise();
 }
 
-void ZMainWindow::openHelpPanel()
+void ZMainWindow::openShortcutsReference()
 {
-  if (m_helpDockWidget->isHidden()) {
-    m_helpDockWidget->show();
-  }
-  m_helpDockWidget->raise();
+  openDocMd(QString::fromLatin1(kShortcutsDocRef));
 }
 
 void ZMainWindow::openDocMd(const QString& name)
@@ -430,11 +435,6 @@ void ZMainWindow::openLogFolder()
   QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::logDir().absolutePath()));
 }
 
-void ZMainWindow::openConfigFolder()
-{
-  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::configDir().absolutePath()));
-}
-
 void ZMainWindow::openDiskCacheFolder()
 {
   const QString cacheDir = atlasDiskCacheDirFromFlags();
@@ -448,33 +448,36 @@ void ZMainWindow::openDiskCacheFolder()
   QDesktopServices::openUrl(QUrl::fromLocalFile(cacheDir));
 }
 
-void ZMainWindow::generateConfigFile()
+void ZMainWindow::openSettingsDialog()
 {
-  QString fn = "user_settings_flagfile.txt";
-  QDir dir = ZSystemInfo::configDir();
-  if (dir.exists(fn)) {
-    QMessageBox msgBox(QApplication::activeWindow());
-    msgBox.setText(tr("File %1 exists, overwrite?").arg(fn));
-    msgBox.setInformativeText("");
-    msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::Cancel);
-    msgBox.setDefaultButton(QMessageBox::Cancel);
-    int ret = msgBox.exec();
-
-    if (ret == QMessageBox::Cancel) {
-      return;
-    }
-    if (!QFile::remove(dir.filePath(fn))) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            QString("Could not replace %1").arg(dir.filePath(fn)));
-      return;
-    }
+  QWidget* dialogParent = QApplication::activeWindow();
+  if (dialogParent == nullptr || !dialogParent->isWindow()) {
+    dialogParent = this;
   }
-  if (!QFile::copy(ZSystemInfo::resourcesDir().absoluteFilePath("settings_flagfile.txt"), dir.absoluteFilePath(fn))) {
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          QString("Could not copy file to %1").arg(dir.filePath(fn)));
-    return;
+
+  auto showRestartRequiredMessage = [this, dialogParent]() {
+    if (auto* statusWindow = qobject_cast<QMainWindow*>(dialogParent)) {
+      statusWindow->statusBar()->showMessage(tr("Settings saved. Restart Atlas to apply changes."), 6000);
+    } else {
+      statusBar()->showMessage(tr("Settings saved. Restart Atlas to apply changes."), 6000);
+    }
+  };
+
+  ZFlagSettingsDialog dlg(dialogParent);
+  if (dlg.exec() == QDialog::Accepted) {
+    if (dlg.restartRequested()) {
+      QTimer::singleShot(0, this, [this, dialogParent]() {
+        if (!ZAppRestartController::requestRestart(*this, dialogParent)) {
+          if (auto* statusWindow = qobject_cast<QMainWindow*>(dialogParent)) {
+            statusWindow->statusBar()->showMessage(tr("Settings saved. Restart Atlas to apply changes."), 6000);
+          } else {
+            statusBar()->showMessage(tr("Settings saved. Restart Atlas to apply changes."), 6000);
+          }
+        }
+      });
+      return;
+    }
+    showRestartRequiredMessage();
   }
 }
 
@@ -667,9 +670,9 @@ void ZMainWindow::createActions()
   m_screenShotAction->setStatusTip(tr("Screenshot"));
   connect(m_screenShotAction, &QAction::triggered, this, &ZMainWindow::openScreenshotPanel);
 
-  m_helpAction = new QAction(ZTheme::instance().icon(ZTheme::HelpIcon), tr("&Help"), this);
-  m_helpAction->setStatusTip(tr("Help"));
-  connect(m_helpAction, &QAction::triggered, this, &ZMainWindow::openHelpPanel);
+  m_shortcutsAction = new QAction(ZTheme::instance().icon(ZTheme::HelpIcon), tr("&Shortcuts"), this);
+  m_shortcutsAction->setStatusTip(tr("Open keyboard and mouse shortcuts reference"));
+  connect(m_shortcutsAction, &QAction::triggered, this, &ZMainWindow::openShortcutsReference);
 
   m_traceToolAction = new QAction(ZTheme::instance().icon(ZTheme::TraceIcon), tr("Trace"), this);
   m_traceToolAction->setStatusTip(tr("Enable trace tool (left-click to trace)"));
@@ -725,20 +728,23 @@ void ZMainWindow::createActions()
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
   connect(m_openLogFolderAction, &QAction::triggered, this, &ZMainWindow::openLogFolder);
 
-  m_openConfigFolderAction =
-    new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open Config Folder"), this);
-  m_openConfigFolderAction->setStatusTip(tr("Open Config Folder"));
-  connect(m_openConfigFolderAction, &QAction::triggered, this, &ZMainWindow::openConfigFolder);
+  m_openSettingsAction = new QAction(tr("&Settings..."), this);
+  m_openSettingsAction->setStatusTip(tr("Open Atlas Settings"));
+  m_openSettingsAction->setMenuRole(QAction::PreferencesRole);
+  connect(m_openSettingsAction, &QAction::triggered, this, &ZMainWindow::openSettingsDialog);
+
+  m_restartAction = new QAction(tr("&Restart Atlas"), this);
+  m_restartAction->setStatusTip(tr("Restart Atlas"));
+  connect(m_restartAction, &QAction::triggered, this, [this]() {
+    QTimer::singleShot(0, this, [this]() {
+      (void)ZAppRestartController::requestRestart(*this, QApplication::activeWindow());
+    });
+  });
 
   m_openDiskCacheFolderAction =
     new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("Open Disk Cache Folder"), this);
   m_openDiskCacheFolderAction->setStatusTip(tr("Open Disk Cache Folder"));
   connect(m_openDiskCacheFolderAction, &QAction::triggered, this, &ZMainWindow::openDiskCacheFolder);
-
-  m_generateConfigFileAction =
-    new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Generate Config File"), this);
-  m_generateConfigFileAction->setStatusTip(tr("Generate Config File"));
-  connect(m_generateConfigFileAction, &QAction::triggered, this, &ZMainWindow::generateConfigFile);
 
 #if ATLAS_ENABLE_CUSTOM_COMMAND
   m_runCustomCommandAction =
@@ -780,6 +786,8 @@ void ZMainWindow::createMenus()
   m_editMenu->addSeparator();
   m_editMenu->addAction(m_view->copyAction());
   m_editMenu->addAction(m_view->pasteAction());
+  m_editMenu->addSeparator();
+  m_editMenu->addAction(m_openSettingsAction);
   // m_editMenu->addAction(m_engine->deleteAction());
 
   m_viewMenu = menuBar()->addMenu(tr("&View"));
@@ -826,15 +834,13 @@ void ZMainWindow::createMenus()
     openDocMd(QStringLiteral("THIRD_PARTY_NOTICES.md"));
   });
   m_helpMenu->addAction(m_thirdPartyNoticesAction);
-  m_helpMenu->addAction(m_helpAction);
+  m_helpMenu->addAction(m_shortcutsAction);
 #ifdef Q_OS_LINUX
   m_helpMenu->addAction(m_createDesktopEntryAction);
 #endif
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_openLogFolderAction);
-  m_helpMenu->addAction(m_openConfigFolderAction);
   m_helpMenu->addAction(m_openDiskCacheFolderAction);
-  m_helpMenu->addAction(m_generateConfigFileAction);
 #if ATLAS_ENABLE_CUSTOM_COMMAND
   m_helpMenu->addAction(m_runCustomCommandAction);
 #endif
@@ -884,10 +890,9 @@ void ZMainWindow::createToolBars()
   m_roiToolBar->addWidget(m_view->createROIModeWidget(this));
   m_roiToolBar->setIconSize(iconSize);
 
-  m_helpToolBar = addToolBar(tr("Help"));
-  m_helpToolBar->addAction(m_helpAction);
-  //    m_helpToolBar->addAction(m_runCustomCommandAction);
-  m_helpToolBar->setIconSize(iconSize);
+  m_shortcutsToolBar = addToolBar(tr("Shortcuts"));
+  m_shortcutsToolBar->addAction(m_shortcutsAction);
+  m_shortcutsToolBar->setIconSize(iconSize);
 }
 
 void ZMainWindow::createStatusBar()
@@ -972,24 +977,6 @@ void ZMainWindow::createDockWindows()
   addDockWidget(Qt::RightDockWidgetArea, m_captureDockWidget);
   m_windowMenu->addAction(m_captureDockWidget->toggleViewAction());
   m_captureDockWidget->setVisible(false);
-
-  m_helpDockWidget = new QDockWidget(tr("Help"), this);
-  m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
-                                QDockWidget::DockWidgetFloatable);
-  m_helpDockWidget->setVisible(false);
-  auto edt = new QPlainTextEdit(this);
-  edt->setReadOnly(true);
-  edt->appendPlainText("zoom:");
-  edt->appendPlainText("    1) command/control key + =(+)/- key");
-  edt->appendPlainText("    2) =(+)/- key");
-  edt->appendPlainText("zoom in to location:");
-  edt->appendPlainText("    1) =(+) key while pointing mouse cursor to the target location");
-  edt->moveCursor(QTextCursor::Start);
-  edt->ensureCursorVisible();
-  m_helpDockWidget->setWidget(edt);
-  addDockWidget(Qt::LeftDockWidgetArea, m_helpDockWidget);
-  m_windowMenu->addAction(m_helpDockWidget->toggleViewAction());
-  m_helpDockWidget->setFloating(true);
 
   m_editObjDockWidget = new QDockWidget(tr("Edit and Output"), this);
   m_editObjDockWidget->setFeatures(QDockWidget::DockWidgetClosable);

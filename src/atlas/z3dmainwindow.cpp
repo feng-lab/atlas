@@ -285,14 +285,6 @@ void Z3DMainWindow::openScreenshotPanel()
   m_captureDockWidget->raise();
 }
 
-void Z3DMainWindow::openHelpPanel()
-{
-  if (m_helpDockWidget->isHidden()) {
-    m_helpDockWidget->show();
-  }
-  m_helpDockWidget->raise();
-}
-
 void Z3DMainWindow::raiseViewSettingDockWidget()
 {
   if (m_viewSettingDockWidget->isHidden()) {
@@ -389,10 +381,6 @@ void Z3DMainWindow::createActions()
   m_screenShotAction->setStatusTip(tr("Screenshot"));
   connect(m_screenShotAction, &QAction::triggered, this, &Z3DMainWindow::openScreenshotPanel);
 
-  m_helpAction = new QAction(ZTheme::instance().icon(ZTheme::HelpIcon), tr("&Help"), this);
-  m_helpAction->setStatusTip(tr("Help"));
-  connect(m_helpAction, &QAction::triggered, this, &Z3DMainWindow::openHelpPanel);
-
   m_traceToolAction = new QAction(ZTheme::instance().icon(ZTheme::TraceIcon), tr("Trace"), this);
   m_traceToolAction->setStatusTip(tr("Enable trace tool (left-click to trace)"));
   m_traceToolAction->setCheckable(true);
@@ -445,6 +433,8 @@ void Z3DMainWindow::createMenus()
   m_editMenu = menuBar()->addMenu(tr("&Edit"));
   m_editMenu->addAction(m_doc.undoAction());
   m_editMenu->addAction(m_doc.redoAction());
+  m_editMenu->addSeparator();
+  m_editMenu->addAction(m_2dWindow.openSettingsAction());
 
   m_viewMenu = menuBar()->addMenu(tr("&View"));
   m_viewMenu->addAction(m_zoomInAction);
@@ -475,10 +465,9 @@ void Z3DMainWindow::createMenus()
   // Share doc actions with 2D window
   m_helpMenu->addAction(m_2dWindow.userGuideAction());
   m_helpMenu->addAction(m_2dWindow.developerGuideAction());
-  m_helpMenu->addAction(m_helpAction);
+  m_helpMenu->addAction(m_2dWindow.shortcutsAction());
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_2dWindow.openLogFolderAction());
-  m_helpMenu->addAction(m_2dWindow.openConfigFolderAction());
   m_helpMenu->addAction(m_2dWindow.openDiskCacheFolderAction());
 }
 
@@ -506,9 +495,9 @@ void Z3DMainWindow::createToolBars()
   m_viewToolBar->addAction(m_screenShotAction);
   m_viewToolBar->setIconSize(iconSize);
 
-  m_helpToolBar = addToolBar(tr("Help"));
-  m_helpToolBar->addAction(m_helpAction);
-  m_helpToolBar->setIconSize(iconSize);
+  m_shortcutsToolBar = addToolBar(tr("Shortcuts"));
+  m_shortcutsToolBar->addAction(m_2dWindow.shortcutsAction());
+  m_shortcutsToolBar->setIconSize(iconSize);
 
   m_progressToolBar = addToolBar(tr("Progress"));
   m_progressBarWidget = new QProgressBar();
@@ -600,14 +589,6 @@ void Z3DMainWindow::createDockWindows()
   m_windowMenu->addAction(m_captureDockWidget->toggleViewAction());
   m_captureDockWidget->setVisible(false);
 
-  m_helpDockWidget = new QDockWidget(tr("Help"), this);
-  m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
-                                QDockWidget::DockWidgetFloatable);
-  m_helpDockWidget->setVisible(false);
-  addDockWidget(Qt::LeftDockWidgetArea, m_helpDockWidget);
-  m_windowMenu->addAction(m_helpDockWidget->toggleViewAction());
-  m_helpDockWidget->setFloating(true);
-
   m_backgroundDockWidget = new QDockWidget(tr("Background"), this);
   m_backgroundDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                       QDockWidget::DockWidgetFloatable);
@@ -643,7 +624,6 @@ void Z3DMainWindow::fillDockWindows()
   CHECK(m_captureDockWidget);
   CHECK(m_backgroundDockWidget);
   CHECK(m_axisDockWidget);
-  CHECK(m_helpDockWidget);
 
   ZObjWidget* objWidget = m_doc.createObjWidget(this);
   m_objectsDockWidget->setWidget(objWidget);
@@ -661,8 +641,6 @@ void Z3DMainWindow::fillDockWindows()
   m_backgroundDockWidget->setWidget(m_engine->backgroundWidget());
 
   m_axisDockWidget->setWidget(m_engine->axisWidget());
-
-  m_helpDockWidget->setWidget(createHelpWidget());
 }
 
 void Z3DMainWindow::readSettings()
@@ -754,27 +732,6 @@ void Z3DMainWindow::initRenderingEngine()
 void Z3DMainWindow::onRenderingError(const QString& error)
 {
   showCriticalWithDetails(this, tr("Rendering error"), error);
-}
-
-QWidget* Z3DMainWindow::createHelpWidget()
-{
-  auto edt = new QPlainTextEdit();
-  edt->setReadOnly(true);
-  edt->appendPlainText("zoom/dolly:");
-  edt->appendPlainText("    1) mouse wheel scroll");
-  edt->appendPlainText("    2) [(optional) command/control key] + =(+)/- key");
-  edt->appendPlainText("rotate:");
-  edt->appendPlainText("    1) [(optional) command/control key] + mouse drag");
-  edt->appendPlainText("    2) command/control key + Left/Right/Up/Down key");
-  edt->appendPlainText("shift:");
-  edt->appendPlainText("    1) shift key + mouse drag");
-  edt->appendPlainText("    2) shift key + Left/Right/Up/Down key");
-  edt->appendPlainText("roll:");
-  edt->appendPlainText("    1) alt key + mouse drag");
-  edt->appendPlainText("    2) alt key + Left/Right key");
-  edt->moveCursor(QTextCursor::Start);
-  edt->ensureCursorVisible();
-  return edt;
 }
 
 void Z3DMainWindow::onProgressChanged(int v)

@@ -536,7 +536,6 @@ elseif (APPLE)
       ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/ffmpeg
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls
-      ${CMAKE_CURRENT_SOURCE_DIR}/settings_flagfile.txt
       ${CMAKE_CURRENT_SOURCE_DIR}/neuroglancer_precomputed_examples.json)
   set(MACOSX_BUNDLE_ICON_FILE app.icns)
 endif (WIN32)
@@ -561,6 +560,9 @@ set(SOURCES
     zanalysisworklistmodel.h zanalysisworklistmodel.cpp
     zstyleditemdelegate.h zstyleditemdelegate.cpp
     zitemeditorfactory.h zitemeditorfactory.cpp
+    zflagfiledocument.h zflagfiledocument.cpp
+    zflagsettingsdialog.h zflagsettingsdialog.cpp
+    zflagsettingsregistry.h zflagsettingsregistry.cpp
     zmainwindow.h zmainwindow.cpp
     zmarkdownbrowser.h zmarkdownbrowser.cpp
     zimgdoc.h zimgdoc.cpp
@@ -834,6 +836,7 @@ set(SOURCES
     zsqlitediskcachebucket.cpp zsqlitediskcachebucket.h
     zsqliteasyncwritequeue.cpp zsqliteasyncwritequeue.h
     zcheckbox.cpp zcheckbox.h
+    zapprestartcontroller.cpp zapprestartcontroller.h
     zrunexport3danimation.cpp zrunexport3danimation.h
     zrundumpanimation3dschema.cpp zrundumpanimation3dschema.h
     zprocess.cpp zprocess.h
@@ -1186,10 +1189,6 @@ if (WIN32)
                      "$<TARGET_FILE_DIR:${APP_NAME}>/")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/settings_flagfile.txt"
-                     "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
-  add_custom_command(TARGET ${APP_NAME}
-                     POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/neuroglancer_precomputed_examples.json"
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
   add_custom_command(TARGET ${APP_NAME}
@@ -1399,10 +1398,6 @@ else (WIN32)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls
-                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
-    add_custom_command(TARGET ${APP_NAME}
-                       POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/settings_flagfile.txt
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
