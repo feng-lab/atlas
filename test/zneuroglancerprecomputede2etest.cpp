@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 
+#include <folly/coro/BlockingWait.h>
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
@@ -82,7 +83,7 @@ void runPublicDatasetSmokeTest(const char* backend)
                                                        /*baseEnd=*/{1, 1, 1});
     ASSERT_FALSE(chunks.empty());
 
-    const auto img = vol->readChunkBlocking(chunks.front());
+    const auto img = folly::coro::blockingWait(vol->readChunkAsync(chunks.front()));
     ASSERT_TRUE(img);
     EXPECT_GT(img->byteNumber(), 0U);
   }

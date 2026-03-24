@@ -346,11 +346,10 @@ public:
 
   [[nodiscard]] std::shared_ptr<ZImg> tryGetCachedChunk(const Chunk& chunk) const;
 
-  folly::coro::Task<std::shared_ptr<ZImg>> readChunkAsync(const Chunk& chunk,
+  folly::coro::Task<std::shared_ptr<ZImg>> readChunkAsync(Chunk chunk,
                                                           /*nullable*/ ZImgReadStatsSink* statsSink = nullptr,
                                                           ZImgReadStatsContext statsContext = {}) const;
-
-  [[nodiscard]] std::shared_ptr<ZImg> readChunkBlocking(const Chunk& chunk) const;
+  [[nodiscard]] std::shared_ptr<ZImg> readChunkBlocking(Chunk chunk) const;
 
   // Builds a 2D slice tile pack for display at the target on-screen scale. This will only use chunks already
   // present in the in-memory chunk cache, and will fall back to coarser pyramid levels as needed to cover the
@@ -362,12 +361,13 @@ public:
                                                                         const QRectF& viewport,
                                                                         double renderScale) const;
 
-  // Builds a 2D slice tile pack by reading the target pyramid level. This may perform network I/O.
-  [[nodiscard]] SliceTilePack sliceTilePackFor2DViewportBlocking(size_t z,
-                                                                 size_t t,
-                                                                 const QRectF& viewport,
-                                                                 double renderScale,
-                                                                 Slice2DRatioPolicy ratioPolicy = Slice2DRatioPolicy::BestForScale) const;
+  // Builds a 2D slice tile pack by batching async chunk reads for one 2D pass. This may perform network I/O.
+  folly::coro::Task<SliceTilePack>
+  sliceTilePackFor2DViewportAsync(size_t z,
+                                  size_t t,
+                                  const QRectF& viewport,
+                                  double renderScale,
+                                  Slice2DRatioPolicy ratioPolicy = Slice2DRatioPolicy::BestForScale) const;
 
   // Computes the set of chunk bounding boxes intersecting a 2D viewport at the selected pyramid level.
   // This does not perform any network I/O; callers can schedule chunk reads as needed (e.g. for incremental rendering).

@@ -1,5 +1,6 @@
 #include "zneuroglancerprecomputed.h"
 
+#include "zcancellation.h"
 #include "zcpuinfo.h"
 #include "zneuroglancerprecomputedchunkdecoder.h"
 #include "zneuroglancerprecomputedmesh.h"
@@ -13,7 +14,9 @@
 #include "zconcurrentlrucache.h"
 
 #include <folly/ExceptionWrapper.h>
+#include <folly/OperationCancelled.h>
 #include <folly/coro/BlockingWait.h>
+#include <folly/coro/Collect.h>
 #include <folly/coro/SharedPromise.h>
 #include <boost/json.hpp>
 
@@ -947,9 +950,10 @@ QUrl ZNeuroglancerPrecomputedVolume::chunkUrl(const Chunk& chunk) const
   return scale.url.resolved(QUrl(name));
 }
 
-folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChunkAsync(const Chunk& chunk,
-                                                                                        ZImgReadStatsSink* statsSink,
-                                                                                        ZImgReadStatsContext statsContext) const
+folly::coro::Task<std::shared_ptr<ZImg>>
+ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
+                                               ZImgReadStatsSink* statsSink,
+                                               ZImgReadStatsContext statsContext) const
 {
   CHECK(m_chunkCache);
   CHECK(chunk.scaleIndex < m_scales.size());
@@ -1291,12 +1295,18 @@ std::shared_ptr<ZImg> ZNeuroglancerPrecomputedVolume::tryGetCachedChunk(const Ch
   return cached ? cached.value() : std::shared_ptr<ZImg>();
 }
 
-std::shared_ptr<ZImg> ZNeuroglancerPrecomputedVolume::readChunkBlocking(const Chunk& chunk) const
+std::shared_ptr<ZImg> ZNeuroglancerPrecomputedVolume::readChunkBlocking(Chunk chunk) const
 {
-  return folly::coro::blockingWait(readChunkAsync(chunk));
+  return folly::coro::blockingWait(readChunkAsync(std::move(chunk)));
 }
 
 namespace {
+
+folly::coro::Task<folly::Try<std::shared_ptr<ZImg>>> readChunkTryAsync(const ZNeuroglancerPrecomputedVolume& volume,
+                                                                       ZNeuroglancerPrecomputedVolume::Chunk chunk)
+{
+  co_return co_await folly::coro::co_awaitTry(volume.readChunkAsync(std::move(chunk)));
+}
 
 [[nodiscard]] std::array<size_t, 3> bestRatioForIsotropicScale(const std::vector<std::array<size_t, 3>>& ratios,
                                                                double scale) // x=y=z
@@ -1536,67 +1546,24 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
   return out;
 }
 
-ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sliceTilePackFor2DViewportBlocking(
-  size_t z,
-  size_t t,
-  const QRectF& viewport,
-  double renderScale,
-  Slice2DRatioPolicy ratioPolicy) const
+folly::coro::Task<ZNeuroglancerPrecomputedVolume::SliceTilePack>
+ZNeuroglancerPrecomputedVolume::sliceTilePackFor2DViewportAsync(size_t z,
+                                                                size_t t,
+                                                                const QRectF& viewport,
+                                                                double renderScale,
+                                                                Slice2DRatioPolicy ratioPolicy) const
 {
-  CHECK(t == 0) << "Neuroglancer precomputed volumes do not support time dimension yet (t must be 0)";
-  CHECK(renderScale > 0);
-
   SliceTilePack out;
-
-  std::vector<std::array<size_t, 3>> ratios = availableRatios();
-  if (ratios.empty()) {
-    return out;
+  const SliceChunkRequests requests = sliceChunkRequestsFor2DViewport(z, t, viewport, renderScale, ratioPolicy);
+  out.targetRatio = requests.targetRatio;
+  if (requests.chunks.empty()) {
+    co_return out;
   }
 
-  std::array<size_t, 3> targetRatio{};
-  switch (ratioPolicy) {
-  case Slice2DRatioPolicy::BestForScale:
-    targetRatio = bestRatioForIsotropicScale(ratios, renderScale);
-    break;
-  case Slice2DRatioPolicy::CoarsestXY:
-    targetRatio = coarsestRatioFor2DPreview(ratios);
-    break;
-  }
-  out.targetRatio = targetRatio;
-
-  if (targetRatio[0] != targetRatio[1]) {
-    throw ZException(fmt::format("Neuroglancer 2D display currently requires isotropic XY downsampling ratios, but got ratio [{},{},{}]",
-                                 targetRatio[0],
-                                 targetRatio[1],
-                                 targetRatio[2]));
-  }
-
-  auto scaleIndexOpt = scaleIndexForRatio(targetRatio);
-  if (!scaleIndexOpt) {
-    throw ZException(fmt::format("Neuroglancer requested ratio [{},{},{}] is not available in this dataset",
-                                 targetRatio[0],
-                                 targetRatio[1],
-                                 targetRatio[2]));
-  }
-
+  const auto& targetRatio = requests.targetRatio;
   const int64_t z0 = static_cast<int64_t>(z);
-  const std::array<int64_t, 3> boxStart{static_cast<int64_t>(std::floor(viewport.x())),
-                                        static_cast<int64_t>(std::floor(viewport.y())),
-                                        z0};
-  const std::array<int64_t, 3> boxEnd{static_cast<int64_t>(std::ceil(viewport.right())),
-                                      static_cast<int64_t>(std::ceil(viewport.bottom())),
-                                      z0 + 1};
-
-  const auto chunks = chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
-  if (chunks.empty()) {
-    return out;
-  }
-
   const int64_t ratioZ = static_cast<int64_t>(targetRatio[2]);
   CHECK(ratioZ > 0);
-
-  std::vector<std::shared_ptr<ZImg>> tmpImgs(chunks.size());
-  std::vector<QPoint> tmpLocs(chunks.size());
 
   auto toIntChecked = [](int64_t v) -> int {
     if (v < static_cast<int64_t>(std::numeric_limits<int>::min()) || v > static_cast<int64_t>(std::numeric_limits<int>::max())) {
@@ -1605,42 +1572,90 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
     return static_cast<int>(v);
   };
 
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
-    for (size_t i = r.begin(); i != r.end(); ++i) {
-      auto chunkImg = readChunkBlocking(chunks[i]);
-      if (!chunkImg) {
-        continue;
-      }
+  // Keep one bounded async batch per 2D pass instead of launching one blockingWait() per chunk across
+  // a worker pool. This preserves the existing "one preview/final pass per epoch" scheduling while
+  // moving the remote I/O and decode path to coroutine-first chunk reads.
+  const size_t recommendedChunkReadWindow = std::max<size_t>(1, ZCpuInfo::instance().nLogicalCores);
+  const size_t chunkReadWindow = std::min(recommendedChunkReadWindow, requests.chunks.size());
+  CHECK(chunkReadWindow > 0);
 
-      const int64_t localZBase = z0 - chunks[i].baseStart[2];
-      CHECK(localZBase >= 0);
-      const int64_t localZ = localZBase / ratioZ;
-      CHECK(localZ >= 0);
-      CHECK(static_cast<size_t>(localZ) < chunkImg->depth());
+  std::vector<folly::coro::Task<folly::Try<std::shared_ptr<ZImg>>>> chunkTasks;
+  chunkTasks.reserve(requests.chunks.size());
+  for (const auto& chunk : requests.chunks) {
+    chunkTasks.push_back(readChunkTryAsync(*this, chunk));
+  }
 
-      ZImg sliceImg = chunkImg->crop(ZImgRegion(0,
-                                                static_cast<index_t>(chunkImg->width()),
-                                                0,
-                                                static_cast<index_t>(chunkImg->height()),
-                                                static_cast<index_t>(localZ),
-                                                static_cast<index_t>(localZ + 1)));
-      tmpImgs[i] = std::make_shared<ZImg>(std::move(sliceImg));
-      tmpLocs[i] = QPoint(toIntChecked(chunks[i].baseStart[0]), toIntChecked(chunks[i].baseStart[1]));
-    }
-  });
+  std::vector<folly::Try<std::shared_ptr<ZImg>>> chunkResults =
+    co_await folly::coro::collectAllWindowed(std::move(chunkTasks), chunkReadWindow);
 
   const double tileScale = static_cast<double>(targetRatio[0]);
-  for (size_t i = 0; i < tmpImgs.size(); ++i) {
-    if (!tmpImgs[i]) {
+  size_t failedChunkCount = 0;
+  folly::exception_wrapper firstChunkFailure;
+  std::string firstChunkFailureMessage;
+
+  out.imgs.reserve(requests.chunks.size());
+  out.locs.reserve(requests.chunks.size());
+  out.scales.reserve(requests.chunks.size());
+  out.ratios.reserve(requests.chunks.size());
+
+  for (size_t i = 0; i < chunkResults.size(); ++i) {
+    const auto& chunk = requests.chunks[i];
+    auto& chunkResult = chunkResults[i];
+    if (chunkResult.hasException()) {
+      folly::exception_wrapper error = std::move(chunkResult).exception();
+      if (error.is_compatible_with<ZCancellationException>() || error.is_compatible_with<folly::OperationCancelled>()) {
+        error.throw_exception();
+      }
+      ++failedChunkCount;
+      if (!firstChunkFailure) {
+        firstChunkFailure = error;
+        try {
+          error.throw_exception();
+        }
+        catch (const std::exception& e) {
+          firstChunkFailureMessage = e.what();
+        }
+        catch (...) {
+          firstChunkFailureMessage = "non-std exception";
+        }
+      }
       continue;
     }
-    out.imgs.push_back(std::move(tmpImgs[i]));
-    out.locs.push_back(tmpLocs[i]);
+
+    std::shared_ptr<ZImg> chunkImg = std::move(chunkResult).value();
+    if (!chunkImg) {
+      continue;
+    }
+
+    const int64_t localZBase = z0 - chunk.baseStart[2];
+    CHECK(localZBase >= 0);
+    const int64_t localZ = localZBase / ratioZ;
+    CHECK(localZ >= 0);
+    CHECK(static_cast<size_t>(localZ) < chunkImg->depth());
+
+    ZImg sliceImg = chunkImg->crop(ZImgRegion(0,
+                                              static_cast<index_t>(chunkImg->width()),
+                                              0,
+                                              static_cast<index_t>(chunkImg->height()),
+                                              static_cast<index_t>(localZ),
+                                              static_cast<index_t>(localZ + 1)));
+    out.imgs.push_back(std::make_shared<ZImg>(std::move(sliceImg)));
+    out.locs.push_back(QPoint(toIntChecked(chunk.baseStart[0]), toIntChecked(chunk.baseStart[1])));
     out.scales.push_back(tileScale);
     out.ratios.push_back(targetRatio);
   }
 
-  return out;
+  if (out.imgs.empty() && firstChunkFailure) {
+    firstChunkFailure.throw_exception();
+  }
+
+  if (failedChunkCount > 0) {
+    VLOG(1) << "Neuroglancer 2D slice pass skipped " << failedChunkCount << " of " << requests.chunks.size()
+            << " chunk(s) at ratio [" << targetRatio[0] << "," << targetRatio[1] << "," << targetRatio[2]
+            << "]; first failure: " << firstChunkFailureMessage;
+  }
+
+  co_return out;
 }
 
 ZNeuroglancerPrecomputedVolume::SliceChunkRequests ZNeuroglancerPrecomputedVolume::sliceChunkRequestsFor2DViewport(

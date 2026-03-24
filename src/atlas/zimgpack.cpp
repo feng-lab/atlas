@@ -20,6 +20,7 @@
 #include <boost/hash2/sha2.hpp>
 #include <bit>
 #include <folly/OperationCancelled.h>
+#include <folly/coro/BlockingWait.h>
 #include <folly/coro/Collect.h>
 #include <tbb/parallel_for.h>
 #include <boost/iterator/function_output_iterator.hpp>
@@ -55,6 +56,11 @@ DEFINE_uint32(atlas_imgpack_quick_window_max_samples,
 // Defined in z3dimg.cpp; shared here so 3D preview assembly can reuse the same concurrency limit.
 DECLARE_uint32(atlas_ng_precomputed_3d_max_concurrent_block_reads);
 
+DEFINE_bool(
+  atlas_ng_precomputed_use_batched_chunk_reads,
+  false,
+  "Experimental: replace Neuroglancer per-chunk fan-out waits with bounded batched chunk reads in 2D/synchronous paths.");
+
 #if 0
 DEFINE_uint32(atlas_readRegionToImg_version,
               1,
@@ -71,6 +77,76 @@ struct MaxOp
     return std::max(voxelRef, static_cast<TVoxel>(otherVoxel));
   }
 };
+
+[[nodiscard]] size_t neuroglancerChunkReadWindow(size_t chunkCount)
+{
+  CHECK(chunkCount > 0);
+  const size_t logicalCores = std::max<size_t>(1, nim::ZCpuInfo::instance().nLogicalCores);
+  return std::min(logicalCores, chunkCount);
+}
+
+folly::coro::Task<std::shared_ptr<nim::ZImg>>
+readNeuroglancerChunkBestEffortAsync(const nim::ZNeuroglancerPrecomputedVolume& volume,
+                                     nim::ZNeuroglancerPrecomputedVolume::Chunk chunk)
+{
+  try {
+    co_return co_await volume.readChunkAsync(std::move(chunk));
+  }
+  catch (const std::exception&) {
+    co_return std::shared_ptr<nim::ZImg>();
+  }
+  catch (...) {
+    co_return std::shared_ptr<nim::ZImg>();
+  }
+}
+
+template<typename ChunkFn>
+void forEachNeuroglancerChunkBestEffortBlocking(const nim::ZNeuroglancerPrecomputedVolume& volume,
+                                                const std::vector<nim::ZNeuroglancerPrecomputedVolume::Chunk>& chunks,
+                                                ChunkFn&& onChunk)
+{
+  if (chunks.empty()) {
+    return;
+  }
+
+  if (!FLAGS_atlas_ng_precomputed_use_batched_chunk_reads) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
+      for (size_t i = r.begin(); i != r.end(); ++i) {
+        std::shared_ptr<nim::ZImg> chunkImg;
+        try {
+          chunkImg = volume.readChunkBlocking(chunks[i]);
+        }
+        catch (const std::exception&) {
+          continue;
+        }
+        catch (...) {
+          continue;
+        }
+        if (!chunkImg) {
+          continue;
+        }
+        onChunk(i, chunks[i], *chunkImg);
+      }
+    });
+    return;
+  }
+
+  const size_t maxConcurrent = neuroglancerChunkReadWindow(chunks.size());
+  std::vector<folly::coro::Task<std::shared_ptr<nim::ZImg>>> tasks;
+  tasks.reserve(chunks.size());
+  for (size_t i = 0; i < chunks.size(); ++i) {
+    tasks.push_back(readNeuroglancerChunkBestEffortAsync(volume, chunks[i]));
+  }
+
+  std::vector<std::shared_ptr<nim::ZImg>> chunkImgs =
+    folly::coro::blockingWait(folly::coro::collectAllWindowed(std::move(tasks), maxConcurrent));
+  for (size_t i = 0; i < chunkImgs.size(); ++i) {
+    if (!chunkImgs[i]) {
+      continue;
+    }
+    onChunk(i, chunks[i], *chunkImgs[i]);
+  }
+}
 
 } // namespace
 
@@ -1053,34 +1129,25 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
       return static_cast<int>(v);
     };
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
-      for (size_t i = r.begin(); i != r.end(); ++i) {
-        std::shared_ptr<ZImg> chunkImg;
-        try {
-          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
-        } catch (const std::exception&) {
-          continue;
-        }
-        if (!chunkImg) {
-          continue;
-        }
-
-        const int64_t localZBase = z0 - chunks[i].baseStart[2];
+    forEachNeuroglancerChunkBestEffortBlocking(
+      *m_ngVolume,
+      chunks,
+      [&](size_t i, const auto& chunk, const ZImg& chunkImg) {
+        const int64_t localZBase = z0 - chunk.baseStart[2];
         CHECK(localZBase >= 0);
         const int64_t localZ = localZBase / ratioZ;
         CHECK(localZ >= 0);
-        CHECK(static_cast<size_t>(localZ) < chunkImg->depth());
+        CHECK(static_cast<size_t>(localZ) < chunkImg.depth());
 
-        ZImg sliceImg = chunkImg->crop(ZImgRegion(0,
-                                                  static_cast<index_t>(chunkImg->width()),
-                                                  0,
-                                                  static_cast<index_t>(chunkImg->height()),
-                                                  static_cast<index_t>(localZ),
-                                                  static_cast<index_t>(localZ + 1)));
+        ZImg sliceImg = chunkImg.crop(ZImgRegion(0,
+                                                 static_cast<index_t>(chunkImg.width()),
+                                                 0,
+                                                 static_cast<index_t>(chunkImg.height()),
+                                                 static_cast<index_t>(localZ),
+                                                 static_cast<index_t>(localZ + 1)));
         tmpImgs[i] = std::make_shared<ZImg>(std::move(sliceImg));
-        tmpLocs[i] = QPoint(toIntChecked(chunks[i].baseStart[0]), toIntChecked(chunks[i].baseStart[1]));
-      }
-    });
+        tmpLocs[i] = QPoint(toIntChecked(chunk.baseStart[0]), toIntChecked(chunk.baseStart[1]));
+      });
 
     for (size_t i = 0; i < tmpImgs.size(); ++i) {
       if (!tmpImgs[i]) {
@@ -1431,27 +1498,17 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
       return res;
     }
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
-      for (size_t i = r.begin(); i != r.end(); ++i) {
-        std::shared_ptr<ZImg> chunkImg;
-        try {
-          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
-        } catch (const std::exception&) {
-          continue;
-        }
-        if (!chunkImg) {
-          continue;
-        }
-
-        ZVoxelCoordinate tileStart(static_cast<index_t>(chunks[i].baseStart[0]),
-                                   static_cast<index_t>(chunks[i].baseStart[1]),
-                                   static_cast<index_t>(chunks[i].baseStart[2]),
-                                   0,
-                                   0);
-        ZVoxelCoordinate start = tileStart - rgn.start;
-        res.pasteImg(*chunkImg, start, false);
-      }
-    });
+    forEachNeuroglancerChunkBestEffortBlocking(*m_ngVolume,
+                                               chunks,
+                                               [&](size_t, const auto& chunk, const ZImg& chunkImg) {
+                                                 ZVoxelCoordinate tileStart(static_cast<index_t>(chunk.baseStart[0]),
+                                                                            static_cast<index_t>(chunk.baseStart[1]),
+                                                                            static_cast<index_t>(chunk.baseStart[2]),
+                                                                            0,
+                                                                            0);
+                                                 ZVoxelCoordinate start = tileStart - rgn.start;
+                                                 res.pasteImg(chunkImg, start, false);
+                                               });
 
     return res;
   }
@@ -3156,30 +3213,22 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
       return res;
     }
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
-      for (size_t i = r.begin(); i != r.end(); ++i) {
-        std::shared_ptr<ZImg> chunkImg;
-        try {
-          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
-        } catch (const std::exception&) {
-          continue;
-        }
-        if (!chunkImg) {
-          continue;
-        }
-        ZVoxelCoordinate start(std::round(static_cast<double>(chunks[i].baseStart[0]) / ratio[0]),
-                               std::round(static_cast<double>(chunks[i].baseStart[1]) / ratio[1]),
-                               std::round(static_cast<double>(chunks[i].baseStart[2]) / ratio[2]),
-                               0,
-                               0);
-        if (m_ngSegmentationRgbFor3D) {
-          CHECK(m_ngVolume->isSegmentation());
-          pasteNeuroglancerSegmentationChunkAsRgb(*chunkImg, res, start);
-        } else {
-          res.pasteImg(*chunkImg, start, false);
-        }
-      }
-    });
+    forEachNeuroglancerChunkBestEffortBlocking(*m_ngVolume,
+                                               chunks,
+                                               [&](size_t, const auto& chunk, const ZImg& chunkImg) {
+                                                 ZVoxelCoordinate start(
+                                                   std::round(static_cast<double>(chunk.baseStart[0]) / ratio[0]),
+                                                   std::round(static_cast<double>(chunk.baseStart[1]) / ratio[1]),
+                                                   std::round(static_cast<double>(chunk.baseStart[2]) / ratio[2]),
+                                                   0,
+                                                   0);
+                                                 if (m_ngSegmentationRgbFor3D) {
+                                                   CHECK(m_ngVolume->isSegmentation());
+                                                   pasteNeuroglancerSegmentationChunkAsRgb(chunkImg, res, start);
+                                                 } else {
+                                                   res.pasteImg(chunkImg, start, false);
+                                                 }
+                                               });
 
     return res;
   }
@@ -3248,34 +3297,24 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t c, size_t t) cons
       return res;
     }
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
-      for (size_t i = r.begin(); i != r.end(); ++i) {
-        std::shared_ptr<ZImg> chunkImg;
-        try {
-          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
-        }
-        catch (const std::exception&) {
-          continue;
-        }
-        if (!chunkImg) {
-          continue;
-        }
-
-        ZVoxelCoordinate start(std::round(static_cast<double>(chunks[i].baseStart[0]) / ratio[0]),
-                               std::round(static_cast<double>(chunks[i].baseStart[1]) / ratio[1]),
-                               std::round(static_cast<double>(chunks[i].baseStart[2]) / ratio[2]),
+    forEachNeuroglancerChunkBestEffortBlocking(
+      *m_ngVolume,
+      chunks,
+      [&](size_t, const auto& chunk, const ZImg& chunkImg) {
+        ZVoxelCoordinate start(std::round(static_cast<double>(chunk.baseStart[0]) / ratio[0]),
+                               std::round(static_cast<double>(chunk.baseStart[1]) / ratio[1]),
+                               std::round(static_cast<double>(chunk.baseStart[2]) / ratio[2]),
                                0,
                                0);
         if (m_ngSegmentationRgbFor3D) {
           CHECK(m_ngVolume->isSegmentation());
           CHECK(c < 3);
-          pasteNeuroglancerSegmentationChunkAsRgbComponent(*chunkImg, res, start, c);
+          pasteNeuroglancerSegmentationChunkAsRgbComponent(chunkImg, res, start, c);
         } else {
           start.c = -static_cast<index_t>(c);
-          res.pasteImg(*chunkImg, start, false);
+          res.pasteImg(chunkImg, start, false);
         }
-      }
-    });
+      });
 
     return res;
   }
@@ -3357,41 +3396,33 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t z, int c, size_t 
       return res;
     }
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
-      for (size_t i = r.begin(); i != r.end(); ++i) {
-        std::shared_ptr<ZImg> chunkImg;
-        try {
-          chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
-        } catch (const std::exception&) {
-          continue;
-        }
-        if (!chunkImg) {
-          continue;
-        }
-        const ZVoxelCoordinate start(std::round(static_cast<double>(chunks[i].baseStart[0]) / ratio[0]),
-                                     std::round(static_cast<double>(chunks[i].baseStart[1]) / ratio[1]),
-                                     static_cast<index_t>(chunks[i].baseStart[2] - iz),
+    forEachNeuroglancerChunkBestEffortBlocking(
+      *m_ngVolume,
+      chunks,
+      [&](size_t, const auto& chunk, const ZImg& chunkImg) {
+        const ZVoxelCoordinate start(std::round(static_cast<double>(chunk.baseStart[0]) / ratio[0]),
+                                     std::round(static_cast<double>(chunk.baseStart[1]) / ratio[1]),
+                                     static_cast<index_t>(chunk.baseStart[2] - iz),
                                      0,
                                      0);
         if (m_ngSegmentationRgbFor3D) {
           CHECK(m_ngVolume->isSegmentation());
           if (allChannels) {
-            pasteNeuroglancerSegmentationChunkAsRgb(*chunkImg, res, start);
+            pasteNeuroglancerSegmentationChunkAsRgb(chunkImg, res, start);
           } else {
             CHECK(sc < 3);
-            pasteNeuroglancerSegmentationChunkAsRgbComponent(*chunkImg, res, start, sc);
+            pasteNeuroglancerSegmentationChunkAsRgbComponent(chunkImg, res, start, sc);
           }
         } else {
           if (allChannels) {
-            res.pasteImg(*chunkImg, start, false);
+            res.pasteImg(chunkImg, start, false);
           } else {
             ZVoxelCoordinate startWithChannel = start;
             startWithChannel.c = -static_cast<index_t>(sc);
-            res.pasteImg(*chunkImg, startWithChannel, false);
+            res.pasteImg(chunkImg, startWithChannel, false);
           }
         }
-      }
-    });
+      });
     return res;
   }
   CHECK(t < m_imgInfo.numTimes);
