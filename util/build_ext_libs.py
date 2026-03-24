@@ -3805,6 +3805,93 @@ def build_proxygen(src_dir: str, install_dir: str):
                 r"",
             ],
         ),
+        # Dump analysis pins the remaining Windows-only Proxygen crash family to
+        # the direct HTTPCoroConnector connect coroutines. The strongest code-
+        # level hypothesis is that TimedBaton cancellation can unwind before
+        # the underlying AsyncSocket/AsyncSSLSocket/Fizz callback is cancelled,
+        # leaving a callback pointer into a dead ConnectCB / coroutine frame.
+        # Keep this mitigation Windows-scoped until that hypothesis is proven
+        # or disproven with first-fault evidence.
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "proxygen",
+                "lib",
+                "http",
+                "coro",
+                "client",
+                "HTTPCoroConnector.cpp",
+            ),
+            from_texts=[
+                r"""  co_await cb.baton.wait();
+  co_await folly::coro::co_safe_point;
+  if (cb.exception) {
+    co_yield co_error(*cb.exception);
+  }
+  if (connParams.congestionFlavor) {
+    asyncSocket->setCongestionFlavor(*connParams.congestionFlavor);
+  }""",
+                r"""  co_await cb.baton.wait();
+  co_await folly::coro::co_safe_point;
+  if (cb.exception) {
+    co_yield co_error(*cb.exception);
+  }
+  initTransportInfoFromFizz(tinfo, *fizzClient);""",
+                r"""    co_await cb.baton.wait();
+    co_await folly::coro::co_safe_point;
+    if (cb.exception) {
+      co_yield co_error(*cb.exception);
+    }
+    initTransportInfoFromSSLSocket(tinfo, *sslSock);""",
+            ],
+            to_texts=[
+                r"""  auto batonStatus = co_await cb.baton.wait();
+  if (batonStatus != TimedBaton::Status::signalled) {
+    asyncSocket->cancelConnect();
+    if (batonStatus == TimedBaton::Status::timedout) {
+      co_yield co_error(folly::AsyncSocketException(
+          folly::AsyncSocketException::TIMED_OUT, "Connect timed out"));
+    }
+    co_yield folly::coro::co_cancelled;
+  }
+  co_await folly::coro::co_safe_point;
+  if (cb.exception) {
+    co_yield co_error(*cb.exception);
+  }
+  if (connParams.congestionFlavor) {
+    asyncSocket->setCongestionFlavor(*connParams.congestionFlavor);
+  }""",
+                r"""  auto batonStatus = co_await cb.baton.wait();
+  if (batonStatus != TimedBaton::Status::signalled) {
+    fizzClient->closeNow();
+    if (batonStatus == TimedBaton::Status::timedout) {
+      co_yield co_error(folly::AsyncSocketException(
+          folly::AsyncSocketException::TIMED_OUT, "Connect timed out"));
+    }
+    co_yield folly::coro::co_cancelled;
+  }
+  co_await folly::coro::co_safe_point;
+  if (cb.exception) {
+    co_yield co_error(*cb.exception);
+  }
+  initTransportInfoFromFizz(tinfo, *fizzClient);""",
+                r"""    auto batonStatus = co_await cb.baton.wait();
+    if (batonStatus != TimedBaton::Status::signalled) {
+      sslSock->cancelConnect();
+      if (batonStatus == TimedBaton::Status::timedout) {
+        co_yield co_error(folly::AsyncSocketException(
+            folly::AsyncSocketException::TIMED_OUT, "Connect timed out"));
+      }
+      co_yield folly::coro::co_cancelled;
+    }
+    co_await folly::coro::co_safe_point;
+    if (cb.exception) {
+      co_yield co_error(*cb.exception);
+    }
+    initTransportInfoFromSSLSocket(tinfo, *sslSock);""",
+            ],
+            patch_condition=is_windows,
+        ),
         # Shared CONNECT tunnels must retain ownership of the underlying proxy
         # session for the full tunnel lifetime. Without this keepalive,
         # pooled proxied HTTPS can tear down the proxy session while the tunneled
@@ -3850,6 +3937,7 @@ def build_proxygen(src_dir: str, install_dir: str):
                                                  : HTTPSessionContextPtr{}),
       eventBase_(session->getEventBase()),""",
             ],
+            patch_condition=is_windows,
         ),
         FilePatcher(
             orig_file=os.path.join(

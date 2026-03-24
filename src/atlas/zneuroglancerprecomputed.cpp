@@ -956,6 +956,8 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
                                                ZImgReadStatsContext statsContext) const
 {
   CHECK(m_chunkCache);
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
   CHECK(chunk.scaleIndex < m_scales.size());
   const auto& scale = m_scales[chunk.scaleIndex];
 
@@ -992,7 +994,9 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
 
   if (!isLeader) {
     CHECK(sharedFuture);
-    co_return co_await std::move(*sharedFuture);
+    std::shared_ptr<ZImg> sharedImg = co_await std::move(*sharedFuture);
+    maybeCancel(cancellationToken);
+    co_return sharedImg;
   }
 
   auto eraseInFlight = [&]() {
@@ -1004,6 +1008,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
   };
 
   auto doRead = [&]() -> folly::coro::Task<std::shared_ptr<ZImg>> {
+    maybeCancel(cancellationToken);
     const size_t sx = static_cast<size_t>(chunk.globalEnd[0] - chunk.globalStart[0]);
     const size_t sy = static_cast<size_t>(chunk.globalEnd[1] - chunk.globalStart[1]);
     const size_t sz = static_cast<size_t>(chunk.globalEnd[2] - chunk.globalStart[2]);
@@ -1037,6 +1042,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
       const MinishardIndexCacheKey minishardCacheKey = std::make_tuple(chunk.scaleIndex, shardAndMinishard);
 
       auto getOrFetchMinishardIndex = [&]() -> folly::coro::Task<std::shared_ptr<const DecodedMinishardIndex>> {
+        maybeCancel(cancellationToken);
         if (auto cached = m_chunkCache->minishardIndexCache.find(
               minishardCacheKey,
               ZConcurrentLRUCache<MinishardIndexCacheKey, std::shared_ptr<const DecodedMinishardIndex>>::FindStrategy::MaybeUpdateLRUList);
@@ -1062,7 +1068,9 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
 
         if (!isMinishardLeader) {
           CHECK(sharedMinishardFuture);
-          co_return co_await std::move(*sharedMinishardFuture);
+          std::shared_ptr<const DecodedMinishardIndex> sharedIndex = co_await std::move(*sharedMinishardFuture);
+          maybeCancel(cancellationToken);
+          co_return sharedIndex;
         }
 
         auto eraseMinishardInFlight = [&]() {
@@ -1082,6 +1090,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
                                                                        ZRemoteRangeReadPolicy::RequireExactLength,
                                                                        statsSink,
                                                                        statsContext);
+          maybeCancel(cancellationToken);
           if (!entryOpt) {
             inFlightMinishard->promise.setValue(std::shared_ptr<const DecodedMinishardIndex>());
             eraseMinishardInFlight();
@@ -1096,6 +1105,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
                                                                ZRemoteRangeReadPolicy::RequireExactLength,
                                                                statsSink,
                                                                statsContext);
+          maybeCancel(cancellationToken);
           if (!decodedIndexOpt) {
             inFlightMinishard->promise.setValue(std::shared_ptr<const DecodedMinishardIndex>());
             eraseMinishardInFlight();
@@ -1103,6 +1113,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
           }
           minishardIndex = std::make_shared<DecodedMinishardIndex>(std::move(*decodedIndexOpt));
 
+          maybeCancel(cancellationToken);
           m_chunkCache->minishardIndexCache.insert(minishardCacheKey, minishardIndex, minishardIndex->byteSize());
           inFlightMinishard->promise.setValue(minishardIndex);
           eraseMinishardInFlight();
@@ -1116,6 +1127,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
       };
 
       auto minishardIndex = co_await getOrFetchMinishardIndex();
+      maybeCancel(cancellationToken);
       if (!minishardIndex) {
         co_return std::shared_ptr<ZImg>();
       }
@@ -1144,6 +1156,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
                                                                        ZRemoteRangeReadPolicy::RequireExactLength,
                                                                        statsSink,
                                                                        statsContext);
+          maybeCancel(cancellationToken);
           if (!entryOpt) {
             co_return std::shared_ptr<ZImg>();
           }
@@ -1159,6 +1172,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
                                                                 ZRemoteRangeReadPolicy::RequireExactLength,
                                                                 statsSink,
                                                                 statsContext);
+      maybeCancel(cancellationToken);
       if (!payloadOpt) {
         co_return std::shared_ptr<ZImg>();
       }
@@ -1168,6 +1182,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
       const std::string urlStr = toStdString(chunkUrl(chunk).toString());
       chunkDebugUrl = urlStr;
       auto resOpt = co_await m_remoteContext->getResponseAsync(urlStr, {}, statsSink, statsContext);
+      maybeCancel(cancellationToken);
       if (!resOpt) {
         // Missing unsharded chunk objects are a soft miss in Neuroglancer.
         // Sparse datasets may omit all-zero chunks entirely, and getBytes()
@@ -1180,52 +1195,56 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
       payload = std::move(resOpt->body);
     }
 
+    maybeCancel(cancellationToken);
     std::vector<uint8_t> body;
     switch (scale.chunkEncoding) {
-    case Scale::ChunkEncoding::Raw:
-      body = std::move(payload);
-      break;
-    case Scale::ChunkEncoding::Jpeg: {
-      CHECK(bytesPerVoxel == 1);
-      body = ZNeuroglancerPrecomputedChunkDecoder::decodeJpegToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
-                                                                   /*expectedVoxelCount=*/sx * sy * sz,
-                                                                   /*expectedChannels=*/m_numChannels);
-      break;
-    }
-    case Scale::ChunkEncoding::Png: {
-      CHECK(bytesPerVoxel == 1 || bytesPerVoxel == 2);
-      body = ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
-                                                                  /*expectedVoxelCount=*/sx * sy * sz,
-                                                                  /*expectedChannels=*/m_numChannels,
-                                                                  bytesPerVoxel);
-      break;
-    }
-    case Scale::ChunkEncoding::Compresso: {
-      CHECK(bytesPerVoxel == 1 || bytesPerVoxel == 2 || bytesPerVoxel == 4 || bytesPerVoxel == 8);
-      CHECK(m_numChannels == 1);
-      body = ZNeuroglancerPrecomputedChunkDecoder::decodeCompressoToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
-                                                                        /*expectedChunkSize=*/{sx, sy, sz},
-                                                                        bytesPerVoxel);
-      break;
-    }
-    case Scale::ChunkEncoding::CompressedSegmentation: {
-      CHECK(scale.compressedSegmentationBlockSize);
-      CHECK(m_dataTypeString == "uint32" || m_dataTypeString == "uint64");
-      std::array<size_t, 3> blockSize{};
-      for (size_t d = 0; d < 3; ++d) {
-        const int64_t v = (*scale.compressedSegmentationBlockSize)[d];
-        CHECK(v > 0);
-        blockSize[d] = static_cast<size_t>(v);
+      case Scale::ChunkEncoding::Raw:
+        body = std::move(payload);
+        break;
+      case Scale::ChunkEncoding::Jpeg: {
+        CHECK(bytesPerVoxel == 1);
+        body = ZNeuroglancerPrecomputedChunkDecoder::decodeJpegToRaw(
+          std::span<const uint8_t>(payload.data(), payload.size()),
+          /*expectedVoxelCount=*/sx * sy * sz,
+          /*expectedChannels=*/m_numChannels);
+        break;
       }
-      const bool isUint64 = (m_dataTypeString == "uint64");
-      body = ZNeuroglancerPrecomputedChunkDecoder::decodeCompressedSegmentationToRaw(
-        std::span<const uint8_t>(payload.data(), payload.size()),
-        /*chunkSize=*/{sx, sy, sz},
-        /*numChannels=*/m_numChannels,
-        blockSize,
-        isUint64);
-      break;
-    }
+      case Scale::ChunkEncoding::Png: {
+        CHECK(bytesPerVoxel == 1 || bytesPerVoxel == 2);
+        body =
+          ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
+                                                               /*expectedVoxelCount=*/sx * sy * sz,
+                                                               /*expectedChannels=*/m_numChannels,
+                                                               bytesPerVoxel);
+        break;
+      }
+      case Scale::ChunkEncoding::Compresso: {
+        CHECK(bytesPerVoxel == 1 || bytesPerVoxel == 2 || bytesPerVoxel == 4 || bytesPerVoxel == 8);
+        CHECK(m_numChannels == 1);
+        body = ZNeuroglancerPrecomputedChunkDecoder::decodeCompressoToRaw(
+          std::span<const uint8_t>(payload.data(), payload.size()),
+          /*expectedChunkSize=*/{sx, sy, sz},
+          bytesPerVoxel);
+        break;
+      }
+      case Scale::ChunkEncoding::CompressedSegmentation: {
+        CHECK(scale.compressedSegmentationBlockSize);
+        CHECK(m_dataTypeString == "uint32" || m_dataTypeString == "uint64");
+        std::array<size_t, 3> blockSize{};
+        for (size_t d = 0; d < 3; ++d) {
+          const int64_t v = (*scale.compressedSegmentationBlockSize)[d];
+          CHECK(v > 0);
+          blockSize[d] = static_cast<size_t>(v);
+        }
+        const bool isUint64 = (m_dataTypeString == "uint64");
+        body = ZNeuroglancerPrecomputedChunkDecoder::decodeCompressedSegmentationToRaw(
+          std::span<const uint8_t>(payload.data(), payload.size()),
+          /*chunkSize=*/{sx, sy, sz},
+          /*numChannels=*/m_numChannels,
+          blockSize,
+          isUint64);
+        break;
+      }
     }
 
     if (body.size() != expectedBytes) {
@@ -1257,10 +1276,12 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
     auto img = std::make_shared<ZImg>(info);
     std::memcpy(img->timeData<uint8_t>(0), body.data(), body.size());
 
+    maybeCancel(cancellationToken);
     if (statsSink) {
       statsSink->onSourceLogicalBytes(statsContext, img ? img->byteNumber() : 0);
     }
 
+    maybeCancel(cancellationToken);
     m_chunkCache->chunkCache.insert(cacheKey, img, img->byteNumber());
     co_return img;
   };

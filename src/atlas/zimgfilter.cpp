@@ -5,6 +5,7 @@
 #include "zimgview.h"
 #include "zimgpackdisplay.h"
 #include "zcpuinfo.h"
+#include "zcancellation.h"
 #include "zbackgroundtaskmanager.h"
 #include "zneuroglancerprecomputed.h"
 #include "zneuroglancerprecomputeddatasetlist.h"
@@ -325,8 +326,10 @@ folly::coro::Task<Neuroglancer2DTileResult> renderNeuroglancer2DTileAsync(Neurog
   CHECK(task.shared);
   out.epoch = task.shared->epoch;
   out.pass = task.shared->pass;
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
 
   try {
+    maybeCancel(cancellationToken);
     if (!isEpochCurrent(task.shared->epochAtomic, task.shared->epoch)) {
       co_return out;
     }
@@ -337,6 +340,7 @@ folly::coro::Task<Neuroglancer2DTileResult> renderNeuroglancer2DTileAsync(Neurog
 
     const ZNeuroglancerPrecomputedVolume::Chunk chunk = task.chunk;
     auto chunkImg = co_await task.shared->volume->readChunkAsync(chunk);
+    maybeCancel(cancellationToken);
     if (!chunkImg) {
       co_return out;
     }
@@ -358,6 +362,7 @@ folly::coro::Task<Neuroglancer2DTileResult> renderNeuroglancer2DTileAsync(Neurog
                                               static_cast<index_t>(chunkImg->height()),
                                               static_cast<index_t>(localZ),
                                               static_cast<index_t>(localZ + 1)));
+    maybeCancel(cancellationToken);
 
     if (!isEpochCurrent(task.shared->epochAtomic, task.shared->epoch)) {
       co_return out;
@@ -372,6 +377,7 @@ folly::coro::Task<Neuroglancer2DTileResult> renderNeuroglancer2DTileAsync(Neurog
     std::vector<double> scales;
     scales.push_back(task.shared->tileScale);
 
+    maybeCancel(cancellationToken);
     out.qImagePack = qImagePackFromZImgs(imgs,
                                          locs,
                                          scales,
@@ -385,10 +391,10 @@ folly::coro::Task<Neuroglancer2DTileResult> renderNeuroglancer2DTileAsync(Neurog
     co_return out;
   }
   catch (const ZCancellationException&) {
-    co_return out;
+    throw;
   }
   catch (const folly::OperationCancelled&) {
-    co_return out;
+    throw;
   }
   catch (const std::exception& e) {
     if (isBestEffortNeuroglancer2DPass(task.shared->pass)) {
@@ -417,6 +423,7 @@ struct ZImgFilter::Neuroglancer2DCoroFanoutState
   uint64_t epoch = 0;
   std::atomic<size_t> nextTaskIndex{0};
   std::atomic<size_t> remainingWorkers{0};
+  std::atomic<bool> stopRequested{false};
 };
 
 ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length,
@@ -1784,15 +1791,22 @@ ZImgFilter::runNeuroglancer2DCoroFanoutWorker(std::shared_ptr<Neuroglancer2DCoro
   CHECK(state->tasks);
 
   QPointer<ZImgFilter> filterPtr(this);
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
 
   try {
     while (true) {
+      maybeCancel(cancellationToken);
+      if (state->stopRequested.load(std::memory_order_acquire)) {
+        break;
+      }
+
       const size_t index = state->nextTaskIndex.fetch_add(1, std::memory_order_relaxed);
       if (index >= state->tasks->size()) {
         break;
       }
 
       Neuroglancer2DTileResult result = co_await renderNeuroglancer2DTileAsync((*state->tasks)[index]);
+      maybeCancel(cancellationToken);
       if (!filterPtr || QCoreApplication::closingDown()) {
         continue;
       }
@@ -1831,8 +1845,10 @@ ZImgFilter::runNeuroglancer2DCoroFanoutWorker(std::shared_ptr<Neuroglancer2DCoro
     }
   }
   catch (const ZCancellationException&) {
+    state->stopRequested.store(true, std::memory_order_release);
   }
   catch (const folly::OperationCancelled&) {
+    state->stopRequested.store(true, std::memory_order_release);
   }
   catch (const std::exception& e) {
     LOG(ERROR) << "Neuroglancer 2D coroutine fan-out worker failed: " << e.what();
@@ -1842,6 +1858,9 @@ ZImgFilter::runNeuroglancer2DCoroFanoutWorker(std::shared_ptr<Neuroglancer2DCoro
   }
 
   if (state->remainingWorkers.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+    if (state->stopRequested.load(std::memory_order_acquire) || cancellationToken.isCancellationRequested()) {
+      co_return;
+    }
     if (!filterPtr || QCoreApplication::closingDown()) {
       co_return;
     }
