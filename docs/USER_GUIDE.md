@@ -341,6 +341,7 @@ Steps to load and manage images:
           - **Load Neuroglancer Annotations for Segment Under Cursor** (uses the relationship index; requires a cached segment ID)
           - **Load Neuroglancer Annotations for Segment ID…** (manual segment/object ID entry)
           - **Load Neuroglancer Annotations in View (spatial index)…** (queries the current viewport region at the current slice; does not require a segment ID)
+        - Spatial-index loads run as background tasks, progressively add puncta/line geometry as batches arrive, and can be cancelled from the Tasks panel. If you cancel after some batches already loaded, Atlas keeps the partial results that were already added.
         - Ellipsoid annotations preserve anisotropic radii and render as true ellipsoids in 3D.
    9. If a remote dataset behaves differently across platforms or crashes in one HTTP stack, restart Atlas with `--atlas_http_backend=curl` or `--atlas_http_backend=proxygen` and compare behavior.
    10. If HTTPS requests fail with certificate/CA errors, run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem`. On Windows, Atlas uses `--atlas_http_windows_trust_source=auto|windows_store|bundled_pem` to choose between exported Windows trust and a PEM bundle such as the packaged `curl-ca-bundle.crt`. On macOS, the curl backend prefers the native/default trust path by default.

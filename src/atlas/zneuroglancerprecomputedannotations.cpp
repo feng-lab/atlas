@@ -6,6 +6,7 @@
 #include "zexception.h"
 #include "zlog.h"
 
+#include <folly/OperationCancelled.h>
 #include <folly/coro/BlockingWait.h>
 #include <boost/json.hpp>
 
@@ -21,6 +22,10 @@ namespace nim {
 namespace json = boost::json;
 
 namespace {
+
+constexpr auto kSpatialBulkLoadMinUpdateInterval = std::chrono::hours{24};
+constexpr size_t kSpatialBulkLoadMaxAnnotationsPerUpdate = 8192;
+constexpr size_t kSpatialStreamReserveHint = 2048;
 
 std::string toStdString(const QString& s)
 {
@@ -327,6 +332,16 @@ ZNeuroglancerPrecomputedAnnotationsSource::open(const QUrl& annotationRootUrl,
                                                 std::array<int64_t, 3> baseVoxelOffset,
                                                 std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
 {
+  return folly::coro::blockingWait(
+    openAsync(annotationRootUrl, baseResolutionNm, baseVoxelOffset, std::move(remoteContext)));
+}
+
+folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>>
+ZNeuroglancerPrecomputedAnnotationsSource::openAsync(const QUrl& annotationRootUrl,
+                                                     std::array<double, 3> baseResolutionNm,
+                                                     std::array<int64_t, 3> baseVoxelOffset,
+                                                     std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
+{
   CHECK(remoteContext);
   QUrl rootUrl = annotationRootUrl;
   if (!rootUrl.toString().endsWith('/')) {
@@ -336,12 +351,12 @@ ZNeuroglancerPrecomputedAnnotationsSource::open(const QUrl& annotationRootUrl,
   const QUrl infoUrl = rootUrl.resolved(QUrl("info"));
   const std::string infoUrlStr = toStdString(infoUrl.toString());
 
-  auto bytesOpt = folly::coro::blockingWait(remoteContext->getBytesAsync(infoUrlStr));
+  auto bytesOpt = co_await remoteContext->getBytesAsync(infoUrlStr);
   if (!bytesOpt) {
     throw ZException(fmt::format("Neuroglancer annotations info not found (HTTP 403/404) at '{}'", infoUrlStr));
   }
   const std::string infoText(reinterpret_cast<const char*>(bytesOpt->data()), bytesOpt->size());
-  return parseInfoJsonText(rootUrl, infoText, baseResolutionNm, baseVoxelOffset, std::move(remoteContext));
+  co_return parseInfoJsonText(rootUrl, infoText, baseResolutionNm, baseVoxelOffset, std::move(remoteContext));
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
@@ -351,10 +366,21 @@ ZNeuroglancerPrecomputedAnnotationsSource::open(const QUrl& annotationRootUrl,
                                                 std::chrono::milliseconds timeout,
                                                 std::shared_ptr<const ZRemoteObjectStore> objectStore)
 {
-  return open(annotationRootUrl,
-              baseResolutionNm,
-              baseVoxelOffset,
-              ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
+  return folly::coro::blockingWait(
+    openAsync(annotationRootUrl, baseResolutionNm, baseVoxelOffset, timeout, std::move(objectStore)));
+}
+
+folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>>
+ZNeuroglancerPrecomputedAnnotationsSource::openAsync(const QUrl& annotationRootUrl,
+                                                     std::array<double, 3> baseResolutionNm,
+                                                     std::array<int64_t, 3> baseVoxelOffset,
+                                                     std::chrono::milliseconds timeout,
+                                                     std::shared_ptr<const ZRemoteObjectStore> objectStore)
+{
+  co_return co_await openAsync(annotationRootUrl,
+                               baseResolutionNm,
+                               baseVoxelOffset,
+                               ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
@@ -609,7 +635,7 @@ ZNeuroglancerPrecomputedAnnotationsSource::findRelationship(const QString& id) c
   return std::nullopt;
 }
 
-std::vector<uint8_t> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryBlocking(
+folly::coro::Task<std::vector<uint8_t>> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryAsync(
   const QUrl& dirUrl,
   const std::optional<ZNeuroglancerPrecomputedVolume::Scale::Sharding>& shardingOpt,
   uint64_t key) const
@@ -618,7 +644,7 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryBl
   if (!shardingOpt) {
     const QUrl url = dirUrl.resolved(QUrl(QString::number(key)));
     const std::string urlStr = toStdString(url.toString());
-    auto resOpt = folly::coro::blockingWait(m_remoteContext->getResponseAsync(urlStr));
+    auto resOpt = co_await m_remoteContext->getResponseAsync(urlStr);
     if (!resOpt) {
       throw ZNotFoundException(
         fmt::format("Neuroglancer annotations index entry not found for key {} (HTTP 403/404)", key));
@@ -639,14 +665,12 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryBl
     const uint64_t minishard = shardAndMinishard & sharding.minishardMask;
     const uint64_t shard = (shardAndMinishard >> sharding.minishardBits) & sharding.shardMask;
 
-    auto entryOpt = folly::coro::blockingWait(
-      getNeuroglancerShardIndexEntryAsync(*m_remoteContext, dirUrl, sharding, shard, minishard));
+    auto entryOpt = co_await getNeuroglancerShardIndexEntryAsync(*m_remoteContext, dirUrl, sharding, shard, minishard);
     if (!entryOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer annotations shard index not found for key {}", key));
     }
 
-    auto decodedOpt =
-      folly::coro::blockingWait(getNeuroglancerDecodedMinishardIndexAsync(*m_remoteContext, *entryOpt, sharding));
+    auto decodedOpt = co_await getNeuroglancerDecodedMinishardIndexAsync(*m_remoteContext, *entryOpt, sharding);
     if (!decodedOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer annotations minishard not found for key {}", key));
     }
@@ -661,8 +685,10 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryBl
       throw ZNotFoundException(fmt::format("Neuroglancer annotations index entry not found for key {}", key));
     }
 
-    auto payloadOpt = folly::coro::blockingWait(
-      getNeuroglancerDecodedShardedPayloadBytesAsync(*m_remoteContext, entryOpt->dataUrl, *locationOpt, sharding));
+    auto payloadOpt = co_await getNeuroglancerDecodedShardedPayloadBytesAsync(*m_remoteContext,
+                                                                              entryOpt->dataUrl,
+                                                                              *locationOpt,
+                                                                              sharding);
     if (!payloadOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer annotations payload not found for key {}", key));
     }
@@ -670,7 +696,7 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedAnnotationsSource::loadIndexEntryBl
   }
 
   CHECK(bytesOpt);
-  return std::move(*bytesOpt);
+  co_return std::move(*bytesOpt);
 }
 
 glm::vec3 ZNeuroglancerPrecomputedAnnotationsSource::voxelFromCoordUnits(const glm::vec3& coord) const
@@ -700,31 +726,31 @@ glm::dvec3 ZNeuroglancerPrecomputedAnnotationsSource::coordUnitsFromVoxel(const 
   return glm::dvec3(cx, cy, cz);
 }
 
-std::optional<std::vector<uint8_t>> ZNeuroglancerPrecomputedAnnotationsSource::loadSpatialCellEntryBlocking(
-  const SpatialLevelSpec& level,
-  const std::array<uint64_t, 3>& cell) const
+folly::coro::Task<std::optional<std::vector<uint8_t>>>
+ZNeuroglancerPrecomputedAnnotationsSource::loadSpatialCellEntryAsync(const SpatialLevelSpec& level,
+                                                                     const std::array<uint64_t, 3>& cell) const
 {
   if (!level.sharding) {
     const QString filename = QString("%1_%2_%3").arg(cell[0]).arg(cell[1]).arg(cell[2]);
     const QUrl url = level.indexDirUrl.resolved(QUrl(filename));
     const std::string urlStr = toStdString(url.toString());
-    auto resOpt = folly::coro::blockingWait(m_remoteContext->getResponseAsync(urlStr));
+    auto resOpt = co_await m_remoteContext->getResponseAsync(urlStr);
     if (!resOpt) {
-      return std::nullopt;
+      co_return std::nullopt;
     }
     if (resOpt->status != 200) {
       throw ZException(
         fmt::format("Failed to fetch neuroglancer spatial index entry from '{}' (HTTP {})", urlStr, resOpt->status));
     }
-    return std::move(resOpt->body);
+    co_return std::move(resOpt->body);
   }
 
   const uint64_t key = ZNeuroglancerUint64Sharding::compressedMortonCode(cell, level.gridShape);
   try {
-    return loadIndexEntryBlocking(level.indexDirUrl, level.sharding, key);
+    co_return co_await loadIndexEntryAsync(level.indexDirUrl, level.sharding, key);
   }
   catch (const ZNotFoundException&) {
-    return std::nullopt;
+    co_return std::nullopt;
   }
 }
 
@@ -866,82 +892,64 @@ struct VoxelBox
   return false;
 }
 
+[[nodiscard]] uint64_t safeAddU64(uint64_t a, uint64_t b)
+{
+  if (a > std::numeric_limits<uint64_t>::max() - b) {
+    return std::numeric_limits<uint64_t>::max();
+  }
+  return a + b;
+}
+
+[[nodiscard]] uint64_t safeMulU64(uint64_t a, uint64_t b)
+{
+  if (a == 0 || b == 0) {
+    return 0;
+  }
+  if (a > std::numeric_limits<uint64_t>::max() / b) {
+    return std::numeric_limits<uint64_t>::max();
+  }
+  return a * b;
+}
+
 } // namespace
+
+folly::coro::Task<std::vector<ZNeuroglancerPrecomputedAnnotationsSource::Annotation>>
+ZNeuroglancerPrecomputedAnnotationsSource::loadAnnotationsIntersectingVoxelBoxAsync(const glm::dvec3& voxelMin,
+                                                                                    const glm::dvec3& voxelMax) const
+{
+  std::vector<Annotation> out;
+  out.reserve(1024);
+  auto updates = streamAnnotationsIntersectingVoxelBoxAsync(
+    voxelMin,
+    voxelMax,
+    SpatialStreamOptions{.minUpdateInterval = kSpatialBulkLoadMinUpdateInterval,
+                         .maxAnnotationsPerUpdate = kSpatialBulkLoadMaxAnnotationsPerUpdate});
+  while (auto update = co_await updates.next()) {
+    auto& batch = update->newAnnotations;
+    out.insert(out.end(), std::make_move_iterator(batch.begin()), std::make_move_iterator(batch.end()));
+  }
+  co_return out;
+}
 
 std::vector<ZNeuroglancerPrecomputedAnnotationsSource::Annotation>
 ZNeuroglancerPrecomputedAnnotationsSource::loadAnnotationsIntersectingVoxelBoxBlocking(const glm::dvec3& voxelMin,
                                                                                        const glm::dvec3& voxelMax) const
 {
-  if (m_spatial.empty()) {
-    throw ZException("Neuroglancer annotations dataset has no spatial index ('spatial' missing in info)");
+  try {
+    return folly::coro::blockingWait(loadAnnotationsIntersectingVoxelBoxAsync(voxelMin, voxelMax));
   }
-
-  const VoxelBox qVoxel = makeVoxelBox(voxelMin, voxelMax);
-  const glm::dvec3 qMinCoord = coordUnitsFromVoxel(qVoxel.min);
-  const glm::dvec3 qMaxCoord = coordUnitsFromVoxel(qVoxel.max);
-
-  std::vector<Annotation> out;
-  out.reserve(1024);
-  std::unordered_set<uint64_t> seen;
-  seen.reserve(1024);
-
-  for (const SpatialLevelSpec& level : m_spatial) {
-    std::array<int64_t, 3> cellMin{};
-    std::array<int64_t, 3> cellMax{};
-
-    for (size_t d = 0; d < 3; ++d) {
-      const double origin = m_lowerBoundCoord[d];
-      const double chunk = level.chunkSize[d];
-      const int64_t maxIdx = static_cast<int64_t>(level.gridShape[d]) - 1;
-      CHECK(maxIdx >= 0);
-
-      const double a = (qMinCoord[d] - origin) / chunk;
-      const double b = (qMaxCoord[d] - origin) / chunk;
-      int64_t lo = static_cast<int64_t>(std::floor(std::min(a, b)));
-      int64_t hi = static_cast<int64_t>(std::floor(std::max(a, b)));
-
-      lo = std::clamp<int64_t>(lo, 0, maxIdx);
-      hi = std::clamp<int64_t>(hi, 0, maxIdx);
-      cellMin[d] = lo;
-      cellMax[d] = hi;
-    }
-
-    for (int64_t z = cellMin[2]; z <= cellMax[2]; ++z) {
-      for (int64_t y = cellMin[1]; y <= cellMax[1]; ++y) {
-        for (int64_t x = cellMin[0]; x <= cellMax[0]; ++x) {
-          const std::array<uint64_t, 3> cell = {static_cast<uint64_t>(x), static_cast<uint64_t>(y), static_cast<uint64_t>(z)};
-
-          auto bytesOpt = loadSpatialCellEntryBlocking(level, cell);
-          if (!bytesOpt) {
-            continue;
-          }
-          const auto anns = decodeMultipleAnnotationBytes(std::span<const uint8_t>(bytesOpt->data(), bytesOpt->size()));
-          for (const auto& a : anns) {
-            if (!annotationIntersectsVoxelBox(a, qVoxel)) {
-              continue;
-            }
-            if (!seen.insert(a.id).second) {
-              continue;
-            }
-            out.push_back(a);
-          }
-        }
-      }
-    }
+  catch (const folly::OperationCancelled&) {
+    throw ZCancellationException();
   }
-
-  return out;
 }
 
-void ZNeuroglancerPrecomputedAnnotationsSource::streamAnnotationsIntersectingVoxelBoxBlocking(
+folly::coro::AsyncGenerator<ZNeuroglancerPrecomputedAnnotationsSource::SpatialLoadUpdate&&>
+ZNeuroglancerPrecomputedAnnotationsSource::streamAnnotationsIntersectingVoxelBoxAsync(
   const glm::dvec3& voxelMin,
   const glm::dvec3& voxelMax,
-  const SpatialLoadUpdateCallback& onUpdate,
-  const std::atomic_bool* cancelFlag,
-  std::chrono::milliseconds minUpdateInterval,
-  size_t maxAnnotationsPerUpdate) const
+  SpatialStreamOptions options) const
 {
-  CHECK(static_cast<bool>(onUpdate)) << "streamAnnotationsIntersectingVoxelBoxBlocking requires an onUpdate callback";
+  CHECK(options.maxAnnotationsPerUpdate > 0);
   if (m_spatial.empty()) {
     throw ZException("Neuroglancer annotations dataset has no spatial index ('spatial' missing in info)");
   }
@@ -949,23 +957,7 @@ void ZNeuroglancerPrecomputedAnnotationsSource::streamAnnotationsIntersectingVox
   const VoxelBox qVoxel = makeVoxelBox(voxelMin, voxelMax);
   const glm::dvec3 qMinCoord = coordUnitsFromVoxel(qVoxel.min);
   const glm::dvec3 qMaxCoord = coordUnitsFromVoxel(qVoxel.max);
-
-  auto safeAddU64 = [](uint64_t a, uint64_t b) -> uint64_t {
-    if (a > std::numeric_limits<uint64_t>::max() - b) {
-      return std::numeric_limits<uint64_t>::max();
-    }
-    return a + b;
-  };
-
-  auto safeMulU64 = [](uint64_t a, uint64_t b) -> uint64_t {
-    if (a == 0 || b == 0) {
-      return 0;
-    }
-    if (a > std::numeric_limits<uint64_t>::max() / b) {
-      return std::numeric_limits<uint64_t>::max();
-    }
-    return a * b;
-  };
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
 
   struct LevelCellRange
   {
@@ -1009,8 +1001,7 @@ void ZNeuroglancerPrecomputedAnnotationsSource::streamAnnotationsIntersectingVox
     const uint64_t nx = static_cast<uint64_t>(r.cellMax[0] - r.cellMin[0] + 1);
     const uint64_t ny = static_cast<uint64_t>(r.cellMax[1] - r.cellMin[1] + 1);
     const uint64_t nz = static_cast<uint64_t>(r.cellMax[2] - r.cellMin[2] + 1);
-    const uint64_t levelCells = safeMulU64(safeMulU64(nx, ny), nz);
-    prog.totalCells = safeAddU64(prog.totalCells, levelCells);
+    prog.totalCells = safeAddU64(prog.totalCells, safeMulU64(safeMulU64(nx, ny), nz));
     ranges.push_back(r);
   }
 
@@ -1018,34 +1009,33 @@ void ZNeuroglancerPrecomputedAnnotationsSource::streamAnnotationsIntersectingVox
   seen.reserve(1024);
 
   std::vector<Annotation> batch;
-  batch.reserve(std::min<size_t>(maxAnnotationsPerUpdate, 2048));
+  batch.reserve(std::min<size_t>(options.maxAnnotationsPerUpdate, kSpatialStreamReserveHint));
 
   using Clock = std::chrono::steady_clock;
   auto lastUpdate = Clock::now();
 
   auto shouldCancel = [&]() -> bool {
-    return cancelFlag && cancelFlag->load(std::memory_order_relaxed);
+    return cancellationToken.isCancellationRequested();
   };
 
-  auto flush = [&](bool force) {
+  auto makeUpdate = [&](bool force) -> std::optional<SpatialLoadUpdate> {
     const auto now = Clock::now();
     if (!force) {
       if (batch.empty()) {
-        return;
+        return std::nullopt;
       }
-      if (now - lastUpdate < minUpdateInterval) {
-        return;
+      if (now - lastUpdate < options.minUpdateInterval) {
+        return std::nullopt;
       }
     }
 
-    SpatialLoadUpdate u;
-    u.progress = prog;
-    u.newAnnotations = std::move(batch);
+    SpatialLoadUpdate update;
+    update.progress = prog;
+    update.newAnnotations = std::move(batch);
     batch.clear();
-    batch.reserve(std::min<size_t>(maxAnnotationsPerUpdate, 2048));
-
-    onUpdate(std::move(u));
+    batch.reserve(std::min<size_t>(options.maxAnnotationsPerUpdate, kSpatialStreamReserveHint));
     lastUpdate = now;
+    return update;
   };
 
   for (size_t levelIdx = 0; levelIdx < ranges.size(); ++levelIdx) {
@@ -1057,21 +1047,22 @@ void ZNeuroglancerPrecomputedAnnotationsSource::streamAnnotationsIntersectingVox
       for (int64_t y = r.cellMin[1]; y <= r.cellMax[1]; ++y) {
         for (int64_t x = r.cellMin[0]; x <= r.cellMax[0]; ++x) {
           if (shouldCancel()) {
-            flush(/*force=*/true);
-            return;
+            if (auto update = makeUpdate(/*force=*/true)) {
+              co_yield std::move(*update);
+            }
+            co_return;
           }
 
           const std::array<uint64_t, 3> cell = {static_cast<uint64_t>(x),
                                                 static_cast<uint64_t>(y),
                                                 static_cast<uint64_t>(z)};
 
-          auto bytesOpt = loadSpatialCellEntryBlocking(*r.level, cell);
+          auto bytesOpt = co_await loadSpatialCellEntryAsync(*r.level, cell);
           prog.visitedCells = safeAddU64(prog.visitedCells, 1);
 
           if (bytesOpt) {
-            const auto anns =
-              decodeMultipleAnnotationBytes(std::span<const uint8_t>(bytesOpt->data(), bytesOpt->size()));
-            for (const auto& a : anns) {
+            auto anns = decodeMultipleAnnotationBytes(std::span<const uint8_t>(bytesOpt->data(), bytesOpt->size()));
+            for (auto& a : anns) {
               if (!annotationIntersectsVoxelBox(a, qVoxel)) {
                 continue;
               }
@@ -1079,20 +1070,26 @@ void ZNeuroglancerPrecomputedAnnotationsSource::streamAnnotationsIntersectingVox
                 continue;
               }
               prog.uniqueAnnotations = safeAddU64(prog.uniqueAnnotations, 1);
-              batch.push_back(a);
-              if (batch.size() >= maxAnnotationsPerUpdate) {
-                flush(/*force=*/true);
+              batch.push_back(std::move(a));
+              if (batch.size() >= options.maxAnnotationsPerUpdate) {
+                if (auto update = makeUpdate(/*force=*/true)) {
+                  co_yield std::move(*update);
+                }
               }
             }
           }
 
-          flush(/*force=*/false);
+          if (auto update = makeUpdate(/*force=*/false)) {
+            co_yield std::move(*update);
+          }
         }
       }
     }
   }
 
-  flush(/*force=*/true);
+  if (auto update = makeUpdate(/*force=*/true)) {
+    co_yield std::move(*update);
+  }
 }
 
 ZNeuroglancerPrecomputedAnnotationsSource::Annotation ZNeuroglancerPrecomputedAnnotationsSource::decodeAnnotationPayload(
@@ -1325,14 +1322,26 @@ std::vector<ZNeuroglancerPrecomputedAnnotationsSource::Annotation>
 ZNeuroglancerPrecomputedAnnotationsSource::loadAnnotationsForRelatedObjectBlocking(const QString& relationshipId,
                                                                                    uint64_t objectId) const
 {
+  try {
+    return folly::coro::blockingWait(loadAnnotationsForRelatedObjectAsync(relationshipId, objectId));
+  }
+  catch (const folly::OperationCancelled&) {
+    throw ZCancellationException();
+  }
+}
+
+folly::coro::Task<std::vector<ZNeuroglancerPrecomputedAnnotationsSource::Annotation>>
+ZNeuroglancerPrecomputedAnnotationsSource::loadAnnotationsForRelatedObjectAsync(const QString& relationshipId,
+                                                                                uint64_t objectId) const
+{
   const auto relOpt = findRelationship(relationshipId);
   if (!relOpt) {
     throw ZException(fmt::format("Unknown neuroglancer relationship id '{}'", toStdString(relationshipId)));
   }
 
   const RelationshipSpec rel = *relOpt;
-  const std::vector<uint8_t> bytes = loadIndexEntryBlocking(rel.indexDirUrl, rel.sharding, objectId);
-  return decodeMultipleAnnotationBytes(std::span<const uint8_t>(bytes.data(), bytes.size()));
+  const std::vector<uint8_t> bytes = co_await loadIndexEntryAsync(rel.indexDirUrl, rel.sharding, objectId);
+  co_return decodeMultipleAnnotationBytes(std::span<const uint8_t>(bytes.data(), bytes.size()));
 }
 
 } // namespace nim

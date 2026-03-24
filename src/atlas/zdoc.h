@@ -1,9 +1,11 @@
 #pragma once
 
 #include "zjson.h"
+#include <folly/Executor.h>
 #include <QObject>
 #include <QUndoGroup>
 #include <memory>
+#include <string_view>
 
 class QUndoStack;
 
@@ -50,6 +52,7 @@ class ZObjPack;
 class ZTraceSettings;
 
 class ZBackgroundTaskManager;
+class ZQtExecutor;
 
 class ZDoc : public QObject
 {
@@ -57,6 +60,7 @@ class ZDoc : public QObject
 
 public:
   explicit ZDoc(QObject* parent = nullptr);
+  ~ZDoc() override;
 
   std::vector<size_t> chooseObjsWithWidget(const QString& title, QWidget* parent) const;
 
@@ -267,6 +271,12 @@ public:
     return *m_backgroundTaskManager;
   }
 
+  [[nodiscard]] ZQtExecutor& uiThreadExecutor();
+
+  [[nodiscard]] const ZQtExecutor& uiThreadExecutor() const;
+
+  [[nodiscard]] folly::Executor::KeepAlive<> uiThreadExecutorKeepAlive(std::string_view debugLabel = {});
+
   // Called during application shutdown. Handles unsaved-change prompts and active background-task
   // cancellation prompts. Returns false when shutdown should be aborted.
   bool canClose(QWidget* parent);
@@ -397,6 +407,7 @@ private:
 
   ZTraceSettings* m_traceSettings = nullptr;
   ZBackgroundTaskManager* m_backgroundTaskManager = nullptr;
+  std::unique_ptr<ZQtExecutor> m_uiThreadExecutor;
 };
 
 } // namespace nim

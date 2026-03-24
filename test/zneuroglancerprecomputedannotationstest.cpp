@@ -1,8 +1,17 @@
 #include "zneuroglancerprecomputedannotations.h"
+#include "zneuroglancerremotecontext.h"
+#include "zremoteobjectstore.h"
 
+#include <folly/coro/BlockingWait.h>
+#include <folly/coro/Task.h>
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <deque>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace nim {
@@ -29,6 +38,48 @@ void appendF32LE(std::vector<uint8_t>& out, float f)
   static_assert(sizeof(float) == sizeof(uint32_t));
   std::memcpy(&u, &f, sizeof(float));
   appendU32LE(out, u);
+}
+
+class FakeRemoteObjectStore final : public ZRemoteObjectStore
+{
+public:
+  struct Request
+  {
+    std::string url;
+    std::chrono::milliseconds timeout{0};
+    std::vector<std::pair<std::string, std::string>> headers;
+  };
+
+  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>>
+  getBytes(std::string url,
+           std::chrono::milliseconds timeout,
+           std::vector<std::pair<std::string, std::string>> requestHeaders) const override
+  {
+    requests.push_back(Request{.url = std::move(url), .timeout = timeout, .headers = std::move(requestHeaders)});
+    if (responses.empty()) {
+      throw std::runtime_error("FakeRemoteObjectStore called without a queued response");
+    }
+    auto next = std::move(responses.front());
+    responses.pop_front();
+    co_return next;
+  }
+
+  mutable std::deque<std::optional<ZHttpGetBytesResult>> responses;
+  mutable std::vector<Request> requests;
+};
+
+folly::coro::Task<std::vector<ZNeuroglancerPrecomputedAnnotationsSource::SpatialLoadUpdate>>
+collectSpatialUpdates(const ZNeuroglancerPrecomputedAnnotationsSource& source,
+                      const glm::dvec3& voxelMin,
+                      const glm::dvec3& voxelMax,
+                      ZNeuroglancerPrecomputedAnnotationsSource::SpatialStreamOptions options)
+{
+  std::vector<ZNeuroglancerPrecomputedAnnotationsSource::SpatialLoadUpdate> out;
+  auto updates = source.streamAnnotationsIntersectingVoxelBoxAsync(voxelMin, voxelMax, options);
+  while (auto update = co_await updates.next()) {
+    out.push_back(std::move(*update));
+  }
+  co_return out;
 }
 
 } // namespace
@@ -290,6 +341,170 @@ TEST(ZNeuroglancerPrecomputedAnnotations, DecodeMultiplePropertyTypes)
   EXPECT_EQ((*anns[0].rgba8)[1], 8);
   EXPECT_EQ((*anns[0].rgba8)[2], 7);
   EXPECT_EQ((*anns[0].rgba8)[3], 255);
+}
+
+TEST(ZNeuroglancerPrecomputedAnnotations, LoadAnnotationsForRelatedObjectAsyncUsesRemoteContext)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+  ZHttpGetBytesResult response;
+  response.status = 200;
+
+  std::vector<uint8_t> body;
+  appendU64LE(body, 1); // count
+  appendF32LE(body, 10.0f);
+  appendF32LE(body, 20.0f);
+  appendF32LE(body, 30.0f);
+  appendU64LE(body, 17); // id list
+  response.body = body;
+  response.encodedBodyBytes = body.size();
+  response.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(response);
+
+  const auto remoteContext = ZNeuroglancerRemoteContext::create(std::chrono::milliseconds{321}, store);
+
+  const std::string info = R"json(
+{
+  "@type": "neuroglancer_annotations_v1",
+  "dimensions": { "x": [4e-9, "m"], "y": [4e-9, "m"], "z": [4e-8, "m"] },
+  "lower_bound": [0, 0, 0],
+  "upper_bound": [1, 1, 1],
+  "annotation_type": "POINT",
+  "properties": [],
+  "relationships": [ { "id": "segment", "key": "by_segment" } ]
+}
+)json";
+
+  const auto source =
+    ZNeuroglancerPrecomputedAnnotationsSource::parseInfoJsonText(QUrl("https://example.invalid/ann/"),
+                                                                 info,
+                                                                 /*baseResolutionNm=*/{4.0, 4.0, 40.0},
+                                                                 /*baseVoxelOffset=*/{0, 0, 0},
+                                                                 remoteContext);
+  ASSERT_TRUE(source);
+
+  const auto anns =
+    folly::coro::blockingWait(source->loadAnnotationsForRelatedObjectAsync(QStringLiteral("segment"), 17));
+  ASSERT_EQ(anns.size(), 1U);
+  EXPECT_EQ(anns[0].id, 17U);
+  ASSERT_EQ(anns[0].points.size(), 1U);
+  EXPECT_FLOAT_EQ(anns[0].points[0].x, 10.0f);
+  EXPECT_FLOAT_EQ(anns[0].points[0].y, 20.0f);
+  EXPECT_FLOAT_EQ(anns[0].points[0].z, 30.0f);
+
+  ASSERT_EQ(store->requests.size(), 1U);
+  EXPECT_EQ(store->requests[0].url, "https://example.invalid/ann/by_segment/17");
+  EXPECT_EQ(store->requests[0].timeout, std::chrono::milliseconds(321));
+  EXPECT_TRUE(store->requests[0].headers.empty());
+}
+
+TEST(ZNeuroglancerPrecomputedAnnotations, StreamAnnotationsIntersectingVoxelBoxAsyncUsesRemoteContextAndDedupes)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+
+  ZHttpGetBytesResult cell0;
+  cell0.status = 200;
+  {
+    std::vector<uint8_t> body;
+    appendU64LE(body, 1); // count
+    appendF32LE(body, 10.0f);
+    appendF32LE(body, 20.0f);
+    appendF32LE(body, 30.0f);
+    appendU64LE(body, 11); // id
+    cell0.body = std::move(body);
+    cell0.encodedBodyBytes = cell0.body.size();
+    cell0.source = ZHttpGetBytesSource::Network;
+  }
+  store->responses.push_back(cell0);
+
+  ZHttpGetBytesResult cell1;
+  cell1.status = 200;
+  {
+    std::vector<uint8_t> body;
+    appendU64LE(body, 3); // count
+    appendF32LE(body, 10.0f);
+    appendF32LE(body, 20.0f);
+    appendF32LE(body, 30.0f); // duplicate id 11
+    appendF32LE(body, 150.0f);
+    appendF32LE(body, 50.0f);
+    appendF32LE(body, 50.0f); // new id 22, inside query box
+    appendF32LE(body, 250.0f);
+    appendF32LE(body, 50.0f);
+    appendF32LE(body, 50.0f); // id 33, outside query box
+    appendU64LE(body, 11);
+    appendU64LE(body, 22);
+    appendU64LE(body, 33);
+    cell1.body = std::move(body);
+    cell1.encodedBodyBytes = cell1.body.size();
+    cell1.source = ZHttpGetBytesSource::Network;
+  }
+  store->responses.push_back(cell1);
+
+  const auto remoteContext = ZNeuroglancerRemoteContext::create(std::chrono::milliseconds{321}, store);
+
+  const std::string info = R"json(
+{
+  "@type": "neuroglancer_annotations_v1",
+  "dimensions": { "x": [4e-9, "m"], "y": [4e-9, "m"], "z": [4e-8, "m"] },
+  "lower_bound": [0, 0, 0],
+  "upper_bound": [200, 100, 100],
+  "annotation_type": "POINT",
+  "properties": [],
+  "relationships": [],
+  "spatial": [
+    {
+      "key": "spatial",
+      "grid_shape": [2, 1, 1],
+      "chunk_size": [100, 100, 100],
+      "limit": 1
+    }
+  ]
+}
+)json";
+
+  const auto source =
+    ZNeuroglancerPrecomputedAnnotationsSource::parseInfoJsonText(QUrl("https://example.invalid/ann/"),
+                                                                 info,
+                                                                 /*baseResolutionNm=*/{4.0, 4.0, 40.0},
+                                                                 /*baseVoxelOffset=*/{0, 0, 0},
+                                                                 remoteContext);
+  ASSERT_TRUE(source);
+
+  const auto updates =
+    folly::coro::blockingWait(collectSpatialUpdates(*source,
+                                                    /*voxelMin=*/glm::dvec3(0.0, 0.0, 0.0),
+                                                    /*voxelMax=*/glm::dvec3(199.0, 99.0, 99.0),
+                                                    ZNeuroglancerPrecomputedAnnotationsSource::SpatialStreamOptions{
+                                                      .minUpdateInterval = std::chrono::milliseconds::zero(),
+                                                      .maxAnnotationsPerUpdate = 1}));
+
+  ASSERT_EQ(updates.size(), 3U);
+
+  ASSERT_EQ(updates[0].newAnnotations.size(), 1U);
+  EXPECT_EQ(updates[0].newAnnotations[0].id, 11U);
+  EXPECT_EQ(updates[0].progress.visitedCells, 1U);
+  EXPECT_EQ(updates[0].progress.totalCells, 2U);
+  EXPECT_EQ(updates[0].progress.uniqueAnnotations, 1U);
+
+  ASSERT_EQ(updates[1].newAnnotations.size(), 1U);
+  EXPECT_EQ(updates[1].newAnnotations[0].id, 22U);
+  EXPECT_EQ(updates[1].newAnnotations[0].points.size(), 1U);
+  EXPECT_FLOAT_EQ(updates[1].newAnnotations[0].points[0].x, 150.0f);
+  EXPECT_EQ(updates[1].progress.visitedCells, 2U);
+  EXPECT_EQ(updates[1].progress.totalCells, 2U);
+  EXPECT_EQ(updates[1].progress.uniqueAnnotations, 2U);
+
+  EXPECT_TRUE(updates[2].newAnnotations.empty());
+  EXPECT_EQ(updates[2].progress.visitedCells, 2U);
+  EXPECT_EQ(updates[2].progress.totalCells, 2U);
+  EXPECT_EQ(updates[2].progress.uniqueAnnotations, 2U);
+
+  ASSERT_EQ(store->requests.size(), 2U);
+  EXPECT_EQ(store->requests[0].url, "https://example.invalid/ann/spatial/0_0_0");
+  EXPECT_EQ(store->requests[1].url, "https://example.invalid/ann/spatial/1_0_0");
+  EXPECT_EQ(store->requests[0].timeout, std::chrono::milliseconds(321));
+  EXPECT_EQ(store->requests[1].timeout, std::chrono::milliseconds(321));
+  EXPECT_TRUE(store->requests[0].headers.empty());
+  EXPECT_TRUE(store->requests[1].headers.empty());
 }
 
 } // namespace nim

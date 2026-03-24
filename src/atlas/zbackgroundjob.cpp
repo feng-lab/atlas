@@ -3,13 +3,13 @@
 #include "zbackgroundtaskmanager.h"
 #include "zdoc.h"
 #include "zexception.h"
+#include "zfolly.h"
 #include "zlog.h"
 
 #include <QMetaObject>
 
 #include <folly/OperationCancelled.h>
 #include <folly/coro/Invoke.h>
-#include <folly/executors/GlobalExecutor.h>
 
 #include <algorithm>
 #include <utility>
@@ -104,7 +104,7 @@ ZBackgroundTask* startBackgroundJob(ZDoc& doc, ZBackgroundJobSpec spec)
 
   folly::Executor::KeepAlive<> executor = spec.executor;
   if (!executor) {
-    executor = folly::getGlobalCPUExecutor();
+    executor = getAtlasBackgroundExecutor();
   }
   CHECK(executor);
 

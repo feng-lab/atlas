@@ -1,7 +1,9 @@
 #include "zremoteobjectreader.h"
 
 #include "zneuroglancerprecomputed.h"
+#include "zneuroglancerprecomputedannotations.h"
 #include "zneuroglancerprecomputedmesh.h"
+#include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancerremotecontext.h"
 #include "zneuroglancerstate.h"
 
@@ -161,6 +163,120 @@ TEST(ZRemoteObjectReader, VolumeRemoteContextCanBeReusedForChildMeshOpen)
   EXPECT_EQ(store->requests[0].timeout, std::chrono::milliseconds(654));
   EXPECT_EQ(store->requests[1].url, "https://storage.googleapis.com/bucket/dataset/mesh/info");
   EXPECT_EQ(store->requests[1].timeout, std::chrono::milliseconds(654));
+}
+
+TEST(ZRemoteObjectReader, VolumeRemoteContextCanBeReusedForChildSkeletonOpen)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+
+  ZHttpGetBytesResult volumeInfo;
+  volumeInfo.status = 200;
+  const std::string volumeInfoJson = R"json(
+{
+  "data_type": "uint64",
+  "type": "segmentation",
+  "num_channels": 1,
+  "skeletons": "skeletons",
+  "scales": [
+    {
+      "key": "8_8_8",
+      "resolution": [8, 8, 8],
+      "size": [1, 1, 1],
+      "chunk_sizes": [[1, 1, 1]],
+      "encoding": "raw"
+    }
+  ]
+}
+)json";
+  volumeInfo.body.assign(volumeInfoJson.begin(), volumeInfoJson.end());
+  volumeInfo.encodedBodyBytes = volumeInfo.body.size();
+  volumeInfo.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(volumeInfo);
+
+  ZHttpGetBytesResult skeletonInfo;
+  skeletonInfo.status = 200;
+  const std::string skeletonInfoJson = R"json({"@type":"neuroglancer_skeletons"})json";
+  skeletonInfo.body.assign(skeletonInfoJson.begin(), skeletonInfoJson.end());
+  skeletonInfo.encodedBodyBytes = skeletonInfo.body.size();
+  skeletonInfo.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(skeletonInfo);
+
+  const auto volume = ZNeuroglancerPrecomputedVolume::open(QStringLiteral("precomputed://gs://bucket/dataset"),
+                                                           std::chrono::milliseconds{777},
+                                                           store);
+  ASSERT_TRUE(volume);
+
+  const auto skeletonSource = folly::coro::blockingWait(volume->loadSkeletonSourceAsync());
+  ASSERT_TRUE(skeletonSource);
+
+  ASSERT_EQ(store->requests.size(), 2U);
+  EXPECT_EQ(store->requests[0].url, "https://storage.googleapis.com/bucket/dataset/info");
+  EXPECT_EQ(store->requests[0].timeout, std::chrono::milliseconds(777));
+  EXPECT_EQ(store->requests[1].url, "https://storage.googleapis.com/bucket/dataset/skeletons/info");
+  EXPECT_EQ(store->requests[1].timeout, std::chrono::milliseconds(777));
+}
+
+TEST(ZRemoteObjectReader, VolumeRemoteContextCanBeReusedForChildAnnotationsOpen)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+
+  ZHttpGetBytesResult volumeInfo;
+  volumeInfo.status = 200;
+  const std::string volumeInfoJson = R"json(
+{
+  "data_type": "uint64",
+  "type": "segmentation",
+  "num_channels": 1,
+  "scales": [
+    {
+      "key": "8_8_8",
+      "resolution": [8, 8, 8],
+      "size": [1, 1, 1],
+      "chunk_sizes": [[1, 1, 1]],
+      "encoding": "raw"
+    }
+  ]
+}
+)json";
+  volumeInfo.body.assign(volumeInfoJson.begin(), volumeInfoJson.end());
+  volumeInfo.encodedBodyBytes = volumeInfo.body.size();
+  volumeInfo.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(volumeInfo);
+
+  ZHttpGetBytesResult annotationsInfo;
+  annotationsInfo.status = 200;
+  const std::string annotationsInfoJson = R"json(
+{
+  "@type": "neuroglancer_annotations_v1",
+  "dimensions": { "x": [8, "nm"], "y": [8, "nm"], "z": [8, "nm"] },
+  "lower_bound": [0, 0, 0],
+  "upper_bound": [1, 1, 1],
+  "annotation_type": "POINT",
+  "relationships": [ { "id": "segment", "key": "by_segment" } ]
+}
+)json";
+  annotationsInfo.body.assign(annotationsInfoJson.begin(), annotationsInfoJson.end());
+  annotationsInfo.encodedBodyBytes = annotationsInfo.body.size();
+  annotationsInfo.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(annotationsInfo);
+
+  const auto volume = ZNeuroglancerPrecomputedVolume::open(QStringLiteral("precomputed://gs://bucket/dataset"),
+                                                           std::chrono::milliseconds{888},
+                                                           store);
+  ASSERT_TRUE(volume);
+
+  const auto annotationsSource = folly::coro::blockingWait(ZNeuroglancerPrecomputedAnnotationsSource::openAsync(
+    QUrl("https://storage.googleapis.com/bucket/annotations/"),
+    {volume->baseImgInfo().voxelSizeX, volume->baseImgInfo().voxelSizeY, volume->baseImgInfo().voxelSizeZ},
+    volume->baseVoxelOffset(),
+    volume->sharedRemoteContext()));
+  ASSERT_TRUE(annotationsSource);
+
+  ASSERT_EQ(store->requests.size(), 2U);
+  EXPECT_EQ(store->requests[0].url, "https://storage.googleapis.com/bucket/dataset/info");
+  EXPECT_EQ(store->requests[0].timeout, std::chrono::milliseconds(888));
+  EXPECT_EQ(store->requests[1].url, "https://storage.googleapis.com/bucket/annotations/info");
+  EXPECT_EQ(store->requests[1].timeout, std::chrono::milliseconds(888));
 }
 
 TEST(ZRemoteObjectReader, MeshSourceOpenScopesInfoMetadataByStore)

@@ -6,6 +6,7 @@
 #include "zexception.h"
 #include "zlog.h"
 
+#include <folly/OperationCancelled.h>
 #include <folly/coro/BlockingWait.h>
 #include <boost/json.hpp>
 
@@ -193,16 +194,26 @@ ZNeuroglancerPrecomputedSkeletonSource::open(const QUrl& skeletonDirUrl,
                                              std::array<int64_t, 3> baseVoxelOffset,
                                              std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
 {
+  return folly::coro::blockingWait(
+    openAsync(skeletonDirUrl, baseResolutionNm, baseVoxelOffset, std::move(remoteContext)));
+}
+
+folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>>
+ZNeuroglancerPrecomputedSkeletonSource::openAsync(const QUrl& skeletonDirUrl,
+                                                  std::array<double, 3> baseResolutionNm,
+                                                  std::array<int64_t, 3> baseVoxelOffset,
+                                                  std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
+{
   CHECK(remoteContext);
   const QUrl infoUrl = skeletonDirUrl.resolved(QUrl("info"));
   const std::string infoUrlStr = toStdString(infoUrl.toString());
 
-  auto bytesOpt = folly::coro::blockingWait(remoteContext->getBytesAsync(infoUrlStr));
+  auto bytesOpt = co_await remoteContext->getBytesAsync(infoUrlStr);
   if (!bytesOpt) {
     throw ZException(fmt::format("Neuroglancer skeleton info not found (HTTP 403/404) at '{}'", infoUrlStr));
   }
   const std::string infoText(reinterpret_cast<const char*>(bytesOpt->data()), bytesOpt->size());
-  return parseInfoJsonText(skeletonDirUrl, infoText, baseResolutionNm, baseVoxelOffset, std::move(remoteContext));
+  co_return parseInfoJsonText(skeletonDirUrl, infoText, baseResolutionNm, baseVoxelOffset, std::move(remoteContext));
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>
@@ -212,10 +223,21 @@ ZNeuroglancerPrecomputedSkeletonSource::open(const QUrl& skeletonDirUrl,
                                              std::chrono::milliseconds timeout,
                                              std::shared_ptr<const ZRemoteObjectStore> objectStore)
 {
-  return open(skeletonDirUrl,
-              baseResolutionNm,
-              baseVoxelOffset,
-              ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
+  return folly::coro::blockingWait(
+    openAsync(skeletonDirUrl, baseResolutionNm, baseVoxelOffset, timeout, std::move(objectStore)));
+}
+
+folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>>
+ZNeuroglancerPrecomputedSkeletonSource::openAsync(const QUrl& skeletonDirUrl,
+                                                  std::array<double, 3> baseResolutionNm,
+                                                  std::array<int64_t, 3> baseVoxelOffset,
+                                                  std::chrono::milliseconds timeout,
+                                                  std::shared_ptr<const ZRemoteObjectStore> objectStore)
+{
+  co_return co_await openAsync(skeletonDirUrl,
+                               baseResolutionNm,
+                               baseVoxelOffset,
+                               ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>
@@ -497,14 +519,15 @@ std::shared_ptr<ZSkeleton> ZNeuroglancerPrecomputedSkeletonSource::decodeSkeleto
   return out;
 }
 
-std::shared_ptr<ZSkeleton> ZNeuroglancerPrecomputedSkeletonSource::loadSkeletonBlocking(uint64_t segmentId) const
+folly::coro::Task<std::shared_ptr<ZSkeleton>>
+ZNeuroglancerPrecomputedSkeletonSource::loadSkeletonAsync(uint64_t segmentId) const
 {
   std::optional<std::vector<uint8_t>> bytesOpt;
 
   if (!m_sharding) {
     const QUrl url = m_skeletonDirUrl.resolved(QUrl(QString::number(segmentId)));
     const std::string urlStr = toStdString(url.toString());
-    auto resOpt = folly::coro::blockingWait(m_remoteContext->getResponseAsync(urlStr));
+    auto resOpt = co_await m_remoteContext->getResponseAsync(urlStr);
     if (!resOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer skeleton not found for segment {} (HTTP 403/404)", segmentId));
     }
@@ -525,14 +548,13 @@ std::shared_ptr<ZSkeleton> ZNeuroglancerPrecomputedSkeletonSource::loadSkeletonB
     const uint64_t minishard = shardAndMinishard & sharding.minishardMask;
     const uint64_t shard = (shardAndMinishard >> sharding.minishardBits) & sharding.shardMask;
 
-    auto entryOpt = folly::coro::blockingWait(
-      getNeuroglancerShardIndexEntryAsync(*m_remoteContext, m_skeletonDirUrl, sharding, shard, minishard));
+    auto entryOpt =
+      co_await getNeuroglancerShardIndexEntryAsync(*m_remoteContext, m_skeletonDirUrl, sharding, shard, minishard);
     if (!entryOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer skeleton shard index not found for segment {}", segmentId));
     }
 
-    auto decodedOpt =
-      folly::coro::blockingWait(getNeuroglancerDecodedMinishardIndexAsync(*m_remoteContext, *entryOpt, sharding));
+    auto decodedOpt = co_await getNeuroglancerDecodedMinishardIndexAsync(*m_remoteContext, *entryOpt, sharding);
     if (!decodedOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer skeleton minishard not found for segment {}", segmentId));
     }
@@ -547,8 +569,10 @@ std::shared_ptr<ZSkeleton> ZNeuroglancerPrecomputedSkeletonSource::loadSkeletonB
       throw ZNotFoundException(fmt::format("Neuroglancer skeleton not found for segment {}", segmentId));
     }
 
-    auto payloadOpt = folly::coro::blockingWait(
-      getNeuroglancerDecodedShardedPayloadBytesAsync(*m_remoteContext, entryOpt->dataUrl, *locationOpt, sharding));
+    auto payloadOpt = co_await getNeuroglancerDecodedShardedPayloadBytesAsync(*m_remoteContext,
+                                                                              entryOpt->dataUrl,
+                                                                              *locationOpt,
+                                                                              sharding);
     if (!payloadOpt) {
       throw ZNotFoundException(fmt::format("Neuroglancer skeleton payload not found for segment {}", segmentId));
     }
@@ -556,7 +580,17 @@ std::shared_ptr<ZSkeleton> ZNeuroglancerPrecomputedSkeletonSource::loadSkeletonB
   }
 
   CHECK(bytesOpt);
-  return decodeSkeletonBytes(std::span<const uint8_t>(bytesOpt->data(), bytesOpt->size()));
+  co_return decodeSkeletonBytes(std::span<const uint8_t>(bytesOpt->data(), bytesOpt->size()));
+}
+
+std::shared_ptr<ZSkeleton> ZNeuroglancerPrecomputedSkeletonSource::loadSkeletonBlocking(uint64_t segmentId) const
+{
+  try {
+    return folly::coro::blockingWait(loadSkeletonAsync(segmentId));
+  }
+  catch (const folly::OperationCancelled&) {
+    throw ZCancellationException();
+  }
 }
 
 } // namespace nim

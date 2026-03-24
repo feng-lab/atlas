@@ -3,6 +3,7 @@
 #include "zbackgroundtaskmanager.h"
 #include "zcancellation.h"
 #include "zdoc.h"
+#include "zfolly.h"
 #include "zimg.h"
 #include "zimgdoc.h"
 #include "zimgpack.h"
@@ -26,7 +27,6 @@
 
 #include <folly/CancellationToken.h>
 #include <folly/coro/Invoke.h>
-#include <folly/executors/GlobalExecutor.h>
 
 namespace nim {
 
@@ -317,7 +317,7 @@ void startSeedTraceInteractive(ZDoc& doc,
   QPointer<ZBackgroundTask> taskPtr(task);
 
   tm.spawnDetachedTask(
-    folly::getGlobalCPUExecutor(),
+    getAtlasBackgroundExecutor(),
     folly::coro::co_invoke([docPtr,
                             taskPtr,
                             imgPack,

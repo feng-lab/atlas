@@ -1,5 +1,6 @@
 #include "zhttpdiskcache.h"
 
+#include "zfolly.h"
 #include "zlog.h"
 #include "zsqlitediskcachebucket.h"
 #include "zstructutils.h"
@@ -9,7 +10,6 @@
 #include <boost/hash2/sha2.hpp>
 
 #include <folly/coro/CurrentExecutor.h>
-#include <folly/executors/GlobalExecutor.h>
 
 #include <algorithm>
 #include <array>
@@ -288,7 +288,7 @@ ZHttpDiskCache::tryGetAsync(std::string url, std::vector<std::pair<std::string, 
   }
 
   co_return co_await folly::coro::co_withExecutor(
-    folly::getGlobalCPUExecutor(),
+    getAtlasBackgroundExecutor(),
     [this,
      url = std::move(url),
      requestHeaders = std::move(requestHeaders)]() -> folly::coro::Task<std::optional<ZHttpGetBytesResult>> {

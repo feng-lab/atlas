@@ -5,6 +5,8 @@
 #include "zglmutils.h"
 #include "zskeleton.h"
 
+#include <folly/coro/Task.h>
+
 #include <QUrl>
 
 #include <array>
@@ -30,12 +32,25 @@ public:
        std::array<int64_t, 3> baseVoxelOffset,
        std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
 
+  static folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>>
+  openAsync(const QUrl& skeletonDirUrl,
+            std::array<double, 3> baseResolutionNm,
+            std::array<int64_t, 3> baseVoxelOffset,
+            std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
+
   static std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>
   open(const QUrl& skeletonDirUrl,
        std::array<double, 3> baseResolutionNm,
        std::array<int64_t, 3> baseVoxelOffset,
        std::chrono::milliseconds timeout,
        std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
+
+  static folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>>
+  openAsync(const QUrl& skeletonDirUrl,
+            std::array<double, 3> baseResolutionNm,
+            std::array<int64_t, 3> baseVoxelOffset,
+            std::chrono::milliseconds timeout,
+            std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
 
   // Exposed for unit tests: parses a skeletons/info JSON without performing network I/O.
   static std::shared_ptr<ZNeuroglancerPrecomputedSkeletonSource>
@@ -63,6 +78,9 @@ public:
   {
     return m_sharding.has_value();
   }
+
+  // Loads a single skeleton payload. This may perform network I/O and suspend.
+  folly::coro::Task<std::shared_ptr<ZSkeleton>> loadSkeletonAsync(uint64_t segmentId) const;
 
   [[nodiscard]] std::shared_ptr<ZSkeleton> loadSkeletonBlocking(uint64_t segmentId) const;
 

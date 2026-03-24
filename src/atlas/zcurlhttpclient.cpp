@@ -600,7 +600,7 @@ ZCurlHttpClient::getBytes(std::string url,
 
     const bool useProxy = requestUsesProxy(proxyStrategy, systemProxy.has_value(), attempt);
     auto attemptResult = co_await folly::coro::co_awaitTry(
-      folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(),
+      folly::coro::co_withExecutor(getAtlasBackgroundExecutor(),
                                    [this, url, timeout, requestHeaders, systemProxy, useProxy, cancellationToken]()
                                      -> folly::coro::Task<ZHttpGetBytesResult> {
                                      co_await folly::coro::co_reschedule_on_current_executor;

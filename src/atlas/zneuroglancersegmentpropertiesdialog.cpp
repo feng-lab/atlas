@@ -1,22 +1,31 @@
 #include "zneuroglancersegmentpropertiesdialog.h"
 
+#include "zbackgroundjob.h"
+#include "zbackgroundtaskmanager.h"
+#include "zdoc.h"
 #include "zexception.h"
 #include "zmessageboxhelpers.h"
 #include "zneuroglancersegmentpropertiesmodel.h"
 
 #include <QApplication>
 #include <QClipboard>
+#include <QCoreApplication>
 #include <QDialogButtonBox>
-#include <QFutureWatcher>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPointer>
 #include <QPushButton>
 #include <QSortFilterProxyModel>
 #include <QTableView>
 #include <QTimer>
 #include <QVBoxLayout>
-#include <QtConcurrent/QtConcurrentRun>
+
+#include <folly/OperationCancelled.h>
+#include <folly/coro/Task.h>
+
+#include <optional>
+#include <utility>
 
 namespace nim {
 
@@ -28,11 +37,78 @@ struct LoadResult
   QString error;
 };
 
+folly::coro::Task<LoadResult> loadSegmentPropertiesTask(std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol)
+{
+  LoadResult out;
+  try {
+    CHECK(vol);
+    out.props = co_await vol->loadSegmentPropertiesAsync();
+  }
+  catch (const ZCancellationException&) {
+    throw;
+  }
+  catch (const folly::OperationCancelled&) {
+    throw;
+  }
+  catch (const ZException& e) {
+    out.error = QString::fromUtf8(e.what());
+  }
+  catch (const std::exception& e) {
+    out.error = QString::fromUtf8(e.what());
+  }
+  co_return out;
+}
+
+template<class Result, class Finish>
+struct SingleShotDialogState
+{
+  SingleShotDialogState(QPointer<QObject> guardObjectIn, Finish finishIn)
+    : guardObject(std::move(guardObjectIn))
+    , finish(std::move(finishIn))
+  {}
+
+  QPointer<QObject> guardObject;
+  Finish finish;
+  std::optional<Result> result;
+};
+
+template<class Result, class Finish>
+void finishSingleShotTaskOnUi(std::shared_ptr<SingleShotDialogState<Result, Finish>> state)
+{
+  if (state->guardObject == nullptr || QCoreApplication::closingDown() || !state->result.has_value()) {
+    return;
+  }
+  state->finish(std::move(*state->result));
+  state->result.reset();
+}
+
+template<class Result, class Finish>
+folly::coro::Task<ZBackgroundJobOutcome>
+runSingleShotTaskWithCancellation(ZBackgroundJobContext ctx,
+                                  folly::coro::Task<Result> workTask,
+                                  std::shared_ptr<SingleShotDialogState<Result, Finish>> state)
+{
+  ZBackgroundJobOutcome out;
+  Result result = co_await folly::coro::co_withCancellation(ctx.cancellationToken(), std::move(workTask));
+  if (auto error = backgroundJobFailureMessageFromResult(result)) {
+    out.state = ZBackgroundJobOutcome::State::Failed;
+    out.message = *error;
+  }
+  state->result.emplace(std::move(result));
+  out.uiCallback = [state = std::move(state)](ZDoc&, ZBackgroundTask&) mutable {
+    finishSingleShotTaskOnUi(std::move(state));
+  };
+  co_return out;
+}
+
 } // namespace
 
-ZNeuroglancerSegmentPropertiesDialog::ZNeuroglancerSegmentPropertiesDialog(std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol,
-                                                                           QWidget* parent)
+ZNeuroglancerSegmentPropertiesDialog::ZNeuroglancerSegmentPropertiesDialog(
+  ZDoc& doc,
+  std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol,
+  QWidget* parent)
   : QDialog(parent)
+  , m_doc(doc)
   , m_vol(std::move(vol))
 {
   CHECK(m_vol);
@@ -128,31 +204,20 @@ void ZNeuroglancerSegmentPropertiesDialog::beginLoad()
   }
 
   m_statusLabel->setText(QStringLiteral("Loading segment_properties…"));
+  auto state = std::make_shared<SingleShotDialogState<LoadResult, std::function<void(LoadResult)>>>(
+    QPointer<QObject>(this),
+    [this](LoadResult result) mutable {
+      finishLoad(std::move(result.props), std::move(result.error));
+    });
 
-  auto* watcher = new QFutureWatcher<LoadResult>(this);
-  m_loadWatcher = watcher;
-  connect(watcher, &QFutureWatcher<LoadResult>::finished, this, [this, watcher]() {
-    const LoadResult r = watcher->result();
-    watcher->deleteLater();
-    if (m_loadWatcher == watcher) {
-      m_loadWatcher = nullptr;
-    }
-    finishLoad(r.props, r.error);
-  });
-
-  watcher->setFuture(QtConcurrent::run([vol = m_vol]() -> LoadResult {
-    LoadResult out;
-    try {
-      out.props = vol->loadSegmentPropertiesBlocking();
-    }
-    catch (const ZException& e) {
-      out.error = QString::fromUtf8(e.what());
-    }
-    catch (const std::exception& e) {
-      out.error = QString::fromUtf8(e.what());
-    }
-    return out;
-  }));
+  ZBackgroundJobSpec spec;
+  spec.title = QStringLiteral("Load Neuroglancer Segment Properties");
+  spec.debugLabel = "ng_segment_properties_dialog_load";
+  spec.work = [state = std::move(state),
+               workTask = loadSegmentPropertiesTask(m_vol)](ZBackgroundJobContext ctx) mutable {
+    return runSingleShotTaskWithCancellation(std::move(ctx), std::move(workTask), std::move(state));
+  };
+  (void)startBackgroundJob(m_doc, std::move(spec));
 }
 
 void ZNeuroglancerSegmentPropertiesDialog::finishLoad(std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> props,

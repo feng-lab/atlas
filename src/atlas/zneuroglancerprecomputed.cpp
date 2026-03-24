@@ -637,7 +637,8 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPr
   return m_segmentProperties;
 }
 
-std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesBlocking() const
+folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties>>
+ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesAsync() const
 {
   if (!hasSegmentPropertiesDirectory()) {
     throw ZException("This Neuroglancer dataset does not specify 'segment_properties' in its volume info.");
@@ -649,7 +650,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPr
   {
     const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
     if (m_segmentProperties) {
-      return m_segmentProperties;
+      co_return m_segmentProperties;
     }
     if (m_segmentPropertiesInFlight) {
       inFlight = m_segmentPropertiesInFlight;
@@ -663,28 +664,39 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPr
 
   if (!isLeader) {
     CHECK(sharedFuture);
-    return folly::coro::blockingWait(std::move(*sharedFuture));
+    co_return co_await std::move(*sharedFuture);
   }
 
-  try {
-    auto loaded = ZNeuroglancerPrecomputedSegmentProperties::open(segmentPropertiesDirUrl(), m_remoteContext);
-    inFlight->promise.setValue(loaded);
-
+  auto clearInFlight = [&]() {
     const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
-    m_segmentProperties = loaded;
     if (m_segmentPropertiesInFlight == inFlight) {
       m_segmentPropertiesInFlight.reset();
     }
-    return loaded;
+  };
+
+  try {
+    auto loaded =
+      co_await ZNeuroglancerPrecomputedSegmentProperties::openAsync(segmentPropertiesDirUrl(), m_remoteContext);
+    inFlight->promise.setValue(loaded);
+
+    {
+      const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
+      m_segmentProperties = loaded;
+    }
+    clearInFlight();
+    co_return loaded;
   }
   catch (...) {
     inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
-    const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
-    if (m_segmentPropertiesInFlight == inFlight) {
-      m_segmentPropertiesInFlight.reset();
-    }
+    clearInFlight();
     throw;
   }
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties>
+ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesBlocking() const
+{
+  return folly::coro::blockingWait(loadSegmentPropertiesAsync());
 }
 
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedVolume::meshSourceShared() const
@@ -693,7 +705,8 @@ std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomput
   return m_meshSource;
 }
 
-std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedVolume::loadMeshSourceBlocking() const
+folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>>
+ZNeuroglancerPrecomputedVolume::loadMeshSourceAsync() const
 {
   if (!hasMeshDirectory()) {
     throw ZException("This Neuroglancer dataset does not specify 'mesh' in its volume info.");
@@ -705,7 +718,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomput
   {
     const std::lock_guard<std::mutex> lock(m_meshMutex);
     if (m_meshSource) {
-      return m_meshSource;
+      co_return m_meshSource;
     }
     if (m_meshSourceInFlight) {
       inFlight = m_meshSourceInFlight;
@@ -719,29 +732,40 @@ std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomput
 
   if (!isLeader) {
     CHECK(sharedFuture);
-    return folly::coro::blockingWait(std::move(*sharedFuture));
+    co_return co_await std::move(*sharedFuture);
   }
 
-  try {
-    auto loaded =
-      ZNeuroglancerPrecomputedMeshSource::open(meshDirUrl(), m_baseResolutionNm, m_baseVoxelOffset, m_remoteContext);
-    inFlight->promise.setValue(loaded);
-
+  auto clearInFlight = [&]() {
     const std::lock_guard<std::mutex> lock(m_meshMutex);
-    m_meshSource = loaded;
     if (m_meshSourceInFlight == inFlight) {
       m_meshSourceInFlight.reset();
     }
-    return loaded;
+  };
+
+  try {
+    auto loaded = co_await ZNeuroglancerPrecomputedMeshSource::openAsync(meshDirUrl(),
+                                                                         m_baseResolutionNm,
+                                                                         m_baseVoxelOffset,
+                                                                         m_remoteContext);
+    inFlight->promise.setValue(loaded);
+
+    {
+      const std::lock_guard<std::mutex> lock(m_meshMutex);
+      m_meshSource = loaded;
+    }
+    clearInFlight();
+    co_return loaded;
   }
   catch (...) {
     inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
-    const std::lock_guard<std::mutex> lock(m_meshMutex);
-    if (m_meshSourceInFlight == inFlight) {
-      m_meshSourceInFlight.reset();
-    }
+    clearInFlight();
     throw;
   }
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedVolume::loadMeshSourceBlocking() const
+{
+  return folly::coro::blockingWait(loadMeshSourceAsync());
 }
 
 std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZNeuroglancerPrecomputedVolume::skeletonSourceShared() const
@@ -750,7 +774,8 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZNeuroglancerPreco
   return m_skeletonSource;
 }
 
-std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZNeuroglancerPrecomputedVolume::loadSkeletonSourceBlocking() const
+folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource>>
+ZNeuroglancerPrecomputedVolume::loadSkeletonSourceAsync() const
 {
   if (!hasSkeletonDirectory()) {
     throw ZException("This Neuroglancer dataset does not specify 'skeletons' in its volume info.");
@@ -762,7 +787,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZNeuroglancerPreco
   {
     const std::lock_guard<std::mutex> lock(m_skeletonMutex);
     if (m_skeletonSource) {
-      return m_skeletonSource;
+      co_return m_skeletonSource;
     }
     if (m_skeletonSourceInFlight) {
       inFlight = m_skeletonSourceInFlight;
@@ -776,31 +801,41 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZNeuroglancerPreco
 
   if (!isLeader) {
     CHECK(sharedFuture);
-    return folly::coro::blockingWait(std::move(*sharedFuture));
+    co_return co_await std::move(*sharedFuture);
   }
 
-  try {
-    auto loaded = ZNeuroglancerPrecomputedSkeletonSource::open(skeletonDirUrl(),
-                                                               m_baseResolutionNm,
-                                                               m_baseVoxelOffset,
-                                                               m_remoteContext);
-    inFlight->promise.setValue(loaded);
-
+  auto clearInFlight = [&]() {
     const std::lock_guard<std::mutex> lock(m_skeletonMutex);
-    m_skeletonSource = loaded;
     if (m_skeletonSourceInFlight == inFlight) {
       m_skeletonSourceInFlight.reset();
     }
-    return loaded;
+  };
+
+  try {
+    auto loaded = co_await ZNeuroglancerPrecomputedSkeletonSource::openAsync(skeletonDirUrl(),
+                                                                             m_baseResolutionNm,
+                                                                             m_baseVoxelOffset,
+                                                                             m_remoteContext);
+    inFlight->promise.setValue(loaded);
+
+    {
+      const std::lock_guard<std::mutex> lock(m_skeletonMutex);
+      m_skeletonSource = loaded;
+    }
+    clearInFlight();
+    co_return loaded;
   }
   catch (...) {
     inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
-    const std::lock_guard<std::mutex> lock(m_skeletonMutex);
-    if (m_skeletonSourceInFlight == inFlight) {
-      m_skeletonSourceInFlight.reset();
-    }
+    clearInFlight();
     throw;
   }
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource>
+ZNeuroglancerPrecomputedVolume::loadSkeletonSourceBlocking() const
+{
+  return folly::coro::blockingWait(loadSkeletonSourceAsync());
 }
 
 std::optional<size_t> ZNeuroglancerPrecomputedVolume::scaleIndexForRatio(const std::array<size_t, 3>& ratio) const

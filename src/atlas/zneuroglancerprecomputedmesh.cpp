@@ -708,10 +708,24 @@ ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
                                          std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext,
                                          const folly::CancellationToken& cancellationToken)
 {
-  CHECK(remoteContext);
-  if (cancellationToken.isCancellationRequested()) {
+  try {
+    auto task = folly::coro::co_withCancellation(
+      cancellationToken,
+      openAsync(meshDirUrl, baseResolutionNm, baseVoxelOffset, std::move(remoteContext)));
+    return folly::coro::blockingWait(std::move(task));
+  }
+  catch (const folly::OperationCancelled&) {
     throw ZCancellationException();
   }
+}
+
+folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>>
+ZNeuroglancerPrecomputedMeshSource::openAsync(const QUrl& meshDirUrl,
+                                              std::array<double, 3> baseResolutionNm,
+                                              std::array<int64_t, 3> baseVoxelOffset,
+                                              std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
+{
+  CHECK(remoteContext);
   using SharedMeshInfoCache = std::unordered_map<QString, std::weak_ptr<const SharedMeshInfo>>;
   static SharedMeshInfoCache sharedMeshInfoCache;
 
@@ -757,14 +771,7 @@ ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
 
     const QUrl infoUrl = parsedMeshInfo->meshDirUrl.resolved(QUrl("info"));
     const std::string infoUrlStr = toStdString(infoUrl.toString());
-    std::optional<ZHttpGetBytesResult> resOpt;
-    try {
-      auto task = folly::coro::co_withCancellation(cancellationToken, remoteContext->getResponseAsync(infoUrlStr));
-      resOpt = folly::coro::blockingWait(std::move(task));
-    }
-    catch (const folly::OperationCancelled&) {
-      throw ZCancellationException();
-    }
+    const auto resOpt = co_await remoteContext->getResponseAsync(infoUrlStr);
     if (resOpt) {
       if (resOpt->status != 200) {
         throw ZException(
@@ -827,7 +834,7 @@ ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
   auto out = std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>(new ZNeuroglancerPrecomputedMeshSource());
   out->m_sharedMeshInfo = std::move(sharedMeshInfo);
   out->m_remoteContext = std::move(remoteContext);
-  return out;
+  co_return out;
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>
@@ -838,24 +845,47 @@ ZNeuroglancerPrecomputedMeshSource::open(const QUrl& meshDirUrl,
                                          std::shared_ptr<const ZRemoteObjectStore> objectStore,
                                          const folly::CancellationToken& cancellationToken)
 {
-  return open(meshDirUrl,
-              baseResolutionNm,
-              baseVoxelOffset,
-              ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)),
-              cancellationToken);
+  try {
+    auto task = folly::coro::co_withCancellation(
+      cancellationToken,
+      openAsync(meshDirUrl, baseResolutionNm, baseVoxelOffset, timeout, std::move(objectStore)));
+    return folly::coro::blockingWait(std::move(task));
+  }
+  catch (const folly::OperationCancelled&) {
+    throw ZCancellationException();
+  }
+}
+
+folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>>
+ZNeuroglancerPrecomputedMeshSource::openAsync(const QUrl& meshDirUrl,
+                                              std::array<double, 3> baseResolutionNm,
+                                              std::array<int64_t, 3> baseVoxelOffset,
+                                              std::chrono::milliseconds timeout,
+                                              std::shared_ptr<const ZRemoteObjectStore> objectStore)
+{
+  co_return co_await openAsync(meshDirUrl,
+                               baseResolutionNm,
+                               baseVoxelOffset,
+                               ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
+}
+
+folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest>>
+ZNeuroglancerPrecomputedMeshSource::loadManifestAsync(uint64_t segmentId) const
+{
+  CHECK(supportsRuntimeLod());
+  const std::shared_ptr<const CachedMultiLodManifest> cached = co_await loadCachedManifestAsync(segmentId);
+  CHECK(cached);
+  CHECK(cached->manifest);
+  co_return cached->manifest;
 }
 
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest>
 ZNeuroglancerPrecomputedMeshSource::loadManifestBlocking(uint64_t segmentId,
                                                          const folly::CancellationToken& cancellationToken) const
 {
-  CHECK(supportsRuntimeLod());
   try {
-    auto task = folly::coro::co_withCancellation(cancellationToken, loadCachedManifestAsync(segmentId));
-    const std::shared_ptr<const CachedMultiLodManifest> cached = folly::coro::blockingWait(std::move(task));
-    CHECK(cached);
-    CHECK(cached->manifest);
-    return cached->manifest;
+    auto task = folly::coro::co_withCancellation(cancellationToken, loadManifestAsync(segmentId));
+    return folly::coro::blockingWait(std::move(task));
   }
   catch (const folly::OperationCancelled&) {
     // co_withCancellation reports cancellation via folly::OperationCancelled.
@@ -867,8 +897,7 @@ ZNeuroglancerPrecomputedMeshSource::loadManifestBlocking(uint64_t segmentId,
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest>
 ZNeuroglancerPrecomputedMeshSource::loadManifestBlocking(uint64_t segmentId) const
 {
-  CHECK(supportsRuntimeLod());
-  return folly::coro::blockingWait(loadCachedManifestAsync(segmentId))->manifest;
+  return folly::coro::blockingWait(loadManifestAsync(segmentId));
 }
 
 ZBBox<glm::dvec3>
@@ -916,6 +945,21 @@ ZNeuroglancerPrecomputedMeshSource::multiLodClipBoundsLocalVoxel(const MultiLodM
   return out;
 }
 
+folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
+ZNeuroglancerPrecomputedMeshSource::loadChunkMeshAsync(uint64_t segmentId, uint32_t row) const
+{
+  co_return co_await loadChunkMeshAsync(segmentId, row, ChunkVertexSpace::LocalVoxel);
+}
+
+folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
+ZNeuroglancerPrecomputedMeshSource::loadChunkMeshAsync(uint64_t segmentId,
+                                                       uint32_t row,
+                                                       ChunkVertexSpace vertexSpace) const
+{
+  CHECK(supportsRuntimeLod());
+  co_return co_await loadMultiLodChunkMeshAsync(segmentId, row, vertexSpace);
+}
+
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>
 ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId,
                                                           uint32_t row,
@@ -936,10 +980,8 @@ ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId,
                                                           ChunkVertexSpace vertexSpace,
                                                           const folly::CancellationToken& cancellationToken) const
 {
-  CHECK(supportsRuntimeLod());
   try {
-    auto task =
-      folly::coro::co_withCancellation(cancellationToken, loadMultiLodChunkMeshAsync(segmentId, row, vertexSpace));
+    auto task = folly::coro::co_withCancellation(cancellationToken, loadChunkMeshAsync(segmentId, row, vertexSpace));
     return folly::coro::blockingWait(std::move(task));
   }
   catch (const folly::OperationCancelled&) {
@@ -954,8 +996,7 @@ ZNeuroglancerPrecomputedMeshSource::loadChunkMeshBlocking(uint64_t segmentId,
                                                           uint32_t row,
                                                           ChunkVertexSpace vertexSpace) const
 {
-  CHECK(supportsRuntimeLod());
-  return folly::coro::blockingWait(loadMultiLodChunkMeshAsync(segmentId, row, vertexSpace));
+  return folly::coro::blockingWait(loadChunkMeshAsync(segmentId, row, vertexSpace));
 }
 
 std::vector<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
@@ -969,15 +1010,22 @@ ZNeuroglancerPrecomputedMeshSource::loadChunkMeshesBlocking(uint64_t segmentId, 
   return out;
 }
 
-std::shared_ptr<ZMesh> ZNeuroglancerPrecomputedMeshSource::loadMeshBlocking(uint64_t segmentId, LodPolicy lodPolicy) const
+folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::loadMeshAsync(uint64_t segmentId,
+                                                                                            LodPolicy lodPolicy) const
 {
   switch (meshType()) {
     case MeshType::Legacy:
-      return folly::coro::blockingWait(loadLegacyMeshAsync(segmentId));
+      co_return co_await loadLegacyMeshAsync(segmentId);
     case MeshType::MultiLodDraco:
-      return folly::coro::blockingWait(loadMultiLodMeshAsync(segmentId, lodPolicy));
+      co_return co_await loadMultiLodMeshAsync(segmentId, lodPolicy);
   }
   throw ZException("Invalid mesh type");
+}
+
+std::shared_ptr<ZMesh> ZNeuroglancerPrecomputedMeshSource::loadMeshBlocking(uint64_t segmentId,
+                                                                            LodPolicy lodPolicy) const
+{
+  return folly::coro::blockingWait(loadMeshAsync(segmentId, lodPolicy));
 }
 
 folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedMeshSource::getHttpBytesAsync(const std::string& url) const

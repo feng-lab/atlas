@@ -2,12 +2,13 @@
 
 #include "zimgdoc.h"
 #include "zlog.h"
+#include "zfolly.h"
 #include "zneuroglancerprecomputed.h"
 #include "zrpcuidispatcher.h"
 
-#include <QFuture>
+#include <QCoreApplication>
 #include <QMetaObject>
-#include <QtConcurrent/QtConcurrentRun>
+#include <QPointer>
 
 #include <algorithm>
 #include <condition_variable>
@@ -113,8 +114,8 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
   // Background work: open Neuroglancer volumes off the UI thread, then enqueue
   // a UI-thread registration step. This avoids blocking UI and avoids shutdown
   // deadlocks (we never wait on UI from a threadpool worker).
-  [[maybe_unused]] const QFuture<void> bg =
-    QtConcurrent::run([task, sources, timeout, setVisible, uiDispatcher = m_uiDispatcher]() {
+  getAtlasBackgroundExecutor()->add(
+    [task, sources, timeout, setVisible, uiDispatcherPtr = QPointer<ZRpcUiDispatcher>(m_uiDispatcher)]() {
       auto setSnapshot = [&](ZRpcTaskState state,
                              std::optional<double> progress,
                              std::string message,
@@ -195,11 +196,31 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
 
       setSnapshot(ZRpcTaskState::Running, 0.9, "registering loaded datasets", "", std::nullopt);
 
+      if (uiDispatcherPtr == nullptr) {
+        setSnapshot(ZRpcTaskState::Failed,
+                    1.0,
+                    "load task failed",
+                    "UI dispatcher was destroyed before dataset registration",
+                    std::nullopt);
+        return;
+      }
+      QPointer<QCoreApplication> appPtr = QCoreApplication::instance();
+      if (appPtr == nullptr) {
+        setSnapshot(ZRpcTaskState::Failed,
+                    1.0,
+                    "load task failed",
+                    "Application object was destroyed before dataset registration",
+                    std::nullopt);
+        return;
+      }
+
       // Register all opened volumes (and any local file loads) on the UI thread.
       // We do not wait on the UI thread from this worker thread to avoid deadlocks during shutdown.
-      QMetaObject::invokeMethod(
-        uiDispatcher,
-        [task, uiDispatcher, localSources, openedVolumes, setVisible, errors]() mutable {
+      // Post onto the application object so the callback still runs if the dispatcher is destroyed
+      // after scheduling but before delivery; the callback itself then re-checks uiDispatcherPtr.
+      const bool invokePosted = QMetaObject::invokeMethod(
+        appPtr,
+        [task, uiDispatcherPtr, localSources, openedVolumes, setVisible, errors]() mutable {
           auto setSnapshotUi = [&](ZRpcTaskState state,
                                    std::optional<double> progress,
                                    std::string message,
@@ -231,6 +252,15 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
             return task->deleted || task->cancelRequested || task->state == ZRpcTaskState::Cancelled;
           };
 
+          if (uiDispatcherPtr == nullptr) {
+            setSnapshotUi(ZRpcTaskState::Failed,
+                          1.0,
+                          "load task failed",
+                          "UI dispatcher was destroyed before dataset registration",
+                          std::nullopt);
+            return;
+          }
+
           if (cancelledUi()) {
             setSnapshotUi(ZRpcTaskState::Cancelled, std::nullopt, "cancelled", "", std::nullopt);
             return;
@@ -243,7 +273,7 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
           // Optional local loads. These still run on the UI thread (same as the GUI file-open path),
           // but are wrapped in the task API so clients don't block a gRPC handler thread.
           if (!localSources.isEmpty()) {
-            const auto before = uiDispatcher->listObjects();
+            const auto before = uiDispatcherPtr->listObjects();
             std::unordered_set<uint64_t> beforeIds;
             const bool beforeOk = before.ok;
             if (before.ok) {
@@ -255,7 +285,7 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
               warnings.push_back("list_objects(before) failed: " + before.error);
             }
 
-            const auto afterLoad = uiDispatcher->loadFilesAndListObjects(localSources);
+            const auto afterLoad = uiDispatcherPtr->loadFilesAndListObjects(localSources);
             if (!afterLoad.ok) {
               allErrors.push_back(afterLoad.error.empty() ? "local load failed" : afterLoad.error);
             } else if (beforeOk) {
@@ -274,7 +304,7 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
             }
 
             const QString url = vol ? vol->rootUrl() : QString();
-            const auto add = uiDispatcher->addNeuroglancerPrecomputedVolume(std::move(vol), setVisible);
+            const auto add = uiDispatcherPtr->addNeuroglancerPrecomputedVolume(std::move(vol), setVisible);
             if (!add.ok) {
               allErrors.push_back(add.error.empty() ? ("failed to register dataset: " + url.toStdString()) : add.error);
               continue;
@@ -282,7 +312,7 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
             loadedIds.insert(add.id);
           }
 
-          const auto listAfter = uiDispatcher->listObjects();
+          const auto listAfter = uiDispatcherPtr->listObjects();
           if (!listAfter.ok) {
             allErrors.push_back(listAfter.error.empty() ? "list_objects(after) failed" : listAfter.error);
           }
@@ -309,6 +339,13 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
           setSnapshotUi(ZRpcTaskState::Succeeded, 1.0, "load task succeeded", "", std::move(res));
         },
         Qt::QueuedConnection);
+      if (!invokePosted) {
+        setSnapshot(ZRpcTaskState::Failed,
+                    1.0,
+                    "load task failed",
+                    "Failed to post dataset registration to the UI thread",
+                    std::nullopt);
+      }
     });
 
   return taskId;

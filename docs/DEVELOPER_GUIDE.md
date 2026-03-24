@@ -104,6 +104,11 @@ Background Tasks and Cancellation
   - Application shutdown prompt: `ZDoc::canClose(...)` owns the close-time unsaved-change prompt,
     background-task prompt, and shutdown drain so the main window does not need direct
     task-manager logic.
+- Atlas-owned user-facing background jobs default to `nim::getAtlasBackgroundExecutor()`, a dedicated `folly::CPUThreadPoolExecutor`
+  that uses the same thread-count policy as Folly's immutable global CPU executor (`FLAGS_folly_global_cpu_executor_threads`,
+  else `folly::hardware_concurrency()`), but keeps Atlas background work isolated from unrelated uses of
+  `folly::getGlobalCPUExecutor()`.
+  - Trade-off: this isolation means Atlas' background pool can coexist with Folly's immutable global CPU executor, so CPU-bound workloads may run with more total worker threads in the process than before. Use the Atlas pool for user-facing/background-job isolation, not as a blanket replacement for every global-executor use site.
 - Cancellation is threaded through tracing code using `folly::CancellationToken` and checked at safe points (see `maybeCancel(...)` in
   `src/img/zcancellation.*` and the tracing loops in `src/img/zneutubetrace*.cpp`).
   - Auto-trace seed sorting now prepares per-seed fits with a bounded rolling window on `folly::getGlobalCPUExecutor()`, then
@@ -335,11 +340,26 @@ Threading Model
     - `Z3DRenderingEngine::renderThreadExecutor()` provides a `ZQtExecutor` (a `folly::Executor`) that schedules onto the engine thread via Qt event posting.
     - Pipeline contexts and Vulkan backend code should use `currentRenderThreadExecutorKeepAlive(...)` at call sites that need a keep-alive token for `co_withExecutor(...)`.
     - Teardown: `Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()` must run on the engine thread before quitting it so fence-gated continuations can complete deterministically.
+  - UI-thread coroutine continuations should use a UI-owned executor, not the render-thread TLS helper:
+    - `ZDoc::uiThreadExecutor()` / `uiThreadExecutorKeepAlive(...)` provide a `ZQtExecutor` pinned to the document’s UI-thread affinity for one-shot view/doc continuations.
+    - Awaiting `co_withExecutor(doc.uiThreadExecutorKeepAlive(...), ...)` from a tracked background task is only safe when shutdown will not cancel-and-join that task from the UI thread. If the UI thread drains the task scope during close, a task that must resume on the UI thread before it can finish can deadlock shutdown.
+    - Keep render-thread executor usage scoped to engine/render code; do not route UI work through `currentRenderThreadExecutorKeepAlive(...)`.
 
 Background Tasks (UI)
 
 - Long-running CPU/network/file work must not block the UI thread.
-- Atlas tracks background work via `ZBackgroundTaskManager` (the Tasks panel) and runs work on folly executors.
+- Atlas tracks background work via `ZBackgroundTaskManager` (the Tasks panel) and runs Atlas-owned jobs on `nim::getAtlasBackgroundExecutor()` by default.
+- Blocking remote-I/O adapter hops that belong to those jobs should stay on the same Atlas background executor; otherwise a Neuroglancer load can still contend on `folly::getGlobalCPUExecutor()` internally even if the outer job was isolated.
+- For one-shot UI workflows that need a background step followed by a UI continuation, prefer spawning through `ZBackgroundTaskManager` and then `co_withExecutor(doc.uiThreadExecutorKeepAlive(...), ...)` for the UI hop.
+- For tracked jobs that may be cancelled and joined from the UI thread during shutdown, do not await the UI hop from the background coroutine body. Prefer `ZBackgroundJobOutcome::uiCallback` or a queued `QMetaObject::invokeMethod(...)` post so the background task can finish without needing the UI thread to resume it.
+- When a one-shot UI workflow should be user-cancellable in the Tasks panel, prefer `startBackgroundJob(...)` so the job owns a `folly::CancellationSource` and the cancel button can drive `co_withCancellation(...)` through the async work.
+- When a Neuroglancer source already depends on coroutine-capable remote I/O, prefer adding source-level `Task` entry points (for example `openAsync()` / `load*Async()`) and let legacy blocking APIs delegate to them. Avoid building new UI coroutine flows on top of freshly introduced blocking wrappers.
+- `ZNeuroglancerPrecomputedSegmentProperties`, `ZNeuroglancerPrecomputedAnnotationsSource`, `ZNeuroglancerPrecomputedMeshSource`, `ZNeuroglancerPrecomputedSkeletonSource`, and `ZNeuroglancerPrecomputedVolume` now follow this pattern for one-shot metadata/relationship/mesh/skeleton loads. Prefer those async entry points from coroutine-based UI/background code, and keep the blocking methods as compatibility shims for older worker-thread call sites.
+- Progressive Neuroglancer spatial annotations now follow the same coroutine-first pattern, but with a streaming boundary:
+  - `ZNeuroglancerPrecomputedAnnotationsSource::streamAnnotationsIntersectingVoxelBoxAsync(...)` is the source of truth for spatial-index streaming.
+  - `ZImgView` consumes that `AsyncGenerator` from a tracked `startBackgroundJob(...)` task, updates task progress/messages as cells are visited, and posts each batch back to the UI thread with queued Qt calls.
+  - The background job does not await those UI updates. This keeps the progressive per-batch UI behavior, lets cancellation propagate into the underlying token-aware remote I/O, and avoids shutdown deadlocks where the UI thread would otherwise wait on a task that is itself waiting to resume on the UI thread.
+- Cancellation is only effective if the lower layers honor the propagated token. Moving a call site from `blockingWait(...)` to a coroutine wrapper is not enough by itself; the source/task path must suspend on token-aware async I/O or explicitly check the token between CPU-bound steps.
 
 Preferred “Process + Dialog” pattern (used by puncta detection, stitching, registration, chromatic correction, and auto trace):
 

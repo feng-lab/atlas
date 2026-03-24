@@ -4,6 +4,8 @@
 #include <QString>
 #include <QStringList>
 
+#include <folly/coro/Task.h>
+
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -62,10 +64,18 @@ public:
   static std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>
   open(const QUrl& dirUrl, std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
 
+  static folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>>
+  openAsync(const QUrl& dirUrl, std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
+
   static std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>
   open(const QUrl& dirUrl,
        std::chrono::milliseconds timeout,
        std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
+
+  static folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>>
+  openAsync(const QUrl& dirUrl,
+            std::chrono::milliseconds timeout,
+            std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
 
   // Parses the contents of a `segment_properties/info` JSON file.
   // This does not perform any network I/O. `dirUrl` is used for error messages and bookkeeping only.

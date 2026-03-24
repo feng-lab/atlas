@@ -268,6 +268,11 @@ public:
   [[nodiscard]] std::shared_ptr<const class ZNeuroglancerPrecomputedSegmentProperties> segmentPropertiesShared() const;
 
   // Loads segment properties from the segment_properties directory specified in the volume info.
+  // This performs network I/O and may suspend; prefer this from coroutine-based UI/background flows.
+  folly::coro::Task<std::shared_ptr<const class ZNeuroglancerPrecomputedSegmentProperties>>
+  loadSegmentPropertiesAsync() const;
+
+  // Loads segment properties from the segment_properties directory specified in the volume info.
   // This performs network I/O and may take time; prefer calling from a worker thread.
   std::shared_ptr<const class ZNeuroglancerPrecomputedSegmentProperties> loadSegmentPropertiesBlocking() const;
 
@@ -290,6 +295,11 @@ public:
   [[nodiscard]] std::shared_ptr<const class ZNeuroglancerPrecomputedMeshSource> meshSourceShared() const;
 
   // Loads mesh metadata from the mesh directory specified in the volume info.
+  // This performs network I/O (reading mesh/info) and may suspend; prefer this from coroutine-based UI/background
+  // flows.
+  folly::coro::Task<std::shared_ptr<const class ZNeuroglancerPrecomputedMeshSource>> loadMeshSourceAsync() const;
+
+  // Loads mesh metadata from the mesh directory specified in the volume info.
   // This performs network I/O (reading mesh/info) and may take time; prefer calling from a worker thread.
   std::shared_ptr<const class ZNeuroglancerPrecomputedMeshSource> loadMeshSourceBlocking() const;
 
@@ -310,6 +320,12 @@ public:
   }
 
   [[nodiscard]] std::shared_ptr<const class ZNeuroglancerPrecomputedSkeletonSource> skeletonSourceShared() const;
+
+  // Loads skeleton metadata from the skeletons directory specified in the volume info.
+  // This performs network I/O (reading skeletons/info) and may suspend; prefer this from coroutine-based UI/background
+  // flows.
+  folly::coro::Task<std::shared_ptr<const class ZNeuroglancerPrecomputedSkeletonSource>>
+  loadSkeletonSourceAsync() const;
 
   // Loads skeleton metadata from the skeletons directory specified in the volume info.
   // This performs network I/O (reading skeletons/info) and may take time; prefer calling from a worker thread.

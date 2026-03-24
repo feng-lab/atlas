@@ -1,15 +1,30 @@
 #include "zfolly.h"
 
+#include <folly/executors/GlobalExecutor.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
-#include <thread>
+#include <folly/system/HardwareConcurrency.h>
 
 namespace nim {
 
-folly::Executor::KeepAlive<> getGlobalCPUExecutor()
+namespace {
+
+[[nodiscard]] size_t atlasBackgroundExecutorThreadCount()
 {
-  static folly::CPUThreadPoolExecutor cpuExecutor(std::thread::hardware_concurrency(),
-                                                  8,
-                                                  std::make_shared<folly::NamedThreadFactory>("GlobalCPUThreadPool"));
+  const uint32_t configuredThreads = FLAGS_folly_global_cpu_executor_threads;
+  size_t nthreads = configuredThreads > 0 ? static_cast<size_t>(configuredThreads) : folly::hardware_concurrency();
+  if (nthreads == 0) {
+    nthreads = 1;
+  }
+  return nthreads;
+}
+
+} // namespace
+
+folly::Executor::KeepAlive<> getAtlasBackgroundExecutor()
+{
+  static folly::CPUThreadPoolExecutor cpuExecutor(
+    atlasBackgroundExecutorThreadCount(),
+    std::make_shared<folly::NamedThreadFactory>("AtlasBackgroundThreadPool"));
   return folly::getKeepAliveToken(&cpuExecutor);
 }
 

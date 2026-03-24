@@ -9,6 +9,7 @@
 #include <folly/coro/Task.h>
 
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace nim {
@@ -65,7 +66,7 @@ struct ZBackgroundJobSpec
   // When enabled, progress will move toward 1.0 (but not reach it) until the task finishes.
   bool useFakeProgress = true;
 
-  // Executor used to run the job body. If empty, the global CPU executor is used.
+  // Executor used to run the job body. If empty, the Atlas background executor is used.
   folly::Executor::KeepAlive<> executor;
 
   // Optional debug label for logging.
@@ -75,6 +76,24 @@ struct ZBackgroundJobSpec
   // Use `ctx.setProgress01()` / `ctx.setMessage()` for UI-safe updates.
   folly::Function<folly::coro::Task<ZBackgroundJobOutcome>(ZBackgroundJobContext ctx)> work;
 };
+
+template<class Result>
+[[nodiscard]] std::optional<QString> backgroundJobFailureMessageFromResult(const Result& result)
+{
+  // Background-job wrappers intentionally only infer failure from typed result
+  // payloads that expose an `.error` member. If a workflow wants the Tasks
+  // panel to reflect domain failures without throwing, prefer a small result
+  // struct with `QString error` over ad hoc string-return conventions.
+  if constexpr (requires {
+                  result.error.isEmpty();
+                  result.error;
+                }) {
+    if (!result.error.isEmpty()) {
+      return QString(result.error);
+    }
+  }
+  return std::nullopt;
+}
 
 [[nodiscard]] ZBackgroundTask* startBackgroundJob(ZDoc& doc, ZBackgroundJobSpec spec);
 

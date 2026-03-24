@@ -15,8 +15,6 @@
 #include <QPushButton>
 #include <QSet>
 
-#include <folly/executors/GlobalExecutor.h>
-
 #include <utility>
 
 namespace nim {
@@ -157,7 +155,6 @@ void ZImgProcessDialog::runWorker()
     job.title = taskTitle;
     job.runningMessage = QStringLiteral("running");
     job.useFakeProgress = true;
-    job.executor = folly::getGlobalCPUExecutor();
     job.debugLabel = workerName.toStdString();
     job.work = [workerName, successMessage, onSuccessUi = std::move(onSuccessUi), makeWorker = std::move(makeWorker)](
                  ZBackgroundJobContext ctx) mutable -> folly::coro::Task<ZBackgroundJobOutcome> {

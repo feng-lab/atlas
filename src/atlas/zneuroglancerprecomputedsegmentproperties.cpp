@@ -148,11 +148,18 @@ std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>
 ZNeuroglancerPrecomputedSegmentProperties::open(const QUrl& dirUrl,
                                                 std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
 {
+  return folly::coro::blockingWait(openAsync(dirUrl, std::move(remoteContext)));
+}
+
+folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>>
+ZNeuroglancerPrecomputedSegmentProperties::openAsync(const QUrl& dirUrl,
+                                                     std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext)
+{
   CHECK(remoteContext);
   QUrl infoUrl = dirUrl.resolved(QUrl("info"));
   const std::string infoUrlStr = toStdString(infoUrl.toString());
 
-  auto resOpt = folly::coro::blockingWait(remoteContext->getResponseAsync(infoUrlStr));
+  auto resOpt = co_await remoteContext->getResponseAsync(infoUrlStr);
   if (!resOpt) {
     throw ZException(fmt::format("Segment properties info not found (HTTP 403/404) at '{}'", infoUrlStr));
   }
@@ -161,7 +168,7 @@ ZNeuroglancerPrecomputedSegmentProperties::open(const QUrl& dirUrl,
   }
 
   const std::string infoText(reinterpret_cast<const char*>(resOpt->body.data()), resOpt->body.size());
-  return parseInfoJsonText(dirUrl, infoText);
+  co_return parseInfoJsonText(dirUrl, infoText);
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>
@@ -169,7 +176,15 @@ ZNeuroglancerPrecomputedSegmentProperties::open(const QUrl& dirUrl,
                                                 std::chrono::milliseconds timeout,
                                                 std::shared_ptr<const ZRemoteObjectStore> objectStore)
 {
-  return open(dirUrl, ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
+  return folly::coro::blockingWait(openAsync(dirUrl, timeout, std::move(objectStore)));
+}
+
+folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties>>
+ZNeuroglancerPrecomputedSegmentProperties::openAsync(const QUrl& dirUrl,
+                                                     std::chrono::milliseconds timeout,
+                                                     std::shared_ptr<const ZRemoteObjectStore> objectStore)
+{
+  co_return co_await openAsync(dirUrl, ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore)));
 }
 
 std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecomputedSegmentProperties::parseInfoJsonText(

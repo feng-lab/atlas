@@ -23,6 +23,10 @@
 #include "zmessageboxhelpers.h"
 #include "ztracesettings.h"
 #include "zbackgroundtaskmanager.h"
+#include "zqtexecutor.h"
+
+#include <folly/Executor.h>
+
 #include <QUndoGroup>
 #include <QAction>
 #include <QApplication>
@@ -126,6 +130,14 @@ ZDoc::ZDoc(QObject* parent)
 
   m_traceSettings = new ZTraceSettings(*this, this);
   m_backgroundTaskManager = new ZBackgroundTaskManager(this);
+  m_uiThreadExecutor = std::make_unique<ZQtExecutor>(this, "ZDoc");
+}
+
+ZDoc::~ZDoc()
+{
+  if (m_backgroundTaskManager != nullptr) {
+    cancelAllBackgroundTasksAndWait();
+  }
 }
 
 bool ZDoc::canClose(QWidget* parent)
@@ -148,6 +160,25 @@ void ZDoc::cancelAllBackgroundTasksAndWait()
 {
   CHECK(m_backgroundTaskManager != nullptr);
   m_backgroundTaskManager->cancelAllTasksAndWait();
+}
+
+ZQtExecutor& ZDoc::uiThreadExecutor()
+{
+  CHECK(m_uiThreadExecutor != nullptr);
+  return *m_uiThreadExecutor;
+}
+
+const ZQtExecutor& ZDoc::uiThreadExecutor() const
+{
+  CHECK(m_uiThreadExecutor != nullptr);
+  return *m_uiThreadExecutor;
+}
+
+folly::Executor::KeepAlive<> ZDoc::uiThreadExecutorKeepAlive(std::string_view debugLabel)
+{
+  CHECK(m_uiThreadExecutor != nullptr) << "UI-thread executor is not set" << (debugLabel.empty() ? "" : " (")
+                                       << debugLabel << (debugLabel.empty() ? "" : ")");
+  return folly::getKeepAliveToken(m_uiThreadExecutor.get());
 }
 
 std::vector<size_t> ZDoc::chooseObjsWithWidget(const QString& title, QWidget* parent) const

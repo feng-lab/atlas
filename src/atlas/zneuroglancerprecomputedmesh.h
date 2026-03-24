@@ -43,7 +43,7 @@ public:
     Finest,
   };
 
-  // Controls the coordinate space of chunk meshes returned by loadChunkMeshBlocking().
+  // Controls the coordinate space of chunk meshes returned by loadChunkMeshBlocking()/loadChunkMeshAsync().
   //
   // - LocalVoxel: vertices are converted into Atlas local-voxel coordinates on CPU (legacy behavior).
   // - Quantized: vertices remain in Neuroglancer's stored quantized fragment coordinate space.
@@ -62,6 +62,12 @@ public:
        std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext,
        const folly::CancellationToken& cancellationToken = {});
 
+  static folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>>
+  openAsync(const QUrl& meshDirUrl,
+            std::array<double, 3> baseResolutionNm,
+            std::array<int64_t, 3> baseVoxelOffset,
+            std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
+
   static std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>
   open(const QUrl& meshDirUrl,
        std::array<double, 3> baseResolutionNm,
@@ -69,6 +75,13 @@ public:
        std::chrono::milliseconds timeout,
        std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr,
        const folly::CancellationToken& cancellationToken = {});
+
+  static folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>>
+  openAsync(const QUrl& meshDirUrl,
+            std::array<double, 3> baseResolutionNm,
+            std::array<int64_t, 3> baseVoxelOffset,
+            std::chrono::milliseconds timeout,
+            std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
 
   [[nodiscard]] const QUrl& meshDirUrl() const
   {
@@ -160,6 +173,9 @@ public:
     return meshType() == MeshType::MultiLodDraco;
   }
 
+  // Loads multi-LOD mesh manifest metadata. This may perform network I/O and suspend.
+  folly::coro::Task<std::shared_ptr<const MultiLodManifest>> loadManifestAsync(uint64_t segmentId) const;
+
   [[nodiscard]] std::shared_ptr<const MultiLodManifest>
   loadManifestBlocking(uint64_t segmentId, const folly::CancellationToken& cancellationToken) const;
 
@@ -174,6 +190,14 @@ public:
   // - camera framing / clipping range when the mesh is the only visible object
   // - selection/bound-box rendering for runtime-NG meshes whose vertices remain quantized
   [[nodiscard]] ZBBox<glm::dvec3> multiLodClipBoundsLocalVoxel(const MultiLodManifest& manifest) const;
+
+  // Loads a multi-LOD chunk mesh. This may perform network I/O and suspend.
+  folly::coro::Task<std::shared_ptr<const MultiLodChunkMesh>> loadChunkMeshAsync(uint64_t segmentId,
+                                                                                 uint32_t row) const;
+
+  // Loads a multi-LOD chunk mesh in the requested vertex space. This may perform network I/O and suspend.
+  folly::coro::Task<std::shared_ptr<const MultiLodChunkMesh>>
+  loadChunkMeshAsync(uint64_t segmentId, uint32_t row, ChunkVertexSpace vertexSpace) const;
 
   [[nodiscard]] std::shared_ptr<const MultiLodChunkMesh>
   loadChunkMeshBlocking(uint64_t segmentId, uint32_t row, const folly::CancellationToken& cancellationToken) const;
@@ -210,6 +234,9 @@ public:
                       uint32_t viewportWidth,
                       uint32_t viewportHeight,
                       const std::function<bool(uint32_t lod, uint32_t row, float renderScale)>& hasChunk);
+
+  // Loads and merges a full mesh for the requested segment. This may perform network I/O and suspend.
+  folly::coro::Task<std::shared_ptr<ZMesh>> loadMeshAsync(uint64_t segmentId, LodPolicy lodPolicy) const;
 
   [[nodiscard]] std::shared_ptr<ZMesh> loadMeshBlocking(uint64_t segmentId, LodPolicy lodPolicy) const;
 

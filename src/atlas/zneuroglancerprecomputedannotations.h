@@ -4,13 +4,14 @@
 
 #include "zglmutils.h"
 
+#include <folly/coro/AsyncGenerator.h>
+#include <folly/coro/Task.h>
+
 #include <QUrl>
 
-#include <atomic>
 #include <array>
 #include <chrono>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -109,12 +110,25 @@ public:
        std::array<int64_t, 3> baseVoxelOffset,
        std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
 
+  static folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>>
+  openAsync(const QUrl& annotationRootUrl,
+            std::array<double, 3> baseResolutionNm,
+            std::array<int64_t, 3> baseVoxelOffset,
+            std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
+
   static std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
   open(const QUrl& annotationRootUrl,
        std::array<double, 3> baseResolutionNm,
        std::array<int64_t, 3> baseVoxelOffset,
        std::chrono::milliseconds timeout,
        std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
+
+  static folly::coro::Task<std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>>
+  openAsync(const QUrl& annotationRootUrl,
+            std::array<double, 3> baseResolutionNm,
+            std::array<int64_t, 3> baseVoxelOffset,
+            std::chrono::milliseconds timeout,
+            std::shared_ptr<const ZRemoteObjectStore> objectStore = nullptr);
 
   // Exposed for unit tests: parses an annotations/info JSON without performing network I/O.
   static std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource>
@@ -161,6 +175,15 @@ public:
   [[nodiscard]] std::vector<Annotation> loadAnnotationsForRelatedObjectBlocking(const QString& relationshipId,
                                                                                 uint64_t objectId) const;
 
+  // Loads all annotations referenced by a related-object index entry. This may perform network I/O and suspend.
+  folly::coro::Task<std::vector<Annotation>> loadAnnotationsForRelatedObjectAsync(const QString& relationshipId,
+                                                                                  uint64_t objectId) const;
+
+  // Loads annotations intersecting the given voxel-space box using the multi-level spatial index.
+  // This returns the full set of intersecting annotations (deduplicated by id), not a subsample.
+  folly::coro::Task<std::vector<Annotation>> loadAnnotationsIntersectingVoxelBoxAsync(const glm::dvec3& voxelMin,
+                                                                                      const glm::dvec3& voxelMax) const;
+
   // Loads annotations intersecting the given voxel-space box using the multi-level spatial index.
   // This returns the full set of intersecting annotations (deduplicated by id), not a subsample.
   [[nodiscard]] std::vector<Annotation> loadAnnotationsIntersectingVoxelBoxBlocking(const glm::dvec3& voxelMin,
@@ -181,22 +204,24 @@ public:
     std::vector<Annotation> newAnnotations;
   };
 
-  using SpatialLoadUpdateCallback = std::function<void(SpatialLoadUpdate update)>;
+  struct SpatialStreamOptions
+  {
+    std::chrono::milliseconds minUpdateInterval{200};
+    size_t maxAnnotationsPerUpdate = 2048;
+  };
 
   // Streams annotations intersecting the given voxel-space box using the multi-level spatial index,
-  // invoking `onUpdate` as new unique annotations become available.
+  // yielding progressive updates as new unique annotations become available.
   //
-  // This method is blocking and performs network I/O; callers should run it off the UI thread.
-  // Updates are rate-limited by `minUpdateInterval` and `maxAnnotationsPerUpdate`.
-  // Cancellation is cooperative: if `cancelFlag` is provided and becomes true, streaming stops as
-  // soon as possible (but any in-flight HTTP request may still take time to return).
-  void streamAnnotationsIntersectingVoxelBoxBlocking(const glm::dvec3& voxelMin,
-                                                     const glm::dvec3& voxelMax,
-                                                     const SpatialLoadUpdateCallback& onUpdate,
-                                                     const std::atomic_bool* cancelFlag = nullptr,
-                                                     std::chrono::milliseconds minUpdateInterval =
-                                                       std::chrono::milliseconds{200},
-                                                     size_t maxAnnotationsPerUpdate = 2048) const;
+  // Cancellation is cooperative through the current coroutine cancellation token. If cancellation is
+  // requested after some annotations have already been accumulated into the current batch, the
+  // generator yields that final partial batch and then returns normally. Callers that need to
+  // distinguish cancellation from ordinary exhaustion should also inspect the cancellation token or
+  // enclosing task context.
+  folly::coro::AsyncGenerator<SpatialLoadUpdate&&>
+  streamAnnotationsIntersectingVoxelBoxAsync(const glm::dvec3& voxelMin,
+                                             const glm::dvec3& voxelMax,
+                                             SpatialStreamOptions options) const;
 
   // Exposed for unit tests: decodes a related-object/spatial index entry (multiple annotation encoding).
   [[nodiscard]] std::vector<Annotation> decodeMultipleAnnotationBytes(std::span<const uint8_t> bytes) const;
@@ -204,12 +229,13 @@ public:
 private:
   [[nodiscard]] std::optional<RelationshipSpec> findRelationship(const QString& id) const;
 
-  [[nodiscard]] std::vector<uint8_t> loadIndexEntryBlocking(const QUrl& dirUrl,
-                                                            const std::optional<ZNeuroglancerPrecomputedVolume::Scale::Sharding>& sharding,
-                                                            uint64_t key) const;
+  folly::coro::Task<std::vector<uint8_t>>
+  loadIndexEntryAsync(const QUrl& dirUrl,
+                      const std::optional<ZNeuroglancerPrecomputedVolume::Scale::Sharding>& sharding,
+                      uint64_t key) const;
 
-  [[nodiscard]] std::optional<std::vector<uint8_t>> loadSpatialCellEntryBlocking(const SpatialLevelSpec& level,
-                                                                                 const std::array<uint64_t, 3>& cell) const;
+  folly::coro::Task<std::optional<std::vector<uint8_t>>>
+  loadSpatialCellEntryAsync(const SpatialLevelSpec& level, const std::array<uint64_t, 3>& cell) const;
 
   [[nodiscard]] Annotation decodeAnnotationPayload(std::span<const uint8_t> bytes, size_t& off) const;
 

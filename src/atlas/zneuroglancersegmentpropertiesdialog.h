@@ -8,7 +8,6 @@
 #include <functional>
 #include <memory>
 
-class QFutureWatcherBase;
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -18,6 +17,7 @@ class QTimer;
 
 namespace nim {
 
+class ZDoc;
 class ZNeuroglancerSegmentPropertiesModel;
 
 class ZNeuroglancerSegmentPropertiesDialog : public QDialog
@@ -25,8 +25,9 @@ class ZNeuroglancerSegmentPropertiesDialog : public QDialog
   Q_OBJECT
 
 public:
-  explicit ZNeuroglancerSegmentPropertiesDialog(std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol,
-                                               QWidget* parent = nullptr);
+  explicit ZNeuroglancerSegmentPropertiesDialog(ZDoc& doc,
+                                                std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol,
+                                                QWidget* parent = nullptr);
 
   void setMeshLoadCallback(std::function<void(uint64_t)> cb);
   void setAfterPropertiesLoadedCallback(
@@ -46,6 +47,7 @@ private:
   void loadMeshesForSelectedIds();
 
 private:
+  ZDoc& m_doc;
   std::shared_ptr<ZNeuroglancerPrecomputedVolume> m_vol;
 
   std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> m_props;
@@ -64,7 +66,6 @@ private:
   ZNeuroglancerSegmentPropertiesModel* m_model = nullptr;
   QSortFilterProxyModel* m_proxy = nullptr;
 
-  QFutureWatcherBase* m_loadWatcher = nullptr;
   QTimer* m_filterTimer = nullptr;
 };
 
