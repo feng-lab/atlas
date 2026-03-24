@@ -17,6 +17,7 @@
 #include <folly/io/IOBufQueue.h>
 #include <folly/OperationCancelled.h>
 #include <folly/coro/Sleep.h>
+#include <folly/SocketAddress.h>
 #include <proxygen/lib/http/coro/client/HTTPCoroConnector.h>
 #include <proxygen/lib/http/HTTPHeaders.h>
 #include <proxygen/lib/http/HTTPMessage.h>
@@ -63,6 +64,12 @@ DEFINE_uint32(atlas_http_retry_backoff_initial_ms,
 DEFINE_uint32(atlas_http_retry_backoff_max_ms,
               2000,
               "Maximum backoff delay in milliseconds for transient HTTP error retries (default 2000ms).");
+
+DEFINE_bool(atlas_http_proxygen_force_unique_proxy_connect,
+            false,
+            "When true, proxied HTTPS requests on the Proxygen backend bypass the pooled shared CONNECT path "
+            "and open a dedicated unique CONNECT tunnel per request. Diagnostic fallback for proxy CONNECT "
+            "lifetime issues; slower than the default pooled path.");
 
 namespace nim {
 namespace {
@@ -402,6 +409,87 @@ bool looksLikeTlsTrustStoreError(std::string_view message)
          message.find("SSL") != std::string_view::npos || message.find("tls") != std::string_view::npos;
 }
 
+folly::SocketAddress resolveProxySocketAddressViaQtThread(const ZHttpProxyEndpoint& endpoint, QObject* lookupInvoker)
+{
+  CHECK(!endpoint.host.empty());
+  CHECK(lookupInvoker);
+
+  const std::vector<std::string> addresses = resolveHostToIpAddrsSystemViaQtThread(endpoint.host, lookupInvoker);
+  CHECK(!addresses.empty());
+
+  folly::SocketAddress proxyAddress;
+  proxyAddress.setFromIpPort(addresses.front(), endpoint.port);
+  return proxyAddress;
+}
+
+class UniqueProxyConnectDrainGuard
+{
+public:
+  proxygen::coro::HTTPSessionContextPtr proxySessionHolder;
+  proxygen::coro::HTTPSessionContextPtr tunneledSessionHolder;
+
+  ~UniqueProxyConnectDrainGuard()
+  {
+    if (tunneledSessionHolder) {
+      tunneledSessionHolder->initiateDrain();
+    } else if (proxySessionHolder) {
+      proxySessionHolder->initiateDrain();
+    }
+  }
+};
+
+folly::coro::Task<proxygen::coro::HTTPClient::Response>
+getHttpsResponseViaUniqueProxyConnect(folly::EventBase* eventBase,
+                                      QObject* lookupInvoker,
+                                      const ZHttpProxyEndpoint& proxyEndpoint,
+                                      proxygen::URL url,
+                                      std::chrono::milliseconds timeout,
+                                      const std::shared_ptr<const folly::SSLContext>& sslContext,
+                                      proxygen::coro::HTTPClient::RequestHeaderMap requestHeaders)
+{
+  CHECK(eventBase);
+  CHECK(lookupInvoker);
+  CHECK(sslContext);
+  CHECK(url.isValid());
+  CHECK(url.hasHost());
+  CHECK(url.isSecure());
+
+  const folly::SocketAddress proxyAddress = resolveProxySocketAddressViaQtThread(proxyEndpoint, lookupInvoker);
+
+  auto proxySession =
+    co_await proxygen::coro::HTTPCoroConnector::connect(eventBase,
+                                                        proxyAddress,
+                                                        timeout,
+                                                        proxygen::coro::HTTPCoroConnector::defaultConnectionParams(),
+                                                        proxygen::coro::HTTPCoroConnector::defaultSessionParams());
+  UniqueProxyConnectDrainGuard drainGuard;
+  drainGuard.proxySessionHolder = proxySession->acquireKeepAlive();
+
+  auto proxyReservation = proxySession->reserveRequest();
+  if (proxyReservation.hasException()) {
+    co_yield folly::coro::co_error(std::move(proxyReservation.exception()));
+  }
+
+  auto connParams = proxygen::coro::HTTPCoroConnector::defaultConnectionParams();
+  connParams.sslContext = sslContext;
+  connParams.serverName = url.getHost();
+
+  auto* tunneledSession =
+    co_await proxygen::coro::HTTPCoroConnector::proxyConnect(proxySession,
+                                                             std::move(*proxyReservation),
+                                                             folly::to<std::string>(url.getHost(), ":", url.getPort()),
+                                                             /*connectUnique=*/true,
+                                                             timeout,
+                                                             connParams,
+                                                             proxygen::coro::HTTPCoroConnector::defaultSessionParams());
+  drainGuard.tunneledSessionHolder = tunneledSession->acquireKeepAlive();
+
+  co_return co_await proxygen::coro::HTTPClient::get(tunneledSession,
+                                                     std::move(url),
+                                                     timeout,
+                                                     std::move(requestHeaders));
+}
+
 bool isRetryableHttpError(const proxygen::coro::HTTPError& e)
 {
   using proxygen::coro::HTTPErrorCode;
@@ -581,6 +669,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
 
     proxygen::coro::HTTPClientConnectionCache* connCache = m_directConnCache.get();
     bool usingProxyForAttempt = false;
+    const ZHttpProxyEndpoint* proxyEndpointForAttempt = nullptr;
     if (systemProxy) {
       const bool useProxy = [&]() {
         switch (proxyStrategy) {
@@ -597,6 +686,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
       if (useProxy) {
         connCache = getOrCreateProxyCache(*systemProxy);
         usingProxyForAttempt = true;
+        proxyEndpointForAttempt = &*systemProxy;
       }
     }
     CHECK(connCache);
@@ -664,20 +754,32 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
           ++it->second.nextIndex;
         }
 
-        auto sessionRes = co_await connCache->getSessionWithReservation(parsedUrl.getHost(),
-                                                                        parsedUrl.getPort(),
-                                                                        isSecure,
-                                                                        timeout,
-                                                                        connParamsPtr,
-                                                                        serverAddress);
-        maybeCancel(cancellationToken);
+        proxygen::coro::HTTPClient::Response response;
+        if (usingProxyForAttempt && isSecure && FLAGS_atlas_http_proxygen_force_unique_proxy_connect) {
+          CHECK(proxyEndpointForAttempt);
+          maybeCancel(cancellationToken);
+          response = co_await getHttpsResponseViaUniqueProxyConnect(m_eventBaseThread.getEventBase(),
+                                                                    m_hostLookupInvoker,
+                                                                    *proxyEndpointForAttempt,
+                                                                    parsedUrl,
+                                                                    timeout,
+                                                                    m_sslContext,
+                                                                    headerMap);
+        } else {
+          auto sessionRes = co_await connCache->getSessionWithReservation(parsedUrl.getHost(),
+                                                                          parsedUrl.getPort(),
+                                                                          isSecure,
+                                                                          timeout,
+                                                                          connParamsPtr,
+                                                                          serverAddress);
+          maybeCancel(cancellationToken);
 
-        auto response = co_await proxygen::coro::HTTPClient::get(
-          sessionRes.session,
-          std::move(sessionRes.reservation),
-          parsedUrl,
-          timeout,
-          headerMap);
+          response = co_await proxygen::coro::HTTPClient::get(sessionRes.session,
+                                                              std::move(sessionRes.reservation),
+                                                              parsedUrl,
+                                                              timeout,
+                                                              headerMap);
+        }
 
         CHECK(response.headers);
         const uint16_t status = response.headers->getStatusCode();

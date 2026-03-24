@@ -3805,6 +3805,52 @@ def build_proxygen(src_dir: str, install_dir: str):
                 r"",
             ],
         ),
+        # Shared CONNECT tunnels must retain ownership of the underlying proxy
+        # session for the full tunnel lifetime. Without this keepalive,
+        # pooled proxied HTTPS can tear down the proxy session while the tunneled
+        # TLS transport is still draining, which later crashes in Proxygen/Folly
+        # coroutine teardown on Windows.
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "proxygen",
+                "lib",
+                "http",
+                "coro",
+                "transport",
+                "HTTPConnectStream.h",
+            ),
+            from_texts=[
+                r"""  HTTPCoroSession* session_{nullptr};
+  folly::EventBase* eventBase_;""",
+            ],
+            to_texts=[
+                r"""  HTTPCoroSession* session_{nullptr};
+  HTTPSessionContextPtr sessionCtx_;
+  folly::EventBase* eventBase_;""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "proxygen",
+                "lib",
+                "http",
+                "coro",
+                "transport",
+                "HTTPConnectStream.cpp",
+            ),
+            from_texts=[
+                r"""    : session_(ownership == Ownership::Unique ? session : nullptr),
+      eventBase_(session->getEventBase()),""",
+            ],
+            to_texts=[
+                r"""    : session_(ownership == Ownership::Unique ? session : nullptr),
+      sessionCtx_(ownership == Ownership::Shared ? session->acquireKeepAlive()
+                                                 : HTTPSessionContextPtr{}),
+      eventBase_(session->getEventBase()),""",
+            ],
+        ),
         FilePatcher(
             orig_file=os.path.join(
                 src_dir, "proxygen", "httpserver", "samples", "hq", "ConnIdLogger.h"

@@ -56,9 +56,15 @@ DEFINE_uint32(atlas_imgpack_quick_window_max_samples,
 // Defined in z3dimg.cpp; shared here so 3D preview assembly can reuse the same concurrency limit.
 DECLARE_uint32(atlas_ng_precomputed_3d_max_concurrent_block_reads);
 
+#ifdef _WIN32
+constexpr bool kDefaultNgPrecomputedUseBatchedChunkReads = true;
+#else
+constexpr bool kDefaultNgPrecomputedUseBatchedChunkReads = false;
+#endif
+
 DEFINE_bool(
   atlas_ng_precomputed_use_batched_chunk_reads,
-  false,
+  kDefaultNgPrecomputedUseBatchedChunkReads,
   "Experimental: replace Neuroglancer per-chunk fan-out waits with bounded batched chunk reads in 2D/synchronous paths.");
 
 #if 0
