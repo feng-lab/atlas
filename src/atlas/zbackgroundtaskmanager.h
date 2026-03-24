@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <folly/Executor.h>
+#include <folly/CancellationToken.h>
 #include <folly/coro/AsyncScope.h>
 #include <folly/coro/Task.h>
 
@@ -162,6 +163,8 @@ private:
   uint64_t m_nextId = 1;
   std::vector<ZBackgroundTask*> m_tasks;
   folly::coro::AsyncScope m_taskScope;
+  std::shared_ptr<folly::CancellationSource> m_detachedTaskCancellationSource =
+    std::make_shared<folly::CancellationSource>();
   bool m_taskScopeJoined = false;
 };
 

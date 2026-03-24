@@ -115,28 +115,6 @@ void forEachNeuroglancerChunkBestEffortBlocking(const nim::ZNeuroglancerPrecompu
     return;
   }
 
-  if (!FLAGS_atlas_ng_precomputed_use_batched_chunk_reads) {
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
-      for (size_t i = r.begin(); i != r.end(); ++i) {
-        std::shared_ptr<nim::ZImg> chunkImg;
-        try {
-          chunkImg = volume.readChunkBlocking(chunks[i]);
-        }
-        catch (const std::exception&) {
-          continue;
-        }
-        catch (...) {
-          continue;
-        }
-        if (!chunkImg) {
-          continue;
-        }
-        onChunk(i, chunks[i], *chunkImg);
-      }
-    });
-    return;
-  }
-
   const size_t maxConcurrent = neuroglancerChunkReadWindow(chunks.size());
   std::vector<folly::coro::Task<std::shared_ptr<nim::ZImg>>> tasks;
   tasks.reserve(chunks.size());

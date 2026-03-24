@@ -6,6 +6,7 @@
 #include <folly/OperationCancelled.h>
 #include <folly/coro/BlockingWait.h>
 #include <folly/coro/Invoke.h>
+#include <folly/coro/WithCancellation.h>
 
 #include <algorithm>
 #include <string>
@@ -174,6 +175,9 @@ void ZBackgroundTaskManager::spawnDetachedTask(folly::Executor::KeepAlive<> exec
   CHECK(!m_taskScopeJoined) << "spawnDetachedTask called after cancelAllTasksAndWait drained the task scope"
                             << (debugLabel.empty() ? "" : " label='") << (debugLabel.empty() ? "" : debugLabel)
                             << (debugLabel.empty() ? "" : "'");
+  CHECK(m_detachedTaskCancellationSource)
+    << "Detached-task cancellation source is not initialized" << (debugLabel.empty() ? "" : " label='")
+    << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : "'");
 
   std::string label(debugLabel);
   auto wrapperTask =
@@ -200,7 +204,9 @@ void ZBackgroundTaskManager::spawnDetachedTask(folly::Executor::KeepAlive<> exec
       co_return;
     });
 
-  m_taskScope.add(folly::coro::co_withExecutor(std::move(executor), std::move(wrapperTask)));
+  m_taskScope.add(folly::coro::co_withExecutor(
+    std::move(executor),
+    folly::coro::co_withCancellation(m_detachedTaskCancellationSource->getToken(), std::move(wrapperTask))));
 }
 
 void ZBackgroundTaskManager::joinDetachedTasksForShutdown()
@@ -298,6 +304,10 @@ void ZBackgroundTaskManager::cancelAllTasksAndWait()
     if (!task->isTerminal()) {
       task->requestCancel();
     }
+  }
+
+  if (m_detachedTaskCancellationSource) {
+    m_detachedTaskCancellationSource->requestCancellation();
   }
 
   joinDetachedTasksForShutdown();

@@ -133,6 +133,16 @@ public:
     return currentViewStyle() == ViewStyle::MIP;
   }
 
+  ZDoc& doc()
+  {
+    return m_doc;
+  }
+
+  [[nodiscard]] const ZDoc& doc() const
+  {
+    return m_doc;
+  }
+
   int currentSlice() const;
 
   int currentTime() const;

@@ -8,6 +8,7 @@
 #include "zstringparameter.h"
 #include "zgraphicsitemtype.h"
 #include "zgraphicsitemgroup.h"
+#include <folly/coro/Task.h>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsSimpleTextItem>
 #include <QPen>
@@ -163,6 +164,8 @@ protected:
   void updateViewSettingWidgetsGroup();
 
 private:
+  struct Neuroglancer2DCoroFanoutState;
+
   void channelVisibleChanged();
 
   void channelRangeChanged();
@@ -188,6 +191,10 @@ private:
   void startNeuroglancer2DCacheRender();
 
   void startNeuroglancer2DRender(bool finalPass);
+
+  void startNeuroglancer2DCoroFanoutRender(std::shared_ptr<Neuroglancer2DCoroFanoutState> state);
+
+  folly::coro::Task<void> runNeuroglancer2DCoroFanoutWorker(std::shared_ptr<Neuroglancer2DCoroFanoutState> state);
 
   [[nodiscard]] bool isNeuroglancer2DViewportFullyCachedAtFinalLod(const QRectF& viewport, double viewScale) const;
 

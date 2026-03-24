@@ -4,11 +4,15 @@
 #include "zimgdoc.h"
 #include "zimgview.h"
 #include "zimgpackdisplay.h"
+#include "zcpuinfo.h"
+#include "zbackgroundtaskmanager.h"
 #include "zneuroglancerprecomputed.h"
 #include "zneuroglancerprecomputeddatasetlist.h"
+#include "zfolly.h"
 #include "zlog.h"
 #include "zmessageboxhelpers.h"
 #include "znumericparameter.h"
+#include "zdoc.h"
 #include "zexception.h"
 #include "zwidgetsgroup.h"
 #include "ztheme.h"
@@ -20,13 +24,13 @@
 #include <QInputDialog>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPointer>
 #include <QStyleOption>
 #include <QPainter>
 #include <QPushButton>
 #include <QWindow>
 #include <folly/OperationCancelled.h>
 #include <folly/coro/BlockingWait.h>
-#include <QtConcurrent/QtConcurrentMap>
 #include <QtConcurrent/QtConcurrentRun>
 #include <algorithm>
 #include <cmath>
@@ -315,7 +319,7 @@ Neuroglancer2DRenderResult renderNeuroglancer2DBlocking(Neuroglancer2DRenderPara
   return pass != Neuroglancer2DRenderParams::Pass::Final;
 }
 
-Neuroglancer2DTileResult renderNeuroglancer2DTile(Neuroglancer2DTileTask task)
+folly::coro::Task<Neuroglancer2DTileResult> renderNeuroglancer2DTileAsync(Neuroglancer2DTileTask task)
 {
   Neuroglancer2DTileResult out;
   CHECK(task.shared);
@@ -324,7 +328,7 @@ Neuroglancer2DTileResult renderNeuroglancer2DTile(Neuroglancer2DTileTask task)
 
   try {
     if (!isEpochCurrent(task.shared->epochAtomic, task.shared->epoch)) {
-      return out;
+      co_return out;
     }
 
     CHECK(task.shared->volume);
@@ -332,13 +336,13 @@ Neuroglancer2DTileResult renderNeuroglancer2DTile(Neuroglancer2DTileTask task)
     CHECK(task.shared->ratioZ > 0);
 
     const ZNeuroglancerPrecomputedVolume::Chunk chunk = task.chunk;
-    auto chunkImg = task.shared->volume->readChunkBlocking(chunk);
+    auto chunkImg = co_await task.shared->volume->readChunkAsync(chunk);
     if (!chunkImg) {
-      return out;
+      co_return out;
     }
 
     if (!isEpochCurrent(task.shared->epochAtomic, task.shared->epoch)) {
-      return out;
+      co_return out;
     }
 
     const int64_t z0 = static_cast<int64_t>(task.shared->z);
@@ -356,7 +360,7 @@ Neuroglancer2DTileResult renderNeuroglancer2DTile(Neuroglancer2DTileTask task)
                                               static_cast<index_t>(localZ + 1)));
 
     if (!isEpochCurrent(task.shared->epochAtomic, task.shared->epoch)) {
-      return out;
+      co_return out;
     }
 
     std::vector<std::shared_ptr<ZImg>> imgs;
@@ -378,33 +382,42 @@ Neuroglancer2DTileResult renderNeuroglancer2DTile(Neuroglancer2DTileTask task)
                                          task.shared->tileWidth,
                                          task.shared->tileHeight,
                                          task.shared->colorizationMode);
-    return out;
+    co_return out;
   }
   catch (const ZCancellationException&) {
-    return out;
+    co_return out;
   }
   catch (const folly::OperationCancelled&) {
-    return out;
+    co_return out;
   }
   catch (const std::exception& e) {
     if (isBestEffortNeuroglancer2DPass(task.shared->pass)) {
       VLOG(1) << "Neuroglancer 2D best-effort tile render skipped: " << e.what();
-      return out;
+      co_return out;
     }
     out.error = QString::fromUtf8(e.what());
-    return out;
+    co_return out;
   }
   catch (...) {
     if (isBestEffortNeuroglancer2DPass(task.shared->pass)) {
       VLOG(1) << "Neuroglancer 2D best-effort tile render skipped: non-std exception";
-      return out;
+      co_return out;
     }
     out.error = QStringLiteral("non-std exception");
-    return out;
+    co_return out;
   }
 }
 
 } // namespace
+
+struct ZImgFilter::Neuroglancer2DCoroFanoutState
+{
+  std::shared_ptr<std::vector<Neuroglancer2DTileTask>> tasks;
+  Neuroglancer2DRenderParams::Pass pass = Neuroglancer2DRenderParams::Pass::CacheOnly;
+  uint64_t epoch = 0;
+  std::atomic<size_t> nextTaskIndex{0};
+  std::atomic<size_t> remainingWorkers{0};
+};
 
 ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length,
                                                    double height,
@@ -1746,6 +1759,144 @@ void ZImgFilter::startNeuroglancer2DCacheRender()
   }));
 }
 
+void ZImgFilter::startNeuroglancer2DCoroFanoutRender(std::shared_ptr<Neuroglancer2DCoroFanoutState> state)
+{
+  CHECK(state);
+  CHECK(state->tasks);
+  CHECK(!state->tasks->empty());
+
+  const size_t logicalCores = std::max<size_t>(1, ZCpuInfo::instance().nLogicalCores);
+  const size_t workerCount = std::min(logicalCores, state->tasks->size());
+  CHECK(workerCount > 0);
+  state->remainingWorkers.store(workerCount, std::memory_order_relaxed);
+
+  for (size_t workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
+    m_view.doc().backgroundTaskManager().spawnDetachedTask(getAtlasBackgroundExecutor(),
+                                                           runNeuroglancer2DCoroFanoutWorker(state),
+                                                           "ng_2d_coro_fanout");
+  }
+}
+
+folly::coro::Task<void>
+ZImgFilter::runNeuroglancer2DCoroFanoutWorker(std::shared_ptr<Neuroglancer2DCoroFanoutState> state)
+{
+  CHECK(state);
+  CHECK(state->tasks);
+
+  QPointer<ZImgFilter> filterPtr(this);
+
+  try {
+    while (true) {
+      const size_t index = state->nextTaskIndex.fetch_add(1, std::memory_order_relaxed);
+      if (index >= state->tasks->size()) {
+        break;
+      }
+
+      Neuroglancer2DTileResult result = co_await renderNeuroglancer2DTileAsync((*state->tasks)[index]);
+      if (!filterPtr || QCoreApplication::closingDown()) {
+        continue;
+      }
+
+      const bool invokeOk = QMetaObject::invokeMethod(
+        filterPtr,
+        [filterPtr, result = std::move(result)]() mutable {
+          if (!filterPtr || QCoreApplication::closingDown()) {
+            return;
+          }
+
+          if (!result.error.isEmpty()) {
+            LOG(ERROR) << "Neuroglancer 2D tile render failed: " << result.error.toStdString();
+            if (result.pass == Neuroglancer2DRenderParams::Pass::Final && result.epoch == filterPtr->m_ngRenderEpoch &&
+                filterPtr->m_ngFinalErrorEpoch != result.epoch) {
+              filterPtr->m_ngFinalErrorEpoch = result.epoch;
+              filterPtr->m_ngFinalError = QString("Neuroglancer 2D final tile render failed: %1").arg(result.error);
+              filterPtr->maybeNotifyNeuroglancerFinalError();
+            }
+            return;
+          }
+          if (!filterPtr->m_isVisible || result.epoch != filterPtr->m_ngRenderEpoch) {
+            return;
+          }
+
+          const int prio = neuroglancer2DPassPriority(result.pass);
+          filterPtr->applyQImagePack(result.qImagePack,
+                                     result.epoch,
+                                     prio,
+                                     /*isFinalPass=*/result.pass == Neuroglancer2DRenderParams::Pass::Final);
+        },
+        Qt::QueuedConnection);
+      if (!invokeOk) {
+        LOG(WARNING) << "Failed to post Neuroglancer 2D tile result to UI thread";
+      }
+    }
+  }
+  catch (const ZCancellationException&) {
+  }
+  catch (const folly::OperationCancelled&) {
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "Neuroglancer 2D coroutine fan-out worker failed: " << e.what();
+  }
+  catch (...) {
+    LOG(ERROR) << "Neuroglancer 2D coroutine fan-out worker failed: non-std exception";
+  }
+
+  if (state->remainingWorkers.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+    if (!filterPtr || QCoreApplication::closingDown()) {
+      co_return;
+    }
+
+    const bool invokeOk = QMetaObject::invokeMethod(
+      filterPtr,
+      [filterPtr, pass = state->pass, epoch = state->epoch]() {
+        if (!filterPtr || QCoreApplication::closingDown()) {
+          return;
+        }
+
+        if (pass == Neuroglancer2DRenderParams::Pass::Final) {
+          if (epoch == filterPtr->m_ngRenderEpoch) {
+            filterPtr->m_ngFinalCompletedEpoch = epoch;
+          }
+          if (filterPtr->m_ngFinalInFlight && filterPtr->m_ngFinalInFlightEpoch == epoch) {
+            filterPtr->m_ngFinalInFlight = false;
+            filterPtr->m_ngFinalInFlightEpoch = 0;
+          }
+          if (epoch == filterPtr->m_ngRenderEpoch) {
+            filterPtr->trimNeuroglancerTilesAfterFinal(epoch);
+          }
+        } else if (pass == Neuroglancer2DRenderParams::Pass::Preview) {
+          if (filterPtr->m_ngPreviewInFlight && filterPtr->m_ngPreviewInFlightEpoch == epoch) {
+            filterPtr->m_ngPreviewInFlight = false;
+            filterPtr->m_ngPreviewInFlightEpoch = 0;
+          }
+        }
+
+        filterPtr->updateNeuroglancerLoadingIndicator();
+
+        if (pass == Neuroglancer2DRenderParams::Pass::Preview) {
+          if (filterPtr->m_ngPreviewDirty &&
+              (!filterPtr->m_ngPreviewInFlight || filterPtr->m_ngPreviewInFlightEpoch != filterPtr->m_ngRenderEpoch) &&
+              filterPtr->m_isVisible) {
+            filterPtr->startNeuroglancer2DRender(/*finalPass=*/false);
+          }
+        } else if (pass == Neuroglancer2DRenderParams::Pass::Final) {
+          if (filterPtr->m_ngFinalPending &&
+              (!filterPtr->m_ngFinalInFlight || filterPtr->m_ngFinalInFlightEpoch != filterPtr->m_ngRenderEpoch) &&
+              filterPtr->m_isVisible) {
+            filterPtr->m_ngFinalPending = false;
+            filterPtr->startNeuroglancer2DRender(/*finalPass=*/true);
+          }
+        }
+      },
+      Qt::QueuedConnection);
+    if (!invokeOk) {
+      LOG(WARNING) << "Failed to post Neuroglancer 2D render completion to UI thread";
+    }
+  }
+
+  co_return;
+}
+
 void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
 {
   CHECK(m_imgPack);
@@ -1905,86 +2056,11 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
       tasks->push_back(std::move(task));
     }
 
-    auto* watcher = new QFutureWatcher<Neuroglancer2DTileResult>(this);
-    connect(watcher, &QFutureWatcher<Neuroglancer2DTileResult>::resultReadyAt, this, [this, watcher](int index) {
-      const Neuroglancer2DTileResult result = watcher->resultAt(index);
-      if (!result.error.isEmpty()) {
-        LOG(ERROR) << "Neuroglancer 2D tile render failed: " << result.error.toStdString();
-        if (result.pass == Neuroglancer2DRenderParams::Pass::Final && result.epoch == m_ngRenderEpoch &&
-            m_ngFinalErrorEpoch != result.epoch) {
-          m_ngFinalErrorEpoch = result.epoch;
-          m_ngFinalError = QString("Neuroglancer 2D final tile render failed: %1").arg(result.error);
-          maybeNotifyNeuroglancerFinalError();
-        }
-        return;
-      }
-      if (!m_isVisible || result.epoch != m_ngRenderEpoch) {
-        return;
-      }
-      const int prio = neuroglancer2DPassPriority(result.pass);
-      applyQImagePack(result.qImagePack,
-                      result.epoch,
-                      prio,
-                      /*isFinalPass=*/result.pass == Neuroglancer2DRenderParams::Pass::Final);
-    });
-
-    connect(watcher, &QFutureWatcher<Neuroglancer2DTileResult>::finished, this, [this, watcher, tasks, pass, epoch]() {
-      for (int i = 0; i < static_cast<int>(tasks->size()); ++i) {
-        const Neuroglancer2DTileResult result = watcher->resultAt(i);
-        if (!result.error.isEmpty()) {
-          if (result.pass == Neuroglancer2DRenderParams::Pass::Final && result.epoch == m_ngRenderEpoch &&
-              m_ngFinalErrorEpoch != result.epoch) {
-            m_ngFinalErrorEpoch = result.epoch;
-            m_ngFinalError = QString("Neuroglancer 2D final tile render failed: %1").arg(result.error);
-            maybeNotifyNeuroglancerFinalError();
-          }
-          continue;
-        }
-        if (!m_isVisible || result.epoch != m_ngRenderEpoch) {
-          continue;
-        }
-        const int prio = neuroglancer2DPassPriority(result.pass);
-        applyQImagePack(result.qImagePack,
-                        result.epoch,
-                        prio,
-                        /*isFinalPass=*/result.pass == Neuroglancer2DRenderParams::Pass::Final);
-      }
-
-      watcher->deleteLater();
-
-      if (pass == Neuroglancer2DRenderParams::Pass::Final) {
-        if (epoch == m_ngRenderEpoch) {
-          m_ngFinalCompletedEpoch = epoch;
-        }
-        if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
-          m_ngFinalInFlight = false;
-          m_ngFinalInFlightEpoch = 0;
-        }
-        if (epoch == m_ngRenderEpoch) {
-          trimNeuroglancerTilesAfterFinal(epoch);
-        }
-      } else if (pass == Neuroglancer2DRenderParams::Pass::Preview) {
-        if (m_ngPreviewInFlight && m_ngPreviewInFlightEpoch == epoch) {
-          m_ngPreviewInFlight = false;
-          m_ngPreviewInFlightEpoch = 0;
-        }
-      }
-
-      updateNeuroglancerLoadingIndicator();
-
-      if (pass == Neuroglancer2DRenderParams::Pass::Preview) {
-        if (m_ngPreviewDirty && (!m_ngPreviewInFlight || m_ngPreviewInFlightEpoch != m_ngRenderEpoch) && m_isVisible) {
-          startNeuroglancer2DRender(/*finalPass=*/false);
-        }
-      } else if (pass == Neuroglancer2DRenderParams::Pass::Final) {
-        if (m_ngFinalPending && (!m_ngFinalInFlight || m_ngFinalInFlightEpoch != m_ngRenderEpoch) && m_isVisible) {
-          m_ngFinalPending = false;
-          startNeuroglancer2DRender(/*finalPass=*/true);
-        }
-      }
-    });
-
-    watcher->setFuture(QtConcurrent::mapped(*tasks, renderNeuroglancer2DTile));
+    auto state = std::make_shared<Neuroglancer2DCoroFanoutState>();
+    state->tasks = tasks;
+    state->pass = pass;
+    state->epoch = epoch;
+    startNeuroglancer2DCoroFanoutRender(std::move(state));
     return;
   }
 
