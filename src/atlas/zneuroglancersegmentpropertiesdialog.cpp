@@ -62,13 +62,15 @@ folly::coro::Task<LoadResult> loadSegmentPropertiesTask(std::shared_ptr<ZNeurogl
 template<class Result, class Finish>
 struct SingleShotDialogState
 {
-  SingleShotDialogState(QPointer<QObject> guardObjectIn, Finish finishIn)
+  SingleShotDialogState(QPointer<QObject> guardObjectIn, Finish finishIn, std::function<void()> finishCancelledIn)
     : guardObject(std::move(guardObjectIn))
     , finish(std::move(finishIn))
+    , finishCancelled(std::move(finishCancelledIn))
   {}
 
   QPointer<QObject> guardObject;
   Finish finish;
+  std::function<void()> finishCancelled;
   std::optional<Result> result;
 };
 
@@ -83,21 +85,46 @@ void finishSingleShotTaskOnUi(std::shared_ptr<SingleShotDialogState<Result, Fini
 }
 
 template<class Result, class Finish>
+void finishSingleShotTaskCancelledOnUi(std::shared_ptr<SingleShotDialogState<Result, Finish>> state)
+{
+  if (state->guardObject == nullptr || QCoreApplication::closingDown() || !state->finishCancelled) {
+    return;
+  }
+  state->finishCancelled();
+}
+
+template<class Result, class Finish>
 folly::coro::Task<ZBackgroundJobOutcome>
 runSingleShotTaskWithCancellation(ZBackgroundJobContext ctx,
                                   folly::coro::Task<Result> workTask,
                                   std::shared_ptr<SingleShotDialogState<Result, Finish>> state)
 {
   ZBackgroundJobOutcome out;
-  Result result = co_await folly::coro::co_withCancellation(ctx.cancellationToken(), std::move(workTask));
-  if (auto error = backgroundJobFailureMessageFromResult(result)) {
-    out.state = ZBackgroundJobOutcome::State::Failed;
-    out.message = *error;
+  try {
+    Result result = co_await folly::coro::co_withCancellation(ctx.cancellationToken(), std::move(workTask));
+    if (auto error = backgroundJobFailureMessageFromResult(result)) {
+      out.state = ZBackgroundJobOutcome::State::Failed;
+      out.message = *error;
+    }
+    state->result.emplace(std::move(result));
+    out.uiCallback = [state = std::move(state)](ZDoc&, ZBackgroundTask&) mutable {
+      finishSingleShotTaskOnUi(std::move(state));
+    };
   }
-  state->result.emplace(std::move(result));
-  out.uiCallback = [state = std::move(state)](ZDoc&, ZBackgroundTask&) mutable {
-    finishSingleShotTaskOnUi(std::move(state));
-  };
+  catch (const ZCancellationException&) {
+    out.state = ZBackgroundJobOutcome::State::Cancelled;
+    out.message = QStringLiteral("cancelled");
+    out.uiCallback = [state = std::move(state)](ZDoc&, ZBackgroundTask&) mutable {
+      finishSingleShotTaskCancelledOnUi(std::move(state));
+    };
+  }
+  catch (const folly::OperationCancelled&) {
+    out.state = ZBackgroundJobOutcome::State::Cancelled;
+    out.message = QStringLiteral("cancelled");
+    out.uiCallback = [state = std::move(state)](ZDoc&, ZBackgroundTask&) mutable {
+      finishSingleShotTaskCancelledOnUi(std::move(state));
+    };
+  }
   co_return out;
 }
 
@@ -208,6 +235,9 @@ void ZNeuroglancerSegmentPropertiesDialog::beginLoad()
     QPointer<QObject>(this),
     [this](LoadResult result) mutable {
       finishLoad(std::move(result.props), std::move(result.error));
+    },
+    [this]() {
+      finishLoadCancelled();
     });
 
   ZBackgroundJobSpec spec;
@@ -271,6 +301,11 @@ void ZNeuroglancerSegmentPropertiesDialog::finishLoad(std::shared_ptr<const ZNeu
     }
     m_meshLoadCallback(*idOpt);
   });
+}
+
+void ZNeuroglancerSegmentPropertiesDialog::finishLoadCancelled()
+{
+  m_statusLabel->setText(QStringLiteral("Loading segment_properties cancelled."));
 }
 
 void ZNeuroglancerSegmentPropertiesDialog::applyFilterNow()

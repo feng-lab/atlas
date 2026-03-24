@@ -9,6 +9,8 @@
 
 - Launch Atlas normally (macOS/Windows/Linux).
 - The gRPC server listens on `0.0.0.0:50051`.
+- If `50051` is already owned by another Atlas instance or process, Atlas now keeps the GUI running, logs an RPC startup
+  error, and leaves Scene RPC unavailable for that process instead of crashing during startup.
 
 ## ID Conventions
 

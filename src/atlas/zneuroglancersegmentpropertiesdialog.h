@@ -37,6 +37,7 @@ private:
   void beginLoad();
 
   void finishLoad(std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> props, QString error);
+  void finishLoadCancelled();
 
   void applyFilterNow();
 

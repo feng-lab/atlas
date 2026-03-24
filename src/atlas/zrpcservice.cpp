@@ -3762,11 +3762,19 @@ void ZRPCService::onRPCThreadStarted()
   builder.RegisterService(m_sceneService.get());
   // Finally assemble the server.
   m_serverOwned = builder.BuildAndStart();
+  if (!m_serverOwned) {
+    LOG(ERROR) << "Failed to start Atlas scene RPC server on " << server_address
+               << "; Scene RPC will be unavailable for this process. "
+               << "This usually means the port is already in use.";
+    m_grpcServer = nullptr;
+    return;
+  }
   LOG(INFO) << "Server listening on " << server_address;
   m_grpcServer = m_serverOwned.get();
   // Block in a background thread so the RPC QThread event loop remains free
   // to accept a BlockingQueuedConnection for shutdown.
   m_waitThread = std::thread([server = m_serverOwned.get()]() {
+    CHECK(server);
     server->Wait();
     LOG(INFO) << "Server shutdown";
   });

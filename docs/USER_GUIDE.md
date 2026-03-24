@@ -1412,6 +1412,9 @@ Tips
 
 - **Updates**: **Help → Check for Updates** opens the installed update tool if that feature is available on your platform.
 - **Multiple instances (macOS)**: from the dock icon, choose **Open Additional Instance of Atlas**.
+- **Scene RPC port**: Atlas reserves `0.0.0.0:50051` for the live Scene RPC server. If another Atlas instance or process is
+  already using that port, the GUI still launches but Scene RPC is disabled for that instance; check the startup log for the
+  bind failure.
 - **Desktop entry (Linux)**: create a launcher for easy access.
 
 ---
