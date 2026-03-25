@@ -240,7 +240,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Gui Widgets Network Svg SvgWidgets Concurrent Test
+find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Gui Widgets Network Svg SvgWidgets Test
              PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
 print_target_properties(Qt6::Core)
 print_target_properties(Qt6::Gui)
@@ -248,7 +248,6 @@ print_target_properties(Qt6::Widgets)
 print_target_properties(Qt6::Network)
 print_target_properties(Qt6::Svg)
 print_target_properties(Qt6::SvgWidgets)
-print_target_properties(Qt6::Concurrent)
 print_target_properties(Qt6::Test)
 
 if (ATLAS_USE_OPENGLWIDGET)
@@ -976,7 +975,7 @@ if (MSVC)
     glbinding::glbinding-aux glbinding::glbinding
     ${OpenCV_LIBS}
     gflags::gflags
-    Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
+    Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets
     Qt6::CorePrivate Qt6::Test
     Brotli::brotlidec
     CURL::libcurl
@@ -1079,7 +1078,7 @@ else ()
     glbinding::glbinding-aux glbinding::glbinding
     ${OpenCV_LIBS}
     gflags::gflags
-    Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
+    Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets
     Qt6::CorePrivate Qt6::Test
     Brotli::brotlidec
     CURL::libcurl
@@ -1148,11 +1147,11 @@ if (WIN32)
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
   set_source_files_properties(${PROTO_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
 
-  if (ATLAS_ENABLE_RELEASE_PDB)
-    # `/DEBUG` would otherwise flip the linker defaults to `/OPT:NOREF,NOICF`.
-    # Restate the Release linker optimizations explicitly so enabling PDB output
-    # does not change the optimized codegen/link behavior.
-    target_link_options(${APP_NAME} PUBLIC /DEBUG /OPT:REF /OPT:ICF /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
+  if (ATLAS_ENABLE_RELEASE_DEBUG_INFO)
+    # Release debug info is configured centrally in the top-level CMakeLists.
+    # Keep Atlas-specific Windows linker knobs here without overriding the
+    # chosen /DEBUG mode for ATLAS_DEBUG_VERSION or --release-pdb builds.
+    target_link_options(${APP_NAME} PUBLIC /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
   elseif (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # Keep the default Release build free of linker debug info unless the
     # dedicated optimized Release+PDB option is requested.

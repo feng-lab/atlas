@@ -80,14 +80,12 @@ message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
 
 option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled and debug symbols." OFF)
 if (ATLAS_SANITIZE_ADDRESS)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
   add_compile_definitions(ATLAS_SANITIZE_ADDRESS)
 endif ()
 message(STATUS "ATLAS_SANITIZE_ADDRESS: ${ATLAS_SANITIZE_ADDRESS}")
 
 option(ATLAS_DEBUG_VERSION "Build Atlas with debug symbols." ON)
 if (ATLAS_DEBUG_VERSION)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
   add_compile_definitions(ATLAS_DEBUG_VERSION)
 endif ()
 message(STATUS "ATLAS_DEBUG_VERSION: ${ATLAS_DEBUG_VERSION}")
@@ -95,13 +93,30 @@ message(STATUS "ATLAS_DEBUG_VERSION: ${ATLAS_DEBUG_VERSION}")
 option(ATLAS_ENABLE_RELEASE_PDB
        "Emit PDBs for optimized Release builds on MSVC-compatible Windows toolchains."
        OFF)
-if (MSVC AND ATLAS_ENABLE_RELEASE_PDB)
-  # Keep the Release configuration while asking MSVC/clang-cl to emit PDB-backed
-  # compile debug info. This is intentionally separate from ATLAS_DEBUG_VERSION,
-  # which also disables Release IPO/LTO for faster local relinks.
-  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Release>:ProgramDatabase>")
+set(ATLAS_ENABLE_RELEASE_DEBUG_INFO OFF)
+if (ATLAS_SANITIZE_ADDRESS OR ATLAS_DEBUG_VERSION OR (MSVC AND ATLAS_ENABLE_RELEASE_PDB))
+  set(ATLAS_ENABLE_RELEASE_DEBUG_INFO ON)
+endif ()
+
+if (ATLAS_ENABLE_RELEASE_DEBUG_INFO)
+  if (MSVC)
+    # Keep Release code generation while emitting PDB-backed debug info on
+    # MSVC/clang-cl. /DEBUG changes the linker's optimization defaults, so
+    # restore the Release /OPT:REF and /OPT:ICF behavior explicitly.
+    set(
+      CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
+      "$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>$<$<CONFIG:Release>:ProgramDatabase>")
+    add_link_options(
+      "$<$<CONFIG:Release>:/DEBUG:FULL>"
+      "$<$<CONFIG:Release>:/OPT:REF>"
+      "$<$<CONFIG:Release>:/OPT:ICF>")
+  else ()
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -g")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+  endif ()
 endif ()
 message(STATUS "ATLAS_ENABLE_RELEASE_PDB: ${ATLAS_ENABLE_RELEASE_PDB}")
+message(STATUS "ATLAS_ENABLE_RELEASE_DEBUG_INFO: ${ATLAS_ENABLE_RELEASE_DEBUG_INFO}")
 
 # Keep local debug-version builds fast to relink by disabling Release IPO/LTO.
 # Production-style Release builds (ATLAS_DEBUG_VERSION=OFF) still keep IPO enabled.
