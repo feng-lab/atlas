@@ -13,10 +13,13 @@
 #include <QPoint>
 #include <QTimer>
 #include <folly/CancellationToken.h>
+#include <folly/coro/AsyncScope.h>
+#include <folly/coro/Task.h>
 #include <map>
 #include <memory>
 #include <optional>
 #include <set>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -155,6 +158,38 @@ private:
 
   [[nodiscard]] size_t pumpRuntimeNeuroglancerRequests();
 
+  void spawnRuntimeNeuroglancerTask(folly::coro::Task<void> task, std::string_view debugLabel);
+
+  folly::coro::Task<void>
+  runRuntimeNeuroglancerOpenTask(uint64_t epoch,
+                                 ZNeuroglancerMeshExternalSourceKey key,
+                                 std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext,
+                                 folly::CancellationToken cancellationToken);
+
+  folly::coro::Task<void>
+  runRuntimeNeuroglancerRowLoadTask(uint64_t epoch,
+                                    std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source,
+                                    uint64_t segmentId,
+                                    uint32_t row,
+                                    ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace vertexSpace,
+                                    uint64_t encodedBytes,
+                                    folly::CancellationToken cancellationToken);
+
+  void applyRuntimeNeuroglancerOpenResult(
+    uint64_t epoch,
+    QString error,
+    std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source,
+    std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest> manifest,
+    std::vector<uint32_t> baseRows);
+
+  void applyRuntimeNeuroglancerChunkLoadResult(
+    uint64_t epoch,
+    uint32_t row,
+    uint64_t encodedBytes,
+    bool cancelled,
+    QString error,
+    std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh> chunk);
+
   void applyRuntimeNeuroglancerSelection();
 
   void logRuntimeNeuroglancerRefinementStarted(size_t remainingDesiredRows);
@@ -241,6 +276,7 @@ private:
   bool m_runtimeNgRefinementActive = false;
   bool m_runtimeNgProgressiveRendering = true;
   bool m_runtimeNgExportActive = false;
+  folly::coro::AsyncScope m_runtimeNgTaskScope;
 
   const RegionNode* m_regionNode = nullptr;
 };

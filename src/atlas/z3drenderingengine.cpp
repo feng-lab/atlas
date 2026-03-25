@@ -447,6 +447,16 @@ const ZQtExecutor& Z3DRenderingEngine::renderThreadExecutor() const
   return *m_renderThreadExecutor;
 }
 
+void Z3DRenderingEngine::cancelLongRendering()
+{
+  if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
+    Z3DRenderGlobalState::instance().requestCancellation();
+  }
+  if (m_globalParas) {
+    m_globalParas->requestMeshLodViewCancellation();
+  }
+}
+
 std::shared_ptr<ZWidgetsGroup> Z3DRenderingEngine::viewSettingWidgetsGroupOf(size_t id)
 {
   if (id == 1) {

@@ -58,6 +58,10 @@ public:
 
   void cameraPointsTo(const ZBBox<glm::dvec3>& bound);
 
+  folly::CancellationToken currentMeshLodViewCancellationToken() const;
+
+  void requestMeshLodViewCancellation();
+
 private:
   void updateLightsArray();
 
@@ -121,6 +125,9 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGrpNoCamera;
 
   size_t m_cameraParameterIndex = 0;
+  mutable std::mutex m_meshLodViewCancellationMutex;
+  std::shared_ptr<folly::CancellationSource> m_meshLodViewCancellationSource =
+    std::make_shared<folly::CancellationSource>();
 
 public:
   // Recompute cut spans in response to new scene bounds based on binding modes.

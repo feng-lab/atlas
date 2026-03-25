@@ -357,7 +357,8 @@ private:
                                                          size_t lod,
                                                          const glm::uvec3& fragmentPos,
                                                          const MultiLodManifest& manifest,
-                                                         const MultiLodInfo& info) const;
+                                                         const MultiLodInfo& info,
+                                                         const folly::CancellationToken& cancellationToken) const;
 
 private:
   std::shared_ptr<const SharedMeshInfo> m_sharedMeshInfo;

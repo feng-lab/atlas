@@ -32,7 +32,6 @@ namespace nim {
 
 class Z3DFilter;
 class Z3DMeshFilter;
-
 class Z3DCanvas;
 
 class ZDoc;
@@ -260,13 +259,7 @@ public:
   void saveCurrentFrameColor(const QString& filename, Z3DEye eye = MonoEye);
   void saveCurrentFrameDepth(const QString& filename, Z3DEye eye = MonoEye);
 
-  void cancelLongRendering()
-  {
-    if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
-      // VLOG(1) << "request cancel";
-      Z3DRenderGlobalState::instance().requestCancellation();
-    }
-  }
+  void cancelLongRendering();
 
   // Teardown helper: drain Vulkan frame-executor fences and execute any
   // fence-gated completion callbacks. This is intended to be invoked on the

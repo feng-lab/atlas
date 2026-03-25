@@ -8,20 +8,22 @@
 #include "zneuroglancerremotecontext.h"
 #include "zrandom.h"
 #include "zregionannotation.h"
+#include "zfolly.h"
 
 #include <gflags/gflags.h>
 
 #include <QFileInfo>
-#include <QFutureWatcher>
-#include <QThreadPool>
-#include <QtConcurrent>
 
 #include <folly/OperationCancelled.h>
+#include <folly/coro/BlockingWait.h>
+#include <folly/coro/WithCancellation.h>
 
 #include <algorithm>
 #include <limits>
 #include <ranges>
+#include <string>
 #include <unordered_set>
+#include <utility>
 
 namespace nim {
 
@@ -82,6 +84,50 @@ struct RuntimeNeuroglancerChunkLoadResult
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh> chunk;
 };
 
+template<class Fn>
+void postToMeshFilterThread(Z3DMeshFilter* filter, Fn&& fn)
+{
+  CHECK(filter);
+  (void)QMetaObject::invokeMethod(
+    filter,
+    [filter, fn = std::forward<Fn>(fn)]() mutable {
+      try {
+        fn(*filter);
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR) << "Unhandled exception in runtime Neuroglancer mesh callback: " << e.what();
+      }
+      catch (...) {
+        LOG(ERROR) << "Unhandled non-std exception in runtime Neuroglancer mesh callback";
+      }
+    },
+    Qt::QueuedConnection);
+}
+
+folly::coro::Task<void> wrapRuntimeNeuroglancerTask(folly::coro::Task<void> task, std::string label)
+{
+  try {
+    co_await std::move(task);
+  }
+  catch (const ZCancellationException&) {
+    co_return;
+  }
+  catch (const folly::OperationCancelled&) {
+    co_return;
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "Runtime Neuroglancer mesh coroutine failed" << (label.empty() ? "" : " label='")
+               << (label.empty() ? "" : label) << (label.empty() ? "" : "'") << ": " << e.what();
+    co_return;
+  }
+  catch (...) {
+    LOG(ERROR) << "Runtime Neuroglancer mesh coroutine failed" << (label.empty() ? "" : " label='")
+               << (label.empty() ? "" : label) << (label.empty() ? "" : "'");
+    co_return;
+  }
+  co_return;
+}
+
 [[nodiscard]] bool sameOptionalArray(const std::optional<std::array<double, 3>>& lhs,
                                      const std::optional<std::array<double, 3>>& rhs)
 {
@@ -116,9 +162,7 @@ collectRuntimeNeuroglancerBaseRows(const ZNeuroglancerPrecomputedMeshSource::Mul
 
 [[nodiscard]] size_t runtimeNgWorkerThreadCount()
 {
-  QThreadPool* pool = QThreadPool::globalInstance();
-  const int threads = pool ? pool->maxThreadCount() : 1;
-  return std::max<size_t>(1, static_cast<size_t>(threads));
+  return atlasBackgroundExecutorThreadCount();
 }
 
 [[nodiscard]] size_t runtimeNgMaxTasksInFlight(bool interactionActive)
@@ -161,11 +205,11 @@ collectRuntimeNeuroglancerBaseRows(const ZNeuroglancerPrecomputedMeshSource::Mul
   return false;
 }
 
-[[nodiscard]] RuntimeNeuroglancerOpenResult
-openRuntimeNeuroglancerSource(uint64_t epoch,
-                              const ZNeuroglancerMeshExternalSourceKey& key,
-                              std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext,
-                              folly::CancellationToken cancellationToken)
+folly::coro::Task<RuntimeNeuroglancerOpenResult>
+openRuntimeNeuroglancerSourceAsync(uint64_t epoch,
+                                   ZNeuroglancerMeshExternalSourceKey key,
+                                   std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext,
+                                   folly::CancellationToken cancellationToken)
 {
   RuntimeNeuroglancerOpenResult out;
   out.epoch = epoch;
@@ -173,25 +217,31 @@ openRuntimeNeuroglancerSource(uint64_t epoch,
     maybeCancel(cancellationToken);
     CHECK(key.baseResolutionNm);
     CHECK(key.baseVoxelOffset);
-    const auto source = remoteContext ? ZNeuroglancerPrecomputedMeshSource::open(QUrl(key.meshSourceDirUrl),
-                                                                                 *key.baseResolutionNm,
-                                                                                 *key.baseVoxelOffset,
-                                                                                 std::move(remoteContext),
-                                                                                 cancellationToken)
-                                      : ZNeuroglancerPrecomputedMeshSource::open(QUrl(key.meshSourceDirUrl),
-                                                                                 *key.baseResolutionNm,
-                                                                                 *key.baseVoxelOffset,
-                                                                                 std::chrono::milliseconds(30000),
-                                                                                 nullptr,
-                                                                                 cancellationToken);
+    const auto source = remoteContext
+                          ? co_await folly::coro::co_withCancellation(
+                              cancellationToken,
+                              ZNeuroglancerPrecomputedMeshSource::openAsync(QUrl(key.meshSourceDirUrl),
+                                                                            *key.baseResolutionNm,
+                                                                            *key.baseVoxelOffset,
+                                                                            std::move(remoteContext)))
+                          : co_await folly::coro::co_withCancellation(
+                              cancellationToken,
+                              ZNeuroglancerPrecomputedMeshSource::openAsync(QUrl(key.meshSourceDirUrl),
+                                                                            *key.baseResolutionNm,
+                                                                            *key.baseVoxelOffset,
+                                                                            std::chrono::milliseconds(30000),
+                                                                            nullptr));
+    maybeCancel(cancellationToken);
     CHECK(source);
     if (!source->supportsRuntimeLod()) {
       out.error = QStringLiteral("dataset does not support multiscale mesh LOD");
-      return out;
+      co_return out;
     }
 
     out.source = source;
-    out.manifest = source->loadManifestBlocking(key.segmentId, cancellationToken);
+    out.manifest =
+      co_await folly::coro::co_withCancellation(cancellationToken, source->loadManifestAsync(key.segmentId));
+    maybeCancel(cancellationToken);
     CHECK(out.manifest);
     out.baseRows = collectRuntimeNeuroglancerBaseRows(*out.manifest);
   }
@@ -204,7 +254,41 @@ openRuntimeNeuroglancerSource(uint64_t epoch,
   catch (const std::exception& e) {
     out.error = QString::fromUtf8(e.what());
   }
-  return out;
+  co_return out;
+}
+
+folly::coro::Task<RuntimeNeuroglancerChunkLoadResult>
+loadRuntimeNeuroglancerChunkAsync(uint64_t epoch,
+                                  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source,
+                                  uint64_t segmentId,
+                                  uint32_t row,
+                                  ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace vertexSpace,
+                                  uint64_t encodedBytes,
+                                  folly::CancellationToken cancellationToken)
+{
+  RuntimeNeuroglancerChunkLoadResult out;
+  out.epoch = epoch;
+  out.row = row;
+  out.encodedBytes = encodedBytes;
+  CHECK(source);
+  try {
+    maybeCancel(cancellationToken);
+    auto chunkMesh = co_await folly::coro::co_withCancellation(cancellationToken,
+                                                               source->loadChunkMeshAsync(segmentId, row, vertexSpace));
+    maybeCancel(cancellationToken);
+    CHECK(chunkMesh);
+    out.chunk = std::move(chunkMesh);
+  }
+  catch (const ZCancellationException&) {
+    out.cancelled = true;
+  }
+  catch (const folly::OperationCancelled&) {
+    out.cancelled = true;
+  }
+  catch (const std::exception& e) {
+    out.error = QString::fromUtf8(e.what());
+  }
+  co_return out;
 }
 
 } // namespace
@@ -325,6 +409,7 @@ Z3DMeshFilter::~Z3DMeshFilter()
       source->requestCancellation();
     }
   }
+  folly::coro::blockingWait(m_runtimeNgTaskScope.joinAsync());
 }
 
 QString Z3DMeshFilter::regionName() const
@@ -349,6 +434,13 @@ void Z3DMeshFilter::setProgressiveRenderingMode(bool v)
   m_runtimeNgProgressiveRendering = v;
 }
 
+void Z3DMeshFilter::spawnRuntimeNeuroglancerTask(folly::coro::Task<void> task, std::string_view debugLabel)
+{
+  m_runtimeNgTaskScope.add(
+    folly::coro::co_withExecutor(getAtlasBackgroundExecutor(),
+                                 wrapRuntimeNeuroglancerTask(std::move(task), std::string(debugLabel))));
+}
+
 void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
 {
   if (!m_runtimeNgSourceKey || fullViewport.x == 0U || fullViewport.y == 0U) {
@@ -359,8 +451,8 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
   m_runtimeNgInteractionActive = false;
 
   if (!m_runtimeNgSource || !m_runtimeNgManifest) {
-    const RuntimeNeuroglancerOpenResult openResult =
-      openRuntimeNeuroglancerSource(m_runtimeNgEpoch, *m_runtimeNgSourceKey, m_runtimeNgRemoteContext, {});
+    const RuntimeNeuroglancerOpenResult openResult = folly::coro::blockingWait(
+      openRuntimeNeuroglancerSourceAsync(m_runtimeNgEpoch, *m_runtimeNgSourceKey, m_runtimeNgRemoteContext, {}));
     if (!openResult.error.isEmpty()) {
       LOG(WARNING) << fmt::format("Mesh export LOD preload skipped: {}", openResult.error);
       return;
@@ -899,8 +991,8 @@ void Z3DMeshFilter::resetRuntimeNeuroglancerLodState()
   }
 
   // Ensure any in-flight row loads stop promptly (e.g. when closing a scene or
-  // quitting the app). QtConcurrent cannot preempt threads, so background tasks
-  // must cooperate via cancellation tokens.
+  // quitting the app). Runtime NG mesh tasks are coroutine-backed and must
+  // cooperate via cancellation tokens.
   if (m_runtimeNgCancellationSource) {
     m_runtimeNgCancellationSource->requestCancellation();
   }
@@ -1038,53 +1130,8 @@ void Z3DMeshFilter::startRuntimeNeuroglancerOpen()
   const folly::CancellationToken cancellationToken =
     m_runtimeNgCancellationSource ? m_runtimeNgCancellationSource->getToken() : folly::CancellationToken();
 
-  auto* watcher = new QFutureWatcher<RuntimeNeuroglancerOpenResult>(this);
-  connect(watcher, &QFutureWatcher<RuntimeNeuroglancerOpenResult>::finished, this, [this, watcher, epoch]() {
-    const RuntimeNeuroglancerOpenResult result = watcher->result();
-    watcher->deleteLater();
-    if (result.epoch != epoch || epoch != m_runtimeNgEpoch) {
-      return;
-    }
-    if (!result.error.isEmpty()) {
-      VLOG(1) << fmt::format("Runtime Neuroglancer mesh LOD disabled: {}", result.error);
-      return;
-    }
-
-    m_runtimeNgSource = result.source;
-    m_runtimeNgManifest = result.manifest;
-    m_runtimeNgBaseRows = result.baseRows;
-    m_runtimeNgBaseReady = m_runtimeNgBaseRows.empty();
-    updateBoundBox();
-    initializeRotationCenterIfDefault();
-    if (!m_runtimeNgBaseReady) {
-      // Hybrid policy: stream the full coarsest working set first while the
-      // imported coarse mesh remains visible. Once base rows are complete we
-      // switch to runtime chunks and start refining.
-      if (m_runtimeNgSourceKey) {
-        const size_t maxTasksInFlight = runtimeNgMaxTasksInFlight(m_runtimeNgInteractionActive);
-        const uint64_t maxBytesInFlight = runtimeNgMaxEncodedBytesInFlight(m_runtimeNgInteractionActive);
-        VLOG(1) << fmt::format(
-          "Runtime Neuroglancer mesh base rows stream start: segment={} mesh='{}' baseRows={} maxTasksInFlight={} "
-          "maxEncodedBytesInFlightMiB={}",
-          m_runtimeNgSourceKey->segmentId,
-          m_runtimeNgSourceKey->meshSourceDirUrl,
-          m_runtimeNgBaseRows.size(),
-          maxTasksInFlight,
-          maxBytesInFlight / (1024ULL * 1024ULL));
-      }
-      setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode::BaseWarmup, m_runtimeNgBaseRows);
-      (void)pumpRuntimeNeuroglancerRequests();
-    } else {
-      clearRuntimeNeuroglancerRequestFrontier();
-    }
-    m_runtimeNgSelectionDirty = true;
-    invalidateResult();
-  });
-
-  watcher->setFuture(
-    QtConcurrent::run([epoch, key, remoteContext, cancellationToken]() -> RuntimeNeuroglancerOpenResult {
-      return openRuntimeNeuroglancerSource(epoch, key, remoteContext, cancellationToken);
-    }));
+  spawnRuntimeNeuroglancerTask(runRuntimeNeuroglancerOpenTask(epoch, key, remoteContext, cancellationToken),
+                               "runtime_ng_mesh_open");
 }
 
 size_t Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& rows)
@@ -1158,6 +1205,10 @@ size_t Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>
   const uint64_t segmentId = m_runtimeNgSourceKey->segmentId;
   const auto source = m_runtimeNgSource;
   CHECK(source);
+  folly::CancellationToken viewCancellationToken;
+  if (m_runtimeNgRequestFrontierMode == RuntimeNeuroglancerRequestFrontierMode::ViewDriven) {
+    viewCancellationToken = m_globalParameters.currentMeshLodViewCancellationToken();
+  }
   const auto vertexSpace = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform
                              ? ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::Quantized
                              : ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::LocalVoxel;
@@ -1165,116 +1216,208 @@ size_t Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>
   for (const RowLoadSpec& spec : rowsToLoad) {
     const uint32_t row = spec.row;
     CHECK(spec.cancellationSource);
-    const folly::CancellationToken cancellationToken = spec.cancellationSource->getToken();
-    auto* watcher = new QFutureWatcher<RuntimeNeuroglancerChunkLoadResult>(this);
-    connect(watcher, &QFutureWatcher<RuntimeNeuroglancerChunkLoadResult>::finished, this, [this, watcher, epoch]() {
-      const RuntimeNeuroglancerChunkLoadResult result = watcher->result();
-      watcher->deleteLater();
-
-      if (result.epoch != epoch || epoch != m_runtimeNgEpoch) {
-        return;
-      }
-
-      // Cancellation is cooperative and may arrive after the worker finished.
-      // Treat cancellation requested at completion time as "cancelled" so the
-      // filter does not apply results or trigger invalidation from obsolete
-      // tasks (e.g. during backend switches or view changes).
-      bool cancellationRequested = false;
-      if (auto it = m_runtimeNgRowCancellationSources.find(result.row); it != m_runtimeNgRowCancellationSources.end()) {
-        cancellationRequested = it->second && it->second->getToken().isCancellationRequested();
-      }
-      const bool cancelled = result.cancelled || cancellationRequested;
-
-      const bool baseWasReady = m_runtimeNgBaseReady;
-      m_runtimeNgRowsInFlight.erase(result.row);
-      if (auto it = m_runtimeNgRowBytesInFlight.find(result.row); it != m_runtimeNgRowBytesInFlight.end()) {
-        const uint64_t bytes = it->second;
-        if (m_runtimeNgBytesInFlight >= bytes) {
-          m_runtimeNgBytesInFlight -= bytes;
-        } else {
-          m_runtimeNgBytesInFlight = 0;
-        }
-        m_runtimeNgRowBytesInFlight.erase(it);
-      }
-      m_runtimeNgRowCancellationSources.erase(result.row);
-
-      if (cancelled) {
-        updateRuntimeNeuroglancerRefinementState();
-        (void)pumpRuntimeNeuroglancerRequests();
-        if (VLOG_IS_ON(2)) {
-          VLOG(2) << fmt::format("Runtime Neuroglancer mesh LOD chunk load cancelled: row={}", result.row);
-        }
-        return;
-      } else if (result.chunk) {
-        m_runtimeNgLoadedRows[result.row] = result.chunk;
-      } else {
-        m_runtimeNgFailedRows.insert(result.row);
-        if (!result.error.isEmpty()) {
-          VLOG(1) << fmt::format("Runtime Neuroglancer mesh LOD chunk load failed: {}", result.error);
-        } else {
-          VLOG(1) << "Runtime Neuroglancer mesh LOD chunk load failed with no error message.";
-        }
-      }
-
-      if (!m_runtimeNgBaseReady) {
-        m_runtimeNgBaseReady = std::ranges::all_of(m_runtimeNgBaseRows, [this](uint32_t row) {
-          return m_runtimeNgLoadedRows.contains(row);
-        });
-      }
-
-      updateRuntimeNeuroglancerRefinementState();
-      (void)pumpRuntimeNeuroglancerRequests();
-
-      if (!m_runtimeNgBaseReady) {
-        // Keep streaming the coarsest working set without spending render
-        // frames on intermediate partial coverage when an imported coarse mesh
-        // is still visible. If the mesh was deferred (no imported geometry),
-        // we still need to repaint as chunks arrive so the user can see
-        // progressive fill.
-        if (!hasImportedMeshGeometry(m_origMeshList)) {
-          m_runtimeNgSelectionDirty = true;
-          invalidateResult();
-        }
-        return;
-      }
-      if (!baseWasReady && m_runtimeNgBaseReady) {
-        VLOG(1) << fmt::format("Runtime Neuroglancer mesh base rows complete: segment={} mesh='{}' baseRowsLoaded={}",
-                               m_runtimeNgSourceKey ? m_runtimeNgSourceKey->segmentId : 0U,
-                               m_runtimeNgSourceKey ? m_runtimeNgSourceKey->meshSourceDirUrl : QString(),
-                               m_runtimeNgBaseRows.size());
-      }
-      m_runtimeNgSelectionDirty = true;
-      invalidateResult();
-    });
-
-    watcher->setFuture(QtConcurrent::run(
-      [source, segmentId, row, vertexSpace, epoch, encodedBytes = spec.encodedBytes, cancellationToken]()
-        -> RuntimeNeuroglancerChunkLoadResult {
-        RuntimeNeuroglancerChunkLoadResult out;
-        out.epoch = epoch;
-        out.row = row;
-        out.encodedBytes = encodedBytes;
-        CHECK(source);
-        try {
-          maybeCancel(cancellationToken);
-          auto chunkMesh = source->loadChunkMeshBlocking(segmentId, row, vertexSpace, cancellationToken);
-          CHECK(chunkMesh);
-          out.chunk = std::move(chunkMesh);
-        }
-        catch (const ZCancellationException&) {
-          out.cancelled = true;
-        }
-        catch (const folly::OperationCancelled&) {
-          out.cancelled = true;
-        }
-        catch (const std::exception& e) {
-          out.error = QString::fromUtf8(e.what());
-        }
-        return out;
-      }));
+    CHECK(m_runtimeNgCancellationSource);
+    const folly::CancellationToken cancellationToken =
+      folly::cancellation_token_merge(m_runtimeNgCancellationSource->getToken(),
+                                      spec.cancellationSource->getToken(),
+                                      viewCancellationToken);
+    spawnRuntimeNeuroglancerTask(runRuntimeNeuroglancerRowLoadTask(epoch,
+                                                                   source,
+                                                                   segmentId,
+                                                                   row,
+                                                                   vertexSpace,
+                                                                   spec.encodedBytes,
+                                                                   cancellationToken),
+                                 "runtime_ng_mesh_row_load");
   }
 
   return rowsToLoad.size();
+}
+
+folly::coro::Task<void>
+Z3DMeshFilter::runRuntimeNeuroglancerOpenTask(uint64_t epoch,
+                                              ZNeuroglancerMeshExternalSourceKey key,
+                                              std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext,
+                                              folly::CancellationToken cancellationToken)
+{
+  RuntimeNeuroglancerOpenResult result =
+    co_await openRuntimeNeuroglancerSourceAsync(epoch, std::move(key), std::move(remoteContext), cancellationToken);
+  postToMeshFilterThread(this,
+                         [epoch,
+                          error = std::move(result.error),
+                          source = std::move(result.source),
+                          manifest = std::move(result.manifest),
+                          baseRows = std::move(result.baseRows)](Z3DMeshFilter& filter) mutable {
+                           filter.applyRuntimeNeuroglancerOpenResult(epoch,
+                                                                     std::move(error),
+                                                                     std::move(source),
+                                                                     std::move(manifest),
+                                                                     std::move(baseRows));
+                         });
+  co_return;
+}
+
+folly::coro::Task<void>
+Z3DMeshFilter::runRuntimeNeuroglancerRowLoadTask(uint64_t epoch,
+                                                 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source,
+                                                 uint64_t segmentId,
+                                                 uint32_t row,
+                                                 ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace vertexSpace,
+                                                 uint64_t encodedBytes,
+                                                 folly::CancellationToken cancellationToken)
+{
+  RuntimeNeuroglancerChunkLoadResult result = co_await loadRuntimeNeuroglancerChunkAsync(epoch,
+                                                                                         std::move(source),
+                                                                                         segmentId,
+                                                                                         row,
+                                                                                         vertexSpace,
+                                                                                         encodedBytes,
+                                                                                         cancellationToken);
+  postToMeshFilterThread(this,
+                         [epoch,
+                          row = result.row,
+                          encodedBytes = result.encodedBytes,
+                          cancelled = result.cancelled,
+                          error = std::move(result.error),
+                          chunk = std::move(result.chunk)](Z3DMeshFilter& filter) mutable {
+                           filter.applyRuntimeNeuroglancerChunkLoadResult(epoch,
+                                                                          row,
+                                                                          encodedBytes,
+                                                                          cancelled,
+                                                                          std::move(error),
+                                                                          std::move(chunk));
+                         });
+  co_return;
+}
+
+void Z3DMeshFilter::applyRuntimeNeuroglancerOpenResult(
+  uint64_t epoch,
+  QString error,
+  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source,
+  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest> manifest,
+  std::vector<uint32_t> baseRows)
+{
+  if (epoch != m_runtimeNgEpoch) {
+    return;
+  }
+  if (!error.isEmpty()) {
+    VLOG(1) << fmt::format("Runtime Neuroglancer mesh LOD disabled: {}", error);
+    return;
+  }
+
+  m_runtimeNgSource = std::move(source);
+  m_runtimeNgManifest = std::move(manifest);
+  m_runtimeNgBaseRows = std::move(baseRows);
+  m_runtimeNgBaseReady = m_runtimeNgBaseRows.empty();
+  updateBoundBox();
+  initializeRotationCenterIfDefault();
+  if (!m_runtimeNgBaseReady) {
+    // Hybrid policy: stream the full coarsest working set first while the
+    // imported coarse mesh remains visible. Once base rows are complete we
+    // switch to runtime chunks and start refining.
+    if (m_runtimeNgSourceKey) {
+      const size_t maxTasksInFlight = runtimeNgMaxTasksInFlight(m_runtimeNgInteractionActive);
+      const uint64_t maxBytesInFlight = runtimeNgMaxEncodedBytesInFlight(m_runtimeNgInteractionActive);
+      VLOG(1) << fmt::format(
+        "Runtime Neuroglancer mesh base rows stream start: segment={} mesh='{}' baseRows={} maxTasksInFlight={} "
+        "maxEncodedBytesInFlightMiB={}",
+        m_runtimeNgSourceKey->segmentId,
+        m_runtimeNgSourceKey->meshSourceDirUrl,
+        m_runtimeNgBaseRows.size(),
+        maxTasksInFlight,
+        maxBytesInFlight / (1024ULL * 1024ULL));
+    }
+    setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode::BaseWarmup, m_runtimeNgBaseRows);
+    (void)pumpRuntimeNeuroglancerRequests();
+  } else {
+    clearRuntimeNeuroglancerRequestFrontier();
+  }
+  m_runtimeNgSelectionDirty = true;
+  invalidateResult();
+}
+
+void Z3DMeshFilter::applyRuntimeNeuroglancerChunkLoadResult(
+  uint64_t epoch,
+  uint32_t row,
+  uint64_t /*encodedBytes*/,
+  bool cancelled,
+  QString error,
+  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh> chunk)
+{
+  if (epoch != m_runtimeNgEpoch) {
+    return;
+  }
+
+  // Cancellation is cooperative and may arrive after the worker finished.
+  // Treat cancellation requested at completion time as "cancelled" so the
+  // filter does not apply results or trigger invalidation from obsolete
+  // tasks (e.g. during backend switches or view changes).
+  bool cancellationRequested = false;
+  if (auto it = m_runtimeNgRowCancellationSources.find(row); it != m_runtimeNgRowCancellationSources.end()) {
+    cancellationRequested = it->second && it->second->getToken().isCancellationRequested();
+  }
+  const bool finalCancelled = cancelled || cancellationRequested;
+
+  const bool baseWasReady = m_runtimeNgBaseReady;
+  m_runtimeNgRowsInFlight.erase(row);
+  if (auto it = m_runtimeNgRowBytesInFlight.find(row); it != m_runtimeNgRowBytesInFlight.end()) {
+    const uint64_t bytes = it->second;
+    if (m_runtimeNgBytesInFlight >= bytes) {
+      m_runtimeNgBytesInFlight -= bytes;
+    } else {
+      m_runtimeNgBytesInFlight = 0;
+    }
+    m_runtimeNgRowBytesInFlight.erase(it);
+  }
+  m_runtimeNgRowCancellationSources.erase(row);
+
+  if (finalCancelled) {
+    updateRuntimeNeuroglancerRefinementState();
+    (void)pumpRuntimeNeuroglancerRequests();
+    if (VLOG_IS_ON(2)) {
+      VLOG(2) << fmt::format("Runtime Neuroglancer mesh LOD chunk load cancelled: row={}", row);
+    }
+    return;
+  } else if (chunk) {
+    m_runtimeNgLoadedRows[row] = std::move(chunk);
+  } else {
+    m_runtimeNgFailedRows.insert(row);
+    if (!error.isEmpty()) {
+      VLOG(1) << fmt::format("Runtime Neuroglancer mesh LOD chunk load failed: {}", error);
+    } else {
+      VLOG(1) << "Runtime Neuroglancer mesh LOD chunk load failed with no error message.";
+    }
+  }
+
+  if (!m_runtimeNgBaseReady) {
+    m_runtimeNgBaseReady = std::ranges::all_of(m_runtimeNgBaseRows, [this](uint32_t rowValue) {
+      return m_runtimeNgLoadedRows.contains(rowValue);
+    });
+  }
+
+  updateRuntimeNeuroglancerRefinementState();
+  (void)pumpRuntimeNeuroglancerRequests();
+
+  if (!m_runtimeNgBaseReady) {
+    // Keep streaming the coarsest working set without spending render
+    // frames on intermediate partial coverage when an imported coarse mesh
+    // is still visible. If the mesh was deferred (no imported geometry),
+    // we still need to repaint as chunks arrive so the user can see
+    // progressive fill.
+    if (!hasImportedMeshGeometry(m_origMeshList)) {
+      m_runtimeNgSelectionDirty = true;
+      invalidateResult();
+    }
+    return;
+  }
+  if (!baseWasReady && m_runtimeNgBaseReady) {
+    VLOG(1) << fmt::format("Runtime Neuroglancer mesh base rows complete: segment={} mesh='{}' baseRowsLoaded={}",
+                           m_runtimeNgSourceKey ? m_runtimeNgSourceKey->segmentId : 0U,
+                           m_runtimeNgSourceKey ? m_runtimeNgSourceKey->meshSourceDirUrl : QString(),
+                           m_runtimeNgBaseRows.size());
+  }
+  m_runtimeNgSelectionDirty = true;
+  invalidateResult();
 }
 
 size_t Z3DMeshFilter::pumpRuntimeNeuroglancerRequests()

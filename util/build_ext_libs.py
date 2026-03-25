@@ -9,7 +9,7 @@ import shutil
 import stat
 import subprocess
 import sys
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from pathlib import Path
 
 from common_dirs import (
@@ -755,23 +755,39 @@ def build_and_install_cmakecmd(
 def patch_file(
     orig_file: str, from_texts: list, to_texts: list, keep_bak_file: bool = True
 ) -> str:
-    assert len(from_texts) == len(to_texts)
+    assert len(from_texts) == len(
+        to_texts
+    ), f"{orig_file}: from_texts/to_texts length mismatch"
 
+    # Preserve historical behavior: text-mode read with errors ignored, then
+    # write patched output as UTF-8.
     txt = Path(orig_file).read_text(errors="ignore")
-    for from_text, to_text in zip(from_texts, to_texts):
+
+    for idx, (from_text, to_text) in enumerate(zip(from_texts, to_texts), start=1):
         if not from_text:
             continue
+
         assert from_text in txt, f"{orig_file}: {from_text}"
-        txt = txt.replace(from_text, to_text)
+        txt = txt.replace(from_text, str(to_text))
 
     bak_file = get_bak_file_name(orig_file)
-    if os.path.exists(bak_file):
-        os.remove(bak_file)
-    os.rename(orig_file, bak_file)
+    tmp_file = orig_file + ".tmp"
 
-    with open(orig_file, mode="w", encoding="utf-8") as f:
+    created_backup = False
+    if not os.path.exists(bak_file):
+        try:
+            shutil.copy2(orig_file, bak_file)
+            created_backup = True
+        except Exception as e:
+            raise RuntimeError(
+                f"patch_file(): failed to create backup {bak_file} for {orig_file}: {e}"
+            ) from e
+
+    with open(tmp_file, mode="w", encoding="utf-8") as f:
         f.write(txt)
+    os.replace(tmp_file, orig_file)
 
+    # Log a unified diff (same behavior as the historical patcher).
     with open(bak_file, mode="r", encoding="utf-8", errors="ignore") as f:
         from_lines = f.readlines()
     with open(orig_file, mode="r", encoding="utf-8") as f:
@@ -785,8 +801,13 @@ def patch_file(
             )
         )
     )
-    if not keep_bak_file:
-        os.remove(bak_file)
+
+    if not keep_bak_file and created_backup:
+        try:
+            os.remove(bak_file)
+        except FileNotFoundError:
+            pass
+
     return bak_file
 
 
@@ -826,11 +847,23 @@ class PatchManager:
         self.patches = patches
 
     def apply_patches(self):
-        for patcher in self.patches:
-            patcher.patch_file()
+        applied = []
+        try:
+            for patcher in self.patches:
+                patcher.patch_file()
+                applied.append(patcher)
+        except Exception:
+            # If patch application fails mid-way, try to restore what we already
+            # changed so callers don't have to remember to do it correctly.
+            for patcher in reversed(applied):
+                try:
+                    patcher.restore_file()
+                except Exception:
+                    pass
+            raise
 
     def restore_files(self):
-        for patcher in self.patches:
+        for patcher in reversed(self.patches):
             patcher.restore_file()
 
 
@@ -3638,15 +3671,22 @@ def build_fizz(src_dir: str, install_dir: str):
         # Lifetime safety:
         # If AsyncFizzClientT is destroyed while an underlying AsyncSocket connect
         # is still in-flight, Windows can still deliver the completion callback
-        # and invoke `connectSuccess()` on a freed object (UAF). Cancel any
-        # in-flight connect from the destructor to prevent post-destruction
-        # connect callbacks. This is correctness-improving and should be safe on
-        # all platforms.
+        # and invoke `connectSuccess()` on a freed object (UAF).
+        #
+        # Fix this in two layers:
+        # 1) Best-effort: cancel any in-flight connect from the destructor.
+        # 2) Correctness: keep AsyncFizzClientT alive for the full duration of
+        #    the underlying socket connect by holding a DelayedDestruction guard
+        #    until connectSuccess/connectErr, and explicitly clear it from close
+        #    paths so cancellation doesn't leak the object.
+        #
+        # This is correctness-improving and should be safe on all platforms.
         FilePatcher(
             orig_file=os.path.join(src_dir, "client", "AsyncFizzClient.h"),
             from_texts=[
                 r"""~AsyncFizzClientT() override = default;
   void writeAppData(""",
+                r"  folly::Optional<AsyncClientCallbackPtr> callback_;",
             ],
             to_texts=[
                 r"""~AsyncFizzClientT() override {
@@ -3659,6 +3699,113 @@ def build_fizz(src_dir: str, install_dir: str):
     }
   }
   void writeAppData(""",
+                r"""  // Keep this alive while the underlying socket connect is in-flight.
+  // Without this keepalive, the owning coroutine/task can drop its UniquePtr
+  // while the OS still completes the connect, leading to connect callbacks
+  // running on a freed object (observed on Windows).
+  DelayedDestruction::DestructorGuard connectGuard_{nullptr};
+
+  folly::Optional<AsyncClientCallbackPtr> callback_;""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "client", "AsyncFizzClient-inl.h"),
+            from_texts=[
+                r"""    underlyingSocket->disableTransparentTls();
+    underlyingSocket->connect(
+        this,
+        connectAddr,
+        static_cast<int>(socketTimeout.count()),
+        options,
+        bindAddr);""",
+                r"""void AsyncFizzClientT<SM>::closeWithReset() {
+  DelayedDestruction::DestructorGuard dg(this);
+  if (transport_->good()) {""",
+                r"""void AsyncFizzClientT<SM>::closeNow() {
+  DelayedDestruction::DestructorGuard dg(this);
+  if (transport_->good()) {""",
+                r"""void AsyncFizzClientT<SM>::connectSuccess() noexcept {
+  startTransportReads();
+
+  folly::Optional<CachedPsk> cachedPsk = folly::none;
+  if (pskIdentity_) {
+    cachedPsk = fizzContext_->getPsk(*pskIdentity_);
+  }
+  fizzClient_.connect(
+      fizzContext_,
+      std::move(verifier_),
+      sni_,
+      std::move(cachedPsk),
+      folly::Optional<std::vector<ech::ParsedECHConfig>>(folly::none),
+      extensions_);
+}""",
+                r"""void AsyncFizzClientT<SM>::connectErr(
+    const folly::AsyncSocketException& ex) noexcept {
+  deliverAllErrors(ex, false);
+}""",
+            ],
+            to_texts=[
+                r"""    underlyingSocket->disableTransparentTls();
+    // Keep this alive until the socket connect completes (success/failure) or
+    // we explicitly close/cancel.
+    connectGuard_ = this;
+    underlyingSocket->connect(
+        this,
+        connectAddr,
+        static_cast<int>(socketTimeout.count()),
+        options,
+        bindAddr);""",
+                r"""void AsyncFizzClientT<SM>::closeWithReset() {
+  DelayedDestruction::DestructorGuard dg(this);
+  connectGuard_ = nullptr;
+  if (transport_->good()) {""",
+                r"""void AsyncFizzClientT<SM>::closeNow() {
+  DelayedDestruction::DestructorGuard dg(this);
+  connectGuard_ = nullptr;
+  if (transport_->good()) {""",
+                r"""void AsyncFizzClientT<SM>::connectSuccess() noexcept {
+  DelayedDestruction::DestructorGuard dg(this);
+
+  // Release the keepalive now that we're running inside the connect callback.
+  connectGuard_ = nullptr;
+
+  // If the owner requested destruction while connect was in-flight, don't
+  // proceed with handshake or invoke callbacks that may no longer exist.
+  if (getDestroyPending()) {
+    cancelHandshakeTimeout();
+    callback_ = folly::none;
+    transport_->closeNow();
+    return;
+  }
+
+  startTransportReads();
+
+  folly::Optional<CachedPsk> cachedPsk = folly::none;
+  if (pskIdentity_) {
+    cachedPsk = fizzContext_->getPsk(*pskIdentity_);
+  }
+  fizzClient_.connect(
+      fizzContext_,
+      std::move(verifier_),
+      sni_,
+      std::move(cachedPsk),
+      folly::Optional<std::vector<ech::ParsedECHConfig>>(folly::none),
+      extensions_);
+}""",
+                r"""void AsyncFizzClientT<SM>::connectErr(
+    const folly::AsyncSocketException& ex) noexcept {
+  DelayedDestruction::DestructorGuard dg(this);
+
+  connectGuard_ = nullptr;
+
+  if (getDestroyPending()) {
+    cancelHandshakeTimeout();
+    callback_ = folly::none;
+    return;
+  }
+
+  deliverAllErrors(ex, false);
+}""",
             ],
         ),
     ]
@@ -4887,8 +5034,10 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
     )
     parser.add_argument("--use-asan", action="store_true", help="use sanitizers")
 
-    # parse arguments
-    args = parser.parse_args(args=None if argv[1:] else ["--help"])
+    # parse arguments from the provided argv instead of implicitly reading
+    # sys.argv. This keeps programmatic callers deterministic.
+    cli_args = list(argv[1:]) if argv else []
+    args = parser.parse_args(args=cli_args if cli_args else ["--help"])
 
     # Track if user explicitly requested "all"; used to decide cleanup
     requested_all = any(lib.lower() == "all" for lib in args.libs)
@@ -4901,16 +5050,23 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
         else:
             libs[lib] = True
 
-    if args.exclude_libs is not None:
-        for lib in args.exclude_libs:
-            libs[lib] = False
+    excluded_libs = set(args.exclude_libs or [])
 
-    # Expand to reverse dependents
-    for lib, rev_dep in libs_reverse_depends.items():
-        if libs[lib]:
-            for dlib in rev_dep:
-                if dlib not in lib_skip_list:
-                    libs[dlib] = True
+    # Expand to transitive reverse dependents. A single pass is order-dependent
+    # and can miss chains like fizz -> mvfst -> proxygen.
+    pending_libs = deque(lib for lib, enabled in libs.items() if enabled and lib not in excluded_libs)
+    while pending_libs:
+        lib = pending_libs.popleft()
+        for dependent_lib in libs_reverse_depends.get(lib, []):
+            if dependent_lib in lib_skip_list or dependent_lib in excluded_libs:
+                continue
+            if libs[dependent_lib]:
+                continue
+            libs[dependent_lib] = True
+            pending_libs.append(dependent_lib)
+
+    for lib in excluded_libs:
+        libs[lib] = False
 
     if args.start_from is not None:
         started = False

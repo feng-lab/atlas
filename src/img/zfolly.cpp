@@ -8,7 +8,7 @@ namespace nim {
 
 namespace {
 
-[[nodiscard]] size_t atlasBackgroundExecutorThreadCount()
+[[nodiscard]] size_t computeAtlasBackgroundExecutorThreadCount()
 {
   const uint32_t configuredThreads = FLAGS_folly_global_cpu_executor_threads;
   size_t nthreads = configuredThreads > 0 ? static_cast<size_t>(configuredThreads) : folly::hardware_concurrency();
@@ -20,10 +20,15 @@ namespace {
 
 } // namespace
 
+size_t atlasBackgroundExecutorThreadCount()
+{
+  return computeAtlasBackgroundExecutorThreadCount();
+}
+
 folly::Executor::KeepAlive<> getAtlasBackgroundExecutor()
 {
   static folly::CPUThreadPoolExecutor cpuExecutor(
-    atlasBackgroundExecutorThreadCount(),
+    computeAtlasBackgroundExecutorThreadCount(),
     std::make_shared<folly::NamedThreadFactory>("AtlasBackgroundThreadPool"));
   return folly::getKeepAliveToken(&cpuExecutor);
 }

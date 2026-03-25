@@ -57,6 +57,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 
 ## C++ Conventions
 - Avoid `friend` declarations. Do not use `friend` classes or functions unless there is a compelling, well-documented reason that cannot be achieved with proper encapsulation (interfaces, accessors, or helper functions). If you must use `friend`, document the rationale inline at the declaration site and in the PR description.
+- Coroutine lambdas are forbidden. Do not introduce lambdas that are themselves coroutines (for example `[](...) -> folly::coro::Task<T> { co_await ...; }`). Use named coroutine functions or named task-helper methods instead. Atlas has seen repeated stability/debuggability problems from coroutine lambdas, including hard-to-diagnose crashes, so coroutine frames must have explicit named entry points.
 
 ## Architecture Highlights
 - **UI Thread**: owns `ZMainWindow`, `Z3DCanvas`, menus, docks. No direct renderer mutations.

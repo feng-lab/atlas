@@ -1,7 +1,16 @@
 #include "zneuroglancerexternalsource.h"
 #include "zneuroglancerprecomputedmesh.h"
+#include "zremoteobjectstore.h"
 
 #include <gtest/gtest.h>
+
+#include <bit>
+#include <deque>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nim {
 namespace {
@@ -10,6 +19,87 @@ using DesiredChunk = ZNeuroglancerPrecomputedMeshSource::MultiLodDesiredChunk;
 using DrawChunk = ZNeuroglancerPrecomputedMeshSource::MultiLodDrawChunk;
 using Manifest = ZNeuroglancerPrecomputedMeshSource::MultiLodManifest;
 using OctreeNode = ZNeuroglancerPrecomputedMeshSource::MultiLodOctreeNode;
+
+class FakeRemoteObjectStore final : public ZRemoteObjectStore
+{
+public:
+  struct Request
+  {
+    std::string url;
+    std::chrono::milliseconds timeout{0};
+    std::vector<std::pair<std::string, std::string>> headers;
+  };
+
+  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>>
+  getBytes(std::string url,
+           std::chrono::milliseconds timeout,
+           std::vector<std::pair<std::string, std::string>> requestHeaders) const override
+  {
+    requests.push_back(Request{.url = std::move(url), .timeout = timeout, .headers = std::move(requestHeaders)});
+    if (responses.empty()) {
+      throw std::runtime_error("FakeRemoteObjectStore called without a queued response");
+    }
+    auto next = std::move(responses.front());
+    responses.pop_front();
+    co_return next;
+  }
+
+  mutable std::deque<std::optional<ZHttpGetBytesResult>> responses;
+  mutable std::vector<Request> requests;
+};
+
+void appendU32LE(std::vector<uint8_t>& bytes, uint32_t value)
+{
+  bytes.push_back(static_cast<uint8_t>(value >> 0U));
+  bytes.push_back(static_cast<uint8_t>(value >> 8U));
+  bytes.push_back(static_cast<uint8_t>(value >> 16U));
+  bytes.push_back(static_cast<uint8_t>(value >> 24U));
+}
+
+void appendF32LE(std::vector<uint8_t>& bytes, float value)
+{
+  appendU32LE(bytes, std::bit_cast<uint32_t>(value));
+}
+
+[[nodiscard]] ZHttpGetBytesResult makeHttpBytesResult(std::vector<uint8_t> body, uint16_t status = 200)
+{
+  ZHttpGetBytesResult result;
+  result.status = status;
+  result.encodedBodyBytes = body.size();
+  result.body = std::move(body);
+  result.source = ZHttpGetBytesSource::Network;
+  return result;
+}
+
+[[nodiscard]] std::vector<uint8_t> makeSingleFragmentManifestBytes()
+{
+  std::vector<uint8_t> bytes;
+
+  appendF32LE(bytes, 11.0F);
+  appendF32LE(bytes, 22.0F);
+  appendF32LE(bytes, 33.0F);
+
+  appendF32LE(bytes, 44.0F);
+  appendF32LE(bytes, 55.0F);
+  appendF32LE(bytes, 66.0F);
+
+  appendU32LE(bytes, 1U);
+
+  appendF32LE(bytes, 1.0F);
+
+  appendF32LE(bytes, 7.0F);
+  appendF32LE(bytes, 8.0F);
+  appendF32LE(bytes, 9.0F);
+
+  appendU32LE(bytes, 1U);
+
+  appendU32LE(bytes, 2U);
+  appendU32LE(bytes, 3U);
+  appendU32LE(bytes, 4U);
+  appendU32LE(bytes, 0U);
+
+  return bytes;
+}
 
 [[nodiscard]] Manifest makeSimpleManifest()
 {
@@ -204,6 +294,61 @@ TEST(ZNeuroglancerPrecomputedMeshTest, ExternalSourceCompatTreatsMissingGeometry
   EXPECT_TRUE(sameNeuroglancerMeshSourceCompat(*legacyKey, *normalizedKey));
   EXPECT_TRUE(sameNeuroglancerMeshSourceCompat(*normalizedKey, *legacyKey));
   EXPECT_FALSE(sameNeuroglancerMeshSourceCompat(*normalizedKey, *differentGeometryKey));
+}
+
+TEST(ZNeuroglancerPrecomputedMeshTest, ParsesMultiLodManifestVectorsInStorageOrder)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+
+  const std::string infoJson = R"json(
+{
+  "@type": "neuroglancer_multilod_draco",
+  "lod_scale_multiplier": 1,
+  "vertex_quantization_bits": 16
+}
+)json";
+  store->responses.push_back(makeHttpBytesResult(std::vector<uint8_t>(infoJson.begin(), infoJson.end())));
+  store->responses.push_back(makeHttpBytesResult(makeSingleFragmentManifestBytes()));
+
+  const auto source = ZNeuroglancerPrecomputedMeshSource::open(QUrl(QStringLiteral("https://example.com/mesh_order/")),
+                                                               std::array<double, 3>{1.0, 1.0, 1.0},
+                                                               std::array<int64_t, 3>{0, 0, 0},
+                                                               std::chrono::milliseconds{123},
+                                                               store);
+  ASSERT_TRUE(source);
+  ASSERT_TRUE(source->supportsRuntimeLod());
+
+  const auto manifest = source->loadManifestBlocking(42U);
+  ASSERT_TRUE(manifest);
+
+  EXPECT_FLOAT_EQ(manifest->chunkShape.x, 11.0F);
+  EXPECT_FLOAT_EQ(manifest->chunkShape.y, 22.0F);
+  EXPECT_FLOAT_EQ(manifest->chunkShape.z, 33.0F);
+
+  EXPECT_FLOAT_EQ(manifest->gridOrigin.x, 44.0F);
+  EXPECT_FLOAT_EQ(manifest->gridOrigin.y, 55.0F);
+  EXPECT_FLOAT_EQ(manifest->gridOrigin.z, 66.0F);
+
+  ASSERT_EQ(manifest->vertexOffsets.size(), 1U);
+  EXPECT_FLOAT_EQ(manifest->vertexOffsets[0].x, 7.0F);
+  EXPECT_FLOAT_EQ(manifest->vertexOffsets[0].y, 8.0F);
+  EXPECT_FLOAT_EQ(manifest->vertexOffsets[0].z, 9.0F);
+
+  ASSERT_EQ(manifest->octreeNodes.size(), 1U);
+  EXPECT_EQ(manifest->octreeNodes[0].gridPosition.x, 2U);
+  EXPECT_EQ(manifest->octreeNodes[0].gridPosition.y, 3U);
+  EXPECT_EQ(manifest->octreeNodes[0].gridPosition.z, 4U);
+
+  EXPECT_FLOAT_EQ(manifest->clipLowerBound.x, 66.0F);
+  EXPECT_FLOAT_EQ(manifest->clipLowerBound.y, 121.0F);
+  EXPECT_FLOAT_EQ(manifest->clipLowerBound.z, 198.0F);
+  EXPECT_FLOAT_EQ(manifest->clipUpperBound.x, 77.0F);
+  EXPECT_FLOAT_EQ(manifest->clipUpperBound.y, 143.0F);
+  EXPECT_FLOAT_EQ(manifest->clipUpperBound.z, 231.0F);
+
+  ASSERT_EQ(store->requests.size(), 2U);
+  EXPECT_EQ(store->requests[0].url, "https://example.com/mesh_order/info");
+  EXPECT_EQ(store->requests[1].url, "https://example.com/mesh_order/42.index");
 }
 
 } // namespace
