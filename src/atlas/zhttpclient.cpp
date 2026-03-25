@@ -8,7 +8,19 @@
 
 #include <folly/String.h>
 
-DEFINE_string(atlas_http_backend, "proxygen", "HTTP backend for remote datasets. Values: proxygen, curl.");
+namespace {
+
+#ifdef _WIN32
+constexpr const char* kDefaultAtlasHttpBackend = "curl";
+#else
+constexpr const char* kDefaultAtlasHttpBackend = "proxygen";
+#endif
+
+} // namespace
+
+DEFINE_string(atlas_http_backend,
+              kDefaultAtlasHttpBackend,
+              "HTTP backend for remote datasets. Values: proxygen, curl.");
 
 namespace nim {
 namespace {
