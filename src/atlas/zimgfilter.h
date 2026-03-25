@@ -24,6 +24,11 @@
 
 namespace nim {
 
+namespace detail {
+struct Neuroglancer2DRenderParams;
+struct Neuroglancer2DRenderResult;
+} // namespace detail
+
 class ZDoubleSpanParameter;
 
 class ZImgScaleBarGraphicsItem : public QGraphicsRectItem
@@ -189,6 +194,11 @@ private:
   void requestNeuroglancer2DRender();
 
   void startNeuroglancer2DCacheRender();
+
+  folly::coro::Task<void>
+  runNeuroglancer2DCacheRenderTask(detail::Neuroglancer2DRenderParams params, uint64_t epoch, bool treatAsFinal);
+
+  void finishNeuroglancer2DCacheRender(detail::Neuroglancer2DRenderResult result, bool treatAsFinal);
 
   void startNeuroglancer2DRender(bool finalPass);
 

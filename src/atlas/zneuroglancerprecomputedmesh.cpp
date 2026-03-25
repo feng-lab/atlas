@@ -1500,10 +1500,18 @@ ZNeuroglancerPrecomputedMeshSource::MultiLodManifest ZNeuroglancerPrecomputedMes
     off += 4;
     return v;
   };
+  auto readVec3 = [&]() -> glm::vec3 {
+    const float x = readF();
+    const float y = readF();
+    const float z = readF();
+    return glm::vec3(x, y, z);
+  };
 
   MultiLodManifest manifest{};
-  manifest.chunkShape = glm::vec3(readF(), readF(), readF());
-  manifest.gridOrigin = glm::vec3(readF(), readF(), readF());
+  // Do not pass readF() directly as constructor arguments here. Argument evaluation
+  // order is unspecified, and readF() advances the byte offset on every call.
+  manifest.chunkShape = readVec3();
+  manifest.gridOrigin = readVec3();
   const uint32_t numStoredLods = readU32();
   if (numStoredLods == 0) {
     throw ZException("Invalid neuroglancer multi-LOD mesh manifest: num_lods must be > 0");
@@ -1516,7 +1524,7 @@ ZNeuroglancerPrecomputedMeshSource::MultiLodManifest ZNeuroglancerPrecomputedMes
 
   manifest.vertexOffsets.resize(numStoredLods);
   for (uint32_t i = 0; i < numStoredLods; ++i) {
-    manifest.vertexOffsets[i] = glm::vec3(readF(), readF(), readF());
+    manifest.vertexOffsets[i] = readVec3();
   }
 
   std::vector<uint32_t> numFragmentsPerLod(numStoredLods);

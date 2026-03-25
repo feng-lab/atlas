@@ -10,6 +10,7 @@
 #include "zneuroglancerremotecontext.h"
 #include "zneuroglancerurl.h"
 #include "zneuroglanceruint64sharding.h"
+#include "zfolly.h"
 #include "zlog.h"
 #include "zconcurrentlrucache.h"
 
@@ -27,9 +28,6 @@
 #include <limits>
 #include <mutex>
 #include <tuple>
-
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
 
 DEFINE_double(atlas_ng_precomputed_chunk_cache_memory_proportion,
               0.3,
@@ -1329,6 +1327,110 @@ folly::coro::Task<folly::Try<std::shared_ptr<ZImg>>> readChunkTryAsync(const ZNe
   co_return co_await folly::coro::co_awaitTry(volume.readChunkAsync(std::move(chunk)));
 }
 
+struct CachedSliceBatchResult
+{
+  std::vector<std::shared_ptr<ZImg>> imgs;
+  std::vector<QPoint> locs;
+  bool fullyCached = true;
+};
+
+struct CachedSliceResult
+{
+  std::shared_ptr<ZImg> img;
+  QPoint loc;
+};
+
+[[nodiscard]] int qPointCoordinateChecked(int64_t v)
+{
+  if (v < static_cast<int64_t>(std::numeric_limits<int>::min()) ||
+      v > static_cast<int64_t>(std::numeric_limits<int>::max())) {
+    throw ZException(fmt::format("Neuroglancer chunk coordinate {} is out of QPoint range", v));
+  }
+  return static_cast<int>(v);
+}
+
+folly::coro::Task<CachedSliceResult> buildCachedSliceAsync(const ZNeuroglancerPrecomputedVolume& volume,
+                                                           ZNeuroglancerPrecomputedVolume::Chunk chunk,
+                                                           int64_t z0,
+                                                           int64_t ratioZ)
+{
+  CHECK(ratioZ > 0);
+
+  CachedSliceResult out;
+
+  auto chunkImg = volume.tryGetCachedChunk(chunk);
+  if (!chunkImg) {
+    co_return out;
+  }
+
+  const int64_t localZBase = z0 - chunk.baseStart[2];
+  if (localZBase < 0) {
+    co_return out;
+  }
+
+  const int64_t localZ = localZBase / ratioZ;
+  if (localZ < 0) {
+    co_return out;
+  }
+  if (static_cast<size_t>(localZ) >= chunkImg->depth()) {
+    co_return out;
+  }
+
+  ZImg sliceImg = chunkImg->crop(ZImgRegion(0,
+                                            static_cast<index_t>(chunkImg->width()),
+                                            0,
+                                            static_cast<index_t>(chunkImg->height()),
+                                            static_cast<index_t>(localZ),
+                                            static_cast<index_t>(localZ + 1)));
+  out.img = std::make_shared<ZImg>(std::move(sliceImg));
+  out.loc = QPoint(qPointCoordinateChecked(chunk.baseStart[0]), qPointCoordinateChecked(chunk.baseStart[1]));
+  co_return out;
+}
+
+folly::coro::Task<CachedSliceBatchResult>
+buildCachedSliceBatchAsync(const ZNeuroglancerPrecomputedVolume& volume,
+                           const std::array<size_t, 3>& ratio,
+                           const std::vector<ZNeuroglancerPrecomputedVolume::Chunk>& chunks,
+                           int64_t z0)
+{
+  CachedSliceBatchResult out;
+  if (chunks.empty()) {
+    co_return out;
+  }
+
+  out.imgs.resize(chunks.size());
+  out.locs.resize(chunks.size());
+
+  const int64_t ratioZ = static_cast<int64_t>(ratio[2]);
+  CHECK(ratioZ > 0);
+
+  const size_t maxConcurrent = std::min(std::max<size_t>(1, ZCpuInfo::instance().nLogicalCores), chunks.size());
+  CHECK(maxConcurrent > 0);
+
+  std::vector<folly::coro::TaskWithExecutor<CachedSliceResult>> tasks;
+  tasks.reserve(chunks.size());
+  for (size_t i = 0; i < chunks.size(); ++i) {
+    tasks.push_back(
+      folly::coro::co_withExecutor(getAtlasBackgroundExecutor(), buildCachedSliceAsync(volume, chunks[i], z0, ratioZ)));
+  }
+
+  std::vector<CachedSliceResult> results = co_await folly::coro::collectAllWindowed(std::move(tasks), maxConcurrent);
+  CHECK(results.size() == chunks.size());
+
+  out.imgs.resize(results.size());
+  out.locs.resize(results.size());
+  out.fullyCached = true;
+  for (size_t i = 0; i < results.size(); ++i) {
+    out.imgs[i] = std::move(results[i].img);
+    out.locs[i] = results[i].loc;
+    if (!out.imgs[i]) {
+      out.fullyCached = false;
+    }
+  }
+
+  co_return out;
+}
+
 [[nodiscard]] std::array<size_t, 3> bestRatioForIsotropicScale(const std::vector<std::array<size_t, 3>>& ratios,
                                                                double scale) // x=y=z
 {
@@ -1402,11 +1504,11 @@ folly::coro::Task<folly::Try<std::shared_ptr<ZImg>>> readChunkTryAsync(const ZNe
 
 } // namespace
 
-ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sliceTilePackFor2DViewportCacheBestEffort(
-  size_t z,
-  size_t t,
-  const QRectF& viewport,
-  double renderScale) const
+folly::coro::Task<ZNeuroglancerPrecomputedVolume::SliceTilePack>
+ZNeuroglancerPrecomputedVolume::sliceTilePackFor2DViewportCacheBestEffortAsync(size_t z,
+                                                                               size_t t,
+                                                                               const QRectF& viewport,
+                                                                               double renderScale) const
 {
   CHECK(t == 0) << "Neuroglancer precomputed volumes do not support time dimension yet (t must be 0)";
   CHECK(renderScale > 0);
@@ -1415,7 +1517,7 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
 
   std::vector<std::array<size_t, 3>> ratios = availableRatios();
   if (ratios.empty()) {
-    return out;
+    co_return out;
   }
 
   const std::array<size_t, 3> targetRatio = bestRatioForIsotropicScale(ratios, renderScale);
@@ -1438,92 +1540,26 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
 
   const std::vector<std::array<size_t, 3>> candidateRatios = ratiosAtLeastAsCoarseAs(ratios, targetRatio);
   if (candidateRatios.empty()) {
-    return out;
+    co_return out;
   }
 
-  auto toIntChecked = [](int64_t v) -> int {
-    if (v < static_cast<int64_t>(std::numeric_limits<int>::min()) || v > static_cast<int64_t>(std::numeric_limits<int>::max())) {
-      throw ZException(fmt::format("Neuroglancer chunk coordinate {} is out of QPoint range", v));
-    }
-    return static_cast<int>(v);
-  };
-
-  auto appendCachedSlicesForRatio = [&](const std::array<size_t, 3>& ratio,
-                                        const std::vector<Chunk>& chunks,
-                                        bool* fullyCachedOut) {
-    if (ratio[0] != ratio[1]) {
-      // 2D view uses a uniform scale factor, so skip anisotropic XY levels rather than rendering incorrectly.
+  auto appendCachedSlicesForRatio =
+    [&](const std::array<size_t, 3>& ratio, CachedSliceBatchResult batch, bool* fullyCachedOut) {
       if (fullyCachedOut) {
-        *fullyCachedOut = false;
+        *fullyCachedOut = batch.fullyCached;
       }
-      return;
-    }
-    if (chunks.empty()) {
-      if (fullyCachedOut) {
-        *fullyCachedOut = true;
-      }
-      return;
-    }
 
-    std::vector<std::shared_ptr<ZImg>> tmpImgs(chunks.size());
-    std::vector<QPoint> tmpLocs(chunks.size());
-
-    const int64_t ratioZ = static_cast<int64_t>(ratio[2]);
-    CHECK(ratioZ > 0);
-
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
-      for (size_t i = r.begin(); i != r.end(); ++i) {
-        auto chunkImg = tryGetCachedChunk(chunks[i]);
-        if (!chunkImg) {
+      const double tileScale = static_cast<double>(ratio[0]);
+      for (size_t i = 0; i < batch.imgs.size(); ++i) {
+        if (!batch.imgs[i]) {
           continue;
         }
-
-        const int64_t localZBase = z0 - chunks[i].baseStart[2];
-        if (localZBase < 0) {
-          continue;
-        }
-
-        const int64_t localZ = localZBase / ratioZ;
-        if (localZ < 0) {
-          continue;
-        }
-        if (static_cast<size_t>(localZ) >= chunkImg->depth()) {
-          continue;
-        }
-
-        ZImg sliceImg = chunkImg->crop(ZImgRegion(0,
-                                                  static_cast<index_t>(chunkImg->width()),
-                                                  0,
-                                                  static_cast<index_t>(chunkImg->height()),
-                                                  static_cast<index_t>(localZ),
-                                                  static_cast<index_t>(localZ + 1)));
-        tmpImgs[i] = std::make_shared<ZImg>(std::move(sliceImg));
-        tmpLocs[i] = QPoint(toIntChecked(chunks[i].baseStart[0]), toIntChecked(chunks[i].baseStart[1]));
+        out.imgs.push_back(std::move(batch.imgs[i]));
+        out.locs.push_back(batch.locs[i]);
+        out.scales.push_back(tileScale);
+        out.ratios.push_back(ratio);
       }
-    });
-
-    if (fullyCachedOut) {
-      bool full = true;
-      for (const auto& img : tmpImgs) {
-        if (!img) {
-          full = false;
-          break;
-        }
-      }
-      *fullyCachedOut = full;
-    }
-
-    const double tileScale = static_cast<double>(ratio[0]);
-    for (size_t i = 0; i < tmpImgs.size(); ++i) {
-      if (!tmpImgs[i]) {
-        continue;
-      }
-      out.imgs.push_back(std::move(tmpImgs[i]));
-      out.locs.push_back(tmpLocs[i]);
-      out.scales.push_back(tileScale);
-      out.ratios.push_back(ratio);
-    }
-  };
+    };
 
   // First: attempt the targetRatio. If it is fully cached, return *only* that level.
   // Keeping coarser underlays would cause visible "blocky" blending artifacts when the image is rendered
@@ -1533,9 +1569,10 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
     const auto scaleIndexOpt = scaleIndexForRatio(targetRatio);
     if (scaleIndexOpt) {
       const auto chunks = chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
-      appendCachedSlicesForRatio(targetRatio, chunks, &out.fullyCachedAtTargetRatio);
+      CachedSliceBatchResult batch = co_await buildCachedSliceBatchAsync(*this, targetRatio, chunks, z0);
+      appendCachedSlicesForRatio(targetRatio, std::move(batch), &out.fullyCachedAtTargetRatio);
       if (out.fullyCachedAtTargetRatio) {
-        return out;
+        co_return out;
       }
     }
   }
@@ -1561,10 +1598,11 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
     if (chunks.empty()) {
       continue;
     }
-    appendCachedSlicesForRatio(ratio, chunks, /*fullyCachedOut=*/nullptr);
+    CachedSliceBatchResult batch = co_await buildCachedSliceBatchAsync(*this, ratio, chunks, z0);
+    appendCachedSlicesForRatio(ratio, std::move(batch), /*fullyCachedOut=*/nullptr);
   }
 
-  return out;
+  co_return out;
 }
 
 folly::coro::Task<ZNeuroglancerPrecomputedVolume::SliceTilePack>

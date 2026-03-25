@@ -1369,7 +1369,7 @@ collectVisibleSegIdsTask(const std::shared_ptr<ZNeuroglancerPrecomputedVolume>& 
   CollectVisibleSegIdsResult out;
   try {
     const auto pack =
-      topVol->sliceTilePackFor2DViewportCacheBestEffort(static_cast<size_t>(z), /*t=*/0, viewport, scale);
+      co_await topVol->sliceTilePackFor2DViewportCacheBestEffortAsync(static_cast<size_t>(z), /*t=*/0, viewport, scale);
 
     if (pack.imgs.empty()) {
       co_return out;

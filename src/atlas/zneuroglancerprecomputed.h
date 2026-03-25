@@ -356,10 +356,8 @@ public:
   // viewport. The returned tiles are ordered arbitrarily; callers should use their scale/z-ordering policy to
   // ensure finer tiles overwrite coarser ones. If the target pyramid level is fully cached for the viewport,
   // the function returns only that level and sets SliceTilePack::fullyCachedAtTargetRatio.
-  [[nodiscard]] SliceTilePack sliceTilePackFor2DViewportCacheBestEffort(size_t z,
-                                                                        size_t t,
-                                                                        const QRectF& viewport,
-                                                                        double renderScale) const;
+  folly::coro::Task<SliceTilePack>
+  sliceTilePackFor2DViewportCacheBestEffortAsync(size_t z, size_t t, const QRectF& viewport, double renderScale) const;
 
   // Builds a 2D slice tile pack by batching async chunk reads for one 2D pass. This may perform network I/O.
   folly::coro::Task<SliceTilePack>

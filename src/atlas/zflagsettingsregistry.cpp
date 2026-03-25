@@ -92,12 +92,6 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
     allSpecs.push_back(
       makeSpec("atlas_http_retry_backoff_max_ms", "Network & Remote Data", "HTTP retry max backoff (ms)"));
 
-    allSpecs.push_back(makeSpec("zimg_llfio_mapped_file_handle_flags",
-                                "I/O & Processing",
-                                "LLFIO mapped file handle flags",
-                                ZFlagSettingEditorKind::Auto,
-                                {},
-                                true));
     allSpecs.push_back(makeSpec("atlas_readRegionToImg_use_multithreaded_resize",
                                 "I/O & Processing",
                                 "Use multithreaded resize for readRegionToImg",
