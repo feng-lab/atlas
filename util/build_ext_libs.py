@@ -3805,13 +3805,12 @@ def build_proxygen(src_dir: str, install_dir: str):
                 r"",
             ],
         ),
-        # Dump analysis pins the remaining Windows-only Proxygen crash family to
-        # the direct HTTPCoroConnector connect coroutines. The strongest code-
-        # level hypothesis is that TimedBaton cancellation can unwind before
-        # the underlying AsyncSocket/AsyncSSLSocket/Fizz callback is cancelled,
-        # leaving a callback pointer into a dead ConnectCB / coroutine frame.
-        # Keep this mitigation Windows-scoped until that hypothesis is proven
-        # or disproven with first-fault evidence.
+        # Cancellation / timeout safety:
+        # `TimedBaton::wait()` can complete with `cancelled` / `timedout`. Without
+        # explicitly cancelling the underlying connect/handshake, the platform
+        # socket layer may still invoke completion callbacks into a destroyed
+        # ConnectCB / coroutine frame (observed on Windows, but correctness is
+        # cross-platform). Cancel the connect before propagating cancellation.
         FilePatcher(
             orig_file=os.path.join(
                 src_dir,
@@ -3863,6 +3862,9 @@ def build_proxygen(src_dir: str, install_dir: str):
   }""",
                 r"""  auto batonStatus = co_await cb.baton.wait();
   if (batonStatus != TimedBaton::Status::signalled) {
+    if (auto* sock = fizzClient->getUnderlyingTransport<folly::AsyncSocket>()) {
+      sock->cancelConnect();
+    }
     fizzClient->closeNow();
     if (batonStatus == TimedBaton::Status::timedout) {
       co_yield co_error(folly::AsyncSocketException(
@@ -3890,7 +3892,6 @@ def build_proxygen(src_dir: str, install_dir: str):
     }
     initTransportInfoFromSSLSocket(tinfo, *sslSock);""",
             ],
-            patch_condition=is_windows,
         ),
         # Shared CONNECT tunnels must retain ownership of the underlying proxy
         # session for the full tunnel lifetime. Without this keepalive,
@@ -3937,7 +3938,6 @@ def build_proxygen(src_dir: str, install_dir: str):
                                                  : HTTPSessionContextPtr{}),
       eventBase_(session->getEventBase()),""",
             ],
-            patch_condition=is_windows,
         ),
         FilePatcher(
             orig_file=os.path.join(
