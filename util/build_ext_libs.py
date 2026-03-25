@@ -3635,6 +3635,32 @@ def build_fizz(src_dir: str, install_dir: str):
                 "",
             ],
         ),
+        # Lifetime safety:
+        # If AsyncFizzClientT is destroyed while an underlying AsyncSocket connect
+        # is still in-flight, Windows can still deliver the completion callback
+        # and invoke `connectSuccess()` on a freed object (UAF). Cancel any
+        # in-flight connect from the destructor to prevent post-destruction
+        # connect callbacks. This is correctness-improving and should be safe on
+        # all platforms.
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "client", "AsyncFizzClient.h"),
+            from_texts=[
+                r"""~AsyncFizzClientT() override = default;
+  void writeAppData(""",
+            ],
+            to_texts=[
+                r"""~AsyncFizzClientT() override {
+    // Prevent the underlying AsyncSocket from invoking connect callbacks into a
+    // dying object if the socket connect is still in-flight.
+    if (auto* sock =
+            transport_ ? transport_->getUnderlyingTransport<folly::AsyncSocket>()
+                       : nullptr) {
+      sock->cancelConnect();
+    }
+  }
+  void writeAppData(""",
+            ],
+        ),
     ]
     patch_manager = PatchManager(patches)
 

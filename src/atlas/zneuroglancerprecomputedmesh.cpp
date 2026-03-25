@@ -9,6 +9,8 @@
 
 #include "zmesh.h"
 
+#include <gflags/gflags.h>
+
 #include <draco/compression/decode.h>
 #include <draco/core/decoder_buffer.h>
 #include <draco/mesh/mesh.h>
@@ -26,7 +28,9 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace nim {
@@ -34,10 +38,274 @@ namespace json = boost::json;
 
 namespace {
 
+DEFINE_bool(
+  atlas_log_ng_runtime_mesh_debug,
+  true,
+  "Log runtime Neuroglancer mesh source/chunk/draw diagnostics for debugging mesh transform and subchunk issues.");
+
+struct Vec3Bounds
+{
+  bool hasVertices = false;
+  bool allFinite = true;
+  glm::vec3 min{0.0F};
+  glm::vec3 max{0.0F};
+};
+
 std::string toStdString(const QString& s)
 {
   const auto u8 = s.toUtf8();
   return std::string(u8.data(), static_cast<size_t>(u8.size()));
+}
+
+[[nodiscard]] std::string formatVec3(const glm::vec3& v)
+{
+  return fmt::format("[{:.6g}, {:.6g}, {:.6g}]", v.x, v.y, v.z);
+}
+
+[[nodiscard]] std::string formatUVec3(const glm::uvec3& v)
+{
+  return fmt::format("[{}, {}, {}]", v.x, v.y, v.z);
+}
+
+[[nodiscard]] std::string formatArray3(const std::array<double, 3>& v)
+{
+  return fmt::format("[{:.17g}, {:.17g}, {:.17g}]", v[0], v[1], v[2]);
+}
+
+[[nodiscard]] std::string formatArray3(const std::array<int64_t, 3>& v)
+{
+  return fmt::format("[{}, {}, {}]", v[0], v[1], v[2]);
+}
+
+[[nodiscard]] std::string formatMat4(const glm::mat4& m)
+{
+  return fmt::format(
+    "[[{:.6g}, {:.6g}, {:.6g}, {:.6g}], "
+    "[{:.6g}, {:.6g}, {:.6g}, {:.6g}], "
+    "[{:.6g}, {:.6g}, {:.6g}, {:.6g}], "
+    "[{:.6g}, {:.6g}, {:.6g}, {:.6g}]]",
+    m[0][0],
+    m[1][0],
+    m[2][0],
+    m[3][0],
+    m[0][1],
+    m[1][1],
+    m[2][1],
+    m[3][1],
+    m[0][2],
+    m[1][2],
+    m[2][2],
+    m[3][2],
+    m[0][3],
+    m[1][3],
+    m[2][3],
+    m[3][3]);
+}
+
+[[nodiscard]] Vec3Bounds computeBounds(std::span<const glm::vec3> vertices)
+{
+  Vec3Bounds out;
+  if (vertices.empty()) {
+    return out;
+  }
+
+  out.hasVertices = true;
+  out.min = vertices.front();
+  out.max = vertices.front();
+  if (!std::isfinite(out.min.x) || !std::isfinite(out.min.y) || !std::isfinite(out.min.z)) {
+    out.allFinite = false;
+    return out;
+  }
+
+  for (size_t i = 1; i < vertices.size(); ++i) {
+    const glm::vec3& vertex = vertices[i];
+    if (!std::isfinite(vertex.x) || !std::isfinite(vertex.y) || !std::isfinite(vertex.z)) {
+      out.allFinite = false;
+      return out;
+    }
+    out.min = glm::min(out.min, vertex);
+    out.max = glm::max(out.max, vertex);
+  }
+  return out;
+}
+
+[[nodiscard]] Vec3Bounds computeTransformedBounds(std::span<const glm::vec3> vertices, const glm::mat4& transform)
+{
+  Vec3Bounds out;
+  if (vertices.empty()) {
+    return out;
+  }
+
+  out.hasVertices = true;
+  const glm::vec3 first = glm::applyMatrix(transform, vertices.front());
+  out.min = first;
+  out.max = first;
+  if (!std::isfinite(first.x) || !std::isfinite(first.y) || !std::isfinite(first.z)) {
+    out.allFinite = false;
+    return out;
+  }
+
+  for (size_t i = 1; i < vertices.size(); ++i) {
+    const glm::vec3 vertex = glm::applyMatrix(transform, vertices[i]);
+    if (!std::isfinite(vertex.x) || !std::isfinite(vertex.y) || !std::isfinite(vertex.z)) {
+      out.allFinite = false;
+      return out;
+    }
+    out.min = glm::min(out.min, vertex);
+    out.max = glm::max(out.max, vertex);
+  }
+  return out;
+}
+
+[[nodiscard]] std::string formatBounds(const Vec3Bounds& bounds)
+{
+  if (!bounds.hasVertices) {
+    return "<empty>";
+  }
+  if (!bounds.allFinite) {
+    return "<non-finite>";
+  }
+  return fmt::format("{} -> {}", formatVec3(bounds.min), formatVec3(bounds.max));
+}
+
+[[nodiscard]] std::string formatPartitionTriangleCounts(const std::vector<std::vector<uint32_t>>& partitionIndices)
+{
+  std::string out = "[";
+  for (size_t i = 0; i < partitionIndices.size(); ++i) {
+    if (i != 0U) {
+      out += ", ";
+    }
+    CHECK((partitionIndices[i].size() % 3U) == 0U);
+    out += fmt::format("{}:{}", i, partitionIndices[i].size() / 3U);
+  }
+  out += "]";
+  return out;
+}
+
+[[nodiscard]] std::string formatSubMeshSummary(const std::vector<std::shared_ptr<ZMesh>>& subMeshes)
+{
+  std::string out = "[";
+  for (size_t i = 0; i < subMeshes.size(); ++i) {
+    if (i != 0U) {
+      out += ", ";
+    }
+    const auto& mesh = subMeshes[i];
+    if (!mesh) {
+      out += fmt::format("{}:null", i);
+      continue;
+    }
+    CHECK((mesh->indices().size() % 3U) == 0U);
+    out += fmt::format("{}:v{}/t{}", i, mesh->vertices().size(), mesh->indices().size() / 3U);
+  }
+  out += "]";
+  return out;
+}
+
+[[nodiscard]] const char* chunkVertexSpaceName(ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace vertexSpace)
+{
+  switch (vertexSpace) {
+    case ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::LocalVoxel:
+      return "local_voxel";
+    case ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::Quantized:
+      return "quantized";
+  }
+  CHECK(false) << "Unexpected ChunkVertexSpace";
+  return "unknown";
+}
+
+void logRuntimeMeshSourceDebugIfEnabled(const QUrl& meshDirUrl,
+                                        const std::array<double, 3>& baseResolutionNm,
+                                        const std::array<int64_t, 3>& baseVoxelOffset,
+                                        const glm::mat4& transform,
+                                        const glm::mat4& voxelFromStored)
+{
+  if (!FLAGS_atlas_log_ng_runtime_mesh_debug) {
+    return;
+  }
+
+  LOG(INFO) << fmt::format("Runtime NG mesh source url={} base_resolution_nm={} base_voxel_offset={} transform={} "
+                           "voxel_from_stored={}",
+                           toStdString(meshDirUrl.toString()),
+                           formatArray3(baseResolutionNm),
+                           formatArray3(baseVoxelOffset),
+                           formatMat4(transform),
+                           formatMat4(voxelFromStored));
+}
+
+void logRuntimeMeshChunkDebugIfEnabled(uint64_t segmentId,
+                                       uint32_t row,
+                                       uint32_t lod,
+                                       const glm::uvec3& gridPosition,
+                                       ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace vertexSpace,
+                                       size_t fragmentByteCount,
+                                       const Vec3Bounds& storedBounds,
+                                       const Vec3Bounds& localVoxelBounds,
+                                       const glm::mat4& vertexToLocalVoxel,
+                                       const std::vector<std::vector<uint32_t>>& partitionIndices,
+                                       const std::vector<std::shared_ptr<ZMesh>>& subMeshes,
+                                       bool hasNormals)
+{
+  if (!FLAGS_atlas_log_ng_runtime_mesh_debug) {
+    return;
+  }
+
+  LOG(INFO) << fmt::format("Runtime NG mesh chunk segment={} row={} lod={} grid_position={} vertex_space={} "
+                           "fragment_bytes={} stored_bounds={} local_voxel_bounds={} vertex_to_local={} "
+                           "partition_triangles={} sub_meshes={} normals={}",
+                           segmentId,
+                           row,
+                           lod,
+                           formatUVec3(gridPosition),
+                           chunkVertexSpaceName(vertexSpace),
+                           fragmentByteCount,
+                           formatBounds(storedBounds),
+                           formatBounds(localVoxelBounds),
+                           formatMat4(vertexToLocalVoxel),
+                           formatPartitionTriangleCounts(partitionIndices),
+                           formatSubMeshSummary(subMeshes),
+                           hasNormals);
+}
+
+void logRuntimeMeshDrawChunksIfEnabled(const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest& manifest,
+                                       std::span<const ZNeuroglancerPrecomputedMeshSource::MultiLodDrawChunk> drawChunks)
+{
+  if (!FLAGS_atlas_log_ng_runtime_mesh_debug) {
+    return;
+  }
+
+  std::string summary = "[";
+  for (size_t i = 0; i < drawChunks.size(); ++i) {
+    if (i != 0U) {
+      summary += ", ";
+    }
+    const auto& drawChunk = drawChunks[i];
+    summary += fmt::format("lod{}:row{}:[{},{}):scale{:.6g}",
+                           drawChunk.lod,
+                           drawChunk.row,
+                           drawChunk.subChunkBegin,
+                           drawChunk.subChunkEnd,
+                           drawChunk.renderScale);
+  }
+  summary += "]";
+
+  static std::mutex mutex;
+  static std::unordered_map<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest*, std::string> previousSummaryByManifest;
+
+  bool shouldLog = false;
+  {
+    std::lock_guard<std::mutex> lock(mutex);
+    std::string& previousSummary = previousSummaryByManifest[&manifest];
+    if (previousSummary != summary) {
+      previousSummary = summary;
+      shouldLog = true;
+    }
+  }
+
+  if (!shouldLog) {
+    return;
+  }
+
+  LOG(INFO) << fmt::format("Runtime NG mesh draw chunks root_row={} count={} {}", manifest.rootRow(), drawChunks.size(), summary);
 }
 
 QString requireString(const json::object& obj, const char* key)
@@ -860,6 +1128,13 @@ ZNeuroglancerPrecomputedMeshSource::openAsync(const QUrl& meshDirUrl,
   auto out = std::shared_ptr<ZNeuroglancerPrecomputedMeshSource>(new ZNeuroglancerPrecomputedMeshSource());
   out->m_sharedMeshInfo = std::move(sharedMeshInfo);
   out->m_remoteContext = std::move(remoteContext);
+  if (out->m_sharedMeshInfo->multiLodInfo) {
+    logRuntimeMeshSourceDebugIfEnabled(out->m_sharedMeshInfo->meshDirUrl,
+                                       out->m_sharedMeshInfo->baseResolutionNm,
+                                       out->m_sharedMeshInfo->baseVoxelOffset,
+                                       out->m_sharedMeshInfo->multiLodInfo->transform,
+                                       out->m_sharedMeshInfo->multiLodInfo->voxelFromStored);
+  }
   co_return out;
 }
 
@@ -1734,6 +2009,7 @@ ZNeuroglancerPrecomputedMeshSource::chunksToDrawForView(
   }
 
   emitChunksUpTo(0U, 0U);
+  logRuntimeMeshDrawChunksIfEnabled(manifest, out);
   return out;
 }
 
@@ -1863,6 +2139,16 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
     decodePartitionedDracoMesh(std::span<const uint8_t>(fragBytesOpt->data(), fragBytesOpt->size()),
                                sharedMeshInfo().multiLodInfo->vertexQuantizationBits,
                                lod != 0U);
+  const bool logRuntimeMeshDebug = FLAGS_atlas_log_ng_runtime_mesh_debug;
+  const Vec3Bounds storedBounds = logRuntimeMeshDebug ? computeBounds(decoded.vertices) : Vec3Bounds{};
+  std::optional<VertexToLocalVoxelTransform> debugTransform;
+  if (logRuntimeMeshDebug || vertexSpace == ChunkVertexSpace::Quantized) {
+    debugTransform =
+      computeMultiLodVertexToLocalVoxelTransform(lod,
+                                                 manifest.octreeNodes[row].gridPosition,
+                                                 manifest,
+                                                 *sharedMeshInfo().multiLodInfo);
+  }
   maybeCancel(cancellationToken);
   if (vertexSpace == ChunkVertexSpace::LocalVoxel) {
     const bool normalsOk = convertMultiLodVerticesToLocalVoxel(decoded.vertices,
@@ -1875,11 +2161,8 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
       decoded.normals.reset();
     }
   } else {
-    const VertexToLocalVoxelTransform tf =
-      computeMultiLodVertexToLocalVoxelTransform(lod,
-                                                 manifest.octreeNodes[row].gridPosition,
-                                                 manifest,
-                                                 *sharedMeshInfo().multiLodInfo);
+    CHECK(debugTransform);
+    const VertexToLocalVoxelTransform& tf = *debugTransform;
     for (size_t i = 0; i < chunkMesh->subMeshes.size(); ++i) {
       chunkMesh->vertexToLocalVoxelTransforms[i] = tf.vertexToLocalVoxel;
       chunkMesh->vertexToLocalVoxelNormalMatrices[i] = tf.vertexToLocalVoxelNormalMatrix;
@@ -1889,6 +2172,25 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
   for (size_t i = 0; i < decoded.partitionIndices.size(); ++i) {
     chunkMesh->subMeshes[i] =
       buildCompactMesh(decoded.vertices, decoded.partitionIndices[i], decoded.normals ? &(*decoded.normals) : nullptr);
+  }
+
+  if (logRuntimeMeshDebug) {
+    CHECK(debugTransform);
+    const Vec3Bounds localVoxelBounds =
+      vertexSpace == ChunkVertexSpace::LocalVoxel ? computeBounds(decoded.vertices)
+                                                  : computeTransformedBounds(decoded.vertices, debugTransform->vertexToLocalVoxel);
+    logRuntimeMeshChunkDebugIfEnabled(segmentId,
+                                      row,
+                                      lod,
+                                      manifest.octreeNodes[row].gridPosition,
+                                      vertexSpace,
+                                      fragBytesOpt->size(),
+                                      storedBounds,
+                                      localVoxelBounds,
+                                      debugTransform->vertexToLocalVoxel,
+                                      decoded.partitionIndices,
+                                      chunkMesh->subMeshes,
+                                      decoded.normals.has_value());
   }
 
   {
