@@ -452,7 +452,8 @@ decodePartitionedDracoMesh(std::span<const uint8_t> bytes, int vertexQuantizatio
   if (pos->num_components() != 3) {
     throw ZException("Failed to decode draco mesh: POSITION must have 3 components");
   }
-  if (pos->data_type() != draco::DT_INT32 && pos->data_type() != draco::DT_FLOAT32) {
+  if (pos->data_type() != draco::DT_INT32 && pos->data_type() != draco::DT_UINT32 &&
+      pos->data_type() != draco::DT_FLOAT32) {
     throw ZException("Failed to decode draco mesh: unsupported POSITION data type");
   }
   if (dmesh->GetAttributeElementType(pos->unique_id()) != draco::MESH_CORNER_ATTRIBUTE) {
@@ -507,22 +508,47 @@ decodePartitionedDracoMesh(std::span<const uint8_t> bytes, int vertexQuantizatio
     out.normals->resize(dmesh->num_points());
   }
 
-  if (pos->data_type() == draco::DT_INT32) {
-    const auto* raw = reinterpret_cast<const int32_t*>(pos->GetAddress(draco::AttributeValueIndex(0)));
-    CHECK(raw);
-    for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
-      const size_t base = static_cast<size_t>(i.value()) * 3U;
-      out.vertices[i.value()] = glm::vec3(static_cast<float>(raw[base + 0U]),
-                                          static_cast<float>(raw[base + 1U]),
-                                          static_cast<float>(raw[base + 2U]));
+  // Draco attributes are not guaranteed to be a tightly packed `T[3]` array with
+  // `byte_stride == 3 * sizeof(T)`. The runtime mesh LOD path added on 2026-03-12
+  // read POSITION data by raw pointer arithmetic from `GetAddress(0)`, which is
+  // only valid for one specific storage layout. Decode through Draco's attribute
+  // conversion API so POSITION values are read correctly regardless of stride,
+  // offset, or decoder-internal layout differences across platforms/toolchains.
+  switch (pos->data_type()) {
+    case draco::DT_INT32: {
+      for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
+        int32_t tmp[3] = {0, 0, 0};
+        if (!pos->ConvertValue<int32_t>(draco::AttributeValueIndex(i.value()), 3, tmp)) {
+          throw ZException("Failed to decode draco mesh: could not read INT32 POSITION value");
+        }
+        out.vertices[i.value()] =
+          glm::vec3(static_cast<float>(tmp[0]), static_cast<float>(tmp[1]), static_cast<float>(tmp[2]));
+      }
+      break;
     }
-  } else {
-    const auto* raw = reinterpret_cast<const float*>(pos->GetAddress(draco::AttributeValueIndex(0)));
-    CHECK(raw);
-    for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
-      const size_t base = static_cast<size_t>(i.value()) * 3U;
-      out.vertices[i.value()] = glm::vec3(raw[base + 0U], raw[base + 1U], raw[base + 2U]);
+    case draco::DT_UINT32: {
+      for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
+        uint32_t tmp[3] = {0U, 0U, 0U};
+        if (!pos->ConvertValue<uint32_t>(draco::AttributeValueIndex(i.value()), 3, tmp)) {
+          throw ZException("Failed to decode draco mesh: could not read UINT32 POSITION value");
+        }
+        out.vertices[i.value()] =
+          glm::vec3(static_cast<float>(tmp[0]), static_cast<float>(tmp[1]), static_cast<float>(tmp[2]));
+      }
+      break;
     }
+    case draco::DT_FLOAT32: {
+      for (draco::PointIndex i(0); i < dmesh->num_points(); ++i) {
+        float tmp[3] = {0.0F, 0.0F, 0.0F};
+        if (!pos->ConvertValue<float>(draco::AttributeValueIndex(i.value()), 3, tmp)) {
+          throw ZException("Failed to decode draco mesh: could not read FLOAT32 POSITION value");
+        }
+        out.vertices[i.value()] = glm::vec3(tmp[0], tmp[1], tmp[2]);
+      }
+      break;
+    }
+    default:
+      CHECK(false) << "Unexpected Draco POSITION data type";
   }
 
   if (hasValidNormals) {

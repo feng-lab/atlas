@@ -21,11 +21,9 @@ template<typename T>
   return static_cast<GLsizeiptr>(values.size() * sizeof(T));
 }
 
-template<typename T>
-[[nodiscard]] GLsizei bufferStride()
-{
-  return static_cast<GLsizei>(sizeof(T));
-}
+static_assert(sizeof(glm::vec2) == sizeof(GLfloat) * 2, "Z3DMeshRenderer assumes glm::vec2 is tightly packed");
+static_assert(sizeof(glm::vec3) == sizeof(GLfloat) * 3, "Z3DMeshRenderer assumes glm::vec3 is tightly packed");
+static_assert(sizeof(glm::vec4) == sizeof(GLfloat) * 4, "Z3DMeshRenderer assumes glm::vec4 is tightly packed");
 
 } // namespace
 
@@ -458,17 +456,14 @@ void Z3DMeshRenderer::renderUsingOpengl()
 
     glEnableClientState(GL_VERTEX_ARRAY);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
-    // GLM vector types may carry ABI-specific padding/alignment on some toolchains
-    // (notably x86/MSVC with SIMD enabled). Use the actual element size/stride instead
-    // of assuming vec3/vec2 are tightly packed float tuples.
     glBufferData(GL_ARRAY_BUFFER, bufferByteSize(vertices), vertices.data(), GL_STATIC_DRAW);
-    glVertexPointer(3, GL_FLOAT, bufferStride<glm::vec3>(), 0);
+    glVertexPointer(3, GL_FLOAT, 0, 0);
 
     if (m_colorSource == MeshColorSource::MeshColor) {
       glEnableClientState(GL_COLOR_ARRAY);
       glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
       glBufferData(GL_ARRAY_BUFFER, bufferByteSize(colors), colors.data(), GL_STATIC_DRAW);
-      glColorPointer(4, GL_FLOAT, bufferStride<glm::vec4>(), 0);
+      glColorPointer(4, GL_FLOAT, 0, 0);
     } else if (m_colorSource == MeshColorSource::CustomColor) {
       glColor4f((*m_meshColorsPt)[i].r,
                 (*m_meshColorsPt)[i].g,
@@ -479,25 +474,25 @@ void Z3DMeshRenderer::renderUsingOpengl()
       glEnableClientState(GL_TEXTURE_COORD_ARRAY);
       glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
       glBufferData(GL_ARRAY_BUFFER, bufferByteSize(texture1DCoords), texture1DCoords.data(), GL_STATIC_DRAW);
-      glTexCoordPointer(1, GL_FLOAT, bufferStride<float>(), 0);
+      glTexCoordPointer(1, GL_FLOAT, 0, 0);
     } else if (m_colorSource == MeshColorSource::Mesh2DTexture) {
       glClientActiveTexture(GL_TEXTURE0);
       glEnableClientState(GL_TEXTURE_COORD_ARRAY);
       glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
       glBufferData(GL_ARRAY_BUFFER, bufferByteSize(texture2DCoords), texture2DCoords.data(), GL_STATIC_DRAW);
-      glTexCoordPointer(2, GL_FLOAT, bufferStride<glm::vec2>(), 0);
+      glTexCoordPointer(2, GL_FLOAT, 0, 0);
     } else if (m_colorSource == MeshColorSource::Mesh3DTexture) {
       glClientActiveTexture(GL_TEXTURE0);
       glEnableClientState(GL_TEXTURE_COORD_ARRAY);
       glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
       glBufferData(GL_ARRAY_BUFFER, bufferByteSize(texture3DCoords), texture3DCoords.data(), GL_STATIC_DRAW);
-      glTexCoordPointer(3, GL_FLOAT, bufferStride<glm::vec3>(), 0);
+      glTexCoordPointer(3, GL_FLOAT, 0, 0);
     }
 
     glEnableClientState(GL_NORMAL_ARRAY);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[2]);
     glBufferData(GL_ARRAY_BUFFER, bufferByteSize(normals), normals.data(), GL_STATIC_DRAW);
-    glNormalPointer(GL_FLOAT, bufferStride<glm::vec3>(), 0);
+    glNormalPointer(GL_FLOAT, 0, 0);
 
     if (triangleIndexes.empty()) {
       glDrawArrays(type, 0, vertices.size());
@@ -561,7 +556,7 @@ void Z3DMeshRenderer::renderPickingUsingOpengl()
     glEnableClientState(GL_VERTEX_ARRAY);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
     glBufferData(GL_ARRAY_BUFFER, bufferByteSize(vertices), vertices.data(), GL_STATIC_DRAW);
-    glVertexPointer(3, GL_FLOAT, bufferStride<glm::vec3>(), 0);
+    glVertexPointer(3, GL_FLOAT, 0, 0);
 
     glColor4f((*m_meshPickingColorsPt)[i].r,
               (*m_meshPickingColorsPt)[i].g,
@@ -708,13 +703,13 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         glEnableVertexAttribArray(attr_vertex);
         m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         glBufferData(GL_ARRAY_BUFFER, bufferByteSize(vertices), vertices.data(), GL_STATIC_DRAW);
-        glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+        glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
         if (attr_normal != -1) {
           glEnableVertexAttribArray(attr_normal);
           m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER, bufferByteSize(normals), normals.data(), GL_STATIC_DRAW);
-          glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+          glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
         if (!triangleIndexes.empty()) {
@@ -733,7 +728,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
                        bufferByteSize(textureCoordinates1D),
                        textureCoordinates1D.data(),
                        GL_STATIC_DRAW);
-          glVertexAttribPointer(attr_1dTexCoord0, 1, GL_FLOAT, GL_FALSE, bufferStride<float>(), 0);
+          glVertexAttribPointer(attr_1dTexCoord0, 1, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
         if (m_colorSource == MeshColorSource::Mesh2DTexture && attr_2dTexCoord0 != -1 &&
@@ -744,7 +739,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
                        bufferByteSize(textureCoordinates2D),
                        textureCoordinates2D.data(),
                        GL_STATIC_DRAW);
-          glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, bufferStride<glm::vec2>(), 0);
+          glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
         if (m_colorSource == MeshColorSource::Mesh3DTexture && attr_3dTexCoord0 != -1 &&
@@ -755,14 +750,14 @@ void Z3DMeshRenderer::render(Z3DEye eye)
                        bufferByteSize(textureCoordinates3D),
                        textureCoordinates3D.data(),
                        GL_STATIC_DRAW);
-          glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+          glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
         if (m_colorSource == MeshColorSource::MeshColor && attr_color != -1 && colors.size() >= vertices.size()) {
           glEnableVertexAttribArray(attr_color);
           m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER, bufferByteSize(colors), colors.data(), GL_STATIC_DRAW);
-          glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, bufferStride<glm::vec4>(), 0);
+          glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -875,7 +870,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       if (m_dataChanged) {
         glBufferData(GL_ARRAY_BUFFER, bufferByteSize(vertices), vertices.data(), GL_STATIC_DRAW);
       }
-      glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+      glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
       if (attr_normal != -1) {
         glEnableVertexAttribArray(attr_normal);
@@ -883,7 +878,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER, bufferByteSize(normals), normals.data(), GL_STATIC_DRAW);
         }
-        glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+        glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
       if (!triangleIndexes.empty()) {
@@ -905,7 +900,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
                        textureCoordinates1D.data(),
                        GL_STATIC_DRAW);
         }
-        glVertexAttribPointer(attr_1dTexCoord0, 1, GL_FLOAT, GL_FALSE, bufferStride<float>(), 0);
+        glVertexAttribPointer(attr_1dTexCoord0, 1, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
       if (m_colorSource == MeshColorSource::Mesh2DTexture && attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
@@ -917,7 +912,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
                        textureCoordinates2D.data(),
                        GL_STATIC_DRAW);
         }
-        glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, bufferStride<glm::vec2>(), 0);
+        glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
       if (m_colorSource == MeshColorSource::Mesh3DTexture && attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
@@ -929,7 +924,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
                        textureCoordinates3D.data(),
                        GL_STATIC_DRAW);
         }
-        glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+        glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
       if (m_colorSource == MeshColorSource::MeshColor && attr_color != -1 && colors.size() >= vertices.size()) {
@@ -938,7 +933,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER, bufferByteSize(colors), colors.data(), GL_STATIC_DRAW);
         }
-        glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, bufferStride<glm::vec4>(), 0);
+        glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
       if (drawSurface) {
@@ -1073,7 +1068,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
         } else {
           m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         }
-        glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+        glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
         if (attr_normal != -1) {
           glEnableVertexAttribArray(attr_normal);
@@ -1083,7 +1078,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
           } else {
             m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           }
-          glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+          glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
         if (!triangleIndexes.empty()) {
@@ -1181,7 +1176,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       } else {
         m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
       }
-      glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+      glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
       if (attr_normal != -1) {
         glEnableVertexAttribArray(attr_normal);
@@ -1193,7 +1188,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
         } else {
           m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         }
-        glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, bufferStride<glm::vec3>(), 0);
+        glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
       if (!triangleIndexes.empty()) {
