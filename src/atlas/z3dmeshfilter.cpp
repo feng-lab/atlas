@@ -403,12 +403,7 @@ Z3DMeshFilter::~Z3DMeshFilter()
   if (m_runtimeNgCancellationSource) {
     m_runtimeNgCancellationSource->requestCancellation();
   }
-  for (const auto& [row, source] : m_runtimeNgRowCancellationSources) {
-    (void)row;
-    if (source) {
-      source->requestCancellation();
-    }
-  }
+  (void)cancelRuntimeNeuroglancerInFlightRows();
   folly::coro::blockingWait(m_runtimeNgTaskScope.joinAsync());
 }
 
@@ -752,12 +747,7 @@ void Z3DMeshFilter::switchRendererBackend(RenderBackend backendRequest)
     // loads will not post results back mid-switch, and then re-solve the
     // selection on the next process() call.
     m_runtimeNgSelectionDirty = true;
-    for (const auto& [row, source] : m_runtimeNgRowCancellationSources) {
-      (void)row;
-      if (source) {
-        source->requestCancellation();
-      }
-    }
+    (void)cancelRuntimeNeuroglancerInFlightRows();
   }
 
   Z3DBoundedFilter::switchRendererBackend(backendRequest);
@@ -996,12 +986,7 @@ void Z3DMeshFilter::resetRuntimeNeuroglancerLodState()
   if (m_runtimeNgCancellationSource) {
     m_runtimeNgCancellationSource->requestCancellation();
   }
-  for (const auto& [row, source] : m_runtimeNgRowCancellationSources) {
-    (void)row;
-    if (source) {
-      source->requestCancellation();
-    }
-  }
+  (void)cancelRuntimeNeuroglancerInFlightRows();
   m_runtimeNgCancellationSource = std::make_shared<folly::CancellationSource>();
   m_runtimeNgRowCancellationSources.clear();
   m_runtimeNgRowBytesInFlight.clear();
@@ -1043,6 +1028,21 @@ void Z3DMeshFilter::clearRuntimeNeuroglancerRequestFrontier()
   updateRuntimeNeuroglancerRefinementState();
 }
 
+size_t Z3DMeshFilter::cancelRuntimeNeuroglancerInFlightRows(const std::unordered_set<uint32_t>* rowsToKeep)
+{
+  size_t cancelled = 0U;
+  for (const auto& [row, source] : m_runtimeNgRowCancellationSources) {
+    if (rowsToKeep && rowsToKeep->contains(row)) {
+      continue;
+    }
+    if (source) {
+      source->requestCancellation();
+      ++cancelled;
+    }
+  }
+  return cancelled;
+}
+
 void Z3DMeshFilter::setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode mode,
                                                           std::vector<uint32_t> rows)
 {
@@ -1066,7 +1066,6 @@ void Z3DMeshFilter::markRuntimeNeuroglancerLodDirty()
     return;
   }
   m_runtimeNgFailedRows.clear();
-  m_runtimeNgCancelObsoleteInFlight = true;
   m_runtimeNgSelectionDirty = true;
   invalidateResult();
 }
@@ -1105,9 +1104,14 @@ void Z3DMeshFilter::onRuntimeNeuroglancerCameraChanged()
   if (!m_runtimeNgSourceKey || m_runtimeNgExportActive) {
     return;
   }
+  const bool wasInteractionActive = m_runtimeNgInteractionActive;
   m_runtimeNgInteractionActive = true;
   m_runtimeNgIdleTimer.start(kRuntimeNgIdleDelayMs);
-  m_runtimeNgCancelObsoleteInFlight = true;
+  const bool deferViewDrivenRefinementUntilIdle = m_runtimeNgBaseReady;
+  if (deferViewDrivenRefinementUntilIdle && !wasInteractionActive) {
+    clearRuntimeNeuroglancerRequestFrontier();
+    (void)cancelRuntimeNeuroglancerInFlightRows();
+  }
   markRuntimeNeuroglancerLodDirty();
 }
 
@@ -1437,6 +1441,12 @@ size_t Z3DMeshFilter::pumpRuntimeNeuroglancerRequests()
       m_runtimeNgSelectionDirty) {
     return 0U;
   }
+  // After base coverage is ready, interaction renders from already loaded rows
+  // only and defers new view-driven refinement until the idle debounce fires.
+  if (m_runtimeNgBaseReady && m_runtimeNgInteractionActive &&
+      m_runtimeNgRequestFrontierMode == RuntimeNeuroglancerRequestFrontierMode::ViewDriven) {
+    return 0U;
+  }
 
   return requestRuntimeNeuroglancerRows(m_runtimeNgRequestFrontierRows);
 }
@@ -1542,62 +1552,58 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
   const glm::mat4 modelViewProjection =
     m_globalParameters.camera.get().projectionViewMatrix(MonoEye) * coordTransform();
   const auto clippingPlanes = ZNeuroglancerPrecomputedMeshSource::getFrustumPlanes(modelViewProjection);
+  const bool deferViewDrivenRefinementUntilIdle = m_runtimeNgBaseReady && m_runtimeNgInteractionActive;
 
-  const auto desiredRows = ZNeuroglancerPrecomputedMeshSource::desiredChunksForView(*m_runtimeNgManifest,
-                                                                                    modelViewProjection,
-                                                                                    clippingPlanes,
-                                                                                    detailCutoff,
-                                                                                    sceneViewport.x,
-                                                                                    sceneViewport.y);
-
-  std::vector<uint32_t> desiredFrontierRows;
-  desiredFrontierRows.reserve(desiredRows.size());
-  std::unordered_set<uint32_t> desiredRowSet;
-  desiredRowSet.reserve(desiredRows.size());
+  size_t desiredRowCount = 0;
   size_t remainingDesiredRows = 0;
-  for (const auto& desired : desiredRows) {
-    if (desired.empty) {
-      continue;
+  size_t rowsToLoadNow = 0;
+  if (deferViewDrivenRefinementUntilIdle) {
+    if (m_runtimeNgRequestFrontierMode == RuntimeNeuroglancerRequestFrontierMode::ViewDriven) {
+      clearRuntimeNeuroglancerRequestFrontier();
     }
-    if (!desiredRowSet.insert(desired.row).second) {
-      continue;
-    }
-    desiredFrontierRows.push_back(desired.row);
-    const bool loaded = m_runtimeNgLoadedRows.contains(desired.row);
-    const bool failed = m_runtimeNgFailedRows.contains(desired.row);
-    if (!loaded && !failed) {
-      ++remainingDesiredRows;
-    }
-  }
-  setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode::ViewDriven,
-                                        std::move(desiredFrontierRows));
-
-  if (m_runtimeNgCancelObsoleteInFlight && !m_runtimeNgRowsInFlight.empty()) {
-    size_t cancelled = 0;
-    for (const uint32_t row : m_runtimeNgRowsInFlight) {
-      if (m_runtimeNgRequestFrontierRowSet.contains(row)) {
+  } else {
+    const auto desiredRows = ZNeuroglancerPrecomputedMeshSource::desiredChunksForView(*m_runtimeNgManifest,
+                                                                                      modelViewProjection,
+                                                                                      clippingPlanes,
+                                                                                      detailCutoff,
+                                                                                      sceneViewport.x,
+                                                                                      sceneViewport.y);
+    desiredRowCount = desiredRows.size();
+    std::vector<uint32_t> desiredFrontierRows;
+    desiredFrontierRows.reserve(desiredRows.size());
+    std::unordered_set<uint32_t> desiredRowSet;
+    desiredRowSet.reserve(desiredRows.size());
+    for (const auto& desired : desiredRows) {
+      if (desired.empty) {
         continue;
       }
-      auto it = m_runtimeNgRowCancellationSources.find(row);
-      if (it == m_runtimeNgRowCancellationSources.end() || !it->second) {
+      if (!desiredRowSet.insert(desired.row).second) {
         continue;
       }
-      it->second->requestCancellation();
-      ++cancelled;
+      desiredFrontierRows.push_back(desired.row);
+      const bool loaded = m_runtimeNgLoadedRows.contains(desired.row);
+      const bool failed = m_runtimeNgFailedRows.contains(desired.row);
+      if (!loaded && !failed) {
+        ++remainingDesiredRows;
+      }
     }
-    if (cancelled > 0U && VLOG_IS_ON(2) && m_runtimeNgSourceKey) {
-      VLOG(2) << fmt::format(
-        "Runtime Neuroglancer mesh LOD cancelled obsolete in-flight rows: segment={} mesh='{}' cancelledRows={} "
-        "rowsInFlight={}",
-        m_runtimeNgSourceKey->segmentId,
-        m_runtimeNgSourceKey->meshSourceDirUrl,
-        cancelled,
-        m_runtimeNgRowsInFlight.size());
-    }
-  }
-  m_runtimeNgCancelObsoleteInFlight = false;
+    setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode::ViewDriven,
+                                          std::move(desiredFrontierRows));
 
-  const size_t rowsToLoadNow = pumpRuntimeNeuroglancerRequests();
+    if (!m_runtimeNgRowsInFlight.empty()) {
+      const size_t cancelled = cancelRuntimeNeuroglancerInFlightRows(&m_runtimeNgRequestFrontierRowSet);
+      if (cancelled > 0U && VLOG_IS_ON(2) && m_runtimeNgSourceKey) {
+        VLOG(2) << fmt::format(
+          "Runtime Neuroglancer mesh LOD cancelled obsolete in-flight rows: segment={} mesh='{}' cancelledRows={} "
+          "rowsInFlight={}",
+          m_runtimeNgSourceKey->segmentId,
+          m_runtimeNgSourceKey->meshSourceDirUrl,
+          cancelled,
+          m_runtimeNgRowsInFlight.size());
+      }
+    }
+    rowsToLoadNow = pumpRuntimeNeuroglancerRequests();
+  }
 
   const auto drawChunks = ZNeuroglancerPrecomputedMeshSource::chunksToDrawForView(
     *m_runtimeNgManifest,
@@ -1657,7 +1663,7 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
       "gpuTransformEnabled={} visibleChanged={}",
       m_runtimeNgSourceKey->segmentId,
       m_runtimeNgSourceKey->meshSourceDirUrl,
-      desiredRows.size(),
+      desiredRowCount,
       remainingDesiredRows,
       rowsToLoadNow,
       m_runtimeNgLoadedRows.size(),

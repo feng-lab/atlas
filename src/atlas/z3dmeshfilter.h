@@ -152,6 +152,8 @@ private:
 
   void setRuntimeNeuroglancerRequestFrontier(RuntimeNeuroglancerRequestFrontierMode mode, std::vector<uint32_t> rows);
 
+  [[nodiscard]] size_t cancelRuntimeNeuroglancerInFlightRows(const std::unordered_set<uint32_t>* rowsToKeep = nullptr);
+
   void updateRuntimeNeuroglancerRefinementState();
 
   [[nodiscard]] size_t requestRuntimeNeuroglancerRows(const std::vector<uint32_t>& rows);
@@ -260,7 +262,6 @@ private:
   uint64_t m_runtimeNgBytesInFlight = 0;
   std::shared_ptr<folly::CancellationSource> m_runtimeNgCancellationSource;
   std::unordered_map<uint32_t, std::shared_ptr<folly::CancellationSource>> m_runtimeNgRowCancellationSources;
-  bool m_runtimeNgCancelObsoleteInFlight = false;
   std::set<uint32_t> m_runtimeNgFailedRows;
   std::vector<ZMesh*> m_runtimeNgVisibleMeshes;
   std::vector<glm::mat4> m_runtimeNgVisiblePosTransforms;
