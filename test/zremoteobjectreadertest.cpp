@@ -11,7 +11,7 @@
 #include <folly/coro/Collect.h>
 #include <folly/coro/CurrentExecutor.h>
 #include <folly/coro/ViaIfAsync.h>
-#include <folly/executors/GlobalExecutor.h>
+#include <folly/executors/CPUThreadPoolExecutor.h>
 #include <gtest/gtest.h>
 
 #include <deque>
@@ -391,11 +391,10 @@ TEST(ZRemoteObjectReader, ConcurrentChunkReadFailureIsDeduplicatedAndShared)
     co_return co_await folly::coro::co_awaitTry(volume->readChunkAsync(std::move(chunk)));
   };
 
+  folly::CPUThreadPoolExecutor executor(/*numThreads=*/2);
   std::vector<folly::coro::TaskWithExecutor<folly::Try<std::shared_ptr<ZImg>>>> tasks;
-  tasks.push_back(
-    folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(), readChunkTry(chunks.front())));
-  tasks.push_back(
-    folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(), readChunkTry(chunks.front())));
+  tasks.push_back(folly::coro::co_withExecutor(&executor, readChunkTry(chunks.front())));
+  tasks.push_back(folly::coro::co_withExecutor(&executor, readChunkTry(chunks.front())));
 
   const auto results = folly::coro::blockingWait(folly::coro::collectAllRange(std::move(tasks)));
 
@@ -481,11 +480,10 @@ TEST(ZRemoteObjectReader, ConcurrentShardedMinishardFailureIsDeduplicatedAndShar
     co_return co_await folly::coro::co_awaitTry(volume->readChunkAsync(std::move(chunk)));
   };
 
+  folly::CPUThreadPoolExecutor executor(/*numThreads=*/2);
   std::vector<folly::coro::TaskWithExecutor<folly::Try<std::shared_ptr<ZImg>>>> tasks;
-  tasks.push_back(
-    folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(), readChunkTry(chunks.front())));
-  tasks.push_back(
-    folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(), readChunkTry(chunks.front())));
+  tasks.push_back(folly::coro::co_withExecutor(&executor, readChunkTry(chunks.front())));
+  tasks.push_back(folly::coro::co_withExecutor(&executor, readChunkTry(chunks.front())));
 
   const auto results = folly::coro::blockingWait(folly::coro::collectAllRange(std::move(tasks)));
 
