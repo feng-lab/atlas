@@ -144,17 +144,10 @@ option(ZIMG_DISABLE_FREEIMAGE
 
 include(PrintCMakeTargetInfo)
 
-
 # subprojects
 set(_atlas_is_windows_ci OFF)
 if (WIN32 AND (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI}))
   set(_atlas_is_windows_ci ON)
-endif ()
-
-if (_atlas_is_windows_ci)
-  message(STATUS "Skipping legacy neurolabi/neutu targets on Windows CI.")
-else ()
-  add_subdirectory(src/neurolabi/c)
 endif ()
 
 include(LibsForImg)
@@ -164,13 +157,19 @@ add_subdirectory(src/img)
 # (e.g. the standalone zimg Python wheel build) can reuse it without rebuilding.
 export(TARGETS img FILE "${CMAKE_BINARY_DIR}/AtlasImgTargets.cmake")
 
-if (NOT _atlas_is_windows_ci)
-  add_subdirectory(src/neurolabi/gui)
-endif ()
 # add_subdirectory(src/matlab)
 add_subdirectory(src/atlas)
 
 option(BUILD_TESTING "Enable tests" ON)
+
 if (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS) AND (NOT CMAKE_CROSSCOMPILING))
+  # Legacy neurolabi/neutu targets are only needed by tests, so keep them
+  # next to the test include instead of wiring them into the main build graph.
+  if (_atlas_is_windows_ci)
+    message(STATUS "Skipping legacy neurolabi/neutu targets on Windows CI.")
+  else ()
+    add_subdirectory(src/neurolabi/c)
+    add_subdirectory(src/neurolabi/gui)
+  endif ()
   include(test/test.cmake)
 endif ()

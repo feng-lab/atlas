@@ -8,10 +8,15 @@
 #include "zneuroglancerstate.h"
 
 #include <folly/coro/BlockingWait.h>
+#include <folly/coro/Collect.h>
+#include <folly/coro/CurrentExecutor.h>
+#include <folly/coro/ViaIfAsync.h>
+#include <folly/executors/GlobalExecutor.h>
 #include <gtest/gtest.h>
 
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <utility>
 
@@ -33,17 +38,28 @@ public:
            std::chrono::milliseconds timeout,
            std::vector<std::pair<std::string, std::string>> requestHeaders) const override
   {
-    requests.push_back(Request{.url = std::move(url), .timeout = timeout, .headers = std::move(requestHeaders)});
-    if (responses.empty()) {
-      throw std::runtime_error("FakeRemoteObjectStore called without a queued response");
+    std::optional<ZHttpGetBytesResult> next;
+    {
+      const std::lock_guard<std::mutex> lock(mutex);
+      requests.push_back(Request{.url = std::move(url), .timeout = timeout, .headers = std::move(requestHeaders)});
+      if (responses.empty()) {
+        throw std::runtime_error("FakeRemoteObjectStore called without a queued response");
+      }
+      next = std::move(responses.front());
+      responses.pop_front();
     }
-    auto next = std::move(responses.front());
-    responses.pop_front();
+
+    if (yieldBeforeResponding) {
+      co_await folly::coro::co_reschedule_on_current_executor;
+    }
+
     co_return next;
   }
 
+  mutable std::mutex mutex;
   mutable std::deque<std::optional<ZHttpGetBytesResult>> responses;
   mutable std::vector<Request> requests;
+  bool yieldBeforeResponding = false;
 };
 
 } // namespace
@@ -324,6 +340,182 @@ TEST(ZRemoteObjectReader, MeshSourceOpenScopesInfoMetadataByStore)
   ASSERT_EQ(storeB->requests.size(), 1U);
   EXPECT_EQ(storeB->requests[0].url, "https://example.com/mesh/info");
   EXPECT_EQ(storeB->requests[0].timeout, std::chrono::milliseconds(200));
+}
+
+TEST(ZRemoteObjectReader, ConcurrentChunkReadFailureIsDeduplicatedAndShared)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+  store->yieldBeforeResponding = true;
+
+  ZHttpGetBytesResult volumeInfo;
+  volumeInfo.status = 200;
+  const std::string volumeInfoJson = R"json(
+{
+  "data_type": "uint8",
+  "type": "image",
+  "num_channels": 1,
+  "scales": [
+    {
+      "key": "1_1_1",
+      "resolution": [1, 1, 1],
+      "size": [1, 1, 1],
+      "chunk_sizes": [[1, 1, 1]],
+      "encoding": "raw"
+    }
+  ]
+}
+)json";
+  volumeInfo.body.assign(volumeInfoJson.begin(), volumeInfoJson.end());
+  volumeInfo.encodedBodyBytes = volumeInfo.body.size();
+  volumeInfo.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(volumeInfo);
+
+  ZHttpGetBytesResult badChunk;
+  badChunk.status = 500;
+  badChunk.encodedBodyBytes = 0;
+  badChunk.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(badChunk);
+  store->responses.push_back(badChunk);
+
+  const auto volume = ZNeuroglancerPrecomputedVolume::open(QStringLiteral("precomputed://gs://bucket/dataset"),
+                                                           std::chrono::milliseconds{321},
+                                                           store);
+  ASSERT_TRUE(volume);
+
+  const auto chunks = volume->chunksIntersectingBaseBox(/*scaleIndex=*/0,
+                                                        /*baseStart=*/{0, 0, 0},
+                                                        /*baseEnd=*/{1, 1, 1});
+  ASSERT_EQ(chunks.size(), 1U);
+
+  auto readChunkTry = [volume](ZNeuroglancerPrecomputedVolume::Chunk chunk) -> folly::coro::Task<folly::Try<std::shared_ptr<ZImg>>> {
+    co_return co_await folly::coro::co_awaitTry(volume->readChunkAsync(std::move(chunk)));
+  };
+
+  std::vector<folly::coro::TaskWithExecutor<folly::Try<std::shared_ptr<ZImg>>>> tasks;
+  tasks.push_back(
+    folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(), readChunkTry(chunks.front())));
+  tasks.push_back(
+    folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(), readChunkTry(chunks.front())));
+
+  const auto results = folly::coro::blockingWait(folly::coro::collectAllRange(std::move(tasks)));
+
+  ASSERT_EQ(results.size(), 2U);
+  for (const auto& result : results) {
+    ASSERT_TRUE(result.hasException());
+    try {
+      (void)result.value();
+      FAIL() << "Expected concurrent chunk read to fail";
+    }
+    catch (const ZException& e) {
+      EXPECT_NE(std::string(e.what()).find("Failed to fetch neuroglancer chunk"), std::string::npos);
+    }
+    catch (const std::exception& e) {
+      FAIL() << "Expected ZException, got std::exception: " << e.what();
+    }
+    catch (...) {
+      FAIL() << "Expected ZException";
+    }
+  }
+
+  ASSERT_EQ(store->requests.size(), 2U);
+  EXPECT_EQ(store->requests[0].url, "https://storage.googleapis.com/bucket/dataset/info");
+  EXPECT_EQ(store->requests[1].url, "https://storage.googleapis.com/bucket/dataset/1_1_1/0-1_0-1_0-1");
+  EXPECT_EQ(store->responses.size(), 1U);
+}
+
+TEST(ZRemoteObjectReader, ConcurrentShardedMinishardFailureIsDeduplicatedAndShared)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+  store->yieldBeforeResponding = true;
+
+  ZHttpGetBytesResult volumeInfo;
+  volumeInfo.status = 200;
+  const std::string volumeInfoJson = R"json(
+{
+  "data_type": "uint8",
+  "type": "image",
+  "num_channels": 1,
+  "scales": [
+    {
+      "key": "1_1_1",
+      "resolution": [1, 1, 1],
+      "size": [1, 1, 1],
+      "chunk_sizes": [[1, 1, 1]],
+      "encoding": "raw",
+      "sharding": {
+        "@type": "neuroglancer_uint64_sharded_v1",
+        "preshift_bits": 0,
+        "hash": "identity",
+        "minishard_bits": 0,
+        "shard_bits": 0,
+        "minishard_index_encoding": "raw",
+        "data_encoding": "raw"
+      }
+    }
+  ]
+}
+)json";
+  volumeInfo.body.assign(volumeInfoJson.begin(), volumeInfoJson.end());
+  volumeInfo.encodedBodyBytes = volumeInfo.body.size();
+  volumeInfo.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(volumeInfo);
+
+  ZHttpGetBytesResult badRange;
+  badRange.status = 500;
+  badRange.encodedBodyBytes = 0;
+  badRange.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(badRange);
+  store->responses.push_back(badRange);
+
+  const auto volume = ZNeuroglancerPrecomputedVolume::open(QStringLiteral("precomputed://gs://bucket/dataset"),
+                                                           std::chrono::milliseconds{321},
+                                                           store);
+  ASSERT_TRUE(volume);
+
+  const auto chunks = volume->chunksIntersectingBaseBox(/*scaleIndex=*/0,
+                                                        /*baseStart=*/{0, 0, 0},
+                                                        /*baseEnd=*/{1, 1, 1});
+  ASSERT_EQ(chunks.size(), 1U);
+
+  auto readChunkTry = [volume](ZNeuroglancerPrecomputedVolume::Chunk chunk) -> folly::coro::Task<folly::Try<std::shared_ptr<ZImg>>> {
+    co_return co_await folly::coro::co_awaitTry(volume->readChunkAsync(std::move(chunk)));
+  };
+
+  std::vector<folly::coro::TaskWithExecutor<folly::Try<std::shared_ptr<ZImg>>>> tasks;
+  tasks.push_back(
+    folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(), readChunkTry(chunks.front())));
+  tasks.push_back(
+    folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(), readChunkTry(chunks.front())));
+
+  const auto results = folly::coro::blockingWait(folly::coro::collectAllRange(std::move(tasks)));
+
+  ASSERT_EQ(results.size(), 2U);
+  for (const auto& result : results) {
+    ASSERT_TRUE(result.hasException());
+    try {
+      (void)result.value();
+      FAIL() << "Expected concurrent sharded chunk read to fail";
+    }
+    catch (const ZException& e) {
+      const std::string what = e.what();
+      EXPECT_NE(what.find("HTTP range GET failed"), std::string::npos);
+      EXPECT_NE(what.find("0.shard"), std::string::npos);
+    }
+    catch (const std::exception& e) {
+      FAIL() << "Expected ZException, got std::exception: " << e.what();
+    }
+    catch (...) {
+      FAIL() << "Expected ZException";
+    }
+  }
+
+  ASSERT_EQ(store->requests.size(), 2U);
+  EXPECT_EQ(store->requests[0].url, "https://storage.googleapis.com/bucket/dataset/info");
+  EXPECT_EQ(store->requests[1].url, "https://storage.googleapis.com/bucket/dataset/1_1_1/0.shard");
+  ASSERT_EQ(store->requests[1].headers.size(), 1U);
+  EXPECT_EQ(store->requests[1].headers[0].first, "range");
+  EXPECT_EQ(store->requests[1].headers[0].second, "bytes=0-15");
+  EXPECT_EQ(store->responses.size(), 1U);
 }
 
 } // namespace nim

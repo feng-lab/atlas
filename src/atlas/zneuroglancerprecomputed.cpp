@@ -18,13 +18,14 @@
 #include <folly/OperationCancelled.h>
 #include <folly/coro/BlockingWait.h>
 #include <folly/coro/Collect.h>
-#include <folly/coro/SharedPromise.h>
+#include <folly/coro/Sleep.h>
 #include <boost/json.hpp>
 
 #include <algorithm>
 #include <bit>
 #include <cmath>
 #include <cstring>
+#include <future>
 #include <limits>
 #include <mutex>
 #include <tuple>
@@ -45,6 +46,133 @@ namespace {
 using ChunkCacheKey = std::tuple<size_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>;
 using MinishardIndexCacheKey = std::tuple<size_t, uint64_t>;
 using DecodedMinishardIndex = ZNeuroglancerUint64Sharding::DecodedMinishardIndex;
+
+enum class SharedLoadErrorKind
+{
+  None,
+  ZCancellation,
+  OperationCancelled,
+  NotFound,
+  ZException,
+  StdException,
+  Unknown,
+};
+
+template<typename T>
+struct SharedLoadResult
+{
+  T value{};
+  SharedLoadErrorKind errorKind = SharedLoadErrorKind::None;
+  std::string errorMessage;
+};
+
+template<typename T>
+using SharedLoadResultPtr = std::shared_ptr<const SharedLoadResult<T>>;
+
+// Windows dump analysis kept landing inside folly::coro::SharedPromise while
+// waking duplicate waiters under MSVC. Atlas only needs "leader publishes one
+// shared result, followers await it", so we keep the shared structured payload
+// but move the publication primitive to std::promise/std::shared_future.
+template<typename T>
+struct SharedLoadCompletion
+{
+  SharedLoadCompletion()
+    : future(promise.get_future().share())
+  {}
+
+  std::promise<SharedLoadResultPtr<T>> promise;
+  std::shared_future<SharedLoadResultPtr<T>> future;
+};
+
+template<typename T>
+[[nodiscard]] SharedLoadResultPtr<T> makeSharedLoadValue(T value)
+{
+  auto out = std::make_shared<SharedLoadResult<T>>();
+  out->value = std::move(value);
+  return out;
+}
+
+// Only call this helper from inside a catch block. We intentionally serialize the
+// exception into a shared structured value instead of using SharedPromise::setException():
+// Windows dump analysis showed crashes while Folly propagated std::exception_ptr
+// through that path under MSVC, and later dumps still crashed while SharedPromise
+// copied/destroyed inline SharedLoadResult values. Keeping the shared-promise
+// payload down to a shared_ptr avoids both Windows-only failure modes.
+template<typename T>
+[[nodiscard]] SharedLoadResultPtr<T> captureSharedLoadError()
+{
+  auto out = std::make_shared<SharedLoadResult<T>>();
+  try {
+    throw;
+  }
+  catch (const ZCancellationException&) {
+    out->errorKind = SharedLoadErrorKind::ZCancellation;
+  }
+  catch (const folly::OperationCancelled&) {
+    out->errorKind = SharedLoadErrorKind::OperationCancelled;
+  }
+  catch (const ZNotFoundException& e) {
+    out->errorKind = SharedLoadErrorKind::NotFound;
+    out->errorMessage = e.what();
+  }
+  catch (const ZException& e) {
+    out->errorKind = SharedLoadErrorKind::ZException;
+    out->errorMessage = e.what();
+  }
+  catch (const std::exception& e) {
+    out->errorKind = SharedLoadErrorKind::StdException;
+    out->errorMessage = e.what();
+  }
+  catch (...) {
+    out->errorKind = SharedLoadErrorKind::Unknown;
+    out->errorMessage = "Unknown exception";
+  }
+  return out;
+}
+
+template<typename T>
+void throwSharedLoadErrorIfAny(const SharedLoadResult<T>& result)
+{
+  switch (result.errorKind) {
+    case SharedLoadErrorKind::None:
+      return;
+    case SharedLoadErrorKind::ZCancellation:
+      throw ZCancellationException();
+    case SharedLoadErrorKind::OperationCancelled:
+      throw folly::OperationCancelled();
+    case SharedLoadErrorKind::NotFound:
+      throw ZNotFoundException(result.errorMessage);
+    case SharedLoadErrorKind::ZException:
+      throw ZException(result.errorMessage);
+    case SharedLoadErrorKind::StdException:
+      throw std::runtime_error(result.errorMessage);
+    case SharedLoadErrorKind::Unknown:
+      throw ZException(result.errorMessage.empty() ? "Unknown exception" : result.errorMessage);
+  }
+
+  CHECK(false) << "Unhandled SharedLoadErrorKind";
+}
+
+constexpr auto kSharedLoadPollInterval = std::chrono::milliseconds(1);
+
+template<typename T>
+folly::coro::Task<SharedLoadResultPtr<T>>
+waitForSharedLoadAsync(std::shared_future<SharedLoadResultPtr<T>> future,
+                       folly::CancellationToken cancellationToken)
+{
+  while (future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+    maybeCancel(cancellationToken);
+    co_await folly::coro::sleep(kSharedLoadPollInterval);
+  }
+
+  maybeCancel(cancellationToken);
+  try {
+    co_return future.get();
+  }
+  catch (const std::future_error& e) {
+    CHECK(false) << "Shared Neuroglancer load future became broken: " << e.what();
+  }
+}
 
 QString requireString(const json::object& obj, const char* key)
 {
@@ -258,12 +386,12 @@ struct ZNeuroglancerPrecomputedVolume::ChunkCache
 {
   struct InFlightChunkRead
   {
-    folly::coro::SharedPromise<std::shared_ptr<ZImg>> promise;
+    SharedLoadCompletion<std::shared_ptr<ZImg>> completion;
   };
 
   struct InFlightMinishardIndexRead
   {
-    folly::coro::SharedPromise<std::shared_ptr<const DecodedMinishardIndex>> promise;
+    SharedLoadCompletion<std::shared_ptr<const DecodedMinishardIndex>> completion;
   };
 
   ChunkCache(size_t chunkMaxBytes, size_t minishardIndexMaxBytes)
@@ -281,17 +409,17 @@ struct ZNeuroglancerPrecomputedVolume::ChunkCache
 
 struct ZNeuroglancerPrecomputedVolume::InFlightSegmentPropertiesLoad
 {
-  folly::coro::SharedPromise<std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties>> promise;
+  SharedLoadCompletion<std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties>> completion;
 };
 
 struct ZNeuroglancerPrecomputedVolume::InFlightMeshSourceLoad
 {
-  folly::coro::SharedPromise<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>> promise;
+  SharedLoadCompletion<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>> completion;
 };
 
 struct ZNeuroglancerPrecomputedVolume::InFlightSkeletonSourceLoad
 {
-  folly::coro::SharedPromise<std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource>> promise;
+  SharedLoadCompletion<std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource>> completion;
 };
 
 QString ZNeuroglancerPrecomputedVolume::normalizeRootUrl(QString url)
@@ -646,8 +774,9 @@ ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesAsync() const
   }
 
   std::shared_ptr<InFlightSegmentPropertiesLoad> inFlight;
-  std::optional<folly::coro::Future<std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties>>> sharedFuture;
+  std::optional<std::shared_future<SharedLoadResultPtr<std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties>>>> sharedFuture;
   bool isLeader = false;
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
   {
     const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
     if (m_segmentProperties) {
@@ -655,7 +784,7 @@ ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesAsync() const
     }
     if (m_segmentPropertiesInFlight) {
       inFlight = m_segmentPropertiesInFlight;
-      sharedFuture = inFlight->promise.getFuture();
+      sharedFuture = inFlight->completion.future;
     } else {
       m_segmentPropertiesInFlight = std::make_shared<InFlightSegmentPropertiesLoad>();
       inFlight = m_segmentPropertiesInFlight;
@@ -665,7 +794,10 @@ ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesAsync() const
 
   if (!isLeader) {
     CHECK(sharedFuture);
-    co_return co_await std::move(*sharedFuture);
+    auto shared = co_await waitForSharedLoadAsync(*sharedFuture, cancellationToken);
+    CHECK(shared);
+    throwSharedLoadErrorIfAny(*shared);
+    co_return shared->value;
   }
 
   auto clearInFlight = [&]() {
@@ -676,9 +808,9 @@ ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesAsync() const
   };
 
   try {
-    auto loaded =
+    std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> loaded =
       co_await ZNeuroglancerPrecomputedSegmentProperties::openAsync(segmentPropertiesDirUrl(), m_remoteContext);
-    inFlight->promise.setValue(loaded);
+    inFlight->completion.promise.set_value(makeSharedLoadValue(loaded));
 
     {
       const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
@@ -688,7 +820,8 @@ ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesAsync() const
     co_return loaded;
   }
   catch (...) {
-    inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
+    inFlight->completion.promise.set_value(
+      captureSharedLoadError<std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties>>());
     clearInFlight();
     throw;
   }
@@ -714,8 +847,9 @@ ZNeuroglancerPrecomputedVolume::loadMeshSourceAsync() const
   }
 
   std::shared_ptr<InFlightMeshSourceLoad> inFlight;
-  std::optional<folly::coro::Future<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>>> sharedFuture;
+  std::optional<std::shared_future<SharedLoadResultPtr<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>>>> sharedFuture;
   bool isLeader = false;
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
   {
     const std::lock_guard<std::mutex> lock(m_meshMutex);
     if (m_meshSource) {
@@ -723,7 +857,7 @@ ZNeuroglancerPrecomputedVolume::loadMeshSourceAsync() const
     }
     if (m_meshSourceInFlight) {
       inFlight = m_meshSourceInFlight;
-      sharedFuture = inFlight->promise.getFuture();
+      sharedFuture = inFlight->completion.future;
     } else {
       m_meshSourceInFlight = std::make_shared<InFlightMeshSourceLoad>();
       inFlight = m_meshSourceInFlight;
@@ -733,7 +867,10 @@ ZNeuroglancerPrecomputedVolume::loadMeshSourceAsync() const
 
   if (!isLeader) {
     CHECK(sharedFuture);
-    co_return co_await std::move(*sharedFuture);
+    auto shared = co_await waitForSharedLoadAsync(*sharedFuture, cancellationToken);
+    CHECK(shared);
+    throwSharedLoadErrorIfAny(*shared);
+    co_return shared->value;
   }
 
   auto clearInFlight = [&]() {
@@ -744,11 +881,12 @@ ZNeuroglancerPrecomputedVolume::loadMeshSourceAsync() const
   };
 
   try {
-    auto loaded = co_await ZNeuroglancerPrecomputedMeshSource::openAsync(meshDirUrl(),
-                                                                         m_baseResolutionNm,
-                                                                         m_baseVoxelOffset,
-                                                                         m_remoteContext);
-    inFlight->promise.setValue(loaded);
+    std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> loaded =
+      co_await ZNeuroglancerPrecomputedMeshSource::openAsync(meshDirUrl(),
+                                                             m_baseResolutionNm,
+                                                             m_baseVoxelOffset,
+                                                             m_remoteContext);
+    inFlight->completion.promise.set_value(makeSharedLoadValue(loaded));
 
     {
       const std::lock_guard<std::mutex> lock(m_meshMutex);
@@ -758,7 +896,7 @@ ZNeuroglancerPrecomputedVolume::loadMeshSourceAsync() const
     co_return loaded;
   }
   catch (...) {
-    inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
+    inFlight->completion.promise.set_value(captureSharedLoadError<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>>());
     clearInFlight();
     throw;
   }
@@ -783,8 +921,9 @@ ZNeuroglancerPrecomputedVolume::loadSkeletonSourceAsync() const
   }
 
   std::shared_ptr<InFlightSkeletonSourceLoad> inFlight;
-  std::optional<folly::coro::Future<std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource>>> sharedFuture;
+  std::optional<std::shared_future<SharedLoadResultPtr<std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource>>>> sharedFuture;
   bool isLeader = false;
+  const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
   {
     const std::lock_guard<std::mutex> lock(m_skeletonMutex);
     if (m_skeletonSource) {
@@ -792,7 +931,7 @@ ZNeuroglancerPrecomputedVolume::loadSkeletonSourceAsync() const
     }
     if (m_skeletonSourceInFlight) {
       inFlight = m_skeletonSourceInFlight;
-      sharedFuture = inFlight->promise.getFuture();
+      sharedFuture = inFlight->completion.future;
     } else {
       m_skeletonSourceInFlight = std::make_shared<InFlightSkeletonSourceLoad>();
       inFlight = m_skeletonSourceInFlight;
@@ -802,7 +941,10 @@ ZNeuroglancerPrecomputedVolume::loadSkeletonSourceAsync() const
 
   if (!isLeader) {
     CHECK(sharedFuture);
-    co_return co_await std::move(*sharedFuture);
+    auto shared = co_await waitForSharedLoadAsync(*sharedFuture, cancellationToken);
+    CHECK(shared);
+    throwSharedLoadErrorIfAny(*shared);
+    co_return shared->value;
   }
 
   auto clearInFlight = [&]() {
@@ -813,11 +955,12 @@ ZNeuroglancerPrecomputedVolume::loadSkeletonSourceAsync() const
   };
 
   try {
-    auto loaded = co_await ZNeuroglancerPrecomputedSkeletonSource::openAsync(skeletonDirUrl(),
-                                                                             m_baseResolutionNm,
-                                                                             m_baseVoxelOffset,
-                                                                             m_remoteContext);
-    inFlight->promise.setValue(loaded);
+    std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> loaded =
+      co_await ZNeuroglancerPrecomputedSkeletonSource::openAsync(skeletonDirUrl(),
+                                                                 m_baseResolutionNm,
+                                                                 m_baseVoxelOffset,
+                                                                 m_remoteContext);
+    inFlight->completion.promise.set_value(makeSharedLoadValue(loaded));
 
     {
       const std::lock_guard<std::mutex> lock(m_skeletonMutex);
@@ -827,7 +970,8 @@ ZNeuroglancerPrecomputedVolume::loadSkeletonSourceAsync() const
     co_return loaded;
   }
   catch (...) {
-    inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
+    inFlight->completion.promise.set_value(
+      captureSharedLoadError<std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource>>());
     clearInFlight();
     throw;
   }
@@ -975,14 +1119,14 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
   }
 
   std::shared_ptr<ChunkCache::InFlightChunkRead> inFlight;
-  std::optional<folly::coro::Future<std::shared_ptr<ZImg>>> sharedFuture;
+  std::optional<std::shared_future<SharedLoadResultPtr<std::shared_ptr<ZImg>>>> sharedFuture;
   bool isLeader = false;
   {
     const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
     auto it = m_chunkCache->inFlightChunkReads.find(cacheKey);
     if (it != m_chunkCache->inFlightChunkReads.end()) {
       inFlight = it->second;
-      sharedFuture = inFlight->promise.getFuture();
+      sharedFuture = inFlight->completion.future;
     } else {
       inFlight = std::make_shared<ChunkCache::InFlightChunkRead>();
       m_chunkCache->inFlightChunkReads.emplace(cacheKey, inFlight);
@@ -992,9 +1136,11 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
 
   if (!isLeader) {
     CHECK(sharedFuture);
-    std::shared_ptr<ZImg> sharedImg = co_await std::move(*sharedFuture);
+    SharedLoadResultPtr<std::shared_ptr<ZImg>> shared = co_await waitForSharedLoadAsync(*sharedFuture, cancellationToken);
+    CHECK(shared);
+    throwSharedLoadErrorIfAny(*shared);
     maybeCancel(cancellationToken);
-    co_return sharedImg;
+    co_return shared->value;
   }
 
   auto eraseInFlight = [&]() {
@@ -1049,14 +1195,14 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
         }
 
         std::shared_ptr<ChunkCache::InFlightMinishardIndexRead> inFlightMinishard;
-        std::optional<folly::coro::Future<std::shared_ptr<const DecodedMinishardIndex>>> sharedMinishardFuture;
+        std::optional<std::shared_future<SharedLoadResultPtr<std::shared_ptr<const DecodedMinishardIndex>>>> sharedMinishardFuture;
         bool isMinishardLeader = false;
         {
           const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
           auto it = m_chunkCache->inFlightMinishardIndexReads.find(minishardCacheKey);
           if (it != m_chunkCache->inFlightMinishardIndexReads.end()) {
             inFlightMinishard = it->second;
-            sharedMinishardFuture = inFlightMinishard->promise.getFuture();
+            sharedMinishardFuture = inFlightMinishard->completion.future;
           } else {
             inFlightMinishard = std::make_shared<ChunkCache::InFlightMinishardIndexRead>();
             m_chunkCache->inFlightMinishardIndexReads.emplace(minishardCacheKey, inFlightMinishard);
@@ -1066,9 +1212,12 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
 
         if (!isMinishardLeader) {
           CHECK(sharedMinishardFuture);
-          std::shared_ptr<const DecodedMinishardIndex> sharedIndex = co_await std::move(*sharedMinishardFuture);
+          SharedLoadResultPtr<std::shared_ptr<const DecodedMinishardIndex>> shared =
+            co_await waitForSharedLoadAsync(*sharedMinishardFuture, cancellationToken);
+          CHECK(shared);
+          throwSharedLoadErrorIfAny(*shared);
           maybeCancel(cancellationToken);
-          co_return sharedIndex;
+          co_return shared->value;
         }
 
         auto eraseMinishardInFlight = [&]() {
@@ -1090,7 +1239,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
                                                                        statsContext);
           maybeCancel(cancellationToken);
           if (!entryOpt) {
-            inFlightMinishard->promise.setValue(std::shared_ptr<const DecodedMinishardIndex>());
+            inFlightMinishard->completion.promise.set_value(makeSharedLoadValue(std::shared_ptr<const DecodedMinishardIndex>()));
             eraseMinishardInFlight();
             co_return std::shared_ptr<const DecodedMinishardIndex>();
           }
@@ -1105,7 +1254,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
                                                                statsContext);
           maybeCancel(cancellationToken);
           if (!decodedIndexOpt) {
-            inFlightMinishard->promise.setValue(std::shared_ptr<const DecodedMinishardIndex>());
+            inFlightMinishard->completion.promise.set_value(makeSharedLoadValue(std::shared_ptr<const DecodedMinishardIndex>()));
             eraseMinishardInFlight();
             co_return std::shared_ptr<const DecodedMinishardIndex>();
           }
@@ -1113,12 +1262,12 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
 
           maybeCancel(cancellationToken);
           m_chunkCache->minishardIndexCache.insert(minishardCacheKey, minishardIndex, minishardIndex->byteSize());
-          inFlightMinishard->promise.setValue(minishardIndex);
+          inFlightMinishard->completion.promise.set_value(makeSharedLoadValue(minishardIndex));
           eraseMinishardInFlight();
           co_return minishardIndex;
         }
         catch (...) {
-          inFlightMinishard->promise.setException(folly::exception_wrapper(std::current_exception()));
+          inFlightMinishard->completion.promise.set_value(captureSharedLoadError<std::shared_ptr<const DecodedMinishardIndex>>());
           eraseMinishardInFlight();
           throw;
         }
@@ -1286,12 +1435,12 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
 
   try {
     auto img = co_await doRead();
-    inFlight->promise.setValue(img);
+    inFlight->completion.promise.set_value(makeSharedLoadValue(img));
     eraseInFlight();
     co_return img;
   }
   catch (...) {
-    inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
+    inFlight->completion.promise.set_value(captureSharedLoadError<std::shared_ptr<ZImg>>());
     eraseInFlight();
     throw;
   }
