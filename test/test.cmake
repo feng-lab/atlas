@@ -57,6 +57,38 @@ macro(add_atlas_gtest_executable test_name)
   gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
 endmacro()
 
+find_package(fizz CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build NO_DEFAULT_PATH)
+find_package(proxygen CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build NO_DEFAULT_PATH)
+
+# Targeted third-party regression coverage for vendored Fizz/Proxygen lifetime
+# patches. This uses the shipped libraries plus selected vendored test headers
+# instead of importing entire upstream test suites into the default Atlas build.
+add_executable(zthirdpartylifetimetest
+  ${CMAKE_CURRENT_LIST_DIR}/zthirdpartylifetimetest.cpp)
+target_include_directories(
+  zthirdpartylifetimetest
+  PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build/include)
+# Match the vendored Folly universal build's x86 feature level so the
+# generated object file references the same F14LinkCheck symbol variant.
+if (APPLE)
+  target_compile_options(
+    zthirdpartylifetimetest
+    PRIVATE
+      -mcpu=apple-m1
+      -mavx)
+endif ()
+target_link_libraries(
+  zthirdpartylifetimetest
+  PRIVATE
+    GTest::gtest_main
+    GTest::gmock
+    fizz::fizz
+    proxygen::proxygen)
+gtest_discover_tests(zthirdpartylifetimetest DISCOVERY_TIMEOUT 600)
+
 
 add_gtest_executable(zclustertest)
 add_gtest_executable(zfilereadtest)

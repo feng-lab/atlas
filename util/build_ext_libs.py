@@ -755,9 +755,9 @@ def build_and_install_cmakecmd(
 def patch_file(
     orig_file: str, from_texts: list, to_texts: list, keep_bak_file: bool = True
 ) -> str:
-    assert len(from_texts) == len(
-        to_texts
-    ), f"{orig_file}: from_texts/to_texts length mismatch"
+    assert len(from_texts) == len(to_texts), (
+        f"{orig_file}: from_texts/to_texts length mismatch"
+    )
 
     # Preserve historical behavior: text-mode read with errors ignored, then
     # write patched output as UTF-8.
@@ -3677,8 +3677,9 @@ def build_fizz(src_dir: str, install_dir: str):
         # 1) Best-effort: cancel any in-flight connect from the destructor.
         # 2) Correctness: keep AsyncFizzClientT alive for the full duration of
         #    the underlying socket connect by holding a DelayedDestruction guard
-        #    until connectSuccess/connectErr, and explicitly clear it from close
-        #    paths so cancellation doesn't leak the object.
+        #    until connectSuccess/connectErr, and route every public close path
+        #    through a shared helper that drops that keepalive before cancelling
+        #    the socket connect.
         #
         # This is correctness-improving and should be safe on all platforms.
         FilePatcher(
@@ -3686,6 +3687,11 @@ def build_fizz(src_dir: str, install_dir: str):
             from_texts=[
                 r"""~AsyncFizzClientT() override = default;
   void writeAppData(""",
+                r""" private:
+  void deliverAllErrors(
+      const folly::AsyncSocketException& ex,
+      bool closeTransport = true);
+  void deliverHandshakeError(folly::exception_wrapper ex);""",
                 r"  folly::Optional<AsyncClientCallbackPtr> callback_;",
             ],
             to_texts=[
@@ -3699,10 +3705,18 @@ def build_fizz(src_dir: str, install_dir: str):
     }
   }
   void writeAppData(""",
+                r""" private:
+  void cancelInFlightConnect();
+  void deliverAllErrors(
+      const folly::AsyncSocketException& ex,
+      bool closeTransport = true);
+  void deliverHandshakeError(folly::exception_wrapper ex);""",
                 r"""  // Keep this alive while the underlying socket connect is in-flight.
   // Without this keepalive, the owning coroutine/task can drop its UniquePtr
   // while the OS still completes the connect, leading to connect callbacks
-  // running on a freed object (observed on Windows).
+  // running on a freed object (observed on Windows). Public close paths clear
+  // this via cancelInFlightConnect() so teardown does not depend on a later
+  // connect callback to release it.
   DelayedDestruction::DestructorGuard connectGuard_{nullptr};
 
   folly::Optional<AsyncClientCallbackPtr> callback_;""",
@@ -3718,6 +3732,17 @@ def build_fizz(src_dir: str, install_dir: str):
         static_cast<int>(socketTimeout.count()),
         options,
         bindAddr);""",
+                r"""void AsyncFizzClientT<SM>::close() {
+  if (transport_->good()) {
+    fizzClient_.appCloseImmediate();
+  } else {
+    DelayedDestruction::DestructorGuard dg(this);
+    folly::AsyncSocketException ase(
+        folly::AsyncSocketException::END_OF_FILE, "socket closed locally");
+    deliverAllErrors(ase, false);
+    transport_->close();
+  }
+}""",
                 r"""void AsyncFizzClientT<SM>::closeWithReset() {
   DelayedDestruction::DestructorGuard dg(this);
   if (transport_->good()) {""",
@@ -3755,13 +3780,43 @@ def build_fizz(src_dir: str, install_dir: str):
         static_cast<int>(socketTimeout.count()),
         options,
         bindAddr);""",
+                r"""void AsyncFizzClientT<SM>::cancelInFlightConnect() {
+  DelayedDestruction::DestructorGuard dg(this);
+  if (!connectGuard_) {
+    return;
+  }
+
+  // Release the keepalive before cancelling the socket connect so callers can
+  // continue teardown without waiting for a later connect callback.
+  connectGuard_ = nullptr;
+
+  if (auto* sock =
+          transport_ ? transport_->getUnderlyingTransport<folly::AsyncSocket>()
+                     : nullptr) {
+    sock->cancelConnect();
+  }
+}
+
+template <typename SM>
+void AsyncFizzClientT<SM>::close() {
+  DelayedDestruction::DestructorGuard dg(this);
+  cancelInFlightConnect();
+  if (transport_->good()) {
+    fizzClient_.appCloseImmediate();
+  } else {
+    folly::AsyncSocketException ase(
+        folly::AsyncSocketException::END_OF_FILE, "socket closed locally");
+    deliverAllErrors(ase, false);
+    transport_->close();
+  }
+}""",
                 r"""void AsyncFizzClientT<SM>::closeWithReset() {
   DelayedDestruction::DestructorGuard dg(this);
-  connectGuard_ = nullptr;
+  cancelInFlightConnect();
   if (transport_->good()) {""",
                 r"""void AsyncFizzClientT<SM>::closeNow() {
   DelayedDestruction::DestructorGuard dg(this);
-  connectGuard_ = nullptr;
+  cancelInFlightConnect();
   if (transport_->good()) {""",
                 r"""void AsyncFizzClientT<SM>::connectSuccess() noexcept {
   DelayedDestruction::DestructorGuard dg(this);
@@ -4066,11 +4121,13 @@ def build_proxygen(src_dir: str, install_dir: str):
     initTransportInfoFromSSLSocket(tinfo, *sslSock);""",
             ],
         ),
-        # Shared CONNECT tunnels must retain ownership of the underlying proxy
-        # session for the full tunnel lifetime. Without this keepalive,
-        # pooled proxied HTTPS can tear down the proxy session while the tunneled
-        # TLS transport is still draining, which later crashes in Proxygen/Folly
-        # coroutine teardown on Windows.
+        # CONNECT tunnels must retain a keepalive on the underlying proxy
+        # session for the full tunnel lifetime, regardless of whether the
+        # stream uniquely owns that session. Without this keepalive, pooled
+        # proxied HTTPS can tear down the proxy session while the tunneled TLS
+        # transport is still draining, which later crashes in
+        # Proxygen/Folly coroutine teardown on Windows. Track teardown
+        # ownership explicitly so destructor behavior is easy to reason about.
         FilePatcher(
             orig_file=os.path.join(
                 src_dir,
@@ -4088,6 +4145,7 @@ def build_proxygen(src_dir: str, install_dir: str):
             to_texts=[
                 r"""  HTTPCoroSession* session_{nullptr};
   HTTPSessionContextPtr sessionCtx_;
+  bool ownsSession_{false};
   folly::EventBase* eventBase_;""",
             ],
         ),
@@ -4104,12 +4162,30 @@ def build_proxygen(src_dir: str, install_dir: str):
             from_texts=[
                 r"""    : session_(ownership == Ownership::Unique ? session : nullptr),
       eventBase_(session->getEventBase()),""",
+                r"""  egressSource_->setHeapAllocated();
+  if (session_) {
+    session_->addLifecycleObserver(this);
+  }
+}""",
+                r"""  if (session_) {
+    session_->removeLifecycleObserver(this);
+    session_->initiateDrain();
+  }""",
             ],
             to_texts=[
-                r"""    : session_(ownership == Ownership::Unique ? session : nullptr),
-      sessionCtx_(ownership == Ownership::Shared ? session->acquireKeepAlive()
-                                                 : HTTPSessionContextPtr{}),
+                r"""    : session_(session),
+      sessionCtx_(session->acquireKeepAlive()),
+      ownsSession_(ownership == Ownership::Unique),
       eventBase_(session->getEventBase()),""",
+                r"""  egressSource_->setHeapAllocated();
+  session_->addLifecycleObserver(this);
+}""",
+                r"""  if (session_) {
+    session_->removeLifecycleObserver(this);
+    if (ownsSession_) {
+      session_->initiateDrain();
+    }
+  }""",
             ],
         ),
         FilePatcher(
@@ -5054,7 +5130,9 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
 
     # Expand to transitive reverse dependents. A single pass is order-dependent
     # and can miss chains like fizz -> mvfst -> proxygen.
-    pending_libs = deque(lib for lib, enabled in libs.items() if enabled and lib not in excluded_libs)
+    pending_libs = deque(
+        lib for lib, enabled in libs.items() if enabled and lib not in excluded_libs
+    )
     while pending_libs:
         lib = pending_libs.popleft()
         for dependent_lib in libs_reverse_depends.get(lib, []):
