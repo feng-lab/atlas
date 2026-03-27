@@ -485,6 +485,12 @@ TEST(ZRemoteObjectReader, MeshSourceOpenScopesInfoMetadataByStore)
 
 TEST(ZRemoteObjectReader, ConcurrentChunkReadFailureIsDeduplicatedAndShared)
 {
+  const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
+  auto restoreRetries = folly::makeGuard([prevRetries]() {
+    FLAGS_atlas_http_max_retries = prevRetries;
+  });
+  FLAGS_atlas_http_max_retries = 0;
+
   auto store = std::make_shared<FakeRemoteObjectStore>();
   store->yieldBeforeResponding = true;
 
@@ -565,6 +571,12 @@ TEST(ZRemoteObjectReader, ConcurrentChunkReadFailureIsDeduplicatedAndShared)
 
 TEST(ZRemoteObjectReader, ConcurrentShardedMinishardFailureIsDeduplicatedAndShared)
 {
+  const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
+  auto restoreRetries = folly::makeGuard([prevRetries]() {
+    FLAGS_atlas_http_max_retries = prevRetries;
+  });
+  FLAGS_atlas_http_max_retries = 0;
+
   auto store = std::make_shared<FakeRemoteObjectStore>();
   store->yieldBeforeResponding = true;
 

@@ -159,20 +159,26 @@ getRemoteObjectRangeBytesAsync(const ZRemoteObjectStore& objectStore,
     }
 
     if (attempt < maxRetries) {
-      VLOG(1) << fmt::format("HTTP range GET size mismatch (attempt {}/{}): '{}' got {} bytes, expected {}; retrying",
-                             attempt + 1,
-                             maxRetries + 1,
-                             url,
-                             resOpt->body.size(),
-                             length);
+      VLOG(1) << fmt::format(
+        "HTTP range GET size mismatch (attempt {}/{}): '{}' offset={} length={} got {} bytes, expected {}; retrying",
+        attempt + 1,
+        maxRetries + 1,
+        url,
+        offset,
+        length,
+        resOpt->body.size(),
+        length);
       co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
       continue;
     }
 
-    throw ZException(fmt::format("HTTP range GET size mismatch for '{}': got {} bytes, expected {} bytes",
-                                 url,
-                                 resOpt->body.size(),
-                                 length));
+    throw ZException(
+      fmt::format("HTTP range GET size mismatch for '{}' offset={} length={}: got {} bytes, expected {} bytes",
+                  url,
+                  offset,
+                  length,
+                  resOpt->body.size(),
+                  length));
   }
 
   throw ZException(fmt::format("HTTP range GET failed for '{}': exhausted retries", url));

@@ -296,6 +296,7 @@ public:
   void clearPendingPagingWarnings();
   void recordPagingFailure(const glm::uvec4& pageTableEntryKey, std::string errorMessage);
   [[nodiscard]] std::optional<std::string> takePendingPagingWarning();
+  [[nodiscard]] std::optional<std::string> takePendingPreviewWarning();
 
 protected:
   void readVolumes();
@@ -446,6 +447,7 @@ private:
   ZImgReadStatsSink* m_readStatsSink = nullptr;
   uint32_t m_activeReadStatsRound = 0;
   std::vector<std::string> m_pendingPagingWarnings;
+  std::optional<std::string> m_pendingPreviewWarning;
 };
 
 } // namespace nim

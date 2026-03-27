@@ -1,8 +1,10 @@
 #include "zneuroglancershardedreader.h"
 
+#include "zcancellation.h"
 #include "zexception.h"
 #include "zlog.h"
 
+#include <folly/OperationCancelled.h>
 #include <folly/compression/Compression.h>
 
 #include <algorithm>
@@ -199,13 +201,28 @@ getNeuroglancerDecodedShardedPayloadBytesAsync(const ZNeuroglancerRemoteContext&
                                                ZImgReadStatsContext statsContext)
 {
   CHECK(location.end >= location.start);
+  const uint64_t payloadLength = location.end - location.start;
 
-  auto bytesOpt = co_await remoteContext.getRangeBytesAsync(dataUrl,
-                                                            location.start,
-                                                            location.end - location.start,
-                                                            rangePolicy,
-                                                            statsSink,
-                                                            statsContext);
+  std::optional<std::vector<uint8_t>> bytesOpt;
+  try {
+    bytesOpt = co_await remoteContext
+                 .getRangeBytesAsync(dataUrl, location.start, payloadLength, rangePolicy, statsSink, statsContext);
+  }
+  catch (const ZCancellationException&) {
+    throw;
+  }
+  catch (const folly::OperationCancelled&) {
+    throw;
+  }
+  catch (const std::exception& e) {
+    throw ZException(
+      fmt::format("Failed to read Neuroglancer sharded payload from '{}' [start={}, end={}, length={}]: {}",
+                  dataUrl,
+                  location.start,
+                  location.end,
+                  payloadLength,
+                  e.what()));
+  }
   if (!bytesOpt) {
     co_return std::nullopt;
   }

@@ -28,7 +28,9 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <zbenchtimer.h>
 
 DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
@@ -78,6 +80,43 @@ struct MaxOp
   CHECK(chunkCount > 0);
   const size_t logicalCores = std::max<size_t>(1, nim::ZCpuInfo::instance().nLogicalCores);
   return std::min(logicalCores, chunkCount);
+}
+
+[[nodiscard]] std::string formatPreviewChunkFailureDetails(const std::vector<std::string>& failureMessages)
+{
+  CHECK(!failureMessages.empty());
+
+  std::map<std::string, size_t> failuresByCause;
+  for (const auto& failure : failureMessages) {
+    ++failuresByCause[failure];
+  }
+
+  std::string failuresText;
+  bool first = true;
+  for (const auto& [failure, count] : failuresByCause) {
+    if (!first) {
+      failuresText += "\n\n";
+    }
+    first = false;
+    failuresText += fmt::format("{} chunk{} failed:\n{}", count, (count == 1) ? "" : "s", failure);
+  }
+
+  return fmt::format("3D image preview failure details ({} chunk{}):\n{}",
+                     failureMessages.size(),
+                     (failureMessages.size() == 1) ? "" : "s",
+                     failuresText);
+}
+
+[[nodiscard]] std::string summarizePreviewChunkFailures(const std::vector<std::string>& failureMessages)
+{
+  CHECK(!failureMessages.empty());
+
+  return fmt::format(
+    "3D image preview skipped {} Neuroglancer chunk{} while building the current preview. Atlas showed the "
+    "missing preview regions as empty, so the completed frame is incomplete. Detailed failure information was "
+    "written to the log.",
+    failureMessages.size(),
+    (failureMessages.size() == 1) ? "" : "s");
 }
 
 folly::coro::Task<std::shared_ptr<nim::ZImg>>
@@ -281,6 +320,50 @@ void pasteNeuroglancerSegmentationChunkAsRgb(const ZImg& src, ZImg& dst, const Z
       break;
   }
   CHECK(false) << "Unsupported voxel type for Neuroglancer segmentation conversion: bytesPerVoxel=" << src.bytesPerVoxel();
+}
+
+folly::coro::Task<void> readPreviewChunkBestEffortAsync(const ZNeuroglancerPrecomputedVolume& volume,
+                                                        ZNeuroglancerPrecomputedVolume::Chunk chunk,
+                                                        ZImg& res,
+                                                        const std::array<size_t, 3>& ratio,
+                                                        bool segmentationRgbFor3D,
+                                                        const folly::CancellationToken& cancellationToken,
+                                                        std::mutex& failureMutex,
+                                                        std::vector<std::string>& failureMessages)
+{
+  std::shared_ptr<ZImg> chunkImg;
+  try {
+    chunkImg = co_await volume.readChunkAsync(chunk);
+  }
+  catch (const ZCancellationException&) {
+    throw;
+  }
+  catch (const folly::OperationCancelled&) {
+    throw;
+  }
+  catch (const std::exception& e) {
+    std::lock_guard<std::mutex> guard(failureMutex);
+    failureMessages.push_back(e.what());
+    co_return;
+  }
+
+  if (!chunkImg) {
+    co_return;
+  }
+
+  maybeCancel(cancellationToken);
+
+  const ZVoxelCoordinate start(std::round(static_cast<double>(chunk.baseStart[0]) / ratio[0]),
+                               std::round(static_cast<double>(chunk.baseStart[1]) / ratio[1]),
+                               std::round(static_cast<double>(chunk.baseStart[2]) / ratio[2]),
+                               0,
+                               0);
+  if (segmentationRgbFor3D) {
+    CHECK(volume.isSegmentation());
+    pasteNeuroglancerSegmentationChunkAsRgb(*chunkImg, res, start);
+  } else {
+    res.pasteImg(*chunkImg, start, false);
+  }
 }
 
 template<typename TVoxel>
@@ -1621,10 +1704,8 @@ std::shared_ptr<const ZImg> ZImgPack::resizedImgCached(size_t width, size_t heig
   return std::shared_ptr<const ZImg>(img);
 }
 
-folly::coro::Task<std::shared_ptr<const ZImg>> ZImgPack::resizedImgCachedAsync(size_t width,
-                                                                               size_t height,
-                                                                               size_t depth,
-                                                                               size_t t) const
+folly::coro::Task<ZImgPack::PreviewBuildResult>
+ZImgPack::resizedImgCachedAsync(size_t width, size_t height, size_t depth, size_t t) const
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
@@ -1648,13 +1729,13 @@ folly::coro::Task<std::shared_ptr<const ZImg>> ZImgPack::resizedImgCachedAsync(s
       maybeCancel(cancellationToken);
       auto img = std::make_shared<ZImg>(resizedImg(width, height, depth, t));
       maybeCancel(cancellationToken);
-      co_return std::shared_ptr<const ZImg>(std::move(img));
+      co_return PreviewBuildResult{std::shared_ptr<const ZImg>(std::move(img)), std::nullopt};
     }
 
     const auto fingerprint = datasetFingerprintForCache();
     if (auto hit = ZImgPreviewDiskCache::instance().tryGetFilePreview(fingerprint, width, height, depth, t); hit) {
       maybeCancel(cancellationToken);
-      co_return std::shared_ptr<const ZImg>(std::move(hit));
+      co_return PreviewBuildResult{std::shared_ptr<const ZImg>(std::move(hit)), std::nullopt};
     }
 
     maybeCancel(cancellationToken);
@@ -1707,7 +1788,7 @@ folly::coro::Task<std::shared_ptr<const ZImg>> ZImgPack::resizedImgCachedAsync(s
 
     auto img = std::make_shared<ZImg>(std::move(res));
     ZImgPreviewDiskCache::instance().tryPutFilePreview(fingerprint, width, height, depth, t, img);
-    co_return std::shared_ptr<const ZImg>(std::move(img));
+    co_return PreviewBuildResult{std::shared_ptr<const ZImg>(std::move(img)), std::nullopt};
   }
 
   // Neuroglancer precomputed (network-backed): build the preview volume via coroutines so cancellation
@@ -1772,6 +1853,8 @@ folly::coro::Task<std::shared_ptr<const ZImg>> ZImgPack::resizedImgCachedAsync(s
   info.voxelSizeZ = scale.resolutionNm[2];
 
   ZImg res(info);
+  std::mutex previewFailureMutex;
+  std::vector<std::string> previewFailureMessages;
 
   const auto chunks = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt,
                                                            {0, 0, 0},
@@ -1784,40 +1867,6 @@ folly::coro::Task<std::shared_ptr<const ZImg>> ZImgPack::resizedImgCachedAsync(s
     const size_t maxConcurrent =
       std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads));
 
-    // Each chunk task both reads and pastes its result. The chunk grid is non-overlapping by construction, so
-    // concurrent writes to disjoint regions of `res` are safe and avoids serializing the CPU-heavy paste step
-    // (notably segmentation ID→RGB conversion).
-    auto readChunkBestEffort = [&](ZNeuroglancerPrecomputedVolume::Chunk chunk) -> folly::coro::Task<void> {
-      std::shared_ptr<ZImg> chunkImg;
-      try {
-        chunkImg = co_await m_ngVolume->readChunkAsync(chunk);
-      } catch (const ZCancellationException&) {
-        throw;
-      } catch (const folly::OperationCancelled&) {
-        throw;
-      } catch (const std::exception&) {
-        co_return;
-      }
-      if (!chunkImg) {
-        co_return;
-      }
-
-      maybeCancel(cancellationToken);
-
-      const ZVoxelCoordinate start(std::round(static_cast<double>(chunk.baseStart[0]) / ratio[0]),
-                                   std::round(static_cast<double>(chunk.baseStart[1]) / ratio[1]),
-                                   std::round(static_cast<double>(chunk.baseStart[2]) / ratio[2]),
-                                   0,
-                                   0);
-      if (m_ngSegmentationRgbFor3D) {
-        CHECK(m_ngVolume->isSegmentation());
-        pasteNeuroglancerSegmentationChunkAsRgb(*chunkImg, res, start);
-      } else {
-        res.pasteImg(*chunkImg, start, false);
-      }
-      co_return;
-    };
-
     for (size_t batchStart = 0; batchStart < chunks.size(); batchStart += maxConcurrent) {
       maybeCancel(cancellationToken);
 
@@ -1825,7 +1874,14 @@ folly::coro::Task<std::shared_ptr<const ZImg>> ZImgPack::resizedImgCachedAsync(s
       std::vector<folly::coro::Task<void>> tasks;
       tasks.reserve(batchEnd - batchStart);
       for (size_t i = batchStart; i < batchEnd; ++i) {
-        tasks.push_back(readChunkBestEffort(chunks[i]));
+        tasks.push_back(readPreviewChunkBestEffortAsync(*m_ngVolume,
+                                                        chunks[i],
+                                                        res,
+                                                        ratio,
+                                                        m_ngSegmentationRgbFor3D,
+                                                        cancellationToken,
+                                                        previewFailureMutex,
+                                                        previewFailureMessages));
       }
 
       co_await folly::coro::collectAllRange(std::move(tasks));
@@ -1844,7 +1900,12 @@ folly::coro::Task<std::shared_ptr<const ZImg>> ZImgPack::resizedImgCachedAsync(s
   }
 
   auto img = std::make_shared<ZImg>(std::move(res));
-  co_return std::shared_ptr<const ZImg>(std::move(img));
+  std::optional<std::string> warning;
+  if (!previewFailureMessages.empty()) {
+    LOG(ERROR) << formatPreviewChunkFailureDetails(previewFailureMessages);
+    warning = summarizePreviewChunkFailures(previewFailureMessages);
+  }
+  co_return PreviewBuildResult{std::shared_ptr<const ZImg>(std::move(img)), std::move(warning)};
 }
 
 #if 0

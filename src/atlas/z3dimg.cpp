@@ -1104,12 +1104,16 @@ void Z3DImg::readVolumes()
 
   const folly::CancellationToken cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
   std::shared_ptr<const ZImg> img;
+  m_pendingPreviewWarning.reset();
   try {
     auto cpuExecutor = folly::getGlobalCPUExecutor();
     auto task = folly::coro::co_withCancellation(
       cancellationToken,
       m_imgPack.resizedImgCachedAsync(m_volumeDimension.x, m_volumeDimension.y, m_volumeDimension.z, 0));
-    img = folly::coro::blockingWait(folly::coro::co_withExecutor(cpuExecutor, std::move(task)));
+    ZImgPack::PreviewBuildResult previewResult =
+      folly::coro::blockingWait(folly::coro::co_withExecutor(cpuExecutor, std::move(task)));
+    img = std::move(previewResult.image);
+    m_pendingPreviewWarning = std::move(previewResult.warning);
   }
   catch (const folly::OperationCancelled&) {
     // co_withCancellation reports cancellation via folly::OperationCancelled.
@@ -1891,6 +1895,17 @@ std::optional<std::string> Z3DImg::takePendingPagingWarning()
     fmt::join(m_pendingPagingWarnings, "\n\n"));
 
   m_pendingPagingWarnings.clear();
+  return warning;
+}
+
+std::optional<std::string> Z3DImg::takePendingPreviewWarning()
+{
+  if (!m_pendingPreviewWarning.has_value()) {
+    return std::nullopt;
+  }
+
+  std::optional<std::string> warning = std::move(m_pendingPreviewWarning);
+  m_pendingPreviewWarning.reset();
   return warning;
 }
 

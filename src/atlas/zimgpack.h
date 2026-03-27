@@ -20,6 +20,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <string>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -64,6 +65,12 @@ public:
     Invalid,
     Partial,
     Complete
+  };
+
+  struct PreviewBuildResult
+  {
+    std::shared_ptr<const ZImg> image;
+    std::optional<std::string> warning;
   };
 
   enum class ReadRegionCachePolicy
@@ -294,10 +301,8 @@ public:
   // network-backed datasets (e.g. Neuroglancer precomputed). Cancellation is provided
   // implicitly via folly's coroutine cancellation context; callers should run it under
   // folly::coro::co_withCancellation(...) (or equivalent) to make cancellation effective.
-  folly::coro::Task<std::shared_ptr<const ZImg>> resizedImgCachedAsync(size_t width,
-                                                                       size_t height,
-                                                                       size_t depth,
-                                                                       size_t t) const;
+  folly::coro::Task<PreviewBuildResult>
+  resizedImgCachedAsync(size_t width, size_t height, size_t depth, size_t t) const;
 
 #if 0
   folly::Future<std::shared_ptr<ZImg>> readRegionToImg(index_t xyRatio,

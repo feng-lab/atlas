@@ -524,6 +524,11 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     LOG(ERROR) << e.what();
     Q_EMIT renderingError(QString("import 3d img error: %1").arg(e.what()));
   }
+  catch (const std::exception& e) {
+    m_3dImg.reset();
+    LOG(ERROR) << e.what();
+    Q_EMIT renderingError(QString("import 3d img error: %1").arg(e.what()));
+  }
 
 #ifdef NO // ATLAS_DEBUG_VERSION
   // Reset cached global cuts since our bounds may have changed with new data
@@ -1115,6 +1120,9 @@ double Z3DImgFilter::process(Z3DEye eye)
         channelDisplayRanges.push_back(para->get());
       }
       m_3dImg->setChannelDisplayRanges(channelDisplayRanges);
+      if (auto warning = m_3dImg->takePendingPreviewWarning()) {
+        Q_EMIT deferredRenderingWarning(QString::fromStdString(*warning));
+      }
       for (size_t i = 0; i < m_transferFuncParas.size() && i < m_3dImg->numChannels(); ++i) {
         auto channelImage = m_3dImg->channelImageShared(i);
         m_transferFuncParas[i]->setImage(std::move(channelImage));
