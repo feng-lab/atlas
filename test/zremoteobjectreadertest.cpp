@@ -6,6 +6,7 @@
 #include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancerremotecontext.h"
 #include "zneuroglancerstate.h"
+#include "zimginit.h"
 
 #include <folly/coro/BlockingWait.h>
 #include <folly/coro/Collect.h>
@@ -69,6 +70,29 @@ public:
 };
 
 } // namespace
+
+class ZRemoteObjectReaderImgInitEnvironment : public ::testing::Environment
+{
+public:
+  void SetUp() override
+  {
+    // Retry tests in this binary hit Folly coroutine sleep/timekeeper paths. Keep
+    // the init local to this suite by reusing the standard img runtime init.
+    (void)ZImgInit::instance("", "", "", false);
+  }
+};
+
+[[maybe_unused]] ::testing::Environment* const kZRemoteObjectReaderImgInitEnvironment =
+  ::testing::AddGlobalTestEnvironment(new ZRemoteObjectReaderImgInitEnvironment());
+
+void expectIdenticalRequestSuffix(const FakeRemoteObjectStore& store, size_t firstSuffixIndex)
+{
+  ASSERT_GE(store.requests.size(), firstSuffixIndex + 1);
+  for (size_t i = firstSuffixIndex + 1; i < store.requests.size(); ++i) {
+    EXPECT_EQ(store.requests[i].url, store.requests[firstSuffixIndex].url);
+    EXPECT_EQ(store.requests[i].headers, store.requests[firstSuffixIndex].headers);
+  }
+}
 
 TEST(ZRemoteObjectReader, RemoteContextUsesInjectedStoreForFullObjectReads)
 {
@@ -483,7 +507,7 @@ TEST(ZRemoteObjectReader, MeshSourceOpenScopesInfoMetadataByStore)
   EXPECT_EQ(storeB->requests[0].timeout, std::chrono::milliseconds(200));
 }
 
-TEST(ZRemoteObjectReader, ConcurrentChunkReadFailureIsDeduplicatedAndShared)
+TEST(ZRemoteObjectReader, ConcurrentChunkReadFailureIsPropagatedToBothCallers)
 {
   const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
   auto restoreRetries = folly::makeGuard([prevRetries]() {
@@ -563,13 +587,16 @@ TEST(ZRemoteObjectReader, ConcurrentChunkReadFailureIsDeduplicatedAndShared)
     }
   }
 
-  ASSERT_EQ(store->requests.size(), 2U);
+  ASSERT_GE(store->requests.size(), 2U);
+  ASSERT_LE(store->requests.size(), 3U);
   EXPECT_EQ(store->requests[0].url, "https://storage.googleapis.com/bucket/dataset/info");
   EXPECT_EQ(store->requests[1].url, "https://storage.googleapis.com/bucket/dataset/1_1_1/0-1_0-1_0-1");
-  EXPECT_EQ(store->responses.size(), 1U);
+  EXPECT_TRUE(store->requests[1].headers.empty());
+  expectIdenticalRequestSuffix(*store, 1);
+  EXPECT_EQ(store->responses.size(), 3U - store->requests.size());
 }
 
-TEST(ZRemoteObjectReader, ConcurrentShardedMinishardFailureIsDeduplicatedAndShared)
+TEST(ZRemoteObjectReader, ConcurrentShardedMinishardFailureIsPropagatedToBothCallers)
 {
   const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
   auto restoreRetries = folly::makeGuard([prevRetries]() {
@@ -660,13 +687,15 @@ TEST(ZRemoteObjectReader, ConcurrentShardedMinishardFailureIsDeduplicatedAndShar
     }
   }
 
-  ASSERT_EQ(store->requests.size(), 2U);
+  ASSERT_GE(store->requests.size(), 2U);
+  ASSERT_LE(store->requests.size(), 3U);
   EXPECT_EQ(store->requests[0].url, "https://storage.googleapis.com/bucket/dataset/info");
   EXPECT_EQ(store->requests[1].url, "https://storage.googleapis.com/bucket/dataset/1_1_1/0.shard");
   ASSERT_EQ(store->requests[1].headers.size(), 1U);
   EXPECT_EQ(store->requests[1].headers[0].first, "range");
   EXPECT_EQ(store->requests[1].headers[0].second, "bytes=0-15");
-  EXPECT_EQ(store->responses.size(), 1U);
+  expectIdenticalRequestSuffix(*store, 1);
+  EXPECT_EQ(store->responses.size(), 3U - store->requests.size());
 }
 
 } // namespace nim

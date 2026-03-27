@@ -21,8 +21,8 @@ from common_dirs import (
     curl_root_dir,
     ext_build_dir,
     ext_dir,
-    find_src_package_with_glob,
     find_latest_windows_curl_package,
+    find_src_package_with_glob,
     get_cmake_binary,
     get_ffmpeg_binary,
     get_gperf_dir,
@@ -73,8 +73,8 @@ def use_clang_in_linux() -> bool:
 
 
 def _clang_major_env() -> str:
-    # Allow CI to control clang version; default to 18 for backward compat
-    return os.environ.get("ATLAS_CLANG_MAJOR") or os.environ.get("LLVM_VERSION") or "18"
+    # Allow CI to control clang version; default to 20 for backward compat
+    return os.environ.get("ATLAS_CLANG_MAJOR") or os.environ.get("LLVM_VERSION") or "20"
 
 
 def get_clang_in_linux() -> str:
