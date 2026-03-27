@@ -1,8 +1,16 @@
 #include "zremoteobjectreader.h"
 
 #include "zexception.h"
+#include "zhttpretrypolicy.h"
+#include "zlog.h"
+
+#include <gflags/gflags.h>
+
+#include <folly/coro/Sleep.h>
 
 #include <cstring>
+
+DECLARE_uint32(atlas_http_max_retries);
 
 namespace nim {
 namespace {
@@ -27,6 +35,19 @@ void recordUnderlyingIoStats(const ZHttpGetBytesResult& result,
     case ZHttpGetBytesSource::Unknown:
       break;
   }
+}
+
+[[nodiscard]] std::optional<std::vector<uint8_t>>
+sliceAllowedFullResponse(const ZHttpGetBytesResult& result, uint64_t offset, uint64_t length)
+{
+  const uint64_t bodySize = static_cast<uint64_t>(result.body.size());
+  if (offset > bodySize || length > bodySize - offset) {
+    return std::nullopt;
+  }
+
+  std::vector<uint8_t> out(static_cast<size_t>(length));
+  std::memcpy(out.data(), result.body.data() + static_cast<size_t>(offset), static_cast<size_t>(length));
+  return out;
 }
 
 } // namespace
@@ -109,39 +130,52 @@ getRemoteObjectRangeBytesAsync(const ZRemoteObjectStore& objectStore,
   }
 
   const uint64_t endInclusive = offset + length - 1;
-  auto resOpt = co_await getRemoteObjectResponseAsync(objectStore,
-                                                      url,
-                                                      timeout,
-                                                      {
-                                                        {"range", fmt::format("bytes={}-{}", offset, endInclusive)}
-  },
-                                                      statsSink,
-                                                      statsContext);
-  if (!resOpt) {
-    co_return std::nullopt;
-  }
+  const std::vector<std::pair<std::string, std::string>> requestHeaders = {
+    {"range", fmt::format("bytes={}-{}", offset, endInclusive)}
+  };
 
-  if (resOpt->status != 206 && resOpt->status != 200) {
-    throw ZException(fmt::format("HTTP range GET failed for '{}' (status {})", url, resOpt->status));
-  }
-
-  if (resOpt->body.size() == length) {
-    co_return std::move(resOpt->body);
-  }
-
-  if (policy == ZRemoteRangeReadPolicy::AllowFullResponseSlice && resOpt->status == 200) {
-    const uint64_t bodySize = static_cast<uint64_t>(resOpt->body.size());
-    if (offset <= bodySize && length <= bodySize - offset) {
-      std::vector<uint8_t> out(static_cast<size_t>(length));
-      std::memcpy(out.data(), resOpt->body.data() + static_cast<size_t>(offset), static_cast<size_t>(length));
-      co_return out;
+  const uint32_t maxRetries = FLAGS_atlas_http_max_retries;
+  for (uint32_t attempt = 0; attempt <= maxRetries; ++attempt) {
+    auto resOpt =
+      co_await getRemoteObjectResponseAsync(objectStore, url, timeout, requestHeaders, statsSink, statsContext);
+    if (!resOpt) {
+      co_return std::nullopt;
     }
+
+    if (resOpt->status != 206 && resOpt->status != 200) {
+      throw ZException(fmt::format("HTTP range GET failed for '{}' (status {})", url, resOpt->status));
+    }
+
+    if (resOpt->status == 206) {
+      if (resOpt->body.size() == length) {
+        co_return std::move(resOpt->body);
+      }
+    } else if (policy == ZRemoteRangeReadPolicy::AllowFullResponseSlice) {
+      if (auto sliced = sliceAllowedFullResponse(*resOpt, offset, length)) {
+        co_return sliced;
+      }
+    } else {
+      throw ZException(fmt::format("HTTP range GET unexpectedly returned 200 for strict range request '{}'", url));
+    }
+
+    if (attempt < maxRetries) {
+      VLOG(1) << fmt::format("HTTP range GET size mismatch (attempt {}/{}): '{}' got {} bytes, expected {}; retrying",
+                             attempt + 1,
+                             maxRetries + 1,
+                             url,
+                             resOpt->body.size(),
+                             length);
+      co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
+      continue;
+    }
+
+    throw ZException(fmt::format("HTTP range GET size mismatch for '{}': got {} bytes, expected {} bytes",
+                                 url,
+                                 resOpt->body.size(),
+                                 length));
   }
 
-  throw ZException(fmt::format("HTTP range GET size mismatch for '{}': got {} bytes, expected {} bytes",
-                               url,
-                               resOpt->body.size(),
-                               length));
+  throw ZException(fmt::format("HTTP range GET failed for '{}': exhausted retries", url));
 }
 
 folly::coro::Task<std::optional<std::vector<uint8_t>>>

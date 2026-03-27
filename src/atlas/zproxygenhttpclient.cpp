@@ -54,8 +54,8 @@ DEFINE_uint32(atlas_http_max_redirect_hops,
               "Maximum number of HTTP redirects to follow for a single GET request (default 5).");
 
 DEFINE_uint32(atlas_http_max_retries,
-              3,
-              "Maximum number of retries for transient network/handshake errors in HTTP GET (default 3).");
+              7,
+              "Maximum number of retries for transient network/handshake errors in HTTP GET (default 7).");
 
 DEFINE_uint32(atlas_http_retry_backoff_initial_ms,
               200,

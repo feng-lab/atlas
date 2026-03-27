@@ -293,6 +293,8 @@ public:
     Q_EMIT renderingError("cancelled");
   }
 
+  void appendDeferredRenderingError(const QString& error);
+
   // Render-thread executor: a folly::Executor that schedules work onto the
   // engine thread via QMetaObject::invokeMethod. Intended for Vulkan/GL
   // continuations that must run on the rendering thread.
@@ -431,6 +433,10 @@ private:
   [[nodiscard]] bool shouldDeferVulkanNetworkProcessing() const;
   void deferRenderUntilVulkanIdle(QEvent::Type deferredType);
   void maybeKickDeferredRenderAfterVulkanPoll();
+  [[nodiscard]] bool beginDeferredRenderingErrorFrame();
+  void endDeferredRenderingErrorFrame(bool startedFrame);
+  void clearDeferredRenderingErrors();
+  void reportDeferredRenderingErrorsIfAny();
 
   // Execute one pass over the current filter pipeline. If cancellationToken
   // is provided, this will check for cancellation between filters.
@@ -529,6 +535,8 @@ private:
   std::mutex m_mutex;
 
   double m_progress = 0;
+  std::vector<QString> m_deferredRenderingErrors;
+  bool m_deferredRenderingErrorFrameActive = false;
 
   // Backend switch deferred
   bool m_backendSwitchScheduled = false;

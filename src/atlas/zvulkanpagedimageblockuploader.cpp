@@ -143,7 +143,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   const size_t bytesPerBlock = image.imageBlockByteSize();
   const ZImgInfo resInfo(extent.x, extent.y, extent.z, 1);
 
-  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>>, true> imgQueue;
+  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>>, true> imgQueue;
   auto readFuture =
     folly::coro::toFuture(folly::coro::co_withCancellation(
                             cancellationToken,
@@ -170,7 +170,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
 
   size_t emptyBlockCount = 0;
   int remainingBlocks = static_cast<int>(pendingTasks.size());
-  std::tuple<size_t, std::shared_ptr<ZImg>> elem;
+  std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>> elem;
   auto lastLog = std::chrono::steady_clock::now();
   bool markedDirty = false;
 
@@ -182,6 +182,10 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
           std::chrono::steady_clock::now() + std::chrono::milliseconds(FLAGS_atlas_3d_paging_queue_poll_interval_ms))) {
       const auto taskIndex = std::get<0>(elem);
       const auto& [pageTableEntryKey, pageTableEntryPtr] = pendingTasks[taskIndex];
+
+      if (std::get<2>(elem).has_value()) {
+        image.recordPagingFailure(pageTableEntryKey, *std::get<2>(elem));
+      }
 
       if (!std::get<1>(elem)) {
         ++emptyBlockCount;

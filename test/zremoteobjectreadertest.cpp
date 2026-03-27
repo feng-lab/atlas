@@ -12,6 +12,8 @@
 #include <folly/coro/CurrentExecutor.h>
 #include <folly/coro/ViaIfAsync.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
+#include <folly/ScopeGuard.h>
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
 #include <deque>
@@ -19,6 +21,10 @@
 #include <mutex>
 #include <stdexcept>
 #include <utility>
+
+DECLARE_uint32(atlas_http_max_retries);
+DECLARE_uint32(atlas_http_retry_backoff_initial_ms);
+DECLARE_uint32(atlas_http_retry_backoff_max_ms);
 
 namespace nim {
 namespace {
@@ -107,6 +113,141 @@ TEST(ZRemoteObjectReader, RemoteContextUsesInjectedStoreForRangeReads)
   ASSERT_EQ(store->requests[0].headers.size(), 1U);
   EXPECT_EQ(store->requests[0].headers[0].first, "range");
   EXPECT_EQ(store->requests[0].headers[0].second, "bytes=7-9");
+}
+
+TEST(ZRemoteObjectReader, RemoteContextRetriesRangeSizeMismatch)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+
+  ZHttpGetBytesResult shortResponse;
+  shortResponse.status = 206;
+  shortResponse.body = std::vector<uint8_t>{1};
+  shortResponse.encodedBodyBytes = 1;
+  shortResponse.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(shortResponse);
+
+  ZHttpGetBytesResult goodResponse;
+  goodResponse.status = 206;
+  goodResponse.body = std::vector<uint8_t>{1, 2, 3};
+  goodResponse.encodedBodyBytes = 3;
+  goodResponse.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(goodResponse);
+
+  const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
+  const uint32_t prevInitialBackoff = FLAGS_atlas_http_retry_backoff_initial_ms;
+  const uint32_t prevMaxBackoff = FLAGS_atlas_http_retry_backoff_max_ms;
+  auto restoreFlags = folly::makeGuard([&]() {
+    FLAGS_atlas_http_max_retries = prevRetries;
+    FLAGS_atlas_http_retry_backoff_initial_ms = prevInitialBackoff;
+    FLAGS_atlas_http_retry_backoff_max_ms = prevMaxBackoff;
+  });
+  FLAGS_atlas_http_max_retries = 1;
+  FLAGS_atlas_http_retry_backoff_initial_ms = 0;
+  FLAGS_atlas_http_retry_backoff_max_ms = 0;
+
+  const auto remoteContext = ZNeuroglancerRemoteContext::create(std::chrono::milliseconds{222}, store);
+
+  auto bytesOpt = folly::coro::blockingWait(remoteContext->getRangeBytesAsync("https://example.com/range", 7, 3));
+
+  ASSERT_TRUE(bytesOpt.has_value());
+  EXPECT_EQ(*bytesOpt, (std::vector<uint8_t>{1, 2, 3}));
+  ASSERT_EQ(store->requests.size(), 2U);
+  EXPECT_EQ(store->requests[0].headers[0].second, "bytes=7-9");
+  EXPECT_EQ(store->requests[1].headers[0].second, "bytes=7-9");
+}
+
+TEST(ZRemoteObjectReader, RemoteContextSlicesFullResponseWhenAllowed)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+
+  ZHttpGetBytesResult fullResponse;
+  fullResponse.status = 200;
+  fullResponse.body = std::vector<uint8_t>{10, 11, 12, 13, 14, 15};
+  fullResponse.encodedBodyBytes = 6;
+  fullResponse.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(fullResponse);
+
+  const auto remoteContext = ZNeuroglancerRemoteContext::create(std::chrono::milliseconds{222}, store);
+
+  auto bytesOpt =
+    folly::coro::blockingWait(remoteContext->getRangeBytesAsync("https://example.com/range",
+                                                                2,
+                                                                3,
+                                                                ZRemoteRangeReadPolicy::AllowFullResponseSlice));
+
+  ASSERT_TRUE(bytesOpt.has_value());
+  EXPECT_EQ(*bytesOpt, (std::vector<uint8_t>{12, 13, 14}));
+  ASSERT_EQ(store->requests.size(), 1U);
+  EXPECT_EQ(store->requests[0].headers[0].second, "bytes=2-4");
+}
+
+TEST(ZRemoteObjectReader, RemoteContextRejectsStrictRangeReadWithStatus200)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+
+  ZHttpGetBytesResult fullResponse;
+  fullResponse.status = 200;
+  fullResponse.body = std::vector<uint8_t>{1, 2, 3};
+  fullResponse.encodedBodyBytes = 3;
+  fullResponse.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(fullResponse);
+
+  const auto remoteContext = ZNeuroglancerRemoteContext::create(std::chrono::milliseconds{222}, store);
+
+  try {
+    (void)folly::coro::blockingWait(
+      remoteContext->getRangeBytesAsync("https://example.com/range", 7, 3, ZRemoteRangeReadPolicy::RequireExactLength));
+    FAIL() << "Expected strict range read with status 200 to throw";
+  }
+  catch (const ZException& e) {
+    const std::string what = e.what();
+    EXPECT_NE(what.find("returned 200"), std::string::npos);
+    EXPECT_NE(what.find("strict range request"), std::string::npos);
+  }
+
+  ASSERT_EQ(store->requests.size(), 1U);
+  EXPECT_EQ(store->requests[0].headers[0].second, "bytes=7-9");
+}
+
+TEST(ZRemoteObjectReader, RemoteContextExhaustsRangeSizeMismatchRetries)
+{
+  auto store = std::make_shared<FakeRemoteObjectStore>();
+
+  ZHttpGetBytesResult shortResponse;
+  shortResponse.status = 206;
+  shortResponse.body = std::vector<uint8_t>{1};
+  shortResponse.encodedBodyBytes = 1;
+  shortResponse.source = ZHttpGetBytesSource::Network;
+  store->responses.push_back(shortResponse);
+  store->responses.push_back(shortResponse);
+
+  const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
+  const uint32_t prevInitialBackoff = FLAGS_atlas_http_retry_backoff_initial_ms;
+  const uint32_t prevMaxBackoff = FLAGS_atlas_http_retry_backoff_max_ms;
+  auto restoreFlags = folly::makeGuard([&]() {
+    FLAGS_atlas_http_max_retries = prevRetries;
+    FLAGS_atlas_http_retry_backoff_initial_ms = prevInitialBackoff;
+    FLAGS_atlas_http_retry_backoff_max_ms = prevMaxBackoff;
+  });
+  FLAGS_atlas_http_max_retries = 1;
+  FLAGS_atlas_http_retry_backoff_initial_ms = 0;
+  FLAGS_atlas_http_retry_backoff_max_ms = 0;
+
+  const auto remoteContext = ZNeuroglancerRemoteContext::create(std::chrono::milliseconds{222}, store);
+
+  try {
+    (void)folly::coro::blockingWait(remoteContext->getRangeBytesAsync("https://example.com/range", 7, 3));
+    FAIL() << "Expected range size mismatch to throw after retries";
+  }
+  catch (const ZException& e) {
+    const std::string what = e.what();
+    EXPECT_NE(what.find("size mismatch"), std::string::npos);
+    EXPECT_NE(what.find("expected 3 bytes"), std::string::npos);
+  }
+
+  ASSERT_EQ(store->requests.size(), 2U);
+  EXPECT_EQ(store->requests[0].headers[0].second, "bytes=7-9");
+  EXPECT_EQ(store->requests[1].headers[0].second, "bytes=7-9");
 }
 
 TEST(ZRemoteObjectReader, StateParsingUsesInjectedStore)

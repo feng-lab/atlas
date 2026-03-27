@@ -615,6 +615,17 @@ bool Z3DImgFilter::isReady(Z3DEye eye) const
   return Z3DBoundedFilter::isReady(eye) && m_visible.get() && m_3dImg;
 }
 
+void Z3DImgFilter::emitPendingPagingWarning() const
+{
+  if (!m_3dImg) {
+    return;
+  }
+
+  if (auto warning = m_3dImg->takePendingPagingWarning()) {
+    Q_EMIT deferredRenderingWarning(QString::fromStdString(*warning));
+  }
+}
+
 bool Z3DImgFilter::hasOpaque(Z3DEye) const
 {
   return hasSlices();
@@ -1082,6 +1093,10 @@ double Z3DImgFilter::process(Z3DEye eye)
   syncRendererState();
   // VLOG(2) << "state synced " << m_rendererBase.frameState().viewport;
 
+  if (m_3dImg) {
+    m_3dImg->clearPendingPagingWarnings();
+  }
+
   // Apply any deferred progressive reset at a safe point
   if (m_resetProgressPending) {
     m_imgRaycasterRenderer.resetProgress(MonoEye);
@@ -1294,6 +1309,8 @@ double Z3DImgFilter::process(Z3DEye eye)
       m_opaqueValid[eye] = true;
     }
 
+    emitPendingPagingWarning();
+
     if (!m_progressiveRendering) {
       CHECK(currentProgress == totalProgress) << currentProgress << " " << totalProgress;
     }
@@ -1319,6 +1336,8 @@ double Z3DImgFilter::process(Z3DEye eye)
     currentProgress += progress;
     totalProgress += 1.0;
   }
+
+  emitPendingPagingWarning();
 
   CHECK_GL_ERROR
 

@@ -22,6 +22,7 @@
 #include <array>
 #include <cmath>
 #include <chrono>
+#include <exception>
 #include <memory>
 #include <utility>
 
@@ -1340,7 +1341,8 @@ Z3DImg::readImageBlockToBufferAsync(size_t c,
                                     const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                     size_t taskIdx,
                                     const ZImgInfo& resInfo,
-                                    uint8_t* buffer) const
+                                    uint8_t* buffer,
+                                    std::optional<std::string>* failureMessage) const
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
@@ -1349,24 +1351,36 @@ Z3DImg::readImageBlockToBufferAsync(size_t c,
   auto pageTableEntryPtr = std::get<1>(pendingTasks[taskIdx]);
   glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
   const auto statsContext = ZImgReadStatsContext{static_cast<uint32_t>(c), m_activeReadStatsRound};
-  auto img = co_await m_imgPack.readRegionToImgAsync(m_levelScales[blockImagePos.w].x,
-                                                     m_levelScales[blockImagePos.w].z,
-                                                     index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
-                                                     index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.y) / 2,
-                                                     index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.z) / 2,
-                                                     c,
-                                                     0,
-                                                     resInfo,
-                                                     m_channelDisplayRanges[c].x,
-                                                     m_channelDisplayRanges[c].y,
-                                                     m_readStatsSink,
-                                                     statsContext);
+  try {
+    auto img = co_await m_imgPack.readRegionToImgAsync(m_levelScales[blockImagePos.w].x,
+                                                       m_levelScales[blockImagePos.w].z,
+                                                       index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
+                                                       index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.y) / 2,
+                                                       index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.z) / 2,
+                                                       c,
+                                                       0,
+                                                       resInfo,
+                                                       m_channelDisplayRanges[c].x,
+                                                       m_channelDisplayRanges[c].y,
+                                                       m_readStatsSink,
+                                                       statsContext);
 
-  maybeCancel(cancellationToken);
-  if (!img) {
+    maybeCancel(cancellationToken);
+    if (!img) {
+      *pageTableEntryPtr = m_emptyPageTableEntry;
+    } else {
+      std::copy_n(img->channelData(0), resInfo.byteNumber(), buffer + taskIdx * resInfo.byteNumber());
+    }
+  }
+  catch (const ZCancellationException&) {
+    throw;
+  }
+  catch (const folly::OperationCancelled&) {
+    throw;
+  }
+  catch (const std::exception& e) {
     *pageTableEntryPtr = m_emptyPageTableEntry;
-  } else {
-    std::copy_n(img->channelData(0), resInfo.byteNumber(), buffer + taskIdx * resInfo.byteNumber());
+    *failureMessage = e.what();
   }
 }
 
@@ -1374,7 +1388,8 @@ folly::coro::Task<void>
 Z3DImg::readImageBlocksToBufferAsync(size_t c,
                                      const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                      const ZImgInfo& resInfo,
-                                     uint8_t* buffer) const
+                                     uint8_t* buffer,
+                                     std::vector<std::optional<std::string>>& failureMessages) const
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   processEventsAndMaybeCancel(cancellationToken);
@@ -1395,9 +1410,9 @@ Z3DImg::readImageBlocksToBufferAsync(size_t c,
     blockTasks.reserve(numberOfTasks);
     size_t finalTaskIdx = taskIdx + numberOfTasks;
     for (; taskIdx < finalTaskIdx; ++taskIdx) {
-      blockTasks.push_back(
-        folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(),
-                                     readImageBlockToBufferAsync(c, pendingTasks, taskIdx, resInfo, buffer)));
+      blockTasks.push_back(folly::coro::co_withExecutor(
+        folly::getGlobalCPUExecutor(),
+        readImageBlockToBufferAsync(c, pendingTasks, taskIdx, resInfo, buffer, &failureMessages[taskIdx])));
     }
     co_await folly::coro::collectAllRange(std::move(blockTasks));
     processEventsAndMaybeCancel(cancellationToken);
@@ -1417,23 +1432,36 @@ Z3DImg::readImageBlockToQueueAsync(size_t c,
   maybeCancel(cancellationToken);
 
   const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
+  auto pageTableEntryPtr = std::get<1>(pendingTasks[taskIdx]);
   glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
   const auto statsContext = ZImgReadStatsContext{static_cast<uint32_t>(c), m_activeReadStatsRound};
-  auto img = co_await m_imgPack.readRegionToImgAsync(m_levelScales[blockImagePos.w].x,
-                                                     m_levelScales[blockImagePos.w].z,
-                                                     index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
-                                                     index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.y) / 2,
-                                                     index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.z) / 2,
-                                                     c,
-                                                     0,
-                                                     resInfo,
-                                                     m_channelDisplayRanges[c].x,
-                                                     m_channelDisplayRanges[c].y,
-                                                     m_readStatsSink,
-                                                     statsContext);
+  try {
+    auto img = co_await m_imgPack.readRegionToImgAsync(m_levelScales[blockImagePos.w].x,
+                                                       m_levelScales[blockImagePos.w].z,
+                                                       index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
+                                                       index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.y) / 2,
+                                                       index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.z) / 2,
+                                                       c,
+                                                       0,
+                                                       resInfo,
+                                                       m_channelDisplayRanges[c].x,
+                                                       m_channelDisplayRanges[c].y,
+                                                       m_readStatsSink,
+                                                       statsContext);
 
-  maybeCancel(cancellationToken);
-  queue.enqueue(std::make_tuple(taskIdx, std::move(img)));
+    maybeCancel(cancellationToken);
+    queue.enqueue(std::make_tuple(taskIdx, std::move(img), std::optional<std::string>{}));
+  }
+  catch (const ZCancellationException&) {
+    throw;
+  }
+  catch (const folly::OperationCancelled&) {
+    throw;
+  }
+  catch (const std::exception& e) {
+    *pageTableEntryPtr = m_emptyPageTableEntry;
+    queue.enqueue(std::make_tuple(taskIdx, std::shared_ptr<ZImg>{}, std::optional<std::string>(e.what())));
+  }
 }
 
 template<typename QueueType>
@@ -1598,7 +1626,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   if (!pboPtr) {
     processEventsAndMaybeCancel(cancellationToken);
 
-    folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>>, true> imgQueue;
+    folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>>, true> imgQueue;
 #if 1
     // auto f = folly::coro::co_withCancellation(cancellationToken,
     //                                           readImageBlocksToQueueAsync(c, pendingTasks, resInfo, imgQueue, bt))
@@ -1659,7 +1687,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
     processEventsAndMaybeCancel(cancellationToken);
 
-    std::tuple<size_t, std::shared_ptr<ZImg>> elem;
+    std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>> elem;
     auto lastLogTime = std::chrono::steady_clock::now();
     int remainingBlocksToUpload = static_cast<int>(pendingTasks.size());
     while (remainingBlocksToUpload > 0) {
@@ -1669,6 +1697,9 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
             elem,
             std::chrono::steady_clock::now() + std::chrono::milliseconds(FLAGS_atlas_3d_paging_queue_poll_interval_ms))) {
         const auto& [pageTableEntryKey, pageTableEntryPtr] = pendingTasks[std::get<0>(elem)];
+        if (std::get<2>(elem).has_value()) {
+          recordPagingFailure(pageTableEntryKey, *std::get<2>(elem));
+        }
         if (!std::get<1>(elem)) {
           ++emptyBlockCount;
           *pageTableEntryPtr = m_emptyPageTableEntry;
@@ -1715,9 +1746,16 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
 #if 1
       try {
+        std::vector<std::optional<std::string>> failureMessages(pendingTasks.size());
         folly::coro::blockingWait(folly::coro::co_withCancellation(
           cancellationToken,
-          readImageBlocksToBufferAsync(c, pendingTasks, resInfo, pboLocalBuffer.data())));
+          readImageBlocksToBufferAsync(c, pendingTasks, resInfo, pboLocalBuffer.data(), failureMessages)));
+
+        for (size_t i = 0; i < pendingTasks.size(); ++i) {
+          if (failureMessages[i].has_value()) {
+            recordPagingFailure(std::get<0>(pendingTasks[i]), *failureMessages[i]);
+          }
+        }
       }
       catch (const folly::OperationCancelled&) {
         // co_withCancellation reports cancellation via folly::OperationCancelled.
@@ -1832,6 +1870,40 @@ void Z3DImg::setVulkanImageBlockUploader(ZVulkanImageBlockUploader* uploader)
   if (m_vulkanImageBlockUploader) {
     m_vulkanImageBlockUploader->ensureImageResources(*this);
   }
+}
+
+void Z3DImg::clearPendingPagingWarnings()
+{
+  m_pendingPagingWarnings.clear();
+}
+
+std::optional<std::string> Z3DImg::takePendingPagingWarning()
+{
+  if (m_pendingPagingWarnings.empty()) {
+    return std::nullopt;
+  }
+
+  std::string warning = fmt::format(
+    "3D image paging exhausted retries for {} block{}. Atlas treated those blocks as empty so rendering could "
+    "finish.\n\nFailures:\n{}",
+    m_pendingPagingWarnings.size(),
+    (m_pendingPagingWarnings.size() == 1) ? "" : "s",
+    fmt::join(m_pendingPagingWarnings, "\n\n"));
+
+  m_pendingPagingWarnings.clear();
+  return warning;
+}
+
+void Z3DImg::recordPagingFailure(const glm::uvec4& pageTableEntryKey, std::string errorMessage)
+{
+  LOG(ERROR) << "3D paging exhausted retries; treating failed block as empty for this render: " << pageTableEntryKey
+             << " " << errorMessage;
+  m_pendingPagingWarnings.push_back(fmt::format("block ({}, {}, {}, {}) failed after retries:\n{}",
+                                                pageTableEntryKey.x,
+                                                pageTableEntryKey.y,
+                                                pageTableEntryKey.z,
+                                                pageTableEntryKey.w,
+                                                errorMessage));
 }
 
 void Z3DImg::checkPageSystemError(size_t c, bool strict)
@@ -2129,18 +2201,18 @@ void Z3DImg::rebuildGLPagingResources()
 
 } // namespace nim
 
-template folly::coro::Task<void>
-nim::Z3DImg::readImageBlockToQueueAsync<folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>>, true>>(
+template folly::coro::Task<void> nim::Z3DImg::readImageBlockToQueueAsync<
+  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>, std::optional<std::string>>, true>>(
   size_t,
   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>&,
   size_t,
   const nim::ZImgInfo&,
-  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>>, true>&) const;
+  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>, std::optional<std::string>>, true>&) const;
 
-template folly::coro::Task<void>
-nim::Z3DImg::readImageBlocksToQueueAsync<folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>>, true>>(
+template folly::coro::Task<void> nim::Z3DImg::readImageBlocksToQueueAsync<
+  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>, std::optional<std::string>>, true>>(
   size_t,
   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>&,
   const nim::ZImgInfo&,
-  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>>, true>&,
+  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>, std::optional<std::string>>, true>&,
   nim::ZBenchTimer&) const;

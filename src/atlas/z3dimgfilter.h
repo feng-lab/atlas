@@ -108,6 +108,7 @@ Q_SIGNALS:
                                 float y,
                                 float z,
                                 Qt::KeyboardModifiers modifiers);
+  void deferredRenderingWarning(const QString& warning) const;
 
 protected:
   void switchRendererBackend(RenderBackend backend) override
@@ -179,6 +180,7 @@ private:
   void prepareSliceInputs(Z3DEye eye, const glm::uvec2& outputSize);
 
   void volumeChanged();
+  void emitPendingPagingWarning() const;
 
   void channelRangeChanged();
 

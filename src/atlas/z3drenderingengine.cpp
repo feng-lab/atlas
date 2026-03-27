@@ -718,6 +718,11 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
   }
 
   try {
+    const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
+    auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
+      endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
+    });
+
     if (width % 2 == 1) {
       ++width;
     }
@@ -934,6 +939,9 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
         }
       }
       LOG(INFO) << dir.filePath(fn) << " saved";
+    }
+    if (startedDeferredErrorFrame) {
+      reportDeferredRenderingErrorsIfAny();
     }
   }
   catch (const ZException& e) {
@@ -1588,6 +1596,67 @@ double Z3DRenderingEngine::processFrame(bool stereo,
   return totalProgress > 0.0 ? currentProgress / totalProgress : 1.0;
 }
 
+bool Z3DRenderingEngine::beginDeferredRenderingErrorFrame()
+{
+  CHECK(QThread::currentThread() == this->thread()) << "Deferred rendering error frame must start on engine thread";
+  if (m_deferredRenderingErrorFrameActive) {
+    return false;
+  }
+
+  clearDeferredRenderingErrors();
+  m_deferredRenderingErrorFrameActive = true;
+  return true;
+}
+
+void Z3DRenderingEngine::endDeferredRenderingErrorFrame(bool startedFrame)
+{
+  CHECK(QThread::currentThread() == this->thread()) << "Deferred rendering error frame must end on engine thread";
+  if (!startedFrame) {
+    return;
+  }
+
+  m_deferredRenderingErrorFrameActive = false;
+}
+
+void Z3DRenderingEngine::appendDeferredRenderingError(const QString& error)
+{
+  CHECK(QThread::currentThread() == this->thread()) << "Deferred rendering errors must be appended on engine thread";
+  if (error.isEmpty()) {
+    return;
+  }
+
+  if (!m_deferredRenderingErrorFrameActive) {
+    return;
+  }
+
+  m_deferredRenderingErrors.push_back(error);
+}
+
+void Z3DRenderingEngine::clearDeferredRenderingErrors()
+{
+  CHECK(QThread::currentThread() == this->thread()) << "Deferred rendering errors must be cleared on engine thread";
+  m_deferredRenderingErrors.clear();
+}
+
+void Z3DRenderingEngine::reportDeferredRenderingErrorsIfAny()
+{
+  CHECK(QThread::currentThread() == this->thread()) << "Deferred rendering errors must be reported on engine thread";
+  if (m_deferredRenderingErrors.empty()) {
+    return;
+  }
+
+  QString combined;
+  for (size_t i = 0; i < m_deferredRenderingErrors.size(); ++i) {
+    if (i > 0) {
+      combined += QStringLiteral("\n\n");
+    }
+    combined += m_deferredRenderingErrors[i];
+  }
+
+  clearDeferredRenderingErrors();
+  reportRenderingError(combined);
+}
+
 ZImg Z3DRenderingEngine::localColorBufferToRGBAImg(const Z3DLocalColorBuffer& buffer)
 {
   if (buffer.width == 0 || buffer.height == 0) {
@@ -1963,6 +2032,10 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   auto cancellationGuard = folly::makeGuard([&renderState]() {
     renderState.resetCancellationSource();
   });
+  const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
+  auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
+    endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
+  });
 
   try {
     const auto token = cancellationSource->getToken();
@@ -2002,6 +2075,9 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   } else {
     Q_EMIT progressChanged(100);
   }
+  if (startedDeferredErrorFrame && m_progress >= 1.0) {
+    reportDeferredRenderingErrorsIfAny();
+  }
 }
 
 void Z3DRenderingEngine::render(bool stereo)
@@ -2015,6 +2091,10 @@ void Z3DRenderingEngine::render(bool stereo)
     // Arm completion polling when returning to the event loop. The QTimer cannot
     // fire while we are inside this tight progressive loop.
     maybeStartVulkanCompletionPolling();
+  });
+  const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
+  auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
+    endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
   try {
     auto cancellationSource = Z3DRenderGlobalState::instance().ensureCancellationSource();
@@ -2044,6 +2124,9 @@ void Z3DRenderingEngine::render(bool stereo)
               << " elapsed_ms=" << elapsedMs << " progress=" << m_progress << " source=render";
   }
   Q_EMIT progressChanged(100);
+  if (startedDeferredErrorFrame && m_progress >= 1.0) {
+    reportDeferredRenderingErrorsIfAny();
+  }
   Z3DRenderGlobalState::instance().resetCancellationSource();
 }
 
@@ -2070,6 +2153,10 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
     m_isRendering = false;
+  });
+  const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
+  auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
+    endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
   const int tileSize = 2048;
   const int tileBorder = 128;
@@ -2177,6 +2264,9 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
       }
     }
   }
+  if (startedDeferredErrorFrame) {
+    reportDeferredRenderingErrorsIfAny();
+  }
 }
 
 void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
@@ -2192,6 +2282,10 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
     m_isRendering = false;
+  });
+  const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
+  auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
+    endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
 
   CHECK(tileSize > 0);
@@ -2259,6 +2353,9 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
       tileBorder,
       rightFilename);
   }
+  if (startedDeferredErrorFrame) {
+    reportDeferredRenderingErrorsIfAny();
+  }
 }
 
 void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScreenShotType sst)
@@ -2266,6 +2363,10 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
     m_isRendering = false;
+  });
+  const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
+  auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
+    endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
 
   prepareMeshFiltersForExport(m_outputSize);
@@ -2309,6 +2410,9 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
       LOG(INFO) << "Saved half sbs stereo rendering (" << leftImg.width() << ", " << leftImg.height()
                 << ") to file:" << filename;
     }
+  }
+  if (startedDeferredErrorFrame) {
+    reportDeferredRenderingErrorsIfAny();
   }
 }
 

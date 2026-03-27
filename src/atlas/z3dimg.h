@@ -293,6 +293,10 @@ public:
     return m_readStatsSink;
   }
 
+  void clearPendingPagingWarnings();
+  void recordPagingFailure(const glm::uvec4& pageTableEntryKey, std::string errorMessage);
+  [[nodiscard]] std::optional<std::string> takePendingPagingWarning();
+
 protected:
   void readVolumes();
 
@@ -322,13 +326,15 @@ protected:
                               const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                               size_t taskIdx,
                               const ZImgInfo& resInfo,
-                              uint8_t* buffer) const;
+                              uint8_t* buffer,
+                              std::optional<std::string>* failureMessage) const;
 
   folly::coro::Task<void>
   readImageBlocksToBufferAsync(size_t c,
                                const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                const ZImgInfo& resInfo,
-                               uint8_t* buffer) const;
+                               uint8_t* buffer,
+                               std::vector<std::optional<std::string>>& failureMessages) const;
 
   // return number of empty (all zero) image blocks
   size_t readAndUploadImageBlocks(size_t c,
@@ -439,6 +445,7 @@ private:
   // Optional paging read stats sink and per-call round tag.
   ZImgReadStatsSink* m_readStatsSink = nullptr;
   uint32_t m_activeReadStatsRound = 0;
+  std::vector<std::string> m_pendingPagingWarnings;
 };
 
 } // namespace nim

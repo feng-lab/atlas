@@ -31,6 +31,10 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
       connect(viewControl, &Z3DImgFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
       connect(viewControl,
+              &Z3DImgFilter::deferredRenderingWarning,
+              &m_engine,
+              &Z3DRenderingEngine::appendDeferredRenderingError);
+      connect(viewControl,
               &Z3DImgFilter::showSeedTraceContextMenu,
               &m_engine,
               &Z3DRenderingEngine::showSeedTraceContextMenu);
@@ -76,6 +80,10 @@ void Z3DImgView::docImgAdded(size_t id)
     connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
     connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
     connect(viewControl, &Z3DImgFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
+    connect(viewControl,
+            &Z3DImgFilter::deferredRenderingWarning,
+            &m_engine,
+            &Z3DRenderingEngine::appendDeferredRenderingError);
     connect(viewControl,
             &Z3DImgFilter::showSeedTraceContextMenu,
             &m_engine,
