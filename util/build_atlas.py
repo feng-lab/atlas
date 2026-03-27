@@ -83,7 +83,6 @@ def get_cmake_cmd_common_part():
                         "-DCMAKE_CXX_COMPILER=clang-cl",
                         "-DCMAKE_C_COMPILER=clang-cl",
                         "-DCMAKE_LINKER=lld-link",
-                        # "-DBoost_COMPILER=vc143",
                     ]
                 )
             return res
@@ -94,7 +93,7 @@ def get_cmake_cmd_common_part():
             res = [
                 common_dirs.get_cmake_binary(),  # '-E', 'echo',
                 "-G",
-                "Visual Studio 17 2022",
+                common_dirs.windows_visual_studio_generator(),
                 "-A",
                 "x64",
                 "-T",
@@ -102,7 +101,6 @@ def get_cmake_cmd_common_part():
             ]
             if common_dirs.use_clang_cl():
                 res.append("-DCMAKE_LINKER=lld-link")
-                # res.append("-DBoost_COMPILER=vc143")
             return res
     elif common_dirs.is_linux():
         res = [

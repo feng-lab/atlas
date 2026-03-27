@@ -51,6 +51,8 @@ from common_dirs import (
     use_ninja,
     vs_install_dir,
     vulkan_SDK_env_dir,
+    windows_msbuild_platform_toolset,
+    windows_visual_studio_generator,
 )
 from download_atlas_deps import download_atlas_deps
 from logger import setup_logger
@@ -557,9 +559,6 @@ def get_cmake_cmd_common_part(
             "-DCMAKE_BUILD_TYPE=Release",
             "-DCMAKE_PREFIX_PATH=" + ext_build_dir(),
             # '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
-            "-G",
-            "Ninja",
-            "-DCMAKE_MAKE_PROGRAM=" + get_ninja_binary(),
             "-DCMAKE_INSTALL_PREFIX=" + install_dir,
             "" if no_hidden_visibility else "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
             "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
@@ -582,7 +581,12 @@ def get_cmake_cmd_common_part(
         if use_ninja:
             res.extend(["-G", "Ninja", "-DCMAKE_MAKE_PROGRAM=" + get_ninja_binary()])
         else:
-            res.extend(["-G", "Visual Studio 17 2022", "-A", "x64", "-T", "host=x64"])
+            toolset = "host=x64"
+            if use_clang_cl():
+                toolset = "ClangCL,host=x64"
+            res.extend(
+                ["-G", windows_visual_studio_generator(), "-A", "x64", "-T", toolset]
+            )
         return res
     elif is_linux():
         res = [
@@ -1489,6 +1493,9 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
         elif is_windows():
             env = get_env_for_config_make(remove_scoop_from_path=False)
             env["PATH"] = f"{env['PATH']};{nasm_dir}"
+            # Keep OpenSSL on the upstream MSVC build path on Windows so we retain
+            # the current assembly-enabled configuration even when Atlas adopts
+            # clang-cl elsewhere.
             subprocess.run(
                 [
                     "perl",
@@ -1807,6 +1814,7 @@ def build_libsodium(src_dir: str, install_dir: str):
                     "/target:libsodium",
                     "/property:Platform=x64",
                     "/property:Configuration=StaticRelease",
+                    "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
                     "/maxcpucount",
                 ],
                 cwd=os.path.join(src_dir, "builds", "msvc", "vs2019"),
@@ -1829,7 +1837,13 @@ def build_libsodium(src_dir: str, install_dir: str):
 
             glob_copy(
                 os.path.join(
-                    src_dir, "bin", "x64", "Release", "v143", "static", "*.lib"
+                    src_dir,
+                    "bin",
+                    "x64",
+                    "Release",
+                    windows_msbuild_platform_toolset(),
+                    "static",
+                    "*.lib",
                 ),
                 os.path.join(install_dir, "lib"),
             )
@@ -2636,6 +2650,7 @@ ERR CloseWS_File(struct WMPStream** ppWS)"""
                     "/property:ForceImportBeforeCppTargets="
                     + ext_dir()
                     + "\\runtime_md.props",
+                    "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
                     "/property:Configuration=Release",
                     "/maxcpucount",
                 ],
@@ -2954,7 +2969,7 @@ def build_freeimage(src_dir: str, install_dir: str):
                     "/property:Platform=x64",
                     "/property:Configuration=Release",
                     "/maxcpucount",
-                    "/property:PlatformToolset=v143",
+                    "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
                     "/property:WindowsTargetPlatformVersion="
                     + env["UCRTVERSION"],  # like 10.0.16299.0
                 ],
@@ -3468,7 +3483,11 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
 
         if is_windows():
             orig_file_2 = os.path.join(
-                install_dir, "x64", "vc17", "staticlib", "OpenCVModules.cmake"
+                install_dir,
+                "x64",
+                f"vc{common_dirs.windows_visual_studio_major_version()}",
+                "staticlib",
+                "OpenCVModules.cmake",
             )
         else:
             orig_file_2 = os.path.join(

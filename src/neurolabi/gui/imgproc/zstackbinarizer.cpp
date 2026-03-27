@@ -72,10 +72,14 @@ bool ZStackBinarizer::binarize(Stack *stack)
 
   bool succ = true;
 
-  if (low == high && hist != NULL) {
+  if (hist == NULL) {
+    // Legacy locmax thresholding can legitimately produce no histogram when the
+    // post-filtered locmax mask is empty. Treat that as threshold failure
+    // instead of dereferencing a null histogram below.
+    succ = false;
+  } else if (low == high) {
     succ = false;
   }
-
 
   if (succ) {
     switch (m_method) {
@@ -139,6 +143,9 @@ int* ZStackBinarizer::computeLocmaxHist(const Stack *stack)
 {
   int conn = 18;
   Stack *locmax = Stack_Locmax_Region(stack, conn);
+  if (locmax == NULL) {
+    return NULL;
+  }
   Stack_Label_Objects_Ns(locmax, NULL, 1, 2, 3, conn);
   int nvoxel = Stack_Voxel_Number(locmax);
   int i;
@@ -151,6 +158,7 @@ int* ZStackBinarizer::computeLocmaxHist(const Stack *stack)
     }
   }
   int *hist = Stack_Hist_M(stack, locmax);
+  Kill_Stack(locmax);
 
   return hist;
 }

@@ -32,6 +32,36 @@ def use_clang_cl() -> bool:
     return False
 
 
+def windows_visual_studio_major_version() -> str:
+    return "17"
+
+
+def windows_visual_studio_year() -> str:
+    return "2022"
+
+
+def windows_visual_studio_generator() -> str:
+    return (
+        f"Visual Studio {windows_visual_studio_major_version()} "
+        f"{windows_visual_studio_year()}"
+    )
+
+
+def windows_native_platform_toolset() -> str:
+    return "v143"
+
+
+def windows_msbuild_platform_toolset() -> str:
+    return "ClangCL" if use_clang_cl() else windows_native_platform_toolset()
+
+
+def windows_vc_redist_dirname(component: str) -> str:
+    assert component
+    return (
+        f"Microsoft.VC{windows_native_platform_toolset().removeprefix('v')}.{component}"
+    )
+
+
 def use_ninja() -> bool:
     return True
 
@@ -197,7 +227,7 @@ def qt_install_dir() -> str:
 
 def qt_compiler_name() -> str:
     if is_windows():
-        return "msvc2022_64"
+        return f"msvc{windows_visual_studio_year()}_64"
     elif is_mac():
         return "macos"
     else:
@@ -321,9 +351,15 @@ def vulkan_SDK_bin_dir() -> str:
 def vs_install_dir() -> str:
     assert sys.platform.startswith("win32")
 
-    vsinstalldir = r"C:\Program Files\Microsoft Visual Studio\2022\Community"
+    vsinstalldir = (
+        rf"C:\Program Files\Microsoft Visual Studio\{windows_visual_studio_year()}"
+        r"\Community"
+    )
     if not os.path.exists(vsinstalldir):
-        vsinstalldir = r"C:\Program Files\Microsoft Visual Studio\2022\Enterprise"
+        vsinstalldir = (
+            rf"C:\Program Files\Microsoft Visual Studio\{windows_visual_studio_year()}"
+            r"\Enterprise"
+        )
     assert os.path.exists(vsinstalldir)
 
     return vsinstalldir
@@ -351,7 +387,7 @@ def vc_redist_dir() -> str:
 def vc_CRT_redist_dir() -> str:
     assert sys.platform.startswith("win32")
 
-    res = os.path.join(vc_redist_dir(), "x64", "Microsoft.VC143.CRT")
+    res = os.path.join(vc_redist_dir(), "x64", windows_vc_redist_dirname("CRT"))
     assert os.path.exists(res)
     return res
 
@@ -359,7 +395,7 @@ def vc_CRT_redist_dir() -> str:
 def vc_CXXAMP_redist_dir() -> str:
     assert sys.platform.startswith("win32")
 
-    res = os.path.join(vc_redist_dir(), "x64", "Microsoft.VC143.CXXAMP")
+    res = os.path.join(vc_redist_dir(), "x64", windows_vc_redist_dirname("CXXAMP"))
     assert os.path.exists(res)
     return res
 
@@ -367,7 +403,7 @@ def vc_CXXAMP_redist_dir() -> str:
 def vc_OpenMP_redist_dir() -> str:
     assert sys.platform.startswith("win32")
 
-    res = os.path.join(vc_redist_dir(), "x64", "Microsoft.VC143.OpenMP")
+    res = os.path.join(vc_redist_dir(), "x64", windows_vc_redist_dirname("OpenMP"))
     assert os.path.exists(res)
     return res
 
