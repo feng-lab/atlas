@@ -923,7 +923,7 @@ Adding a New 3D Object View
 
 Coding Guidelines
 
-- Follow existing style (Qt, modern C++17/20).
+- Follow existing style (Qt, modern C++20).
 - Keep UI and engine responsibilities separated; prefer posted calls over shared state.
 - Prefer plain data transfer (ids, JSON, POD) across threads.
 - When in doubt about a cross-thread call, add a `thread()` equality check and use `invokeMethod` accordingly.
@@ -1160,4 +1160,5 @@ Agent tooling dependency
 
 LLVM/Clang versioning
 
-- Linux builds use Clang by default. The version can be overridden with env `ATLAS_CLANG_MAJOR` (e.g., `20`).
+- Linux builds use Clang by default. The version can be overridden with env `ATLAS_CLANG_MAJOR`.
+- Windows' clang-cl path keeps the install root fixed at `C:\Program Files\LLVM` and detects the installed LLVM toolset version from `clang-cl --version`.

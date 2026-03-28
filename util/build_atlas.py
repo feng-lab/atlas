@@ -80,9 +80,10 @@ def get_cmake_cmd_common_part():
             if common_dirs.use_clang_cl():
                 res.extend(
                     [
-                        "-DCMAKE_CXX_COMPILER=clang-cl",
-                        "-DCMAKE_C_COMPILER=clang-cl",
-                        "-DCMAKE_LINKER=lld-link",
+                        "-DCMAKE_C_COMPILER:FILEPATH=" + common_dirs.clang_cl_binary(),
+                        "-DCMAKE_CXX_COMPILER:FILEPATH="
+                        + common_dirs.clang_cl_binary(),
+                        "-DCMAKE_LINKER:FILEPATH=" + common_dirs.lld_link_binary(),
                     ]
                 )
             return res
@@ -100,7 +101,23 @@ def get_cmake_cmd_common_part():
                 toolset,
             ]
             if common_dirs.use_clang_cl():
-                res.append("-DCMAKE_LINKER=lld-link")
+                res.extend(
+                    [
+                        "-DCMAKE_C_COMPILER:FILEPATH=" + common_dirs.clang_cl_binary(),
+                        "-DCMAKE_CXX_COMPILER:FILEPATH="
+                        + common_dirs.clang_cl_binary(),
+                        "-DCMAKE_LINKER:FILEPATH=" + common_dirs.lld_link_binary(),
+                    ]
+                )
+                res.append(
+                    "-DCMAKE_VS_GLOBALS:STRING="
+                    + ";".join(
+                        [
+                            "LLVMInstallDir=" + common_dirs.llvm_install_dir(),
+                            "LLVMToolsVersion=" + common_dirs.llvm_tools_version(),
+                        ]
+                    )
+                )
             return res
     elif common_dirs.is_linux():
         res = [
@@ -198,13 +215,22 @@ def build_atlas(
                 env=env,
             )
         else:
+            msbuild_cmd = [
+                "MSBuild",
+                "ALL_BUILD.vcxproj",
+                "/property:Configuration=Release",
+                "/maxcpucount",
+            ]
+            if common_dirs.use_clang_cl():
+                msbuild_cmd.extend(
+                    [
+                        "/property:LLVMInstallDir=" + common_dirs.llvm_install_dir(),
+                        "/property:LLVMToolsVersion="
+                        + common_dirs.llvm_tools_version(),
+                    ]
+                )
             subprocess.run(
-                [
-                    "MSBuild",
-                    "ALL_BUILD.vcxproj",
-                    "/property:Configuration=Release",
-                    "/maxcpucount",
-                ],
+                msbuild_cmd,
                 cwd=common_dirs.atlas_build_dir(),
                 shell=True,
                 check=True,

@@ -38,17 +38,6 @@ def _run_checked(
         ) from None
 
 
-def _prepend_path(env: dict[str, str], dir_path: Path) -> None:
-    existing = env.get("PATH", "")
-    prefix = str(dir_path)
-    if not existing:
-        env["PATH"] = prefix
-        return
-    if existing.split(os.pathsep)[0] == prefix:
-        return
-    env["PATH"] = prefix + os.pathsep + existing
-
-
 def _prepend_search_path(env: dict[str, str], *, key: str, dir_path: Path) -> None:
     existing = env.get(key, "")
     prefix = str(dir_path)
@@ -181,11 +170,11 @@ def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
     """
 
     cmake_path = Path(common_dirs.get_cmake_binary())
-    _prepend_path(env, cmake_path.parent)
+    env["PATH"] = str(cmake_path.parent) + os.pathsep + env["PATH"]
 
     if common_dirs.use_ninja():
         ninja_path = Path(common_dirs.get_ninja_binary())
-        _prepend_path(env, ninja_path.parent)
+        env["PATH"] = str(ninja_path.parent) + os.pathsep + env["PATH"]
         env["CMAKE_GENERATOR"] = "Ninja"
         _append_cmake_args(env, [f"-DCMAKE_MAKE_PROGRAM={ninja_path}"])
 
@@ -207,10 +196,17 @@ def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
             )
 
     if common_dirs.is_windows() and common_dirs.use_clang_cl():
+        env["PATH"] = common_dirs.llvm_bin_dir() + os.pathsep + env["PATH"]
+        env["LLVMInstallDir"] = common_dirs.llvm_install_dir()
+        env["LLVMToolsVersion"] = common_dirs.llvm_tools_version()
         _append_cmake_args(
-            env, ["-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"]
+            env,
+            [
+                "-DCMAKE_C_COMPILER:FILEPATH=" + common_dirs.clang_cl_binary(),
+                "-DCMAKE_CXX_COMPILER:FILEPATH=" + common_dirs.clang_cl_binary(),
+                "-DCMAKE_LINKER:FILEPATH=" + common_dirs.lld_link_binary(),
+            ],
         )
-        _append_cmake_args(env, ["-DCMAKE_LINKER=lld-link"])
 
 
 def _assert_linux_wheel_contains_expected_libs(

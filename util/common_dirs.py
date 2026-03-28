@@ -55,6 +55,49 @@ def windows_msbuild_platform_toolset() -> str:
     return "ClangCL" if use_clang_cl() else windows_native_platform_toolset()
 
 
+def llvm_install_dir() -> str:
+    assert is_windows()
+    res = os.path.join("C:", os.sep, "Program Files", "LLVM")
+    assert os.path.exists(res), res
+    assert os.path.exists(os.path.join(res, "bin", "clang-cl.exe")), res
+    return res
+
+
+def llvm_bin_dir() -> str:
+    assert is_windows()
+    return os.path.join(llvm_install_dir(), "bin")
+
+
+def clang_cl_binary() -> str:
+    assert is_windows()
+    res = os.path.join(llvm_bin_dir(), "clang-cl.exe")
+    assert os.path.exists(res), res
+    return res
+
+
+def lld_link_binary() -> str:
+    assert is_windows()
+    res = os.path.join(llvm_bin_dir(), "lld-link.exe")
+    assert os.path.exists(res), res
+    return res
+
+
+def llvm_tools_version() -> str:
+    assert is_windows()
+    res = subprocess.run(
+        [clang_cl_binary(), "--version"],
+        shell=False,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    output = (res.stdout or "") + (res.stderr or "")
+    assert res.returncode == 0, output
+    match = re.search(r"clang version\s+([0-9]+(?:\.[0-9]+){1,3})", output)
+    assert match, output
+    return match.group(1)
+
+
 def windows_vc_redist_dirname(component: str) -> str:
     assert component
     return (

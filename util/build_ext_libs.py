@@ -14,6 +14,7 @@ from pathlib import Path
 
 from common_dirs import (
     atlas_repository_dir,
+    clang_cl_binary,
     curl_ca_bundle_path,
     curl_def_path,
     curl_dll_path,
@@ -37,6 +38,10 @@ from common_dirs import (
     is_linux,
     is_mac,
     is_windows,
+    lld_link_binary,
+    llvm_bin_dir,
+    llvm_install_dir,
+    llvm_tools_version,
     qt_base_dir,
     qt_installer_framework_bin_dir,
     qt_ver,
@@ -73,8 +78,8 @@ def use_clang_in_linux() -> bool:
 
 
 def _clang_major_env() -> str:
-    # Allow CI to control clang version; default to 20 for backward compat
-    return os.environ.get("ATLAS_CLANG_MAJOR") or os.environ.get("LLVM_VERSION") or "20"
+    # Allow CI to control clang version
+    return os.environ.get("ATLAS_CLANG_MAJOR") or os.environ.get("LLVM_VERSION") or "22"
 
 
 def get_clang_in_linux() -> str:
@@ -409,7 +414,10 @@ def get_enviroment_from_shell_script(
     if remove_scoop_from_path:
         remove_path_contains("scoop", env)
     remove_path_contains("mingw", env)
-    env["PATH"] += r";C:\Program Files\LLVM\bin"
+    if is_windows() and use_clang_cl():
+        env["PATH"] = llvm_bin_dir() + os.pathsep + env["PATH"]
+        env["LLVMInstallDir"] = llvm_install_dir()
+        env["LLVMToolsVersion"] = llvm_tools_version()
     return env
 
 
@@ -573,9 +581,9 @@ def get_cmake_cmd_common_part(
         if use_clang_cl():
             res.extend(
                 [
-                    "-DCMAKE_CXX_COMPILER=clang-cl",
-                    "-DCMAKE_C_COMPILER=clang-cl",
-                    "-DCMAKE_LINKER=lld-link",
+                    "-DCMAKE_C_COMPILER:FILEPATH=" + clang_cl_binary(),
+                    "-DCMAKE_CXX_COMPILER:FILEPATH=" + clang_cl_binary(),
+                    "-DCMAKE_LINKER:FILEPATH=" + lld_link_binary(),
                 ]
             )
         if use_ninja:
@@ -587,6 +595,16 @@ def get_cmake_cmd_common_part(
             res.extend(
                 ["-G", windows_visual_studio_generator(), "-A", "x64", "-T", toolset]
             )
+            if use_clang_cl():
+                res.append(
+                    "-DCMAKE_VS_GLOBALS:STRING="
+                    + ";".join(
+                        [
+                            "LLVMInstallDir=" + llvm_install_dir(),
+                            "LLVMToolsVersion=" + llvm_tools_version(),
+                        ]
+                    )
+                )
         return res
     elif is_linux():
         res = [
@@ -711,13 +729,21 @@ def build_and_install_cmakecmd(
                 env=env,
             )
         else:
+            msbuild_cmd = [
+                "MSBuild",
+                "INSTALL.vcxproj",
+                "/property:Configuration=Release",
+                "/maxcpucount",
+            ]
+            if use_clang_cl():
+                msbuild_cmd.extend(
+                    [
+                        "/property:LLVMInstallDir=" + llvm_install_dir(),
+                        "/property:LLVMToolsVersion=" + llvm_tools_version(),
+                    ]
+                )
             subprocess.run(
-                [
-                    "MSBuild",
-                    "INSTALL.vcxproj",
-                    "/property:Configuration=Release",
-                    "/maxcpucount",
-                ],
+                msbuild_cmd,
                 cwd=build_dir,
                 shell=True,
                 check=True,
@@ -1807,16 +1833,24 @@ def build_libsodium(src_dir: str, install_dir: str):
                 check=True,
                 env=env,
             )
+            msbuild_cmd = [
+                "MSBuild",
+                "libsodium.sln",
+                "/target:libsodium",
+                "/property:Platform=x64",
+                "/property:Configuration=StaticRelease",
+                "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
+                "/maxcpucount",
+            ]
+            if use_clang_cl():
+                msbuild_cmd.extend(
+                    [
+                        "/property:LLVMInstallDir=" + llvm_install_dir(),
+                        "/property:LLVMToolsVersion=" + llvm_tools_version(),
+                    ]
+                )
             subprocess.run(
-                [
-                    "MSBuild",
-                    "libsodium.sln",
-                    "/target:libsodium",
-                    "/property:Platform=x64",
-                    "/property:Configuration=StaticRelease",
-                    "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
-                    "/maxcpucount",
-                ],
+                msbuild_cmd,
                 cwd=os.path.join(src_dir, "builds", "msvc", "vs2019"),
                 shell=True,
                 check=True,
@@ -2639,21 +2673,29 @@ ERR CloseWS_File(struct WMPStream** ppWS)"""
                 check=True,
                 env=env,
             )
+            msbuild_cmd = [
+                "MSBuild",
+                "JXR_vc14.sln",
+                "/target:JXRDecApp",
+                "/property:Platform=x64",
+                "/property:WindowsTargetPlatformVersion="
+                + env["UCRTVERSION"],  # like 10.0.16299.0
+                "/property:ForceImportBeforeCppTargets="
+                + ext_dir()
+                + "\\runtime_md.props",
+                "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
+                "/property:Configuration=Release",
+                "/maxcpucount",
+            ]
+            if use_clang_cl():
+                msbuild_cmd.extend(
+                    [
+                        "/property:LLVMInstallDir=" + llvm_install_dir(),
+                        "/property:LLVMToolsVersion=" + llvm_tools_version(),
+                    ]
+                )
             subprocess.run(
-                [
-                    "MSBuild",
-                    "JXR_vc14.sln",
-                    "/target:JXRDecApp",
-                    "/property:Platform=x64",
-                    "/property:WindowsTargetPlatformVersion="
-                    + env["UCRTVERSION"],  # like 10.0.16299.0
-                    "/property:ForceImportBeforeCppTargets="
-                    + ext_dir()
-                    + "\\runtime_md.props",
-                    "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
-                    "/property:Configuration=Release",
-                    "/maxcpucount",
-                ],
+                msbuild_cmd,
                 cwd=os.path.join(src_dir, "jxrencoderdecoder"),
                 shell=True,
                 check=True,
@@ -2961,18 +3003,26 @@ def build_freeimage(src_dir: str, install_dir: str):
 
         if is_windows():
             env = get_vcvars_environment()
+            msbuild_cmd = [
+                "MSBuild",
+                "FreeImage.2017.sln",
+                "/target:FreeImagePlus",
+                "/property:Platform=x64",
+                "/property:Configuration=Release",
+                "/maxcpucount",
+                "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
+                "/property:WindowsTargetPlatformVersion="
+                + env["UCRTVERSION"],  # like 10.0.16299.0
+            ]
+            if use_clang_cl():
+                msbuild_cmd.extend(
+                    [
+                        "/property:LLVMInstallDir=" + llvm_install_dir(),
+                        "/property:LLVMToolsVersion=" + llvm_tools_version(),
+                    ]
+                )
             subprocess.run(
-                [
-                    "MSBuild",
-                    "FreeImage.2017.sln",
-                    "/target:FreeImagePlus",
-                    "/property:Platform=x64",
-                    "/property:Configuration=Release",
-                    "/maxcpucount",
-                    "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
-                    "/property:WindowsTargetPlatformVersion="
-                    + env["UCRTVERSION"],  # like 10.0.16299.0
-                ],
+                msbuild_cmd,
                 cwd=src_dir,
                 shell=True,
                 check=True,
