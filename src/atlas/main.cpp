@@ -116,11 +116,6 @@ int main(int argc, char* argv[])
 #endif
 
   QCoreApplication::setOrganizationName("fenglab");
-  // On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
-  //  is preferred over the name. On other platforms, the name is preferred over the domain.
-#ifndef __APPLE__
-  QCoreApplication::setOrganizationDomain("fenglab.xyz");
-#endif
   QCoreApplication::setApplicationName("Atlas");
 
   if (argc > 1 && strcmp(argv[1], "--command") == 0) {
