@@ -11,4 +11,5 @@ fenglab.neutube/
 /Atlas/
 /Atlas.AppDir/
 /Atlas.app/
+/generated/
 package.xml

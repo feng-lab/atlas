@@ -29,13 +29,13 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
     # Activate your Python environment (conda/venv/uv/etc.)
     # e.g. conda activate pt12
     # install qt by aqt
-    python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine
+    python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine boto3
     cd ~
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/
     aqt install-qt --outputdir ~/Qt mac desktop 6.9.2 clang_64 # --external 7z
-    # install tools: refer to https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/tools_ifw/
+    # install tools: refer to https://download.qt.io/online/qtsdkrepository/mac_x64/ifw/
     aqt install-tool --outputdir ~/Qt mac desktop tools_ifw qt.tools.ifw.47
     # list modules
     aqt list-tool mac desktop
@@ -52,14 +52,14 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
     # Activate your Python environment (conda/venv/uv/etc.)
     # e.g. conda activate pt12
     # install qt by aqt
-    python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine
+    python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine boto3
     cd c:
     rm -r Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/
     aqt install-qt --outputdir c:/Qt windows desktop 6.9.2 win64_msvc2022_64
     aqt install-qt --outputdir c:/Qt windows desktop 6.9.2 win64_mingw
-    # install tools: refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/tools_ifw/
+    # install tools: refer to https://download.qt.io/online/qtsdkrepository/windows_x86/ifw/
     aqt install-tool --outputdir c:/Qt windows desktop tools_ifw qt.tools.ifw.47
     # list modules
     aqt list-tool windows desktop
@@ -80,13 +80,13 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
     # Activate your Python environment (conda/venv/uv/etc.)
     # e.g. conda activate pt12
     # install qt by aqt
-    python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine
+    python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine boto3
     cd ~
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/
     aqt install-qt --outputdir ~/Qt linux desktop 6.9.2 linux_gcc_64 # --external 7z
-    # install tools: refer to https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/tools_ifw/
+    # install tools: refer to https://download.qt.io/online/qtsdkrepository/linux_x64/ifw/
     aqt install-tool --outputdir ~/Qt linux desktop tools_ifw qt.tools.ifw.47
     # list modules
     aqt list-tool linux desktop

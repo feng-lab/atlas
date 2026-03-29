@@ -178,6 +178,15 @@ runs:
 
         retry 5 5 60 publish_release
 
+    - name: Publish artifacts to R2
+      shell: bash -l {0}
+      run: |
+        eval "$(conda shell.bash hook)"
+        conda activate atlas-ci
+        set -euo pipefail
+        cd "$GITHUB_WORKSPACE"
+        python util/publish_r2.py publish-ifw --os macOS
+
     - name: Setup SSH key
       shell: bash -l {0}
       run: |
@@ -256,48 +265,6 @@ runs:
         cd "$GITHUB_WORKSPACE/deploy"
         retry 5 5 60 rsync -av --delete -e "${sshCmd}" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
         retry 5 5 60 rsync -tv -e "${sshCmd}" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
-
-    - name: Deploy artifacts (secondary target)
-      shell: bash -l {0}
-      run: |
-        if [ -z "${SSH_SERVER2:-}" ] || [ -z "${SSH_PORT2:-}" ] || [ -z "${SSH_USERNAME2:-}" ] || [ -z "${SSH_DEPLOY_PATH2:-}" ]; then
-          echo "Secondary SSH deploy target not fully configured; skipping."
-          exit 0
-        fi
-        set -euo pipefail
-
-        retry() {
-          local attempts="${1:?attempts missing}"
-          local base_delay="${2:?base_delay missing}"
-          local max_delay="${3:?max_delay missing}"
-          shift 3
-          local attempt=1
-          while true; do
-            if "$@"; then
-              return 0
-            fi
-            local rc=$?
-            if [ "$attempt" -ge "$attempts" ]; then
-              echo "Command failed after ${attempts} attempts (exit ${rc}): ${1:-<unknown>}" >&2
-              return "$rc"
-            fi
-            local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
-            if [ "$sleep_for" -gt "$max_delay" ]; then
-              sleep_for="$max_delay"
-            fi
-            echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): ${1:-<unknown>}" >&2
-            sleep "$sleep_for"
-            attempt=$(( attempt + 1 ))
-          done
-        }
-
-        : "${ATLAS__SSH_KEY_PATH:?Error: ATLAS__SSH_KEY_PATH is not set}"
-        : "${ATLAS__SSH_KNOWN_HOSTS_PATH:?Error: ATLAS__SSH_KNOWN_HOSTS_PATH is not set}"
-
-        sshCmd="ssh -p $SSH_PORT2 -i $ATLAS__SSH_KEY_PATH -o UserKnownHostsFile=$ATLAS__SSH_KNOWN_HOSTS_PATH -o StrictHostKeyChecking=yes -o LogLevel=ERROR"
-        cd "$GITHUB_WORKSPACE/deploy"
-        retry 5 5 60 rsync -av --delete -e "${sshCmd}" ${{ runner.os }} $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/
-        retry 5 5 60 rsync -tv -e "${sshCmd}" AtlasInstaller*.zip $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
 
     - name: Publish zimg (PyPI + conda)
       shell: bash -l {0}

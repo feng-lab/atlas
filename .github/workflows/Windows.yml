@@ -202,7 +202,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
           python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
-          python -m pip install --no-cache-dir aqtinstall requests packaging
+          python -m pip install --no-cache-dir aqtinstall requests packaging boto3
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
           conda clean --all -y
 
@@ -345,7 +345,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
           python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
-          python -m pip install --no-cache-dir aqtinstall requests packaging
+          python -m pip install --no-cache-dir aqtinstall requests packaging boto3
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
           conda clean --all -y
 
@@ -518,7 +518,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
           python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
-          python -m pip install --no-cache-dir aqtinstall requests packaging build twine
+          python -m pip install --no-cache-dir aqtinstall requests packaging build twine boto3
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
 
       - name: Cache Qt (installed)
@@ -593,6 +593,15 @@ jobs:
           cd "$env:GITHUB_WORKSPACE"
           python util/build_and_deploy_atlas.py
           if ($LASTEXITCODE -ne 0) { Write-Error "build_and_deploy_atlas failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
+
+      - name: Publish artifacts to R2
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          eval "$(conda shell.bash hook)"
+          conda activate atlas-ci
+          cd "$GITHUB_WORKSPACE"
+          python util/publish_r2.py publish-ifw --os Windows
 
       - name: Setup SSH key
         shell: bash -l {0}
@@ -731,57 +740,13 @@ jobs:
           : "${ATLAS__SSH_KNOWN_HOSTS_PATH:?Error: ATLAS__SSH_KNOWN_HOSTS_PATH is not set}"
           sshCommonArgs=(-i "$ATLAS__SSH_KEY_PATH" -o "UserKnownHostsFile=$ATLAS__SSH_KNOWN_HOSTS_PATH" -o StrictHostKeyChecking=yes -o LogLevel=ERROR)
           deploy_primary() {
-            # Ensure remote paths exist and replace the Windows package folder
+            # Ensure remote paths exist and replace the Windows package folder.
             ssh -p "$SSH_PORT" "${sshCommonArgs[@]}" "$SSH_USERNAME@$SSH_SERVER" \
               "mkdir -p '$SSH_DEPLOY_PATH/packages' '$SSH_DEPLOY_PATH/installers' && rm -rf '$SSH_DEPLOY_PATH/packages/Windows'"
             scp -P "$SSH_PORT" "${sshCommonArgs[@]}" -r "deploy/Windows" "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/"
             scp -P "$SSH_PORT" "${sshCommonArgs[@]}" deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/"
           }
           retry 5 5 60 deploy_primary
-
-      - name: Deploy artifacts (SSH, secondary target)
-        shell: bash -l {0}
-        run: |
-          set -euo pipefail
-          retry() {
-            local attempts="${1:?attempts missing}"
-            local base_delay="${2:?base_delay missing}"
-            local max_delay="${3:?max_delay missing}"
-            shift 3
-            local attempt=1
-            while true; do
-              if "$@"; then
-                return 0
-              fi
-              local rc=$?
-              if [ "$attempt" -ge "$attempts" ]; then
-                echo "Command failed after ${attempts} attempts (exit ${rc}): ${1:-<unknown>}" >&2
-                return "$rc"
-              fi
-              local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
-              if [ "$sleep_for" -gt "$max_delay" ]; then
-                sleep_for="$max_delay"
-              fi
-              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): ${1:-<unknown>}" >&2
-              sleep "$sleep_for"
-              attempt=$(( attempt + 1 ))
-            done
-          }
-          : "${SSH_SERVER2:?Error: SSH_SERVER2 is not set (ATLAS_ENV_LOCAL)}"
-          : "${SSH_PORT2:?Error: SSH_PORT2 is not set (ATLAS_ENV_LOCAL)}"
-          : "${SSH_USERNAME2:?Error: SSH_USERNAME2 is not set (ATLAS_ENV_LOCAL)}"
-          : "${SSH_DEPLOY_PATH2:?Error: SSH_DEPLOY_PATH2 is not set (ATLAS_ENV_LOCAL)}"
-          : "${ATLAS__SSH_KEY_PATH:?Error: ATLAS__SSH_KEY_PATH is not set}"
-          : "${ATLAS__SSH_KNOWN_HOSTS_PATH:?Error: ATLAS__SSH_KNOWN_HOSTS_PATH is not set}"
-          sshCommonArgs=(-i "$ATLAS__SSH_KEY_PATH" -o "UserKnownHostsFile=$ATLAS__SSH_KNOWN_HOSTS_PATH" -o StrictHostKeyChecking=yes -o LogLevel=ERROR)
-          deploy_secondary() {
-            # Ensure remote paths exist and replace the Windows package folder
-            ssh -p "$SSH_PORT2" "${sshCommonArgs[@]}" "$SSH_USERNAME2@$SSH_SERVER2" \
-              "mkdir -p '$SSH_DEPLOY_PATH2/packages' '$SSH_DEPLOY_PATH2/installers' && rm -rf '$SSH_DEPLOY_PATH2/packages/Windows'"
-            scp -P "$SSH_PORT2" "${sshCommonArgs[@]}" -r "deploy/Windows" "$SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/"
-            scp -P "$SSH_PORT2" "${sshCommonArgs[@]}" deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/"
-          }
-          retry 5 5 60 deploy_secondary
 
       - name: Cleanup SSH assets
         if: ${{ always() }}

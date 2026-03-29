@@ -6,6 +6,7 @@ import sys
 import time
 import urllib.request
 from functools import wraps
+from typing import Callable, Optional, Tuple, Type
 
 import requests
 
@@ -18,21 +19,62 @@ PROGRESS_LOG_INTERVAL_SEC = 5  # minimum seconds between progress log lines
 PROGRESS_LOG_PERCENT_STEP = 10  # log on each additional N% completion
 
 
-def retry_with_backoff(retries=5, backoff_in_seconds=1):
+def call_with_backoff(
+    func,
+    *,
+    retries=5,
+    backoff_in_seconds=1,
+    max_backoff_seconds=None,
+    retry_exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+    should_retry: Optional[Callable[[BaseException], bool]] = None,
+    operation_name: Optional[str] = None,
+):
+    attempt = 0
+    op_name = operation_name or getattr(func, "__name__", "operation")
+    while True:
+        try:
+            return func()
+        except retry_exceptions as e:
+            if should_retry is not None and not should_retry(e):
+                raise
+            if attempt >= retries:
+                raise
+
+            sleep = backoff_in_seconds * 2**attempt + random.uniform(0, 1)
+            if max_backoff_seconds is not None:
+                sleep = min(sleep, max_backoff_seconds)
+            logger.warning(
+                "Retrying %s in %.1fs after error (%d/%d): %s",
+                op_name,
+                sleep,
+                attempt + 1,
+                retries,
+                e,
+            )
+            time.sleep(sleep)
+            attempt += 1
+
+
+def retry_with_backoff(
+    retries=5,
+    backoff_in_seconds=1,
+    max_backoff_seconds=None,
+    retry_exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+    should_retry: Optional[Callable[[BaseException], bool]] = None,
+    operation_name: Optional[str] = None,
+):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            x = 0
-            while True:
-                try:
-                    return func(*args, **kwargs)
-                except Exception:
-                    if x == retries:
-                        raise
-                    sleep = backoff_in_seconds * 2**x + random.uniform(0, 1)
-                    time.sleep(sleep)
-                    x += 1
-                    logger.info(f"Retrying {func.__name__}... (attempt {x + 1})")
+            return call_with_backoff(
+                lambda: func(*args, **kwargs),
+                retries=retries,
+                backoff_in_seconds=backoff_in_seconds,
+                max_backoff_seconds=max_backoff_seconds,
+                retry_exceptions=retry_exceptions,
+                should_retry=should_retry,
+                operation_name=operation_name or func.__name__,
+            )
 
         return wrapper
 

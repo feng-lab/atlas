@@ -182,7 +182,7 @@ runs:
         conda update --all -y
         conda install -y anaconda-client conda-build pip
         python -m pip install --upgrade pip
-        python -m pip install --no-cache-dir aqtinstall requests packaging
+        python -m pip install --no-cache-dir aqtinstall requests packaging boto3
         conda clean --all -y
 
     - name: Cache Qt (installed)

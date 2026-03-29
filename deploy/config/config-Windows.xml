@@ -6,7 +6,7 @@
     <Publisher>fenglab</Publisher>
     <StartMenuDir>fenglab</StartMenuDir>
     <TargetDir>@ApplicationsDirX64@/fenglab</TargetDir>
-    <ProductUrl>https://fenglab.xyz</ProductUrl>
+    <ProductUrl>__ATLAS_PRODUCT_URL__</ProductUrl>
     <InstallerWindowIcon>atlas</InstallerWindowIcon>
     <InstallerApplicationIcon>atlas</InstallerApplicationIcon>
     <Logo>atlas.png</Logo>
@@ -18,12 +18,12 @@
 
     <RemoteRepositories>
         <Repository>
-            <Url>https://neutracing.com/static/packages/Windows</Url>
+            <Url>__ATLAS_IFW_REPO_PRIMARY_URL__</Url>
             <Enabled>1</Enabled>
             <DisplayName>repository 1</DisplayName>
         </Repository>
         <Repository>
-            <Url>https://fenglab.xyz/static/packages/Windows</Url>
+            <Url>__ATLAS_IFW_REPO_BACKUP_URL__</Url>
             <Enabled>0</Enabled>
             <DisplayName>repository 2</DisplayName>
         </Repository>

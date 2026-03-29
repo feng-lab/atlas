@@ -34,6 +34,9 @@ _ENTITLEMENTS_ENV_VAR = "ATLAS_MACOS_CODESIGN_ENTITLEMENTS"
 _NOTARY_API_KEY_PATH_ENV_VAR = "MACOS_NOTARYTOOL_API_KEY_PATH"
 _NOTARY_API_KEY_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_KEY_ID"
 _NOTARY_API_ISSUER_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_ISSUER_ID"
+_PRODUCT_URL_ENV_VAR = "ATLAS_PRODUCT_URL"
+_IFW_REPO_PRIMARY_BASE_URL_ENV_VAR = "ATLAS_IFW_REPO_PRIMARY_BASE_URL"
+_IFW_REPO_BACKUP_BASE_URL_ENV_VAR = "ATLAS_IFW_REPO_BACKUP_BASE_URL"
 
 # Only import the deployment-related variables from dotenv files to avoid surprising
 # side effects (e.g. altering subprocess behavior via unrelated env vars).
@@ -45,6 +48,9 @@ _DOTENV_KEYS: frozenset[str] = frozenset(
         _NOTARY_API_KEY_PATH_ENV_VAR,
         _NOTARY_API_KEY_ID_ENV_VAR,
         _NOTARY_API_ISSUER_ID_ENV_VAR,
+        _PRODUCT_URL_ENV_VAR,
+        _IFW_REPO_PRIMARY_BASE_URL_ENV_VAR,
+        _IFW_REPO_BACKUP_BASE_URL_ENV_VAR,
     }
 )
 
@@ -243,9 +249,89 @@ def load_deploy_env_from_dotenv() -> None:
     This is intentionally explicit (no import-time side effects). Call it from
     entrypoints that want local `.env.local` support.
     """
-    if not common_dirs.is_mac():
-        return
     atlas_env.load_repo_dotenv(allowed_keys=_DOTENV_KEYS)
+
+
+def _required_url_env_var(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise RuntimeError(
+            f"{name} is not set. Define it in the environment or in the repo-root `.env.local`."
+        )
+    return _normalize_url_base(value, env_var=name)
+
+
+def _optional_url_env_var(name: str) -> Optional[str]:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return None
+    return _normalize_url_base(value, env_var=name)
+
+
+def _normalize_url_base(value: str, *, env_var: str) -> str:
+    norm = str(value).strip().rstrip("/")
+    if not norm.startswith("https://"):
+        raise RuntimeError(f"{env_var} must start with https:// (got {value!r})")
+    return norm
+
+
+def _join_url_path(base_url: str, *parts: str) -> str:
+    suffix = "/".join(
+        str(part).strip().strip("/") for part in parts if str(part).strip()
+    )
+    if not suffix:
+        return base_url.rstrip("/")
+    return f"{base_url.rstrip('/')}/{suffix}"
+
+
+def _required_child(element: eTree.Element, tag: str, *, context: str) -> eTree.Element:
+    child = element.find(tag)
+    if child is None:
+        raise RuntimeError(f"Missing <{tag}> in {context}")
+    return child
+
+
+def _render_ifw_config_for_suffix(suffix: str) -> str:
+    template_path = os.path.join(
+        common_dirs.deploy_target_dir(), "config", f"config-{suffix}.xml"
+    )
+    tree = eTree.parse(template_path)
+    root = tree.getroot()
+
+    product_url = _required_url_env_var(_PRODUCT_URL_ENV_VAR)
+    primary_repo_base = _required_url_env_var(_IFW_REPO_PRIMARY_BASE_URL_ENV_VAR)
+    backup_repo_base = _optional_url_env_var(_IFW_REPO_BACKUP_BASE_URL_ENV_VAR)
+
+    _required_child(root, "ProductUrl", context=template_path).text = product_url
+
+    remote_repositories = _required_child(
+        root, "RemoteRepositories", context=template_path
+    )
+    repositories = remote_repositories.findall("Repository")
+    if len(repositories) != 2:
+        raise RuntimeError(
+            f"Expected exactly 2 <Repository> entries in {template_path}, found {len(repositories)}"
+        )
+
+    primary_url = _join_url_path(primary_repo_base, suffix)
+    backup_enabled = backup_repo_base is not None
+    backup_url = (
+        _join_url_path(backup_repo_base, suffix) if backup_repo_base else primary_url
+    )
+
+    _required_child(repositories[0], "Url", context=template_path).text = primary_url
+    _required_child(repositories[0], "Enabled", context=template_path).text = "1"
+
+    _required_child(repositories[1], "Url", context=template_path).text = backup_url
+    _required_child(repositories[1], "Enabled", context=template_path).text = (
+        "1" if backup_enabled else "0"
+    )
+
+    generated_dir = os.path.join(common_dirs.deploy_target_dir(), "generated", "config")
+    os.makedirs(generated_dir, exist_ok=True)
+    generated_path = os.path.join(generated_dir, f"config-{suffix}.xml")
+    tree.write(generated_path, encoding="utf-8", xml_declaration=True)
+    return generated_path
 
 
 def _macos_codesign_identity() -> str:
@@ -1703,6 +1789,8 @@ def build_atlas_installer():
         installer_app_name = "AtlasInstaller.exe"
         installer_zip_name = f"AtlasInstaller-{suffix}.zip"
 
+    generated_ifw_config_path = _render_ifw_config_for_suffix(suffix)
+
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), repo_package_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), repo_package_name))
     shutil.rmtree(
@@ -1753,7 +1841,7 @@ def build_atlas_installer():
                     common_dirs.qt_installer_framework_bin_dir(), "binarycreator"
                 ),
                 "-c",
-                os.path.join("config", "config-macOS.xml"),
+                generated_ifw_config_path,
                 "--mt",
             ],
             cwd=common_dirs.deploy_target_dir(),
@@ -1890,7 +1978,7 @@ def build_atlas_installer():
             os.path.join(common_dirs.qt_installer_framework_bin_dir(), "binarycreator"),
             "--online-only",
             "-c",
-            "config/config-" + suffix + ".xml",
+            generated_ifw_config_path,
             "-p",
             "packages",
             installer_base_name,
