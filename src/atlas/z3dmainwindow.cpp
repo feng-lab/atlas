@@ -110,6 +110,7 @@ Z3DMainWindow::~Z3DMainWindow()
 {
   if (!m_renderingThread.isFinished()) {
     m_engine->cancelLongRendering();
+    m_engine->cancelScreenshot();
     QMetaObject::invokeMethod(m_engine,
                               &Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown,
                               Qt::BlockingQueuedConnection);
@@ -715,11 +716,32 @@ QWidget* Z3DMainWindow::createCaptureWidget() const
 {
   auto m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
   m_screenShotWidget->setCaptureStereoImage(m_isStereoView);
-  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot, m_engine, &Z3DRenderingEngine::takeScreenShot);
+  connect(m_screenShotWidget,
+          &ZTakeScreenShotWidget::take3DScreenShot,
+          this,
+          [this](const QString& filename, Z3DScreenShotType sst) {
+            CHECK(m_engine != nullptr);
+            m_engine->cancelLongRendering();
+            QMetaObject::invokeMethod(
+              m_engine,
+              [engine = m_engine, filename, sst]() {
+                engine->takeScreenShot(filename, sst);
+              },
+              Qt::QueuedConnection);
+          });
   connect(m_screenShotWidget,
           &ZTakeScreenShotWidget::takeFixedSize3DScreenShot,
-          m_engine,
-          &Z3DRenderingEngine::takeFixedSizeScreenShot);
+          this,
+          [this](const QString& filename, int width, int height, Z3DScreenShotType sst) {
+            CHECK(m_engine != nullptr);
+            m_engine->cancelLongRendering();
+            QMetaObject::invokeMethod(
+              m_engine,
+              [engine = m_engine, filename, width, height, sst]() {
+                engine->takeFixedSizeScreenShot(filename, width, height, sst);
+              },
+              Qt::QueuedConnection);
+          });
 
   return m_screenShotWidget;
 }
@@ -771,6 +793,7 @@ void Z3DMainWindow::resetCamera()
 void Z3DMainWindow::cancelRendering()
 {
   m_engine->cancelLongRendering();
+  m_engine->cancelScreenshot();
 }
 
 // 3D window uses shared actions from 2D; no local doc loader needed.

@@ -2,9 +2,62 @@
 
 #include "z3dcameraparameter.h"
 #include <boost/math/constants/constants.hpp>
+#include <array>
 #include <utility>
 
 namespace nim {
+
+namespace {
+
+enum class TrackballKeyBindingKind
+{
+  Rotate,
+  Shift,
+  Dolly,
+  Roll,
+};
+
+struct TrackballKeyBinding
+{
+  const char* actionName;
+  Qt::Key key;
+  Qt::KeyboardModifiers modifiers;
+  TrackballKeyBindingKind kind;
+};
+
+constexpr std::array<TrackballKeyBinding, 12> kTrackballKeyBindings{
+  {
+   {"rotate left", Qt::Key_Left, Qt::ControlModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Rotate},
+   {"rotate right", Qt::Key_Right, Qt::ControlModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Rotate},
+   {"rotate up", Qt::Key_Up, Qt::ControlModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Rotate},
+   {"rotate down", Qt::Key_Down, Qt::ControlModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Rotate},
+   {"shift left", Qt::Key_Left, Qt::ShiftModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Shift},
+   {"shift right", Qt::Key_Right, Qt::ShiftModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Shift},
+   {"shift up", Qt::Key_Up, Qt::ShiftModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Shift},
+   {"shift down", Qt::Key_Down, Qt::ShiftModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Shift},
+   {"dolly in", Qt::Key_Equal, Qt::ControlModifier, TrackballKeyBindingKind::Dolly},
+   {"dolly out", Qt::Key_Minus, Qt::ControlModifier, TrackballKeyBindingKind::Dolly},
+   {"rool left", Qt::Key_Left, Qt::AltModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Roll},
+   {"rool right", Qt::Key_Right, Qt::AltModifier | Qt::KeypadModifier, TrackballKeyBindingKind::Roll},
+   }
+};
+
+[[nodiscard]] bool matchesTrackballKeyBinding(const QKeyEvent& event, const TrackballKeyBinding& binding)
+{
+  return event.type() == QEvent::KeyPress && event.key() == binding.key && event.modifiers() == binding.modifiers;
+}
+
+void addTrackballKeyBindings(ZEventListenerParameter* listener, TrackballKeyBindingKind kind)
+{
+  CHECK(listener);
+  for (const auto& binding : kTrackballKeyBindings) {
+    if (binding.kind == kind) {
+      listener->listenTo(QString::fromLatin1(binding.actionName), binding.key, binding.modifiers, QEvent::KeyPress);
+    }
+  }
+}
+
+} // namespace
 
 Z3DInteractionHandler::Z3DInteractionHandler(QString name, QObject* parent)
   : QObject(parent)
@@ -140,10 +193,7 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString& na
   addEventListener(m_rollEvent);
 
   m_keyRotateEvent = new ZEventListenerParameter(name + " Key Rotate");
-  m_keyRotateEvent->listenTo("rotate left", Qt::Key_Left, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyRotateEvent->listenTo("rotate right", Qt::Key_Right, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyRotateEvent->listenTo("rotate up", Qt::Key_Up, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyRotateEvent->listenTo("rotate down", Qt::Key_Down, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
+  addTrackballKeyBindings(m_keyRotateEvent, TrackballKeyBindingKind::Rotate);
   connect(m_keyRotateEvent,
           &ZEventListenerParameter::keyEventTriggered,
           this,
@@ -151,10 +201,7 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString& na
   addEventListener(m_keyRotateEvent);
 
   m_keyShiftEvent = new ZEventListenerParameter(name + " Key Shift");
-  m_keyShiftEvent->listenTo("shift left", Qt::Key_Left, Qt::ShiftModifier | Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyShiftEvent->listenTo("shift right", Qt::Key_Right, Qt::ShiftModifier | Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyShiftEvent->listenTo("shift up", Qt::Key_Up, Qt::ShiftModifier | Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyShiftEvent->listenTo("shift down", Qt::Key_Down, Qt::ShiftModifier | Qt::KeypadModifier, QEvent::KeyPress);
+  addTrackballKeyBindings(m_keyShiftEvent, TrackballKeyBindingKind::Shift);
   connect(m_keyShiftEvent,
           &ZEventListenerParameter::keyEventTriggered,
           this,
@@ -162,8 +209,7 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString& na
   addEventListener(m_keyShiftEvent);
 
   m_keyDollyEvent = new ZEventListenerParameter(name + " Key Dolly");
-  m_keyDollyEvent->listenTo("dolly in", Qt::Key_Equal, Qt::ControlModifier, QEvent::KeyPress);
-  m_keyDollyEvent->listenTo("dolly out", Qt::Key_Minus, Qt::ControlModifier, QEvent::KeyPress);
+  addTrackballKeyBindings(m_keyDollyEvent, TrackballKeyBindingKind::Dolly);
   connect(m_keyDollyEvent,
           &ZEventListenerParameter::keyEventTriggered,
           this,
@@ -171,13 +217,22 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString& na
   addEventListener(m_keyDollyEvent);
 
   m_keyRollEvent = new ZEventListenerParameter(name + " Key Roll");
-  m_keyRollEvent->listenTo("rool left", Qt::Key_Left, Qt::AltModifier | Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyRollEvent->listenTo("rool right", Qt::Key_Right, Qt::AltModifier | Qt::KeypadModifier, QEvent::KeyPress);
+  addTrackballKeyBindings(m_keyRollEvent, TrackballKeyBindingKind::Roll);
   connect(m_keyRollEvent,
           &ZEventListenerParameter::keyEventTriggered,
           this,
           &Z3DTrackballInteractionHandler::keyRollEvent);
   addEventListener(m_keyRollEvent);
+}
+
+bool Z3DTrackballInteractionHandler::isTrackballNavigationKeyPress(const QKeyEvent& e)
+{
+  for (const auto& binding : kTrackballKeyBindings) {
+    if (matchesTrackballKeyBinding(e, binding)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void Z3DTrackballInteractionHandler::rotateEvent(QMouseEvent* e, int w, int h)

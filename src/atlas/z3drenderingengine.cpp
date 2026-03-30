@@ -447,11 +447,19 @@ const ZQtExecutor& Z3DRenderingEngine::renderThreadExecutor() const
   return *m_renderThreadExecutor;
 }
 
+void Z3DRenderingEngine::cancelActiveRender()
+{
+  Z3DRenderGlobalState::instance().requestCancellation();
+}
+
+void Z3DRenderingEngine::cancelScreenshot()
+{
+  Z3DRenderGlobalState::instance().requestScreenshotCancellation();
+}
+
 void Z3DRenderingEngine::cancelLongRendering()
 {
-  if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
-    Z3DRenderGlobalState::instance().requestCancellation();
-  }
+  cancelActiveRender();
   if (m_globalParas) {
     m_globalParas->requestMeshLodViewCancellation();
   }
@@ -597,9 +605,28 @@ void Z3DRenderingEngine::resetCameraClippingRange()
 
 void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst)
 {
-  try {
-    takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename, width, height, sst);
+  Q_EMIT progressChanged(5);
+  auto progressGuard = folly::makeGuard([this]() {
+    Q_EMIT progressChanged(100);
+  });
+  auto resetOutputSizeGuard = folly::makeGuard([this]() {
     resetOutputSizeToMatchCanvasSize();
+  });
+  auto screenshotCancellationSource = Z3DRenderGlobalState::instance().ensureScreenshotCancellationSource();
+  CHECK(screenshotCancellationSource);
+  auto screenshotCancellationGuard = folly::makeGuard([]() {
+    Z3DRenderGlobalState::instance().resetScreenshotCancellationSource();
+  });
+  try {
+    const auto token = screenshotCancellationSource->getToken();
+    takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename, width, height, sst, true, &token);
+    Q_EMIT progressChanged(98);
+  }
+  catch (const ZCancellationException&) {
+    LOG(INFO) << "takeFixedSizeScreenShot cancelled";
+  }
+  catch (const folly::OperationCancelled&) {
+    LOG(INFO) << "takeFixedSizeScreenShot cancelled (folly)";
   }
   catch (const ZException& e) {
     auto errorMsg = fmt::format("takeFixedSizeScreenShot error: {}", e.what());
@@ -610,8 +637,24 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int wi
 
 void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
 {
+  Q_EMIT progressChanged(5);
+  auto progressGuard = folly::makeGuard([this]() {
+    Q_EMIT progressChanged(100);
+  });
+  auto screenshotCancellationSource = Z3DRenderGlobalState::instance().ensureScreenshotCancellationSource();
+  CHECK(screenshotCancellationSource);
+  auto screenshotCancellationGuard = folly::makeGuard([]() {
+    Z3DRenderGlobalState::instance().resetScreenshotCancellationSource();
+  });
   try {
-    takeScreenShotPrivate(filename, sst);
+    const auto token = screenshotCancellationSource->getToken();
+    takeScreenShotPrivate(filename, sst, true, &token);
+  }
+  catch (const ZCancellationException&) {
+    LOG(INFO) << "takeScreenShot cancelled";
+  }
+  catch (const folly::OperationCancelled&) {
+    LOG(INFO) << "takeScreenShot cancelled (folly)";
   }
   catch (const ZException& e) {
     auto errorMsg = fmt::format("takeScreenShot error: {}", e.what());
@@ -1504,11 +1547,11 @@ double Z3DRenderingEngine::processFrame(bool stereo,
   const uint64_t perfFrameToken = renderState.currentPerfFrameToken();
   auto closePerfTokenGuard = folly::makeGuard([perfFrameToken]() {
     // Progressive rendering is intentionally interruptible: deep render loops
-    // (raycaster paging, compaction, etc.) call processEventsAndMaybeCancel()
-    // which can throw ZCancellationException mid-frame. If we don't close the
-    // perf token on exceptional exits, Z3DPerfCollector will observe an "open"
-    // token and refuse to flush later ones (ordered summaries), making perf
-    // logs appear to never trigger.
+    // (raycaster paging, compaction, etc.) poll the cancellation token and can
+    // throw ZCancellationException mid-frame. If we don't close the perf token
+    // on exceptional exits, Z3DPerfCollector will observe an "open" token and
+    // refuse to flush later ones (ordered summaries), making perf logs appear
+    // to never trigger.
     nim::Z3DPerfCollector::instance().markClosed(perfFrameToken);
   });
 
@@ -1688,15 +1731,19 @@ ZImg Z3DRenderingEngine::localColorBufferToRGBAImg(const Z3DLocalColorBuffer& bu
   return res;
 }
 
-void Z3DRenderingEngine::prepareMeshFiltersForExport(const glm::uvec2& exportSize)
+void Z3DRenderingEngine::prepareMeshFiltersForExport(const glm::uvec2& exportSize,
+                                                     const folly::CancellationToken* cancellationToken)
 {
   finishMeshFiltersForExport();
   for (auto* filter : m_pipeline) {
+    if (cancellationToken) {
+      maybeCancel(*cancellationToken);
+    }
     auto* meshFilter = dynamic_cast<Z3DMeshFilter*>(filter);
     if (!meshFilter) {
       continue;
     }
-    meshFilter->beginExportMeshLod(exportSize);
+    meshFilter->beginExportMeshLod(exportSize, cancellationToken);
     m_exportPreparedMeshFilters.push_back(meshFilter);
   }
 }
@@ -2145,10 +2192,13 @@ Z3DLocalColorBuffer* Z3DRenderingEngine::rightReadyLocalBuffer() const
   return m_compositor->rightReadyLocalBuffer();
 }
 
-void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,
-                                                                              int width,
-                                                                              int height,
-                                                                              Z3DScreenShotType sst)
+void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
+  const QString& filename,
+  int width,
+  int height,
+  Z3DScreenShotType sst,
+  bool reportProgress,
+  const folly::CancellationToken* cancellationToken)
 {
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
@@ -2161,14 +2211,27 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
   const int tileSize = 2048;
   const int tileBorder = 128;
 
+  if (cancellationToken) {
+    maybeCancel(*cancellationToken);
+  }
+
   if (width <= tileSize && height <= tileSize) {
+    if (reportProgress) {
+      Q_EMIT progressChanged(15);
+    }
     // resize texture container to desired image dimensions and propagate change
     setOutputSize(glm::uvec2(width, height));
+    if (reportProgress) {
+      Q_EMIT progressChanged(20);
+    }
 
-    takeScreenShotPrivate(filename, sst);
+    takeScreenShotPrivate(filename, sst, reportProgress, cancellationToken);
   } else {
     m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
-    prepareMeshFiltersForExport(glm::uvec2(width, height));
+    prepareMeshFiltersForExport(glm::uvec2(width, height), cancellationToken);
+    if (reportProgress) {
+      Q_EMIT progressChanged(20);
+    }
     auto meshExportGuard = folly::makeGuard([this]() {
       finishMeshFiltersForExport();
     });
@@ -2195,11 +2258,19 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
 
     int numCols = (width + tileSize - 1) / tileSize;
     int numRows = (height + tileSize - 1) / tileSize;
+    const int totalTiles = numCols * numRows;
+    int completedTiles = 0;
     bool forwardCol = false;
     for (int r = 0; r < numRows; ++r) {
+      if (cancellationToken) {
+        maybeCancel(*cancellationToken);
+      }
       auto tileStartY = r * tileSize;
       forwardCol = !forwardCol;
       for (int c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
+        if (cancellationToken) {
+          maybeCancel(*cancellationToken);
+        }
         auto tileStartX = c * tileSize;
 
         int left = tileStartX;
@@ -2220,7 +2291,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
         m_compositor->setRenderingRegion(nLeft, nRight, nBottom, nTop);
 
         // Evaluate the filter pipeline for this tile.
-        processFrame(sst != Z3DScreenShotType::MonoView, false);
+        processFrame(sst != Z3DScreenShotType::MonoView, false, cancellationToken);
 
         const int pasteY = flipYForSave ? tileStartY : (height - top);
         if (sst == Z3DScreenShotType::MonoView) {
@@ -2232,9 +2303,17 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
           rightImg.pasteImg(localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer()).crop(validRegion),
                             ZVoxelCoordinate(tileStartX, pasteY));
         }
+
+        ++completedTiles;
+        if (reportProgress) {
+          Q_EMIT progressChanged(20 + (completedTiles * 70) / std::max(1, totalTiles));
+        }
       }
     }
 
+    if (cancellationToken) {
+      maybeCancel(*cancellationToken);
+    }
     if (sst == Z3DScreenShotType::MonoView) {
       if (flipYForSave) {
         img.flip(Dimension::Y).save(filename);
@@ -2263,21 +2342,26 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
                   << ") to file:" << filename;
       }
     }
+    if (reportProgress) {
+      Q_EMIT progressChanged(95);
+    }
   }
   if (startedDeferredErrorFrame) {
     reportDeferredRenderingErrorsIfAny();
   }
 }
 
-void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
-                                                                                    const QString& rightFilename,
-                                                                                    int width,
-                                                                                    int height,
-                                                                                    Z3DScreenShotType sst,
-                                                                                    int tileSize,
-                                                                                    int tileBorder,
-                                                                                    int tileStartX,
-                                                                                    int tileStartY)
+void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(
+  const QString& filename,
+  const QString& rightFilename,
+  int width,
+  int height,
+  Z3DScreenShotType sst,
+  int tileSize,
+  int tileBorder,
+  int tileStartX,
+  int tileStartY,
+  const folly::CancellationToken* cancellationToken)
 {
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
@@ -2288,12 +2372,16 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
 
+  if (cancellationToken) {
+    maybeCancel(*cancellationToken);
+  }
+
   CHECK(tileSize > 0);
   CHECK(width > tileSize || height > tileSize);
   tileBorder = std::max(tileBorder, 16);
 
   m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
-  prepareMeshFiltersForExport(glm::uvec2(width, height));
+  prepareMeshFiltersForExport(glm::uvec2(width, height), cancellationToken);
   auto meshExportGuard = folly::makeGuard([this]() {
     finishMeshFiltersForExport();
   });
@@ -2319,7 +2407,11 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
     m_compositor->setRenderingRegion();
   });
   // Evaluate the filter pipeline for this tile.
-  processFrame(sst != Z3DScreenShotType::MonoView, false);
+  processFrame(sst != Z3DScreenShotType::MonoView, false, cancellationToken);
+
+  if (cancellationToken) {
+    maybeCancel(*cancellationToken);
+  }
 
   if (sst == Z3DScreenShotType::MonoView) {
     localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion).save(filename);
@@ -2358,7 +2450,10 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   }
 }
 
-void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScreenShotType sst)
+void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename,
+                                               Z3DScreenShotType sst,
+                                               bool reportProgress,
+                                               const folly::CancellationToken* cancellationToken)
 {
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
@@ -2369,14 +2464,30 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
 
-  prepareMeshFiltersForExport(m_outputSize);
+  if (cancellationToken) {
+    maybeCancel(*cancellationToken);
+  }
+
+  if (reportProgress) {
+    Q_EMIT progressChanged(25);
+  }
+  prepareMeshFiltersForExport(m_outputSize, cancellationToken);
+  if (reportProgress) {
+    Q_EMIT progressChanged(45);
+  }
   auto meshExportGuard = folly::makeGuard([this]() {
     finishMeshFiltersForExport();
   });
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
   const bool flipYForSave = shouldFlipYWhenSaving(backend);
-  processFrame(sst != Z3DScreenShotType::MonoView, false);
+  processFrame(sst != Z3DScreenShotType::MonoView, false, cancellationToken);
+  if (cancellationToken) {
+    maybeCancel(*cancellationToken);
+  }
+  if (reportProgress) {
+    Q_EMIT progressChanged(85);
+  }
 
   if (sst == Z3DScreenShotType::MonoView) {
     auto img = localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer());
@@ -2410,6 +2521,9 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
       LOG(INFO) << "Saved half sbs stereo rendering (" << leftImg.width() << ", " << leftImg.height()
                 << ") to file:" << filename;
     }
+  }
+  if (reportProgress) {
+    Q_EMIT progressChanged(95);
   }
   if (startedDeferredErrorFrame) {
     reportDeferredRenderingErrorsIfAny();

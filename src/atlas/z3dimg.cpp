@@ -851,7 +851,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   checkPageSystemError(c, true);
 
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   size_t count = 0;
   size_t alreadyMapped = 0;
@@ -1396,7 +1396,7 @@ Z3DImg::readImageBlocksToBufferAsync(size_t c,
                                      std::vector<std::optional<std::string>>& failureMessages) const
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   size_t effectiveBatchSize = m_blockUploadingBatchSize;
   if (m_imgPack.isNeuroglancerPrecomputed()) {
@@ -1406,7 +1406,7 @@ Z3DImg::readImageBlocksToBufferAsync(size_t c,
 
   size_t taskIdx = 0;
   while (taskIdx < pendingTasks.size()) {
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     size_t numberOfTasks = std::min(effectiveBatchSize, pendingTasks.size() - taskIdx);
 
@@ -1419,7 +1419,7 @@ Z3DImg::readImageBlocksToBufferAsync(size_t c,
         readImageBlockToBufferAsync(c, pendingTasks, taskIdx, resInfo, buffer, &failureMessages[taskIdx])));
     }
     co_await folly::coro::collectAllRange(std::move(blockTasks));
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
     LOG(INFO) << fmt::format("finish block {}", taskIdx);
   }
 }
@@ -1540,7 +1540,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
   size_t emptyBlockCount = 0;
 
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   LOG(INFO) << "reading " << pendingTasks.size() << " image blocks...";
   if (VLOG_IS_ON(1)) {
@@ -1628,7 +1628,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   });
 
   if (!pboPtr) {
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>>, true> imgQueue;
 #if 1
@@ -1689,13 +1689,13 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     });
 #endif
 
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>> elem;
     auto lastLogTime = std::chrono::steady_clock::now();
     int remainingBlocksToUpload = static_cast<int>(pendingTasks.size());
     while (remainingBlocksToUpload > 0) {
-      processEventsAndMaybeCancel(cancellationToken);
+      maybeCancel(cancellationToken);
 
       if (imgQueue.try_dequeue_until(
             elem,
@@ -1744,7 +1744,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
       });
 
-      processEventsAndMaybeCancel(cancellationToken);
+      maybeCancel(cancellationToken);
 
       CHECK(m_blockUploadingBatchSize > 0);
 
@@ -1770,7 +1770,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 #else
       size_t taskIdx = 0;
       while (taskIdx < pendingTasks.size()) {
-        processEventsAndMaybeCancel(cancellationToken);
+        maybeCancel(cancellationToken);
 
         size_t numberOfTasks = std::min(m_blockUploadingBatchSize, pendingTasks.size() - taskIdx);
         std::vector<folly::Future<folly::Unit>> blockFutures;
@@ -1810,7 +1810,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
         while (
           !f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
-          processEventsAndMaybeCancel(cancellationToken);
+          maybeCancel(cancellationToken);
 
           auto poolStats = p->getPoolStats();
           LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
@@ -1822,7 +1822,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       }
 #endif
 
-      processEventsAndMaybeCancel(cancellationToken);
+      maybeCancel(cancellationToken);
 
       //      if (true) {
       //        auto [minv, maxv] = std::ranges::minmax_element(pboLocalBuffer);
@@ -1837,7 +1837,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     }
 
     for (size_t i = 0; i < pendingTasks.size(); ++i) {
-      processEventsAndMaybeCancel(cancellationToken);
+      maybeCancel(cancellationToken);
 
       const auto& [pageTableEntryKey, pageTableEntryPtr] = pendingTasks[i];
       if (pageTableEntryPtr->w == m_emptyFlag) {

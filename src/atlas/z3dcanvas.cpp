@@ -17,6 +17,7 @@
 #include "zgraphicsview.h"
 #include "z3dswcview.h"
 #include "z3dswcfilter.h"
+#include "z3dinteractionhandler.h"
 #if defined(ATLAS_USE_OPENGLWIDGET)
 #include "z3dscene.h"
 #include "z3dopenglwidget.h"
@@ -263,6 +264,7 @@ void Z3DCanvas::contextMenuEvent(QContextMenuEvent* e)
     m_connectTo3dSwcObjId.reset();
 
     if (m_engine && swcObjIdOpt.has_value()) {
+      m_engine->cancelActiveRender();
       const size_t swcObjId = *swcObjIdOpt;
       QMetaObject::invokeMethod(
         m_engine,
@@ -280,6 +282,7 @@ void Z3DCanvas::contextMenuEvent(QContextMenuEvent* e)
   }
 
   if (m_engine) {
+    m_engine->cancelActiveRender();
     QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
@@ -524,6 +527,7 @@ void Z3DCanvas::toggle3dSwcExtendMode(bool)
                                                 : Z3DSwcFilter::InteractionMode::Select;
 
   const size_t swcObjId = m_active3dSwcPack->id();
+  m_engine->cancelActiveRender();
   QMetaObject::invokeMethod(
     m_engine,
     [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), swcObjId, mode]() {
@@ -548,6 +552,7 @@ void Z3DCanvas::start3dSwcConnectToMode()
   m_connectTo3dSwcObjId = m_active3dSwcPack->id();
 
   const size_t swcObjId = m_active3dSwcPack->id();
+  m_engine->cancelActiveRender();
   QMetaObject::invokeMethod(
     m_engine,
     [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), swcObjId]() {
@@ -564,7 +569,12 @@ void Z3DCanvas::toggle3dSwcMoveSelectedMode(bool)
   const bool on = m_toggle3dMoveSelectedAction && m_toggle3dMoveSelectedAction->isChecked();
 
   m_active3dSwcLinearInv.reset();
-  if (on && m_active3dSwcPack != nullptr && m_engine != nullptr) {
+  if (m_engine == nullptr) {
+    return;
+  }
+
+  m_engine->cancelActiveRender();
+  if (on && m_active3dSwcPack != nullptr) {
     json::object viewJson;
     const size_t swcObjId = m_active3dSwcPack->id();
 
@@ -581,9 +591,6 @@ void Z3DCanvas::toggle3dSwcMoveSelectedMode(bool)
     m_active3dSwcLinearInv = tryExtractCoordLinearInvFromView3DJson(viewJson);
   }
 
-  if (m_engine == nullptr) {
-    return;
-  }
   QMetaObject::invokeMethod(
     m_engine,
     [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), on]() {
@@ -858,6 +865,7 @@ void Z3DCanvas::toggle3dAddNeuronNodeMode(bool)
   const Z3DSwcFilter::InteractionMode mode =
     on ? Z3DSwcFilter::InteractionMode::AddSwcNode : Z3DSwcFilter::InteractionMode::Select;
 
+  m_engine->cancelActiveRender();
   QMetaObject::invokeMethod(
     m_engine,
     [enginePtr = QPointer<Z3DRenderingEngine>(m_engine), swcObjId, mode]() {
@@ -1103,6 +1111,7 @@ void Z3DCanvas::mouseMoveEvent(QMouseEvent* e)
 void Z3DCanvas::mouseDoubleClickEvent(QMouseEvent* e)
 {
   if (m_engine) {
+    m_engine->cancelActiveRender();
     QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
@@ -1120,6 +1129,9 @@ void Z3DCanvas::keyPressEvent(QKeyEvent* e)
 {
   QGraphicsView::keyPressEvent(e);
   if (m_engine) {
+    if (Z3DTrackballInteractionHandler::isTrackballNavigationKeyPress(*e)) {
+      m_engine->cancelLongRendering();
+    }
     QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
@@ -1144,6 +1156,9 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
 #endif
 
   // VLOG(1) << devicePixelRatio() << " " << event->size() << " " << logicalDpiX() << " " << physicalDpiX();
+  if (m_engine) {
+    m_engine->cancelLongRendering();
+  }
   Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatio(), event->size().height() * devicePixelRatio());
 }
 

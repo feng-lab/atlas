@@ -210,7 +210,7 @@ Neuroglancer Precomputed (HTTP)
     - Runtime LOD selection uses the stable engine output size (propagated to filters via `updateSize()`) as its screen-space input. It must not depend on the filter's transient per-pass viewport, because compositor passes temporarily override that state (and the Vulkan path restores it after recording), which can otherwise stall async refinement until another camera move re-dirties the filter.
     - The runtime LOD scheduler keeps the current desired row frontier separate from async dispatch. Selection updates the stored frontier, and row completion only frees capacity plus re-pumps that frontier; cancellation never chooses retry rows on its own. This prevents backend switches or rapid view changes from leaving desired rows stranded in a "not loaded, not in flight" gap once cancelled work drains.
     - Interaction is intentionally biased toward responsiveness: while the camera is moving, Atlas uses a looser detail cutoff; after a short idle debounce it requests finer visible chunks. Legacy non-multiscale mesh sources stay on the static import path.
-    - 3D screenshots/export reuse the same runtime LOD source, but before capture Atlas now synchronously preloads the fine visible rows for the full export view in bounded parallel on the background executor and then freezes that mesh working set for the duration of the capture (including tiled exports). This keeps exported mesh detail stable instead of capturing whichever async rows happened to be loaded at that moment, while avoiding the old one-row-at-a-time export bottleneck.
+    - 3D screenshots/export reuse the same runtime LOD source, but before capture Atlas now synchronously preloads the fine visible rows for the full export view with a bounded async row window and then freezes that mesh working set for the duration of the capture (including tiled exports). Export still walks mesh filters one by one, but each filter now uses a wider `threads * 8` preload window instead of the old one-row-at-a-time blocking loop. This keeps exported mesh detail stable instead of capturing whichever async rows happened to be loaded at that moment, while avoiding unbounded per-filter fan-out.
     - Saving/exporting an external-source Neuroglancer mesh materializes the finest mesh into the document before writing, clears the external-source JSON, and emits `meshChanged` so 3D views drop runtime LOD and treat the mesh as an ordinary local object.
   - Precomputed skeletons (`skeletons/`) are supported via `ZNeuroglancerPrecomputedSkeletonSource` (`src/atlas/zneuroglancerprecomputedskeleton.*`) and are imported into `ZSkeletonDoc` for SWC-like rendering.
   - Precomputed annotations collections are supported via `ZNeuroglancerPrecomputedAnnotationsSource` (`src/atlas/zneuroglancerprecomputedannotations.*`):
@@ -816,6 +816,8 @@ Invalidation & Progressive Rendering
   - Global camera/viewport changes and engine output-size changes
   - Per-filter `updateSize(targetSize)` calls (size handling, then invalidates all results)
 - Image filters request cancellation on invalidate and defer renderer resets to the next `process()` to avoid mutating state mid-pass.
+- Deep progressive render loops now use direct cancellation polling only, so queued UI/engine work is delivered at frame boundaries instead of in the middle of a long pass.
+- This is intentional: active renders must observe a stable filter/network state for the duration of the pass. Better responsiveness for selected user actions comes from explicit pre-cancellation at the entry point, not from mid-frame event delivery.
 
 Debug reason plumbing (debug builds only)
 
@@ -827,6 +829,8 @@ Debug reason plumbing (debug builds only)
 Canvas and Lifecycle
 
 - `Z3DCanvas` posts UI events to engine. It updates its view on `renderingFinished`.
+- Because render loops no longer pump the render thread's Qt event queue mid-frame, queued canvas/input events now apply after the active render unwinds unless the entry point explicitly cancels first.
+- Atlas explicitly cancels the active progressive render for the highest-value interaction starts before queueing the corresponding work: camera/navigation drags and wheel, resize, context-menu / double-click / trackball-navigation key-press delivery, screenshot/export starts, and SWC interaction-mode toggles. Generic mouse press, generic key press, and passive trailing events such as release events are still delivered later rather than aborting the render again.
 - Teardown (ordering and guards):
   - Queued signals can arrive after detaching/destroying engine.
   - `Z3DCanvas::renderingFinished` guards its engine pointer before access.
@@ -1029,6 +1033,7 @@ User-Facing Behavior (summary)
   - On invalidation, the image filter requests cancellation via `globalParas().cancellationSource->requestCancellation()` if a render is in progress.
   - Each `Z3DImgFilter` also sets a small internal flag so it can ask its renderers to reset at the start of the next `process()` call (a safe point). Renderers expose reset as an internal operation (friend access) — it is not part of the public API.
   - Renderers also periodically check the token and may throw a cancellation exception during long passes; they perform their own safe reset in the catch paths. Together, this guarantees a clean progressive restart across all image filters without mutating state mid-pass.
+  - UI/RPC callers that need better responsiveness should request cancellation explicitly before queueing work onto the rendering thread. Do not reintroduce generic `QCoreApplication::processEvents(...)` pumping inside render loops to "fix" latency; that reopens mid-frame state-mutation hazards.
   - When orchestration is expressed via `ZVulkanLinearScript` (compositor/image filters), call sites must flush explicitly (`script.flush(...)`) so cancellation propagates; do not rely on destructor flush.
 
 Scratch Resource Pool (`Z3DScratchResourcePool`)
@@ -1055,6 +1060,7 @@ Stereo and Screenshots
 
 - Stereo: left/right eyes rendered separately; compositor holds per-eye ready/current targets.
 - Screenshots: single shot uses current canvas size; tiled output computes normalized left/right/bottom/top and sets tile frustum on `Z3DCameraParameter` and compositor region, then composites tiles to an image (mono or stereo).
+- Top-level screenshot entry points also emit coarse progress updates through the existing `progressChanged(int)` toolbar path so users can see screenshot preload / render / save progress without introducing a separate progress UI contract.
 
 OpenGL Context and Shaders
 

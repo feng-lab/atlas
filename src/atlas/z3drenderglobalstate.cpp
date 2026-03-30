@@ -177,10 +177,47 @@ void Z3DRenderGlobalState::requestCancellation()
   }
 }
 
+std::shared_ptr<folly::CancellationSource> Z3DRenderGlobalState::ensureScreenshotCancellationSource()
+{
+  const std::lock_guard<std::mutex> lock(m_cancellationMutex);
+  if (!m_screenshotCancellationSource) {
+    m_screenshotCancellationSource = std::make_shared<folly::CancellationSource>();
+  }
+  return m_screenshotCancellationSource;
+}
+
+void Z3DRenderGlobalState::resetScreenshotCancellationSource()
+{
+  const std::lock_guard<std::mutex> lock(m_cancellationMutex);
+  m_screenshotCancellationSource.reset();
+}
+
+void Z3DRenderGlobalState::requestScreenshotCancellation()
+{
+  std::shared_ptr<folly::CancellationSource> source;
+  {
+    const std::lock_guard<std::mutex> lock(m_cancellationMutex);
+    source = m_screenshotCancellationSource;
+  }
+  if (source) {
+    source->requestCancellation();
+  }
+}
+
 folly::CancellationToken Z3DRenderGlobalState::currentCancellationToken() const
 {
   const std::lock_guard<std::mutex> lock(m_cancellationMutex);
-  return m_cancellationSource ? m_cancellationSource->getToken() : folly::CancellationToken();
+  if (m_cancellationSource && m_screenshotCancellationSource) {
+    return folly::cancellation_token_merge(m_cancellationSource->getToken(),
+                                           m_screenshotCancellationSource->getToken());
+  }
+  if (m_cancellationSource) {
+    return m_cancellationSource->getToken();
+  }
+  if (m_screenshotCancellationSource) {
+    return m_screenshotCancellationSource->getToken();
+  }
+  return folly::CancellationToken();
 }
 
 void Z3DRenderGlobalState::markViewStateDirty()

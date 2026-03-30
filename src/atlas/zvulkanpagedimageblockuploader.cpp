@@ -175,7 +175,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   bool markedDirty = false;
 
   while (remainingBlocks > 0) {
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     if (imgQueue.try_dequeue_until(
           elem,

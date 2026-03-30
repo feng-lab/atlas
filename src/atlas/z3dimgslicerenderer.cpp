@@ -845,7 +845,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     LOG(INFO) << "";
     ZBenchTimer bt(fmt::format("render slice ch{}", i));
 
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     // Acquire a scratch Block ID RT with a single color attachment
     auto blockLease = scratchPool.acquireBlockIdRenderTarget(m_outputSize, 1);
@@ -881,7 +881,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
         blockLease.renderTarget->release();
 
-        processEventsAndMaybeCancel(cancellationToken);
+        maybeCancel(cancellationToken);
 
         blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)
           ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
@@ -890,7 +890,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
                             ccSet.insert(range.begin(), range.end()); // inserts a sequence
                           });
 
-        processEventsAndMaybeCancel(cancellationToken);
+        maybeCancel(cancellationToken);
       }
       // glFinish();
     }
@@ -899,7 +899,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
     bt.recordEvent("render and collect blockids");
 
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, i, cancellationToken, bt, /*roundIndex=*/0);
 

@@ -448,7 +448,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                             vk::raii::CommandBuffer& cmd)
 {
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   if (!payload.image || payload.slices.empty()) {
     return;
@@ -1191,7 +1191,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   mergeDraw.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
   mergeDraw.instanceCount = 1;
   recorder.recordGraphicsDraw(mergeDraw);
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   if (FLAGS_atlas_debug_save_slice_layers) {
     auto leaseRef = payload.layerLease;

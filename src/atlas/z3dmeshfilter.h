@@ -68,7 +68,7 @@ public:
   void setExternalSourceState(json::value sourceJson, std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext);
   void setViewport(glm::uvec2 viewport) override;
   void setViewport(glm::uvec4 viewport) override;
-  void beginExportMeshLod(const glm::uvec2& fullViewport);
+  void beginExportMeshLod(const glm::uvec2& fullViewport, const folly::CancellationToken* cancellationToken = nullptr);
   void endExportMeshLod();
 
   void setSelectedMeshes(std::set<ZMesh*>* list)

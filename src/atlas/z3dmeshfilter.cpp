@@ -294,10 +294,10 @@ loadRuntimeNeuroglancerChunkAsync(uint64_t epoch,
 
 [[nodiscard]] std::vector<RuntimeNeuroglancerChunkLoadResult>
 loadRuntimeNeuroglancerRowsBlockingForExport(const std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>& source,
-                                             const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest& manifest,
                                              uint64_t segmentId,
                                              ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace vertexSpace,
-                                             const std::vector<uint32_t>& rows)
+                                             const std::vector<uint32_t>& rows,
+                                             folly::CancellationToken cancellationToken)
 {
   CHECK(source);
 
@@ -306,46 +306,19 @@ loadRuntimeNeuroglancerRowsBlockingForExport(const std::shared_ptr<const ZNeurog
     return out;
   }
 
-  const size_t maxConcurrent = std::max<size_t>(1, runtimeNgMaxTasksInFlight(false));
-  const uint64_t maxBytesInFlight = runtimeNgMaxEncodedBytesInFlight(false);
-  const bool byteBudgetEnabled = (maxBytesInFlight != std::numeric_limits<uint64_t>::max());
+  maybeCancel(cancellationToken);
 
-  out.reserve(rows.size());
-  size_t nextRowIndex = 0;
-  while (nextRowIndex < rows.size()) {
-    std::vector<folly::coro::TaskWithExecutor<RuntimeNeuroglancerChunkLoadResult>> tasks;
-    tasks.reserve(std::min(maxConcurrent, rows.size() - nextRowIndex));
-    uint64_t batchBytes = 0;
-    while (nextRowIndex < rows.size() && tasks.size() < maxConcurrent) {
-      const uint32_t row = rows[nextRowIndex];
-      const uint64_t rowBytes = encodedBytesForManifestRow(manifest, row);
-      if (byteBudgetEnabled && rowBytes > 0U && !tasks.empty()) {
-        if (batchBytes >= maxBytesInFlight || rowBytes > maxBytesInFlight - batchBytes) {
-          break;
-        }
-      }
-
-      tasks.push_back(folly::coro::co_withExecutor(
-        getAtlasBackgroundExecutor(),
-        loadRuntimeNeuroglancerChunkAsync(0U, source, segmentId, row, vertexSpace, rowBytes, {})));
-      if (std::numeric_limits<uint64_t>::max() - batchBytes < rowBytes) {
-        batchBytes = std::numeric_limits<uint64_t>::max();
-      } else {
-        batchBytes += rowBytes;
-      }
-      ++nextRowIndex;
-    }
-
-    CHECK(!tasks.empty());
-    const size_t windowSize = tasks.size();
-    std::vector<RuntimeNeuroglancerChunkLoadResult> batchResults =
-      folly::coro::blockingWait(folly::coro::collectAllWindowed(std::move(tasks), windowSize));
-    for (auto& result : batchResults) {
-      out.push_back(std::move(result));
-    }
+  std::vector<folly::coro::TaskWithExecutor<RuntimeNeuroglancerChunkLoadResult>> tasks;
+  tasks.reserve(rows.size());
+  for (const uint32_t row : rows) {
+    tasks.push_back(folly::coro::co_withExecutor(
+      getAtlasBackgroundExecutor(),
+      loadRuntimeNeuroglancerChunkAsync(0U, source, segmentId, row, vertexSpace, 0U, cancellationToken)));
   }
-
-  return out;
+  auto results =
+    folly::coro::blockingWait(folly::coro::collectAllWindowed(std::move(tasks), runtimeNgMaxTasksInFlight(false)));
+  maybeCancel(cancellationToken);
+  return results;
 }
 
 } // namespace
@@ -493,10 +466,15 @@ void Z3DMeshFilter::spawnRuntimeNeuroglancerTask(folly::coro::Task<void> task, s
                                  wrapRuntimeNeuroglancerTask(std::move(task), std::string(debugLabel))));
 }
 
-void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
+void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport,
+                                       const folly::CancellationToken* cancellationToken)
 {
   if (!m_runtimeNgSourceKey || fullViewport.x == 0U || fullViewport.y == 0U) {
     return;
+  }
+
+  if (cancellationToken) {
+    maybeCancel(*cancellationToken);
   }
 
   m_runtimeNgIdleTimer.stop();
@@ -504,7 +482,13 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
 
   if (!m_runtimeNgSource || !m_runtimeNgManifest) {
     const RuntimeNeuroglancerOpenResult openResult = folly::coro::blockingWait(
-      openRuntimeNeuroglancerSourceAsync(m_runtimeNgEpoch, *m_runtimeNgSourceKey, m_runtimeNgRemoteContext, {}));
+      openRuntimeNeuroglancerSourceAsync(m_runtimeNgEpoch,
+                                         *m_runtimeNgSourceKey,
+                                         m_runtimeNgRemoteContext,
+                                         cancellationToken ? *cancellationToken : folly::CancellationToken()));
+    if (cancellationToken) {
+      maybeCancel(*cancellationToken);
+    }
     if (!openResult.error.isEmpty()) {
       LOG(WARNING) << fmt::format("Mesh export LOD preload skipped: {}", openResult.error);
       return;
@@ -560,25 +544,26 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
   }
 
   if (!missingRows.empty() && m_runtimeNgSourceKey) {
-    const size_t maxConcurrent = std::max<size_t>(1, runtimeNgMaxTasksInFlight(false));
-    const uint64_t maxBytesInFlight = runtimeNgMaxEncodedBytesInFlight(false);
     VLOG(1) << fmt::format(
-      "Mesh export LOD preload start: segment={} mesh='{}' rows={} missingRows={} maxConcurrent={} "
-      "maxEncodedBytesInFlightMiB={}",
+      "Mesh export LOD preload start: segment={} mesh='{}' rows={} missingRows={} backgroundThreads={} "
+      "dispatchPolicy=windowed_rows window={}",
       m_runtimeNgSourceKey->segmentId,
       m_runtimeNgSourceKey->meshSourceDirUrl,
       rowsToLoad.size(),
       missingRows.size(),
-      maxConcurrent,
-      maxBytesInFlight == std::numeric_limits<uint64_t>::max() ? 0ULL : maxBytesInFlight / (1024ULL * 1024ULL));
+      runtimeNgWorkerThreadCount(),
+      runtimeNgMaxTasksInFlight(false));
   }
 
   const std::vector<RuntimeNeuroglancerChunkLoadResult> preloadResults =
     loadRuntimeNeuroglancerRowsBlockingForExport(m_runtimeNgSource,
-                                                 *m_runtimeNgManifest,
                                                  m_runtimeNgSourceKey->segmentId,
                                                  vertexSpace,
-                                                 missingRows);
+                                                 missingRows,
+                                                 cancellationToken ? *cancellationToken : folly::CancellationToken());
+  if (cancellationToken) {
+    maybeCancel(*cancellationToken);
+  }
   for (auto result : preloadResults) {
     if (result.chunk) {
       m_runtimeNgLoadedRows[result.row] = std::move(result.chunk);

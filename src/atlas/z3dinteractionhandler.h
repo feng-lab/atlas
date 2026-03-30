@@ -88,6 +88,8 @@ class Z3DTrackballInteractionHandler : public Z3DInteractionHandler
 public:
   Z3DTrackballInteractionHandler(const QString& name, Z3DCameraParameter* camera, QObject* parent = nullptr);
 
+  [[nodiscard]] static bool isTrackballNavigationKeyPress(const QKeyEvent& e);
+
   [[nodiscard]] Z3DCameraParameter* camera() const
   {
     return m_camera;

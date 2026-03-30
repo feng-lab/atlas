@@ -1591,7 +1591,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     LOG(INFO) << "";
     ZBenchTimer bt(fmt::format("render 2d slice of 3d image ch{}", c));
 
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     // Acquire single-attachment Block ID RT for slice-of-3D pass
     auto blockLease = scratchPool.acquireBlockIdRenderTarget(m_outputSize, 1);
@@ -1627,7 +1627,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
 
         blockLease.renderTarget->release();
 
-        processEventsAndMaybeCancel(cancellationToken);
+        maybeCancel(cancellationToken);
 
         blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)
           ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
@@ -1636,7 +1636,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
                             ccSet.insert(range.begin(), range.end()); // inserts a sequence
                           });
 
-        processEventsAndMaybeCancel(cancellationToken);
+        maybeCancel(cancellationToken);
       }
       // glFinish();
     }
@@ -1645,7 +1645,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
     bt.recordEvent("render and collect blockids");
 
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, /*roundIndex=*/0);
 
@@ -1866,7 +1866,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
   VLOG(1) << n << " " << f << " " << ze_to_screen_pixel_voxel_size << " " << pixelEyeSpaceSize << " " << ze_to_zw_a
           << " " << ze_to_zw_b;
 
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
 #if defined(__linux__)
   static int dummyidx = -1;
@@ -1909,7 +1909,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
                                               visibleIdxs.size(),
                                               *m_image3DRaycasterShader,
                                               RaycastExportMode::Display);
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     auto* lastTarget = m_lastRaycastAccum[eye].renderTarget;
     CHECK(lastTarget);
@@ -2008,7 +2008,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         }
       }
 
-      processEventsAndMaybeCancel(cancellationToken);
+      maybeCancel(cancellationToken);
 
       auto* lastTarget = m_lastRaycastAccum[eye].renderTarget;
       CHECK(lastTarget);
@@ -2036,7 +2036,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     }
   }
 
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   if (progressive || visibleIdxs.size() > 1) {
     const Z3DTexture* mergeColor = nullptr;
@@ -2118,7 +2118,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   CHECK(currentTarget);
 
   maybeCancelFirstProgressiveRound();
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   m_image3DRaycasterBlockIDsShader->bind();
   //          m_image3DRaycasterBlockIDsShader->setUniform("screen_dim_RCP",
@@ -2178,7 +2178,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   bt.recordEvent("render blockids");
 
   maybeCancelFirstProgressiveRound();
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   // check missed blocks and upload
   const Z3DTexture* missingBlockIDsTexture = blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0);
@@ -2209,7 +2209,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
                     });
 
   maybeCancelFirstProgressiveRound();
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   CHECK(!ccSet.empty());
   bool lastRound = ccSet.size() == 1 && ccSet.contains(0_u32); // ccSet contains only 0
@@ -2247,7 +2247,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
       }
 
       maybeCancelFirstProgressiveRound();
-      processEventsAndMaybeCancel(cancellationToken);
+      maybeCancel(cancellationToken);
     }
 
     std::vector<uint32_t> missingBlockIDs;
@@ -2271,12 +2271,12 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     bt.recordEvent("collect blockids");
 
     maybeCancelFirstProgressiveRound();
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
 
     lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, round) && lastRound;
 
     maybeCancelFirstProgressiveRound();
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
   }
 
   // render channels one by one

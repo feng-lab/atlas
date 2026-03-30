@@ -645,7 +645,7 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   // Cooperative cancellation: mirror GL by polling UI events and
   // throwing when a cancel is requested.
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   CHECK(payload.stage != ImgRaycasterPayload::Stage::Unspecified) << "Raycaster payload missing stage";
 
@@ -2591,7 +2591,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
 {
   (void)renderer;
   const folly::CancellationToken cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
   (void)batch;
   if (!payload.blockIdLease || !payload.blockIdLease->hasVulkanImage()) {
     return;
@@ -2712,7 +2712,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   const uint32_t capacityIDs = std::max<uint32_t>(1u, imgW * imgH * 4u);
 
   for (uint32_t att = 0; att < effectiveAttachmentCount; ++att) {
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
     ZVulkanTexture* blockTex = payload.blockIdLease->colorAttachment(att);
     if (!blockTex) {
       continue;

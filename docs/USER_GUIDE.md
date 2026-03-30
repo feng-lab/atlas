@@ -1133,8 +1133,8 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 
 ### 6.6 The Progress Toolbar and Rendering Queue
 
-1. Long-running processes (full-res rendering, animation export) update the progress bar.
-2. **Cancel Rendering** – stop the current job without exiting the application.
+1. Long-running processes (full-res rendering, screenshots, animation export) update the progress bar.
+2. **Cancel Rendering** – stop the current render or screenshot job without exiting the application.
 3. Check logs for “waiting for 3D scene apply to finish” messages when using blocking options.
 
 <!-- > 📸 **Screenshot to add:** 3D window with Progress toolbar visible during a render.-->
@@ -1200,7 +1200,7 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 3. Set window or custom size. For large outputs enable tiling (tile size and border).
 4. Optionally configure rotation sequences (axis, direction, duration, frame rate) for dynamic captures.
 5. Click **Capture**. The engine renders the frame(s) and stores them in the target folder. For runtime Neuroglancer multiscale meshes, Atlas first freezes the fine visible mesh working set for the full capture view so tiled screenshots keep mesh detail consistent across tiles.
-6. Monitor the Progress toolbar; cancel if necessary.
+6. Monitor the Progress toolbar while Atlas preloads export mesh detail, renders, and writes the image. Use **Cancel Rendering** on that toolbar to stop an in-progress screenshot capture.
 ![3D capture dock](images/3DCapture.png)
 
 ### 8.3 3D Animation Export in the GUI

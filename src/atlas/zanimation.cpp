@@ -785,6 +785,7 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
           engine,
           &Z3DRenderingEngine::exportFixedSize3DAnimation);
 
+  engine->cancelLongRendering();
   m_cancelFlag = false;
   Q_EMIT exportFixedSize3DAnimationInEngine(this,
                                             fn,

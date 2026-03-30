@@ -808,6 +808,7 @@ ZRpcUiDispatcher::Screenshot3DResult ZRpcUiDispatcher::takeScreenshot3D(const Sc
 
   out.path = outPath;
 
+  engine->cancelLongRendering();
   auto inv = invokeOnObjectThreadWait(
     engine,
     [engine, outPath, width = req.width, height = req.height]() -> Screenshot3DResult {

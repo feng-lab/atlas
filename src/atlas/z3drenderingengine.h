@@ -259,6 +259,8 @@ public:
   void saveCurrentFrameColor(const QString& filename, Z3DEye eye = MonoEye);
   void saveCurrentFrameDepth(const QString& filename, Z3DEye eye = MonoEye);
 
+  void cancelActiveRender();
+  void cancelScreenshot();
   void cancelLongRendering();
 
   // Teardown helper: drain Vulkan frame-executor fences and execute any
@@ -405,23 +407,31 @@ private:
   void rotateZM();
 
   // private version will throw exception on error
-  void takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,
-                                                            int width,
-                                                            int height,
-                                                            Z3DScreenShotType sst);
+  void
+  takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,
+                                                       int width,
+                                                       int height,
+                                                       Z3DScreenShotType sst,
+                                                       bool reportProgress = false,
+                                                       const folly::CancellationToken* cancellationToken = nullptr);
 
-  void takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
-                                                                  const QString& rightFilename,
-                                                                  int width,
-                                                                  int height,
-                                                                  Z3DScreenShotType sst,
-                                                                  int tileSize = 0,
-                                                                  int tileBorder = 0,
-                                                                  int tileStartX = 0,
-                                                                  int tileStartY = 0);
+  void takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(
+    const QString& filename,
+    const QString& rightFilename,
+    int width,
+    int height,
+    Z3DScreenShotType sst,
+    int tileSize = 0,
+    int tileBorder = 0,
+    int tileStartX = 0,
+    int tileStartY = 0,
+    const folly::CancellationToken* cancellationToken = nullptr);
 
   // private version will throw exception on error
-  void takeScreenShotPrivate(const QString& filename, Z3DScreenShotType sst);
+  void takeScreenShotPrivate(const QString& filename,
+                             Z3DScreenShotType sst,
+                             bool reportProgress = false,
+                             const folly::CancellationToken* cancellationToken = nullptr);
 
   void resetOutputSizeToMatchCanvasSize();
 
@@ -448,7 +458,8 @@ private:
   // towards sources, using the engine's output size as the global target.
   void updateAllFilterSizes();
 
-  void prepareMeshFiltersForExport(const glm::uvec2& exportSize);
+  void prepareMeshFiltersForExport(const glm::uvec2& exportSize,
+                                   const folly::CancellationToken* cancellationToken = nullptr);
   void finishMeshFiltersForExport();
 
 private:
