@@ -466,29 +466,24 @@ void Z3DMeshFilter::spawnRuntimeNeuroglancerTask(folly::coro::Task<void> task, s
                                  wrapRuntimeNeuroglancerTask(std::move(task), std::string(debugLabel))));
 }
 
-void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport,
-                                       const folly::CancellationToken* cancellationToken)
+void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport, folly::CancellationToken cancellationToken)
 {
   if (!m_runtimeNgSourceKey || fullViewport.x == 0U || fullViewport.y == 0U) {
     return;
   }
 
-  if (cancellationToken) {
-    maybeCancel(*cancellationToken);
-  }
+  maybeCancel(cancellationToken);
 
   m_runtimeNgIdleTimer.stop();
   m_runtimeNgInteractionActive = false;
 
   if (!m_runtimeNgSource || !m_runtimeNgManifest) {
-    const RuntimeNeuroglancerOpenResult openResult = folly::coro::blockingWait(
-      openRuntimeNeuroglancerSourceAsync(m_runtimeNgEpoch,
-                                         *m_runtimeNgSourceKey,
-                                         m_runtimeNgRemoteContext,
-                                         cancellationToken ? *cancellationToken : folly::CancellationToken()));
-    if (cancellationToken) {
-      maybeCancel(*cancellationToken);
-    }
+    const RuntimeNeuroglancerOpenResult openResult =
+      folly::coro::blockingWait(openRuntimeNeuroglancerSourceAsync(m_runtimeNgEpoch,
+                                                                   *m_runtimeNgSourceKey,
+                                                                   m_runtimeNgRemoteContext,
+                                                                   cancellationToken));
+    maybeCancel(cancellationToken);
     if (!openResult.error.isEmpty()) {
       LOG(WARNING) << fmt::format("Mesh export LOD preload skipped: {}", openResult.error);
       return;
@@ -560,10 +555,8 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport,
                                                  m_runtimeNgSourceKey->segmentId,
                                                  vertexSpace,
                                                  missingRows,
-                                                 cancellationToken ? *cancellationToken : folly::CancellationToken());
-  if (cancellationToken) {
-    maybeCancel(*cancellationToken);
-  }
+                                                 cancellationToken);
+  maybeCancel(cancellationToken);
   for (auto result : preloadResults) {
     if (result.chunk) {
       m_runtimeNgLoadedRows[result.row] = std::move(result.chunk);

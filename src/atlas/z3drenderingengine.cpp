@@ -452,9 +452,9 @@ void Z3DRenderingEngine::cancelActiveRender()
   Z3DRenderGlobalState::instance().requestCancellation();
 }
 
-void Z3DRenderingEngine::cancelScreenshot()
+void Z3DRenderingEngine::cancelCapture()
 {
-  Z3DRenderGlobalState::instance().requestScreenshotCancellation();
+  Z3DRenderGlobalState::instance().requestCaptureCancellation();
 }
 
 void Z3DRenderingEngine::cancelLongRendering()
@@ -612,14 +612,14 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int wi
   auto resetOutputSizeGuard = folly::makeGuard([this]() {
     resetOutputSizeToMatchCanvasSize();
   });
-  auto screenshotCancellationSource = Z3DRenderGlobalState::instance().ensureScreenshotCancellationSource();
-  CHECK(screenshotCancellationSource);
-  auto screenshotCancellationGuard = folly::makeGuard([]() {
-    Z3DRenderGlobalState::instance().resetScreenshotCancellationSource();
+  auto captureCancellationSource = Z3DRenderGlobalState::instance().ensureCaptureCancellationSource();
+  CHECK(captureCancellationSource);
+  auto captureCancellationGuard = folly::makeGuard([]() {
+    Z3DRenderGlobalState::instance().resetCaptureCancellationSource();
   });
   try {
-    const auto token = screenshotCancellationSource->getToken();
-    takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename, width, height, sst, true, &token);
+    const auto token = captureCancellationSource->getToken();
+    takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename, width, height, sst, true, token);
     Q_EMIT progressChanged(98);
   }
   catch (const ZCancellationException&) {
@@ -641,14 +641,14 @@ void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotTy
   auto progressGuard = folly::makeGuard([this]() {
     Q_EMIT progressChanged(100);
   });
-  auto screenshotCancellationSource = Z3DRenderGlobalState::instance().ensureScreenshotCancellationSource();
-  CHECK(screenshotCancellationSource);
-  auto screenshotCancellationGuard = folly::makeGuard([]() {
-    Z3DRenderGlobalState::instance().resetScreenshotCancellationSource();
+  auto captureCancellationSource = Z3DRenderGlobalState::instance().ensureCaptureCancellationSource();
+  CHECK(captureCancellationSource);
+  auto captureCancellationGuard = folly::makeGuard([]() {
+    Z3DRenderGlobalState::instance().resetCaptureCancellationSource();
   });
   try {
-    const auto token = screenshotCancellationSource->getToken();
-    takeScreenShotPrivate(filename, sst, true, &token);
+    const auto token = captureCancellationSource->getToken();
+    takeScreenShotPrivate(filename, sst, true, token);
   }
   catch (const ZCancellationException&) {
     LOG(INFO) << "takeScreenShot cancelled";
@@ -672,7 +672,6 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                     int height,
                                                     bool overwriteFileIfExist,
                                                     Z3DScreenShotType sst,
-                                                    std::atomic_bool* cancelFlag,
                                                     const QString* imageOuputFolder,
                                                     bool skipVideoCompression,
                                                     int tileSize,
@@ -761,6 +760,17 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
   }
 
   try {
+    auto captureCancellationSource = Z3DRenderGlobalState::instance().ensureCaptureCancellationSource();
+    CHECK(captureCancellationSource);
+    auto captureCancellationGuard = folly::makeGuard([]() {
+      Z3DRenderGlobalState::instance().resetCaptureCancellationSource();
+    });
+    auto resetOutputSizeGuard = folly::makeGuard([this]() {
+      resetOutputSizeToMatchCanvasSize();
+    });
+    const auto token = captureCancellationSource->getToken();
+    maybeCancel(token);
+
     const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
     auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
       endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
@@ -782,17 +792,14 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
     if (tileSize == 0 || (tileSize >= width && tileSize >= height)) {
       for (int i = startFrame; i < endFrame; ++i) {
+        maybeCancel(token);
         Q_EMIT progressChanged(std::clamp<int>(std::floor((i - startFrame) * 1. / numFrame * 100.), 0, 99));
-        if (cancelFlag && cancelFlag->load()) {
-          reportCancelError();
-          return;
-        }
 
         animation->setCurrentTime(static_cast<double>(i) / framePerSecond);
         QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
         QString filepath = tmpdir.filePath(filename);
 
-        takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath, width, height, sst);
+        takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath, width, height, sst, false, token);
       }
     } else {
       int numCols = (width + tileSize - 1) / tileSize;
@@ -800,21 +807,20 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
       bool forwardFrame = false;
       bool forwardCol = false;
       for (int r = 0; r < numRows; ++r) {
+        maybeCancel(token);
         auto tileStartY = r * tileSize;
         forwardCol = !forwardCol;
         for (int c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
+          maybeCancel(token);
           auto tileStartX = c * tileSize;
           forwardFrame = !forwardFrame;
           for (int i = forwardFrame ? startFrame : (endFrame - 1); forwardFrame ? (i < endFrame) : (i >= startFrame);
                forwardFrame ? ++i : --i) {
+            maybeCancel(token);
             Q_EMIT progressChanged(std::clamp<int>(
               std::floor(((c * r + r) * numFrame + i - startFrame) * 1. / (numFrame * numCols * numRows) * 100.),
               0,
               98));
-            if (cancelFlag && cancelFlag->load()) {
-              reportCancelError();
-              return;
-            }
 
             animation->setCurrentTime(static_cast<double>(i) / framePerSecond);
             QString filename = QString("_%1%2_%3_%4.png")
@@ -849,18 +855,16 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                                        tileSize,
                                                                        tileBorder,
                                                                        tileStartX,
-                                                                       tileStartY);
+                                                                       tileStartY,
+                                                                       token);
           }
         }
       }
 
       // compose images
       for (int i = startFrame; i < endFrame; ++i) {
+        maybeCancel(token);
         Q_EMIT progressChanged(99);
-        if (cancelFlag && cancelFlag->load()) {
-          reportCancelError();
-          return;
-        }
 
         const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
         const bool flipYForSave = shouldFlipYWhenSaving(backend);
@@ -959,15 +963,11 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
         }
       }
     }
-    resetOutputSizeToMatchCanvasSize();
-
-    if (cancelFlag && cancelFlag->load()) {
-      reportCancelError();
-      return;
-    }
+    maybeCancel(token);
 
     ZVideoEncoder videoEncoder;
     if (skipVideoCompression) {
+      maybeCancel(token);
       LOG(INFO) << "video compression skipped, you can run the following command to get video:";
       ZVideoEncoder::encodeDryRun(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
     } else {
@@ -976,16 +976,23 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
       connect(&videoEncoder, &ZVideoEncoder::canceled, this, &Z3DRenderingEngine::reportCancelError);
       videoEncoder.encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
       while (!videoEncoder.waitForFinished(3000)) {
-        if (cancelFlag && cancelFlag->load()) {
+        if (token.isCancellationRequested()) {
           videoEncoder.cancel();
-          return;
+          maybeCancel(token);
         }
       }
+      maybeCancel(token);
       LOG(INFO) << dir.filePath(fn) << " saved";
     }
     if (startedDeferredErrorFrame) {
       reportDeferredRenderingErrorsIfAny();
     }
+  }
+  catch (const ZCancellationException&) {
+    reportCancelError();
+  }
+  catch (const folly::OperationCancelled&) {
+    reportCancelError();
   }
   catch (const ZException& e) {
     LOG(ERROR) << e.what();
@@ -1528,9 +1535,8 @@ void Z3DRenderingEngine::updateAllFilterSizes()
   }
 }
 
-double Z3DRenderingEngine::processFrame(bool stereo,
-                                        bool progressiveRendering,
-                                        const folly::CancellationToken* cancellationToken)
+double
+Z3DRenderingEngine::processFrame(bool stereo, bool progressiveRendering, folly::CancellationToken cancellationToken)
 {
   if (m_pipeline.empty()) {
     return 1.0;
@@ -1570,9 +1576,7 @@ double Z3DRenderingEngine::processFrame(bool stereo,
   double totalProgress = 0.0;
 
   for (auto* filter : m_pipeline) {
-    if (cancellationToken) {
-      maybeCancel(*cancellationToken);
-    }
+    maybeCancel(cancellationToken);
 
     filter->setProgressiveRenderingMode(progressiveRendering);
 
@@ -1732,13 +1736,11 @@ ZImg Z3DRenderingEngine::localColorBufferToRGBAImg(const Z3DLocalColorBuffer& bu
 }
 
 void Z3DRenderingEngine::prepareMeshFiltersForExport(const glm::uvec2& exportSize,
-                                                     const folly::CancellationToken* cancellationToken)
+                                                     folly::CancellationToken cancellationToken)
 {
   finishMeshFiltersForExport();
   for (auto* filter : m_pipeline) {
-    if (cancellationToken) {
-      maybeCancel(*cancellationToken);
-    }
+    maybeCancel(cancellationToken);
     auto* meshFilter = dynamic_cast<Z3DMeshFilter*>(filter);
     if (!meshFilter) {
       continue;
@@ -2086,7 +2088,7 @@ void Z3DRenderingEngine::renderFast(bool stereo)
 
   try {
     const auto token = cancellationSource->getToken();
-    m_progress = processFrame(stereo, true, &token);
+    m_progress = processFrame(stereo, true, token);
     maybeStartVulkanCompletionPolling();
   }
   catch (const ZCancellationException&) {
@@ -2148,7 +2150,7 @@ void Z3DRenderingEngine::render(bool stereo)
     CHECK(cancellationSource);
     while (m_progress < 1.0) {
       auto token = cancellationSource->getToken();
-      m_progress = processFrame(stereo, true, &token);
+      m_progress = processFrame(stereo, true, token);
       pollVulkanCompletionsOnce();
       Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
     }
@@ -2198,7 +2200,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   int height,
   Z3DScreenShotType sst,
   bool reportProgress,
-  const folly::CancellationToken* cancellationToken)
+  folly::CancellationToken cancellationToken)
 {
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
@@ -2211,9 +2213,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   const int tileSize = 2048;
   const int tileBorder = 128;
 
-  if (cancellationToken) {
-    maybeCancel(*cancellationToken);
-  }
+  maybeCancel(cancellationToken);
 
   if (width <= tileSize && height <= tileSize) {
     if (reportProgress) {
@@ -2262,15 +2262,11 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
     int completedTiles = 0;
     bool forwardCol = false;
     for (int r = 0; r < numRows; ++r) {
-      if (cancellationToken) {
-        maybeCancel(*cancellationToken);
-      }
+      maybeCancel(cancellationToken);
       auto tileStartY = r * tileSize;
       forwardCol = !forwardCol;
       for (int c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
-        if (cancellationToken) {
-          maybeCancel(*cancellationToken);
-        }
+        maybeCancel(cancellationToken);
         auto tileStartX = c * tileSize;
 
         int left = tileStartX;
@@ -2311,9 +2307,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
       }
     }
 
-    if (cancellationToken) {
-      maybeCancel(*cancellationToken);
-    }
+    maybeCancel(cancellationToken);
     if (sst == Z3DScreenShotType::MonoView) {
       if (flipYForSave) {
         img.flip(Dimension::Y).save(filename);
@@ -2361,7 +2355,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   int tileBorder,
   int tileStartX,
   int tileStartY,
-  const folly::CancellationToken* cancellationToken)
+  folly::CancellationToken cancellationToken)
 {
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
@@ -2372,9 +2366,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
 
-  if (cancellationToken) {
-    maybeCancel(*cancellationToken);
-  }
+  maybeCancel(cancellationToken);
 
   CHECK(tileSize > 0);
   CHECK(width > tileSize || height > tileSize);
@@ -2409,9 +2401,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   // Evaluate the filter pipeline for this tile.
   processFrame(sst != Z3DScreenShotType::MonoView, false, cancellationToken);
 
-  if (cancellationToken) {
-    maybeCancel(*cancellationToken);
-  }
+  maybeCancel(cancellationToken);
 
   if (sst == Z3DScreenShotType::MonoView) {
     localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion).save(filename);
@@ -2453,7 +2443,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
 void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename,
                                                Z3DScreenShotType sst,
                                                bool reportProgress,
-                                               const folly::CancellationToken* cancellationToken)
+                                               folly::CancellationToken cancellationToken)
 {
   m_isRendering = true;
   auto renderingGuard = folly::makeGuard([this]() {
@@ -2464,9 +2454,7 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename,
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
 
-  if (cancellationToken) {
-    maybeCancel(*cancellationToken);
-  }
+  maybeCancel(cancellationToken);
 
   if (reportProgress) {
     Q_EMIT progressChanged(25);
@@ -2482,9 +2470,7 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename,
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
   const bool flipYForSave = shouldFlipYWhenSaving(backend);
   processFrame(sst != Z3DScreenShotType::MonoView, false, cancellationToken);
-  if (cancellationToken) {
-    maybeCancel(*cancellationToken);
-  }
+  maybeCancel(cancellationToken);
   if (reportProgress) {
     Q_EMIT progressChanged(85);
   }

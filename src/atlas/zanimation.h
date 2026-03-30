@@ -205,7 +205,6 @@ Q_SIGNALS:
                                           int height,
                                           bool overwriteFileIfExist,
                                           Z3DScreenShotType sst,
-                                          std::atomic_bool* cancelFlag,
                                           const QString* imageOuputFolder,
                                           bool skipVideoCompression,
                                           int tileSize,
@@ -296,8 +295,6 @@ protected:
   ZVideoEncoder* m_videoEncoder;
 
   std::shared_ptr<QTemporaryDir> m_tempDir;
-
-  std::atomic_bool m_cancelFlag = false;
 };
 
 } // namespace nim

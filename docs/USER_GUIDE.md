@@ -1134,7 +1134,7 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 ### 6.6 The Progress Toolbar and Rendering Queue
 
 1. Long-running processes (full-res rendering, screenshots, animation export) update the progress bar.
-2. **Cancel Rendering** – stop the current render or screenshot job without exiting the application.
+2. **Cancel Rendering** – stop the current render or capture job without exiting the application.
 3. Check logs for “waiting for 3D scene apply to finish” messages when using blocking options.
 
 <!-- > 📸 **Screenshot to add:** 3D window with Progress toolbar visible during a render.-->

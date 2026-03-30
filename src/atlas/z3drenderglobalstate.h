@@ -30,9 +30,9 @@ public:
   std::shared_ptr<folly::CancellationSource> ensureCancellationSource();
   void resetCancellationSource();
   void requestCancellation();
-  std::shared_ptr<folly::CancellationSource> ensureScreenshotCancellationSource();
-  void resetScreenshotCancellationSource();
-  void requestScreenshotCancellation();
+  std::shared_ptr<folly::CancellationSource> ensureCaptureCancellationSource();
+  void resetCaptureCancellationSource();
+  void requestCaptureCancellation();
   folly::CancellationToken currentCancellationToken() const;
 
   struct RendererSharedState
@@ -100,7 +100,7 @@ private:
   // mid-frame. Guard access to the source pointer to avoid data races.
   mutable std::mutex m_cancellationMutex;
   std::shared_ptr<folly::CancellationSource> m_cancellationSource;
-  std::shared_ptr<folly::CancellationSource> m_screenshotCancellationSource;
+  std::shared_ptr<folly::CancellationSource> m_captureCancellationSource;
   Z3DScratchResourcePool* m_scratchPool = nullptr;
   RendererSharedState m_rendererState;
 

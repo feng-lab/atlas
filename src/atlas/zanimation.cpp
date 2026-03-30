@@ -786,7 +786,6 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
           &Z3DRenderingEngine::exportFixedSize3DAnimation);
 
   engine->cancelLongRendering();
-  m_cancelFlag = false;
   Q_EMIT exportFixedSize3DAnimationInEngine(this,
                                             fn,
                                             framePerSecond,
@@ -796,7 +795,6 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             height,
                                             true,
                                             sst,
-                                            &m_cancelFlag,
                                             nullptr,
                                             false,
                                             tileSize,
@@ -1014,8 +1012,7 @@ void ZAnimation::videoEncoderCanceled()
 void ZAnimation::cancelButtonPressed()
 {
   if (auto eng = dynamic_cast<Z3DRenderingEngine*>(m_engine); eng) {
-    eng->cancelLongRendering();
-    m_cancelFlag = true;
+    eng->cancelCapture();
   }
 }
 

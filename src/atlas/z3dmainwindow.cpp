@@ -110,7 +110,7 @@ Z3DMainWindow::~Z3DMainWindow()
 {
   if (!m_renderingThread.isFinished()) {
     m_engine->cancelLongRendering();
-    m_engine->cancelScreenshot();
+    m_engine->cancelCapture();
     QMetaObject::invokeMethod(m_engine,
                               &Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown,
                               Qt::BlockingQueuedConnection);
@@ -793,7 +793,7 @@ void Z3DMainWindow::resetCamera()
 void Z3DMainWindow::cancelRendering()
 {
   m_engine->cancelLongRendering();
-  m_engine->cancelScreenshot();
+  m_engine->cancelCapture();
 }
 
 // 3D window uses shared actions from 2D; no local doc loader needed.

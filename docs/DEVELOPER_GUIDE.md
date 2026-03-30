@@ -1060,7 +1060,7 @@ Stereo and Screenshots
 
 - Stereo: left/right eyes rendered separately; compositor holds per-eye ready/current targets.
 - Screenshots: single shot uses current canvas size; tiled output computes normalized left/right/bottom/top and sets tile frustum on `Z3DCameraParameter` and compositor region, then composites tiles to an image (mono or stereo).
-- Top-level screenshot entry points also emit coarse progress updates through the existing `progressChanged(int)` toolbar path so users can see screenshot preload / render / save progress without introducing a separate progress UI contract.
+- Top-level capture entry points emit coarse progress updates through the existing `progressChanged(int)` path so users can see screenshot/export preload / render / save progress without introducing a separate progress UI contract.
 
 OpenGL Context and Shaders
 

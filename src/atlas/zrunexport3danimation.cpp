@@ -260,7 +260,6 @@ int ZRunExport3DAnimation::run()
                                     FLAGS_output_height,
                                     FLAGS_overwrite,
                                     Z3DScreenShotType::MonoView,
-                                    nullptr,
                                     outputImageFolderName.isEmpty() ? nullptr : &outputImageFolderName,
                                     FLAGS_skip_video_compression,
                                     FLAGS_output_tile_size,

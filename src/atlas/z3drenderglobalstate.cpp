@@ -177,27 +177,27 @@ void Z3DRenderGlobalState::requestCancellation()
   }
 }
 
-std::shared_ptr<folly::CancellationSource> Z3DRenderGlobalState::ensureScreenshotCancellationSource()
+std::shared_ptr<folly::CancellationSource> Z3DRenderGlobalState::ensureCaptureCancellationSource()
 {
   const std::lock_guard<std::mutex> lock(m_cancellationMutex);
-  if (!m_screenshotCancellationSource) {
-    m_screenshotCancellationSource = std::make_shared<folly::CancellationSource>();
+  if (!m_captureCancellationSource) {
+    m_captureCancellationSource = std::make_shared<folly::CancellationSource>();
   }
-  return m_screenshotCancellationSource;
+  return m_captureCancellationSource;
 }
 
-void Z3DRenderGlobalState::resetScreenshotCancellationSource()
+void Z3DRenderGlobalState::resetCaptureCancellationSource()
 {
   const std::lock_guard<std::mutex> lock(m_cancellationMutex);
-  m_screenshotCancellationSource.reset();
+  m_captureCancellationSource.reset();
 }
 
-void Z3DRenderGlobalState::requestScreenshotCancellation()
+void Z3DRenderGlobalState::requestCaptureCancellation()
 {
   std::shared_ptr<folly::CancellationSource> source;
   {
     const std::lock_guard<std::mutex> lock(m_cancellationMutex);
-    source = m_screenshotCancellationSource;
+    source = m_captureCancellationSource;
   }
   if (source) {
     source->requestCancellation();
@@ -207,15 +207,14 @@ void Z3DRenderGlobalState::requestScreenshotCancellation()
 folly::CancellationToken Z3DRenderGlobalState::currentCancellationToken() const
 {
   const std::lock_guard<std::mutex> lock(m_cancellationMutex);
-  if (m_cancellationSource && m_screenshotCancellationSource) {
-    return folly::cancellation_token_merge(m_cancellationSource->getToken(),
-                                           m_screenshotCancellationSource->getToken());
+  if (m_cancellationSource && m_captureCancellationSource) {
+    return folly::cancellation_token_merge(m_cancellationSource->getToken(), m_captureCancellationSource->getToken());
   }
   if (m_cancellationSource) {
     return m_cancellationSource->getToken();
   }
-  if (m_screenshotCancellationSource) {
-    return m_screenshotCancellationSource->getToken();
+  if (m_captureCancellationSource) {
+    return m_captureCancellationSource->getToken();
   }
   return folly::CancellationToken();
 }

@@ -126,7 +126,6 @@ public:
                                   int height,
                                   bool overwriteFileIfExist = true,
                                   Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
-                                  std::atomic_bool* cancelFlag = nullptr,
                                   const QString* imageOuputFolder = nullptr,
                                   bool skipVideoCompression = false,
                                   int tileSize = 0,
@@ -260,7 +259,7 @@ public:
   void saveCurrentFrameDepth(const QString& filename, Z3DEye eye = MonoEye);
 
   void cancelActiveRender();
-  void cancelScreenshot();
+  void cancelCapture();
   void cancelLongRendering();
 
   // Teardown helper: drain Vulkan frame-executor fences and execute any
@@ -407,31 +406,29 @@ private:
   void rotateZM();
 
   // private version will throw exception on error
-  void
-  takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,
-                                                       int width,
-                                                       int height,
-                                                       Z3DScreenShotType sst,
-                                                       bool reportProgress = false,
-                                                       const folly::CancellationToken* cancellationToken = nullptr);
+  void takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,
+                                                            int width,
+                                                            int height,
+                                                            Z3DScreenShotType sst,
+                                                            bool reportProgress = false,
+                                                            folly::CancellationToken cancellationToken = {});
 
-  void takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(
-    const QString& filename,
-    const QString& rightFilename,
-    int width,
-    int height,
-    Z3DScreenShotType sst,
-    int tileSize = 0,
-    int tileBorder = 0,
-    int tileStartX = 0,
-    int tileStartY = 0,
-    const folly::CancellationToken* cancellationToken = nullptr);
+  void takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
+                                                                  const QString& rightFilename,
+                                                                  int width,
+                                                                  int height,
+                                                                  Z3DScreenShotType sst,
+                                                                  int tileSize = 0,
+                                                                  int tileBorder = 0,
+                                                                  int tileStartX = 0,
+                                                                  int tileStartY = 0,
+                                                                  folly::CancellationToken cancellationToken = {});
 
   // private version will throw exception on error
   void takeScreenShotPrivate(const QString& filename,
                              Z3DScreenShotType sst,
                              bool reportProgress = false,
-                             const folly::CancellationToken* cancellationToken = nullptr);
+                             folly::CancellationToken cancellationToken = {});
 
   void resetOutputSizeToMatchCanvasSize();
 
@@ -448,18 +445,15 @@ private:
   void clearDeferredRenderingErrors();
   void reportDeferredRenderingErrorsIfAny();
 
-  // Execute one pass over the current filter pipeline. If cancellationToken
-  // is provided, this will check for cancellation between filters.
-  double processFrame(bool stereo,
-                      bool progressiveRendering,
-                      const folly::CancellationToken* cancellationToken = nullptr);
+  // Execute one pass over the current filter pipeline, polling
+  // cancellationToken between filters.
+  double processFrame(bool stereo, bool progressiveRendering, folly::CancellationToken cancellationToken = {});
 
   // Update sizes for all filters in the pipeline, walking from sinks back
   // towards sources, using the engine's output size as the global target.
   void updateAllFilterSizes();
 
-  void prepareMeshFiltersForExport(const glm::uvec2& exportSize,
-                                   const folly::CancellationToken* cancellationToken = nullptr);
+  void prepareMeshFiltersForExport(const glm::uvec2& exportSize, folly::CancellationToken cancellationToken = {});
   void finishMeshFiltersForExport();
 
 private:
