@@ -535,8 +535,6 @@ private:
 
   boost::unordered_flat_set<QEvent::Type> m_eventTypes;
 
-  bool m_isRendering = false;
-
   std::mutex m_mutex;
 
   double m_progress = 0;

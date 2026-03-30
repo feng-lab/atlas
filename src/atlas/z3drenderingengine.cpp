@@ -768,6 +768,9 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     auto resetOutputSizeGuard = folly::makeGuard([this]() {
       resetOutputSizeToMatchCanvasSize();
     });
+    auto progressGuard = folly::makeGuard([this]() {
+      Q_EMIT progressChanged(100);
+    });
     const auto token = captureCancellationSource->getToken();
     maybeCancel(token);
 
@@ -2049,11 +2052,6 @@ void Z3DRenderingEngine::getGLFocus()
 void Z3DRenderingEngine::renderFast(bool stereo)
 {
   const auto benchmarkStart = std::chrono::steady_clock::now();
-  if (m_isRendering) {
-    LOG(INFO) << "in fast rendering, schedule a update later";
-    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
-    return;
-  }
   if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
     Z3DRenderGlobalState::instance().requestCancellation();
     LOG(INFO) << "cancel rendering, schedule a update later";
@@ -2070,10 +2068,6 @@ void Z3DRenderingEngine::renderFast(bool stereo)
 
   VLOG(1) << "renderFast";
   Q_EMIT progressChanged(10);
-  m_isRendering = true;
-  auto renderingGuard = folly::makeGuard([this]() {
-    m_isRendering = false;
-  });
 
   auto& renderState = Z3DRenderGlobalState::instance();
   auto cancellationSource = renderState.ensureCancellationSource();
@@ -2132,7 +2126,6 @@ void Z3DRenderingEngine::renderFast(bool stereo)
 void Z3DRenderingEngine::render(bool stereo)
 {
   const auto benchmarkStart = std::chrono::steady_clock::now();
-  CHECK(!m_isRendering);
   CHECK(!Z3DRenderGlobalState::instance().hasCancellationSource());
 
   VLOG(1) << "render";
@@ -2202,10 +2195,6 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   bool reportProgress,
   folly::CancellationToken cancellationToken)
 {
-  m_isRendering = true;
-  auto renderingGuard = folly::makeGuard([this]() {
-    m_isRendering = false;
-  });
   const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
   auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
@@ -2357,10 +2346,6 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   int tileStartY,
   folly::CancellationToken cancellationToken)
 {
-  m_isRendering = true;
-  auto renderingGuard = folly::makeGuard([this]() {
-    m_isRendering = false;
-  });
   const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
   auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
@@ -2445,10 +2430,6 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename,
                                                bool reportProgress,
                                                folly::CancellationToken cancellationToken)
 {
-  m_isRendering = true;
-  auto renderingGuard = folly::makeGuard([this]() {
-    m_isRendering = false;
-  });
   const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
   auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
@@ -2559,6 +2540,10 @@ void Z3DRenderingEngine::applyBackendSwitch()
 {
   VLOG(1) << "Entering applyBackendSwitch";
   stopVulkanCompletionPolling();
+  // Deferred render requests are tied to the previous Vulkan backend state.
+  // Drop any queued Vulkan backpressure work before rebuilding backend-owned
+  // resources so a stale deferred event cannot fire after the switch.
+  m_vkDeferredRenderEventType.reset();
   auto resetScheduleGuard = folly::makeGuard([this]() {
     m_backendSwitchScheduled = false;
   });
@@ -2733,7 +2718,6 @@ void Z3DRenderingEngine::applyBackendSwitch()
   resetCameraClippingRange();
 
   m_progress = 0.0;
-  m_isRendering = false;
   VLOG(1) << "Backend switch state reset; requesting update";
 
   QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
