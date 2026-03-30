@@ -16,6 +16,7 @@
 
 #include <folly/OperationCancelled.h>
 #include <folly/coro/BlockingWait.h>
+#include <folly/coro/Collect.h>
 #include <folly/coro/WithCancellation.h>
 
 #include <algorithm>
@@ -291,6 +292,62 @@ loadRuntimeNeuroglancerChunkAsync(uint64_t epoch,
   co_return out;
 }
 
+[[nodiscard]] std::vector<RuntimeNeuroglancerChunkLoadResult>
+loadRuntimeNeuroglancerRowsBlockingForExport(const std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>& source,
+                                             const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest& manifest,
+                                             uint64_t segmentId,
+                                             ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace vertexSpace,
+                                             const std::vector<uint32_t>& rows)
+{
+  CHECK(source);
+
+  std::vector<RuntimeNeuroglancerChunkLoadResult> out;
+  if (rows.empty()) {
+    return out;
+  }
+
+  const size_t maxConcurrent = std::max<size_t>(1, runtimeNgMaxTasksInFlight(false));
+  const uint64_t maxBytesInFlight = runtimeNgMaxEncodedBytesInFlight(false);
+  const bool byteBudgetEnabled = (maxBytesInFlight != std::numeric_limits<uint64_t>::max());
+
+  out.reserve(rows.size());
+  size_t nextRowIndex = 0;
+  while (nextRowIndex < rows.size()) {
+    std::vector<folly::coro::TaskWithExecutor<RuntimeNeuroglancerChunkLoadResult>> tasks;
+    tasks.reserve(std::min(maxConcurrent, rows.size() - nextRowIndex));
+    uint64_t batchBytes = 0;
+    while (nextRowIndex < rows.size() && tasks.size() < maxConcurrent) {
+      const uint32_t row = rows[nextRowIndex];
+      const uint64_t rowBytes = encodedBytesForManifestRow(manifest, row);
+      if (byteBudgetEnabled && rowBytes > 0U && !tasks.empty()) {
+        if (batchBytes >= maxBytesInFlight || rowBytes > maxBytesInFlight - batchBytes) {
+          break;
+        }
+      }
+
+      tasks.push_back(folly::coro::co_withExecutor(
+        getAtlasBackgroundExecutor(),
+        loadRuntimeNeuroglancerChunkAsync(0U, source, segmentId, row, vertexSpace, rowBytes, {})));
+      if (std::numeric_limits<uint64_t>::max() - batchBytes < rowBytes) {
+        batchBytes = std::numeric_limits<uint64_t>::max();
+      } else {
+        batchBytes += rowBytes;
+      }
+      ++nextRowIndex;
+    }
+
+    CHECK(!tasks.empty());
+    const size_t windowSize = tasks.size();
+    std::vector<RuntimeNeuroglancerChunkLoadResult> batchResults =
+      folly::coro::blockingWait(folly::coro::collectAllWindowed(std::move(tasks), windowSize));
+    for (auto& result : batchResults) {
+      out.push_back(std::move(result));
+    }
+  }
+
+  return out;
+}
+
 } // namespace
 
 Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode* regionNode, QObject* parent)
@@ -461,6 +518,12 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
   CHECK(m_runtimeNgSource);
   CHECK(m_runtimeNgManifest);
 
+  // Export owns the full-view preload barrier. Cancel any stale view-driven
+  // refinement so it does not compete with export chunk loads for the same
+  // background executor capacity.
+  clearRuntimeNeuroglancerRequestFrontier();
+  (void)cancelRuntimeNeuroglancerInFlightRows();
+
   m_runtimeNgFailedRows.clear();
 
   const glm::mat4 modelViewProjection =
@@ -488,21 +551,51 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport)
   const auto vertexSpace = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform
                              ? ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::Quantized
                              : ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::LocalVoxel;
+  std::vector<uint32_t> missingRows;
+  missingRows.reserve(rowsToLoad.size());
   for (const uint32_t row : rowsToLoad) {
-    if (m_runtimeNgLoadedRows.contains(row)) {
+    if (!m_runtimeNgLoadedRows.contains(row)) {
+      missingRows.push_back(row);
+    }
+  }
+
+  if (!missingRows.empty() && m_runtimeNgSourceKey) {
+    const size_t maxConcurrent = std::max<size_t>(1, runtimeNgMaxTasksInFlight(false));
+    const uint64_t maxBytesInFlight = runtimeNgMaxEncodedBytesInFlight(false);
+    VLOG(1) << fmt::format(
+      "Mesh export LOD preload start: segment={} mesh='{}' rows={} missingRows={} maxConcurrent={} "
+      "maxEncodedBytesInFlightMiB={}",
+      m_runtimeNgSourceKey->segmentId,
+      m_runtimeNgSourceKey->meshSourceDirUrl,
+      rowsToLoad.size(),
+      missingRows.size(),
+      maxConcurrent,
+      maxBytesInFlight == std::numeric_limits<uint64_t>::max() ? 0ULL : maxBytesInFlight / (1024ULL * 1024ULL));
+  }
+
+  const std::vector<RuntimeNeuroglancerChunkLoadResult> preloadResults =
+    loadRuntimeNeuroglancerRowsBlockingForExport(m_runtimeNgSource,
+                                                 *m_runtimeNgManifest,
+                                                 m_runtimeNgSourceKey->segmentId,
+                                                 vertexSpace,
+                                                 missingRows);
+  for (auto result : preloadResults) {
+    if (result.chunk) {
+      m_runtimeNgLoadedRows[result.row] = std::move(result.chunk);
       continue;
     }
-    try {
-      auto chunkMesh = m_runtimeNgSource->loadChunkMeshBlocking(m_runtimeNgSourceKey->segmentId, row, vertexSpace);
-      CHECK(chunkMesh);
-      m_runtimeNgLoadedRows[row] = std::move(chunkMesh);
+    m_runtimeNgFailedRows.insert(result.row);
+    if (firstError.isEmpty() && !result.error.isEmpty()) {
+      firstError = std::move(result.error);
     }
-    catch (const std::exception& e) {
-      m_runtimeNgFailedRows.insert(row);
-      if (firstError.isEmpty()) {
-        firstError = QString::fromUtf8(e.what());
-      }
-    }
+  }
+
+  if (!missingRows.empty() && m_runtimeNgSourceKey) {
+    VLOG(1) << fmt::format("Mesh export LOD preload complete: segment={} mesh='{}' loadedRows={} failedRows={}",
+                           m_runtimeNgSourceKey->segmentId,
+                           m_runtimeNgSourceKey->meshSourceDirUrl,
+                           m_runtimeNgLoadedRows.size(),
+                           m_runtimeNgFailedRows.size());
   }
 
   if (!firstError.isEmpty()) {
