@@ -38,17 +38,18 @@ public:
     std::string url;
     std::chrono::milliseconds timeout{0};
     std::vector<std::pair<std::string, std::string>> headers;
+    std::optional<ZHttpByteRange> exactByteRange;
   };
 
-  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-  getBytes(std::string url,
-           std::chrono::milliseconds timeout,
-           std::vector<std::pair<std::string, std::string>> requestHeaders) const override
+  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>> getBytes(ZHttpGetRequest request) const override
   {
     std::optional<ZHttpGetBytesResult> next;
     {
       const std::lock_guard<std::mutex> lock(mutex);
-      requests.push_back(Request{.url = std::move(url), .timeout = timeout, .headers = std::move(requestHeaders)});
+      requests.push_back(Request{.url = std::move(request.url),
+                                 .timeout = request.timeout,
+                                 .headers = std::move(request.headers),
+                                 .exactByteRange = request.exactByteRange});
       if (responses.empty()) {
         throw std::runtime_error("FakeRemoteObjectStore called without a queued response");
       }
@@ -91,6 +92,7 @@ void expectIdenticalRequestSuffix(const FakeRemoteObjectStore& store, size_t fir
   for (size_t i = firstSuffixIndex + 1; i < store.requests.size(); ++i) {
     EXPECT_EQ(store.requests[i].url, store.requests[firstSuffixIndex].url);
     EXPECT_EQ(store.requests[i].headers, store.requests[firstSuffixIndex].headers);
+    EXPECT_EQ(store.requests[i].exactByteRange, store.requests[firstSuffixIndex].exactByteRange);
   }
 }
 
@@ -134,9 +136,10 @@ TEST(ZRemoteObjectReader, RemoteContextUsesInjectedStoreForRangeReads)
   EXPECT_EQ(*bytesOpt, (std::vector<uint8_t>{1, 2, 3}));
   ASSERT_EQ(store->requests.size(), 1U);
   EXPECT_EQ(store->requests[0].url, "https://example.com/range");
-  ASSERT_EQ(store->requests[0].headers.size(), 1U);
-  EXPECT_EQ(store->requests[0].headers[0].first, "range");
-  EXPECT_EQ(store->requests[0].headers[0].second, "bytes=7-9");
+  EXPECT_TRUE(store->requests[0].headers.empty());
+  ASSERT_TRUE(store->requests[0].exactByteRange.has_value());
+  EXPECT_EQ(store->requests[0].exactByteRange->offset, 7U);
+  EXPECT_EQ(store->requests[0].exactByteRange->length, 3U);
 }
 
 TEST(ZRemoteObjectReader, RemoteContextRetriesRangeSizeMismatch)
@@ -176,8 +179,12 @@ TEST(ZRemoteObjectReader, RemoteContextRetriesRangeSizeMismatch)
   ASSERT_TRUE(bytesOpt.has_value());
   EXPECT_EQ(*bytesOpt, (std::vector<uint8_t>{1, 2, 3}));
   ASSERT_EQ(store->requests.size(), 2U);
-  EXPECT_EQ(store->requests[0].headers[0].second, "bytes=7-9");
-  EXPECT_EQ(store->requests[1].headers[0].second, "bytes=7-9");
+  ASSERT_TRUE(store->requests[0].exactByteRange.has_value());
+  ASSERT_TRUE(store->requests[1].exactByteRange.has_value());
+  EXPECT_EQ(store->requests[0].exactByteRange->offset, 7U);
+  EXPECT_EQ(store->requests[0].exactByteRange->length, 3U);
+  EXPECT_EQ(store->requests[1].exactByteRange->offset, 7U);
+  EXPECT_EQ(store->requests[1].exactByteRange->length, 3U);
 }
 
 TEST(ZRemoteObjectReader, RemoteContextSlicesFullResponseWhenAllowed)
@@ -202,7 +209,9 @@ TEST(ZRemoteObjectReader, RemoteContextSlicesFullResponseWhenAllowed)
   ASSERT_TRUE(bytesOpt.has_value());
   EXPECT_EQ(*bytesOpt, (std::vector<uint8_t>{12, 13, 14}));
   ASSERT_EQ(store->requests.size(), 1U);
-  EXPECT_EQ(store->requests[0].headers[0].second, "bytes=2-4");
+  ASSERT_TRUE(store->requests[0].exactByteRange.has_value());
+  EXPECT_EQ(store->requests[0].exactByteRange->offset, 2U);
+  EXPECT_EQ(store->requests[0].exactByteRange->length, 3U);
 }
 
 TEST(ZRemoteObjectReader, RemoteContextRejectsStrictRangeReadWithStatus200)
@@ -230,7 +239,9 @@ TEST(ZRemoteObjectReader, RemoteContextRejectsStrictRangeReadWithStatus200)
   }
 
   ASSERT_EQ(store->requests.size(), 1U);
-  EXPECT_EQ(store->requests[0].headers[0].second, "bytes=7-9");
+  ASSERT_TRUE(store->requests[0].exactByteRange.has_value());
+  EXPECT_EQ(store->requests[0].exactByteRange->offset, 7U);
+  EXPECT_EQ(store->requests[0].exactByteRange->length, 3U);
 }
 
 TEST(ZRemoteObjectReader, RemoteContextExhaustsRangeSizeMismatchRetries)
@@ -270,8 +281,12 @@ TEST(ZRemoteObjectReader, RemoteContextExhaustsRangeSizeMismatchRetries)
   }
 
   ASSERT_EQ(store->requests.size(), 2U);
-  EXPECT_EQ(store->requests[0].headers[0].second, "bytes=7-9");
-  EXPECT_EQ(store->requests[1].headers[0].second, "bytes=7-9");
+  ASSERT_TRUE(store->requests[0].exactByteRange.has_value());
+  ASSERT_TRUE(store->requests[1].exactByteRange.has_value());
+  EXPECT_EQ(store->requests[0].exactByteRange->offset, 7U);
+  EXPECT_EQ(store->requests[0].exactByteRange->length, 3U);
+  EXPECT_EQ(store->requests[1].exactByteRange->offset, 7U);
+  EXPECT_EQ(store->requests[1].exactByteRange->length, 3U);
 }
 
 TEST(ZRemoteObjectReader, StateParsingUsesInjectedStore)
@@ -691,9 +706,10 @@ TEST(ZRemoteObjectReader, ConcurrentShardedMinishardFailureIsPropagatedToBothCal
   ASSERT_LE(store->requests.size(), 3U);
   EXPECT_EQ(store->requests[0].url, "https://storage.googleapis.com/bucket/dataset/info");
   EXPECT_EQ(store->requests[1].url, "https://storage.googleapis.com/bucket/dataset/1_1_1/0.shard");
-  ASSERT_EQ(store->requests[1].headers.size(), 1U);
-  EXPECT_EQ(store->requests[1].headers[0].first, "range");
-  EXPECT_EQ(store->requests[1].headers[0].second, "bytes=0-15");
+  EXPECT_TRUE(store->requests[1].headers.empty());
+  ASSERT_TRUE(store->requests[1].exactByteRange.has_value());
+  EXPECT_EQ(store->requests[1].exactByteRange->offset, 0U);
+  EXPECT_EQ(store->requests[1].exactByteRange->length, 16U);
   expectIdenticalRequestSuffix(*store, 1);
   EXPECT_EQ(store->responses.size(), 3U - store->requests.size());
 }

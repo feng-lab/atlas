@@ -22,16 +22,12 @@ enum class ZRemoteRangeReadPolicy
 
 folly::coro::Task<std::optional<ZHttpGetBytesResult>>
 getRemoteObjectResponseAsync(const ZRemoteObjectStore& objectStore,
-                             std::string url,
-                             std::chrono::milliseconds timeout,
-                             std::vector<std::pair<std::string, std::string>> requestHeaders = {},
+                             ZHttpGetRequest request,
                              /*nullable*/ ZImgReadStatsSink* statsSink = nullptr,
                              ZImgReadStatsContext statsContext = {});
 
 folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-getRemoteObjectResponseAsync(std::string url,
-                             std::chrono::milliseconds timeout,
-                             std::vector<std::pair<std::string, std::string>> requestHeaders = {},
+getRemoteObjectResponseAsync(ZHttpGetRequest request,
                              /*nullable*/ ZImgReadStatsSink* statsSink = nullptr,
                              ZImgReadStatsContext statsContext = {});
 

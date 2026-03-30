@@ -25,14 +25,17 @@ QString cacheDbPathForRoot(const QString& rootDir)
   return QDir(cacheDir).filePath(QStringLiteral("http.sqlite"));
 }
 
-QByteArray cacheKeyHashFor(const std::string& url, const std::string& rangeHeaderValue)
+QByteArray cacheKeyHashFor(const ZHttpGetRequest& request)
 {
   QByteArray keyBytes;
   keyBytes.append("GET\n", 4);
-  keyBytes.append(QByteArray(url.data(), static_cast<int>(url.size())));
+  keyBytes.append(QByteArray(request.url.data(), static_cast<int>(request.url.size())));
   keyBytes.append('\n');
   keyBytes.append("range=", 6);
-  keyBytes.append(QByteArray(rangeHeaderValue.data(), static_cast<int>(rangeHeaderValue.size())));
+  if (request.exactByteRange.has_value()) {
+    const std::string rangeHeaderValue = formatHttpByteRangeHeaderValue(*request.exactByteRange);
+    keyBytes.append(QByteArray(rangeHeaderValue.data(), static_cast<int>(rangeHeaderValue.size())));
+  }
   keyBytes.append('\n');
 
   boost::hash2::sha2_256 hash;
@@ -170,12 +173,20 @@ bool setLastAccessNs(const QString& rootDir, const QByteArray& keyHash, sqlite3_
   return ok;
 }
 
-ZHttpGetBytesResult makeResult(std::vector<uint8_t> body)
+[[nodiscard]] ZHttpGetRequest makeRequest(std::string url, std::optional<ZHttpByteRange> exactByteRange = std::nullopt)
+{
+  return ZHttpGetRequest{.url = std::move(url),
+                         .timeout = std::chrono::milliseconds(0),
+                         .exactByteRange = exactByteRange};
+}
+
+ZHttpGetBytesResult makeResult(std::vector<uint8_t> body, uint16_t status = 200)
 {
   ZHttpGetBytesResult out{};
-  out.status = 200;
+  out.status = status;
   out.contentType = "application/octet-stream";
   out.contentEncoding = "identity";
+  out.encodedBodyBytes = body.size();
   out.body = std::move(body);
   return out;
 }
@@ -191,10 +202,11 @@ TEST(ZHttpDiskCache, StoreAndHitNoRange)
   ASSERT_TRUE(cache.isEnabled());
 
   const std::string url = "https://example.invalid/data.bin";
-  cache.put(url, /*requestHeaders=*/{}, makeResult({1, 2, 3, 4}));
+  const ZHttpGetRequest request = makeRequest(url);
+  cache.put(request, makeResult({1, 2, 3, 4}));
   ASSERT_TRUE(cache.drainWrites(std::chrono::seconds(5)));
 
-  auto got = cache.tryGet(url, /*requestHeaders=*/{});
+  auto got = cache.tryGet(request);
   ASSERT_TRUE(got.has_value());
   EXPECT_EQ(got->status, 200);
   EXPECT_EQ(got->contentType, "application/octet-stream");
@@ -214,14 +226,50 @@ TEST(ZHttpDiskCache, RangeDifferentiatesEntries)
   ASSERT_TRUE(cache.isEnabled());
 
   const std::string url = "https://example.invalid/data.bin";
-  cache.put(url, /*requestHeaders=*/{{"Range", "bytes=0-3"}}, makeResult({1, 2, 3, 4}));
+  const ZHttpGetRequest hitRequest = makeRequest(url, ZHttpByteRange{.offset = 0, .length = 4});
+  const ZHttpGetRequest missRequest = makeRequest(url, ZHttpByteRange{.offset = 4, .length = 4});
+  cache.put(hitRequest, makeResult({1, 2, 3, 4}, /*status=*/206));
   ASSERT_TRUE(cache.drainWrites(std::chrono::seconds(5)));
 
-  auto hit = cache.tryGet(url, /*requestHeaders=*/{{"range", "bytes=0-3"}});
+  auto hit = cache.tryGet(hitRequest);
   ASSERT_TRUE(hit.has_value());
 
-  auto miss = cache.tryGet(url, /*requestHeaders=*/{{"range", "bytes=4-7"}});
+  auto miss = cache.tryGet(missRequest);
   EXPECT_FALSE(miss.has_value());
+}
+
+TEST(ZHttpDiskCache, RejectsStatus200RangeEntry)
+{
+  QTemporaryDir tmp;
+  ASSERT_TRUE(tmp.isValid());
+
+  ZHttpDiskCache cache(tmp.path(), /*maxBytes=*/1024 * 1024);
+  ASSERT_TRUE(cache.isEnabled());
+
+  const std::string url = "https://example.invalid/data.bin";
+  const ZHttpGetRequest request = makeRequest(url, ZHttpByteRange{.offset = 7, .length = 3});
+  cache.put(request, makeResult({1, 2, 3, 4}, /*status=*/200));
+  ASSERT_TRUE(cache.drainWrites(std::chrono::seconds(5)));
+
+  EXPECT_FALSE(cache.tryGet(request).has_value());
+  EXPECT_EQ(countCacheEntries(tmp.path()), 0u);
+}
+
+TEST(ZHttpDiskCache, RejectsMismatched206RangeEntry)
+{
+  QTemporaryDir tmp;
+  ASSERT_TRUE(tmp.isValid());
+
+  ZHttpDiskCache cache(tmp.path(), /*maxBytes=*/1024 * 1024);
+  ASSERT_TRUE(cache.isEnabled());
+
+  const std::string url = "https://example.invalid/data.bin";
+  const ZHttpGetRequest request = makeRequest(url, ZHttpByteRange{.offset = 7, .length = 3});
+  cache.put(request, makeResult({1, 2}, /*status=*/206));
+  ASSERT_TRUE(cache.drainWrites(std::chrono::seconds(5)));
+
+  EXPECT_FALSE(cache.tryGet(request).has_value());
+  EXPECT_EQ(countCacheEntries(tmp.path()), 0u);
 }
 
 TEST(ZHttpDiskCache, CorruptEntryIsMissAndRemoved)
@@ -233,14 +281,15 @@ TEST(ZHttpDiskCache, CorruptEntryIsMissAndRemoved)
   ASSERT_TRUE(cache.isEnabled());
 
   const std::string url = "https://example.invalid/data.bin";
-  cache.put(url, /*requestHeaders=*/{{"range", "bytes=0-3"}}, makeResult({1, 2, 3, 4}));
+  const ZHttpGetRequest request = makeRequest(url, ZHttpByteRange{.offset = 0, .length = 4});
+  cache.put(request, makeResult({1, 2, 3, 4}, /*status=*/206));
   ASSERT_TRUE(cache.drainWrites(std::chrono::seconds(5)));
 
-  const QByteArray keyHash = cacheKeyHashFor(url, "bytes=0-3");
+  const QByteArray keyHash = cacheKeyHashFor(request);
   ASSERT_TRUE(hasEntry(tmp.path(), keyHash));
   ASSERT_TRUE(overwriteEntryPrefix(tmp.path(), keyHash, QByteArray("BADCACHE")));
 
-  auto miss = cache.tryGet(url, /*requestHeaders=*/{{"range", "bytes=0-3"}});
+  auto miss = cache.tryGet(request);
   EXPECT_FALSE(miss.has_value());
   ASSERT_TRUE(cache.drainWrites(std::chrono::seconds(5)));
   EXPECT_FALSE(hasEntry(tmp.path(), keyHash));
@@ -257,16 +306,18 @@ TEST(ZHttpDiskCache, PrunesOldestEntries)
 
   const std::string url1 = "https://example.invalid/first.bin";
   const std::string url2 = "https://example.invalid/second.bin";
+  const ZHttpGetRequest request1 = makeRequest(url1);
+  const ZHttpGetRequest request2 = makeRequest(url2);
 
-  cache.put(url1, /*requestHeaders=*/{}, makeResult(std::vector<uint8_t>(600, 0x11)));
+  cache.put(request1, makeResult(std::vector<uint8_t>(600, 0x11)));
   ASSERT_TRUE(cache.drainWrites(std::chrono::seconds(5)));
-  const QByteArray key1 = cacheKeyHashFor(url1, /*range=*/"");
+  const QByteArray key1 = cacheKeyHashFor(request1);
   ASSERT_TRUE(hasEntry(tmp.path(), key1));
   ASSERT_TRUE(setLastAccessNs(tmp.path(), key1, /*lastAccessNs=*/1));
 
-  cache.put(url2, /*requestHeaders=*/{}, makeResult(std::vector<uint8_t>(600, 0x22)));
+  cache.put(request2, makeResult(std::vector<uint8_t>(600, 0x22)));
   ASSERT_TRUE(cache.drainWrites(std::chrono::seconds(5)));
-  const QByteArray key2 = cacheKeyHashFor(url2, /*range=*/"");
+  const QByteArray key2 = cacheKeyHashFor(request2);
   ASSERT_TRUE(hasEntry(tmp.path(), key2));
 
   // After pruning, only the newest entry should remain.

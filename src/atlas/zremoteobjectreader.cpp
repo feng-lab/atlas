@@ -54,13 +54,11 @@ sliceAllowedFullResponse(const ZHttpGetBytesResult& result, uint64_t offset, uin
 
 folly::coro::Task<std::optional<ZHttpGetBytesResult>>
 getRemoteObjectResponseAsync(const ZRemoteObjectStore& objectStore,
-                             std::string url,
-                             std::chrono::milliseconds timeout,
-                             std::vector<std::pair<std::string, std::string>> requestHeaders,
+                             ZHttpGetRequest request,
                              /*nullable*/ ZImgReadStatsSink* statsSink,
                              ZImgReadStatsContext statsContext)
 {
-  auto resOpt = co_await objectStore.getBytes(std::move(url), timeout, std::move(requestHeaders));
+  auto resOpt = co_await objectStore.getBytes(std::move(request));
   if (!resOpt) {
     co_return std::nullopt;
   }
@@ -70,16 +68,12 @@ getRemoteObjectResponseAsync(const ZRemoteObjectStore& objectStore,
 }
 
 folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-getRemoteObjectResponseAsync(std::string url,
-                             std::chrono::milliseconds timeout,
-                             std::vector<std::pair<std::string, std::string>> requestHeaders,
+getRemoteObjectResponseAsync(ZHttpGetRequest request,
                              /*nullable*/ ZImgReadStatsSink* statsSink,
                              ZImgReadStatsContext statsContext)
 {
   co_return co_await getRemoteObjectResponseAsync(ZRemoteObjectStore::defaultStore(),
-                                                  std::move(url),
-                                                  timeout,
-                                                  std::move(requestHeaders),
+                                                  std::move(request),
                                                   statsSink,
                                                   statsContext);
 }
@@ -91,7 +85,10 @@ getRemoteObjectBytesAsync(const ZRemoteObjectStore& objectStore,
                           /*nullable*/ ZImgReadStatsSink* statsSink,
                           ZImgReadStatsContext statsContext)
 {
-  auto resOpt = co_await getRemoteObjectResponseAsync(objectStore, url, timeout, {}, statsSink, statsContext);
+  auto resOpt = co_await getRemoteObjectResponseAsync(objectStore,
+                                                      ZHttpGetRequest{.url = url, .timeout = timeout},
+                                                      statsSink,
+                                                      statsContext);
   if (!resOpt) {
     co_return std::nullopt;
   }
@@ -129,15 +126,15 @@ getRemoteObjectRangeBytesAsync(const ZRemoteObjectStore& objectStore,
     co_return std::vector<uint8_t>{};
   }
 
-  const uint64_t endInclusive = offset + length - 1;
-  const std::vector<std::pair<std::string, std::string>> requestHeaders = {
-    {"range", fmt::format("bytes={}-{}", offset, endInclusive)}
+  const ZHttpGetRequest request{
+    .url = url,
+    .timeout = timeout,
+    .exactByteRange = ZHttpByteRange{.offset = offset, .length = length},
   };
 
   const uint32_t maxRetries = FLAGS_atlas_http_max_retries;
   for (uint32_t attempt = 0; attempt <= maxRetries; ++attempt) {
-    auto resOpt =
-      co_await getRemoteObjectResponseAsync(objectStore, url, timeout, requestHeaders, statsSink, statsContext);
+    auto resOpt = co_await getRemoteObjectResponseAsync(objectStore, request, statsSink, statsContext);
     if (!resOpt) {
       co_return std::nullopt;
     }

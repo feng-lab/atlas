@@ -40,16 +40,6 @@ struct HttpCacheEntryHeader
   uint64_t bodyLen = 0;
 };
 
-[[nodiscard]] bool isSafeAsciiLower(std::string_view s)
-{
-  for (char c : s) {
-    if (c < 'a' || c > 'z') {
-      return false;
-    }
-  }
-  return true;
-}
-
 [[nodiscard]] std::string lowerAscii(std::string_view in)
 {
   std::string out(in);
@@ -61,18 +51,37 @@ struct HttpCacheEntryHeader
   return out;
 }
 
-[[nodiscard]] std::optional<std::string> findHeaderValueLowerKey(
-  const std::vector<std::pair<std::string, std::string>>& headers,
-  std::string_view keyLowerAscii)
+[[nodiscard]] bool hasHeaderLowerKey(const std::vector<std::pair<std::string, std::string>>& headers,
+                                     std::string_view keyLowerAscii)
 {
-  CHECK(isSafeAsciiLower(keyLowerAscii));
   for (const auto& [k, v] : headers) {
+    (void)v;
     std::string kLower = lowerAscii(k);
     if (kLower == keyLowerAscii) {
-      return v;
+      return true;
     }
   }
-  return std::nullopt;
+  return false;
+}
+
+[[nodiscard]] std::string exactByteRangeKeyString(const std::optional<ZHttpByteRange>& exactByteRange)
+{
+  if (!exactByteRange.has_value()) {
+    return {};
+  }
+  return formatHttpByteRangeHeaderValue(*exactByteRange);
+}
+
+[[nodiscard]] bool isCacheableExactRangeResponse(const ZHttpGetRequest& request, const ZHttpGetBytesResult& result)
+{
+  if (!request.exactByteRange.has_value()) {
+    return true;
+  }
+
+  // Range-keyed HTTP cache entries must represent the exact requested bytes.
+  // Do not persist partial 206 bodies or full-object 200 fallbacks under a
+  // byte-range key, or retries can get poisoned by the cache.
+  return result.status == 206 && static_cast<uint64_t>(result.body.size()) == request.exactByteRange->length;
 }
 
 [[nodiscard]] int64_t nowNs()
@@ -128,15 +137,14 @@ bool ZHttpDiskCache::isEnabled() const
   return m_bucket && m_bucket->isEnabled();
 }
 
-ZHttpDiskCache::KeyParts ZHttpDiskCache::keyPartsFrom(
-  const std::string& url,
-  const std::vector<std::pair<std::string, std::string>>& requestHeaders)
+ZHttpDiskCache::KeyParts ZHttpDiskCache::keyPartsFrom(const ZHttpGetRequest& request)
 {
+  CHECK(!hasHeaderLowerKey(request.headers, "range"))
+    << "ZHttpDiskCache expects typed exact-byte-range metadata instead of raw Range headers";
+
   KeyParts out;
-  out.url = url;
-  if (auto rangeOpt = findHeaderValueLowerKey(requestHeaders, "range")) {
-    out.range = *rangeOpt;
-  }
+  out.url = request.url;
+  out.exactByteRange = request.exactByteRange;
   return out;
 }
 
@@ -236,23 +244,22 @@ ZHttpDiskCache::Blob ZHttpDiskCache::serializeEntry(const ZHttpGetBytesResult& r
   return out;
 }
 
-std::optional<ZHttpGetBytesResult>
-ZHttpDiskCache::tryGet(const std::string& url,
-                       const std::vector<std::pair<std::string, std::string>>& requestHeaders) const
+std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(const ZHttpGetRequest& request) const
 {
   if (!isEnabled()) {
     return std::nullopt;
   }
 
-  const KeyParts parts = keyPartsFrom(url, requestHeaders);
+  const KeyParts parts = keyPartsFrom(request);
+  const std::string rangeKey = exactByteRangeKeyString(parts.exactByteRange);
 
   std::string keyBytes;
-  keyBytes.reserve(16 + parts.url.size() + parts.range.size());
+  keyBytes.reserve(16 + parts.url.size() + rangeKey.size());
   keyBytes.append("GET\n");
   keyBytes.append(parts.url);
   keyBytes.push_back('\n');
   keyBytes.append("range=");
-  keyBytes.append(parts.range);
+  keyBytes.append(rangeKey);
   keyBytes.push_back('\n');
 
   const Blob keyHash = sha256(keyBytes.data(), keyBytes.size());
@@ -280,8 +287,7 @@ ZHttpDiskCache::tryGet(const std::string& url,
   return resOpt;
 }
 
-folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-ZHttpDiskCache::tryGetAsync(std::string url, std::vector<std::pair<std::string, std::string>> requestHeaders) const
+folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZHttpDiskCache::tryGetAsync(ZHttpGetRequest request) const
 {
   if (!isEnabled()) {
     co_return std::nullopt;
@@ -289,17 +295,13 @@ ZHttpDiskCache::tryGetAsync(std::string url, std::vector<std::pair<std::string, 
 
   co_return co_await folly::coro::co_withExecutor(
     getAtlasBackgroundExecutor(),
-    [this,
-     url = std::move(url),
-     requestHeaders = std::move(requestHeaders)]() -> folly::coro::Task<std::optional<ZHttpGetBytesResult>> {
+    [this, request = std::move(request)]() mutable -> folly::coro::Task<std::optional<ZHttpGetBytesResult>> {
       co_await folly::coro::co_reschedule_on_current_executor;
-      co_return tryGet(url, requestHeaders);
+      co_return tryGet(request);
     }());
 }
 
-void ZHttpDiskCache::put(const std::string& url,
-                         const std::vector<std::pair<std::string, std::string>>& requestHeaders,
-                         const ZHttpGetBytesResult& result)
+void ZHttpDiskCache::put(const ZHttpGetRequest& request, const ZHttpGetBytesResult& result)
 {
   if (!isEnabled()) {
     return;
@@ -307,19 +309,23 @@ void ZHttpDiskCache::put(const std::string& url,
   if (result.status != 200 && result.status != 206) {
     return;
   }
+  if (!isCacheableExactRangeResponse(request, result)) {
+    return;
+  }
   if (static_cast<uint64_t>(result.body.size()) > m_maxBytes) {
     // An entry larger than the entire budget would cause immediate thrash; skip caching.
     return;
   }
 
-  const KeyParts parts = keyPartsFrom(url, requestHeaders);
+  const KeyParts parts = keyPartsFrom(request);
+  const std::string rangeKey = exactByteRangeKeyString(parts.exactByteRange);
   std::string keyBytes;
-  keyBytes.reserve(16 + parts.url.size() + parts.range.size());
+  keyBytes.reserve(16 + parts.url.size() + rangeKey.size());
   keyBytes.append("GET\n");
   keyBytes.append(parts.url);
   keyBytes.push_back('\n');
   keyBytes.append("range=");
-  keyBytes.append(parts.range);
+  keyBytes.append(rangeKey);
   keyBytes.push_back('\n');
 
   const Blob keyHash = sha256(keyBytes.data(), keyBytes.size());

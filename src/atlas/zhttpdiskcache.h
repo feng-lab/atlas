@@ -19,7 +19,7 @@ class ZSqliteDiskCacheBucket;
 // Simple persistent on-disk cache for HTTP GET results (SQLite-backed).
 //
 // Notes:
-// - This is intentionally a *byte cache* keyed by (URL + Range) and stores the already-decoded
+// - This is intentionally a *byte cache* keyed by (URL + exact byte range) and stores the already-decoded
 //   result bytes returned to callers (i.e. after any HTTP-level Content-Encoding has been handled).
 // - Eviction is best-effort LRU-ish based on access timestamps (touched on read).
 // - Multi-process: multiple Atlas processes may concurrently read/write the same cache DB.
@@ -32,7 +32,7 @@ public:
   struct KeyParts
   {
     std::string url;
-    std::string range; // empty for non-Range requests
+    std::optional<ZHttpByteRange> exactByteRange;
   };
 
   ZHttpDiskCache(QString rootDir, uint64_t maxBytes);
@@ -46,26 +46,21 @@ public:
   }
 
   // Returns cached bytes for the request if present (otherwise std::nullopt).
-  [[nodiscard]] std::optional<ZHttpGetBytesResult>
-  tryGet(const std::string& url, const std::vector<std::pair<std::string, std::string>>& requestHeaders) const;
+  [[nodiscard]] std::optional<ZHttpGetBytesResult> tryGet(const ZHttpGetRequest& request) const;
 
   // Async wrapper around tryGet() that offloads synchronous SQLite reads onto a
   // CPU executor. This prevents callers like the Proxygen EventBase thread from
   // serializing all concurrent requests on disk-cache hits.
-  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-  tryGetAsync(std::string url, std::vector<std::pair<std::string, std::string>> requestHeaders) const;
+  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>> tryGetAsync(ZHttpGetRequest request) const;
 
   // Stores a successful response in the cache. No-op if disabled.
-  void put(const std::string& url,
-           const std::vector<std::pair<std::string, std::string>>& requestHeaders,
-           const ZHttpGetBytesResult& result);
+  void put(const ZHttpGetRequest& request, const ZHttpGetBytesResult& result);
 
   // Waits until all queued async writes complete (or timeout). Intended for tests.
   [[nodiscard]] bool drainWrites(std::chrono::milliseconds timeout = std::chrono::seconds(5));
 
 private:
-  [[nodiscard]] static KeyParts keyPartsFrom(const std::string& url,
-                                            const std::vector<std::pair<std::string, std::string>>& requestHeaders);
+  [[nodiscard]] static KeyParts keyPartsFrom(const ZHttpGetRequest& request);
 
   [[nodiscard]] static Blob sha256(const void* data, size_t bytes);
 

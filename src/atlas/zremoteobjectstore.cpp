@@ -12,12 +12,9 @@ std::shared_ptr<const ZRemoteObjectStore> ZRemoteObjectStore::sharedDefaultStore
   return ZHttpRemoteObjectStore::sharedInstance();
 }
 
-folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-ZHttpRemoteObjectStore::getBytes(std::string url,
-                                 std::chrono::milliseconds timeout,
-                                 std::vector<std::pair<std::string, std::string>> requestHeaders) const
+folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZHttpRemoteObjectStore::getBytes(ZHttpGetRequest request) const
 {
-  co_return co_await ZHttpClient::instance().getBytes(std::move(url), timeout, std::move(requestHeaders));
+  co_return co_await ZHttpClient::instance().getBytes(std::move(request));
 }
 
 const void* ZHttpRemoteObjectStore::contentCacheScopeToken() const

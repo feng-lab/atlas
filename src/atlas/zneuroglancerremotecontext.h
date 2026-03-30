@@ -10,8 +10,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <utility>
-#include <vector>
 
 namespace nim {
 
@@ -45,8 +43,12 @@ public:
   }
 
   [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>>
+  getResponseAsync(ZHttpGetRequest request,
+                   /*nullable*/ ZImgReadStatsSink* statsSink = nullptr,
+                   ZImgReadStatsContext statsContext = {}) const;
+
+  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>>
   getResponseAsync(std::string url,
-                   std::vector<std::pair<std::string, std::string>> requestHeaders = {},
                    /*nullable*/ ZImgReadStatsSink* statsSink = nullptr,
                    ZImgReadStatsContext statsContext = {}) const;
 

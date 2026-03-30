@@ -3,9 +3,11 @@
 #include <folly/coro/Task.h>
 
 #include <chrono>
+#include <compare>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -16,6 +18,26 @@ enum class ZHttpGetBytesSource : std::uint8_t
   Unknown = 0,
   Network = 1,
   DiskCache = 2,
+};
+
+struct ZHttpByteRange
+{
+  uint64_t offset = 0;
+  uint64_t length = 0;
+
+  auto operator<=>(const ZHttpByteRange&) const = default;
+};
+
+struct ZHttpGetRequest
+{
+  std::string url;
+  std::chrono::milliseconds timeout{0};
+  std::vector<std::pair<std::string, std::string>> headers;
+
+  // When present, this request requires the exact byte range [offset, offset + length).
+  // Transport backends synthesize the HTTP Range header from this field rather than
+  // asking higher layers to encode range semantics in raw header text.
+  std::optional<ZHttpByteRange> exactByteRange;
 };
 
 struct ZHttpGetBytesResult
@@ -35,15 +57,17 @@ struct ZHttpGetBytesResult
   ZHttpGetBytesSource source = ZHttpGetBytesSource::Unknown;
 };
 
+[[nodiscard]] std::string formatHttpByteRangeHeaderValue(const ZHttpByteRange& range);
+
+[[nodiscard]] std::vector<std::pair<std::string, std::string>>
+httpRequestHeadersForTransport(const ZHttpGetRequest& request);
+
 class ZHttpClient
 {
 public:
   static ZHttpClient& instance();
 
-  folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-  getBytes(std::string url,
-           std::chrono::milliseconds timeout,
-           std::vector<std::pair<std::string, std::string>> requestHeaders = {});
+  folly::coro::Task<std::optional<ZHttpGetBytesResult>> getBytes(ZHttpGetRequest request);
 
 private:
   ZHttpClient() = default;

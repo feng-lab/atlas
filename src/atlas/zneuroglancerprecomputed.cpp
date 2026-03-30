@@ -1328,7 +1328,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
     } else {
       const std::string urlStr = toStdString(chunkUrl(chunk).toString());
       chunkDebugUrl = urlStr;
-      auto resOpt = co_await m_remoteContext->getResponseAsync(urlStr, {}, statsSink, statsContext);
+      auto resOpt = co_await m_remoteContext->getResponseAsync(urlStr, statsSink, statsContext);
       maybeCancel(cancellationToken);
       if (!resOpt) {
         // Missing unsharded chunk objects are a soft miss in Neuroglancer.

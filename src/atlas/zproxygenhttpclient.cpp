@@ -571,45 +571,28 @@ ZProxygenHttpClient::~ZProxygenHttpClient()
   }
 }
 
-folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBytes(
-  std::string url,
-  std::chrono::milliseconds timeout,
-  std::vector<std::pair<std::string, std::string>> requestHeaders)
+folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBytes(ZHttpGetRequest request)
 {
-  co_return co_await folly::coro::co_withExecutor(
-    m_eventBaseThread.getEventBase(),
-    getBytesOnEventBase(std::move(url), timeout, std::move(requestHeaders)));
+  co_return co_await folly::coro::co_withExecutor(m_eventBaseThread.getEventBase(),
+                                                  getBytesOnEventBase(std::move(request)));
 }
 
-folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBytesOnEventBase(
-  std::string url,
-  std::chrono::milliseconds timeout,
-  std::vector<std::pair<std::string, std::string>> requestHeaders)
+folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBytesOnEventBase(ZHttpGetRequest request)
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
 
-  const bool isRangeRequest = [&]() {
-    for (const auto& [k, v] : requestHeaders) {
-      (void)v;
-      std::string keyLower(k);
-      folly::toLowerAscii(keyLower);
-      if (keyLower == "range") {
-        return true;
-      }
-    }
-    return false;
-  }();
+  const bool isRangeRequest = request.exactByteRange.has_value();
 
-  proxygen::URL initialUrl(url);
+  proxygen::URL initialUrl(request.url);
   if (!initialUrl.isValid() || initialUrl.getHost().empty()) {
-    throw ZException(fmt::format("Invalid URL '{}'", url));
+    throw ZException(fmt::format("Invalid URL '{}'", request.url));
   }
 
   const ProxyStrategy proxyStrategy = proxyStrategyFromFlag();
   std::optional<ZHttpProxyEndpoint> systemProxy;
   if (proxyStrategy != ProxyStrategy::NoProxy) {
-    const ZSystemHttpProxyResolution proxyResolution = querySystemHttpProxyForUrl(url, kProxygenProxySupport);
+    const ZSystemHttpProxyResolution proxyResolution = querySystemHttpProxyForUrl(request.url, kProxygenProxySupport);
     if (proxyResolution.error) {
       throw ZException(fmt::format("proxygen backend: {}", *proxyResolution.error));
     }
@@ -636,7 +619,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
   };
 
   proxygen::coro::HTTPClient::RequestHeaderMap headerMap;
-  for (const auto& [k, v] : requestHeaders) {
+  for (const auto& [k, v] : httpRequestHeadersForTransport(request)) {
     std::string keyLower(k);
     folly::toLowerAscii(keyLower);
     headerMap.emplace(std::move(keyLower), v);
@@ -652,11 +635,11 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
 
   if (m_diskCache && m_diskCache->isEnabled()) {
     maybeCancel(cancellationToken);
-    auto cachedTry = co_await folly::coro::co_awaitTry(m_diskCache->tryGetAsync(url, requestHeaders));
+    auto cachedTry = co_await folly::coro::co_awaitTry(m_diskCache->tryGetAsync(request));
     maybeCancel(cancellationToken);
     if (cachedTry.hasValue() && cachedTry.value().has_value()) {
       auto cached = std::move(cachedTry).value();
-      VLOG(2) << "HTTP disk cache hit: " << url;
+      VLOG(2) << "HTTP disk cache hit: " << request.url;
       cached->source = ZHttpGetBytesSource::DiskCache;
       cached->encodedBodyBytes = 0;
       co_return std::move(*cached);
@@ -694,7 +677,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     auto attemptResult = co_await folly::coro::co_awaitTry([&]() -> folly::coro::Task<ZHttpGetBytesResult> {
       maybeCancel(cancellationToken);
 
-      std::string currentUrl = url;
+      std::string currentUrl = request.url;
       const uint32_t maxRedirectHops = FLAGS_atlas_http_max_redirect_hops;
       for (uint32_t hop = 0; hop <= maxRedirectHops; ++hop) {
         maybeCancel(cancellationToken);
@@ -762,14 +745,14 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
                                                                     m_hostLookupInvoker,
                                                                     *proxyEndpointForAttempt,
                                                                     parsedUrl,
-                                                                    timeout,
+                                                                    request.timeout,
                                                                     m_sslContext,
                                                                     headerMap);
         } else {
           auto sessionRes = co_await connCache->getSessionWithReservation(parsedUrl.getHost(),
                                                                           parsedUrl.getPort(),
                                                                           isSecure,
-                                                                          timeout,
+                                                                          request.timeout,
                                                                           connParamsPtr,
                                                                           serverAddress);
           maybeCancel(cancellationToken);
@@ -777,7 +760,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
           response = co_await proxygen::coro::HTTPClient::get(sessionRes.session,
                                                               std::move(sessionRes.reservation),
                                                               parsedUrl,
-                                                              timeout,
+                                                              request.timeout,
                                                               headerMap);
         }
 
@@ -836,18 +819,19 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
           VLOG(1) << fmt::format("HTTP GET transient status (attempt {}/{}): '{}' (status {})",
                                  attempt + 1,
                                  maxRetries + 1,
-                                 url,
+                                 request.url,
                                  value.status);
           co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
           continue;
         }
-        throw ZException(fmt::format("HTTP GET failed for '{}' (status {}): exhausted retries", url, value.status));
+        throw ZException(
+          fmt::format("HTTP GET failed for '{}' (status {}): exhausted retries", request.url, value.status));
       }
       if (value.status >= 400) {
-        throw ZException(fmt::format("HTTP GET failed for '{}' (status {})", url, value.status));
+        throw ZException(fmt::format("HTTP GET failed for '{}' (status {})", request.url, value.status));
       }
       if (m_diskCache && m_diskCache->isEnabled()) {
-        m_diskCache->put(url, requestHeaders, value);
+        m_diskCache->put(request, value);
       }
       co_return std::move(value);
     }
@@ -879,7 +863,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
         VLOG(1) << fmt::format("HTTP GET transient error (attempt {}/{}): '{}' ({})",
                                attempt + 1,
                                maxRetries + 1,
-                               url,
+                               request.url,
                                httpErr->describe());
         co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
         continue;
@@ -891,7 +875,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
                            m_trustSourceDescription,
                            m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
       }
-      throw ZException(fmt::format("HTTP GET failed for '{}': {}", url, msg));
+      throw ZException(fmt::format("HTTP GET failed for '{}': {}", request.url, msg));
     }
 
     // Fall back to message-based retry heuristics for non-proxygen errors.
@@ -902,7 +886,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
       VLOG(1) << fmt::format("HTTP GET transient exception (attempt {}/{}): '{}' ({})",
                              attempt + 1,
                              maxRetries + 1,
-                             url,
+                             request.url,
                              msg);
       co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
       continue;
@@ -913,10 +897,10 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
                          m_trustSourceDescription,
                          m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
     }
-    throw ZException(fmt::format("HTTP GET failed for '{}': {}", url, msg));
+    throw ZException(fmt::format("HTTP GET failed for '{}': {}", request.url, msg));
   }
 
-  throw ZException(fmt::format("HTTP GET failed for '{}': exhausted retries", url));
+  throw ZException(fmt::format("HTTP GET failed for '{}': exhausted retries", request.url));
 }
 
 } // namespace nim

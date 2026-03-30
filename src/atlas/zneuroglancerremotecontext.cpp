@@ -16,17 +16,20 @@ ZNeuroglancerRemoteContext::create(std::chrono::milliseconds timeout,
 }
 
 folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-ZNeuroglancerRemoteContext::getResponseAsync(std::string url,
-                                             std::vector<std::pair<std::string, std::string>> requestHeaders,
+ZNeuroglancerRemoteContext::getResponseAsync(ZHttpGetRequest request,
                                              /*nullable*/ ZImgReadStatsSink* statsSink,
                                              ZImgReadStatsContext statsContext) const
 {
-  co_return co_await getRemoteObjectResponseAsync(objectStore(),
-                                                  std::move(url),
-                                                  m_timeout,
-                                                  std::move(requestHeaders),
-                                                  statsSink,
-                                                  statsContext);
+  request.timeout = m_timeout;
+  co_return co_await getRemoteObjectResponseAsync(objectStore(), std::move(request), statsSink, statsContext);
+}
+
+folly::coro::Task<std::optional<ZHttpGetBytesResult>>
+ZNeuroglancerRemoteContext::getResponseAsync(std::string url,
+                                             /*nullable*/ ZImgReadStatsSink* statsSink,
+                                             ZImgReadStatsContext statsContext) const
+{
+  co_return co_await getResponseAsync(ZHttpGetRequest{.url = std::move(url)}, statsSink, statsContext);
 }
 
 folly::coro::Task<std::optional<std::vector<uint8_t>>>

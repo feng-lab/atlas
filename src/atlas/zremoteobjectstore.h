@@ -15,19 +15,16 @@ namespace nim {
 
 // Lowest-level remote-read seam for Atlas.
 //
-// This interface intentionally knows only about "fetch bytes for this URL with these headers + timeout".
-// It does not encode Neuroglancer-specific concepts such as shard reads, object/range helpers, or per-reader
-// request policy. Reader code should usually depend on ZNeuroglancerRemoteContext instead; this store exists so
-// the transport/backend can be swapped or faked in tests without pulling the HTTP runtime into every reader.
+// This interface intentionally stays generic, but it does preserve one transport-level concept explicitly:
+// exact byte-range requests. Reader code should usually depend on ZNeuroglancerRemoteContext instead; this store
+// exists so the transport/backend can be swapped or faked in tests without pulling the HTTP runtime into every reader.
 class ZRemoteObjectStore
 {
 public:
   virtual ~ZRemoteObjectStore() = default;
 
   [[nodiscard]] virtual folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-  getBytes(std::string url,
-           std::chrono::milliseconds timeout,
-           std::vector<std::pair<std::string, std::string>> requestHeaders = {}) const = 0;
+  getBytes(ZHttpGetRequest request) const = 0;
 
   // Cache-scope token for any metadata derived from remote object content.
   //
@@ -46,10 +43,7 @@ public:
 class ZHttpRemoteObjectStore final : public ZRemoteObjectStore
 {
 public:
-  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-  getBytes(std::string url,
-           std::chrono::milliseconds timeout,
-           std::vector<std::pair<std::string, std::string>> requestHeaders = {}) const override;
+  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>> getBytes(ZHttpGetRequest request) const override;
 
   [[nodiscard]] const void* contentCacheScopeToken() const override;
 

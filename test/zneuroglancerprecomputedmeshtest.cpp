@@ -28,14 +28,15 @@ public:
     std::string url;
     std::chrono::milliseconds timeout{0};
     std::vector<std::pair<std::string, std::string>> headers;
+    std::optional<ZHttpByteRange> exactByteRange;
   };
 
-  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-  getBytes(std::string url,
-           std::chrono::milliseconds timeout,
-           std::vector<std::pair<std::string, std::string>> requestHeaders) const override
+  [[nodiscard]] folly::coro::Task<std::optional<ZHttpGetBytesResult>> getBytes(ZHttpGetRequest request) const override
   {
-    requests.push_back(Request{.url = std::move(url), .timeout = timeout, .headers = std::move(requestHeaders)});
+    requests.push_back(Request{.url = std::move(request.url),
+                               .timeout = request.timeout,
+                               .headers = std::move(request.headers),
+                               .exactByteRange = request.exactByteRange});
     if (responses.empty()) {
       throw std::runtime_error("FakeRemoteObjectStore called without a queued response");
     }

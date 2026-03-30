@@ -385,9 +385,7 @@ int transferProgressCallback(void* clientp, curl_off_t, curl_off_t, curl_off_t, 
   return state->cancelled.load(std::memory_order_relaxed) ? 1 : 0;
 }
 
-ZHttpGetBytesResult performCurlRequestBlocking(const std::string& url,
-                                               std::chrono::milliseconds timeout,
-                                               const std::vector<std::pair<std::string, std::string>>& requestHeaders,
+ZHttpGetBytesResult performCurlRequestBlocking(const ZHttpGetRequest& request,
                                                const std::optional<ZHttpProxyEndpoint>& proxy,
                                                bool useProxy,
                                                const std::string& caBundlePath,
@@ -409,14 +407,12 @@ ZHttpGetBytesResult performCurlRequestBlocking(const std::string& url,
     progressState.cancelled.store(true, std::memory_order_relaxed);
   });
 
-  bool isRangeRequest = false;
+  const bool isRangeRequest = request.exactByteRange.has_value();
+  const std::vector<std::pair<std::string, std::string>> requestHeaders = httpRequestHeadersForTransport(request);
   std::optional<std::string> acceptEncodingHeader;
   for (const auto& [k, v] : requestHeaders) {
     std::string keyLower(k);
     folly::toLowerAscii(keyLower);
-    if (keyLower == "range") {
-      isRangeRequest = true;
-    }
     if (keyLower == "accept-encoding") {
       acceptEncodingHeader = v;
       continue;
@@ -435,14 +431,14 @@ ZHttpGetBytesResult performCurlRequestBlocking(const std::string& url,
 
   std::array<char, CURL_ERROR_SIZE> errorBuffer{};
 
-  curl_easy_setopt(handle.get(), CURLOPT_URL, url.c_str());
+  curl_easy_setopt(handle.get(), CURLOPT_URL, request.url.c_str());
   curl_easy_setopt(handle.get(), CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(handle.get(), CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(handle.get(), CURLOPT_MAXREDIRS, static_cast<long>(FLAGS_atlas_http_max_redirect_hops));
   curl_easy_setopt(handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
   curl_easy_setopt(handle.get(), CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
-  curl_easy_setopt(handle.get(), CURLOPT_TIMEOUT_MS, static_cast<long>(timeout.count()));
-  curl_easy_setopt(handle.get(), CURLOPT_CONNECTTIMEOUT_MS, static_cast<long>(timeout.count()));
+  curl_easy_setopt(handle.get(), CURLOPT_TIMEOUT_MS, static_cast<long>(request.timeout.count()));
+  curl_easy_setopt(handle.get(), CURLOPT_CONNECTTIMEOUT_MS, static_cast<long>(request.timeout.count()));
   curl_easy_setopt(handle.get(), CURLOPT_SSL_VERIFYPEER, 1L);
   curl_easy_setopt(handle.get(), CURLOPT_SSL_VERIFYHOST, 2L);
   curl_easy_setopt(handle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
@@ -480,7 +476,7 @@ ZHttpGetBytesResult performCurlRequestBlocking(const std::string& url,
 
     std::string message =
       errorBuffer.data()[0] != '\0' ? std::string(errorBuffer.data()) : std::string(curl_easy_strerror(res));
-    throw CurlRequestException(res, fmt::format("curl GET failed for '{}': {}", url, message));
+    throw CurlRequestException(res, fmt::format("curl GET failed for '{}': {}", request.url, message));
   }
 
   long statusCode = 0;
@@ -499,7 +495,7 @@ ZHttpGetBytesResult performCurlRequestBlocking(const std::string& url,
 
   if (isRangeRequest && !isIdentityContentEncoding(out.contentEncoding)) {
     throw ZException(fmt::format("HTTP Range response for '{}' used Content-Encoding='{}' (expected identity)",
-                                 url,
+                                 request.url,
                                  out.contentEncoding));
   }
 
@@ -559,21 +555,18 @@ ZCurlHttpClient::~ZCurlHttpClient()
   curl_global_cleanup();
 }
 
-folly::coro::Task<std::optional<ZHttpGetBytesResult>>
-ZCurlHttpClient::getBytes(std::string url,
-                          std::chrono::milliseconds timeout,
-                          std::vector<std::pair<std::string, std::string>> requestHeaders)
+folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZCurlHttpClient::getBytes(ZHttpGetRequest request)
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
 
   if (m_diskCache && m_diskCache->isEnabled()) {
     maybeCancel(cancellationToken);
-    auto cachedTry = co_await folly::coro::co_awaitTry(m_diskCache->tryGetAsync(url, requestHeaders));
+    auto cachedTry = co_await folly::coro::co_awaitTry(m_diskCache->tryGetAsync(request));
     maybeCancel(cancellationToken);
     if (cachedTry.hasValue() && cachedTry.value().has_value()) {
       auto cached = std::move(cachedTry).value();
-      VLOG(2) << "HTTP disk cache hit: " << url;
+      VLOG(2) << "HTTP disk cache hit: " << request.url;
       cached->source = ZHttpGetBytesSource::DiskCache;
       cached->encodedBodyBytes = 0;
       co_return std::move(*cached);
@@ -583,7 +576,7 @@ ZCurlHttpClient::getBytes(std::string url,
   const ProxyStrategy proxyStrategy = proxyStrategyFromFlag();
   std::optional<ZHttpProxyEndpoint> systemProxy;
   if (proxyStrategy != ProxyStrategy::NoProxy) {
-    const ZSystemHttpProxyResolution proxyResolution = querySystemHttpProxyForUrl(url, kCurlProxySupport);
+    const ZSystemHttpProxyResolution proxyResolution = querySystemHttpProxyForUrl(request.url, kCurlProxySupport);
     if (proxyResolution.error) {
       throw ZException(fmt::format("curl backend: {}", *proxyResolution.error));
     }
@@ -599,19 +592,12 @@ ZCurlHttpClient::getBytes(std::string url,
     maybeCancel(cancellationToken);
 
     const bool useProxy = requestUsesProxy(proxyStrategy, systemProxy.has_value(), attempt);
-    auto attemptResult = co_await folly::coro::co_awaitTry(
-      folly::coro::co_withExecutor(getAtlasBackgroundExecutor(),
-                                   [this, url, timeout, requestHeaders, systemProxy, useProxy, cancellationToken]()
-                                     -> folly::coro::Task<ZHttpGetBytesResult> {
-                                     co_await folly::coro::co_reschedule_on_current_executor;
-                                     co_return performCurlRequestBlocking(url,
-                                                                          timeout,
-                                                                          requestHeaders,
-                                                                          systemProxy,
-                                                                          useProxy,
-                                                                          m_caBundlePath,
-                                                                          cancellationToken);
-                                   }()));
+    auto attemptResult = co_await folly::coro::co_awaitTry(folly::coro::co_withExecutor(
+      getAtlasBackgroundExecutor(),
+      [this, request, systemProxy, useProxy, cancellationToken]() -> folly::coro::Task<ZHttpGetBytesResult> {
+        co_await folly::coro::co_reschedule_on_current_executor;
+        co_return performCurlRequestBlocking(request, systemProxy, useProxy, m_caBundlePath, cancellationToken);
+      }()));
 
     if (attemptResult.hasValue()) {
       ZHttpGetBytesResult value = std::move(attemptResult).value();
@@ -623,18 +609,19 @@ ZCurlHttpClient::getBytes(std::string url,
           VLOG(1) << fmt::format("curl HTTP GET transient status (attempt {}/{}): '{}' (status {})",
                                  attempt + 1,
                                  maxRetries + 1,
-                                 url,
+                                 request.url,
                                  value.status);
           co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
           continue;
         }
-        throw ZException(fmt::format("HTTP GET failed for '{}' (status {}): exhausted retries", url, value.status));
+        throw ZException(
+          fmt::format("HTTP GET failed for '{}' (status {}): exhausted retries", request.url, value.status));
       }
       if (value.status >= 400) {
-        throw ZException(fmt::format("HTTP GET failed for '{}' (status {})", url, value.status));
+        throw ZException(fmt::format("HTTP GET failed for '{}' (status {})", request.url, value.status));
       }
       if (m_diskCache && m_diskCache->isEnabled()) {
-        m_diskCache->put(url, requestHeaders, value);
+        m_diskCache->put(request, value);
       }
       co_return std::move(value);
     }
@@ -651,7 +638,7 @@ ZCurlHttpClient::getBytes(std::string url,
         VLOG(1) << fmt::format("curl HTTP GET transient error (attempt {}/{}): '{}' ({})",
                                attempt + 1,
                                maxRetries + 1,
-                               url,
+                               request.url,
                                curlErr->what());
         co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
         continue;
@@ -672,7 +659,7 @@ ZCurlHttpClient::getBytes(std::string url,
       VLOG(1) << fmt::format("curl HTTP GET transient exception (attempt {}/{}): '{}' ({})",
                              attempt + 1,
                              maxRetries + 1,
-                             url,
+                             request.url,
                              msg);
       co_await folly::coro::sleepReturnEarlyOnCancel(httpRetryBackoffForAttempt(attempt));
       continue;
@@ -683,10 +670,10 @@ ZCurlHttpClient::getBytes(std::string url,
                          m_trustSourceDescription,
                          m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
     }
-    throw ZException(fmt::format("HTTP GET failed for '{}': {}", url, msg));
+    throw ZException(fmt::format("HTTP GET failed for '{}': {}", request.url, msg));
   }
 
-  throw ZException(fmt::format("HTTP GET failed for '{}': exhausted retries", url));
+  throw ZException(fmt::format("HTTP GET failed for '{}': exhausted retries", request.url));
 }
 
 } // namespace nim
