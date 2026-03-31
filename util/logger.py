@@ -39,34 +39,36 @@ class CriticalExitStreamHandler(logging.StreamHandler):
                 traceback.print_exception(*record.exc_info)
             else:
                 # Otherwise, print the current stack trace
-                print('Stack trace before exit:', file=sys.stderr)
+                print("Stack trace before exit:", file=sys.stderr)
                 traceback.print_stack(file=sys.stderr)
 
             # Flush the stream to ensure all log messages are outputted
             self.flush()
 
             # Exit the program
-            sys.exit('Exiting due to critical log: ' + record.getMessage())
+            sys.exit("Exiting due to critical log: " + record.getMessage())
 
 
 @functools.lru_cache()  # so that calling setup_logger multiple times won't add many handlers
 def setup_logger(
-        output=None,
-        distributed_rank=0,
-        *,
-        color=True,
-        name="",
-        enable_propagation: bool = False,
-        configure_stdout: bool = True
+    output=None,
+    distributed_rank=0,
+    *,
+    color=True,
+    name="",
+    level: int = logging.INFO,
+    enable_propagation: bool = False,
+    configure_stdout: bool = True,
 ):
     """
-    Initialize the detectron2 logger and set its verbosity level to "DEBUG".
+    Initialize the logger with a configurable verbosity level.
 
     Args:
         output (str): a file name or a directory to save log. If None, will not save log file.
             If ends with ".txt" or ".log", assumed to be a file name.
             Otherwise, logs will be saved to `output/log.txt`.
         name (str): the root module name of this logger
+        level (int): logging level for the logger and its handlers.
         enable_propagation (bool): whether to propagate logs to the parent logger.
         configure_stdout (bool): whether to configure logging to stdout.
 
@@ -75,7 +77,7 @@ def setup_logger(
         logging.Logger: a logger
     """
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(level)
     logger.propagate = enable_propagation
 
     plain_formatter = logging.Formatter(
@@ -85,12 +87,13 @@ def setup_logger(
     # stdout logging: master only
     if configure_stdout and distributed_rank == 0:
         ch = CriticalExitStreamHandler(stream=sys.stdout)
-        ch.setLevel(logging.DEBUG)
+        ch.setLevel(level)
         if color and _can_do_colour():
             formatter = _ColorfulFormatter(
                 # colored("[%(asctime)s %(name)s]: ", "green") + "%(message)s",
                 # datefmt="%m/%d %H:%M:%S",
-                colored("[%(asctime)s %(process)d %(name)s:%(lineno)d]:", "green") + " %(message)s",
+                colored("[%(asctime)s %(process)d %(name)s:%(lineno)d]:", "green")
+                + " %(message)s",
             )
         else:
             formatter = plain_formatter
@@ -109,7 +112,7 @@ def setup_logger(
         os.makedirs(os.path.dirname(filename), exist_ok=True)
 
         fh = logging.FileHandler(filename)
-        fh.setLevel(logging.DEBUG)
+        fh.setLevel(level)
         fh.setFormatter(plain_formatter)
         logger.addHandler(fh)
 
@@ -226,7 +229,7 @@ RESET = "\033[0m"
 
 
 def _can_do_colour(
-        *, no_color: bool | None = None, force_color: bool | None = None
+    *, no_color: bool | None = None, force_color: bool | None = None
 ) -> bool:
     """Check env vars and for tty/dumb terminal"""
     # First check overrides:
@@ -261,13 +264,13 @@ def _can_do_colour(
 
 
 def colored(
-        text: object,
-        color: Color | None = None,
-        on_color: Highlight | None = None,
-        attrs: Iterable[Attribute] | None = None,
-        *,
-        no_color: bool | None = None,
-        force_color: bool | None = None,
+    text: object,
+    color: Color | None = None,
+    on_color: Highlight | None = None,
+    attrs: Iterable[Attribute] | None = None,
+    *,
+    no_color: bool | None = None,
+    force_color: bool | None = None,
 ) -> str:
     """Colorize text.
 
