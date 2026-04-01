@@ -56,7 +56,9 @@ from common_dirs import (
     use_ninja,
     vs_install_dir,
     vulkan_SDK_env_dir,
+    windows_native_platform_toolset,
     windows_msbuild_platform_toolset,
+    windows_visual_studio_major_version,
     windows_visual_studio_generator,
 )
 from download_atlas_deps import download_atlas_deps
@@ -75,6 +77,10 @@ def cpp_standard() -> int:
 
 def use_clang_in_linux() -> bool:
     return is_linux()
+
+
+def use_windows_clang_cl() -> bool:
+    return is_windows() and use_clang_cl()
 
 
 def _clang_major_env() -> str:
@@ -491,10 +497,33 @@ def get_common_build_flags(
             )
     elif is_windows():
         optimization = " /O2" if with_optimization else ""
-        res["CFLAGS"] = "/utf-8" + optimization
+        clang_cl_warning_suppressions = ""
+        clang_cl_cxx_compat_suppressions = ""
+        if use_windows_clang_cl():
+            # Vendored projects built under clang-cl frequently enable very broad
+            # warning groups intended for cl.exe. Keep the actionable diagnostics
+            # while suppressing low-signal compatibility/style noise.
+            clang_cl_warning_suppressions = (
+                " /clang:-Wno-unused-command-line-argument"
+                " /clang:-Wno-shadow-header"
+                " /clang:-Wno-reserved-identifier"
+                " /clang:-Wno-reserved-macro-identifier"
+                " /clang:-Wno-unsafe-buffer-usage"
+            )
+            clang_cl_cxx_compat_suppressions = (
+                " /clang:-Wno-c++98-compat"
+                " /clang:-Wno-c++98-compat-pedantic"
+                " /clang:-Wno-pre-c++14-compat"
+                " /clang:-Wno-pre-c++17-compat"
+                " /clang:-Wno-pre-c++20-compat"
+            )
+        res["CFLAGS"] = "/utf-8" + clang_cl_warning_suppressions + optimization
         res["CXXFLAGS"] = (
             f"/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS "
-            f"/DNOMINMAX /arch:AVX" + optimization
+            f"/DNOMINMAX /arch:AVX"
+            + clang_cl_warning_suppressions
+            + clang_cl_cxx_compat_suppressions
+            + optimization
         )
     return res
 
@@ -553,6 +582,7 @@ def get_cmake_cmd_common_part(
     universal: bool = False,
     arm64_only: bool = False,
     no_hidden_visibility: bool = False,
+    enable_cxx: bool = True,
 ):
     cbf = get_common_build_flags(
         cpp_standard=cpp_standard,
@@ -569,23 +599,25 @@ def get_cmake_cmd_common_part(
             # '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
             "-DCMAKE_INSTALL_PREFIX=" + install_dir,
             "" if no_hidden_visibility else "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
-            "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
             "" if no_hidden_visibility else "-DCMAKE_C_VISIBILITY_PRESET=hidden",
-            f"-DCMAKE_CXX_STANDARD={cpp_standard}",
-            "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-            "-DCMAKE_CXX_EXTENSIONS=OFF",
             f"-DCMAKE_C_FLAGS:STRING={cbf['CFLAGS']}",
-            f"-DCMAKE_CXX_FLAGS:STRING={cbf['CXXFLAGS']}",
             "-DCMAKE_LIBRARY_ARCHITECTURE=x86_64",
         ]
-        if use_clang_cl():
+        if enable_cxx:
             res.extend(
                 [
-                    "-DCMAKE_C_COMPILER:FILEPATH=" + clang_cl_binary(),
-                    "-DCMAKE_CXX_COMPILER:FILEPATH=" + clang_cl_binary(),
-                    "-DCMAKE_LINKER:FILEPATH=" + lld_link_binary(),
+                    "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
+                    f"-DCMAKE_CXX_STANDARD={cpp_standard}",
+                    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
+                    "-DCMAKE_CXX_EXTENSIONS=OFF",
+                    f"-DCMAKE_CXX_FLAGS:STRING={cbf['CXXFLAGS']}",
                 ]
             )
+        if use_clang_cl():
+            res.append("-DCMAKE_C_COMPILER:FILEPATH=" + clang_cl_binary())
+            if enable_cxx:
+                res.append("-DCMAKE_CXX_COMPILER:FILEPATH=" + clang_cl_binary())
+            res.append("-DCMAKE_LINKER:FILEPATH=" + lld_link_binary())
         if use_ninja:
             res.extend(["-G", "Ninja", "-DCMAKE_MAKE_PROGRAM=" + get_ninja_binary()])
         else:
@@ -616,15 +648,20 @@ def get_cmake_cmd_common_part(
             "-DCMAKE_MODULE_PATH=" + ext_build_dir(),
             "-DCMAKE_INSTALL_PREFIX=" + install_dir,
             "" if no_hidden_visibility else "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
-            "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
             "" if no_hidden_visibility else "-DCMAKE_C_VISIBILITY_PRESET=hidden",
-            f"-DCMAKE_CXX_STANDARD={cpp_standard}",
-            "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-            "-DCMAKE_CXX_EXTENSIONS=" + ("ON" if cpp_extention else "OFF"),
             f"-DCMAKE_C_FLAGS:STRING={cbf['CFLAGS']}",
-            f"-DCMAKE_CXX_FLAGS:STRING={cbf['CXXFLAGS']}",
             "-DCMAKE_LIBRARY_ARCHITECTURE=x86_64",
         ]
+        if enable_cxx:
+            res.extend(
+                [
+                    "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
+                    f"-DCMAKE_CXX_STANDARD={cpp_standard}",
+                    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
+                    "-DCMAKE_CXX_EXTENSIONS=" + ("ON" if cpp_extention else "OFF"),
+                    f"-DCMAKE_CXX_FLAGS:STRING={cbf['CXXFLAGS']}",
+                ]
+            )
         if use_ninja:
             res.extend(["-G", "Ninja", "-DCMAKE_MAKE_PROGRAM=" + get_ninja_binary()])
         return res
@@ -649,17 +686,22 @@ def get_cmake_cmd_common_part(
             "-DCMAKE_MODULE_PATH=" + ext_build_dir(),
             "-DCMAKE_INSTALL_PREFIX=" + install_dir,
             "" if no_hidden_visibility else "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
-            "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
             "" if no_hidden_visibility else "-DCMAKE_C_VISIBILITY_PRESET=hidden",
-            f"-DCMAKE_CXX_STANDARD={cpp_standard}",
-            "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-            "-DCMAKE_CXX_EXTENSIONS=OFF",
             "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + macos_min_version(),
             "-DCMAKE_OSX_SYSROOT=" + osx_sysroot,
             f"-DCMAKE_OSX_ARCHITECTURES={arch}",
             f"-DCMAKE_C_FLAGS:STRING={cbf['CFLAGS']}",
-            f"-DCMAKE_CXX_FLAGS:STRING={cbf['CXXFLAGS']}",
         ]
+        if enable_cxx:
+            res.extend(
+                [
+                    "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
+                    f"-DCMAKE_CXX_STANDARD={cpp_standard}",
+                    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
+                    "-DCMAKE_CXX_EXTENSIONS=OFF",
+                    f"-DCMAKE_CXX_FLAGS:STRING={cbf['CXXFLAGS']}",
+                ]
+            )
         if use_ninja:
             res.extend(["-G", "Ninja", "-DCMAKE_MAKE_PROGRAM=" + get_ninja_binary()])
         return res
@@ -941,6 +983,30 @@ def build_zlib(src_dir: str, install_dir: str):
         patch_manager.restore_files()
 
 
+def write_boost_clang_win_user_config(config_path: str):
+    assert is_windows()
+
+    clang_cl = os.path.normpath(clang_cl_binary()).replace("\\", "/")
+    config_text = "\n".join(
+        [
+            "using clang-win",
+            f"    : {llvm_tools_version()}",
+            f'    : "{clang_cl}"',
+            "    : <assembler>ml.exe",
+            "      <assembler-64>ml64.exe",
+            "      <archiver>lib.exe",
+            "      <manifest-tool>mt.exe",
+            "      <resource-compiler>rc.exe",
+            "      <mc-compiler>mc.exe",
+            "      <idl-compiler>midl.exe",
+            "    ;",
+            "",
+        ]
+    )
+    with open(config_path, "w", encoding="ascii", newline="\n") as f:
+        f.write(config_text)
+
+
 def build_boost(src_dir: str, install_dir: str):
     try:
         shutil.rmtree(os.path.join(src_dir, "bin.v2"), ignore_errors=True)
@@ -960,6 +1026,12 @@ def build_boost(src_dir: str, install_dir: str):
                 "--with-charconv",
             ]
             if use_clang_cl():
+                clang_win_user_config = os.path.join(
+                    install_dir, "boost-clang-win-user-config.jam"
+                )
+                os.makedirs(os.path.dirname(clang_win_user_config), exist_ok=True)
+                write_boost_clang_win_user_config(clang_win_user_config)
+                boost_b2_cmd.append("--user-config=" + clang_win_user_config)
                 boost_b2_cmd.append("toolset=clang-win")
             boost_b2_cmd.extend(
                 [
@@ -1656,9 +1728,13 @@ def build_zstd(src_dir: str, install_dir: str):
     try:
         patch_manager.apply_patches()
 
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd = get_cmake_cmd_common_part(
+            install_dir, universal=True, enable_cxx=False
+        )
         cmakecmd.extend(
             [
+                "-DBUILD_TESTING:BOOL=OFF",
+                "-DZSTD_BUILD_TESTS:BOOL=OFF",
                 "-DZSTD_USE_STATIC_RUNTIME:BOOL=OFF",
                 "-DZSTD_BUILD_SHARED:BOOL=OFF",
                 "-DZSTD_BUILD_STATIC:BOOL=ON",
@@ -1826,6 +1902,8 @@ def build_libsodium(src_dir: str, install_dir: str):
     try:
         if is_windows():
             env = get_vcvars_environment()
+            # Pre-generated VS solutions require a VS-installed platform toolset.
+            msbuild_toolset = windows_native_platform_toolset()
             subprocess.run(
                 ["devenv", "libsodium.sln", "/Upgrade"],
                 cwd=os.path.join(src_dir, "builds", "msvc", "vs2019"),
@@ -1839,10 +1917,10 @@ def build_libsodium(src_dir: str, install_dir: str):
                 "/target:libsodium",
                 "/property:Platform=x64",
                 "/property:Configuration=StaticRelease",
-                "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
+                "/property:PlatformToolset=" + msbuild_toolset,
                 "/maxcpucount",
             ]
-            if use_clang_cl():
+            if msbuild_toolset == windows_msbuild_platform_toolset():
                 msbuild_cmd.extend(
                     [
                         "/property:LLVMInstallDir=" + llvm_install_dir(),
@@ -1875,7 +1953,7 @@ def build_libsodium(src_dir: str, install_dir: str):
                     "bin",
                     "x64",
                     "Release",
-                    windows_msbuild_platform_toolset(),
+                    msbuild_toolset,
                     "static",
                     "*.lib",
                 ),
@@ -2037,11 +2115,23 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
             orig_file=os.path.join(src_dir, "CMake", "FollyCompilerMSVC.cmake"),
             from_texts=[
                 r"list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)",
+                r"/favor:${MSVC_FAVORED_ARCHITECTURE} # Architecture to prefer when generating code.",
+                r"$<$<BOOL:${MSVC_ENABLE_PARALLEL_BUILD}>:/MP> # Enable multi-processor compilation if requested.",
+                r"/Qpar # Enable parallel code generation.",
+                r"/Zc:referenceBinding # Disallow temporaries from binding to non-const lvalue references.",
+                r"/Zc:implicitNoexcept # Enable implicit noexcept specifications where required, such as destructors.",
+                r"/Zc:throwingNew # Assume operator new throws on failure.",
                 r"/std:${MSVC_LANGUAGE_VERSION}",
                 r"/EHs #",
             ],
             to_texts=[
                 r"list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib Crypt32.lib)",
+                r"$<$<NOT:$<CXX_COMPILER_ID:Clang>>:/favor:${MSVC_FAVORED_ARCHITECTURE}> # Architecture to prefer when generating code.",
+                r"$<$<AND:$<BOOL:${MSVC_ENABLE_PARALLEL_BUILD}>,$<NOT:$<CXX_COMPILER_ID:Clang>>>:/MP> # Enable multi-processor compilation if requested.",
+                r"$<$<NOT:$<CXX_COMPILER_ID:Clang>>:/Qpar> # Enable parallel code generation.",
+                r"$<$<NOT:$<CXX_COMPILER_ID:Clang>>:/Zc:referenceBinding> # Disallow temporaries from binding to non-const lvalue references.",
+                r"$<$<NOT:$<CXX_COMPILER_ID:Clang>>:/Zc:implicitNoexcept> # Enable implicit noexcept specifications where required, such as destructors.",
+                r"$<$<NOT:$<CXX_COMPILER_ID:Clang>>:/Zc:throwingNew> # Assume operator new throws on failure.",
                 r"/DGLOG_NO_ABBREVIATED_SEVERITIES #/std:${MSVC_LANGUAGE_VERSION}",
                 r"/EHsc #",
             ],
@@ -2049,6 +2139,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         FilePatcher(
             orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
+                r"target_link_libraries(folly PUBLIC folly_deps)",
                 r"""file(
   GENERATE
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libfolly.pc
@@ -2062,9 +2153,13 @@ install(
 )""",
             ],
             to_texts=[
+                r"""target_link_libraries(folly PUBLIC folly_deps)
+if (WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  target_compile_definitions(folly_deps INTERFACE LLVM_COROUTINES_CPP20)
+endif()""",
                 r"",
             ],
-            patch_condition=is_windows,
+            patch_condition=use_windows_clang_cl,
         ),
         FilePatcher(
             orig_file=os.path.join(src_dir, "CMake", "FindLibsodium.cmake"),
@@ -2075,6 +2170,34 @@ install(
                 r"find_library(LIBSODIUM_LIBRARY NAMES sodium libsodium)",
             ],
             patch_condition=is_windows,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "folly", "json", "DynamicParser.h"),
+            from_texts=[
+                """struct FOLLY_EXPORT DynamicParserLogicError : public std::logic_error {
+  template <typename... Args>
+  explicit DynamicParserLogicError(Args&&... args)
+      : std::logic_error(folly::to<std::string>(std::forward<Args>(args)...)) {}
+};""",
+            ],
+            to_texts=[
+                """struct FOLLY_EXPORT DynamicParserLogicError : public std::logic_error {
+  DynamicParserLogicError(const DynamicParserLogicError&) = default;
+  DynamicParserLogicError(DynamicParserLogicError&&) = default;
+
+  template <
+      typename... Args,
+      std::enable_if_t<
+          !(sizeof...(Args) == 1 &&
+            (... || std::is_same_v<
+                        DynamicParserLogicError,
+                        std::remove_cv_t<std::remove_reference_t<Args>>>)),
+          int> = 0>
+  explicit DynamicParserLogicError(Args&&... args)
+      : std::logic_error(folly::to<std::string>(std::forward<Args>(args)...)) {}
+};""",
+            ],
+            patch_condition=use_windows_clang_cl,
         ),
     ]
     patch_manager = PatchManager(patches)
@@ -2092,6 +2215,7 @@ install(
             "-DBUILD_TESTS:BOOL=OFF",
             "-DBOOST_LINK_STATIC=ON",
             "-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON",
+            "-DFOLLY_HAVE_WEAK_SYMBOLS:BOOL=OFF" if use_windows_clang_cl() else "",
             "-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=" + ("ON" if use_asan else "OFF"),
             src_dir,
         ]
@@ -2666,6 +2790,7 @@ ERR CloseWS_File(struct WMPStream** ppWS)"""
 
         if is_windows():
             env = get_vcvars_environment()
+            msbuild_toolset = windows_native_platform_toolset()
             subprocess.run(
                 ["devenv", "JXR_vc14.sln", "/Upgrade"],
                 cwd=os.path.join(src_dir, "jxrencoderdecoder"),
@@ -2673,6 +2798,61 @@ ERR CloseWS_File(struct WMPStream** ppWS)"""
                 check=True,
                 env=env,
             )
+            vcxproj_patch_manager = PatchManager([])
+            if use_windows_clang_cl():
+                vcxproj_patchers = []
+                for vcxproj in Path(src_dir).rglob("*_vc14.vcxproj"):
+                    txt = vcxproj.read_text(errors="ignore")
+                    from_texts = []
+                    to_texts = []
+                    if (
+                        "<WholeProgramOptimization>true</WholeProgramOptimization>"
+                        in txt
+                    ):
+                        from_texts.append(
+                            "<WholeProgramOptimization>true</WholeProgramOptimization>"
+                        )
+                        to_texts.append(
+                            "<WholeProgramOptimization>false</WholeProgramOptimization>"
+                        )
+                    if "<LinkTimeCodeGeneration>true</LinkTimeCodeGeneration>" in txt:
+                        from_texts.append(
+                            "<LinkTimeCodeGeneration>true</LinkTimeCodeGeneration>"
+                        )
+                        to_texts.append(
+                            "<LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>"
+                        )
+                    if (
+                        "<LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>"
+                        in txt
+                    ):
+                        from_texts.append(
+                            "<LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>"
+                        )
+                        to_texts.append(
+                            "<LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>"
+                        )
+                    if (
+                        "<AdditionalOptions>/LTCG %(AdditionalOptions)</AdditionalOptions>"
+                        in txt
+                    ):
+                        from_texts.append(
+                            "<AdditionalOptions>/LTCG %(AdditionalOptions)</AdditionalOptions>"
+                        )
+                        to_texts.append(
+                            "<AdditionalOptions>%(AdditionalOptions)</AdditionalOptions>"
+                        )
+                    if from_texts:
+                        vcxproj_patchers.append(
+                            FilePatcher(
+                                orig_file=str(vcxproj),
+                                from_texts=from_texts,
+                                to_texts=to_texts,
+                            )
+                        )
+
+                vcxproj_patch_manager = PatchManager(vcxproj_patchers)
+                vcxproj_patch_manager.apply_patches()
             msbuild_cmd = [
                 "MSBuild",
                 "JXR_vc14.sln",
@@ -2683,24 +2863,27 @@ ERR CloseWS_File(struct WMPStream** ppWS)"""
                 "/property:ForceImportBeforeCppTargets="
                 + ext_dir()
                 + "\\runtime_md.props",
-                "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
+                "/property:PlatformToolset=" + msbuild_toolset,
                 "/property:Configuration=Release",
                 "/maxcpucount",
             ]
-            if use_clang_cl():
+            if msbuild_toolset == windows_msbuild_platform_toolset():
                 msbuild_cmd.extend(
                     [
                         "/property:LLVMInstallDir=" + llvm_install_dir(),
                         "/property:LLVMToolsVersion=" + llvm_tools_version(),
                     ]
                 )
-            subprocess.run(
-                msbuild_cmd,
-                cwd=os.path.join(src_dir, "jxrencoderdecoder"),
-                shell=True,
-                check=True,
-                env=env,
-            )
+            try:
+                subprocess.run(
+                    msbuild_cmd,
+                    cwd=os.path.join(src_dir, "jxrencoderdecoder"),
+                    shell=True,
+                    check=True,
+                    env=env,
+                )
+            finally:
+                vcxproj_patch_manager.restore_files()
             glob_copy(
                 os.path.join(src_dir, "common", "include", "*.h"),
                 os.path.join(install_dir, "include", "libjxr", "common"),
@@ -3003,6 +3186,7 @@ def build_freeimage(src_dir: str, install_dir: str):
 
         if is_windows():
             env = get_vcvars_environment()
+            msbuild_toolset = windows_native_platform_toolset()
             msbuild_cmd = [
                 "MSBuild",
                 "FreeImage.2017.sln",
@@ -3010,11 +3194,11 @@ def build_freeimage(src_dir: str, install_dir: str):
                 "/property:Platform=x64",
                 "/property:Configuration=Release",
                 "/maxcpucount",
-                "/property:PlatformToolset=" + windows_msbuild_platform_toolset(),
+                "/property:PlatformToolset=" + msbuild_toolset,
                 "/property:WindowsTargetPlatformVersion="
                 + env["UCRTVERSION"],  # like 10.0.16299.0
             ]
-            if use_clang_cl():
+            if msbuild_toolset == windows_msbuild_platform_toolset():
                 msbuild_cmd.extend(
                     [
                         "/property:LLVMInstallDir=" + llvm_install_dir(),
@@ -3189,6 +3373,50 @@ def build_itk(src_dir: str, install_dir: str):
             from_texts=[r"set(_Eigen3_min_version 3.3)"],
             to_texts=[r"set(_Eigen3_min_version 5)"],
         ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "Modules",
+                "ThirdParty",
+                "MINC",
+                "src",
+                "libminc",
+                "config.h.cmake",
+            ),
+            from_texts=[
+                """#cmakedefine HAVE_RINT 1
+"""
+            ],
+            to_texts=[
+                """#cmakedefine HAVE_RINT 1
+
+#ifdef _WIN32
+#include <io.h>
+#include <process.h>
+
+#ifndef tempnam
+#define tempnam _tempnam
+#endif
+#ifndef getpid
+#define getpid _getpid
+#endif
+#ifndef open
+#define open _open
+#endif
+#ifndef close
+#define close _close
+#endif
+#ifndef unlink
+#define unlink _unlink
+#endif
+#ifndef lseek
+#define lseek _lseek
+#endif
+#endif /* _WIN32 */
+"""
+            ],
+            patch_condition=is_windows,
+        ),
     ]
     patch_manager = PatchManager(patches)
 
@@ -3299,6 +3527,91 @@ def build_vtk(src_dir: str, install_dir: str):
                 f"set(CMAKE_CXX_STANDARD {cpp_standard()})",
                 r"-Wall",
             ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "ThirdParty",
+                "netcdf",
+                "vtknetcdf",
+                "libdispatch",
+                "dpathmgr.c",
+            ),
+            from_texts=[
+                r"        if(_stat64(cvtpath,buf) < 0) {status = errno; goto done;}",
+                r"        if(_wstat64(wpath,buf) < 0) {status = errno; goto done;}",
+            ],
+            to_texts=[
+                r"        if(_stat64i32(cvtpath,(struct _stat64i32*)buf) < 0) {status = errno; goto done;}",
+                r"        if(_wstat64i32(wpath,(struct _stat64i32*)buf) < 0) {status = errno; goto done;}",
+            ],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "ThirdParty",
+                "netcdf",
+                "vtknetcdf",
+                "libdispatch",
+                "dinfermodel.c",
+            ),
+            from_texts=[
+                """#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+"""
+            ],
+            to_texts=[
+                """#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef _WIN32
+#include <io.h>
+#endif
+"""
+            ],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "Common", "DataModel", "vtkBoundingBox.cxx"
+            ),
+            from_texts=[
+                """template void vtkBoundingBox::ComputeBounds(
+  vtkPoints* pts, int* ptIds, vtkIdType numberOfPointsIds, double bounds[6]);""",
+                """template void vtkBoundingBox::ComputeBounds(
+  vtkPoints* pts, long long* ptIds, vtkIdType numberOfPointsIds, double bounds[6]);""",
+            ],
+            to_texts=[
+                """template <>
+void vtkBoundingBox::ComputeBounds(
+  vtkPoints* pts, int* ptIds, vtkIdType numberOfPointsIds, double bounds[6])
+{
+  vtkBoundingBox bbox;
+  double point[3];
+  for (vtkIdType i = 0; i < numberOfPointsIds; ++i)
+  {
+    pts->GetPoint(static_cast<vtkIdType>(ptIds[i]), point);
+    bbox.AddPoint(point);
+  }
+  bbox.GetBounds(bounds);
+}""",
+                """template <>
+void vtkBoundingBox::ComputeBounds(
+  vtkPoints* pts, long long* ptIds, vtkIdType numberOfPointsIds, double bounds[6])
+{
+  vtkBoundingBox bbox;
+  double point[3];
+  for (vtkIdType i = 0; i < numberOfPointsIds; ++i)
+  {
+    pts->GetPoint(static_cast<vtkIdType>(ptIds[i]), point);
+    bbox.AddPoint(point);
+  }
+  bbox.GetBounds(bounds);
+}""",
+            ],
+            patch_condition=use_windows_clang_cl,
         ),
     ]
     patch_manager = PatchManager(patches)
@@ -3535,7 +3848,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             orig_file_2 = os.path.join(
                 install_dir,
                 "x64",
-                f"vc{common_dirs.windows_visual_studio_major_version()}",
+                f"vc{windows_visual_studio_major_version()}",
                 "staticlib",
                 "OpenCVModules.cmake",
             )
@@ -3717,25 +4030,80 @@ def build_fizz(src_dir: str, install_dir: str):
         FilePatcher(
             orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
+                r"""find_package(Sodium REQUIRED)
+set(FIZZ_HAVE_SODIUM ${Sodium_FOUND})""",
                 r"list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)",
                 r"    ${sodium_INCLUDE_DIR}",
-                r"    sodium",
             ],
             to_texts=[
+                r"""if (WIN32)
+  set(_ATLAS_SODIUM_INCLUDE "${CMAKE_INSTALL_PREFIX}/include")
+  set(_ATLAS_SODIUM_LIBRARY "${CMAKE_INSTALL_PREFIX}/lib/libsodium.lib")
+  if (NOT EXISTS "${_ATLAS_SODIUM_INCLUDE}/sodium.h")
+    message(FATAL_ERROR "Expected Atlas-installed libsodium headers at ${_ATLAS_SODIUM_INCLUDE}")
+  endif()
+  if (NOT EXISTS "${_ATLAS_SODIUM_LIBRARY}")
+    message(FATAL_ERROR "Expected Atlas-installed libsodium library at ${_ATLAS_SODIUM_LIBRARY}")
+  endif()
+  if (NOT TARGET sodium)
+    add_library(sodium STATIC IMPORTED)
+  endif()
+  set_target_properties(sodium PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${_ATLAS_SODIUM_INCLUDE}"
+    INTERFACE_COMPILE_DEFINITIONS "SODIUM_STATIC"
+    IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+    IMPORTED_LOCATION "${_ATLAS_SODIUM_LIBRARY}"
+    IMPORTED_LOCATION_DEBUG "${_ATLAS_SODIUM_LIBRARY}"
+    IMPORTED_LOCATION_RELEASE "${_ATLAS_SODIUM_LIBRARY}"
+    IMPORTED_LOCATION_RELWITHDEBINFO "${_ATLAS_SODIUM_LIBRARY}"
+    IMPORTED_LOCATION_MINSIZEREL "${_ATLAS_SODIUM_LIBRARY}"
+  )
+  set(Sodium_FOUND ON)
+else()
+  find_package(Sodium REQUIRED)
+endif()
+set(FIZZ_HAVE_SODIUM ${Sodium_FOUND})""",
                 "list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n"
                 "add_library(gflags::gflags ALIAS gflags)",
                 r"",
-                r"",
             ],
+            patch_condition=use_windows_clang_cl,
         ),
         FilePatcher(
             orig_file=os.path.join(src_dir, "cmake", "fizz-config.cmake.in"),
             from_texts=[
+                r"""set(FIZZ_HAVE_SODIUM "@FIZZ_HAVE_SODIUM@")
+
+if (NOT TARGET fizz::fizz)""",
                 r"find_dependency(Sodium)",
             ],
             to_texts=[
+                r"""set(FIZZ_HAVE_SODIUM "@FIZZ_HAVE_SODIUM@")
+
+if (WIN32 AND FIZZ_HAVE_SODIUM AND NOT TARGET sodium)
+  set(_ATLAS_SODIUM_INCLUDE "${PACKAGE_PREFIX_DIR}/include")
+  set(_ATLAS_SODIUM_LIBRARY "${PACKAGE_PREFIX_DIR}/lib/libsodium.lib")
+  if (EXISTS "${_ATLAS_SODIUM_INCLUDE}/sodium.h" AND EXISTS "${_ATLAS_SODIUM_LIBRARY}")
+    add_library(sodium STATIC IMPORTED)
+    set_target_properties(sodium PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${_ATLAS_SODIUM_INCLUDE}"
+      INTERFACE_COMPILE_DEFINITIONS "SODIUM_STATIC"
+      IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+      IMPORTED_LOCATION "${_ATLAS_SODIUM_LIBRARY}"
+      IMPORTED_LOCATION_DEBUG "${_ATLAS_SODIUM_LIBRARY}"
+      IMPORTED_LOCATION_RELEASE "${_ATLAS_SODIUM_LIBRARY}"
+      IMPORTED_LOCATION_RELWITHDEBINFO "${_ATLAS_SODIUM_LIBRARY}"
+      IMPORTED_LOCATION_MINSIZEREL "${_ATLAS_SODIUM_LIBRARY}"
+    )
+  else()
+    message(FATAL_ERROR "Expected Atlas-installed libsodium under ${PACKAGE_PREFIX_DIR}")
+  endif()
+endif()
+
+if (NOT TARGET fizz::fizz)""",
                 "",
             ],
+            patch_condition=use_windows_clang_cl,
         ),
         # Lifetime safety:
         # If AsyncFizzClientT is destroyed while an underlying AsyncSocket connect
