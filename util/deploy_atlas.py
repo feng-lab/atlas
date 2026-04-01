@@ -1597,6 +1597,38 @@ def update_maintenance_pacakge_xml_version(template_file: str, file: str):
     tree.write(file, encoding="utf-8", xml_declaration=True)
 
 
+def _refresh_builtin_ifw_package_metadata() -> None:
+    """Render built-in QtIFW package metadata into deploy/packages/.
+
+    Clean CI checkouts do not contain these generated `meta/package.xml` files
+    because `deploy/.gitignore` excludes them. QtIFW validates component
+    metadata before creating `update.rcc`, so generate the files before any
+    `binarycreator -p packages ...` invocation.
+    """
+
+    deploy_dir = common_dirs.deploy_target_dir()
+    package_updates = (
+        (
+            os.path.join(deploy_dir, "maintenance_package.xml"),
+            os.path.join(deploy_dir, "packages", "fenglab.maintenance"),
+            update_maintenance_pacakge_xml_version,
+        ),
+        (
+            os.path.join(deploy_dir, "atlas_package.xml"),
+            os.path.join(deploy_dir, "packages", "fenglab.atlas"),
+            update_pacakge_xml_version,
+        ),
+    )
+
+    for template_path, package_dir, updater in package_updates:
+        meta_dir = os.path.join(package_dir, "meta")
+        if not os.path.isdir(meta_dir):
+            raise RuntimeError(
+                f"QtIFW package metadata directory is missing.\nexpected: {meta_dir}"
+            )
+        updater(template_path, os.path.join(meta_dir, "package.xml"))
+
+
 def build_atlas_package(is_debug_version: bool = False, release_pdb: bool = False):
     logger.info(f"current interpreter: {sys.executable}")
 
@@ -1932,6 +1964,7 @@ def build_atlas_installer():
         ),
         os.path.join(common_dirs.deploy_target_dir(), "packages", "fenglab.neutube"),
     )
+    _refresh_builtin_ifw_package_metadata()
 
     mt_app_path = os.path.join(common_dirs.deploy_target_dir(), mt_app_name)
     if common_dirs.is_mac():
@@ -2104,16 +2137,6 @@ def build_atlas_installer():
         os.path.join(common_dirs.deploy_target_dir(), mt_repo_package_name),
         repo_package_folder,
     )
-    update_maintenance_pacakge_xml_version(
-        os.path.join(common_dirs.deploy_target_dir(), "maintenance_package.xml"),
-        os.path.join(
-            common_dirs.deploy_target_dir(),
-            "packages",
-            "fenglab.maintenance",
-            "meta",
-            "package.xml",
-        ),
-    )
 
     subprocess.run(
         [
@@ -2136,16 +2159,6 @@ def build_atlas_installer():
     shutil.move(
         os.path.join(common_dirs.deploy_target_dir(), repo_package_name),
         repo_package_folder,
-    )
-    update_pacakge_xml_version(
-        os.path.join(common_dirs.deploy_target_dir(), "atlas_package.xml"),
-        os.path.join(
-            common_dirs.deploy_target_dir(),
-            "packages",
-            "fenglab.atlas",
-            "meta",
-            "package.xml",
-        ),
     )
 
     subprocess.run(
