@@ -549,30 +549,30 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
       args.zToXYRatioOverride = json::value_to<double>(zscaleIt->value());
     }
 
-    if (auto downsampleIt = inputJson.find("signal_downsample_ratio"); downsampleIt != inputJson.end()) {
+    if (auto signalDownsampleIt = inputJson.find("signal_downsample_ratio"); signalDownsampleIt != inputJson.end()) {
       std::array<int, 3> ratio{};
-      if (!parseArray3Int(downsampleIt->value(), &ratio)) {
+      if (!parseArray3Int(signalDownsampleIt->value(), &ratio)) {
         LOG(ERROR) << "Invalid input.signal_downsample_ratio: expected array[3] of int";
         return 1;
       }
       args.downsampleInterval = ratio;
-    } else if (auto downsampleIt = inputJson.find("downsample_ratio"); downsampleIt != inputJson.end()) {
+    } else if (auto downsampleRatioIt = inputJson.find("downsample_ratio"); downsampleRatioIt != inputJson.end()) {
       std::array<int, 3> ratio{};
-      if (!parseArray3Int(downsampleIt->value(), &ratio)) {
+      if (!parseArray3Int(downsampleRatioIt->value(), &ratio)) {
         LOG(ERROR) << "Invalid input.downsample_ratio: expected array[3] of int";
         return 1;
       }
       args.downsampleInterval = ratio;
-    } else if (auto downsampleIt = inputJson.find("downsample"); downsampleIt != inputJson.end()) {
+    } else if (auto downsampleLegacyIt = inputJson.find("downsample"); downsampleLegacyIt != inputJson.end()) {
       std::array<int, 3> ratio{};
-      if (!parseArray3Int(downsampleIt->value(), &ratio)) {
+      if (!parseArray3Int(downsampleLegacyIt->value(), &ratio)) {
         LOG(ERROR) << "Invalid input.downsample: expected array[3] of int";
         return 1;
       }
       args.downsampleInterval = ratio;
-    } else if (auto downsampleIt = inputJson.find("intv"); downsampleIt != inputJson.end()) {
+    } else if (auto intvIt = inputJson.find("intv"); intvIt != inputJson.end()) {
       std::array<int, 3> ratio{};
-      if (!parseArray3Int(downsampleIt->value(), &ratio)) {
+      if (!parseArray3Int(intvIt->value(), &ratio)) {
         LOG(ERROR) << "Invalid input.intv: expected array[3] of int";
         return 1;
       }

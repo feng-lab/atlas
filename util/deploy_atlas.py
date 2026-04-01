@@ -1123,6 +1123,111 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
         pass
 
 
+def _macos_notarize_file(file_path: str) -> None:
+    """Submit a signed standalone executable to Apple's notarization service.
+
+    Standalone Mach-O files cannot be stapled, so this helper only submits a zip
+    containing the file and waits for an Accepted notarization result.
+    """
+    if not common_dirs.is_mac():
+        raise RuntimeError("_macos_notarize_file called on non-macOS")
+    if not os.path.isfile(file_path):
+        raise RuntimeError(f"File path does not exist: {file_path}")
+
+    auth_args = _macos_notarytool_auth_args()
+
+    file_dir = os.path.dirname(file_path)
+    file_name = os.path.basename(file_path)
+    notarize_zip = os.path.join(file_dir, f"{file_name}.notarize.zip")
+    if os.path.exists(notarize_zip):
+        os.remove(notarize_zip)
+
+    ditto_cmd = ["ditto", "-c", "-k", "--keepParent", file_name, notarize_zip]
+    logger.info("Running: %s", _macos_format_command_for_logging(ditto_cmd))
+    proc = subprocess.run(
+        ditto_cmd,
+        cwd=file_dir,
+        shell=False,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    ditto_output = (proc.stdout or "").strip()
+    if ditto_output:
+        for line in ditto_output.splitlines():
+            logger.error("%s", line)
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, ditto_cmd)
+    if ditto_output:
+        raise RuntimeError(
+            "Failed creating notarization zip for standalone helper; `ditto` reported errors.\n"
+            f"file: {file_path}"
+        )
+
+    submission_id, status = _macos_notarytool_submit_wait_checked(
+        notarize_zip, auth_args
+    )
+    logger.info("Notarytool result: id=%s status=%s", submission_id, status)
+    if status != "Accepted":
+        log_path = os.path.join(file_dir, f"{file_name}.notarytool.log.json")
+        try:
+            _macos_run_checked(
+                ["xcrun", "notarytool", "log", submission_id, log_path, *auth_args]
+            )
+        except subprocess.CalledProcessError:
+            safe_cmd = _macos_format_command_for_logging(
+                [
+                    "xcrun",
+                    "notarytool",
+                    "log",
+                    submission_id,
+                    "<output-path>",
+                    *auth_args,
+                ]
+            )
+            raise RuntimeError(
+                "Standalone helper notarization failed and fetching the notarization log also failed.\n"
+                f"file: {file_path}\n"
+                f"id: {submission_id}\n"
+                f"status: {status}\n"
+                "Re-run:\n"
+                f"  {safe_cmd}"
+            )
+
+        try:
+            with open(log_path, "r", encoding="utf-8") as f:
+                log_text = f.read()
+            if _allow_verbose_diagnostics_in_logs() and _env_truthy(
+                _MACOS_NOTARYTOOL_PRINT_FULL_LOG_ENV_VAR
+            ):
+                logger.error("notarytool log (%s):\n%s", log_path, log_text)
+            else:
+                _macos_log_notarytool_result_summary(log_path, log_text)
+        except Exception as e:
+            logger.error("Failed printing notarytool log %s: %s", log_path, e)
+
+        raise RuntimeError(
+            "Standalone helper notarization failed.\n"
+            f"file: {file_path}\n"
+            f"id: {submission_id}\n"
+            f"status: {status}\n"
+            f"log: {log_path}\n"
+            "Open the log file above to see which embedded file failed validation."
+        )
+
+    logger.info(
+        "Standalone helper notarization accepted: %s. "
+        "Skipping stapler/spctl validation because Apple does not staple tickets to standalone binaries.",
+        file_path,
+    )
+
+    try:
+        os.remove(notarize_zip)
+    except OSError:
+        pass
+
+
 def _macos_qtifw_archivegen_path() -> str:
     archivegen = os.path.join(
         common_dirs.qt_installer_framework_bin_dir(), "archivegen"
@@ -1486,7 +1591,7 @@ def update_maintenance_pacakge_xml_version(template_file: str, file: str):
     tree = eTree.parse(template_file)
     tree.find(
         "Version"
-    ).text = "4.7.3"  # todo: get version and date from qt components.xml
+    ).text = "4.7.4"  # todo: get version and date from qt components.xml
     tree.find("ReleaseDate").text = "2024-02-18"
     # Write back to file
     tree.write(file, encoding="utf-8", xml_declaration=True)
@@ -1830,16 +1935,30 @@ def build_atlas_installer():
 
     mt_app_path = os.path.join(common_dirs.deploy_target_dir(), mt_app_name)
     if common_dirs.is_mac():
+        binarycreator_path = os.path.join(
+            common_dirs.qt_installer_framework_bin_dir(), "binarycreator"
+        )
+        archivegen_path = os.path.join(
+            common_dirs.qt_installer_framework_bin_dir(), "archivegen"
+        )
+        mt_helper_name = "maintenanceToolUpdater"
+        mt_helper_source_path = os.path.join(
+            common_dirs.qt_installer_framework_bin_dir(), mt_helper_name
+        )
+        generated_update_rcc_path = os.path.join(
+            common_dirs.deploy_target_dir(), "update.rcc"
+        )
+
         if os.path.exists(mt_app_path):
             shutil.rmtree(
                 mt_app_path, ignore_errors=False, onexc=common_dirs.handleRemoveReadonly
             )
+        if os.path.exists(generated_update_rcc_path):
+            os.remove(generated_update_rcc_path)
 
         subprocess.run(
             [
-                os.path.join(
-                    common_dirs.qt_installer_framework_bin_dir(), "binarycreator"
-                ),
+                binarycreator_path,
                 "-c",
                 generated_ifw_config_path,
                 "--mt",
@@ -1861,23 +1980,91 @@ def build_atlas_installer():
             _macos_codesign_bundle(mt_app_path)
             _macos_notarize_and_staple_bundle(mt_app_path)
 
+        if not os.path.isfile(mt_helper_source_path):
+            raise RuntimeError(
+                "QtIFW 4.11 maintenanceToolUpdater helper was not found.\n"
+                f"Expected: {mt_helper_source_path}"
+            )
+
         subprocess.run(
             [
-                os.path.join(
-                    common_dirs.qt_installer_framework_bin_dir(), "archivegen"
-                ),
-                "--compression",
-                "5",
-                mt_repo_package_name,
-                mt_app_name,
+                binarycreator_path,
+                "-c",
+                generated_ifw_config_path,
+                "-p",
+                "packages",
+                "-rcc",
             ],
             cwd=common_dirs.deploy_target_dir(),
             shell=False,
             check=True,
         )
+        if not os.path.isfile(generated_update_rcc_path):
+            raise RuntimeError(
+                "QtIFW did not create the expected update.rcc file.\n"
+                f"Expected: {generated_update_rcc_path}"
+            )
+
+        with tempfile.TemporaryDirectory(
+            prefix="atlas-maintenance-payload-", dir=common_dirs.deploy_target_dir()
+        ) as payload_dir:
+            staged_mt_app_path = os.path.join(payload_dir, mt_app_name)
+            shutil.copytree(mt_app_path, staged_mt_app_path, symlinks=True)
+
+            staged_helper_path = os.path.join(payload_dir, mt_helper_name)
+            shutil.copy2(mt_helper_source_path, staged_helper_path)
+
+            if _macos_signing_disabled():
+                _macos_run_checked(["chmod", "u+rwX", staged_helper_path])
+                _macos_run_checked(["xattr", "-cr", staged_helper_path])
+                _macos_codesign_target(
+                    staged_helper_path,
+                    identity="-",
+                    entitlements=None,
+                    file_descriptions={
+                        staged_helper_path: _macos_file_description(staged_helper_path)
+                        or ""
+                    },
+                )
+            else:
+                _macos_run_checked(["chmod", "u+rwX", staged_helper_path])
+                _macos_run_checked(["xattr", "-cr", staged_helper_path])
+                _macos_codesign_target(
+                    staged_helper_path,
+                    identity=_macos_codesign_identity(),
+                    entitlements=None,
+                    file_descriptions={
+                        staged_helper_path: _macos_file_description(staged_helper_path)
+                        or ""
+                    },
+                )
+                _macos_notarize_file(staged_helper_path)
+
+            shutil.copy2(
+                generated_update_rcc_path,
+                os.path.join(payload_dir, os.path.basename(generated_update_rcc_path)),
+            )
+
+            subprocess.run(
+                [
+                    archivegen_path,
+                    "--compression",
+                    "5",
+                    os.path.join(common_dirs.deploy_target_dir(), mt_repo_package_name),
+                    mt_app_name,
+                    mt_helper_name,
+                    os.path.basename(generated_update_rcc_path),
+                ],
+                cwd=payload_dir,
+                shell=False,
+                check=True,
+            )
+
         shutil.rmtree(
             mt_app_path, ignore_errors=False, onexc=common_dirs.handleRemoveReadonly
         )
+        if os.path.exists(generated_update_rcc_path):
+            os.remove(generated_update_rcc_path)
     else:
         if os.path.exists(mt_app_path):
             os.remove(mt_app_path)

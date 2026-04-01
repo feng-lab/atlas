@@ -6,18 +6,29 @@ function Component()
 Component.prototype.onInstallationStarted = function()
 {
     if (component.updateRequested() || component.installationRequested()) {
+        var updateResourceFilePath = installer.value("TargetDir");
         if (installer.value("os") == "win")
             component.installerbaseBinaryPath = "@TargetDir@/tempMaintenanceTool.exe";
         else if (installer.value("os") == "x11")
             component.installerbaseBinaryPath = "@TargetDir@/.tempMaintenanceTool";
-        else if (installer.value("os") == "mac")
-            component.installerbaseBinaryPath = "@TargetDir@/MaintenanceTool.app";
+        else if (installer.value("os") == "mac") {
+            updateResourceFilePath += "/tmpMaintenanceToolApp";
+            component.installerbaseBinaryPath = "@TargetDir@/tmpMaintenanceToolApp/MaintenanceTool.app";
+        }
         installer.setInstallerBaseBinary(component.installerbaseBinaryPath);
 
         // Update resource file (branding) used when QtIFW updates the MaintenanceTool base binary.
-        var updateResourceFilePath = installer.value("TargetDir") + "/update.rcc";
+        updateResourceFilePath += "/update.rcc";
         installer.setValue("DefaultResourceReplacement", updateResourceFilePath);
     }
+}
+
+Component.prototype.createOperationsForArchive = function(archive)
+{
+    if (installer.value("os") != "mac")
+        component.createOperationsForArchive(archive);
+    else
+        component.addOperation("Extract", archive, "@TargetDir@/tmpMaintenanceToolApp");
 }
 
 Component.prototype.createOperations = function()

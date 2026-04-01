@@ -70,6 +70,7 @@ __pycache__/
 /deploy/Linux/
 /deploy/macOS/
 /deploy/Windows/
+/deploy/update.rcc
 /deploy/*.log
 /deploy/*.json
 /Atlas.AppDir/
