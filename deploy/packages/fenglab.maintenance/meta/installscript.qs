@@ -1,5 +1,6 @@
 function Component()
 {
+    component.ifwVersion = installer.value("FrameworkVersion");
     installer.installationStarted.connect(this, Component.prototype.onInstallationStarted);
 }
 
@@ -12,8 +13,20 @@ Component.prototype.onInstallationStarted = function()
         else if (installer.value("os") == "x11")
             component.installerbaseBinaryPath = "@TargetDir@/.tempMaintenanceTool";
         else if (installer.value("os") == "mac") {
-            updateResourceFilePath += "/tmpMaintenanceToolApp";
-            component.installerbaseBinaryPath = "@TargetDir@/tmpMaintenanceToolApp/MaintenanceTool.app";
+            // In macOs maintenance tool can be either installerbase from Qt Installer
+            // Framework's install folder, or app bundle created by binarycreator
+            // with --create-maintenancetool switch. "MaintenanceTool.app" -name
+            // may differ depending on what has been defined in config.xml while
+            // creating the maintenance tool.
+            // Use either of the following (not both):
+
+            // component.installerbaseBinaryPath = "@TargetDir@/installerbase";
+            if (installer.versionMatches(component.ifwVersion, "<4.8.0")) {
+                component.installerbaseBinaryPath = "@TargetDir@/MaintenanceTool.app";
+            } else {
+                updateResourceFilePath += "/tmpMaintenanceToolApp";
+                component.installerbaseBinaryPath = "@TargetDir@/tmpMaintenanceToolApp/MaintenanceTool.app";
+            }
         }
         installer.setInstallerBaseBinary(component.installerbaseBinaryPath);
 
@@ -25,7 +38,12 @@ Component.prototype.onInstallationStarted = function()
 
 Component.prototype.createOperationsForArchive = function(archive)
 {
-    if (installer.value("os") != "mac")
+    // IFW versions 4.8.1 onwards supports extracting the maintenance tool to a folder.
+    // It is a good practice to extract the maintenance tool to a folder in macOs, so
+    // it won't interfere the current running maintenance tool. As the last step of the
+    // installation, IFW will move the maintenance tool to the root of the installation.
+    // Windows is using deferred update for the maintenance tool, and Linux inode.
+    if (installer.versionMatches(component.ifwVersion, "<4.8.0") || (installer.value("os") != "mac"))
         component.createOperationsForArchive(archive);
     else
         component.addOperation("Extract", archive, "@TargetDir@/tmpMaintenanceToolApp");

@@ -291,6 +291,53 @@ def _required_child(element: eTree.Element, tag: str, *, context: str) -> eTree.
     return child
 
 
+def _copy_ifw_config_sidecar_assets(
+    root: eTree.Element, *, template_path: str, generated_dir: str
+) -> None:
+    """Copy config-adjacent IFW assets next to the rendered config."""
+
+    template_dir = os.path.dirname(template_path)
+    assets_to_copy: set[tuple[str, str]] = set()
+
+    for tag in ("InstallerWindowIcon", "InstallerApplicationIcon"):
+        child = root.find(tag)
+        if child is None or not child.text:
+            continue
+
+        base_rel_path = child.text.strip()
+        matching_assets = []
+        for extension in (".icns", ".ico", ".png"):
+            rel_path = f"{base_rel_path}{extension}"
+            source_path = os.path.join(template_dir, rel_path)
+            if os.path.isfile(source_path):
+                matching_assets.append((source_path, rel_path))
+
+        if not matching_assets:
+            raise RuntimeError(
+                f"Expected icon assets for <{tag}>{base_rel_path}</{tag}> next to {template_path}"
+            )
+
+        assets_to_copy.update(matching_assets)
+
+    for tag in ("Logo", "Watermark", "Banner", "Background"):
+        child = root.find(tag)
+        if child is None or not child.text:
+            continue
+
+        rel_path = child.text.strip()
+        source_path = os.path.join(template_dir, rel_path)
+        if not os.path.isfile(source_path):
+            raise RuntimeError(
+                f"Expected resource file for <{tag}>{rel_path}</{tag}> next to {template_path}"
+            )
+        assets_to_copy.add((source_path, rel_path))
+
+    for source_path, rel_path in sorted(assets_to_copy, key=lambda item: item[1]):
+        destination_path = os.path.join(generated_dir, rel_path)
+        os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+        shutil.copy2(source_path, destination_path)
+
+
 def _render_ifw_config_for_suffix(suffix: str) -> str:
     template_path = os.path.join(
         common_dirs.deploy_target_dir(), "config", f"config-{suffix}.xml"
@@ -329,6 +376,9 @@ def _render_ifw_config_for_suffix(suffix: str) -> str:
 
     generated_dir = os.path.join(common_dirs.deploy_target_dir(), "generated", "config")
     os.makedirs(generated_dir, exist_ok=True)
+    _copy_ifw_config_sidecar_assets(
+        root, template_path=template_path, generated_dir=generated_dir
+    )
     generated_path = os.path.join(generated_dir, f"config-{suffix}.xml")
     tree.write(generated_path, encoding="utf-8", xml_declaration=True)
     return generated_path
