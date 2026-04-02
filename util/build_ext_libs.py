@@ -679,7 +679,10 @@ def get_cmake_cmd_common_part(
             get_cmake_binary(),  # '-E', 'echo',
             "-DCMAKE_BUILD_TYPE=Release",
             # "-DCMAKE_SYSTEM_NAME=Darwin",
-            "" if universal else f"-DCMAKE_SYSTEM_PROCESSOR={arch}",
+            # On macOS, downstream CMake projects must key target-arch
+            # decisions off CMAKE_OSX_ARCHITECTURES, not
+            # CMAKE_SYSTEM_PROCESSOR. In Rosetta/x86_64 shells, CMake can
+            # still report CMAKE_SYSTEM_PROCESSOR=x86_64 for an arm64 target.
             "-DCMAKE_PREFIX_PATH=" + ext_build_dir(),
             "-DCMAKE_IGNORE_PREFIX_PATH=/usr/local",
             "-DCMAKE_IGNORE_PATH=/usr/local/bin",
@@ -2236,6 +2239,75 @@ endif()""",
             ],
         ),
         FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "folly", "crypto", "detail", "CMakeLists.txt"
+            ),
+            from_texts=[
+                r"""if (IS_X86_64_ARCH)
+  target_compile_options(folly_crypto_detail_math_operation_simple_obj
+    PRIVATE -mno-avx -mno-avx2 -mno-sse2)
+endif()""",
+            ],
+            to_texts=[
+                r"""if (IS_X86_64_ARCH)
+  if (APPLE)
+    # Recent macOS SDK headers require SSE2 on x86_64. Keep the simple path
+    # free of AVX/AVX2 without forcing an SDK-incompatible -mno-sse2 mode.
+    target_compile_options(folly_crypto_detail_math_operation_simple_obj
+      PRIVATE -mno-avx -mno-avx2)
+  else()
+    target_compile_options(folly_crypto_detail_math_operation_simple_obj
+      PRIVATE -mno-avx -mno-avx2 -mno-sse2)
+  endif()
+endif()""",
+            ],
+            patch_condition=is_mac,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "CMakeLists.txt"),
+            from_texts=[
+                r"""if(NOT DEFINED IS_X86_64_ARCH AND ${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86_64|AMD64")
+  set(IS_X86_64_ARCH TRUE)
+else()
+  set(IS_X86_64_ARCH FALSE)
+endif()
+
+if(NOT DEFINED IS_AARCH64_ARCH AND ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+  set(IS_AARCH64_ARCH TRUE)
+else()
+  set(IS_AARCH64_ARCH FALSE)
+endif()""",
+            ],
+            to_texts=[
+                r"""# Atlas note:
+# On macOS, CMAKE_SYSTEM_PROCESSOR follows the configure host in some setups
+# (for example under Rosetta) and can report x86_64 even when the actual
+# target arch list is arm64 or x86_64;arm64. Use CMAKE_OSX_ARCHITECTURES for
+# Apple target decisions so universal and arm64 builds are deterministic across
+# Intel, Apple Silicon, and Rosetta-hosted configures.
+if(APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES "(^|;)x86_64($|;)")
+  set(IS_X86_64_ARCH TRUE)
+elseif(APPLE)
+  set(IS_X86_64_ARCH FALSE)
+elseif(NOT DEFINED IS_X86_64_ARCH AND ${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86_64|AMD64")
+  set(IS_X86_64_ARCH TRUE)
+else()
+  set(IS_X86_64_ARCH FALSE)
+endif()
+
+# Keep Folly's AArch64 asm path disabled on Darwin even for arm64 targets.
+# Those sources are Linux-only and fail on Apple's assembler/ABI.
+if(APPLE)
+  set(IS_AARCH64_ARCH FALSE)
+elseif(NOT DEFINED IS_AARCH64_ARCH AND ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+  set(IS_AARCH64_ARCH TRUE)
+else()
+  set(IS_AARCH64_ARCH FALSE)
+endif()""",
+            ],
+            patch_condition=is_mac,
+        ),
+        FilePatcher(
             orig_file=os.path.join(src_dir, "CMake", "FollyCompilerMSVC.cmake"),
             from_texts=[
                 r"list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)",
@@ -2528,21 +2600,32 @@ include(libs)""",
                 "SuiteSparse__blas_threading.cmake",
             ),
             from_texts=[
-                """    try_run ( MKL_RUNS MKL_COMPILES
+                """    get_filename_component ( ABS_SOURCE_PATH
+        ${PROJECT_SOURCE_DIR}/../SuiteSparse_config/cmake_modules/check_mkl.c
+        ABSOLUTE )
+    try_run ( MKL_RUNS MKL_COMPILES
         ${CMAKE_CURRENT_BINARY_DIR}
         ${ABS_SOURCE_PATH}
         LINK_OPTIONS    ${BLAS_LINKER_FLAGS}
         LINK_LIBRARIES  ${BLAS_LIBRARIES}
-        RUN_OUTPUT_VARIABLE MKL_OUTPUT )""",
+        RUN_OUTPUT_VARIABLE MKL_OUTPUT )
+
+    if ( ${MKL_COMPILES} )
+        if ( ${MKL_RUNS} STREQUAL "FAILED_TO_RUN" )
+            # MKL compiled but failed to run ... why?
+            message ( FATAL_ERROR "Intel MKL failed to run" )
+        endif ( )
+        if ( ${MKL_OUTPUT} EQUAL 1 )
+            message ( STATUS "BLAS: Intel MKL: single-threaded" )
+        else ( )
+            message ( STATUS "BLAS: Intel MKL: multi-threaded (threads: ${MKL_OUTPUT})" )
+        endif ( )
+    else ( )
+        message ( FATAL_ERROR "BLAS: Intel MKL failed to compile" )
+    endif ( )""",
             ],
             to_texts=[
-                """    try_run ( MKL_RUNS MKL_COMPILES
-        ${CMAKE_CURRENT_BINARY_DIR}
-        ${ABS_SOURCE_PATH}
-        CMAKE_FLAGS "-DINCLUDE_DIRECTORIES:STRING=${BLAS_INCLUDE_DIRS}"
-        LINK_OPTIONS    ${BLAS_LINKER_FLAGS}
-        LINK_LIBRARIES  ${BLAS_LIBRARIES}
-        RUN_OUTPUT_VARIABLE MKL_OUTPUT )""",
+                """    message ( STATUS "BLAS: Intel MKL threading probe skipped by Atlas" )""",
             ],
         ),
     ]

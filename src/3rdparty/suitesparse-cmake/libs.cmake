@@ -1,4 +1,8 @@
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
+if (APPLE)
+  if (CMAKE_OSX_ARCHITECTURES MATCHES "(^|;)arm64($|;)")
+    set(AARCH64 1)
+  endif ()
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
   set(AARCH64 1)
 endif ()
 
