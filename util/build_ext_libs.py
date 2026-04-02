@@ -4641,10 +4641,20 @@ def build_proxygen(src_dir: str, install_dir: str):
             from_texts=[
                 r"find_program(PROXYGEN_PYTHON python3)",
                 r"-Wextra",
+                r"""find_package(Threads)
+find_package(Cares REQUIRED)
+find_package(Glog REQUIRED)""",
             ],
             to_texts=[
                 r"find_program(PROXYGEN_PYTHON python)",
                 r"",
+                r"""find_package(Threads)
+find_package(c-ares CONFIG REQUIRED)
+if(NOT TARGET cares AND TARGET c-ares::cares)
+  add_library(cares INTERFACE IMPORTED)
+  set_target_properties(cares PROPERTIES INTERFACE_LINK_LIBRARIES "c-ares::cares")
+endif()
+find_package(Glog REQUIRED)""",
             ],
             patch_condition=is_windows,
         ),
@@ -4656,6 +4666,19 @@ def build_proxygen(src_dir: str, install_dir: str):
             ],
             to_texts=[
                 "${PROXYGEN_FBCODE_ROOT}\n${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http\n${PROXYGEN_GPERF}",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "cmake", "proxygen-config.cmake.in"),
+            from_texts=[
+                r"find_dependency(c-ares REQUIRED)",
+            ],
+            to_texts=[
+                r"""find_dependency(c-ares REQUIRED)
+if(NOT TARGET cares AND TARGET c-ares::cares)
+  add_library(cares INTERFACE IMPORTED)
+  set_target_properties(cares PROPERTIES INTERFACE_LINK_LIBRARIES "c-ares::cares")
+endif()""",
             ],
         ),
         # Proxygen keeps reusable HQ server targets under samples/hq, but the
