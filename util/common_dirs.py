@@ -29,7 +29,7 @@ def is_linux() -> bool:
 
 
 def use_clang_cl() -> bool:
-    return False
+    return True
 
 
 def windows_visual_studio_major_version() -> str:

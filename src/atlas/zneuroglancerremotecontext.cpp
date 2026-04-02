@@ -29,7 +29,15 @@ ZNeuroglancerRemoteContext::getResponseAsync(std::string url,
                                              /*nullable*/ ZImgReadStatsSink* statsSink,
                                              ZImgReadStatsContext statsContext) const
 {
-  co_return co_await getResponseAsync(ZHttpGetRequest{.url = std::move(url)}, statsSink, statsContext);
+  co_return co_await getResponseAsync(
+    ZHttpGetRequest{
+      .url = std::move(url),
+      .timeout = std::chrono::milliseconds{0},
+      .headers = {},
+      .exactByteRange = std::nullopt,
+    },
+    statsSink,
+    statsContext);
 }
 
 folly::coro::Task<std::optional<std::vector<uint8_t>>>

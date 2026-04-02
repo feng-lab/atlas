@@ -56,10 +56,10 @@ from common_dirs import (
     use_ninja,
     vs_install_dir,
     vulkan_SDK_env_dir,
-    windows_native_platform_toolset,
     windows_msbuild_platform_toolset,
-    windows_visual_studio_major_version,
+    windows_native_platform_toolset,
     windows_visual_studio_generator,
+    windows_visual_studio_major_version,
 )
 from download_atlas_deps import download_atlas_deps
 from logger import setup_logger
@@ -1450,7 +1450,6 @@ def build_glog(src_dir: str, install_dir: str):
             [
                 "-DBUILD_TESTING:BOOL=OFF",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
-                "-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON",
             ]
         )
 
@@ -1771,7 +1770,14 @@ def build_fmt(src_dir: str, install_dir: str):
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(["-DFMT_DOC:BOOL=OFF", "-DFMT_TEST:BOOL=OFF", src_dir])
+        cmakecmd.extend(
+            [
+                "-DFMT_DOC:BOOL=OFF",
+                "-DFMT_TEST:BOOL=OFF",
+                "-DFMT_MODULE:BOOL=OFF",
+                src_dir,
+            ]
+        )
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -2042,21 +2048,80 @@ def build_libsodium(src_dir: str, install_dir: str):
 
 def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     build_dir = create_build_dir(src_dir)
+    fmt_format_include_files = [
+        ["folly", "cli", "Args.cpp"],
+        ["folly", "concurrency", "CacheLocality.cpp"],
+        ["folly", "detail", "IPAddressSource.h"],
+        ["folly", "fibers", "detail", "AtomicBatchDispatcher.cpp"],
+        ["folly", "futures", "detail", "Core.cpp"],
+        ["folly", "io", "async", "fdsock", "AsyncFdSocket.cpp"],
+        ["folly", "IPAddress.cpp"],
+        ["folly", "IPAddressV4.cpp"],
+        ["folly", "IPAddressV6.cpp"],
+        ["folly", "logging", "LogStreamProcessor.h"],
+        ["folly", "observer", "WithJitter-inl.h"],
+        ["folly", "python", "import.h"],
+        ["folly", "result", "rich_error_base.h"],
+        ["folly", "settings", "CommandLineParser.cpp"],
+        ["folly", "SocketAddress.cpp"],
+        ["folly", "system", "MemoryMapping.cpp"],
+    ]
 
     patches = [
         FilePatcher(
             orig_file=os.path.join(src_dir, "CMake", "folly-config.cmake.in"),
             from_texts=[
-                r"find_dependency(fmt)",
-                r"    regex",
-                r"    system",
+                r"""# Find glog before loading targets, since targets reference the glog::glog target
+if(NOT TARGET glog::glog)
+  find_package(Glog QUIET)
+endif()""",
+                r"""# Set FOLLY_LIBRARIES from our Folly::folly target
+set(FOLLY_LIBRARIES Folly::folly)
+
+# Find folly's dependencies
+find_dependency(fmt)""",
             ],
             to_texts=[
-                "find_dependency(fmt)\n"
-                "find_dependency(gflags CONFIG)\n"
-                "find_dependency(glog CONFIG)",
-                r"",
-                r"",
+                r"""# Find dependencies before loading targets, since targets reference them.
+find_dependency(fmt)
+find_dependency(gflags CONFIG)
+
+find_dependency(glog CONFIG)""",
+                r"""# Set FOLLY_LIBRARIES from our Folly::folly target
+set(FOLLY_LIBRARIES Folly::folly)""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "CMake", "folly-config.cmake.in"),
+            from_texts=[
+                r"""find_package(Boost 1.69.0 REQUIRED
+  COMPONENTS
+    context
+    filesystem
+    program_options
+    regex
+    thread
+)""",
+            ],
+            to_texts=[
+                r"""find_package(Boost 1.69.0 REQUIRED
+  COMPONENTS
+    context
+    filesystem
+    program_options
+    thread
+)
+if (NOT TARGET Boost::regex)
+  if (TARGET Boost::headers)
+    add_library(Boost::regex INTERFACE IMPORTED)
+    target_link_libraries(Boost::regex INTERFACE Boost::headers)
+  elseif (TARGET Boost::boost)
+    add_library(Boost::regex INTERFACE IMPORTED)
+    target_link_libraries(Boost::regex INTERFACE Boost::boost)
+  else()
+    message(FATAL_ERROR "Boost::regex target missing after Boost discovery")
+  endif()
+endif()""",
             ],
         ),
         FilePatcher(
@@ -2072,17 +2137,14 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                 r"find_package(Snappy MODULE)",
                 r"find_package(Libsodium)",
                 r"find_package(Gflags MODULE)",
-                r"list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})",
                 r"find_package(Glog MODULE)",
                 r"set(FOLLY_HAVE_LIBGLOG ${GLOG_FOUND})",
-                r"list(APPEND FOLLY_LINK_LIBRARIES ${GLOG_LIBRARY})",
                 r"find_package(LibDwarf)" if is_mac() else "",
                 r"find_package(Libiberty)" if is_mac() else "",
                 r"find_package(LibAIO)" if is_mac() else "",
                 r"find_package(LibUring)" if is_mac() else "",
                 r"find_package(LibUnwind)" if is_mac() else "",
                 r"set(FOLLY_USE_SYMBOLIZER ON)",
-                r"    regex",
             ],
             to_texts=[
                 r"",
@@ -2098,17 +2160,79 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                 f"find_package({'SNAPPY' if is_mac() else 'Snappy'} MODULE REQUIRED)",
                 f"find_package({'LIBSODIUM' if is_mac() else 'Libsodium'} REQUIRED)",
                 r"find_package(Gflags MODULE REQUIRED)",
-                r"#list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})",
                 r"find_package(Glog CONFIG REQUIRED)",
                 r"set(FOLLY_HAVE_LIBGLOG ON)",
-                r"list(APPEND FOLLY_LINK_LIBRARIES glog::glog)",
                 r"find_package(LIBDWARF)",
                 r"find_package(LIBIBERTY)",
                 r"find_package(LIBAIO)",
                 r"find_package(LIBURING)",
                 r"find_package(LIBUNWIND)",
                 r"set(FOLLY_USE_SYMBOLIZER OFF)",
-                r"",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "CMake", "folly-deps.cmake"),
+            from_texts=[
+                r"""set(FOLLY_BOOST_COMPONENTS
+    context
+    filesystem
+    program_options
+    regex
+)
+if(WIN32)
+  list(APPEND FOLLY_BOOST_COMPONENTS thread)
+endif()
+
+find_package(Boost 1.69.0 REQUIRED
+  COMPONENTS
+    ${FOLLY_BOOST_COMPONENTS}
+)""",
+            ],
+            to_texts=[
+                r"""set(FOLLY_BOOST_COMPONENTS
+    context
+    filesystem
+    program_options
+)
+if(WIN32)
+  list(APPEND FOLLY_BOOST_COMPONENTS thread)
+endif()
+
+find_package(Boost 1.69.0 REQUIRED
+  COMPONENTS
+    ${FOLLY_BOOST_COMPONENTS}
+)
+if (NOT TARGET Boost::regex)
+  if (TARGET Boost::headers)
+    add_library(Boost::regex INTERFACE IMPORTED)
+    target_link_libraries(Boost::regex INTERFACE Boost::headers)
+  elseif (TARGET Boost::boost)
+    add_library(Boost::regex INTERFACE IMPORTED)
+    target_link_libraries(Boost::regex INTERFACE Boost::boost)
+  else()
+    message(FATAL_ERROR "Boost::regex target missing after Boost discovery")
+  endif()
+endif()""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "folly", "portability", "CMakeLists.txt"),
+            from_texts=[
+                r"""if(WIN32)
+  target_link_libraries(folly_portability_pthread_obj PUBLIC Boost::thread)
+  target_link_libraries(folly_portability_pthread PUBLIC Boost::thread)
+endif()""",
+            ],
+            to_texts=[
+                r"""if(WIN32)
+  # folly_create_monolithic_library only propagates dependencies recorded in
+  # FOLLY_MONOLITHIC_EXTERNAL_DEPS. pthread adds Boost::thread after
+  # folly_add_library(), so register it explicitly for the exported Folly::folly
+  # target as well.
+  set_property(GLOBAL APPEND PROPERTY FOLLY_MONOLITHIC_EXTERNAL_DEPS Boost::thread)
+  target_link_libraries(folly_portability_pthread_obj PUBLIC Boost::thread)
+  target_link_libraries(folly_portability_pthread PUBLIC Boost::thread)
+endif()""",
             ],
         ),
         FilePatcher(
@@ -2139,7 +2263,10 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         FilePatcher(
             orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
-                r"target_link_libraries(folly PUBLIC folly_deps)",
+                r"""target_include_directories(folly_deps
+  INTERFACE
+    $<INSTALL_INTERFACE:include>
+)""",
                 r"""file(
   GENERATE
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libfolly.pc
@@ -2153,7 +2280,10 @@ install(
 )""",
             ],
             to_texts=[
-                r"""target_link_libraries(folly PUBLIC folly_deps)
+                r"""target_include_directories(folly_deps
+  INTERFACE
+    $<INSTALL_INTERFACE:include>
+)
 if (WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_definitions(folly_deps INTERFACE LLVM_COROUTINES_CPP20)
 endif()""",
@@ -2170,6 +2300,124 @@ endif()""",
                 r"find_library(LIBSODIUM_LIBRARY NAMES sodium libsodium)",
             ],
             patch_condition=is_windows,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "folly", "logging", "BridgeFromGoogleLogging.h"
+            ),
+            from_texts=[
+                """  void send(
+      ::google::LogSeverity severity,
+      const char* full_filename,
+      const char* base_filename,
+      int line,
+      const struct ::tm* pTime,
+      const char* message,
+      size_t message_len,
+      int32_t usecs);
+
+  void send(
+      ::google::LogSeverity severity,
+      const char* full_filename,
+      const char* base_filename,
+      int line,
+      const struct ::tm* pTime,
+      const char* message,
+      size_t message_len) override;""",
+            ],
+            to_texts=[
+                """  void send(
+      ::google::LogSeverity severity,
+      const char* full_filename,
+      const char* base_filename,
+      int line,
+      const ::google::LogMessageTime& time,
+      const char* message,
+      size_t message_len) override;""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "folly", "logging", "BridgeFromGoogleLogging.cpp"
+            ),
+            from_texts=[
+                """void BridgeFromGoogleLogging::send(
+    ::google::LogSeverity severity,
+    const char* full_filename,
+    const char* base_filename,
+    int line,
+    const struct ::tm* pTime,
+    const char* message,
+    size_t message_len,
+    int32_t usecs) {
+  struct ::tm time = *pTime;
+  folly::Logger const logger{full_filename};
+  auto follyLevel = asFollyLogLevel(severity);
+  if (logger.getCategory()->logCheck(follyLevel)) {
+    folly::LogMessage logMessage{
+        logger.getCategory(),
+        follyLevel,
+        std::chrono::system_clock::from_time_t(mktime(&time)) +
+            std::chrono::microseconds(usecs),
+        base_filename,
+        static_cast<unsigned>(line),
+        {},
+        std::string{message, message_len}};
+    // Make sure we don't abort on fatal messages and let glog library to
+    // handle it. As this call is done under lock, this could lead to a deadlock
+    logger.getCategory()->admitMessage(logMessage, /* skipAbortOnFatal */ true);
+  }
+}
+
+void BridgeFromGoogleLogging::send(
+    ::google::LogSeverity severity,
+    const char* full_filename,
+    const char* base_filename,
+    int line,
+    const struct ::tm* pTime,
+    const char* message,
+    size_t message_len) {
+  struct ::tm time = *pTime;
+  auto usecs = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::system_clock::now() -
+      std::chrono::system_clock::from_time_t(mktime(&time)));
+  send(
+      severity,
+      full_filename,
+      base_filename,
+      line,
+      pTime,
+      message,
+      message_len,
+      folly::to_narrow(usecs.count()));
+}""",
+            ],
+            to_texts=[
+                """void BridgeFromGoogleLogging::send(
+    ::google::LogSeverity severity,
+    const char* full_filename,
+    const char* base_filename,
+    int line,
+    const ::google::LogMessageTime& time,
+    const char* message,
+    size_t message_len) {
+  folly::Logger const logger{full_filename};
+  auto follyLevel = asFollyLogLevel(severity);
+  if (logger.getCategory()->logCheck(follyLevel)) {
+    folly::LogMessage logMessage{
+        logger.getCategory(),
+        follyLevel,
+        time.when(),
+        base_filename,
+        static_cast<unsigned>(line),
+        {},
+        std::string{message, message_len}};
+    // Make sure we don't abort on fatal messages and let glog library to
+    // handle it. As this call is done under lock, this could lead to a deadlock
+    logger.getCategory()->admitMessage(logMessage, /* skipAbortOnFatal */ true);
+  }
+}""",
+            ],
         ),
         FilePatcher(
             orig_file=os.path.join(src_dir, "folly", "json", "DynamicParser.h"),
@@ -2200,21 +2448,26 @@ endif()""",
             patch_condition=use_windows_clang_cl,
         ),
     ]
+    patches.extend(
+        [
+            FilePatcher(
+                orig_file=os.path.join(src_dir, *relative_path_parts),
+                from_texts=[r"#include <fmt/core.h>"],
+                to_texts=[r"#include <fmt/format.h>"],
+            )
+            for relative_path_parts in fmt_format_include_files
+        ]
+    )
     patch_manager = PatchManager(patches)
 
     try:
         patch_manager.apply_patches()
-
-        os.remove(
-            os.path.join(src_dir, "folly", "logging", "BridgeFromGoogleLogging.cpp")
-        )
 
         cmakecmd_options = [
             "-DBUILD_SHARED_LIBS:BOOL=OFF",
             "-DPYTHON_EXTENSIONS:BOOL=OFF",
             "-DBUILD_TESTS:BOOL=OFF",
             "-DBOOST_LINK_STATIC=ON",
-            "-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON",
             "-DFOLLY_HAVE_WEAK_SYMBOLS:BOOL=OFF" if use_windows_clang_cl() else "",
             "-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=" + ("ON" if use_asan else "OFF"),
             src_dir,
@@ -2265,6 +2518,31 @@ find_package ( BLAS )""",
 set ( BLA_SIZEOF_INTEGER 4 )
 # find_package ( BLAS )
 include(libs)""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "SuiteSparse_config",
+                "cmake_modules",
+                "SuiteSparse__blas_threading.cmake",
+            ),
+            from_texts=[
+                """    try_run ( MKL_RUNS MKL_COMPILES
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${ABS_SOURCE_PATH}
+        LINK_OPTIONS    ${BLAS_LINKER_FLAGS}
+        LINK_LIBRARIES  ${BLAS_LIBRARIES}
+        RUN_OUTPUT_VARIABLE MKL_OUTPUT )""",
+            ],
+            to_texts=[
+                """    try_run ( MKL_RUNS MKL_COMPILES
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${ABS_SOURCE_PATH}
+        CMAKE_FLAGS "-DINCLUDE_DIRECTORIES:STRING=${BLAS_INCLUDE_DIRS}"
+        LINK_OPTIONS    ${BLAS_LINKER_FLAGS}
+        LINK_LIBRARIES  ${BLAS_LIBRARIES}
+        RUN_OUTPUT_VARIABLE MKL_OUTPUT )""",
             ],
         ),
     ]
@@ -2383,7 +2661,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
             "-DBUILD_EXAMPLES:BOOL=OFF",
             "-DBUILD_BENCHMARKS:BOOL=OFF",
             "-DBUILD_SHARED_LIBS:BOOL=OFF",
-            "-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON",
         ]
 
         cmakecmd.extend(cmakecmd_options)
@@ -3492,18 +3769,6 @@ def build_vtk(src_dir: str, install_dir: str):
     patches = [
         FilePatcher(
             orig_file=os.path.join(
-                src_dir, "ThirdParty", "netcdf", "vtknetcdf", "CMakeLists.txt"
-            ),
-            from_texts=[
-                r'check_type_size("uint64_t" HAVE_UINT64_T)',
-            ],
-            to_texts=[
-                'check_type_size("uint64_t" HAVE_UINT64_T)\n'
-                'check_type_size("uintptr_t" HAVE_UINTPTR_T)\n',
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(
                 src_dir, "ThirdParty", "eigen", "vtkeigen", "CMakeLists.txt"
             ),
             from_texts=[
@@ -3575,6 +3840,23 @@ def build_vtk(src_dir: str, install_dir: str):
         ),
         FilePatcher(
             orig_file=os.path.join(
+                src_dir,
+                "ThirdParty",
+                "netcdf",
+                "vtknetcdf",
+                "libdispatch",
+                "XGetopt.c",
+            ),
+            from_texts=[
+                r"    char** p;",
+            ],
+            to_texts=[
+                r"    const char* p;",
+            ],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
                 src_dir, "Common", "DataModel", "vtkBoundingBox.cxx"
             ),
             from_texts=[
@@ -3632,7 +3914,7 @@ void vtkBoundingBox::ComputeBounds(
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_doubleconversion:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL="
-                + ("OFF" if is_windows() else "ON"),
+                + ("OFF" if (is_windows() and not use_clang_cl()) else "ON"),
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lz4:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=ON",
@@ -3770,7 +4052,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 "-DBUILD_opencv_videostab:BOOL=ON",
                 "-DBUILD_opencv_xfeatures2d:BOOL=ON",
                 "-DBUILD_opencv_freetype:BOOL=OFF",
-                "-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON",
             ]
 
             cmakecmd_options.extend(
@@ -3918,7 +4199,6 @@ def build_rocksdb(src_dir: str, install_dir: str):
             "-DUSE_COROUTINES:BOOL=OFF",
             "-DUSE_FOLLY:BOOL=ON",
             "-DROCKSDB_INSTALL_ON_WINDOWS:BOOL=ON",
-            "-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON",
             "-DFAIL_ON_WARNINGS:BOOL=OFF",
         ]
 
@@ -4032,7 +4312,6 @@ def build_fizz(src_dir: str, install_dir: str):
             from_texts=[
                 r"""find_package(Sodium REQUIRED)
 set(FIZZ_HAVE_SODIUM ${Sodium_FOUND})""",
-                r"list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)",
                 r"    ${sodium_INCLUDE_DIR}",
             ],
             to_texts=[
@@ -4063,8 +4342,6 @@ else()
   find_package(Sodium REQUIRED)
 endif()
 set(FIZZ_HAVE_SODIUM ${Sodium_FOUND})""",
-                "list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n"
-                "add_library(gflags::gflags ALIAS gflags)",
                 r"",
             ],
             patch_condition=use_windows_clang_cl,
@@ -4162,13 +4439,15 @@ if (NOT TARGET fizz::fizz)""",
         FilePatcher(
             orig_file=os.path.join(src_dir, "client", "AsyncFizzClient-inl.h"),
             from_texts=[
-                r"""    underlyingSocket->disableTransparentTls();
+                r"""  if (underlyingSocket) {
+    underlyingSocket->disableTransparentTls();
     underlyingSocket->connect(
         this,
         connectAddr,
         static_cast<int>(socketTimeout.count()),
         options,
-        bindAddr);""",
+        bindOptions);
+  } else {""",
                 r"""void AsyncFizzClientT<SM>::close() {
   if (transport_->good()) {
     fizzClient_.appCloseImmediate();
@@ -4207,7 +4486,8 @@ if (NOT TARGET fizz::fizz)""",
 }""",
             ],
             to_texts=[
-                r"""    underlyingSocket->disableTransparentTls();
+                r"""  if (underlyingSocket) {
+    underlyingSocket->disableTransparentTls();
     // Keep this alive until the socket connect completes (success/failure) or
     // we explicitly close/cancel.
     connectGuard_ = this;
@@ -4216,7 +4496,8 @@ if (NOT TARGET fizz::fizz)""",
         connectAddr,
         static_cast<int>(socketTimeout.count()),
         options,
-        bindAddr);""",
+        bindOptions);
+  } else {""",
                 r"""void AsyncFizzClientT<SM>::cancelInFlightConnect() {
   DelayedDestruction::DestructorGuard dg(this);
   if (!connectGuard_) {
@@ -4325,69 +4606,19 @@ void AsyncFizzClientT<SM>::close() {
 def build_mvfst(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    patches = [
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "CMakeLists.txt"),
-            from_texts=[
-                r"list(APPEND GFLAG_DEPENDENCIES gflags)",
-                r"  iostreams",
-                r"  date_time",
-                r"  system",
-                r"  regex",
-            ],
-            to_texts=[
-                "list(APPEND GFLAG_DEPENDENCIES gflags)\n"
-                "add_library(gflags::gflags ALIAS gflags)",
-                r"",
-                r"",
-                r"",
-                r"",
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "cmake", "mvfst-config.cmake.in"),
-            from_texts=[
-                r"find_dependency(Boost COMPONENTS iostreams system thread filesystem regex context)",
-            ],
-            to_texts=[
-                r"find_dependency(Boost COMPONENTS thread filesystem context)",
-            ],
-        ),
-    ]
-    patch_manager = PatchManager(patches)
-
     try:
-        patch_manager.apply_patches()
-
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        patch_manager.restore_files()
 
 
 def build_wangle(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    patches = [
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "CMakeLists.txt"),
-            from_texts=[
-                r"find_package(LibEvent MODULE REQUIRED)",
-            ],
-            to_texts=[
-                "add_library(gflags::gflags ALIAS gflags)\n"
-                "find_package(LibEvent MODULE REQUIRED)",
-            ],
-        ),
-    ]
-    patch_manager = PatchManager(patches)
-
     try:
-        patch_manager.apply_patches()
-
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(
             [
@@ -4399,7 +4630,6 @@ def build_wangle(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        patch_manager.restore_files()
 
 
 def build_proxygen(src_dir: str, install_dir: str):
@@ -4409,65 +4639,41 @@ def build_proxygen(src_dir: str, install_dir: str):
         FilePatcher(
             orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
-                r"list(APPEND GFLAG_DEPENDENCIES gflags)",
                 r"find_program(PROXYGEN_PYTHON python3)",
                 r"-Wextra",
-                r"    iostreams",
-                r"    chrono",
-                r"    regex",
-                r"    system",
             ],
             to_texts=[
-                "list(APPEND GFLAG_DEPENDENCIES gflags)\n"
-                "add_library(gflags::gflags ALIAS gflags)",
-                r"find_program(PROXYGEN_PYTHON python)"
-                if is_windows()
-                else r"find_program(PROXYGEN_PYTHON python3)",
-                r"" if is_windows() else r"-Wextra",
-                r"",
-                r"",
-                r"",
+                r"find_program(PROXYGEN_PYTHON python)",
                 r"",
             ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "cmake", "proxygen-config.cmake.in"),
-            from_texts=[
-                r"""find_dependency(Boost 1.58 REQUIRED
-  COMPONENTS
-    iostreams
-    context
-    filesystem
-    program_options
-    regex
-    system
-    thread
-)""",
-            ],
-            to_texts=[
-                r"""find_dependency(Boost 1.58 REQUIRED
-  COMPONENTS
-    context
-    filesystem
-    program_options
-    thread
-)""",
-            ],
+            patch_condition=is_windows,
         ),
         FilePatcher(
             orig_file=os.path.join(src_dir, "proxygen", "lib", "CMakeLists.txt"),
             from_texts=[
                 r"""${PROXYGEN_FBCODE_ROOT}
         ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
-                r"    zstd",
-                r"Boost::boost",
-                r"Boost::iostreams",
             ],
             to_texts=[
                 "${PROXYGEN_FBCODE_ROOT}\n${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http\n${PROXYGEN_GPERF}",
-                r"",
-                r"",
-                r"",
+            ],
+        ),
+        # Proxygen keeps reusable HQ server targets under samples/hq, but the
+        # sample-only proxygen_hq_samples target should not build when Atlas
+        # configures Proxygen with BUILD_SAMPLES=OFF.
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "proxygen", "httpserver", "samples", "hq", "CMakeLists.txt"
+            ),
+            from_texts=[
+                r"proxygen_add_library(proxygen_hq_samples",
+                r"add_subdirectory(devious)",
+            ],
+            to_texts=[
+                """if (BUILD_SAMPLES)
+  proxygen_add_library(proxygen_hq_samples""",
+                """  add_subdirectory(devious)
+endif()""",
             ],
         ),
         # Cancellation / timeout safety:

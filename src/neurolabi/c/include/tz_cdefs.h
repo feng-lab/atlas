@@ -14,7 +14,7 @@
 #  include <limits>
 #endif
 
-#ifdef _MSC_VER // will compile neurolabi as cpp code if use msvc
+#if defined(_MSC_VER) && !defined(__clang__) // cl.exe builds neurolabi as C++
 #  define __BEGIN_DECLS
 #  define __END_DECLS
 #  define PUBLIC_API

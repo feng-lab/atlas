@@ -130,9 +130,6 @@
 [submodule "src/3rdparty/proxygen"]
 	path = src/3rdparty/proxygen
 	url = https://github.com/facebook/proxygen.git
-[submodule "src/3rdparty/llfio"]
-	path = src/3rdparty/llfio
-	url = https://github.com/ned14/llfio.git
 [submodule "src/3rdparty/reflect"]
 	path = src/3rdparty/reflect
 	url = https://github.com/qlibs/reflect.git

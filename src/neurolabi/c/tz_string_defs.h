@@ -19,7 +19,7 @@ __BEGIN_DECLS
 /**@brief Workspace for line processing.
  *
  */
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 typedef struct __String_Workspace {
 #else
 typedef struct _String_Workspace {

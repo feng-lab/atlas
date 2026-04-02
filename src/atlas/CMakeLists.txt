@@ -922,36 +922,45 @@ set(ATLAS_SOURCES_NO_MAIN ${SOURCES})
 list(REMOVE_ITEM ATLAS_SOURCES_NO_MAIN main.cpp)
 
 ###
-# Split monolithic atlas_lib into two static libraries to avoid Windows COFF 4GB limit
-# while keeping a stable consumer target name via an umbrella INTERFACE library.
-#
-# atlas_core    — all non-Vulkan code (Z3D*, UI, filters, etc.)
-# atlas_vulkan  — Vulkan-only code (ZVulkan*)
-# atlas_lib     — INTERFACE target that pulls in both (consumers link just atlas_lib)
+# Keep the normal Atlas build simple: one static `atlas_lib` containing all
+# non-entry-point sources. The only exception is the classic MSVC toolchain,
+# where `/GL` + `/LTCG` Release builds can hit the Windows COFF archive size
+# limit. That toolchain keeps the existing split-library workaround.
 ###
 
-# Partition sources from the full set (minus main.cpp).
-#  - Vulkan-only (zvulkan*)
-#  - Z3D shared/GL (z3d*)
-#  - Core (everything else)
+set(ATLAS_USE_MSVC_LIBRARY_SPLIT OFF)
+if (MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set(ATLAS_USE_MSVC_LIBRARY_SPLIT ON)
+endif ()
 
-# Vulkan-only sources
-set(ATLAS_VULKAN_SOURCES ${ATLAS_SOURCES_NO_MAIN})
-list(FILTER ATLAS_VULKAN_SOURCES INCLUDE REGEX "(^|/)zvulkan[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+if (ATLAS_USE_MSVC_LIBRARY_SPLIT)
+  # The split-library workaround is only needed for the classic MSVC toolchain,
+  # where lib.exe can hit the COFF archive size limit with Release /GL + /LTCG builds.
+  # clang-cl uses the MSVC frontend but should stay on the simpler single-library path.
+  #
+  # Classic MSVC split layout:
+  # atlas_core    — core/shared support code outside the renderer-specific source sets
+  # atlas_z3d     — Z3D shared/OpenGL renderer code (z3d*)
+  # atlas_vulkan  — Vulkan-only renderer code (zvulkan*)
+  # atlas_lib     — INTERFACE target that pulls in the three concrete libraries
 
-# Z3D sources
-set(ATLAS_Z3D_SOURCES ${ATLAS_SOURCES_NO_MAIN})
-list(FILTER ATLAS_Z3D_SOURCES INCLUDE REGEX "(^|/)z3d[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+  # Partition sources from the full set (minus main.cpp).
+  #  - Vulkan-only (zvulkan*)
+  #  - Z3D shared/GL (z3d*)
+  #  - Core (everything else)
 
-# Core: exclude Vulkan-only and Z3D sources
-set(ATLAS_CORE_SOURCES ${ATLAS_SOURCES_NO_MAIN})
-list(FILTER ATLAS_CORE_SOURCES EXCLUDE REGEX "(^|/)zvulkan[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
-list(FILTER ATLAS_CORE_SOURCES EXCLUDE REGEX "(^|/)z3d[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+  # Vulkan-only sources
+  set(ATLAS_VULKAN_SOURCES ${ATLAS_SOURCES_NO_MAIN})
+  list(FILTER ATLAS_VULKAN_SOURCES INCLUDE REGEX "(^|/)zvulkan[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
 
-if (MSVC)
-  # MSVC (COFF) static libraries have a hard ~4GiB size limit. With /GL + /LTCG enabled,
-  # `atlas_core` can exceed that limit (LNK1248 from lib.exe). Split `atlas_core` into
-  # multiple implementation archives and expose a stable umbrella target name.
+  # Z3D sources
+  set(ATLAS_Z3D_SOURCES ${ATLAS_SOURCES_NO_MAIN})
+  list(FILTER ATLAS_Z3D_SOURCES INCLUDE REGEX "(^|/)z3d[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+
+  # Core: exclude Vulkan-only and Z3D sources
+  set(ATLAS_CORE_SOURCES ${ATLAS_SOURCES_NO_MAIN})
+  list(FILTER ATLAS_CORE_SOURCES EXCLUDE REGEX "(^|/)zvulkan[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+  list(FILTER ATLAS_CORE_SOURCES EXCLUDE REGEX "(^|/)z3d[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
 
   add_library(atlas_core_deps INTERFACE)
   target_include_directories(atlas_core_deps
@@ -974,7 +983,7 @@ if (MSVC)
     img
     glbinding::glbinding-aux glbinding::glbinding
     ${OpenCV_LIBS}
-    gflags::gflags
+    gflags_static
     Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets
     Qt6::CorePrivate Qt6::Test
     Brotli::brotlidec
@@ -1043,41 +1052,59 @@ if (MSVC)
     atlas_core_n_p
     atlas_core_q_r
     atlas_core_s_z)
+  # Z3D static library (OpenGL/shared renderer code). Keep it simple: inherit everything from atlas_core.
+  add_library(atlas_z3d STATIC ${ATLAS_Z3D_SOURCES})
+  target_link_libraries(atlas_z3d PRIVATE atlas_core)
+
+  # Vulkan static library. Keep it simple: inherit everything from atlas_core.
+  add_library(atlas_vulkan STATIC ${ATLAS_VULKAN_SOURCES})
+
+  # Shader build dependency for Vulkan code
+  add_dependencies(atlas_vulkan vulkan_shaders)
+
+  # Inherit usage requirements via atlas_core
+  target_link_libraries(atlas_vulkan PRIVATE atlas_core)
+
+  # Umbrella target preserves the original consumer name without producing a giant .lib
+  add_library(atlas_lib INTERFACE)
+  # Order keeps providers after dependents for linkers that care about library order
+  target_link_libraries(atlas_lib INTERFACE atlas_core atlas_z3d atlas_vulkan)
 else ()
-  # Core static library (non-MSVC toolchains do not suffer from the COFF 4GiB archive limit).
-  add_library(atlas_core STATIC
+  # Toolchains that do not need the classic MSVC archive-size workaround, including
+  # clang-cl, keep the original single-library Atlas layout.
+  add_library(atlas_lib STATIC
               ${SYS_SOURCES}
               ${QTCSV_SOURCES}
               ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
-              ${ATLAS_CORE_SOURCES}
+              ${ATLAS_SOURCES_NO_MAIN}
               ${PROTO_SRCS} ${GRPC_SRCS})
 
-  target_include_directories(atlas_core
+  target_include_directories(atlas_lib
     PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR}
       ${CMAKE_CURRENT_BINARY_DIR})
 
-  target_include_directories(atlas_core
+  target_include_directories(atlas_lib
     SYSTEM PRIVATE
       ${QTCSVDIR} ${QTCSVDIR}/include
       ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
-  # Vulkan headers are required transitively by some core sources/headers (e.g. zvulkan*.h
-  # included from renderer base). Ensure the SDK include path is visible to atlas_core too.
+  # Vulkan headers are required transitively by some Atlas sources/headers (e.g. zvulkan*.h
+  # included from renderer base). Ensure the SDK include path is visible to atlas_lib too.
   if (WIN32)
-    target_include_directories(atlas_core PUBLIC $ENV{VULKAN_SDK}/Include)
+    target_include_directories(atlas_lib PUBLIC $ENV{VULKAN_SDK}/Include)
   else ()
     # Do not use Vulkan::Headers, which might point to /usr/include
-    target_include_directories(atlas_core PUBLIC $ENV{VULKAN_SDK}/include)
+    target_include_directories(atlas_lib PUBLIC $ENV{VULKAN_SDK}/include)
   endif ()
-  target_compile_definitions(atlas_core PUBLIC
+  target_compile_definitions(atlas_lib PUBLIC
     ATLAS_USE_CORE_PROFILE
     ATLAS_ENABLE_CUSTOM_COMMAND=$<BOOL:${ATLAS_ENABLE_CUSTOM_COMMAND}>)
 
-  target_link_libraries(atlas_core PUBLIC
+  target_link_libraries(atlas_lib PUBLIC
     img
     glbinding::glbinding-aux glbinding::glbinding
     ${OpenCV_LIBS}
-    gflags::gflags
+    gflags_static
     Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets
     Qt6::CorePrivate Qt6::Test
     Brotli::brotlidec
@@ -1088,31 +1115,23 @@ else ()
     gRPC::grpc++ protobuf::libprotobuf)
   if (WIN32)
     # Required for importing the Windows system certificate store for HTTPS.
-    target_link_libraries(atlas_core PUBLIC crypt32)
+    target_link_libraries(atlas_lib PUBLIC crypt32)
   endif ()
   if (UNIX AND NOT APPLE)
-    target_link_libraries(atlas_core PUBLIC OpenGL::OpenGL OpenGL::EGL)
+    target_link_libraries(atlas_lib PUBLIC OpenGL::OpenGL OpenGL::EGL)
   endif ()
   if (ATLAS_USE_OPENGLWIDGET)
-    target_link_libraries(atlas_core PUBLIC Qt6::OpenGLWidgets)
+    target_link_libraries(atlas_lib PUBLIC Qt6::OpenGLWidgets)
   endif ()
+
+  # Keep the Vulkan shader generation dependency on the monolithic library so
+  # building atlas_lib directly still materializes shader artifacts.
+  add_dependencies(atlas_lib vulkan_shaders)
+
 endif ()
 
-# Z3D static library (OpenGL/shared renderer code). Keep it simple: inherit everything from atlas_core.
-add_library(atlas_z3d STATIC ${ATLAS_Z3D_SOURCES})
-target_link_libraries(atlas_z3d PRIVATE atlas_core)
-
-# Vulkan static library. Keep it simple: inherit everything from atlas_core.
-add_library(atlas_vulkan STATIC ${ATLAS_VULKAN_SOURCES})
-
-# Shader build dependency for Vulkan code
-add_dependencies(atlas_vulkan vulkan_shaders)
-
-# Inherit usage requirements via atlas_core
-target_link_libraries(atlas_vulkan PRIVATE atlas_core)
-
 # Enable IPO/LTCG for Release where supported
-if (MSVC)
+if (ATLAS_USE_MSVC_LIBRARY_SPLIT)
   set_property(TARGET
     atlas_core_support
     atlas_core_0_9_a_h
@@ -1124,14 +1143,9 @@ if (MSVC)
     set_property(TARGET atlas_z3d PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
     set_property(TARGET atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 else ()
-  set_property(TARGET atlas_core atlas_z3d atlas_vulkan
+  set_property(TARGET atlas_lib
     PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 endif ()
-
-# Umbrella target preserves the original consumer name without producing a giant .lib
-add_library(atlas_lib INTERFACE)
-# Order keeps providers after dependents for linkers that care about library order
-target_link_libraries(atlas_lib INTERFACE atlas_core atlas_z3d atlas_vulkan)
 
 # Final application links the object files plus the entry point and assets.
 add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE

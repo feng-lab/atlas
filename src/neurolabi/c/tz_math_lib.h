@@ -7,7 +7,7 @@
 
 /**@brief Obsolete routines*/
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 #define __typeof__ decltype
 #endif
 

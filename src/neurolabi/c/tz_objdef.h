@@ -39,7 +39,7 @@
 #define ROUTINE(fun) #fun
 
 /* Management object structure definition */
-#ifndef _MSC_VER
+#if !defined(_MSC_VER) || defined(__clang__)
 #define DECLARE_OBJECT(type, asize, data)	\
   typedef struct TZ_CONCAT(__,  type) {		\
     struct TZ_CONCAT(__, type) *next;		\
@@ -78,7 +78,7 @@
   }
 
 /* Set_<type>_Asize() */
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 #define DEFINE_SET_OBJECT_ASIZE(type, array, asize, data)		\
   void SET_OBJECT_ASIZE(type) (type *data, size_t new_asize)		\
   {									\
@@ -107,7 +107,7 @@
 #endif
 
 /* Define static function of newing an object : new_<data>() */
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 #define DECLARE_NEW_OBJECT_STATIC(type, array, asize, data)		\
   static inline type * NEW_OBJECT_STATIC(data) (size_t asize, char *routine) \
   {									\
@@ -189,7 +189,7 @@
   { return (COPY_OBJECT_STATIC(data) (data)); }
 
 /* Define the static function of packing an object */
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 #define DECLARE_PACK_OBJECT(type, array, asize, data)			\
   static inline void PACK_OBJECT_STATIC(data) (type *data)		\
   {									\

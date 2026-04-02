@@ -25,7 +25,7 @@ __BEGIN_DECLS
  * neighborhood system (see tz_stack_neighborhood.h for more information). If
  * <conn> is 0, there is no constraint for voxel connection.
  */
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 typedef struct __Object_3d {
 #else
 typedef struct _Object_3d {

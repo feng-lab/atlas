@@ -405,20 +405,6 @@ if (WIN32)
     set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "WIN32;DISABLE_PERF_MEASUREMENT")
     set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS /I${SCIFIODIR})
     set_source_files_properties(zimginterpolate.cpp PROPERTIES COMPILE_FLAGS /I${SCIFIODIR})
-
-    # # MSVC /GL (LTCG) can run out of compiler heap space when compiling large ITK template translation units
-    # # (e.g. filters derived from itk::ImageToImageFilter). Disable /GL for the ITK-heavy sources while
-    # # keeping /GL enabled for the rest of img.
-    # if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    #     set_property(SOURCE
-    #             zimgitkimage.cpp
-    #             zimginterpolate.cpp
-    #             zimgsigneddistancemap.cpp
-    #             zimgfillhole.cpp
-    #             zpunctadetection.cpp
-    #             APPEND PROPERTY COMPILE_OPTIONS /GL-)
-    # endif ()
-    # set_source_files_properties(zroiutils2.cpp PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/skia)
 else (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti>)
     target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing)

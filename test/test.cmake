@@ -22,34 +22,8 @@ macro(add_gtest_executable test_name)
 endmacro()
 
 
-# Atlas-aware test: links against the Atlas static library, exporting
+# Atlas-aware test: links against the public Atlas library target, exporting
 # all required include dirs and link dependencies (Qt, glbinding, etc.).
-macro(add_atlas_core_gtest_executable test_name)
-  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp)
-  target_link_libraries(${test_name} PRIVATE GTest::gtest_main atlas_core)
-  target_compile_definitions(${test_name} PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
-  gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
-endmacro()
-
-# Atlas-aware test: links against the Z3D codepath (OpenGL/shared rendering) plus core.
-macro(add_atlas_z3d_gtest_executable test_name)
-  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp)
-  # Keep providers after dependents for linkers that care about order.
-  target_link_libraries(${test_name} PRIVATE GTest::gtest_main atlas_z3d atlas_core)
-  target_compile_definitions(${test_name} PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
-  gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
-endmacro()
-
-# Atlas-aware test: links against the Vulkan-only codepath plus core.
-macro(add_atlas_vulkan_gtest_executable test_name)
-  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp)
-  # Keep providers after dependents for linkers that care about order.
-  target_link_libraries(${test_name} PRIVATE GTest::gtest_main atlas_vulkan atlas_z3d atlas_core)
-  target_compile_definitions(${test_name} PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
-  gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
-endmacro()
-
-# Full Atlas-linked test: links core + Z3D + Vulkan via the umbrella target.
 macro(add_atlas_gtest_executable test_name)
   add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp)
   target_link_libraries(${test_name} PRIVATE GTest::gtest_main atlas_lib)
@@ -139,7 +113,7 @@ endif ()
 
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
-add_atlas_vulkan_gtest_executable(zvulkanpipelinecontexttest)
+add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
 # the large atlas_lib link cost multiple times. This currently includes:
@@ -157,7 +131,7 @@ else ()
   add_gtest_executable(zneutubecommand2paritytest)
   target_link_libraries(zneutubecommand2paritytest neutu)
   # skip for now
-  # add_atlas_vulkan_gtest_executable(zswcpackundomergetest)
+  # add_atlas_gtest_executable(zswcpackundomergetest)
   add_executable(
     zatlasheavytest
     ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
@@ -181,9 +155,7 @@ else ()
     ${CMAKE_CURRENT_LIST_DIR}/zmarkdownbrowsertest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zflagfiledocumenttest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
-  # This test suite does not depend on Vulkan. Avoid linking atlas_vulkan to keep
-  # the link step lighter (especially on Windows CI and developer machines).
-  target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_vulkan atlas_z3d atlas_core)
+  target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_lib)
   target_compile_definitions(zatlasheavytest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
   gtest_discover_tests(zatlasheavytest DISCOVERY_TIMEOUT 600)
 endif ()

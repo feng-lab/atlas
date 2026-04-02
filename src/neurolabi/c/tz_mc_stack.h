@@ -12,7 +12,7 @@
 
 __BEGIN_DECLS
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 typedef struct __Mc_Stack {
 #else
 typedef struct _Mc_Stack {

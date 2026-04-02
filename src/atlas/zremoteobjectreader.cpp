@@ -86,7 +86,12 @@ getRemoteObjectBytesAsync(const ZRemoteObjectStore& objectStore,
                           ZImgReadStatsContext statsContext)
 {
   auto resOpt = co_await getRemoteObjectResponseAsync(objectStore,
-                                                      ZHttpGetRequest{.url = url, .timeout = timeout},
+                                                      ZHttpGetRequest{
+                                                        .url = url,
+                                                        .timeout = timeout,
+                                                        .headers = {},
+                                                        .exactByteRange = std::nullopt,
+                                                      },
                                                       statsSink,
                                                       statsContext);
   if (!resOpt) {
@@ -129,6 +134,7 @@ getRemoteObjectRangeBytesAsync(const ZRemoteObjectStore& objectStore,
   const ZHttpGetRequest request{
     .url = url,
     .timeout = timeout,
+    .headers = {},
     .exactByteRange = ZHttpByteRange{.offset = offset, .length = length},
   };
 

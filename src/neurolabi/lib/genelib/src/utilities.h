@@ -67,6 +67,11 @@
 
 #include <stdio.h>
 
+#if defined(_MSC_VER) && defined(__clang__) && !defined(__cplusplus)
+/* clang-cl in C mode still defines _MSC_VER, but it supports GNU typeof. */
+#define decltype(expr) __typeof__(expr)
+#endif
+
 #define ASCII 128
 
 /* The usual protected allocation and file opening routines.   */
