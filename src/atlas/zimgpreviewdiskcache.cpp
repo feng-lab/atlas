@@ -36,8 +36,6 @@ constexpr char kImgPreviewDiskCacheDbName[] = "imgpreview.sqlite";
 constexpr uint32_t kImgPreviewDiskCacheEntryVersion = 1;
 constexpr std::array<char, 8> kImgPreviewDiskCacheMagic = {'A', 'T', 'L', 'S', 'P', 'V', 'C', '1'};
 
-constexpr std::chrono::seconds kTouchMinInterval{5};
-
 constexpr std::array<char, 8> kImgPreviewKeyTag = {'I', 'M', 'G', 'P', 'R', 'E', 'V', '1'};
 
 struct ImgPreviewKeyBytes
@@ -192,9 +190,9 @@ std::shared_ptr<ZImg> ZImgPreviewDiskCache::tryGetFilePreview(const std::array<s
 
   const int64_t nowNs = nowSystemClockNs();
   m_impl->bucket->tryEnqueueTouchIfStale(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
-                                        getOpt->lastAccessNs,
-                                        nowNs,
-                                        kTouchMinInterval);
+                                         getOpt->lastAccessNs,
+                                         nowNs,
+                                         atlasDiskCacheTouchMinInterval());
 
   return parsed;
 }

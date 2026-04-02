@@ -1,5 +1,6 @@
 #include "zhttpdiskcache.h"
 
+#include "zdiskcacheutils.h"
 #include "zfolly.h"
 #include "zlog.h"
 #include "zsqlitediskcachebucket.h"
@@ -282,7 +283,7 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(const ZHttpGetRequest&
   m_bucket->tryEnqueueTouchIfStale(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
                                    getOpt->lastAccessNs,
                                    nowNs(),
-                                   std::chrono::seconds(5));
+                                   atlasDiskCacheTouchMinInterval());
 
   return resOpt;
 }

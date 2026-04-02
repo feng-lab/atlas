@@ -222,7 +222,7 @@ public:
     m_bucket->tryEnqueueTouchIfStale(std::span<const std::uint8_t>(keyHash.data(), keyHash.size()),
                                      getOpt->lastAccessNs,
                                      nowNs,
-                                     std::chrono::seconds(5));
+                                     atlasDiskCacheTouchMinInterval());
 
     DiskLookupResult out;
     out.value = std::move(parsed);

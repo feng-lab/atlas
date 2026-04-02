@@ -347,7 +347,7 @@ Steps to load and manage images:
    10. If HTTPS requests fail with certificate/CA errors, run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem`. On Windows, Atlas uses `--atlas_http_windows_trust_source=auto|windows_store|bundled_pem` to choose between exported Windows trust and a PEM bundle such as the packaged `curl-ca-bundle.crt`. On macOS, the curl backend prefers the native/default trust path by default.
    11. System-proxy support is backend-specific. `--atlas_http_backend=proxygen` supports only plain HTTP proxies without credentials. `--atlas_http_backend=curl` additionally supports SOCKS5 proxies and proxy credentials returned by the OS proxy settings. If Atlas reports an unsupported system proxy, switch backends before assuming the dataset itself is the problem. Use `--atlas_http_proxy_strategy=no_proxy` only if direct access is actually allowed in your environment.
    12. Optional: enable the persistent HTTP disk cache to speed up repeated Neuroglancer sessions (and reduce duplicated downloads):
-       - `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable; tune e.g. 10–50 GiB depending on disk space)
+       - `--atlas_disk_cache_http_max_bytes=<N>` (default 20 GiB; set to 0 to disable; tune e.g. 10–50 GiB depending on disk space)
        - `--atlas_disk_cache_http_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued background cache writes; when full, writes are dropped on a best-effort basis)
        - `--atlas_disk_cache_dir=<path>` (optional override; default is auto-chosen Atlas cache/config directory)
        - The cache is stored in a single database file at `<dir>/atlas_disk_cache_v1/http.sqlite`.
@@ -364,6 +364,12 @@ Steps to load and manage images:
        - `--atlas_disk_cache_dir=<path>` (shared root with the other disk caches; defaults to an auto-chosen Atlas cache/config directory)
        - The cache is stored in a single database file at `<dir>/atlas_disk_cache_v1/imgpreview.sqlite`.
        - This cache is file-backed only (not Neuroglancer) and is best-effort.
+   15. Advanced SQLite tuning for the persistent disk caches:
+       - `--atlas_disk_cache_sqlite_reader_cache_bytes=<N>` and `--atlas_disk_cache_sqlite_writer_cache_bytes=<N>` tune SQLite's in-process pager cache per read-only or writer connection.
+       - `--atlas_disk_cache_sqlite_mmap_bytes=<N>` tunes SQLite memory-mapped I/O (`0` disables mmap).
+       - `--atlas_disk_cache_sqlite_touch_min_interval_seconds=<N>` reduces how often read hits update the persistent LRU timestamp; larger values reduce background write churn for read-heavy workloads.
+       - `--atlas_disk_cache_sqlite_journal_size_limit_bytes=<N>` caps the SQLite WAL size left behind after checkpoints (`-1` leaves SQLite's default behavior).
+       - `--atlas_disk_cache_sqlite_page_size=<N>` changes SQLite page size for newly created cache DBs only. Delete the existing `http.sqlite`, `imgregion.sqlite`, and/or `imgpreview.sqlite` files if you want a new page size to take effect.
 3. **Load Neuroglancer (State JSON)**
    1. Choose **File → Load Neuroglancer (State JSON)...**.
    2. Paste one of:

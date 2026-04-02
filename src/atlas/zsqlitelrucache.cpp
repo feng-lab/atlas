@@ -1,6 +1,9 @@
 #include "zsqlitelrucache.h"
 
+#include "zdiskcacheutils.h"
 #include "zlog.h"
+
+#include <gflags/gflags.h>
 
 #include <QDir>
 #include <QFile>
@@ -15,6 +18,12 @@
 #include <string_view>
 #include <vector>
 
+DECLARE_uint64(atlas_disk_cache_sqlite_reader_cache_bytes);
+DECLARE_uint64(atlas_disk_cache_sqlite_writer_cache_bytes);
+DECLARE_uint64(atlas_disk_cache_sqlite_mmap_bytes);
+DECLARE_int64(atlas_disk_cache_sqlite_journal_size_limit_bytes);
+DECLARE_uint64(atlas_disk_cache_sqlite_page_size);
+
 namespace nim {
 
 namespace {
@@ -23,9 +32,11 @@ constexpr int kCacheSchemaVersion = 1;
 constexpr std::chrono::seconds kPruneMinInterval{30};
 constexpr double kPruneTargetFraction = 0.9;
 constexpr int kDisableAfterConsecutiveFailures = 8;
-constexpr std::chrono::seconds kTouchMinInterval{5};
 
 constexpr std::string_view kMetaKeyTotalBytes = "total_bytes";
+
+constexpr uint64_t kSqlitePageSizeMinBytes = 512;
+constexpr uint64_t kSqlitePageSizeMaxBytes = 65536;
 
 [[nodiscard]] int64_t defaultNowNs()
 {
@@ -46,6 +57,54 @@ void resetStmt(sqlite3_stmt* stmt)
   }
   (void)sqlite3_reset(stmt);
   (void)sqlite3_clear_bindings(stmt);
+}
+
+[[nodiscard]] std::optional<int64_t> sqliteCacheSizeKiBFromBytes(uint64_t bytes)
+{
+  if (bytes == 0) {
+    return std::nullopt;
+  }
+
+  constexpr uint64_t kKiB = 1024;
+  const uint64_t kib = std::max<uint64_t>(1, (bytes + kKiB - 1) / kKiB);
+  return static_cast<int64_t>(std::min<uint64_t>(kib, static_cast<uint64_t>(std::numeric_limits<int>::max())));
+}
+
+[[nodiscard]] std::optional<int64_t> sqliteMmapBytes()
+{
+  const uint64_t mmapBytes = FLAGS_atlas_disk_cache_sqlite_mmap_bytes;
+  if (mmapBytes > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+    LOG(WARNING) << "Ignoring atlas_disk_cache_sqlite_mmap_bytes=" << mmapBytes
+                 << " because it exceeds SQLite's signed 64-bit PRAGMA range";
+    return std::nullopt;
+  }
+  return static_cast<int64_t>(mmapBytes);
+}
+
+[[nodiscard]] std::optional<int64_t> sqliteJournalSizeLimitBytes()
+{
+  const int64_t limitBytes = FLAGS_atlas_disk_cache_sqlite_journal_size_limit_bytes;
+  if (limitBytes < -1) {
+    LOG(WARNING) << "Ignoring atlas_disk_cache_sqlite_journal_size_limit_bytes=" << limitBytes
+                 << " because valid values are -1 or >= 0";
+    return std::nullopt;
+  }
+  return limitBytes;
+}
+
+[[nodiscard]] std::optional<int64_t> sqliteFreshDbPageSizeBytes()
+{
+  const uint64_t pageSizeBytes = FLAGS_atlas_disk_cache_sqlite_page_size;
+  if (pageSizeBytes == 0) {
+    return std::nullopt;
+  }
+  if (pageSizeBytes < kSqlitePageSizeMinBytes || pageSizeBytes > kSqlitePageSizeMaxBytes ||
+      (pageSizeBytes & (pageSizeBytes - 1)) != 0) {
+    LOG(WARNING) << "Ignoring atlas_disk_cache_sqlite_page_size=" << pageSizeBytes
+                 << " because SQLite page_size must be a power of two in [512, 65536]";
+    return std::nullopt;
+  }
+  return static_cast<int64_t>(pageSizeBytes);
 }
 
 } // namespace
@@ -195,7 +254,7 @@ std::optional<ZSqliteLRUCache::Blob> ZSqliteLRUCache::tryGet(std::span<const std
   // Touch access time (best-effort).
   const int64_t nowNs = nowNsLocked();
   const int64_t touchMinIntervalNs =
-    std::chrono::duration_cast<std::chrono::nanoseconds>(kTouchMinInterval).count();
+    std::chrono::duration_cast<std::chrono::nanoseconds>(atlasDiskCacheTouchMinInterval()).count();
   const int64_t last = std::max<int64_t>(0, lastAccessNs);
   if (nowNs >= last && (nowNs - last) >= touchMinIntervalNs) {
     resetStmt(m_stmtTouch);
@@ -431,6 +490,7 @@ bool ZSqliteLRUCache::initDbLocked()
 
   const QFileInfo fi(m_dbPath);
   const QString dirPath = fi.dir().absolutePath();
+  const bool shouldApplyFreshDbPageSize = !m_readOnly && (!fi.exists() || fi.size() == 0);
   if (m_readOnly) {
     // Read-only connections must not create directories. This avoids accidental
     // directory creation when a user points the cache at a removable volume
@@ -460,7 +520,16 @@ bool ZSqliteLRUCache::initDbLocked()
   sqlite3_busy_timeout(m_db, /*ms=*/250);
 
   if (m_readOnly) {
-    // Read connections should not modify PRAGMAs or attempt schema creation.
+    // Read connections must not attempt schema creation, but can still apply
+    // connection-local read tuning.
+    if (const auto cacheKiB = sqliteCacheSizeKiBFromBytes(FLAGS_atlas_disk_cache_sqlite_reader_cache_bytes);
+        cacheKiB.has_value()) {
+      (void)execLocked(fmt::format("PRAGMA cache_size=-{}", *cacheKiB).c_str());
+    }
+    if (const auto mmapBytes = sqliteMmapBytes(); mmapBytes.has_value()) {
+      (void)execLocked(fmt::format("PRAGMA mmap_size={}", *mmapBytes).c_str());
+    }
+
     if (!prepareLocked("SELECT value,last_access_ns FROM entries WHERE key_hash=?1", &m_stmtSelectValue)) {
       LOG(WARNING) << "SQLite cache disabled: failed to prepare read-only statements for " << m_dbPath;
       closeDbLocked();
@@ -472,10 +541,27 @@ bool ZSqliteLRUCache::initDbLocked()
     return true;
   }
 
-  // Cache-friendly defaults. WAL keeps writes sequential and avoids blocking readers.
+  // Cache-friendly defaults. Apply page_size before any schema objects or WAL.
+  if (shouldApplyFreshDbPageSize) {
+    if (const auto pageSizeBytes = sqliteFreshDbPageSizeBytes(); pageSizeBytes.has_value()) {
+      (void)execLocked(fmt::format("PRAGMA page_size={}", *pageSizeBytes).c_str());
+    }
+  }
+
+  // WAL keeps writes sequential and avoids blocking readers.
   (void)execLocked("PRAGMA journal_mode=WAL");
   (void)execLocked("PRAGMA synchronous=NORMAL");
   (void)execLocked("PRAGMA temp_store=MEMORY");
+  if (const auto cacheKiB = sqliteCacheSizeKiBFromBytes(FLAGS_atlas_disk_cache_sqlite_writer_cache_bytes);
+      cacheKiB.has_value()) {
+    (void)execLocked(fmt::format("PRAGMA cache_size=-{}", *cacheKiB).c_str());
+  }
+  if (const auto mmapBytes = sqliteMmapBytes(); mmapBytes.has_value()) {
+    (void)execLocked(fmt::format("PRAGMA mmap_size={}", *mmapBytes).c_str());
+  }
+  if (const auto journalSizeLimitBytes = sqliteJournalSizeLimitBytes(); journalSizeLimitBytes.has_value()) {
+    (void)execLocked(fmt::format("PRAGMA journal_size_limit={}", *journalSizeLimitBytes).c_str());
+  }
 
   if (!ensureSchemaLocked()) {
     closeDbLocked();

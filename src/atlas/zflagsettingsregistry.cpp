@@ -59,6 +59,42 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
                                 ZFlagSettingEditorKind::Auto,
                                 {},
                                 true));
+    allSpecs.push_back(makeSpec("atlas_disk_cache_sqlite_reader_cache_bytes",
+                                "Memory & Cache",
+                                "Disk-cache SQLite reader cache bytes",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
+    allSpecs.push_back(makeSpec("atlas_disk_cache_sqlite_writer_cache_bytes",
+                                "Memory & Cache",
+                                "Disk-cache SQLite writer cache bytes",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
+    allSpecs.push_back(makeSpec("atlas_disk_cache_sqlite_mmap_bytes",
+                                "Memory & Cache",
+                                "Disk-cache SQLite mmap bytes",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
+    allSpecs.push_back(makeSpec("atlas_disk_cache_sqlite_journal_size_limit_bytes",
+                                "Memory & Cache",
+                                "Disk-cache SQLite journal size limit",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
+    allSpecs.push_back(makeSpec("atlas_disk_cache_sqlite_touch_min_interval_seconds",
+                                "Memory & Cache",
+                                "Disk-cache touch-on-read interval (s)",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
+    allSpecs.push_back(makeSpec("atlas_disk_cache_sqlite_page_size",
+                                "Memory & Cache",
+                                "Disk-cache SQLite page size",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
     allSpecs.push_back(makeSpec("atlas_3d_preview_max_dimension", "Memory & Cache", "3D preview max dimension"));
     allSpecs.push_back(makeSpec("atlas_disk_cache_dir",
                                 "Memory & Cache",

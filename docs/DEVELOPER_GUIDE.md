@@ -153,9 +153,15 @@ Neuroglancer Precomputed (HTTP)
       - Retry policy is shared in `src/atlas/zhttpretrypolicy.*`: transport exceptions use shared unstable-network heuristics, `403/404` remain soft misses, and transient response statuses (`408`, `421`, `425`, `429`, `500`, `502`, `503`, `504`) re-enter the retry/backoff loop instead of being cached as completed responses.
       - Build/dependency model: Windows uses the curl SDK unpacked under `src/3rdparty/build`; macOS uses `find_package(CURL)` against the system libcurl; Linux intentionally resolves the shared system libcurl via CMake's `FindCURL` module because the top-level Atlas build otherwise prefers static archives first.
   - Optional persistent HTTP disk cache (SQLite-backed, cross-OS) is implemented in `src/atlas/zhttpdiskcache.h`, `src/atlas/zhttpdiskcache.cpp`, and `src/atlas/zsqlitelrucache.h` / `src/atlas/zsqlitelrucache.cpp` and is integrated into both HTTP backends before/after network fetches (cache lookup before network; store only after non-missing, non-retryable completed responses).
-    - Enable with `--atlas_disk_cache_http_max_bytes=<N>` (default 10 GiB; set to 0 to disable).
+    - Enable with `--atlas_disk_cache_http_max_bytes=<N>` (default 20 GiB; set to 0 to disable).
     - Async write queue: `--atlas_disk_cache_http_async_max_pending_bytes=<N>` bounds queued SQLite writes (touch/put/erase). Values smaller than 256 MiB are clamped to 256 MiB. When the queue is full, disk writes are dropped (best-effort cache semantics).
     - Read path: synchronous point lookups using per-thread read-only SQLite connections (so concurrent readers do not block each other); LRU touches happen asynchronously.
+    - Shared SQLite tuning flags for all Atlas disk-cache buckets:
+      - `--atlas_disk_cache_sqlite_reader_cache_bytes=<N>` and `--atlas_disk_cache_sqlite_writer_cache_bytes=<N>` tune SQLite's per-connection pager-cache budgets.
+      - `--atlas_disk_cache_sqlite_mmap_bytes=<N>` tunes the SQLite memory-mapped I/O window (`0` disables mmap).
+      - `--atlas_disk_cache_sqlite_touch_min_interval_seconds=<N>` coarsens persistent touch-on-read LRU updates to reduce background write churn from read-heavy workloads.
+      - `--atlas_disk_cache_sqlite_journal_size_limit_bytes=<N>` sets SQLite's WAL journal size limit (`-1` leaves SQLite's default).
+      - `--atlas_disk_cache_sqlite_page_size=<N>` applies a larger SQLite page size to newly created cache DBs only; delete/recreate existing cache DBs to adopt a new page size.
     - Optional location override: `--atlas_disk_cache_dir=<path>` (otherwise uses the Atlas cache/config directories).
     - The cache is keyed by `(URL + Range)` and stores the already-decoded bytes returned to callers (after HTTP-level `Content-Encoding` handling).
     - Multi-process RW: multiple Atlas processes may concurrently read/write the same cache DB. SQLite contention yields best-effort behavior (writes may be dropped; reads degrade to cache misses).

@@ -2,6 +2,7 @@
 
 #include <QString>
 
+#include <chrono>
 #include <cstdint>
 
 namespace nim {
@@ -24,5 +25,9 @@ inline constexpr uint64_t kAtlasDiskCacheAsyncMinPendingBytes = 256ULL * 1024ULL
 
 // Convenience wrapper: atlasDiskCacheDirFromRoot(atlasDiskCacheRootDirFromFlags()).
 [[nodiscard]] QString atlasDiskCacheDirFromFlags();
+
+// Minimum wall-clock interval between persistent LRU access-time touches for a
+// single key. The interval is shared by all SQLite-backed Atlas disk caches.
+[[nodiscard]] std::chrono::seconds atlasDiskCacheTouchMinInterval();
 
 } // namespace nim
