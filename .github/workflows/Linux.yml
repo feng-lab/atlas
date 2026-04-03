@@ -27,7 +27,7 @@ env:
   # Pin a Vulkan SDK version
   VULKAN_SDK_VERSION: 1.4.328.1
   # Choose LLVM/Clang major version; mirrored in build scripts via ATLAS_CLANG_MAJOR
-  CLANG_MAJOR: "20"
+  CLANG_MAJOR: "22"
   # Centralize Qt version to make upgrades easy
   QT_VERSION: "6.9.2"
 
