@@ -46,7 +46,7 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
 
 ### Windows:
 * install visual studio 2022, intel oneapi basekit, git
-* for Atlas' clang-cl Windows path, install the official LLVM for Windows at `C:\Program Files\LLVM` (for example the official `LLVM-<version>-win64.exe` release installer from `llvm/llvm-project`)
+* for Atlas' clang-cl Windows path, install the official LLVM for Windows in one of Atlas' hardcoded probe locations: `C:\Program Files\LLVM`, `D:\llvm`, or `C:\llvm` (checked in that order by the build scripts)
 * install qt6 (by aqt or installer from the qt website)
     ```powershell
     # Activate your Python environment (conda/venv/uv/etc.)

@@ -55,12 +55,19 @@ def windows_msbuild_platform_toolset() -> str:
     return "ClangCL" if use_clang_cl() else windows_native_platform_toolset()
 
 
+def llvm_install_dir_candidates() -> list[str]:
+    assert is_windows()
+    return [r"C:\Program Files\LLVM", r"D:\llvm", r"C:\llvm"]
+
+
 def llvm_install_dir() -> str:
     assert is_windows()
-    res = os.path.join("C:", os.sep, "Program Files", "LLVM")
-    assert os.path.exists(res), res
-    assert os.path.exists(os.path.join(res, "bin", "clang-cl.exe")), res
-    return res
+    for candidate in llvm_install_dir_candidates():
+        if os.path.exists(os.path.join(candidate, "bin", "clang-cl.exe")):
+            return candidate
+    raise AssertionError(
+        "LLVM not found; tried: " + ", ".join(llvm_install_dir_candidates())
+    )
 
 
 def llvm_bin_dir() -> str:
