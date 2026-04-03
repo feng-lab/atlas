@@ -95,28 +95,11 @@ jobs:
           perl -v
           where perl
 
-      - name: Restore LLVM cache
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        id: cache-llvm-buildenv1
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            llvm
-          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
-
       - name: Install LLVM (release tarball)
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true' && steps.cache-llvm-buildenv1.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           & .\util\install_llvm_windows.ps1
-
-      - name: Save LLVM cache
-        if: ${{ !cancelled() && steps.cache-extlibs-p1.outputs.cache-hit != 'true' && steps.cache-llvm-buildenv1.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            llvm
-          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
 
       - name: Restore Intel oneAPI cache
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
@@ -319,27 +302,10 @@ jobs:
           perl -v
           where perl
 
-      - name: Restore LLVM cache
-        id: cache-llvm-buildenv2
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            llvm
-          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
-
       - name: Install LLVM (release tarball)
-        if: steps.cache-llvm-buildenv2.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           & .\util\install_llvm_windows.ps1
-
-      - name: Save LLVM cache
-        if: ${{ !cancelled() && steps.cache-llvm-buildenv2.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            llvm
-          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
 
       - name: Restore Intel oneAPI cache
         id: cache-oneapi-restore-buildenv2
@@ -460,27 +426,10 @@ jobs:
           perl -v
           where perl
 
-      - name: Restore LLVM cache
-        id: cache-llvm-build
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            llvm
-          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
-
       - name: Install LLVM (release tarball)
-        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           & .\util\install_llvm_windows.ps1
-
-      - name: Save LLVM cache
-        if: ${{ !cancelled() && steps.cache-llvm-build.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            llvm
-          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
 
       - name: Restore Intel oneAPI cache
         id: cache-oneapi-restore-build

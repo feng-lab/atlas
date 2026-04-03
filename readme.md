@@ -40,8 +40,6 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
     # list modules
     aqt list-tool mac desktop
     ```
-* install intel oneapi basekit
-* fix intel oneapi basekit ipp cmake error: add 'set(IPP_ARCH)' to file `oneapi/ipp/latest/lib/cmake/ipp/ipp-config.cmake`
 * install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3): https://vulkan.lunarg.com/home/welcome
 
 ### Windows:

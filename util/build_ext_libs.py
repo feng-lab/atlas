@@ -840,9 +840,8 @@ def patch_file(
         f"{orig_file}: from_texts/to_texts length mismatch"
     )
 
-    # Preserve historical behavior: text-mode read with errors ignored, then
-    # write patched output as UTF-8.
-    txt = Path(orig_file).read_text(errors="ignore")
+    txt = Path(orig_file).read_text(encoding="utf-8", errors="ignore")
+    original_txt = txt
 
     for idx, (from_text, to_text) in enumerate(zip(from_texts, to_texts), start=1):
         if not from_text:
@@ -869,16 +868,13 @@ def patch_file(
     os.replace(tmp_file, orig_file)
 
     # Log a unified diff (same behavior as the historical patcher).
-    with open(bak_file, mode="r", encoding="utf-8", errors="ignore") as f:
-        from_lines = f.readlines()
-    with open(orig_file, mode="r", encoding="utf-8") as f:
-        to_lines = f.readlines()
     logger.info(
         "".join(
-            list(
-                difflib.unified_diff(
-                    from_lines, to_lines, fromfile=orig_file, tofile="<new>"
-                )
+            difflib.unified_diff(
+                original_txt.splitlines(keepends=True),
+                txt.splitlines(keepends=True),
+                fromfile=orig_file,
+                tofile="<new>",
             )
         )
     )
@@ -3182,7 +3178,7 @@ ERR CloseWS_File(struct WMPStream** ppWS)"""
             if use_windows_clang_cl():
                 vcxproj_patchers = []
                 for vcxproj in Path(src_dir).rglob("*_vc14.vcxproj"):
-                    txt = vcxproj.read_text(errors="ignore")
+                    txt = vcxproj.read_text(encoding="utf-8", errors="ignore")
                     from_texts = []
                     to_texts = []
                     if (
