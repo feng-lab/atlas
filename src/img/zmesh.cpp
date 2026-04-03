@@ -93,9 +93,9 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh& mesh)
   vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
   points->SetDataType(VTK_FLOAT);
   const std::vector<glm::vec3>& vertices = mesh.vertices();
-  points->Allocate(vertices.size());
+  points->SetNumberOfPoints(vertices.size());
   for (size_t i = 0; i < vertices.size(); ++i) {
-    points->InsertPoint(i, vertices[i].x, vertices[i].y, vertices[i].z);
+    points->SetPoint(i, vertices[i].x, vertices[i].y, vertices[i].z);
   }
 
   vtkSmartPointer<vtkFloatArray> nrmls = vtkSmartPointer<vtkFloatArray>::New();
@@ -103,10 +103,10 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh& mesh)
   if (!normals.empty()) {
     CHECK(normals.size() == vertices.size()) << normals.size() << " " << vertices.size();
     nrmls->SetNumberOfComponents(3);
-    nrmls->Allocate(3 * normals.size());
+    nrmls->SetNumberOfTuples(normals.size());
     nrmls->SetName("Normals");
     for (size_t i = 0; i < normals.size(); ++i) {
-      nrmls->InsertTuple(i, &normals[i][0]);
+      nrmls->SetTuple(i, &normals[i][0]);
     }
   }
 

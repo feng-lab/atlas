@@ -606,7 +606,9 @@ def get_cmake_cmd_common_part(
         if enable_cxx:
             res.extend(
                 [
-                    "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
+                    ""
+                    if no_hidden_visibility
+                    else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
                     f"-DCMAKE_CXX_STANDARD={cpp_standard}",
                     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
                     "-DCMAKE_CXX_EXTENSIONS=OFF",
@@ -655,7 +657,9 @@ def get_cmake_cmd_common_part(
         if enable_cxx:
             res.extend(
                 [
-                    "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
+                    ""
+                    if no_hidden_visibility
+                    else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
                     f"-DCMAKE_CXX_STANDARD={cpp_standard}",
                     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
                     "-DCMAKE_CXX_EXTENSIONS=" + ("ON" if cpp_extention else "OFF"),
@@ -698,7 +702,9 @@ def get_cmake_cmd_common_part(
         if enable_cxx:
             res.extend(
                 [
-                    "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
+                    ""
+                    if no_hidden_visibility
+                    else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
                     f"-DCMAKE_CXX_STANDARD={cpp_standard}",
                     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
                     "-DCMAKE_CXX_EXTENSIONS=OFF",
@@ -1911,21 +1917,23 @@ def build_libsodium(src_dir: str, install_dir: str):
     try:
         if is_windows():
             env = get_vcvars_environment()
+            msvc_solution_dir = os.path.join(src_dir, "builds", "msvc", "vs2022")
+            if not os.path.exists(os.path.join(msvc_solution_dir, "libsodium.sln")):
+                raise FileNotFoundError(
+                    f"Expected shipped libsodium VS2022 solution under {msvc_solution_dir}"
+                )
             # Pre-generated VS solutions require a VS-installed platform toolset.
             msbuild_toolset = windows_native_platform_toolset()
-            subprocess.run(
-                ["devenv", "libsodium.sln", "/Upgrade"],
-                cwd=os.path.join(src_dir, "builds", "msvc", "vs2019"),
-                shell=True,
-                check=True,
-                env=env,
-            )
+            # Keep the MSBuild-based libsodium build on /MD to match Atlas'
+            # CMake/Ninja Windows CRT policy.
+            runtime_md_props = ext_dir() + "\\runtime_md.props"
             msbuild_cmd = [
                 "MSBuild",
                 "libsodium.sln",
                 "/target:libsodium",
                 "/property:Platform=x64",
                 "/property:Configuration=StaticRelease",
+                "/property:ForceImportBeforeCppTargets=" + runtime_md_props,
                 "/property:PlatformToolset=" + msbuild_toolset,
                 "/maxcpucount",
             ]
@@ -1938,7 +1946,7 @@ def build_libsodium(src_dir: str, install_dir: str):
                 )
             subprocess.run(
                 msbuild_cmd,
-                cwd=os.path.join(src_dir, "builds", "msvc", "vs2019"),
+                cwd=msvc_solution_dir,
                 shell=True,
                 check=True,
                 env=env,
@@ -3547,6 +3555,9 @@ def build_freeimage(src_dir: str, install_dir: str):
         if is_windows():
             env = get_vcvars_environment()
             msbuild_toolset = windows_native_platform_toolset()
+            # FreeImage still builds from vendored MSBuild projects, so force the
+            # DLL CRT explicitly instead of inheriting their /MT defaults.
+            runtime_md_props = ext_dir() + "\\runtime_md.props"
             msbuild_cmd = [
                 "MSBuild",
                 "FreeImage.2017.sln",
@@ -3555,6 +3566,7 @@ def build_freeimage(src_dir: str, install_dir: str):
                 "/property:Configuration=Release",
                 "/maxcpucount",
                 "/property:PlatformToolset=" + msbuild_toolset,
+                "/property:ForceImportBeforeCppTargets=" + runtime_md_props,
                 "/property:WindowsTargetPlatformVersion="
                 + env["UCRTVERSION"],  # like 10.0.16299.0
             ]
@@ -3986,15 +3998,19 @@ void vtkBoundingBox::ComputeBounds(
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
+        vtk_smp_backend = "STDThread"
+
+        # Keep these cache args aligned with the current vendored VTK tree.
+        # VTK_DATA_EXCLUDE_FROM_ALL only matters when VTK_BUILD_TESTING is ON,
+        # VTK_LEGACY_REMOVE is now inert, and the old doubleconversion toggle
+        # no longer exists in this VTK checkout.
         cmakecmd.extend(
             [
                 "-DVTK_BUILD_EXAMPLES:BOOL=OFF",
                 "-DBUILD_TESTING:BOOL=OFF",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DVTK_BUILD_TESTING:STRING=OFF",
-                "-DVTK_DATA_EXCLUDE_FROM_ALL:BOOL=OFF",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
-                "-DVTK_MODULE_USE_EXTERNAL_VTK_doubleconversion:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL="
                 + ("OFF" if (is_windows() and not use_clang_cl()) else "ON"),
@@ -4003,14 +4019,22 @@ void vtkBoundingBox::ComputeBounds(
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_png:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON",
-                "-DVTK_LEGACY_REMOVE:BOOL=ON",
                 "-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO",
                 "-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO",
-                "-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=STDThread",
-                "-DTBB_DIR:PATH=" + tbb_dir(),
+                "-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=" + vtk_smp_backend,
                 "-DVTK_WRAP_PYTHON:BOOL=OFF",
             ]
         )
+        if vtk_smp_backend == "TBB":
+            cmakecmd.append("-DTBB_DIR:PATH=" + tbb_dir())
+        if is_mac():
+            # VTK's PCH path is special on macOS universal builds: clang cannot
+            # emit one fat precompiled header for both x86_64 and arm64, so CMake
+            # splits the PCH build into per-arch compilations. That exposes Atlas'
+            # universal tuning flags (-mavx and -mcpu=apple-m1) as invalid on the
+            # individual x86_64/arm64 PCH invocations even though normal fat-object
+            # compilation works for our other universal third-party libraries.
+            cmakecmd.append("-DVTK_USE_PCH:BOOL=OFF")
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=get_tbb_env())
@@ -4440,9 +4464,13 @@ if (NOT TARGET fizz::fizz)""",
             to_texts=[
                 r"""set(FIZZ_HAVE_SODIUM "@FIZZ_HAVE_SODIUM@")
 
-if (WIN32 AND FIZZ_HAVE_SODIUM AND NOT TARGET sodium)
+if (FIZZ_HAVE_SODIUM AND NOT TARGET sodium)
   set(_ATLAS_SODIUM_INCLUDE "${PACKAGE_PREFIX_DIR}/include")
-  set(_ATLAS_SODIUM_LIBRARY "${PACKAGE_PREFIX_DIR}/lib/libsodium.lib")
+  if (WIN32)
+    set(_ATLAS_SODIUM_LIBRARY "${PACKAGE_PREFIX_DIR}/lib/libsodium.lib")
+  else()
+    set(_ATLAS_SODIUM_LIBRARY "${PACKAGE_PREFIX_DIR}/lib/libsodium.a")
+  endif()
   if (EXISTS "${_ATLAS_SODIUM_INCLUDE}/sodium.h" AND EXISTS "${_ATLAS_SODIUM_LIBRARY}")
     add_library(sodium STATIC IMPORTED)
     set_target_properties(sodium PROPERTIES
@@ -4461,9 +4489,8 @@ if (WIN32 AND FIZZ_HAVE_SODIUM AND NOT TARGET sodium)
 endif()
 
 if (NOT TARGET fizz::fizz)""",
-                "",
+                r"",
             ],
-            patch_condition=use_windows_clang_cl,
         ),
         # Lifetime safety:
         # If AsyncFizzClientT is destroyed while an underlying AsyncSocket connect
