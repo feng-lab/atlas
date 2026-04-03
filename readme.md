@@ -46,7 +46,7 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
 
 ### Windows:
 * install visual studio 2022, intel oneapi basekit, git
-* for Atlas' clang-cl Windows path, install the official LLVM for Windows in one of Atlas' hardcoded probe locations: `C:\Program Files\LLVM`, `D:\llvm`, or `C:\llvm` (checked in that order by the build scripts)
+* for Atlas' clang-cl Windows path, install the official LLVM for Windows into the repository-local `llvm/` folder. Atlas probes `<repo>/llvm` first and also supports `C:\Program Files\LLVM`.
 * install qt6 (by aqt or installer from the qt website)
     ```powershell
     # Activate your Python environment (conda/venv/uv/etc.)
@@ -58,7 +58,6 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/
     aqt install-qt --outputdir c:/Qt windows desktop 6.9.2 win64_msvc2022_64
-    aqt install-qt --outputdir c:/Qt windows desktop 6.9.2 win64_mingw
     # install tools: refer to https://download.qt.io/online/qtsdkrepository/windows_x86/ifw/
     aqt install-tool --outputdir c:/Qt windows desktop tools_ifw qt.tools.ifw.47
     # list modules
@@ -70,10 +69,23 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
 ### Linux:
 * install some required packages
     ```bash
-    sudo apt install zip unrar p7zip-full git nasm golang patchelf libxcursor-dev build-essential libglfw3-dev \
+    sudo apt-get update
+    sudo apt-get install \
+         curl wget ca-certificates gnupg lsb-release software-properties-common \
+         zsh build-essential git zip unzip rsync p7zip-full \
+         nasm gperf patchelf libgl1-mesa-dev libxrender-dev libxcursor-dev libglfw3-dev \
+         libfreetype6-dev libfontconfig1-dev \
          libcurl4-openssl-dev \
          libxcb-xinerama0 libxkbcommon0 libfontconfig1 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 \
-         libxcb-render-util0 libxcb-shape0 libxcb-xkb1 libxkbcommon-x11-0
+         libxcb-render-util0 libxcb-shape0 libxcb-xkb1 libxkbcommon-x11-0 \
+         unrar golang-go
+    ```
+* install LLVM/clang (Atlas currently builds with clang on Linux; GitHub Actions uses clang 22)
+    ```bash
+    curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
+    chmod +x /tmp/llvm.sh
+    sudo /tmp/llvm.sh 22
+    sudo apt-get install clang-22 lld-22 clang-tools-22
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
@@ -92,7 +104,16 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
     aqt list-tool linux desktop
     ```
 * install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3): https://vulkan.lunarg.com/home/welcome
-* install intel oneapi basekit with apt
+* install Intel oneAPI MKL/TBB packages with apt
+    ```bash
+    sudo mkdir -p /usr/share/keyrings
+    wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
+      | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+    echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | \
+      sudo tee /etc/apt/sources.list.d/oneAPI.list
+    sudo apt-get update
+    sudo apt-get install intel-oneapi-mkl-devel intel-oneapi-tbb-devel
+    ```
 
 ### All:
 * clone atlas repo

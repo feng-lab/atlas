@@ -57,7 +57,7 @@ def windows_msbuild_platform_toolset() -> str:
 
 def llvm_install_dir_candidates() -> list[str]:
     assert is_windows()
-    return [r"C:\Program Files\LLVM", r"D:\llvm", r"C:\llvm"]
+    return [os.path.join(atlas_repository_dir(), "llvm"), r"C:\Program Files\LLVM"]
 
 
 def llvm_install_dir() -> str:
@@ -459,15 +459,39 @@ def vc_OpenMP_redist_dir() -> str:
 
 
 def intel_sw_dir() -> str:
-    if sys.platform.startswith("win32"):
-        # res = os.path.join('C:', os.sep, 'Program Files (x86)', 'IntelSWTools', 'compilers_and_libraries', 'windows')
-        res = os.path.join("C:", os.sep, "Program Files (x86)", "Intel", "oneAPI")
+    if is_windows():
+        candidates = [
+            os.path.join("C:", os.sep, "Program Files (x86)", "Intel", "oneAPI")
+        ]
     else:
-        res = os.path.join(os.sep, "opt", "intel", "oneapi")
-    if not os.path.exists(res):
-        res = os.path.join(os.path.expanduser("~"), "oneapi")
-    assert os.path.exists(res)
-    return res
+        candidates = [
+            os.path.join(os.sep, "opt", "intel", "oneapi"),
+            os.path.join(os.path.expanduser("~"), "oneapi"),
+        ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
+    if is_mac():
+        bundled_dir = os.path.join(ext_build_dir(), "oneapi")
+        if os.path.exists(bundled_dir):
+            return bundled_dir
+        try:
+            return unpack_tool_to_target_dir(
+                src_package_dir(),
+                "oneapi-mkl-*-macos-x64.tar.xz",
+                "oneapi",
+            )
+        except Exception as exc:
+            tried = candidates + [
+                bundled_dir,
+                os.path.join("atlas_deps", "oneapi-mkl-*-macos-x64.tar.xz"),
+            ]
+            raise AssertionError(
+                "Intel oneAPI not found; tried: " + ", ".join(tried)
+            ) from exc
+
+    raise AssertionError("Intel oneAPI not found; tried: " + ", ".join(candidates))
 
 
 def tbb_dir() -> str:

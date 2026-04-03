@@ -29,7 +29,7 @@ runs:
     - name: Cache 3rdparty build
       id: cache-extlibs
       if: ${{ inputs.enable-cache == 'true' }}
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           src/3rdparty/build
@@ -83,14 +83,14 @@ runs:
 
     - name: Cache Vulkan SDK (installed)
       if: ${{ inputs.enable-cache == 'true' && (inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true') }}
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/VulkanSDK/${{ inputs.vulkan-version }}
         key: ${{ runner.os }}-vulkan-${{ inputs.vulkan-version }}
 
     - name: Install Vulkan SDK (LunarG macOS CLI)
-      if: ${{ steps.cache-extlibs.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
       shell: bash -l {0}
       env:
         VULKAN_SDK_VERSION: ${{ inputs.vulkan-version }}
@@ -187,7 +187,7 @@ runs:
 
     - name: Cache Qt (installed)
       if: ${{ inputs.enable-cache == 'true' && (inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true') }}
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/Qt/${{ inputs.qt-version }}
@@ -217,7 +217,7 @@ runs:
 
     - name: Cache atlas_deps (download archives)
       if: ${{ inputs.enable-cache == 'true' && (inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true') }}
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           atlas_deps
@@ -227,7 +227,7 @@ runs:
 
     - name: Cache atlas test data
       if: ${{ inputs.enable-cache == 'true' }}
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         enableCrossOsArchive: true
         path: |

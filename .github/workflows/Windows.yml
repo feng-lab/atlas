@@ -27,13 +27,6 @@ env:
   # Official Intel oneAPI BaseKit offline installer URL (mirrors oneapi-ci)
   # Used to install MKL + oneTBB components silently on Windows runners.
   ONEAPI_BASEKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f18901e-877d-469d-a41a-a10f11b39336/intel-oneapi-base-toolkit-2025.3.0.372_offline.exe
-  # Pinned current upstream LLVM release for the clang-cl Windows path.
-  # Extracted from the official llvm/llvm-project Windows MSVC tarball to a
-  # hardcoded Atlas probe location. Atlas checks C:\Program Files\LLVM first,
-  # then D:\llvm, then C:\llvm; CI removes C:\Program Files\LLVM first and
-  # installs into D:\llvm or C:\llvm to avoid the slow Program Files extract.
-  LLVM_VERSION: "22.1.2"
-  LLVM_WIN64_TAR_XZ_SHA256: 6550bcc308bf972f7f956001b73f6478da3d22f1ebd4b01653c978a6c7ff3698
   # Centralize Qt version to make upgrades easy
   QT_VERSION: "6.9.2"
   # Pin a Vulkan SDK version
@@ -55,7 +48,7 @@ jobs:
 
       - name: Probe 3rdparty build cache (final p2)
         id: cache-extlibs-probe
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             src/3rdparty/build
@@ -85,7 +78,7 @@ jobs:
 
       - name: Cache 3rdparty build (part 1)
         id: cache-extlibs-p1
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             src/3rdparty/build
@@ -102,58 +95,33 @@ jobs:
           perl -v
           where perl
 
-      - name: Install LLVM (release tarball)
+      - name: Restore LLVM cache
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
+        id: cache-llvm-buildenv1
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            llvm
+          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
+
+      - name: Install LLVM (release tarball)
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true' && steps.cache-llvm-buildenv1.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $legacyRoot = 'C:\Program Files\LLVM'
-          if (Test-Path $legacyRoot) {
-            Write-Host "Removing existing LLVM installation at $legacyRoot before choosing a CI install root"
-            Remove-Item -LiteralPath $legacyRoot -Recurse -Force
-          }
-          $installRoots = @('D:\llvm', 'C:\llvm')
-          $llvmRoot = $null
-          foreach ($candidate in $installRoots) {
-            $driveRoot = [System.IO.Path]::GetPathRoot($candidate)
-            if ($driveRoot -and (Test-Path $driveRoot)) {
-              $llvmRoot = $candidate
-              break
-            }
-          }
-          if (-not $llvmRoot) {
-            Write-Error "No supported CI LLVM install root found. Tried: $($installRoots -join ', ')"
-          }
-          Write-Host "Using LLVM install root: $llvmRoot"
-          $ver = $env:LLVM_VERSION
-          $archiveName = "clang+llvm-$ver-x86_64-pc-windows-msvc.tar.xz"
-          $archivePath = Join-Path $env:TEMP $archiveName
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$archiveName"
-          Write-Host "Downloading LLVM $ver from: $url"
-          Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
-          if (-not (Test-Path $archivePath)) { Write-Error "Download failed: $archivePath not found" }
-          $hash = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash.ToLowerInvariant()
-          if ($hash -ne $env:LLVM_WIN64_TAR_XZ_SHA256.ToLowerInvariant()) {
-            Write-Error "LLVM archive SHA-256 mismatch. Expected $env:LLVM_WIN64_TAR_XZ_SHA256, got $hash"
-          }
-          if (Test-Path $llvmRoot) {
-            Write-Host "Removing existing LLVM installation at $llvmRoot before extract"
-            Remove-Item -LiteralPath $llvmRoot -Recurse -Force
-          }
-          New-Item -ItemType Directory -Force -Path $llvmRoot | Out-Null
-          Write-Host "Extracting LLVM $ver into $llvmRoot"
-          & tar.exe -xf $archivePath -C $llvmRoot --strip-components=1
-          if ($LASTEXITCODE -ne 0) { Write-Error "LLVM archive extraction failed with exit code $LASTEXITCODE" }
-          $clangCl = Join-Path $llvmRoot 'bin\clang-cl.exe'
-          $lldLink = Join-Path $llvmRoot 'bin\lld-link.exe'
-          if (-not (Test-Path $clangCl)) { Write-Error "clang-cl.exe not found under $llvmRoot\\bin" }
-          if (-not (Test-Path $lldLink)) { Write-Error "lld-link.exe not found under $llvmRoot\\bin" }
-          & $clangCl --version
+          & .\util\install_llvm_windows.ps1
+
+      - name: Save LLVM cache
+        if: ${{ !cancelled() && steps.cache-extlibs-p1.outputs.cache-hit != 'true' && steps.cache-llvm-buildenv1.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            llvm
+          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
 
       - name: Restore Intel oneAPI cache
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         id: cache-oneapi-restore-buildenv
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             C:\\Program Files (x86)\\Intel\\oneAPI
@@ -177,7 +145,7 @@ jobs:
 
       - name: Always save Intel oneAPI cache
         if: ${{ !cancelled() && steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: |
             C:\\Program Files (x86)\\Intel\\oneAPI
@@ -186,7 +154,7 @@ jobs:
       - name: Cache Vulkan SDK (installed)
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         id: cache-vulkan-build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             C:\VulkanSDK\${{ env.VULKAN_SDK_VERSION }}
@@ -263,7 +231,7 @@ jobs:
 
       - name: Cache Qt (installed)
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Qt/${{ env.QT_VERSION }}
@@ -299,7 +267,7 @@ jobs:
 
       - name: Cache atlas_deps (download archives)
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             atlas_deps
@@ -351,56 +319,31 @@ jobs:
           perl -v
           where perl
 
+      - name: Restore LLVM cache
+        id: cache-llvm-buildenv2
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            llvm
+          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
+
       - name: Install LLVM (release tarball)
+        if: steps.cache-llvm-buildenv2.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $legacyRoot = 'C:\Program Files\LLVM'
-          if (Test-Path $legacyRoot) {
-            Write-Host "Removing existing LLVM installation at $legacyRoot before choosing a CI install root"
-            Remove-Item -LiteralPath $legacyRoot -Recurse -Force
-          }
-          $installRoots = @('D:\llvm', 'C:\llvm')
-          $llvmRoot = $null
-          foreach ($candidate in $installRoots) {
-            $driveRoot = [System.IO.Path]::GetPathRoot($candidate)
-            if ($driveRoot -and (Test-Path $driveRoot)) {
-              $llvmRoot = $candidate
-              break
-            }
-          }
-          if (-not $llvmRoot) {
-            Write-Error "No supported CI LLVM install root found. Tried: $($installRoots -join ', ')"
-          }
-          Write-Host "Using LLVM install root: $llvmRoot"
-          $ver = $env:LLVM_VERSION
-          $archiveName = "clang+llvm-$ver-x86_64-pc-windows-msvc.tar.xz"
-          $archivePath = Join-Path $env:TEMP $archiveName
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$archiveName"
-          Write-Host "Downloading LLVM $ver from: $url"
-          Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
-          if (-not (Test-Path $archivePath)) { Write-Error "Download failed: $archivePath not found" }
-          $hash = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash.ToLowerInvariant()
-          if ($hash -ne $env:LLVM_WIN64_TAR_XZ_SHA256.ToLowerInvariant()) {
-            Write-Error "LLVM archive SHA-256 mismatch. Expected $env:LLVM_WIN64_TAR_XZ_SHA256, got $hash"
-          }
-          if (Test-Path $llvmRoot) {
-            Write-Host "Removing existing LLVM installation at $llvmRoot before extract"
-            Remove-Item -LiteralPath $llvmRoot -Recurse -Force
-          }
-          New-Item -ItemType Directory -Force -Path $llvmRoot | Out-Null
-          Write-Host "Extracting LLVM $ver into $llvmRoot"
-          & tar.exe -xf $archivePath -C $llvmRoot --strip-components=1
-          if ($LASTEXITCODE -ne 0) { Write-Error "LLVM archive extraction failed with exit code $LASTEXITCODE" }
-          $clangCl = Join-Path $llvmRoot 'bin\clang-cl.exe'
-          $lldLink = Join-Path $llvmRoot 'bin\lld-link.exe'
-          if (-not (Test-Path $clangCl)) { Write-Error "clang-cl.exe not found under $llvmRoot\\bin" }
-          if (-not (Test-Path $lldLink)) { Write-Error "lld-link.exe not found under $llvmRoot\\bin" }
-          & $clangCl --version
+          & .\util\install_llvm_windows.ps1
+
+      - name: Save LLVM cache
+        if: ${{ !cancelled() && steps.cache-llvm-buildenv2.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            llvm
+          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
 
       - name: Restore Intel oneAPI cache
         id: cache-oneapi-restore-buildenv2
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             C:\\Program Files (x86)\\Intel\\oneAPI
@@ -452,7 +395,7 @@ jobs:
           conda clean --all -y
 
       - name: Cache atlas_deps (download archives)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             atlas_deps
@@ -462,7 +405,7 @@ jobs:
 
       - name: Cache 3rdparty build (part 2)
         id: cache-extlibs-p2
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             src/3rdparty/build
@@ -517,56 +460,31 @@ jobs:
           perl -v
           where perl
 
+      - name: Restore LLVM cache
+        id: cache-llvm-build
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            llvm
+          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
+
       - name: Install LLVM (release tarball)
+        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $legacyRoot = 'C:\Program Files\LLVM'
-          if (Test-Path $legacyRoot) {
-            Write-Host "Removing existing LLVM installation at $legacyRoot before choosing a CI install root"
-            Remove-Item -LiteralPath $legacyRoot -Recurse -Force
-          }
-          $installRoots = @('D:\llvm', 'C:\llvm')
-          $llvmRoot = $null
-          foreach ($candidate in $installRoots) {
-            $driveRoot = [System.IO.Path]::GetPathRoot($candidate)
-            if ($driveRoot -and (Test-Path $driveRoot)) {
-              $llvmRoot = $candidate
-              break
-            }
-          }
-          if (-not $llvmRoot) {
-            Write-Error "No supported CI LLVM install root found. Tried: $($installRoots -join ', ')"
-          }
-          Write-Host "Using LLVM install root: $llvmRoot"
-          $ver = $env:LLVM_VERSION
-          $archiveName = "clang+llvm-$ver-x86_64-pc-windows-msvc.tar.xz"
-          $archivePath = Join-Path $env:TEMP $archiveName
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$archiveName"
-          Write-Host "Downloading LLVM $ver from: $url"
-          Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
-          if (-not (Test-Path $archivePath)) { Write-Error "Download failed: $archivePath not found" }
-          $hash = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash.ToLowerInvariant()
-          if ($hash -ne $env:LLVM_WIN64_TAR_XZ_SHA256.ToLowerInvariant()) {
-            Write-Error "LLVM archive SHA-256 mismatch. Expected $env:LLVM_WIN64_TAR_XZ_SHA256, got $hash"
-          }
-          if (Test-Path $llvmRoot) {
-            Write-Host "Removing existing LLVM installation at $llvmRoot before extract"
-            Remove-Item -LiteralPath $llvmRoot -Recurse -Force
-          }
-          New-Item -ItemType Directory -Force -Path $llvmRoot | Out-Null
-          Write-Host "Extracting LLVM $ver into $llvmRoot"
-          & tar.exe -xf $archivePath -C $llvmRoot --strip-components=1
-          if ($LASTEXITCODE -ne 0) { Write-Error "LLVM archive extraction failed with exit code $LASTEXITCODE" }
-          $clangCl = Join-Path $llvmRoot 'bin\clang-cl.exe'
-          $lldLink = Join-Path $llvmRoot 'bin\lld-link.exe'
-          if (-not (Test-Path $clangCl)) { Write-Error "clang-cl.exe not found under $llvmRoot\\bin" }
-          if (-not (Test-Path $lldLink)) { Write-Error "lld-link.exe not found under $llvmRoot\\bin" }
-          & $clangCl --version
+          & .\util\install_llvm_windows.ps1
+
+      - name: Save LLVM cache
+        if: ${{ !cancelled() && steps.cache-llvm-build.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            llvm
+          key: ${{ runner.os }}-llvm-${{ hashFiles('util/install_llvm_windows.ps1') }}
 
       - name: Restore Intel oneAPI cache
         id: cache-oneapi-restore-build
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             C:\\Program Files (x86)\\Intel\\oneAPI
@@ -590,7 +508,7 @@ jobs:
 
       - name: Always save Intel oneAPI cache
         if: ${{ !cancelled() && steps.cache-oneapi-restore-build.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: |
             C:\\Program Files (x86)\\Intel\\oneAPI
@@ -598,7 +516,7 @@ jobs:
 
       - name: Cache Vulkan SDK (installed)
         id: cache-vulkan
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             C:\VulkanSDK\${{ env.VULKAN_SDK_VERSION }}
@@ -671,7 +589,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
 
       - name: Cache Qt (installed)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Qt/${{ env.QT_VERSION }}
@@ -705,14 +623,14 @@ jobs:
           Get-ChildItem -Force $qtRoot | Select-Object FullName
 
       - name: Cache 3rdparty build (final)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             src/3rdparty/build
           key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py') }}
 
       - name: Cache atlas_deps (download archives)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             atlas_deps
@@ -721,7 +639,7 @@ jobs:
             ${{ runner.os }}-atlasdeps-
 
       - name: Cache atlas test data
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           enableCrossOsArchive: true
           path: |

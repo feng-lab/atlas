@@ -54,7 +54,7 @@ jobs:
           
       - name: Cache 3rdparty build
         id: cache-extlibs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             src/3rdparty/build
@@ -131,7 +131,7 @@ jobs:
 
       - name: Cache Vulkan SDK (installed)
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
@@ -194,7 +194,7 @@ jobs:
 
       - name: Cache Qt (installed)
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Qt/${{ env.QT_VERSION }}
@@ -215,7 +215,7 @@ jobs:
 
       - name: Cache atlas_deps (download archives)
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             atlas_deps
@@ -326,7 +326,7 @@ jobs:
           test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
 
       - name: Cache Vulkan SDK (installed)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
@@ -384,7 +384,7 @@ jobs:
           conda clean --all -y
 
       - name: Cache Qt (installed)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Qt/${{ env.QT_VERSION }}
@@ -403,14 +403,14 @@ jobs:
           ls -la "$HOME/Qt" || true
 
       - name: Cache 3rdparty build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             src/3rdparty/build
           key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py') }}
 
       - name: Cache atlas_deps (download archives)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             atlas_deps
@@ -419,7 +419,7 @@ jobs:
             ${{ runner.os }}-atlasdeps-
 
       - name: Cache atlas test data
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           enableCrossOsArchive: true
           path: |

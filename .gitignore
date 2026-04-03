@@ -76,6 +76,9 @@ __pycache__/
 /Atlas.AppDir/
 /Atlas/
 /Atlas.app/
+/llvm/
+/llvm.__download/
+/llvm.__extract/
 
 # binary file
 obj/
