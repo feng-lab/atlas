@@ -378,6 +378,8 @@ if (WIN32)
         target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-switch-default)
         target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-float-conversion)
         target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-missing-field-initializers)
+        # Keep clang-cl aligned with non-Windows Clang for Eigen-heavy img code.
+        target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-mllvm /clang:-inline-threshold=600)
         set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "/clang:-Wno-reserved-identifier /clang:-Wno-unused-parameter /clang:-Wno-unused-command-line-argument /clang:-Wno-sign-conversion /clang:-Wno-format")
     endif ()
     # standard conformance
