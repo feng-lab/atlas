@@ -18,6 +18,36 @@
       }
     },
     {
+      "name": "windows-clang-cl-base",
+      "hidden": true,
+      "displayName": "Windows clang-cl base",
+      "description": "Atlas Windows clang-cl + lld defaults for IDE and manual configure runs",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/Release",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/src/3rdparty/build/ninja.exe",
+        "CMAKE_C_COMPILER": {
+          "type": "FILEPATH",
+          "value": "C:/Program Files/LLVM/bin/clang-cl.exe"
+        },
+        "CMAKE_CXX_COMPILER": {
+          "type": "FILEPATH",
+          "value": "C:/Program Files/LLVM/bin/clang-cl.exe"
+        },
+        "CMAKE_LINKER": {
+          "type": "FILEPATH",
+          "value": "C:/Program Files/LLVM/bin/lld-link.exe"
+        }
+      }
+    },
+    {
       "name": "Release",
       "displayName": "Config Release",
       "description": "Sets Release build type",
@@ -29,63 +59,10 @@
       }
     },
     {
-      "name": "Release-msvc",
-      "displayName": "Config Release (MSVC)",
-      "description": "Windows Release build using Ninja with the Visual Studio 2022 x64 MSVC environment",
-      "inherits": "Release",
-      "binaryDir": "${sourceDir}/build/Release",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
-      "toolset": {
-        "value": "host=x64",
-        "strategy": "external"
-      },
-      "environment": {
-        "VSLANG": "1033",
-        "VSINSTALLDIR": "C:/Program Files/Microsoft Visual Studio/2022/Community/",
-        "VCINSTALLDIR": "$env{VSINSTALLDIR}VC/",
-        "VCToolsVersion": "14.44.35207",
-        "VCToolsInstallDir": "$env{VCINSTALLDIR}Tools/MSVC/$env{VCToolsVersion}/",
-        "VCToolsRedistDir": "$env{VCINSTALLDIR}Redist/MSVC/14.44.35112/",
-        "VisualStudioVersion": "17.0",
-        "DevEnvDir": "$env{VSINSTALLDIR}Common7/IDE/",
-        "VCIDEInstallDir": "$env{DevEnvDir}VC/",
-        "FrameworkDir64": "C:/Windows/Microsoft.NET/Framework64/",
-        "FrameworkVersion64": "v4.0.30319",
-        "FrameworkDir": "$env{FrameworkDir64}",
-        "FrameworkVersion": "$env{FrameworkVersion64}",
-        "WindowsSdkDir": "C:/Program Files (x86)/Windows Kits/10/",
-        "WindowsSDKVersion": "10.0.26100.0/",
-        "WindowsSDKLibVersion": "$env{WindowsSDKVersion}",
-        "UniversalCRTSdkDir": "$env{WindowsSdkDir}",
-        "UCRTVersion": "10.0.26100.0",
-        "WindowsSdkBinPath": "$env{WindowsSdkDir}bin/",
-        "WindowsSdkVerBinPath": "$env{WindowsSdkBinPath}$env{UCRTVersion}/",
-        "WindowsLibPath": "$env{WindowsSdkDir}UnionMetadata/$env{UCRTVersion};$env{WindowsSdkDir}References/$env{UCRTVersion}",
-        "ExtensionSdkDir": "$env{WindowsSdkDir}ExtensionSDKs",
-        "CommandPromptType": "Native",
-        "Platform": "x64",
-        "VSCMD_ARG_HOST_ARCH": "x64",
-        "VSCMD_ARG_TGT_ARCH": "x64",
-        "VSCMD_VER": "17.14.2",
-        "is_x64_arch": "true",
-        "PATH": "$env{VCToolsInstallDir}bin/HostX64/x64;$env{VSINSTALLDIR}Common7/IDE/VC/VCPackages;$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/TestWindow;$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer;$env{VSINSTALLDIR}MSBuild/Current/bin/Roslyn;$env{VSINSTALLDIR}Team Tools/DiagnosticsHub/Collector;$env{VSINSTALLDIR}Common7/IDE/Extensions/Microsoft/CodeCoverage.Console;$env{WindowsSdkVerBinPath}x64;$env{WindowsSdkBinPath}x64;$env{VSINSTALLDIR}MSBuild/Current/Bin/amd64;$env{FrameworkDir64}$env{FrameworkVersion64};$env{DevEnvDir};$env{VSINSTALLDIR}Common7/Tools;$penv{PATH}",
-        "INCLUDE": "$env{VCToolsInstallDir}include;$env{VCToolsInstallDir}ATLMFC/include;$env{VCINSTALLDIR}Auxiliary/VS/include;$env{WindowsSdkDir}include/$env{UCRTVersion}/ucrt;$env{WindowsSdkDir}include/$env{UCRTVersion}/um;$env{WindowsSdkDir}include/$env{UCRTVersion}/shared;$env{WindowsSdkDir}include/$env{UCRTVersion}/winrt;$env{WindowsSdkDir}include/$env{UCRTVersion}/cppwinrt",
-        "EXTERNAL_INCLUDE": "$env{INCLUDE}",
-        "LIB": "$env{VCToolsInstallDir}ATLMFC/lib/x64;$env{VCToolsInstallDir}lib/x64;$env{WindowsSdkDir}lib/$env{UCRTVersion}/ucrt/x64;$env{WindowsSdkDir}lib/$env{UCRTVersion}/um/x64",
-        "LIBPATH": "$env{VCToolsInstallDir}ATLMFC/lib/x64;$env{VCToolsInstallDir}lib/x64;$env{VCToolsInstallDir}lib/x86/store/references;$env{WindowsLibPath};$env{FrameworkDir64}$env{FrameworkVersion64}"
-      },
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "cl",
-        "CMAKE_CXX_COMPILER": "cl"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
+      "name": "windows-clang-cl-release",
+      "displayName": "Windows clang-cl Release",
+      "description": "Release configure matching Atlas' Windows clang-cl Ninja workflow",
+      "inherits": "windows-clang-cl-base"
     }
   ],
   "buildPresets": [
@@ -102,17 +79,11 @@
       "configuration": "Release"
     },
     {
-      "name": "Release-msvc",
-      "displayName": "Build Release (MSVC)",
+      "name": "windows-clang-cl-release",
+      "displayName": "Build Windows clang-cl Release",
       "inherits": "build-base",
-      "configurePreset": "Release-msvc",
-      "configuration": "Release",
-      "inheritConfigureEnvironment": true,
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
+      "configurePreset": "windows-clang-cl-release",
+      "configuration": "Release"
     }
   ],
   "testPresets": [
@@ -128,14 +99,14 @@
       }
     },
     {
-      "name": "test-all-msvc",
-      "displayName": "Test All (MSVC)",
-      "inherits": "test-all",
-      "configurePreset": "Release-msvc",
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
+      "name": "test-windows-clang-cl-release",
+      "displayName": "Test Windows clang-cl Release",
+      "configurePreset": "windows-clang-cl-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "stopOnFailure": false
       }
     }
   ]

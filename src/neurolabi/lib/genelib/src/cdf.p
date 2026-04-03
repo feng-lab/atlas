@@ -113,7 +113,7 @@ static double sample_unorm()
 
 		/* Map [0,1) random var to upper-half of cdf */
 #ifdef _MSC_VER
-	x = double(rand())/RAND_MAX;
+	x = (double) rand()/RAND_MAX;
 #else
   x = drand48();
 #endif
@@ -467,7 +467,7 @@ double Sample_CDF(CDF *cdf)
   bin = (Cdf *) cdf;
 
   #ifdef _MSC_VER
-	x = double(rand())/RAND_MAX;
+	x = (double) rand()/RAND_MAX;
 #else
   x = drand48();
   #endif
