@@ -28,10 +28,10 @@ env:
   # Used to install MKL + oneTBB components silently on Windows runners.
   ONEAPI_BASEKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f18901e-877d-469d-a41a-a10f11b39336/intel-oneapi-base-toolkit-2025.3.0.372_offline.exe
   # Pinned current upstream LLVM release for the clang-cl Windows path.
-  # Installed from the official llvm/llvm-project Windows installer to
+  # Extracted from the official llvm/llvm-project Windows MSVC tarball to
   # the default Atlas-expected location: C:\Program Files\LLVM.
   LLVM_VERSION: "22.1.2"
-  LLVM_WIN64_EXE_SHA256: cc168bff8d152d68ce5fc8f272bd2390307a1f9192cbe39e9465e373445a2bc3
+  LLVM_WIN64_TAR_XZ_SHA256: 6550bcc308bf972f7f956001b73f6478da3d22f1ebd4b01653c978a6c7ff3698
   # Centralize Qt version to make upgrades easy
   QT_VERSION: "6.9.2"
   # Pin a Vulkan SDK version
@@ -100,47 +100,36 @@ jobs:
           perl -v
           where perl
 
-      - name: Restore LLVM cache
+      - name: Install LLVM (release tarball)
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        id: cache-llvm-restore-buildenv
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            C:\Program Files\LLVM
-          key: ${{ runner.os }}-llvm-${{ env.LLVM_VERSION }}
-
-      - name: Install LLVM (official installer)
-        if: steps.cache-llvm-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $llvmRoot = 'C:\Program Files\LLVM'
+          $ver = $env:LLVM_VERSION
+          $archiveName = "clang+llvm-$ver-x86_64-pc-windows-msvc.tar.xz"
+          $archivePath = Join-Path $env:TEMP $archiveName
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$archiveName"
+          Write-Host "Downloading LLVM $ver from: $url"
+          Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
+          if (-not (Test-Path $archivePath)) { Write-Error "Download failed: $archivePath not found" }
+          $hash = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash.ToLowerInvariant()
+          if ($hash -ne $env:LLVM_WIN64_TAR_XZ_SHA256.ToLowerInvariant()) {
+            Write-Error "LLVM archive SHA-256 mismatch. Expected $env:LLVM_WIN64_TAR_XZ_SHA256, got $hash"
+          }
           if (Test-Path $llvmRoot) {
-            Write-Host "Removing existing LLVM installation at $llvmRoot before reinstall"
+            Write-Host "Removing existing LLVM installation at $llvmRoot before extract"
             Remove-Item -LiteralPath $llvmRoot -Recurse -Force
           }
-          $ver = $env:LLVM_VERSION
-          $exeName = "LLVM-$ver-win64.exe"
-          $exePath = Join-Path $env:TEMP $exeName
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$exeName"
-          Write-Host "Downloading LLVM $ver from: $url"
-          Invoke-WebRequest -Uri $url -OutFile $exePath -UseBasicParsing
-          if (-not (Test-Path $exePath)) { Write-Error "Download failed: $exePath not found" }
-          $hash = (Get-FileHash -Algorithm SHA256 -Path $exePath).Hash.ToLowerInvariant()
-          if ($hash -ne $env:LLVM_WIN64_EXE_SHA256.ToLowerInvariant()) {
-            Write-Error "LLVM installer SHA-256 mismatch. Expected $env:LLVM_WIN64_EXE_SHA256, got $hash"
-          }
-          Write-Host "Installing LLVM $ver to the default location via NSIS silent mode"
-          $p = Start-Process -FilePath $exePath -ArgumentList '/S' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Write-Error "LLVM installer exit code: $($p.ExitCode)" }
-
-      - name: Always save LLVM cache
-        if: ${{ !cancelled() && steps.cache-llvm-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            C:\Program Files\LLVM
-          key: ${{ runner.os }}-llvm-${{ env.LLVM_VERSION }}
+          New-Item -ItemType Directory -Force -Path $llvmRoot | Out-Null
+          Write-Host "Extracting LLVM $ver into $llvmRoot"
+          & tar.exe -xf $archivePath -C $llvmRoot --strip-components=1
+          if ($LASTEXITCODE -ne 0) { Write-Error "LLVM archive extraction failed with exit code $LASTEXITCODE" }
+          $clangCl = Join-Path $llvmRoot 'bin\clang-cl.exe'
+          $lldLink = Join-Path $llvmRoot 'bin\lld-link.exe'
+          if (-not (Test-Path $clangCl)) { Write-Error "clang-cl.exe not found under $llvmRoot\\bin" }
+          if (-not (Test-Path $lldLink)) { Write-Error "lld-link.exe not found under $llvmRoot\\bin" }
+          & $clangCl --version
 
       - name: Restore Intel oneAPI cache
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
@@ -343,46 +332,35 @@ jobs:
           perl -v
           where perl
 
-      - name: Restore LLVM cache
-        id: cache-llvm-restore-buildenv2
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            C:\Program Files\LLVM
-          key: ${{ runner.os }}-llvm-${{ env.LLVM_VERSION }}
-
-      - name: Install LLVM (official installer)
-        if: steps.cache-llvm-restore-buildenv2.outputs.cache-hit != 'true'
+      - name: Install LLVM (release tarball)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $llvmRoot = 'C:\Program Files\LLVM'
+          $ver = $env:LLVM_VERSION
+          $archiveName = "clang+llvm-$ver-x86_64-pc-windows-msvc.tar.xz"
+          $archivePath = Join-Path $env:TEMP $archiveName
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$archiveName"
+          Write-Host "Downloading LLVM $ver from: $url"
+          Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
+          if (-not (Test-Path $archivePath)) { Write-Error "Download failed: $archivePath not found" }
+          $hash = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash.ToLowerInvariant()
+          if ($hash -ne $env:LLVM_WIN64_TAR_XZ_SHA256.ToLowerInvariant()) {
+            Write-Error "LLVM archive SHA-256 mismatch. Expected $env:LLVM_WIN64_TAR_XZ_SHA256, got $hash"
+          }
           if (Test-Path $llvmRoot) {
-            Write-Host "Removing existing LLVM installation at $llvmRoot before reinstall"
+            Write-Host "Removing existing LLVM installation at $llvmRoot before extract"
             Remove-Item -LiteralPath $llvmRoot -Recurse -Force
           }
-          $ver = $env:LLVM_VERSION
-          $exeName = "LLVM-$ver-win64.exe"
-          $exePath = Join-Path $env:TEMP $exeName
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$exeName"
-          Write-Host "Downloading LLVM $ver from: $url"
-          Invoke-WebRequest -Uri $url -OutFile $exePath -UseBasicParsing
-          if (-not (Test-Path $exePath)) { Write-Error "Download failed: $exePath not found" }
-          $hash = (Get-FileHash -Algorithm SHA256 -Path $exePath).Hash.ToLowerInvariant()
-          if ($hash -ne $env:LLVM_WIN64_EXE_SHA256.ToLowerInvariant()) {
-            Write-Error "LLVM installer SHA-256 mismatch. Expected $env:LLVM_WIN64_EXE_SHA256, got $hash"
-          }
-          Write-Host "Installing LLVM $ver to the default location via NSIS silent mode"
-          $p = Start-Process -FilePath $exePath -ArgumentList '/S' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Write-Error "LLVM installer exit code: $($p.ExitCode)" }
-
-      - name: Always save LLVM cache
-        if: ${{ !cancelled() && steps.cache-llvm-restore-buildenv2.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            C:\Program Files\LLVM
-          key: ${{ runner.os }}-llvm-${{ env.LLVM_VERSION }}
+          New-Item -ItemType Directory -Force -Path $llvmRoot | Out-Null
+          Write-Host "Extracting LLVM $ver into $llvmRoot"
+          & tar.exe -xf $archivePath -C $llvmRoot --strip-components=1
+          if ($LASTEXITCODE -ne 0) { Write-Error "LLVM archive extraction failed with exit code $LASTEXITCODE" }
+          $clangCl = Join-Path $llvmRoot 'bin\clang-cl.exe'
+          $lldLink = Join-Path $llvmRoot 'bin\lld-link.exe'
+          if (-not (Test-Path $clangCl)) { Write-Error "clang-cl.exe not found under $llvmRoot\\bin" }
+          if (-not (Test-Path $lldLink)) { Write-Error "lld-link.exe not found under $llvmRoot\\bin" }
+          & $clangCl --version
 
       - name: Restore Intel oneAPI cache
         id: cache-oneapi-restore-buildenv2
@@ -503,46 +481,35 @@ jobs:
           perl -v
           where perl
 
-      - name: Restore LLVM cache
-        id: cache-llvm-restore-build
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            C:\Program Files\LLVM
-          key: ${{ runner.os }}-llvm-${{ env.LLVM_VERSION }}
-
-      - name: Install LLVM (official installer)
-        if: steps.cache-llvm-restore-build.outputs.cache-hit != 'true'
+      - name: Install LLVM (release tarball)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $llvmRoot = 'C:\Program Files\LLVM'
+          $ver = $env:LLVM_VERSION
+          $archiveName = "clang+llvm-$ver-x86_64-pc-windows-msvc.tar.xz"
+          $archivePath = Join-Path $env:TEMP $archiveName
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$archiveName"
+          Write-Host "Downloading LLVM $ver from: $url"
+          Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
+          if (-not (Test-Path $archivePath)) { Write-Error "Download failed: $archivePath not found" }
+          $hash = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash.ToLowerInvariant()
+          if ($hash -ne $env:LLVM_WIN64_TAR_XZ_SHA256.ToLowerInvariant()) {
+            Write-Error "LLVM archive SHA-256 mismatch. Expected $env:LLVM_WIN64_TAR_XZ_SHA256, got $hash"
+          }
           if (Test-Path $llvmRoot) {
-            Write-Host "Removing existing LLVM installation at $llvmRoot before reinstall"
+            Write-Host "Removing existing LLVM installation at $llvmRoot before extract"
             Remove-Item -LiteralPath $llvmRoot -Recurse -Force
           }
-          $ver = $env:LLVM_VERSION
-          $exeName = "LLVM-$ver-win64.exe"
-          $exePath = Join-Path $env:TEMP $exeName
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$exeName"
-          Write-Host "Downloading LLVM $ver from: $url"
-          Invoke-WebRequest -Uri $url -OutFile $exePath -UseBasicParsing
-          if (-not (Test-Path $exePath)) { Write-Error "Download failed: $exePath not found" }
-          $hash = (Get-FileHash -Algorithm SHA256 -Path $exePath).Hash.ToLowerInvariant()
-          if ($hash -ne $env:LLVM_WIN64_EXE_SHA256.ToLowerInvariant()) {
-            Write-Error "LLVM installer SHA-256 mismatch. Expected $env:LLVM_WIN64_EXE_SHA256, got $hash"
-          }
-          Write-Host "Installing LLVM $ver to the default location via NSIS silent mode"
-          $p = Start-Process -FilePath $exePath -ArgumentList '/S' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Write-Error "LLVM installer exit code: $($p.ExitCode)" }
-
-      - name: Always save LLVM cache
-        if: ${{ !cancelled() && steps.cache-llvm-restore-build.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            C:\Program Files\LLVM
-          key: ${{ runner.os }}-llvm-${{ env.LLVM_VERSION }}
+          New-Item -ItemType Directory -Force -Path $llvmRoot | Out-Null
+          Write-Host "Extracting LLVM $ver into $llvmRoot"
+          & tar.exe -xf $archivePath -C $llvmRoot --strip-components=1
+          if ($LASTEXITCODE -ne 0) { Write-Error "LLVM archive extraction failed with exit code $LASTEXITCODE" }
+          $clangCl = Join-Path $llvmRoot 'bin\clang-cl.exe'
+          $lldLink = Join-Path $llvmRoot 'bin\lld-link.exe'
+          if (-not (Test-Path $clangCl)) { Write-Error "clang-cl.exe not found under $llvmRoot\\bin" }
+          if (-not (Test-Path $lldLink)) { Write-Error "lld-link.exe not found under $llvmRoot\\bin" }
+          & $clangCl --version
 
       - name: Restore Intel oneAPI cache
         id: cache-oneapi-restore-build

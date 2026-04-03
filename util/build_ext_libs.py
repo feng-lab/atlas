@@ -2247,6 +2247,18 @@ endif()""",
             ],
         ),
         FilePatcher(
+            orig_file=os.path.join(src_dir, "folly", "lang", "Exception.h"),
+            from_texts=[
+                r"""#include <exception>
+#include <functional>""",
+            ],
+            to_texts=[
+                r"""#include <exception>
+#include <cstring>
+#include <functional>""",
+            ],
+        ),
+        FilePatcher(
             orig_file=os.path.join(
                 src_dir, "folly", "crypto", "detail", "CMakeLists.txt"
             ),
