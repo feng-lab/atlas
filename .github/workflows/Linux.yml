@@ -169,8 +169,8 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: ${{ env.PYTHON_VERSION_MIN }}
-          miniconda-version: "latest"
+          activate-environment: ""
+          auto-activate: false
           channels: defaults
 
       - name: Create/Reset atlas-ci conda env
@@ -362,8 +362,8 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: ${{ env.PYTHON_VERSION_MIN }}
-          miniconda-version: "latest"
+          activate-environment: ""
+          auto-activate: false
           channels: defaults
 
       - name: Create/Reset atlas-ci conda env

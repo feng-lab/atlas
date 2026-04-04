@@ -159,8 +159,8 @@ runs:
       uses: conda-incubator/setup-miniconda@v3
       with:
         auto-update-conda: true
-        python-version: ${{ inputs.python-version }}
-        miniconda-version: latest
+        activate-environment: ""
+        auto-activate: false
         channels: defaults
 
     - name: Create/Reset atlas-ci conda env

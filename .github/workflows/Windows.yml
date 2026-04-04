@@ -166,24 +166,13 @@ jobs:
             Write-Error "glslc not found under C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin — core tools missing"
           }
 
-      - name: Detect existing conda
+      - name: Setup conda
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        id: detect-conda-be1
-        shell: pwsh
-        run: |
-          if (Get-Command conda -ErrorAction SilentlyContinue) {
-            "found=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          } else {
-            "found=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          }
-
-      - name: Setup Miniconda
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true' && steps.detect-conda-be1.outputs.found != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: ${{ env.PYTHON_VERSION_MIN }}
-          miniconda-version: "latest"
+          activate-environment: ""
+          auto-activate: false
           channels: defaults
 
       - name: Create/Reset atlas-ci conda env
@@ -317,23 +306,12 @@ jobs:
             C:\\Program Files (x86)\\Intel\\oneAPI
           key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
-      - name: Detect existing conda
-        id: detect-conda-be2
-        shell: pwsh
-        run: |
-          if (Get-Command conda -ErrorAction SilentlyContinue) {
-            "found=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          } else {
-            "found=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          }
-
-      - name: Setup Miniconda
-        if: steps.detect-conda-be2.outputs.found != 'true'
+      - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: ${{ env.PYTHON_VERSION_MIN }}
-          miniconda-version: "latest"
+          activate-environment: ""
+          auto-activate: false
           channels: defaults
       
       - name: Create/Reset atlas-ci conda env
@@ -495,23 +473,12 @@ jobs:
           }
           Get-ChildItem -Force "C:\VulkanSDK\$env:VULKAN_SDK_VERSION" | Select-Object FullName
 
-      - name: Detect existing conda
-        id: detect-conda-build
-        shell: pwsh
-        run: |
-          if (Get-Command conda -ErrorAction SilentlyContinue) {
-            "found=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          } else {
-            "found=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          }
-
-      - name: Setup Miniconda
-        if: steps.detect-conda-build.outputs.found != 'true'
+      - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: ${{ env.PYTHON_VERSION_MIN }}
-          miniconda-version: "latest"
+          activate-environment: ""
+          auto-activate: false
           channels: defaults
 
       - name: Create/Reset atlas-ci conda env
