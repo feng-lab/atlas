@@ -258,7 +258,7 @@ std::vector<Z3DViewSettingParamOps::ValidateResult> Z3DViewSettingParamOps::vali
 
     // Special handling for 3DTransform: accept plain field names and normalize to child jsonKeys.
     if (!normalized) {
-      if (auto tp = dynamic_cast<const Z3DTransformParameter*>(target)) {
+      if (dynamic_cast<const Z3DTransformParameter*>(target)) {
         if (v.is_object()) {
           const auto& obj = v.as_object();
           json::object outObj;

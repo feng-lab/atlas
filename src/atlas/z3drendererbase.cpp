@@ -30,7 +30,9 @@ Z3DRendererBase::Z3DRendererBase(RendererParameterState& parameterState,
   , m_clipEnabled(true)
   , m_shaderHookType(ShaderHookType::Normal)
   , m_activeBackend(initialBackend)
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   , m_renderMethod(RenderMethod::GLSL)
+#endif
 {
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   m_legacyGLState = std::make_unique<LegacyGLState>();

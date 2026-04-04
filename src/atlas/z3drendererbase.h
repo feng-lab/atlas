@@ -507,7 +507,9 @@ private:
   std::set<Z3DPrimitiveRenderer*>::iterator m_renderersIt;
   std::unique_ptr<Z3DRendererBackend> m_backend;
   RenderBackend m_activeBackend = RenderBackend::OpenGL;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   RenderMethod m_renderMethod;
+#endif
   bool m_vulkanFrameActive = false;
   bool m_keepVulkanFrameOpen = false;
   // Cached Vulkan device uniform alignment (minUniformBufferOffsetAlignment).

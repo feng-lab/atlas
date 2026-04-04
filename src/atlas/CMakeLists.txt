@@ -1160,6 +1160,9 @@ if (WIN32)
   set_source_files_properties(${LIBQXTDIR}/core/qxtcsvmodel.cpp PROPERTIES COMPILE_FLAGS /wd4458) # declaration of 'd_ptr' hides class member
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
   set_source_files_properties(${PROTO_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set_property(SOURCE ${PROTO_SRCS} APPEND PROPERTY COMPILE_OPTIONS -Wno-invalid-offsetof)
+  endif ()
 
   if (ATLAS_ENABLE_RELEASE_DEBUG_INFO)
     # Release debug info is configured centrally in the top-level CMakeLists.
