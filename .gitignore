@@ -62,6 +62,7 @@ src/neurolabi/data/
 # config file
 .idea/
 __pycache__/
+.venv/
 *.egg-info/
 /src/version/version.h
 /deploy/Atlas.AppDir/

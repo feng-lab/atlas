@@ -218,6 +218,26 @@ endif ()
 
 nanobind_add_module(${module_name} ${NB_ARGS} imgpy.cpp)
 target_link_libraries(${module_name} PRIVATE img)
+
+# Keep nanobind's static support library in the same Release IPO mode as `img`
+# and `_imgpy`. Upstream only auto-enables IPO for the shared support-library
+# path, but zimg uses the default static nanobind helper target.
+set(_zimg_nanobind_support_target "nanobind-static")
+if (IMG_PY_STABLE_ABI)
+  string(APPEND _zimg_nanobind_support_target "-abi3")
+endif ()
+if (IMG_PY_FREE_THREADED)
+  string(APPEND _zimg_nanobind_support_target "-ft")
+endif ()
+if (NOT TARGET ${_zimg_nanobind_support_target})
+  message(FATAL_ERROR "Expected nanobind support target missing: ${_zimg_nanobind_support_target}")
+endif ()
+set_property(TARGET ${_zimg_nanobind_support_target}
+             PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
+
+# Equivalent to nanobind's optional `LTO` flag for the extension target, but
+# routed through Atlas's shared Release IPO toggle so the standalone wheel
+# matches `img` and Atlas.
 set_property(TARGET ${module_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 
 if (APPLE)

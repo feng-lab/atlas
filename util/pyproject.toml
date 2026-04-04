@@ -1,27 +1,31 @@
-[build-system]
-requires = []
-build-backend = "nonexistent.shownotbebuilt.backend"
-
 [project]
 name = "atlas-build-utils"
 version = "0.0.0"
-description = "Build and deployment utilities for Atlas CI (external deps, packaging, downloads)."
+description = "Local dependency manifest for Atlas utility scripts."
 requires-python = ">=3.12"
 authors = [{ name = "Feng Lab" }]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.12",
   "Operating System :: OS Independent",
 ]
 dependencies = [
-  "boto3>=1.35.0",
-  "requests>=2.31.0",
-  "packaging>=23.2",
+  "boto3>=1.42",
+  "requests>=2.33",
+  "packaging>=26",
 ]
 
 [project.urls]
 Homepage = "https://github.com/feng-lab/atlas"
+
+[dependency-groups]
+publish = [
+  "build>=1.4",
+  "twine>=6.2",
+]
+qt = [
+  "aqtinstall>=3.3",
+]
 
 [tool.ruff]
 # Keep formatting/linting out of generated files.
