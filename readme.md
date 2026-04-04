@@ -14,6 +14,11 @@
 ### All: Python >=3.12 (required for build scripts)
 Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pip`). Any Python installers work (e.g. conda, `uv`, pyenv, or a custom install).
 
+For the standalone `zimg` wheel, the Stable ABI floor is fixed by packaging
+configuration, not by the build interpreter. Building with newer regular
+CPython is supported as long as the wheel continues to target that configured
+`abi3` floor.
+
 ### macOS:
 * install xcode
 * install homebrew **without installing xcode command line tools** and some required packages
@@ -159,6 +164,8 @@ Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pi
 ## Python Package Build
 ```bash
 # Builds the wheel; uploads to PyPI only when GIT_VERSION is exactly at a tag.
+# The builder may be regular CPython at or above the minimum supported version;
+# the published wheel target remains the configured `abi3` floor.
 python util/publish_zimg.py
 
 # install zimg from pypi

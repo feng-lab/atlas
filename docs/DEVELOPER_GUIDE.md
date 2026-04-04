@@ -3,6 +3,8 @@ Atlas Developer Guide
 Build, Run, and Layout
 
 - Build instructions: see `readme.md` (macOS/Linux/Windows, Qt 6.9.x, Intel oneAPI, Vulkan SDK 1.3+, Ninja, Conda recipe for `zimg`).
+  - Python build/tooling uses the repository's minimum supported Python version or newer.
+  - `zimg` wheel builds keep a fixed Stable ABI floor, but the build interpreter may be newer regular CPython.
   - Local developer note: when `ATLAS_DEBUG_VERSION=ON`, Atlas still configures a Release build but disables Release IPO/LTO so
     incremental relinks stay usable during day-to-day development.
   - Minimum Vulkan runtime/driver: 1.3. The engine assumes 1.3 core features (dynamic rendering, synchronization2) and no longer enables 1.2 KHR fallbacks.

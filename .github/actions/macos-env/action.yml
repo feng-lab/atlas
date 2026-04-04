@@ -20,9 +20,8 @@ inputs:
     required: false
     default: "true"
   python-version:
-    description: Python version for the conda env
-    required: false
-    default: "3.12"
+    description: Python version for the conda env (minimum CI builder version; zimg wheel ABI floor stays on the configured abi3 target)
+    required: true
 runs:
   using: composite
   steps:

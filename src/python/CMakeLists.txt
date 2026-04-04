@@ -164,6 +164,8 @@ endif ()
 # nanobind
 # Locate the Python interpreter and development headers before including nanobind.
 # Note: the requested version is a minimum; building against Python >= 3.12 is OK.
+# The Stable ABI floor remains the configured minimum even when the selected
+# builder is a newer regular CPython.
 set(_img_py_python_components Interpreter Development.Module)
 if (IMG_PY_STABLE_ABI)
   list(APPEND _img_py_python_components Development.SABIModule)

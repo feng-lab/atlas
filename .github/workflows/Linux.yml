@@ -30,6 +30,8 @@ env:
   CLANG_MAJOR: "22"
   # Centralize Qt version to make upgrades easy
   QT_VERSION: "6.9.2"
+  # Minimum Python version used by CI build environments
+  PYTHON_VERSION_MIN: "3.12"
 
 jobs:
   build-env:
@@ -167,7 +169,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION_MIN }}
           miniconda-version: "latest"
           channels: defaults
 
@@ -177,7 +179,7 @@ jobs:
         run: |
           conda info || true
           conda env remove -n atlas-ci -y || true
-          conda create -n atlas-ci -y python=3.12
+          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
 
       - name: Install conda tooling
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
@@ -360,7 +362,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION_MIN }}
           miniconda-version: "latest"
           channels: defaults
 
@@ -369,7 +371,7 @@ jobs:
         run: |
           conda info || true
           conda env remove -n atlas-ci -y || true
-          conda create -n atlas-ci -y python=3.12
+          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
 
       - name: Install conda tooling
         shell: bash -l {0}

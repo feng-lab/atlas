@@ -29,6 +29,8 @@ env:
   ONEAPI_BASEKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f18901e-877d-469d-a41a-a10f11b39336/intel-oneapi-base-toolkit-2025.3.0.372_offline.exe
   # Centralize Qt version to make upgrades easy
   QT_VERSION: "6.9.2"
+  # Minimum Python version used by CI build environments
+  PYTHON_VERSION_MIN: "3.12"
   # Pin a Vulkan SDK version
   VULKAN_SDK_VERSION: 1.4.328.1
   # Split point for 3rdparty build; job1 stops before this lib, job2 starts from this lib
@@ -180,7 +182,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION_MIN }}
           miniconda-version: "latest"
           channels: defaults
 
@@ -192,7 +194,7 @@ jobs:
           conda info
           conda env remove -n atlas-ci -y
           if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
-          conda create -n atlas-ci -y python=3.12
+          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
 
       - name: Install conda tooling and Python deps
@@ -330,7 +332,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION_MIN }}
           miniconda-version: "latest"
           channels: defaults
       
@@ -341,7 +343,7 @@ jobs:
           conda info
           conda env remove -n atlas-ci -y
           if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
-          conda create -n atlas-ci -y python=3.12
+          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
       
       - name: Install conda tooling and Python deps
@@ -508,7 +510,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION_MIN }}
           miniconda-version: "latest"
           channels: defaults
 
@@ -519,7 +521,7 @@ jobs:
           conda info
           conda env remove -n atlas-ci -y
           if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
-          conda create -n atlas-ci -y python=3.12
+          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
 
       - name: Install conda tooling

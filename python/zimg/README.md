@@ -25,6 +25,8 @@ scientific image formats.
 ## Installation
 
 - Requires Python `>= 3.12`.
+- Prebuilt wheels target the package's configured Stable ABI floor, so a wheel
+  built with newer regular CPython still targets the same runtime floor.
 - Requires NumPy (installed automatically by `pip install zimg`).
 - If a prebuilt wheel is available for your platform: `pip install zimg`.
 - If `pip` falls back to building from source, see “Building from source” below.
@@ -254,6 +256,10 @@ Supported file formats depend on how the wheel/source was built. The
 This package reuses Atlas’ native CMake build. Building from source generally
 requires the same native dependencies as Atlas (compiler toolchain, Qt, and the
 Atlas third-party libraries built/configured).
+
+For source builds, use regular CPython at or above the minimum supported
+version (not free-threaded Python). The builder itself may be newer than the
+wheel ABI floor, but the wheel target stays on that configured `abi3` floor.
 
 From the repo root:
 
