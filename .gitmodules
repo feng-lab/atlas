@@ -139,3 +139,7 @@
 [submodule "src/3rdparty/nanobind"]
 	path = src/3rdparty/nanobind
 	url = https://github.com/wjakob/nanobind
+[submodule "src/3rdparty/libtiff"]
+	path = src/3rdparty/libtiff
+	url = https://gitlab.com/libtiff/libtiff.git
+	branch = master

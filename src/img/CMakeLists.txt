@@ -5,6 +5,7 @@ project(img)
 
 # tiff srcs
 set(TIFFDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff/libtiff)
+set(TIFF_ATLAS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff_atlas/include)
 set(TIFF_SOURCES
         ${TIFFDIR}/tif_aux.c
         ${TIFFDIR}/tif_close.c
@@ -324,6 +325,7 @@ target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_NO_KEYWORDS QT_USE_QSTRINGB
 target_compile_definitions(${LIBRARY_NAME} PUBLIC BOOST_CONTAINER_NO_LIB BOOST_JSON_NO_LIB)
 
 target_compile_definitions(${LIBRARY_NAME} PRIVATE TIFF_DO_NOT_USE_NON_EXT_ALLOC_FUNCTIONS)
+set_source_files_properties(${TIFF_SOURCES} ztiff.cpp PROPERTIES INCLUDE_DIRECTORIES "${TIFF_ATLAS_INCLUDE_DIR};${TIFFDIR}")
 set_source_files_properties(${TIFFDIR}/tif_open.c PROPERTIES COMPILE_DEFINITIONS ALLOW_TIFF_NON_EXT_ALLOC_FUNCTIONS)
 # set_source_files_properties(${TIFFDIR}/tif_win32.c PROPERTIES COMPILE_DEFINITIONS ALLOW_TIFF_NON_EXT_ALLOC_FUNCTIONS)
 set_source_files_properties(${TIFFDIR}/tif_unix.c PROPERTIES COMPILE_DEFINITIONS ALLOW_TIFF_NON_EXT_ALLOC_FUNCTIONS)
@@ -394,7 +396,6 @@ if (WIN32)
     set_source_files_properties(zsaturateoperation_avx512.cpp PROPERTIES COMPILE_FLAGS /arch:AVX512)
     set_source_files_properties(zsaturateoperation_avx2.cpp PROPERTIES COMPILE_FLAGS /arch:AVX2)
 
-    set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS /I${TIFFDIR})
     set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS /I${PNG_INCLUDE_DIRS})
     if (NOT ZIMG_DISABLE_FREEIMAGE)
         set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS /I${FREEIMAGE_INCLUDE_DIRS})
@@ -455,7 +456,6 @@ else (WIN32)
     set_source_files_properties(zsaturateoperation_avx512.cpp PROPERTIES COMPILE_FLAGS -mavx512bw)
     set_source_files_properties(zsaturateoperation_avx2.cpp PROPERTIES COMPILE_FLAGS -mavx2)
 
-    set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS -I${TIFFDIR})
     set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS -I${PNG_INCLUDE_DIRS})
     foreach (item IN LISTS JPEGXR_INCLUDE_DIRS)
         message(STATUS "JPEGXR_INCLUDE_DIRS: ${item}")
