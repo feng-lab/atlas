@@ -283,16 +283,6 @@ jobs:
         with:
           dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
 
-      - name: Ensure Perl
-        shell: pwsh
-        run: |
-          if (-not (Get-Command perl -ErrorAction SilentlyContinue)) {
-            choco feature enable -n=allowGlobalConfirmation
-            choco install strawberryperl
-          }
-          perl -v
-          where perl
-
       - name: Install LLVM (release tarball)
         shell: pwsh
         run: |

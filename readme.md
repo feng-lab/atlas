@@ -50,6 +50,7 @@ CPython is supported as long as the wheel continues to target that configured
 ### Windows:
 * install visual studio 2022, intel oneapi basekit, git
 * for Atlas' clang-cl Windows path, install the official LLVM for Windows into the repository-local `llvm/` folder. Atlas probes `<repo>/llvm` first and also supports `C:\Program Files\LLVM`.
+* install Perl 5.10.0 or newer and add it to `PATH`; use a Perl 5 distribution, not Perl 6. Strawberry Perl is a good default choice.
 * install qt6 (by aqt or installer from the qt website)
     ```powershell
     # Activate your Python environment (conda/venv/uv/etc.)

@@ -5682,7 +5682,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(ext_dir(), "llfio")
             build_llfio(src_dir, ext_build_dir())
 
-        if lib_name == "jansson":
+        if lib_name == "jansson" and is_internal_dev_environment():
             package_name = find_src_package_with_glob(
                 os.path.join(src_package_dir(), "jansson*")
             )
@@ -5695,7 +5695,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 assert os.path.exists(src_dir)
             build_jansson(src_dir, ext_build_dir())
 
-        if lib_name == "pcre":
+        if lib_name == "pcre" and is_internal_dev_environment():
             if is_windows():
                 package_name = find_src_package_with_glob(
                     os.path.join(src_package_dir(), "pcre2*")
