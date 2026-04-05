@@ -167,6 +167,12 @@ def merge_dicts(x, y):
     return z
 
 
+def count_dependency_type(dependencies, dependency_type):
+    return sum(
+        1 for details in dependencies.values() if details["type"] == dependency_type
+    )
+
+
 def which(program):
     """Determine if argument is an executable and return the full path. Return None if none of either."""
 
@@ -203,10 +209,10 @@ def objdump(executable, blacklist):
 
 def objdumpr(executable, libs, blacklist):
     """Get all library dependencies (recursive) of 'executable' using objdump"""
-    output = subprocess.check_output(["objdump", "-x", executable]).decode('utf-8')
-    output = output.split('\n')
+    output = subprocess.check_output(["objdump", "-x", executable]).decode("utf-8")
+    output = output.split("\n")
 
-    accepted_columns = ['NEEDED', 'RPATH', 'RUNPATH']
+    accepted_columns = ["NEEDED", "RPATH", "RUNPATH"]
 
     for line in output:
         split = line.split()
@@ -225,35 +231,43 @@ def objdumpr(executable, libs, blacklist):
         realpath = os.path.realpath(path)
 
         if not os.path.exists(path):
-            logger.debug("Can't find path for %s (resolved to %s). Skipping...", so, path)
+            logger.debug(
+                "Can't find path for %s (resolved to %s). Skipping...", so, path
+            )
             continue
 
         if so not in libs:
-            details = {'so': so, 'path': path, 'realpath': realpath, 'dependants': {executable}, 'type': 'lib'}
+            details = {
+                "so": so,
+                "path": path,
+                "realpath": realpath,
+                "dependants": {executable},
+                "type": "lib",
+            }
             libs[so] = details
 
-            logger.debug("Resolved %s to %s", so, realpath)
+            logger.info("Resolved dependency %s -> %s", so, realpath)
 
             libs = merge_dicts(libs, lddr(realpath, libs, blacklist))
         else:
-            libs[so]['dependants'].add(executable)
+            libs[so]["dependants"].add(executable)
 
     return libs
 
 
 def ldd(executable, blacklist, env=None):
-    """Get all library dependencies (recursive) of 'executable' """
+    """Get all library dependencies (recursive) of 'executable'"""
     libs = {}
     return lddr(executable, libs, blacklist, env=env)
 
 
 def lddr(executable, libs, blacklist, env=None):
-    """Get all library dependencies (recursive) of 'executable' """
+    """Get all library dependencies (recursive) of 'executable'"""
     output = subprocess.check_output(["ldd", "-r", executable], env=env).decode("utf-8")
-    output = output.split('\n')
+    output = output.split("\n")
 
     for line in output:
-        if line.startswith('undefined symbol:'):
+        if line.startswith("undefined symbol:"):
             continue
 
         split = line.split()
@@ -264,13 +278,19 @@ def lddr(executable, libs, blacklist, env=None):
             # debug("'%s' is blacklisted. Skipping..." % (split[0]))
             continue
 
-        if split[0] == 'statically' and split[1] == 'linked':
-            logger.debug("'%s' is statically linked. Skipping...", (os.path.basename(executable)))
+        if split[0] == "statically" and split[1] == "linked":
+            logger.debug(
+                "'%s' is statically linked. Skipping...", (os.path.basename(executable))
+            )
             continue
 
         if len(split) < 3:
-            logger.warning("Could not determine path of %s %s for ldd output line '%s'. Skipping...",
-                           os.path.basename(executable), split, line)
+            logger.warning(
+                "Could not determine path of %s %s for ldd output line '%s'. Skipping...",
+                os.path.basename(executable),
+                split,
+                line,
+            )
             continue
 
         so = split[0]
@@ -278,40 +298,52 @@ def lddr(executable, libs, blacklist, env=None):
         realpath = os.path.realpath(path)
 
         if not os.path.exists(path):
-            logger.debug("Can't find path for %s (resolved to %s). Skipping...", so, path)
+            logger.debug(
+                "Can't find path for %s (resolved to %s). Skipping...", so, path
+            )
             continue
 
         if so not in libs:
-            details = {'so': so, 'path': path, 'realpath': realpath, 'dependants': {executable}, 'type': 'lib'}
+            details = {
+                "so": so,
+                "path": path,
+                "realpath": realpath,
+                "dependants": {executable},
+                "type": "lib",
+            }
             libs[so] = details
 
-            logger.debug("Resolved %s to %s", so, realpath)
+            logger.info("Resolved dependency %s -> %s", so, realpath)
 
             libs = merge_dicts(libs, lddr(realpath, libs, blacklist, env=env))
         else:
-            libs[so]['dependants'].add(executable)
+            libs[so]["dependants"].add(executable)
 
     return libs
 
 
 def strip(f):
-    cp = subprocess.run(['file', f], stdout=subprocess.PIPE, encoding='utf-8')
-    if 'not stripped' in cp.stdout:
-        res = subprocess.call(('strip', "-x", f))
+    cp = subprocess.run(["file", f], stdout=subprocess.PIPE, encoding="utf-8")
+    if "not stripped" in cp.stdout:
+        res = subprocess.call(("strip", "-x", f))
         logger.debug("Stripping '%s'", f)
         if res > 0:
-            logger.warning("'strip' command failed with return code '%s' on file '%s'", res, f)
+            logger.warning(
+                "'strip' command failed with return code '%s' on file '%s'", res, f
+            )
         return res
     else:
         return 0
 
 
 def patch_elf(options, f):
-    arguments = ['patchelf'] + options + [f]
+    arguments = ["patchelf"] + options + [f]
     res = subprocess.call(arguments)
     logger.debug("Running patchelf '%s'", arguments)
     if res > 0:
-        logger.warning("'patchelf' command failed with return code '%s' on file '%s'", res, f)
+        logger.warning(
+            "'patchelf' command failed with return code '%s' on file '%s'", res, f
+        )
     return res
 
 
@@ -349,16 +381,25 @@ def create_desktop_file(path):
     text_file.close()
 
 
-def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir,
-                 is_debug_version: bool = False):
+def build_appdir(
+    dest_dir,
+    executable,
+    dependencies,
+    qt_plugin_dir,
+    qt_qml_dir,
+    qt_lib_dir,
+    is_debug_version: bool = False,
+):
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
 
-    shutil.copytree(os.path.join(os.path.dirname(executable), 'lib'), os.path.join(dest_dir, 'lib'))
+    shutil.copytree(
+        os.path.join(os.path.dirname(executable), "lib"), os.path.join(dest_dir, "lib")
+    )
 
-    appdir_libs = 'lib'
-    appdir_qml = 'qml'
-    appdir_plugins = 'plugins'
+    appdir_libs = "lib"
+    appdir_qml = "qml"
+    appdir_plugins = "plugins"
     # appdir_libs = 'lib'
 
     if not os.path.exists(dest_dir + os.sep + appdir_libs):
@@ -374,58 +415,76 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
 
     # Handle executable
     shutil.copyfile(executable, dest_file)  # overrides dest
-    shutil.copytree(os.path.join(os.path.dirname(executable), 'Resources'), os.path.join(dest_dir, 'Resources'))
-    shutil.copy2(os.path.join(os.path.dirname(executable), 'Atlas.png'), dest_dir)
+    shutil.copytree(
+        os.path.join(os.path.dirname(executable), "Resources"),
+        os.path.join(dest_dir, "Resources"),
+    )
+    shutil.copy2(os.path.join(os.path.dirname(executable), "Atlas.png"), dest_dir)
 
     # Strip executable
     if not is_debug_version:
         strip(dest_file)
     # https://github.com/NixOS/patchelf/issues/94
     # todo: check if it is needed as we set it in cmake already
-    patch_elf(['--remove-rpath'], dest_file)
-    patch_elf(['--force-rpath', "--set-rpath", "$ORIGIN" + os.sep + appdir_libs], dest_file)
+    patch_elf(["--remove-rpath"], dest_file)
+    patch_elf(
+        ["--force-rpath", "--set-rpath", "$ORIGIN" + os.sep + appdir_libs], dest_file
+    )
 
+    logger.info(
+        "Bundling %d resolved shared libraries into '%s'",
+        count_dependency_type(dependencies, "lib"),
+        os.path.join(dest_dir, appdir_libs),
+    )
     for dep in dependencies:
         details = dependencies[dep]
 
-        if details['type'] == 'lib':
-            src = details['realpath']
+        if details["type"] == "lib":
+            src = details["realpath"]
             # Dependency filtering is performed in resolve_dependencies() via the AppImage
             # excludelist; copy every remaining DT_NEEDED entry even if it resides in
             # /usr/lib on the build machine (e.g. libzstd.so.1 on Ubuntu).
             dst = dest_dir + os.sep + appdir_libs + os.sep + dep
-            logger.debug("Copying library " + dep + ": " + src + " -> " + dst)
+            logger.info("Bundling shared library %s: %s -> %s", dep, src, dst)
             shutil.copyfile(src, dst)  # overrides dest no questions asked
             strip(dst)
 
-        elif details['type'] == 'qml plugin':
-            src = details['realpath']
-            dst = dest_dir + os.sep + appdir_qml + os.sep + src.replace(qt_qml_dir + os.sep, '', 1)
+        elif details["type"] == "qml plugin":
+            src = details["realpath"]
+            dst = (
+                dest_dir
+                + os.sep
+                + appdir_qml
+                + os.sep
+                + src.replace(qt_qml_dir + os.sep, "", 1)
+            )
             if not os.path.exists(os.path.dirname(dst)):
                 os.makedirs(os.path.dirname(dst))
             dst_dir = os.path.dirname(dst)
             src_dir = os.path.dirname(src)
 
-            logger.debug("Copying qml plugin dir " + dep + ": " + src_dir + ' -> ' + dst_dir)
+            logger.info("Bundling QML plugin %s: %s -> %s", dep, src_dir, dst_dir)
             shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
             strip(dst)
         else:
-            src = details['realpath']
-            logger.debug("Unhandled type '%s' (%s)", details['type'], src)
+            src = details["realpath"]
+            logger.debug("Unhandled type '%s' (%s)", details["type"], src)
 
-    for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6XcbQpa.so*')):
+    for dep in glob.glob(os.path.join(qt_lib_dir, "libQt6XcbQpa.so*")):
         dst = dest_dir + os.sep + appdir_libs
-        logger.debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
+        logger.info("Bundling extra Qt runtime library %s -> %s", dep, dst)
         shutil.copy2(dep, dst)  # overrides dest no questions asked
 
-    for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6WaylandClient.so*')):
+    for dep in glob.glob(os.path.join(qt_lib_dir, "libQt6WaylandClient.so*")):
         dst = dest_dir + os.sep + appdir_libs
-        logger.debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
+        logger.info("Bundling extra Qt runtime library %s -> %s", dep, dst)
         shutil.copy2(dep, dst)  # overrides dest no questions asked
 
-    for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6WaylandEglClientHwIntegration.so*')):
+    for dep in glob.glob(
+        os.path.join(qt_lib_dir, "libQt6WaylandEglClientHwIntegration.so*")
+    ):
         dst = dest_dir + os.sep + appdir_libs
-        logger.debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
+        logger.info("Bundling extra Qt runtime library %s -> %s", dep, dst)
         shutil.copy2(dep, dst)  # overrides dest no questions asked
 
     # for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6Egl*')):
@@ -433,10 +492,15 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
     #     debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
     #     shutil.copy2(dep, dst)  # overrides dest no questions asked
 
+    logger.info(
+        "Bundling Qt plugin tree: %s -> %s",
+        qt_plugin_dir,
+        os.path.join(dest_dir, appdir_plugins),
+    )
     shutil.copytree(qt_plugin_dir, os.path.join(dest_dir, appdir_plugins))
-    for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so.debug')):
+    for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, "**", "*.so.debug")):
         os.remove(dst)
-    for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so')):
+    for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, "**", "*.so")):
         strip(dst)
 
     # Make qt.conf file
@@ -446,7 +510,9 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
     create_desktop_file(dest_dir)
 
     # Make AppRun symlink
-    os.system('cd "' + dest_dir + '" && ln -s ' + os.path.basename(executable) + ' AppRun')
+    os.system(
+        'cd "' + dest_dir + '" && ln -s ' + os.path.basename(executable) + " AppRun"
+    )
 
     # Make AppRun executable
     os.system('cd "' + dest_dir + '" && chmod +x AppRun')
@@ -454,17 +520,19 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
 
 def build_appimage(appdir, appimage):
     logger.debug("Building AppImage %s from %s", appimage, appdir)
-    res = subprocess.call(('AppImageAssistant', appdir, appimage))
+    res = subprocess.call(("AppImageAssistant", appdir, appimage))
     return res
 
 
-def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_version: bool = False):
+def linuxdeployqt(
+    binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_version: bool = False
+):
     blacklist = build_blacklist()
 
-    qt_qml_dir = qt_base_dir + os.sep + 'qml'
-    qt_bin_dir = qt_base_dir + os.sep + 'bin'
-    qt_plugin_dir = qt_base_dir + os.sep + 'plugins'
-    qt_lib_dir = qt_base_dir + os.sep + 'lib'
+    qt_qml_dir = qt_base_dir + os.sep + "qml"
+    qt_bin_dir = qt_base_dir + os.sep + "bin"
+    qt_plugin_dir = qt_base_dir + os.sep + "plugins"
+    qt_lib_dir = qt_base_dir + os.sep + "lib"
 
     # temporary directory to work in
     tmp_dir = os.path.join(tempfile.gettempdir(), "linuxdeployqt.py.tmp")
@@ -472,16 +540,18 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_
         shutil.rmtree(tmp_dir)
     os.makedirs(tmp_dir)
 
-    logger.info('Executable: ' + binary_name)
-    logger.info('Qt install directory: ' + qt_base_dir)
-    logger.info('Qt QML directory: ' + qt_qml_dir)
-    logger.info('Qt bin directory: ' + qt_bin_dir)
-    logger.info('Qt plugin directory: ' + qt_plugin_dir)
-    logger.info('Qt lib directory: ' + qt_lib_dir)
+    logger.info("Executable: " + binary_name)
+    logger.info("Qt install directory: " + qt_base_dir)
+    logger.info("Qt QML directory: " + qt_qml_dir)
+    logger.info("Qt bin directory: " + qt_bin_dir)
+    logger.info("Qt plugin directory: " + qt_plugin_dir)
+    logger.info("Qt lib directory: " + qt_lib_dir)
 
     dependencies = {}
 
-    logger.info("Resolving shared object dependencies for '%s'", os.path.basename(binary_name))
+    logger.info(
+        "Resolving shared object dependencies for '%s'", os.path.basename(binary_name)
+    )
     env = os.environ.copy()
     binary_lib_dir = os.path.join(os.path.dirname(binary_name), "lib")
     if os.path.isdir(binary_lib_dir):
@@ -497,10 +567,22 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_
     exedeps = resolve_dependencies(binary_name, blacklist, env=env)
 
     dependencies = merge_dicts(dependencies, exedeps)
+    logger.info(
+        "Resolved %d shared-library dependencies for '%s'",
+        count_dependency_type(dependencies, "lib"),
+        os.path.basename(binary_name),
+    )
 
     logger.info("Building AppDir in '%s'", deploy_dir)
-    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir,
-                 is_debug_version=is_debug_version)
+    build_appdir(
+        deploy_dir,
+        binary_name,
+        dependencies,
+        qt_plugin_dir,
+        qt_qml_dir,
+        qt_lib_dir,
+        is_debug_version=is_debug_version,
+    )
 
 
 def linux_deploy_deps_to_lib_dir(binary_name: str, lib_dir: str):
@@ -522,25 +604,32 @@ def linux_deploy_deps_to_lib_dir(binary_name: str, lib_dir: str):
         shutil.rmtree(tmp_dir)
     os.makedirs(tmp_dir)
 
-    logger.info('Executable: ' + binary_name)
+    logger.info("Executable: " + binary_name)
 
     dependencies = {}
 
-    logger.info("Resolving shared object dependencies for '%s'", os.path.basename(binary_name))
+    logger.info(
+        "Resolving shared object dependencies for '%s'", os.path.basename(binary_name)
+    )
     exedeps = resolve_dependencies(binary_name, blacklist)
 
     dependencies = merge_dicts(dependencies, exedeps)
+    logger.info(
+        "Resolved %d shared-library dependencies for '%s'",
+        count_dependency_type(dependencies, "lib"),
+        os.path.basename(binary_name),
+    )
 
     logger.info("To Dir in '%s'", lib_dir)
     if not os.path.exists(lib_dir):
         os.makedirs(lib_dir)
-    
+
     for dep in dependencies:
         details = dependencies[dep]
 
-        if details['type'] == 'lib':
+        if details["type"] == "lib":
             src = details["realpath"]
             dst = lib_dir + os.sep + dep
-            logger.debug("Copying library " + dep + ": " + src + " -> " + dst)
+            logger.info("Bundling shared library %s: %s -> %s", dep, src, dst)
             shutil.copyfile(src, dst)  # overrides dest no questions asked
             strip(dst)
