@@ -35,6 +35,7 @@ from common_dirs import (
     install_gperf,
     install_ninja,
     intel_sw_dir,
+    is_internal_dev_environment,
     is_linux,
     is_mac,
     is_windows,
@@ -5659,6 +5660,19 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 os.path.join(ext_build_dir(), "packages-" + suffix),
                 dirs_exist_ok=True,
             )
+            if is_internal_dev_environment():
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "neurolabi-internal-src*")
+                )
+                source_dir = os.path.join(ext_dir(), "neurolabi")
+                if not os.path.exists(os.path.join(source_dir, "c", "CMakeLists.txt")):
+                    remove_old_src_folder_with_glob(
+                        os.path.join(ext_dir(), "neurolabi")
+                    )
+                    unpack_file_to_folder(package_name, ext_dir())
+                    assert os.path.exists(
+                        os.path.join(source_dir, "c", "CMakeLists.txt")
+                    )
 
         if lib_name == "rocksdb":
             src_dir = os.path.join(ext_dir(), "rocksdb")

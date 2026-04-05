@@ -1,9 +1,0 @@
-#!/bin/bash
-
-echo "Testing building NeuTu ..."
-conda config --set anaconda_upload yes
-./build_package neutu
-./build_package neu3
-conda config --set anaconda_upload no
-
- 

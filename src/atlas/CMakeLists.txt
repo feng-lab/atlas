@@ -1221,8 +1221,9 @@ if (WIN32)
                      $<TARGET_FILE_DIR:${APP_NAME}>/Resources/ontology)
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
-                     $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json)
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory
+                             "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json"
+                             "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/json")
   add_custom_command(TARGET ${APP_NAME} POST_BUILD
                      # Copy Vulkan resources
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -1241,14 +1242,6 @@ if (WIN32)
                      $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_validation.json
                      $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_validation.json
   )
-  # Copy pre-generated agent schema/capabilities from repo (if present)
-  if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas")
-    add_custom_command(TARGET ${APP_NAME}
-                       POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory
-                               "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas"
-                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas")
-  endif ()
   # Copy Markdown docs into bundle for in-app help
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
@@ -1333,8 +1326,9 @@ else (WIN32)
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/ontology)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json)
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory
+                               "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json")
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
                        # Copy Vulkan resources
                        COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -1364,14 +1358,6 @@ else (WIN32)
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_validation.dylib
     )
-    # Copy pre-generated agent schema/capabilities from repo (if present)
-    if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas")
-      add_custom_command(TARGET ${APP_NAME}
-                         POST_BUILD
-                         COMMAND ${CMAKE_COMMAND} -E copy_directory
-                                 "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas"
-                                 "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json/atlas")
-    endif ()
     # Copy Markdown docs into .app bundle
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
@@ -1433,8 +1419,9 @@ else (WIN32)
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/ontology)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
-                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json)
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory
+                               "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/json")
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
                        # Copy Vulkan resources
                        COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -1449,14 +1436,6 @@ else (WIN32)
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.so
                        $<TARGET_FILE_DIR:${APP_NAME}>/lib/libVkLayer_khronos_validation.so
     )
-    # Copy pre-generated agent schema/capabilities from repo (if present)
-    if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas")
-      add_custom_command(TARGET ${APP_NAME}
-                         POST_BUILD
-                         COMMAND ${CMAKE_COMMAND} -E copy_directory
-                                 "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas"
-                                 "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas")
-    endif ()
     # Copy Markdown docs into bundle
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD

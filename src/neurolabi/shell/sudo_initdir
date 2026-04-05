@@ -1,6 +1,0 @@
-#!/bin/bash
-dirname=$1
-username=$2
-mkdir $dirname
-chown $username $dirname
- 

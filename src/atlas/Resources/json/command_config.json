@@ -1,0 +1,8 @@
+{
+  "skeletonize": {
+    "include": "skeletonize.json"
+  },
+  "trace": {
+    "include": "trace_config.json"
+  }
+}

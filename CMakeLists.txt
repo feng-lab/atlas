@@ -144,12 +144,6 @@ option(ZIMG_DISABLE_FREEIMAGE
 
 include(PrintCMakeTargetInfo)
 
-# subprojects
-set(_atlas_is_windows_ci OFF)
-if (WIN32 AND (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI}))
-  set(_atlas_is_windows_ci ON)
-endif ()
-
 include(LibsForImg)
 add_subdirectory(src/img)
 
@@ -162,14 +156,19 @@ add_subdirectory(src/atlas)
 
 option(BUILD_TESTING "Enable tests" ON)
 
+set(ATLAS_INTERNAL_NEUROLABI_SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/3rdparty/neurolabi")
+set(ATLAS_HAS_INTERNAL_NEUROLABI OFF)
+if (EXISTS "${ATLAS_INTERNAL_NEUROLABI_SOURCE_DIR}/c/CMakeLists.txt"
+    AND EXISTS "${ATLAS_INTERNAL_NEUROLABI_SOURCE_DIR}/gui/CMakeLists.txt")
+  set(ATLAS_HAS_INTERNAL_NEUROLABI ON)
+endif ()
+
 if (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS) AND (NOT CMAKE_CROSSCOMPILING))
-  # Legacy neurolabi/neutu targets are only needed by tests, so keep them
-  # next to the test include instead of wiring them into the main build graph.
-  if (_atlas_is_windows_ci)
-    message(STATUS "Skipping legacy neurolabi/neutu targets on Windows CI.")
-  else ()
-    add_subdirectory(src/neurolabi/c)
-    add_subdirectory(src/neurolabi/gui)
+  # Legacy neurolabi/neutu targets are only needed by the internal parity test.
+  if (ATLAS_HAS_INTERNAL_NEUROLABI)
+    add_subdirectory(src/3rdparty/neurolabi/c)
+    add_subdirectory(src/3rdparty/neurolabi/gui)
   endif ()
   include(test/test.cmake)
 endif ()

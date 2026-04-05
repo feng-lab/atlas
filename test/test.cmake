@@ -101,16 +101,6 @@ add_gtest_executable(zstringutilstest)
 add_gtest_executable(ztupleliketest)
 # Atlas-side tests
 
-# Policy for heavy Atlas-linked tests:
-# - Enabled on developer machines.
-# - Disabled on Windows CI runners where link time/memory can be a bottleneck.
-if (NOT DEFINED _atlas_is_windows_ci)
-  set(_atlas_is_windows_ci OFF)
-  if (WIN32 AND (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI}))
-    set(_atlas_is_windows_ci ON)
-  endif ()
-endif ()
-
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
 add_atlas_gtest_executable(zvulkanpipelinecontexttest)
@@ -121,44 +111,39 @@ add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 # - Neuroglancer state/share-link parsing tests
 # - ROI mask rasterization integration tests (historically `zroimaskrastertest`)
 # - SQLite-backed HTTP disk cache tests (historically `zhttpdiskcachetest`)
-# `zatlasheavytest` is a large executable that links against atlas_lib
-# and is frequently too slow/heavy to build+link on Windows CI runners. Skip it in
-# CI to keep the default test build lightweight.
-if (_atlas_is_windows_ci)
-  message(STATUS "Skipping zatlasheavytest on Windows CI (heavy link against atlas_lib).")
-else ()
-  add_gtest_executable(zneutubeswcsignalfittertest)
+add_gtest_executable(zneutubeswcsignalfittertest)
+if (ATLAS_HAS_INTERNAL_NEUROLABI)
   add_gtest_executable(zneutubecommand2paritytest)
   target_link_libraries(zneutubecommand2paritytest neutu)
-  # skip for now
-  # add_atlas_gtest_executable(zswcpackundomergetest)
-  add_executable(
-    zatlasheavytest
-    ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zcameraparameteranimationtest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zcutspanparametertest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedchunkdecodertest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedannotationstest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedsegmentpropertiestest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedskeletontest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputede2etest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerstatetest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerurltest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zremoteobjectreadertest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancershardedreadertest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedmeshtest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zneuroglanceruint64shardingtest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zhttpretrypolicytest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zhttpsystemproxytest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zhttptruststoretest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zimgdiskcacheentrytest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zmarkdownbrowsertest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zflagfiledocumenttest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
-  target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_lib)
-  target_compile_definitions(zatlasheavytest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
-  gtest_discover_tests(zatlasheavytest DISCOVERY_TIMEOUT 600)
 endif ()
+# skip for now
+# add_atlas_gtest_executable(zswcpackundomergetest)
+add_executable(
+  zatlasheavytest
+  ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zcameraparameteranimationtest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zcutspanparametertest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedchunkdecodertest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedannotationstest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedsegmentpropertiestest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedskeletontest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputede2etest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerstatetest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerurltest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zremoteobjectreadertest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglancershardedreadertest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedmeshtest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zneuroglanceruint64shardingtest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zhttpretrypolicytest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zhttpsystemproxytest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zhttptruststoretest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zimgdiskcacheentrytest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zmarkdownbrowsertest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zflagfiledocumenttest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
+target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_lib)
+target_compile_definitions(zatlasheavytest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
+gtest_discover_tests(zatlasheavytest DISCOVERY_TIMEOUT 600)
 
 
 find_package(benchmark REQUIRED

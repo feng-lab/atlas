@@ -93,7 +93,7 @@ def _unpack_benchmark_zip(atlas_test_data_dir: str) -> None:
 
 
 def download_atlas_test_data():
-    if common_dirs.is_my_computer():
+    if common_dirs.is_internal_dev_environment():
         logger.info("skip downloading atlas test data")
         _unpack_benchmark_zip(common_dirs.static_atlas_test_data_dir())
         return

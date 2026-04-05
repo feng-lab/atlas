@@ -11,14 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 def download_atlas_deps():
-    if common_dirs.is_my_computer():
-        logger.info('skip downloading atlas deps')
+    if common_dirs.is_internal_dev_environment():
+        logger.info("skip downloading atlas deps")
         return
     files_to_download = atlas_file_hosts.with_static_urls(
         raw_files_to_download,
         static_subdir="atlas_deps",
     )
-    sync_files(files_to_download, os.path.join(common_dirs.atlas_repository_dir(), 'atlas_deps'))
+    sync_files(
+        files_to_download,
+        os.path.join(common_dirs.atlas_repository_dir(), "atlas_deps"),
+    )
 
 
 if __name__ == "__main__":

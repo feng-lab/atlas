@@ -190,7 +190,9 @@ def static_deploy_folder() -> str:
     )
 
 
-def is_my_computer() -> bool:
+def is_internal_dev_environment() -> bool:
+    # Internal/dev environment detection currently keys off the presence of the
+    # local private static Atlas mirror.
     return (
         os.path.exists(static_deploy_folder())
         and os.path.exists(os.path.join(static_deploy_folder(), "atlas_deps"))
@@ -205,7 +207,7 @@ def static_src_package_dir() -> str:
 
 
 def src_package_dir() -> str:
-    if is_my_computer():
+    if is_internal_dev_environment():
         res = static_src_package_dir()
     else:
         res = os.path.join(atlas_repository_dir(), "atlas_deps")
@@ -220,7 +222,7 @@ def static_atlas_test_data_dir() -> str:
 
 
 def atlas_test_data_dir() -> str:
-    if is_my_computer():
+    if is_internal_dev_environment():
         res = static_atlas_test_data_dir()
     else:
         res = os.path.join(atlas_repository_dir(), "atlas_test_data")

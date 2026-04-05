@@ -1,3 +1,0 @@
-#!/bin/bash
-
-date | sed 's_[ ][ ]*_-_g' | cut -d- -f6

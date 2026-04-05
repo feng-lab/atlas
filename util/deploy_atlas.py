@@ -1576,14 +1576,6 @@ def _copy_third_party_licenses_to_resources(resources_dir: str) -> None:
             os.makedirs(os.path.dirname(dst_path), exist_ok=True)
             shutil.copy2(src_path, dst_path)
 
-    # NeuTu/neurolabi is vendored outside src/3rdparty; include its upstream LICENSE.txt as well.
-    neutu_license = os.path.join(repo_root, "src", "neurolabi", "LICENSE.txt")
-    if not os.path.isfile(neutu_license):
-        raise RuntimeError(f"NeuTu license not found: {neutu_license}")
-    neutu_dst = os.path.join(dst_root, "NeuTu", "LICENSE.txt")
-    os.makedirs(os.path.dirname(neutu_dst), exist_ok=True)
-    shutil.copy2(neutu_license, neutu_dst)
-
 
 def _download_runtime_licenses(dst_runtime_dir: str) -> None:
     """Download license texts for runtime redistributions into the deployed bundle.
@@ -2270,7 +2262,7 @@ def build_atlas_installer():
             check=True,
         )
 
-    if common_dirs.is_my_computer():
+    if common_dirs.is_internal_dev_environment():
         if common_dirs.is_mac():
             out_folder = common_dirs.static_deploy_folder()
             shutil.copy2(
