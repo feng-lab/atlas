@@ -286,8 +286,6 @@ if (UNIX AND NOT APPLE)
   )
 endif ()
 
-# target_include_directories(${module_name} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
-
 # install
 install(DIRECTORY "${_ZIMG_PY_PACKAGE_DIR}/" # canonical pure-Python package sources
         DESTINATION zimg # target directory (relative so --prefix/DESTDIR work)

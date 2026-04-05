@@ -165,7 +165,7 @@ if (EXISTS "${ATLAS_INTERNAL_NEUROLABI_SOURCE_DIR}/c/CMakeLists.txt"
 endif ()
 
 if (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS) AND (NOT CMAKE_CROSSCOMPILING))
-  # Legacy neurolabi/neutu targets are only needed by the internal parity test.
+  # neurolabi/neutu targets are only needed by the internal parity test.
   if (ATLAS_HAS_INTERNAL_NEUROLABI)
     add_subdirectory(src/3rdparty/neurolabi/c)
     add_subdirectory(src/3rdparty/neurolabi/gui)

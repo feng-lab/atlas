@@ -51,7 +51,7 @@ Entry Points
   - `zToXYRatio = voxelSizeZ / voxelSizeXY` is explicit at the tracing API boundary. Entry points decide it once; the
     tracing stack then passes that value through consistently instead of recomputing anisotropy from signal metadata in
     inner loops.
-  - Legacy neuTube tracing keeps locseg positions in isotropized trace space, not raw image space: callers multiply
+  - neuTube tracing keeps locseg positions in isotropized trace space, not raw image space: callers multiply
     input seed/click `z` by `zToXYRatio` when creating locseg geometry, while sampling and mask queries divide by
     `zToXYRatio` to get back to image voxels.
   - Legacy workspace fields named `resolution` remain in a few tracing ports (`TraceWorkspace`, connection-test
@@ -117,8 +117,7 @@ Background Tasks and Cancellation
     commits the results by descending score by default so overlap suppression favors stronger local fits while cancellation
     remains responsive without fixed batch barriers. The max in-flight prepare count is tunable via
     `--atlas_autotrace_seed_sort_precompute_window_size` (default `0`, meaning "use the global CPU executor's thread count"), and
-    parity tests can restore the legacy
-    original-order commit behavior with `--atlas_autotrace_seed_sort_commit_by_score=false`.
+    parity tests can restore the original-order commit behavior with `--atlas_autotrace_seed_sort_commit_by_score=false`.
 
 Logging and Debugging
 
@@ -217,7 +216,7 @@ Neuroglancer Precomputed (HTTP)
     - Runtime LOD now lives in `Z3DMeshFilter`: the 3D filter opens the multiscale mesh source on demand, streams the full coarsest "base row" working set asynchronously in small batches while continuing to render the imported coarse mesh, and only then swaps the rendered mesh list to runtime chunk partitions and progressively refines visible rows. Document geometry is never mutated during interaction. Source-open and per-row chunk loads run on the Atlas background executor, completion is posted back to the filter thread with queued Qt calls, filter-wide plus per-row cancellation propagate down to source-level safe points before parse/decode/cache publication, and the long per-row decode/build loops now poll cancellation internally so obsolete refinement rows can stop within CPU-heavy Draco decode / mesh-build work instead of only between major awaits. Once base coverage is ready, view-driven refinement pauses while the camera is actively moving and resumes after the idle debounce; Atlas renders from already loaded chunks during interaction instead of enqueueing new refinement rows.
     - Runtime LOD selection uses the stable engine output size (propagated to filters via `updateSize()`) as its screen-space input. It must not depend on the filter's transient per-pass viewport, because compositor passes temporarily override that state (and the Vulkan path restores it after recording), which can otherwise stall async refinement until another camera move re-dirties the filter.
     - The runtime LOD scheduler keeps the current desired row frontier separate from async dispatch. Selection updates the stored frontier, and row completion only frees capacity plus re-pumps that frontier; cancellation never chooses retry rows on its own. This prevents backend switches or rapid view changes from leaving desired rows stranded in a "not loaded, not in flight" gap once cancelled work drains.
-    - Interaction is intentionally biased toward responsiveness: while the camera is moving, Atlas uses a looser detail cutoff; after a short idle debounce it requests finer visible chunks. Legacy non-multiscale mesh sources stay on the static import path.
+    - Interaction is intentionally biased toward responsiveness: while the camera is moving, Atlas uses a looser detail cutoff; after a short idle debounce it requests finer visible chunks. Non-multiscale mesh sources stay on the static import path.
     - 3D screenshots/export reuse the same runtime LOD source, but before capture Atlas now synchronously preloads the fine visible rows for the full export view with a bounded async row window and then freezes that mesh working set for the duration of the capture (including tiled exports). Export still walks mesh filters one by one, but each filter now uses a wider `threads * 8` preload window instead of the old one-row-at-a-time blocking loop. This keeps exported mesh detail stable instead of capturing whichever async rows happened to be loaded at that moment, while avoiding unbounded per-filter fan-out.
     - Saving/exporting an external-source Neuroglancer mesh materializes the finest mesh into the document before writing, clears the external-source JSON, and emits `meshChanged` so 3D views drop runtime LOD and treat the mesh as an ordinary local object.
   - Precomputed skeletons (`skeletons/`) are supported via `ZNeuroglancerPrecomputedSkeletonSource` (`src/atlas/zneuroglancerprecomputedskeleton.*`) and are imported into `ZSkeletonDoc` for SWC-like rendering.
@@ -290,7 +289,7 @@ Agents: Codegen Mode
 - When tasks require loops, randomness, or file parsing (e.g., “for each SWC, randomly translate within ranges”, or “read transforms from file and apply”), prefer codegen over raw tool chaining.
 - Workflow (multi‑step, iterative):
  - Discover with tools: `scene_list_objects`, `scene_list_params(id)`, `scene_bbox`.
- - Unified addressing across tools: use `id` only with reserved ids 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids. The legacy scope/object/group forms have been removed from Agent Tooling.
+ - Unified addressing across tools: use `id` only with reserved ids 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids.
   - Generate a small plan‑only Python script using `atlas_agent.api` (SceneAPI/CameraAPI) to compute values (no writes). Run with `python_write_and_run` and print compact JSON.
   - Validate with tools: `scene_validate_params` or `camera_validate`; refine the script if invalid.
   - Generate an apply script to write keys/params; run; then verify (`scene_get_values(id)`, `animation_list_keys(id,json_key)`).
@@ -408,7 +407,7 @@ Blocked auto trace specifics:
   remove noisy seeds first, then exclude seeds that land in the halo outside the core block.
 - The resumable session SWC remains append-only in tracing coordinates. Cross-block continuity uses exact
   `attachSwcNodeId` continuation tasks, while fresh seed-started chains try an ROI-aware interactive-style host attach
-  against the current global SWC. Final output keeps the forest shape and then applies the legacy SWC postprocess
+  against the current global SWC. Final output keeps the forest shape and then applies the SWC postprocess
   pipeline before writing `result.swc`.
 - Each blocked-trace commit directory is self-contained for resume. Besides the commit delta, Atlas persists a full SWC
   snapshot plus the full visited-block snapshot, so resume can continue from the highest loadable commit even if other
@@ -802,7 +801,7 @@ Policy:
     (`VkPhysicalDeviceDescriptorIndexingProperties`).
   - If `descriptorBindingSampledImageUpdateAfterBind` is enabled, Atlas creates the bindless set/layout/pools with
     update-after-bind enabled so large descriptor arrays are accounted against the descriptor indexing limits (this is
-    required on some drivers such as MoltenVK which expose very small legacy sampler limits).
+    required on some drivers such as MoltenVK which expose very small sampler limits).
   - If the requested capacities exceed the device’s limits, Atlas clamps them downward and logs a warning with the
     requested vs effective values and the limiting constraint.
   - If the device cannot satisfy the minimum bindless contract (at least 1 entry in each table so index 0 can be the
@@ -915,7 +914,7 @@ Common examples in the generated settings file / dialog
 Render Batch Contract
 
 - Neutral batches: renderers enqueue backend‑neutral `RenderBatch` structs that describe state, bindings, and geometry.
-- Viewport is authoritative: `BackendPassDesc::viewport` is the single source of truth for render area and depth range. The former `BackendPassDesc::extent` field has been removed.
+- Viewport is authoritative: `BackendPassDesc::viewport` is the single source of truth for render area and depth range.
 - Attachments and images:
   - Framebuffer attachments are passed via `AttachmentHandle` (backend + opaque id).
   - Sampled images are passed via `SampledImageHandle` (backend + opaque id) or CPU pixels where explicitly supported (e.g., fonts).
@@ -1143,11 +1142,11 @@ Vulkan async readback (offscreen only)
 - The compositor requests an end-of-frame GPU copy of the final color attachment into a host-visible staging buffer. The CPU reads the mapped memory after the frame fence signals (default 1-frame latency) and updates the BGRA8 local buffer for UI consumption.
 - Flags:
 - VLOG(1) includes `readback_bytes_copied` and `readback_slots_in_flight` to track throughput.
+
 ### RPC: Parameter metadata (ListParams/Capabilities)
 
 - Parameter proto now carries a single authoritative `value_schema` (google.protobuf.Struct) describing the parameter value using JSON Schema conventions.
-- Legacy numeric/vector/span fields have been removed: `number_min`, `number_max`, `number_step`, `decimal`, `vector_min`, `vector_max`, `span_min`, `span_max`, `span_step`.
-- Legacy option fields have been removed: `option_names`, `option_data`. Enumerations should be represented via `enum` inside `value_schema`.
+- Enumerations should be represented via `enum` inside `value_schema`.
 - Enumerated options remain (`option_names`, `option_data`), but enums should also appear in `value_schema` when applicable.
 - The server populates `value_schema` via `ZParameter::valueSchema()` for all parameter types. Composite types (e.g., `3DTransform`, Camera) expose an object schema with canonical subfield names.
 - Client guidance: consume `value_schema` for validation, UI hints (ranges/steps), and LLM guidance. Do not infer constraints from type strings.
