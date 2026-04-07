@@ -39,7 +39,7 @@ CPython is supported as long as the wheel continues to target that configured
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/
-    aqt install-qt --outputdir ~/Qt mac desktop 6.9.2 clang_64 # --external 7z
+    aqt install-qt --outputdir ~/Qt mac desktop 6.9.3 clang_64
     # install tools: refer to https://download.qt.io/online/qtsdkrepository/mac_x64/ifw/
     aqt install-tool --outputdir ~/Qt mac desktop tools_ifw qt.tools.ifw.47
     # list modules
@@ -61,7 +61,7 @@ CPython is supported as long as the wheel continues to target that configured
     rm -r Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/
-    aqt install-qt --outputdir c:/Qt windows desktop 6.9.2 win64_msvc2022_64
+    aqt install-qt --outputdir c:/Qt windows desktop 6.9.3 win64_msvc2022_64
     # install tools: refer to https://download.qt.io/online/qtsdkrepository/windows_x86/ifw/
     aqt install-tool --outputdir c:/Qt windows desktop tools_ifw qt.tools.ifw.47
     # list modules
@@ -101,7 +101,7 @@ CPython is supported as long as the wheel continues to target that configured
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/
-    aqt install-qt --outputdir ~/Qt linux desktop 6.9.2 linux_gcc_64 # --external 7z
+    aqt install-qt --outputdir ~/Qt linux desktop 6.9.3 linux_gcc_64
     # install tools: refer to https://download.qt.io/online/qtsdkrepository/linux_x64/ifw/
     aqt install-tool --outputdir ~/Qt linux desktop tools_ifw qt.tools.ifw.47
     # list modules
