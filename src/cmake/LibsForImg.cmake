@@ -1,5 +1,7 @@
-# qt
-include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/PathList.cmake)
+# Resolve host SDK locations through Atlas' shared CMake logic so direct IDE
+# configures and Python-driven builds use the exact same Qt/Vulkan selection.
+include(AtlasHostSdk)
+atlas_resolve_host_sdks()
 if (NOT INTEL_PATH)
   set(ATLAS_BUNDLED_INTEL_PATH "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/oneapi")
   if (WIN32)

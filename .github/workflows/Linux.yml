@@ -131,28 +131,6 @@ jobs:
           test -d /opt/intel/oneapi || { echo "/opt/intel/oneapi not found" >&2; exit 1; }
           test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
 
-      - name: Cache Vulkan SDK (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
-          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
-
-      - name: Install Vulkan SDK (LunarG)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        run: |
-          mkdir -p "$HOME/VulkanSDK"
-          cd "$HOME/VulkanSDK"
-          if [ -d "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" ]; then echo "Vulkan SDK cached"; else \
-            SDK_TAR="vulkansdk-linux-x86_64-${VULKAN_SDK_VERSION}.tar.xz"; \
-            curl -fL "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/linux/${SDK_TAR}?Human=true" -o "${SDK_TAR}"; \
-            tar -xJf "${SDK_TAR}"; \
-            rm -f "${SDK_TAR}"; \
-          fi
-          ls -la "$HOME/VulkanSDK"
-
       - name: Detect existing conda
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         id: detect-conda-linux-be
@@ -191,29 +169,8 @@ jobs:
           conda update --all -y
           conda install -y anaconda-client conda-build pip
           python -m pip install --upgrade pip
-          python -m pip install --no-cache-dir aqtinstall requests packaging boto3
+          python -m pip install --no-cache-dir requests packaging boto3
           conda clean --all -y
-
-      - name: Cache Qt (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/Qt/${{ env.QT_VERSION }}
-            ~/Qt/Tools/QtInstallerFramework
-          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
-
-      - name: Install Qt 6 (aqt)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        run: |
-          eval "$(conda shell.bash hook)"
-          conda activate atlas-ci
-          # Match readme.md recommendation for Linux
-          mkdir -p "$HOME/Qt"
-          if [ -d "$HOME/Qt/${QT_VERSION}/gcc_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" linux desktop ${QT_VERSION} linux_gcc_64; fi
-          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" linux desktop tools_ifw qt.tools.ifw.47; fi
-          ls -la "$HOME/Qt" || true
 
       - name: Cache atlas_deps (download archives)
         if: steps.cache-extlibs.outputs.cache-hit != 'true'

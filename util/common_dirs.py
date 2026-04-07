@@ -1,5 +1,6 @@
 import errno
 import glob
+import json
 import logging
 import os
 import re
@@ -8,12 +9,14 @@ import stat
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import zipfile
 
 from packaging import version
 
 logger = logging.getLogger(__name__)
+_resolved_host_sdk_metadata_cache = None
 
 
 def is_windows() -> bool:
@@ -264,26 +267,86 @@ def deploy_target_dir() -> str:
     return os.path.join(atlas_repository_dir(), "deploy")
 
 
+def _cmake_binary_for_host_sdk_resolver() -> str:
+    try:
+        return get_cmake_binary()
+    except Exception:
+        fallback = shutil.which("cmake")
+        if fallback:
+            return fallback
+        raise
+
+
+def _resolved_host_sdk_metadata() -> dict[str, str]:
+    global _resolved_host_sdk_metadata_cache
+    if _resolved_host_sdk_metadata_cache is not None:
+        return _resolved_host_sdk_metadata_cache
+
+    resolver_script = os.path.join(
+        atlas_repository_dir(), "src", "cmake", "AtlasHostSdk.cmake"
+    )
+    assert os.path.exists(resolver_script), (
+        f"Host SDK resolver script missing: {resolver_script}"
+    )
+
+    fd, output_json = tempfile.mkstemp(prefix="atlas-host-sdks-", suffix=".json")
+    os.close(fd)
+    try:
+        res = subprocess.run(
+            [
+                _cmake_binary_for_host_sdk_resolver(),
+                f"-DATLAS_HOST_SDK_OUTPUT_JSON={output_json}",
+                "-P",
+                resolver_script,
+            ],
+            shell=False,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if res.returncode != 0:
+            raise AssertionError(
+                "Host SDK resolution via CMake failed.\n"
+                f"command: {_cmake_binary_for_host_sdk_resolver()} -DATLAS_HOST_SDK_OUTPUT_JSON=... -P {resolver_script}\n"
+                f"stdout:\n{res.stdout}\n"
+                f"stderr:\n{res.stderr}"
+            )
+
+        with open(output_json, mode="r", encoding="utf-8") as f:
+            metadata = json.load(f)
+    finally:
+        if os.path.exists(output_json):
+            os.remove(output_json)
+
+    required_keys = [
+        "qt_host_path",
+        "qt_version",
+        "qtifw_bin_dir",
+        "vulkan_sdk_root",
+        "vulkan_sdk_version",
+        "vulkan_sdk",
+        "vulkan_sdk_bin_dir",
+    ]
+    missing_keys = [key for key in required_keys if key not in metadata]
+    assert not missing_keys, (
+        "Host SDK resolver returned incomplete metadata; missing keys: "
+        + ", ".join(missing_keys)
+    )
+
+    _resolved_host_sdk_metadata_cache = metadata
+    return metadata
+
+
 def qt_install_dir() -> str:
-    if is_windows():
-        res = os.path.join("C:", os.sep, "Qt")
-        if not os.path.exists(res):
-            res = os.path.join(os.path.expanduser("~"), "Qt")
-    elif is_mac():
-        res = os.path.join(os.path.expanduser("~"), "Qt")
-    else:
-        res = os.path.join(os.path.expanduser("~"), "Qt")
+    res = os.path.dirname(os.path.dirname(qt_base_dir()))
     assert os.path.exists(res)
     return res
 
 
 def qt_compiler_name() -> str:
-    if is_windows():
-        return f"msvc{windows_visual_studio_year()}_64"
-    elif is_mac():
-        return "macos"
-    else:
-        return "gcc_64"
+    res = os.path.basename(qt_base_dir())
+    assert res
+    return res
 
 
 def qmake_bin_name() -> str:
@@ -294,23 +357,15 @@ def qmake_bin_name() -> str:
 
 
 def qt_ver() -> str:
-    vers = [
-        fd
-        for fd in os.listdir(qt_install_dir())
-        if os.path.exists(
-            os.path.join(
-                qt_install_dir(), fd, qt_compiler_name(), "bin", qmake_bin_name()
-            )
-        )
-    ]
-    assert vers, "No valid QT versions found."
-    vers = sorted(vers, key=version.parse)
-    ver = vers[-1]
-    return ver
+    res = os.path.basename(os.path.dirname(qt_base_dir()))
+    assert res, "No valid QT versions found."
+    return res
 
 
 def qt_base_dir() -> str:
-    return os.path.join(qt_install_dir(), qt_ver(), qt_compiler_name())
+    res = _resolved_host_sdk_metadata()["qt_host_path"]
+    assert os.path.exists(res)
+    return res
 
 
 def qt_bin_dir() -> str:
@@ -322,32 +377,19 @@ def qmake_bin() -> str:
 
 
 def qt_installer_framework_ver() -> str:
-    folder = os.path.join(qt_install_dir(), "Tools", "QtInstallerFramework")
-    vers = [
-        fd
-        for fd in os.listdir(folder)
-        if os.path.exists(os.path.join(folder, fd, "bin"))
-    ]
-    assert vers
-    vers = sorted(vers, key=version.parse)
-    ver = vers[-1]
-    return ver
+    res = os.path.basename(os.path.dirname(qt_installer_framework_bin_dir()))
+    assert res
+    return res
 
 
 def qt_installer_framework_bin_dir() -> str:
-    folder = os.path.join(qt_install_dir(), "Tools", "QtInstallerFramework")
-    return os.path.join(folder, qt_installer_framework_ver(), "bin")
+    res = _resolved_host_sdk_metadata()["qtifw_bin_dir"]
+    assert os.path.exists(res)
+    return res
 
 
 def vulkan_SDK_dir() -> str:
-    if is_windows():
-        res = os.path.join("C:", os.sep, "VulkanSDK")
-        if not os.path.exists(res):
-            res = os.path.join(os.path.expanduser("~"), "VulkanSDK")
-    elif is_mac():
-        res = os.path.join(os.path.expanduser("~"), "VulkanSDK")
-    else:
-        res = os.path.join(os.path.expanduser("~"), "VulkanSDK")
+    res = _resolved_host_sdk_metadata()["vulkan_sdk_root"]
     assert os.path.exists(res)
     return res
 
@@ -362,17 +404,9 @@ def _vulkan_SDK_bin_folder_name() -> str:
 
 
 def vulkan_SDK_ver() -> str:
-    vers = [
-        fd
-        for fd in os.listdir(vulkan_SDK_dir())
-        if os.path.exists(
-            os.path.join(vulkan_SDK_dir(), fd, _vulkan_SDK_bin_folder_name())
-        )
-    ]
-    assert vers, "No valid vulkan SDK versions found."
-    vers = sorted(vers, key=version.parse)
-    ver = vers[-1]
-    return ver
+    res = _resolved_host_sdk_metadata()["vulkan_sdk_version"]
+    assert res, "No valid vulkan SDK versions found."
+    return res
 
 
 def _vulkan_SDK_env_folder_name() -> str:
@@ -385,17 +419,13 @@ def _vulkan_SDK_env_folder_name() -> str:
 
 
 def vulkan_SDK_env_dir() -> str:
-    res = os.path.join(
-        vulkan_SDK_dir(), vulkan_SDK_ver(), _vulkan_SDK_env_folder_name()
-    )
+    res = _resolved_host_sdk_metadata()["vulkan_sdk"]
     assert os.path.exists(res)
     return res
 
 
 def vulkan_SDK_bin_dir() -> str:
-    res = os.path.join(
-        vulkan_SDK_dir(), vulkan_SDK_ver(), _vulkan_SDK_bin_folder_name()
-    )
+    res = _resolved_host_sdk_metadata()["vulkan_sdk_bin_dir"]
     assert os.path.exists(res)
     return res
 

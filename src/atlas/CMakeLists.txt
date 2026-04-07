@@ -269,7 +269,12 @@ if (UNIX AND NOT APPLE)
   print_target_properties(OpenGL::EGL)
 endif ()
 
-message(STATUS "ENV{VULKAN_SDK}: $ENV{VULKAN_SDK}")
+message(STATUS "ATLAS_VULKAN_SDK: ${ATLAS_VULKAN_SDK}")
+set(ENV{VULKAN_SDK} "${ATLAS_VULKAN_SDK}")
+unset(Vulkan_INCLUDE_DIR CACHE)
+unset(Vulkan_LIBRARY CACHE)
+unset(Vulkan_GLSLC_EXECUTABLE CACHE)
+unset(Vulkan_GLSLANG_VALIDATOR_EXECUTABLE CACHE)
 find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator)
 print_target_properties(Vulkan::glslc)
 
@@ -970,10 +975,10 @@ if (ATLAS_USE_MSVC_LIBRARY_SPLIT)
   # Vulkan headers are required transitively by some core sources/headers (e.g. zvulkan*.h
   # included from renderer base). Ensure the SDK include path is visible to consumers too.
   if (WIN32)
-    target_include_directories(atlas_core_deps INTERFACE $ENV{VULKAN_SDK}/Include)
+    target_include_directories(atlas_core_deps INTERFACE ${ATLAS_VULKAN_SDK}/Include)
   else ()
     # Do not use Vulkan::Headers, which might point to /usr/include
-    target_include_directories(atlas_core_deps INTERFACE $ENV{VULKAN_SDK}/include)
+    target_include_directories(atlas_core_deps INTERFACE ${ATLAS_VULKAN_SDK}/include)
   endif ()
   target_compile_definitions(atlas_core_deps INTERFACE
     ATLAS_USE_CORE_PROFILE
@@ -1091,10 +1096,10 @@ else ()
   # Vulkan headers are required transitively by some Atlas sources/headers (e.g. zvulkan*.h
   # included from renderer base). Ensure the SDK include path is visible to atlas_lib too.
   if (WIN32)
-    target_include_directories(atlas_lib PUBLIC $ENV{VULKAN_SDK}/Include)
+    target_include_directories(atlas_lib PUBLIC ${ATLAS_VULKAN_SDK}/Include)
   else ()
     # Do not use Vulkan::Headers, which might point to /usr/include
-    target_include_directories(atlas_lib PUBLIC $ENV{VULKAN_SDK}/include)
+    target_include_directories(atlas_lib PUBLIC ${ATLAS_VULKAN_SDK}/include)
   endif ()
   target_compile_definitions(atlas_lib PUBLIC
     ATLAS_USE_CORE_PROFILE
@@ -1227,19 +1232,19 @@ if (WIN32)
   add_custom_command(TARGET ${APP_NAME} POST_BUILD
                      # Copy Vulkan resources
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                     $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_profiles.dll
+                     ${ATLAS_VULKAN_SDK}/Bin/VkLayer_khronos_profiles.dll
                      $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_profiles.dll
 
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                     $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_profiles.json
+                     ${ATLAS_VULKAN_SDK}/Bin/VkLayer_khronos_profiles.json
                      $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_profiles.json
 
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                     $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_validation.dll
+                     ${ATLAS_VULKAN_SDK}/Bin/VkLayer_khronos_validation.dll
                      $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_validation.dll
 
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                     $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_validation.json
+                     ${ATLAS_VULKAN_SDK}/Bin/VkLayer_khronos_validation.json
                      $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_validation.json
   )
   # Copy Markdown docs into bundle for in-app help
@@ -1332,12 +1337,12 @@ else (WIN32)
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
                        # Copy Vulkan resources
                        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                       $ENV{VULKAN_SDK}/share/vulkan
+                       ${ATLAS_VULKAN_SDK}/share/vulkan
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/vulkan
 
                        # Copy libvulkan.1.dylib if it exists
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib
+                       ${ATLAS_VULKAN_SDK}/lib/libvulkan.1.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libvulkan.1.dylib
 
                        # Create symlink for libvulkan.dylib if libvulkan.1.dylib exists
@@ -1347,15 +1352,15 @@ else (WIN32)
 
                        # Copy libMoltenVK.dylib if it exists
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libMoltenVK.dylib
+                       ${ATLAS_VULKAN_SDK}/lib/libMoltenVK.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libMoltenVK.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_profiles.dylib
+                       ${ATLAS_VULKAN_SDK}/lib/libVkLayer_khronos_profiles.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_profiles.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.dylib
+                       ${ATLAS_VULKAN_SDK}/lib/libVkLayer_khronos_validation.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_validation.dylib
     )
     # Copy Markdown docs into .app bundle
@@ -1425,15 +1430,15 @@ else (WIN32)
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
                        # Copy Vulkan resources
                        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                       $ENV{VULKAN_SDK}/share/vulkan
+                       ${ATLAS_VULKAN_SDK}/share/vulkan
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/vulkan
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_profiles.so
+                       ${ATLAS_VULKAN_SDK}/lib/libVkLayer_khronos_profiles.so
                        $<TARGET_FILE_DIR:${APP_NAME}>/lib/libVkLayer_khronos_profiles.so
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.so
+                       ${ATLAS_VULKAN_SDK}/lib/libVkLayer_khronos_validation.so
                        $<TARGET_FILE_DIR:${APP_NAME}>/lib/libVkLayer_khronos_validation.so
     )
     # Copy Markdown docs into bundle

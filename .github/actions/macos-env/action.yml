@@ -81,7 +81,7 @@ runs:
         brew install unrar p7zip git golang autoconf || true
 
     - name: Cache Vulkan SDK (installed)
-      if: ${{ inputs.enable-cache == 'true' && (inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true') }}
+      if: ${{ inputs.enable-cache == 'true' && inputs.force-setup == 'true' }}
       uses: actions/cache@v5
       with:
         path: |
@@ -89,7 +89,7 @@ runs:
         key: ${{ runner.os }}-vulkan-${{ inputs.vulkan-version }}
 
     - name: Install Vulkan SDK (LunarG macOS CLI)
-      if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.force-setup == 'true' }}
       shell: bash -l {0}
       env:
         VULKAN_SDK_VERSION: ${{ inputs.vulkan-version }}
@@ -185,7 +185,7 @@ runs:
         conda clean --all -y
 
     - name: Cache Qt (installed)
-      if: ${{ inputs.enable-cache == 'true' && (inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true') }}
+      if: ${{ inputs.enable-cache == 'true' && inputs.force-setup == 'true' }}
       uses: actions/cache@v5
       with:
         path: |
@@ -194,7 +194,7 @@ runs:
         key: ${{ runner.os }}-qt-${{ inputs.qt-version }}
 
     - name: Install Qt 6 (aqt)
-      if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.force-setup == 'true' }}
       shell: bash -l {0}
       env:
         QT_VERSION: ${{ inputs.qt-version }}

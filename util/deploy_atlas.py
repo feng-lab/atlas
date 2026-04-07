@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import json
 import logging
+import mmap
 import os
 import re
 import shlex
@@ -78,6 +79,43 @@ _MACOS_JAR_ENTRY_REMOVE_LIST: frozenset[str] = frozenset(
 
 _MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS = 5
 _MACOS_CODESIGN_TIMESTAMP_RETRY_BASE_DELAY_SECONDS = 2.0
+
+
+def _patch_qtifw_installerbase() -> None:
+    pattern_bytes = b"Mozilla/5.0"
+    replace_bytes = b"Mozilla/590"
+    installerbase = os.path.join(
+        common_dirs.qt_installer_framework_bin_dir(), "installerbase"
+    )
+    if common_dirs.is_windows():
+        installerbase += ".exe"
+
+    with open(installerbase, "r+b") as f:
+        with mmap.mmap(f.fileno(), 0) as mm:
+            all_indexes = []
+            index = mm.find(pattern_bytes)
+            while index != -1:
+                all_indexes.append(index)
+                index = mm.find(pattern_bytes, index + len(pattern_bytes))
+            if not all_indexes:
+                logger.info(
+                    "QtIFW installerbase patch already applied or not needed: %s",
+                    installerbase,
+                )
+                return
+
+            if not os.path.exists(installerbase + ".bak"):
+                shutil.copy2(installerbase, installerbase + ".bak")
+            for index in all_indexes:
+                mm[index : index + len(replace_bytes)] = replace_bytes
+            mm.flush()
+            logger.info(
+                "Patched QtIFW installerbase at %d locations: %s",
+                len(all_indexes),
+                installerbase,
+            )
+
+
 _MACOS_CODESIGN_TIMESTAMP_RETRY_MAX_DELAY_SECONDS = 30.0
 
 _MACOS_NOTARYTOOL_SUBMIT_RETRY_ATTEMPTS = 5
@@ -2300,6 +2338,7 @@ def build_atlas_installer():
 def deploy_atlas(is_debug_version: bool = False, release_pdb: bool = False):
     build_atlas_package(is_debug_version=is_debug_version, release_pdb=release_pdb)
     if not is_debug_version:
+        _patch_qtifw_installerbase()
         pack_atlas_package()
         build_atlas_installer()
 

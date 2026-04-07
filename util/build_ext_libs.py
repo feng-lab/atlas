@@ -3,7 +3,6 @@ import difflib
 import glob
 import json
 import logging
-import mmap
 import os
 import shutil
 import stat
@@ -43,9 +42,6 @@ from common_dirs import (
     llvm_bin_dir,
     llvm_install_dir,
     llvm_tools_version,
-    qt_base_dir,
-    qt_installer_framework_bin_dir,
-    qt_ver,
     remove_old_src_folder_with_glob,
     remove_old_src_folders_with_glob,
     rm_tree,
@@ -56,7 +52,6 @@ from common_dirs import (
     use_clang_cl,
     use_ninja,
     vs_install_dir,
-    vulkan_SDK_env_dir,
     windows_msbuild_platform_toolset,
     windows_native_platform_toolset,
     windows_visual_studio_generator,
@@ -5273,74 +5268,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                     logger.info("link jre-arm")
                     os.symlink(jre_dir, os.path.join(ext_build_dir(), "jre-arm"))
 
-        if lib_name == "qt":
-            logger.info(f"Qt {qt_ver()} in {qt_base_dir()}")
-            # if is_windows():
-            #     # patch Qt, not necessary for qt6
-            #     orig_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h')
-            #     bak_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h.bak')
-            #     if not os.path.exists(bak_file):
-            #         os.rename(orig_file, bak_file)
-            #         with open(bak_file, mode='r', encoding='utf-8') as f:
-            #             from_lines = f.readlines()
-            #         with open(orig_file, mode='w', encoding='utf-8') as f:
-            #             to_lines = []
-            #             for line in from_lines:
-            #                 line = line.replace(
-            #                     r'#if defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14',
-            #                     r'#if defined(_MSC_VER) || '
-            #                     r'defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14')
-            #                 f.write(line)
-            #                 to_lines.append(line)
-            #         logger.info(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
-
-            # patch installer framework
-            pattern_bytes = b"Mozilla/5.0"
-            replace_bytes = b"Mozilla/590"
-            file = os.path.join(qt_installer_framework_bin_dir(), "installerbase")
-            if is_windows():
-                file += ".exe"
-            with open(file, "r+b") as f:
-                with mmap.mmap(f.fileno(), 0) as mm:
-                    all_indexes = []
-                    index = mm.find(pattern_bytes)
-                    while index != -1:
-                        all_indexes.append(index)
-                        index = mm.find(pattern_bytes, index + len(pattern_bytes))
-                    if not all_indexes:
-                        logger.info(f"Pattern not found in {file}, skip patching.")
-                    else:
-                        # make backup
-                        shutil.copy2(file, file + ".bak")
-                        for index in all_indexes:
-                            mm[index : index + len(replace_bytes)] = replace_bytes
-                        mm.flush()
-                        logger.info(
-                            f"{file} successfully patched at {len(all_indexes)} places."
-                        )
-
-        if lib_name == "make-cmake-pathlist":
-            with open(
-                os.path.join(ext_build_dir(), "PathList.cmake"),
-                mode="w",
-                encoding="utf-8",
-            ) as file:
-                file.write("# Set PATH for CMake\n")
-                file.write(f"set(QT_VERSION {qt_ver()})\n")
-                if is_windows():
-                    file.write(
-                        'set(QT_HOST_PATH "{0}")\n'.format(
-                            qt_base_dir().replace("\\", "/")
-                        )
-                    )
-                    file.write(
-                        "set(ENV{VULKAN_SDK} "
-                        + '"{0}")\n'.format(vulkan_SDK_env_dir().replace("\\", "/"))
-                    )
-                else:
-                    file.write(f"set(QT_HOST_PATH {qt_base_dir()})\n")
-                    file.write("set(ENV{VULKAN_SDK} " + f"{vulkan_SDK_env_dir()})\n")
-
         if lib_name == "fast_float":
             src_dir = os.path.join(ext_dir(), "fast_float")
             build_fast_float(src_dir, ext_build_dir())
@@ -5768,8 +5695,6 @@ def parse_inputs(argv: list):
         "gperf",
         "ffmpeg",
         "java",
-        "qt",
-        "make-cmake-pathlist",
         "fast_float",
         "zlib",
         "boost",
@@ -5867,7 +5792,6 @@ def parse_inputs(argv: list):
         "bzip2": ["folly"],
         "libsodium": ["folly"],
         "folly": ["rocksdb", "proxygen", "wangle", "fizz", "mvfst"],
-        "qt": ["make-cmake-pathlist"],
         "wangle": ["proxygen"],
         "mvfst": ["proxygen"],
         "gperf": ["proxygen"],

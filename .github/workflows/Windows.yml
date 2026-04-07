@@ -136,36 +136,6 @@ jobs:
             C:\\Program Files (x86)\\Intel\\oneAPI
           key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
-      - name: Cache Vulkan SDK (installed)
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        id: cache-vulkan-build
-        uses: actions/cache@v5
-        with:
-          path: |
-            C:\VulkanSDK\${{ env.VULKAN_SDK_VERSION }}
-          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
-
-      - name: Install Vulkan SDK (LunarG installer)
-        if: steps.cache-vulkan-build.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $ver = $env:VULKAN_SDK_VERSION
-          $cliName = "vulkansdk-windows-X64-$ver.exe"
-          $cliPath = Join-Path $env:TEMP $cliName
-          # Use $() to avoid parsing ambiguity before query string
-          $url = "https://sdk.lunarg.com/sdk/download/$ver/windows/$($cliName)?Human=true"
-          Write-Host "Downloading Vulkan SDK CLI $ver from: $url"
-          Invoke-WebRequest -Uri $url -OutFile $cliPath -UseBasicParsing
-          if (-not (Test-Path $cliPath)) { Write-Error "Download failed: $cliPath not found" }
-          Write-Host "Installing Vulkan SDK components: core + VMA"
-          $args = @('--accept-licenses','--default-answer','--confirm-command','install','com.lunarg.vulkan.core','com.lunarg.vulkan.vma')
-          $p = Start-Process -FilePath $cliPath -ArgumentList $args -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Write-Error "Vulkan SDK CLI exit code: $($p.ExitCode)" }
-          if (-not (Test-Path "C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin\glslc.exe")) {
-            Write-Error "glslc not found under C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin — core tools missing"
-          }
-
       - name: Setup conda
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         uses: conda-incubator/setup-miniconda@v3
@@ -199,45 +169,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
           python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
-          python -m pip install --no-cache-dir aqtinstall requests packaging boto3
+          python -m pip install --no-cache-dir requests packaging boto3
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
           conda clean --all -y
-
-      - name: Cache Qt (installed)
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/Qt/${{ env.QT_VERSION }}
-            ~/Qt/Tools/QtInstallerFramework
-          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
-
-      - name: Install Qt 6 (aqt)
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
-          $qtRoot = Join-Path $HOME 'Qt'
-          New-Item -ItemType Directory -Force -Path $qtRoot | Out-Null
-          $qtVer = $env:QT_VERSION
-          $qtMSVC = Join-Path (Join-Path $qtRoot $qtVer) 'msvc2022_64'
-          if (Test-Path $qtMSVC) {
-            Write-Host 'Qt already cached'
-          } else {
-            python -m aqt install-qt --outputdir "$qtRoot" windows desktop $qtVer win64_msvc2022_64
-            if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-qt failed"; exit $LASTEXITCODE }
-          }
-          $ifwDir = Join-Path (Join-Path $qtRoot 'Tools') 'QtInstallerFramework'
-          if (Test-Path $ifwDir) {
-            Write-Host 'Qt IFW cached'
-          } else {
-            python -m aqt install-tool --outputdir "$qtRoot" windows desktop tools_ifw qt.tools.ifw.47
-            if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-tool failed"; exit $LASTEXITCODE }
-          }
-          Get-ChildItem -Force $qtRoot | Select-Object FullName
 
       - name: Cache atlas_deps (download archives)
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
