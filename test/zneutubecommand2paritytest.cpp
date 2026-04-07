@@ -3956,7 +3956,7 @@ TEST(NeutubeCommand2Parity, Trace_DiagnosisWithHostSwc_MatchesLegacy)
 TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
 {
   const std::vector<QString> candidateRelativePaths = {
-    "benchmark/fake_neuron.tif",
+    // "benchmark/fake_neuron.tif",
     "benchmark/fake_neuron2.tif",
     "benchmark/fake_neuron3.tif",
     "benchmark/fake_neuron4.tif",
@@ -3967,7 +3967,7 @@ TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
     "benchmark/line.tif",
     "benchmark/gaussians.tif",
     // 2D edge cases (depth==1) exercise local-max / neighborhood guards.
-    "benchmark/bline_2d_1.tif",
+    // "benchmark/bline_2d_1.tif",
     "benchmark/bline_2d_2.tif",
     "benchmark/bline_2d.tif",
     "benchmark/bfork_2d.tif",

@@ -15,12 +15,16 @@ if (AARCH64)
 else (AARCH64)
 
   if (NOT INTEL_PATH)
+    set(ATLAS_BUNDLED_INTEL_PATH "${CMAKE_CURRENT_LIST_DIR}/../build/oneapi")
     if (WIN32)
       set(INTEL_PATH "C:\\Program Files (x86)\\Intel\\oneAPI")
+      if (NOT EXISTS "${INTEL_PATH}/mkl/latest" OR NOT EXISTS "${INTEL_PATH}/tbb/latest/lib/cmake/tbb/TBBConfig.cmake")
+        set(INTEL_PATH "${ATLAS_BUNDLED_INTEL_PATH}")
+      endif ()
     elseif (APPLE)
       set(INTEL_PATH /opt/intel/oneapi)
       if (NOT EXISTS "${INTEL_PATH}/mkl/latest")
-        set(INTEL_PATH "${CMAKE_CURRENT_LIST_DIR}/../build/oneapi")
+        set(INTEL_PATH "${ATLAS_BUNDLED_INTEL_PATH}")
       endif ()
     else (WIN32)
       set(INTEL_PATH /opt/intel/oneapi)
@@ -47,10 +51,9 @@ else (AARCH64)
   endif ()
   set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include ${MKL_PATH}/include/fftw)
   if (WIN32)
-    # todo: fix, mkl_tbb_thread links to static version of msvc runtime so we can not use it now
     set(MKL_LIBRARIES ${MKL_LIBRARIES}
         ${MKL_PATH}/lib/mkl_intel_lp64.lib
-        ${MKL_PATH}/lib/mkl_sequential.lib
+        ${MKL_PATH}/lib/mkl_tbb_thread.lib
         ${MKL_PATH}/lib/mkl_core.lib)
   elseif (APPLE)
     set(MKL_LIBRARIES ${MKL_LIBRARIES}

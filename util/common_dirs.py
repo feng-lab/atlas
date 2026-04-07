@@ -460,40 +460,59 @@ def vc_OpenMP_redist_dir() -> str:
     return res
 
 
-def intel_sw_dir() -> str:
+def installed_intel_sw_dir_candidates() -> list[str]:
     if is_windows():
-        candidates = [
-            os.path.join("C:", os.sep, "Program Files (x86)", "Intel", "oneAPI")
-        ]
-    else:
-        candidates = [
-            os.path.join(os.sep, "opt", "intel", "oneapi"),
-            os.path.join(os.path.expanduser("~"), "oneapi"),
-        ]
+        return [os.path.join("C:", os.sep, "Program Files (x86)", "Intel", "oneAPI")]
+    return [
+        os.path.join(os.sep, "opt", "intel", "oneapi"),
+        os.path.join(os.path.expanduser("~"), "oneapi"),
+    ]
+
+
+def _is_valid_intel_sw_dir(candidate: str) -> bool:
+    if not candidate:
+        return False
+    if not os.path.exists(os.path.join(candidate, "mkl", "latest")):
+        return False
+    if is_windows():
+        return os.path.exists(os.path.join(candidate, "tbb", "latest", "lib", "cmake"))
+    return True
+
+
+def intel_sw_dir() -> str:
+    candidates = installed_intel_sw_dir_candidates()
     for candidate in candidates:
-        if os.path.exists(candidate):
+        if _is_valid_intel_sw_dir(candidate):
             return candidate
 
+    bundled_dir = os.path.join(ext_build_dir(), "oneapi")
+    if _is_valid_intel_sw_dir(bundled_dir):
+        return bundled_dir
+
+    package_patterns = []
     if is_mac():
-        bundled_dir = os.path.join(ext_build_dir(), "oneapi")
-        if os.path.exists(bundled_dir):
-            return bundled_dir
+        package_patterns = ["oneapi-mkl-*-macos-x64.tar.xz"]
+    elif is_windows():
+        package_patterns = ["oneapi-mkl-*-windows-x64.7z"]
+
+    tried = candidates + [bundled_dir]
+    last_exc = None
+    for package_pattern in package_patterns:
+        tried.append(os.path.join(src_package_dir(), package_pattern))
         try:
-            return unpack_tool_to_target_dir(
-                src_package_dir(),
-                "oneapi-mkl-*-macos-x64.tar.xz",
-                "oneapi",
+            extracted_dir = unpack_tool_to_target_dir(
+                src_package_dir(), package_pattern, "oneapi"
             )
         except Exception as exc:
-            tried = candidates + [
-                bundled_dir,
-                os.path.join("atlas_deps", "oneapi-mkl-*-macos-x64.tar.xz"),
-            ]
-            raise AssertionError(
-                "Intel oneAPI not found; tried: " + ", ".join(tried)
-            ) from exc
+            last_exc = exc
+            continue
+        if _is_valid_intel_sw_dir(extracted_dir):
+            return extracted_dir
+        tried.append(extracted_dir)
 
-    raise AssertionError("Intel oneAPI not found; tried: " + ", ".join(candidates))
+    raise AssertionError(
+        "Intel oneAPI not found; tried: " + ", ".join(tried)
+    ) from last_exc
 
 
 def tbb_dir() -> str:

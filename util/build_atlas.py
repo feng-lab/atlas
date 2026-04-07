@@ -179,7 +179,7 @@ def build_atlas(
             "-DATLAS_ENABLE_CUSTOM_COMMAND:BOOL=" + ("ON" if debug_version else "OFF"),
         ]
     )
-    if common_dirs.is_mac():
+    if common_dirs.is_mac() or common_dirs.is_windows():
         cmakecmd.append("-DINTEL_PATH=" + common_dirs.intel_sw_dir())
     cmakecmd.extend([common_dirs.atlas_repository_dir()])
 

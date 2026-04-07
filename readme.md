@@ -48,7 +48,7 @@ CPython is supported as long as the wheel continues to target that configured
 * install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3): https://vulkan.lunarg.com/home/welcome
 
 ### Windows:
-* install visual studio 2022, intel oneapi basekit, git
+* install visual studio 2022 and git
 * for Atlas' clang-cl Windows path, install the official LLVM for Windows into the repository-local `llvm/` folder. Atlas probes `<repo>/llvm` first and also supports `C:\Program Files\LLVM`.
 * install Perl 5.10.0 or newer and add it to `PATH`; use a Perl 5 distribution, not Perl 6. Strawberry Perl is a good default choice.
 * install qt6 (by aqt or installer from the qt website)
