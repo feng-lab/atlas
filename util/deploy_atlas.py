@@ -16,6 +16,7 @@ import time
 import xml.etree.ElementTree as eTree
 import zipfile
 from pathlib import Path
+from packaging.version import Version
 from typing import Optional
 
 import atlas_env
@@ -1638,13 +1639,46 @@ def _download_runtime_licenses(dst_runtime_dir: str) -> None:
     )
 
     vulkan_ver = common_dirs.vulkan_SDK_ver()
-    vulkan_base = f"https://vulkan.lunarg.com/software/license/vulkan-{vulkan_ver}"
-    for platform in ("linux", "windows", "macos"):
-        fname = f"vulkan-{vulkan_ver}-{platform}-license-summary.txt"
-        download(
-            f"{vulkan_base}-{platform}-license-summary.txt",
-            os.path.join(dst_runtime_dir, "Vulkan", fname),
+    parsed_vulkan_ver = Version(vulkan_ver)
+    vulkan_versions = [vulkan_ver]
+    if len(parsed_vulkan_ver.release) >= 4 and parsed_vulkan_ver.release[-1] != 0:
+        vulkan_versions.append(
+            ".".join(
+                str(component) for component in (*parsed_vulkan_ver.release[:-1], 0)
+            )
         )
+
+    for platform in ("linux", "windows", "macos"):
+        tried_versions = []
+        for candidate_ver in vulkan_versions:
+            tried_versions.append(candidate_ver)
+            fname = f"vulkan-{candidate_ver}-{platform}-license-summary.txt"
+            dst_path = os.path.join(dst_runtime_dir, "Vulkan", fname)
+            url = (
+                f"https://vulkan.lunarg.com/software/license/"
+                f"vulkan-{candidate_ver}-{platform}-license-summary.txt"
+            )
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            if download_utils.download_file_with_resume(url, "", dst_path):
+                if candidate_ver != vulkan_ver:
+                    logger.warning(
+                        "Downloaded Vulkan %s license summary using fallback SDK "
+                        "version %s for requested SDK %s.",
+                        platform,
+                        candidate_ver,
+                        vulkan_ver,
+                    )
+                break
+            if os.path.exists(dst_path):
+                os.remove(dst_path)
+        else:
+            logger.error(
+                "Failed to download Vulkan %s license summary for SDK %s. Tried "
+                "versions: %s. Continuing without this optional license file.",
+                platform,
+                vulkan_ver,
+                ", ".join(tried_versions),
+            )
 
 
 def _copy_runtime_redistribution_licenses_to_resources(resources_dir: str) -> None:
