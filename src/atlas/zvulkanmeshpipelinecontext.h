@@ -114,10 +114,11 @@ private:
   {
     uint64_t streamKey = 0;
     MeshPayload::ColorSource colorSource = MeshPayload::ColorSource::MeshColor;
-    bool picking = false;
+    // Picking uses per-draw material overrides but the promoted mesh SoA
+    // streams themselves stay identical, so picking is intentionally excluded.
     auto tie() const
     {
-      return std::tuple(streamKey, static_cast<int>(colorSource), picking);
+      return std::tuple(streamKey, static_cast<int>(colorSource));
     }
     bool operator<(const CacheKey& rhs) const
     {
@@ -148,6 +149,22 @@ private:
   // current submission, we must not bind the static buffers again until the
   // next submission because copies are flushed after rendering ends.
   std::set<CacheKey> m_staticCopyPendingKeys;
+  struct PendingUploadBinding
+  {
+    Z3DRendererVulkanBackend::UploadSlice pos{};
+    Z3DRendererVulkanBackend::UploadSlice norm{};
+    Z3DRendererVulkanBackend::UploadSlice color{};
+    Z3DRendererVulkanBackend::UploadSlice tex{};
+    Z3DRendererVulkanBackend::UploadSlice index{};
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t posGen = 0;
+    uint32_t normGen = 0;
+    uint32_t colorGen = 0;
+    uint32_t texGen = 0;
+    uint32_t indexGen = 0;
+  };
+  std::map<CacheKey, PendingUploadBinding> m_staticCopyPendingUploads;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 

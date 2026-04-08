@@ -228,6 +228,7 @@ void ZVulkanMeshPipelineContext::resetFrame()
   m_ddpArgsOffsets.clear();
   m_ddpArgsPrepared.clear();
   m_staticCopyPendingKeys.clear();
+  m_staticCopyPendingUploads.clear();
 }
 
 void ZVulkanMeshPipelineContext::evictStream(uint64_t streamKey)
@@ -239,6 +240,14 @@ void ZVulkanMeshPipelineContext::evictStream(uint64_t streamKey)
   for (auto it = m_staticCopyPendingKeys.begin(); it != m_staticCopyPendingKeys.end();) {
     if (it->streamKey == streamKey) {
       it = m_staticCopyPendingKeys.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto it = m_staticCopyPendingUploads.begin(); it != m_staticCopyPendingUploads.end();) {
+    if (it->first.streamKey == streamKey) {
+      it = m_staticCopyPendingUploads.erase(it);
     } else {
       ++it;
     }
@@ -1536,11 +1545,99 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
       break;
   }
 
-  // Fast path: if this stream was promoted to device-local static buffers and
-  // nothing changed, bind the static buffers and skip per-frame staging/memcpy.
+  auto rebuildDrawListFromPayload = [&]() {
+    m_draws.clear();
+    size_t vertexCursor = 0;
+    size_t indexCursor = 0;
+    for (size_t meshIdx = 0; meshIdx < payload.meshes.size(); ++meshIdx) {
+      ZMesh* mesh = payload.meshes[meshIdx];
+      if (!mesh || mesh->numVertices() == 0) {
+        continue;
+      }
+
+      MeshDraw draw{};
+      draw.mesh = mesh;
+      draw.payloadMeshIndex = meshIdx;
+      draw.firstVertex = static_cast<uint32_t>(vertexCursor);
+      draw.vertexCount = static_cast<uint32_t>(mesh->numVertices());
+
+      const auto& indices = mesh->indices();
+      if (!indices.empty() && m_indexCount > 0 && m_indexUploadBuffer) {
+        draw.indexed = true;
+        draw.firstIndex = static_cast<uint32_t>(indexCursor);
+        draw.indexCount = static_cast<uint32_t>(indices.size());
+        indexCursor += indices.size();
+      }
+
+      const auto& colors = mesh->colors();
+      const bool hasVertexColors =
+        payload.colorSource == MeshPayload::ColorSource::MeshColor && colors.size() >= mesh->numVertices();
+      const bool fallbackColorNeeded = payload.colorSource == MeshPayload::ColorSource::MeshColor && !hasVertexColors;
+
+      if (payload.pickingPass) {
+        draw.useFallbackColor = true;
+        if (meshIdx < payload.meshPickingColors.size()) {
+          draw.fallbackColor = payload.meshPickingColors[meshIdx];
+        } else {
+          draw.fallbackColor = glm::vec4(0.0f);
+        }
+      } else {
+        draw.useFallbackColor = fallbackColorNeeded;
+        draw.fallbackColor = fallbackColorNeeded ? kFallbackMeshColor : glm::vec4(1.0f);
+      }
+
+      m_draws.push_back(draw);
+      vertexCursor += mesh->numVertices();
+    }
+  };
+
+  // Fast path: if this stream/colorSource pair was promoted to device-local
+  // static buffers and nothing changed, bind the static buffers and skip
+  // per-frame staging/memcpy. Picking stays out of this key because it only
+  // changes material/fallback color state, not the immutable SoA streams.
   if (payload.streamKey != 0) {
-    CacheKey key{payload.streamKey, payload.colorSource, payload.pickingPass};
-    if (!m_staticCopyPendingKeys.contains(key)) {
+    CacheKey key{payload.streamKey, payload.colorSource};
+    if (m_staticCopyPendingKeys.contains(key)) {
+      auto pendingIt = m_staticCopyPendingUploads.find(key);
+      if (pendingIt != m_staticCopyPendingUploads.end()) {
+        const PendingUploadBinding& pending = pendingIt->second;
+        const bool sizeUnchanged = pending.vertexCount == m_vertexCount && pending.indexCount == m_indexCount;
+        const bool posSame = pending.posGen == payload.posGen;
+        const bool normSame = pending.normGen == payload.normGen;
+        const bool texSame = pending.texGen == payload.texGen;
+        const bool idxSame = pending.indexGen == payload.indexGen;
+        const bool colorSame = pending.colorGen == payload.colorGen;
+        const bool wantTex = (texBinding != TexBinding::None);
+        const bool texLayoutSame = (!wantTex && !pending.tex.buffer) || (wantTex && pending.tex.buffer);
+        const bool buffersOk = pending.pos.buffer && pending.norm.buffer && pending.color.buffer && texLayoutSame &&
+                               ((m_indexCount == 0) || pending.index.buffer);
+        if (sizeUnchanged && posSame && normSame && texSame && idxSame && colorSame && buffersOk) {
+          m_posBuffer = pending.pos.buffer;
+          m_normBuffer = pending.norm.buffer;
+          m_colorBuffer = pending.color.buffer;
+          m_posOffset = pending.pos.offset;
+          m_normOffset = pending.norm.offset;
+          m_colorOffset = pending.color.offset;
+          m_texBinding = texBinding;
+          if (wantTex) {
+            m_texBuffer = pending.tex.buffer;
+            m_texOffset = pending.tex.offset;
+          } else {
+            m_texBuffer = vk::Buffer{};
+            m_texOffset = 0;
+          }
+          if (m_indexCount > 0) {
+            m_indexUploadBuffer = pending.index.buffer;
+            m_indexUploadOffset = pending.index.offset;
+          } else {
+            m_indexUploadBuffer = vk::Buffer{};
+            m_indexUploadOffset = 0;
+          }
+          rebuildDrawListFromPayload();
+          return;
+        }
+      }
+    } else {
       auto it = m_staticCache.find(key);
       if (it != m_staticCache.end()) {
         CacheEntry& entry = it->second;
@@ -1584,52 +1681,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
             {&entry.vbPos, &entry.vbNorm, &entry.vbColor, &entry.vbTex, &entry.ib});
           m_usedStaticVBThisFrame = true;
           entry.usedStaticOnce = true;
-
-          // Rebuild draw list without touching CPU vertex data.
-          size_t vertexCursor = 0;
-          size_t indexCursor = 0;
-          for (size_t meshIdx = 0; meshIdx < payload.meshes.size(); ++meshIdx) {
-            ZMesh* mesh = payload.meshes[meshIdx];
-            if (!mesh || mesh->numVertices() == 0) {
-              continue;
-            }
-
-            MeshDraw draw{};
-            draw.mesh = mesh;
-            draw.payloadMeshIndex = meshIdx;
-            draw.firstVertex = static_cast<uint32_t>(vertexCursor);
-            draw.vertexCount = static_cast<uint32_t>(mesh->numVertices());
-
-            const auto& indices = mesh->indices();
-            if (!indices.empty() && m_indexCount > 0 && m_indexUploadBuffer) {
-              draw.indexed = true;
-              draw.firstIndex = static_cast<uint32_t>(indexCursor);
-              draw.indexCount = static_cast<uint32_t>(indices.size());
-              indexCursor += indices.size();
-            }
-
-            const auto& colors = mesh->colors();
-            const bool hasVertexColors =
-              payload.colorSource == MeshPayload::ColorSource::MeshColor && colors.size() >= mesh->numVertices();
-            const bool fallbackColorNeeded = payload.colorSource == MeshPayload::ColorSource::MeshColor && !hasVertexColors;
-
-            if (payload.pickingPass) {
-              draw.useFallbackColor = true;
-              if (meshIdx < payload.meshPickingColors.size()) {
-                draw.fallbackColor = payload.meshPickingColors[meshIdx];
-              } else {
-                draw.fallbackColor = glm::vec4(0.0f);
-              }
-            } else {
-              draw.useFallbackColor = fallbackColorNeeded;
-              draw.fallbackColor = fallbackColorNeeded ? kFallbackMeshColor : glm::vec4(1.0f);
-            }
-
-            m_draws.push_back(draw);
-            vertexCursor += mesh->numVertices();
-          }
-
-          entry.usedStaticOnce = true;
+          rebuildDrawListFromPayload();
           return;
         }
       }
@@ -1686,9 +1738,10 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
   m_texBinding = texBinding;
 
   // Index buffer slice
+  Z3DRendererVulkanBackend::UploadSlice idxSlice{};
   uint32_t* indexPtr = nullptr;
   if (totalIndices > 0) {
-    auto idxSlice = m_backend.suballocateUpload(totalIndices * sizeof(uint32_t), alignof(uint32_t));
+    idxSlice = m_backend.suballocateUpload(totalIndices * sizeof(uint32_t), alignof(uint32_t));
     if (!idxSlice.buffer || !idxSlice.mapped) {
       m_draws.clear();
       return;
@@ -1805,13 +1858,30 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
   m_vertexCount = totalVertices;
   m_indexCount = totalIndices;
 
+  auto rememberPendingUploadBinding = [&](const CacheKey& key) {
+    PendingUploadBinding binding{};
+    binding.pos = posSlice;
+    binding.norm = normSlice;
+    binding.color = colorSlice;
+    binding.tex = texSlice;
+    binding.index = idxSlice;
+    binding.vertexCount = static_cast<uint32_t>(m_vertexCount);
+    binding.indexCount = static_cast<uint32_t>(m_indexCount);
+    binding.posGen = payload.posGen;
+    binding.normGen = payload.normGen;
+    binding.colorGen = payload.colorGen;
+    binding.texGen = payload.texGen;
+    binding.indexGen = payload.indexGen;
+    m_staticCopyPendingUploads[key] = binding;
+  };
+
   // Attempt static SoA promotion based on renderer identity + gen counters
   {
     CHECK(payload.streamKey != 0) << "Mesh payload missing streamKey";
-    CacheKey key{payload.streamKey, payload.colorSource, payload.pickingPass};
+    CacheKey key{payload.streamKey, payload.colorSource};
     auto it = m_staticCache.find(key);
     const int kPromotionThreshold = 2; // frames unchanged before promotion
-    const auto promoteToStatics = [&](CacheEntry& dstEntry) -> bool {
+    const auto promoteToStatics = [&](CacheEntry& dstEntry, size_t* stagedBytesOut) -> bool {
       const size_t idxBytes = totalIndices * sizeof(uint32_t);
       Z3DRendererVulkanBackend::UploadSlice idxUpload{};
       const Z3DRendererVulkanBackend::UploadSlice* idxSrc = nullptr;
@@ -1838,6 +1908,9 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
       }
 
       dstEntry.hasTex = texBytes > 0;
+      if (stagedBytesOut != nullptr) {
+        *stagedBytesOut = stagedBytes;
+      }
       if (stagedBytes > 0) {
         m_backend.addMeshBytesStaged(stagedBytes);
       }
@@ -1857,11 +1930,21 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
 
       // UX: stage into device-local statics on first sight so steady-state
       // frames can bind fast device-local buffers starting on the next frame.
-      if (promoteToStatics(insertedEntry)) {
+      size_t stagedBytes = 0;
+      if (promoteToStatics(insertedEntry, &stagedBytes)) {
+        VLOG(1) << fmt::format(
+          "VK mesh static promote: reason=cache_miss streamKey={} colorSource={} verts={} idx={} staged={}B picking={}",
+          payload.streamKey,
+          enumOrUnderlying(payload.colorSource, 16),
+          m_vertexCount,
+          m_indexCount,
+          stagedBytes,
+          payload.pickingPass);
         insertedEntry.promoted = true;
         insertedEntry.usedStaticOnce = false;
         // Do not bind statics this frame; keep upload slices. Statics bind next frame.
         m_staticCopyPendingKeys.insert(key);
+        rememberPendingUploadBinding(key);
         return;
       }
     } else {
@@ -1896,6 +1979,8 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
       // edit frame (any stream changed), keep using upload slices to avoid
       // hazards; otherwise bind static VBs.
       if (entry.promoted && !sizeUnchanged) {
+        const uint32_t oldVertexCount = entry.vertexCount;
+        const uint32_t oldIndexCount = entry.indexCount;
         vulkan::releaseStaticSlices(m_backend, {&entry.vbPos, &entry.vbNorm, &entry.vbColor, &entry.vbTex, &entry.ib});
         entry.promoted = false;
         entry.usedStaticOnce = false;
@@ -1910,11 +1995,23 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
 
         // Recreate static slices immediately so the next steady frame can bind
         // device-local buffers without a multi-frame warmup.
-        if (promoteToStatics(entry)) {
+        size_t stagedBytes = 0;
+        if (promoteToStatics(entry, &stagedBytes)) {
+          VLOG(1) << fmt::format(
+            "VK mesh static promote: reason=size_change streamKey={} colorSource={} oldVerts={} oldIdx={} newVerts={} newIdx={} staged={}B picking={}",
+            payload.streamKey,
+            enumOrUnderlying(payload.colorSource, 16),
+            oldVertexCount,
+            oldIndexCount,
+            m_vertexCount,
+            m_indexCount,
+            stagedBytes,
+            payload.pickingPass);
           entry.promoted = true;
           entry.usedStaticOnce = false;
           // Do not bind statics this frame; keep upload slices. Statics bind next frame.
           m_staticCopyPendingKeys.insert(key);
+          rememberPendingUploadBinding(key);
           return;
         }
         return;
@@ -1992,6 +2089,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
         }
         // Defer restaging to the next frame; keep upload slices bound.
         m_staticCopyPendingKeys.insert(key);
+        rememberPendingUploadBinding(key);
         return;
       }
 
@@ -2005,11 +2103,22 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
       entry.indexGen = payload.indexGen;
 
       if (!entry.promoted && sizeUnchanged && entry.unchangedFrames >= kPromotionThreshold) {
-        if (promoteToStatics(entry)) {
+        size_t stagedBytes = 0;
+        if (promoteToStatics(entry, &stagedBytes)) {
+          VLOG(1) << fmt::format(
+            "VK mesh static promote: reason=stable streamKey={} colorSource={} verts={} idx={} unchangedFrames={} staged={}B picking={}",
+            payload.streamKey,
+            enumOrUnderlying(payload.colorSource, 16),
+            m_vertexCount,
+            m_indexCount,
+            entry.unchangedFrames,
+            stagedBytes,
+            payload.pickingPass);
           entry.promoted = true;
           entry.usedStaticOnce = false;
           // Do not bind statics this frame; keep upload slices. Statics bind next frame.
           m_staticCopyPendingKeys.insert(key);
+          rememberPendingUploadBinding(key);
         } else {
           VLOG(2) << "Mesh static promotion skipped: arena out of space";
         }

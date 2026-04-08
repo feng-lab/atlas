@@ -541,6 +541,9 @@ Vulkan Pipeline Invariants
   - Upload pages are reused across later submissions on the same frame slot via a compact active prefix, and unused tail pages are trimmed at the next safe slot reuse so one pathological peak frame does not keep gigabytes of mapped staging buffers alive forever.
   - Page capacity is chosen with awareness of `VkPhysicalDeviceMaintenance3Properties::maxMemoryAllocationSize`; Atlas must not grow a single staging allocation past the device's per-allocation limit just because one frame briefly needs more upload space.
   - `reserveUploadSlices(...)` may prepare a fresh page so a known sequence of suballocations can stay contiguous within one page, but very large sequences are still allowed to span pages rather than forcing a monolithic growth step.
+- Mesh static promotion cache (Vulkan): promoted mesh SoA buffers are keyed by immutable stream identity (`streamKey`) plus vertex payload layout (`colorSource`), not by whether the current draw is a picking pass.
+  - Picking changes per-draw material/fallback colors only. It must not duplicate device-local mesh vertex/index buffers or re-stage the same immutable geometry a second time in the same submission.
+  - When one pass in the current submission has already staged upload slices for a promoted mesh stream, later passes with the same immutable stream reuse those upload slices until the deferred upload->static copies flush at submission end. This avoids double-staging the same mesh stream before the static buffers become bindable on the next submission.
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
 
 Performance Instrumentation
