@@ -32,7 +32,7 @@ env:
   # Minimum Python version used by CI build environments
   PYTHON_VERSION_MIN: "3.12"
   # Pin a Vulkan SDK version
-  VULKAN_SDK_VERSION: 1.4.328.1
+  VULKAN_SDK_VERSION: 1.4.341.1
   # Split point for 3rdparty build; job1 stops before this lib, job2 starts from this lib
   EXT_SPLIT_LIB: hdf5
 
