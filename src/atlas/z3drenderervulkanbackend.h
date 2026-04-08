@@ -174,6 +174,40 @@ struct UniformArenaBudgetTraits<ImgSlicePayload>
   [[nodiscard]] static size_t estimateAdditionalBytes(const ImgSlicePayload& payload, size_t uniformAlignment);
 };
 
+// Batch-level estimator for per-frame uniform arena usage. This extends the
+// payload-level traits above with batch metadata that can trigger additional
+// allocations during replay/recording (for example a viewStateOverride causing
+// line/cone pipelines to allocate a dedicated frame-transform UBO slice).
+inline size_t estimateAdditionalUniformArenaBytesForBatch(const RenderBatch& batch, size_t uniformAlignment)
+{
+  size_t total = std::visit(
+    [&](const auto& payload) -> size_t {
+      using PayloadT = std::remove_cvref_t<decltype(payload)>;
+      if constexpr (kHasUniformArenaBudgetTraits<PayloadT>) {
+        return UniformArenaBudgetTraits<PayloadT>::estimateAdditionalBytes(payload, uniformAlignment);
+      }
+      return 0u;
+    },
+    batch.geometry);
+
+  if (!batch.viewStateOverride) {
+    return total;
+  }
+
+  const size_t szFrameTransforms = alignUp(sizeof(FrameTransformsUBOStd140), uniformAlignment);
+  total += std::visit(
+    [&](const auto& payload) -> size_t {
+      using PayloadT = std::remove_cvref_t<decltype(payload)>;
+      if constexpr (std::is_same_v<PayloadT, LinePayload> || std::is_same_v<PayloadT, ConePayload>) {
+        return szFrameTransforms;
+      }
+      return 0u;
+    },
+    batch.geometry);
+
+  return total;
+}
+
 } // namespace vulkan
 
 // Vulkan renderer backend borrows the shared ZVulkanDevice injected through the scratch pool.
@@ -253,8 +287,9 @@ public:
 
   // Conservative upper-bound estimate of additional uniform-arena bytes
   // required to execute the given CPU batches (e.g., dynamic transforms/material
-  // UBO slices). This excludes the always-on per-frame overhead returned by
-  // estimateFrameUniformOverheadBytes().
+  // UBO slices and batch-level replay metadata such as viewStateOverride-
+  // driven frame-transform slices). This excludes the always-on per-frame
+  // overhead returned by estimateFrameUniformOverheadBytes().
   [[nodiscard]] size_t estimateAdditionalUniformBytesForBatches(const RendererCPUState& state);
 
   // Hint the minimum uniform arena capacity (bytes) for the next begun frame.

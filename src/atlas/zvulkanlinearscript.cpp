@@ -496,6 +496,13 @@ ZVulkanLinearScript::SegmentHandle ZVulkanLinearScript::replay(std::string_view 
   m_pendingSubmissionHasGpuNodes = true;
   ReplayNode node;
   node.label = std::string(label);
+  if (state) {
+    // Callers may patch captured batches (for example attaching a
+    // viewStateOverride for replay-only overlays) before enqueuing replay.
+    // Refresh the estimate from the final replay state so uniform arena sizing
+    // matches what will actually execute.
+    state->uniformBytesEstimate = m_backend.estimateAdditionalUniformBytesForBatches(*state);
+  }
   node.state = std::move(state);
   m_nodes.emplace_back(std::move(node));
   return handle;

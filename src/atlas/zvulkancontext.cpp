@@ -355,6 +355,9 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(vk::DebugUtilsMessage
   }
 
   std::string message = pCallbackData->pMessage;
+  if (logLevel == google::GLOG_WARNING && message.find("VK_LOADER_DRIVERS_SELECT") != std::string::npos) {
+    logLevel = google::GLOG_INFO;
+  }
 
   if (pCallbackData->queueLabelCount > 0) {
     message += "\n\tQueue Labels:";

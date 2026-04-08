@@ -113,6 +113,8 @@ int main(int argc, char* argv[])
   // Set the environment variable
   qputenv("VK_ADD_LAYER_PATH", vulkanLayerPath.toUtf8());
   qputenv("VK_LAYER_PATH", vulkanLayerPath.toUtf8()); // should remove in later version
+#elif defined(Q_OS_MAC)
+  qputenv("VK_LOADER_DRIVERS_SELECT", QByteArrayLiteral("*MoltenVK*"));
 #endif
 
   QCoreApplication::setOrganizationName("fenglab");

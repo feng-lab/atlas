@@ -855,6 +855,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   size_t count = 0;
   size_t alreadyMapped = 0;
+  size_t alreadyEmpty = 0;
   size_t emptyBlockCount = 0;
   auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
 
@@ -919,20 +920,21 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       if (pageTableEntryPtr->w != 0) { // image block already mapped or is empty block
         if (pageTableEntryPtr->w == m_emptyFlag) {
-#if 1
-          LOG(ERROR) << "Error: block id shader should not collect mapped empty block, "
-                        "will reset the cache system and try again.";
-          LOG(ERROR) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
-                     << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
-                     << pageTableEntryCoord; // block id shader should not collect mapped empty block
-          resetCacheSystem(c);
-          return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, roundIndex);
-#else
-          CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
+          if (m_vulkanImageBlockUploader != nullptr) {
+            // Deferred Vulkan Block-ID readbacks are generated from a paging snapshot
+            // that can lag behind the CPU cache state. If another deferred readback
+            // already classified this block as empty, treat this ID as stale input
+            // instead of resetting the entire cache system.
+            ++alreadyEmpty;
+          } else {
+            LOG(ERROR) << "Error: block id shader should not collect mapped empty block, "
+                          "will reset the cache system and try again.";
+            LOG(ERROR) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
                        << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
                        << pageTableEntryCoord; // block id shader should not collect mapped empty block
-          ++emptyBlockCount;
-#endif
+            resetCacheSystem(c);
+            return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, roundIndex);
+          }
         } else {
           m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
           ++alreadyMapped;
@@ -1058,12 +1060,14 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     }
   }
 
-  LOG(INFO) << fmt::format("filled {} blocks ({} already mapped, {} empty blocks, read {} blocks ({} empty))",
-                           count,
-                           alreadyMapped,
-                           emptyBlockCount,
-                           pendingTasks.size(),
-                           readEmptyBlockCount);
+  LOG(INFO) << fmt::format(
+    "filled {} blocks ({} already mapped, {} already empty, {} newly empty, read {} blocks ({} empty))",
+    count,
+    alreadyMapped,
+    alreadyEmpty,
+    emptyBlockCount,
+    pendingTasks.size(),
+    readEmptyBlockCount);
 
 #ifdef ATLAS_CHECK_CACHE
   CHECK(m_usedPageTableEntry.size() == alreadyMapped + pendingTasks.size() - readEmptyBlockCount)

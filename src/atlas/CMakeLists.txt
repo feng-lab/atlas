@@ -1363,6 +1363,12 @@ else (WIN32)
                        ${ATLAS_VULKAN_SDK}/lib/libVkLayer_khronos_validation.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_validation.dylib
     )
+    if(EXISTS "${ATLAS_VULKAN_SDK}/lib/libvulkan_kosmickrisp.dylib")
+      add_custom_command(TARGET ${APP_NAME} POST_BUILD
+                         COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                                 "${ATLAS_VULKAN_SDK}/lib/libvulkan_kosmickrisp.dylib"
+                                 "$<TARGET_FILE_DIR:${APP_NAME}>/../lib/libvulkan_kosmickrisp.dylib")
+    endif()
     # Copy Markdown docs into .app bundle
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD

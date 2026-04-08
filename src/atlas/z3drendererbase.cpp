@@ -196,15 +196,7 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
     }
 
     const size_t align = m_vkUniformAlignmentForEstimates;
-    m_cpuState.uniformBytesEstimate += std::visit(
-      [&](const auto& payload) -> size_t {
-        using PayloadT = std::remove_cvref_t<decltype(payload)>;
-        if constexpr (vulkan::kHasUniformArenaBudgetTraits<PayloadT>) {
-          return vulkan::UniformArenaBudgetTraits<PayloadT>::estimateAdditionalBytes(payload, align);
-        }
-        return 0u;
-      },
-      batch.geometry);
+    m_cpuState.uniformBytesEstimate += vulkan::estimateAdditionalUniformArenaBytesForBatch(batch, align);
   }
 
   m_cpuState.batches.push_back(std::move(batch));

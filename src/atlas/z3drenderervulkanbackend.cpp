@@ -2330,15 +2330,7 @@ size_t Z3DRendererVulkanBackend::estimateAdditionalUniformBytesForBatches(const 
 
   size_t total = 0;
   for (const auto& b : state.batches) {
-    total += std::visit(
-      [&](const auto& payload) -> size_t {
-        using PayloadT = std::remove_cvref_t<decltype(payload)>;
-        if constexpr (vulkan::kHasUniformArenaBudgetTraits<PayloadT>) {
-          return vulkan::UniformArenaBudgetTraits<PayloadT>::estimateAdditionalBytes(payload, align);
-        }
-        return 0u;
-      },
-      b.geometry);
+    total += vulkan::estimateAdditionalUniformArenaBytesForBatch(b, align);
   }
 
   // Conservatively align to the device's dynamic UBO alignment.
