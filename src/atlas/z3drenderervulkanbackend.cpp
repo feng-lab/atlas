@@ -106,8 +106,38 @@ DEFINE_int32(atlas_vk_bindless_utexture3d_capacity,
 // all dynamic UBO bindings for the frame. The backend pre-sizes beyond this baseline
 // based on a cheap estimate; mid-frame growth is disallowed.
 static constexpr int kUniformArenaBaseKiB = 256;
+static constexpr size_t kUploadArenaMinPageBytes = 1ull << 20;
+static constexpr size_t kUploadArenaPreferredPageBytes = 32ull * 1024ull * 1024ull;
 
 namespace nim {
+
+namespace {
+
+size_t uploadArenaMaxPageBytes(const ZVulkanDevice& device)
+{
+  const vk::DeviceSize limit = device.maxMemoryAllocationSize();
+  if (limit == 0 || limit >= static_cast<vk::DeviceSize>(std::numeric_limits<size_t>::max())) {
+    return std::numeric_limits<size_t>::max();
+  }
+  return static_cast<size_t>(limit);
+}
+
+size_t chooseUploadArenaPageCapacity(const ZVulkanDevice& device, size_t minCapacity)
+{
+  const size_t limit = uploadArenaMaxPageBytes(device);
+  if (minCapacity > limit) {
+    return 0;
+  }
+
+  const size_t preferred = std::max<size_t>(kUploadArenaMinPageBytes, std::min(kUploadArenaPreferredPageBytes, limit));
+  size_t capacity = std::max(minCapacity, preferred);
+  if (capacity > limit) {
+    capacity = minCapacity;
+  }
+  return capacity;
+}
+
+} // namespace
 
 namespace vulkan {
 size_t UniformArenaBudgetTraits<ImgRaycasterPayload>::estimateAdditionalBytes(const ImgRaycasterPayload& payload,
@@ -834,20 +864,17 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Reset DDP device-args arena for this submission.
   frameResources.ddpArgsDevice.cursor = 0;
   frameResources.ddpArgsDevice.retiredBuffers.clear();
-  // Reset per-frame upload arena virtual block; free retired resources
-  if (frameResources.uploadArena.block != nullptr) {
-    vmaClearVirtualBlock(frameResources.uploadArena.block);
+  trimUnusedUploadPages(frameResources.uploadArena);
+  // Reset per-frame upload pages. Pages are kept per frame-slot so upload
+  // slices remain valid until submission completion, then reused by rewinding
+  // the compact active prefix at the next safe point.
+  for (auto& page : frameResources.uploadArena.pages) {
+    page.cursor = 0;
   }
+  frameResources.uploadArena.activePageIndex = 0;
+  frameResources.uploadArena.usedPageCount = 0;
+  frameResources.uploadArena.usedBytes = 0;
   frameResources.uploadArena.highWatermark = 0;
-  // Release any retired upload buffers from a previous use of this frame.
-  for (auto& r : frameResources.uploadArena.retiredBuffers) {
-    if (r.block != nullptr) {
-      vmaDestroyVirtualBlock(r.block);
-      r.block = nullptr;
-    }
-    r.buffer.reset();
-  }
-  frameResources.uploadArena.retiredBuffers.clear();
   // Ensure static arenas exist once a device is present
   ensureStaticArenas();
 
@@ -3186,6 +3213,95 @@ void Z3DRendererVulkanBackend::ensureSharedSamplers()
   }
 }
 
+Z3DRendererVulkanBackend::FrameResources::UploadArena::Page*
+Z3DRendererVulkanBackend::activateUploadPage(FrameResources::UploadArena& arena,
+                                             size_t minCapacity,
+                                             std::string_view debugLabel)
+{
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in activateUploadPage";
+
+  const size_t pageCapacity = chooseUploadArenaPageCapacity(*m_sharedDevice, minCapacity);
+  if (pageCapacity == 0) {
+    LOG(ERROR) << fmt::format("Upload arena request exceeds Vulkan maxMemoryAllocationSize: need={}B max={}B",
+                              minCapacity,
+                              static_cast<uint64_t>(uploadArenaMaxPageBytes(*m_sharedDevice)));
+    return nullptr;
+  }
+
+  const size_t targetIndex = arena.usedPageCount;
+  size_t bestReuseIndex = arena.pages.size();
+  for (size_t i = targetIndex; i < arena.pages.size(); ++i) {
+    if (arena.pages[i].capacity < minCapacity) {
+      continue;
+    }
+    if (bestReuseIndex == arena.pages.size() || arena.pages[i].capacity < arena.pages[bestReuseIndex].capacity) {
+      bestReuseIndex = i;
+    }
+  }
+
+  if (bestReuseIndex < arena.pages.size()) {
+    if (bestReuseIndex != targetIndex) {
+      std::swap(arena.pages[targetIndex], arena.pages[bestReuseIndex]);
+    }
+    auto& page = arena.pages[targetIndex];
+    CHECK(page.cursor == 0u) << "Reused upload page cursor was not reset";
+    arena.activePageIndex = targetIndex;
+    arena.usedPageCount = targetIndex + 1;
+    VLOG(1) << fmt::format("Upload arena reused page: index={} size={}B request={}B spare_pages={} ({})",
+                           arena.activePageIndex,
+                           page.capacity,
+                           minCapacity,
+                           arena.pages.size() - arena.usedPageCount,
+                           debugLabel);
+    return &page;
+  }
+
+  const size_t newIndex = arena.pages.size();
+  arena.pages.emplace_back();
+  auto& newPage = arena.pages.back();
+  newPage.buffer = m_sharedDevice->createBufferInPool(
+    pageCapacity,
+    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
+      vk::BufferUsageFlagBits::eTransferSrc,
+    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+    m_sharedDevice->uploadTransientPool());
+  newPage.capacity = pageCapacity;
+  newPage.mapped = newPage.buffer->map(0, pageCapacity);
+  newPage.cursor = 0;
+  if (newIndex != targetIndex) {
+    std::swap(arena.pages[targetIndex], arena.pages.back());
+  }
+  auto& page = arena.pages[targetIndex];
+  arena.activePageIndex = targetIndex;
+  arena.usedPageCount = targetIndex + 1;
+  VLOG(1) << fmt::format("Upload arena added page: index={} size={}B request={}B total_pages={} ({})",
+                         arena.activePageIndex,
+                         pageCapacity,
+                         minCapacity,
+                         arena.pages.size(),
+                         debugLabel);
+  return &page;
+}
+
+void Z3DRendererVulkanBackend::trimUnusedUploadPages(FrameResources::UploadArena& arena)
+{
+  if (arena.pages.size() <= arena.usedPageCount) {
+    return;
+  }
+
+  size_t trimmedBytes = 0;
+  for (size_t i = arena.usedPageCount; i < arena.pages.size(); ++i) {
+    trimmedBytes += arena.pages[i].capacity;
+  }
+  const size_t keptPages = arena.usedPageCount;
+  const size_t trimmedPages = arena.pages.size() - keptPages;
+  arena.pages.resize(keptPages);
+  VLOG(1) << fmt::format("Upload arena trimmed unused tail: kept_pages={} trimmed_pages={} trimmed_bytes={}B",
+                         keptPages,
+                         trimmedPages,
+                         trimmedBytes);
+}
+
 Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUpload(size_t bytes, size_t alignment)
 {
   UploadSlice slice{};
@@ -3193,77 +3309,51 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
     VLOG(2) << "suballocateUpload: inactive frame; returning null slice for " << bytes << " bytes";
     return slice;
   }
+  if (bytes == 0) {
+    return slice;
+  }
   CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in suballocateUpload";
 
   auto& arena = m_activeFrame->uploadArena;
 
-  const size_t required = bytes; // virtual allocator handles alignment and placement
-
-  auto ensureCapacity = [&](size_t minCapacity) {
-    if (arena.buffer && arena.mapped && arena.capacity >= minCapacity) {
-      return;
+  auto ensureActivePage = [&](size_t minBytes,
+                              size_t align) -> Z3DRendererVulkanBackend::FrameResources::UploadArena::Page* {
+    if (arena.usedPageCount > 0 && arena.activePageIndex < arena.usedPageCount) {
+      auto& page = arena.pages[arena.activePageIndex];
+      const size_t alignedCursor = vulkan::alignUp(page.cursor, std::max<size_t>(align, 1));
+      if (alignedCursor + minBytes <= page.capacity) {
+        return &page;
+      }
     }
-    size_t newCapacity = std::max<size_t>(static_cast<size_t>(1) << 20, arena.capacity);
-    while (newCapacity < minCapacity) {
-      newCapacity = newCapacity ? (newCapacity * 2) : (static_cast<size_t>(1) << 20);
-    }
-    // Move the previous buffer to the retired list so any already-returned
-    // mapped pointers remain valid for the rest of the frame.
-    if (arena.buffer) {
-      arena.retiredBuffers.push_back({std::move(arena.buffer), arena.block});
-      arena.block = nullptr;
-    }
-    // Upload arena buffers act as sources for GPU copies into device-local
-    // static buffers. They must carry TRANSFER_SRC usage (not DST).
-    arena.buffer = m_sharedDevice->createBufferInPool(
-      newCapacity,
-      vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
-        vk::BufferUsageFlagBits::eTransferSrc,
-      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-      m_sharedDevice->uploadTransientPool());
-    arena.capacity = newCapacity;
-    // Persistently map the entire buffer
-    arena.mapped = arena.buffer->map(0, newCapacity);
-    // Create a fresh virtual block spanning [0, capacity)
-    VmaVirtualBlockCreateInfo vinfo{};
-    vinfo.size = newCapacity;
-    if (vmaCreateVirtualBlock(&vinfo, &arena.block) != VK_SUCCESS) {
-      arena.block = nullptr;
-      LOG(ERROR) << "Failed to create VMA virtual block for upload arena";
-    }
+    return activateUploadPage(arena, minBytes, "suballocateUpload");
   };
 
-  VLOG(2) << "suballocateUpload: request bytes=" << bytes << " align=" << alignment << " required=" << required
-          << " cap=" << arena.capacity;
-  const size_t prevCap = arena.capacity;
-  void* prevMapped = arena.mapped;
-  ensureCapacity(required);
-  if (arena.capacity != prevCap || arena.mapped != prevMapped) {
-    VLOG(2) << "suballocateUpload: after ensureCapacity cap=" << arena.capacity
-            << " mapped=" << (arena.mapped != nullptr);
+  auto* page = ensureActivePage(bytes, alignment);
+  if (page == nullptr) {
+    return slice;
   }
 
-  // Allocate from the virtual block
-  VmaVirtualAllocationCreateInfo ainfo{};
-  ainfo.size = bytes;
-  ainfo.alignment = std::max<size_t>(1, alignment);
-  VmaVirtualAllocation alloc = nullptr;
-  VkDeviceSize vOffset = 0;
-  if (arena.block == nullptr || vmaVirtualAllocate(arena.block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
-    VLOG(1) << "suballocateUpload: virtual allocate failed; attempting to grow arena";
-    ensureCapacity(arena.capacity + required);
-    if (arena.block == nullptr || vmaVirtualAllocate(arena.block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
-      VLOG(1) << "suballocateUpload: virtual allocate failed after growth";
-      return slice;
-    }
-  }
-  slice.buffer = arena.buffer->buffer();
-  slice.offset = static_cast<vk::DeviceSize>(vOffset);
-  slice.mapped = arena.mapped ? static_cast<uint8_t*>(arena.mapped) + static_cast<size_t>(vOffset) : nullptr;
+  const size_t alignedCursor = vulkan::alignUp(page->cursor, std::max<size_t>(alignment, 1));
+  CHECK(alignedCursor + bytes <= page->capacity)
+    << fmt::format("Upload arena page overflow: need={}B have={}B page={} cursor={}B align={}B",
+                   bytes,
+                   page->capacity,
+                   arena.activePageIndex,
+                   page->cursor,
+                   alignment);
+
+  const size_t consumed = (alignedCursor - page->cursor) + bytes;
+  page->cursor = alignedCursor + bytes;
+  arena.usedBytes += consumed;
+  arena.highWatermark = std::max(arena.highWatermark, arena.usedBytes);
+
+  slice.buffer = page->buffer->buffer();
+  slice.offset = static_cast<vk::DeviceSize>(alignedCursor);
+  slice.mapped = page->mapped ? static_cast<uint8_t*>(page->mapped) + alignedCursor : nullptr;
   slice.size = bytes;
-  arena.highWatermark = std::max<vk::DeviceSize>(arena.highWatermark, vOffset + static_cast<VkDeviceSize>(bytes));
-  VLOG(2) << "suballocateUpload: slice buf=" << static_cast<bool>(slice.buffer) << " off=" << slice.offset
-          << " size=" << slice.size << " mapped=" << (slice.mapped != nullptr);
+  VLOG(2) << "suballocateUpload: request bytes=" << bytes << " align=" << alignment << " page=" << arena.activePageIndex
+          << " pageCap=" << page->capacity << " off=" << slice.offset << " size=" << slice.size
+          << " mapped=" << (slice.mapped != nullptr) << " used=" << arena.usedBytes;
   return slice;
 }
 
@@ -3277,7 +3367,7 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   }
   CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in reserveUploadSlices";
   auto& arena = m_activeFrame->uploadArena;
-  size_t cursor = 0; // virtual block will handle placement; we just size the buffer
+  size_t cursor = 0;
   for (const auto& s : slices) {
     const size_t bytes = s.first;
     const size_t align = s.second ? s.second : 1;
@@ -3288,35 +3378,43 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
     cursor = aligned + bytes;
   }
   const size_t required = cursor;
-  if (arena.buffer && arena.mapped && arena.capacity >= required) {
+  if (required == 0) {
     return;
   }
-  size_t newCapacity = std::max<size_t>(static_cast<size_t>(1) << 20, arena.capacity);
-  while (newCapacity < required) {
-    newCapacity = newCapacity ? (newCapacity * 2) : (static_cast<size_t>(1) << 20);
+
+  const size_t maxPageBytes = uploadArenaMaxPageBytes(*m_sharedDevice);
+  if (required > maxPageBytes) {
+    VLOG(1) << fmt::format(
+      "reserveUploadSlices: sequence {}B exceeds max page {}B; suballocations may span multiple pages",
+      required,
+      maxPageBytes);
+    return;
   }
-  if (arena.buffer) {
-    arena.retiredBuffers.push_back({std::move(arena.buffer), arena.block});
-    arena.block = nullptr;
+
+  if (arena.usedPageCount > 0 && arena.activePageIndex < arena.usedPageCount) {
+    const auto& page = arena.pages[arena.activePageIndex];
+    size_t pageCursor = page.cursor;
+    for (const auto& s : slices) {
+      const size_t bytes = s.first;
+      const size_t align = s.second ? s.second : 1;
+      if (bytes == 0) {
+        continue;
+      }
+      const size_t aligned = vulkan::alignUp(pageCursor, align);
+      pageCursor = aligned + bytes;
+    }
+    if (pageCursor <= page.capacity) {
+      return;
+    }
   }
-  // Upload arena buffers act as the source of GPU copies into device-local
-  // static buffers. They must be created with TRANSFER_SRC usage (not DST).
-  arena.buffer = m_sharedDevice->createBufferInPool(
-    newCapacity,
-    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
-      vk::BufferUsageFlagBits::eTransferSrc,
-    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-    m_sharedDevice->uploadTransientPool());
-  arena.capacity = newCapacity;
-  arena.mapped = arena.buffer->map(0, newCapacity);
-  // Create a fresh virtual block spanning [0, capacity)
-  VmaVirtualBlockCreateInfo vinfo{};
-  vinfo.size = newCapacity;
-  if (vmaCreateVirtualBlock(&vinfo, &arena.block) != VK_SUCCESS) {
-    arena.block = nullptr;
-    LOG(ERROR) << "Failed to create VMA virtual block for upload arena (reserve)";
-  }
-  VLOG(2) << fmt::format("reserveUploadSlices: grew arena to {} bytes for {} slices", newCapacity, slices.size());
+
+  auto* page = activateUploadPage(arena, required, "reserveUploadSlices");
+  CHECK(page != nullptr) << "reserveUploadSlices failed to activate a page for " << required << " bytes";
+  VLOG(2) << fmt::format("reserveUploadSlices: prepared page={} size={}B for {} slices ({}B)",
+                         arena.activePageIndex,
+                         page->capacity,
+                         slices.size(),
+                         required);
 }
 
 Z3DRendererVulkanBackend::StaticArena::Segment::~Segment()

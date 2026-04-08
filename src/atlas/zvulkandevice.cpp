@@ -85,6 +85,13 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   const auto& phys = m_context.physicalDevice();
   const auto props = phys.getProperties();
   const auto& limits = props.limits;
+  try {
+    auto props2 = phys.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceMaintenance3Properties>();
+    m_maxMemoryAllocationSize = props2.get<vk::PhysicalDeviceMaintenance3Properties>().maxMemoryAllocationSize;
+  }
+  catch (...) {
+    m_maxMemoryAllocationSize = std::numeric_limits<vk::DeviceSize>::max();
+  }
   const auto features = phys.getFeatures();
   const auto fmt = vk::Format::eR32G32B32A32Uint;
   const auto fprops = phys.getFormatProperties(fmt);
@@ -110,6 +117,8 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
     (minAlign ? minAlign : static_cast<size_t>(256)),
     maxRange,
     m_framesInFlight);
+  LOG(INFO) << fmt::format("VK device allocation limits: maxMemoryAllocationSize={}B",
+                           static_cast<uint64_t>(m_maxMemoryAllocationSize));
   try {
     auto domains = phys.getCalibrateableTimeDomainsEXT();
     bool supported = !domains.empty();

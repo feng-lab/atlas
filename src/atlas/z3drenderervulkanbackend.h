@@ -464,15 +464,18 @@ public:
     size_t size = 0; // requested bytes
   };
 
-  // Obtain a suballocation in the current frame's upload arena. Grows the
-  // underlying buffer if necessary. Returns an empty slice when no active
-  // frame is recording (e.g., zero-sized viewport).
+  // Obtain a suballocation in the current frame's upload arena. The arena is a
+  // paged linear allocator over one or more persistently mapped host-visible
+  // buffers; when the current page fills, the backend reuses a later page from
+  // the frame-slot pool or allocates a new one as needed. Returns an empty
+  // slice when no active frame is recording.
   UploadSlice suballocateUpload(size_t bytes, size_t alignment = 16);
 
-  // Precisely reserve space in the per-frame upload arena for a sequence of
-  // slices, each given as {bytes, alignment}. When enabled via flag, this
-  // performs at most one growth before any suballocations to keep all slices
-  // within the same underlying buffer. No-op if not recording or disabled.
+  // Precisely reserve space in the current upload page for a sequence of slices,
+  // each given as {bytes, alignment}. When the active page lacks enough room,
+  // this activates a reusable later page (or allocates a fresh one) so the
+  // subsequent sequence can suballocate without mid-batch rollover. No-op if
+  // not recording or disabled.
   void reserveUploadSlices(std::initializer_list<std::pair<size_t, size_t>> slices);
 
   // Device-local static buffer arena (lifetime: backend)
@@ -1101,19 +1104,18 @@ private:
     // Per-frame CPU→GPU upload arena for transient vertex/index data
     struct UploadArena
     {
-      std::unique_ptr<class ZVulkanBuffer> buffer; // host-visible, host-coherent
-      VmaVirtualBlock block = nullptr; // VMA virtual allocator over buffer
-      void* mapped = nullptr; // persistent mapping
-      size_t capacity = 0; // bytes
-      size_t highWatermark = 0; // max used this frame (debug)
-      // Keep previous buffers + virtual blocks alive if we grow during the frame so earlier
-      // returned mapped pointers remain valid until the frame completes.
-      struct Retired
+      struct Page
       {
         std::unique_ptr<class ZVulkanBuffer> buffer;
-        VmaVirtualBlock block = nullptr;
+        void* mapped = nullptr; // persistent mapping
+        size_t capacity = 0; // bytes
+        size_t cursor = 0; // linear bump pointer for this frame
       };
-      std::vector<Retired> retiredBuffers;
+      std::vector<Page> pages;
+      size_t activePageIndex = 0; // index into the compact [0, usedPageCount) prefix
+      size_t usedPageCount = 0; // pages activated on the most recent frame-slot use
+      size_t usedBytes = 0; // aggregate bytes suballocated this frame
+      size_t highWatermark = 0; // aggregate peak suballocated bytes (debug/perf)
     } uploadArena;
 
     // Per-frame CPU->GPU uniform arena for dynamic UBO slices (host-visible,
@@ -1204,6 +1206,9 @@ private:
   void ensureStaticArenas();
   void ensureUniformArena(FrameResources& frame);
   void ensurePersistentUniformArena(FrameResources& frame);
+  FrameResources::UploadArena::Page*
+  activateUploadPage(FrameResources::UploadArena& arena, size_t minCapacity, std::string_view debugLabel);
+  void trimUnusedUploadPages(FrameResources::UploadArena& arena);
   // DDP indirect-count: ensure per-frame buffers exist
   void ensureDDPGatingResources(FrameResources& frame);
   // PPLL (exact OIT): ensure per-frame buffers exist

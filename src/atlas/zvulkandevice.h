@@ -3,6 +3,7 @@
 #include "zvulkan.h"
 #include "zvulkantexture.h"
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 
@@ -93,6 +94,11 @@ public:
     return m_deviceLocalPool;
   }
 
+  [[nodiscard]] vk::DeviceSize maxMemoryAllocationSize() const
+  {
+    return m_maxMemoryAllocationSize;
+  }
+
   // Utility to query a memory type index with required flags
   uint32_t findMemoryTypeIndex(VkMemoryPropertyFlags requiredFlags, VkMemoryPropertyFlags preferredFlags = 0) const;
 
@@ -113,6 +119,7 @@ private:
   VmaPool m_uploadTransientPool = nullptr;
   VmaPool m_uploadStagingPool = nullptr;
   VmaPool m_deviceLocalPool = nullptr;
+  vk::DeviceSize m_maxMemoryAllocationSize = std::numeric_limits<vk::DeviceSize>::max();
 };
 
 } // namespace nim

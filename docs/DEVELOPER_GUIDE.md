@@ -537,6 +537,10 @@ Vulkan Pipeline Invariants
 - Composite/resolve passes (DDP final, WA resolve, WB resolve) must write to exactly one color attachment; depth is disabled in the pipeline and no depth attachment is bound.
 - Descriptor writes during command-buffer recording are forbidden. All descriptor sets must be primed before recording begins; per-draw variation uses dynamic offsets and bindless indices.
 - Dynamic UBO arena (Vulkan): all per‑draw UBOs are suballocated from a per‑frame, host‑visible "uniform arena" buffer. Capacity is fixed for the frame; exceeding it is a hard CHECK. The backend provisions a baseline capacity (default 256 KiB) and will pre‑size above it when needed (based on a cheap pre‑record estimate). Growth within a frame is not supported (would invalidate already‑bound descriptors).
+- Dynamic upload arena (Vulkan): transient vertex/index staging uses a per-frame paged linear allocator over one or more persistently mapped host-visible upload buffers. Atlas rewinds page cursors only after the frame-completion safe point, so mapped pointers handed to a submission remain valid for that submission without retiring/replacing buffers mid-frame.
+  - Upload pages are reused across later submissions on the same frame slot via a compact active prefix, and unused tail pages are trimmed at the next safe slot reuse so one pathological peak frame does not keep gigabytes of mapped staging buffers alive forever.
+  - Page capacity is chosen with awareness of `VkPhysicalDeviceMaintenance3Properties::maxMemoryAllocationSize`; Atlas must not grow a single staging allocation past the device's per-allocation limit just because one frame briefly needs more upload space.
+  - `reserveUploadSlices(...)` may prepare a fresh page so a known sequence of suballocations can stay contiguous within one page, but very large sequences are still allowed to span pages rather than forcing a monolithic growth step.
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
 
 Performance Instrumentation
