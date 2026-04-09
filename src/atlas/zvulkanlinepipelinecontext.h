@@ -142,7 +142,32 @@ private:
   vk::Buffer m_wideIndexBuffer{};
 
   // Static promotion caches
-  struct ThinCacheKey
+  struct ThinGeometryCacheKey
+  {
+    uint64_t streamKey = 0;
+    bool lineStrip = false;
+    auto tie() const
+    {
+      return std::tuple(streamKey, lineStrip);
+    }
+    bool operator<(const ThinGeometryCacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+  struct ThinGeometryCacheEntry
+  {
+    Z3DRendererVulkanBackend::StaticSlice vbPos{};
+    Z3DRendererVulkanBackend::StaticSlice ib{};
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t positionsGen = 0;
+    uint32_t indexGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+    bool usedStaticOnce = false;
+  };
+  struct ThinAppearanceCacheKey
   {
     uint64_t streamKey = 0;
     bool picking = false;
@@ -151,30 +176,71 @@ private:
     {
       return std::tuple(streamKey, picking, lineStrip);
     }
-    bool operator<(const ThinCacheKey& rhs) const
+    bool operator<(const ThinAppearanceCacheKey& rhs) const
     {
       return tie() < rhs.tie();
     }
   };
-  struct ThinCacheEntry
+  struct ThinAppearanceCacheEntry
   {
-    // Separate static VBs for positions and colors
-    Z3DRendererVulkanBackend::StaticSlice vbPos{};
     Z3DRendererVulkanBackend::StaticSlice vbColor{};
     uint32_t vertexCount = 0;
-    Z3DRendererVulkanBackend::StaticSlice ib{}; // only for line strip
+    uint32_t colorsGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+    bool usedStaticOnce = false;
+  };
+  struct ThinPendingGeometryUploadBinding
+  {
+    Z3DRendererVulkanBackend::UploadSlice pos{};
+    Z3DRendererVulkanBackend::UploadSlice index{};
+    uint32_t vertexCount = 0;
     uint32_t indexCount = 0;
     uint32_t positionsGen = 0;
-    uint32_t colorsGen = 0; // picking or regular colors depending on pass
+    uint32_t indexGen = 0;
+  };
+  struct ThinPendingAppearanceUploadBinding
+  {
+    Z3DRendererVulkanBackend::UploadSlice color{};
+    uint32_t vertexCount = 0;
+    uint32_t colorsGen = 0;
+  };
+  std::map<ThinGeometryCacheKey, ThinGeometryCacheEntry> m_thinGeometryStaticCache;
+  std::map<ThinAppearanceCacheKey, ThinAppearanceCacheEntry> m_thinAppearanceStaticCache;
+  std::set<ThinGeometryCacheKey> m_thinGeometryStaticCopyPendingKeys;
+  std::set<ThinAppearanceCacheKey> m_thinAppearanceStaticCopyPendingKeys;
+  std::map<ThinGeometryCacheKey, ThinPendingGeometryUploadBinding> m_thinGeometryStaticCopyPendingUploads;
+  std::map<ThinAppearanceCacheKey, ThinPendingAppearanceUploadBinding> m_thinAppearanceStaticCopyPendingUploads;
+
+  struct WideGeometryCacheKey
+  {
+    uint64_t streamKey = 0;
+    auto tie() const
+    {
+      return std::tuple(streamKey);
+    }
+    bool operator<(const WideGeometryCacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+  struct WideGeometryCacheEntry
+  {
+    Z3DRendererVulkanBackend::StaticSlice vbP0{};
+    Z3DRendererVulkanBackend::StaticSlice vbP1{};
+    Z3DRendererVulkanBackend::StaticSlice vbFlags{};
+    Z3DRendererVulkanBackend::StaticSlice ib{};
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t p0Gen = 0;
+    uint32_t p1Gen = 0;
+    uint32_t flagsGen = 0;
     uint32_t indexGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
     bool usedStaticOnce = false;
   };
-  std::map<ThinCacheKey, ThinCacheEntry> m_thinStaticCache;
-  std::set<ThinCacheKey> m_thinStaticCopyPendingKeys;
-
-  struct WideCacheKey
+  struct WideAppearanceCacheKey
   {
     uint64_t streamKey = 0;
     bool picking = false;
@@ -182,35 +248,51 @@ private:
     {
       return std::tuple(streamKey, picking);
     }
-    bool operator<(const WideCacheKey& rhs) const
+    bool operator<(const WideAppearanceCacheKey& rhs) const
     {
       return tie() < rhs.tie();
     }
   };
-  struct WideCacheEntry
+  struct WideAppearanceCacheEntry
   {
-    // Static VBs per attribute (SoA)
-    Z3DRendererVulkanBackend::StaticSlice vbP0{};
-    Z3DRendererVulkanBackend::StaticSlice vbP1{};
     Z3DRendererVulkanBackend::StaticSlice vbC0{};
     Z3DRendererVulkanBackend::StaticSlice vbC1{};
-    Z3DRendererVulkanBackend::StaticSlice vbFlags{};
-    Z3DRendererVulkanBackend::StaticSlice ib{};
     uint32_t vertexCount = 0;
-    uint32_t indexCount = 0;
-    uint32_t p0Gen = 0;
-    uint32_t p1Gen = 0;
     uint32_t c0Gen = 0;
     uint32_t c1Gen = 0;
     uint32_t pickGen = 0;
-    uint32_t flagsGen = 0;
-    uint32_t indexGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
     bool usedStaticOnce = false;
   };
-  std::map<WideCacheKey, WideCacheEntry> m_wideStaticCache;
-  std::set<WideCacheKey> m_wideStaticCopyPendingKeys;
+  struct WidePendingGeometryUploadBinding
+  {
+    Z3DRendererVulkanBackend::UploadSlice p0{};
+    Z3DRendererVulkanBackend::UploadSlice p1{};
+    Z3DRendererVulkanBackend::UploadSlice flags{};
+    Z3DRendererVulkanBackend::UploadSlice index{};
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t p0Gen = 0;
+    uint32_t p1Gen = 0;
+    uint32_t flagsGen = 0;
+    uint32_t indexGen = 0;
+  };
+  struct WidePendingAppearanceUploadBinding
+  {
+    Z3DRendererVulkanBackend::UploadSlice c0{};
+    Z3DRendererVulkanBackend::UploadSlice c1{};
+    uint32_t vertexCount = 0;
+    uint32_t c0Gen = 0;
+    uint32_t c1Gen = 0;
+    uint32_t pickGen = 0;
+  };
+  std::map<WideGeometryCacheKey, WideGeometryCacheEntry> m_wideGeometryStaticCache;
+  std::map<WideAppearanceCacheKey, WideAppearanceCacheEntry> m_wideAppearanceStaticCache;
+  std::set<WideGeometryCacheKey> m_wideGeometryStaticCopyPendingKeys;
+  std::set<WideAppearanceCacheKey> m_wideAppearanceStaticCopyPendingKeys;
+  std::map<WideGeometryCacheKey, WidePendingGeometryUploadBinding> m_wideGeometryStaticCopyPendingUploads;
+  std::map<WideAppearanceCacheKey, WidePendingAppearanceUploadBinding> m_wideAppearanceStaticCopyPendingUploads;
 
   // Cached per-draw secondary command buffers (steady-state optimization).
   struct ThinSecondaryCacheKey

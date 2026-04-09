@@ -177,7 +177,35 @@ private:
   vk::DeviceSize m_ddpArgsOffset{0};
 
   // Static promotion cache
-  struct CacheKey
+  struct GeometryCacheKey
+  {
+    uint64_t streamKey = 0;
+    auto tie() const
+    {
+      return std::tuple(streamKey);
+    }
+    bool operator<(const GeometryCacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+  struct GeometryCacheEntry
+  {
+    Z3DRendererVulkanBackend::StaticSlice vbOrigin{};
+    Z3DRendererVulkanBackend::StaticSlice vbAxis{};
+    Z3DRendererVulkanBackend::StaticSlice vbFlags{};
+    Z3DRendererVulkanBackend::StaticSlice ib{};
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t baseGen = 0;
+    uint32_t axisGen = 0;
+    uint32_t flagsGen = 0;
+    uint32_t indexGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+    bool usedStaticOnce = false;
+  };
+  struct AppearanceCacheKey
   {
     uint64_t streamKey = 0;
     bool picking = false;
@@ -185,34 +213,54 @@ private:
     {
       return std::tuple(streamKey, picking);
     }
-    bool operator<(const CacheKey& rhs) const
+    bool operator<(const AppearanceCacheKey& rhs) const
     {
       return tie() < rhs.tie();
     }
   };
-  struct CacheEntry
+  struct AppearanceCacheEntry
   {
-    // Separate static buffers for each attribute stream
-    Z3DRendererVulkanBackend::StaticSlice vbOrigin{};
-    Z3DRendererVulkanBackend::StaticSlice vbAxis{};
-    Z3DRendererVulkanBackend::StaticSlice vbFlags{};
     Z3DRendererVulkanBackend::StaticSlice vbBaseColor{};
     Z3DRendererVulkanBackend::StaticSlice vbTopColor{};
-    Z3DRendererVulkanBackend::StaticSlice ib{};
     uint32_t vertexCount = 0;
-    uint32_t indexCount = 0;
-    // Last observed gens
-    uint32_t baseGen = 0, axisGen = 0, baseColorGen = 0, topColorGen = 0, pickingColorsGen = 0, flagsGen = 0,
-             indexGen = 0;
+    uint32_t baseColorGen = 0;
+    uint32_t topColorGen = 0;
+    uint32_t pickingColorsGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
     bool usedStaticOnce = false;
   };
-  std::map<CacheKey, CacheEntry> m_staticCache;
+  struct PendingGeometryUploadBinding
+  {
+    Z3DRendererVulkanBackend::UploadSlice origin{};
+    Z3DRendererVulkanBackend::UploadSlice axis{};
+    Z3DRendererVulkanBackend::UploadSlice flags{};
+    Z3DRendererVulkanBackend::UploadSlice index{};
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t baseGen = 0;
+    uint32_t axisGen = 0;
+    uint32_t flagsGen = 0;
+    uint32_t indexGen = 0;
+  };
+  struct PendingAppearanceUploadBinding
+  {
+    Z3DRendererVulkanBackend::UploadSlice baseColor{};
+    Z3DRendererVulkanBackend::UploadSlice topColor{};
+    uint32_t vertexCount = 0;
+    uint32_t baseColorGen = 0;
+    uint32_t topColorGen = 0;
+    uint32_t pickingColorsGen = 0;
+  };
+  std::map<GeometryCacheKey, GeometryCacheEntry> m_staticGeometryCache;
+  std::map<AppearanceCacheKey, AppearanceCacheEntry> m_staticAppearanceCache;
   // Guard: if we scheduled upload->static copies for a stream within the
-  // current submission, we must not bind the static buffers again until the
-  // next submission because copies are flushed after rendering ends.
-  std::set<CacheKey> m_staticCopyPendingKeys;
+  // current submission, later draws in the same submission must keep reusing
+  // those upload slices instead of rebinding stale statics.
+  std::set<GeometryCacheKey> m_geometryStaticCopyPendingKeys;
+  std::set<AppearanceCacheKey> m_appearanceStaticCopyPendingKeys;
+  std::map<GeometryCacheKey, PendingGeometryUploadBinding> m_geometryStaticCopyPendingUploads;
+  std::map<AppearanceCacheKey, PendingAppearanceUploadBinding> m_appearanceStaticCopyPendingUploads;
 
   // Cached per-draw secondary command buffers (steady-state optimization).
   struct SecondaryCacheKey

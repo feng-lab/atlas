@@ -260,6 +260,16 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
   QDir tmpdir(tempDirPath);
   QString targetFilename = QString("%1%2.png").arg(namePrefix).arg(frameIndex, fieldWidth, 10, QChar('0'));
   const QString targetFilepath = tmpdir.filePath(targetFilename);
+  std::vector<QString> tileFilesToDelete;
+  tileFilesToDelete.reserve(static_cast<size_t>(numCols) * static_cast<size_t>(numRows) *
+                            (screenshotType == Z3DScreenShotType::MonoView ? 1u : 2u));
+  auto removeComposedTiles = [&tileFilesToDelete]() {
+    for (const QString& tileFilepath : tileFilesToDelete) {
+      if (QFile::exists(tileFilepath) && !QFile::remove(tileFilepath)) {
+        LOG(WARNING) << "Failed to remove composed tile file: " << tileFilepath;
+      }
+    }
+  };
 
   ZImg img(ZImgInfo(width, height, 1, 4));
   img.infoRef().lastChannelIsAlphaChannel = true;
@@ -287,6 +297,7 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
                                                    .arg(tileStartY));
         if (QFileInfo::exists(filepath)) {
           img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, pasteY));
+          tileFilesToDelete.push_back(filepath);
         } else {
           LOG(ERROR) << "Could not find file: " << filepath;
         }
@@ -300,6 +311,7 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
                                                      .arg(tileStartY));
       if (QFileInfo::exists(leftFilepath)) {
         img.pasteImg(ZImg(leftFilepath), ZVoxelCoordinate(tileStartX, pasteY));
+        tileFilesToDelete.push_back(leftFilepath);
       } else {
         LOG(ERROR) << "Could not find left file: " << leftFilepath;
       }
@@ -311,6 +323,7 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
                                                       .arg(tileStartY));
       if (QFileInfo::exists(rightFilepath)) {
         rightImg.pasteImg(ZImg(rightFilepath), ZVoxelCoordinate(tileStartX, pasteY));
+        tileFilesToDelete.push_back(rightFilepath);
       } else {
         LOG(ERROR) << "Could not find right file: " << rightFilepath;
       }
@@ -325,6 +338,7 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
     } else {
       img.save(targetFilepath);
     }
+    removeComposedTiles();
     LOG(INFO) << fmt::format("Saved rendering ({}, {}) to file: {}", img.width(), img.height(), targetFilepath);
     co_return;
   }
@@ -335,6 +349,7 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
     } else {
       ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).save(targetFilepath);
     }
+    removeComposedTiles();
     LOG(INFO) << fmt::format("Saved stereo rendering ({} x 2, {}) to file: {}",
                              img.width(),
                              img.height(),
@@ -350,6 +365,7 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
   } else {
     ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).zoom(0.5, 1).save(targetFilepath);
   }
+  removeComposedTiles();
   LOG(INFO) << fmt::format("Saved half sbs stereo rendering ({}, {}) to file: {}",
                            img.width(),
                            img.height(),

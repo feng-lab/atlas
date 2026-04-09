@@ -121,7 +121,10 @@ void ZVulkanConePipelineContext::resetFrame()
   // uniform arena; keep them across submissions to stabilize dynamic offsets.
   m_ddpArgsPrepared = false;
   m_ddpArgsOffset = 0;
-  m_staticCopyPendingKeys.clear();
+  m_geometryStaticCopyPendingKeys.clear();
+  m_appearanceStaticCopyPendingKeys.clear();
+  m_geometryStaticCopyPendingUploads.clear();
+  m_appearanceStaticCopyPendingUploads.clear();
 }
 
 void ZVulkanConePipelineContext::evictStream(uint64_t streamKey)
@@ -130,15 +133,39 @@ void ZVulkanConePipelineContext::evictStream(uint64_t streamKey)
     return;
   }
 
-  for (auto it = m_staticCopyPendingKeys.begin(); it != m_staticCopyPendingKeys.end();) {
+  for (auto it = m_geometryStaticCopyPendingKeys.begin(); it != m_geometryStaticCopyPendingKeys.end();) {
     if (it->streamKey == streamKey) {
-      it = m_staticCopyPendingKeys.erase(it);
+      it = m_geometryStaticCopyPendingKeys.erase(it);
     } else {
       ++it;
     }
   }
 
-  for (auto it = m_staticCache.begin(); it != m_staticCache.end();) {
+  for (auto it = m_appearanceStaticCopyPendingKeys.begin(); it != m_appearanceStaticCopyPendingKeys.end();) {
+    if (it->streamKey == streamKey) {
+      it = m_appearanceStaticCopyPendingKeys.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto it = m_geometryStaticCopyPendingUploads.begin(); it != m_geometryStaticCopyPendingUploads.end();) {
+    if (it->first.streamKey == streamKey) {
+      it = m_geometryStaticCopyPendingUploads.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto it = m_appearanceStaticCopyPendingUploads.begin(); it != m_appearanceStaticCopyPendingUploads.end();) {
+    if (it->first.streamKey == streamKey) {
+      it = m_appearanceStaticCopyPendingUploads.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  for (auto it = m_staticGeometryCache.begin(); it != m_staticGeometryCache.end();) {
     if (it->first.streamKey != streamKey) {
       ++it;
       continue;
@@ -147,10 +174,19 @@ void ZVulkanConePipelineContext::evictStream(uint64_t streamKey)
     m_backend.releaseStaticSlice(entry.vbOrigin);
     m_backend.releaseStaticSlice(entry.vbAxis);
     m_backend.releaseStaticSlice(entry.vbFlags);
+    m_backend.releaseStaticSlice(entry.ib);
+    it = m_staticGeometryCache.erase(it);
+  }
+
+  for (auto it = m_staticAppearanceCache.begin(); it != m_staticAppearanceCache.end();) {
+    if (it->first.streamKey != streamKey) {
+      ++it;
+      continue;
+    }
+    auto& entry = it->second;
     m_backend.releaseStaticSlice(entry.vbBaseColor);
     m_backend.releaseStaticSlice(entry.vbTopColor);
-    m_backend.releaseStaticSlice(entry.ib);
-    it = m_staticCache.erase(it);
+    it = m_staticAppearanceCache.erase(it);
   }
 
   for (auto it = m_secondaryCache.begin(); it != m_secondaryCache.end();) {
@@ -956,66 +992,173 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
 
   CHECK(payload.axisAndTopRadius.size() == m_vertexCount && payload.flags.size() == m_vertexCount)
     << "Vulkan cone backend skipping batch: attribute buffers are incomplete.";
+  const size_t v4Bytes = m_vertexCount * sizeof(glm::vec4);
+  const size_t fBytes = m_vertexCount * sizeof(float);
+  const size_t idxBytes = m_indexCount * sizeof(uint32_t);
+  const bool hasStreamKey = payload.streamKey != 0;
+  const GeometryCacheKey geometryKey{payload.streamKey};
+  const AppearanceCacheKey appearanceKey{payload.streamKey, payload.pickingPass};
 
-  // Fast path: if this stream was promoted to device-local static buffers and
-  // nothing changed, bind the static buffers and skip per-frame staging/memcpy.
-  if (payload.streamKey != 0) {
-    CacheKey key{payload.streamKey, payload.pickingPass};
-    if (!m_staticCopyPendingKeys.contains(key)) {
-      auto it = m_staticCache.find(key);
-      if (it != m_staticCache.end()) {
-        CacheEntry& entry = it->second;
+  GeometryCacheEntry* boundGeometryStaticEntry = nullptr;
+  AppearanceCacheEntry* boundAppearanceStaticEntry = nullptr;
+  bool geometryBound = false;
+  bool appearanceBound = false;
+
+  auto bindGeometryStatic = [&](GeometryCacheEntry& entry) {
+    m_originBuffer = entry.vbOrigin.buffer;
+    m_axisBuffer = entry.vbAxis.buffer;
+    m_flagsBuffer = entry.vbFlags.buffer;
+    m_originOffset = entry.vbOrigin.offset;
+    m_axisOffset = entry.vbAxis.offset;
+    m_flagsOffset = entry.vbFlags.offset;
+    if (m_indexCount > 0) {
+      m_indexUploadBuffer = entry.ib.buffer;
+      m_indexUploadOffset = entry.ib.offset;
+    } else {
+      m_indexUploadBuffer = vk::Buffer{};
+      m_indexUploadOffset = 0;
+    }
+    boundGeometryStaticEntry = &entry;
+    geometryBound = true;
+  };
+  auto bindAppearanceStatic = [&](AppearanceCacheEntry& entry) {
+    m_baseColorBuffer = entry.vbBaseColor.buffer;
+    m_topColorBuffer = entry.vbTopColor.buffer;
+    m_baseColorOffset = entry.vbBaseColor.offset;
+    m_topColorOffset = entry.vbTopColor.offset;
+    boundAppearanceStaticEntry = &entry;
+    appearanceBound = true;
+  };
+
+  if (hasStreamKey) {
+    if (m_geometryStaticCopyPendingKeys.contains(geometryKey)) {
+      auto pendingIt = m_geometryStaticCopyPendingUploads.find(geometryKey);
+      if (pendingIt != m_geometryStaticCopyPendingUploads.end()) {
+        const PendingGeometryUploadBinding& pending = pendingIt->second;
+        const bool sizeSame = pending.vertexCount == m_vertexCount && pending.indexCount == m_indexCount;
+        const bool gensSame = pending.baseGen == payload.baseGen && pending.axisGen == payload.axisGen &&
+                              pending.flagsGen == payload.flagsGen && pending.indexGen == payload.indexGen;
+        const bool buffersOk = pending.origin.buffer && pending.axis.buffer && pending.flags.buffer &&
+                               ((m_indexCount == 0) || pending.index.buffer);
+        if (sizeSame && gensSame && buffersOk) {
+          m_originBuffer = pending.origin.buffer;
+          m_axisBuffer = pending.axis.buffer;
+          m_flagsBuffer = pending.flags.buffer;
+          m_originOffset = pending.origin.offset;
+          m_axisOffset = pending.axis.offset;
+          m_flagsOffset = pending.flags.offset;
+          if (m_indexCount > 0) {
+            m_indexUploadBuffer = pending.index.buffer;
+            m_indexUploadOffset = pending.index.offset;
+          } else {
+            m_indexUploadBuffer = vk::Buffer{};
+            m_indexUploadOffset = 0;
+          }
+          geometryBound = true;
+        }
+      }
+    }
+    if (!geometryBound && !m_geometryStaticCopyPendingKeys.contains(geometryKey)) {
+      auto it = m_staticGeometryCache.find(geometryKey);
+      if (it != m_staticGeometryCache.end()) {
+        GeometryCacheEntry& entry = it->second;
         const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
-        const bool shapeSame = (entry.baseGen == payload.baseGen) && (entry.axisGen == payload.axisGen) &&
-                               (entry.flagsGen == payload.flagsGen) && (entry.indexGen == payload.indexGen);
+        const bool gensSame = (entry.baseGen == payload.baseGen) && (entry.axisGen == payload.axisGen) &&
+                              (entry.flagsGen == payload.flagsGen) && (entry.indexGen == payload.indexGen);
+        if (entry.promoted && sizeSame && gensSame && entry.vbOrigin && entry.vbAxis && entry.vbFlags &&
+            (m_indexCount == 0 || entry.ib)) {
+          bindGeometryStatic(entry);
+        }
+      }
+    }
+
+    if (m_appearanceStaticCopyPendingKeys.contains(appearanceKey)) {
+      auto pendingIt = m_appearanceStaticCopyPendingUploads.find(appearanceKey);
+      if (pendingIt != m_appearanceStaticCopyPendingUploads.end()) {
+        const PendingAppearanceUploadBinding& pending = pendingIt->second;
+        const bool sizeSame = pending.vertexCount == m_vertexCount;
+        const bool colorsSame = payload.pickingPass ? (pending.pickingColorsGen == payload.pickingColorsGen)
+                                                    : ((pending.baseColorGen == payload.baseColorGen) &&
+                                                       (pending.topColorGen == payload.topColorGen));
+        const bool buffersOk = pending.baseColor.buffer && pending.topColor.buffer;
+        if (sizeSame && colorsSame && buffersOk) {
+          m_baseColorBuffer = pending.baseColor.buffer;
+          m_topColorBuffer = pending.topColor.buffer;
+          m_baseColorOffset = pending.baseColor.offset;
+          m_topColorOffset = pending.topColor.offset;
+          appearanceBound = true;
+        }
+      }
+    }
+    if (!appearanceBound && !m_appearanceStaticCopyPendingKeys.contains(appearanceKey)) {
+      auto it = m_staticAppearanceCache.find(appearanceKey);
+      if (it != m_staticAppearanceCache.end()) {
+        AppearanceCacheEntry& entry = it->second;
+        const bool sizeSame = entry.vertexCount == m_vertexCount;
         const bool colorsSame = payload.pickingPass ? (entry.pickingColorsGen == payload.pickingColorsGen)
                                                     : ((entry.baseColorGen == payload.baseColorGen) &&
                                                        (entry.topColorGen == payload.topColorGen));
-        if (entry.promoted && sizeSame && shapeSame && colorsSame && entry.vbOrigin && entry.vbAxis && entry.vbFlags &&
-            entry.vbBaseColor && entry.vbTopColor && (m_indexCount == 0 || entry.ib)) {
-          m_originBuffer = entry.vbOrigin.buffer;
-          m_axisBuffer = entry.vbAxis.buffer;
-          m_flagsBuffer = entry.vbFlags.buffer;
-          m_baseColorBuffer = entry.vbBaseColor.buffer;
-          m_topColorBuffer = entry.vbTopColor.buffer;
-          m_originOffset = entry.vbOrigin.offset;
-          m_axisOffset = entry.vbAxis.offset;
-          m_flagsOffset = entry.vbFlags.offset;
-          m_baseColorOffset = entry.vbBaseColor.offset;
-          m_topColorOffset = entry.vbTopColor.offset;
-          if (m_indexCount > 0) {
-            m_indexUploadBuffer = entry.ib.buffer;
-            m_indexUploadOffset = entry.ib.offset;
-          }
-          vulkan::pinStaticSlicesForActiveSubmission(
-            m_backend,
-            {&entry.vbOrigin, &entry.vbAxis, &entry.vbFlags, &entry.vbBaseColor, &entry.vbTopColor, &entry.ib});
-          m_usedStaticVBThisFrame = true;
-          entry.usedStaticOnce = true;
-          return;
+        if (entry.promoted && sizeSame && colorsSame && entry.vbBaseColor && entry.vbTopColor) {
+          bindAppearanceStatic(entry);
         }
       }
     }
   }
 
-  // Allocate SoA slices
-  const size_t v4Bytes = m_vertexCount * sizeof(glm::vec4);
-  const size_t fBytes = m_vertexCount * sizeof(float);
+  if (geometryBound && appearanceBound) {
+    if (boundGeometryStaticEntry != nullptr) {
+      vulkan::pinStaticSlicesForActiveSubmission(m_backend,
+                                                 {&boundGeometryStaticEntry->vbOrigin,
+                                                  &boundGeometryStaticEntry->vbAxis,
+                                                  &boundGeometryStaticEntry->vbFlags,
+                                                  &boundGeometryStaticEntry->ib});
+      boundGeometryStaticEntry->usedStaticOnce = true;
+    }
+    if (boundAppearanceStaticEntry != nullptr) {
+      vulkan::pinStaticSlicesForActiveSubmission(
+        m_backend,
+        {&boundAppearanceStaticEntry->vbBaseColor, &boundAppearanceStaticEntry->vbTopColor});
+      boundAppearanceStaticEntry->usedStaticOnce = true;
+    }
+    m_usedStaticVBThisFrame = (boundGeometryStaticEntry != nullptr) && (boundAppearanceStaticEntry != nullptr);
+    return;
+  }
+
+  const bool needGeometryUpload = !geometryBound;
+  const bool needAppearanceUpload = !appearanceBound;
+
   m_backend.reserveUploadSlices({
-    {v4Bytes,                         alignof(glm::vec4)},
-    {v4Bytes,                         alignof(glm::vec4)},
-    {fBytes,                          alignof(float)    },
-    {v4Bytes,                         alignof(glm::vec4)},
-    {v4Bytes,                         alignof(glm::vec4)},
-    {m_indexCount * sizeof(uint32_t), alignof(uint32_t) }
+    {needGeometryUpload ? v4Bytes : 0u,   alignof(glm::vec4)},
+    {needGeometryUpload ? v4Bytes : 0u,   alignof(glm::vec4)},
+    {needGeometryUpload ? fBytes : 0u,    alignof(float)    },
+    {needAppearanceUpload ? v4Bytes : 0u, alignof(glm::vec4)},
+    {needAppearanceUpload ? v4Bytes : 0u, alignof(glm::vec4)},
+    {needGeometryUpload ? idxBytes : 0u,  alignof(uint32_t) }
   });
-  VLOG(2) << "uploadGeometry allocating: v4Bytes=" << v4Bytes << " fBytes=" << fBytes
-          << " idxBytes=" << (m_indexCount * sizeof(uint32_t));
-  auto originSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
-  auto axisSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
-  auto flagsSlice = m_backend.suballocateUpload(fBytes, alignof(float));
-  auto baseColorSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
-  auto topColorSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+  VLOG(2) << "uploadGeometry allocating: needGeometry=" << needGeometryUpload
+          << " needAppearance=" << needAppearanceUpload << " v4Bytes=" << v4Bytes << " fBytes=" << fBytes
+          << " idxBytes=" << idxBytes;
+
+  Z3DRendererVulkanBackend::UploadSlice originSlice{};
+  Z3DRendererVulkanBackend::UploadSlice axisSlice{};
+  Z3DRendererVulkanBackend::UploadSlice flagsSlice{};
+  Z3DRendererVulkanBackend::UploadSlice baseColorSlice{};
+  Z3DRendererVulkanBackend::UploadSlice topColorSlice{};
+  Z3DRendererVulkanBackend::UploadSlice indexSlice{};
+
+  if (needGeometryUpload) {
+    originSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+    axisSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+    flagsSlice = m_backend.suballocateUpload(fBytes, alignof(float));
+  }
+  if (needAppearanceUpload) {
+    baseColorSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+    topColorSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+  }
+  if (needGeometryUpload && idxBytes > 0) {
+    indexSlice = m_backend.suballocateUpload(idxBytes, alignof(uint32_t));
+  }
+
   VLOG(2) << "Slices: origin(buf=" << static_cast<bool>(originSlice.buffer)
           << ", mapped=" << (originSlice.mapped != nullptr) << ") axis(buf=" << static_cast<bool>(axisSlice.buffer)
           << ", mapped=" << (axisSlice.mapped != nullptr) << ") flags(buf=" << static_cast<bool>(flagsSlice.buffer)
@@ -1024,74 +1167,71 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
           << ", mapped=" << (baseColorSlice.mapped != nullptr)
           << ") topColor(buf=" << static_cast<bool>(topColorSlice.buffer)
           << ", mapped=" << (topColorSlice.mapped != nullptr) << ")";
-  if (!originSlice.buffer || !originSlice.mapped || !axisSlice.buffer || !axisSlice.mapped || !flagsSlice.buffer ||
-      !flagsSlice.mapped || !baseColorSlice.buffer || !baseColorSlice.mapped || !topColorSlice.buffer ||
-      !topColorSlice.mapped) {
+  if ((needGeometryUpload &&
+       (!originSlice.buffer || !originSlice.mapped || !axisSlice.buffer || !axisSlice.mapped || !flagsSlice.buffer ||
+        !flagsSlice.mapped || (idxBytes > 0 && (!indexSlice.buffer || !indexSlice.mapped)))) ||
+      (needAppearanceUpload &&
+       (!baseColorSlice.buffer || !baseColorSlice.mapped || !topColorSlice.buffer || !topColorSlice.mapped))) {
     VLOG(2) << "uploadGeometry: one or more upload slices are invalid (null buffer or mapping). Aborting batch.";
     m_vertexCount = 0;
     m_indexCount = 0;
     return;
   }
-  VLOG(2) << "uploadGeometry: memcpy origins/axis (" << v4Bytes << " bytes each)";
-  auto* originOut = static_cast<glm::vec4*>(originSlice.mapped);
-  auto* axisOut = static_cast<glm::vec4*>(axisSlice.mapped);
-  auto* flagsOut = static_cast<float*>(flagsSlice.mapped);
-  auto* baseColorOut = static_cast<glm::vec4*>(baseColorSlice.mapped);
-  auto* topColorOut = static_cast<glm::vec4*>(topColorSlice.mapped);
-  std::memcpy(originOut, payload.baseAndRadius.data(), v4Bytes);
-  std::memcpy(axisOut, payload.axisAndTopRadius.data(), v4Bytes);
-  VLOG(2) << "uploadGeometry: filled origin/axis, writing flags/colors";
-  for (size_t i = 0; i < m_vertexCount; ++i) {
-    float flagsValue = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
-    // GL parity: keep flags encoding as produced by the GL path.
-    // - For cone.vert (8-vertex path), flags are encoded as (right<<8 | up<<4 | out)
-    // - For cone_2.vert (quad path), flags are encoded as (right<<4 | up)
-    flagsOut[i] = flagsValue;
-  }
-  if (payload.pickingPass) {
+
+  if (needGeometryUpload) {
+    VLOG(2) << "uploadGeometry: memcpy origins/axis (" << v4Bytes << " bytes each)";
+    auto* originOut = static_cast<glm::vec4*>(originSlice.mapped);
+    auto* axisOut = static_cast<glm::vec4*>(axisSlice.mapped);
+    auto* flagsOut = static_cast<float*>(flagsSlice.mapped);
+    std::memcpy(originOut, payload.baseAndRadius.data(), v4Bytes);
+    std::memcpy(axisOut, payload.axisAndTopRadius.data(), v4Bytes);
     for (size_t i = 0; i < m_vertexCount; ++i) {
-      glm::vec4 c = (i < payload.pickingColors.size()) ? payload.pickingColors[i] : glm::vec4(0.0f);
-      baseColorOut[i] = c;
-      topColorOut[i] = c;
+      flagsOut[i] = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
     }
-  } else {
-    for (size_t i = 0; i < m_vertexCount; ++i) {
-      glm::vec4 base = (i < payload.baseColors.size()) ? payload.baseColors[i] : glm::vec4(1.0f);
-      baseColorOut[i] = base;
-      glm::vec4 top = base;
-      if (!payload.sameColorForBaseAndTop && i < payload.topColors.size()) {
-        top = payload.topColors[i];
-      }
-      topColorOut[i] = top;
+    if (idxBytes > 0) {
+      std::memcpy(indexSlice.mapped, payload.indices.data(), idxBytes);
+    }
+    m_originBuffer = originSlice.buffer;
+    m_axisBuffer = axisSlice.buffer;
+    m_flagsBuffer = flagsSlice.buffer;
+    m_originOffset = originSlice.offset;
+    m_axisOffset = axisSlice.offset;
+    m_flagsOffset = flagsSlice.offset;
+    if (idxBytes > 0) {
+      m_indexUploadBuffer = indexSlice.buffer;
+      m_indexUploadOffset = indexSlice.offset;
+    } else {
+      m_indexUploadBuffer = vk::Buffer{};
+      m_indexUploadOffset = 0;
     }
   }
 
-  if (m_indexCount > 0) {
-    VLOG(2) << "uploadGeometry: allocating/staging indices bytes=" << (m_indexCount * sizeof(uint32_t));
-    auto iSlice = m_backend.suballocateUpload(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
-    if (iSlice.buffer && iSlice.mapped) {
-      std::memcpy(iSlice.mapped, payload.indices.data(), m_indexCount * sizeof(uint32_t));
-      m_indexUploadBuffer = iSlice.buffer;
-      m_indexUploadOffset = iSlice.offset;
-      VLOG(2) << "uploadGeometry: indices staged at offset=" << m_indexUploadOffset;
+  if (needAppearanceUpload) {
+    auto* baseColorOut = static_cast<glm::vec4*>(baseColorSlice.mapped);
+    auto* topColorOut = static_cast<glm::vec4*>(topColorSlice.mapped);
+    if (payload.pickingPass) {
+      for (size_t i = 0; i < m_vertexCount; ++i) {
+        const glm::vec4 c = (i < payload.pickingColors.size()) ? payload.pickingColors[i] : glm::vec4(0.0f);
+        baseColorOut[i] = c;
+        topColorOut[i] = c;
+      }
     } else {
-      VLOG(2) << "uploadGeometry: index upload slice invalid; drawing non-indexed";
-      m_indexCount = 0;
+      for (size_t i = 0; i < m_vertexCount; ++i) {
+        glm::vec4 base = (i < payload.baseColors.size()) ? payload.baseColors[i] : glm::vec4(1.0f);
+        baseColorOut[i] = base;
+        glm::vec4 top = base;
+        if (!payload.sameColorForBaseAndTop && i < payload.topColors.size()) {
+          top = payload.topColors[i];
+        }
+        topColorOut[i] = top;
+      }
     }
-  } else {
-    m_indexUploadBuffer = nullptr;
-    m_indexUploadOffset = 0;
+    m_baseColorBuffer = baseColorSlice.buffer;
+    m_topColorBuffer = topColorSlice.buffer;
+    m_baseColorOffset = baseColorSlice.offset;
+    m_topColorOffset = topColorSlice.offset;
   }
-  m_originBuffer = originSlice.buffer;
-  m_axisBuffer = axisSlice.buffer;
-  m_flagsBuffer = flagsSlice.buffer;
-  m_baseColorBuffer = baseColorSlice.buffer;
-  m_topColorBuffer = topColorSlice.buffer;
-  m_originOffset = originSlice.offset;
-  m_axisOffset = axisSlice.offset;
-  m_flagsOffset = flagsSlice.offset;
-  m_baseColorOffset = baseColorSlice.offset;
-  m_topColorOffset = topColorSlice.offset;
+
   auto bufToU64 = [](vk::Buffer b) {
     return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(b)));
   };
@@ -1101,245 +1241,249 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   VLOG(2) << "uploadGeometry: VB offsets origin=" << m_originOffset << " axis=" << m_axisOffset
           << " flags=" << m_flagsOffset << " baseCol=" << m_baseColorOffset << " topCol=" << m_topColorOffset;
 
-  // Attempt static promotion
-  {
-    CHECK(payload.streamKey != 0) << "Cone payload missing streamKey";
-    CacheKey key{payload.streamKey, payload.pickingPass};
-    auto it = m_staticCache.find(key);
-    const int kPromotionThreshold = 2;
-    const auto promoteToStatics = [&](CacheEntry& dstEntry) -> bool {
-      const size_t idxBytes = m_indexCount > 0 ? m_indexCount * sizeof(uint32_t) : 0u;
-      Z3DRendererVulkanBackend::UploadSlice idxUpload{};
-      const Z3DRendererVulkanBackend::UploadSlice* idxSrc = nullptr;
-      if (idxBytes > 0) {
-        if (!m_indexUploadBuffer) {
-          return false;
-        }
-        idxUpload = Z3DRendererVulkanBackend::UploadSlice{m_indexUploadBuffer, m_indexUploadOffset, nullptr, idxBytes};
-        idxSrc = &idxUpload;
+  if (hasStreamKey) {
+    auto rememberPendingGeometryUpload = [&]() {
+      if (!needGeometryUpload) {
+        return;
       }
+      PendingGeometryUploadBinding binding{};
+      binding.origin = originSlice;
+      binding.axis = axisSlice;
+      binding.flags = flagsSlice;
+      binding.index = indexSlice;
+      binding.vertexCount = static_cast<uint32_t>(m_vertexCount);
+      binding.indexCount = static_cast<uint32_t>(m_indexCount);
+      binding.baseGen = payload.baseGen;
+      binding.axisGen = payload.axisGen;
+      binding.flagsGen = payload.flagsGen;
+      binding.indexGen = payload.indexGen;
+      m_geometryStaticCopyPendingUploads[geometryKey] = binding;
+    };
+    auto rememberPendingAppearanceUpload = [&]() {
+      if (!needAppearanceUpload) {
+        return;
+      }
+      PendingAppearanceUploadBinding binding{};
+      binding.baseColor = baseColorSlice;
+      binding.topColor = topColorSlice;
+      binding.vertexCount = static_cast<uint32_t>(m_vertexCount);
+      binding.baseColorGen = payload.baseColorGen;
+      binding.topColorGen = payload.topColorGen;
+      binding.pickingColorsGen = payload.pickingColorsGen;
+      m_appearanceStaticCopyPendingUploads[appearanceKey] = binding;
+    };
 
+    const int kPromotionThreshold = 2;
+    auto promoteGeometryToStatics = [&](GeometryCacheEntry& entry) -> bool {
+      if (!needGeometryUpload) {
+        return false;
+      }
+      const Z3DRendererVulkanBackend::UploadSlice* idxSrc = idxBytes > 0 ? &indexSlice : nullptr;
       if (!vulkan::allocateAndScheduleStaticCopies(
             m_backend,
             {
-              {&dstEntry.vbOrigin,    &originSlice,    v4Bytes,  alignof(glm::vec4), false},
-              {&dstEntry.vbAxis,      &axisSlice,      v4Bytes,  alignof(glm::vec4), false},
-              {&dstEntry.vbFlags,     &flagsSlice,     fBytes,   alignof(float),     false},
-              {&dstEntry.vbBaseColor, &baseColorSlice, v4Bytes,  alignof(glm::vec4), false},
-              {&dstEntry.vbTopColor,  &topColorSlice,  v4Bytes,  alignof(glm::vec4), false},
-              {&dstEntry.ib,          idxSrc,          idxBytes, alignof(uint32_t),  true }
+              {&entry.vbOrigin, &originSlice, v4Bytes,  alignof(glm::vec4), false},
+              {&entry.vbAxis,   &axisSlice,   v4Bytes,  alignof(glm::vec4), false},
+              {&entry.vbFlags,  &flagsSlice,  fBytes,   alignof(float),     false},
+              {&entry.ib,       idxSrc,       idxBytes, alignof(uint32_t),  true }
       })) {
         return false;
       }
-
-      VLOG(1) << fmt::format("VK cone promote: origin={}B axis={}B flags={}B baseColor={}B topColor={}B idx={}B",
+      VLOG(1) << fmt::format("VK cone geometry promote: origin={}B axis={}B flags={}B idx={}B",
                              v4Bytes,
                              v4Bytes,
                              fBytes,
-                             v4Bytes,
-                             v4Bytes,
                              idxBytes);
       return true;
     };
-    if (it == m_staticCache.end()) {
-      CacheEntry entry{};
-      entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
-      entry.indexCount = static_cast<uint32_t>(m_indexCount);
-      entry.baseGen = payload.baseGen;
-      entry.axisGen = payload.axisGen;
-      entry.baseColorGen = payload.baseColorGen;
-      entry.topColorGen = payload.topColorGen;
-      entry.pickingColorsGen = payload.pickingColorsGen;
-      entry.flagsGen = payload.flagsGen;
-      entry.indexGen = payload.indexGen;
-      auto [inserted, _] = m_staticCache.emplace(key, entry);
-      CacheEntry& insertedEntry = inserted->second;
-
-      // UX: stage into device-local statics on first sight so steady-state
-      // frames can bind fast device-local buffers starting on the next frame.
-      if (promoteToStatics(insertedEntry)) {
-        insertedEntry.promoted = true;
-        insertedEntry.usedStaticOnce = false;
-        // Do not bind statics this frame; keep upload slices. Statics bind next frame.
-        m_staticCopyPendingKeys.insert(key);
-        return;
+    auto promoteAppearanceToStatics = [&](AppearanceCacheEntry& entry) -> bool {
+      if (!needAppearanceUpload) {
+        return false;
       }
-    } else {
-      CacheEntry& entry = it->second;
-      const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
-      const bool shapeSame = entry.baseGen == payload.baseGen && entry.axisGen == payload.axisGen &&
-                             entry.flagsGen == payload.flagsGen && entry.indexGen == payload.indexGen;
-      if (sizeSame && shapeSame) {
-        entry.unchangedFrames++;
-      } else {
-        entry.unchangedFrames = 0;
-      }
-
-      // A previous draw in this submission scheduled upload->static copies for
-      // this stream; do not bind statics until the next submission because the
-      // copies are flushed after rendering ends.
-      if (m_staticCopyPendingKeys.contains(key)) {
-        // Still update observed state so stability tracking stays correct.
-        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
-        entry.indexCount = static_cast<uint32_t>(m_indexCount);
-        entry.baseGen = payload.baseGen;
-        entry.axisGen = payload.axisGen;
-        entry.flagsGen = payload.flagsGen;
-        entry.indexGen = payload.indexGen;
-        entry.baseColorGen = payload.baseColorGen;
-        entry.topColorGen = payload.topColorGen;
-        entry.pickingColorsGen = payload.pickingColorsGen;
-        return;
-      }
-
-      // If the stream was previously promoted but the geometry sizes changed,
-      // drop the old static slices so this stream can promote again later.
-      if (entry.promoted && !sizeSame) {
-        vulkan::releaseStaticSlices(
-          m_backend,
-          {&entry.vbOrigin, &entry.vbAxis, &entry.vbFlags, &entry.vbBaseColor, &entry.vbTopColor, &entry.ib});
-        entry.promoted = false;
-        entry.usedStaticOnce = false;
-        entry.unchangedFrames = 0;
-        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
-        entry.indexCount = static_cast<uint32_t>(m_indexCount);
-        entry.baseGen = payload.baseGen;
-        entry.axisGen = payload.axisGen;
-        entry.flagsGen = payload.flagsGen;
-        entry.indexGen = payload.indexGen;
-        entry.baseColorGen = payload.baseColorGen;
-        entry.topColorGen = payload.topColorGen;
-        entry.pickingColorsGen = payload.pickingColorsGen;
-
-        // Recreate static slices immediately so the next steady frame can bind
-        // device-local buffers without a multi-frame warmup.
-        if (promoteToStatics(entry)) {
-          entry.promoted = true;
-          entry.usedStaticOnce = false;
-          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
-          m_staticCopyPendingKeys.insert(key);
-          return;
-        }
-        return;
-      }
-
-      if (entry.promoted && sizeSame) {
-        const bool baseColorChanged =
-          (entry.baseColorGen != payload.baseColorGen) || (entry.pickingColorsGen != payload.pickingColorsGen);
-        const bool topColorChanged = (!payload.sameColorForBaseAndTop && entry.topColorGen != payload.topColorGen) ||
-                                     (payload.sameColorForBaseAndTop && baseColorChanged);
-        const bool axisChanged = (entry.axisGen != payload.axisGen);
-        const bool originChanged = (entry.baseGen != payload.baseGen);
-        const bool flagsChanged = (entry.flagsGen != payload.flagsGen);
-        const bool indexChanged = (entry.indexGen != payload.indexGen) && (m_indexCount > 0) && m_indexUploadBuffer;
-        const bool anyChanged =
-          baseColorChanged || topColorChanged || axisChanged || originChanged || flagsChanged || indexChanged;
-
-        // If this stream is still changing before we've ever bound the static
-        // buffers, drop the statics and fall back to upload-only mode to avoid
-        // paying upload->device copies every frame without a benefit.
-        if (anyChanged && !entry.usedStaticOnce) {
-          vulkan::releaseStaticSlices(
+      if (!vulkan::allocateAndScheduleStaticCopies(
             m_backend,
-            {&entry.vbOrigin, &entry.vbAxis, &entry.vbFlags, &entry.vbBaseColor, &entry.vbTopColor, &entry.ib});
+            {
+              {&entry.vbBaseColor, &baseColorSlice, v4Bytes, alignof(glm::vec4), false},
+              {&entry.vbTopColor,  &topColorSlice,  v4Bytes, alignof(glm::vec4), false},
+      })) {
+        return false;
+      }
+      VLOG(1) << fmt::format("VK cone appearance promote: baseColor={}B topColor={}B", v4Bytes, v4Bytes);
+      return true;
+    };
+
+    {
+      auto [it, inserted] = m_staticGeometryCache.try_emplace(geometryKey);
+      GeometryCacheEntry& entry = it->second;
+      const uint32_t prevVertexCount = entry.vertexCount;
+      const uint32_t prevIndexCount = entry.indexCount;
+      const uint32_t prevBaseGen = entry.baseGen;
+      const uint32_t prevAxisGen = entry.axisGen;
+      const uint32_t prevFlagsGen = entry.flagsGen;
+      const uint32_t prevIndexGen = entry.indexGen;
+      const bool sizeSame = (prevVertexCount == m_vertexCount) && (prevIndexCount == m_indexCount);
+      const bool gensSame = (prevBaseGen == payload.baseGen) && (prevAxisGen == payload.axisGen) &&
+                            (prevFlagsGen == payload.flagsGen) && (prevIndexGen == payload.indexGen);
+      entry.unchangedFrames = (!inserted && sizeSame && gensSame) ? (entry.unchangedFrames + 1) : 0;
+
+      if (needGeometryUpload) {
+        if (m_geometryStaticCopyPendingKeys.contains(geometryKey)) {
+          rememberPendingGeometryUpload();
+        } else if (inserted) {
+          if (promoteGeometryToStatics(entry)) {
+            entry.promoted = true;
+            entry.usedStaticOnce = false;
+            m_geometryStaticCopyPendingKeys.insert(geometryKey);
+            rememberPendingGeometryUpload();
+          }
+        } else if (entry.promoted && !sizeSame) {
+          vulkan::releaseStaticSlices(m_backend, {&entry.vbOrigin, &entry.vbAxis, &entry.vbFlags, &entry.ib});
           entry.promoted = false;
           entry.usedStaticOnce = false;
           entry.unchangedFrames = 0;
-          entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
-          entry.indexCount = static_cast<uint32_t>(m_indexCount);
-          entry.baseGen = payload.baseGen;
-          entry.axisGen = payload.axisGen;
-          entry.flagsGen = payload.flagsGen;
-          entry.indexGen = payload.indexGen;
-          entry.baseColorGen = payload.baseColorGen;
-          entry.topColorGen = payload.topColorGen;
-          entry.pickingColorsGen = payload.pickingColorsGen;
-          return;
-        }
-
-        if (baseColorChanged) {
-          m_backend.scheduleStaticCopy(entry.vbBaseColor.buffer, entry.vbBaseColor.offset, baseColorSlice, false);
-        }
-        if (topColorChanged && entry.vbTopColor) {
-          m_backend.scheduleStaticCopy(entry.vbTopColor.buffer, entry.vbTopColor.offset, topColorSlice, false);
-        }
-        if (axisChanged) {
-          m_backend.scheduleStaticCopy(entry.vbAxis.buffer, entry.vbAxis.offset, axisSlice, false);
-        }
-        if (originChanged) {
-          m_backend.scheduleStaticCopy(entry.vbOrigin.buffer, entry.vbOrigin.offset, originSlice, false);
-        }
-        if (flagsChanged) {
-          m_backend.scheduleStaticCopy(entry.vbFlags.buffer, entry.vbFlags.offset, flagsSlice, false);
-        }
-        if (indexChanged) {
-          Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer,
-                                                        m_indexUploadOffset,
-                                                        nullptr,
-                                                        m_indexCount * sizeof(uint32_t)};
-          m_backend.scheduleStaticCopy(entry.ib.buffer, entry.ib.offset, iUpload, true);
-        }
-
-        // Cache the new observed gens immediately. Restaged buffers take effect
-        // on the next submission; this frame binds upload slices when anyChanged.
-        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
-        entry.indexCount = static_cast<uint32_t>(m_indexCount);
-        entry.baseGen = payload.baseGen;
-        entry.axisGen = payload.axisGen;
-        entry.flagsGen = payload.flagsGen;
-        entry.indexGen = payload.indexGen;
-        entry.baseColorGen = payload.baseColorGen;
-        entry.topColorGen = payload.topColorGen;
-        entry.pickingColorsGen = payload.pickingColorsGen;
-        if (!anyChanged) {
-          m_originBuffer = entry.vbOrigin.buffer;
-          m_axisBuffer = entry.vbAxis.buffer;
-          m_flagsBuffer = entry.vbFlags.buffer;
-          m_baseColorBuffer = entry.vbBaseColor.buffer;
-          m_topColorBuffer = entry.vbTopColor.buffer;
-          m_originOffset = entry.vbOrigin.offset;
-          m_axisOffset = entry.vbAxis.offset;
-          m_flagsOffset = entry.vbFlags.offset;
-          m_baseColorOffset = entry.vbBaseColor.offset;
-          m_topColorOffset = entry.vbTopColor.offset;
-          if (entry.indexCount > 0 && entry.ib) {
-            m_indexUploadBuffer = entry.ib.buffer;
-            m_indexUploadOffset = entry.ib.offset;
+          if (promoteGeometryToStatics(entry)) {
+            entry.promoted = true;
+            entry.usedStaticOnce = false;
+            m_geometryStaticCopyPendingKeys.insert(geometryKey);
+            rememberPendingGeometryUpload();
           }
-          vulkan::pinStaticSlicesForActiveSubmission(
-            m_backend,
-            {&entry.vbOrigin, &entry.vbAxis, &entry.vbFlags, &entry.vbBaseColor, &entry.vbTopColor, &entry.ib});
-          m_usedStaticVBThisFrame = true;
-          entry.usedStaticOnce = true;
-        } else {
-          // Defer promotion copies to the next frame; use upload slices now.
-          m_staticCopyPendingKeys.insert(key);
-          return;
+        } else if (entry.promoted && sizeSame) {
+          const bool originChanged = prevBaseGen != payload.baseGen;
+          const bool axisChanged = prevAxisGen != payload.axisGen;
+          const bool flagsChanged = prevFlagsGen != payload.flagsGen;
+          const bool indexChanged = (prevIndexGen != payload.indexGen) && (idxBytes > 0);
+          const bool anyChanged = originChanged || axisChanged || flagsChanged || indexChanged;
+          if (anyChanged && !entry.usedStaticOnce) {
+            vulkan::releaseStaticSlices(m_backend, {&entry.vbOrigin, &entry.vbAxis, &entry.vbFlags, &entry.ib});
+            entry.promoted = false;
+            entry.usedStaticOnce = false;
+            entry.unchangedFrames = 0;
+          } else if (anyChanged) {
+            if (originChanged) {
+              m_backend.scheduleStaticCopy(entry.vbOrigin.buffer, entry.vbOrigin.offset, originSlice, false);
+            }
+            if (axisChanged) {
+              m_backend.scheduleStaticCopy(entry.vbAxis.buffer, entry.vbAxis.offset, axisSlice, false);
+            }
+            if (flagsChanged) {
+              m_backend.scheduleStaticCopy(entry.vbFlags.buffer, entry.vbFlags.offset, flagsSlice, false);
+            }
+            if (indexChanged) {
+              m_backend.scheduleStaticCopy(entry.ib.buffer, entry.ib.offset, indexSlice, true);
+            }
+            m_geometryStaticCopyPendingKeys.insert(geometryKey);
+            rememberPendingGeometryUpload();
+          }
+        } else if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
+          if (promoteGeometryToStatics(entry)) {
+            entry.promoted = true;
+            entry.usedStaticOnce = false;
+            m_geometryStaticCopyPendingKeys.insert(geometryKey);
+            rememberPendingGeometryUpload();
+          }
+        } else if (m_geometryStaticCopyPendingKeys.contains(geometryKey)) {
+          rememberPendingGeometryUpload();
         }
-        return;
       }
 
-      // Not promoted: keep observed counts/gens up-to-date so unchangedFrames
-      // can reach the promotion threshold after a data change.
       entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
       entry.indexCount = static_cast<uint32_t>(m_indexCount);
       entry.baseGen = payload.baseGen;
       entry.axisGen = payload.axisGen;
       entry.flagsGen = payload.flagsGen;
       entry.indexGen = payload.indexGen;
+    }
+
+    {
+      auto [it, inserted] = m_staticAppearanceCache.try_emplace(appearanceKey);
+      AppearanceCacheEntry& entry = it->second;
+      const uint32_t prevVertexCount = entry.vertexCount;
+      const uint32_t prevBaseColorGen = entry.baseColorGen;
+      const uint32_t prevTopColorGen = entry.topColorGen;
+      const uint32_t prevPickingColorsGen = entry.pickingColorsGen;
+      const bool sizeSame = prevVertexCount == m_vertexCount;
+      const bool colorsSame =
+        payload.pickingPass ? (prevPickingColorsGen == payload.pickingColorsGen)
+                            : ((prevBaseColorGen == payload.baseColorGen) && (prevTopColorGen == payload.topColorGen));
+      entry.unchangedFrames = (!inserted && sizeSame && colorsSame) ? (entry.unchangedFrames + 1) : 0;
+
+      if (needAppearanceUpload) {
+        if (m_appearanceStaticCopyPendingKeys.contains(appearanceKey)) {
+          rememberPendingAppearanceUpload();
+        } else if (inserted) {
+          if (promoteAppearanceToStatics(entry)) {
+            entry.promoted = true;
+            entry.usedStaticOnce = false;
+            m_appearanceStaticCopyPendingKeys.insert(appearanceKey);
+            rememberPendingAppearanceUpload();
+          }
+        } else if (entry.promoted && !sizeSame) {
+          vulkan::releaseStaticSlices(m_backend, {&entry.vbBaseColor, &entry.vbTopColor});
+          entry.promoted = false;
+          entry.usedStaticOnce = false;
+          entry.unchangedFrames = 0;
+          if (promoteAppearanceToStatics(entry)) {
+            entry.promoted = true;
+            entry.usedStaticOnce = false;
+            m_appearanceStaticCopyPendingKeys.insert(appearanceKey);
+            rememberPendingAppearanceUpload();
+          }
+        } else if (entry.promoted && sizeSame) {
+          const bool baseColorChanged = payload.pickingPass ? (prevPickingColorsGen != payload.pickingColorsGen)
+                                                            : (prevBaseColorGen != payload.baseColorGen);
+          const bool topColorChanged =
+            payload.pickingPass ? (prevPickingColorsGen != payload.pickingColorsGen)
+                                : ((!payload.sameColorForBaseAndTop && prevTopColorGen != payload.topColorGen) ||
+                                   (payload.sameColorForBaseAndTop && baseColorChanged));
+          const bool anyChanged = baseColorChanged || topColorChanged;
+          if (anyChanged && !entry.usedStaticOnce) {
+            vulkan::releaseStaticSlices(m_backend, {&entry.vbBaseColor, &entry.vbTopColor});
+            entry.promoted = false;
+            entry.usedStaticOnce = false;
+            entry.unchangedFrames = 0;
+          } else if (anyChanged) {
+            if (baseColorChanged) {
+              m_backend.scheduleStaticCopy(entry.vbBaseColor.buffer, entry.vbBaseColor.offset, baseColorSlice, false);
+            }
+            if (topColorChanged) {
+              m_backend.scheduleStaticCopy(entry.vbTopColor.buffer, entry.vbTopColor.offset, topColorSlice, false);
+            }
+            m_appearanceStaticCopyPendingKeys.insert(appearanceKey);
+            rememberPendingAppearanceUpload();
+          }
+        } else if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
+          if (promoteAppearanceToStatics(entry)) {
+            entry.promoted = true;
+            entry.usedStaticOnce = false;
+            m_appearanceStaticCopyPendingKeys.insert(appearanceKey);
+            rememberPendingAppearanceUpload();
+          }
+        } else if (m_appearanceStaticCopyPendingKeys.contains(appearanceKey)) {
+          rememberPendingAppearanceUpload();
+        }
+      }
+
+      entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
       entry.baseColorGen = payload.baseColorGen;
       entry.topColorGen = payload.topColorGen;
       entry.pickingColorsGen = payload.pickingColorsGen;
-
-      if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
-        if (promoteToStatics(entry)) {
-          entry.promoted = true;
-          entry.usedStaticOnce = false;
-          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
-          m_staticCopyPendingKeys.insert(key);
-        }
-      }
     }
+
+    if (boundGeometryStaticEntry != nullptr) {
+      vulkan::pinStaticSlicesForActiveSubmission(m_backend,
+                                                 {&boundGeometryStaticEntry->vbOrigin,
+                                                  &boundGeometryStaticEntry->vbAxis,
+                                                  &boundGeometryStaticEntry->vbFlags,
+                                                  &boundGeometryStaticEntry->ib});
+      boundGeometryStaticEntry->usedStaticOnce = true;
+    }
+    if (boundAppearanceStaticEntry != nullptr) {
+      vulkan::pinStaticSlicesForActiveSubmission(
+        m_backend,
+        {&boundAppearanceStaticEntry->vbBaseColor, &boundAppearanceStaticEntry->vbTopColor});
+      boundAppearanceStaticEntry->usedStaticOnce = true;
+    }
+    m_usedStaticVBThisFrame = (boundGeometryStaticEntry != nullptr) && (boundAppearanceStaticEntry != nullptr);
   }
 }
 

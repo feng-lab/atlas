@@ -146,7 +146,37 @@ private:
   std::unordered_map<void*, FrameUboCache> m_uboCacheByFrameKey;
 
   // Static promotion cache
-  struct CacheKey
+  struct GeometryCacheKey
+  {
+    uint64_t streamKey = 0;
+    auto tie() const
+    {
+      return std::tuple(streamKey);
+    }
+    bool operator<(const GeometryCacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+  struct GeometryCacheEntry
+  {
+    Z3DRendererVulkanBackend::StaticSlice vbAxis1{};
+    Z3DRendererVulkanBackend::StaticSlice vbAxis2{};
+    Z3DRendererVulkanBackend::StaticSlice vbAxis3{};
+    Z3DRendererVulkanBackend::StaticSlice vbCenter{};
+    Z3DRendererVulkanBackend::StaticSlice vbFlags{};
+    Z3DRendererVulkanBackend::StaticSlice ib{};
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t centersGen = 0;
+    uint32_t axesGen = 0;
+    uint32_t flagsGen = 0;
+    uint32_t indexGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+    bool usedStaticOnce = false;
+  };
+  struct AppearanceCacheKey
   {
     uint64_t streamKey = 0;
     bool picking = false;
@@ -155,36 +185,56 @@ private:
     {
       return std::tuple(streamKey, picking, dynamicMaterial);
     }
-    bool operator<(const CacheKey& rhs) const
+    bool operator<(const AppearanceCacheKey& rhs) const
     {
       return tie() < rhs.tie();
     }
   };
-  struct CacheEntry
+  struct AppearanceCacheEntry
   {
-    // Separate static buffers per attribute stream
-    Z3DRendererVulkanBackend::StaticSlice vbAxis1{};
-    Z3DRendererVulkanBackend::StaticSlice vbAxis2{};
-    Z3DRendererVulkanBackend::StaticSlice vbAxis3{};
-    Z3DRendererVulkanBackend::StaticSlice vbCenter{};
     Z3DRendererVulkanBackend::StaticSlice vbColor{};
-    Z3DRendererVulkanBackend::StaticSlice vbFlags{};
     Z3DRendererVulkanBackend::StaticSlice vbSpecular{};
-    Z3DRendererVulkanBackend::StaticSlice ib{};
     uint32_t vertexCount = 0;
-    uint32_t indexCount = 0;
-    // Last observed gens
-    uint32_t centersGen = 0, axesGen = 0, colorsGen = 0, pickingColorsGen = 0, specularGen = 0, flagsGen = 0,
-             indexGen = 0;
+    uint32_t colorsGen = 0;
+    uint32_t pickingColorsGen = 0;
+    uint32_t specularGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
     bool usedStaticOnce = false;
   };
-  std::map<CacheKey, CacheEntry> m_staticCache;
+  struct PendingGeometryUploadBinding
+  {
+    Z3DRendererVulkanBackend::UploadSlice axis1{};
+    Z3DRendererVulkanBackend::UploadSlice axis2{};
+    Z3DRendererVulkanBackend::UploadSlice axis3{};
+    Z3DRendererVulkanBackend::UploadSlice center{};
+    Z3DRendererVulkanBackend::UploadSlice flags{};
+    Z3DRendererVulkanBackend::UploadSlice index{};
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t centersGen = 0;
+    uint32_t axesGen = 0;
+    uint32_t flagsGen = 0;
+    uint32_t indexGen = 0;
+  };
+  struct PendingAppearanceUploadBinding
+  {
+    Z3DRendererVulkanBackend::UploadSlice color{};
+    Z3DRendererVulkanBackend::UploadSlice specular{};
+    uint32_t vertexCount = 0;
+    uint32_t colorsGen = 0;
+    uint32_t pickingColorsGen = 0;
+    uint32_t specularGen = 0;
+  };
+  std::map<GeometryCacheKey, GeometryCacheEntry> m_staticGeometryCache;
+  std::map<AppearanceCacheKey, AppearanceCacheEntry> m_staticAppearanceCache;
   // Guard: if we scheduled upload->static copies for a stream within the
-  // current submission, we must not bind the static buffers again until the
-  // next submission because copies are flushed after rendering ends.
-  std::set<CacheKey> m_staticCopyPendingKeys;
+  // current submission, later draws in the same submission must keep reusing
+  // those upload slices instead of rebinding stale statics.
+  std::set<GeometryCacheKey> m_geometryStaticCopyPendingKeys;
+  std::set<AppearanceCacheKey> m_appearanceStaticCopyPendingKeys;
+  std::map<GeometryCacheKey, PendingGeometryUploadBinding> m_geometryStaticCopyPendingUploads;
+  std::map<AppearanceCacheKey, PendingAppearanceUploadBinding> m_appearanceStaticCopyPendingUploads;
 
   // Cached per-draw secondary command buffers (steady-state optimization).
   // Keyed by frame-slot identity + stream identity, since descriptor sets

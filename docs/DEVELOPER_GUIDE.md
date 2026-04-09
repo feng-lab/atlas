@@ -552,6 +552,12 @@ Vulkan Pipeline Invariants
   - Picking changes per-draw material/fallback colors only. It must not duplicate device-local mesh vertex/index buffers or re-stage the same immutable geometry a second time in the same submission.
   - When one pass in the current submission has already staged upload slices for a promoted mesh stream, later passes with the same immutable stream reuse those upload slices until the deferred upload->static copies flush at submission end. This avoids double-staging the same mesh stream before the static buffers become bindable on the next submission.
   - Size-changing mesh streams keep their old static buffers alive instead of tearing them down immediately. Atlas renders the latest geometry from upload slices while a replacement static version is copied in under a bounded per-submission budget, then swaps to that replacement only after the deferred copy completes. This avoids repeated whole-stream rebuild spikes while progressive mesh content is still converging.
+- Line/cone/sphere/ellipsoid static promotion caches (Vulkan): these SoA pipelines split promoted state into a geometry cache and an appearance cache.
+  - Geometry cache keys are pass-invariant and exclude `picking`, so immutable streams like axes, centers, radii, flags, and indices are shared between normal and picking passes.
+  - Thin lines keep `lineStrip` in both geometry and appearance keys because the topology and synthetic index stream differ between strip and segment draws.
+  - Appearance cache keys still keep `picking` and any material-layout dimension (for example `dynamicMaterial`) because those streams genuinely differ between passes.
+  - Draws may bind mixed sources in one submission: static geometry with upload-backed appearance, upload-backed geometry with static appearance, or both static. This preserves correctness while avoiding duplicate geometry uploads during picking warmup.
+  - If one pass in the current submission has already queued upload->static copies for a geometry or appearance key, later passes reuse the remembered upload slices for that key until the deferred copies flush. This avoids rebinding stale statics or restaging the same sub-stream twice before the next submission.
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
 
 Performance Instrumentation
