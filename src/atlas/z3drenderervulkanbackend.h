@@ -1371,6 +1371,11 @@ public:
       m_activeFrame->meshesBytesStaged += bytes;
     }
   }
+  [[nodiscard]] size_t meshBytesStagedThisFrame() const
+  {
+    CHECK(m_activeFrame != nullptr) << "meshBytesStagedThisFrame requires an active frame";
+    return m_activeFrame->meshesBytesStaged;
+  }
   void addSphereBytesStaged(size_t bytes)
   {
     if (m_activeFrame) {

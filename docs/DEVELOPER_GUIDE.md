@@ -544,6 +544,7 @@ Vulkan Pipeline Invariants
 - Mesh static promotion cache (Vulkan): promoted mesh SoA buffers are keyed by immutable stream identity (`streamKey`) plus vertex payload layout (`colorSource`), not by whether the current draw is a picking pass.
   - Picking changes per-draw material/fallback colors only. It must not duplicate device-local mesh vertex/index buffers or re-stage the same immutable geometry a second time in the same submission.
   - When one pass in the current submission has already staged upload slices for a promoted mesh stream, later passes with the same immutable stream reuse those upload slices until the deferred upload->static copies flush at submission end. This avoids double-staging the same mesh stream before the static buffers become bindable on the next submission.
+  - Size-changing mesh streams keep their old static buffers alive instead of tearing them down immediately. Atlas renders the latest geometry from upload slices while a replacement static version is copied in under a bounded per-submission budget, then swaps to that replacement only after the deferred copy completes. This avoids repeated whole-stream rebuild spikes while progressive mesh content is still converging.
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
 
 Performance Instrumentation

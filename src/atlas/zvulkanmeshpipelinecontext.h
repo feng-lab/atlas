@@ -137,17 +137,46 @@ private:
 
     uint32_t vertexCount = 0;
     uint32_t indexCount = 0;
-    // Last observed generation counters
+    // Active promoted static-buffer metadata.
     uint32_t posGen = 0, normGen = 0, colorGen = 0, texGen = 0, indexGen = 0;
+    // Latest observed stream state. This can differ from the active static
+    // buffers while a larger replacement is being streamed in.
+    uint32_t latestVertexCount = 0;
+    uint32_t latestIndexCount = 0;
+    uint32_t latestPosGen = 0, latestNormGen = 0, latestColorGen = 0, latestTexGen = 0, latestIndexGen = 0;
     // Promotion
     int unchangedFrames = 0;
     bool promoted = false;
     bool usedStaticOnce = false;
+
+    struct PendingReplacement
+    {
+      Z3DRendererVulkanBackend::StaticSlice vbPos{};
+      Z3DRendererVulkanBackend::StaticSlice vbNorm{};
+      Z3DRendererVulkanBackend::StaticSlice vbColor{};
+      Z3DRendererVulkanBackend::StaticSlice vbTex{};
+      bool hasTex = false;
+      Z3DRendererVulkanBackend::StaticSlice ib{};
+
+      uint32_t vertexCount = 0;
+      uint32_t indexCount = 0;
+      uint32_t posGen = 0, normGen = 0, colorGen = 0, texGen = 0, indexGen = 0;
+
+      size_t posCopiedBytes = 0;
+      size_t normCopiedBytes = 0;
+      size_t colorCopiedBytes = 0;
+      size_t texCopiedBytes = 0;
+      size_t indexCopiedBytes = 0;
+
+      bool allocated = false;
+      bool readyToActivate = false;
+    } replacement;
   };
   std::map<CacheKey, CacheEntry> m_staticCache;
-  // Guard: if we scheduled upload->static copies for a stream within the
-  // current submission, we must not bind the static buffers again until the
-  // next submission because copies are flushed after rendering ends.
+  // Guard: if a stream is using upload slices in the current submission
+  // (because we just staged it, queued a static copy, or are building a
+  // replacement), later passes in the same submission must reuse those upload
+  // slices instead of rebinding stale statics or re-staging the stream.
   std::set<CacheKey> m_staticCopyPendingKeys;
   struct PendingUploadBinding
   {

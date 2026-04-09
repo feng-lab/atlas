@@ -67,6 +67,7 @@ inline bool allocateAndScheduleStaticCopies(Z3DRendererVulkanBackend& backend,
     }
     CHECK(plan.dst != nullptr);
     CHECK(plan.src != nullptr);
+    backend.pinStaticSliceForActiveSubmission(*plan.dst);
     backend.scheduleStaticCopy(plan.dst->buffer, plan.dst->offset, *plan.src, plan.isIndexBuffer);
   }
 
